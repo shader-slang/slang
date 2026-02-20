@@ -7,25 +7,22 @@ so it does not imply dynamic dispatch.
 
 @category neural
 */
-public interface ILayer<T, InputVector, OutputVector, Storage, Layout, Activation>
+public interface ILayer<T, InputVector, OutputVector, Layout, Activation>
     where T : __BuiltinFloatingPointType
     where T.Differential == T
-    where Storage : IStorage<T>
     where Layout : IStorageLayout
     where InputVector : IVector<T>
     where OutputVector : IVector<T>
     where Activation : IActivation<T>
 {
     /// Forward evaluation: y = f(x).
-    /// Storage is passed as parameter to enable autodiff gradient routing.
-    /// Method-level generic `S` is required for `linearTransform` constraints.
-    /// @param storage Weight/bias storage (primal for forward, gradient for backward via autodiff).
+    /// Address is passed as parameter to enable autodiff gradient routing.
     /// @param input Input vector.
+    /// @param weightAddress Weight address (pointer-like).
+    /// @param biasAddress Bias address (pointer-like). Pass `none` if no bias.
     /// @return Output vector.
     [Differentiable]
-    public OutputVector eval<S>(S storage, InputVector input)
-        where S : IStorage<T>
-        where S.Differential : IStorage<T.Differential>
-        where S.Address == S.Differential.Address
-        where S.Address == Storage.Address;
+    public OutputVector eval<A>(InputVector input, A weightAddress, Optional<A> biasAddress = none)
+        where A : IPointerLikeAddress<T>
+        where A.Differential : IPointerLikeAddress<T.Differential>;
 }

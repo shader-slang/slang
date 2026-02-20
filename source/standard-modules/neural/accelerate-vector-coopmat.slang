@@ -263,14 +263,13 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
     // we can consider using more than one warp in the future.
     [ForceInline]
     [require(cooperative_matrix, subgroup_basic)]
-    internal static void matALoadStore<U, Storage, bool isStore = false>(
+    internal static void matALoadStore<U, Address, bool isStore = false>(
         SPtr<uint4> sharedMemory,
         int tileIndex,
-        Storage weightStorage,
-        Storage.Address weightAddress)
+        Address weightAddress)
             where U : __BuiltinFloatingPointType
             where U.Differential == U
-            where Storage : IStorage<U>
+            where Address : IPointerLikeAddress<U>
     {
         uint indexInVectorizedTile = WaveGetLaneIndex();
 
@@ -293,7 +292,6 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
         // tx and ty are the 2-D coordinate of scalar tile.
         // row coordinate ty is the same between vectorized tile and original tile.
         // column coordinate tx needs to be scaled by ElementCountPerVector to get the actual column coordinate in original data type.
-
         uint2 coordInWeight = vectorizedTileCoordToWeightCoord<elementCountPerVector>(coordInTile, tileIndex);
 
         uint4 value;
@@ -306,7 +304,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
                 break;
             // Given the coordinate inside the tile and the tile index, we can get the index in weight matrix.
             // Note, we always treat row of matrix A as uint4 aligned, so always calculate 'indexInWeight' as if it's uint4 aligned.
-            // though it might not. But IStorage.readUint4() will handle the padding.
+            // though it might not. But readUint4() will handle the padding.
             // We only need to provide the actual boundary and the aligned boundary.
             indexInWeight = flattenedIndex<K>(coordInWeight);
 
@@ -324,11 +322,10 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
                 }
                 else
                 {
-                    let offsetAddress = Storage.getOffset(weightAddress, indexInWeight);
-                    // Though the weight matrix is not necessarily aligned with the uint4 vector size, readUnit4() will handle the padding
+                    // Though the weight matrix is not necessarily aligned with the uint4 vector size, readUint4() will handle the padding
                     // if the reading is cross the boundary of the uint4 vector size.
                     // MatA can only be half type, so we can always read it as half type no matter what the data type of the weight matrix is.
-                    value = weightStorage.readUint4<half, TileInfo.IsAlignedVector, K>(weightAddress, offsetAddress);
+                    value = weightAddress.readUint4<half, TileInfo.IsAlignedVector, K>(int(indexInWeight));
                 }
 
                 sharedMemory[indexInVectorizedTile] = value;
@@ -340,9 +337,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
                 if (!isOutOfRange)
                 {
                     value = sharedMemory[indexInVectorizedTile];
-                    let offsetAddress = Storage.getOffset(weightAddress, indexInWeight);
-
-                    weightStorage.writeUint4Atomic<T, TileInfo.IsAlignedVector, K>(weightAddress, offsetAddress, value);
+                    weightAddress.writeUint4Atomic<T, TileInfo.IsAlignedVector, K>(int(indexInWeight), value);
                 }
             }
 
@@ -359,30 +354,28 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
 
     [ForceInline]
     [require(cooperative_matrix, subgroup_basic)]
-    VISIBILITY_LEVEL static void loadShA<U, Storage>(
+    VISIBILITY_LEVEL static void loadShA<U, Address>(
         SPtr<uint4> sharedMemory,
         int tileIndex,
-        Storage weightStorage,
-        Storage.Address weightAddress)
+        Address weightAddress)
             where U : __BuiltinFloatingPointType
             where U.Differential == U
-            where Storage : IStorage<U>
+            where Address : IPointerLikeAddress<U>
     {
-        matALoadStore<U, Storage, false>(sharedMemory, tileIndex, weightStorage, weightAddress);
+        matALoadStore<U, Address, false>(sharedMemory, tileIndex, weightAddress);
     }
 
     [ForceInline]
     [require(cooperative_matrix, subgroup_basic)]
-    VISIBILITY_LEVEL static void storeShA<U, Storage>(
+    VISIBILITY_LEVEL static void storeShA<U, Address>(
         SPtr<uint4> sharedMemory,
         int tileIndex,
-        Storage weightStorage,
-        Storage.Address weightAddress)
+        Address weightAddress)
             where U : __BuiltinFloatingPointType
             where U.Differential == U
-            where Storage : IStorage<U>
+            where Address : IPointerLikeAddress<U>
     {
-        matALoadStore<U, Storage, true>(sharedMemory, tileIndex, weightStorage, weightAddress);
+        matALoadStore<U, Address, true>(sharedMemory, tileIndex, weightAddress);
     }
 
     [ForceInline]
@@ -703,20 +696,18 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
     // @param sharedMemory Shared memory containing partial sums from each warp
     // @param subgroupId Current warp index
     // @param subgroupCount Total number of warps
-    // @param biasStorage Storage for bias gradient
-    // @param biasAddress Base address in bias storage
+    // @param biasAddress Pointer-like address for bias gradient
     // @param MPadded M rounded up to even (for half2 alignment)
     // @param ColsPacked Number of packed pairs per warp (MPadded / 2)
     [ForceInline]
-    static void crossWarpReduceAndAtomicWrite<U, Storage, int MPadded, int ColsPacked>(
+    static void crossWarpReduceAndAtomicWrite<U, Address, int MPadded, int ColsPacked>(
         SPtr<uint4> sharedMemory,
         int subgroupId,
         int subgroupCount,
-        Storage biasStorage,
-        Storage.Address biasAddress)
+        Address biasAddress)
         where U : __BuiltinFloatingPointType
         where U.Differential == U
-        where Storage : IStorage<U>
+        where Address : IPointerLikeAddress<U>
     {
         const uint laneId = WaveGetLaneIndex();
         const int NUM_VECTORS = subgroupCount * N;
@@ -755,15 +746,15 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
                     if (elemIdx1 < M)
                     {
                         // Both elements are valid - use vector<half, 2> atomic
+                        // TODO: vector<U,2> atomicAdd needs to be added to IPointerLikeAddress
                         vector<U, 2> sum_v2 = vector<U, 2>(U(sum0), U(sum1));
-                        let addr = Storage.getOffset(biasAddress, elemIdx0);
-                        biasStorage.atomicAdd(addr, sum_v2);
+                        let addr = biasAddress.getOffset(elemIdx0);
+                        addr.atomicAdd(0u, sum_v2);
                     }
                     else if (elemIdx0 < M)
                     {
                         // Only first element is valid (M is odd)
-                        let addr = Storage.getOffset(biasAddress, elemIdx0);
-                        biasStorage.atomicAdd(addr, U(sum0));
+                        biasAddress.atomicAdd(uint(elemIdx0), U(sum0));
                     }
                 }
 
@@ -795,13 +786,11 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
 
                     if (elemIdx0 < M)
                     {
-                        let addr0 = Storage.getOffset(biasAddress, elemIdx0);
-                        biasStorage.atomicAdd(addr0, sum0);
+                        biasAddress.atomicAdd(uint(elemIdx0), sum0);
                     }
                     if (elemIdx1 < M)
                     {
-                        let addr1 = Storage.getOffset(biasAddress, elemIdx1);
-                        biasStorage.atomicAdd(addr1, sum1);
+                        biasAddress.atomicAdd(uint(elemIdx1), sum1);
                     }
                 }
 
@@ -820,15 +809,14 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
     [ForceInline]
     [require(cuda_spirv, subgroup_partitioned)]
     [require(cuda_spirv, sm_6_6)]
-    VISIBILITY_LEVEL static void sumReduceRows<U, Storage, InArrayType>(
+    VISIBILITY_LEVEL static void sumReduceRows<U, Address, InArrayType>(
         SPtr<uint4> sharedMemory,
         in InArrayType dOut,
         in int subgroupId,
-        Storage biasStorage,
-        Storage.Address biasAddress)
+        Address biasAddress)
         where U : __BuiltinFloatingPointType
         where U.Differential == U
-        where Storage : IStorage<U>
+        where Address : IPointerLikeAddress<U>
         where InArrayType : IArrayAccessor<U>
     {
         const uint laneId = WaveGetLaneIndex();
@@ -868,23 +856,22 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
         GroupMemoryBarrierWithGroupSync();
 
         // Phase 3: Cross-warp reduction and atomic write
-        crossWarpReduceAndAtomicWrite<U, Storage, MPadded, ColsPacked>(
-            sharedMemory, subgroupId, subgroupCount, biasStorage, biasAddress);
+        crossWarpReduceAndAtomicWrite<U, Address, MPadded, ColsPacked>(
+            sharedMemory, subgroupId, subgroupCount, biasAddress);
     }
 
     [ForceInline]
     [require(cooperative_matrix, subgroup_basic)]
     [require(spvAtomicFloat16AddEXT)]
-    VISIBILITY_LEVEL static void outerProductAccumulate<U, Storage, TypeA, InArrayTypeA, TypeB, InArrayTypeB>(
+    VISIBILITY_LEVEL static void outerProductAccumulate<U, Address, TypeA, InArrayTypeA, TypeB, InArrayTypeB>(
         SPtr<uint4> sharedMemoryA,
         SPtr<uint4> sharedMemoryB,
         InArrayTypeA inputVectorA,
         InArrayTypeB inputVectorB,
-        Storage weightStorage,
-        Storage.Address weightAddress)
+        Address weightAddress)
             where U : __BuiltinFloatingPointType
             where U.Differential == U
-            where Storage : IStorage<U>
+            where Address : IPointerLikeAddress<U>
             where TypeA : __BuiltinFloatingPointType
             where TypeA.Differential == TypeA
             where TypeB : __BuiltinFloatingPointType
@@ -972,7 +959,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
                 // K dimension. Note that column major in transpose case is just the row major in non-transpose case.
 
                 typealias MMA = MMAHelper<T, InputSize, OutputSize, SubgroupSize, Target, true>;
-                MMA.storeShA<U, Storage>(sharedMemoryB, i, weightStorage, weightAddress);
+                MMA.storeShA<U, Address>(sharedMemoryB, i, weightAddress);
 
                 // Wait until all threads in the warp finish reading the shared memory and storing to the global memory.
                 GroupMemoryBarrierWithWaveSync();
@@ -986,17 +973,15 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
     //  for each thread, so the matrix-matrix multiply only needs to be performed for each warp (sub-group).
     [ForceInline]
     [require(cooperative_matrix, subgroup_basic)]
-    VISIBILITY_LEVEL static OutArrayType mma<U, Storage, InArrayType, OutArrayType, V, bool Bias = false>(InArrayType inputVector,
+    VISIBILITY_LEVEL static OutArrayType mma<U, Address, InArrayType, OutArrayType, V, bool Bias = false>(InArrayType inputVector,
         SPtr<uint4> sharedMemoryA,
         SPtr<uint4> sharedMemoryB,
         SPtr<uint4> sharedMemoryC,
-        Storage weightStorage,
-        Storage.Address weightAddress,
-        Optional<Storage> biasStorage,
-        Optional<Storage.Address> biasAddress)
+        Address weightAddress,
+        Optional<Address> biasAddress)
             where U : __BuiltinFloatingPointType
             where U.Differential == U
-            where Storage : IStorage<U>
+            where Address : IPointerLikeAddress<U>
             where V : __BuiltinFloatingPointType
             where V.Differential == V
             where InArrayType : IArrayAccessor<V>
@@ -1019,7 +1004,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
             ptrB[0] = sharedMemoryB;
             ptrB[1] = sharedMemoryB + ShMemInfo.SharedMemSizeInVectorMatB;
             // PreLoad for the first iteration
-            loadShA<U, Storage>(ptrA[0], 0, weightStorage, weightAddress);
+            loadShA<U, Address>(ptrA[0], 0, weightAddress);
             loadVectorToShB(ptrB[0], 0, subgroupIndex, inputVector);
         }
 
@@ -1039,8 +1024,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
             [ForceUnroll]
             for (int i = 0; i < M; i++)
             {
-                Storage.Address offset = Storage.getOffset(biasAddress.value, i);
-                U bias = biasStorage.value.read(offset);
+                U bias = biasAddress.value[uint(i)];
                 outputVector[i] = __realCast<V>(bias);
             }
         }
@@ -1057,7 +1041,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
                 // swap to next buffer to load new data.
                 bufferIndex = bufferIndex ^ 1;
                 // Load the another buffer and do the math so we can hide the latency of the load.
-                loadShA<U, Storage>(ptrA[bufferIndex], tileIndex, weightStorage, weightAddress);
+                loadShA<U, Address>(ptrA[bufferIndex], tileIndex, weightAddress);
                 loadVectorToShB(ptrB[bufferIndex], tileIndex, subgroupIndex, inputVector);
 
                 // swap back to the previous buffer to perform the math.
@@ -1065,7 +1049,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
             }
             else
             {
-                loadShA<U, Storage>(ptrA[0], tileIndex, weightStorage, weightAddress);
+                loadShA<U, Address>(ptrA[0], tileIndex, weightAddress);
                 loadVectorToShB(ptrB[0], tileIndex, subgroupIndex, inputVector);
 
                 // The reason that we have to sync the whole workgroup is that for matrix A, the tile is shared by
@@ -1240,14 +1224,12 @@ public struct WaveTangledVector<T, ShMemPool : ISharedMemoryPool, int N, int Sub
         set { this.data[index] = newValue; }
     }
 
-    private OutputVector linearTransformOnTarget<Storage, Layout, OutputVector, TargetEnum Target, bool Bias>(
-        Storage weight,
-        no_diff Storage.Address weightAddress,
-        no_diff Optional<Storage> bias,
-        no_diff Optional<Storage.Address> biasAddress)
-        where Storage : IStorage<T>
-        where Storage.Differential : IStorage<T.Differential>
-        where Storage.Address == Storage.Differential.Address
+    [ForceInline]
+    private OutputVector linearTransformOnTarget<Address, Layout, OutputVector, TargetEnum Target, bool Bias>(
+        Address weightAddress,
+        Optional<Address> biasAddress)
+        where Address : IPointerLikeAddress<T>
+        where Address.Differential : IPointerLikeAddress<T.Differential>
         where OutputVector : IVector<T>
     {
         typealias MMA = MMAHelper<DTypeMatC, N, OutputVector.Size, SubgroupSize, Target, false>;
@@ -1255,21 +1237,19 @@ public struct WaveTangledVector<T, ShMemPool : ISharedMemoryPool, int N, int Sub
         SPtr<uint4> shB = shA + MMA.ShMemInfo.SharedMemSizeInVectorMatA;
         SPtr<uint4> shC = shB;
         const int AlignedOutSize = MMA.TileInfo.Uint4AlignedM;
-        let outputArray = MMA.mma<T, Storage, T[Uint4AlignedInputSize], T[AlignedOutSize], T, Bias
-                            >( data, shA, shB, shC, weight, weightAddress, bias, biasAddress);
+        let outputArray = MMA.mma<T, Address, T[Uint4AlignedInputSize], T[AlignedOutSize], T, Bias
+                            >( data, shA, shB, shC, weightAddress, biasAddress);
         return OutputVector(outputArray);
     }
 
-    private static void linearTransformBwdOnTarget<Storage, Layout, OutputVector, TargetEnum Target, bool Bias>(
+    [ForceInline]
+    private static void linearTransformBwdOnTarget<Address, Layout, OutputVector, TargetEnum Target, bool Bias>(
         inout DifferentialPair<This> dthis,
-        DifferentialPtrPair<Storage> dWeightStorage,
-        no_diff Storage.Address dWeightAddress,
-        Optional<DifferentialPtrPair<Storage>> biasStorage,
-        no_diff Optional<Storage.Address> biasAddress,
+        DifferentialPtrPair<Address> dWeightAddress,
+        Optional<DifferentialPtrPair<Address>> biasAddress,
         OutputVector.Differential doutput)
-        where Storage : IStorage<T>
-        where Storage.Differential : IStorage<T.Differential>
-        where Storage.Address == Storage.Differential.Address
+        where Address : IPointerLikeAddress<T>
+        where Address.Differential : IPointerLikeAddress<T.Differential>
         where OutputVector : IVector<T>
         where OutputVector.Differential : IVector<T.Differential>
     {
@@ -1287,126 +1267,38 @@ public struct WaveTangledVector<T, ShMemPool : ISharedMemoryPool, int N, int Sub
         // of the mma operation.
         // dIn = W^T * dOut;
 #if 1
-        let outArray = MMA.mma<T, Storage, OutputVector.Differential, T[AlignedOutSize].Differential, T.Differential, false
-                        >( doutput, shA, shB, shC, dWeightStorage.p, dWeightAddress, none, none);
+        let outArray = MMA.mma<T, Address, OutputVector.Differential, T[AlignedOutSize].Differential, T.Differential, false
+                        >( doutput, shA, shB, shC, dWeightAddress.p, none);
         This.Differential dInput = This.Differential(outArray);
         dthis = DifferentialPair<This>(dthis.p, dInput);
 
         // dW = dOut * input^T
-        MMA.outerProductAccumulate<T.Differential, Storage.Differential,
+        MMA.outerProductAccumulate<T.Differential, Address.Differential,
                                    T.Differential, OutputVector.Differential,
                                    T, T[Uint4AlignedInputSize]
-                                  >( shA, shB, doutput, dthis.p.data, dWeightStorage.d, dWeightAddress);
+                                  >( shA, shB, doutput, dthis.p.data, dWeightAddress.d);
 #else
-        let dInput = MMA.mma<T, Storage, OutputVector.Differential, This.Differential
-                        >( doutput, shA, shB, shC, dWeightStorage.p, dWeightAddress);
+        let dInput = MMA.mma<T, Address, OutputVector.Differential, This.Differential
+                        >( doutput, shA, shB, shC, dWeightAddress.p, none);
         dthis = DifferentialPair<This>(dthis.p, dInput);
 
-        MMA.outerProductAccumulate< T.Differential, Storage.Differential,
+        MMA.outerProductAccumulate<T.Differential, Address.Differential,
                                     T.Differential, OutputVector.Differential,
                                     T, This
-                                  >( shA, shB, doutput, dthis.p, dWeightStorage.d, dWeightAddress);
+                                  >( shA, shB, doutput, dthis.p, dWeightAddress.d);
 #endif
 
         if (Bias)
         {
             const int subgroupIndex = getWaveId();
-            MMA.sumReduceRows<T.Differential, Storage.Differential, OutputVector.Differential
-                >(shA, doutput, subgroupIndex, biasStorage.value.d, biasAddress.value);
+            MMA.sumReduceRows<T.Differential, Address.Differential, OutputVector.Differential
+                >(shA, doutput, subgroupIndex, biasAddress.value.d);
         }
     }
 
     // Linear transformation without bias
-    [Differentiable]
+    [ForceInline]
     [BackwardDerivative(linearTransformBwd)]
-    public OutputVector linearTransform<Storage, Layout, OutputVector>(
-        Storage weightStorage,
-        no_diff Storage.Address weightAddress)
-            where Storage : IStorage<T>
-            where Storage.Differential : IStorage<T.Differential>
-            where Storage.Address == Storage.Differential.Address
-            where Layout : IStorageLayout
-            where OutputVector : IVector<T>
-    {
-        __target_switch
-        {
-        case cuda:
-            return no_diff linearTransformOnTarget<Storage, Layout, OutputVector, TargetEnum.CUDA, false>(weightStorage, weightAddress, none, none);
-        case spirv:
-            return no_diff linearTransformOnTarget<Storage, Layout, OutputVector, TargetEnum.SPIR_V, false>(weightStorage, weightAddress, none, none);
-        }
-    }
-
-    // Backward of linear transformation without bias
-    static void linearTransformBwd<Storage, Layout, OutputVector>(
-        inout DifferentialPair<This> dthis,
-        DifferentialPtrPair<Storage> dWeightStorage,
-        no_diff Storage.Address dWeightAddress,
-        OutputVector.Differential doutput)
-            where Storage : IStorage<T>
-            where Storage.Differential : IStorage<T.Differential>
-            where Storage.Address == Storage.Differential.Address
-            where Layout : IStorageLayout
-            where OutputVector : IVector<T>
-            where OutputVector.Differential : IVector<T.Differential>
-    {
-        Optional<DifferentialPtrPair<Storage>> biasStorage = {};
-        __target_switch
-        {
-        case cuda:
-            linearTransformBwdOnTarget<Storage, Layout, OutputVector, TargetEnum.CUDA, false>(dthis, dWeightStorage, dWeightAddress, biasStorage, none, doutput);
-        case spirv:
-            linearTransformBwdOnTarget<Storage, Layout, OutputVector, TargetEnum.SPIR_V, false>(dthis, dWeightStorage, dWeightAddress, biasStorage, none, doutput);
-        }
-    }
-
-    [Differentiable]
-    [BackwardDerivative(linearTransformBwd)]
-    public OutputVector linearTransform<Storage, Layout, OutputVector>(
-        Storage weightStorage,
-        Storage biasStorage,
-        no_diff Storage.Address weightAddress,
-        no_diff Storage.Address biasAddress)
-            where Storage : IStorage<T>
-            where Storage.Differential : IStorage<T.Differential>
-            where Storage.Address == Storage.Differential.Address
-            where Layout : IStorageLayout
-            where OutputVector : IVector<T>
-    {
-        __target_switch
-        {
-        case cuda:
-            return no_diff linearTransformOnTarget<Storage, Layout, OutputVector, TargetEnum.CUDA, true>(weightStorage, weightAddress, biasStorage, biasAddress);
-        case spirv:
-            return no_diff linearTransformOnTarget<Storage, Layout, OutputVector, TargetEnum.SPIR_V, true>(weightStorage, weightAddress, biasStorage, biasAddress);
-        }
-    }
-
-    // Backward of linear transformation with bias
-    static void linearTransformBwd<Storage, Layout, OutputVector>(
-        inout DifferentialPair<This> dthis,
-        DifferentialPtrPair<Storage> dWeightStorage,
-        DifferentialPtrPair<Storage> dBiasStorage,
-        no_diff Storage.Address dWeightAddress,
-        no_diff Storage.Address dBiasAddress,
-        OutputVector.Differential doutput)
-            where Storage : IStorage<T>
-            where Storage.Differential : IStorage<T.Differential>
-            where Storage.Address == Storage.Differential.Address
-            where Layout : IStorageLayout
-            where OutputVector : IVector<T>
-            where OutputVector.Differential : IVector<T.Differential>
-    {
-        __target_switch
-        {
-        case cuda:
-            linearTransformBwdOnTarget<Storage, Layout, OutputVector, TargetEnum.CUDA, true>( dthis, dWeightStorage, dWeightAddress, dBiasStorage, dBiasAddress, doutput);
-        case spirv:
-            linearTransformBwdOnTarget<Storage, Layout, OutputVector, TargetEnum.SPIR_V, true>(dthis, dWeightStorage, dWeightAddress, dBiasStorage, dBiasAddress, doutput);
-        }
-    }
-
-    [Differentiable]
     public OutputVector linearTransform<Address, Layout, OutputVector>(
         Address weightAddress)
             where Address : IPointerLikeAddress<T>
@@ -1414,11 +1306,39 @@ public struct WaveTangledVector<T, ShMemPool : ISharedMemoryPool, int N, int Sub
             where Layout : IStorageLayout
             where OutputVector : IVector<T>
     {
-        OutputVector output = OutputVector();
-        return output;
+        __target_switch
+        {
+        case cuda:
+            return no_diff linearTransformOnTarget<Address, Layout, OutputVector, TargetEnum.CUDA, false>(weightAddress, none);
+        case spirv:
+            return no_diff linearTransformOnTarget<Address, Layout, OutputVector, TargetEnum.SPIR_V, false>(weightAddress, none);
+        }
     }
 
-    [Differentiable]
+    // Backward of linear transformation without bias
+    [ForceInline]
+    static void linearTransformBwd<Address, Layout, OutputVector>(
+        inout DifferentialPair<This> dthis,
+        DifferentialPtrPair<Address> dWeightAddress,
+        OutputVector.Differential doutput)
+            where Address : IPointerLikeAddress<T>
+            where Address.Differential : IPointerLikeAddress<T.Differential>
+            where Layout : IStorageLayout
+            where OutputVector : IVector<T>
+            where OutputVector.Differential : IVector<T.Differential>
+    {
+        Optional<DifferentialPtrPair<Address>> biasAddress = {};
+        __target_switch
+        {
+        case cuda:
+            linearTransformBwdOnTarget<Address, Layout, OutputVector, TargetEnum.CUDA, false>(dthis, dWeightAddress, biasAddress, doutput);
+        case spirv:
+            linearTransformBwdOnTarget<Address, Layout, OutputVector, TargetEnum.SPIR_V, false>(dthis, dWeightAddress, biasAddress, doutput);
+        }
+    }
+
+    [ForceInline]
+    [BackwardDerivative(linearTransformBwd)]
     public OutputVector linearTransform<Address, Layout, OutputVector>(
         Address weightAddress, Address biasAddress)
             where Address : IPointerLikeAddress<T>
@@ -1426,7 +1346,34 @@ public struct WaveTangledVector<T, ShMemPool : ISharedMemoryPool, int N, int Sub
             where Layout : IStorageLayout
             where OutputVector : IVector<T>
     {
-        OutputVector output = OutputVector();
-        return output;
+        __target_switch
+        {
+        case cuda:
+            return no_diff linearTransformOnTarget<Address, Layout, OutputVector, TargetEnum.CUDA, true>(weightAddress, biasAddress);
+        case spirv:
+            return no_diff linearTransformOnTarget<Address, Layout, OutputVector, TargetEnum.SPIR_V, true>(weightAddress, biasAddress);
+        }
+    }
+
+    // Backward of linear transformation with bias
+    [ForceInline]
+    static void linearTransformBwd<Address, Layout, OutputVector>(
+        inout DifferentialPair<This> dthis,
+        DifferentialPtrPair<Address> dWeightAddress,
+        DifferentialPtrPair<Address> dBiasAddress,
+        OutputVector.Differential doutput)
+            where Address : IPointerLikeAddress<T>
+            where Address.Differential : IPointerLikeAddress<T.Differential>
+            where Layout : IStorageLayout
+            where OutputVector : IVector<T>
+            where OutputVector.Differential : IVector<T.Differential>
+    {
+        __target_switch
+        {
+        case cuda:
+            linearTransformBwdOnTarget<Address, Layout, OutputVector, TargetEnum.CUDA, true>(dthis, dWeightAddress, dBiasAddress, doutput);
+        case spirv:
+            linearTransformBwdOnTarget<Address, Layout, OutputVector, TargetEnum.SPIR_V, true>(dthis, dWeightAddress, dBiasAddress, doutput);
+        }
     }
 }

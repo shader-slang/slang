@@ -18,10 +18,10 @@ typealias DType = half;
 typealias DType = float;
 #endif
 
-// TEST_INPUT: ubuffer(stride=4, count=64):name=outputBuffer
-RWStructuredBuffer<DType> outputBuffer;
+// TEST_INPUT: set outputBuffer = ubuffer(stride=4, count=64)
+uniform RWStructuredBuffer<DType>.Handle outputBuffer;
 
-typealias BufferStorage = StructuredBufferStorage<DType>;
+typealias Address = BindlessAddress<DType>;
 
 static const int SubgroupSize = 32;
 static const int WorkgroupSize = 128;
@@ -39,7 +39,7 @@ typealias SPtr = Ptr<uint4, Access::ReadWrite, AddressSpace::GroupShared>;
 // Basic test on MatMul without bias, this test covers both forward and backward pass
 void TestBiasSumReduce<int OutputSize, TargetEnum Target>(uint tid)
 {
-    BufferStorage storage = BufferStorage(outputBuffer);
+    Address biasAddress = Address(outputBuffer);
 
     typealias MMA = MMAHelper<DType, InputSize, OutputSize, SubgroupSize, Target, false>;
     const int OutSize = MMA.Uint4AlignedM;
@@ -57,7 +57,7 @@ void TestBiasSumReduce<int OutputSize, TargetEnum Target>(uint tid)
     uint subgroupId = tid / SubgroupSize;
 
     // perform dOut OPA Input
-    MMA.sumReduceRows<DType, BufferStorage, DType[OutSize]>(shPtr, dOutVector, subgroupId, storage, 0);
+    MMA.sumReduceRows<DType, Address, DType[OutSize]>(shPtr, dOutVector, subgroupId, biasAddress);
 
     // serialRead<16, DType>(tid, shPtr);
 }
