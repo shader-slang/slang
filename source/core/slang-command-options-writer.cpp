@@ -352,7 +352,17 @@ void MarkdownCommandOptionsWriter::_appendDescriptionForCategory(Index categoryI
                 }
 
                 m_builder << "### ";
-                StringUtil::join(names.getBuffer(), names.getCount(), toSlice(", "), m_builder);
+                if ((option.flags & CommandOptions::Flag::TemplateExpanded) &&
+                    option.usage.getLength())
+                {
+                    auto spaceIdx = option.usage.indexOf(' ');
+                    auto headingName = (spaceIdx >= 0) ? option.usage.head(spaceIdx) : option.usage;
+                    _appendEscapedMarkdown(headingName, m_builder);
+                }
+                else
+                {
+                    StringUtil::join(names.getBuffer(), names.getCount(), toSlice(", "), m_builder);
+                }
                 m_builder << "\n";
 
                 if (option.usage.getLength())

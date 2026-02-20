@@ -78,8 +78,9 @@ struct CommandOptions
     {
         enum Enum : Flags
         {
-            CanPrefix = 0x1, /// Allows -Dfsggf or -D fdsfsd
-            IsPrefix = 0x2,  /// Is an option that can only be a prefix
+            CanPrefix = 0x1,        /// Allows -Dfsggf or -D fdsfsd
+            IsPrefix = 0x2,         /// Is an option that can only be a prefix
+            TemplateExpanded = 0x4, /// Names are expansions of a template; prefer usage for display
         };
     };
 
@@ -118,7 +119,8 @@ struct CommandOptions
         const char* name,
         const char* usage,
         const char* description,
-        UserValue userValue = kInvalidUserValue);
+        UserValue userValue = kInvalidUserValue,
+        Flags flags = 0);
     void add(
         const UnownedStringSlice* names,
         Count namesCount,

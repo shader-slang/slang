@@ -239,7 +239,8 @@ void CommandOptions::add(
     const char* inName,
     const char* usage,
     const char* description,
-    UserValue userValue)
+    UserValue userValue,
+    Flags flags)
 {
     UnownedStringSlice nameSlice(inName);
 
@@ -248,7 +249,7 @@ void CommandOptions::add(
     option.usage = _addString(usage);
     option.description = _addString(UnownedStringSlice(description));
     option.userValue = userValue;
-    option.flags = 0;
+    option.flags = flags;
 
     if (nameSlice.indexOf(',') >= 0)
     {

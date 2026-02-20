@@ -46,6 +46,7 @@ struct Option
     const char* name;
     const char* usage = nullptr;
     const char* description = nullptr;
+    CommandOptions::Flags flags = 0;
 };
 
 enum class ValueCategory
@@ -101,8 +102,12 @@ static void _addOptions(const ConstArrayView<Option>& options, CommandOptions& c
 {
     for (auto& opt : options)
     {
-        cmdOptions
-            .add(opt.name, opt.usage, opt.description, CommandOptions::UserValue(opt.optionKind));
+        cmdOptions.add(
+            opt.name,
+            opt.usage,
+            opt.description,
+            CommandOptions::UserValue(opt.optionKind),
+            opt.flags);
     }
 }
 
@@ -698,7 +703,8 @@ void initCommandOptions(CommandOptions& options)
          "SPIR-V.rst#implicit-binding-number-assignment)\n"
          "* [GLSL "
          "wiki](https://github.com/KhronosGroup/glslang/wiki/"
-         "HLSL-FAQ#auto-mapped-binding-numbers)\n"},
+         "HLSL-FAQ#auto-mapped-binding-numbers)\n",
+         CommandOptions::Flag::TemplateExpanded},
         {OptionKind::VulkanBindGlobals,
          "-fvk-bind-globals",
          "-fvk-bind-globals <N> <descriptor-set>",
@@ -803,7 +809,8 @@ void initCommandOptions(CommandOptions& options)
             "-<compiler>-path <path>",
             "Specify path to a downstream <compiler> "
             "executable or library.\n",
-            UserValue(OptionKind::CompilerPath));
+            UserValue(OptionKind::CompilerPath),
+            CommandOptions::Flag::TemplateExpanded);
     }
 
     const Option downstreamOpts[] = {
