@@ -81,7 +81,7 @@ struct ImmutableBufferLoadLoweringContext : InstPassBase
     {
         IRSizeAndAlignment naturalSizeAlignment;
         getNaturalSizeAndAlignment(targetProgram->getTargetReq(), innerType, &naturalSizeAlignment);
-        if (naturalSizeAlignment.alignment == alignment)
+        if (naturalSizeAlignment.alignment >= alignment)
             return innerType;
 
         auto key = AlignedTypeWrapperKey{innerType, alignment};
