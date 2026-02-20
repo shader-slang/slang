@@ -257,9 +257,10 @@ void CommandOptions::add(
     const char* inName,
     const char* usage,
     const char* description,
-    UserValue userValue)
+    UserValue userValue,
+    const char* displayName)
 {
-    add(inName, usage, description, nullptr, 0, userValue);
+    add(inName, usage, description, nullptr, 0, userValue, displayName);
 }
 
 void CommandOptions::add(
@@ -268,12 +269,14 @@ void CommandOptions::add(
     const char* description,
     const InputLink* inputLinks,
     Count linkCount,
-    UserValue userValue)
+    UserValue userValue,
+    const char* displayName)
 {
     UnownedStringSlice nameSlice(inName);
 
     Option option;
     option.categoryIndex = m_currentCategoryIndex;
+    option.displayName = _addString(displayName);
     option.usage = _addString(usage);
     option.description = _addString(UnownedStringSlice(description));
     _addLinks(inputLinks, linkCount, option);

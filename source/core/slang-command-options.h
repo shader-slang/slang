@@ -93,7 +93,9 @@ struct CommandOptions
     struct Option
     {
         UnownedStringSlice names; ///< Comma delimited list of names, first name is the default
-        UnownedStringSlice usage; ///< Describes usage, can be empty
+        UnownedStringSlice displayName; ///< Heading override for docs (e.g. template form); empty
+                                        ///< means use names
+        UnownedStringSlice usage;       ///< Describes usage, can be empty
         UnownedStringSlice description; ///< A description of usage
 
         Index linkStartIndex = 0; ///< Start index into m_links
@@ -135,14 +137,16 @@ struct CommandOptions
         const char* name,
         const char* usage,
         const char* description,
-        UserValue userValue = kInvalidUserValue);
+        UserValue userValue = kInvalidUserValue,
+        const char* displayName = nullptr);
     void add(
         const char* name,
         const char* usage,
         const char* description,
         const InputLink* links,
         Count linkCount,
-        UserValue userValue = kInvalidUserValue);
+        UserValue userValue = kInvalidUserValue,
+        const char* displayName = nullptr);
     void add(
         const UnownedStringSlice* names,
         Count namesCount,

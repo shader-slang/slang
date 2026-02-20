@@ -490,7 +490,7 @@ Make data accessed through ConstantBuffer, ParameterBlock, StructuredBuffer, Byt
 
 
 <a id="fvk-b-shift"></a>
-### -fvk-b-shift, -fvk-s-shift, -fvk-t-shift, -fvk-u-shift
+### -fvk-&lt;vulkan-shift&gt;-shift
 
 **-fvk-&lt;[vulkan-shift](#vulkan-shift)&gt;-shift &lt;N&gt; &lt;space&gt;**
 
@@ -618,7 +618,7 @@ Sets a comma-separates list of architecture-specific features for the LLVM targe
 Downstream compiler options 
 
 <a id="none-path"></a>
-### -none-path, -fxc-path, -dxc-path, -glslang-path, -spirv-dis-path, -clang-path, -visualstudio-path, -gcc-path, -genericcpp-path, -nvrtc-path, -llvm-path, -spirv-opt-path, -metal-path, -tint-path
+### -&lt;compiler&gt;-path
 
 **-&lt;[compiler](#compiler)&gt;-path &lt;path&gt;**
 

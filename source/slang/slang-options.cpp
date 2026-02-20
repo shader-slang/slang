@@ -48,6 +48,7 @@ struct Option
     const char* description = nullptr;
     const CommandOptions::InputLink* links = nullptr;
     Count linkCount = 0;
+    const char* displayName = nullptr;
 };
 
 enum class ValueCategory
@@ -109,7 +110,8 @@ static void _addOptions(const ConstArrayView<Option>& options, CommandOptions& c
             opt.description,
             opt.links,
             opt.linkCount,
-            CommandOptions::UserValue(opt.optionKind));
+            CommandOptions::UserValue(opt.optionKind),
+            opt.displayName);
     }
 }
 
@@ -715,7 +717,8 @@ void initCommandOptions(CommandOptions& options)
          "If more than one such option is provided for the same space, the last one takes effect. "
          "If you need to shift the inferred binding numbers for all sets, use 'all' as <space>.",
          kVulkanBindShiftLinks,
-         SLANG_COUNT_OF(kVulkanBindShiftLinks)},
+         SLANG_COUNT_OF(kVulkanBindShiftLinks),
+         "-fvk-<vulkan-shift>-shift"},
         {OptionKind::VulkanBindGlobals,
          "-fvk-bind-globals",
          "-fvk-bind-globals <N> <descriptor-set>",
@@ -819,7 +822,8 @@ void initCommandOptions(CommandOptions& options)
             "-<compiler>-path <path>",
             "Specify path to a downstream <compiler> "
             "executable or library.\n",
-            UserValue(OptionKind::CompilerPath));
+            UserValue(OptionKind::CompilerPath),
+            "-<compiler>-path");
     }
 
     const Option downstreamOpts[] = {
