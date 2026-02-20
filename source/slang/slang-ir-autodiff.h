@@ -36,38 +36,14 @@ struct DiffInstPair
 
 typedef DiffInstPair<IRInst*, IRInst*> InstPair;
 
-enum class FuncBodyTranscriptionTaskType
-{
-    Forward,
-    BackwardPrimal,
-    BackwardPropagate,
-    Backward
-};
-
-struct FuncBodyTranscriptionTask
-{
-    FuncBodyTranscriptionTaskType type;
-    IRFunc* originalFunc;
-    IRFunc* resultFunc;
-};
-
-struct AutoDiffTranscriberBase;
-
-struct DiffTranscriberSet
-{
-    AutoDiffTranscriberBase* forwardTranscriber = nullptr;
-    AutoDiffTranscriberBase* primalTranscriber = nullptr;
-    AutoDiffTranscriberBase* propagateTranscriber = nullptr;
-    AutoDiffTranscriberBase* backwardTranscriber = nullptr;
-};
-
-
 enum class DiffConformanceKind
 {
     Any = 0,  // Perform actions for any conformance (infer from context)
     Ptr = 1,  // Perform actions for IDifferentiablePtrType
     Value = 2 // Perform actions for IDifferentiable
 };
+
+ParameterDirectionInfo transposeDirection(ParameterDirectionInfo direction);
 
 struct AutoDiffSharedContext
 {
@@ -81,6 +57,13 @@ struct AutoDiffSharedContext
     //
     IRInterfaceType* differentiableInterfaceType = nullptr;
 
+    // Reference to the generic IForwardDifferentiable<F>
+    // and IBackwardDifferentiable<F> interfaces.
+    //
+    IRGeneric* forwardDifferentiableInterfaceType = nullptr;
+    IRGeneric* backwardDifferentiableInterfaceType = nullptr;
+    IRGeneric* backwardCallableInterfaceType = nullptr;
+
     // The struct key for the 'Differential' associated type
     // defined inside IDifferential. We use this to lookup the differential
     // type in the conformance table associated with the concrete type.
@@ -91,7 +74,6 @@ struct AutoDiffSharedContext
     // `IDifferential`.
     IRStructKey* differentialAssocTypeWitnessStructKey = nullptr;
     IRWitnessTableType* differentialAssocTypeWitnessTableType = nullptr;
-
 
     // The struct key for the 'zero()' associated type
     // defined inside IDifferential. We use this to lookup the
@@ -141,219 +123,381 @@ struct AutoDiffSharedContext
     bool isInterfaceAvailable = false;
     bool isPtrInterfaceAvailable = false;
 
-    List<FuncBodyTranscriptionTask> followUpFunctionsToTranscribe;
-
-    DiffTranscriberSet transcriberSet;
-
-    AutoDiffSharedContext(TargetProgram* target, IRModuleInst* inModuleInst);
-
-private:
-    IRInst* findDifferentiableInterface();
-
-    IRStructType* findNullDifferentialStructType();
-
-    IRInst* findNullDifferentialWitness();
-
-    IRStructKey* findDifferentialTypeStructKey()
-    {
-        return cast<IRStructKey>(
-            getInterfaceEntryAtIndex(differentiableInterfaceType, 0)->getRequirementKey());
-    }
-
-    IRStructKey* findDifferentialTypeWitnessStructKey()
-    {
-        return cast<IRStructKey>(
-            getInterfaceEntryAtIndex(differentiableInterfaceType, 1)->getRequirementKey());
-    }
-
-    IRWitnessTableType* findDifferentialTypeWitnessTableType()
-    {
-        return cast<IRWitnessTableType>(
-            getInterfaceEntryAtIndex(differentiableInterfaceType, 1)->getRequirementVal());
-    }
-
-    IRStructKey* findZeroMethodStructKey()
-    {
-        return cast<IRStructKey>(
-            getInterfaceEntryAtIndex(differentiableInterfaceType, 2)->getRequirementKey());
-    }
-
-    IRStructKey* findAddMethodStructKey()
-    {
-        return cast<IRStructKey>(
-            getInterfaceEntryAtIndex(differentiableInterfaceType, 3)->getRequirementKey());
-    }
-
-    IRStructKey* findMulMethodStructKey()
-    {
-        return cast<IRStructKey>(
-            getInterfaceEntryAtIndex(differentiableInterfaceType, 4)->getRequirementKey());
-    }
-
-
-    IRStructKey* findDifferentialPtrTypeStructKey()
-    {
-        return cast<IRStructKey>(
-            getInterfaceEntryAtIndex(differentiablePtrInterfaceType, 0)->getRequirementKey());
-    }
-
-    IRStructKey* findDifferentialPtrTypeWitnessStructKey()
-    {
-        return cast<IRStructKey>(
-            getInterfaceEntryAtIndex(differentiablePtrInterfaceType, 1)->getRequirementKey());
-    }
-
-    IRWitnessTableType* findDifferentialPtrTypeWitnessTableType()
-    {
-        return cast<IRWitnessTableType>(
-            getInterfaceEntryAtIndex(differentiablePtrInterfaceType, 1)->getRequirementVal());
-    }
-
-    // IRStructKey* getIDifferentiableStructKeyAtIndex(UInt index);
-    IRInterfaceRequirementEntry* getInterfaceEntryAtIndex(IRInterfaceType* interface, UInt index);
+    AutoDiffSharedContext(TargetProgram* targetProgram, IRModuleInst* inModuleInst);
 };
-
 
 struct DifferentiableTypeConformanceContext
 {
     AutoDiffSharedContext* sharedContext;
 
     IRGlobalValueWithCode* parentFunc = nullptr;
-    OrderedDictionary<IRType*, IRInst*> differentiableTypeWitnessDictionary;
-
-    Dictionary<IRInst*, List<IRDifferentiableTypeAnnotation*>> annotationCache;
 
     IRFunc* existentialDAddFunc = nullptr;
 
     DifferentiableTypeConformanceContext(AutoDiffSharedContext* shared)
         : sharedContext(shared)
     {
-        // Populate dictionary with null differential type.
-        if (sharedContext->nullDifferentialStructType)
-            differentiableTypeWitnessDictionary.add(
-                sharedContext->nullDifferentialStructType,
-                sharedContext->nullDifferentialWitness);
     }
 
-    void setFunc(IRGlobalValueWithCode* func);
+    IRType* resolveType(IRBuilder* builder, IRInst* typeInst)
+    {
+        if (auto funcType = as<IRFuncType>(typeInst))
+        {
+            // resolve the parameter and result types.
+            List<IRType*> paramTypes;
+            for (UIndex i = 0; i < funcType->getParamCount(); ++i)
+            {
+                paramTypes.add(resolveType(builder, funcType->getParamType(i)));
+            }
 
-    List<IRDifferentiableTypeAnnotation*> getAnnotations(IRGlobalValueWithCode* inst);
+            auto resultType = resolveType(builder, funcType->getResultType());
+            return builder->getFuncType(paramTypes, resultType);
+        }
 
-    List<IRDifferentiableTypeAnnotation*> getAnnotations(IRModuleInst* inst);
+        switch (typeInst->getOp())
+        {
+        case kIROp_ForwardDiffFuncType:
+            {
+                auto innerFnType = cast<IRFuncType>(resolveType(builder, typeInst->getOperand(0)));
+                List<IRType*> paramTypes;
+                for (UIndex i = 0; i < innerFnType->getParamCount(); ++i)
+                {
+                    const auto& [paramDirection, paramType] =
+                        splitParameterDirectionAndType(innerFnType->getParamType(i));
 
-    void buildGlobalWitnessDictionary();
+                    if (auto diffPairType = tryGetAssociationOfKind(
+                            paramType,
+                            ValAssociationKind::DifferentialPairType))
+                    {
+                        paramTypes.add(
+                            fromDirectionAndType(builder, paramDirection, (IRType*)diffPairType));
+                    }
+                    else if (
+                        auto diffPtrPairType = tryGetAssociationOfKind(
+                            paramType,
+                            ValAssociationKind::DifferentialPtrPairType))
+                    {
+                        paramTypes.add(fromDirectionAndType(
+                            builder,
+                            paramDirection,
+                            (IRType*)diffPtrPairType));
+                    }
+                    else
+                    {
+                        paramTypes.add(innerFnType->getParamType(i));
+                    }
+                }
 
-    // Lookup a witness table for the concreteType. One should exist if concreteType
-    // inherits (successfully) from IDifferentiable.
-    //
-    IRInst* lookUpConformanceForType(IRInst* type, DiffConformanceKind kind);
+                // Do the same for the result type.
+                IRType* resultType = innerFnType->getResultType();
+                if (auto diffPairType = tryGetAssociationOfKind(
+                        innerFnType->getResultType(),
+                        ValAssociationKind::DifferentialPairType))
+                {
+                    resultType = (IRType*)diffPairType;
+                }
+                else if (
+                    auto diffPtrPairType = tryGetAssociationOfKind(
+                        innerFnType->getResultType(),
+                        ValAssociationKind::DifferentialPtrPairType))
+                {
+                    resultType = (IRType*)diffPtrPairType;
+                }
 
-    IRInst* lookUpInterfaceMethod(
-        IRBuilder* builder,
-        IRType* origType,
-        IRStructKey* key,
-        IRType* resultType = nullptr,
-        DiffConformanceKind kind = DiffConformanceKind::Any);
+                return builder->getFuncType(paramTypes, resultType);
+            }
+        case kIROp_BackwardDiffFuncType:
+            {
+                auto innerFnType = cast<IRFuncType>(resolveType(builder, typeInst->getOperand(0)));
 
-    IRType* differentiateType(IRBuilder* builder, IRInst* primalType);
+                List<IRType*> origParamTypes;
+                for (UIndex i = 0; i < innerFnType->getParamCount(); ++i)
+                {
+                    origParamTypes.add(innerFnType->getParamType(i));
+                }
 
-    IRInst* tryGetDifferentiableWitness(
-        IRBuilder* builder,
-        IRInst* originalType,
-        DiffConformanceKind kind);
+                origParamTypes.add(fromDirectionAndType(
+                    builder,
+                    {ParameterDirectionInfo::Kind::Out},
+                    innerFnType->getResultType()));
 
-    IRType* getOrCreateDiffPairType(IRBuilder* builder, IRInst* primalType, IRInst* witness);
+                List<IRType*> paramTypes;
+                for (auto origParamType : origParamTypes)
+                {
+                    const auto& [paramDirection, paramType] =
+                        splitParameterDirectionAndType(origParamType);
 
-    IRInst* getDifferentialTypeFromDiffPairType(
-        IRBuilder* builder,
-        IRDifferentialPairTypeBase* diffPairType);
+                    if (isDifferentiableValueType(paramType))
+                    {
+                        // Differentiable
+                        switch (paramDirection.kind)
+                        {
+                        case ParameterDirectionInfo::Kind::In:
+                            paramTypes.add(fromDirectionAndType(
+                                builder,
+                                {ParameterDirectionInfo::Kind::BorrowInOut},
+                                (IRType*)tryGetAssociationOfKind(
+                                    paramType,
+                                    ValAssociationKind::DifferentialPairType)));
+                            break;
+                        case ParameterDirectionInfo::Kind::Out:
+                            paramTypes.add(fromDirectionAndType(
+                                builder,
+                                {ParameterDirectionInfo::Kind::In},
+                                (IRType*)getDifferentialForType(paramType)));
+                            break;
+                        case ParameterDirectionInfo::Kind::BorrowInOut:
+                            paramTypes.add(fromDirectionAndType(
+                                builder,
+                                {ParameterDirectionInfo::Kind::BorrowInOut},
+                                (IRType*)tryGetAssociationOfKind(
+                                    paramType,
+                                    ValAssociationKind::DifferentialPairType)));
+                            break;
+                        default:
+                            SLANG_UNEXPECTED(
+                                "Unhandled parameter direction in backward diff func type");
+                        }
+                    }
+                    else if (isDifferentiablePtrType(paramType))
+                    {
+                        // Differentiable Ptr
+                        switch (paramDirection.kind)
+                        {
+                        case ParameterDirectionInfo::Kind::In:
+                            paramTypes.add(fromDirectionAndType(
+                                builder,
+                                {ParameterDirectionInfo::Kind::In},
+                                (IRType*)tryGetAssociationOfKind(
+                                    paramType,
+                                    ValAssociationKind::DifferentialPtrPairType)));
+                            break;
+                        default:
+                            SLANG_UNEXPECTED(
+                                "Unhandled parameter direction in backward diff func type");
+                        }
+                    }
+                    else
+                    {
+                        // Non-differentiable
+                        switch (paramDirection.kind)
+                        {
+                        case ParameterDirectionInfo::Kind::In:
+                        case ParameterDirectionInfo::Kind::Ref:
+                        case ParameterDirectionInfo::Kind::BorrowIn:
+                            paramTypes.add(
+                                fromDirectionAndType(builder, paramDirection, paramType));
+                            break;
+                        case ParameterDirectionInfo::Kind::Out:
+                            // skip.
+                            break;
+                        case ParameterDirectionInfo::Kind::BorrowInOut:
+                            paramTypes.add(fromDirectionAndType(
+                                builder,
+                                ParameterDirectionInfo::Kind::In,
+                                paramType));
+                            break;
+                        default:
+                            SLANG_UNEXPECTED(
+                                "Unhandled parameter direction in backward diff func type");
+                        }
+                    }
+                }
+
+                return builder->getFuncType(paramTypes, builder->getVoidType());
+            }
+        case kIROp_ApplyForBwdFuncType:
+            {
+                auto bwdContextType = typeInst->getOperand(1);
+
+                // Copy the func's parameter types as-is and replace the result type with
+                // the bwd context type.
+                //
+                auto innerFnType = cast<IRFuncType>(resolveType(builder, typeInst->getOperand(0)));
+
+                List<IRType*> paramTypes;
+                for (UIndex i = 0; i < innerFnType->getParamCount(); ++i)
+                {
+                    if (isDifferentiablePtrType(innerFnType->getParamType(i)))
+                    {
+                        // For differentiable ptr types, we need to replace with the
+                        // differential ptr pair type.
+                        const auto& [paramDirection, paramType] =
+                            splitParameterDirectionAndType(innerFnType->getParamType(i));
+                        paramTypes.add(fromDirectionAndType(
+                            builder,
+                            paramDirection,
+                            (IRType*)tryGetAssociationOfKind(
+                                paramType,
+                                ValAssociationKind::DifferentialPtrPairType)));
+                    }
+                    else
+                        paramTypes.add(innerFnType->getParamType(i));
+                }
+
+                return builder->getFuncType(paramTypes, (IRType*)bwdContextType);
+                break;
+            }
+        case kIROp_FuncResultType:
+            {
+                auto bwdContextType = typeInst->getOperand(1);
+                auto innerFnType = cast<IRFuncType>(resolveType(builder, typeInst->getOperand(0)));
+
+                return builder->getFuncType(
+                    List<IRType*>((IRType*)bwdContextType),
+                    innerFnType->getResultType());
+                break;
+            }
+        case kIROp_BwdCallableFuncType:
+            {
+                auto bwdContextType = typeInst->getOperand(1);
+
+                auto innerFnType = cast<IRFuncType>(resolveType(builder, typeInst->getOperand(0)));
+                List<IRType*> paramTypes;
+
+                paramTypes.add((IRType*)bwdContextType);
+                for (UIndex i = 0; i < innerFnType->getParamCount(); ++i)
+                {
+                    const auto& [paramDirection, paramType] =
+                        splitParameterDirectionAndType(innerFnType->getParamType(i));
+                    if (auto diffValueType = tryGetDifferentiableValueType(paramType))
+                    {
+                        // If the parameter type is a differentiable value type, we replace it with
+                        // the differential type.
+                        //
+                        paramTypes.add(fromDirectionAndType(
+                            builder,
+                            transposeDirection(paramDirection),
+                            (IRType*)diffValueType));
+                    }
+                    else
+                        paramTypes.add(builder->getVoidType());
+                }
+
+                // Add the differential of the result type.
+                if (auto resultDiffType =
+                        tryGetDifferentiableValueType(innerFnType->getResultType()))
+                {
+                    paramTypes.add((IRType*)resultDiffType);
+                }
+
+                return builder->getFuncType(paramTypes, builder->getVoidType());
+                break;
+            }
+        }
+
+        return (IRType*)typeInst;
+    }
+
+    IRInst* tryGetAssociationOfKind(IRInst* target, ValAssociationKind kind);
 
     IRInst* getDiffTypeFromPairType(IRBuilder* builder, IRDifferentialPairTypeBase* type);
 
     IRInst* getDiffTypeWitnessFromPairType(IRBuilder* builder, IRDifferentialPairTypeBase* type);
 
-    IRInst* getDiffZeroMethodFromPairType(IRBuilder* builder, IRDifferentialPairTypeBase* type);
+    IRInst* tryGetDifferentiableValueType(IRType* origType)
+    {
+        IRBuilder builder(sharedContext->moduleInst);
+        if (auto typePack = as<IRTypePack>(origType))
+        {
+            List<IRType*> diffTypes;
+            for (UInt i = 0; i < typePack->getOperandCount(); i++)
+            {
+                auto elemDiff = tryGetDifferentiableValueType((IRType*)typePack->getOperand(i));
+                if (!elemDiff)
+                    return nullptr;
+                diffTypes.add((IRType*)elemDiff);
+            }
+            return builder.getTypePack(diffTypes.getCount(), diffTypes.getBuffer());
+        }
 
-    IRInst* getDiffAddMethodFromPairType(IRBuilder* builder, IRDifferentialPairTypeBase* type);
+        return tryGetAssociationOfKind(origType, ValAssociationKind::DifferentialType);
+    }
 
-    void addTypeToDictionary(IRType* type, IRInst* witness);
+    IRInst* tryGetDifferentiablePtrType(IRType* origType)
+    {
+        IRBuilder builder(sharedContext->moduleInst);
+        if (auto typePack = as<IRTypePack>(origType))
+        {
+            List<IRType*> diffTypes;
+            for (UInt i = 0; i < typePack->getOperandCount(); i++)
+            {
+                auto elemDiff = tryGetDifferentiablePtrType((IRType*)typePack->getOperand(i));
+                if (!elemDiff)
+                    return nullptr;
+                diffTypes.add((IRType*)elemDiff);
+            }
+            return builder.getTypePack(diffTypes.getCount(), diffTypes.getBuffer());
+        }
 
-    IRInterfaceType* getConformanceTypeFromWitness(IRInst* witness);
+        return tryGetAssociationOfKind(origType, ValAssociationKind::DifferentialPtrType);
+    }
 
-    IRInst* tryExtractConformanceFromInterfaceType(
-        IRBuilder* builder,
-        IRInterfaceType* interfaceType,
-        IRWitnessTable* witnessTable);
+    IRType* tryGetDiffPairType(IRType* originalType)
+    {
+        IRBuilder builder(sharedContext->moduleInst);
 
-    List<IRInterfaceRequirementEntry*> findInterfaceLookupPath(
-        IRInterfaceType* supType,
-        IRInterfaceType* type);
+        if (auto typePack = as<IRTypePack>(originalType))
+        {
+            List<IRType*> pairTypes;
+            for (UInt i = 0; i < typePack->getOperandCount(); i++)
+            {
+                auto elemPair = tryGetDiffPairType((IRType*)typePack->getOperand(i));
+                if (!elemPair)
+                    return nullptr;
+                pairTypes.add(elemPair);
+            }
+            return builder.getTypePack(pairTypes.getCount(), pairTypes.getBuffer());
+        }
+
+        // In case we're dealing with a parameter type, we need to split out the direction first.
+        // If we're not, then the split & merge are no-ops.
+        //
+        auto [passingMode, baseType] = splitParameterDirectionAndType(originalType);
+        auto basePairType =
+            tryGetAssociationOfKind(baseType, ValAssociationKind::DifferentialPairType);
+
+        if (!basePairType)
+        {
+            basePairType =
+                tryGetAssociationOfKind(baseType, ValAssociationKind::DifferentialPtrPairType);
+        }
+
+        if (!basePairType)
+            return nullptr;
+
+        return fromDirectionAndType(&builder, passingMode, (IRType*)basePairType);
+    }
 
     // Lookup and return the 'Differential' type declared in the concrete type
     // in order to conform to the IDifferentiable/IDifferentiablePtrType interfaces
-    // Note that inside a generic block, this will be a witness table lookup instruction
-    // that gets resolved during the specialization pass.
     //
-    IRInst* getDifferentialForType(IRBuilder* builder, IRType* origType)
+    IRInst* tryGetDifferentialForType(IRType* origType)
     {
-        switch (origType->getOp())
-        {
-        case kIROp_InterfaceType:
-            {
-                if (isDifferentiableValueType(origType))
-                    return this->sharedContext->differentiableInterfaceType;
-                else if (isDifferentiablePtrType(origType))
-                    return this->sharedContext->differentiablePtrInterfaceType;
-                else
-                    return nullptr;
-            }
-        case kIROp_ArrayType:
-            {
-                auto diffElementType = (IRType*)getDifferentialForType(
-                    builder,
-                    as<IRArrayType>(origType)->getElementType());
-                if (!diffElementType)
-                    return nullptr;
-                return builder->getArrayType(
-                    diffElementType,
-                    as<IRArrayType>(origType)->getElementCount());
-            }
-        case kIROp_TupleType:
-        case kIROp_TypePack:
-        case kIROp_OptionalType:
-            {
-                return differentiateType(builder, origType);
-            }
-        case kIROp_DifferentialPairUserCodeType:
-            {
-                auto diffPairType = as<IRDifferentialPairTypeBase>(origType);
-                auto diffType = getDiffTypeFromPairType(builder, diffPairType);
-                auto diffWitness = getDiffTypeWitnessFromPairType(builder, diffPairType);
-                return builder->getDifferentialPairUserCodeType((IRType*)diffType, diffWitness);
-            }
-        case kIROp_DifferentialPtrPairType:
-            {
-                auto diffPairType = as<IRDifferentialPairTypeBase>(origType);
-                auto diffType = getDiffTypeFromPairType(builder, diffPairType);
-                auto diffWitness = getDiffTypeWitnessFromPairType(builder, diffPairType);
-                return builder->getDifferentialPtrPairType((IRType*)diffType, diffWitness);
-            }
-        default:
-            if (isDifferentiableValueType(origType))
-                return lookUpInterfaceMethod(
-                    builder,
-                    origType,
-                    sharedContext->differentialAssocTypeStructKey,
-                    builder->getTypeKind());
-            else if (isDifferentiablePtrType(origType))
-                return lookUpInterfaceMethod(
-                    builder,
-                    origType,
-                    sharedContext->differentialAssocRefTypeStructKey,
-                    builder->getTypeKind());
-            else
-                return nullptr;
-        }
+        auto diffValueType = tryGetDifferentiableValueType(origType);
+        auto diffPtrType = tryGetDifferentiablePtrType(origType);
+
+        SLANG_ASSERT(
+            !(diffValueType && diffPtrType) &&
+            "Type cannot conform to both IDifferentiable and IDifferentiablePtrType");
+
+        return diffValueType ? diffValueType : diffPtrType;
+    }
+
+    // Lookup and return the 'Differential' type declared in the concrete type
+    // in order to conform to the IDifferentiable/IDifferentiablePtrType interfaces
+    // Asserts that the differential exists.
+    IRInst* getDifferentialForType(IRType* origType)
+    {
+        auto diffValueType = tryGetDifferentiableValueType(origType);
+        auto diffPtrType = tryGetDifferentiablePtrType(origType);
+
+        SLANG_ASSERT(
+            !(diffValueType && diffPtrType) &&
+            "Type cannot conform to both IDifferentiable and IDifferentiablePtrType");
+
+        SLANG_RELEASE_ASSERT(diffValueType || diffPtrType);
+        return diffValueType ? diffValueType : diffPtrType;
     }
 
     bool isDifferentiableType(IRType* origType)
@@ -363,70 +507,24 @@ struct DifferentiableTypeConformanceContext
 
     bool isDifferentiableValueType(IRType* origType)
     {
-        for (; origType;)
-        {
-            switch (origType->getOp())
-            {
-            case kIROp_FloatType:
-            case kIROp_HalfType:
-            case kIROp_DoubleType:
-            case kIROp_DifferentialPairType:
-            case kIROp_DifferentialPairUserCodeType:
-                return true;
-            case kIROp_VectorType:
-            case kIROp_ArrayType:
-            case kIROp_PtrType:
-            case kIROp_OutParamType:
-            case kIROp_BorrowInOutParamType:
-                origType = (IRType*)origType->getOperand(0);
-                continue;
-            default:
-                return lookUpConformanceForType(origType, DiffConformanceKind::Value) != nullptr;
-            }
-        }
-        return false;
+        return tryGetDifferentiableValueType(origType) != nullptr;
     }
 
     bool isDifferentiablePtrType(IRType* origType)
     {
-        for (; origType;)
-        {
-            switch (origType->getOp())
-            {
-            case kIROp_VectorType:
-            case kIROp_ArrayType:
-            case kIROp_PtrType:
-            case kIROp_OutParamType:
-            case kIROp_BorrowInOutParamType:
-                origType = (IRType*)origType->getOperand(0);
-                continue;
-            default:
-                return lookUpConformanceForType(origType, DiffConformanceKind::Ptr) != nullptr;
-            }
-        }
-        return false;
+        return tryGetDifferentiablePtrType(origType) != nullptr;
     }
 
     IRInst* getZeroMethodForType(IRBuilder* builder, IRType* origType)
     {
-        auto result = lookUpInterfaceMethod(
-            builder,
-            origType,
-            sharedContext->zeroMethodStructKey,
-            sharedContext->zeroMethodType,
-            DiffConformanceKind::Value);
-        return result;
+        SLANG_UNUSED(builder);
+        return tryGetAssociationOfKind(origType, ValAssociationKind::DifferentialZero);
     }
 
     IRInst* getAddMethodForType(IRBuilder* builder, IRType* origType)
     {
-        auto result = lookUpInterfaceMethod(
-            builder,
-            origType,
-            sharedContext->addMethodStructKey,
-            sharedContext->addMethodType,
-            DiffConformanceKind::Value);
-        return result;
+        SLANG_UNUSED(builder);
+        return tryGetAssociationOfKind(origType, ValAssociationKind::DifferentialAdd);
     }
 
     IRInst* emitNullDifferential(IRBuilder* builder)
@@ -444,18 +542,6 @@ struct DifferentiableTypeConformanceContext
         IRDifferentialPairTypeBase* pairType,
         DiffConformanceKind target);
 
-    IRInst* buildArrayWitness(
-        IRBuilder* builder,
-        IRArrayType* pairType,
-        DiffConformanceKind target);
-
-    IRInst* buildTupleWitness(IRBuilder* builder, IRInst* tupleType, DiffConformanceKind target);
-
-    IRInst* buildExtractExistensialTypeWitness(
-        IRBuilder* builder,
-        IRExtractExistentialType* extractExistentialType,
-        DiffConformanceKind target);
-
     IRInst* emitDAddOfDiffInstType(
         IRBuilder* builder,
         IRType* primalType,
@@ -469,96 +555,12 @@ struct DifferentiableTypeConformanceContext
         IRInst* op2);
 
     IRInst* emitDZeroOfDiffInstType(IRBuilder* builder, IRType* primalType);
+
+    void markDiffTypeInst(IRBuilder* builder, IRInst* diffInst, IRType* primalType);
+
+    void markDiffPairTypeInst(IRBuilder* builder, IRInst* diffPairInst, IRType* pairType);
 };
 
-
-struct DifferentialPairTypeBuilder
-{
-    DifferentialPairTypeBuilder() = default;
-
-    DifferentialPairTypeBuilder(AutoDiffSharedContext* sharedContext)
-        : sharedContext(sharedContext)
-    {
-    }
-
-    IRInst* findSpecializationForParam(IRInst* specializeInst, IRInst* genericParam);
-
-    IRInst* emitFieldAccessor(IRBuilder* builder, IRInst* baseInst, IRStructKey* key);
-
-    IRInst* emitPrimalFieldAccess(IRBuilder* builder, IRType* loweredPairType, IRInst* baseInst);
-
-    IRInst* emitDiffFieldAccess(IRBuilder* builder, IRType* loweredPairType, IRInst* baseInst);
-
-    IRInst* emitExistentialMakePair(
-        IRBuilder* builder,
-        IRInst* type,
-        IRInst* primalInst,
-        IRInst* diffInst);
-
-    IRStructKey* _getOrCreateDiffStructKey();
-
-    IRStructKey* _getOrCreatePrimalStructKey();
-
-    IRInst* _createDiffPairType(IRType* origBaseType, IRType* diffType);
-
-    IRInst* _createDiffPairInterfaceRequirement(IRType* origBaseType, IRType* diffType);
-
-    IRInst* lowerDiffPairType(IRBuilder* builder, IRType* originalPairType);
-
-    IRInst* getOrCreateCommonDiffPairInterface(IRBuilder* builder);
-
-    struct PairStructKey
-    {
-        IRInst* originalType;
-        IRInst* diffType;
-    };
-
-    // Cache from pair types to lowered type.
-    Dictionary<IRInst*, IRInst*> pairTypeCache;
-
-    // Cache from existential pair types to their lowered interface keys.
-    // We use a different cache because an interface type can have
-    // a regular pair for the pair of interface types, as well as an
-    // interface key for the associated pair types used for its implementations
-    //
-    Dictionary<IRInst*, IRInst*> existentialPairTypeCache;
-
-    // Cache for any interface requirement keys (generated for existential
-    // pair types)
-    //
-    Dictionary<IRInst*, IRStructKey*> assocPairTypeKeyMap;
-    Dictionary<IRInst*, IRStructKey*> makePairKeyMap;
-    Dictionary<IRInst*, IRStructKey*> getPrimalKeyMap;
-    Dictionary<IRInst*, IRStructKey*> getDiffKeyMap;
-
-    // More caches for easier lookups of the types associated with the
-    // keys. (avoid having to keep recomputing or performing complicated
-    // lookups)
-    //
-    Dictionary<IRInst*, IRFuncType*> makePairFuncTypeMap;
-    Dictionary<IRInst*, IRFuncType*> getPrimalFuncTypeMap;
-    Dictionary<IRInst*, IRFuncType*> getDiffFuncTypeMap;
-
-    // Even more caches for easier access to original primal/diff types
-    // (Only used for existential pair types). For regular pair types,
-    // these are easy to find right on the type itself.
-    //
-    Dictionary<IRInst*, IRType*> primalTypeMap;
-    Dictionary<IRInst*, IRType*> diffTypeMap;
-
-
-    IRStructKey* globalPrimalKey = nullptr;
-
-    IRStructKey* globalDiffKey = nullptr;
-
-    IRInst* genericDiffPairType = nullptr;
-
-    List<IRInst*> generatedTypeList;
-
-    AutoDiffSharedContext* sharedContext = nullptr;
-
-    IRInterfaceType* commonDiffPairInterface = nullptr;
-};
 
 void stripAutoDiffDecorations(IRModule* module);
 void stripTempDecorations(IRInst* inst);
@@ -566,20 +568,13 @@ void stripTempDecorations(IRInst* inst);
 bool isNoDiffType(IRType* paramType);
 bool isNeverDiffFuncType(IRFuncType* funcType);
 
-IRInst* lookupForwardDerivativeReference(IRInst* primalFunction);
-
-struct IRAutodiffPassOptions
-{
-    // Nothing for now...
-};
+IRInst* _lookupWitness(
+    IRBuilder* builder,
+    IRInst* witness,
+    IRInst* requirementKey,
+    IRType* resultType = nullptr);
 
 void checkAutodiffPatterns(IRModule* module, TargetProgram* target, DiagnosticSink* sink);
-
-bool processAutodiffCalls(
-    IRModule* module,
-    TargetProgram* target,
-    DiagnosticSink* sink,
-    IRAutodiffPassOptions const& options = IRAutodiffPassOptions());
 
 bool finalizeAutoDiffPass(IRModule* module, TargetProgram* target);
 
@@ -596,10 +591,6 @@ void cloneCheckpointHint(
     IRGlobalValueWithCode* code);
 
 void stripDerivativeDecorations(IRInst* inst);
-
-bool isBackwardDifferentiableFunc(IRInst* func);
-
-bool isDifferentiableType(DifferentiableTypeConformanceContext& context, IRInst* typeInst);
 
 bool canTypeBeStored(IRInst* type);
 
@@ -621,8 +612,6 @@ inline bool isRelevantDifferentialPair(IRType* type)
 
 bool isRuntimeType(IRType* type);
 
-IRInst* getExistentialBaseWitnessTable(IRBuilder* builder, IRType* type);
-
 UIndex addPhiOutputArg(
     IRBuilder* builder,
     IRBlock* block,
@@ -638,5 +627,24 @@ bool isDerivativeContextVar(IRVar* var);
 bool isDiffInst(IRInst* inst);
 
 bool isDifferentialOrRecomputeBlock(IRBlock* block);
+
+void copyDebugInfo(IRInst* srcFunc, IRInst* destFunc);
+
+void copyOriginalDecorations(IRInst* origFunc, IRInst* diffFunc);
+
+inline bool isDifferentialInst(IRInst* inst)
+{
+    return inst->findDecoration<IRDifferentialInstDecoration>();
+}
+
+inline bool isPrimalInst(IRInst* inst)
+{
+    return inst->findDecoration<IRPrimalInstDecoration>() || (as<IRConstant>(inst) != nullptr);
+}
+
+inline bool isMixedDifferentialInst(IRInst* inst)
+{
+    return inst->findDecoration<IRMixedDifferentialInstDecoration>();
+}
 
 }; // namespace Slang

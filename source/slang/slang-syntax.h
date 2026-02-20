@@ -50,7 +50,7 @@ inline int getVectorSize(VectorExpressionType* vecType)
 struct SemanticsVisitor;
 
 List<ExtensionDecl*> const& getCandidateExtensions(
-    DeclRef<AggTypeDecl> const& declRef,
+    DeclRef<Decl> const& declRef,
     SemanticsVisitor* semantics);
 
 // Returns the members of `genericInnerDecl`'s enclosing generic decl.
@@ -100,6 +100,11 @@ inline FilteredMemberRefList<T> getMembersOfType(
         declRef.getDecl()->getDirectMemberDecls(),
         declRef,
         filterStyle);
+}
+
+inline bool hasDirectFuncType(DeclRef<CallableDecl> declRef)
+{
+    return declRef.getDecl()->funcType.type != nullptr;
 }
 
 void _foreachDirectOrExtensionMemberOfType(
@@ -299,6 +304,22 @@ inline Type* getType(ASTBuilder* astBuilder, DeclRef<TypeDefDecl> declRef)
 
 inline Type* getResultType(ASTBuilder* astBuilder, DeclRef<CallableDecl> declRef)
 {
+    /*if (hasDirectFuncType(declRef))
+    {
+        return as<FuncType>(
+                   declRef.substitute(astBuilder, declRef.getDecl()->funcType.type)->resolve())
+            ->getResultType();
+    }
+    else
+    {*/
+    /*auto returnType = declRef.substitute(astBuilder, declRef.getDecl()->returnType.type);
+    if (!declRef.getDecl()->findModifier<NoDiffModifier>())
+        return returnType;
+    else
+    {
+        return astBuilder->getModifiedType(returnType, astBuilder->getNoDiffModifierVal());
+    //}
+    //}*/
     return declRef.substitute(astBuilder, declRef.getDecl()->returnType.type);
 }
 
@@ -320,6 +341,10 @@ inline FilteredMemberRefList<ParamDecl> getParameters(
 {
     return getMembersOfType<ParamDecl>(astBuilder, declRef);
 }
+
+std::tuple<Type*, ParamPassingMode> splitParameterTypeAndDirection(
+    ASTBuilder* astBuilder,
+    Type* paramTypeWithDirection);
 
 inline Decl* getInner(DeclRef<GenericDecl> declRef)
 {
@@ -390,6 +415,8 @@ GenericDeclRefType* getGenericDeclRefType(
 NamespaceType* getNamespaceType(ASTBuilder* astBuilder, DeclRef<NamespaceDeclBase> const& declRef);
 
 SamplerStateType* getSamplerStateType(ASTBuilder* astBuilder);
+
+ModifiedType* getTypeWithModifier(Type* baseType, Val* typeModifier);
 
 
 // Definitions that can't come earlier despite

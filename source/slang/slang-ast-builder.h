@@ -108,6 +108,7 @@ protected:
     Type* m_nullPtrType = nullptr;
     Type* m_noneType = nullptr;
     Type* m_diffInterfaceType = nullptr;
+    Type* m_forwardDiffFuncInterfaceType = nullptr;
     Type* m_builtinTypes[Index(BaseType::CountOf)];
     Dictionary<String, Type*> m_magicEnumTypes;
 
@@ -221,6 +222,11 @@ public:
     ///
     Dictionary<ValKey, Val*, Hash<ValKey>, ValKeyEqual> m_cachedNodes;
 
+    Dictionary<GenericDecl*, List<Val*>> m_cachedGenericDefaultArgs;
+
+    // For [PrimalSubstitute] and [PrimalSubstituteOf] decorators
+    Dictionary<Decl*, ShortList<Decl*, 4>> m_substituteMap;
+
     /// Create AST types
     template<typename T>
     T* createImpl()
@@ -329,7 +335,8 @@ public:
         if (!parent)
             return getDirectDeclRef(memberDecl);
         // A Generic value/type ParamDecl is always referred to directly.
-        if (as<GenericTypeParamDecl>(memberDecl) || as<GenericValueParamDecl>(memberDecl))
+        if (as<GenericTypeParamDecl>(memberDecl) || as<GenericValueParamDecl>(memberDecl) ||
+            as<GenericTypePackParamDecl>(memberDecl))
             return getDirectDeclRef(memberDecl);
         if (as<ThisTypeDecl>(memberDecl) && !as<InterfaceDecl>(memberDecl->parentDecl))
             return as<T>(parent);
@@ -348,6 +355,8 @@ public:
             //   Lookup of a decl defined in an extension is to lookup directly.
             // - Member(Lookup(w, AssociatedType), TypeConstraintDecl) ==> Lookup(w,
             // TypeConstraintDecl)
+            // - Member(Lookup(w, SubscriptDecl), GetterDecl/SetterDecl) ==> Lookup(w,
+            // GetterDecl/SetterDecl)
             //   Type constraint of an associated type is defined directly in w.
 
             auto parentDeclKind = lookupDeclRef->getDecl()->astNodeType;
@@ -361,6 +370,17 @@ public:
                            lookupDeclRef->getWitness(),
                            memberDecl)
                     .template as<T>();
+            case ASTNodeType::SubscriptDecl:
+                if (memberDecl->astNodeType == ASTNodeType::GetterDecl ||
+                    memberDecl->astNodeType == ASTNodeType::SetterDecl)
+                {
+                    return getLookupDeclRef(
+                               lookupDeclRef->getLookupSource(),
+                               lookupDeclRef->getWitness(),
+                               memberDecl)
+                        .template as<T>();
+                }
+                break;
             default:
                 break;
             }
@@ -532,6 +552,11 @@ public:
     Type* getNoneType() { return m_sharedASTBuilder->getNoneType(); }
     Type* getEnumTypeType() { return m_sharedASTBuilder->getEnumTypeType(); }
     Type* getDiffInterfaceType() { return m_sharedASTBuilder->getDiffInterfaceType(); }
+
+    Type* getForwardDiffFuncInterfaceType(Type* baseType, Witness* typeInfoWitness);
+    Type* getBackwardDiffFuncInterfaceType(Type* baseType, Witness* typeInfoWitness);
+    Type* getBwdCallableBaseType(Type* baseType, Witness* typeInfoWitness);
+
     // Construct the type `Ptr<valueType>`, where `Ptr`
     // is looked up as a builtin type.
     PtrType* getPtrType(Type* valueType, AccessQualifier accessQualifier, AddressSpace addrSpace);
@@ -604,8 +629,17 @@ public:
     DeclRef<InterfaceDecl> getDifferentiableInterfaceDecl();
     DeclRef<InterfaceDecl> getDifferentiableRefInterfaceDecl();
 
+    Type* getDiffTypeInfoInterfaceType();
+    DeclRef<InterfaceDecl> getDiffTypeInfoInterfaceDecl();
+
+    Type* getFwdDiffFuncType(Type* baseType, Witness* diffTypeInfoWitness);
+
+    DeclRef<InterfaceDecl> getFunctionBaseInterfaceDecl();
+
     Type* getDifferentiableInterfaceType();
     Type* getDifferentiableRefInterfaceType();
+
+    Type* getFunctionBaseType();
 
     bool isDifferentiableInterfaceAvailable();
 

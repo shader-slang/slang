@@ -17,8 +17,7 @@ typedef float.Differential dfloat;
 // be absolutely no context stored for any of these tests.
 //
 
-// CHK_REPORT: (0): note: no checkpoint contexts to report
-
+// CHK_REPORT-NOT: {{.*}}: 'test_simple'{{$}}
 [Differentiable]
 float test_simple(float y)
 {
@@ -32,6 +31,7 @@ float test_simple(float y)
     return t;
 }
 
+// CHK_REPORT-NOT: {{.*}}: 'test_strided'{{$}}
 [Differentiable]
 float test_strided(float y)
 {
@@ -45,6 +45,7 @@ float test_strided(float y)
     return t;
 }
 
+// CHK_REPORT-NOT: {{.*}}: 'test_offset'{{$}}
 [Differentiable]
 float test_offset(float y)
 {
@@ -58,6 +59,7 @@ float test_offset(float y)
     return t;
 }
 
+// CHK_REPORT-NOT: {{.*}}: 'test_negative_stride'{{$}}
 [Differentiable]
 float test_negative_stride(float y)
 {
@@ -71,6 +73,7 @@ float test_negative_stride(float y)
     return t;
 }
 
+// CHK_REPORT-NOT: {{.*}}: 'test_nested'{{$}}
 [Differentiable]
 float test_nested(float y)
 {
@@ -87,6 +90,7 @@ float test_nested(float y)
     return t;
 }
 
+// CHK_REPORT-NOT: {{.*}}: 'test_nested_with_offset'{{$}}
 [Differentiable]
 float test_nested_with_offset(float y)
 {
@@ -103,6 +107,7 @@ float test_nested_with_offset(float y)
     return t;
 }
 
+// CHK_REPORT-NOT: {{.*}}: 'test_nested_with_conditions'{{$}}
 [Differentiable]
 float test_nested_with_conditions(float y)
 {
@@ -125,6 +130,7 @@ float test_nested_with_conditions(float y)
     return t;
 }
 
+// CHK_REPORT-NOT: {{.*}}: 'test_with_continue'{{$}}
 [Differentiable]
 float test_with_continue(float y)
 {
@@ -143,6 +149,7 @@ float test_with_continue(float y)
     return t;
 }
 
+// CHK_REPORT-NOT: {{.*}}: 'test_nested_with_continue'{{$}}
 [Differentiable]
 float test_nested_with_continue(float y)
 {
@@ -176,63 +183,63 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     {
         dpfloat dpa = dpfloat(0.4, 0.0);
 
-        __bwd_diff(test_simple)(dpa, 1.0f);
+        bwd_diff(test_simple)(dpa, 1.0f);
         outputBuffer[1] = dpa.d; // CHECK-NEXT: 6.000000
     }
 
     {
         dpfloat dpa = dpfloat(0.4, 0.0);
 
-        __bwd_diff(test_strided)(dpa, 1.0f);
+        bwd_diff(test_strided)(dpa, 1.0f);
         outputBuffer[2] = dpa.d; // CHECK-NEXT: 15.000000
     }
 
     {
         dpfloat dpa = dpfloat(0.4, 0.0);
 
-        __bwd_diff(test_offset)(dpa, 1.0f);
+        bwd_diff(test_offset)(dpa, 1.0f);
         outputBuffer[3] = dpa.d; // CHECK-NEXT: 15.000000
     }
 
     {
         dpfloat dpa = dpfloat(0.4, 0.0);
 
-        __bwd_diff(test_negative_stride)(dpa, 1.0f);
+        bwd_diff(test_negative_stride)(dpa, 1.0f);
         outputBuffer[4] = dpa.d; // CHECK-NEXT: 384.000000
     }
 
     {
         dpfloat dpa = dpfloat(0.4, 0.0);
 
-        __bwd_diff(test_nested)(dpa, 1.0f);
+        bwd_diff(test_nested)(dpa, 1.0f);
         outputBuffer[5] = dpa.d;  // CHECK-NEXT: 1247400.000000
     }
 
     {
         dpfloat dpa = dpfloat(0.4, 0.0);
 
-        __bwd_diff(test_nested_with_offset)(dpa, 1.0f);
+        bwd_diff(test_nested_with_offset)(dpa, 1.0f);
         outputBuffer[6] = dpa.d; // CHECK-NEXT: 5159780352.000000
     }
 
     {
         dpfloat dpa = dpfloat(0.4, 0.0);
 
-        __bwd_diff(test_nested_with_conditions)(dpa, 1.0f);
+        bwd_diff(test_nested_with_conditions)(dpa, 1.0f);
         outputBuffer[7] = dpa.d; // CHECK-NEXT: 297.000000
     }
 
     {
         dpfloat dpa = dpfloat(0.4, 0.0);
 
-        __bwd_diff(test_with_continue)(dpa, 1.0f);
+        bwd_diff(test_with_continue)(dpa, 1.0f);
         outputBuffer[8] = dpa.d; // CHECK-NEXT: 8.000000
     }
 
     {
         dpfloat dpa = dpfloat(0.4, 0.0);
 
-        __bwd_diff(test_nested_with_continue)(dpa, 1.0f);
+        bwd_diff(test_nested_with_continue)(dpa, 1.0f);
         outputBuffer[9] = dpa.d; // CHECK-NEXT: 6.000000
     }
 }

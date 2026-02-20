@@ -33,6 +33,24 @@ struct IROutOfOrderCloneContext : public RefObject
             pendingUses.add(&clonedInst->getOperands()[ii]);
         }
 
+        // Also add the data type use (if it exists and is not in a differential or recompute
+        // block).
+        //
+        bool addTypeUse = true;
+        if (clonedInst->getDataType())
+        {
+            if (auto operandParent = as<IRBlock>(clonedInst->getDataType()->getParent()))
+            {
+                if (isDifferentialOrRecomputeBlock(operandParent))
+                {
+                    addTypeUse = false;
+                }
+            }
+        }
+
+        if (addTypeUse)
+            pendingUses.add(&clonedInst->typeUse);
+
         for (auto use = inst->firstUse; use;)
         {
             auto nextUse = use->nextUse;
@@ -291,7 +309,7 @@ struct UseOrPseudoUse
 //   from the original block, but located in the corresponding the reverse
 //   diff region so their results are accessible in the diff block for
 //   derivative computation.
-// - A 'diff' block, which contains the transcribed instructions from the
+// - A 'diff' block, which contains the translated instructions from the
 //   original block.
 struct BlockSplitInfo : public RefObject
 {

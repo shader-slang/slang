@@ -1442,6 +1442,11 @@ DIAGNOSTIC(
     valueRequirementMustBeCompileTimeConst,
     "requirement in the form of a simple value must be declared as 'static const'.")
 DIAGNOSTIC(30310, Error, typeIsNotDifferentiable, "type '$0' is not differentiable.")
+DIAGNOSTIC(
+    30311,
+    Error,
+    typeCannotConformToBothValueAndPointerDiffInterfaces,
+    "type '$0' should conform only to one of IDifferentiable or IDifferentiablePtrType, not both.")
 
 DIAGNOSTIC(
     30311,
@@ -2078,6 +2083,12 @@ DIAGNOSTIC(
     Error,
     cannotUseConstRefOnDifferentiableMemberMethod,
     "cannot use '[constref]' on a differentiable member method of a differentiable type.")
+DIAGNOSTIC(
+    38035,
+    Error,
+    encounteredNonDifferentiableFunctionDuringHigherOrderDiff,
+    "cannot propagate through non-differentiable function. mismatch encountered during "
+    "higher-order differentiation")
 
 DIAGNOSTIC(
     38040,

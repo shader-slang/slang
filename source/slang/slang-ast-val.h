@@ -719,6 +719,42 @@ class DeclaredSubtypeWitness : public SubtypeWitness
     ConversionCost _getOverloadResolutionCostOverride();
 };
 
+FIDDLE()
+class DiffTypeInfoWitness : public SubtypeWitness
+{
+    FIDDLE(...)
+
+    Type* getThisParamType() { return as<Type>(getOperand(0)); }
+
+    SubtypeWitness* getThisTypeDiffWitness() { return as<SubtypeWitness>(getOperand(1)); }
+
+    SubtypeWitness* getReturnTypeDiffWitness() { return as<SubtypeWitness>(getOperand(2)); }
+
+    SubtypeWitness* getParamTypeDiffWitness(Index index)
+    {
+        return as<SubtypeWitness>(getOperand(3 + index));
+    }
+
+    UCount getParamTypeCount() { return getOperandCount() - 3; }
+
+    void _toTextOverride(StringBuilder& out);
+    Val* _resolveImplOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
+FIDDLE()
+class HigherOrderDiffTypeTranslationWitness : public SubtypeWitness
+{
+    FIDDLE(...)
+
+    SubtypeWitness* getBaseWitness() { return as<SubtypeWitness>(getOperand(0)); }
+
+    void _toTextOverride(StringBuilder& out);
+    Val* _resolveImplOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
+
 // A witness that `sub : sup` because `sub : mid` and `mid : sup`
 FIDDLE()
 class TransitiveSubtypeWitness : public SubtypeWitness
@@ -1056,5 +1092,15 @@ inline bool isTypeEqualityWitness(Val* witness)
     }
     return false;
 }
+
+RequirementWitness getUnspecializedLookupRec(
+    ASTBuilder* astBuilder,
+    Decl* requirementKey,
+    SubtypeWitness* witness);
+
+RequirementWitness specializeLookedUpRec(
+    ASTBuilder* astBuilder,
+    SubtypeWitness* witness,
+    RequirementWitness lookedUpVal);
 
 } // namespace Slang

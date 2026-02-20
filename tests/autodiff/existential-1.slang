@@ -75,3 +75,32 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         outputBuffer[3] = dpx.d;
     }
 }
+
+/*
+// NEW STUFF:
+[Differentiable]
+float doThing2(dyn IInterface obj, float x)
+{
+    return obj.calc(x);
+}
+
+// "Internally".. 
+// Not sure if we can or should type check something like this:
+DifferentialPair<float> doThing2_fwd(dyn IDiffPair<dyn IInterface> obj, float x)
+{
+
+}
+
+// Should we just go with something simpler, like allowing
+DifferentialPair<float> doThing2_fwd_dyn(DifferentialPair<dyn IInterface> obj, DifferentialPair<float> x)
+{
+    // and including DifferentialPair as one of the supported types for type-flow analysis (so that
+    // types are propagated through it)?
+    //
+    //
+    // Then we need to undo the `DiffPair` associated type work, since that implies that 
+    // there can be other implementations of `IDiffPair<T>` for a given `T`, (but here we assume that
+    // its always DifferentialPair<T>).
+    // 
+}
+*/

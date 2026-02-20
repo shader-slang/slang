@@ -130,6 +130,12 @@ attribute_syntax [ExperimentalModule] : ExperimentalModuleAttribute;
 __attributeTarget(DeclBase)
 attribute_syntax [TreatAsDifferentiable] : TreatAsDifferentiableAttribute;
 
+__attributeTarget(DeclBase)
+attribute_syntax [HasTrivialForwardDerivative] : HasTrivialForwardDerivativeAttribute;
+
+__attributeTarget(DeclBase)
+attribute_syntax [MaybeDifferentiable] : MaybeDifferentiableAttribute;
+
 /// Represents types that provide arithmetic operations.
 interface IArithmetic : IComparable
 {
@@ -298,42 +304,42 @@ interface IInteger : IArithmetic, ILogical
 interface IFloat : IArithmetic, IDifferentiable
 {
     /// Initializes a value of the conforming type form a `float`.
-    [TreatAsDifferentiable]
+    [Differentiable]
     __init(float value);
 
     /// Converts a value of the conforming type into a `float`.
-    [TreatAsDifferentiable]
+    [Differentiable]
     float toFloat();
 
     /// Computes the arithmetic sum of two values of the conforming type.
-    [TreatAsDifferentiable]
+    [Differentiable]
     This add(This other);
 
     /// Computes the arithmetic subtraction from values of the conforming type.
-    [TreatAsDifferentiable]
+    [Differentiable]
     This sub(This other);
 
     /// Computes the arithmetic multiplication from values of the conforming type.
-    [TreatAsDifferentiable]
+    [Differentiable]
     This mul(This other);
 
     /// Computes the arithmetic division from values of the conforming type.
-    [TreatAsDifferentiable]
+    [Differentiable]
     This div(This other);
 
     /// Computes the arithmetic remainder from values of the conforming type.
-    [TreatAsDifferentiable]
+    [Differentiable]
     This mod(This other);
 
     /// Computes the arithmetic negation of the conforming type.
-    [TreatAsDifferentiable]
+    [Differentiable]
     This neg();
 
-    [TreatAsDifferentiable]
+    [Differentiable]
     __init(This value);
 
     /// Multiplies a value of the conforming type by a floating point scale factor..
-    [TreatAsDifferentiable]
+    [Differentiable]
     This scale<T:__BuiltinFloatingPointType>(T scale);
 }
 
@@ -617,16 +623,11 @@ interface IDifferentiable
 
     /// Returns a zero-initialized value of the differential type.
     __builtin_requirement($((int)BuiltinRequirementKind::DZeroFunc))
-    static Differential dzero();
+    [Differentiable] static Differential dzero();
 
     /// Adds two differential values and returns the result.
     __builtin_requirement($((int)BuiltinRequirementKind::DAddFunc))
-    static Differential dadd(Differential, Differential);
-
-    /// Multiplies a scalar value of a built-in real type with a differential value and returns the result.
-    __builtin_requirement($((int)BuiltinRequirementKind::DMulFunc))
-    __generic<T : __BuiltinRealType>
-    static Differential dmul(T, Differential);
+    [Differentiable] static Differential dadd(Differential, Differential);
 };
 
 /// @experimental
@@ -656,6 +657,69 @@ interface IDifferentiablePtrType
     associatedtype Differential : IDifferentiablePtrType;
 };
 
+__magic_type(DiffTypeInfoInterfaceType)
+interface IHasDiffTypeInfo
+{ };
+
+__magic_type(FwdDiffFuncType)
+__intrinsic_type($(kIROp_ForwardDiffFuncType))
+struct FwdDiffFuncType<FType> where FType : IHasDiffTypeInfo
+{ };
+
+__magic_type(BwdCallableFuncType)
+__intrinsic_type($(kIROp_BwdCallableFuncType))
+struct BwdCallableFuncType<FType, CtxType> where FType : IHasDiffTypeInfo
+{ };
+
+__magic_type(ApplyForBwdFuncType)
+__intrinsic_type($(kIROp_ApplyForBwdFuncType))
+struct ApplyForBwdFuncType<FType, CtxType> where FType : IHasDiffTypeInfo
+{ };
+
+__magic_type(BwdDiffFuncType)
+__intrinsic_type($(kIROp_BackwardDiffFuncType))
+struct BwdDiffFuncType<FType> where FType : IHasDiffTypeInfo
+{ };
+
+__magic_type(FuncResultType)
+__intrinsic_type($(kIROp_FuncResultType))
+struct FuncResultType<FType, CtxType> where FType : IHasDiffTypeInfo
+{ };
+
+__magic_type(ForwardDiffFuncInterfaceType)
+[KnownBuiltin($((int)KnownBuiltinDeclName::IForwardDifferentiable))]
+interface IForwardDifferentiable<FType> where FType : IHasDiffTypeInfo
+{
+    __builtin_requirement($( (int)BuiltinRequirementKind::ForwardDerivativeFunc))
+    [MaybeDifferentiable]
+    static __associatedfunc FwdDiffFuncType<FType> fwd_diff; // -> fwd_diff
+};
+
+// Core library interfaces:
+__magic_type(BwdCallableBaseType)
+[KnownBuiltin($((int)KnownBuiltinDeclName::IBwdCallable))]
+interface IBwdCallable<FType> where FType : IHasDiffTypeInfo
+{
+    __builtin_requirement($( (int)BuiltinRequirementKind::BwdCallablePropFunc))
+    __associatedfunc BwdCallableFuncType<FType, This> operator(); // -> bwd_prop
+
+    __builtin_requirement($( (int)BuiltinRequirementKind::BwdCallableGetValFunc)) 
+    __associatedfunc FuncResultType<FType, This> val;
+};
+
+__magic_type(BwdDiffFuncInterfaceType)
+[KnownBuiltin($((int)KnownBuiltinDeclName::IBackwardDifferentiable))]
+interface IBackwardDifferentiable<FType> where FType : IHasDiffTypeInfo
+{
+    __builtin_requirement($( (int)BuiltinRequirementKind::BwdCallableContextType)) 
+    associatedtype BwdCallable : IBwdCallable<FType>; // -> intermediate_context_type
+
+    __builtin_requirement($( (int)BuiltinRequirementKind::BwdApplyFunc))
+    __associatedfunc ApplyForBwdFuncType<FType, This.BwdCallable> apply_bwd; // -> apply_bwd
+
+    __builtin_requirement($( (int)BuiltinRequirementKind::LegacyBackwardDerivativeFunc))
+    __associatedfunc BwdDiffFuncType<FType> bwd_diff; // -> primal_ctx
+};
 
 /// `DifferentialPair<T>` is a built-in type that carries both the original and derivative value of a term.
 /// It is defined as follows:
@@ -680,30 +744,30 @@ interface IDifferentiablePtrType
 ///
 __generic<T : IDifferentiable>
 __magic_type(DifferentialPairType)
-__intrinsic_type($(kIROp_DifferentialPairUserCodeType))
+__intrinsic_type($(kIROp_DifferentialPairType))
 struct DifferentialPair : IDifferentiable
 {
     typedef DifferentialPair<T.Differential> Differential;
     typedef T.Differential DifferentialElementType;
 
-    __intrinsic_op($(kIROp_MakeDifferentialPairUserCode))
-    __init(T _primal, T.Differential _differential);
+    __intrinsic_op($(kIROp_MakeDifferentialPair))
+    [Differentiable] __init(T _primal, T.Differential _differential);
 
     property p : T
     {
-        __intrinsic_op($(kIROp_DifferentialPairGetPrimalUserCode))
+        __intrinsic_op($(kIROp_DifferentialPairGetPrimal))
         get;
     }
 
     property v : T
     {
-        __intrinsic_op($(kIROp_DifferentialPairGetPrimalUserCode))
+        __intrinsic_op($(kIROp_DifferentialPairGetPrimal))
         get;
     }
 
     property d : T.Differential
     {
-        __intrinsic_op($(kIROp_DifferentialPairGetDifferentialUserCode))
+        __intrinsic_op($(kIROp_DifferentialPairGetDifferential))
         get;
     }
 
@@ -720,12 +784,14 @@ struct DifferentialPair : IDifferentiable
     }
 
     [__unsafeForceInlineEarly]
+    [Differentiable]
     static Differential dzero()
     {
         return Differential(T.dzero(), T.Differential.dzero());
     }
 
     [__unsafeForceInlineEarly]
+    [Differentiable]
     static Differential dadd(Differential a, Differential b)
     {
         return Differential(
@@ -734,15 +800,6 @@ struct DifferentialPair : IDifferentiable
                 b.p
             ),
             T.Differential.dadd(a.d, b.d));
-    }
-
-    __generic<U : __BuiltinRealType>
-    [__unsafeForceInlineEarly]
-    static Differential dmul(U a, Differential b)
-    {
-        return Differential(
-            T.dmul<U>(a, b.p),
-            T.Differential.dmul<U>(a, b.d));
     }
 };
 
@@ -1126,7 +1183,7 @@ ${
 
         const char* attrib = "";
         if ((kBaseTypes[tt].flags & kBaseTypes[ss].flags & FLOAT_MASK) != 0)
-            attrib = "[TreatAsDifferentiable]";
+            attrib = "[Differentiable]";
 $}
     $(attrib)
     __intrinsic_op($(intrinsicOpCode))
@@ -1227,37 +1284,30 @@ $}
          __intrinsic_op($(kIROp_Less)) bool lessThan(This other);
          __intrinsic_op($(kIROp_Leq))  bool lessThanOrEquals(This other);
          __intrinsic_op($(kIROp_Eql))  bool equals(This other);
-         __intrinsic_op($(kIROp_Add))  This add(This other);
-         __intrinsic_op($(kIROp_Sub))  This sub(This other);
-         __intrinsic_op($(kIROp_Mul))  This mul(This other);
-         __intrinsic_op($(kIROp_Div))  This div(This other);
-         __intrinsic_op($(kIROp_FRem)) This mod(This other);
-         __intrinsic_op($(kIROp_Neg))  This neg();
-         __intrinsic_op($(kIROp_FloatCast)) float toFloat();
-         [__unsafeForceInlineEarly] This scale<T:__BuiltinFloatingPointType>(T s) { return __mul(this, __realCast<This>(s)); }
+         __intrinsic_op($(kIROp_Add))  [Differentiable] This add(This other);
+         __intrinsic_op($(kIROp_Sub))  [Differentiable] This sub(This other);
+         __intrinsic_op($(kIROp_Mul))  [Differentiable] This mul(This other);
+         __intrinsic_op($(kIROp_Div))  [Differentiable] This div(This other);
+         __intrinsic_op($(kIROp_FRem)) [Differentiable] This mod(This other);
+         __intrinsic_op($(kIROp_Neg))  [Differentiable] This neg();
+         __intrinsic_op($(kIROp_FloatCast)) [Differentiable] float toFloat();
+         [__unsafeForceInlineEarly] [Differentiable] This scale<T:__BuiltinFloatingPointType>(T s) { return __mul(this, __realCast<This>(s)); }
         typedef $(kBaseTypes[tt].name) Differential;
 
         [__unsafeForceInlineEarly]
-        [BackwardDifferentiable]
+        [Differentiable]
         static Differential dzero()
         {
             return Differential(0);
         }
 
         [__unsafeForceInlineEarly]
-        [BackwardDifferentiable]
+        [Differentiable]
         static Differential dadd(Differential a, Differential b)
         {
             return a + b;
         }
-
-        __generic<U : __BuiltinRealType>
-        [__unsafeForceInlineEarly]
-        [BackwardDifferentiable]
-        static Differential dmul(U a, Differential b)
-        {
-            return __realCast<Differential, U>(a) * b;
-        }
+        
 ${
         break;
     }
@@ -2178,7 +2228,6 @@ struct vector : IRWArray<T>
 
 
         /// Initialize a vector where all elements have the same scalar `value`.
-    [TreatAsDifferentiable]
     __implicit_conversion($(kConversionCost_ScalarToVector))
     __intrinsic_op($(kIROp_MakeVectorFromScalar))
     __init(T value);
@@ -2186,7 +2235,6 @@ struct vector : IRWArray<T>
     /// Initialize a vector from a value of the same type
     // TODO: we should revise semantic checking so this kind of "identity" conversion is not required
     __intrinsic_op(0)
-    [TreatAsDifferentiable]
     __init(vector<T,N> value);
 
     [ForceInline]
@@ -2206,13 +2254,11 @@ struct matrix : IRWArray<vector<T,C>>
 {
     __intrinsic_op($(kIROp_MakeMatrixFromScalar))
     __implicit_conversion($(kConversionCost_ScalarToMatrix))
-    [TreatAsDifferentiable]
     __init(T val);
 
     /// Initialize a vector from a value of the same type
     // TODO: we should revise semantic checking so this kind of "identity" conversion is not required
     __intrinsic_op(0)
-    [TreatAsDifferentiable]
     __init(This value);
 
     [ForceInline]
@@ -2300,14 +2346,21 @@ extension vector<T,N> : IFloat
     [__unsafeForceInlineEarly] bool lessThan(This other) { return this[0] < other[0]; }
     [__unsafeForceInlineEarly] bool lessThanOrEquals(This other) { return this[0] <= other[0]; }
     [__unsafeForceInlineEarly] bool equals(This other) { return all(__vectorEql(this, other)); }
-    __intrinsic_op($(kIROp_Add)) This add(This other);
-    __intrinsic_op($(kIROp_Sub)) This sub(This other);
-    __intrinsic_op($(kIROp_Mul)) This mul(This other);
-    __intrinsic_op($(kIROp_Div)) This div(This other);
-    __intrinsic_op($(kIROp_FRem)) This mod(This other);
-    __intrinsic_op($(kIROp_Neg)) This neg();
-    [__unsafeForceInlineEarly] This scale<T1:__BuiltinFloatingPointType>(T1 s) { return this.mul(__realCast<T>(s)); }
-    [__unsafeForceInlineEarly] float toFloat() { return __realCast<float>(this[0]); }
+    __intrinsic_op($(kIROp_Add)) [Differentiable] This add(This other);
+    __intrinsic_op($(kIROp_Sub)) [Differentiable] This sub(This other);
+    __intrinsic_op($(kIROp_Mul)) [Differentiable] This mul(This other);
+    __intrinsic_op($(kIROp_Div)) [Differentiable] This div(This other);
+    __intrinsic_op($(kIROp_FRem)) [Differentiable] This mod(This other);
+    __intrinsic_op($(kIROp_Neg)) [Differentiable] This neg();
+    [Differentiable] [__unsafeForceInlineEarly]  This scale<T1:__BuiltinFloatingPointType>(T1 s) { return this.mul(__realCast<T>(s)); }
+    [Differentiable] [__unsafeForceInlineEarly] float toFloat() { return __realCast<float>(this[0]); }
+
+    [OverloadRank(-1)]
+    [Differentiable]
+    __implicit_conversion($(kConversionCost_Default))
+    __intrinsic_op($(kIROp_FloatCast))
+    __generic<U:__BuiltinFloatingPointType>
+    __init(vector<U, N> other);
 
     [OverloadRank(-1)]
     __intrinsic_op($(kIROp_CastIntToFloat))
@@ -2317,7 +2370,7 @@ extension vector<T,N> : IFloat
     [OverloadRank(-1)]
     [__unsafeForceInlineEarly] __init(int v) { this = vector<T,N>(T(v)); }
     [OverloadRank(-1)]
-    [__unsafeForceInlineEarly] __init(float v) { this = vector<T,N>(T(v)); }
+    [__unsafeForceInlineEarly] [Differentiable] __init(float v) { this = vector<T,N>(T(v)); }
 
 }
 
@@ -2334,54 +2387,57 @@ extension vector<T,N> : IDifferentiable
     typedef vector<T, N> Differential;
 
     [__unsafeForceInlineEarly]
-    [BackwardDifferentiable]
+    [Differentiable]
     static Differential dzero()
     {
         return Differential(__slang_noop_cast<T>(T.dzero()));
     }
 
     [__unsafeForceInlineEarly]
-    [BackwardDifferentiable]
+    [Differentiable]
     static Differential dadd(Differential a, Differential b)
     {
         return __internal_add(a, b);
-    }
-
-    __generic<U : __BuiltinRealType>
-    [__unsafeForceInlineEarly]
-    [BackwardDifferentiable]
-    static Differential dmul(U a, Differential b)
-    {
-        return __internal_mul(__realCast<float>(a), b);
     }
 }
 
 __generic<T:__BuiltinFloatingPointType, let N : int, let M : int, let L : int>
 extension matrix<T,N,M,L> : IFloat
 {
-    [TreatAsDifferentiable][__unsafeForceInlineEarly] bool lessThan(This other) { return this < other; }
-    [TreatAsDifferentiable][__unsafeForceInlineEarly] bool lessThanOrEquals(This other) { return this <= other; }
-    [TreatAsDifferentiable][__unsafeForceInlineEarly] bool equals(This other) { return all(this == other); }
-    [TreatAsDifferentiable] __intrinsic_op($(kIROp_Add)) This add(This other);
-    [TreatAsDifferentiable] __intrinsic_op($(kIROp_Sub)) This sub(This other);
-    [TreatAsDifferentiable] __intrinsic_op($(kIROp_Mul))This mul(This other);
-    [TreatAsDifferentiable] __intrinsic_op($(kIROp_Div)) This div(This other);
-    [TreatAsDifferentiable] __intrinsic_op($(kIROp_FRem)) This mod(This other);
-    [TreatAsDifferentiable] __intrinsic_op($(kIROp_Neg)) This neg();
-    [TreatAsDifferentiable][__unsafeForceInlineEarly] This scale<T1:__BuiltinFloatingPointType>(T1 s) { return this.mul(__realCast<T>(s)); }
-    [TreatAsDifferentiable][__unsafeForceInlineEarly] float toFloat() { return __realCast<float>(this[0][0]); }
+    // TODO(sai): wut is happening here? before this was just this <= other which is just
+    // self-recursive.
+    //
+    [__unsafeForceInlineEarly] bool lessThan(This other) { return this[0][0] < other[0][0]; }
+    [__unsafeForceInlineEarly] bool lessThanOrEquals(This other) { return this[0][0] <= other[0][0]; }
+    [__unsafeForceInlineEarly] bool equals(This other) { return all(this[0][0] == other[0][0]); }
+    [Differentiable] __intrinsic_op($(kIROp_Add)) This add(This other);
+    [Differentiable] __intrinsic_op($(kIROp_Sub)) This sub(This other);
+    [Differentiable] __intrinsic_op($(kIROp_Mul))This mul(This other);
+    [Differentiable] __intrinsic_op($(kIROp_Div)) This div(This other);
+    [Differentiable] __intrinsic_op($(kIROp_FRem)) This mod(This other);
+    [Differentiable] __intrinsic_op($(kIROp_Neg)) This neg();
+    [Differentiable][__unsafeForceInlineEarly] This scale<T1:__BuiltinFloatingPointType>(T1 s) { return this.mul(__realCast<T>(s)); }
+    [Differentiable][__unsafeForceInlineEarly] float toFloat() { return __realCast<float>(this[0][0]); }
 
     [OverloadRank(-1)]
-    [TreatAsDifferentiable]
+    [Differentiable]
     [__unsafeForceInlineEarly]
     __implicit_conversion($(kConversionCost_ScalarIntegerToFloatMatrix))
     __init(int v) { this = matrix<T,N,M>(T(v)); }
 
     [OverloadRank(-1)]
-    [TreatAsDifferentiable]
+    [Differentiable]
     [__unsafeForceInlineEarly]
     __implicit_conversion($(kConversionCost_ScalarToMatrix))
     __init(float v) { this = matrix<T,N,M>(T(v)); }
+    
+    /// Initialize a matrix where all elements have the same scalar `value`.
+    [OverloadRank(-1)]
+    [Differentiable]
+    __implicit_conversion($(kConversionCost_ScalarToMatrix))
+    __intrinsic_op($(kIROp_MakeMatrixFromScalar))
+    __init(T value);
+
 }
 
 __generic<T:IDifferentiable, let N : int, let M : int, let L : int>
@@ -2391,25 +2447,17 @@ extension matrix<T,N,M,L> : IDifferentiable
     typedef matrix<T, N,M,L> Differential;
 
     [__unsafeForceInlineEarly]
-    [BackwardDifferentiable]
+    [Differentiable]
     static Differential dzero()
     {
         return matrix<T, N,M,L>(__slang_noop_cast<T>(T.dzero()));
     }
 
     [__unsafeForceInlineEarly]
-    [BackwardDifferentiable]
+    [Differentiable]
     static Differential dadd(Differential a, Differential b)
     {
         return __internal_add(a, b);
-    }
-
-    __generic<U : __BuiltinRealType>
-    [__unsafeForceInlineEarly]
-    [BackwardDifferentiable]
-    static Differential dmul(U a, Differential b)
-    {
-        return __internal_mul(__realCast<float>(a), b);
     }
 }
 
@@ -3459,7 +3507,7 @@ bool operator !=(T v0, T v1)
 
 ${
 const char* arithmeticInterfaces[] = {"IArithmetic", "IFloat"};
-const char* attribs[] = {"", "[TreatAsDifferentiable]"};
+const char* attribs[] = {"", "[Differentiable]"};
 for (Index i = 0; i < 2; i++) {
     const auto interfaceName = arithmeticInterfaces[i];
     const auto attrib = attribs[i];

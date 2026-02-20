@@ -20,7 +20,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     dpfloat dpa = dpfloat(2.0, 0.0);
     dpfloat dpb = dpfloat(1.5, 0.0);
 
-    __bwd_diff(test)(dpa, dpb, 1.0f);
+    bwd_diff(test)(dpa, dpb, 1.0f);
     outputBuffer[0] = dpa.d; // Expect: 1
     outputBuffer[1] = dpb.d; // Expect: 4
 }

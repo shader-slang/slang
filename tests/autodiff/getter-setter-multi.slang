@@ -22,6 +22,7 @@ struct A : IDifferentiable
     float y[10];
 
     [__unsafeForceInlineEarly]
+    [Differentiable]
     static Differential dzero()
     {
         B b = {0.0};
@@ -29,16 +30,10 @@ struct A : IDifferentiable
     }
 
     [__unsafeForceInlineEarly]
+    [Differentiable]
     static Differential dadd(Differential a, Differential b)
     {
         B o = {a.z + b.z};
-        return o;
-    }
-
-    [__unsafeForceInlineEarly]
-    static Differential dmul<T: __BuiltinRealType>(T a, Differential b)
-    {
-        B o = {__realCast<float, T>(a) * b.z};
         return o;
     }
 };

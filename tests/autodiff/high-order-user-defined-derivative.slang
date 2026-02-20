@@ -52,7 +52,7 @@ void d_fwd_loadLineSegment(uint id, DifferentialPair<LineSegment>.Differential d
 [BackwardDifferentiable]
 float something()
 {
-    LineSegment ls = __fwd_diff(loadLineSegment)(1).p;
+    LineSegment ls = fwd_diff(loadLineSegment)(1).p;
     return ls.x0 + ls.x1;
 }
 
@@ -60,13 +60,13 @@ float something()
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     {
-        LineSegment ls = __fwd_diff(loadLineSegment)(0).p;
+        LineSegment ls = fwd_diff(loadLineSegment)(0).p;
         outputBuffer[0] = ls.x0; // Expect: 0
         outputBuffer[1] = ls.x1; // Expect: 1
     }
 
     {
-        LineSegment.Differential d_ls = __fwd_diff(loadLineSegment)(0).d;
+        LineSegment.Differential d_ls = fwd_diff(loadLineSegment)(0).d;
         outputBuffer[2] = d_ls.x1; // Expect: 0
     }
 

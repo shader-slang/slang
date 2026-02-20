@@ -191,6 +191,7 @@ public struct PermutoEncoder<T,
 
     /// Reads feature values at a given lattice position from the feature table.
     /// @param levelBaseOffset Base offset into the feature table for this level (in number of elements).
+    [HasTrivialForwardDerivative]
     [BackwardDerivative(readFeatureValueBwd)]
     static void readFeatureValue<Address>(
         Address featureTableAddress,
@@ -199,7 +200,7 @@ public struct PermutoEncoder<T,
         uvec<Dimensions> key,
         out T result[FeatureDimensionPerEntry])
             where Address : IPointerLikeAddress<T>
-            where Address.Differential : IPointerLikeAddress<T.Differential>
+            where Address.Differential : IPointerLikeAddress<T>
     {
         uint index = levelBaseOffset + permutoIndex(key, hashmapSize) * FeatureDimensionPerEntry;
 
@@ -217,7 +218,7 @@ public struct PermutoEncoder<T,
         uvec<Dimensions> key,
         T.Differential[FeatureDimensionPerEntry] result)
             where Address : IPointerLikeAddress<T>
-            where Address.Differential : IPointerLikeAddress<T.Differential>
+            where Address.Differential : IPointerLikeAddress<T>
     {
         uint index = levelBaseOffset + permutoIndex(key, hashmapSize) * FeatureDimensionPerEntry;
 
@@ -244,7 +245,7 @@ public struct PermutoEncoder<T,
         Address featureTableAddress,
         inout OutArray encodedFeatures)
             where Address : IPointerLikeAddress<T>
-            where Address.Differential : IPointerLikeAddress<T.Differential>
+            where Address.Differential : IPointerLikeAddress<T>
     {
         // Compute offset into output array for this level
         uint outputOffset = params.levelInfo.currentLevelIndex * FeatureDimensionPerEntry;
@@ -317,7 +318,7 @@ public struct PermutoEncoder<T,
     [Differentiable]
     public OutArray encode<Address>(in InArray input, Address parametersAddress)
         where Address : IPointerLikeAddress<T>
-        where Address.Differential : IPointerLikeAddress<T.Differential>
+        where Address.Differential : IPointerLikeAddress<T>
     {
         OutArray encodedFeatures = OutArray();
 

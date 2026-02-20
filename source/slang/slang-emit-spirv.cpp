@@ -797,6 +797,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             switch (irOpCode)
             {
             case kIROp_IntCast:
+            case kIROp_ConstexprIntCast:
                 return SpvOpUConvert;
             case kIROp_FloatCast:
                 return SpvOpFConvert;
@@ -833,15 +834,19 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         switch (irOpCode)
         {
         case kIROp_Add:
+        case kIROp_ConstexprAdd:
             opCode = isFloatingPoint ? SpvOpFAdd : SpvOpIAdd;
             break;
         case kIROp_Sub:
+        case kIROp_ConstexprSub:
             opCode = isFloatingPoint ? SpvOpFSub : SpvOpISub;
             break;
         case kIROp_Mul:
+        case kIROp_ConstexprMul:
             opCode = isFloatingPoint ? SpvOpFMul : SpvOpIMul;
             break;
         case kIROp_Div:
+        case kIROp_ConstexprDiv:
             opCode = isFloatingPoint ? SpvOpFDiv : isSigned ? SpvOpSDiv : SpvOpUDiv;
             break;
         case kIROp_IRem:
@@ -1187,6 +1192,27 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         m_mapIRInstToSpvInst[inst] = result;
         return result;
     }
+
+    SpvInst* emitNullPtr(IRType* type, IRInst* inst = nullptr)
+    {
+        ConstantValueKey<IRFloatingPointValue> key;
+        key.value = 0;
+        key.type = type;
+
+        SpvInst* result = nullptr;
+        if (m_spvFloatConstants.tryGetValue(key, result))
+        {
+            m_mapIRInstToSpvInst[inst] = result;
+            return result;
+        }
+
+        return emitInst(
+            getSection(SpvLogicalSectionID::ConstantsAndTypes),
+            inst,
+            SpvOpConstantNull,
+            inst->getDataType());
+    }
+
     SpvInst* emitFloatConstant(IRFloatingPointValue val, IRType* type, IRInst* inst = nullptr)
     {
         ConstantValueKey<IRFloatingPointValue> key;
@@ -5290,6 +5316,15 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     kResultID,
                     SpvLiteralBits::fromUnownedStringSlice(value));
             }
+        case kIROp_PtrLit:
+            {
+                auto value = as<IRPtrLit>(inst)->getValue();
+
+                // We only support null pointer literals.
+                SLANG_ASSERT(value == nullptr);
+
+                return emitOpConstantNull(inst, inst->getDataType());
+            }
         default:
             return nullptr;
         }
@@ -6088,9 +6123,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         decoration,
                         dstID,
                         SpvDecorationUserTypeGOOGLE,
-                        legalizeUserTypeName(cast<IRUserTypeNameDecoration>(decoration)
-                                                 ->getUserTypeName()
-                                                 ->getStringSlice())
+                        legalizeUserTypeName(
+                            cast<IRUserTypeNameDecoration>(decoration)
+                                ->getUserTypeName()
+                                ->getStringSlice())
                             .getUnownedSlice());
                 }
                 break;

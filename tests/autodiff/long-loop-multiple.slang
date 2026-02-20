@@ -24,7 +24,7 @@ float sin_series(float x, int iterations)
 // This test differs from ./long-loop.slang in that the loop counter is
 // relative to a multiple of the loop iteration
 
-// CHECK: struct s_bwd_prop_sin_series_Intermediates
+// CHECK: struct s_bwdCallableCtx_sin_series_{{[0-9]+}}
 // CHECK-NOT: int {{[A-Za-z0-9_]+}}[{{.*}}]
 // CHECK: }
 

@@ -65,6 +65,67 @@ SubtypeWitness* SemanticsVisitor::isSubtype(
     return result;
 }
 
+
+SubtypeWitness* SemanticsVisitor::getDiffTypeInfoWitness(DeclRef<FunctionDeclBase> callableDeclRef)
+{
+    List<SubtypeWitness*> paramWitnesses;
+
+    auto astBuilder = getCurrentASTBuilder();
+
+    if (auto fwdDiffFuncType = as<FwdDiffFuncType>(callableDeclRef.getDecl()->funcType.type))
+    {
+        auto diffTypeWitness = as<GenericAppDeclRef>(fwdDiffFuncType->getDeclRefBase())->getArg(1);
+        return astBuilder->getOrCreate<HigherOrderDiffTypeTranslationWitness>(diffTypeWitness);
+    }
+
+    auto funcType = as<FuncType>(getFuncType(astBuilder, callableDeclRef));
+    auto getDiffWitness = [&](Type* type) -> SubtypeWitness*
+    {
+        auto witness = tryGetSubtypeWitness(type, astBuilder->getDifferentiableInterfaceType());
+
+        if (!witness)
+            witness = tryGetSubtypeWitness(type, astBuilder->getDifferentiableRefInterfaceType());
+
+        return witness;
+    };
+
+    for (auto paramType : funcType->getParamTypes())
+    {
+        auto [paramValueType, _] = splitParameterTypeAndDirection(astBuilder, paramType);
+        auto witness = getDiffWitness(paramValueType);
+        paramWitnesses.add(witness);
+    }
+
+    SubtypeWitness* returnWitness = getDiffWitness(funcType->getResultType());
+
+    auto thisValueType = getTypeForThisExpr(this, callableDeclRef);
+    Type* thisParamType = nullptr;
+
+    if (callableDeclRef.getDecl()->hasModifier<HLSLStaticModifier>() ||
+        as<ConstructorDecl>(callableDeclRef.getDecl()))
+    {
+        thisParamType = nullptr;
+    }
+    else if (thisValueType.type)
+    {
+        if (thisValueType.isLeftValue)
+            thisParamType = astBuilder->getBorrowInOutParamType(thisValueType.type);
+        else
+            thisParamType = thisValueType.type;
+    }
+
+    SubtypeWitness* thisWitness = thisParamType ? getDiffWitness(thisValueType) : nullptr;
+
+    if (callableDeclRef.getDecl()->hasModifier<NoDiffThisAttribute>())
+        thisWitness = nullptr;
+
+    return astBuilder->getOrCreate<DiffTypeInfoWitness>(
+        thisParamType,
+        thisWitness,
+        returnWitness,
+        paramWitnesses);
+}
+
 SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
     Type* subType,
     Type* superType,
@@ -109,6 +170,13 @@ SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
     // For now we are continuing to conflate all the subtype-ish relationships but not
     // tangling convertibility into it.
 
+    // TODO: Un-special case this if possible.
+    if (isDeclRefTypeOf<FunctionDeclBase>(subType) && as<DiffTypeInfoInterfaceType>(superType))
+    {
+        return getDiffTypeInfoWitness(
+            as<DeclRefType>(subType)->getDeclRef().as<FunctionDeclBase>());
+    }
+
     // First, make sure both sub type and super type decl are ready for lookup.
     if (!(int(isSubTypeOptions) & int(IsSubTypeOptions::NoCaching)))
     {
@@ -138,7 +206,7 @@ SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
         // the facets that represent supertypes, and those
         // will be the ones that store a type on the facet.
         //
-        auto facetType = facet->getType();
+        auto facetType = facet->getType()->resolve();
         if (!facetType)
             continue;
 
@@ -163,7 +231,7 @@ SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
 
         // Conveniently, the `facet` stores a pre-computed witness for the
         // subtype relationship, which we can use here.
-        return facet->subtypeWitness;
+        return as<SubtypeWitness>(facet->subtypeWitness->resolve());
     }
     //
     // TODO: We could expand upon the test using the facet list above

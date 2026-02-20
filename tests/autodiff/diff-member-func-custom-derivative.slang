@@ -28,6 +28,7 @@ struct A : IDifferentiable
 
     static void diff_g(inout DifferentialPair<A> dpa, inout DifferentialPair<float> v, float dOut)
     {
+        dpa = DifferentialPair<A>(dpa.p, A.dzero());
         v = diffPair(v.p, dOut * 2.0);
     }
 }

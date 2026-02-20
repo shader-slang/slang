@@ -1,4 +1,4 @@
-//TEST:EXECUTABLE:
+//TEST:EXECUTABLE: -Xslang -dump-intermediates
 import gfx;
 import slang;
 

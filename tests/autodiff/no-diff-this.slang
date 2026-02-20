@@ -40,11 +40,11 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     A.Differential ad;
     ad.x = 1.0;
 
-    let rs = __fwd_diff(A.f)(DifferentialPair<A>(a, ad), dpfloat(3.0, 1.0));
+    let rs = fwd_diff(A.f)(DifferentialPair<A>(a, ad), dpfloat(3.0, 1.0));
     outputBuffer[0] = rs.p; // Expect: 13.0
     outputBuffer[1] = rs.d; // Expect: 10.0
 
-    let rs2 = __fwd_diff(A.f2)(DifferentialPair<A>(a, ad), dpfloat(3.0, 1.0));
+    let rs2 = fwd_diff(A.f2)(DifferentialPair<A>(a, ad), dpfloat(3.0, 1.0));
     outputBuffer[2] = rs2.p; // Expect: 13.0
     outputBuffer[3] = rs2.d; // Expect: 6.0
 }

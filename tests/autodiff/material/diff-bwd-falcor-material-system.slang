@@ -14,7 +14,7 @@ import GlossyMaterialInstance;
 //TEST_INPUT: type_conformance DiffuseMaterial:IMaterial = 0
 //TEST_INPUT: type_conformance GlossyMaterial:IMaterial = 1
 
-[BackwardDifferentiable]
+[Differentiable]
 float3 evalBSDF(int type)
 {
     float3 wi = normalize(float3(0.5, 0.2, 0.8));
@@ -29,6 +29,6 @@ float3 evalBSDF(int type)
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
-    __bwd_diff(evalBSDF)(0, float3(1.f));
-    __bwd_diff(evalBSDF)(1, float3(1.f));
+    bwd_diff(evalBSDF)(0, float3(1.f));
+    bwd_diff(evalBSDF)(1, float3(1.f));
 }

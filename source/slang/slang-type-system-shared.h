@@ -151,6 +151,32 @@ enum class AccessQualifier : uint64_t
     Immutable = 2,
 };
 
+enum class ValAssociationKind
+{
+    Unknown = 0,
+    // Associations for differentiable functions/callables.
+    ForwardDerivative = 1,
+    ForwardDerivativeWitnessTable = 2,
+    BackwardDerivativeWitnessTable = 3,
+
+    BackwardDerivativeApply = 4,
+    BackwardDerivativeContext = 5,
+    BackwardDerivativeContextGetVal = 6,
+    BackwardDerivativePropagate = 7,
+
+    // Associations for differentiable types.
+    DifferentialPairType = 8,
+    DifferentialPairMake = 9,
+    DifferentialPairGetPrimal = 10,
+    DifferentialPairGetDifferential = 11,
+    DifferentialType = 12,
+    DifferentialPtrType = 13,
+    DifferentialPtrPairType = 14,
+    DifferentialZero = 15,
+    DifferentialAdd = 16,
+};
+
+
 } // namespace Slang
 
 #endif

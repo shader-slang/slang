@@ -7,11 +7,9 @@ RWStructuredBuffer<float> outputBuffer;
 
 typedef DifferentialPair<float> dpfloat;
 
-typealias IDFloat = __BuiltinFloatingPointType & IDifferentiable;
-
 namespace myintrinsiclib
 {
-    __generic<T : IDFloat>
+    __generic<T : __BuiltinFloatingPointType>
     [ForwardDerivative(d_myexp<T>)]
     T myexp(T x)
     {
@@ -30,17 +28,17 @@ namespace myintrinsiclib
         }
     }
 
-    __generic<T : IDFloat>
+    __generic<T : __BuiltinFloatingPointType>
     DifferentialPair<T> d_myexp(DifferentialPair<T> dpx)
     {
         return DifferentialPair<T>(
             myexp(dpx.p),
-            T.dmul(myexp(dpx.p), dpx.d));
+            __mul_p_d(myexp(dpx.p), dpx.d));
     }
 
     
     // Sine
-    __generic<T : IDFloat>
+    __generic<T : __BuiltinFloatingPointType>
     [ForwardDerivative(d_mysin<T>)]
     T mysin(T x)
     {
@@ -59,16 +57,16 @@ namespace myintrinsiclib
         }
     }
 
-    __generic<T : IDFloat>
+    __generic<T : __BuiltinFloatingPointType>
     DifferentialPair<T> d_mysin(DifferentialPair<T> dpx)
     {
         return DifferentialPair<T>(
             mysin(dpx.p),
-            T.dmul(mycos(dpx.p), dpx.d));
+            __mul_p_d(mycos(dpx.p), dpx.d));
     }
 
     // Cosine
-    __generic<T : IDFloat>
+    __generic<T : __BuiltinFloatingPointType>
     [ForwardDerivative(d_mycos<T>)]
     T mycos(T x)
     {
@@ -87,16 +85,16 @@ namespace myintrinsiclib
         }
     }
 
-    __generic<T : IDFloat>
+    __generic<T : __BuiltinFloatingPointType>
     DifferentialPair<T> d_mycos(DifferentialPair<T> dpx)
     {
         return DifferentialPair<T>(
             mycos(dpx.p),
-            T.dmul(-sin(dpx.p), dpx.d));
+            __mul_p_d(-sin(dpx.p), dpx.d));
     }
 
     // Sine and cosine
-    __generic<T : IDFloat>
+    __generic<T : __BuiltinFloatingPointType>
     __target_intrinsic(hlsl, "sincos($0, $1, $2)")
     __target_intrinsic(cuda, "$P_sincos($0, $1, $2)")
     [ForwardDerivative(d_mysincos<T>)]
@@ -106,15 +104,15 @@ namespace myintrinsiclib
         c = cos(x);
     }
 
-    __generic<T : IDFloat>
+    __generic<T : __BuiltinFloatingPointType>
     void d_mysincos(DifferentialPair<T> x, out DifferentialPair<T> s, out DifferentialPair<T> c)
     {
         T _s;
         T _c;
         mysincos(x.p, _s, _c);
 
-        s = DifferentialPair<T>(_s, T.dmul(_c, x.d));
-        c = DifferentialPair<T>(_c, T.dmul(-_s, x.d));
+        s = DifferentialPair<T>(_s, __mul_p_d(_c, x.d));
+        c = DifferentialPair<T>(_c, __mul_p_d(-_s, x.d));
     }
 };
 
@@ -141,7 +139,7 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
         dpfloat dpa = dpfloat(2.0, 1.0);
 
         outputBuffer[0] = f(dpa.p);        // Expect: 7.389056
-        outputBuffer[1] = __fwd_diff(f)(dpa).d; // Expect: 7.389056
+        outputBuffer[1] = fwd_diff(f)(dpa).d; // Expect: 7.389056
 
         // g() needs additional handling of  IRMakeDifferentialPair(PtrType). This needs to 
         // generate a new var, load from the individual vars and store into the pair var.

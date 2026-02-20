@@ -4525,8 +4525,9 @@ void CLikeSourceEmitter::emitClass(IRClassType* classType)
         m_writer->emit("SLANG_COM_OBJECT_IUNKNOWN_ALL\n");
         m_writer->emit("void* getInterface(const Guid & uuid)\n{\n");
         m_writer->indent();
-        m_writer->emit("if (uuid == ISlangUnknown::getTypeGuid()) return "
-                       "static_cast<ISlangUnknown*>(this);\n");
+        m_writer->emit(
+            "if (uuid == ISlangUnknown::getTypeGuid()) return "
+            "static_cast<ISlangUnknown*>(this);\n");
         for (auto wt : comWitnessTables)
         {
             auto interfaceName = getName(wt->getConformanceType());

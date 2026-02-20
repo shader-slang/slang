@@ -233,6 +233,9 @@ FIDDLE() namespace Slang
         saturated_cooperation_using,
         IDifferentiable,
         IDifferentiablePtr,
+        IForwardDifferentiable,
+        IBackwardDifferentiable,
+        IBwdCallable,
         NullDifferential,
         OperatorAddressOf,
         COUNT
@@ -1787,26 +1790,46 @@ FIDDLE() namespace Slang
     {
         DefaultInitializableConstructor, ///< The `IDefaultInitializable.__init()` method
 
-        DifferentialType,    ///< The `IDifferentiable.Differential` associated type requirement
-        DifferentialPtrType, ///< The `IDifferentiable.DifferentialPtr` associated type requirement
-        DZeroFunc,           ///< The `IDifferentiable.dzero` function requirement
-        DAddFunc,            ///< The `IDifferentiable.dadd` function requirement
-        DMulFunc,            ///< The `IDifferentiable.dmul` function requirement
+        DifferentialType,     ///< The `IDifferentiable.Differential` associated type requirement
+        DifferentialPairType, ///< The `IDifferentiable.DifferentialPair` associated type
+                              ///< requirement
+        DifferentialPtrType,  ///< The `IDifferentiable.DifferentialPtr` associated type requirement
+        DifferentialPtrPairType, ///< The `IDifferentiable.DifferentialPtrPair` associated type
+                                 ///< requirement
+        DZeroFunc,               ///< The `IDifferentiable.dzero` function requirement
+        DAddFunc,                ///< The `IDifferentiable.dadd` function requirement
+        DMulFunc,                ///< The `IDifferentiable.dmul` function requirement
 
-        InitLogicalFromInt, ///< The `ILogical.__init` mtehod.
-        Equals,             ///< The `ILogical.equals` mtehod.
-        LessThan,           ///< The `ILogical.lessThan` mtehod.
-        LessThanOrEquals,   ///< The `ILogical.lessThanOrEquals` mtehod.
-        Shl,                ///< The `ILogical.shl` mtehod.
-        Shr,                ///< The `ILogical.shr` mtehod.
-        BitAnd,             ///< The `ILogical.bitAnd` mtehod.
-        BitOr,              ///< The `ILogical.bitOr` mtehod.
-        BitXor,             ///< The `ILogical.bitXor` mtehod.
-        BitNot,             ///< The `ILogical.bitNot` mtehod.
-        And,                ///< The `ILogical.and` mtehod.
-        Or,                 ///< The `ILogical.or` mtehod.
-        Not,                ///< The `ILogical.not` mtehod.
+        InitLogicalFromInt,        ///< The `ILogical.__init` method.
+        Equals,                    ///< The `ILogical.equals` method.
+        LessThan,                  ///< The `ILogical.lessThan` method.
+        LessThanOrEquals,          ///< The `ILogical.lessThanOrEquals` method.
+        Shl,                       ///< The `ILogical.shl` method.
+        Shr,                       ///< The `ILogical.shr` method.
+        BitAnd,                    ///< The `ILogical.bitAnd` method.
+        BitOr,                     ///< The `ILogical.bitOr` method.
+        BitXor,                    ///< The `ILogical.bitXor` method.
+        BitNot,                    ///< The `ILogical.bitNot` method.
+        And,                       ///< The `ILogical.and` method.
+        Or,                        ///< The `ILogical.or` method.
+        Not,                       ///< The `ILogical.not` method.
+                                   // Requirement keys for new auto-diff system
+        ForwardDerivativeFuncType, ///< The "__fwd_diff_func_type" built-in associatedtype on
+                                   ///< functions
+        ForwardDerivativeFunc,
+        ForwardDerivativeAllowInline, ///< "IForwardDifferentiable::allowInline" built-in associated
+                                      ///< boolean constant.
+
+        BwdCallableContextType,        ///< The "BwdCallable" built-in associatedtype on functions
+        BwdApplyFunc,                  ///< The "apply" built-in associated function on functions
+        BwdCallablePropFunc,           ///< The "BwdCallable::operator()" built-in function
+        BwdCallableGetValFunc,         ///< The "BwdCallable::getVal()" built-in function
+        LegacyBackwardDerivativeFunc,  ///< The "bwdDiff" built-in associated function on functions
+        BackwardDerivativeAllowInline, ///< "IBackwardDifferentiable::allowInline" built-in
+                                       ///< associated boolean constant.
     };
+
+    // How do we swap out applyFwd for applyBwd?
 
     enum class FunctionDifferentiableLevel
     {

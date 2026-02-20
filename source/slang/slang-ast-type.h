@@ -634,6 +634,86 @@ class DefaultInitializableType : public BuiltinType
     FIDDLE(...)
 };
 
+FIDDLE()
+class FunctionBaseType : public BuiltinType
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class DifferentiableFuncBaseType : public BuiltinType
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class ForwardDiffFuncInterfaceType : public BuiltinType
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class BwdCallableBaseType : public BuiltinType
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class BwdDiffFuncInterfaceType : public BuiltinType
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class LegacyBwdDiffFuncInterfaceType : public BuiltinType
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class DiffTypeInfoInterfaceType : public BuiltinType
+{
+    FIDDLE(...)
+};
+
+// Built-in type to translate the type.
+FIDDLE()
+class FwdDiffFuncType : public BuiltinType
+{
+    FIDDLE(...)
+    Val* _resolveImplOverride();
+};
+
+
+FIDDLE()
+class BwdDiffFuncType : public BuiltinType
+{
+    FIDDLE(...)
+    Val* _resolveImplOverride();
+};
+
+FIDDLE()
+class BwdCallableFuncType : public BuiltinType
+{
+    FIDDLE(...)
+    Val* _resolveImplOverride();
+};
+
+FIDDLE()
+class ApplyForBwdFuncType : public BuiltinType
+{
+    FIDDLE(...)
+    Val* _resolveImplOverride();
+};
+
+
+FIDDLE()
+class FuncResultType : public BuiltinType
+{
+    FIDDLE(...)
+    Val* _resolveImplOverride();
+};
+
 // A vector type, e.g., `vector<T,N>`
 FIDDLE()
 class VectorExpressionType : public ArithmeticExpressionType

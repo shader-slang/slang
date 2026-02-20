@@ -28,7 +28,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     float3x3 b = float3x3(1.5);
     float3x3 da = float3x3(1.0);
 
-    outputBuffer[0] = __fwd_diff(g)(
+    outputBuffer[0] = fwd_diff(g)(
                           diffPair(a, da),
                           diffPair(b, da)).d._11; // Expect: 8
 
@@ -39,5 +39,5 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     //float2x2 epsilon = d * 0.001f;
     //outputBuffer[1] = (h(l + epsilon, r + epsilon) - h(l - epsilon, r - epsilon)) / (epsilon[0][0] * 2.0));
 
-    outputBuffer[1] = __fwd_diff(h)(diffPair(l, d), diffPair(r, d)).d; // Expect 83.0
+    outputBuffer[1] = fwd_diff(h)(diffPair(l, d), diffPair(r, d)).d; // Expect 83.0
 }

@@ -20,7 +20,7 @@ float outerF(float x)
 [BackwardDifferentiable]
 float df(float x)
 {
-    return __fwd_diff(outerF)(DifferentialPair<float>(x, 1.0)).d; // 4*sin^3(x)
+    return fwd_diff(outerF)(DifferentialPair<float>(x, 1.0)).d; // 4*sin^3(x)
 }
 
 [numthreads(1, 1, 1)]
@@ -34,14 +34,14 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     // Expect f''(4) = -0.291
     {
         var p = diffPair(4.0, 0.0);
-        __bwd_diff(df)(p, 1.0);
+        bwd_diff(df)(p, 1.0);
         outputBuffer[0] = p.d;
     }
 
     // Expect f''(4) = -0.653643
     {
         var p = diffPair(2.0, 0.0);
-        __bwd_diff(df)(p, 0.5);
+        bwd_diff(df)(p, 0.5);
         outputBuffer[1] = p.d;
     }
 }

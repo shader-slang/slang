@@ -1140,7 +1140,7 @@ public struct WaveTangledVector<T, ShMemPool : ISharedMemoryPool, int N, int Sub
     where T : __BuiltinFloatingPointType
     where T.Differential == T
 {
-    public typealias Differential = WaveTangledVector<T.Differential, ShMemPool, N, SubgroupSize>;
+    public typealias Differential = WaveTangledVector<T, ShMemPool, N, SubgroupSize>;
 
     public static const int Size = N;
     public no_diff ShMemPool shMemPool;
@@ -1229,7 +1229,7 @@ public struct WaveTangledVector<T, ShMemPool : ISharedMemoryPool, int N, int Sub
         Address weightAddress,
         Optional<Address> biasAddress)
         where Address : IPointerLikeAddress<T>
-        where Address.Differential : IPointerLikeAddress<T.Differential>
+        where Address.Differential : IPointerLikeAddress<T>
         where OutputVector : IVector<T>
     {
         typealias MMA = MMAHelper<DTypeMatC, N, OutputVector.Size, SubgroupSize, Target, false>;
@@ -1249,9 +1249,8 @@ public struct WaveTangledVector<T, ShMemPool : ISharedMemoryPool, int N, int Sub
         Optional<DifferentialPtrPair<Address>> biasAddress,
         OutputVector.Differential doutput)
         where Address : IPointerLikeAddress<T>
-        where Address.Differential : IPointerLikeAddress<T.Differential>
+        where Address.Differential : IPointerLikeAddress<T>
         where OutputVector : IVector<T>
-        where OutputVector.Differential : IVector<T.Differential>
     {
         typealias MMA = MMAHelper<DTypeMatC, N, OutputVector.Size, SubgroupSize, Target, true>;
 
@@ -1267,14 +1266,14 @@ public struct WaveTangledVector<T, ShMemPool : ISharedMemoryPool, int N, int Sub
         // of the mma operation.
         // dIn = W^T * dOut;
 #if 1
-        let outArray = MMA.mma<T, Address, OutputVector.Differential, T[AlignedOutSize].Differential, T.Differential, false
+        let outArray = MMA.mma<T, Address, OutputVector.Differential, T[AlignedOutSize], T, false
                         >( doutput, shA, shB, shC, dWeightAddress.p, none);
         This.Differential dInput = This.Differential(outArray);
         dthis = DifferentialPair<This>(dthis.p, dInput);
 
         // dW = dOut * input^T
-        MMA.outerProductAccumulate<T.Differential, Address.Differential,
-                                   T.Differential, OutputVector.Differential,
+        MMA.outerProductAccumulate<T, Address.Differential,
+                                   T, OutputVector.Differential,
                                    T, T[Uint4AlignedInputSize]
                                   >( shA, shB, doutput, dthis.p.data, dWeightAddress.d);
 #else
@@ -1291,18 +1290,19 @@ public struct WaveTangledVector<T, ShMemPool : ISharedMemoryPool, int N, int Sub
         if (Bias)
         {
             const int subgroupIndex = getWaveId();
-            MMA.sumReduceRows<T.Differential, Address.Differential, OutputVector.Differential
+            MMA.sumReduceRows<T, Address.Differential, OutputVector.Differential
                 >(shA, doutput, subgroupIndex, biasAddress.value.d);
         }
     }
 
     // Linear transformation without bias
     [ForceInline]
+    [HasTrivialForwardDerivative]
     [BackwardDerivative(linearTransformBwd)]
     public OutputVector linearTransform<Address, Layout, OutputVector>(
         Address weightAddress)
             where Address : IPointerLikeAddress<T>
-            where Address.Differential : IPointerLikeAddress<T.Differential>
+            where Address.Differential : IPointerLikeAddress<T>
             where Layout : IStorageLayout
             where OutputVector : IVector<T>
     {
@@ -1322,10 +1322,10 @@ public struct WaveTangledVector<T, ShMemPool : ISharedMemoryPool, int N, int Sub
         DifferentialPtrPair<Address> dWeightAddress,
         OutputVector.Differential doutput)
             where Address : IPointerLikeAddress<T>
-            where Address.Differential : IPointerLikeAddress<T.Differential>
+            where Address.Differential : IPointerLikeAddress<T>
             where Layout : IStorageLayout
             where OutputVector : IVector<T>
-            where OutputVector.Differential : IVector<T.Differential>
+            where OutputVector.Differential : IVector<T>
     {
         Optional<DifferentialPtrPair<Address>> biasAddress = {};
         __target_switch
@@ -1338,11 +1338,12 @@ public struct WaveTangledVector<T, ShMemPool : ISharedMemoryPool, int N, int Sub
     }
 
     [ForceInline]
+    [HasTrivialForwardDerivative]
     [BackwardDerivative(linearTransformBwd)]
     public OutputVector linearTransform<Address, Layout, OutputVector>(
         Address weightAddress, Address biasAddress)
             where Address : IPointerLikeAddress<T>
-            where Address.Differential : IPointerLikeAddress<T.Differential>
+            where Address.Differential : IPointerLikeAddress<T>
             where Layout : IStorageLayout
             where OutputVector : IVector<T>
     {
@@ -1363,10 +1364,10 @@ public struct WaveTangledVector<T, ShMemPool : ISharedMemoryPool, int N, int Sub
         DifferentialPtrPair<Address> dBiasAddress,
         OutputVector.Differential doutput)
             where Address : IPointerLikeAddress<T>
-            where Address.Differential : IPointerLikeAddress<T.Differential>
+            where Address.Differential : IPointerLikeAddress<T>
             where Layout : IStorageLayout
             where OutputVector : IVector<T>
-            where OutputVector.Differential : IVector<T.Differential>
+            where OutputVector.Differential : IVector<T>
     {
         __target_switch
         {

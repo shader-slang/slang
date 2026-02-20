@@ -478,10 +478,11 @@ static void serializeAsFlatModule(const IRWriteSerializer& serializer, IRModuleI
             const auto thisInstIndex = flat.instAllocInfo.getCount();
             instMap.add(inst, thisInstIndex);
             insts.add(inst);
-            flat.instAllocInfo.add(InstAllocInfo{
-                .op = inst->m_op,
-                .operandCount = inst->operandCount,
-            });
+            flat.instAllocInfo.add(
+                InstAllocInfo{
+                    .op = inst->m_op,
+                    .operandCount = inst->operandCount,
+                });
             flat.childCounts.add(0);
             flat.sourceLocs.add(inst->sourceLoc);
             inst->scratchData = thisInstIndex; // Store index for child counting

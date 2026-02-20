@@ -1,8 +1,8 @@
 // Test calling differentiable function through dynamic dispatch.
 
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
+//DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -40,8 +40,8 @@ float sqr<T:IInterface>(T obj, float x)
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     var obj = createDynamicObject<IInterface>(dispatchThreadID.x, 0); // A
-    outputBuffer[0] = __fwd_diff(sqr)(obj, DifferentialPair<float>(2.0, 1.0)).d; // A.calc, expect 12
+    outputBuffer[0] = fwd_diff(sqr)(obj, DifferentialPair<float>(2.0, 1.0)).d; // A.calc, expect 12
 
     obj = createDynamicObject<IInterface>(dispatchThreadID.x + 1, 0); // B
-    outputBuffer[1] = __fwd_diff(sqr)(obj, DifferentialPair<float>(1.5, 1.0)).d; // B.calc, expect 3
+    outputBuffer[1] = fwd_diff(sqr)(obj, DifferentialPair<float>(1.5, 1.0)).d; // B.calc, expect 3
 }

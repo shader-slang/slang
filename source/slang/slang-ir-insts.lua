@@ -157,12 +157,35 @@ local insts = {
 				},
 			},
 			{
-				BwdDiffIntermediateCtxType = {
-					struct_name = "BackwardDiffIntermediateContextType",
-					operands = { { "func" } },
+				TranslatedTypeBase = 
+				{
 					hoistable = true,
-				},
+					{
+						BackwardDiffIntermediateContextType = {
+							struct_name = "BackwardDiffIntermediateContextType",
+							operands = { { "func" } }
+						}
+					},
+					{
+						TrivialBackwardDiffIntermediateContextType = {
+							struct_name = "TrivialBackwardDiffIntermediateContextType",
+							operands = { { "func" } }
+						}
+					},
+					{
+						BackwardContextFromLegacyBwdDiffFunc = {
+							operands = { { "func" }, {"legacyBwdDiffFunc"} }
+						}
+					}
+				}
 			},
+
+			{ ForwardDiffFuncType = { hoistable = true } },
+			{ BackwardDiffFuncType = { hoistable = true } },
+			{ ApplyForBwdFuncType = { hoistable = true } },
+			{ FuncResultType = { hoistable = true } },
+			{ BwdCallableFuncType = { hoistable = true } },
+
 			{
 				TensorView = {
 					struct_name = "TensorViewType",
@@ -941,6 +964,13 @@ local insts = {
 			hoistable = true,
 		},
 	},
+	-- Holds witness tables for differential type info (this type witness, return type witness, param witnesses).
+	-- This is lowered to MakeTuple after specialization.
+	{
+		DiffTypeInfo = {
+			hoistable = true,
+		},
+	},
 	{ Expand = { operands = { { "value" } } } },
 	{
 		Each = {
@@ -1185,7 +1215,12 @@ local insts = {
 	--
 	--   for(ii : 0 ... M-1 )
 	--     dst[ii] = src[idx[ii]];
+	
 	{ swizzledStore = { operands = { { "dest" }, { "source" } }, min_operands = 2 } },
+	-- Transposed operation of MakeVectorFromScalar
+	{ SumVectorElements = { min_operands = 1 } },
+	-- Transposed operation of MakeMatrixFromScalar
+	{ SumMatrixElements = { min_operands = 1 } },
 	{
 		TerminatorInst = {
 			{ return_val = { struct_name = "Return", operands = { { "val" } } } },
@@ -1794,6 +1829,15 @@ local insts = {
 				},
 			},
 			{
+				AllowPreTranslationInlining = {
+					-- This decoration indicates the callee should be inlined after translation passes,
+					-- Typically, this is because the callee has non-trivial values associated with it that need to be preserved 
+					-- for translation.
+					--
+					struct_name = "AllowPreTranslationInliningDecoration",
+				},
+			},
+			{
 				ForceUnroll = {
 					-- A `[ForceUnroll]` decoration indicates the loop should be unrolled by the Slang compiler.
 					struct_name = "ForceUnrollDecoration",
@@ -2113,7 +2157,7 @@ local insts = {
 				},
 			},
 			{
-				primalSubstFunc = {
+				primalSubstFunc = { -- TODO: remove
 					-- Used by the auto-diff pass to hold a reference to the
 					-- primal substitute function.
 					struct_name = "PrimalSubstituteDecoration",
@@ -2121,20 +2165,20 @@ local insts = {
 				},
 			},
 			{
-				backwardDiffPrimalReference = {
+				backwardDiffPrimalReference = { -- TODO: remove
 					-- Decorations to associate an original function with compiler generated backward derivative functions.
 					struct_name = "BackwardDerivativePrimalDecoration",
 					operands = { { "backwardDerivativePrimalFunc" } },
 				},
 			},
 			{
-				backwardDiffPropagateReference = {
+				backwardDiffPropagateReference = { -- TODO: remove
 					struct_name = "BackwardDerivativePropagateDecoration",
 					operands = { { "backwardDerivativePropagateFunc" } },
 				},
 			},
 			{
-				backwardDiffIntermediateTypeReference = {
+				backwardDiffIntermediateTypeReference = { -- TODO: remove
 					struct_name = "BackwardDerivativeIntermediateTypeDecoration",
 					operands = { { "backwardDerivativeIntermediateType" } },
 				},
@@ -2213,6 +2257,9 @@ local insts = {
 					-- Used by the auto-diff pass to mark the differential type of an intermediate context field.
 					operands = { { "differentialWitness" } },
 				},
+			},
+			{
+				ReturnValueContextFieldDecoration = { },
 			},
 			{
 				derivativeMemberDecoration = {
@@ -2432,8 +2479,8 @@ local insts = {
 	{ CastDescriptorHandleToResource = { operands = { { "handle" } } } },
 	{ CastResourceToDescriptorHandle = { operands = { { "resource" } } } },
 	{ TreatAsDynamicUniform = { operands = { { "value" } } } },
-	{ sizeOf = { operands = { { "type" } } } },
-	{ alignOf = { operands = { { "baseOp" } } } },
+	{ sizeOf = { operands = { { "type" } }, hoistable = true } },
+	{ alignOf = { operands = { { "baseOp" } }, hoistable = true } },
 	{ countOf = { operands = { { "type" } } } },
 	{ GetArrayLength = { operands = { { "array" } } } },
 	{
@@ -2452,16 +2499,42 @@ local insts = {
 	{ IsSignedInt = { operands = { { "value" } } } },
 	{ IsVector = { operands = { { "value" } } } },
 	{ GetDynamicResourceHeap = { hoistable = true } },
-	{ ForwardDifferentiate = { operands = { { "baseFn" } } } },
-	-- Produces the primal computation of backward derivatives, will return an intermediate context for
-	-- backward derivative func.
-	{ BackwardDifferentiatePrimal = { operands = { { "baseFn" } } } },
-	-- Produces the actual backward derivative propagate function, using the intermediate context returned by the
-	-- primal func produced from `BackwardDifferentiatePrimal`.
-	{ BackwardDifferentiatePropagate = { operands = { { "baseFn" } } } },
-	-- Represents the conceptual backward derivative function. Only produced by lower-to-ir and will be
-	-- replaced with `BackwardDifferentiatePrimal` and `BackwardDifferentiatePropagate`.
-	{ BackwardDifferentiate = { operands = { { "baseFn" } } } },
+	{ TranslateBase = {
+		hoistable = true,
+
+		-- TODO: Document these.
+		{ TrivialForwardDifferentiate = { min_operands = 1 } },
+
+		{ BackwardDifferentiatePrimal = { min_operands = 1 } },
+		{ BackwardDifferentiatePropagate = { min_operands = 1 } },
+		{ BackwardContextGetPrimalVal = { min_operands = 1 } },
+
+		{ TrivialBackwardDifferentiate = { min_operands = 1 } },
+
+		{ TrivialBackwardDifferentiatePrimal = { min_operands = 1 } },
+		{ TrivialBackwardDifferentiatePropagate = { min_operands = 1 } },
+		{ TrivialBackwardContextGetPrimalVal = { min_operands = 1 } },
+
+		{ FunctionCopy = { min_operands = 1 } },
+
+		{ BackwardDifferentiate = { min_operands = 3 } },
+		{ ForwardDifferentiate = { min_operands = 1, operands = { { "baseFn" } } } },
+
+		{ LegacyBackwardDifferentiate = { min_operands = 3 } },
+		
+		{ BackwardPrimalFromLegacyBwdDiffFunc = { min_operands = 2 } },
+		{ BackwardContextGetValFromLegacyBwdDiffFunc = { min_operands = 2 } },
+		{ BackwardPropagateFromLegacyBwdDiffFunc = { min_operands = 2 } },
+
+		{ BackwardFromLegacyBwdDiffFunc = { min_operands = 2 } },
+		{ ForwardDifferentiatePropagate = { min_operands = 1 } },
+
+		-- For higher-order derivatives.
+		{ SynthesizedForwardDerivativeWitnessTable = { min_operands = 1 } },
+		{ SynthesizedBackwardDerivativeWitnessTable = { min_operands = 1 } },
+		{ MakeIDifferentiableWitness = { min_operands = 1 } },
+		{ SynthesizedBackwardDerivativeWitnessTableFromLegacyBwdDiffFunc = { min_operands = 2 } },
+	} },
 	{ PrimalSubstitute = { operands = { { "baseFn" } } } },
 	{ DispatchKernel = { operands = { { "baseFn" }, { "threadGroupSize" }, { "dispatchSize" } } } },
 	{
@@ -2576,6 +2649,8 @@ local insts = {
 	{ DifferentiableTypeDictionaryItem = { operands = { { "concreteType" }, { "witness" } } } },
 	-- Differentiable Type Annotation (for run-time types)
 	{ DifferentiableTypeAnnotation = { operands = { { "baseType" }, { "witness" } }, hoistable = true } },
+	{ WitnessTableAnnotation = { min_operands = 2, hoistable = true } }, -- TODO: remove this..
+	{ AssociatedInstAnnotation = { min_operands = 2, hoistable = true } },
 	{ BeginFragmentShaderInterlock = {} },
 	{
 		EndFragmentShaderInterlock = { struct_name = "EndFragmentShaderInterlock" },
@@ -2959,6 +3034,28 @@ local insts = {
 		--
 		hoistable = true
 	} },
+	{ WeakUse = { hoistable = true } },
+	{ FuncTypeOf = { hoistable = true }},
+	{ CompilerDictionaryEntry = { hoistable = true, parent = true }},
+	{ CompilerDictionaryValue = { operands = { {"value"} } } },
+	{ CompilerDictionary = { parent = true } },
+	{ CompilerDictionaryScope = { parent = true } },
+	-- Constexpr arithmetic ops. These are hoistable variants of the regular
+	-- arithmetic ops, used for lowering compile-time integer expressions
+	-- (IntVal subclasses like PolynomialIntVal) so that they get deduplicated.
+	{ constexprAdd = { operands = { { "left" }, { "right" } }, hoistable = true } },
+	{ constexprSub = { operands = { { "left" }, { "right" } }, hoistable = true } },
+	{ constexprMul = { operands = { { "left" }, { "right" } }, hoistable = true } },
+	{ constexprNeg = { operands = { { "value" } }, hoistable = true } },
+	{ constexprDiv = { operands = { { "left" }, { "right" } }, hoistable = true } },
+	-- Constexpr cast ops. Hoistable variants of casting ops used for IntVal lowering.
+	{ constexprIntCast = { operands = { { "value" } }, hoistable = true } },
+	{ constexprCastIntToFloat = { operands = { { "value" } }, hoistable = true } },
+	{ constexprCastFloatToInt = { operands = { { "value" } }, hoistable = true } },
+	{ constexprFloatCast = { operands = { { "value" } }, hoistable = true } },
+	{ constexprCastIntToEnum = { operands = { { "value" } }, hoistable = true } },
+	{ constexprCastEnumToInt = { operands = { { "value" } }, hoistable = true } },
+	{ constexprEnumCast = { operands = { { "value" } }, hoistable = true } },
 }
 
 -- A function to calculate some useful properties and put it in the table,

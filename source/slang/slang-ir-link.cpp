@@ -149,15 +149,6 @@ void registerClonedValue(IRSpecContextBase* context, IRInst* clonedValue, IRInst
         context->deferredWitnessTableEntryKeys.add(
             getMangledName(as<IRLookupWitnessMethod>(clonedValue)->getRequirementKey()));
         break;
-    case kIROp_ForwardDerivativeDecoration:
-    case kIROp_BackwardDerivativeDecoration:
-    case kIROp_UserDefinedBackwardDerivativeDecoration:
-        if (context->getShared()->useAutodiff)
-        {
-            if (auto key = as<IRStructKey>(clonedValue->getOperand(0)))
-                context->deferredWitnessTableEntryKeys.add(getMangledName(key));
-        }
-        break;
     }
 }
 
@@ -198,31 +189,24 @@ IRInst* cloneInst(
     IRInst* originalInst,
     IROriginalValuesForClone const& originalValues);
 
-IRInst* cloneInst(IRSpecContextBase* context, IRBuilder* builder, IRInst* originalInst)
+static void cloneAnnotations(IRSpecContextBase* context, IRInst* clonedInst, IRInst* originalInst)
 {
-    return cloneInst(context, builder, originalInst, originalInst);
+    SLANG_UNUSED(clonedInst);
+    traverseUsers<IRAssociatedInstAnnotation>(
+        originalInst,
+        [&](IRAssociatedInstAnnotation* annotation)
+        {
+            if (annotation->getTarget() == originalInst)
+                cloneInst(context, context->builder, annotation, annotation);
+        });
 }
 
-bool isAutoDiffDecoration(IRInst* decor)
+IRInst* cloneInst(IRSpecContextBase* context, IRBuilder* builder, IRInst* originalInst)
 {
-    switch (decor->getOp())
-    {
-    case kIROp_ForwardDerivativeDecoration:
-    case kIROp_BackwardDerivativeIntermediateTypeDecoration:
-    case kIROp_BackwardDerivativePrimalDecoration:
-    case kIROp_BackwardDerivativePropagateDecoration:
-    case kIROp_BackwardDerivativePrimalContextDecoration:
-    case kIROp_BackwardDerivativePrimalReturnDecoration:
-    case kIROp_PrimalSubstituteDecoration:
-    case kIROp_BackwardDerivativeDecoration:
-    case kIROp_UserDefinedBackwardDerivativeDecoration:
-    case kIROp_DifferentiableTypeDictionaryDecoration:
-    case kIROp_ForwardDifferentiableDecoration:
-    case kIROp_BackwardDifferentiableDecoration:
-        return true;
-    default:
-        return false;
-    }
+    auto clonedInst = cloneInst(context, builder, originalInst, originalInst);
+    cloneAnnotations(context, clonedInst, originalInst);
+
+    return clonedInst;
 }
 
 /// Clone any decorations from `originalValue` onto `clonedValue`
@@ -241,8 +225,6 @@ void cloneDecorations(IRSpecContextBase* context, IRInst* clonedValue, IRInst* o
     SLANG_UNUSED(context);
     for (auto originalDecoration : originalValue->getDecorations())
     {
-        if (!context->shared->useAutodiff && isAutoDiffDecoration(originalDecoration))
-            continue;
         cloneInst(context, builder, originalDecoration);
     }
 
@@ -263,8 +245,6 @@ void cloneDecorationsAndChildren(
     SLANG_UNUSED(context);
     for (auto originalItem : originalValue->getDecorationsAndChildren())
     {
-        if (!context->shared->useAutodiff && isAutoDiffDecoration(originalItem))
-            continue;
         cloneInst(context, builder, originalItem);
     }
 
@@ -375,6 +355,7 @@ IRInst* IRSpecContext::maybeCloneValue(IRInst* originalValue)
 
             cloneDecorationsAndChildren(this, clonedValue, originalValue);
             addHoistableInst(builder, clonedValue);
+            cloneAnnotations(this, clonedValue, originalValue);
             return clonedValue;
         }
         break;
@@ -487,12 +468,6 @@ static void cloneExtraDecorationsFromInst(
         {
         default:
             break;
-        case kIROp_ForwardDerivativeDecoration:
-        case kIROp_UserDefinedBackwardDerivativeDecoration:
-        case kIROp_PrimalSubstituteDecoration:
-            if (!context->getShared()->useAutodiff)
-                break;
-            [[fallthrough]];
         case kIROp_HLSLExportDecoration:
         case kIROp_BindExistentialSlotsDecoration:
         case kIROp_LayoutDecoration:
@@ -686,6 +661,7 @@ IRGlobalGenericParam* cloneGlobalGenericParamImpl(
 
 bool shouldDeepCloneWitnessTable(IRSpecContextBase* context, IRWitnessTable* table)
 {
+    SLANG_UNUSED(context);
     for (auto decor : table->getDecorations())
     {
         switch (decor->getOp())
@@ -697,7 +673,6 @@ bool shouldDeepCloneWitnessTable(IRSpecContextBase* context, IRWitnessTable* tab
     }
 
     auto conformanceType = getResolvedInstForDecorations(table->getConformanceType());
-
     for (auto decor : conformanceType->getDecorations())
     {
         switch (decor->getOp())
@@ -707,9 +682,15 @@ bool shouldDeepCloneWitnessTable(IRSpecContextBase* context, IRWitnessTable* tab
         case kIROp_KnownBuiltinDecoration:
             {
                 auto name = as<IRKnownBuiltinDecoration>(decor)->getName();
-                if (name == KnownBuiltinDeclName::IDifferentiable ||
-                    name == KnownBuiltinDeclName::IDifferentiablePtr)
-                    return context->getShared()->useAutodiff;
+                switch (name)
+                {
+                case KnownBuiltinDeclName::IDifferentiable:
+                case KnownBuiltinDeclName::IDifferentiablePtr:
+                case KnownBuiltinDeclName::IForwardDifferentiable:
+                case KnownBuiltinDeclName::IBackwardDifferentiable:
+                case KnownBuiltinDeclName::IBwdCallable:
+                    return true;
+                }
                 break;
             }
         default:
@@ -914,9 +895,6 @@ void cloneGlobalValueWithCodeCommon(
                 }
                 else
                 {
-                    if (oi->getOp() == kIROp_DifferentiableTypeAnnotation &&
-                        !context->getShared()->useAutodiff)
-                        continue;
                     cloneInst(context, builder, oi);
                 }
             }
@@ -1482,6 +1460,7 @@ IRInst* cloneGlobalValueImpl(
     auto clonedValue =
         cloneInst(context, &context->shared->builderStorage, originalInst, originalValues);
     clonedValue->moveToEnd();
+    cloneAnnotations(context, clonedValue, originalInst);
     return clonedValue;
 }
 
@@ -2038,64 +2017,15 @@ bool isDiffPairType(IRInst* type)
     return as<IRDifferentialPairTypeBase>(type) != nullptr;
 }
 
-bool doesModuleUseAutodiff(IRInst* inst)
+bool doesModuleUseAutodiff(IRModule* module)
 {
-    switch (inst->getOp())
+    for (auto globalInst : module->getGlobalInsts())
     {
-    case kIROp_Call:
-        if (auto callee = getResolvedInstForDecorations(inst->getOperand(0)))
-        {
-            switch (callee->getOp())
-            {
-            case kIROp_ForwardDifferentiate:
-            case kIROp_BackwardDifferentiate:
-            case kIROp_BackwardDifferentiatePrimal:
-            case kIROp_BackwardDifferentiatePropagate:
-                return true;
-            }
-        }
-        return false;
-    case kIROp_DifferentialPairGetDifferentialUserCode:
-    case kIROp_DifferentialPairGetPrimalUserCode:
-    case kIROp_DifferentialPtrPairGetPrimal:
-    case kIROp_DifferentialPtrPairGetDifferential:
-        return true;
-    case kIROp_StructField:
-        return isDiffPairType(as<IRStructField>(inst)->getFieldType());
-    case kIROp_Param:
-        return isDiffPairType(inst->getDataType());
-    default:
-        for (auto child : inst->getChildren())
-        {
-            bool isImported = false;
-            for (auto decor : child->getDecorations())
-            {
-                if (as<IRImportDecoration>(decor))
-                {
-                    isImported = true;
-                    break;
-                }
-                else if (as<IRAutoPyBindCudaDecoration>(decor))
-                {
-                    return true;
-                }
-                else if (as<IRAutoPyBindExportInfoDecoration>(decor))
-                {
-                    return true;
-                }
-            }
-            if (isImported)
-                continue;
-            for (auto decor : child->getDecorations())
-            {
-                if (isAutoDiffDecoration(decor))
-                    return true;
-            }
-            if (doesModuleUseAutodiff(child))
-                return true;
-        }
-        return false;
+        if (as<IRTranslateBase>(globalInst))
+            return true;
     }
+
+    return false;
 }
 
 void cloneUsedWitnessTableEntries(IRSpecContext* context)
@@ -2196,7 +2126,7 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
     {
         if (sharedContext->useAutodiff)
             break;
-        sharedContext->useAutodiff = doesModuleUseAutodiff(irModule->getModuleInst());
+        sharedContext->useAutodiff = doesModuleUseAutodiff(irModule);
     }
 
     auto context = state->getContext();
@@ -2300,16 +2230,42 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
     bool shouldCopyGlobalParams =
         linkage->m_optionSet.getBoolOption(CompilerOptionName::PreserveParameters);
 
+    auto shouldCopy = [&](IRInst* inst) -> bool
+    {
+        // We need to copy over exported symbols,
+        // and any global parameters if preserve-params option is set.
+        //
+        if (_isHLSLExported(inst))
+        {
+            return true;
+        }
+
+        if (shouldCopyGlobalParams && as<IRGlobalParam>(inst))
+        {
+            return true;
+        }
+
+        if (auto knownBuiltin = inst->findDecoration<IRKnownBuiltinDecoration>())
+        {
+            switch (knownBuiltin->getName())
+            {
+            case KnownBuiltinDeclName::NullDifferential:
+                return true;
+            default:
+                break;
+            }
+        }
+
+        return false;
+    };
+
     for (IRModule* irModule : irModules)
     {
         for (auto inst : irModule->getGlobalInsts())
         {
             // We need to copy over exported symbols,
             // and any global parameters if preserve-params option is set.
-            if (_isHLSLExported(inst) || shouldCopyGlobalParams && as<IRGlobalParam>(inst) ||
-                sharedContext->useAutodiff &&
-                    (as<IRDifferentiableTypeAnnotation>(inst) ||
-                     inst->findDecorationImpl(kIROp_AutoDiffBuiltinDecoration) != nullptr))
+            if (shouldCopy(inst))
             {
                 auto cloned = cloneValue(context, inst);
                 if (!cloned->findDecorationImpl(kIROp_KeepAliveDecoration))
@@ -2535,6 +2491,7 @@ void prelinkIR(Module* module, IRModule* irModule, const List<IRInst*>& external
     IRSharedSpecContext sharedContext;
     sharedContext.builderStorage = IRBuilder(irModule->getModuleInst());
     sharedContext.module = irModule;
+    sharedContext.useAutodiff = doesModuleUseAutodiff(irModule);
 
     IRPrelinkContext specContext;
     specContext.builder = &sharedContext.builderStorage;

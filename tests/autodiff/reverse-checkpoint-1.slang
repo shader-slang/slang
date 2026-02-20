@@ -10,6 +10,7 @@ RWStructuredBuffer<float> outputBuffer;
 typedef DifferentialPair<float> dpfloat;
 typedef float.Differential dfloat;
 
+//CHK: note: checkpointing context of 4 bytes associated with function: 'g'
 [BackwardDifferentiable]
 [PreferCheckpoint]
 float g(float x)
@@ -17,14 +18,14 @@ float g(float x)
     return log(x);
 }
 
-//CHK: note: checkpointing context of 4 bytes associated with function: 'f'
+//CHK: note: checkpointing context of 12 bytes associated with function: 'f'
 [BackwardDifferentiable]
 float f(int p, float x)
 {
     float y = 1.0;
     // Test that phi parameter can be restored.
     if (p == 0)
-        //CHK: note: 4 bytes (float) used to checkpoint the following item:
+        //CHK:([[@LINE+1]]): note: 8 bytes (s_bwdCallableCtx_g_{{[0-9]+}}) used to checkpoint the following item:
         y = g(x);
 
     return y * y;
@@ -32,8 +33,8 @@ float f(int p, float x)
 
 // Check that there are no calls to primal_g in bwd_f.
 
-// CHECK: void s_bwd_f_{{[0-9]+}}
-// CHECK-NOT: {{[_a-zA-Z0-9]+}} = s_primal_ctx_g_{{[0-9]+}}
+// CHECK: void s_bwdProp_f_{{[0-9]+}}
+// CHECK-NOT: {{[_a-zA-Z0-9]+}} = s_apply_g_{{[0-9]+}}
 // CHECK: return
 
 
@@ -42,8 +43,6 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     dpfloat dpa = dpfloat(2.0, 0.0);
 
-    __bwd_diff(f)(0, dpa, 1.0f);
+    bwd_diff(f)(0, dpa, 1.0f);
     outputBuffer[0] = dpa.d; // Expect: 1
 }
-
-//CHK-NOT: note

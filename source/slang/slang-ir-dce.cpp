@@ -241,6 +241,13 @@ struct DeadCodeEliminationContext
             //
             if (inst->hasUses())
             {
+                traverseUsers<IRAssociatedInstAnnotation>(
+                    inst,
+                    [&](IRAssociatedInstAnnotation* annotation)
+                    {
+                        if (annotation->getTarget() == inst)
+                            annotation->removeAndDeallocate();
+                    });
                 inst->replaceUsesWith(getUnitPoisonVal());
             }
 
@@ -587,22 +594,6 @@ bool shouldInstBeLiveIfParentIsLive(IRInst* inst, IRDeadCodeEliminationOptions o
                 break;
             }
         }
-
-        if (innerInst)
-        {
-            for (auto decor : innerInst->getDecorations())
-            {
-                switch (decor->getOp())
-                {
-                case kIROp_ForwardDerivativeDecoration:
-                case kIROp_UserDefinedBackwardDerivativeDecoration:
-                case kIROp_PrimalSubstituteDecoration:
-                    shouldKeptAliveIfImported = true;
-                    break;
-                }
-            }
-        }
-
         if (isImported && shouldKeptAliveIfImported)
             return true;
     }
@@ -685,6 +676,15 @@ bool isWeakReferenceOperand(IRInst* inst, UInt operandIndex)
         // Ignore all operands of SpecializationDictionaryItem.
         // This inst is used as a cache and shouldn't hold anything alive.
         return true;
+    case kIROp_WeakUse:
+        return true;
+    case kIROp_AssociatedInstAnnotation:
+        if (operandIndex == 0)
+            return true;
+        break;
+    case kIROp_CompilerDictionaryEntry:
+        if (operandIndex != 1)
+            return true;
     default:
         break;
     }

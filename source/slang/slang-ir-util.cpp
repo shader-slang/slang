@@ -76,6 +76,11 @@ bool isPointerOfType(IRInst* type, IRInst* elementType)
     return false;
 }
 
+bool isAnnotation(IRInst* inst)
+{
+    return as<IRAssociatedInstAnnotation>(inst);
+}
+
 bool isPtrToClassType(IRInst* type)
 {
     return isPointerOfType(type, kIROp_ClassType);
@@ -176,6 +181,53 @@ IROp getTypeStyle(BaseType op)
     }
 }
 
+// Split parameter type into a direction and a type
+std::tuple<ParameterDirectionInfo, IRType*> splitParameterDirectionAndType(IRType* paramType)
+{
+    if (as<IROutParamType>(paramType))
+        return {
+            ParameterDirectionInfo(ParameterDirectionInfo::Kind::Out),
+            as<IROutParamType>(paramType)->getValueType()};
+    else if (as<IRBorrowInOutParamType>(paramType))
+        return {
+            ParameterDirectionInfo(ParameterDirectionInfo::Kind::BorrowInOut),
+            as<IRBorrowInOutParamType>(paramType)->getValueType()};
+    else if (as<IRRefParamType>(paramType))
+        return {
+            ParameterDirectionInfo(
+                ParameterDirectionInfo::Kind::Ref,
+                as<IRRefParamType>(paramType)->getAddressSpace()),
+            as<IRRefParamType>(paramType)->getValueType()};
+    else if (as<IRBorrowInParamType>(paramType))
+        return {
+            ParameterDirectionInfo(
+                ParameterDirectionInfo::Kind::BorrowIn,
+                as<IRBorrowInParamType>(paramType)->getAddressSpace()),
+            as<IRBorrowInParamType>(paramType)->getValueType()};
+    else
+        return {ParameterDirectionInfo(ParameterDirectionInfo::Kind::In), paramType};
+}
+
+// Join parameter direction and a type back into a parameter type
+IRType* fromDirectionAndType(IRBuilder* builder, ParameterDirectionInfo info, IRType* type)
+{
+    switch (info.kind)
+    {
+    case ParameterDirectionInfo::Kind::In:
+        return type;
+    case ParameterDirectionInfo::Kind::Out:
+        return builder->getOutParamType(type);
+    case ParameterDirectionInfo::Kind::BorrowInOut:
+        return builder->getBorrowInOutParamType(type);
+    case ParameterDirectionInfo::Kind::BorrowIn:
+        return builder->getBorrowInParamType(type, info.addressSpace);
+    case ParameterDirectionInfo::Kind::Ref:
+        return builder->getRefParamType(type, info.addressSpace);
+    default:
+        SLANG_UNEXPECTED("Unhandled parameter info in fromDirectionAndType");
+    }
+}
+
 IRInst* specializeWithGeneric(
     IRBuilder& builder,
     IRInst* genericToSpecialize,
@@ -246,7 +298,6 @@ bool isValueType(IRInst* dataType)
     case kIROp_ResultType:
     case kIROp_OptionalType:
     case kIROp_DifferentialPairType:
-    case kIROp_DifferentialPairUserCodeType:
     case kIROp_DynamicType:
     case kIROp_AnyValueType:
     case kIROp_ArrayType:
@@ -403,6 +454,17 @@ IRInst* hoistValueFromGeneric(
             subOutSpecialized,
             false);
         newGeneric->setFullType((IRType*)genericFuncType);
+    }
+    else if (newResultVal->getOp() == kIROp_WitnessTable)
+    {
+        IRBuilder subBuilder = builder;
+        IRInst* subOutSpecialized = nullptr;
+        auto genericWitnessTableType = hoistValueFromGeneric(
+            subBuilder,
+            newResultVal->getFullType(),
+            subOutSpecialized,
+            false);
+        newGeneric->setFullType((IRType*)genericWitnessTableType);
     }
     else
     {
@@ -1572,55 +1634,15 @@ bool isSideEffectFreeFunctionalCall(IRCall* call, SideEffectAnalysisOptions opti
 // that might be used by a pass (e.g. auto-diff)
 //
 template<typename TFunc>
-void forEachAssociatedFunction(IRInst* func, TFunc callback)
+void forEachAssociatedCallee(IRInst* callee, TFunc callback)
 {
-    // Resolve the function to get all its decorations
-    auto resolvedFunc = getResolvedInstForDecorations(func);
-    if (!resolvedFunc)
-        return;
-
-    // We'll scan for appropriate decorations and return
-    // the function references.
-    //
-    // TODO: In the future, as we get more function transformation
-    // passes, we might want to create a parent class for such
-    // decorations that associate functions with each other.
-    //
-    for (auto decor : resolvedFunc->getDecorations())
-    {
-        switch (decor->getOp())
+    traverseUsers<IRAssociatedInstAnnotation>(
+        callee,
+        [&](IRAssociatedInstAnnotation* annotation)
         {
-        case kIROp_UserDefinedBackwardDerivativeDecoration:
-            if (as<IRUserDefinedBackwardDerivativeDecoration>(decor))
-            {
-                auto associatedCallee = as<IRUserDefinedBackwardDerivativeDecoration>(decor)
-                                            ->getBackwardDerivativeFunc();
-                callback(associatedCallee);
-            }
-            break;
-
-        case kIROp_ForwardDerivativeDecoration:
-            if (as<IRForwardDerivativeDecoration>(decor))
-            {
-                auto associatedCallee =
-                    as<IRForwardDerivativeDecoration>(decor)->getForwardDerivativeFunc();
-                callback(associatedCallee);
-            }
-            break;
-
-        case kIROp_PrimalSubstituteDecoration:
-            if (as<IRPrimalSubstituteDecoration>(decor))
-            {
-                auto associatedCallee =
-                    as<IRPrimalSubstituteDecoration>(decor)->getPrimalSubstituteFunc();
-                callback(associatedCallee);
-            }
-            break;
-
-        default:
-            break;
-        }
-    }
+            if (annotation->getTarget() == callee)
+                callback(annotation->getInst());
+        });
 }
 
 bool doesCalleeHaveSideEffect(IRInst* callee)
@@ -1647,9 +1669,13 @@ bool doesCalleeHaveSideEffect(IRInst* callee)
     // Typically, once the relevant pass has completed, the association is removed,
     // and at that point we can remove the function.
     //
+    // TODO: We can narrow this check down a bit.. this check is only really
+    // needed if the parent function that is performing the call is an operand
+    // of a translate inst (i.e. IRTranslateBase/IRTranslatedTypeBase)
+    //
     if (!sideEffect)
     {
-        forEachAssociatedFunction(
+        forEachAssociatedCallee(
             callee,
             [&](IRInst* associatedCallee)
             {
@@ -1676,6 +1702,12 @@ IRInst* findInterfaceRequirement(IRInterfaceType* type, IRInst* key)
 
 IRInst* findWitnessTableEntry(IRWitnessTable* table, IRInst* key)
 {
+    if (table->getConformanceType()->getOp() == kIROp_VoidType)
+    {
+        IRBuilder builder(table->getModule());
+        return builder.getVoidValue();
+    }
+
     for (auto entry : table->getEntries())
     {
         if (entry->getRequirementKey() == key)
@@ -2143,6 +2175,12 @@ UnownedStringSlice getBuiltinFuncName(IRInst* callee)
         return UnownedStringSlice::fromLiteral("IDifferentiable");
     case KnownBuiltinDeclName::IDifferentiablePtr:
         return UnownedStringSlice::fromLiteral("IDifferentiablePtr");
+    case KnownBuiltinDeclName::IForwardDifferentiable:
+        return UnownedStringSlice::fromLiteral("IForwardDifferentiable");
+    case KnownBuiltinDeclName::IBackwardDifferentiable:
+        return UnownedStringSlice::fromLiteral("IBackwardDifferentiable");
+    case KnownBuiltinDeclName::IBwdCallable:
+        return UnownedStringSlice::fromLiteral("IBwdCallable");
     case KnownBuiltinDeclName::NullDifferential:
         return UnownedStringSlice::fromLiteral("NullDifferential");
     default:

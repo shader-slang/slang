@@ -6,6 +6,7 @@ RWStructuredBuffer<float> outputBuffer;
 
 void foo_bwd(float a, inout DifferentialPair<float> dpx)
 {
+    dpx = diffPair(0.f, 2.f); // TODO: Should this really been needed (to silence fxc warning?)
     outputBuffer[2] = 2.f;
 }
 

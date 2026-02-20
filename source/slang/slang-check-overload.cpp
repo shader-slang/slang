@@ -676,7 +676,7 @@ static QualType getParamQualType(Type* paramType)
     Type* valueType = paramType;
     if (auto paramDirType = as<ParamPassingModeType>(paramType))
     {
-        valueType = paramDirType->getValueType();
+        valueType = unwrapModifiedType(paramDirType->getValueType());
         if (as<BorrowInOutParamType>(paramDirType))
             isLVal = true;
         if (as<OutParamType>(paramDirType))
@@ -684,7 +684,7 @@ static QualType getParamQualType(Type* paramType)
         if (as<RefParamType>(paramDirType))
             isLVal = true;
     }
-    return QualType(valueType, isLVal);
+    return QualType(unwrapModifiedType(valueType), isLVal);
 }
 
 bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
@@ -1043,7 +1043,7 @@ bool SemanticsVisitor::TryCheckOverloadCandidateConstraints(
         auto sub = getSub(m_astBuilder, constraintDeclRef);
         auto sup = getSup(m_astBuilder, constraintDeclRef);
 
-        auto subTypeWitness = tryGetSubtypeWitness(sub, sup);
+        SubtypeWitness* subTypeWitness = tryGetSubtypeWitness(sub, sup);
 
         bool witnessIsOptional = isWitnessUncheckedOptional(subTypeWitness);
         bool constraintIsOptional = constraintDecl->hasModifier<OptionalConstraintModifier>();
@@ -1406,6 +1406,46 @@ DeclRef<Decl> getParentDeclRef(DeclRef<Decl> declRef)
     return parent;
 }
 
+// TODO: Probably a nicer way to do this..
+bool isEffectivelySynthesized(Decl* decl)
+{
+    if (auto synFuncDecl = as<SynthesizedFuncDecl>(decl))
+    {
+        if (synFuncDecl->irOp == kIROp_FunctionCopy)
+            return isEffectivelySynthesized(
+                DeclRef<Decl>(as<DeclRefBase>(synFuncDecl->operands[0])).getDecl());
+
+        switch (synFuncDecl->irOp)
+        {
+        case kIROp_BackwardPrimalFromLegacyBwdDiffFunc:
+        case kIROp_BackwardPropagateFromLegacyBwdDiffFunc:
+        case kIROp_BackwardContextGetValFromLegacyBwdDiffFunc:
+            return false;
+        default:
+            // All other synthesized functions are considered synthesized.
+            return true;
+        }
+    }
+
+    if (auto typealiasDecl = as<TypeDefDecl>(decl))
+        if (auto declRefType = as<DeclRefType>(typealiasDecl->type.type))
+            return isEffectivelySynthesized(declRefType->getDeclRef().getDecl());
+
+    if (auto synStructDecl = as<SynthesizedStructDecl>(decl))
+    {
+        switch (synStructDecl->irOp)
+        {
+        case kIROp_BackwardContextFromLegacyBwdDiffFunc:
+            return false;
+        default:
+            // All other synthesized structs are considered synthesized.
+            return true;
+        }
+    }
+
+    return false;
+}
+
 // Returns -1 if left is preferred, 1 if right is preferred, and 0 if they are equal.
 //
 int SemanticsVisitor::CompareLookupResultItems(
@@ -1607,6 +1647,17 @@ int SemanticsVisitor::CompareLookupResultItems(
         }
     }
 
+    // If both are synthesized func decls, prefer the one that is not
+    // synthesized.
+    //
+    bool isEffectivelySynthesizedLeft = isEffectivelySynthesized(left.declRef.getDecl());
+    bool isEffectivelySynthesizedRight = isEffectivelySynthesized(right.declRef.getDecl());
+
+    if (isEffectivelySynthesizedLeft != isEffectivelySynthesizedRight)
+    {
+        // If one is synthesized and the other is not, prefer the one that is not synthesized.
+        return int(isEffectivelySynthesizedLeft) - int(isEffectivelySynthesizedRight);
+    }
 
     // TODO: We should generalize above rules such that in a tie a declaration
     // A::m is better than B::m when all other factors are equal and
@@ -2050,12 +2101,51 @@ void SemanticsVisitor::AddFuncOverloadCandidate(
         }
     }
 
-    OverloadCandidate candidate;
-    candidate.flavor = OverloadCandidate::Flavor::Func;
-    candidate.item = item;
-    candidate.resultType = getResultType(m_astBuilder, funcDeclRef);
+    if (!funcDeclRef.getDecl()->funcType.type)
+    {
+        // Standard function definition, resolve using parameter declarations.
+        OverloadCandidate candidate;
+        candidate.flavor = OverloadCandidate::Flavor::Func;
+        candidate.item = item;
+        candidate.resultType = getResultType(m_astBuilder, funcDeclRef);
 
-    AddOverloadCandidate(context, candidate, baseCost);
+        AddOverloadCandidate(context, candidate, baseCost);
+    }
+    else
+    {
+        auto resolvedFuncType =
+            as<FuncType>(funcDeclRef.getDecl()
+                             ->funcType.type->substitute(m_astBuilder, SubstitutionSet(funcDeclRef))
+                             ->resolve());
+
+        if (!resolvedFuncType)
+        {
+            // Diagnose.
+            getSink()->diagnose(
+                funcDeclRef.getLoc(),
+                Diagnostics::expectedFunction,
+                funcDeclRef.getName());
+            return;
+        }
+
+        auto funcExpr = ConstructLookupResultExpr(
+            item,
+            context.baseExpr,
+            item.declRef.getName(),
+            item.declRef.getLoc(),
+            context.originalExpr);
+
+        funcExpr->type = resolvedFuncType;
+
+        OverloadCandidate candidate;
+        candidate.flavor = OverloadCandidate::Flavor::Expr;
+        candidate.funcType = resolvedFuncType;
+        candidate.resultType = resolvedFuncType->getResultType();
+        candidate.exprVal = funcExpr;
+        candidate.item = item;
+
+        AddOverloadCandidate(context, candidate, baseCost);
+    }
 }
 
 void SemanticsVisitor::AddFuncOverloadCandidate(
@@ -2404,7 +2494,12 @@ DeclRef<Decl> SemanticsVisitor::inferGenericArguments(
             //
             // So the question is then whether a mismatch during the
             // unification step should be taken as an immediate failure...
-            auto argType = matchedArgs[aa].argType;
+            //
+            // Additionally, we'll always assume that modifiers do not participate
+            // in generic arg inference, so we will unwrap them here. Modifiers
+            // can still affect type coercion checks later on (post-generic-inference)
+            //
+            auto argType = unwrapModifiedType(matchedArgs[aa].argType);
             auto paramType = (*innerParameterTypes)[aa];
             auto canUnify = TryUnifyTypes(
                 constraints,
@@ -2547,6 +2642,15 @@ void SemanticsVisitor::AddDeclRefOverloadCandidates(
     {
         auto type = getNamedType(m_astBuilder, typeDefDeclRef);
         AddTypeOverloadCandidates(type, context);
+    }
+    else if (auto funcAliasDeclRef = item.declRef.as<FuncAliasDecl>())
+    {
+        auto aliasFuncDeclRef = substituteDeclRef(
+                               SubstitutionSet(item.declRef),
+                               m_astBuilder,
+                               funcAliasDeclRef.getDecl()->targetDeclRef)
+                               .as<CallableDecl>();
+        AddFuncOverloadCandidate(item, aliasFuncDeclRef, context, baseCost);
     }
     else if (auto genericTypeParamDeclRef = item.declRef.as<GenericTypeParamDecl>())
     {

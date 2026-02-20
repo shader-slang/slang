@@ -1,32 +1,46 @@
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -cuda -output-using-type
 
-// This test just ensures that we compile and run the code.
-// It does not check the correctness of the autodiff.
-
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out, name outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
+typealias SharedFloatPtr = Ptr<float, Access::ReadWrite, AddressSpace::GroupShared>;
+
 struct MyDiffPtr
 {
-    float data1;
-    float data2;
+    SharedFloatPtr primalPtr;
+    SharedFloatPtr diffPtr;
+
+    [BackwardDerivative(load_bwd)]
+    float load()
+    {
+        return primalPtr[0];
+    }
+
+    void load_bwd(float dOut)
+    {
+        if (diffPtr != nullptr)
+        {
+            diffPtr[0] += dOut;
+        }
+    }
 };
 
 [Differentiable]
-float function(Ptr<MyDiffPtr, Access::ReadWrite, AddressSpace::GroupShared> i)
+float function(MyDiffPtr diffPtr)
 {
-    return i[0].data1 + i[1].data2;
+    return diffPtr.load() * diffPtr.load() * 2.0f;
 }
 
-groupshared MyDiffPtr s[2];
+groupshared float sbuf[2];
+
 [numthreads(1, 1, 1), shader("compute")]
 void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
-    s = { { 0, 2 }, { 1, 3 } };
-    float result = 1.0f;
-    let pair = __fwd_diff(function)(__getAddress(s[0]));
-    outputBuffer[0] = pair.getPrimal();
-    outputBuffer[1] = pair.getDifferential();
-    // CHECK: 3.0
-    // CHECK-NEXT: 0.0
+    sbuf[0] = 3.0f;
+    sbuf[1] = 0.0f;
+    
+    bwd_diff(function)({ __getAddress(sbuf[0]), __getAddress(sbuf[1]) }, 1.f);
+
+    outputBuffer[0] = sbuf[1];
+    // CHECK: 12.0
 }

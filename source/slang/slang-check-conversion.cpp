@@ -68,6 +68,11 @@ bool SemanticsVisitor::isEffectivelyScalarForInitializerLists(Type* type)
             return false;
     }
 
+    if (auto modifiedType = as<ModifiedType>(type))
+    {
+        return isEffectivelyScalarForInitializerLists(modifiedType->getBase());
+    }
+
     return true;
 }
 
@@ -519,7 +524,9 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
     InitializerListExpr* fromInitializerListExpr,
     UInt& ioArgIndex)
 {
-    auto toType = inToType;
+    // TODO(sai): there's a massive number of special cases to handle for
+    // modified types..
+    auto toType = unwrapModifiedType(inToType);
     UInt argCount = fromInitializerListExpr->args.getCount();
 
     // In the case where we need to build a result expression,
@@ -1060,7 +1067,7 @@ static bool _hasMatchingModifier(ModifiedType* type, Val* modifier)
 /// For example, it is generally safe to convert from a value
 /// of type `T` to a value of type `const T` in C/C++.
 ///
-static bool _canModifierBeAddedDuringCoercion(Val* modifier)
+static bool _canModifierBeAddedDuringCoercion(SemanticsVisitor* ctx, Type* fromType, Val* modifier)
 {
     switch (modifier->astNodeType)
     {
@@ -1069,8 +1076,13 @@ static bool _canModifierBeAddedDuringCoercion(Val* modifier)
 
     case ASTNodeType::UNormModifierVal:
     case ASTNodeType::SNormModifierVal:
-    case ASTNodeType::NoDiffModifierVal:
         return true;
+
+    case ASTNodeType::NoDiffModifierVal:
+        if (ctx->isTypeDifferentiable(fromType) && !ctx->getAllowDroppingDerivatives())
+            return false;
+        else
+            return true;
     }
 }
 
@@ -1218,7 +1230,7 @@ bool SemanticsVisitor::_coerce(
         ShortList<Expr*> coercibleCandidates;
         for (auto candidate : overloadedExpr2->candidateExprs)
         {
-            if (canCoerce(toType, candidate->type, candidate))
+            if ((candidate->type.type) && canCoerce(toType, candidate->type, candidate))
                 coercibleCandidates.add(candidate);
         }
         if (coercibleCandidates.getCount() == 1)
@@ -1369,7 +1381,7 @@ bool SemanticsVisitor::_coerce(
 
     {
         // It is possible that one or more of the types involved might have modifiers
-        // on it, but the underlying types are otherwise the same.
+        // on it, but the underlying types are otherwise coercible.
         //
         auto toModified = as<ModifiedType>(toType);
         auto toBase = toModified ? toModified->getBase() : toType;
@@ -1379,7 +1391,7 @@ bool SemanticsVisitor::_coerce(
             fromModified ? QualType(fromModified->getBase(), fromType.isLeftValue) : fromType;
 
 
-        if ((toModified || fromModified) && toBase->equals(fromBase))
+        if (toModified || fromModified)
         {
             // We need to check each modifier present on either `toType`
             // or `fromType`. For each modifier, it will either be:
@@ -1400,7 +1412,7 @@ bool SemanticsVisitor::_coerce(
                     // then we need to know whether this modifier can be added
                     // to the type of an expression as part of coercion.
                     //
-                    if (!_canModifierBeAddedDuringCoercion(modifier))
+                    if (!_canModifierBeAddedDuringCoercion(this, fromType, modifier))
                     {
                         return _failedCoercion(toType, outToExpr, fromExpr, sink);
                     }
@@ -1426,16 +1438,39 @@ bool SemanticsVisitor::_coerce(
                 }
             }
 
-            // If all the modifiers were okay, we can convert.
+            // If all the modifiers were okay, recursively coerce the base types.
+            Expr* coercedBaseExpr = nullptr;
+            ConversionCost baseCost = kConversionCost_None;
+
+            if (!_coerce(
+                    site,
+                    toBase,
+                    outToExpr ? &coercedBaseExpr : nullptr,
+                    fromBase,
+                    fromExpr,
+                    sink,
+                    &baseCost))
+            {
+                return false;
+            }
 
             // TODO: we may need a cost to allow disambiguation of overloads based on modifiers?
             if (outCost)
             {
-                *outCost = kConversionCost_None;
+                *outCost = baseCost;
             }
             if (outToExpr)
             {
-                *outToExpr = createModifierCastExpr(toType, fromExpr);
+                // If the target type has modifiers, wrap the coerced expression
+                // in a modifier cast to apply them.
+                if (toModified)
+                {
+                    *outToExpr = createModifierCast(toType, coercedBaseExpr->type, coercedBaseExpr);
+                }
+                else
+                {
+                    *outToExpr = coercedBaseExpr;
+                }
             }
 
             return true;
@@ -2353,6 +2388,29 @@ Expr* SemanticsVisitor::createModifierCastExpr(Type* toType, Expr* fromExpr)
     expr->type = QualType(toType);
     expr->valueArg = fromExpr;
     return expr;
+}
+
+Expr* SemanticsVisitor::createModifierCast(Type* toType, Type* fromType, Expr* fromExpr)
+{
+    if (!isTypeDifferentiable(toType) && isTypeDifferentiable(fromType))
+    {
+        // TODO: It's possible that multiple modifiers are changing..
+        // Right now, this just works because no other modifier actually needs any non-trivial
+        // handling.
+        //
+        // However, if that changes, we may need more complex logic for modifier casting.
+        //
+        auto detachExpr = getCurrentASTBuilder()->create<DetachExpr>();
+        detachExpr->loc = fromExpr->loc;
+        detachExpr->inner = fromExpr;
+        detachExpr->type.type = toType;
+        return detachExpr;
+    }
+    else
+    {
+        // General case..
+        return createModifierCastExpr(toType, fromExpr);
+    }
 }
 
 

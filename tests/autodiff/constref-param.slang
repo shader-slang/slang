@@ -30,8 +30,8 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
     float a = 10.0;
     NonDiff fIn = { a };
     DifferentialPair<float> dpx = DifferentialPair<float>(4.f, 1.f);
-    float rs = __fwd_diff(myFunc)(fIn, dpx, 1.0).d;
-    float rs2 = __fwd_diff(myFunc2)(fIn, dpx, 1.0).d;
+    float rs = fwd_diff(myFunc)(fIn, dpx, 1.0).d;
+    float rs2 = fwd_diff(myFunc2)(fIn, dpx, 1.0).d;
 
     // CHECK: 10.0
     // CHECK: 10.0

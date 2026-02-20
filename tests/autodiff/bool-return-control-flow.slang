@@ -26,7 +26,7 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     float a = 10.0;
     DifferentialPair<float> dpx = DifferentialPair<float>(4.f, 1.f);
-    __bwd_diff(outerFunc)(a, dpx, 1.0);
+    bwd_diff(outerFunc)(a, dpx, 1.0);
 
     outputBuffer[0] = dpx.d;
 }
