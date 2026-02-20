@@ -821,6 +821,8 @@ DeclRef<Decl> createDefaultSubstitutionsIfNeeded(
         return declRef;
     if (declRef.as<GenericValueParamDecl>())
         return declRef;
+    if (declRef.as<GenericTypePackParamDecl>())
+        return declRef;
     ShortList<GenericDecl*> genericParentDecls;
     auto lastSubstNode = SubstitutionSet(declRef).getInnerMostNodeWithSubstInfo();
     auto lastGenApp = as<GenericAppDeclRef>(lastSubstNode);

@@ -1381,7 +1381,7 @@ bool SemanticsVisitor::_coerce(
 
     {
         // It is possible that one or more of the types involved might have modifiers
-        // on it, but the underlying types are otherwise the same.
+        // on it, but the underlying types are otherwise coercible.
         //
         auto toModified = as<ModifiedType>(toType);
         auto toBase = toModified ? toModified->getBase() : toType;
@@ -1391,7 +1391,7 @@ bool SemanticsVisitor::_coerce(
             fromModified ? QualType(fromModified->getBase(), fromType.isLeftValue) : fromType;
 
 
-        if ((toModified || fromModified) && toBase->equals(fromBase))
+        if (toModified || fromModified)
         {
             // We need to check each modifier present on either `toType`
             // or `fromType`. For each modifier, it will either be:
@@ -1438,16 +1438,39 @@ bool SemanticsVisitor::_coerce(
                 }
             }
 
-            // If all the modifiers were okay, we can convert.
+            // If all the modifiers were okay, recursively coerce the base types.
+            Expr* coercedBaseExpr = nullptr;
+            ConversionCost baseCost = kConversionCost_None;
+
+            if (!_coerce(
+                    site,
+                    toBase,
+                    outToExpr ? &coercedBaseExpr : nullptr,
+                    fromBase,
+                    fromExpr,
+                    sink,
+                    &baseCost))
+            {
+                return false;
+            }
 
             // TODO: we may need a cost to allow disambiguation of overloads based on modifiers?
             if (outCost)
             {
-                *outCost = kConversionCost_None;
+                *outCost = baseCost;
             }
             if (outToExpr)
             {
-                *outToExpr = createModifierCast(toType, fromType, fromExpr);
+                // If the target type has modifiers, wrap the coerced expression
+                // in a modifier cast to apply them.
+                if (toModified)
+                {
+                    *outToExpr = createModifierCast(toType, coercedBaseExpr->type, coercedBaseExpr);
+                }
+                else
+                {
+                    *outToExpr = coercedBaseExpr;
+                }
             }
 
             return true;

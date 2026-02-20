@@ -4904,6 +4904,17 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
 
             requiredSubstArgs.add(satisfyingVal);
         }
+        else if (
+            auto requiredTypePackParamDeclRef =
+                requiredMemberDeclRef.as<GenericTypePackParamDecl>())
+        {
+            auto satisfyingTypePackParamDeclRef =
+                satisfyingMemberDeclRef.as<GenericTypePackParamDecl>();
+            SLANG_ASSERT(satisfyingTypePackParamDeclRef);
+            auto satisfyingType = DeclRefType::create(m_astBuilder, satisfyingTypePackParamDeclRef);
+
+            requiredSubstArgs.add(satisfyingType);
+        }
     }
 
     // Build substitution args from the constraints.
