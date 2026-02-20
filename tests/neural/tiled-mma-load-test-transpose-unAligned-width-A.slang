@@ -54,8 +54,8 @@ import neural;
 
 
 // Make the weight matrix as 16x32 matrix in row major order
-// TEST_INPUT:ubuffer(stride=2, count=1024):name=inputBuffer
-RWStructuredBuffer<half> inputBuffer;
+// TEST_INPUT: set inputBuffer = ubuffer(stride=2, count=1024)
+uniform RWStructuredBuffer<half>.Handle inputBuffer;
 
 // TEST_INPUT:ubuffer(stride=4, count=9):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
@@ -78,12 +78,12 @@ typealias SPtr = Ptr<uint4, Access::ReadWrite, AddressSpace::GroupShared>;
 
 void testLoadShA<TargetEnum Target, int M>(uint tid, uint tileIndex)
 {
-    typealias Storage = StructuredBufferStorage<half>;
+    typealias Address = BindlessAddress<half>;
 
-    Storage storage = Storage(inputBuffer);
+    Address address = Address(inputBuffer);
 
     SPtr sharedMemoryA = __getAddress(s_sharedMemoryA[0]);
-    MMAHelper<half, InputSize, M, SubgroupSize, Target, true>.loadShA<half, Storage>(sharedMemoryA, tileIndex, storage, 0);
+    MMAHelper<half, InputSize, M, SubgroupSize, Target, true>.loadShA<half, Address>(sharedMemoryA, tileIndex, address);
     GroupMemoryBarrierWithWaveSync();
 }
 
