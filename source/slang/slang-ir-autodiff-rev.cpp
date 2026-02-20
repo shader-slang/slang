@@ -323,23 +323,7 @@ struct BackwardDiffTranslationContext
         propagatePropertiesForSingleFunc(builder->getModule(), applyFunc);
         propagatePropertiesForSingleFunc(builder->getModule(), getValFunc);
 
-        IRBuilder subBuilder = *builder;
-
-        //
-        // Output the 4-tuple result of the translation (and hoist values out of any generic
-        // contexts).
-        //
-
-        // It's important to hoist the context type out *first* because the other funcs may depend
-        // on it.
-        //
-        /*
-        contextTypeInst = maybeHoist(subBuilder, intermediateType);
-
-        propagateFuncInst = maybeHoist(subBuilder, propagateFunc);
-        applyFuncInst = maybeHoist(subBuilder, applyFunc);
-        contextGetValFuncInst = maybeHoist(subBuilder, getValFunc);
-        */
+        // Output the 4-tuple result of the translation.
 
         contextTypeInst = intermediateType;
         propagateFuncInst = propagateFunc;

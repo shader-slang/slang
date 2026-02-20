@@ -470,9 +470,6 @@ DeclRefBase* GenericAppDeclRef::_substituteImplOverride(
             "GenericAppDeclRef::substituteImpl: generic decl ref is not a child of the new parent "
             "& base is not a lookup");
     }
-
-    // Default:
-    return astBuilder->getGenericAppDeclRef(substGenericDeclRef, substArgs.getArrayView());
 }
 
 GenericDecl* GenericAppDeclRef::getGenericDecl()
