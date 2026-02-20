@@ -57,5 +57,4 @@ void computeMain(uint3 threadId : SV_DispatchThreadID)
                  // NEGATIVE_CHECK_2-DAG: ([[# @LINE+1]]): error 38043: 'CustomStruct1' is not convertible to 'CustomStruct2', not satisfying the type coerce constraint 'CustomStruct2(CustomStruct1)'
                  && castableConstraint1<CustomStruct2, CustomStruct1>(CustomStruct1(1)).data == 1
                 ) ? 1 : 0;
-
 }
