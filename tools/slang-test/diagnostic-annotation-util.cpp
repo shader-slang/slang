@@ -72,12 +72,13 @@ static SlangResult parseAnnotations(
     outAnnotations.clear();
 
     // Build the comment markers we're looking for
+    // The colon after the prefix is required to avoid confusion with substring matching
     StringBuilder lineMarkerBuilder;
-    lineMarkerBuilder << "//" << prefix;
+    lineMarkerBuilder << "//" << prefix << ":";
     String lineMarker = lineMarkerBuilder.produceString();
 
     StringBuilder blockStartBuilder;
-    blockStartBuilder << "/*" << prefix;
+    blockStartBuilder << "/*" << prefix << ":";
     String blockStart = blockStartBuilder.produceString();
 
     // Split source into lines
@@ -296,6 +297,29 @@ static void generateSuggestedAnnotations(
 {
     sb << "  ⋮\n"; // Vertical ellipsis (indented)
 
+    // Check if any diagnostic has column 0 (no valid location)
+    // These should use caretless format since position-based matching won't work
+    bool hasLocationlessDiagnostic = false;
+    for (const auto* diag : diagnostics)
+    {
+        if (diag->beginCol == 0)
+        {
+            hasLocationlessDiagnostic = true;
+            break;
+        }
+    }
+
+    // For locationless diagnostics (column 0), use simple caretless format
+    if (hasLocationlessDiagnostic)
+    {
+        for (const auto* diag : diagnostics)
+        {
+            sb << "//" << prefix << ": " << diag->message << "\n";
+        }
+        sb << "  ⋮\n"; // Trailing vertical ellipsis (indented)
+        return;
+    }
+
     // Show source line (no indentation)
     if (lineNumber >= 1 && lineNumber <= sourceLines.getCount())
     {
@@ -305,8 +329,8 @@ static void generateSuggestedAnnotations(
             sb << "\n";
     }
 
-    // Calculate the prefix length: "//" + prefix
-    int linePrefixLength = 2 + prefix.getLength();
+    // Calculate the prefix length: "//" + prefix + ":"
+    int linePrefixLength = 3 + int(prefix.getLength());
 
     // Check if we should use block comment
     bool useBlockComment = false;
@@ -322,7 +346,7 @@ static void generateSuggestedAnnotations(
     if (useBlockComment)
     {
         // Generate block comment format (no indentation)
-        sb << "/*" << prefix << "\n";
+        sb << "/*" << prefix << ":\n";
         for (const auto* diag : diagnostics)
         {
             // Generate spacing to align caret with column
@@ -369,7 +393,7 @@ static void generateSuggestedAnnotations(
                 caretBuilder << "^";
             }
 
-            sb << "//" << prefix << spacingBuilder.getUnownedSlice()
+            sb << "//" << prefix << ":" << spacingBuilder.getUnownedSlice()
                << caretBuilder.getUnownedSlice() << " " << diag->message << "\n";
         }
     }

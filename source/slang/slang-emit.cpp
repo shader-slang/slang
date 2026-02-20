@@ -2625,7 +2625,14 @@ static SlangResult createArtifactFromIR(
     ComPtr<IArtifact>& dbgArtifact)
 {
     List<uint8_t> spirv, outSpirv;
-    emitSPIRVFromIR(codeGenContext, irModule, irEntryPoints, spirv);
+    SLANG_RETURN_ON_FAIL(emitSPIRVFromIR(codeGenContext, irModule, irEntryPoints, spirv));
+
+    // If SPIR-V emission reported any errors, do not continue with
+    // downstream linking/validation/optimization on partial output.
+    if (codeGenContext->getSink()->getErrorCount() != 0)
+    {
+        return SLANG_FAIL;
+    }
 
     auto targetRequest = codeGenContext->getTargetReq();
     auto targetCompilerOptions = targetRequest->getOptionSet();

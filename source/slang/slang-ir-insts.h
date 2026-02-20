@@ -2614,6 +2614,11 @@ struct IRDebugVar : IRInst
     IRInst* getLine() { return getOperand(1); }
     IRInst* getCol() { return getOperand(2); }
     IRInst* getArgIndex() { return getOperandCount() >= 4 ? getOperand(3) : nullptr; }
+    void setArgIndex(IRInst* argIndex)
+    {
+        if (getOperandCount() >= 4)
+            setOperand(3, argIndex);
+    }
 };
 
 FIDDLE()

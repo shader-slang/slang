@@ -1,22 +1,22 @@
 result code = -1
 standard error = {
 error[E39999]: ambiguous call to 'func' with arguments of type ()
-  --> tests/diagnostics/overload-ambiguous.slang:44:27
-   |
-44 | outputBuffer[0] = func();
-   |                       ^ in call expression
+   ╭╼ tests/diagnostics/overload-ambiguous.slang:44:27
+   │
+44 │ outputBuffer[0] = func();
+   │                       ━ in call expression
 
 note: candidate: func B1::func() -> uint
-  --- tests/diagnostics/overload-ambiguous.slang:28:10
-   |
-28 | uint func()
-   |      ----
+   ╭╼ tests/diagnostics/overload-ambiguous.slang:28:10
+   │
+28 │ uint func()
+   │      ────
 
 note: candidate: func A1::func() -> uint
-  --- tests/diagnostics/overload-ambiguous.slang:13:10
-   |
-13 | uint func()
-   |      ----
+   ╭╼ tests/diagnostics/overload-ambiguous.slang:13:10
+   │
+13 │ uint func()
+   │      ────
 }
 standard output = {
 }

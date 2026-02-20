@@ -2255,6 +2255,7 @@ IRTypeLayoutRuleName getTypeLayoutRulesFromOp(IROp layoutTypeOp, IRTypeLayoutRul
     switch (layoutTypeOp)
     {
     case kIROp_DefaultBufferLayoutType:
+    case kIROp_DefaultPushConstantBufferLayoutType:
         return defaultLayout;
     case kIROp_Std140BufferLayoutType:
         return IRTypeLayoutRuleName::Std140;
@@ -2317,6 +2318,32 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
         if (!target->shouldEmitSPIRVDirectly() && !isCPUTargetViaLLVM(targetReq))
             return IRTypeLayoutRuleName::Natural;
 
+        // An explicit (non-default) layout annotation on the buffer takes precedence
+        // over global compiler options such as forceScalarLayout.
+        {
+            IROp layoutTypeOp = kIROp_DefaultBufferLayoutType;
+            if (auto paramGroupType = as<IRUniformParameterGroupType>(bufferType))
+            {
+                if (paramGroupType->getDataLayout())
+                    layoutTypeOp = paramGroupType->getDataLayout()->getOp();
+            }
+            else if (auto structBufferType = as<IRHLSLStructuredBufferTypeBase>(bufferType))
+            {
+                if (structBufferType->getDataLayout())
+                    layoutTypeOp = structBufferType->getDataLayout()->getOp();
+            }
+            else if (auto storageBufferType = as<IRGLSLShaderStorageBufferType>(bufferType))
+            {
+                if (storageBufferType->getDataLayout())
+                    layoutTypeOp = storageBufferType->getDataLayout()->getOp();
+            }
+            if (layoutTypeOp != kIROp_DefaultBufferLayoutType &&
+                layoutTypeOp != kIROp_DefaultPushConstantBufferLayoutType)
+            {
+                return getTypeLayoutRulesFromOp(layoutTypeOp, IRTypeLayoutRuleName::Natural);
+            }
+        }
+
         // If the user specified a C-compatible buffer layout, then do that.
         if (target->getOptionSet().shouldUseCLayout())
             return IRTypeLayoutRuleName::C;
@@ -2359,6 +2386,10 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
             auto layoutTypeOp = parameterGroupType->getDataLayout()
                                     ? parameterGroupType->getDataLayout()->getOp()
                                     : kIROp_DefaultBufferLayoutType;
+
+            // DefaultPushConstantBufferLayoutType defaults to Std430.
+            if (layoutTypeOp == kIROp_DefaultPushConstantBufferLayoutType)
+                return IRTypeLayoutRuleName::Std430;
 
             // The CPU targets default to the C buffer layout for compatibility
             // with C/C++.
