@@ -1028,51 +1028,70 @@ bool SemanticsVisitor::TryCheckOverloadCandidateConstraints(
     auto substArgs = tryGetGenericArguments(candidate.subst, genericDeclRef.getDecl());
     SLANG_ASSERT(substArgs.getCount());
 
-    List<Val*> newArgs;
+    ShortList<Val*> newArgs;
     for (auto arg : substArgs)
         newArgs.add(arg);
 
-    for (auto constraintDecl :
-         genericDeclRef.getDecl()->getMembersOfType<GenericTypeConstraintDecl>())
+    for (auto constraintDecl : genericDeclRef.getDecl()->getMembers())
     {
-        DeclRef<GenericTypeConstraintDecl> constraintDeclRef =
-            m_astBuilder
-                ->getGenericAppDeclRef(genericDeclRef, newArgs.getArrayView(), constraintDecl)
-                .as<GenericTypeConstraintDecl>();
-
-        auto sub = getSub(m_astBuilder, constraintDeclRef);
-        auto sup = getSup(m_astBuilder, constraintDeclRef);
-
-        auto subTypeWitness = tryGetSubtypeWitness(sub, sup);
-
-        bool witnessIsOptional = isWitnessUncheckedOptional(subTypeWitness);
-        bool constraintIsOptional = constraintDecl->hasModifier<OptionalConstraintModifier>();
-
-        if (subTypeWitness && (!witnessIsOptional || constraintIsOptional))
+        if (auto genericTypeConstraintDecl = as<GenericTypeConstraintDecl>(constraintDecl))
         {
-            newArgs.add(subTypeWitness);
-        }
-        else if (!subTypeWitness && constraintIsOptional)
-        {
-            newArgs.add(m_astBuilder->getOrCreate<NoneWitness>());
-        }
-        else
-        {
-            if (context.mode != OverloadResolveContext::Mode::JustTrying)
+            DeclRef<GenericTypeConstraintDecl> constraintDeclRef =
+                m_astBuilder
+                    ->getGenericAppDeclRef(
+                        genericDeclRef,
+                        newArgs.getArrayView().arrayView,
+                        genericTypeConstraintDecl)
+                    .as<GenericTypeConstraintDecl>();
+
+            auto sub = getSub(m_astBuilder, constraintDeclRef);
+            auto sup = getSup(m_astBuilder, constraintDeclRef);
+
+            auto subTypeWitness = tryGetSubtypeWitness(sub, sup);
+
+            bool witnessIsOptional = isWitnessUncheckedOptional(subTypeWitness);
+            bool constraintIsOptional =
+                genericTypeConstraintDecl->hasModifier<OptionalConstraintModifier>();
+
+            if (subTypeWitness && (!witnessIsOptional || constraintIsOptional))
             {
-                subTypeWitness = isSubtype(sub, sup, IsSubTypeOptions::None);
-                getSink()->diagnose(
-                    context.loc,
-                    Diagnostics::typeArgumentDoesNotConformToInterface,
-                    sub,
-                    sup);
+                newArgs.add(subTypeWitness);
             }
-            return false;
+            else if (!subTypeWitness && constraintIsOptional)
+            {
+                newArgs.add(m_astBuilder->getOrCreate<NoneWitness>());
+            }
+            else
+            {
+                if (context.mode != OverloadResolveContext::Mode::JustTrying)
+                {
+                    subTypeWitness = isSubtype(sub, sup, IsSubTypeOptions::None);
+                    getSink()->diagnose(
+                        context.loc,
+                        Diagnostics::typeArgumentDoesNotConformToInterface,
+                        sub,
+                        sup);
+                }
+                return false;
+            }
+        }
+        else if (auto typeCoercionConstraintDecl = as<TypeCoercionConstraintDecl>(constraintDecl))
+        {
+            if (!addTypeCoercionWitnessToArgs(
+                    getASTBuilder(),
+                    this,
+                    typeCoercionConstraintDecl,
+                    genericDeclRef,
+                    &context,
+                    nullptr,
+                    newArgs,
+                    context.mode != OverloadResolveContext::Mode::JustTrying))
+                return false;
         }
     }
 
-    candidate.subst =
-        SubstitutionSet(m_astBuilder->getGenericAppDeclRef(genericDeclRef, newArgs.getArrayView()));
+    candidate.subst = SubstitutionSet(
+        m_astBuilder->getGenericAppDeclRef(genericDeclRef, newArgs.getArrayView().arrayView));
 
     // Done checking all the constraints, hooray.
     return true;
@@ -2893,7 +2912,8 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
                                             expr->arguments[0]->type,
                                             expr->arguments[0],
                                             &collectedErrorsSink,
-                                            &conversionCost);
+                                            &conversionCost,
+                                            nullptr);
                 if (auto resultInvokeExpr = as<InvokeExpr>(resultExpr))
                 {
                     resultInvokeExpr->originalFunctionExpr = expr->functionExpr;
