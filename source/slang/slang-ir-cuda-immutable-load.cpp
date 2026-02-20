@@ -75,7 +75,7 @@ struct ImmutableBufferLoadLoweringContext : InstPassBase
         }
     };
 
-    Dictionary<AlignedTypeWrapperKey, IRType*> aligneedWrapperTypes;
+    Dictionary<AlignedTypeWrapperKey, IRType*> alignedWrapperTypes;
 
     IRType* getOrCreateAlignedWrapper(IRType* innerType, IRIntegerValue alignment)
     {
@@ -85,7 +85,7 @@ struct ImmutableBufferLoadLoweringContext : InstPassBase
             return innerType;
 
         auto key = AlignedTypeWrapperKey{innerType, alignment};
-        if (auto* wrappedType = aligneedWrapperTypes.tryGetValue(key))
+        if (auto* wrappedType = alignedWrapperTypes.tryGetValue(key))
             return *wrappedType;
 
         IRBuilder builder(innerType);
@@ -102,7 +102,7 @@ struct ImmutableBufferLoadLoweringContext : InstPassBase
         builder.createStructField(structType, fieldKey, innerType);
         builder.addAlignmentDecoration(structType, alignment);
 
-        aligneedWrapperTypes[key] = structType;
+        alignedWrapperTypes[key] = structType;
         return structType;
     }
 
@@ -391,6 +391,7 @@ struct ImmutableBufferLoadLoweringContext : InstPassBase
                     auto firstField = wrappedStruct->getFields().getFirst();
                     SLANG_ASSERT(firstField);
                     auto fieldKey = firstField->getKey();
+                    builder.setInsertAfter(loadedValue);
                     loadedValue = builder.emitFieldExtract(loadedValue, fieldKey);
                     for (auto use : uses)
                     {
