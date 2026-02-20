@@ -642,6 +642,22 @@ public:
     /// Only valid within a playback handler.
     SLANG_API uint64_t getCurrentThisHandle() const { return m_currentThisHandle; }
 
+    // =========================================================================
+    // Post-Call Callback
+    // =========================================================================
+
+    /// Callback invoked after each call during playback.
+    /// Receives the function signature, the 'this' handle, and user data.
+    using PostCallCallback = void (*)(const char* signature, uint64_t thisHandle, void* userData);
+
+    /// Set a callback to be invoked after each replayed call.
+    /// Pass nullptr to clear the callback.
+    SLANG_API void setPostCallCallback(PostCallCallback callback, void* userData)
+    {
+        m_postCallCallback = callback;
+        m_postCallUserData = userData;
+    }
+
     /// Get the 'this' pointer for the current call, cast to the given type.
     /// Only valid within a playback handler.
     /// Note: The handle table stores canonical ISlangUnknown* pointers (via
@@ -721,6 +737,10 @@ private:
 
     // Current 'this' handle during playback execution
     uint64_t m_currentThisHandle = kNullHandle;
+
+    // Post-call callback
+    PostCallCallback m_postCallCallback = nullptr;
+    void* m_postCallUserData = nullptr;
 };
 
 // Template implementations

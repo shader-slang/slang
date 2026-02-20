@@ -819,8 +819,18 @@ bool ReplayContext::executeNextCall()
     // Seek back to the start of the command before calling the handler.
     m_stream.seek(streamPos);
 
+    // Save the signature for the post-call callback (the handler will
+    // consume the stream, invalidating the pointer from the arena).
+    String savedSignature(signature);
+
     // Call the handler - it will read the remaining arguments from the stream
     (*handler)(*this);
+
+    // Invoke the post-call callback if one is registered
+    if (m_postCallCallback)
+    {
+        m_postCallCallback(savedSignature.getBuffer(), thisHandle, m_postCallUserData);
+    }
 
     return true;
 }

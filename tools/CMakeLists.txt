@@ -415,14 +415,27 @@ endif()
 # slang-replay tool for replaying the record files
 #
 if(SLANG_ENABLE_REPLAYER)
-    slang_add_target(
-        slang-replay
-        EXECUTABLE
-        # Note: replay-context sources are already compiled into the slang library,
-        # so we only add include directories here, not EXTRA_SOURCE_DIRS
-        LINK_WITH_PRIVATE core compiler-core slang
-        INCLUDE_DIRECTORIES_PUBLIC
-            ${slang_SOURCE_DIR}/source/slang-record-replay
-        FOLDER test
-    )
+    if(SLANG_ENABLE_SLANG_RHI)
+        slang_add_target(
+            slang-replay
+            EXECUTABLE
+            # Note: replay-context sources are already compiled into the slang library,
+            # so we only add include directories here, not EXTRA_SOURCE_DIRS
+            LINK_WITH_PRIVATE core compiler-core slang slang-rhi
+            INCLUDE_FROM_PRIVATE slang-rhi
+            INCLUDE_DIRECTORIES_PUBLIC
+                ${slang_SOURCE_DIR}/source/slang-record-replay
+            EXTRA_COMPILE_DEFINITIONS_PRIVATE SLANG_ENABLE_SLANG_RHI=1
+            FOLDER test
+        )
+    else()
+        slang_add_target(
+            slang-replay
+            EXECUTABLE
+            LINK_WITH_PRIVATE core compiler-core slang
+            INCLUDE_DIRECTORIES_PUBLIC
+                ${slang_SOURCE_DIR}/source/slang-record-replay
+            FOLDER test
+        )
+    endif()
 endif()

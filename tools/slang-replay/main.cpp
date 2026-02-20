@@ -2,8 +2,13 @@
 #include "../../source/slang-record-replay/replay-context.h"
 #include "../../source/slang-record-replay/replay-stream-decoder.h"
 
+#if SLANG_ENABLE_SLANG_RHI
+#include "driver-replay.h"
+#endif
+
 #include <memory>
 #include <stdio.h>
+#include <string.h>
 
 struct Options
 {
@@ -13,6 +18,9 @@ struct Options
     bool verbose{false};
     Slang::String recordFileName;
     Slang::String outputFileName;
+#if SLANG_ENABLE_SLANG_RHI
+    Slang::String replayDriver;
+#endif
 };
 
 void printUsage()
@@ -28,6 +36,12 @@ void printUsage()
     printf("  --verbose, -v: Enable verbose output during replay.\n");
     printf(
         "  --output, -o <file>: Write decoded output to the specified file instead of stdout.\n");
+#if SLANG_ENABLE_SLANG_RHI
+    printf("  --replay-driver <type>: After replaying each shader compilation, create the\n");
+    printf("                          compute pipeline on a real GPU driver via slang-rhi.\n");
+    printf("                          Supported types: vulkan, d3d12, d3d11, metal, cuda\n");
+    printf("                          Implies --replay.\n");
+#endif
 }
 
 Options parseOption(int argc, char* argv[])
@@ -83,6 +97,21 @@ Options parseOption(int argc, char* argv[])
             option.outputFileName = argv[argIndex];
             argIndex++;
         }
+#if SLANG_ENABLE_SLANG_RHI
+        else if (strcmp("--replay-driver", arg) == 0)
+        {
+            argIndex++;
+            if (argIndex >= argc)
+            {
+                printf("Error: --replay-driver requires a device type argument\n");
+                printUsage();
+                exit(1);
+            }
+            option.replayDriver = argv[argIndex];
+            option.replay = true;
+            argIndex++;
+        }
+#endif
         else if ((strcmp("--help", arg) == 0) || (strcmp("-h", arg) == 0))
         {
             printUsage();
@@ -105,6 +134,52 @@ Options parseOption(int argc, char* argv[])
 
     return option;
 }
+
+#if SLANG_ENABLE_SLANG_RHI
+static rhi::DeviceType parseDeviceType(const char* name)
+{
+    if (strcmp(name, "vulkan") == 0 || strcmp(name, "vk") == 0)
+        return rhi::DeviceType::Vulkan;
+    if (strcmp(name, "d3d12") == 0 || strcmp(name, "dx12") == 0)
+        return rhi::DeviceType::D3D12;
+    if (strcmp(name, "d3d11") == 0 || strcmp(name, "dx11") == 0)
+        return rhi::DeviceType::D3D11;
+    if (strcmp(name, "metal") == 0)
+        return rhi::DeviceType::Metal;
+    if (strcmp(name, "cuda") == 0)
+        return rhi::DeviceType::CUDA;
+    return rhi::DeviceType::Default;
+}
+
+static void driverReplayCallback(
+    const char* signature,
+    uint64_t thisHandle,
+    void* userData)
+{
+    if (strcmp(signature, "ComponentTypeProxy::getEntryPointCode") != 0)
+        return;
+
+    auto* driverReplay = static_cast<DriverReplay*>(userData);
+    auto& ctx = SlangRecord::ReplayContext::get();
+
+    ISlangUnknown* proxy = ctx.getProxy(thisHandle);
+    if (!proxy)
+        return;
+
+    // Unwrap the proxy to get the real Slang IComponentType implementation.
+    ISlangUnknown* impl = SlangRecord::unwrapObject(proxy);
+    if (!impl)
+        return;
+
+    slang::IComponentType* componentType = nullptr;
+    impl->queryInterface(slang::IComponentType::getTypeGuid(), (void**)&componentType);
+    if (!componentType)
+        return;
+    componentType->release();
+
+    driverReplay->tryCreateComputePipeline(componentType);
+}
+#endif
 
 int main(int argc, char* argv[])
 {
@@ -198,6 +273,35 @@ int main(int argc, char* argv[])
 
             printf("Loading replay from: %s\n", streamPath.getBuffer());
 
+#if SLANG_ENABLE_SLANG_RHI
+            // Create the RHI device BEFORE loading the replay. The replay
+            // context is still Idle here, so Slang API calls made by the RHI
+            // device during initialization won't interfere with the proxy
+            // record/replay layer.
+            std::unique_ptr<DriverReplay> driverReplay;
+            if (options.replayDriver.getLength() > 0)
+            {
+                rhi::DeviceType deviceType = parseDeviceType(options.replayDriver.getBuffer());
+                if (deviceType == rhi::DeviceType::Default)
+                {
+                    fprintf(
+                        stderr,
+                        "Error: unknown device type '%s'\n",
+                        options.replayDriver.getBuffer());
+                    printUsage();
+                    return 1;
+                }
+
+                driverReplay = std::make_unique<DriverReplay>();
+                SlangResult initResult = driverReplay->init(deviceType);
+                if (SLANG_FAILED(initResult))
+                {
+                    fprintf(stderr, "Error: failed to initialize driver replay\n");
+                    return 1;
+                }
+            }
+#endif
+
             // Load and execute the replay
             SlangResult loadResult =
                 ctx.loadReplay(Slang::Path::getParentDirectory(streamPath).getBuffer());
@@ -207,11 +311,36 @@ int main(int argc, char* argv[])
                 return 1;
             }
 
+#if SLANG_ENABLE_SLANG_RHI
+            if (driverReplay)
+            {
+                ctx.setPostCallCallback(driverReplayCallback, driverReplay.get());
+            }
+#endif
+
             printf("Executing replay...\n");
             ctx.executeAll();
             printf("Replay completed successfully.\n");
 
-            return 0;
+            int exitCode = 0;
+#if SLANG_ENABLE_SLANG_RHI
+            if (driverReplay)
+            {
+                ctx.setPostCallCallback(nullptr, nullptr);
+                driverReplay->printSummary();
+                if (driverReplay->getFailCount() > 0)
+                    exitCode = 1;
+            }
+
+            // Reset the replay context back to Idle before destroying the
+            // RHI device. The device holds proxy-wrapped Slang sessions whose
+            // destructors go through the proxy layer; if the context is still
+            // in Playback mode those calls would try to read from the stream.
+            ctx.reset();
+            driverReplay.reset();
+#endif
+
+            return exitCode;
         }
         catch (const Slang::Exception& e)
         {
