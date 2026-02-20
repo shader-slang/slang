@@ -154,6 +154,15 @@ struct CommandOptions
         const char* description,
         UserValue userValue = kInvalidUserValue,
         Flags flags = 0);
+    void add(
+        const UnownedStringSlice* names,
+        Count namesCount,
+        const char* usage,
+        const char* description,
+        const InputLink* links,
+        Count linkCount,
+        UserValue userValue = kInvalidUserValue,
+        Flags flags = 0);
 
     void addValue(const UnownedStringSlice& name, UserValue userValue = kInvalidUserValue);
     void addValue(
@@ -245,8 +254,10 @@ struct CommandOptions
     /// Get the links associated with an option
     ConstArrayView<Link> getLinksForOption(const Option& option) const
     {
-        return makeConstArrayView(
-            m_links.getBuffer() + option.linkStartIndex,
+        if (option.linkStartIndex == option.linkEndIndex || m_links.getCount() == 0)
+            return ConstArrayView<Link>();
+        return m_links.getArrayView(
+            option.linkStartIndex,
             option.linkEndIndex - option.linkStartIndex);
     }
 

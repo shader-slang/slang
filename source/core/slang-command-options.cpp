@@ -311,10 +311,24 @@ void CommandOptions::add(
     UserValue userValue,
     Flags flags)
 {
+    add(names, namesCount, usage, description, nullptr, 0, userValue, flags);
+}
+
+void CommandOptions::add(
+    const UnownedStringSlice* names,
+    Count namesCount,
+    const char* usage,
+    const char* description,
+    const InputLink* inputLinks,
+    Count linkCount,
+    UserValue userValue,
+    Flags flags)
+{
     Option option;
     option.categoryIndex = m_currentCategoryIndex;
     option.usage = _addString(usage);
     option.description = _addString(UnownedStringSlice(description));
+    _addLinks(inputLinks, linkCount, option);
     option.flags = flags;
     option.userValue = userValue;
 

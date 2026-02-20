@@ -46,9 +46,9 @@ struct Option
     const char* name;
     const char* usage = nullptr;
     const char* description = nullptr;
+    const char* displayName = nullptr;
     const CommandOptions::InputLink* links = nullptr;
     Count linkCount = 0;
-    const char* displayName = nullptr;
 };
 
 enum class ValueCategory
@@ -716,14 +716,15 @@ void initCommandOptions(CommandOptions& options)
          "inferred binding numbers for more than one space, provide more than one such option. "
          "If more than one such option is provided for the same space, the last one takes effect. "
          "If you need to shift the inferred binding numbers for all sets, use 'all' as <space>.",
+         "-fvk-<vulkan-shift>-shift",
          kVulkanBindShiftLinks,
-         SLANG_COUNT_OF(kVulkanBindShiftLinks),
-         "-fvk-<vulkan-shift>-shift"},
+         SLANG_COUNT_OF(kVulkanBindShiftLinks)},
         {OptionKind::VulkanBindGlobals,
          "-fvk-bind-globals",
          "-fvk-bind-globals <N> <descriptor-set>",
          "Places the $Globals cbuffer at descriptor set <descriptor-set> and binding <N>.\n"
          "It lets you specify the descriptor for the source at a certain register.",
+         nullptr,
          kVulkanBindGlobalsLinks,
          SLANG_COUNT_OF(kVulkanBindGlobalsLinks)},
         {OptionKind::VulkanInvertY,

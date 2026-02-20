@@ -601,8 +601,9 @@ void TextCommandOptionsWriter::_appendDescriptionForCategory(Index categoryIndex
             _appendWrappedIndented(1, names, toSlice(", "));
         }
 
-        if (option.description.getLength() == 0 &&
-            options.getLinksForOption(option).getCount() == 0)
+        auto links = options.getLinksForOption(option);
+
+        if (option.description.getLength() == 0 && links.getCount() == 0)
         {
             m_builder << "\n";
             continue;
@@ -636,16 +637,13 @@ void TextCommandOptionsWriter::_appendDescriptionForCategory(Index categoryIndex
             m_builder << "\n";
         }
 
+        if (links.getCount() > 0)
         {
-            auto links = options.getLinksForOption(option);
-            if (links.getCount() > 0)
+            m_builder << m_options.indent << m_options.indent << "Links:\n";
+            for (const auto& link : links)
             {
-                m_builder << m_options.indent << m_options.indent << "Links:\n";
-                for (const auto& link : links)
-                {
-                    m_builder << m_options.indent << m_options.indent;
-                    m_builder << "* " << link.text << ": " << link.url << "\n";
-                }
+                m_builder << m_options.indent << m_options.indent;
+                m_builder << "* " << link.text << ": " << link.url << "\n";
             }
         }
     }
