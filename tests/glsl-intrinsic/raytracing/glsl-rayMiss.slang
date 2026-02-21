@@ -12,7 +12,7 @@ buffer MyBlockName
 // CHECK_GLSL-DAG: rayPayloadInEXT
 // CHECK_SPV-DAG: IncomingRayPayload{{NV|KHR}}
 layout(location = 2) rayPayloadInEXT vec4 payload;
-// CHECK_GLSL-DAG: hitObjectAttributeNV
+// CHECK_GLSL-DAG: hitObjectAttributeEXT
 // CHECK_SPV-DAG: HitObjectAttributeNV
 layout(location = 2) hitObjectAttributeNV vec4 attrMain;
 
