@@ -2,6 +2,7 @@
 
 //TEST:CROSS_COMPILE:-target dxil-asm -stage compute -profile sm_6_5 -entry main -line-directive-mode none
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-asm -stage compute -profile glsl_460+GL_EXT_ray_query -entry main -line-directive-mode none
+//TEST:SIMPLE(filecheck=METAL):-target metal -stage compute -entry main
 
 // CHECK: OpCapability RayQueryKHR
 // CHECK: OpExtension "SPV_KHR_ray_query"
@@ -9,6 +10,14 @@
 // CHECK: OpRayQueryProceedKHR
 // CHECK: OpRayQueryGetIntersectionTypeKHR
 // CHECK: OpRayQueryConfirmIntersectionKHR
+
+// METAL: reset
+// METAL: next
+// METAL: get_candidate_intersection_type
+// METAL: commit_bounding_box_intersection
+// METAL: commit_triangle_intersection
+// METAL: abort
+// METAL: get_committed_intersection_type
 
 // The goal of this shader is to use all the main pieces
 // of functionality in DXR 1.1's `TraceRayInline` feature,
