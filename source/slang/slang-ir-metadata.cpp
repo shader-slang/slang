@@ -92,7 +92,10 @@ void collectMetadataFromInst(IRInst* param, ArtifactPostEmitMetadata& outMetadat
         varLayout->findOffsetAttr(LayoutResourceKind::SubElementRegisterSpace);
     if (!containerSpaceOffset)
         return;
-    spaceOffset += containerSpaceOffset->getOffset();
+    // The sub-element register space offset already includes the descriptor set allocated for the
+    // parameter block. Do not accumulate the parent register-space offset here, or we will double
+    // count the descriptor set index for the automatically introduced constant buffer.
+    UInt containerSpaceOffsetValue = containerSpaceOffset->getOffset();
     for (auto sizeAttr : containerVarLayout->getTypeLayout()->getSizeAttrs())
     {
         auto kind = sizeAttr->getResourceKind();
@@ -102,7 +105,7 @@ void collectMetadataFromInst(IRInst* param, ArtifactPostEmitMetadata& outMetadat
 
         if (auto offsetAttr = containerVarLayout->findOffsetAttr(kind))
         {
-            auto spaceIndex = spaceOffset + offsetAttr->getSpace();
+            auto spaceIndex = containerSpaceOffsetValue + offsetAttr->getSpace();
             auto registerIndex = offsetAttr->getOffset();
             auto size = sizeAttr->getSize();
             auto count = size.getFiniteValueOr(0);
