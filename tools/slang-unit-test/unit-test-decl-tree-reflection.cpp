@@ -18,7 +18,7 @@ static String getTypeFullName(slang::TypeReflection* type)
     return String((const char*)blob->getBufferPointer());
 }
 
-static void printRefl(slang::DeclReflection* refl, unsigned int level = 0)
+static void printRefl(slang::ISession* session, slang::DeclReflection* refl, unsigned int level = 0)
 {
     // Mapping of kind ids to names
     std::string names[] = {"Unsupported", "Struct", "Function", "Module", "Generic", "Variable"};
@@ -26,12 +26,14 @@ static void printRefl(slang::DeclReflection* refl, unsigned int level = 0)
     {
         std::cout << "  ";
     }
+    auto sourceLocation = session->getDeclSourceLocation(refl);
+    const char* filePath = sourceLocation.filePath ? sourceLocation.filePath : "<null>";
     std::cout << "[" << names[(unsigned int)refl->getKind()] << "] (" << refl->getChildrenCount()
-              << ")" << std::endl;
+              << ") " << filePath << ":" << sourceLocation.line << ":" << sourceLocation.column << std::endl;
 
     for (auto* child : refl->getChildren())
     {
-        printRefl(child, level + 1);
+        printRefl(session, child, level + 1);
     }
 }
 

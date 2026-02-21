@@ -4189,6 +4189,13 @@ enum class ContainerType
     ParameterBlock
 };
 
+struct SourceLocation
+{
+    const char* filePath = nullptr;
+    SlangInt line = -1;
+    SlangInt column = -1;
+};
+
 /** A session provides a scope for code that is loaded.
 
 A session can be used to load modules of Slang source code,
@@ -4372,6 +4379,9 @@ struct ISession : public ISlangUnknown
      */
     virtual SLANG_NO_THROW bool SLANG_MCALL
     isBinaryModuleUpToDate(const char* modulePath, slang::IBlob* binaryModuleBlob) = 0;
+
+    virtual SLANG_NO_THROW slang::SourceLocation SLANG_MCALL
+    getDeclSourceLocation(slang::DeclReflection* decl) = 0;
 
     /** Load a module from a string.
      */
