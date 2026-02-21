@@ -1046,6 +1046,11 @@ extern "C"
     SLANG_API char const* spGetTranslationUnitSource(
         SlangCompileRequest* request,
         int translationUnitIndex);
+
+    /** Get the descriptor set/space index allocated for the bindless resource heap.
+     *  Returns -1 if the program does not use bindless resource heap.
+     */
+    SLANG_API SlangInt spReflection_getBindlessSpaceIndex(SlangReflection* reflection);
 #ifdef __cplusplus
 }
 #endif

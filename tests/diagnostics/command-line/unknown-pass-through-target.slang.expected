@@ -1,6 +1,6 @@
 result code = 1
 standard error = {
-(1): error 16: unknown pass-through target 'subcon'
+command line(1): error 16: unknown pass-through target 'subcon'
 tests/diagnostics/command-line/unknown-pass-through-target.slang -pass-through subcon
                                                                                ^
 }
