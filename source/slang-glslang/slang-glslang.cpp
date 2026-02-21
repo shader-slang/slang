@@ -162,17 +162,12 @@ static void validationMessageConsumer(
     }
 }
 
-// Validate the given SPIRV-ASM instructions.
-extern "C"
-#ifdef _MSC_VER
-    _declspec(dllexport)
-#else
-    __attribute__((__visibility__("default")))
-#endif
-        bool glslang_validateSPIRV(const uint32_t* contents, int contentsSize)
+// Internal helper to validate SPIR-V with a specific target environment.
+static bool _validateSPIRVWithEnv(
+    const uint32_t* contents,
+    int contentsSize,
+    spv_target_env target_env)
 {
-    spv_target_env target_env = SPV_ENV_VULKAN_1_4;
-
     spvtools::ValidatorOptions options;
     options.SetScalarBlockLayout(true);
     options.SetFriendlyNames(true);
@@ -181,6 +176,19 @@ extern "C"
     tools.SetMessageConsumer(validationMessageConsumer);
 
     return tools.Validate(contents, contentsSize, options);
+}
+
+// Validate the given SPIRV-ASM instructions (legacy function, uses default Vulkan 1.4 environment).
+extern "C"
+#ifdef _MSC_VER
+    _declspec(dllexport)
+#else
+    __attribute__((__visibility__("default")))
+#endif
+        bool glslang_validateSPIRV(const uint32_t* contents, int contentsSize)
+{
+    // Keep backward compatibility with the original hardcoded environment
+    return _validateSPIRVWithEnv(contents, contentsSize, SPV_ENV_VULKAN_1_4);
 }
 
 // Disassemble the given SPIRV-ASM instructions and return the result as a string.
@@ -247,6 +255,10 @@ extern "C"
     delete result;
     return succ;
 }
+
+// Forward declarations
+static spv_target_env _getUniversalTargetEnv(const glsl_SPIRVVersion& spirvVersion);
+static spv_target_env _getVulkanTargetEnv(const glsl_SPIRVVersion& spirvVersion);
 
 // Apply the SPIRV-Tools optimizer to generated SPIR-V based on the desired optimization level
 // TODO: add flag for optimizing SPIR-V size as well
@@ -553,7 +565,9 @@ static int spirv_Optimize_1_2(const glslang_CompileRequest_1_2& request)
     std::vector<SPIRVOptimizationDiagnostic> diagnostics;
     std::vector<uint32_t> spirvBuffer((uint32_t*)request.inputBegin, (uint32_t*)request.inputEnd);
 
-    int err = glslang_optimizeSPIRV(SPV_ENV_UNIVERSAL_1_5, request, diagnostics, spirvBuffer);
+    // Calculate target environment from the request's SPIR-V version
+    spv_target_env targetEnv = _getUniversalTargetEnv(request.spirvVersion);
+    int err = glslang_optimizeSPIRV(targetEnv, request, diagnostics, spirvBuffer);
     if (request.outputFunc)
     {
         request.outputFunc(
@@ -628,6 +642,10 @@ static const SPRIVTargetInfo kSpirvTargetInfos[] = {
     {"1.4", SPV_ENV_UNIVERSAL_1_4},
     {"vk1.1_spirv1.4", SPV_ENV_VULKAN_1_1_SPIRV_1_4},
     {"1.5", SPV_ENV_UNIVERSAL_1_5},
+    {"vk1.2", SPV_ENV_VULKAN_1_2},
+    {"1.6", SPV_ENV_UNIVERSAL_1_6},
+    {"vk1.3", SPV_ENV_VULKAN_1_3},
+    {"vk1.4", SPV_ENV_VULKAN_1_4},
 };
 
 static int _findTargetIndex(const char* name)
@@ -645,9 +663,27 @@ static int _findTargetIndex(const char* name)
     return -1;
 }
 
-static spv_target_env _getUniversalTargetEnv(glslang::EShTargetLanguageVersion inVersion)
+// Validate the given SPIRV-ASM instructions with a specific target environment.
+// Converts the glsl_SPIRVVersion to the appropriate spv_target_env for validation.
+extern "C"
+#ifdef _MSC_VER
+    _declspec(dllexport)
+#else
+    __attribute__((__visibility__("default")))
+#endif
+        bool glslang_validateSPIRVWithVersion(
+            const uint32_t* contents,
+            int contentsSize,
+            glsl_SPIRVVersion spirvVersion)
 {
-    glsl_SPIRVVersion spirvVersion = _toSPIRVVersion(inVersion);
+    // Convert the SPIR-V version to Vulkan target environment for validation
+    // Using Vulkan environments enables Vulkan-specific validation rules
+    spv_target_env target_env = _getVulkanTargetEnv(spirvVersion);
+    return _validateSPIRVWithEnv(contents, contentsSize, target_env);
+}
+
+static spv_target_env _getUniversalTargetEnv(const glsl_SPIRVVersion& spirvVersion)
+{
     uint32_t ver = (uint32_t(spirvVersion.major) << 8) | spirvVersion.minor;
 
     switch (ver)
@@ -678,6 +714,46 @@ static spv_target_env _getUniversalTargetEnv(glslang::EShTargetLanguageVersion i
     }
     // Just use the default...
     return SPV_ENV_UNIVERSAL_1_2;
+}
+
+static spv_target_env _getUniversalTargetEnv(glslang::EShTargetLanguageVersion inVersion)
+{
+    glsl_SPIRVVersion spirvVersion = _toSPIRVVersion(inVersion);
+    return _getUniversalTargetEnv(spirvVersion);
+}
+
+// Map SPIR-V version to Vulkan target environment for validation.
+// Using Vulkan environments enables Vulkan-specific validation rules.
+static spv_target_env _getVulkanTargetEnv(const glsl_SPIRVVersion& spirvVersion)
+{
+    uint32_t ver = (uint32_t(spirvVersion.major) << 8) | spirvVersion.minor;
+
+    switch (ver)
+    {
+    case 0x100:
+        return SPV_ENV_VULKAN_1_0; // SPIR-V 1.0
+    case 0x101:
+    case 0x102:
+    case 0x103:
+        return SPV_ENV_VULKAN_1_1; // SPIR-V 1.1, 1.2, 1.3
+    case 0x104:
+        return SPV_ENV_VULKAN_1_1_SPIRV_1_4; // SPIR-V 1.4
+    case 0x105:
+        return SPV_ENV_VULKAN_1_4; // SPIR-V 1.5
+    case 0x106:
+        return SPV_ENV_VULKAN_1_4; // SPIR-V 1.6
+    default:
+        {
+            if (ver > 0x106)
+            {
+                // Use the highest Vulkan environment we know
+                return SPV_ENV_VULKAN_1_4;
+            }
+            break;
+        }
+    }
+    // Default to SPV_ENV_VULKAN_1_4 (SPIR-V 1.6)
+    return SPV_ENV_VULKAN_1_4;
 }
 
 static int glslang_compileGLSLToSPIRV(glslang_CompileRequest_1_2 request)

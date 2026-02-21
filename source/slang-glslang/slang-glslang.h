@@ -166,6 +166,15 @@ typedef int (*glslang_CompileFunc_1_0)(glslang_CompileRequest_1_0* request);
 typedef int (*glslang_CompileFunc_1_1)(glslang_CompileRequest_1_1* request);
 typedef int (*glslang_CompileFunc_1_2)(glslang_CompileRequest_1_2* request);
 typedef bool (*glslang_ValidateSPIRVFunc)(const uint32_t* contents, int contentsSize);
+/// Validate SPIR-V with a specific target environment.
+/// @param contents The SPIR-V binary data.
+/// @param contentsSize The size of the SPIR-V binary in 32-bit words.
+/// @param spirvVersion The SPIR-V version structure.
+/// @return true if validation succeeded, false otherwise.
+typedef bool (*glslang_ValidateSPIRVWithEnvFunc)(
+    const uint32_t* contents,
+    int contentsSize,
+    glsl_SPIRVVersion spirvVersion);
 typedef bool (*glslang_DisassembleSPIRVFunc)(const uint32_t* contents, int contentsSize);
 typedef bool (*glslang_DisassembleSPIRVWithResultFunc)(
     const uint32_t* contents,

@@ -352,9 +352,23 @@ public:
     /// Get the version of this compiler
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     getVersionString(slang::IBlob** outVersionString) = 0;
-    /// Validate and return the result
+    /// Validate and return the result (uses default target environment)
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     validate(const uint32_t* contents, int contentsSize) = 0;
+    /// Validate with a specific SPIR-V target environment.
+    /// @param contents The SPIR-V binary data.
+    /// @param contentsSize The size of the SPIR-V binary in 32-bit words.
+    /// @param spirvCapVersion The SPIR-V capability version containing the target version.
+    /// @return SLANG_OK if validation succeeded, SLANG_FAIL otherwise.
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL validateWithTargetVersion(
+        const uint32_t* contents,
+        int contentsSize,
+        const CapabilityVersion& capVersion)
+    {
+        // Default implementation falls back to validate without env for backward compatibility
+        SLANG_UNUSED(capVersion);
+        return validate(contents, contentsSize);
+    }
     /// Disassemble and print to stdout
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     disassemble(const uint32_t* contents, int contentsSize) = 0;
