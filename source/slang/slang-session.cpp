@@ -1786,7 +1786,7 @@ Linkage::isBinaryModuleUpToDate(const char* modulePath, slang::IBlob* binaryModu
     return isBinaryModuleUpToDate(modulePath, rootChunk);
 }
 
-SLANG_NO_THROW slang::ISession::SourceLocation SLANG_MCALL
+SLANG_NO_THROW slang::SourceLocation SLANG_MCALL
 Linkage::getDeclSourceLocation(slang::DeclReflection* inDecl)
 {
     Decl* decl = (Decl*)inDecl;
@@ -1795,7 +1795,7 @@ Linkage::getDeclSourceLocation(slang::DeclReflection* inDecl)
     if (sourceView)
     {
         auto humaneLoc = sourceView->getHumaneLoc(decl->getNameLoc());
-        slang::ISession::SourceLocation loc;
+        slang::SourceLocation loc;
         
         if (humaneLoc.pathInfo.hasFoundPath())
             loc.filePath = humaneLoc.pathInfo.foundPath.getBuffer();
@@ -1804,7 +1804,7 @@ Linkage::getDeclSourceLocation(slang::DeclReflection* inDecl)
         loc.column = humaneLoc.column;
         return loc;
     }
-    return slang::ISession::SourceLocation();
+    return slang::SourceLocation();
 }
 
 SourceFile* Linkage::findFile(Name* name, SourceLoc loc, IncludeSystem& outIncludeSystem)
