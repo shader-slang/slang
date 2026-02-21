@@ -104,7 +104,7 @@ After EMSDK is activated, Slang needs to be built in a cross compiling setup:
 # Build generators.
 cmake --workflow --preset generators --fresh
 mkdir generators
-cmake --install build --prefix generators --component generators
+cmake --install build --config Release --prefix generators --component generators
 
 # Configure the build with emcmake.
 # emcmake is available only when emsdk_env setup the environment correctly.
@@ -119,6 +119,40 @@ cmake --build --preset emscripten --target slang-wasm
 
 > Note: If the last build step fails, try running the command that `emcmake`
 > outputs, directly.
+
+### Android build
+
+In order to build Slang for Android, you need the Android NDK installed and the `ANDROID_NDK_HOME` environment variable set to point to your NDK installation.
+
+Android builds are a cross compiling setup, so build the generators for the build platform first:
+
+```bash
+# Build generators.
+cmake --workflow --preset generators --fresh
+mkdir generators
+cmake --install build --prefix generators --component generators
+```
+
+Then configure and build for the desired architecture:
+
+```bash
+# ARM64 (arm64-v8a)
+cmake --preset android-arm64 --fresh -DSLANG_GENERATORS_PATH=generators/bin
+cmake --build --preset android-arm64-release
+
+# x86_64
+cmake --preset android-x86_64 --fresh -DSLANG_GENERATORS_PATH=generators/bin
+cmake --build --preset android-x86_64-release
+```
+
+Other build presets are also provided for both architectures:
+
+- `android-arm64-debug`
+- `android-arm64-releaseWithDebugInfo`
+- `android-x86_64-debug`
+- `android-x86_64-releaseWithDebugInfo`
+
+> Note: Android presets disable some features to reduce dependencies, including GFX, tests, slangd, replayer, LLVM, examples, xlib, CUDA, OptiX, NVAPI, and Aftermath.
 
 ## Installing
 
