@@ -76,7 +76,7 @@ EndToEndCompileRequest::queryInterface(SlangUUID const& uuid, void** outObject)
         return SLANG_OK;
     }
 
-    if (uuid == ISlangUnknown::getTypeGuid() && uuid == ICompileRequest::getTypeGuid())
+    if (uuid == ISlangUnknown::getTypeGuid() || uuid == ICompileRequest::getTypeGuid())
     {
         addReference();
         *outObject = static_cast<slang::ICompileRequest*>(this);
