@@ -1034,6 +1034,12 @@ void createVarLayoutForLegalizedGlobalParam(
             builder->addInterpolationModeDecoration(globalParam, interpolationModeDecor->getMode());
             break;
         }
+
+        if (decorParent->findDecoration<IRGLSLPrimitivesRateDecoration>())
+        {
+            builder->addSimpleDecoration<IRGLSLPrimitivesRateDecoration>(globalParam);
+            break;
+        }
     }
 
     if (declarator && declarator->flavor == GlobalVaryingDeclarator::Flavor::meshOutputPrimitives)

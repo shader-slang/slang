@@ -41,6 +41,9 @@ syntax globallycoherent : GloballyCoherentModifier;
 ///
 syntax pervertex : PerVertexModifier;
 
+/// Modifier to disable inteprolation and force per-primitive passing of a varying attribute.
+syntax perprimitive : PerPrimitiveModifier;
+
 /// Modifier to indicate a buffer or texture element type is
 /// backed by data in an unsigned normalized format.
 ///

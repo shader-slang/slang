@@ -1414,6 +1414,7 @@ ASTNodeType getModifierConflictGroupKind(ASTNodeType modifierType)
     case ASTNodeType::HLSLSampleModifier:
     case ASTNodeType::HLSLCentroidModifier:
     case ASTNodeType::PerVertexModifier:
+    case ASTNodeType::PerPrimitiveModifier:
         return ASTNodeType::InterpolationModeModifier;
 
     case ASTNodeType::PrefixModifier:
@@ -1506,6 +1507,7 @@ bool isModifierAllowedOnDecl(bool isGLSLInput, ASTNodeType modifierType, Decl* d
     case ASTNodeType::HLSLSampleModifier:
     case ASTNodeType::HLSLCentroidModifier:
     case ASTNodeType::PerVertexModifier:
+    case ASTNodeType::PerPrimitiveModifier:
     case ASTNodeType::HLSLUniformModifier:
     case ASTNodeType::DynamicUniformModifier:
         return (as<VarDeclBase>(decl) &&

@@ -160,6 +160,12 @@ void GLSLSourceEmitter::_requireFragmentShaderBarycentric()
     m_glslExtensionTracker->requireVersion(ProfileVersion::GLSL_450);
 }
 
+void GLSLSourceEmitter::_requireMeshShader()
+{
+    m_glslExtensionTracker->requireExtension(
+        UnownedStringSlice::fromLiteral("GL_EXT_mesh_shader"));
+    m_glslExtensionTracker->requireVersion(ProfileVersion::GLSL_450);
+}
 
 void GLSLSourceEmitter::_requireGLSLExtension(const UnownedStringSlice& name)
 {
@@ -3756,6 +3762,7 @@ void GLSLSourceEmitter::emitMeshShaderModifiersImpl(IRInst* varInst)
 {
     if (varInst->findDecoration<IRGLSLPrimitivesRateDecoration>())
     {
+        _requireMeshShader();
         m_writer->emit("perprimitiveEXT");
         m_writer->emit(" ");
     }
