@@ -1789,6 +1789,8 @@ Linkage::isBinaryModuleUpToDate(const char* modulePath, slang::IBlob* binaryModu
 SLANG_NO_THROW slang::SourceLocation SLANG_MCALL
 Linkage::getDeclSourceLocation(slang::DeclReflection* inDecl)
 {
+    if (!inDecl)
+        return slang::SourceLocation();
     Decl* decl = (Decl*)inDecl;
     SourceManager* sourceManager = getSourceManager();
     auto sourceView = sourceManager->findSourceViewRecursively(decl->getNameLoc());
@@ -1798,7 +1800,10 @@ Linkage::getDeclSourceLocation(slang::DeclReflection* inDecl)
         slang::SourceLocation loc;
         
         if (humaneLoc.pathInfo.hasFoundPath())
-            loc.filePath = humaneLoc.pathInfo.foundPath.getBuffer();
+        {
+            auto pathSlice = m_stringSlicePool.addAndGetSlice(humaneLoc.pathInfo.foundPath);
+            loc.filePath = pathSlice.begin();
+        }
 
         loc.line = humaneLoc.line;
         loc.column = humaneLoc.column;
