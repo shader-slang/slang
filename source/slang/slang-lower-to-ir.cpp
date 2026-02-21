@@ -8797,6 +8797,27 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return LoweredValInfo();
     }
 
+    LoweredValInfo visitStaticAssertDecl(StaticAssertDecl* decl)
+    {
+        // For static assertions, we need to emit IR that can be evaluated at compile time
+        // The checkStaticAssert function expects:
+        // - operand 0: IRBoolLit (compile-time boolean)
+        // - operand 1: IRStringLit (compile-time string)
+
+        // Try to evaluate the condition as a compile-time constant
+        auto condition = lowerRValueExpr(context, decl->condition);
+        auto message = lowerRValueExpr(context, decl->message);
+
+        // Create operands array
+        IRInst* operands[] = {getSimpleVal(context, condition), getSimpleVal(context, message)};
+
+        // Emit the static assert IR instruction
+        getBuilder()
+            ->emitIntrinsicInst(getBuilder()->getVoidType(), kIROp_StaticAssert, 2, operands);
+
+        return LoweredValInfo();
+    }
+
     void ensureInsertAtGlobalScope(IRBuilder* builder)
     {
         auto inst = builder->getInsertLoc().getInst();

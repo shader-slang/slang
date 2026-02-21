@@ -1337,6 +1337,21 @@ static NodeBase* parseImplementingDecl(Parser* parser, void* /*userData*/)
     return decl;
 }
 
+static NodeBase* parseStaticAssertDecl(Parser* parser, void* /*userData*/)
+{
+    auto decl = parser->astBuilder->create<StaticAssertDecl>();
+    parser->FillPosition(decl);
+
+    parser->ReadMatchingToken(TokenType::LParent);
+    decl->condition = parser->ParseArgExpr();
+    parser->ReadMatchingToken(TokenType::Comma);
+    decl->message = parser->ParseArgExpr();
+    parser->ReadMatchingToken(TokenType::RParent);
+    parser->ReadMatchingToken(TokenType::Semicolon);
+
+    return decl;
+}
+
 static NodeBase* parseModuleDeclarationDecl(Parser* parser, void* /*userData*/)
 {
     auto decl = parser->astBuilder->create<ModuleDeclarationDecl>();
@@ -5191,6 +5206,16 @@ static DeclBase* ParseDeclWithModifiers(
                     }
                 }
             endOfGlslBufferBlock:;
+            }
+
+            // Special handling for static_assert which may not be found via normal lookup
+            auto nameToken = peekToken(parser);
+            if (nameToken.getContent() == "static_assert")
+            {
+                // Consume the token
+                advanceToken(parser);
+                decl = as<Decl>(parseStaticAssertDecl(parser, nullptr));
+                break;
             }
 
             // Our final fallback case is to assume that the user is
@@ -9713,6 +9738,7 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseDecl("__include", parseIncludeDecl),
     _makeParseDecl("module", parseModuleDeclarationDecl),
     _makeParseDecl("implementing", parseImplementingDecl),
+    _makeParseDecl("static_assert", parseStaticAssertDecl),
     _makeParseDecl("let", parseLetDecl),
     _makeParseDecl("var", parseVarDecl),
     _makeParseDecl("func", parseFuncDecl),

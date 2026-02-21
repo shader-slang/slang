@@ -3,9 +3,6 @@
 //TEST:SIMPLE(filecheck=GLSL):-target glsl -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=SPV):-target spirv -stage compute -entry computeMain
 
-// TODO: requires changes in parser
-//static_assert(true, "PASS_global");
-//static_assert(false, "FAIL_global");
 
 __generic<T:IArithmetic>
 void TEST_specialize()
