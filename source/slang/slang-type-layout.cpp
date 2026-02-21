@@ -52,9 +52,15 @@ static size_t _roundUpToPowerOfTwo(size_t value)
     value--;
 #if SLANG_VC && 0
     // TODO: Disabled to avoid build failure on aarch64/windows
-    return 1ULL << (64 - (size_t)__lzcnt64(value));
+    if constexpr (sizeof(size_t) > 4)
+        return size_t(1) << (sizeof(size_t) * 8 - __lzcnt64(value));
+    else
+        return size_t(1) << (sizeof(size_t) * 8 - __lzcnt(value));
 #elif SLANG_GCC || SLANG_CLANG
-    return 1ULL << (sizeof(size_t) * 8 - __builtin_clzll(value));
+    if constexpr (sizeof(size_t) > 4)
+        return size_t(1) << (sizeof(size_t) * 8 - __builtin_clzll(value));
+    else
+        return size_t(1) << (sizeof(size_t) * 8 - __builtin_clzl(value));
 #else
     value |= value >> 1;
     value |= value >> 2;
