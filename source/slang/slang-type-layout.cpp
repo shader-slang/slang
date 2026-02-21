@@ -5434,6 +5434,24 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
 
         auto element = _createTypeLayout(context, elementType);
 
+        // If the element type is not a uniform type (e.g., a resource type like Sampler2D),
+        // we can't form a proper vector layout. This case arises from Conditional<T, hasValue>
+        // which uses vector<T, hasValue ? 1 : 0> as storage. For non-uniform element types,
+        // return the element layout directly for count 1, or an empty layout for count 0.
+        if (element.info.kind != LayoutResourceKind::Uniform &&
+            element.info.kind != LayoutResourceKind::None)
+        {
+            if (elementCount == 0)
+            {
+                RefPtr<TypeLayout> typeLayout = new TypeLayout();
+                typeLayout->type = type;
+                typeLayout->rules = rules;
+                return TypeLayoutResult(typeLayout, SimpleLayoutInfo());
+            }
+            SLANG_ASSERT(elementCount == 1);
+            return TypeLayoutResult(element.layout, element.info);
+        }
+
         BaseType elementBaseType = BaseType::Void;
         if (auto elementBasicType = as<BasicExpressionType>(elementType))
         {
