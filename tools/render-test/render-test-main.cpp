@@ -1254,8 +1254,8 @@ Result RenderTestApp::writeBindingOutput(const String& fileName)
     // Wait until everything is complete
     m_queue->waitOnHost();
 
-    FILE* f = nullptr;
-    if (fopen_s(&f, fileName.getBuffer(), "wb") != 0 || !f)
+    FILE* f = fopen(fileName.getBuffer(), "wb");
+    if (!f)
     {
         return SLANG_FAIL;
     }

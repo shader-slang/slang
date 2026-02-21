@@ -355,8 +355,7 @@ struct App
         if (!outputPath)
             outputPath = defaultOutputPath;
 
-        FILE* outputFile = nullptr;
-        fopen_s(&outputFile, outputPath, "w");
+        FILE* outputFile = fopen(outputPath, "w");
         ScopedFile outputFileCleanup(outputFile);
         if (!outputFile)
         {

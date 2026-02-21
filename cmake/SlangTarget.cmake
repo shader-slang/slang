@@ -64,8 +64,6 @@ function(slang_add_target dir type)
         EXPLICIT_SOURCE
         # Additional directories from which to glob source
         EXTRA_SOURCE_DIRS
-        # Headers to precompile (PCH)
-        PRECOMPILE_HEADERS
         # Additional compile definitions and options
         EXTRA_COMPILE_DEFINITIONS_PRIVATE
         EXTRA_COMPILE_DEFINITIONS_PUBLIC
@@ -551,13 +549,6 @@ function(slang_add_target dir type)
             ${target}
             PRIVATE ${ARG_EXTRA_COMPILE_OPTIONS_PRIVATE}
         )
-    endif()
-
-    #
-    # Precompiled headers (PCH)
-    #
-    if(SLANG_ENABLE_PCH AND ARG_PRECOMPILE_HEADERS)
-        target_precompile_headers(${target} PRIVATE ${ARG_PRECOMPILE_HEADERS})
     endif()
 
     #

@@ -2,9 +2,6 @@
 # Tools used to generate source during the build:
 #
 
-# PCH header for tools that use slang core types
-set(SLANG_TOOLS_PCH ${slang_SOURCE_DIR}/source/core/slang-basic.h)
-
 add_custom_target(
     all-generators
     COMMENT "meta target which depends on all generators"
@@ -32,13 +29,6 @@ function(generator dir)
                     "${SLANG_GENERATORS_PATH}/${target}${CMAKE_HOST_EXECUTABLE_SUFFIX}"
         )
     else()
-        # Check if using compiler-core to enable PCH
-        string(FIND "${ARGN}" "compiler-core" HAS_COMPILER_CORE)
-        if(${HAS_COMPILER_CORE} GREATER -1)
-            set(PCH_ARGS PRECOMPILE_HEADERS ${SLANG_TOOLS_PCH})
-        else()
-            set(PCH_ARGS "")
-        endif()
         slang_add_target(
             ${dir}
             EXECUTABLE
@@ -50,7 +40,6 @@ function(generator dir)
             FOLDER generators
             INSTALL_COMPONENT generators
             EXPORT_SET_NAME SlangGeneratorTargets
-            ${PCH_ARGS}
             ${ARGN}
         )
     endif()
@@ -101,7 +90,6 @@ slang_add_target(
     USE_FEWER_WARNINGS
     LINK_WITH_PRIVATE core compiler-core
     INCLUDE_DIRECTORIES_PUBLIC .
-    PRECOMPILE_HEADERS ${SLANG_TOOLS_PCH}
     FOLDER generators
 )
 
@@ -264,7 +252,6 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
             ${CMAKE_DL_LIBS}
             Threads::Threads
         INCLUDE_FROM_PRIVATE slang-rhi
-        PRECOMPILE_HEADERS ${SLANG_TOOLS_PCH}
         REQUIRES
             # Shared libraries dlopened by slang-test
             slang-reflection-test
@@ -356,7 +343,6 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
         USE_FEWER_WARNINGS
         LINK_WITH_PRIVATE core slang unit-test stb platform slang-rhi
         INCLUDE_FROM_PRIVATE slang-rhi
-        PRECOMPILE_HEADERS ${SLANG_TOOLS_PCH}
         INCLUDE_DIRECTORIES_PUBLIC
             .
             platform
@@ -384,7 +370,6 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
             stb
             $<$<BOOL:${SLANG_ENABLE_CUDA}>:CUDA::cuda_driver>
         INCLUDE_FROM_PRIVATE slang-rhi
-        PRECOMPILE_HEADERS ${SLANG_TOOLS_PCH}
         EXTRA_COMPILE_DEFINITIONS_PRIVATE
             $<$<BOOL:${SLANG_ENABLE_CUDA}>:RENDER_TEST_CUDA>
             $<$<BOOL:${SLANG_ENABLE_OPTIX}>:RENDER_TEST_OPTIX>
@@ -403,7 +388,6 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
             SLANG_NO_DEPRECATION
         USE_FEWER_WARNINGS
         LINK_WITH_PRIVATE core compiler-core unit-test slang Threads::Threads
-        PRECOMPILE_HEADERS ${SLANG_TOOLS_PCH}
         OUTPUT_NAME slang-unit-test-tool
         FOLDER test/tools
     )
@@ -440,7 +424,6 @@ if(SLANG_ENABLE_REPLAYER)
         LINK_WITH_PRIVATE core compiler-core slang
         INCLUDE_DIRECTORIES_PUBLIC
             ${slang_SOURCE_DIR}/source/slang-record-replay
-        PRECOMPILE_HEADERS ${SLANG_TOOLS_PCH}
         FOLDER test
     )
 endif()
