@@ -3014,6 +3014,13 @@ private:
                 varOffset += offsetAttr->getOffset();
                 builder.addSemanticDecoration(key, toSlice("_slang_attr"), (int)varOffset);
             }
+            else
+            {
+                // If no offset attribute is found, this field still needs a semantic decoration
+                // to ensure it gets a location attribute in WGSL. We'll use a default semantic
+                // with an index based on the field position.
+                builder.addSemanticDecoration(key, toSlice("_slang_attr"), (int)index);
+            }
             index++;
         }
     }

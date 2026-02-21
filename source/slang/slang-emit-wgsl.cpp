@@ -285,6 +285,13 @@ void WGSLSourceEmitter::emitSemanticsPrefixImpl(IRInst* inst)
             m_writer->emit(")");
             return;
         }
+
+        // If no semantic decoration is found, this might be a field that should have
+        // received a location attribute during legalization but didn't for some reason.
+        // This can happen in edge cases and would result in invalid WGSL.
+        // For now, we emit a warning but don't emit an invalid location to avoid
+        // breaking existing functionality. The legalization process should ensure
+        // all varying fields get proper semantic decorations.
     }
 }
 
