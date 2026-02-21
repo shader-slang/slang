@@ -304,18 +304,6 @@ SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
     const UnownedStringSlice& name,
     StringBuilder& out)
 {
-#ifdef _WIN32
-    char* value = nullptr;
-    size_t len = 0;
-    errno_t err = _dupenv_s(&value, &len, String(name).getBuffer());
-    if (err == 0 && value != nullptr)
-    {
-        out.append(value);
-        free(value);
-        return SLANG_OK;
-    }
-    return SLANG_E_NOT_FOUND;
-#else
     const char* value = getenv(String(name).getBuffer());
     if (value)
     {
@@ -323,7 +311,6 @@ SLANG_COMPILE_TIME_ASSERT(E_OUTOFMEMORY == SLANG_E_OUT_OF_MEMORY);
         return SLANG_OK;
     }
     return SLANG_E_NOT_FOUND;
-#endif
 }
 
 /* static */ PlatformKind PlatformUtil::getPlatformKind()

@@ -9,6 +9,4 @@ slang_add_target(
     INCLUDE_DIRECTORIES_PUBLIC
         ${slang_SOURCE_DIR}/source
         ${slang_SOURCE_DIR}/include
-    PRECOMPILE_HEADERS
-        ${CMAKE_CURRENT_SOURCE_DIR}/slang-basic.h
 )

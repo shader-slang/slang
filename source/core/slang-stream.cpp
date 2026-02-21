@@ -184,7 +184,7 @@ SlangResult FileStream::_init(
         m_handle = _wfsopen(fileName.toWString(), wideMode, shFlag);
     }
 #else
-    fopen_s(&m_handle, fileName.getBuffer(), mode);
+    m_handle = fopen(fileName.getBuffer(), mode);
 #endif
     if (!m_handle)
     {
