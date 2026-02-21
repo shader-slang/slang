@@ -2410,6 +2410,12 @@ DIAGNOSTIC(
     "getStringHash can only be called when argument is statically resolvable to a string literal")
 
 DIAGNOSTIC(
+    41027,
+    Error,
+    accessingValueOfNoneOptional,
+    "accessing `.value` on `Optional<$0>` that is always `none`")
+
+DIAGNOSTIC(
     41030,
     Warning,
     operatorShiftLeftOverflow,
