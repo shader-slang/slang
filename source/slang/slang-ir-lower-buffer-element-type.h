@@ -1,14 +1,16 @@
 #ifndef SLANG_IR_LOWER_BUFFER_ELEMENT_TYPE_H
 #define SLANG_IR_LOWER_BUFFER_ELEMENT_TYPE_H
 
-#include "slang.h"
+#include "slang-ir.h"
 
 namespace Slang
 {
 struct IRModule;
+struct IRBuilder;
 class TargetProgram;
 struct IRTypeLayoutRules;
 struct IRType;
+struct IRPtrType;
 enum class IRTypeLayoutRuleName;
 
 enum class BufferElementTypeLoweringPolicyKind
@@ -38,10 +40,15 @@ void lowerBufferElementTypeToStorageType(
     TargetProgram* target,
     BufferElementTypeLoweringOptions options = BufferElementTypeLoweringOptions());
 
-
 // Returns the type layout rules should be used for a buffer resource type.
 IRTypeLayoutRules* getTypeLayoutRuleForBuffer(TargetProgram* target, IRType* bufferType);
 IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRType* bufferType);
+IRType* getTypeLayoutTypeForBuffer(TargetProgram* target, IRBuilder& builder, IRType* bufferType);
+IRPtrType* copyBufferLayoutToPointer(
+    TargetProgram* target,
+    IRBuilder& builder,
+    IRType* bufferType,
+    IRPtrTypeBase* pointerType);
 
 } // namespace Slang
 

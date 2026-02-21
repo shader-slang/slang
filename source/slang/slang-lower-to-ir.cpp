@@ -2188,6 +2188,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         IRType* irValueType = lowerType(context, astValueType);
         IRInst* accessQualifier = nullptr;
         IRInst* addrSpace = nullptr;
+        IRType* dataLayout = nullptr;
 
         if (auto astAccessQualifier = type->getAccessQualifier())
         {
@@ -2207,7 +2208,13 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
                 (IRIntegerValue)AddressSpace::Generic);
         }
 
-        return getBuilder()->getPtrType(kIROp_PtrType, irValueType, accessQualifier, addrSpace);
+        if (auto dataLayoutType = type->getDataLayout())
+        {
+            dataLayout = lowerType(context, dataLayoutType);
+        }
+
+        return getBuilder()
+            ->getPtrType(kIROp_PtrType, irValueType, accessQualifier, addrSpace, dataLayout);
     }
 
     IRType* visitDeclRefType(DeclRefType* type)
