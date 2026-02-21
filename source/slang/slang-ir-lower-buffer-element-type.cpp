@@ -2804,28 +2804,26 @@ struct MetalParameterBlockElementTypeLoweringPolicy : DefaultBufferElementTypeLo
                 }
             }
         }
-        if (config.addressSpace == AddressSpace::StorageBuffer)
+        
+        if (auto vectorType = as<IRVectorType>(type))
         {
-            if (auto vectorType = as<IRVectorType>(type))
+            if (auto basicType = as<IRBasicType>(vectorType->getElementType()))
             {
-                if (auto basicType = as<IRBasicType>(vectorType->getElementType()))
+                auto elementCount = getIntVal(vectorType->getElementCount());
+                if (elementCount >= 2 && elementCount <= 4)
                 {
-                    auto elementCount = getIntVal(vectorType->getElementCount());
-                    if (elementCount >= 2 && elementCount <= 4)
-                    {
-                        IRBuilder builder(type);
-                        builder.setInsertAfter(type);
+                    IRBuilder builder(type);
+                    builder.setInsertAfter(type);
 
-                        LoweredElementTypeInfo info;
-                        info.originalType = type;
+                    LoweredElementTypeInfo info;
+                    info.originalType = type;
 
-                        auto arrayType = builder.getArrayType(basicType, vectorType->getElementCount());
-                        info.loweredType = arrayType;
+                    auto arrayType = builder.getArrayType(basicType, vectorType->getElementCount());
+                    info.loweredType = arrayType;
 
-                        info.convertLoweredToOriginal = createVectorUnpackFunc(vectorType, arrayType);
-                        info.convertOriginalToLowered = createVectorPackFunc(vectorType, arrayType);
-                        return info;
-                    }
+                    info.convertLoweredToOriginal = createVectorUnpackFunc(vectorType, arrayType);
+                    info.convertOriginalToLowered = createVectorPackFunc(vectorType, arrayType);
+                    return info;
                 }
             }
         }
