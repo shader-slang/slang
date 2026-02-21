@@ -816,7 +816,7 @@ SlangResult Path::remove(const String& path)
     auto widePath = path.toWString();
     Index widePathLen = wcslen(widePath);
     wchar_t* doubleNullPath = (wchar_t*)_alloca((widePathLen + 2) * sizeof(wchar_t));
-    wcscpy(doubleNullPath, widePath);
+    wcscpy_s(doubleNullPath, widePathLen + 2, widePath);
     doubleNullPath[widePathLen] = L'\0';     // First null terminator
     doubleNullPath[widePathLen + 1] = L'\0'; // Second null terminator for SHFileOperationW
 
@@ -1215,8 +1215,8 @@ SlangResult File::writeAllTextIfChanged(const String& fileName, UnownedStringSli
 
 /* static */ SlangResult File::writeNativeText(const String& path, const void* data, size_t size)
 {
-    FILE* file = fopen(path.getBuffer(), "w");
-    if (!file)
+    FILE* file = nullptr;
+    if (fopen_s(&file, path.getBuffer(), "w") != 0 || !file)
     {
         return SLANG_FAIL;
     }

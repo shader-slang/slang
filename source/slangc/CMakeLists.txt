@@ -15,6 +15,8 @@ if(SLANG_ENABLE_SLANGC)
             slang
             Threads::Threads
             ${SLANG_GLSL_MODULE_DEPENDENCY}
+        PRECOMPILE_HEADERS
+            ${slang_SOURCE_DIR}/source/core/slang-basic.h
         INSTALL
         EXPORT_SET_NAME SlangTargets
     )
