@@ -2712,6 +2712,58 @@ struct MetalParameterBlockElementTypeLoweringPolicy : DefaultBufferElementTypeLo
         return false;
     }
 
+    IRFunc* createVectorUnpackFunc(IRVectorType* vectorType, IRArrayType* arrayType)
+    {
+        IRBuilder builder(vectorType);
+        builder.setInsertAfter(vectorType);
+        auto func = builder.createFunc();
+        auto refArrayType = builder.getRefParamType(arrayType, AddressSpace::Generic);
+        auto funcType = builder.getFuncType(1, (IRType**)&refArrayType, vectorType);
+        func->setFullType(funcType);
+        builder.addNameHintDecoration(func, UnownedStringSlice("unpackPackedVector"));
+        builder.addForceInlineDecoration(func);
+        builder.setInsertInto(func);
+        builder.emitBlock();
+        auto packedParam = builder.emitParam(refArrayType);
+        auto count = getIntVal(vectorType->getElementCount());
+        List<IRInst*> args;
+        for (IRIntegerValue i = 0; i < count; ++i)
+        {
+            auto elementAddr = builder.emitElementAddress(packedParam, builder.getIntValue(builder.getIntType(), i));
+            auto element = builder.emitLoad(elementAddr);
+            args.add(element);
+        }
+        auto result = builder.emitMakeVector(vectorType, args);
+        builder.emitReturn(result);
+        return func;
+    }
+
+    IRFunc* createVectorPackFunc(IRVectorType* vectorType, IRArrayType* arrayType)
+    {
+        IRBuilder builder(vectorType);
+        builder.setInsertAfter(vectorType);
+        auto func = builder.createFunc();
+        auto outArrayType = builder.getRefParamType(arrayType, AddressSpace::Generic);
+        IRType* paramTypes[] = {outArrayType, vectorType};
+        auto funcType = builder.getFuncType(2, paramTypes, builder.getVoidType());
+        func->setFullType(funcType);
+        builder.addNameHintDecoration(func, UnownedStringSlice("packPackedVector"));
+        builder.addForceInlineDecoration(func);
+        builder.setInsertInto(func);
+        builder.emitBlock();
+        auto outParam = builder.emitParam(outArrayType);
+        auto valParam = builder.emitParam(vectorType);
+        auto count = getIntVal(vectorType->getElementCount());
+        for (IRIntegerValue i = 0; i < count; ++i)
+        {
+            auto element = builder.emitElementExtract(valParam, i);
+            auto destAddr = builder.emitElementAddress(outParam, builder.getIntValue(builder.getIntType(), i));
+            builder.emitStore(destAddr, element);
+        }
+        builder.emitReturn();
+        return func;
+    }
+
     LoweredElementTypeInfo lowerLeafLogicalType(IRType* type, TypeLoweringConfig config) override
     {
         if (config.layoutRuleName == IRTypeLayoutRuleName::MetalParameterBlock &&
@@ -2726,6 +2778,56 @@ struct MetalParameterBlockElementTypeLoweringPolicy : DefaultBufferElementTypeLo
             info.convertOriginalToLowered = kIROp_CastResourceToDescriptorHandle;
             return info;
         }
+
+        if (auto ptrType = as<IRPtrTypeBase>(type))
+        {
+            if (auto vectorType = as<IRVectorType>(ptrType->getValueType()))
+            {
+                if (auto basicType = as<IRBasicType>(vectorType->getElementType()))
+                {
+                    auto elementCount = getIntVal(vectorType->getElementCount());
+                    if (elementCount >= 2 && elementCount <= 4)
+                    {
+                        IRBuilder builder(type);
+                        builder.setInsertAfter(type);
+
+                        LoweredElementTypeInfo info;
+                        info.originalType = type;
+
+                        auto arrayType = builder.getArrayType(basicType, vectorType->getElementCount());
+                        auto loweredPtrType = builder.getPtrTypeWithAddressSpace(arrayType, ptrType);
+                        info.loweredType = loweredPtrType;
+                        info.convertLoweredToOriginal = kIROp_BitCast;
+                        info.convertOriginalToLowered = kIROp_BitCast;
+                        return info;
+                    }
+                }
+            }
+        }
+        
+        if (auto vectorType = as<IRVectorType>(type))
+        {
+            if (auto basicType = as<IRBasicType>(vectorType->getElementType()))
+            {
+                auto elementCount = getIntVal(vectorType->getElementCount());
+                if (elementCount >= 2 && elementCount <= 4)
+                {
+                    IRBuilder builder(type);
+                    builder.setInsertAfter(type);
+
+                    LoweredElementTypeInfo info;
+                    info.originalType = type;
+
+                    auto arrayType = builder.getArrayType(basicType, vectorType->getElementCount());
+                    info.loweredType = arrayType;
+
+                    info.convertLoweredToOriginal = createVectorUnpackFunc(vectorType, arrayType);
+                    info.convertOriginalToLowered = createVectorPackFunc(vectorType, arrayType);
+                    return info;
+                }
+            }
+        }
+        
         return DefaultBufferElementTypeLoweringPolicy::lowerLeafLogicalType(type, config);
     }
 };
