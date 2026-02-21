@@ -2999,12 +2999,15 @@ private:
                             sysValInfo.systemValueName.getUnownedSlice());
                         semanticDecor->removeAndDeallocate();
                     }
+                    index++;
+                    continue;
                 }
-                index++;
-                continue;
+                // For user-defined semantics (non-sv_), we need to remove the existing semantic
+                // decoration and add a new one based on the layout offset so that WGSL can emit
+                // proper @location attributes
+                semanticDecor->removeAndDeallocate();
             }
             SLANG_ASSERT(typeLayout);
-            typeLayout->getFieldLayout(index);
             auto fieldLayout = typeLayout->getFieldLayout(index);
             if (auto offsetAttr = fieldLayout->findOffsetAttr(K))
             {
@@ -3013,6 +3016,16 @@ private:
                     varOffset = varOffsetAttr->getOffset();
                 varOffset += offsetAttr->getOffset();
                 builder.addSemanticDecoration(key, toSlice("_slang_attr"), (int)varOffset);
+            }
+            else
+            {
+                // Fallback: If there's no layout offset for this field, we still need to add a
+                // semantic decoration to ensure WGSL can emit a @location attribute. This can
+                // happen when the varLayout passed to this function doesn't have offset information
+                // for all fields (e.g., when layout is for an original struct but we're processing
+                // a flattened struct, or when dealing with implicit varying parameters).
+                // Use a sequential index based on the field position as a reasonable default.
+                builder.addSemanticDecoration(key, toSlice("_slang_attr"), (int)index);
             }
             index++;
         }
