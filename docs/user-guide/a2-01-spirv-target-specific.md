@@ -1,6 +1,7 @@
 ---
 layout: user-guide
 permalink: /user-guide/spirv-target-specific
+redirect_to: https://docs.shader-slang.org/en/latest/external/slang/docs/user-guide/a2-01-spirv-target-specific.html
 ---
 
 # SPIR-V-Specific Functionalities

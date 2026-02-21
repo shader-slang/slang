@@ -1,6 +1,7 @@
 ---
 layout: user-guide
 permalink: /user-guide/metal-target-specific
+redirect_to: https://docs.shader-slang.org/en/latest/external/slang/docs/user-guide/a2-02-metal-target-specific.html
 ---
 
 # Metal-Specific Functionalities

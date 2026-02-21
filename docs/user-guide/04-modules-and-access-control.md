@@ -1,6 +1,7 @@
 ---
 layout: user-guide
 permalink: /user-guide/modules
+redirect_to: https://docs.shader-slang.org/en/latest/external/slang/docs/user-guide/04-modules-and-access-control.html
 ---
 
 Modules and Access Control
