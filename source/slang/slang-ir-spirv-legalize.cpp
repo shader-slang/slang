@@ -27,9 +27,42 @@
 #include "slang-ir-validate.h"
 #include "slang-ir.h"
 #include "slang-legalize-types.h"
+#include "spirv/unified1/spirv.h"
 
 namespace Slang
 {
+
+// Helper to check if an IR instruction represents a compile-time constant value.
+// Used to determine if Offset can be converted to ConstOffset for image gather operations.
+static bool isIRConstantValue(IRInst* inst)
+{
+    if (!inst)
+        return false;
+
+    switch (inst->getOp())
+    {
+    case kIROp_IntLit:
+    case kIROp_FloatLit:
+    case kIROp_BoolLit:
+    case kIROp_StringLit:
+        return true;
+
+    case kIROp_MakeVector:
+    case kIROp_MakeArray:
+    case kIROp_MakeStruct:
+    case kIROp_MakeMatrix:
+        // Check if all operands are constant
+        for (UInt i = 0; i < inst->getOperandCount(); i++)
+        {
+            if (!isIRConstantValue(inst->getOperand(i)))
+                return false;
+        }
+        return true;
+
+    default:
+        return false;
+    }
+}
 
 //
 // Legalization of IR for direct SPIRV emit.
@@ -1533,6 +1566,28 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         return (as<IRSPIRVAsmInst>(inst) || as<IRSPIRVAsmOperand>(inst));
     }
 
+    static SpvOp getSpvOpCodeFromAsmInst(IRSPIRVAsmInst* spvInst)
+    {
+        if (spvInst->getOperandCount() == 0)
+            return SpvOpMax; // invalid
+
+        // Get the opcode operand - must be a literal or enum
+        auto opcodeOperand = spvInst->getOpcodeOperand();
+        if (opcodeOperand->getOp() == kIROp_SPIRVAsmOperandTruncate)
+            return SpvOpMax; // ignore
+
+        auto opcodeValue = opcodeOperand->getValue();
+        if (!opcodeValue)
+            return SpvOpMax;
+
+        auto opcodeLit = as<IRIntLit>(opcodeValue);
+        if (!opcodeLit)
+            return SpvOpMax;
+
+        SpvOp opcode = (SpvOp)opcodeLit->getValue();
+        return opcode;
+    }
+
     void processConvertTexel(IRInst* asmBlockInst, IRInst* inst)
     {
         // If we see `__convertTexel(x)`, we need to return a vector<__sampledElementType(x), 4>.
@@ -1560,6 +1615,96 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         inst->removeAndDeallocate();
     }
 
+    // Legalizes image gather operations (OpImageGather/OpImageDrefGather) to use ConstOffset
+    // instead of Offset when the offset value is a compile-time constant.
+    // Per SPIR-V spec:
+    // - ConstOffset (0x0008): for compile-time constants, no capability needed
+    // - Offset (0x0010): for runtime values, requires ImageGatherExtended capability
+    void processImageGatherOffset(IRSPIRVAsm* asmBlock, IRSPIRVAsmInst* spvInst)
+    {
+        // Find the image operand mask operand
+        Index operandIdx = 0;
+        IRSPIRVAsmOperand* maskOperand = nullptr;
+        uint32_t mask = 0;
+
+        for (auto operand : spvInst->getSPIRVOperands())
+        {
+            if (operand->getOp() == kIROp_SPIRVAsmOperandLiteral ||
+                operand->getOp() == kIROp_SPIRVAsmOperandEnum)
+            {
+                if (auto valInst = as<IRIntLit>(operand->getOperand(0)))
+                {
+                    uint32_t val = uint32_t(valInst->getValue());
+                    // Check if Offset bit (0x0010) is set but not ConstOffset (0x0008)
+                    if ((val & SpvImageOperandsOffsetMask) &&
+                        !(val & SpvImageOperandsConstOffsetMask))
+                    {
+                        maskOperand = operand;
+                        mask = val;
+                        break;
+                    }
+                }
+            }
+            operandIdx++;
+        }
+
+        if (!maskOperand)
+            return;
+
+        // Find the offset value operand.
+        // Count how many operands come before the offset based on mask bits.
+        Index offsetOperandIdx = operandIdx + 1;
+        if (mask & SpvImageOperandsBiasMask)
+            offsetOperandIdx++;
+        if (mask & SpvImageOperandsLodMask)
+            offsetOperandIdx++;
+        if (mask & SpvImageOperandsGradMask)
+            offsetOperandIdx += 2;
+
+        // Find the offset value operand
+        Index currentIdx = 0;
+        IRInst* offsetValue = nullptr;
+        for (auto op : spvInst->getSPIRVOperands())
+        {
+            if (currentIdx == offsetOperandIdx)
+            {
+                if (op->getOp() == kIROp_SPIRVAsmOperandInst)
+                {
+                    offsetValue = op->getValue();
+                }
+                break;
+            }
+            currentIdx++;
+        }
+
+        IRBuilder builder(asmBlock->getModule());
+        if (offsetValue && isIRConstantValue(offsetValue))
+        {
+            // Force reset the `Offset` mask to `ConstOffset` mask.
+            uint32_t newMask =
+                (mask & ~SpvImageOperandsOffsetMask) | SpvImageOperandsConstOffsetMask;
+            auto newMaskLit = builder.getIntValue(builder.getIntType(), newMask);
+            builder.replaceOperand(&maskOperand->getOperands()[0], newMaskLit);
+        }
+        else
+        {
+            // The offset value is not constant.
+            // Keep the `Offset` mask but insert `OpCapability ImageGatherExtended`
+            // at the beginning of the asm block
+            builder.setInsertInto(asmBlock);
+            if (auto firstChild = asmBlock->getFirstChild())
+                builder.setInsertBefore(firstChild);
+            auto capabilityLit =
+                builder.getIntValue(builder.getIntType(), SpvCapabilityImageGatherExtended);
+            auto capOpcodeOperand = builder.emitSPIRVAsmOperandEnum(
+                builder.getIntValue(builder.getIntType(), SpvOpCapability));
+            auto capabilityOperand = builder.emitSPIRVAsmOperandEnum(capabilityLit);
+            List<IRInst*> operands;
+            operands.add(capabilityOperand);
+            builder.emitSPIRVAsmInst(capOpcodeOperand, operands);
+        }
+    }
+
     void processSPIRVAsm(IRSPIRVAsm* inst)
     {
         // Move anything that is not an spirv instruction to the outer parent.
@@ -1569,6 +1714,16 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 child->insertBefore(inst);
             else if (child->getOp() == kIROp_SPIRVAsmOperandConvertTexel)
                 processConvertTexel(inst, child);
+            else if (auto spvInst = as<IRSPIRVAsmInst>(child))
+            {
+                switch (getSpvOpCodeFromAsmInst(spvInst))
+                {
+                case SpvOpImageGather:
+                case SpvOpImageDrefGather:
+                    processImageGatherOffset(inst, spvInst);
+                    break;
+                }
+            }
         }
     }
 
