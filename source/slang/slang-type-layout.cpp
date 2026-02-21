@@ -5448,6 +5448,7 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
                 typeLayout->rules = rules;
                 return TypeLayoutResult(typeLayout, SimpleLayoutInfo());
             }
+            SLANG_ASSERT(elementCount == 1);
             return TypeLayoutResult(element.layout, element.info);
         }
 

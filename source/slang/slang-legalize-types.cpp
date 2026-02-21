@@ -163,16 +163,21 @@ RefPtr<TupleLegalElementWrappingObj> LegalElementWrapping::getTuple() const
 
 bool isResourceType(IRType* type)
 {
-    while (auto arrayType = as<IRArrayTypeBase>(type))
+    for (;;)
     {
-        type = arrayType->getElementType();
-    }
-
-    // Unwrap vector types to check if the element is a resource type.
-    // This handles cases like vector<Sampler2D, 1> from Conditional<Sampler2D, true>.
-    if (auto vecType = as<IRVectorType>(type))
-    {
-        type = vecType->getElementType();
+        if (auto arrayType = as<IRArrayTypeBase>(type))
+        {
+            type = arrayType->getElementType();
+            continue;
+        }
+        // Unwrap vector types to check if the element is a resource type.
+        // This handles cases like vector<Sampler2D, 1> from Conditional<Sampler2D, true>.
+        if (auto vecType = as<IRVectorType>(type))
+        {
+            type = vecType->getElementType();
+            continue;
+        }
+        break;
     }
 
     if (const auto resourceTypeBase = as<IRResourceTypeBase>(type))
@@ -1304,6 +1309,7 @@ LegalType legalizeTypeImpl(TypeLegalizationContext* context, IRType* type)
             auto countLit = as<IRIntLit>(vecType->getElementCount());
             if (countLit && countLit->getValue() == 0)
                 return LegalType();
+            SLANG_ASSERT(countLit && countLit->getValue() == 1);
             return legalizeType(context, elementType);
         }
         return LegalType::simple(type);
