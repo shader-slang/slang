@@ -1,28 +1,36 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -g2 -O0 -emit-spirv-directly -stage compute -entry computeMain
-
-// Test that SPIRV debug information is correctly generated for functions
-// defined via __include vs directly in the module file.
+//TEST:SIMPLE(filecheck=CHECK):-target spirv -g2 -O0 -emit-spirv-directly -stage compute -entry computeMain
 //
-// This is a minimal reproduction case for the bug where functions from
-// __include files are missing DebugFunctionDefinition.
+// Regression test for Issue #9806:
+// Functions defined in a file brought in via `__include` must get SPIR-V debug info
+// (in particular DebugFunctionDefinition).
+//
+// This test is designed to exercise the `findAndIncludeFile()` path so that the
+// included file is added to TranslationUnitRequest::getSourceFiles().
 
-import simple_module;
+module include_debug_function_definition;
+
+__include "include-debug-function-definition-impl";
 
 RWStructuredBuffer<int> outputBuffer;
+
+int TestFunctionB(int x)
+{
+    return x + 200;
+}
 
 [numthreads(1, 1, 1)]
 [shader("compute")]
 void computeMain(uint3 tid : SV_DispatchThreadID)
 {
-    // TestFunctionA is defined in simple-module-impl.slang via __include
+    // TestFunctionA is defined in the __include'd file.
     int a = TestFunctionA(3);
-    // TestFunctionB is defined directly in simple-module.slang
+    // TestFunctionB is defined in this file.
     int b = TestFunctionB(4);
     outputBuffer[0] = a;
     outputBuffer[1] = b;
 }
 
-// Verify DebugFunctionDefinition for TestFunctionB (defined directly in module file)
+// Verify DebugFunctionDefinition for TestFunctionB (defined in this file)
 // CHECK-DAG: [[TESTFUNCB_STR:%[0-9]+]] = OpString "TestFunctionB"
 // CHECK-DAG: [[TESTFUNCB_FUNC:%[0-9]+]] = OpExtInst %void %{{[0-9]+}} DebugFunction [[TESTFUNCB_STR]]
 // CHECK-DAG: OpExtInst %void %{{[0-9]+}} DebugFunctionDefinition [[TESTFUNCB_FUNC]] %TestFunctionB
@@ -31,3 +39,4 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
 // CHECK-DAG: [[TESTFUNCA_STR:%[0-9]+]] = OpString "TestFunctionA"
 // CHECK-DAG: [[TESTFUNCA_FUNC:%[0-9]+]] = OpExtInst %void %{{[0-9]+}} DebugFunction [[TESTFUNCA_STR]]
 // CHECK-DAG: OpExtInst %void %{{[0-9]+}} DebugFunctionDefinition [[TESTFUNCA_FUNC]] %TestFunctionA
+

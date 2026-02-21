@@ -1919,6 +1919,11 @@ Linkage::IncludeResult Linkage::findAndIncludeFile(
 
     module->getModuleDecl()->addMember(fileDecl);
 
+    // Add the included source file to the translation unit so that it appears in
+    // getSourceFiles() and gets a DebugSource during IR lowering (needed for
+    // IRDebugLocationDecoration / IRDebugFuncDecoration on declarations from __include'd files).
+    translationUnit->addIncludedSourceFileIfNotExist(sourceFile);
+
     result.fileDecl = fileDecl;
     result.isNew = true;
     return result;
