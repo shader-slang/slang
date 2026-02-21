@@ -83,6 +83,13 @@ struct CommandOptions
         };
     };
 
+    /// A hyperlink with display text and URL
+    struct Link
+    {
+        UnownedStringSlice text;
+        UnownedStringSlice url;
+    };
+
     struct Option
     {
         UnownedStringSlice names; ///< Comma delimited list of names, first name is the default
@@ -90,6 +97,9 @@ struct CommandOptions
                                         ///< means use names
         UnownedStringSlice usage;       ///< Describes usage, can be empty
         UnownedStringSlice description; ///< A description of usage
+
+        Index linkStartIndex = 0; ///< Start index into m_links
+        Index linkEndIndex = 0;   ///< End index (non-inclusive) into m_links
 
         UserValue userValue = kInvalidUserValue;
 
@@ -116,6 +126,13 @@ struct CommandOptions
     /// Use an already known category. It's an error if the category isn't found
     void setCategory(const char* name);
 
+    /// A hyperlink specified as plain C strings, for use when defining options
+    struct InputLink
+    {
+        const char* text;
+        const char* url;
+    };
+
     void add(
         const char* name,
         const char* usage,
@@ -123,10 +140,27 @@ struct CommandOptions
         UserValue userValue = kInvalidUserValue,
         const char* displayName = nullptr);
     void add(
+        const char* name,
+        const char* usage,
+        const char* description,
+        const InputLink* links,
+        Count linkCount,
+        UserValue userValue = kInvalidUserValue,
+        const char* displayName = nullptr);
+    void add(
         const UnownedStringSlice* names,
         Count namesCount,
         const char* usage,
         const char* description,
+        UserValue userValue = kInvalidUserValue,
+        Flags flags = 0);
+    void add(
+        const UnownedStringSlice* names,
+        Count namesCount,
+        const char* usage,
+        const char* description,
+        const InputLink* links,
+        Count linkCount,
         UserValue userValue = kInvalidUserValue,
         Flags flags = 0);
 
@@ -217,6 +251,16 @@ struct CommandOptions
     /// Get the option at the specified index
     const Option& getOptionAt(Index index) const { return m_options[index]; }
 
+    /// Get the links associated with an option
+    ConstArrayView<Link> getLinksForOption(const Option& option) const
+    {
+        if (option.linkStartIndex == option.linkEndIndex || m_links.getCount() == 0)
+            return ConstArrayView<Link>();
+        return m_links.getArrayView(
+            option.linkStartIndex,
+            option.linkEndIndex - option.linkStartIndex);
+    }
+
     /// Find all of the categories in the usage slice
     void findCategoryIndicesFromUsage(
         const UnownedStringSlice& usageSlice,
@@ -266,6 +310,8 @@ protected:
     UnownedStringSlice _addString(const char* text);
     UnownedStringSlice _addString(const UnownedStringSlice& slice);
 
+    void _addLinks(const InputLink* inputLinks, Count linkCount, Option& option);
+
     Index _findTargetIndexByName(
         LookupKind kind,
         const UnownedStringSlice& name,
@@ -297,6 +343,7 @@ protected:
     uint32_t m_prefixSizes = 0;
 
     List<Option> m_options; ///< All of the entries describing each of the options
+    List<Link> m_links;     ///< All links, indexed by Option::linkStartIndex/linkEndIndex
     StringSlicePool m_pool; ///< Only holds options, and handle therefore matches up to m_entries
     Dictionary<NameKey, Index> m_nameMap;           ///< Maps a name to an option index
     Dictionary<UserValueKey, Index> m_userValueMap; ///< Maps a user value (for a kind) to an index
