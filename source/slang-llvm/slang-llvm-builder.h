@@ -367,6 +367,13 @@ public:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL generateAssembly(IArtifact** outArtifact) = 0;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL generateObjectCode(IArtifact** outArtifact) = 0;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL generateJITLibrary(IArtifact** outArtifact) = 0;
+
+    //==========================================================================
+    // Metadata
+    //==========================================================================
+
+    virtual SLANG_NO_THROW void SLANG_MCALL setPointerDereferenceable(LLVMInst* ptr, uint64_t bytes) = 0;
+    virtual SLANG_NO_THROW void SLANG_MCALL setLoadInvariant(LLVMInst* load) = 0;
 };
 
 } // namespace Slang
