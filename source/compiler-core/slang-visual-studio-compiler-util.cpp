@@ -61,15 +61,17 @@ static void _addFile(
     }
     if (flags & ProductFlag::Miscellaneous)
     {
-
-        _addFile(
-            modulePath + ".ilk",
-            ArtifactDesc::make(
-                ArtifactKind::BinaryFormat,
-                ArtifactPayload::Unknown,
-                ArtifactStyle::None),
-            lockFile,
-            outArtifacts);
+        if (options.targetType != SLANG_OBJECT_CODE)
+        {
+            _addFile(
+                modulePath + ".ilk",
+                ArtifactDesc::make(
+                    ArtifactKind::BinaryFormat,
+                    ArtifactPayload::Unknown,
+                    ArtifactStyle::None),
+                lockFile,
+                outArtifacts);
+        }
 
         if (options.targetType == SLANG_SHADER_SHARED_LIBRARY)
         {
@@ -255,12 +257,15 @@ static void _addFile(
             cmdLine.addPrefixPathArg("/Fe", modulePath, ".exe");
             break;
         }
+    case SLANG_OBJECT_CODE:
+        {
+            cmdLine.addArg("/c");
+            cmdLine.addPrefixPathArg("/Fo", modulePath, ".obj");
+            break;
+        }
     default:
         break;
     }
-
-    // Object file specify it's location - needed if we are out
-    cmdLine.addPrefixPathArg("/Fo", modulePath, ".obj");
 
     // Add defines
     for (const auto& define : options.defines)
@@ -297,46 +302,49 @@ static void _addFile(
         cmdLine.addArg(fileRep->getPath());
     }
 
-    // Link options (parameters past /link go to linker)
-    cmdLine.addArg("/link");
-
-    StringSlicePool libPathPool(StringSlicePool::Style::Default);
-
-    for (const auto& libPath : options.libraryPaths)
+    if (options.targetType != SLANG_OBJECT_CODE)
     {
-        libPathPool.add(libPath);
-    }
+        // Link options (parameters past /link go to linker)
+        cmdLine.addArg("/link");
 
-    // Link libraries.
-    for (IArtifact* artifact : options.libraries)
-    {
-        auto desc = artifact->getDesc();
+        StringSlicePool libPathPool(StringSlicePool::Style::Default);
 
-        if (ArtifactDescUtil::isCpuBinary(desc) && desc.kind == ArtifactKind::Library)
+        for (const auto& libPath : options.libraryPaths)
         {
-            // Get the libray name and path
-            ComPtr<IOSFileArtifactRepresentation> fileRep;
-            SLANG_RETURN_ON_FAIL(artifact->requireFile(ArtifactKeep::Yes, fileRep.writeRef()));
-
-            const UnownedStringSlice path(fileRep->getPath());
-            libPathPool.add(Path::getParentDirectory(path));
-            // We need the extension for windows
-            cmdLine.addArg(ArtifactDescUtil::getBaseNameFromPath(desc, path) + ".lib");
+            libPathPool.add(libPath);
         }
-    }
 
-    // Add all the library paths
-    for (const auto& libPath : libPathPool.getAdded())
-    {
-        // Note that any escaping of the path is handled in the ProcessUtil::
-        cmdLine.addPrefixPathArg("/LIBPATH:", libPath);
-    }
+        // Link libraries.
+        for (IArtifact* artifact : options.libraries)
+        {
+            auto desc = artifact->getDesc();
 
-    // Add compiler specific options from user.
-    for (auto compilerSpecificArg : options.compilerSpecificArguments)
-    {
-        const char* const arg = compilerSpecificArg;
-        cmdLine.addArg(arg);
+            if (ArtifactDescUtil::isCpuBinary(desc) && desc.kind == ArtifactKind::Library)
+            {
+                // Get the libray name and path
+                ComPtr<IOSFileArtifactRepresentation> fileRep;
+                SLANG_RETURN_ON_FAIL(artifact->requireFile(ArtifactKeep::Yes, fileRep.writeRef()));
+
+                const UnownedStringSlice path(fileRep->getPath());
+                libPathPool.add(Path::getParentDirectory(path));
+                // We need the extension for windows
+                cmdLine.addArg(ArtifactDescUtil::getBaseNameFromPath(desc, path) + ".lib");
+            }
+        }
+
+        // Add all the library paths
+        for (const auto& libPath : libPathPool.getAdded())
+        {
+            // Note that any escaping of the path is handled in the ProcessUtil::
+            cmdLine.addPrefixPathArg("/LIBPATH:", libPath);
+        }
+
+        // Add compiler specific options from user.
+        for (auto compilerSpecificArg : options.compilerSpecificArguments)
+        {
+            const char* const arg = compilerSpecificArg;
+            cmdLine.addArg(arg);
+        }
     }
 
     return SLANG_OK;
@@ -502,9 +510,7 @@ static SlangResult _parseVisualStudioLine(
     const ExecuteResult& exeRes,
     IArtifactDiagnostics* diagnostics)
 {
-    diagnostics->reset();
-
-    diagnostics->setRaw(SliceUtil::asTerminatedCharSlice(exeRes.standardOutput));
+    diagnostics->appendRaw(SliceUtil::asTerminatedCharSlice(exeRes.standardOutput));
 
     SliceAllocator allocator;
 

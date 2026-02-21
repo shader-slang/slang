@@ -118,6 +118,14 @@ SlangResult GCCDownstreamCompilerUtil::calcVersion(
 {
     CommandLine cmdLine;
     cmdLine.setExecutableLocation(exe);
+
+    return calcVersion(cmdLine, outDesc);
+}
+
+SlangResult GCCDownstreamCompilerUtil::calcVersion(
+    CommandLine cmdLine,
+    DownstreamCompilerDesc& outDesc)
+{
     cmdLine.addArg("-v");
 
     ExecuteResult exeRes;
@@ -708,8 +716,7 @@ static SlangResult _parseGCCFamilyLine(
 
     SliceAllocator allocator;
 
-    diagnostics->reset();
-    diagnostics->setRaw(SliceUtil::asCharSlice(exeRes.standardError));
+    diagnostics->appendRaw(SliceUtil::asCharSlice(exeRes.standardError));
 
     // Debug output for downstream compiler diagnostics
     // Set environment variable: SLANG_GCC_PARSER_DEBUG=1
@@ -1049,12 +1056,6 @@ static SlangResult _parseGCCFamilyLine(
         {
             // Shared library
             cmdLine.addArg("-shared");
-
-            if (PlatformUtil::isFamily(PlatformFamily::Unix, platformKind))
-            {
-                // Position independent
-                cmdLine.addArg("-fPIC");
-            }
             break;
         }
     case SLANG_HOST_EXECUTABLE:
@@ -1066,9 +1067,46 @@ static SlangResult _parseGCCFamilyLine(
         {
             // Don't link, just produce object file
             cmdLine.addArg("-c");
+
             break;
         }
     default:
+        break;
+    }
+
+    switch (options.targetType)
+    {
+    case SLANG_HOST_EXECUTABLE:
+        // If Slang was built using Clang or GCC and with sanitizers, the same `-fsanitize=...` flag
+        // used for Slang must also be used when linking host executables as we might be trying to
+        // link them with Slang libraries, in which case we must link them with the sanitizer
+        // runtime as well or else they will fail to either link or run.
+#if defined(__has_feature)
+#if __has_feature(address_sanitizer)
+#if SLANG_CLANG || SLANG_GCC
+        cmdLine.addArg("-fsanitize=address");
+#endif // SLANG_CLANG || SLANG_GCC
+#if SLANG_CLANG
+        cmdLine.addArg("-shared-libsan");
+#endif // SLANG_CLANG
+#endif // __has_feature(address_sanitizer)
+#endif // defined(__has_feature)
+        break;
+
+    case SLANG_SHADER_SHARED_LIBRARY:
+    case SLANG_SHADER_HOST_CALLABLE:
+    case SLANG_OBJECT_CODE:
+        if (!PlatformUtil::isFamily(PlatformFamily::Apple, platformKind) &&
+            !PlatformUtil::isFamily(PlatformFamily::Microsoft, platformKind))
+        {
+            // Position-independent code (PIC). If we're on Darwin or Windows, adding this flag has
+            // no effect at best (PIC is forced on or off) and is erroneous at worst:
+            // - When targeting Windows, this flag causes Clang <= 13 to emit an error, and GCC <= 6
+            //   to emit a warning.
+            // - Passing this flag to the Metal compiler (based on Clang) results in Metal failures
+            //   at run-time ("Compiler encountered an internal error" or Mach IPC hanging forever).
+            cmdLine.addArg("-fPIC");
+        }
         break;
     }
 
@@ -1157,13 +1195,17 @@ static SlangResult _parseGCCFamilyLine(
             const UnownedStringSlice path(fileRep->getPath());
             libPathPool.add(Path::getParentDirectory(path));
 
-            cmdLine.addPrefixPathArg(
-                "-l",
-                ArtifactDescUtil::getBaseNameFromPath(artifact->getDesc(), path));
+            if (options.targetType != SLANG_OBJECT_CODE)
+            {
+                cmdLine.addPrefixPathArg(
+                    "-l",
+                    ArtifactDescUtil::getBaseNameFromPath(artifact->getDesc(), path));
+            }
         }
     }
 
     if (options.sourceLanguage == SLANG_SOURCE_LANGUAGE_CPP &&
+        options.targetType != SLANG_OBJECT_CODE &&
         !PlatformUtil::isFamily(PlatformFamily::Windows, platformKind))
     {
         // Make STD libs available
@@ -1174,9 +1216,12 @@ static SlangResult _parseGCCFamilyLine(
 
     for (const auto& libPath : libPathPool.getAdded())
     {
-        // Note that any escaping of the path is handled in the ProcessUtil::
-        cmdLine.addArg("-L");
-        cmdLine.addArg(libPath);
+        if (options.targetType != SLANG_OBJECT_CODE)
+        {
+            // Note that any escaping of the path is handled in the ProcessUtil::
+            cmdLine.addArg("-L");
+            cmdLine.addArg(libPath);
+        }
         cmdLine.addArg("-F");
         cmdLine.addArg(libPath);
     }
@@ -1195,12 +1240,22 @@ static SlangResult _parseGCCFamilyLine(
     const ExecutableLocation& exe,
     ComPtr<IDownstreamCompiler>& outCompiler)
 {
+    CommandLine cmdLine;
+    cmdLine.setExecutableLocation(exe);
+
+    return createCompiler(cmdLine, outCompiler);
+}
+
+/* static */ SlangResult GCCDownstreamCompilerUtil::createCompiler(
+    const CommandLine& cmdLine,
+    ComPtr<IDownstreamCompiler>& outCompiler)
+{
     DownstreamCompilerDesc desc;
-    SLANG_RETURN_ON_FAIL(GCCDownstreamCompilerUtil::calcVersion(exe, desc));
+    SLANG_RETURN_ON_FAIL(GCCDownstreamCompilerUtil::calcVersion(cmdLine, desc));
 
     auto compiler = new GCCDownstreamCompiler(desc);
     ComPtr<IDownstreamCompiler> compilerIntf(compiler);
-    compiler->m_cmdLine.setExecutableLocation(exe);
+    compiler->m_cmdLine = cmdLine;
 
     outCompiler.swap(compilerIntf);
     return SLANG_OK;

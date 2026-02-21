@@ -3109,10 +3109,8 @@ static TestResult runCPPCompilerSharedLibrary(TestContext* context, TestInput& i
     options.modulePath = SliceUtil::asTerminatedCharSlice(modulePath);
 
     ComPtr<IArtifact> artifact;
-    if (SLANG_FAILED(compiler->compile(options, artifact.writeRef())))
-    {
-        return TestResult::Fail;
-    }
+    // Not checking the result as some tests are supposed to make compilation or linking fail.
+    compiler->compile(options, artifact.writeRef());
 
     auto diagnostics = findAssociatedRepresentation<IArtifactDiagnostics>(artifact);
 
