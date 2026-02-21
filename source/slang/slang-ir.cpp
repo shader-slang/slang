@@ -3829,6 +3829,14 @@ IRInst* IRBuilder::emitDefaultConstruct(IRType* type, bool fallback)
                 return nullptr;
             return emitIntrinsicInst(type, kIROp_MakeMatrixFromScalar, 1, &inner);
         }
+    case kIROp_DescriptorHandleType:
+        {
+            auto uint2Type = getVectorType(getUIntType(), 2);
+            auto zero = getIntValue(getUIntType(), 0);
+            IRInst* components[2] = {zero, zero};
+            auto uint2Val = emitMakeVector(uint2Type, 2, components);
+            return emitIntrinsicInst(type, kIROp_CastUInt2ToDescriptorHandle, 1, &uint2Val);
+        }
     default:
         break;
     }
