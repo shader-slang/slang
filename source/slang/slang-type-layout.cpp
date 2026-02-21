@@ -873,6 +873,13 @@ struct CUDALayoutRulesImpl : DefaultLayoutRulesImpl
     {
         // Conform to CUDA/C/C++ size is adjusted to the largest alignment
         ioStructInfo->size = _roundToAlignment(ioStructInfo->size, ioStructInfo->alignment);
+
+        // Ensure empty structs have at least size 1, following C++ semantics
+        // where every object must have a unique address
+        if (ioStructInfo->size == 0)
+        {
+            ioStructInfo->size = 1;
+        }
     }
 
     ObjectLayoutInfo GetDescriptorHandleLayout(
