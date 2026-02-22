@@ -2577,6 +2577,11 @@ DIAGNOSTIC(
     Warning,
     unnecessaryHLSLMeshOutputModifier,
     "Unnecessary HLSL style mesh shader output modifier")
+DIAGNOSTIC(
+    54005,
+    Error,
+    attemptToReadFromMeshShaderOutput,
+    "Cannot read values from mesh shader outputs")
 
 DIAGNOSTIC(
     55101,
