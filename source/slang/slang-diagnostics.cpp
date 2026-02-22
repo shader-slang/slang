@@ -11,37 +11,15 @@
 namespace Slang
 {
 
-namespace Diagnostics
-{
-#define DIAGNOSTIC(id, severity, name, messageFormat) \
-    const DiagnosticInfo name = {id, Severity::severity, #name, messageFormat};
-#include "slang-diagnostic-defs.h"
-#undef DIAGNOSTIC
-} // namespace Diagnostics
-
-static const DiagnosticInfo* const kCompilerDiagnostics[] = {
-#define DIAGNOSTIC(id, severity, name, messageFormat) &Diagnostics::name,
-#include "slang-diagnostic-defs.h"
-#undef DIAGNOSTIC
-};
+// All diagnostics are now defined in slang-diagnostics.lua and generated
+// via slang-rich-diagnostics.h. The old slang-diagnostic-defs.h has been removed.
 
 static DiagnosticsLookup* _newDiagnosticsLookup()
 {
-    // Start with rich diagnostics first - they have priority over old-style diagnostics
-    // with the same name since they provide better error messages.
+    // Use rich diagnostics defined in slang-diagnostics.lua
     DiagnosticsLookup* lookup = new DiagnosticsLookup(
         Diagnostics::getRichDiagnosticsInfo(),
         Diagnostics::getRichDiagnosticsInfoCount());
-
-    // Add old-style compiler diagnostics, skipping any that conflict with rich diagnostics
-    for (Index i = 0; i < Index(SLANG_COUNT_OF(kCompilerDiagnostics)); ++i)
-    {
-        const auto* info = kCompilerDiagnostics[i];
-        if (!lookup->findDiagnosticByExactName(UnownedStringSlice(info->name)))
-        {
-            lookup->add(info);
-        }
-    }
 
     // Add all the diagnostics in 'core', skipping conflicts
     DiagnosticsLookup* coreLookup = getCoreDiagnosticsLookup();

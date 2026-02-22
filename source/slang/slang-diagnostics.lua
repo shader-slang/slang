@@ -1,6 +1,3 @@
--- !!!!!!
--- THIS FILE IS PROTOTYPE WORK, PLEASE USE source/slang/slang-diagnostic-defs.h
--- !!!!!!
 --
 -- Lua-based diagnostic definitions for the Slang compiler
 --

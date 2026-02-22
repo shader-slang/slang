@@ -25,11 +25,8 @@ SlangResult overrideDiagnostics(
     Severity originalSeverity,
     Severity overrideSeverity);
 
-namespace Diagnostics
-{
-#define DIAGNOSTIC(id, severity, name, messageFormat) extern const DiagnosticInfo name;
-#include "slang-diagnostic-defs.h"
-} // namespace Diagnostics
+// All diagnostics are now defined in slang-diagnostics.lua and generated
+// via slang-rich-diagnostics.h. The old slang-diagnostic-defs.h has been removed.
 } // namespace Slang
 
 // NOTE: The SLANG_INTERNAL_ERROR, SLANG_UNIMPLEMENTED, and SLANG_DIAGNOSE_UNEXPECTED macros
