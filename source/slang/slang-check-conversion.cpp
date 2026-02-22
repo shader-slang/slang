@@ -396,6 +396,8 @@ bool SemanticsVisitor::createInvokeExprForExplicitCtor(
 
             DiagnosticSink tempSink(getSourceManager(), nullptr);
             tempSink.setFlags(getSink()->getFlags());
+            tempSink.setDiagnosticColorMode(getSink()->getDiagnosticColorMode());
+            tempSink.setEnableUnicode(getSink()->getEnableUnicode());
 
             SemanticsVisitor subVisitor(withSink(&tempSink));
             ctorInvokeExpr = subVisitor.CheckTerm(ctorInvokeExpr);
@@ -477,6 +479,9 @@ bool SemanticsVisitor::createInvokeExprForSynthesizedCtor(
     }
 
     DiagnosticSink tempSink(getSourceManager(), nullptr);
+    tempSink.setFlags(getSink()->getFlags());
+    tempSink.setDiagnosticColorMode(getSink()->getDiagnosticColorMode());
+    tempSink.setEnableUnicode(getSink()->getEnableUnicode());
     SemanticsVisitor subVisitor(withSink(&tempSink));
 
     // First make sure the struct is fully checked, otherwise the synthesized constructor may not be
