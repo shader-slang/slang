@@ -576,10 +576,8 @@ public:
             else
                 imax = imid - 1;
         }
-        // TODO: The return value on a failed search should be
-        // the bitwise negation of the index where `obj` should
-        // be inserted to be in the proper sorted location.
-        return -1;
+        // If not found, return the bitwise negation of the insertion index.
+        return ~imin;
     }
 
     template<typename T2>
