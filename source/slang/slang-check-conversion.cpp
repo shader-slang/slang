@@ -1003,7 +1003,10 @@ bool SemanticsVisitor::_failedCoercion(
         {
             if (sink)
             {
-                sink->diagnose(fromExpr->loc, Diagnostics::typeMismatch, toType, fromExpr->type);
+                sink->diagnose(Diagnostics::TypeMismatch{
+                    .expected_type = toType,
+                    .actual_type = fromExpr->type,
+                    .expr = fromExpr});
             }
         }
     }
@@ -1903,10 +1906,8 @@ bool SemanticsVisitor::_coerce(
                     .expr = fromExpr});
                 for (auto candidate : overloadContext.bestCandidates)
                 {
-                    sink->diagnose(
-                        candidate.item.declRef,
-                        Diagnostics::seeDeclarationOf,
-                        candidate.item.declRef);
+                    sink->diagnose(Diagnostics::SeeDeclarationOf{
+                        .decl = candidate.item.declRef.getDecl()});
                 }
             }
 
@@ -1964,12 +1965,14 @@ bool SemanticsVisitor::_coerce(
             {
                 if (sink)
                 {
-                    sink->diagnose(fromExpr, Diagnostics::typeMismatch, toType, fromType);
-                    sink->diagnoseWithoutSourceView(
-                        fromExpr,
-                        Diagnostics::noteExplicitConversionPossible,
-                        fromType.type,
-                        toType);
+                    sink->diagnose(Diagnostics::TypeMismatch{
+                        .expected_type = toType,
+                        .actual_type = fromType,
+                        .expr = fromExpr});
+                    sink->diagnose(Diagnostics::NoteExplicitConversionPossible{
+                        .from_type = fromType.type,
+                        .to_type = toType,
+                        .location = fromExpr->loc});
                 }
             }
             else if (cost >= kConversionCost_Default)

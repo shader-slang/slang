@@ -481,7 +481,9 @@ void diagnoseCallStack(IRInst* inst, DiagnosticSink* sink)
             auto user = use->getUser();
             if (auto call = as<IRCall>(user))
             {
-                sink->diagnose(call, Diagnostics::seeCallOfFunc, func);
+                sink->diagnose(Diagnostics::SeeCallOfFuncIr{
+                    .inst = func,
+                    .location = call->sourceLoc});
                 inst = call;
                 shouldContinue = true;
                 break;

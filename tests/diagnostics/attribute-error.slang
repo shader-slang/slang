@@ -17,6 +17,7 @@ struct DefaultValueAttribute
 };
 
 [MyStruct(0, "stringVal")] // attribute arg type mismatch
+//CHECK:                ^ type mismatch in expression
 //CHECK:                ^ expected an expression of type 'float', got 'String'
 struct A
 {

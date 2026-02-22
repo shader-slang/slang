@@ -184,10 +184,9 @@ struct UninitializedResourceDetectionContext
                             // Note pointing to struct definition
                             if (structType->sourceLoc.isValid())
                             {
-                                sink->diagnose(
-                                    structType->sourceLoc,
-                                    Diagnostics::seeDefinitionOfStruct,
-                                    structName);
+                                sink->diagnose(Diagnostics::SeeDefinitionOfStruct{
+                                    .name = structName,
+                                    .location = structType->sourceLoc});
                             }
                         }
                         else

@@ -1053,6 +1053,10 @@ semantic_checking_15_module(helpers)
 local semantic_checking_16_module = dofile(debug.getinfo(1).source:match("@?(.*/)") .. "slang-diagnostics-semantic-checking-16.lua")
 semantic_checking_16_module(helpers)
 
+-- Load semantic checking diagnostics (part 17) - Standalone notes for cross-referencing
+local semantic_checking_17_module = dofile(debug.getinfo(1).source:match("@?(.*/)") .. "slang-diagnostics-semantic-checking-17.lua")
+semantic_checking_17_module(helpers)
+
 -- Process and validate all diagnostics
 processed_diagnostics, validation_errors = helpers.process_diagnostics(helpers.diagnostics)
 

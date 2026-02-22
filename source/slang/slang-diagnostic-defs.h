@@ -19,152 +19,30 @@
 #endif
 
 //
-// -1 - Notes that decorate another diagnostic.
+// All diagnostics have been migrated to slang-diagnostics.lua and its submodules.
+// This file now only contains the DIAGNOSTIC macro setup and can be deprecated
+// once all consumers are updated.
 //
-
-DIAGNOSTIC(-1, Note, seeDefinitionOf, "see definition of '$0'")
-DIAGNOSTIC(-1, Note, seeDefinitionOfStruct, "see definition of struct '$0'")
-DIAGNOSTIC(-1, Note, seeConstantBufferDefinition, "see constant buffer definition.")
-DIAGNOSTIC(-1, Note, seeUsingOf, "see using of '$0'")
-DIAGNOSTIC(-1, Note, seeCallOfFunc, "see call to '$0'")
-DIAGNOSTIC(-1, Note, seePreviousDefinition, "see previous definition")
-DIAGNOSTIC(-1, Note, seePreviousDefinitionOf, "see previous definition of '$0'")
-
-DIAGNOSTIC(-1, Note, seeDeclarationOf, "see declaration of '$0'")
-DIAGNOSTIC(
-    -1,
-    Note,
-    seeDeclarationOfInterfaceRequirement,
-    "see interface requirement declaration of '$0'")
-
-DIAGNOSTIC(-1, Note, seeOverloadConsidered, "see overloads considered: '$0'.")
-
-// An alternate wording of the above note, emphasing the position rather than content of the
-// declaration.
-DIAGNOSTIC(-1, Note, seePreviousDeclarationOf, "see previous declaration of '$0'")
-
+// Diagnostic modules:
+//   slang-diagnostics-preprocessing.lua - 15xxx preprocessing diagnostics
+//   slang-diagnostics-parsing.lua - 2xxxx parsing diagnostics
+//   slang-diagnostics-semantic-checking-1.lua - 3xxxx semantic checking (core)
+//   slang-diagnostics-semantic-checking-2.lua - 3xxxx semantic checking (types/overloads)
+//   slang-diagnostics-semantic-checking-3.lua - Include/Visibility/Capability
+//   slang-diagnostics-semantic-checking-4.lua - Attributes
+//   slang-diagnostics-semantic-checking-5.lua - COM/Derivative/Extern
+//   slang-diagnostics-semantic-checking-6.lua - Differentiation/Modifiers/GLSL/HLSL
+//   slang-diagnostics-semantic-checking-7.lua - Link Time/Generics/Inheritance
+//   slang-diagnostics-semantic-checking-8.lua - Properties/Accessors/BitFields
+//   slang-diagnostics-semantic-checking-9.lua - Operators/Literals/Entry Points
+//   slang-diagnostics-semantic-checking-10.lua - Matrices/Compute stages
+//   slang-diagnostics-semantic-checking-11.lua - Loops/Interfaces/Mesh
+//   slang-diagnostics-semantic-checking-12.lua - IL code generation (4xxxx)
+//   slang-diagnostics-semantic-checking-13.lua - Resource validation (41xxx)
+//   slang-diagnostics-semantic-checking-14.lua - Target code generation (5xxxx)
+//   slang-diagnostics-semantic-checking-15.lua - Metal/SPIRV/GLSL/Autodiff/NVAPI
+//   slang-diagnostics-semantic-checking-16.lua - Internal errors/Ray tracing/Coop matrix
+//   slang-diagnostics-semantic-checking-17.lua - Standalone notes for cross-referencing
 //
-// 0xxxx - Command line and interaction with host platform APIs.
-//
-
-//
-// 15xxx - Preprocessing
-//
-
-// 150xx - conditionals
-// (definitions moved to slang-diagnostics.lua)
-
-// 151xx - directive parsing
-// (definitions moved to slang-diagnostics.lua)
-
-// 152xx - preprocessor expressions
-// (definitions moved to slang-diagnostics.lua)
-
-// 153xx - #include
-// (definitions moved to slang-diagnostics.lua)
-
-// 154xx - macro definition
-// (definitions moved to slang-diagnostics.lua)
-
-// 155xx - macro expansion
-// (definitions moved to slang-diagnostics.lua)
-
-// 156xx - pragmas
-// (definitions moved to slang-diagnostics.lua)
-
-// 159xx - user-defined error/warning
-// (definitions moved to slang-diagnostics.lua)
-
-//
-// 2xxxx - Parsing
-// (definitions moved to slang-diagnostics.lua)
-
-// 29xxx - Snippet parsing and inline asm
-// (definitions moved to slang-diagnostics.lua)
-
-//
-// 3xxxx - Semantic analysis
-//
-
-// 300xx - 303xx: definitions moved to slang-diagnostics-semantic-checking-1.lua
-
-// Some diagnostics that were already converted earlier (kept here until migration complete):
-DIAGNOSTIC(30013, Error, subscriptNonArray, "no subscript operation found for type '$0'")
-DIAGNOSTIC(30019, Error, typeMismatch, "expected an expression of type '$0', got '$1'")
-DIAGNOSTIC(
-    30024,
-    Error,
-    cannotConvertArrayOfSmallerToLargerSize,
-    "Cannot convert array of size $0 to array of size $1 as this would truncate data")
-DIAGNOSTIC(30052, Error, invalidSwizzleExpr, "invalid swizzle pattern '$0' on type '$1'")
-DIAGNOSTIC(30201, Error, functionRedefinition, "function '$0' already has a body")
-
-// 3xx7x - 3011x: definitions moved to slang-diagnostics-semantic-checking-2.lua
-
-// Note: noteExplicitConversionPossible is kept here because it's used with
-// diagnoseWithoutSourceView which doesn't support rich diagnostics
-DIAGNOSTIC(
-    -1,
-    Note,
-    noteExplicitConversionPossible,
-    "explicit conversion from '$0' to '$1' is possible")
-
-// Include
-// (definitions moved to slang-diagnostics-semantic-checking-3.lua)
-
-// Visibility
-// (definitions moved to slang-diagnostics-semantic-checking-3.lua)
-
-// Capability
-// (definitions moved to slang-diagnostics-semantic-checking-3.lua)
-
-// Attributes
-// (definitions moved to slang-diagnostics-semantic-checking-4.lua)
-
-// COM Interface, DerivativeMember, Extern Decl, Custom Derivative
-// (definitions moved to slang-diagnostics-semantic-checking-5.lua)
-
-// Differentiation, Modifiers, GLSL/HLSL specifics, Interfaces, Control flow, Enums, Generics
-// (definitions moved to slang-diagnostics-semantic-checking-6.lua)
-
-// Link Time, Cyclic Refs, Generics, Initializers, Variables, Parameters, Inheritance, Extensions, Subscripts
-// (definitions moved to slang-diagnostics-semantic-checking-7.lua)
-
-// 310xx: properties
-
-// 311xx: accessors - converted to slang-diagnostics-semantic-checking-8.lua
-// 313xx: bit fields - converted to slang-diagnostics-semantic-checking-8.lua
-// 39999: converted to slang-diagnostics-semantic-checking-8.lua
-
-// Diagnostics 229-333 moved to slang-diagnostics-semantic-checking-9.lua:
-// expectedPrefixOperator, expectedPostfixOperator, notEnoughArguments, tooManyArguments,
-// invalidIntegerLiteralSuffix, invalidFloatingPointLiteralSuffix, integerLiteralTooLarge,
-// integerLiteralTruncated, floatLiteralUnrepresentable, floatLiteralTooSmall,
-// matrixColumnOrRowCountIsOne, entryPointFunctionNotFound, expectedTypeForSpecializationArg,
-// specifiedStageDoesntMatchAttribute, entryPointHasNoStage, specializationParameterOfNameNotSpecialized,
-// specializationParameterNotSpecialized, expectedValueOfTypeForSpecializationArg,
-// unhandledModOnEntryPointParameter, entryPointCannotReturnResourceType
-
-// 381xx, 380xx, 382xx diagnostics have been moved to slang-diagnostics-semantic-checking-10.lua
-
-// 4xxxx IL code generation diagnostics have been moved to slang-diagnostics-semantic-checking-12.lua
-
-// Diagnostics 41011-41403 have been converted to rich diagnostics in
-// slang-diagnostics-semantic-checking-13.lua
-
-// 5xxxx - Target code generation diagnostics (50010-56003) have been converted to rich diagnostics in
-// slang-diagnostics-semantic-checking-14.lua
-
-// Metal (56101-56104) - definitions moved to slang-diagnostics-semantic-checking-15.lua
-// SPIRV (57001-57004) - definitions moved to slang-diagnostics-semantic-checking-15.lua
-// GLSL Compatibility (58001-58003) - definitions moved to slang-diagnostics-semantic-checking-15.lua
-// Autodiff checkpoint reporting notes - definitions moved to slang-diagnostics-semantic-checking-15.lua
-// 9xxxx - Documentation generation (90001) - definitions moved to slang-diagnostics-semantic-checking-15.lua
-// 8xxxx - NVAPI (81110-81111) - definitions moved to slang-diagnostics-semantic-checking-15.lua
-
-// 99999 - Internal compiler errors - definitions moved to slang-diagnostics-semantic-checking-16.lua
-// 40100 - Entry point renaming - definitions moved to slang-diagnostics-semantic-checking-16.lua
-// 40000-40001 - Ray tracing - definitions moved to slang-diagnostics-semantic-checking-16.lua
-// 50000, 51701 - Cooperative Matrix - definitions moved to slang-diagnostics-semantic-checking-16.lua
 
 #undef DIAGNOSTIC
