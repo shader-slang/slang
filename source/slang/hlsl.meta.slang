@@ -23751,14 +23751,16 @@ struct HitObject
     }
 
         /// Returns the parametric ending point (T value at hit/miss). Valid if the hit object represents a hit or a miss.
-        /// DXR 1.3 only.
+        /// DXR 1.3 and OptiX.
     [ForceInline]
     [require(hlsl, ser_dxr_raygen_closesthit_miss)]
+    [require(cuda, ser_raygen_closesthit_miss)]
     float GetRayTCurrent()
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".GetRayTCurrent";
+        case cuda: __intrinsic_asm "slangOptixHitObjectGetRayTmax";
         }
     }
 
