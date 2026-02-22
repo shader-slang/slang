@@ -630,7 +630,7 @@ extension vector<int64_t,2>:ITexelElement
 /// @param isMS Indicates whether the texture is a multisampled texture.
 /// @param sampleCount The number of samples of a multisampled texture.
 /// @param access The access mode of the texture. 0 for read-only, 1 for read-write, 2 for rasterizer-ordered, 3 for feedback.
-/// @param isShadow Indicates whether the texture is a shadow texture (for combined texture-sampler only).
+/// @param isShadow Indicates whether the texture is a depth texture (`isCombined==0`) or a shadow texture (`isCombined==1`).
 /// @param isCombined Indicates whether the texture is a combined texture-sampler.
 /// @param format The storage format of the texture. Users should specify the format using an `[format("...")]` attribute instead.
 /// @see `Texture1D`, `Texture2D`, `Texture3D`, `TextureCube`, `Texture1DArray`,
@@ -692,7 +692,91 @@ extension vector<int64_t,2>:ITexelElement
 ///
 /// When targeting Vulkan, a combined-texture-sampler type (`isCombined==1`) translates to a `OpTypeSampledImage` type in SPIR-V.
 /// For other targets, the combined-texture-sampler type is translated to a pair of a `Texture` and `SamplerState`.
-/// `isShadow` is only applicable to combined-texture-sampler types and must be `0` for non-combined texture types.
+///
+/// The defined texture types and their backend support:
+///
+/// | Type                              | Cuda | GLSL core version / extension         | HLSL   | Metal/macOS | SPIR-V | WGSL |
+/// |:----------------------------------|:-----|:--------------------------------------|:-------|:------------|:-------|:-----|
+/// | `DepthTexture1D`                  |      | 110                                   | SM 4.0 | -           |        | -    |
+/// | `DepthTexture1DArray`             |      | 130 / EXT_texture_array               | SM 4.0 | -           |        | -    |
+/// | `DepthTexture2D`                  |      | 110                                   | SM 4.0 | 1.0         |        | 1.0  |
+/// | `DepthTexture2DArray`             |      | 130 / EXT_texture_array               | SM 4.0 | 1.0         |        | 1.0  |
+/// | `DepthTexture2DMS`                |      | -                                     | SM 4.0 | 1.0         |        | 1.0  |
+/// | `DepthTexture2DMSArray`           |      | -                                     | SM 4.0 | 2.0         |        | -    |
+/// | `DepthTexture3D`                  |      | -                                     | -      | -           |        | -    |
+/// | `DepthTextureCube`                |      | 110                                   | SM 4.0 | 1.0         |        | 1.0  |
+/// | `DepthTextureCubeArray`           |      | 400 / ARB_texture_cube_map_array      | SM 4.0 | 1.0         |        | 1.0  |
+/// | `FeedbackTexture2D`               |      | -                                     | SM 6.5 | -           |        | -    |
+/// | `FeedbackTexture2DArray`          |      | -                                     | SM 6.5 | -           |        | -    |
+/// | `RWTexture1D`                     |      | 420 / ARB_shader_image_load_store     | SM 5.0 | 1.0         |        | 1.0  |
+/// | `RWTexture1DArray`                |      | 420 / ARB_shader_image_load_store     | SM 5.0 | 1.0         |        | -    |
+/// | `RWTexture2D`                     |      | 420 / ARB_shader_image_load_store     | SM 5.0 | 1.0         |        | 1.0  |
+/// | `RWTexture2DArray`                |      | 420 / ARB_shader_image_load_store     | SM 5.0 | 1.0         |        | 1.0  |
+/// | `RWTexture2DMS`                   |      | 420 / ARB_shader_image_load_store     | SM 6.7 | -           |        | -    |
+/// | `RWTexture2DMSArray`              |      | 420 / ARB_shader_image_load_store     | SM 6.7 | -           |        | -    |
+/// | `RWTexture3D`                     |      | 420 / ARB_shader_image_load_store     | SM 5.0 | 1.0         |        | 1.0  |
+/// | `RasterizerOrderedTexture1D`      |      | none / ARB_fragment_shader_interlock  | SM 5.1 | 2.0         |        | -    |
+/// | `RasterizerOrderedTexture1DArray` |      | none / ARB_fragment_shader_interlock  | SM 5.1 | 2.0         |        | -    |
+/// | `RasterizerOrderedTexture2D`      |      | none / ARB_fragment_shader_interlock  | SM 5.1 | 2.0         |        | -    |
+/// | `RasterizerOrderedTexture2DArray` |      | none / ARB_fragment_shader_interlock  | SM 5.1 | 2.0         |        | -    |
+/// | `RasterizerOrderedTexture3D`      |      | none / ARB_fragment_shader_interlock  | SM 5.1 | 2.0         |        | -    |
+/// | `Texture1D`                       |      | 110                                   | SM 4.0 | 1.0         |        | 1.0  |
+/// | `Texture1DArray`                  |      | 130 / EXT_texture_array               | SM 4.0 | 1.0         |        | -    |
+/// | `Texture2D`                       |      | 110                                   | SM 4.0 | 1.0         |        | 1.0  |
+/// | `Texture2DArray`                  |      | 130 / EXT_texture_array               | SM 4.0 | 1.0         |        | 1.0  |
+/// | `Texture2DMS`                     |      | 150(*)                                | SM 4.0 | 1.0         |        | 1.0  |
+/// | `Texture2DMSArray`                |      | 150(*)                                | SM 4.0 | 2.0         |        | -    |
+/// | `Texture3D`                       |      | 110                                   | SM 4.0 | 1.0         |        | 1.0  |
+/// | `TextureCube`                     |      | 110                                   | SM 4.0 | 1.0         |        | 1.0  |
+/// | `TextureCubeArray`                |      | 400 / ARB_texture_cube_map_array      | SM 4.0 | 1.0         |        | 1.0  |
+/// | `WTexture1D`                      |      | 420 / ARB_shader_image_load_store     | -      | 1.0         |        | 1.0  |
+/// | `WTexture1DArray`                 |      | 420 / ARB_shader_image_load_store     | -      | 1.0         |        | -    |
+/// | `WTexture2D`                      |      | 420 / ARB_shader_image_load_store     | -      | 1.0         |        | 1.0  |
+/// | `WTexture2DArray`                 |      | 420 / ARB_shader_image_load_store     | -      | 1.0         |        | 1.0  |
+/// | `WTexture3D`                      |      | 420 / ARB_shader_image_load_store     | -      | 1.0         |        | 1.0  |
+///
+/// (*) Usable only via combined texture-sampler types.
+///
+/// The combined texture-sampler types and their backend support:
+///
+/// | Type                              | Cuda | GLSL | HLSL   | Metal/macOS | SPIR-V | WGSL |
+/// |:----------------------------------|:-----|:-----|:-------|:------------|:-------|:-----|
+/// | `Sampler1DShadow`                 |      |      |        |             |        |      |
+/// | `Sampler1DArrayShadow`            |      |      |        |             |        |      |
+/// | `Sampler2DShadow`                 |      |      |        |             |        |      |
+/// | `Sampler2DArrayShadow`            |      |      |        |             |        |      |
+/// | `Sampler2DMSShadow`               |      |      |        |             |        |      |
+/// | `Sampler2DMSArrayShadow`          |      |      |        |             |        |      |
+/// | `Sampler3DShadow`                 |      |      |        |             |        |      |
+/// | `SamplerCubeShadow`               |      |      |        |             |        |      |
+/// | `SamplerCubeArrayShadow`          |      |      |        |             |        |      |
+/// | `RWSampler1D`                     |      |      |        |             |        |      |
+/// | `RWSampler1DArray`                |      |      |        |             |        |      |
+/// | `RWSampler2D`                     |      |      |        |             |        |      |
+/// | `RWSampler2DArray`                |      |      |        |             |        |      |
+/// | `RWSampler2DMS`                   |      |      |        |             |        |      |
+/// | `RWSampler2DMSArray`              |      |      |        |             |        |      |
+/// | `RWSampler3D`                     |      |      |        |             |        |      |
+/// | `RasterizerOrderedSampler1D`      |      |      |        |             |        |      |
+/// | `RasterizerOrderedSampler1DArray` |      |      |        |             |        |      |
+/// | `RasterizerOrderedSampler2D`      |      |      |        |             |        |      |
+/// | `RasterizerOrderedSampler2DArray` |      |      |        |             |        |      |
+/// | `RasterizerOrderedSampler3D`      |      |      |        |             |        |      |
+/// | `Sampler1D`                       |      |      |        |             |        |      |
+/// | `Sampler1DArray`                  |      |      |        |             |        |      |
+/// | `Sampler2D`                       |      |      |        |             |        |      |
+/// | `Sampler2DArray`                  |      |      |        |             |        |      |
+/// | `Sampler2DMS`                     |      |      |        |             |        |      |
+/// | `Sampler2DMSArray`                |      |      |        |             |        |      |
+/// | `Sampler3D`                       |      |      |        |             |        |      |
+/// | `SamplerCube`                     |      |      |        |             |        |      |
+/// | `SamplerCubeArray`                |      |      |        |             |        |      |
+/// | `WSampler1D`                      |      |      |        |             |        |      |
+/// | `WSampler1DArray`                 |      |      |        |             |        |      |
+/// | `WSampler2D`                      |      |      |        |             |        |      |
+/// | `WSampler2DArray`                 |      |      |        |             |        |      |
+/// | `WSampler3D`                      |      |      |        |             |        |      |
+///
 /// @internal
 /// @category texture_types Texture types
 __magic_type(TextureType)
@@ -967,9 +1051,22 @@ void __wgsl_check_texture_type()
     static_assert(isShadow == 0 || Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_CUBE)
         , "WGSL depth texture shape must be either 2D or Cube");
 
-    // Multisampled texture shapes
+    // Multisampled textures
     static_assert(isMS == 0 || Shape.flavor == $(SLANG_TEXTURE_2D)
         , "WGSL multisampled texture shape must be 2D");
+    static_assert(isMS == 0 ||
+                 (access != $(kCoreModule_ResourceAccessWriteOnly) &&
+                  access != $(kCoreModule_ResourceAccessReadWrite))
+        , "WGSL does not support multisampled texture storage");
+
+
+    // access
+    static_assert(access != $(kCoreModule_ResourceAccessRasterizerOrdered)
+        , "WGSL does not support RasterizerOrderedTexture types");
+    static_assert(access != $(kCoreModule_ResourceAccessFeedback)
+        , "WGSL does not support FeedbackTexture types");
+    static_assert(access <= $(kCoreModule_ResourceAccessFeedback)
+        , "WGSL: unhandled texture access type");
 }
 
 __generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
