@@ -2733,9 +2733,8 @@ static SlangResult createArtifactFromIR(
                     compiler->validate((uint32_t*)spirv.getBuffer(), int(spirv.getCount() / 4))))
             {
                 compiler->disassemble((uint32_t*)spirv.getBuffer(), int(spirv.getCount() / 4));
-                codeGenContext->getSink()->diagnoseWithoutSourceView(
-                    SourceLoc{},
-                    Diagnostics::spirvValidationFailed);
+                codeGenContext->getSink()->diagnose(
+                    Diagnostics::SpirvValidationFailed{});
             }
         }
 

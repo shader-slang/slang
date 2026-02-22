@@ -5329,9 +5329,9 @@ static Decl* ParseSingleDecl(Parser* parser, ContainerDecl* containerDecl)
     }
 
     parser->sink->diagnose(
-        declBase->loc,
-        Diagnostics::unimplemented,
-        "didn't expect multiple declarations here");
+        Diagnostics::Unimplemented{
+            .feature = "didn't expect multiple declarations here",
+            .location = declBase->loc});
     return nullptr;
 }
 
@@ -9099,7 +9099,10 @@ static IROp parseIROp(Parser* parser, Token& outToken)
 
         if (op == kIROp_Invalid)
         {
-            parser->sink->diagnose(outToken, Diagnostics::unimplemented, "unknown intrinsic op");
+            parser->sink->diagnose(
+                Diagnostics::Unimplemented{
+                    .feature = "unknown intrinsic op",
+                    .location = outToken.loc});
         }
         return op;
     }

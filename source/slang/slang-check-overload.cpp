@@ -3323,9 +3323,9 @@ Expr* SemanticsVisitor::checkGenericAppWithCheckedArgs(GenericAppExpr* genericAp
             // TODO(tfoley): print a reasonable message here...
 
             getSink()->diagnose(
-                genericAppExpr,
-                Diagnostics::unimplemented,
-                "no applicable generic");
+                Diagnostics::Unimplemented{
+                    .feature = "no applicable generic",
+                    .location = genericAppExpr->loc});
 
             return CreateErrorExpr(genericAppExpr);
         }

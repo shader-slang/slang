@@ -1487,10 +1487,9 @@ SlangResult EndToEndCompileRequest::compile()
             // If for some reason we didn't output any diagnostic, something is
             // going wrong, but we want to make sure we at least output something.
             getSink()->diagnose(
-                SourceLoc(),
-                Diagnostics::compilationAbortedDueToException,
-                typeid(e).name(),
-                e.Message);
+                Diagnostics::CompilationAbortedDueToException{
+                    .exception_type = typeid(e).name(),
+                    .exception_message = e.Message});
         }
     }
     catch (const Exception& e)
@@ -1500,10 +1499,9 @@ SlangResult EndToEndCompileRequest::compile()
         // in either filing a bug, or locating what in their code created
         // a problem.
         getSink()->diagnose(
-            SourceLoc(),
-            Diagnostics::compilationAbortedDueToException,
-            typeid(e).name(),
-            e.Message);
+            Diagnostics::CompilationAbortedDueToException{
+                .exception_type = typeid(e).name(),
+                .exception_message = e.Message});
     }
     catch (...)
     {
@@ -1511,7 +1509,7 @@ SlangResult EndToEndCompileRequest::compile()
         // `Exception`, so something really fishy is going on. We want to
         // let the user know that we messed up, so they know to blame Slang
         // and not some other component in their system.
-        getSink()->diagnose(SourceLoc(), Diagnostics::compilationAborted);
+        getSink()->diagnose(Diagnostics::CompilationAborted{});
     }
     m_diagnosticOutput = getSink()->outputBuffer.produceString();
 

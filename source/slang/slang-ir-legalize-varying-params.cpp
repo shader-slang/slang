@@ -1044,9 +1044,9 @@ protected:
         SLANG_UNUSED(info);
 
         m_sink->diagnose(
-            m_param,
-            Diagnostics::unimplemented,
-            "this target doesn't support this system-defined varying parameter");
+            Diagnostics::Unimplemented{
+                .feature = "this target doesn't support this system-defined varying parameter",
+                .location = m_param->sourceLoc});
 
         return LegalizedVaryingVal();
     }
@@ -1056,9 +1056,9 @@ protected:
         SLANG_UNUSED(info);
 
         m_sink->diagnose(
-            m_param,
-            Diagnostics::unimplemented,
-            "this target doesn't support this user-defined varying parameter");
+            Diagnostics::Unimplemented{
+                .feature = "this target doesn't support this user-defined varying parameter",
+                .location = m_param->sourceLoc});
 
         return LegalizedVaryingVal();
     }
@@ -2108,10 +2108,10 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                 if (ioBaseAttributeIndex > 8)
                 {
                     m_sink->diagnose(
-                        m_param,
-                        Diagnostics::unexpected,
-                        "the supplied hit attribute exceeds the maximum hit attribute structure "
-                        "size (32 bytes)");
+                        Diagnostics::Unexpected{
+                            .message = "the supplied hit attribute exceeds the maximum hit attribute structure "
+                                       "size (32 bytes)",
+                            .location = m_param->sourceLoc});
                     return LegalizedVaryingVal();
                 }
                 return LegalizedVaryingVal::makeValue(getHitAttributes);

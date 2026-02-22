@@ -1128,7 +1128,9 @@ inline String CLikeSourceEmitter::maybeMakeEntryPointNameValid(String name, Diag
         if (name == "main")
         {
             String newName = _generateUniqueName(name.getUnownedSlice());
-            sink->diagnose(SourceLoc(), Diagnostics::mainEntryPointRenamed, name, newName);
+            sink->diagnose(Diagnostics::MainEntryPointRenamed{
+                .old_name = name,
+                .new_name = newName});
             return newName;
         }
     }
@@ -2337,7 +2339,10 @@ void CLikeSourceEmitter::emitInstStmt(IRInst* inst)
 
 void CLikeSourceEmitter::diagnoseUnhandledInst(IRInst* inst)
 {
-    getSink()->diagnose(inst, Diagnostics::unimplemented, "unexpected IR opcode during code emit");
+    getSink()->diagnose(
+        Diagnostics::Unimplemented{
+            .feature = "unexpected IR opcode during code emit",
+            .location = inst->sourceLoc});
 }
 
 bool CLikeSourceEmitter::hasExplicitConstantBufferOffset(IRInst* cbufferType)
@@ -2793,10 +2798,10 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
         // We should have legalized ImageSubscript before emit for metal targets
         if (isMetalTarget(this->getTargetReq()))
             getSink()->diagnose(
-                inst,
-                Diagnostics::unimplemented,
-                "kIROp_ImageSubscript is unimplemented for Metal, expected legalization "
-                "beforehand");
+                Diagnostics::Unimplemented{
+                    .feature = "kIROp_ImageSubscript is unimplemented for Metal, expected legalization "
+                               "beforehand",
+                    .location = inst->sourceLoc});
         [[fallthrough]];
     case kIROp_GetElement:
     case kIROp_MeshOutputRef:

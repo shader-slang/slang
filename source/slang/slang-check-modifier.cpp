@@ -2320,9 +2320,8 @@ void SemanticsVisitor::checkRayPayloadStructFields(StructDecl* structDecl)
         {
             // Emit the diagnostic error
             getSink()->diagnose(
-                fieldVarDecl,
-                Diagnostics::rayPayloadFieldMissingAccessQualifiers,
-                fieldVarDecl->getName());
+                Diagnostics::RayPayloadFieldMissingAccessQualifiers{
+                    .field = fieldVarDecl});
         }
 
         // Check stage names in read qualifier
@@ -2334,9 +2333,9 @@ void SemanticsVisitor::checkRayPayloadStructFields(StructDecl* structDecl)
                 if (!validStages.contains(stageName))
                 {
                     getSink()->diagnose(
-                        stageToken,
-                        Diagnostics::rayPayloadInvalidStageInAccessQualifier,
-                        stageName);
+                        Diagnostics::RayPayloadInvalidStageInAccessQualifier{
+                            .stage_name = stageName,
+                            .location = stageToken.loc});
                 }
             }
         }
@@ -2350,9 +2349,9 @@ void SemanticsVisitor::checkRayPayloadStructFields(StructDecl* structDecl)
                 if (!validStages.contains(stageName))
                 {
                     getSink()->diagnose(
-                        stageToken,
-                        Diagnostics::rayPayloadInvalidStageInAccessQualifier,
-                        stageName);
+                        Diagnostics::RayPayloadInvalidStageInAccessQualifier{
+                            .stage_name = stageName,
+                            .location = stageToken.loc});
                 }
             }
         }

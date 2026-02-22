@@ -745,10 +745,9 @@ IArtifact* ComponentType::getTargetArtifact(Int targetIndex, slang::IBlob** outD
             applySettingsToDiagnosticSink(&sink, &sink, linkage->m_optionSet);
             applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
             sink.diagnose(
-                SourceLoc(),
-                Diagnostics::compilationAbortedDueToException,
-                typeid(e).name(),
-                e.Message);
+                Diagnostics::CompilationAbortedDueToException{
+                    .exception_type = typeid(e).name(),
+                    .exception_message = e.Message});
             sink.getBlobIfNeeded(outDiagnostics);
         }
         return nullptr;

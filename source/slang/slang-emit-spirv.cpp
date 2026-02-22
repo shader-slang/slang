@@ -3695,7 +3695,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     SpvInst* emitFuncDefinition(IRFunc* irFunc)
     {
         if (!irFunc->getFirstBlock())
-            m_sink->diagnose(irFunc, Diagnostics::noBlocksOrIntrinsic, "spirv");
+            m_sink->diagnose(
+                Diagnostics::NoBlocksOrIntrinsic{
+                    .target = "spirv",
+                    .location = irFunc->sourceLoc});
 
         // [2.4: Logical Layout of a Module]
         //
@@ -8149,12 +8152,12 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         // wrong, so it can help the user or developers to locate the issue easier.
         if (!isFloatOrPackedFloatType(fromType))
         {
-            m_sink->diagnose(inst, Diagnostics::internalCompilerError);
+            m_sink->diagnose(Diagnostics::InternalCompilerError{.location = inst->sourceLoc});
         }
 
         if (!isFloatOrPackedFloatType(toType))
         {
-            m_sink->diagnose(inst, Diagnostics::internalCompilerError);
+            m_sink->diagnose(Diagnostics::InternalCompilerError{.location = inst->sourceLoc});
         }
 
         if (isTypeEqual(fromType, toType))

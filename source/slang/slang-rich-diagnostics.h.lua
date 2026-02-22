@@ -204,8 +204,8 @@ local severity_map = {
 	["note"] = "Severity::Note",
 	["warning"] = "Severity::Warning",
 	["error"] = "Severity::Error",
-	["fatal error"] = "Severity::Fatal",
-	["internal error"] = "Severity::Internal",
+	["fatal"] = "Severity::Fatal",
+	["internal"] = "Severity::Internal",
 }
 
 function M.getSeverityEnum(severity_name)

@@ -480,8 +480,8 @@ void FrontEndCompileRequest::generateIR()
                     SerialContainerUtil::verifyIRSerialize(irModule, getSession(), options)))
             {
                 getSink()->diagnose(
-                    irModule->getModuleInst()->sourceLoc,
-                    Diagnostics::serialDebugVerificationFailed);
+                Diagnostics::SerialDebugVerificationFailed{
+                    .location = irModule->getModuleInst()->sourceLoc});
             }
         }
 
