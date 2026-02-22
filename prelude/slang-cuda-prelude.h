@@ -4653,6 +4653,32 @@ __forceinline__ __device__ void optixTrace(
     }
 }
 
+// Non-template overload for empty payload case.
+// When Slang's type legalization eliminates an empty payload struct,
+// the generated code calls optixTrace without a payload argument.
+__forceinline__ __device__ void optixTrace(
+    OptixTraversableHandle AccelerationStructure,
+    uint32_t RayFlags,
+    uint32_t InstanceInclusionMask,
+    uint32_t RayContributionToHitGroupIndex,
+    uint32_t MultiplierForGeometryContributionToHitGroupIndex,
+    uint32_t MissShaderIndex,
+    RayDesc Ray)
+{
+    optixTrace(
+        AccelerationStructure,
+        Ray.Origin,
+        Ray.Direction,
+        Ray.TMin,
+        Ray.TMax,
+        0.f,
+        InstanceInclusionMask,
+        RayFlags,
+        RayContributionToHitGroupIndex,
+        MultiplierForGeometryContributionToHitGroupIndex,
+        MissShaderIndex);
+}
+
 #if (OPTIX_VERSION >= 90000)
 __forceinline__ __device__ float4 optixGetSpherePositionAndRadius()
 {
@@ -5106,6 +5132,33 @@ __forceinline__ __device__ void optixTraverse(
             r0,
             r1);
     }
+}
+
+// Non-template overload for empty payload case.
+// When Slang's type legalization eliminates an empty payload struct,
+// the generated code calls optixTraverse without a payload argument.
+__forceinline__ __device__ void optixTraverse(
+    OptixTraversableHandle AccelerationStructure,
+    uint32_t RayFlags,
+    uint32_t InstanceInclusionMask,
+    uint32_t RayContributionToHitGroupIndex,
+    uint32_t MultiplierForGeometryContributionToHitGroupIndex,
+    uint32_t MissShaderIndex,
+    RayDesc Ray,
+    OptixTraversableHandle* hitObj)
+{
+    optixTraverse(
+        AccelerationStructure,
+        Ray.Origin,
+        Ray.Direction,
+        Ray.TMin,
+        Ray.TMax,
+        0.f,
+        InstanceInclusionMask,
+        RayFlags,
+        RayContributionToHitGroupIndex,
+        MultiplierForGeometryContributionToHitGroupIndex,
+        MissShaderIndex);
 }
 
 #if (OPTIX_VERSION >= 80100)
