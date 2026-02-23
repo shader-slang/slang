@@ -99,13 +99,7 @@ SlangResult overrideDiagnostic(
     }
 
     // If we are only allowing certain original severities check it's the right type.
-    // However, when using numeric IDs, we skip this check because multiple diagnostics
-    // can share the same ID with different severities (e.g., both warnings and errors
-    // may use ID 41024). The override will still be applied to all diagnostics with
-    // that ID regardless of their individual severities.
-    bool usedNumericId = identifier.getLength() > 0 &&
-                         (CharUtil::isDigit(identifier[0]) || identifier[0] == '-');
-    if (!usedNumericId && diagnostic && originalSeverity != Severity::Disable &&
+    if (diagnostic && originalSeverity != Severity::Disable &&
         diagnostic->severity != originalSeverity)
     {
         // Strictly speaking the diagnostic name is known, but it's not the right severity
