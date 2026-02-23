@@ -215,6 +215,13 @@ SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, 
 
     switch (type->getOp())
     {
+    case kIROp_UnsizedArrayType:
+        {
+            auto arrayType = static_cast<IRUnsizedArrayType*>(type);
+            SLANG_RETURN_ON_FAIL(calcTypeName(arrayType->getElementType(), target, out));
+            out << "*";
+            return SLANG_OK;
+        }
     case kIROp_VectorType:
         {
             auto vecType = static_cast<IRVectorType*>(type);
@@ -1015,6 +1022,13 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             m_writer->emit(")");
         }
         return true;
+    case kIROp_GetStructuredBufferPtr:
+        {
+            m_writer->emit("(&(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(").data)");
+            return true;
+        }
     default:
         break;
     }
@@ -1041,6 +1055,18 @@ void CUDASourceEmitter::emitVectorTypeNameImpl(IRType* elementType, IRIntegerVal
 {
     m_writer->emit(getVectorPrefix(elementType->getOp()));
     m_writer->emit(elementCount);
+}
+
+void CUDASourceEmitter::_emitType(IRType* type, DeclaratorInfo* declarator)
+{
+    if (type->getOp() == kIROp_UnsizedArrayType)
+    {
+        auto arrayType = cast<IRUnsizedArrayType>(type);
+        PtrDeclaratorInfo ptrDeclarator(declarator);
+        _emitType(arrayType->getElementType(), &ptrDeclarator);
+        return;
+    }
+    Super::_emitType(type, declarator);
 }
 
 void CUDASourceEmitter::emitSimpleTypeImpl(IRType* type)

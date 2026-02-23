@@ -5584,11 +5584,11 @@ __intrinsic_op($(kIROp_GetUntypedBufferPtr))
 Ptr<uint[]> __getByteAddressBufferPtr(RWByteAddressBuffer buffer);
 
 __intrinsic_op($(kIROp_GetStructuredBufferPtr))
-[require(spirv, structuredbuffer)]
+[require(cuda_spirv, structuredbuffer)]
 Ptr<T[]> __getStructuredBufferPtr<T>(StructuredBuffer<T> buffer);
 
 __intrinsic_op($(kIROp_GetStructuredBufferPtr))
-[require(spirv, structuredbuffer_rw)]
+[require(cuda_spirv, structuredbuffer_rw)]
 Ptr<T[]> __getStructuredBufferPtr<T>(RWStructuredBuffer<T> buffer);
 
 /**
