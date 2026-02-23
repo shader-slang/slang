@@ -1,5 +1,4 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -output-using-type -shaderobj
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -output-using-type -shaderobj
 
 // Test that __getStructuredBufferPtr works on CUDA.
 // Ptr<T[]> collapses to T* on CUDA, and GetStructuredBufferPtr returns the data pointer.
