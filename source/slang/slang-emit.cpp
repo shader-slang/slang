@@ -1913,6 +1913,17 @@ Result linkAndOptimizeIR(
         if (targetProgram->shouldEmitSPIRVDirectly())
             SLANG_PASS(removeRawDefaultConstructors);
         break;
+    case CodeGenTarget::ShaderLLVMIR:
+    case CodeGenTarget::HostLLVMIR:
+    case CodeGenTarget::HostObjectCode:
+    case CodeGenTarget::ShaderObjectCode:
+    case CodeGenTarget::ShaderSharedLibrary:
+    case CodeGenTarget::HostExecutable:
+    case CodeGenTarget::HostSharedLibrary:
+    case CodeGenTarget::ShaderHostCallable:
+        if (isCPUTargetViaLLVM(targetRequest))
+            SLANG_PASS(removeRawDefaultConstructors);
+        break;
     default:
         break;
     }
