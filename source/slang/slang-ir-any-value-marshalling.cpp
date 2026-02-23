@@ -981,8 +981,8 @@ struct AnyValueMarshallingContext
                     components.getBuffer());
                 auto combinedBits = builder->emitBitCast(dataType, uintNVal);
                 builder->emitStore(concreteVar, combinedBits);
-                advanceOffset((uint32_t)size);
             }
+            advanceOffset((uint32_t)size);
         }
 
         // unpack: AnyValue -> DescriptorHandle
