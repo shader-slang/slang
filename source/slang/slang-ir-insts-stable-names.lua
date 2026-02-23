@@ -727,4 +727,9 @@ return {
 	["Type.OptionalNoneType"] = 725,
 	["ReinterpretOptional"] = 726,
 	["Type.DefaultPushConstantLayout"] = 727,
+	["makeCombinedTextureSampler"] = 731,
+	["SPIRVResourceHeap"] = 729,
+	["SPIRVSamplerHeap"] = 730,
+	["SPIRVLoadDescriptorFromHeap"] = 728,
+	["SPIRVLoadTexelPointerFromHeap"] = 732,
 }

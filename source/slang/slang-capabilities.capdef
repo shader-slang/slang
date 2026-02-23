@@ -660,6 +660,14 @@ def SPV_NV_bindless_texture: _spirv_1_0;
 /// [EXT]
 def SPV_EXT_float8: _spirv_1_0;
 
+/// Represents the SPIR-V extension for descriptor heaps.
+/// [EXT]
+def SPV_EXT_descriptor_heap : _spirv_1_0;
+
+/// Represents the SPIR-V extension for untyped pointers.
+/// [EXT]
+def SPV_KHR_untyped_pointers : _spirv_1_0;
+
 /// Represents the SPIR-V extension for BFloat16 types.
 /// [EXT]
 def SPV_KHR_bfloat16: _spirv_1_0;
@@ -900,6 +908,10 @@ def spvVulkanMemoryModelDeviceScopeKHR : SPV_KHR_vulkan_memory_model;
 /// Represents the SPIR-V capability for the bindless texture.
 /// [EXT]
 def spvBindlessTextureNV : SPV_NV_bindless_texture;
+
+/// Represents the SPIR-V capability for descriptor heaps.
+/// [EXT]
+def spvDescriptorHeapEXT : SPV_EXT_descriptor_heap + SPV_KHR_untyped_pointers;
 
 // The following capabilities all pertain to how ray tracing shaders are translated
 // to GLSL, where there are two different extensions that can provide the core

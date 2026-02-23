@@ -2642,6 +2642,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_IndicesType:
         case kIROp_PrimitivesType:
             return nullptr;
+        case kIROp_SPIRVSamplerHeap:
+        case kIROp_SPIRVResourceHeap:
+            return ensureDescriptorHeapBuiltinVar(inst);
         default:
             {
                 if (isSpecConstRateType(inst->getFullType()))
@@ -4548,6 +4551,51 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_MakeUInt64:
             result = emitMakeUInt64(parent, inst);
             break;
+        case kIROp_SPIRVLoadDescriptorFromHeap:
+            {
+                auto loadDesc = as<IRSPIRVLoadDescriptorFromHeap>(inst);
+                result =
+                    emitDescriptorHeapLoad(parent, inst, loadDesc->getHeap(), loadDesc->getIndex());
+                break;
+            }
+        case kIROp_SPIRVLoadTexelPointerFromHeap:
+            {
+                auto loadDesc = as<IRSPIRVLoadTexelPointerFromHeap>(inst);
+                bool isBufferResource = false;
+                auto resourceType = loadDesc->getTextureType();
+                auto resourceArrayType = getDescriptorRuntimeArrayType(ensureInst(resourceType));
+                auto imagePtr = emitInst(
+                    parent,
+                    nullptr,
+                    SpvOpUntypedAccessChainKHR,
+                    ensureUntypedPointerType(SpvStorageClassUniformConstant),
+                    kResultID,
+                    resourceArrayType,
+                    loadDesc->getHeap(),
+                    loadDesc->getIndex());
+
+                result = emitInst(
+                    parent,
+                    inst,
+                    SpvOpUntypedImageTexelPointerEXT,
+                    inst->getDataType(),
+                    kResultID,
+                    loadDesc->getTextureType(),
+                    imagePtr,
+                    loadDesc->getCoord(),
+                    loadDesc->getSampleIndex());
+                break;
+            }
+        case kIROp_MakeCombinedTextureSampler:
+            result = emitInst(
+                parent,
+                inst,
+                SpvOpSampledImage,
+                inst->getDataType(),
+                kResultID,
+                inst->getOperand(0),
+                inst->getOperand(1));
+            break;
         case kIROp_Add:
         case kIROp_Sub:
         case kIROp_Mul:
@@ -4586,48 +4634,46 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_CastDescriptorHandleToResource:
             // Convert DescriptorHandle (uint64_t handle) to appropriate resource type
             {
-                auto targetCaps = m_targetProgram->getTargetReq()->getTargetCaps();
+                requireSPIRVCapability((SpvCapability)SpvCapabilityBindlessTextureNV);
+                ensureExtensionDeclaration(UnownedStringSlice("SPV_NV_bindless_texture"));
 
-                if (targetCaps.implies(CapabilityAtom::spvBindlessTextureNV))
+                auto operand = ensureInst(inst->getOperand(0));
+                SpvOp conversionOp = SpvOpConvertUToSampledImageNV;
+                IRType* resultType = inst->getDataType();
+
+                switch (resultType->getOp())
                 {
-                    requireSPIRVCapability((SpvCapability)SpvCapabilityBindlessTextureNV);
-                    ensureExtensionDeclaration(UnownedStringSlice("SPV_NV_bindless_texture"));
-
-                    auto operand = ensureInst(inst->getOperand(0));
-                    SpvOp conversionOp = SpvOpConvertUToSampledImageNV;
-                    IRType* resultType = inst->getDataType();
-
-                    switch (resultType->getOp())
-                    {
-                    case kIROp_TextureType:
-                        conversionOp = SpvOpConvertUToSampledImageNV;
-                        result = emitInst(
-                            parent,
-                            inst,
-                            conversionOp,
-                            inst->getDataType(),
-                            kResultID,
-                            operand);
-                        break;
-                    case kIROp_SamplerStateType:
-                        conversionOp = SpvOpConvertUToSamplerNV;
-                        result = emitInst(
-                            parent,
-                            inst,
-                            conversionOp,
-                            inst->getDataType(),
-                            kResultID,
-                            operand);
-                        break;
-                    default:
-                        // Unsupported result type for descriptor-to-resource conversion
-                        SLANG_UNEXPECTED(
-                            "Unsupported result type for CastDescriptorHandleToResource");
-                        break;
-                    }
+                case kIROp_TextureType:
+                    conversionOp = SpvOpConvertUToSampledImageNV;
+                    result = emitInst(
+                        parent,
+                        inst,
+                        conversionOp,
+                        inst->getDataType(),
+                        kResultID,
+                        operand);
+                    break;
+                case kIROp_SamplerStateType:
+                    conversionOp = SpvOpConvertUToSamplerNV;
+                    result = emitInst(
+                        parent,
+                        inst,
+                        conversionOp,
+                        inst->getDataType(),
+                        kResultID,
+                        operand);
+                    break;
+                default:
+                    // Unsupported result type for descriptor-to-resource conversion
+                    SLANG_UNEXPECTED("Unsupported result type for CastDescriptorHandleToResource");
+                    break;
                 }
-                break;
             }
+            break;
+        case kIROp_SPIRVSamplerHeap:
+        case kIROp_SPIRVResourceHeap:
+            return ensureDescriptorHeapBuiltinVar(inst);
+
         case kIROp_GetVulkanRayTracingPayloadLocation:
             {
                 IRInst* location = getVulkanPayloadLocation(inst->getOperand(0));
@@ -5508,6 +5554,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     case kIROp_GlobalVar:
                     case kIROp_GlobalParam:
                     case kIROp_SPIRVAsmOperandBuiltinVar:
+                    case kIROp_SPIRVResourceHeap:
+                    case kIROp_SPIRVSamplerHeap:
                         {
                             SpvInst* spvGlobalInst;
                             if (m_mapIRInstToSpvInst.tryGetValue(globalInst, spvGlobalInst))
@@ -6385,6 +6433,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
     };
     Dictionary<BuiltinSpvVarKey, SpvInst*> m_builtinGlobalVars;
+    SpvInst* m_descriptorHeapUntypedPointerType = nullptr;
+    Dictionary<SpvStorageClass, SpvInst*> m_descriptorHeapBufferDescriptorTypes;
+    Dictionary<SpvInst*, SpvInst*> m_descriptorHeapRuntimeArrayTypes;
 
 
     bool isInstUsedInStage(IRInst* inst, Stage s)
@@ -6469,6 +6520,175 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
 
         return varInst;
+    }
+
+    SpvInst* ensureDescriptorHeapBuiltinVar(IRInst* builtinVarInst)
+    {
+        ensureExtensionDeclaration(UnownedStringSlice("SPV_EXT_descriptor_heap"));
+        ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_untyped_pointers"));
+        requireSPIRVCapability(SpvCapabilityDescriptorHeapEXT);
+        requireSPIRVCapability(SpvCapabilityUntypedPointersKHR);
+        requireSPIRVCapability(SpvCapabilityRuntimeDescriptorArrayEXT);
+
+        auto uniformConstantUntypedPtrType =
+            ensureUntypedPointerType(SpvStorageClassUniformConstant);
+
+        auto builtinVar = emitInst(
+            getSection(SpvLogicalSectionID::GlobalVariables),
+            builtinVarInst,
+            SpvOpUntypedVariableKHR,
+            uniformConstantUntypedPtrType,
+            kResultID,
+            SpvStorageClassUniformConstant);
+        emitOpDecorateBuiltIn(
+            getSection(SpvLogicalSectionID::Annotations),
+            nullptr,
+            builtinVar,
+            builtinVarInst->getOp() == kIROp_SPIRVSamplerHeap ? SpvBuiltInSamplerHeapEXT
+                                                              : SpvBuiltInResourceHeapEXT);
+        emitOpName(
+            getSection(SpvLogicalSectionID::DebugNames),
+            nullptr,
+            builtinVar,
+            builtinVarInst->getOp() == kIROp_SPIRVSamplerHeap
+                ? UnownedStringSlice("slang_samplerHeap")
+                : UnownedStringSlice("slang_resourceHeap"));
+        return builtinVar;
+    }
+
+    SpvInst* ensureUntypedPointerType(SpvStorageClass storageClass)
+    {
+        if (storageClass == SpvStorageClassUniformConstant && m_descriptorHeapUntypedPointerType)
+            return m_descriptorHeapUntypedPointerType;
+
+        auto type = emitInstMemoized(
+            getSection(SpvLogicalSectionID::ConstantsAndTypes),
+            nullptr,
+            SpvOpTypeUntypedPointerKHR,
+            kResultID,
+            storageClass);
+        if (storageClass == SpvStorageClassUniformConstant)
+            m_descriptorHeapUntypedPointerType = type;
+        return type;
+    }
+
+    SpvStorageClass getDescriptorHeapBufferStorageClass(IRType* valueType)
+    {
+        auto ptrType = as<IRPtrTypeBase>(valueType);
+        if (!ptrType)
+        {
+            // Buffer resource handle types should have been lowered to pointers before emission.
+            SLANG_ASSERT(!"expected lowered buffer resource type to be a pointer");
+            return SpvStorageClassStorageBuffer;
+        }
+
+        auto storageClass = addressSpaceToStorageClass(ptrType->getAddressSpace());
+        switch (storageClass)
+        {
+        case SpvStorageClassStorageBuffer:
+            // Descriptor-backed buffer resources are represented as Uniform/StorageBuffer.
+            return isSpirv14OrLater() ? SpvStorageClassStorageBuffer : SpvStorageClassUniform;
+        default:
+            return storageClass;
+        }
+    }
+
+    SpvInst* ensureDescriptorHeapBufferDescriptorType(SpvStorageClass storageClass)
+    {
+        SpvInst* type = nullptr;
+        if (m_descriptorHeapBufferDescriptorTypes.tryGetValue(storageClass, type))
+            return type;
+
+        type = emitInstMemoized(
+            getSection(SpvLogicalSectionID::ConstantsAndTypes),
+            nullptr,
+            SpvOpTypeBufferEXT,
+            kResultID,
+            storageClass);
+        m_descriptorHeapBufferDescriptorTypes[storageClass] = type;
+        return type;
+    }
+
+    SpvInst* getDescriptorRuntimeArrayType(SpvInst* descriptorElementType)
+    {
+        if (auto found = m_descriptorHeapRuntimeArrayTypes.tryGetValue(descriptorElementType))
+            return *found;
+
+        auto runtimeArrayType = emitOpTypeRuntimeArray(nullptr, descriptorElementType);
+        m_descriptorHeapRuntimeArrayTypes[descriptorElementType] = runtimeArrayType;
+        return runtimeArrayType;
+    }
+
+    SpvInst* getDescriptorHeapBaseType(IRType* valueType, bool* outIsBufferResource = nullptr)
+    {
+        SpvInst* descriptorElementType = nullptr;
+        bool isBufferResource = false;
+        switch (valueType->getOp())
+        {
+        case kIROp_TextureType:
+        case kIROp_RaytracingAccelerationStructureType:
+        case kIROp_SamplerStateType:
+        case kIROp_SamplerComparisonStateType:
+            descriptorElementType = ensureInst(valueType);
+            break;
+        default:
+            isBufferResource = true;
+            descriptorElementType = ensureDescriptorHeapBufferDescriptorType(
+                getDescriptorHeapBufferStorageClass(valueType));
+            break;
+        }
+
+        if (outIsBufferResource)
+            *outIsBufferResource = isBufferResource;
+
+        return getDescriptorRuntimeArrayType(descriptorElementType);
+    }
+
+    SpvInst* emitDescriptorHeapLoad(
+        SpvInstParent* parent,
+        IRInst* inst,
+        IRInst* heap,
+        IRInst* index)
+    {
+        bool isBufferResource = false;
+        auto resourceType = inst->getDataType();
+        auto baseType = getDescriptorHeapBaseType(resourceType, &isBufferResource);
+        auto valuePtr = emitInst(
+            parent,
+            nullptr,
+            SpvOpUntypedAccessChainKHR,
+            ensureUntypedPointerType(SpvStorageClassUniformConstant),
+            kResultID,
+            baseType,
+            heap,
+            index);
+        if (isBufferResource)
+        {
+            auto result = emitInst(
+                parent,
+                inst,
+                SpvOpBufferPointerEXT,
+                inst->getDataType(),
+                kResultID,
+                valuePtr);
+            if (auto ptrType = as<IRPtrTypeBase>(inst->getDataType()))
+            {
+                if (ptrType->getAddressSpace() == AddressSpace::StorageBuffer)
+                {
+                    if (ptrType->getAccessQualifier() == AccessQualifier::Immutable ||
+                        ptrType->getAccessQualifier() == AccessQualifier::Read)
+                    {
+                        emitOpDecorate(
+                            getSection(SpvLogicalSectionID::Annotations),
+                            nullptr,
+                            result,
+                            SpvDecorationNonWritable);
+                    }
+                }
+            }
+            return result;
+        }
+        return emitOpLoad(parent, inst, inst->getDataType(), valuePtr);
     }
 
     SpvInst* maybeEmitSystemVal(IRInst* inst)

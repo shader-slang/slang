@@ -923,6 +923,7 @@ local insts = {
 	{ makeTuple = {} },
 	{ makeTargetTuple = { struct_name = "MakeTargetTuple" } },
 	{ makeValuePack = {} },
+	{ makeCombinedTextureSampler = { operands = { {"texture"}, {"sampler"} } } },
 	{ getTargetTupleElement = {} },
 	{
 		getTupleElement = {
@@ -934,6 +935,22 @@ local insts = {
 		LoadSamplerDescriptorFromHeap = {
 			operands = { { "index" } },
 		},
+	},
+	{
+		SPIRVLoadDescriptorFromHeap = {
+			operands = { { "heap" }, { "index" } },
+		},
+	},
+	{
+		SPIRVLoadTexelPointerFromHeap = {
+			operands = { { "heap" }, { "index" }, { "textureType" }, { "coord" }, { "sampleIndex" } },
+		},
+	},
+	{
+		SPIRVResourceHeap = { hoistable = true }
+	},
+	{
+		SPIRVSamplerHeap = { hoistable = true }
 	},
 	{ MakeCombinedTextureSamplerFromHandle = { operands = { { "handle" } } } },
 	{
