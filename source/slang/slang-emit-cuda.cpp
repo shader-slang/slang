@@ -1028,6 +1028,7 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
         }
         return true;
     case kIROp_GetStructuredBufferPtr:
+    case kIROp_GetUntypedBufferPtr:
         {
             m_writer->emit("(&(");
             emitOperand(inst->getOperand(0), getInfo(EmitOp::General));

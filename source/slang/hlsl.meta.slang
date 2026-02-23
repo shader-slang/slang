@@ -5576,11 +5576,11 @@ __intrinsic_op($(kIROp_ByteAddressBufferStore))
 void __byteAddressBufferStore<T>(RasterizerOrderedByteAddressBuffer buffer, uint offset, uint alignment, T value);
 
 __intrinsic_op($(kIROp_GetUntypedBufferPtr))
-[require(spirv, byteaddressbuffer)]
+[require(cuda_spirv, byteaddressbuffer)]
 Ptr<uint[]> __getByteAddressBufferPtr(ByteAddressBuffer buffer);
 
 __intrinsic_op($(kIROp_GetUntypedBufferPtr))
-[require(spirv, byteaddressbuffer_rw)]
+[require(cuda_spirv, byteaddressbuffer_rw)]
 Ptr<uint[]> __getByteAddressBufferPtr(RWByteAddressBuffer buffer);
 
 __intrinsic_op($(kIROp_GetStructuredBufferPtr))
