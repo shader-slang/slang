@@ -2759,50 +2759,6 @@ static SourceLoc FindNextEndOfLine(
     return inputStream->findNextLineEnd(from, lineCount);
 }
 
-// Legacy helper functions for diagnostics not yet converted to rich format
-static bool ExpectRaw(
-    PreprocessorDirectiveContext* context,
-    TokenType tokenType,
-    DiagnosticInfo const& diagnostic,
-    Token* outToken = NULL)
-{
-    if (PeekRawTokenType(context) != tokenType)
-    {
-        if (!context->m_parseError)
-        {
-            GetSink(context)
-                ->diagnose(PeekLoc(context), diagnostic, tokenType, GetDirectiveName(context));
-        }
-        context->m_parseError = true;
-        return false;
-    }
-    Token const& token = AdvanceRawToken(context);
-    if (outToken)
-        *outToken = token;
-    return true;
-}
-
-static bool Expect(
-    PreprocessorDirectiveContext* context,
-    TokenType tokenType,
-    DiagnosticInfo const& diagnostic,
-    Token* outToken = NULL)
-{
-    if (PeekTokenType(context) != tokenType)
-    {
-        if (!context->m_parseError)
-        {
-            GetSink(context)
-                ->diagnose(PeekLoc(context), diagnostic, tokenType, GetDirectiveName(context));
-            context->m_parseError = true;
-        }
-        return false;
-    }
-    Token const& token = AdvanceToken(context);
-    if (outToken)
-        *outToken = token;
-    return true;
-}
 
 // Enum for preprocessor expect diagnostics (used with rich diagnostic system)
 enum class PreprocessorExpectDiag

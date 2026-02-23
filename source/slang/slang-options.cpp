@@ -1921,6 +1921,7 @@ SlangResult createArtifactFromReferencedModule(
     DiagnosticSink* sink,
     IArtifact** outArtifact)
 {
+    SLANG_UNUSED(loc);
     auto desc = ArtifactDescUtil::getDescFromPath(path.getUnownedSlice());
 
     if (desc.kind == ArtifactKind::Unknown)
