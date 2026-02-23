@@ -108,10 +108,10 @@ static void _addOptions(const ConstArrayView<Option>& options, CommandOptions& c
             opt.name,
             opt.usage,
             opt.description,
-            opt.links,
-            opt.linkCount,
             CommandOptions::UserValue(opt.optionKind),
-            opt.displayName);
+            opt.displayName,
+            opt.links,
+            opt.linkCount);
     }
 }
 

@@ -143,24 +143,15 @@ struct CommandOptions
         const char* name,
         const char* usage,
         const char* description,
+        UserValue userValue,
+        const char* displayName,
         const InputLink* links,
-        Count linkCount,
-        UserValue userValue = kInvalidUserValue,
-        const char* displayName = nullptr);
+        Count linkCount);
     void add(
         const UnownedStringSlice* names,
         Count namesCount,
         const char* usage,
         const char* description,
-        UserValue userValue = kInvalidUserValue,
-        Flags flags = 0);
-    void add(
-        const UnownedStringSlice* names,
-        Count namesCount,
-        const char* usage,
-        const char* description,
-        const InputLink* links,
-        Count linkCount,
         UserValue userValue = kInvalidUserValue,
         Flags flags = 0);
 
