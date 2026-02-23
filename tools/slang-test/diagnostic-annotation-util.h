@@ -16,7 +16,7 @@
 // 2. Add annotations to indicate expected diagnostics:
 //    void test() {
 //        if (x);
-//    //CHECK   ^ empty statement
+//    //CHECK:  ^ empty statement
 //    }
 //
 // When the test runs, slang-test will:
@@ -31,11 +31,11 @@
 // The carets (^) should align directly with the source column:
 //
 //     int x = undefined;
-//     //CHECK ^^^^^^^^^ undeclared identifier
+//     //CHECK: ^^^^^^^^^ undeclared identifier
 //
 // Syntax:
-//     //PREFIX   [spaces]   ^^^   message substring
-//            └─ spaces position the caret to match the source column
+//     //PREFIX:  [spaces]   ^^^   message substring
+//            └─ colon is required after prefix
 //                            └─ one or more carets indicate the column range
 //                                  └─ expected message substring
 //
@@ -44,11 +44,11 @@
 // in the annotation line, it expects a diagnostic at column 15 in the source.
 //
 // Use block comments when you need to place carets at early columns that
-// would be taken up by "//CHECK", or when you have multiple diagnostics on the
+// would be taken up by "//CHECK:", or when you have multiple diagnostics on the
 // same line:
 //
 //     if (x == y);
-//     /*CHECK
+//     /*CHECK:
 //     ^ don't use if here
 //               ^ this semicolon isn't great
 //     */
@@ -65,7 +65,7 @@
 //     a message containing the expected substring.
 //
 //     if (abc(foo));
-//     //CHECK      ^ empty statement
+//     //CHECK:     ^ empty statement
 //
 //     This expects:
 //     - Line 1 (the preceding non-annotation line)
@@ -76,7 +76,7 @@
 //     Checks that a diagnostic message containing the substring appears
 //     somewhere in the output, regardless of location.
 //
-//     //CHECK unused variable
+//     //CHECK: unused variable
 //
 //     This expects:
 //     - Any line, any column
@@ -93,10 +93,10 @@
 //
 // Examples:
 //     if (x);
-//     //CHECK   ^ warning
-//     //CHECK   ^ E20101
-//     //CHECK   ^ warning E20101
-//     //CHECK   ^ empty statement
+//     //CHECK:  ^ warning
+//     //CHECK:  ^ E20101
+//     //CHECK:  ^ warning E20101
+//     //CHECK:  ^ empty statement
 //
 // This is useful for checking specific error codes without needing the full message.
 //
@@ -110,7 +110,7 @@
 //     //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 //     void test() {
 //         if (1);
-//     //CHECK   ^ empty statement
+//     //CHECK:  ^ empty statement
 //         // Missing annotation for "implicit conversion" warning!
 //     }
 //
@@ -118,7 +118,7 @@
 //     //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
 //     void test() {
 //         if (1);
-//     //CHECK   ^ empty statement
+//     //CHECK:  ^ empty statement
 //         // implicit conversion warning is OK to ignore
 //     }
 //
@@ -135,7 +135,7 @@
 // Use multiple carets to specify the exact column range:
 //
 //     MyStruct xyz = {};
-//     //CHECK  ^^^ unused variable
+//     //CHECK: ^^^ unused variable
 //
 // Single caret (^):    Expects diagnostic at exactly that column (e.g., 5-5)
 // Multiple carets (^^^): Expects diagnostic spanning that range (e.g., 5-7)

@@ -490,7 +490,7 @@ Make data accessed through ConstantBuffer, ParameterBlock, StructuredBuffer, Byt
 
 
 <a id="fvk-b-shift"></a>
-### -fvk-b-shift, -fvk-s-shift, -fvk-t-shift, -fvk-u-shift
+### -fvk-&lt;vulkan-shift&gt;-shift
 
 **-fvk-&lt;[vulkan-shift](#vulkan-shift)&gt;-shift &lt;N&gt; &lt;space&gt;**
 
@@ -621,7 +621,7 @@ Sets a comma-separates list of architecture-specific features for the LLVM targe
 Downstream compiler options 
 
 <a id="none-path"></a>
-### -none-path, -fxc-path, -dxc-path, -glslang-path, -spirv-dis-path, -clang-path, -visualstudio-path, -gcc-path, -genericcpp-path, -nvrtc-path, -llvm-path, -spirv-opt-path, -metal-path, -tint-path
+### -&lt;compiler&gt;-path
 
 **-&lt;[compiler](#compiler)&gt;-path &lt;path&gt;**
 
@@ -898,6 +898,14 @@ Enable experimental rich diagnostics with enhanced formatting and details
 <a id="enable-machine-readable-diagnostics"></a>
 ### -enable-machine-readable-diagnostics
 Enable machine-readable diagnostic output in tab-separated format 
+
+
+<a id="diagnostic-color"></a>
+### -diagnostic-color
+
+**-diagnostic-color &lt;always|never|auto&gt;**
+
+Control colored diagnostic output (auto uses color if stderr is a tty) 
 
 
 
@@ -1515,6 +1523,7 @@ A capability describes an optional feature that a target may or may not support.
 * `tensor_addressing` 
 * `cooperative_matrix_2` 
 * `vk_mem_model` 
+* `descriptor_handle` 
 * `pixel` 
 * `tesscontrol` 
 * `tesseval` 
@@ -1623,6 +1632,8 @@ A capability describes an optional feature that a target may or may not support.
 * `cuda_sm_7_0` 
 * `cuda_sm_8_0` 
 * `cuda_sm_9_0` 
+* `atomic_reduce` 
+* `atomic_bfloat16` 
 * `METAL_2_3` 
 * `METAL_2_4` 
 * `METAL_3_0` 

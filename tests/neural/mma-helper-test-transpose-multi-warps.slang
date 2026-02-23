@@ -17,8 +17,8 @@ typealias DType = float;
 
 
 // Make the weight matrix a 64x64 matrix in row major order
-// TEST_INPUT:ubuffer(stride=4, count=4096):name=inputBuffer
-RWStructuredBuffer<DType> inputBuffer;
+// TEST_INPUT: set inputBuffer = ubuffer(stride=4, count=4096)
+uniform RWStructuredBuffer<DType>.Handle inputBuffer;
 
 // TEST_INPUT:ubuffer(stride=4, count=5):out, name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
@@ -82,8 +82,8 @@ void fillWeightMatrix<int InputSize, int OutputSize>(uint tid, bool clear = fals
 
 DType[MMAHelper<DType, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA, true>.Uint4AlignedK] testMatTransposeVecMul<int InputSize, int OutputSize, TargetEnum Target>(uint tid)
 {
-    typealias Storage = StructuredBufferStorage<DType>;
-    Storage storage = Storage(inputBuffer);
+    typealias Address = BindlessAddress<DType>;
+    Address address = Address(inputBuffer);
 
     // Construct the input vector as follow:
     // x = tid + 1
@@ -103,7 +103,7 @@ DType[MMAHelper<DType, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA, tru
     SPtr ptrB = __getAddress(s_sharedMemoryB[0]);
     SPtr ptrC = __getAddress(s_sharedMemoryB[0]);
 
-    let res = MMA.mma<DType, Storage, DType[InSize], DType[OutSize], DType, false>(inputVector, ptrA, ptrB, ptrC, storage, 0, none, none);
+    let res = MMA.mma<DType, Address, DType[InSize], DType[OutSize], DType, false>(inputVector, ptrA, ptrB, ptrC, address, none);
     // serialRead(tid, ptrB, 16);
     return res;
 }

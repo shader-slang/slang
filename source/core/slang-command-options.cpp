@@ -239,12 +239,14 @@ void CommandOptions::add(
     const char* inName,
     const char* usage,
     const char* description,
-    UserValue userValue)
+    UserValue userValue,
+    const char* displayName)
 {
     UnownedStringSlice nameSlice(inName);
 
     Option option;
     option.categoryIndex = m_currentCategoryIndex;
+    option.displayName = _addString(displayName);
     option.usage = _addString(usage);
     option.description = _addString(UnownedStringSlice(description));
     option.userValue = userValue;

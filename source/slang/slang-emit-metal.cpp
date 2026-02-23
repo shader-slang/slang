@@ -204,7 +204,8 @@ void MetalSourceEmitter::emitFuncParamLayoutImpl(IRInst* param)
             if (as<IRPtrTypeBase>(param->getDataType()) ||
                 as<IRHLSLStructuredBufferTypeBase>(param->getDataType()) ||
                 as<IRByteAddressBufferTypeBase>(param->getDataType()) ||
-                as<IRUniformParameterGroupType>(param->getDataType()))
+                as<IRUniformParameterGroupType>(param->getDataType()) ||
+                as<IRRaytracingAccelerationStructureType>(param->getDataType()))
             {
                 m_writer->emit(" [[buffer(");
                 m_writer->emit(rr->getOffset());
@@ -1191,6 +1192,13 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
     case kIROp_StringType:
         {
             m_writer->emit("int");
+            return;
+        }
+
+    case kIROp_RayQueryType:
+        {
+            m_writer->emit("raytracing::intersection_query<raytracing::triangle_data, "
+                           "raytracing::instancing>");
             return;
         }
     case kIROp_ParameterBlockType:
