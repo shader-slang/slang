@@ -5364,7 +5364,7 @@ SlangResult innerMain(int argc, char** argv)
 
     // The context holds useful things used during testing
     TestContext context;
-    SLANG_RETURN_ON_FAIL(SLANG_FAILED(context.init(argv[0])))
+    SLANG_RETURN_ON_FAIL(context.init(argv[0]))
 
     auto& categorySet = context.categorySet;
 
