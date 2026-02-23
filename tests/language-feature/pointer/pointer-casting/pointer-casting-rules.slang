@@ -23,22 +23,22 @@ void computeMain(int id : SV_DispatchThreadID)
     Ptr<float, Access::ReadWrite, AddressSpace::Device> p3 = Ptr<float, Access::ReadWrite, AddressSpace::Device>(rPtr);
 
     // Cannot implicit cast ptr's
-    // CHECK: error 30019
+    // CHECK: error[E30019]:
     Ptr<float, Access::ReadWrite, AddressSpace::Device> p4 = rPtr;
     // cannot implcitly cast between different access qualifiers
-    // CHECK: error 30019
+    // CHECK: error[E30019]:
     Ptr<int, Access::Read> p5 = Ptr<int, Access::ReadWrite>(processMemory + id.x);
     // cannot implcitly cast between different access qualifiers
-    // CHECK: error 30019
+    // CHECK: error[E30019]:
     Ptr<int, Access::ReadWrite> p6 = Ptr<int, Access::Read>(processMemory + id.x);
 
     // TODO: Enable this when we allow user-defined group-shared address space, Issue #8173.
     // Cannot cast between different address spaces.
-    // CHECK: ambiguous conversion
+    // CHECK: error[E30080]: ambiguous conversion
     Ptr<float, Access::ReadWrite, AddressSpace::GroupShared> p7 = Ptr<float, Access::ReadWrite, AddressSpace::GroupShared>(rwPtr);
-    // CHECK: too many initializers
+    // CHECK: error[E30500]: too many initializers
     Ptr<float, Access::ReadWrite, AddressSpace::GroupShared> p8 = Ptr<float, Access::ReadWrite, AddressSpace::GroupShared>(p1);
-    // CHECK: error 30019
+    // CHECK: error[E30019]:
     Ptr<float, Access::ReadWrite, AddressSpace::GroupShared> p9 = rwPtr;
 
     output[id] = *rwPtr;

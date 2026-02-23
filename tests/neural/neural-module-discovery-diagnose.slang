@@ -2,6 +2,5 @@
 
 import neural;
 /*CHECK:
-       ^^^^^^ cannot open file 'neural.slang'
-       ^^^^^^ cannot open file 'neural.slang'
+       ^^^^^^ 'neural' is an experimental module, need to enable '-experimental-feature' to load this module
 */

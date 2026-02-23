@@ -13,6 +13,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     int i = dispatchThreadID.x;
     int n = outputBuffer[i];
     int r = spirv_asm
+//CHECK:    ^^^^^^^^^ type mismatch in expression
 //CHECK:    ^^^^^^^^^ expected an expression of type 'int', got 'void'
     {
         OpConstant $$int %two 2;

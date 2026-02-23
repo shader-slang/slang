@@ -18,7 +18,7 @@ struct Foo :  IFoo
     [DerivativeMember(Differential.x)]
 /*CHECK:
                                    ^ 'x' is not a member of
-     ^^^^^^^^^^^^^^^^ expected an expression of type 'float', got 'error'
+                                   ^ expected an expression of type 'float', got 'error'
      ^^^^^^^^^^^^^^^^ [DerivativeMember] must reference to a member in the associated differential type 'Bar'.
 */
     float x;
