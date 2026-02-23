@@ -975,10 +975,8 @@ struct AnyValueMarshallingContext
                         anyValInfo->fieldKeys[fieldOffset + (uint32_t)i]);
                     components.add(builder->emitLoad(srcAddr));
                 }
-                auto uintNVal = builder->emitMakeVector(
-                    uintNType,
-                    (UInt)numUints,
-                    components.getBuffer());
+                auto uintNVal =
+                    builder->emitMakeVector(uintNType, (UInt)numUints, components.getBuffer());
                 auto combinedBits = builder->emitBitCast(dataType, uintNVal);
                 builder->emitStore(concreteVar, combinedBits);
             }
