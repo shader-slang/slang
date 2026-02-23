@@ -221,8 +221,7 @@ SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, 
             auto ptrType = cast<IRPtrTypeBase>(type);
             if (auto unsizedArrayType = as<IRUnsizedArrayType>(ptrType->getValueType()))
             {
-                SLANG_RETURN_ON_FAIL(
-                    calcTypeName(unsizedArrayType->getElementType(), target, out));
+                SLANG_RETURN_ON_FAIL(calcTypeName(unsizedArrayType->getElementType(), target, out));
                 out << "**";
                 return SLANG_OK;
             }
