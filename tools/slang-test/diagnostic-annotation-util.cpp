@@ -656,18 +656,19 @@ static bool checkAnnotations(
         }
     }
 
+    // Count unmatched diagnostics
+    List<const ParsedDiagnostic*> unmatchedDiagnostics;
+    for (Index i = 0; i < diagnostics.getCount(); ++i)
+    {
+        if (!diagnosticMatched[i])
+        {
+            unmatchedDiagnostics.add(&diagnostics[i]);
+        }
+    }
+
     // In exhaustive mode, check for diagnostics that weren't matched by any annotation
     if (exhaustive)
     {
-        List<const ParsedDiagnostic*> unmatchedDiagnostics;
-        for (Index i = 0; i < diagnostics.getCount(); ++i)
-        {
-            if (!diagnosticMatched[i])
-            {
-                unmatchedDiagnostics.add(&diagnostics[i]);
-            }
-        }
-
         if (unmatchedDiagnostics.getCount() > 0)
         {
             StringBuilder sb;
@@ -709,6 +710,19 @@ static bool checkAnnotations(
             sb << "\n  Or add 'non-exhaustive' to skip checking unannotated diagnostics:\n";
             sb << "  //DIAGNOSTIC_TEST:SIMPLE(diag=" << prefix << ",non-exhaustive):\n";
 
+            outMissingAnnotations.add(sb.produceString());
+        }
+    }
+    else
+    {
+        // In non-exhaustive mode, fail if non-exhaustive wasn't actually necessary
+        // (i.e., all diagnostics were matched by annotations)
+        if (unmatchedDiagnostics.getCount() == 0 && diagnostics.getCount() > 0)
+        {
+            StringBuilder sb;
+            sb << "Unnecessary 'non-exhaustive': All " << diagnostics.getCount()
+               << " diagnostic(s) were matched by annotations.\n";
+            sb << "Remove 'non-exhaustive' from the test directive to use exhaustive mode.\n";
             outMissingAnnotations.add(sb.produceString());
         }
     }
