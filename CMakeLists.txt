@@ -132,6 +132,11 @@ option(
     "Enable AddressSanitizer (ASan), and UndefinedBehaviorSanitizer (UBSan) if available as well"
 )
 option(SLANG_ENABLE_COVERAGE "Enable code coverage instrumentation")
+option(
+    SLANG_ENABLE_TIME_TRACE
+    "Enable Clang time trace profiling for build analysis"
+)
+option(SLANG_ENABLE_PCH "Enable precompiled headers for faster builds" ON)
 
 option(
     SLANG_STANDARD_MODULE_DEVELOP_BUILD

@@ -159,6 +159,7 @@ struct GCCPatternStrings
     static constexpr const char* GPP = "g++";
     static constexpr const char* METAL = "metal";
     static constexpr const char* LD = "ld";
+    static constexpr const char* MOLD = "mold";
     static constexpr const char* UNDEFINED_REF = "undefined reference";
     static constexpr const char* TEXT_SECTION = "(.text";
     static constexpr const char* LD_RETURNED = "ld returned";
@@ -578,6 +579,39 @@ static SlangResult _parseStandardCompileError(
     return SLANG_OK;
 }
 
+// Pattern: mold:severity:message (mold linker errors)
+// Handles: mold: error: undefined symbol: thing
+static SlangResult _parseMoldError(
+    SliceAllocator& allocator,
+    const UnownedStringSlice& line,
+    const List<UnownedStringSlice>& split,
+    LineParseResult& outLineParseResult,
+    ArtifactDiagnostic& outDiagnostic)
+{
+    SLANG_UNUSED(line);
+
+    // Need at least 3 parts: mold:severity:message
+    if (split.getCount() < 3)
+        return SLANG_FAIL;
+
+    const auto split0 = split[0].trim();
+    if (split0 != UnownedStringSlice(GCCPatternStrings::MOLD))
+        return SLANG_FAIL;
+
+    // Parse severity
+    if (SLANG_FAILED(_parseSeverity(split[1].trim(), outDiagnostic.severity)))
+        return SLANG_FAIL;
+
+    // mold is always a linker, so this is always a link-stage diagnostic
+    outDiagnostic.stage = ArtifactDiagnostic::Stage::Link;
+
+    // Combine remaining parts as the message
+    outDiagnostic.text = allocator.allocate(split[2].begin(), split.getLast().end());
+    outLineParseResult = LineParseResult::Start;
+
+    return SLANG_OK;
+}
+
 namespace
 { // anonymous
 
@@ -591,6 +625,7 @@ namespace
 static const GCCPatternMatcher s_gccPatterns[] = {
     // Link errors (priority 0-99)
     {10, "ld-linker-error", _parseLdLinkerError},
+    {15, "mold-error", _parseMoldError},
     {20, "gcc13-link-error", _parseGCC13LinkError},
     {25, "object-file-link-error", _parseObjectFileLinkError},
     {30, "file-link-error", _parseFileLinkError},

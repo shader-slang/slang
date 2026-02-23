@@ -530,9 +530,10 @@ SlangResult TestServer::_executeTool(const JSONRPCCall& call)
     StringBuilder stdError;
     renderer_test::CoreDebugCallback debugCallback;
 
-    // Make writer/s act as if they are the console.
+    RefPtr<StringWriter> stdErrorWriter(new StringWriter(&stdError));
+    // Use IsConsole on stdout because we have tests which output spirv
+    // which we want to have disassembled
     RefPtr<StringWriter> stdOutWriter(new StringWriter(&stdOut, WriterFlag::IsConsole));
-    RefPtr<StringWriter> stdErrorWriter(new StringWriter(&stdError, WriterFlag::IsConsole));
 
     stdWriters.setWriter(SLANG_WRITER_CHANNEL_STD_ERROR, stdErrorWriter);
     stdWriters.setWriter(SLANG_WRITER_CHANNEL_STD_OUTPUT, stdOutWriter);

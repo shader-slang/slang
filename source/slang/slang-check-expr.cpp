@@ -2864,6 +2864,7 @@ Expr* SemanticsExprVisitor::visitAssignExpr(AssignExpr* expr)
 Expr* SemanticsVisitor::CheckExpr(Expr* uncheckedExpr)
 {
     auto checkedTerm = CheckTerm(uncheckedExpr);
+    checkedTerm = maybeRegisterLambdaCapture(checkedTerm);
 
     // First, we want to do any disambiguation that is needed in order
     // to turn the `term` into an expression that names a single
@@ -3526,99 +3527,126 @@ Expr* SemanticsExprVisitor::visitVarExpr(VarExpr* expr)
     return resultExpr;
 }
 
-Expr* SemanticsExprVisitor::maybeRegisterLambdaCapture(Expr* exprIn)
+/// Visitor that walks an expression tree and rewrites `VarExpr`/`ThisExpr` references
+/// to outer-scope variables into `MemberExpr(this_lambda, capturedField)` references.
+/// Inherits plain recursive traversal from `ModifyingExprVisitor` and only overrides
+/// the leaf cases that need capture logic.
+struct LambdaCaptureVisitor : ModifyingExprVisitor<LambdaCaptureVisitor>
 {
-    if (auto memberExpr = as<MemberExpr>(exprIn))
-    {
-        memberExpr->baseExpression = maybeRegisterLambdaCapture(memberExpr->baseExpression);
-        return memberExpr;
-    }
-    else if (auto subscriptExpr = as<IndexExpr>(exprIn))
-    {
-        subscriptExpr->baseExpression = maybeRegisterLambdaCapture(subscriptExpr->baseExpression);
-        return subscriptExpr;
-    }
-    auto thisExpr = as<ThisExpr>(exprIn);
-    auto varExpr = as<VarExpr>(exprIn);
-    if (!thisExpr && !varExpr)
-        return exprIn;
+    LambdaExpr* lambdaExpr;
+    LambdaDecl* lambdaDecl;
+    Dictionary<Decl*, VarDeclBase*>* mapSrcDeclToCapturedDecl;
+    ASTBuilder* astBuilder;
+    DiagnosticSink* sink;
 
-    Decl* srcDecl = nullptr;
-    if (varExpr)
-        srcDecl = as<VarDeclBase>(varExpr->declRef.getDecl());
-    else
+    LambdaCaptureVisitor(
+        LambdaExpr* inLambdaExpr,
+        LambdaDecl* inLambdaDecl,
+        Dictionary<Decl*, VarDeclBase*>* inMap,
+        ASTBuilder* inAstBuilder,
+        DiagnosticSink* inSink)
+        : lambdaExpr(inLambdaExpr)
+        , lambdaDecl(inLambdaDecl)
+        , mapSrcDeclToCapturedDecl(inMap)
+        , astBuilder(inAstBuilder)
+        , sink(inSink)
     {
-        // If we see a `this` expression inside a lambda, it is referencing the
-        // `this` value of the parent type of the outer function, not the lambda struct
-        // itself. Since we don't have a VarDecl representing `this`, we will just use
-        // the AggTypeDecl as the key to register in the lambda capture map.
-        auto thisTypeDecl = isDeclRefTypeOf<Decl>(thisExpr->type.type);
-        if (!thisTypeDecl)
+    }
+
+    /// Try to capture an outer-scope declaration referenced by a VarExpr or ThisExpr.
+    /// Returns a MemberExpr on the lambda struct if capture is needed, or the original expr.
+    Expr* maybeCaptureDecl(Expr* exprIn, Decl* srcDecl)
+    {
+        if (!srcDecl)
             return exprIn;
-        srcDecl = thisTypeDecl.getDecl();
-    }
 
-    if (!srcDecl)
-        return exprIn;
+        if (as<VarDeclBase>(srcDecl) && isGlobalDecl(srcDecl))
+            return exprIn;
 
-    if (as<VarDeclBase>(srcDecl) && isGlobalDecl(srcDecl))
-        return exprIn;
-
-    auto lambdaScope = m_parentLambdaExpr->paramScopeDecl;
-    bool isDefinedInLambdaScope = false;
-    for (auto parentDecl = srcDecl->parentDecl; parentDecl; parentDecl = parentDecl->parentDecl)
-    {
-        if (parentDecl == lambdaScope)
+        auto lambdaScope = lambdaExpr->paramScopeDecl;
+        bool isDefinedInLambdaScope = false;
+        for (auto parentDecl = srcDecl->parentDecl; parentDecl; parentDecl = parentDecl->parentDecl)
         {
-            isDefinedInLambdaScope = true;
-            break;
+            if (parentDecl == lambdaScope)
+            {
+                isDefinedInLambdaScope = true;
+                break;
+            }
         }
+        if (isDefinedInLambdaScope)
+            return exprIn;
+
+        // We are referencing something that doesn't belong to the lambda scope,
+        // we need to capture it in the current lambda function.
+
+        VarDeclBase* capturedVarDecl = nullptr;
+        if (!mapSrcDeclToCapturedDecl->tryGetValue(srcDecl, capturedVarDecl))
+        {
+            capturedVarDecl = astBuilder->create<VarDecl>();
+            capturedVarDecl->nameAndLoc = srcDecl->nameAndLoc;
+            SLANG_ASSERT(exprIn->type.type);
+            capturedVarDecl->type.type = exprIn->type.type;
+            mapSrcDeclToCapturedDecl->add(srcDecl, capturedVarDecl);
+            lambdaDecl->addMember(capturedVarDecl);
+
+            if (isNonCopyableType(capturedVarDecl->type.type))
+            {
+                if (sink)
+                {
+                    sink->diagnose(
+                        exprIn,
+                        Diagnostics::nonCopyableTypeCapturedInLambda,
+                        capturedVarDecl->type.type);
+                }
+            }
+        }
+
+        auto thisLambdaExpr = astBuilder->create<ThisExpr>();
+        thisLambdaExpr->scope = lambdaDecl->ownedScope;
+        thisLambdaExpr->type = QualType(DeclRefType::create(astBuilder, lambdaDecl));
+        thisLambdaExpr->checked = true;
+
+        auto resultMemberExpr = astBuilder->create<MemberExpr>();
+        resultMemberExpr->declRef = capturedVarDecl;
+        resultMemberExpr->baseExpression = thisLambdaExpr;
+        resultMemberExpr->type = exprIn->type;
+        resultMemberExpr->loc = exprIn->loc;
+        resultMemberExpr->type.isLeftValue = false;
+        resultMemberExpr->checked = true;
+        return resultMemberExpr;
     }
-    if (isDefinedInLambdaScope)
+
+    Expr* visitVarExpr(VarExpr* expr)
+    {
+        auto srcDecl = as<VarDeclBase>(expr->declRef.getDecl());
+        return maybeCaptureDecl(expr, srcDecl);
+    }
+
+    Expr* visitThisExpr(ThisExpr* expr)
+    {
+        auto thisTypeDecl = isDeclRefTypeOf<Decl>(expr->type.type);
+        if (!thisTypeDecl)
+            return expr;
+        // Don't capture `this` references that already point to the lambda struct
+        // itself (these are created by the capture mechanism).
+        if (thisTypeDecl.getDecl() == lambdaDecl)
+            return expr;
+        return maybeCaptureDecl(expr, thisTypeDecl.getDecl());
+    }
+};
+
+Expr* SemanticsVisitor::maybeRegisterLambdaCapture(Expr* exprIn)
+{
+    if (!m_parentLambdaExpr)
         return exprIn;
 
-    // We are referencing something that doesn't belong to the lambda scope, we need to
-    // capture it in the current lambda function.
-
-    // If we have already captured the variable, just return the captured variable.
-    VarDeclBase* capturedVarDecl = nullptr;
-    if (!m_mapSrcDeclToCapturedLambdaDecl->tryGetValue(srcDecl, capturedVarDecl))
-    {
-        // If not already captured, create a captured variable in the lambda struct decl.
-        capturedVarDecl = m_astBuilder->create<VarDecl>();
-        capturedVarDecl->nameAndLoc = srcDecl->nameAndLoc;
-        SLANG_ASSERT(exprIn->type.type);
-        capturedVarDecl->type.type = exprIn->type.type;
-        m_mapSrcDeclToCapturedLambdaDecl->add(srcDecl, capturedVarDecl);
-        m_parentLambdaDecl->addMember(capturedVarDecl);
-
-        // Is captured value NonCopyable? If so, it needs to be an error.
-        if (isNonCopyableType(capturedVarDecl->type.type))
-        {
-            getSink()->diagnose(
-                exprIn,
-                Diagnostics::nonCopyableTypeCapturedInLambda,
-                capturedVarDecl->type.type);
-        }
-    }
-
-    // Return a VarExpr referencing the capturedVarDecl.
-    auto thisLambdaExpr = m_astBuilder->create<ThisExpr>();
-    thisLambdaExpr->scope = m_parentLambdaDecl->ownedScope;
-    thisLambdaExpr->type = QualType(DeclRefType::create(m_astBuilder, m_parentLambdaDecl));
-    thisLambdaExpr->checked = true;
-
-    auto resultMemberExpr = m_astBuilder->create<MemberExpr>();
-    resultMemberExpr->declRef = capturedVarDecl;
-    resultMemberExpr->baseExpression = thisLambdaExpr;
-    resultMemberExpr->type = exprIn->type;
-    resultMemberExpr->loc = exprIn->loc;
-
-    // For captured variables, we need to set the type to be a non-lvalue to prevent
-    // lambda expression body from mutating their values.
-    resultMemberExpr->type.isLeftValue = false;
-    resultMemberExpr->checked = true;
-    return resultMemberExpr;
+    LambdaCaptureVisitor visitor(
+        m_parentLambdaExpr,
+        m_parentLambdaDecl,
+        m_mapSrcDeclToCapturedLambdaDecl,
+        m_astBuilder,
+        getSink());
+    return visitor.dispatch(exprIn);
 }
 
 Type* SemanticsVisitor::_toDifferentialParamType(Type* primalParamType)

@@ -85,8 +85,9 @@
 --                        Typed locations can be used as parameters in interpolations
 --
 -- Available functions:
---   err(name, code, message, primary_span, ...) - Define an error diagnostic
---   warning(name, code, message, primary_span, ...) - Define a warning diagnostic
+--   err(name, code, message, [primary_span], ...) - Define an error diagnostic
+--   warning(name, code, message, [primary_span], ...) - Define a warning diagnostic
+--   Note: primary_span is optional for locationless diagnostics (e.g., command-line errors)
 --
 --   span(location, message?) - Create a span (message defaults to empty string)
 --     Positional: span("location:Type", "message text")
@@ -173,6 +174,65 @@ err(
     30013,
     "invalid subscript expression",
     span { loc = "expr:Expr", message = "no subscript declarations found for type '~type:Type'" }
+)
+
+-- Conversion examples from slang-diagnostic-defs.h
+
+err(
+    "type mismatch",
+    30019,
+    "type mismatch in expression",
+    span {
+        loc = "expr:Expr",
+        message = "expected an expression of type '~expected_type:Type', got '~actual_type:QualType'",
+    }
+)
+
+warning(
+    "macro redefinition",
+    15400,
+    "macro '~name:Name' is being redefined",
+    span { loc = "location", message = "redefinition of macro '~name:Name'" },
+    note { message = "see previous definition of '~name'", span { loc = "original_location" } }
+)
+
+err(
+    "invalid swizzle expr",
+    30052,
+    "invalid swizzle expression",
+    span { loc = "expr:Expr", message = "invalid swizzle pattern '~pattern' on type '~type:Type'" }
+)
+
+err(
+    "expected prefix operator",
+    39999,
+    "function called as prefix operator was not declared `__prefix`",
+    span { loc = "call_loc", message = "function called as prefix operator was not declared `__prefix`" },
+    note { message = "see definition of '~decl'", span { loc = "decl:Decl" } }
+)
+
+err(
+    "too many initializers",
+    30500,
+    "too many initializers in initializer list",
+    span { loc = "init_list:Expr", message = "too many initializers (expected ~expected:int, got ~got:int)" }
+)
+
+err(
+    "cannot convert array of smaller to larger size",
+    30024,
+    "array size mismatch prevents conversion",
+    span {
+        loc = "location",
+        message = "Cannot convert array of size ~source_size:int to array of size ~target_size:int as this would truncate data",
+    }
+)
+
+err(
+    "unknown stage",
+    15,
+    "unknown stage '~stage_name'",
+    span { loc = "location", message = "unknown stage '~stage_name'" }
 )
 
 -- Process and validate all diagnostics
