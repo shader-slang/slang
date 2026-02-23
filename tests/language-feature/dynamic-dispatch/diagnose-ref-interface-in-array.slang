@@ -1,8 +1,5 @@
-// Tests disabled: diagnostic 52010 not yet implemented (see #9906).
-// Enable when __ref/__constref dynamic dispatch diagnostic is added.
-//DISABLED_TEST:SIMPLE(filecheck=CHECK): -target spirv
-//DISABLED_TEST:SIMPLE(filecheck=CHECK): -target hlsl
-//DISABLED_TEST:SIMPLE(filecheck=CHECK): -target cuda
+//TEST:SIMPLE(filecheck=CHECK): -target spirv
+//TEST:SIMPLE(filecheck=CHECK): -target hlsl
 
 // The diagnostic for __ref/__constref with interface types in dynamic
 // dispatch is applied recursively: if a struct contains an array whose

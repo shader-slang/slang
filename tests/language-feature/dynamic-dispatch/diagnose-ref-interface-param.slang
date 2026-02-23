@@ -1,7 +1,5 @@
-// Tests disabled: diagnostic 52010 not yet implemented (see #9906).
-// Enable when __ref/__constref dynamic dispatch diagnostic is added.
-//DISABLED_TEST:SIMPLE(filecheck=CHECK): -target spirv
-//DISABLED_TEST:SIMPLE(filecheck=CHECK): -target hlsl
+//TEST:SIMPLE(filecheck=CHECK): -target spirv
+//TEST:SIMPLE(filecheck=CHECK): -target hlsl
 
 // __ref and __constref parameters with interface types are not supported
 // in dynamic dispatch contexts. This test checks that the compiler

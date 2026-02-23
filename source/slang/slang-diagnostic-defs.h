@@ -2569,12 +2569,6 @@ DIAGNOSTIC(
     Error,
     refParamWithInterfaceTypeInDynamicDispatch,
     "'$0' parameter of type '$1' cannot be used in dynamic dispatch context.")
-DIAGNOSTIC(
-    53001,
-    Error,
-    invalidTypeMarshallingForImportedDLLSymbol,
-    "invalid type marshalling in imported func $0.")
-
 DIAGNOSTIC(54001, Warning, meshOutputMustBeOut, "Mesh shader outputs must be declared with 'out'.")
 DIAGNOSTIC(54002, Error, meshOutputMustBeArray, "HLSL style mesh shader outputs must be arrays")
 DIAGNOSTIC(
