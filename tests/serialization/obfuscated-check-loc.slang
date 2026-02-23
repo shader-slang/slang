@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target cpp -stage compute -entry computeMain -obfuscate -line-directive-mode none
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target cpp -stage compute -entry computeMain -obfuscate -line-directive-mode none
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
