@@ -1,10 +1,54 @@
 -- Lua helper functions for rich diagnostic data processing
 -- This file provides helper functions for FIDDLE templates in slang-rich-diagnostics.h
 
--- Load the diagnostic definitions
+-- Load shared helpers for edit distance functions
+local helpers = dofile("source/slang/slang-diagnostics-helpers.lua")
+local edit_distance = helpers.edit_distance
+local find_similar = helpers.find_similar
+
+-- Load the diagnostic definitions (this processes using helpers internally)
 local diagnostics_module = dofile("source/slang/slang-diagnostics.lua")
 
 local M = {}
+
+-- Helper function to build an error message with suggestions
+-- @param error_prefix: The main error message (e.g., "Unknown type 'foo'")
+-- @param valid_options: Array of valid option strings
+-- @param invalid_value: The invalid value to find suggestions for
+-- @param hints: Optional array of hint strings to include before suggestions
+local function buildErrorWithSuggestions(error_prefix, valid_options, invalid_value, hints)
+	local msg = error_prefix
+
+	-- Add any custom hints
+	if hints then
+		for _, hint in ipairs(hints) do
+			msg = msg .. "\n  " .. hint
+		end
+	end
+
+	-- Find and add similar suggestions
+	local similar = find_similar(invalid_value, valid_options, 3)
+	if #similar > 0 then
+		msg = msg .. "\n  Did you mean: "
+		local suggestions = {}
+		for i, s in ipairs(similar) do
+			if i <= 3 then  -- Limit to top 3 suggestions
+				table.insert(suggestions, "'" .. s.name .. "'")
+			end
+		end
+		msg = msg .. table.concat(suggestions, ", ") .. "?"
+	end
+
+	-- Add list of valid options
+	local sorted_options = {}
+	for _, opt in ipairs(valid_options) do
+		table.insert(sorted_options, opt)
+	end
+	table.sort(sorted_options)
+	msg = msg .. "\n  Valid options: " .. table.concat(sorted_options, ", ")
+
+	return msg
+end
 
 -- Helper function to convert space-separated name to PascalCase
 function M.toPascalCase(name)
@@ -39,13 +83,13 @@ function M.getCppType(lua_type)
 		for key in pairs(cpp_type_map) do
 			supported[#supported + 1] = key
 		end
-		table.sort(supported)
-		error(
-			"Unknown type '"
-				.. lua_type
-				.. "' in diagnostic parameter. Supported types: "
-				.. table.concat(supported, ", ")
+
+		local msg = buildErrorWithSuggestions(
+			"Unknown type '" .. lua_type .. "' in diagnostic parameter.",
+			supported,
+			lua_type
 		)
+		error(msg)
 	end
 	return mapped
 end
@@ -69,7 +113,26 @@ function M.getLocationExpr(location_name, location_type)
 
 	local extractor = location_extractors[location_type]
 	if not extractor then
-		error("Unknown location type '" .. location_type .. "' for location '" .. location_name .. "'")
+		-- Build a list of valid types for suggestion
+		local valid_types = {}
+		for k in pairs(location_extractors) do
+			table.insert(valid_types, k)
+		end
+
+		-- Check if user might have meant SourceLoc
+		local hints = {}
+		local sourceloc_dist = edit_distance(location_type:lower(), "sourceloc")
+		if sourceloc_dist <= 3 then
+			table.insert(hints, "Hint: For a plain SourceLoc, omit the type annotation: use '" .. location_name .. "' instead of '" .. location_name .. ":" .. location_type .. "'.")
+		end
+
+		local msg = buildErrorWithSuggestions(
+			"Unknown location type '" .. location_type .. "' for location '" .. location_name .. "'.",
+			valid_types,
+			location_type,
+			#hints > 0 and hints or nil
+		)
+		error(msg)
 	end
 
 	return extractor
