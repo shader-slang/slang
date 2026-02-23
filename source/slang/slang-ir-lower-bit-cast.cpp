@@ -366,7 +366,8 @@ struct BitCastLoweringContext
         {
             return;
         }
-        if (as<IRHLSLStructuredBufferTypeBase>(fromType) || as<IRHLSLStructuredBufferTypeBase>(toType))
+        if (as<IRHLSLStructuredBufferTypeBase>(fromType) ||
+            as<IRHLSLStructuredBufferTypeBase>(toType))
         {
             return;
         }
