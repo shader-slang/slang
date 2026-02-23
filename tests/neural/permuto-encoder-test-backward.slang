@@ -1,7 +1,7 @@
 // Test permuto encoder backward pass using autodiff
 
 // TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cuda -compute -shaderobj -output-using-type -xslang -experimental-feature
-// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -shaderobj -output-using-type -xslang -experimental-feature
+// TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -shaderobj -output-using-type -xslang -experimental-feature -emit-spirv-directly
 
 import neural;
 import "permuto-reference-data";
@@ -38,12 +38,12 @@ static const float EPSILON = 0.1f;  // Allow for floating-point precision differ
 
 // Feature table buffer: will be initialized by threads with value[i] = i
 // Total size: 1024 * 2 = 2048 floats
-//TEST_INPUT:ubuffer(count=2048, stride=4):name=gFeatureTable
-RWStructuredBuffer<float> gFeatureTable;
+//TEST_INPUT: set gFeatureTable = ubuffer(count=2048, stride=4)
+uniform RWStructuredBuffer<float>.Handle gFeatureTable;
 
 // Gradient buffer for feature table (dL/dparams)
-//TEST_INPUT:ubuffer(count=2048, stride=4):name=gDFeatureTable
-RWStructuredBuffer<float> gDFeatureTable;
+//TEST_INPUT: set gDFeatureTable = ubuffer(count=2048, stride=4)
+uniform RWStructuredBuffer<float>.Handle gDFeatureTable;
 
 // Output buffer for dL/dpos: N_POSITIONS * N_POS_DIMS = 512 floats
 //TEST_INPUT:ubuffer(count=512, stride=4):name=gDLdPosBuffer
@@ -58,7 +58,7 @@ RWStructuredBuffer<uint> gVerifyBuffer;
 [Differentiable]
 void encodeAllLevels(
     float position[N_POS_DIMS],
-    StructuredBufferStorage<float> featureStorage,
+    BindlessAddress<float> featureAddress,
     out float output[N_FEATURES])
 {
     Encoder.Params params;
@@ -72,24 +72,24 @@ void encodeAllLevels(
         Encoder.prepareLevelInfo(level, BASE_SCALE, LOG2_PER_LEVEL_SCALE, 1337u, params.levelInfo);
 
         // Encode this level - writes to output at offset level * FEATURE_DIM_PER_ENTRY
-        Encoder.encodePerLevel<StructuredBufferStorage<float>>(
-            params, position, featureStorage, 0u, output);
+        Encoder.encodePerLevel<BindlessAddress<float>>(
+            params, position, featureAddress, output);
     }
 }
 
 /// Compute backward pass for all levels by calling bwd_diff on encodeAllLevels
 void encodeBackwardAllLevels(
     float position[N_POS_DIMS],
-    StructuredBufferStorage<float> featureStorage,
-    StructuredBufferStorage<float> dfeatureStorage,
+    BindlessAddress<float> featureAddress,
+    BindlessAddress<float> dfeatureAddress,
     out float dL_dpos[N_POS_DIMS])
 {
     // Create differential pair for position
     float dPosition[N_POS_DIMS] = {0.0f, 0.0f};
     var dpPosition = diffPair(position, dPosition);
 
-    // Create differential pair for feature storage
-    var dpFeatureStorage = DifferentialPtrPair<StructuredBufferStorage<float>>(featureStorage, dfeatureStorage);
+    // Create differential pair for feature address
+    var dpFeatureAddress = DifferentialPtrPair<BindlessAddress<float>>(featureAddress, dfeatureAddress);
 
     // Upstream gradient: all ones for all output features
     float dL_dy[N_FEATURES];
@@ -100,7 +100,7 @@ void encodeBackwardAllLevels(
     }
 
     // Call backward pass on the whole encodeAllLevels function
-    bwd_diff(encodeAllLevels)(dpPosition, dpFeatureStorage, dL_dy);
+    bwd_diff(encodeAllLevels)(dpPosition, dpFeatureAddress, dL_dy);
 
     // Extract position gradient
     dL_dpos[0] = dpPosition.d[0];
@@ -152,7 +152,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         uint idx = baseIdx + i;
         if (idx < FEATURE_TABLE_SIZE)
         {
-            gFeatureTable[idx] = float(idx);
+            gFeatureTable[idx] = idx;
             gDFeatureTable[idx] = 0.0f;  // Initialize gradient to zero
         }
     }
@@ -167,13 +167,13 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     position[0] = (float(x) + 0.5f) / float(GRID_SIZE);
     position[1] = (float(y) + 0.5f) / float(GRID_SIZE);
 
-    // Create storage for feature table and its gradient
-    StructuredBufferStorage<float> featureStorage = StructuredBufferStorage<float>(gFeatureTable);
-    StructuredBufferStorage<float> dfeatureStorage = StructuredBufferStorage<float>(gDFeatureTable);
+    // Create addresses for feature table and its gradient
+    BindlessAddress<float> featureAddress = BindlessAddress<float>(gFeatureTable);
+    BindlessAddress<float> dfeatureAddress = BindlessAddress<float>(gDFeatureTable);
 
     // Compute backward pass for all levels
     float dL_dpos[N_POS_DIMS];
-    encodeBackwardAllLevels(position, featureStorage, dfeatureStorage, dL_dpos);
+    encodeBackwardAllLevels(position, featureAddress, dfeatureAddress, dL_dpos);
 
     // Write dL/dpos to buffer
     gDLdPosBuffer[posIdx * N_POS_DIMS + 0] = dL_dpos[0];

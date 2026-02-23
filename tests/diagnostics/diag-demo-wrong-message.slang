@@ -8,6 +8,6 @@ struct S {};
 void test()
 {
     if (1);
-//CHECK   ^ this message doesn't match
+//CHECK:  ^ this message doesn't match
     // The actual message is "empty statement", not "this message doesn't match"
 }

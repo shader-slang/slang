@@ -1049,7 +1049,9 @@ Result spawnAndWaitSharedLibrary(
         rhiDebugBridge.setCoreCallback(&coreDebugCallback);
 
         // Say static so not released
-        StringWriter stdError(&stdErrorString, WriterFlag::IsConsole | WriterFlag::IsStatic);
+        StringWriter stdError(&stdErrorString, WriterFlag::IsStatic);
+        // Use IsConsole on stdout because we have tests which output spirv
+        // which we want to have disassembled
         StringWriter stdOut(&stdOutString, WriterFlag::IsConsole | WriterFlag::IsStatic);
 
         StdWriters* prevStdWriters = StdWriters::getSingleton();
@@ -2627,19 +2629,21 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
         cmdLine.addArg(input.filePath);
     }
 
+    // Enable machine-readable diagnostics if diag option is specified
+    // This must come BEFORE other test options so that diagnostics emitted
+    // during option parsing are properly formatted
+    String diagPrefix;
+    if (input.testOptions->getDiagTestPrefix(diagPrefix))
+    {
+        cmdLine.addArg("-enable-machine-readable-diagnostics");
+    }
+
     for (auto arg : input.testOptions->args)
     {
         // Filter out slang-test specific options that shouldn't be passed to slangc
         if (arg == kPreserveEmbeddedSourceOption)
             continue;
         cmdLine.addArg(arg);
-    }
-
-    // Enable machine-readable diagnostics if diag option is specified
-    String diagPrefix;
-    if (input.testOptions->getDiagTestPrefix(diagPrefix))
-    {
-        cmdLine.addArg("-enable-machine-readable-diagnostics");
     }
 
     // If we can't set up for simple compilation, it's because some external resource isn't
@@ -5358,7 +5362,7 @@ SlangResult innerMain(int argc, char** argv)
 
     // The context holds useful things used during testing
     TestContext context;
-    SLANG_RETURN_ON_FAIL(SLANG_FAILED(context.init(argv[0])))
+    SLANG_RETURN_ON_FAIL(context.init(argv[0]))
 
     auto& categorySet = context.categorySet;
 
