@@ -215,12 +215,18 @@ SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, 
 
     switch (type->getOp())
     {
-    case kIROp_UnsizedArrayType:
+    case kIROp_PtrType:
+    case kIROp_NativePtrType:
         {
-            auto arrayType = static_cast<IRUnsizedArrayType*>(type);
-            SLANG_RETURN_ON_FAIL(calcTypeName(arrayType->getElementType(), target, out));
-            out << "*";
-            return SLANG_OK;
+            auto ptrType = cast<IRPtrTypeBase>(type);
+            if (auto unsizedArrayType = as<IRUnsizedArrayType>(ptrType->getValueType()))
+            {
+                SLANG_RETURN_ON_FAIL(
+                    calcTypeName(unsizedArrayType->getElementType(), target, out));
+                out << "**";
+                return SLANG_OK;
+            }
+            break;
         }
     case kIROp_VectorType:
         {
@@ -1059,12 +1065,20 @@ void CUDASourceEmitter::emitVectorTypeNameImpl(IRType* elementType, IRIntegerVal
 
 void CUDASourceEmitter::_emitType(IRType* type, DeclaratorInfo* declarator)
 {
-    if (type->getOp() == kIROp_UnsizedArrayType)
+    // Handle Ptr<T[]> on CUDA, we shouldn't emit it as Array<T>*.
+    // Instead, we should emit it as T**.
+    // e.g. Array<T>* a;    a[1] == a + sizeof(Array<T>)
+    // but T** b;    b[1] == b + sizeof(T*)
+    if (type->getOp() == kIROp_PtrType || type->getOp() == kIROp_NativePtrType)
     {
-        auto arrayType = cast<IRUnsizedArrayType>(type);
-        PtrDeclaratorInfo ptrDeclarator(declarator);
-        _emitType(arrayType->getElementType(), &ptrDeclarator);
-        return;
+        auto ptrType = cast<IRPtrTypeBase>(type);
+        if (auto unsizedArrayType = as<IRUnsizedArrayType>(ptrType->getValueType()))
+        {
+            PtrDeclaratorInfo outerPtr(declarator);
+            PtrDeclaratorInfo innerPtr(&outerPtr);
+            _emitType(unsizedArrayType->getElementType(), &innerPtr);
+            return;
+        }
     }
     Super::_emitType(type, declarator);
 }

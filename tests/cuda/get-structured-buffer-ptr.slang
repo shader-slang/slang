@@ -2,7 +2,7 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -output-using-type -shaderobj
 
 // Test that __getStructuredBufferPtr works on CUDA.
-// Unsized arrays (T[]) emit as T* instead of Array<T>, and Ptr<T[]> becomes T**.
+// Ptr<T[]> collapses to T* on CUDA, and GetStructuredBufferPtr returns the data pointer.
 
 //TEST_INPUT:ubuffer(data=[10 20 30 40], stride=4):name=inputBuffer
 RWStructuredBuffer<int> inputBuffer;
