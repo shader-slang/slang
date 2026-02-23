@@ -1,0 +1,12 @@
+prefix=${pcfiledir}/../..
+exec_prefix=${prefix}
+libdir=${prefix}/lib
+includedir=${prefix}/@CMAKE_INSTALL_INCLUDEDIR@
+
+Name: slang-compiler
+Description: Slang shading language compiler library
+Version: @SLANG_VERSION_NUMERIC@
+Libs: -L${libdir} -lslang-compiler
+Cflags: -I${includedir}
+
+# Note: currently no support for static linking.
