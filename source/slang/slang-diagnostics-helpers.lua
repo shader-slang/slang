@@ -1,5 +1,58 @@
 -- Helper functions for defining diagnostics
 
+-- Calculate Levenshtein edit distance between two strings
+local function edit_distance(s1, s2)
+  local len1, len2 = #s1, #s2
+  if len1 == 0 then return len2 end
+  if len2 == 0 then return len1 end
+
+  local matrix = {}
+  for i = 0, len1 do
+    matrix[i] = { [0] = i }
+  end
+  for j = 0, len2 do
+    matrix[0][j] = j
+  end
+
+  for i = 1, len1 do
+    for j = 1, len2 do
+      local cost = (s1:sub(i, i) == s2:sub(j, j)) and 0 or 1
+      matrix[i][j] = math.min(
+        matrix[i-1][j] + 1,      -- deletion
+        matrix[i][j-1] + 1,      -- insertion
+        matrix[i-1][j-1] + cost  -- substitution
+      )
+    end
+  end
+
+  return matrix[len1][len2]
+end
+
+-- Find similar strings from a list based on edit distance
+-- Returns array of {name, distance} sorted by distance (ascending)
+local function find_similar(target, candidates, max_distance)
+  max_distance = max_distance or 3
+  local similar = {}
+  local target_lower = target:lower()
+
+  for _, candidate in ipairs(candidates) do
+    local dist = edit_distance(target_lower, candidate:lower())
+    if dist <= max_distance then
+      table.insert(similar, { name = candidate, distance = dist })
+    end
+  end
+
+  -- Sort by distance (ascending)
+  table.sort(similar, function(a, b) return a.distance < b.distance end)
+
+  return similar
+end
+
+-- Set to false to enable uniqueness checking for diagnostic codes.
+-- Currently set to true to allow duplicate codes during the transition period.
+-- See: https://github.com/shader-slang/slang/issues/6736
+local allow_duplicate_diagnostic_codes = true
+
 local diagnostics = {}
 
 -- Helper function to create a span
@@ -233,6 +286,12 @@ local function warning(name, code, message, primary_span, ...)
   add_diagnostic(name, code, "warning", message, primary_span, ...)
 end
 
+-- Note: This creates a standalone note-level diagnostic, not a note within another diagnostic.
+-- For notes within diagnostics, use the `note` function above (line 37).
+local function note_diagnostic(name, code, message, primary_span, ...)
+  add_diagnostic(name, code, "note", message, primary_span, ...)
+end
+
 -- Helper function to parse interpolated message strings
 -- Converts "text ~param more text" or "text ~param:Type more text" into structured format
 -- Also supports member access: ~param.member
@@ -401,10 +460,12 @@ local function validate_diagnostic(diag, index)
     table.insert(errors, diagnostic_name .. ".message must be a string")
   end
 
-  -- 5. Validate mandatory 'primary_span' structure
-  local primary_errors = validate_span(diag.primary_span, diagnostic_name .. ".primary_span")
-  for _, err in ipairs(primary_errors) do
-    table.insert(errors, err)
+  -- 5. Validate optional 'primary_span' structure (nil allowed for locationless diagnostics)
+  if diag.primary_span then
+    local primary_errors = validate_span(diag.primary_span, diagnostic_name .. ".primary_span")
+    for _, err in ipairs(primary_errors) do
+      table.insert(errors, err)
+    end
   end
 
   -- 6. Validate optional 'secondary_spans' array
@@ -491,7 +552,7 @@ local function process_diagnostics(diagnostics_table)
         seen_names[diag.name] = i
       end
 
-      if seen_codes[diag.code] then
+      if seen_codes[diag.code] and not allow_duplicate_diagnostic_codes then
         table.insert(all_errors, diagnostic_name .. " has duplicate code " .. diag.code)
       else
         seen_codes[diag.code] = i
@@ -539,8 +600,10 @@ local function process_diagnostics(diagnostics_table)
         end
       end
 
-      -- Collect locations from primary span
-      collect_location(diag.primary_span)
+      -- Collect locations from primary span (if present)
+      if diag.primary_span then
+        collect_location(diag.primary_span)
+      end
 
       -- Collect locations from secondary spans
       if diag.secondary_spans then
@@ -677,30 +740,32 @@ local function process_diagnostics(diagnostics_table)
         end
       end
 
-      -- 2. Process primary span
-      process_message_container(diag.primary_span, diagnostic_name .. ".primary_span")
-
-      -- Extract required params from primary span for assertions (only pointer types)
+      -- 2. Process primary span (if present)
       local primary_span_required = {}
-      if diag.primary_span.location_name and diag.primary_span.location_type then
-        table.insert(primary_span_required, diag.primary_span.location_name)
-      end
-      if diag.primary_span.message_parts then
-        for _, part in ipairs(diag.primary_span.message_parts) do
-          if part.type == "interpolation" and not part.member_name then
-            local param_type = seen_params[part.param_name]
-            -- Only add pointer types (not string or int)
-            if param_type and param_type ~= "string" and param_type ~= "int" then
-              -- Avoid duplicates
-              local found = false
-              for _, existing in ipairs(primary_span_required) do
-                if existing == part.param_name then
-                  found = true
-                  break
+      if diag.primary_span then
+        process_message_container(diag.primary_span, diagnostic_name .. ".primary_span")
+
+        -- Extract required params from primary span for assertions (only pointer types)
+        if diag.primary_span.location_name and diag.primary_span.location_type then
+          table.insert(primary_span_required, diag.primary_span.location_name)
+        end
+        if diag.primary_span.message_parts then
+          for _, part in ipairs(diag.primary_span.message_parts) do
+            if part.type == "interpolation" and not part.member_name then
+              local param_type = seen_params[part.param_name]
+              -- Only add pointer types (not string or int)
+              if param_type and param_type ~= "string" and param_type ~= "int" then
+                -- Avoid duplicates
+                local found = false
+                for _, existing in ipairs(primary_span_required) do
+                  if existing == part.param_name then
+                    found = true
+                    break
+                  end
                 end
-              end
-              if not found then
-                table.insert(primary_span_required, part.param_name)
+                if not found then
+                  table.insert(primary_span_required, part.param_name)
+                end
               end
             end
           end
@@ -818,4 +883,7 @@ return {
   err = err,
   warning = warning,
   process_diagnostics = process_diagnostics,
+  -- Utility functions for typo suggestions
+  edit_distance = edit_distance,
+  find_similar = find_similar,
 }

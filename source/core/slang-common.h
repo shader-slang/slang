@@ -343,9 +343,9 @@ public:
             __builtin_unreachable(); \
     } while (0)
 #elif SLANG_CLANG
-#define SLANG_ASSUME(X) __builtin_assume(X)
+#define SLANG_ASSUME(X) __builtin_assume(static_cast<bool>(X))
 #elif SLANG_VC
-#define SLANG_ASSUME(X) __assume(X)
+#define SLANG_ASSUME(X) __assume(static_cast<bool>(X))
 #else
 [[noreturn]] inline void invokeUndefinedBehaviour() {}
 #define SLANG_ASSUME(X)                 \

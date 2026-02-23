@@ -35,7 +35,7 @@ internal uint getWaveId()
 }
 
 [ForceInline]
-internal int getWaveCount()
+public int getWaveCount()
 {
     // Note, we always require the threads count is multiple of the subgroup size, therefore we don't need to round up the result.
     __stage_switch
@@ -263,14 +263,13 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
     // we can consider using more than one warp in the future.
     [ForceInline]
     [require(cooperative_matrix, subgroup_basic)]
-    internal static void matALoadStore<U, Storage, bool isStore = false>(
+    internal static void matALoadStore<U, Address, bool isStore = false>(
         SPtr<uint4> sharedMemory,
         int tileIndex,
-        Storage weightStorage,
-        Storage.Address weightAddress)
+        Address weightAddress)
             where U : __BuiltinFloatingPointType
             where U.Differential == U
-            where Storage : IStorage<U>
+            where Address : IPointerLikeAddress<U>
     {
         uint indexInVectorizedTile = WaveGetLaneIndex();
 
@@ -293,18 +292,19 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
         // tx and ty are the 2-D coordinate of scalar tile.
         // row coordinate ty is the same between vectorized tile and original tile.
         // column coordinate tx needs to be scaled by ElementCountPerVector to get the actual column coordinate in original data type.
-
         uint2 coordInWeight = vectorizedTileCoordToWeightCoord<elementCountPerVector>(coordInTile, tileIndex);
 
         uint4 value;
         uint indexInWeight;
+
+        [ForceUnroll]
         for (uint i = 0; i < numLoadOrStorePerThread; i++)
         {
             if (coordInWeight.y >= TileInfo.HeightInElementsTileA)
                 break;
             // Given the coordinate inside the tile and the tile index, we can get the index in weight matrix.
             // Note, we always treat row of matrix A as uint4 aligned, so always calculate 'indexInWeight' as if it's uint4 aligned.
-            // though it might not. But IStorage.readUint4() will handle the padding.
+            // though it might not. But readUint4() will handle the padding.
             // We only need to provide the actual boundary and the aligned boundary.
             indexInWeight = flattenedIndex<K>(coordInWeight);
 
@@ -322,11 +322,10 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
                 }
                 else
                 {
-                    let offsetAddress = Storage.getOffset(weightAddress, indexInWeight);
-                    // Though the weight matrix is not necessarily aligned with the uint4 vector size, readUnit4() will handle the padding
+                    // Though the weight matrix is not necessarily aligned with the uint4 vector size, readUint4() will handle the padding
                     // if the reading is cross the boundary of the uint4 vector size.
                     // MatA can only be half type, so we can always read it as half type no matter what the data type of the weight matrix is.
-                    value = weightStorage.readUint4<half, TileInfo.IsAlignedVector, K>(weightAddress, offsetAddress);
+                    value = weightAddress.readUint4<half, TileInfo.IsAlignedVector, K>(int(indexInWeight));
                 }
 
                 sharedMemory[indexInVectorizedTile] = value;
@@ -338,9 +337,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
                 if (!isOutOfRange)
                 {
                     value = sharedMemory[indexInVectorizedTile];
-                    let offsetAddress = Storage.getOffset(weightAddress, indexInWeight);
-
-                    weightStorage.writeUint4Atomic<T, TileInfo.IsAlignedVector, K>(weightAddress, offsetAddress, value);
+                    weightAddress.writeUint4Atomic<T, TileInfo.IsAlignedVector, K>(int(indexInWeight), value);
                 }
             }
 
@@ -357,30 +354,28 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
 
     [ForceInline]
     [require(cooperative_matrix, subgroup_basic)]
-    VISIBILITY_LEVEL static void loadShA<U, Storage>(
+    VISIBILITY_LEVEL static void loadShA<U, Address>(
         SPtr<uint4> sharedMemory,
         int tileIndex,
-        Storage weightStorage,
-        Storage.Address weightAddress)
+        Address weightAddress)
             where U : __BuiltinFloatingPointType
             where U.Differential == U
-            where Storage : IStorage<U>
+            where Address : IPointerLikeAddress<U>
     {
-        matALoadStore<U, Storage, false>(sharedMemory, tileIndex, weightStorage, weightAddress);
+        matALoadStore<U, Address, false>(sharedMemory, tileIndex, weightAddress);
     }
 
     [ForceInline]
     [require(cooperative_matrix, subgroup_basic)]
-    VISIBILITY_LEVEL static void storeShA<U, Storage>(
+    VISIBILITY_LEVEL static void storeShA<U, Address>(
         SPtr<uint4> sharedMemory,
         int tileIndex,
-        Storage weightStorage,
-        Storage.Address weightAddress)
+        Address weightAddress)
             where U : __BuiltinFloatingPointType
             where U.Differential == U
-            where Storage : IStorage<U>
+            where Address : IPointerLikeAddress<U>
     {
-        matALoadStore<U, Storage, true>(sharedMemory, tileIndex, weightStorage, weightAddress);
+        matALoadStore<U, Address, true>(sharedMemory, tileIndex, weightAddress);
     }
 
     [ForceInline]
@@ -540,6 +535,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
 
         uint index = (laneId % BatchSize) * TileStrideInVector;
 
+        [ForceUnroll]
         for (uint i = 0; i < TileStrideInVector; i++)
         {
             uint4 value;
@@ -569,9 +565,11 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
             // will use one shared memory. And left subgroup loads, right subgroup stores.
             uint subgroupOffset = (subgroupId / (k<<1)) * (CMShape.CoopMatCSizeInVector * COLUMN);
             let ptrPerWarp = sharedMemory + subgroupOffset;
+            [ForceUnroll]
             for (int i = 0; i < ROW; i++)
             {
                 // Store one row of cooperative matrix to the shared memory.
+                [ForceUnroll]
                 for (int j = 0; j < COLUMN; j++)
                 {
                     // This is the right node in the 2-way merge operation.
@@ -593,6 +591,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
                     // If the left node is the last subgroup, it means that there is no right node for it, so we don't need to do any addition for this subgroup.
                     if (subgroupId != (subgroupCount - 1))
                     {
+                        [ForceUnroll]
                         for (int j = 0; j < COLUMN; j++)
                         {
                             MatC rightMatC = MatC.Load<RowMajor, uint4>(ptrPerWarp + j * CMShape.CoopMatCSizeInVector,
@@ -608,123 +607,271 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
         }
     }
 
-    // Sum reduce of the dOut
+    // =========================================================================
+    // Shared memory pack/unpack helpers
+    //
+    // Shared memory is typed as SPtr<uint4> (16 bytes per slot).
+    // We cannot reinterpret-cast shared memory pointers in SPIR-V's logical
+    // addressing model, so we manually pack/unpack scalar values of type U
+    // into/from the uint4 array using bit_cast and shift operations.
+    //
+    // Layout: element index `i` of type U is stored at:
+    //   uint4 slot:  i / ElementsPerUint4
+    //   uint  comp:  (i % ElementsPerUint4) / ElementsPerUint
+    //   sub-element: i % ElementsPerUint  (shift = subIdx * sizeof(U) * 8)
+    // =========================================================================
+
+    /// Store a scalar value of type U into uint4 shared memory at flat element index.
+    [ForceInline]
+    static void smemStore<U>(SPtr<uint4> mem, int index, U value)
+        where U : __BuiltinFloatingPointType
+    {
+        static const int elementsPerUint  = 4 / sizeof(U);
+        static const int elementsPerUint4 = 16 / sizeof(U);
+        static const int bitsPerElement   = sizeof(U) * 8;
+
+        const int slot = index / elementsPerUint4;
+        const int comp = (index % elementsPerUint4) / elementsPerUint;
+        const int sub  = index % elementsPerUint;
+        const uint shift = sub * bitsPerElement;
+
+        switch (sizeof(U))
+        {
+        case 2:
+            {
+                uint packed = mem[slot][comp];
+                // Clear the target bits and insert new value
+                packed = (packed & ~(uint(0xFFFF) << shift)) | (uint(bit_cast<uint16_t>(value)) << shift);
+                mem[slot][comp] = packed;
+            }
+            break;
+        case 4:
+            mem[slot][comp] = bit_cast<uint>(value);
+            break;
+        }
+    }
+
+    /// Load a scalar value of type U from uint4 shared memory at flat element index.
+    [ForceInline]
+    static U smemLoad<U>(SPtr<uint4> mem, int index)
+        where U : __BuiltinFloatingPointType
+    {
+        static const int elementsPerUint  = 4 / sizeof(U);
+        static const int elementsPerUint4 = 16 / sizeof(U);
+        static const int bitsPerElement   = sizeof(U) * 8;
+
+        const int slot = index / elementsPerUint4;
+        const int comp = (index % elementsPerUint4) / elementsPerUint;
+        const int sub  = index % elementsPerUint;
+        const uint shift = sub * bitsPerElement;
+
+        switch (sizeof(U))
+        {
+        case 2:
+            return bit_cast<U>(uint16_t((mem[slot][comp] >> shift) & 0xFFFF));
+        case 4:
+            return bit_cast<U>(mem[slot][comp]);
+        default:
+            return U(0);
+        }
+    }
+
+    /// Load a packed uint from uint4 shared memory at a uint-level index.
+    /// This is useful for reading two half values packed in a single uint.
+    [ForceInline]
+    static uint smemLoadUint(SPtr<uint4> mem, int uintIndex)
+    {
+        const int slot = uintIndex / 4;
+        const int comp = uintIndex % 4;
+        return mem[slot][comp];
+    }
+
+    // Helper function: Cross-warp reduction and atomic write to global memory.
+    // Reads from shared memory where each warp has written its partial sums,
+    // reduces across warps, and atomically adds to the bias gradient.
+    //
+    // For half type: Uses vector<half, 2> atomics (maps to red.relaxed.gpu.global.add.noftz.f16x2 on CUDA)
+    // For other types: Uses scalar atomicAdd
+    //
+    // @param sharedMemory Shared memory containing partial sums from each warp
+    // @param subgroupId Current warp index
+    // @param subgroupCount Total number of warps
+    // @param biasAddress Pointer-like address for bias gradient
+    // @param MPadded M rounded up to even (for half2 alignment)
+    // @param ColsPacked Number of packed pairs per warp (MPadded / 2)
+    [ForceInline]
+    static void crossWarpReduceAndAtomicWrite<U, Address, int MPadded, int ColsPacked>(
+        SPtr<uint4> sharedMemory,
+        int subgroupId,
+        int subgroupCount,
+        Address biasAddress)
+        where U : __BuiltinFloatingPointType
+        where U.Differential == U
+        where Address : IPointerLikeAddress<U>
+    {
+        const uint laneId = WaveGetLaneIndex();
+        const int NUM_VECTORS = subgroupCount * N;
+        const int ColsPerThread = ColsPacked / NUM_VECTORS;
+        const int NumIters = (ColsPacked % NUM_VECTORS) != 0 ? ColsPerThread + 1 : ColsPerThread;
+
+        int packed_col_idx = subgroupId * N + laneId;
+
+        if (U is half)
+        {
+            // Half path: pack two half values into uint for efficient shared memory access
+            // Uses vector<half, 2> atomic which maps to red.relaxed.gpu.global.add.noftz.f16x2 on CUDA
+
+            for (int j = 0; j < NumIters; j++)
+            {
+                if (packed_col_idx < ColsPacked)
+                {
+                    // Sum packed half2 across all warps
+                    half sum0 = half(0);
+                    half sum1 = half(0);
+
+                    for (int i = 0; i < subgroupCount; i++)
+                    {
+                        // Each warp's data is at offset i * ColsPacked (in half2/uint units)
+                        uint packed = smemLoadUint(sharedMemory, packed_col_idx + i * ColsPacked);
+                        half elem0 = bit_cast<half>(uint16_t(packed & 0xFFFF));
+                        half elem1 = bit_cast<half>(uint16_t((packed >> 16) & 0xFFFF));
+                        sum0 = sum0 + elem0;
+                        sum1 = sum1 + elem1;
+                    }
+
+                    // Only write valid elements
+                    int elemIdx0 = packed_col_idx * 2;
+                    int elemIdx1 = elemIdx0 + 1;
+
+                    if (elemIdx1 < M)
+                    {
+                        // Both elements are valid - use vector<half, 2> atomic
+                        // TODO: vector<U,2> atomicAdd needs to be added to IPointerLikeAddress
+                        vector<U, 2> sum_v2 = vector<U, 2>(U(sum0), U(sum1));
+                        let addr = biasAddress.getOffset(elemIdx0);
+                        addr.atomicAdd(0u, sum_v2);
+                    }
+                    else if (elemIdx0 < M)
+                    {
+                        // Only first element is valid (M is odd)
+                        biasAddress.atomicAdd(uint(elemIdx0), U(sum0));
+                    }
+                }
+
+                packed_col_idx += NUM_VECTORS;
+            }
+        }
+        else
+        {
+            // Non-half path: use scalar atomicAdd (no native vector atomic support)
+            // Read individual elements from uint4 shared memory via smemLoad.
+
+            for (int j = 0; j < NumIters; j++)
+            {
+                if (packed_col_idx < ColsPacked)
+                {
+                    int elemIdx0 = packed_col_idx * 2;
+                    int elemIdx1 = elemIdx0 + 1;
+
+                    // Sum elements across all warps
+                    U sum0 = U(0);
+                    U sum1 = U(0);
+
+                    for (int i = 0; i < subgroupCount; i++)
+                    {
+                        sum0 = sum0 + smemLoad<U>(sharedMemory, i * MPadded + elemIdx0);
+                        if (elemIdx1 < MPadded)
+                            sum1 = sum1 + smemLoad<U>(sharedMemory, i * MPadded + elemIdx1);
+                    }
+
+                    if (elemIdx0 < M)
+                    {
+                        biasAddress.atomicAdd(uint(elemIdx0), sum0);
+                    }
+                    if (elemIdx1 < M)
+                    {
+                        biasAddress.atomicAdd(uint(elemIdx1), sum1);
+                    }
+                }
+
+                packed_col_idx += NUM_VECTORS;
+            }
+        }
+    }
+
+    // Sum reduce of the dOut across the block and accumulate to bias gradient.
+    //
+    // Uses __atomic_reduce_add which maps to PTX `red` instruction on CUDA:
+    //   red.relaxed.gpu.global.add.noftz.f16x2 for half2
+    // This is faster than standard atomicAdd because:
+    // 1. Uses relaxed memory ordering (less synchronization overhead)
+    // 2. Single instruction for two half values
     [ForceInline]
     [require(cuda_spirv, subgroup_partitioned)]
     [require(cuda_spirv, sm_6_6)]
-    VISIBILITY_LEVEL static void sumReduceRows<U, Storage, InArrayType>(
+    VISIBILITY_LEVEL static void sumReduceRows<U, Address, InArrayType>(
         SPtr<uint4> sharedMemory,
         in InArrayType dOut,
         in int subgroupId,
-        Storage biasStorage,
-        Storage.Address biasAddress)
+        Address biasAddress)
         where U : __BuiltinFloatingPointType
         where U.Differential == U
-        where Storage : IStorage<U>
+        where Address : IPointerLikeAddress<U>
         where InArrayType : IArrayAccessor<U>
     {
         const uint laneId = WaveGetLaneIndex();
         const int subgroupCount = getWaveCount();
 
-        // First, perform warp reduce, dOut's actual size is M
+        // Phase 1: Warp-level reduction
         InArrayType localResult;
+        [ForceUnroll]
         for (int i = 0; i < M; i++)
         {
             localResult[i] = WaveActiveSum(dOut[i]);
         }
 
-        // TODO:
-        // Naive way is that we still have to store to the shared memory by tile size, because
-        // we are reuse the shared memory B for the shared memory saving sake. However, more smart
-        // way is that we can compute the usage here during compile time, and compare with the total
-        // size of the shared memory pool. Since this sum reduce compute is not overlapped with other
-        // computation, so we can actually freely use all the shared memory in the pool.
-        static const int elementPerVector = sizeof(uint4) / sizeof(U);
-        static const int NumTiles = (Uint4AlignedM + TileInfo.HeightInElementTileB - 1) / TileInfo.HeightInElementTileB;
+        // Pad M to even number for half2 alignment
+        static const int MPadded = (M + 1) & ~1;  // Round up to even
+        static const int ColsPacked = MPadded / 2;  // Number of half2 pairs per warp
+        static const int HasOddElement = M % 2;  // 1 if M is odd, 0 otherwise
 
-        // This loop is used to move the local result of each warp into the first warp
-        [ForceUnroll]
-        for (uint i = 0; i < NumTiles; i++)
+        // Layout: [warp0: MPadded elements][warp1: MPadded elements]...
+        // Shared memory stays as uint4; pack/unpack via smemStore/smemLoad helpers.
+
+        // Phase 2: Lane 0 of each warp writes reduced result to shared memory
+        if (laneId == 0)
         {
-            const int startIndex = i * TileInfo.HeightInElementTileB;
-
-            // lane 0 of each warp will store the local result to the shared memory.
-            if (laneId == 0)
+            [ForceUnroll]
+            for (int i = 0; i < M; i++)
             {
-                [ForceUnroll]
-                for (uint j = 0; j < TileInfo.HeightInVectorTileB; j++)
-                {
-                    uint4 value;
-                    const uint offset = startIndex + j * elementPerVector;
-                    if (offset >= M)
-                        break;
-                    accessUint4Aligned<AccessOp.READ, U, U, InArrayType>(localResult, offset, value);
-                    sharedMemory[subgroupId * TileInfo.HeightInVectorTileB + j] = value;
-                }
+                smemStore<U>(sharedMemory, subgroupId * MPadded + i, localResult[i]);
             }
-
-            GroupMemoryBarrierWithGroupSync();
-
-            // Now all the results are stored in the shared memory, we can perform warp reduce to get the final result.
-            if (subgroupId == 0)
+            // Pad with zero if M is odd
+            if (HasOddElement != 0)
             {
-                if (laneId < subgroupCount)
-                {
-                    [ForceUnroll]
-                    for (uint j = 0; j < TileInfo.HeightInVectorTileB; j++)
-                    {
-                        uint4 value = sharedMemory[laneId * TileInfo.HeightInVectorTileB + j];
-                        int offset = startIndex + j * elementPerVector;
-                        if (offset >= M)
-                            break;
-                        accessUint4Aligned<AccessOp.WRITE, U, U, InArrayType>(localResult, offset, value);
-                    }
-                }
+                smemStore<U>(sharedMemory, subgroupId * MPadded + M, U(0));
             }
         }
 
-        // Now all the partial result are stored in the registers in the first warp, so we can perform the one more
-        // warp reduce to get the final result.
-        if (subgroupId == 0)
-        {
-            // Only perform the reduce for the lane ids smaller than the 'subgroupCount', because there
-            // are only 'subgroupCount' vectors in the shared memory.
-            WaveMask mask = WaveMaskBallot(0xFFFFFFFF, laneId < subgroupCount);
-            [ForceUnroll]
-            for (uint j = 0; j < M; j++)
-            {
-                localResult[j] = WaveMaskSum(mask, localResult[j]);
-            }
+        GroupMemoryBarrierWithGroupSync();
 
-            // spread the result writing to all threads in the first subgroup.
-            // Atomic add to the bias gradient storage buffer
-            static const int numIter = (M + SubgroupSize - 1) / SubgroupSize;
-            [ForceUnroll]
-            for (uint i = 0; i < numIter; i++)
-            {
-                const int index = i * SubgroupSize + laneId;
-                if (index >= M)
-                    break;
-
-                let offset = Storage.getOffset(biasAddress, index);
-                biasStorage.atomicAdd(offset, localResult[index]);
-            }
-        }
+        // Phase 3: Cross-warp reduction and atomic write
+        crossWarpReduceAndAtomicWrite<U, Address, MPadded, ColsPacked>(
+            sharedMemory, subgroupId, subgroupCount, biasAddress);
     }
 
     [ForceInline]
     [require(cooperative_matrix, subgroup_basic)]
     [require(spvAtomicFloat16AddEXT)]
-    VISIBILITY_LEVEL static void outerProductAccumulate<U, Storage, TypeA, InArrayTypeA, TypeB, InArrayTypeB>(
+    VISIBILITY_LEVEL static void outerProductAccumulate<U, Address, TypeA, InArrayTypeA, TypeB, InArrayTypeB>(
         SPtr<uint4> sharedMemoryA,
         SPtr<uint4> sharedMemoryB,
         InArrayTypeA inputVectorA,
         InArrayTypeB inputVectorB,
-        Storage weightStorage,
-        Storage.Address weightAddress)
+        Address weightAddress)
             where U : __BuiltinFloatingPointType
             where U.Differential == U
-            where Storage : IStorage<U>
+            where Address : IPointerLikeAddress<U>
             where TypeA : __BuiltinFloatingPointType
             where TypeA.Differential == TypeA
             where TypeB : __BuiltinFloatingPointType
@@ -743,6 +890,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
         static const int StrideInVectorTileC = CoopMatCColumns * CMShape.COLUMN_C / CMShape.ElementCountPerVectorMatC;
 
         MatC matC[CoopMatCRows * CoopMatCColumns];
+        [ForceUnroll]
         for (int i = 0; i < CoopMatCRows * CoopMatCColumns; i++)
         {
             matC[i].fill(T(0.0f));
@@ -753,6 +901,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
 
         // Perform outer product for each warp.
         // The shared dimension is the Subgroup size N.
+        [ForceUnroll]
         for (uint k = 0; k < N; k += CMShape.COLUMN_A)
         {
             uint tileIndex = k / CMShape.COLUMN_A;
@@ -761,11 +910,13 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
             GroupMemoryBarrierWithWaveSync();
 
             MatA matA[CoopMatCRows];
+            [ForceUnroll]
             for (uint i = 0; i < CoopMatCRows; i++)
             {
                 matA[i] = MatA.Load<ColumnMajor, uint4>( warpLocalPtrA + i * CMShape.ROW_A / CMShape.ElementCountPerVector, StrideInVectorTileA);
             }
 
+            [ForceUnroll]
             for (uint j = 0; j < CoopMatCColumns; j++)
             {
                 // For matrix B, stride will be the width of the tile. This is different from the forward pass in A*B where the stride is height of tile B.
@@ -789,8 +940,10 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
         if (subgroupIndex == 0)
         {
             // Store the result shared memory. We store one row of the cooperative matrix at a time.
+            [ForceUnroll]
             for (uint i = 0; i < CoopMatCRows; i++)
             {
+                [ForceUnroll]
                 for (uint j = 0; j < CoopMatCColumns; j++)
                 {
                     // Save the result to shared memory in row major, because this is cache friendly for global memory access.
@@ -806,7 +959,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
                 // K dimension. Note that column major in transpose case is just the row major in non-transpose case.
 
                 typealias MMA = MMAHelper<T, InputSize, OutputSize, SubgroupSize, Target, true>;
-                MMA.storeShA<U, Storage>(sharedMemoryB, i, weightStorage, weightAddress);
+                MMA.storeShA<U, Address>(sharedMemoryB, i, weightAddress);
 
                 // Wait until all threads in the warp finish reading the shared memory and storing to the global memory.
                 GroupMemoryBarrierWithWaveSync();
@@ -820,17 +973,15 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
     //  for each thread, so the matrix-matrix multiply only needs to be performed for each warp (sub-group).
     [ForceInline]
     [require(cooperative_matrix, subgroup_basic)]
-    VISIBILITY_LEVEL static OutArrayType mma<U, Storage, InArrayType, OutArrayType, V, bool Bias = false>(InArrayType inputVector,
+    VISIBILITY_LEVEL static OutArrayType mma<U, Address, InArrayType, OutArrayType, V, bool Bias = false>(InArrayType inputVector,
         SPtr<uint4> sharedMemoryA,
         SPtr<uint4> sharedMemoryB,
         SPtr<uint4> sharedMemoryC,
-        Storage weightStorage,
-        Storage.Address weightAddress,
-        Optional<Storage> biasStorage,
-        Optional<Storage.Address> biasAddress)
+        Address weightAddress,
+        Optional<Address> biasAddress)
             where U : __BuiltinFloatingPointType
             where U.Differential == U
-            where Storage : IStorage<U>
+            where Address : IPointerLikeAddress<U>
             where V : __BuiltinFloatingPointType
             where V.Differential == V
             where InArrayType : IArrayAccessor<V>
@@ -853,7 +1004,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
             ptrB[0] = sharedMemoryB;
             ptrB[1] = sharedMemoryB + ShMemInfo.SharedMemSizeInVectorMatB;
             // PreLoad for the first iteration
-            loadShA<U, Storage>(ptrA[0], 0, weightStorage, weightAddress);
+            loadShA<U, Address>(ptrA[0], 0, weightAddress);
             loadVectorToShB(ptrB[0], 0, subgroupIndex, inputVector);
         }
 
@@ -873,12 +1024,12 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
             [ForceUnroll]
             for (int i = 0; i < M; i++)
             {
-                Storage.Address offset = Storage.getOffset(biasAddress.value, i);
-                U bias = biasStorage.value.read(offset);
+                U bias = biasAddress.value[uint(i)];
                 outputVector[i] = __realCast<V>(bias);
             }
         }
 
+        [ForceUnroll]
         for (int k = 0; k < TileInfo.SharedDimensionSize; k += CMShape.COLUMN_A)
         {
             uint tileIndex = k / CMShape.COLUMN_A;
@@ -890,7 +1041,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
                 // swap to next buffer to load new data.
                 bufferIndex = bufferIndex ^ 1;
                 // Load the another buffer and do the math so we can hide the latency of the load.
-                loadShA<U, Storage>(ptrA[bufferIndex], tileIndex, weightStorage, weightAddress);
+                loadShA<U, Address>(ptrA[bufferIndex], tileIndex, weightAddress);
                 loadVectorToShB(ptrB[bufferIndex], tileIndex, subgroupIndex, inputVector);
 
                 // swap back to the previous buffer to perform the math.
@@ -898,7 +1049,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
             }
             else
             {
-                loadShA<U, Storage>(ptrA[0], tileIndex, weightStorage, weightAddress);
+                loadShA<U, Address>(ptrA[0], tileIndex, weightAddress);
                 loadVectorToShB(ptrB[0], tileIndex, subgroupIndex, inputVector);
 
                 // The reason that we have to sync the whole workgroup is that for matrix A, the tile is shared by
@@ -915,6 +1066,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
             // shB is shared only by each subgroup, and each subgroup will have its own offset on shB.
             // For matB, each warp could only have 1 or 2 Tiles to load according whether this warp is less (1 tile) or more than half warp (2 tiles).
             MatA matA[TileInfo.NCoopMatRow];
+            [ForceUnroll]
             for (uint i = 0; i < TileInfo.NCoopMatRow; i ++)
             {
                 if (TransposeA)
@@ -929,6 +1081,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
                 }
             }
 
+            [ForceUnroll]
             for (uint j = 0; j < TileInfo.NCoopMatColumn; j ++)
             {
                 // NTilesColumn * HeightInVectorTileB is the size of the shared memory for matrix B in one warp measured in vector uint4.
@@ -1071,14 +1224,12 @@ public struct WaveTangledVector<T, ShMemPool : ISharedMemoryPool, int N, int Sub
         set { this.data[index] = newValue; }
     }
 
-    private OutputVector linearTransformOnTarget<Storage, Layout, OutputVector, TargetEnum Target, bool Bias>(
-        Storage weight,
-        no_diff Storage.Address weightAddress,
-        no_diff Optional<Storage> bias,
-        no_diff Optional<Storage.Address> biasAddress)
-        where Storage : IStorage<T>
-        where Storage.Differential : IStorage<T.Differential>
-        where Storage.Address == Storage.Differential.Address
+    [ForceInline]
+    private OutputVector linearTransformOnTarget<Address, Layout, OutputVector, TargetEnum Target, bool Bias>(
+        Address weightAddress,
+        Optional<Address> biasAddress)
+        where Address : IPointerLikeAddress<T>
+        where Address.Differential : IPointerLikeAddress<T.Differential>
         where OutputVector : IVector<T>
     {
         typealias MMA = MMAHelper<DTypeMatC, N, OutputVector.Size, SubgroupSize, Target, false>;
@@ -1086,21 +1237,19 @@ public struct WaveTangledVector<T, ShMemPool : ISharedMemoryPool, int N, int Sub
         SPtr<uint4> shB = shA + MMA.ShMemInfo.SharedMemSizeInVectorMatA;
         SPtr<uint4> shC = shB;
         const int AlignedOutSize = MMA.TileInfo.Uint4AlignedM;
-        let outputArray = MMA.mma<T, Storage, T[Uint4AlignedInputSize], T[AlignedOutSize], T, Bias
-                            >( data, shA, shB, shC, weight, weightAddress, bias, biasAddress);
+        let outputArray = MMA.mma<T, Address, T[Uint4AlignedInputSize], T[AlignedOutSize], T, Bias
+                            >( data, shA, shB, shC, weightAddress, biasAddress);
         return OutputVector(outputArray);
     }
 
-    private static void linearTransformBwdOnTarget<Storage, Layout, OutputVector, TargetEnum Target, bool Bias>(
+    [ForceInline]
+    private static void linearTransformBwdOnTarget<Address, Layout, OutputVector, TargetEnum Target, bool Bias>(
         inout DifferentialPair<This> dthis,
-        DifferentialPtrPair<Storage> dWeightStorage,
-        no_diff Storage.Address dWeightAddress,
-        Optional<DifferentialPtrPair<Storage>> biasStorage,
-        no_diff Optional<Storage.Address> biasAddress,
+        DifferentialPtrPair<Address> dWeightAddress,
+        Optional<DifferentialPtrPair<Address>> biasAddress,
         OutputVector.Differential doutput)
-        where Storage : IStorage<T>
-        where Storage.Differential : IStorage<T.Differential>
-        where Storage.Address == Storage.Differential.Address
+        where Address : IPointerLikeAddress<T>
+        where Address.Differential : IPointerLikeAddress<T.Differential>
         where OutputVector : IVector<T>
         where OutputVector.Differential : IVector<T.Differential>
     {
@@ -1118,132 +1267,38 @@ public struct WaveTangledVector<T, ShMemPool : ISharedMemoryPool, int N, int Sub
         // of the mma operation.
         // dIn = W^T * dOut;
 #if 1
-        let outArray = MMA.mma<T, Storage, OutputVector.Differential, T[AlignedOutSize].Differential, T.Differential, false
-                        >( doutput, shA, shB, shC, dWeightStorage.p, dWeightAddress, none, none);
+        let outArray = MMA.mma<T, Address, OutputVector.Differential, T[AlignedOutSize].Differential, T.Differential, false
+                        >( doutput, shA, shB, shC, dWeightAddress.p, none);
         This.Differential dInput = This.Differential(outArray);
         dthis = DifferentialPair<This>(dthis.p, dInput);
 
         // dW = dOut * input^T
-        MMA.outerProductAccumulate<T.Differential, Storage.Differential,
+        MMA.outerProductAccumulate<T.Differential, Address.Differential,
                                    T.Differential, OutputVector.Differential,
                                    T, T[Uint4AlignedInputSize]
-                                  >( shA, shB, doutput, dthis.p.data, dWeightStorage.d, dWeightAddress);
+                                  >( shA, shB, doutput, dthis.p.data, dWeightAddress.d);
 #else
-        let dInput = MMA.mma<T, Storage, OutputVector.Differential, This.Differential
-                        >( doutput, shA, shB, shC, dWeightStorage.p, dWeightAddress);
+        let dInput = MMA.mma<T, Address, OutputVector.Differential, This.Differential
+                        >( doutput, shA, shB, shC, dWeightAddress.p, none);
         dthis = DifferentialPair<This>(dthis.p, dInput);
 
-        MMA.outerProductAccumulate< T.Differential, Storage.Differential,
+        MMA.outerProductAccumulate<T.Differential, Address.Differential,
                                     T.Differential, OutputVector.Differential,
                                     T, This
-                                  >( shA, shB, doutput, dthis.p, dWeightStorage.d, dWeightAddress);
+                                  >( shA, shB, doutput, dthis.p, dWeightAddress.d);
 #endif
 
         if (Bias)
         {
-            // VISIBILITY_LEVEL static void sumReduceRows<U, Storage, InArrayType>(
-            //     SPtr<uint4> sharedMemory,
-            //     in InArrayType dOut,
-            //     in int subgroupId,
-            //     Storage biasStorage,
-            //     Storage.Address biasAddress)
             const int subgroupIndex = getWaveId();
-            MMA.sumReduceRows<T.Differential, Storage.Differential, OutputVector.Differential
-                >(shB, doutput, subgroupIndex, biasStorage.value.d, biasAddress.value);
+            MMA.sumReduceRows<T.Differential, Address.Differential, OutputVector.Differential
+                >(shA, doutput, subgroupIndex, biasAddress.value.d);
         }
     }
 
     // Linear transformation without bias
-    [Differentiable]
+    [ForceInline]
     [BackwardDerivative(linearTransformBwd)]
-    public OutputVector linearTransform<Storage, Layout, OutputVector>(
-        Storage weightStorage,
-        no_diff Storage.Address weightAddress)
-            where Storage : IStorage<T>
-            where Storage.Differential : IStorage<T.Differential>
-            where Storage.Address == Storage.Differential.Address
-            where Layout : IStorageLayout
-            where OutputVector : IVector<T>
-    {
-        __target_switch
-        {
-        case cuda:
-            return no_diff linearTransformOnTarget<Storage, Layout, OutputVector, TargetEnum.CUDA, false>(weightStorage, weightAddress, none, none);
-        case spirv:
-            return no_diff linearTransformOnTarget<Storage, Layout, OutputVector, TargetEnum.SPIR_V, false>(weightStorage, weightAddress, none, none);
-        }
-    }
-
-    // Backward of linear transformation without bias
-    static void linearTransformBwd<Storage, Layout, OutputVector>(
-        inout DifferentialPair<This> dthis,
-        DifferentialPtrPair<Storage> dWeightStorage,
-        no_diff Storage.Address dWeightAddress,
-        OutputVector.Differential doutput)
-            where Storage : IStorage<T>
-            where Storage.Differential : IStorage<T.Differential>
-            where Storage.Address == Storage.Differential.Address
-            where Layout : IStorageLayout
-            where OutputVector : IVector<T>
-            where OutputVector.Differential : IVector<T.Differential>
-    {
-        Optional<DifferentialPtrPair<Storage>> biasStorage = {};
-        __target_switch
-        {
-        case cuda:
-            linearTransformBwdOnTarget<Storage, Layout, OutputVector, TargetEnum.CUDA, false>(dthis, dWeightStorage, dWeightAddress, biasStorage, none, doutput);
-        case spirv:
-            linearTransformBwdOnTarget<Storage, Layout, OutputVector, TargetEnum.SPIR_V, false>(dthis, dWeightStorage, dWeightAddress, biasStorage, none, doutput);
-        }
-    }
-
-    [Differentiable]
-    [BackwardDerivative(linearTransformBwd)]
-    public OutputVector linearTransform<Storage, Layout, OutputVector>(
-        Storage weightStorage,
-        Storage biasStorage,
-        no_diff Storage.Address weightAddress,
-        no_diff Storage.Address biasAddress)
-            where Storage : IStorage<T>
-            where Storage.Differential : IStorage<T.Differential>
-            where Storage.Address == Storage.Differential.Address
-            where Layout : IStorageLayout
-            where OutputVector : IVector<T>
-    {
-        __target_switch
-        {
-        case cuda:
-            return no_diff linearTransformOnTarget<Storage, Layout, OutputVector, TargetEnum.CUDA, true>(weightStorage, weightAddress, biasStorage, biasAddress);
-        case spirv:
-            return no_diff linearTransformOnTarget<Storage, Layout, OutputVector, TargetEnum.SPIR_V, true>(weightStorage, weightAddress, biasStorage, biasAddress);
-        }
-    }
-
-    // Backward of linear transformation with bias
-    static void linearTransformBwd<Storage, Layout, OutputVector>(
-        inout DifferentialPair<This> dthis,
-        DifferentialPtrPair<Storage> dWeightStorage,
-        DifferentialPtrPair<Storage> dBiasStorage,
-        no_diff Storage.Address dWeightAddress,
-        no_diff Storage.Address dBiasAddress,
-        OutputVector.Differential doutput)
-            where Storage : IStorage<T>
-            where Storage.Differential : IStorage<T.Differential>
-            where Storage.Address == Storage.Differential.Address
-            where Layout : IStorageLayout
-            where OutputVector : IVector<T>
-            where OutputVector.Differential : IVector<T.Differential>
-    {
-        __target_switch
-        {
-        case cuda:
-            linearTransformBwdOnTarget<Storage, Layout, OutputVector, TargetEnum.CUDA, true>( dthis, dWeightStorage, dWeightAddress, dBiasStorage, dBiasAddress, doutput);
-        case spirv:
-            linearTransformBwdOnTarget<Storage, Layout, OutputVector, TargetEnum.SPIR_V, true>(dthis, dWeightStorage, dWeightAddress, dBiasStorage, dBiasAddress, doutput);
-        }
-    }
-
-    [Differentiable]
     public OutputVector linearTransform<Address, Layout, OutputVector>(
         Address weightAddress)
             where Address : IPointerLikeAddress<T>
@@ -1251,11 +1306,39 @@ public struct WaveTangledVector<T, ShMemPool : ISharedMemoryPool, int N, int Sub
             where Layout : IStorageLayout
             where OutputVector : IVector<T>
     {
-        OutputVector output = OutputVector();
-        return output;
+        __target_switch
+        {
+        case cuda:
+            return no_diff linearTransformOnTarget<Address, Layout, OutputVector, TargetEnum.CUDA, false>(weightAddress, none);
+        case spirv:
+            return no_diff linearTransformOnTarget<Address, Layout, OutputVector, TargetEnum.SPIR_V, false>(weightAddress, none);
+        }
     }
 
-    [Differentiable]
+    // Backward of linear transformation without bias
+    [ForceInline]
+    static void linearTransformBwd<Address, Layout, OutputVector>(
+        inout DifferentialPair<This> dthis,
+        DifferentialPtrPair<Address> dWeightAddress,
+        OutputVector.Differential doutput)
+            where Address : IPointerLikeAddress<T>
+            where Address.Differential : IPointerLikeAddress<T.Differential>
+            where Layout : IStorageLayout
+            where OutputVector : IVector<T>
+            where OutputVector.Differential : IVector<T.Differential>
+    {
+        Optional<DifferentialPtrPair<Address>> biasAddress = {};
+        __target_switch
+        {
+        case cuda:
+            linearTransformBwdOnTarget<Address, Layout, OutputVector, TargetEnum.CUDA, false>(dthis, dWeightAddress, biasAddress, doutput);
+        case spirv:
+            linearTransformBwdOnTarget<Address, Layout, OutputVector, TargetEnum.SPIR_V, false>(dthis, dWeightAddress, biasAddress, doutput);
+        }
+    }
+
+    [ForceInline]
+    [BackwardDerivative(linearTransformBwd)]
     public OutputVector linearTransform<Address, Layout, OutputVector>(
         Address weightAddress, Address biasAddress)
             where Address : IPointerLikeAddress<T>
@@ -1263,7 +1346,34 @@ public struct WaveTangledVector<T, ShMemPool : ISharedMemoryPool, int N, int Sub
             where Layout : IStorageLayout
             where OutputVector : IVector<T>
     {
-        OutputVector output = OutputVector();
-        return output;
+        __target_switch
+        {
+        case cuda:
+            return no_diff linearTransformOnTarget<Address, Layout, OutputVector, TargetEnum.CUDA, true>(weightAddress, biasAddress);
+        case spirv:
+            return no_diff linearTransformOnTarget<Address, Layout, OutputVector, TargetEnum.SPIR_V, true>(weightAddress, biasAddress);
+        }
+    }
+
+    // Backward of linear transformation with bias
+    [ForceInline]
+    static void linearTransformBwd<Address, Layout, OutputVector>(
+        inout DifferentialPair<This> dthis,
+        DifferentialPtrPair<Address> dWeightAddress,
+        DifferentialPtrPair<Address> dBiasAddress,
+        OutputVector.Differential doutput)
+            where Address : IPointerLikeAddress<T>
+            where Address.Differential : IPointerLikeAddress<T.Differential>
+            where Layout : IStorageLayout
+            where OutputVector : IVector<T>
+            where OutputVector.Differential : IVector<T.Differential>
+    {
+        __target_switch
+        {
+        case cuda:
+            linearTransformBwdOnTarget<Address, Layout, OutputVector, TargetEnum.CUDA, true>(dthis, dWeightAddress, dBiasAddress, doutput);
+        case spirv:
+            linearTransformBwdOnTarget<Address, Layout, OutputVector, TargetEnum.SPIR_V, true>(dthis, dWeightAddress, dBiasAddress, doutput);
+        }
     }
 }
