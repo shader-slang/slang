@@ -731,6 +731,10 @@ void EndToEndCompileRequest::generateOutput()
     SLANG_PROFILE;
     generateOutput(getSpecializedGlobalAndEntryPointsComponentType());
 
+    // Do not emit any artifacts if code generation produced errors.
+    if (getSink()->getErrorCount() != 0)
+        return;
+
     // If we are in command-line mode, we might be expected to actually
     // write output to one or more files here.
 

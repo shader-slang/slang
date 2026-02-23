@@ -28,10 +28,48 @@ public struct BindlessAddress<T> : IPointerLikeAddress<T>
         set { handle[baseIndex + index] = newValue; }
     }
 
+    [ForceInline]
+    [require(hlsl, sm_6_6)]
+    internal void atomicAddForHLSL(uint index, T value)
+    {
+        T compareValue;
+        bool success = false;
+        do
+        {
+            compareValue = handle[baseIndex + index];
+            T newValue = compareValue + value;
+            success = __atomic_compare_exchange(handle[baseIndex + index], compareValue, newValue) == compareValue;
+        } while (!success);
+    }
+
+    [ForceInline]
     [require(cuda_glsl_hlsl_metal_spirv, sm_6_6)]
     public void atomicAdd(uint index, T value)
     {
-        __atomic_reduce_add(handle[baseIndex + index], value);
+        __target_switch
+        {
+        case hlsl:
+            atomicAddForHLSL(index, value);
+        default:
+            __atomic_reduce_add(handle[baseIndex + index], value);
+        }
+    }
+
+    [ForceInline]
+    public void atomicAdd(uint index, vector<T, 2> value)
+    {
+        __target_switch
+        {
+        case cuda:
+            // On CUDA, use packed vector atomic for types that support it (half2, bfloat16x2).
+            let scalarPtr = &handle[baseIndex + index];
+            let vecPtr = reinterpret<vector<T, 2>*>(scalarPtr);
+            __atomic_reduce_add(vecPtr[0], value);
+        default:
+            // On other targets, fall back to two scalar atomic adds.
+            atomicAdd(index, value[0]);
+            atomicAdd(index + 1, value[1]);
+        }
     }
 
     public This getOffset(int elements)
@@ -41,6 +79,26 @@ public struct BindlessAddress<T> : IPointerLikeAddress<T>
         This address = This(handle);
         address.baseIndex = newBaseIndex;
         return address;
+    }
+
+    [ForceInline]
+    internal uint4 readUint4<DstType, bool IsAligned, uint ActualBoundary>(int offsetIndex)
+        where DstType : __BuiltinFloatingPointType
+        where DstType.Differential == DstType
+    {
+        uint4 value;
+        accessUint4<AccessOp.READ, DstType, T, RWStructuredBuffer<T>.Handle, IsAligned, ActualBoundary>(
+            handle, int(baseIndex), int(baseIndex) + offsetIndex, value);
+        return value;
+    }
+
+    [ForceInline]
+    internal void writeUint4Atomic<SrcType, bool IsAligned, uint ActualBoundary>(int offsetIndex, uint4 value)
+        where SrcType : __BuiltinFloatingPointType
+        where SrcType.Differential == SrcType
+    {
+        accessUint4<AccessOp.ATOMIC_ADD, SrcType, T, RWStructuredBuffer<T>.Handle, IsAligned, ActualBoundary>(
+            handle, int(baseIndex), int(baseIndex) + offsetIndex, value);
     }
 }
 
@@ -71,10 +129,67 @@ public struct PointerAddress<T> : IPointerLikeAddress<T>
         return This(ptr + elements);
     }
 
+    [ForceInline]
+    [require(hlsl, sm_6_6)]
+    internal void atomicAddForHLSL(uint index, T value)
+    {
+        T compareValue;
+        bool success = false;
+        do
+        {
+            compareValue = ptr[index];
+            T newValue = compareValue + value;
+            success = __atomic_compare_exchange(ptr[index], compareValue, newValue) == compareValue;
+        } while (!success);
+    }
+
+    [ForceInline]
     [require(cuda_glsl_hlsl_metal_spirv, sm_6_6)]
     public void atomicAdd(uint index, T value)
     {
-        __atomic_reduce_add(ptr[index], value);
+        __target_switch
+        {
+        case hlsl:
+            atomicAddForHLSL(index, value);
+        default:
+            __atomic_reduce_add(ptr[index], value);
+        }
+    }
+
+    [ForceInline]
+    public void atomicAdd(uint index, vector<T, 2> value)
+    {
+        __target_switch
+        {
+        case cuda:
+            // On CUDA, use packed vector atomic for types that support it (half2, bfloat16x2).
+            let vecPtr = reinterpret<vector<T, 2>*>(ptr + index);
+            __atomic_reduce_add(vecPtr[0], value);
+        default:
+            // On other targets, fall back to two scalar atomic adds.
+            atomicAdd(index, value[0]);
+            atomicAdd(index + 1, value[1]);
+        }
+    }
+
+    [ForceInline]
+    internal uint4 readUint4<DstType, bool IsAligned, uint ActualBoundary>(int offsetIndex)
+        where DstType : __BuiltinFloatingPointType
+        where DstType.Differential == DstType
+    {
+        uint4 value;
+        accessUint4<AccessOp.READ, DstType, T, T*, IsAligned, ActualBoundary>(
+            ptr, 0, offsetIndex, value);
+        return value;
+    }
+
+    [ForceInline]
+    internal void writeUint4Atomic<SrcType, bool IsAligned, uint ActualBoundary>(int offsetIndex, uint4 value)
+        where SrcType : __BuiltinFloatingPointType
+        where SrcType.Differential == SrcType
+    {
+        accessUint4<AccessOp.ATOMIC_ADD, SrcType, T, T*, IsAligned, ActualBoundary>(
+            ptr, 0, offsetIndex, value);
     }
 }
 
@@ -106,112 +221,64 @@ internal extension<T> Ptr<T, Access.ReadWrite, AddressSpace.Device> : IPointerLi
         return This(this + elements);
     }
 
-    [require(cuda_glsl_hlsl_metal_spirv, sm_6_6)]
-    internal void atomicAdd(uint index, T value) {__atomic_reduce_add(this[index], value);}
-}
-
-/**
-Bindless buffer storage implementation using buffer handles.
-Provides pointer-like addressing through buffer handles, enabling more flexible
-memory access patterns suitable for dynamic or sparse data structures.
-@param T The element type (must be a floating-point type).
-@remarks Type constraints:
-- `T` must conform to `__BuiltinFloatingPointType` (float, double, half, etc.)
-- `T.Differential` must conform to `__BuiltinFloatingPointType` for automatic differentiation
-@category neural
-*/
-public struct BindlessBufferStorage<T> : IStorage<T>
-    where T : __BuiltinFloatingPointType
-    where T.Differential == T
-{
-    public typealias Address = BindlessAddress<T>;
-    public typealias Differential = BindlessBufferStorage<T.Differential>;
-
-    // Following method will not be needed for bindless storage
-    public T read(Address address) { return address[0]; }
-
-    internal uint4 readUint4<DstType, bool IsAligned, uint ActualBoundary>(Address baseAddress, Address address)
-        where DstType : __BuiltinFloatingPointType
-        where DstType.Differential == DstType
+    [require(hlsl, sm_6_6)]
+    internal void atomicAddForHLSL(uint index, T value)
     {
-        static_assert(false, "Not implemented");
-        return uint4(0);
+        T compareValue;
+        bool success = false;
+        do
+        {
+            compareValue = this[index];
+            T newValue = compareValue + value;
+            success = __atomic_compare_exchange(this[index], compareValue, newValue) == compareValue;
+        } while (!success);
     }
-
-    internal void writeUint4Atomic<SrcType, bool IsAligned, uint ActualBoundary>(Address baseAddress, Address address, uint4 value)
-        where SrcType : __BuiltinFloatingPointType
-        where SrcType.Differential == SrcType
-    {
-        static_assert(false, "Not implemented");
-    }
-    public void atomicAdd(Address address, T value) {address.atomicAdd(0, value);}
 
     [ForceInline]
-    public void atomicAdd(Address address, vector<T, 2> value)
+    [require(cuda_glsl_hlsl_metal_spirv, sm_6_6)]
+    internal void atomicAdd(uint index, T value)
     {
         __target_switch
         {
-        case cuda:
-            // On CUDA, use packed vector atomic for types that support it (half2, bfloat16x2).
-            if (let handle = address.handle as RWStructuredBuffer<T>.Handle)
-            {
-                let scalarPtr = &handle[address.baseIndex];
-                let vecPtr = reinterpret<vector<T, 2>*>(scalarPtr);
-                __atomic_reduce_add(vecPtr[0], value);
-            }
+        case hlsl:
+            atomicAddForHLSL(index, value);
         default:
-            // On other targets, fall back to two scalar atomic adds.
-            address.atomicAdd(0, value[0]);
-            address.atomicAdd(1, value[1]);
+            __atomic_reduce_add(this[index], value);
         }
     }
 
-    public void write(Address address, T value) {address[0] = value;}
-    public static Address getOffset(Address base, int elements) { return base.getOffset(elements); }
-}
-
-public struct PointerStorage<T> : IStorage<T>
-    where T : __BuiltinFloatingPointType
-    where T.Differential == T
-{
-    public typealias Address = PointerAddress<T>;
-    public typealias Differential = PointerStorage<T.Differential>;
-
-    // Following method will not be needed for pointer storage
-    public T read(Address address) { return address[0]; }
-
-    internal uint4 readUint4<DstType, bool IsAligned, uint ActualBoundary>(Address baseAddress, Address address)
-        where DstType : __BuiltinFloatingPointType
-        where DstType.Differential == DstType
-    {
-        static_assert(false, "Not implemented");
-        return uint4(0);
-    }
-    internal void writeUint4Atomic<SrcType, bool IsAligned, uint ActualBoundary>(Address baseAddress, Address address, uint4 value)
-        where SrcType : __BuiltinFloatingPointType
-        where SrcType.Differential == SrcType
-    {
-        static_assert(false, "Not implemented");
-    }
-    public void atomicAdd(Address address, T value) {address.atomicAdd(0, value);}
-
     [ForceInline]
-    public void atomicAdd(Address address, vector<T, 2> value)
+    internal void atomicAdd(uint index, vector<T, 2> value)
     {
         __target_switch
         {
         case cuda:
-            // On CUDA, use packed vector atomic for types that support it (half2, bfloat16x2).
-            // address.ptr is already a T*, cast to vector<T, 2>* and dereference.
-            let vecPtr = reinterpret<vector<T, 2>*>(address.ptr);
+            let vecPtr = reinterpret<vector<T, 2>*>(this + index);
             __atomic_reduce_add(vecPtr[0], value);
         default:
-            // On other targets, fall back to two scalar atomic adds.
-            address.atomicAdd(0, value[0]);
-            address.atomicAdd(1, value[1]);
+            atomicAdd(index, value[0]);
+            atomicAdd(index + 1, value[1]);
         }
     }
 
-    public void write(Address address, T value) {address[0] = value;}
-    public static Address getOffset(Address base, int elements) {return base.getOffset(elements);}
+    [ForceInline]
+    internal uint4 readUint4<DstType, bool IsAligned, uint ActualBoundary>(int offsetIndex)
+        where DstType : __BuiltinFloatingPointType
+        where DstType.Differential == DstType
+    {
+        uint4 value;
+        accessUint4<AccessOp.READ, DstType, T, This, IsAligned, ActualBoundary>(
+            this, 0, offsetIndex, value);
+        return value;
+    }
+
+    [ForceInline]
+    internal void writeUint4Atomic<SrcType, bool IsAligned, uint ActualBoundary>(int offsetIndex, uint4 value)
+        where SrcType : __BuiltinFloatingPointType
+        where SrcType.Differential == SrcType
+    {
+        accessUint4<AccessOp.ATOMIC_ADD, SrcType, T, This, IsAligned, ActualBoundary>(
+            this, 0, offsetIndex, value);
+    }
 }
+

@@ -352,7 +352,14 @@ void MarkdownCommandOptionsWriter::_appendDescriptionForCategory(Index categoryI
                 }
 
                 m_builder << "### ";
-                StringUtil::join(names.getBuffer(), names.getCount(), toSlice(", "), m_builder);
+                if (option.displayName.getLength())
+                {
+                    _appendEscapedMarkdown(option.displayName, m_builder);
+                }
+                else
+                {
+                    StringUtil::join(names.getBuffer(), names.getCount(), toSlice(", "), m_builder);
+                }
                 m_builder << "\n";
 
                 if (option.usage.getLength())
