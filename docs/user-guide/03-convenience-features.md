@@ -577,11 +577,15 @@ int invalidTest()
 }
 ```
 
-Pointer types can also be specified using the generic syntax `Ptr<MyType>`. `Ptr<MyType>` is equivalent to `MyType*`.
+Pointer types can also be specified using the generic syntax
+`Ptr<MyType, AccessMode=Access.ReadWrite, AddressSpace=AddressSpace.Device>`. The generic syntax allows
+declaring pointers to read-only and immutable values, and pointers to address spaces other than
+`Device`. Pointers to immutable values can also be declared with type alias
+`ImmutablePtr<T, AddressSpace>`. `Ptr<MyType>` is equivalent to `MyType*`.
 
 ### Limitations
 
-- Slang supports pointers to global memory, but not shared or local memory. For example, it is invalid to define a pointer to a local variable.
+- Slang supports pointers to global and shared memory but not local memory. It is invalid to define a pointer to a local variable.
 
 - Slang supports pointers that are defined as shader parameters (e.g. as a constant buffer field).
 
@@ -589,11 +593,10 @@ Pointer types can also be specified using the generic syntax `Ptr<MyType>`. `Ptr
 
 - Slang doesn't support forming pointers to opaque handle types, e.g. `Texture2D`. For handle pointers, use `DescriptorHandle<T>` instead.
 
-- Slang doesn't support coherent load/stores.
+- Slang doesn't support custom alignment specification. Functions
+  `loadAligned()` and `storeAligned()` may be used for loads and stores using pointers with known alignment.
 
-- Slang doesn't support custom alignment specification.
-
-- Slang currently does not support pointers to immutable values, i.e. `const T*`.
+- Slang currently does not support `const` pointers.
 
 ## `DescriptorHandle` for Bindless Descriptor Access
 

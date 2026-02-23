@@ -21,12 +21,12 @@ typealias DType = float;
 #endif
 
 
-// TEST_INPUT:ubuffer(stride=4, count=4096):name=inputBuffer
-RWStructuredBuffer<DType> inputBuffer;
+// TEST_INPUT: set inputBuffer = ubuffer(stride=4, count=4096)
+uniform RWStructuredBuffer<DType>.Handle inputBuffer;
 
 
-// TEST_INPUT:ubuffer(stride=4, count=64):name=biasBuffer
-RWStructuredBuffer<DType> biasBuffer;
+// TEST_INPUT: set biasBuffer = ubuffer(stride=4, count=64)
+uniform RWStructuredBuffer<DType>.Handle biasBuffer;
 
 // TEST_INPUT:ubuffer(stride=4, count=5):out, name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
@@ -86,8 +86,8 @@ void identityWeightMatrix<int InputSize>(uint tid, bool clear = false)
 
 DType[MMAHelper<DType, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA>.Uint4AlignedM] testMatVecMul<int InputSize, int OutputSize, TargetEnum Target>(uint tid)
 {
-    typealias Storage = StructuredBufferStorage<DType>;
-    Storage storage = Storage(inputBuffer);
+    typealias Address = BindlessAddress<DType>;
+    Address address = Address(inputBuffer);
 
 
 
@@ -109,10 +109,10 @@ DType[MMAHelper<DType, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA>.Uin
     SPtr ptrC = __getAddress(s_sharedMemoryB[0]);
 
 #if !TEST_BIAS
-    let res = MMA.mma<DType, Storage, DType[InSize], DType[OutSize], DType, false>( inputVector, ptrA, ptrB, ptrC, storage, 0, none, none);
+    let res = MMA.mma<DType, Address, DType[InSize], DType[OutSize], DType, false>( inputVector, ptrA, ptrB, ptrC, address, none);
 #else
-    Storage biasStorage = Storage(biasBuffer);
-    let res = MMA.mma<DType, Storage, DType[InSize], DType[OutSize], DType, true>( inputVector, ptrA, ptrB, ptrC, storage, 0, biasStorage, Optional<Storage.Address>(0));
+    Address biasAddress = Address(biasBuffer);
+    let res = MMA.mma<DType, Address, DType[InSize], DType[OutSize], DType, true>( inputVector, ptrA, ptrB, ptrC, address, biasAddress);
 #endif
 
     return res;

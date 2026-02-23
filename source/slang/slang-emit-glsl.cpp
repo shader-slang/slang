@@ -577,6 +577,7 @@ void GLSLSourceEmitter::_emitGLSLParameterGroup(
             case kIROp_Std140BufferLayoutType:
                 m_writer->emit("std140");
                 break;
+            case kIROp_DefaultPushConstantBufferLayoutType:
             case kIROp_Std430BufferLayoutType:
                 m_writer->emit("std430");
                 break;

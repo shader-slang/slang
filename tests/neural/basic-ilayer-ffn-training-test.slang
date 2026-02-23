@@ -1,6 +1,6 @@
 // Unit test for ILayer with multi-layer FFN (forward pass only).
 //
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-dx12 -compute -shaderobj -profile cs_6_6 -xslang -experimental-feature -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-mtl -compute -shaderobj -output-using-type -xslang -experimental-feature
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -xslang -experimental-feature
@@ -18,38 +18,42 @@ import neural;
 //
 // Total params: (2*2 + 2) + (1*2 + 1) = 9
 
-//TEST_INPUT: ubuffer(data=[2.0 -1.0 0.5 3.0  1.0 -2.0  -2.0 4.0  0.5], stride=4):name=parametersFloat
+//TEST_INPUT: set parametersFloat = ubuffer(data=[2.0 -1.0 0.5 3.0  1.0 -2.0  -2.0 4.0  0.5], stride=4)
 RWStructuredBuffer<float> parametersFloat;
 
-//TEST_INPUT: ubuffer(data=[0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0], stride=4):name=params
-RWStructuredBuffer<float> params;
+//TEST_INPUT: set params = ubuffer(data=[0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0], stride=4)
+uniform RWStructuredBuffer<float>.Handle params;
 
 //TEST_INPUT: ubuffer(data=[0 0], stride=4):out,name=resultBuffer
 RWStructuredBuffer<uint> resultBuffer;
 
-typealias Storage = StructuredBufferStorage<float>;
+typealias Address = BindlessAddress<float>;
 typealias V2 = InlineVector<float, 2>;
 typealias V1 = InlineVector<float, 1>;
 typealias Act = IdentityActivation<float>;
-typealias Layer1 = FFLayer<float, V2, V2, Storage, Act, true>;
-typealias Layer2 = FFLayer<float, V2, V1, Storage, Act, true>;
+typealias Layer1 = FFLayer<float, V2, V2, LinearLayout, Act, true>;
+typealias Layer2 = FFLayer<float, V2, V1, LinearLayout, Act, true>;
 
-static const uint Base0 = 0;
+static const int Base0 = 0;
 
 bool forwardCheck()
 {
-    let storage = Storage(params);
+    let baseAddr = Address(params);
 
     float[2] xArr = { 1.5, -2.0 };
     let x = V2(xArr);
 
-    // Layer1: weights at 0 (4 floats: 2x2), bias at 4 (2 floats)
-    let layer1 = Layer1(0, 4);
-    // Layer2: weights at 6 (2 floats: 1x2), bias at 8 (1 float)
-    let layer2 = Layer2(6, 8);
+    let layer1 = Layer1();
+    let layer2 = Layer2();
 
-    let h = layer1.eval<Storage>(storage, x);
-    let y = layer2.eval<Storage>(storage, h);
+    // Compute weight/bias addresses for each layer
+    let w1Addr = baseAddr.getOffset(0);
+    let b1Addr = baseAddr.getOffset(4);
+    let w2Addr = baseAddr.getOffset(6);
+    let b2Addr = baseAddr.getOffset(8);
+
+    let h = layer1.eval<Address>(x, w1Addr, b1Addr);
+    let y = layer2.eval<Address>(h, w2Addr, b2Addr);
 
     // Expected:
     // h = W1*x + b1
@@ -63,7 +67,7 @@ bool forwardCheck()
     //   = [-12 - 29] + 0.5
     //   = -41 + 0.5
     //   = -40.5
-    return (y[0] == -40.5);
+    return abs(y[0] - (-40.5)) < 0.001;
 }
 
 bool parameterCountCheck()
@@ -73,7 +77,7 @@ bool parameterCountCheck()
     // Total: 9
     bool layer1Ok = (Layer1.ParameterCount == 6);
     bool layer2Ok = (Layer2.ParameterCount == 3);
-    bool addressOk = (Layer1.nextAddress(Base0) == 6);
+    bool addressOk = (Layer1.nextOffset(Base0) == 6);
     return layer1Ok && layer2Ok && addressOk;
 }
 

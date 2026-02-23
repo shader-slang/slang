@@ -3282,14 +3282,36 @@ static LegalVal declareVars(
 
     case LegalType::Flavor::implicitDeref:
         {
-            // Just declare a variable of the pointed-to type,
+            auto unwrappedTypeLayout = typeLayout;
+            IRVarLayout* elementVarLayout = nullptr;
+
+            // If the type layout is a ParameterGroupTypeLayout wrapping a non-struct
+            // element, unwrap to the element layout so resource bindings (e.g.
+            // DescriptorTableSlot) propagate to the declared variable.
+            // Struct elements get pair-decomposed, and the element
+            // layout refers to the full struct rather than the ordinary-only part.
+            if (auto paramGroupLayout = as<IRParameterGroupTypeLayout>(typeLayout))
+            {
+                auto paramGroupElementVarLayout = paramGroupLayout->getElementVarLayout();
+                auto paramGroupElementTypeLayout = paramGroupElementVarLayout->getTypeLayout();
+                if (!as<IRStructTypeLayout>(paramGroupElementTypeLayout))
+                {
+                    elementVarLayout = paramGroupElementVarLayout;
+                    unwrappedTypeLayout = paramGroupElementTypeLayout;
+                }
+            }
+
+            // This constructor just copies `varChain` if `elementVarLayout` is null.
+            LegalVarChainLink varChainWithElement(varChain, elementVarLayout);
+
+            // Declare a variable of the pointed-to type,
             // since we are removing the indirection.
             auto val = declareVars(
                 context,
                 op,
                 type.getImplicitDeref()->valueType,
-                typeLayout,
-                varChain,
+                unwrappedTypeLayout,
+                varChainWithElement,
                 nameHint,
                 leafVar,
                 globalParamInfo,

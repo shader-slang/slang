@@ -35,11 +35,11 @@ typealias DType = float;
 
 
 // Make the weight matrix a 64x64 matrix in row major order
-// TEST_INPUT:ubuffer(stride=4, count=4096):name=inputBuffer
-RWStructuredBuffer<DType> inputBuffer;
+// TEST_INPUT: set inputBuffer = ubuffer(stride=4, count=4096)
+uniform RWStructuredBuffer<DType>.Handle inputBuffer;
 
-// TEST_INPUT:ubuffer(data=[0], stride=4, count=64):name=biasBuffer
-RWStructuredBuffer<DType> biasBuffer;
+// TEST_INPUT: set biasBuffer = ubuffer(data=[0], stride=4, count=64)
+uniform RWStructuredBuffer<DType>.Handle biasBuffer;
 
 // TEST_INPUT:ubuffer(stride=4, count=5):out, name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
@@ -81,8 +81,8 @@ void fillWeightMatrix<int InputSize, int OutputSize>(uint tid)
 DType[MMAHelper<DType, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA>.Uint4AlignedM]
 testMatVecMul<int InputSize, int OutputSize, TargetEnum Target>(uint tid)
 {
-    typealias Storage = StructuredBufferStorage<DType>;
-    Storage storage = Storage(inputBuffer);
+    typealias Address = BindlessAddress<DType>;
+    Address address = Address(inputBuffer);
 
     // Construct the input vector as follow:
     // x = tid + 1
@@ -104,11 +104,10 @@ testMatVecMul<int InputSize, int OutputSize, TargetEnum Target>(uint tid)
     SPtr ptrC = ptrB;
 
 #if !TEST_BIAS
-    let res = MMA.mma<DType, Storage, DType[InSize], DType[OutSize], DType, false>(inputVector, ptrA, ptrB, ptrC, storage, 0, none, none);
+    let res = MMA.mma<DType, Address, DType[InSize], DType[OutSize], DType, false>(inputVector, ptrA, ptrB, ptrC, address, none);
 #else
-    Storage biasStorage = Storage(biasBuffer);
-    let res = MMA.mma<DType, Storage, DType[InSize], DType[OutSize], DType, true>(inputVector, ptrA, ptrB, ptrC, storage, 0,
-                                                                                    biasStorage, Optional<Storage.Address>(0));
+    Address biasAddress = Address(biasBuffer);
+    let res = MMA.mma<DType, Address, DType[InSize], DType[OutSize], DType, true>(inputVector, ptrA, ptrB, ptrC, address, biasAddress);
 #endif
 
     // serialRead<DType>(tid, ptrC, 32);

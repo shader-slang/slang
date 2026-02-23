@@ -1309,6 +1309,13 @@ static void emitReflectionJSON(
         }
     }
 
+    // Emit the bindless space index
+    auto bindlessSpaceIndex = programReflection->getBindlessSpaceIndex();
+    if (bindlessSpaceIndex >= 0)
+    {
+        writer << ",\n\"bindlessSpaceIndex\": " << bindlessSpaceIndex;
+    }
+
     writer.dedent();
     writer << "\n}\n";
 }

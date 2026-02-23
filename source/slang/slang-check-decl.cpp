@@ -11248,6 +11248,8 @@ void SemanticsDeclHeaderVisitor::visitImportDecl(ImportDecl* decl)
     // the module's scope.
 
     auto name = decl->moduleNameAndLoc.name;
+    if (!name)
+        return;
     auto scope = getModuleDecl(decl)->ownedScope;
 
     // Try to load a module matching the name
@@ -11316,6 +11318,8 @@ ModuleDeclarationDecl* findExistingModuleDeclarationDecl(ModuleDecl* moduleDecl)
 void SemanticsDeclHeaderVisitor::visitIncludeDecl(IncludeDecl* decl)
 {
     auto name = decl->moduleNameAndLoc.name;
+    if (!name)
+        return;
 
     if (!getShared()->getTranslationUnitRequest())
         getSink()->diagnose(decl->moduleNameAndLoc.loc, Diagnostics::cannotProcessInclude);
@@ -11440,6 +11444,8 @@ void SemanticsDeclScopeWiringVisitor::visitImplementingDecl(ImplementingDecl* de
     // we are in a language server context.
 
     auto name = decl->moduleNameAndLoc.name;
+    if (!name)
+        return;
 
     if (!getShared()->getTranslationUnitRequest())
         getSink()->diagnose(decl->moduleNameAndLoc.loc, Diagnostics::cannotProcessInclude);
