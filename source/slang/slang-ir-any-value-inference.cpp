@@ -234,7 +234,9 @@ void inferAnyValueSizeWhereNecessary(
         // there's no base case and AnyValue size cannot be calculated.
         if (nonSelfRefList.getCount() == 0 && selfRefList.getCount() > 0)
         {
-            sink->diagnose(interfaceType, Diagnostics::cyclicInterfaceDependency, interfaceType);
+            sink->diagnose(Diagnostics::CyclicInterfaceDependency{
+                .interface_type = interfaceType,
+            });
         }
     }
 
@@ -271,13 +273,19 @@ void inferAnyValueSizeWhereNecessary(
 
             if (existingMaxSize < sizeAndAlignment.size)
             {
-                sink->diagnose(implType, Diagnostics::typeDoesNotFitAnyValueSize, implType);
-                sink->diagnoseWithoutSourceView(
-                    implType,
-                    Diagnostics::typeAndLimit,
-                    implType,
-                    sizeAndAlignment.size,
-                    existingMaxSize);
+                StringBuilder typeSb;
+                getTypeNameHint(typeSb, implType);
+                String typeStr = typeSb.produceString();
+                sink->diagnose(Diagnostics::TypeDoesNotFitAnyValueSize{
+                    .type = typeStr,
+                    .location = implType->sourceLoc,
+                });
+                sink->diagnose(Diagnostics::TypeAndLimit{
+                    .type = typeStr,
+                    .size = sizeAndAlignment.size,
+                    .limit = existingMaxSize,
+                    .location = implType->sourceLoc,
+                });
             }
         }
 

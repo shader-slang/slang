@@ -88,6 +88,13 @@ err(
 )
 
 err(
+    "cyclic interface dependency",
+    41002,
+    "interface has cyclic dependency on itself",
+    span { loc = "interface_type:IRInst", message = "interface '~interface_type' has cyclic dependency on itself through its implementations." }
+)
+
+err(
     "missing return error",
     41009,
     "non-void function must return",

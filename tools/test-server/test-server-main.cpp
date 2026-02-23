@@ -532,7 +532,7 @@ SlangResult TestServer::_executeTool(const JSONRPCCall& call)
 
     // Make writer/s act as if they are the console.
     RefPtr<StringWriter> stdOutWriter(new StringWriter(&stdOut, WriterFlag::IsConsole));
-    RefPtr<StringWriter> stdErrorWriter(new StringWriter(&stdError));
+    RefPtr<StringWriter> stdErrorWriter(new StringWriter(&stdError, WriterFlag::IsConsole));
 
     stdWriters.setWriter(SLANG_WRITER_CHANNEL_STD_ERROR, stdErrorWriter);
     stdWriters.setWriter(SLANG_WRITER_CHANNEL_STD_OUTPUT, stdOutWriter);
