@@ -474,6 +474,30 @@ struct SpecializationContext
         }
     }
 
+    bool hasNonTrivialUses(IRInst* inst)
+    {
+        // Check that our instruction either has non-annotation uses,
+        // or is marked as a dynamic dispatch witness table, in which case it should be specialized
+        // even if it has no uses, since it will be found by the dynamic dispatch pass.
+        //
+        bool hasNonTrivialUses = false;
+        traverseUsers<IRInst>(
+            inst,
+            [&](IRInst* user)
+            {
+                if (user->getOp() != kIROp_AssociatedInstAnnotation)
+                    hasNonTrivialUses = true;
+            });
+
+        if (auto specialize = as<IRSpecialize>(inst))
+        {
+            if (specialize->findDecoration<IRDynamicDispatchWitnessDecoration>())
+                hasNonTrivialUses = true;
+        }
+
+        return hasNonTrivialUses;
+    }
+
     // Now that we know when we can specialize a generic, and how
     // to do it, we can write a subroutine that takes a
     // `specialize(g, a, b, c, ...)` instruction and performs
@@ -488,16 +512,8 @@ struct SpecializationContext
         if (!areAllOperandsFullySpecialized(specInst))
             return false;
 
-        bool hasNonTrivialUses = false;
-        traverseUsers<IRInst>(
-            specInst,
-            [&](IRInst* inst)
-            {
-                if (inst->getOp() != kIROp_AssociatedInstAnnotation)
-                    hasNonTrivialUses = true;
-            });
 
-        if (!hasNonTrivialUses)
+        if (!hasNonTrivialUses(specInst))
             return false;
 
         // The invariant that the arguments are fully specialized

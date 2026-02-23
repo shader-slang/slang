@@ -25,7 +25,6 @@ struct Linear<let C : int>
     typedef Feature<C> Output;
 
     [BackwardDerivative(eval_bwd)]
-    //[ForwardDerivative(eval_fwd)]
     [ForwardDifferentiable]
     Output eval(Input in_feature)
     {
@@ -42,12 +41,6 @@ struct Linear<let C : int>
     {
         /* empty.. doesn't really matter */
     }
-
-    /*DifferentialPair<Output> eval_fwd(DifferentialPair<Input> in_feature_pair)
-    {
-        // incorrect implementation.. doesn't really matter. we just want this test to compile 
-        return in_feature_pair;
-    }*/
 }
 
 [Differentiable]
