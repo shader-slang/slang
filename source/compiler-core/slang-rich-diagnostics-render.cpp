@@ -61,14 +61,23 @@ private:
     DiagnosticSink::SourceLocationLexer m_lexer;
     DiagnosticRenderOptions m_options;
 
+    // Colors safe on both dark and light terminal color schemes
+    // See https://blog.xoria.org/terminal-colors/
     enum class TerminalColor
     {
+        Regular,
+        BoldRegular,
         Red,
+        Green,
         Yellow,
+        Magenta,
         Cyan,
-        Blue,
-        Bold,
-        Reset
+        BrightRed,
+        BrightMagenta,
+        BoldRed,
+        BoldBrightRed,
+        BoldMagenta,
+        BoldBrightMagenta,
     };
 
     struct Glyphs
@@ -166,26 +175,45 @@ private:
         const char* code = "";
         switch (c)
         {
-        case TerminalColor::Red:
-            code = "\x1B[31;1m";
-            break;
-        case TerminalColor::Yellow:
-            code = "\x1B[33;1m";
-            break;
-        case TerminalColor::Cyan:
-            code = "\x1B[36;1m";
-            break;
-        case TerminalColor::Blue:
-            code = "\x1B[34;1m";
-            break;
-        case TerminalColor::Bold:
-            code = "\x1B[1m";
-            break;
-        case TerminalColor::Reset:
+        case TerminalColor::Regular:
             code = "\x1B[0m";
             break;
-        default:
-            return text;
+        case TerminalColor::BoldRegular:
+            code = "\x1B[1m";
+            break;
+        case TerminalColor::Red:
+            code = "\x1B[31m";
+            break;
+        case TerminalColor::Green:
+            code = "\x1B[32m";
+            break;
+        case TerminalColor::Yellow:
+            code = "\x1B[33m";
+            break;
+        case TerminalColor::Magenta:
+            code = "\x1B[35m";
+            break;
+        case TerminalColor::Cyan:
+            code = "\x1B[36m";
+            break;
+        case TerminalColor::BrightRed:
+            code = "\x1B[91m";
+            break;
+        case TerminalColor::BrightMagenta:
+            code = "\x1B[95m";
+            break;
+        case TerminalColor::BoldRed:
+            code = "\x1B[1;31m";
+            break;
+        case TerminalColor::BoldBrightRed:
+            code = "\x1B[1;91m";
+            break;
+        case TerminalColor::BoldMagenta:
+            code = "\x1B[1;35m";
+            break;
+        case TerminalColor::BoldBrightMagenta:
+            code = "\x1B[1;95m";
+            break;
         }
         return String(code) + text + "\x1B[0m";
     }
@@ -193,7 +221,8 @@ private:
     String repeat(char c, Int64 n) const
     {
         String ret;
-        ret.appendRepeatedChar(c, n);
+        if (n > 0)
+            ret.appendRepeatedChar(c, n);
         return ret;
     }
 
@@ -470,15 +499,15 @@ private:
             {
                 String label = String(line.number);
                 ss << repeat(' ', section.maxGutterWidth - label.getLength())
-                   << color(TerminalColor::Bold, label) << " "
-                   << color(TerminalColor::Blue, m_glyphs.vertical) << " ";
+                   << color(TerminalColor::BoldRegular, label) << " "
+                   << color(TerminalColor::Cyan, m_glyphs.vertical) << " ";
                 renderSourceLine(ss, line, section.commonIndent);
                 ss << "\n";
 
                 auto rows = buildAnnotationRows(line, section.commonIndent);
                 for (const auto& row : rows)
                     ss << repeat(' ', section.maxGutterWidth + 1)
-                       << color(TerminalColor::Blue, m_glyphs.vertical) << " " << row << "\n";
+                       << color(TerminalColor::Cyan, m_glyphs.vertical) << " " << row << "\n";
             }
         }
     }
@@ -491,7 +520,11 @@ private:
         layout.header.code = diag.code;
         layout.header.message = diag.message;
 
-        HumaneSourceLoc humaneLoc = m_sourceManager->getHumaneLoc(diag.primarySpan.range.begin);
+        HumaneSourceLoc humaneLoc;
+        if (m_sourceManager)
+        {
+            humaneLoc = m_sourceManager->getHumaneLoc(diag.primarySpan.range.begin);
+        }
         layout.primaryLoc.fileName = humaneLoc.pathInfo.foundPath;
         layout.primaryLoc.line = humaneLoc.line;
         layout.primaryLoc.col = humaneLoc.column;
@@ -509,7 +542,11 @@ private:
         {
             DiagnosticLayout::NoteEntry noteEntry;
             noteEntry.message = note.message;
-            HumaneSourceLoc noteHumane = m_sourceManager->getHumaneLoc(note.span.range.begin);
+            HumaneSourceLoc noteHumane;
+            if (m_sourceManager)
+            {
+                noteHumane = m_sourceManager->getHumaneLoc(note.span.range.begin);
+            }
             noteEntry.loc.fileName = noteHumane.pathInfo.foundPath;
             noteEntry.loc.line = noteHumane.line;
             noteEntry.loc.col = noteHumane.column;
@@ -529,7 +566,11 @@ private:
 
     LayoutSpan makeLayoutSpan(const DiagnosticSpan& span, bool isPrimary)
     {
-        HumaneSourceLoc humane = m_sourceManager->getHumaneLoc(span.range.begin);
+        HumaneSourceLoc humane;
+        if (m_sourceManager)
+        {
+            humane = m_sourceManager->getHumaneLoc(span.range.begin);
+        }
         return {
             humane.line,
             humane.column,
@@ -574,11 +615,12 @@ private:
                                      ? TerminalColor::Red
                                      : TerminalColor::Yellow;
         ss << color(sevColor, layout.header.severity);
-        String codeStr = String(layout.header.code);
-        while (codeStr.getLength() < 4)
-            codeStr = "0" + codeStr;
-        ss << "[E" << codeStr << "]"
-           << ": " << color(TerminalColor::BoldRegular, layout.header.message) << "\n";
+        if (layout.header.code >= 0)
+        {
+            String codeStr = String(layout.header.code);
+            ss << "[E" << repeat('0', 5 - codeStr.getLength()) << codeStr << "]";
+        }
+        ss << ": " << color(TerminalColor::BoldRegular, layout.header.message) << "\n";
 
         // Skip location and source snippet for diagnostics without meaningful locations
         // (line 0 indicates SourceLoc() was used, meaning no source location)
@@ -602,7 +644,7 @@ private:
             if (note.section.blocks.getCount() > 0)
             {
                 ss << repeat(' ', note.section.maxGutterWidth + 1)
-                   << color(TerminalColor::Blue, m_glyphs.vertical) << "\n";
+                   << color(TerminalColor::Cyan, m_glyphs.vertical) << "\n";
                 renderSectionBody(ss, note.section);
             }
         }
@@ -632,10 +674,16 @@ String renderDiagnosticMachineReadable(
     // Format:
     // E<code>\t<severity>\t<filename>\t<beginline>\t<begincol>\t<endline>\t<endcol>\t<message>
 
-    // Format the error code as E#### (e.g., E0001, E1234)
-    String codeStr = String(diag.code);
-    while (codeStr.getLength() < 4)
-        codeStr = "0" + codeStr;
+    // Format the error code as E##### (e.g., E00001, E12345)
+    // Use empty string for negative codes (-1 is used as placeholder for no code)
+    String codeStr;
+    if (diag.code >= 0)
+    {
+        String numStr = String(diag.code);
+        String padding;
+        padding.appendRepeatedChar('0', std::max<Int64>(0, 5 - numStr.getLength()));
+        codeStr = padding + numStr;
+    }
 
     // Helper lambda to output a span in the machine-readable format
     // Returns false if the span was skipped (0,0 location with no message)

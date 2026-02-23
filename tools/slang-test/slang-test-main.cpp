@@ -1049,7 +1049,9 @@ Result spawnAndWaitSharedLibrary(
         rhiDebugBridge.setCoreCallback(&coreDebugCallback);
 
         // Say static so not released
-        StringWriter stdError(&stdErrorString, WriterFlag::IsConsole | WriterFlag::IsStatic);
+        StringWriter stdError(&stdErrorString, WriterFlag::IsStatic);
+        // Use IsConsole on stdout because we have tests which output spirv
+        // which we want to have disassembled
         StringWriter stdOut(&stdOutString, WriterFlag::IsConsole | WriterFlag::IsStatic);
 
         StdWriters* prevStdWriters = StdWriters::getSingleton();
@@ -5364,7 +5366,7 @@ SlangResult innerMain(int argc, char** argv)
 
     // The context holds useful things used during testing
     TestContext context;
-    SLANG_RETURN_ON_FAIL(SLANG_FAILED(context.init(argv[0])))
+    SLANG_RETURN_ON_FAIL(context.init(argv[0]))
 
     auto& categorySet = context.categorySet;
 

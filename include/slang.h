@@ -918,7 +918,6 @@ typedef uint32_t SlangSizeT;
         SLANG_DIAGNOSTIC_COLOR_NEVER,    // Never use color
     };
 
-
     // All compiler option names supported by Slang.
     namespace slang
     {
@@ -1118,6 +1117,8 @@ typedef uint32_t SlangSizeT;
 
         EnableMachineReadableDiagnostics, // bool, enable machine-readable diagnostic output
                                           // (implies EnableRichDiagnostics)
+
+        DiagnosticColor, // intValue0: SlangDiagnosticColor (always, never, auto)
 
         CountOf,
     };
