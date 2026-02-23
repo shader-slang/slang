@@ -2891,9 +2891,12 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
     bool typeOverloadChecked = false;
 
     DiagnosticSink collectedErrorsSink(getSourceManager(), nullptr);
-    collectedErrorsSink.setFlags(getSink()->getFlags());
-    collectedErrorsSink.setDiagnosticColorMode(getSink()->getDiagnosticColorMode());
-    collectedErrorsSink.setEnableUnicode(getSink()->getEnableUnicode());
+    if (auto parentSink = getSink())
+    {
+        collectedErrorsSink.setFlags(parentSink->getFlags());
+        collectedErrorsSink.setDiagnosticColorMode(parentSink->getDiagnosticColorMode());
+        collectedErrorsSink.setEnableUnicode(parentSink->getEnableUnicode());
+    }
     if (expr->arguments.getCount() == 1 && !as<ExplicitCtorInvokeExpr>(expr) &&
         !as<InitializerListExpr>(expr->arguments[0]))
     {

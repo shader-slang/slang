@@ -661,8 +661,10 @@ bool DiagnosticSink::diagnoseRichImpl(
     String message;
     if (isFlagSet(Flag::MachineReadableDiagnostics))
     {
-        message =
-            renderDiagnosticMachineReadable(getSourceLocationLexer(), sourceManager, effectiveDiagnostic);
+        message = renderDiagnosticMachineReadable(
+            getSourceLocationLexer(),
+            sourceManager,
+            effectiveDiagnostic);
     }
     else
     {
