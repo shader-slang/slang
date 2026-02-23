@@ -238,6 +238,14 @@ struct BitCastLoweringContext
         auto fromType = operand->getDataType();
         auto toType = inst->getDataType();
 
+        // Resource types (e.g. RWStructuredBuffer) cannot be decomposed into basic types.
+        // Leave the bit_cast as-is for the C-like emitter which handles it as a C-style cast.
+        if (as<IRResourceTypeBase>(fromType) || as<IRResourceTypeBase>(toType) ||
+            as<IRHLSLStructuredBufferTypeBase>(fromType) || as<IRHLSLStructuredBufferTypeBase>(toType))
+        {
+            return;
+        }
+
         IRSizeAndAlignment toTypeSize;
         getNaturalSizeAndAlignment(targetProgram->getTargetReq(), toType, &toTypeSize);
         IRSizeAndAlignment fromTypeSize;
