@@ -183,63 +183,63 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     {
         dpfloat dpa = dpfloat(0.4, 0.0);
 
-        bwd_diff(test_simple)(dpa, 1.0f);
+        __bwd_diff(test_simple)(dpa, 1.0f);
         outputBuffer[1] = dpa.d; // CHECK-NEXT: 6.000000
     }
 
     {
         dpfloat dpa = dpfloat(0.4, 0.0);
 
-        bwd_diff(test_strided)(dpa, 1.0f);
+        __bwd_diff(test_strided)(dpa, 1.0f);
         outputBuffer[2] = dpa.d; // CHECK-NEXT: 15.000000
     }
 
     {
         dpfloat dpa = dpfloat(0.4, 0.0);
 
-        bwd_diff(test_offset)(dpa, 1.0f);
+        __bwd_diff(test_offset)(dpa, 1.0f);
         outputBuffer[3] = dpa.d; // CHECK-NEXT: 15.000000
     }
 
     {
         dpfloat dpa = dpfloat(0.4, 0.0);
 
-        bwd_diff(test_negative_stride)(dpa, 1.0f);
+        __bwd_diff(test_negative_stride)(dpa, 1.0f);
         outputBuffer[4] = dpa.d; // CHECK-NEXT: 384.000000
     }
 
     {
         dpfloat dpa = dpfloat(0.4, 0.0);
 
-        bwd_diff(test_nested)(dpa, 1.0f);
+        __bwd_diff(test_nested)(dpa, 1.0f);
         outputBuffer[5] = dpa.d;  // CHECK-NEXT: 1247400.000000
     }
 
     {
         dpfloat dpa = dpfloat(0.4, 0.0);
 
-        bwd_diff(test_nested_with_offset)(dpa, 1.0f);
+        __bwd_diff(test_nested_with_offset)(dpa, 1.0f);
         outputBuffer[6] = dpa.d; // CHECK-NEXT: 5159780352.000000
     }
 
     {
         dpfloat dpa = dpfloat(0.4, 0.0);
 
-        bwd_diff(test_nested_with_conditions)(dpa, 1.0f);
+        __bwd_diff(test_nested_with_conditions)(dpa, 1.0f);
         outputBuffer[7] = dpa.d; // CHECK-NEXT: 297.000000
     }
 
     {
         dpfloat dpa = dpfloat(0.4, 0.0);
 
-        bwd_diff(test_with_continue)(dpa, 1.0f);
+        __bwd_diff(test_with_continue)(dpa, 1.0f);
         outputBuffer[8] = dpa.d; // CHECK-NEXT: 8.000000
     }
 
     {
         dpfloat dpa = dpfloat(0.4, 0.0);
 
-        bwd_diff(test_nested_with_continue)(dpa, 1.0f);
+        __bwd_diff(test_nested_with_continue)(dpa, 1.0f);
         outputBuffer[9] = dpa.d; // CHECK-NEXT: 6.000000
     }
 }

@@ -66,9 +66,6 @@ struct FooImpl1: IFoo<8>
     }
 }
 
-
-// There's a slight issue with dynamic dispatch over generic interfaces. Uncomment after that is fixed.
-
 struct FooImpl2: IFoo<8>
 {
     typealias Params = GetterImpl;
@@ -91,7 +88,6 @@ IFoo<8> getFoo(uint id)
         return FooImpl1();
     else
         return FooImpl2();
-    //return FooImpl1();
 }
 
 [Differentiable]

@@ -80,5 +80,5 @@ float evalDecoder()
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
-    bwd_diff(evalDecoder)(1.0);
+    __bwd_diff(evalDecoder)(1.0);
 }

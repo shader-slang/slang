@@ -43,6 +43,6 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     dpfloat dpa = dpfloat(2.0, 0.0);
 
-    bwd_diff(f)(0, dpa, 1.0f);
+    __bwd_diff(f)(0, dpa, 1.0f);
     outputBuffer[0] = dpa.d; // Expect: 1
 }

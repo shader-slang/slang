@@ -29,6 +29,6 @@ float3 evalBSDF(int type)
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
-    bwd_diff(evalBSDF)(0, float3(1.f));
-    bwd_diff(evalBSDF)(1, float3(1.f));
+    __bwd_diff(evalBSDF)(0, float3(1.f));
+    __bwd_diff(evalBSDF)(1, float3(1.f));
 }

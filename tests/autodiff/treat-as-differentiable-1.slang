@@ -34,6 +34,6 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     B b = {2};
     var p = diffPair(1.0);
-    bwd_diff(use)(b, p, 1.0);
-    outputBuffer[0] = p.d;
+    __bwd_diff(use)(b, p, 1.0);
+    outputBuffer[0] = p.d; // Expect 0.0, since [TreatAsDifferentiable] create trivial derivative implementations.
 }
