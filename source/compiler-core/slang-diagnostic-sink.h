@@ -222,6 +222,18 @@ public:
         return diagnoseRichImpl(d.toGenericDiagnostic(), D::getInfo());
     }
 
+    //
+    // Overload that accepts a position parameter (of any type supported by getDiagnosticPos)
+    // and a diagnostic struct. This extracts the location from pos and sets it on the struct.
+    // Useful for macros like SLANG_DIAGNOSE_UNEXPECTED that accept various position types.
+    //
+    template<typename P, typename D>
+    bool diagnoseWithPos(P const& pos, D d)
+    {
+        d.location = getDiagnosticPos(pos);
+        return diagnose(d);
+    }
+
     // Useful for notes on existing diagnostics, where it would be redundant to display the same
     // line again. (Ideally we would print the error/warning and notes in one call...)
     template<typename P, typename... Args>

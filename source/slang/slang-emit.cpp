@@ -255,11 +255,12 @@ static void reportCheckpointIntermediates(
             continue;
 
         auto func = checkpointDecoration->getSourceFunction();
-        sink->diagnose(
-            structType,
-            Diagnostics::reportCheckpointIntermediates,
-            func,
-            structSize.size);
+        StringBuilder funcNameBuilder;
+        printDiagnosticArg(funcNameBuilder, func);
+        sink->diagnose(Diagnostics::ReportCheckpointIntermediates{
+            .size = (int64_t)structSize.size,
+            .func = funcNameBuilder.produceString(),
+            .location = structType->sourceLoc});
         nonEmptyStructs++;
 
         for (auto field : structType->getFields())
@@ -273,18 +274,25 @@ static void reportCheckpointIntermediates(
             typeWriter.clearContent();
             emitter.emitType(fieldType);
 
-            sink->diagnose(
-                field->sourceLoc,
-                field->findDecoration<IRLoopCounterDecoration>()
-                    ? Diagnostics::reportCheckpointCounter
-                    : Diagnostics::reportCheckpointVariable,
-                fieldSize.size,
-                typeWriter.getContent());
+            if (field->findDecoration<IRLoopCounterDecoration>())
+            {
+                sink->diagnose(Diagnostics::ReportCheckpointCounter{
+                    .size = (int64_t)fieldSize.size,
+                    .type_name = typeWriter.getContent(),
+                    .location = field->sourceLoc});
+            }
+            else
+            {
+                sink->diagnose(Diagnostics::ReportCheckpointVariable{
+                    .size = (int64_t)fieldSize.size,
+                    .type_name = typeWriter.getContent(),
+                    .location = field->sourceLoc});
+            }
         }
     }
 
     if (nonEmptyStructs == 0)
-        sink->diagnose(SourceLoc(), Diagnostics::reportCheckpointNone);
+        sink->diagnose(Diagnostics::ReportCheckpointNone{});
 }
 
 struct LinkingAndOptimizationOptions
@@ -473,7 +481,9 @@ void diagnoseCallStack(IRInst* inst, DiagnosticSink* sink)
             auto user = use->getUser();
             if (auto call = as<IRCall>(user))
             {
-                sink->diagnose(call, Diagnostics::seeCallOfFunc, func);
+                sink->diagnose(Diagnostics::SeeCallOfFuncIr{
+                    .inst = func,
+                    .location = call->sourceLoc});
                 inst = call;
                 shouldContinue = true;
                 break;
@@ -2641,7 +2651,7 @@ static SlangResult createArtifactFromIR(
     String optErr;
     if (SLANG_FAILED(optimizeSPIRV(spirv, optErr, outSpirv)))
     {
-        codeGenContext->getSink()->diagnose(SourceLoc(), Diagnostics::spirvOptFailed, optErr);
+        codeGenContext->getSink()->diagnose(Diagnostics::SpirvOptFailed{.error = optErr});
         spirv = _Move(outSpirv);
     }
 #endif
@@ -2725,9 +2735,8 @@ static SlangResult createArtifactFromIR(
                     compiler->validate((uint32_t*)spirv.getBuffer(), int(spirv.getCount() / 4))))
             {
                 compiler->disassemble((uint32_t*)spirv.getBuffer(), int(spirv.getCount() / 4));
-                codeGenContext->getSink()->diagnoseWithoutSourceView(
-                    SourceLoc{},
-                    Diagnostics::spirvValidationFailed);
+                codeGenContext->getSink()->diagnose(
+                    Diagnostics::SpirvValidationFailed{});
             }
         }
 

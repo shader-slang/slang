@@ -3,6 +3,7 @@
 #include "../compiler-core/slang-rich-diagnostics-render.h"
 #include "slang-ast-modifier.h"
 #include "slang-ast-type.h"
+#include "slang-ir.h"
 
 //
 #include "slang-rich-diagnostics.cpp.fiddle"
@@ -74,6 +75,15 @@ String modifierToPrintableString(Modifier* modifier)
         sb << modifier->keywordName->text;
     if (auto hlslSemantic = as<HLSLSemantic>(modifier))
         sb << hlslSemantic->name.getContent();
+    return sb.produceString();
+}
+
+String irInstToPrintableString(IRInst* inst)
+{
+    if (!inst)
+        return "<unknown>";
+    StringBuilder sb;
+    printDiagnosticArg(sb, inst);
     return sb.produceString();
 }
 
@@ -212,6 +222,8 @@ String modifierToPrintableString(Modifier* modifier)
           nameToPrintableString($(base_expr)->getName())
 %           elseif ptype == "modifier" then
           modifierToPrintableString($(base_expr))
+%           elseif ptype == "irinst" then
+          irInstToPrintableString($(base_expr))
 %           elseif ptype == "expr" or ptype == "stmt" or ptype == "val" then
           $(base_expr)
 %           else

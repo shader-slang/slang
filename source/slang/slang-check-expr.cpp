@@ -1557,11 +1557,10 @@ void SemanticsVisitor::checkDerivativeMemberAttributeReferences(
         derivativeMemberAttr->memberDeclRef = declRefExpr;
         if (!diffType->equals(declRefExpr->type))
         {
-            getSink()->diagnose(
-                derivativeMemberAttr,
-                Diagnostics::typeMismatch,
-                diffType,
-                declRefExpr->type);
+            getSink()->diagnose(Diagnostics::TypeMismatch{
+                .expected_type = diffType,
+                .actual_type = declRefExpr->type,
+                .expr = declRefExpr});
         }
         if (!varDecl->parentDecl)
         {
@@ -2708,15 +2707,8 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
         {
             if (!maybeDiagnoseAmbiguousReference(baseExpr))
             {
-                if (getOptionSet().shouldEmitRichDiagnostics())
-                {
-                    getSink()->diagnose(
-                        Diagnostics::SubscriptNonArray{.type = baseType, .expr = subscriptExpr});
-                }
-                else
-                {
-                    getSink()->diagnose(subscriptExpr, Diagnostics::subscriptNonArray, baseType);
-                }
+                getSink()->diagnose(
+                    Diagnostics::SubscriptNonArray{.type = baseType, .expr = subscriptExpr});
             }
         }
         return CreateErrorExpr(subscriptExpr);
@@ -4092,20 +4084,24 @@ Expr* SemanticsExprVisitor::visitDispatchKernelExpr(DispatchKernelExpr* expr)
     expr->threadGroupSize = dispatchExpr(expr->threadGroupSize, *this);
     if (!isInt3Type(expr->threadGroupSize->type.type))
     {
-        getSink()->diagnose(
-            expr->threadGroupSize,
-            Diagnostics::typeMismatch,
-            "uint3",
-            expr->threadGroupSize->type);
+        auto uint3Type = m_astBuilder->getVectorType(
+            m_astBuilder->getUIntType(),
+            m_astBuilder->getIntVal(m_astBuilder->getIntType(), 3));
+        getSink()->diagnose(Diagnostics::TypeMismatch{
+            .expected_type = uint3Type,
+            .actual_type = expr->threadGroupSize->type,
+            .expr = expr->threadGroupSize});
     }
     expr->dispatchSize = dispatchExpr(expr->dispatchSize, *this);
     if (!isInt3Type(expr->dispatchSize->type.type))
     {
-        getSink()->diagnose(
-            expr->dispatchSize,
-            Diagnostics::typeMismatch,
-            "uint3",
-            expr->dispatchSize->type);
+        auto uint3Type = m_astBuilder->getVectorType(
+            m_astBuilder->getUIntType(),
+            m_astBuilder->getIntVal(m_astBuilder->getIntType(), 3));
+        getSink()->diagnose(Diagnostics::TypeMismatch{
+            .expected_type = uint3Type,
+            .actual_type = expr->dispatchSize->type,
+            .expr = expr->dispatchSize});
     }
     PassthroughHighOrderExprCheckingActionsBase<DispatchKernelExpr> actions;
     return _checkHigherOrderInvokeExpr(this, expr, &actions);
@@ -4147,7 +4143,9 @@ Expr* SemanticsExprVisitor::visitGetArrayLengthExpr(GetArrayLengthExpr* expr)
     {
         if (!as<ErrorType>(expr->arrayExpr->type))
         {
-            getSink()->diagnose(expr, Diagnostics::typeMismatch, "array", expr->arrayExpr->type);
+            getSink()->diagnose(Diagnostics::ExpectedArrayExpression{
+                .actual_type = expr->arrayExpr->type,
+                .expr = expr->arrayExpr});
         }
         expr->type = m_astBuilder->getErrorType();
     }
@@ -5324,8 +5322,10 @@ Expr* SemanticsVisitor::checkTupleSwizzleExpr(MemberExpr* memberExpr, TupleType*
 
         if (elementCoord >= tupleElementCount)
         {
-            getSink()
-                ->diagnose(memberExpr, Diagnostics::invalidSwizzleExpr, swizzleText, baseTupleType);
+            getSink()->diagnose(Diagnostics::InvalidSwizzleExpr{
+                .pattern = swizzleText,
+                .type = baseTupleType,
+                .expr = memberExpr});
             return CreateErrorExpr(memberExpr);
         }
 
@@ -6294,9 +6294,9 @@ Val* SemanticsExprVisitor::checkTypeModifier(Modifier* modifier, Type* type)
     {
         // TODO: more complete error message here
         getSink()->diagnose(
-            modifier,
-            Diagnostics::unexpected,
-            "unknown type modifier in semantic checking");
+            Diagnostics::Unexpected{
+                .message = "unknown type modifier in semantic checking",
+                .location = modifier->loc});
         return nullptr;
     }
 }

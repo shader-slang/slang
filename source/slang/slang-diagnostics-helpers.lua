@@ -292,6 +292,15 @@ local function standalone_note(name, code, message, primary_span, ...)
   add_diagnostic(name, code, "note", message, primary_span, ...)
 end
 
+-- Helper function to add an internal error diagnostic
+local function internal(name, code, message, primary_span, ...)
+  add_diagnostic(name, code, "internal", message, primary_span, ...)
+end
+
+-- Helper function to add a fatal error diagnostic
+local function fatal(name, code, message, primary_span, ...)
+  add_diagnostic(name, code, "fatal", message, primary_span, ...)
+end
 
 -- Helper function to parse interpolated message strings
 -- Converts "text ~param more text" or "text ~param:Type more text" into structured format
@@ -468,8 +477,8 @@ local function validate_diagnostic(diag, index)
   -- 3. Validate mandatory 'severity' field and allowed values
   if not diag.severity or type(diag.severity) ~= "string" then
     table.insert(errors, diagnostic_name .. ".severity must be a string")
-  elseif not (diag.severity == "error" or diag.severity == "warning" or diag.severity == "note") then
-    table.insert(errors, diagnostic_name .. ".severity must be one of: error, warning, note")
+  elseif not (diag.severity == "error" or diag.severity == "warning" or diag.severity == "note" or diag.severity == "internal" or diag.severity == "fatal") then
+    table.insert(errors, diagnostic_name .. ".severity must be one of: error, warning, note, internal, fatal")
   end
 
   -- 4. Validate mandatory 'message' field
@@ -906,6 +915,8 @@ return {
   variadic_note = variadic_note,
   err = err,
   warning = warning,
+  internal = internal,
+  fatal = fatal,
   process_diagnostics = process_diagnostics,
   -- Utility functions for typo suggestions
   edit_distance = edit_distance,

@@ -1,6 +1,3 @@
--- !!!!!!
--- THIS FILE IS PROTOTYPE WORK, PLEASE USE source/slang/slang-diagnostic-defs.h
--- !!!!!!
 --
 -- Lua-based diagnostic definitions for the Slang compiler
 --
@@ -240,19 +237,9 @@ err(
 -- 0xxxx - Command line and interaction with host platform APIs.
 --
 
-err(
-    "cannot open file",
-    1,
-    "cannot open file '~path'",
-    span { loc = "location", message = "cannot open file '~path'" }
-)
+err("cannot open file", 1, "cannot open file '~path'", span { loc = "location", message = "cannot open file '~path'" })
 
-err(
-    "cannot find file",
-    2,
-    "cannot find file '~path'",
-    span { loc = "location", message = "cannot find file '~path'" }
-)
+err("cannot find file", 2, "cannot find file '~path'", span { loc = "location", message = "cannot find file '~path'" })
 
 err(
     "cannot write output file",
@@ -272,14 +259,13 @@ err(
     "too many output paths specified",
     6,
     "too many output paths specified",
-    span { loc = "location", message = "~output_count:int output paths specified, but only ~entry_point_count:int entry points given" }
+    span {
+        loc = "location",
+        message = "~output_count:int output paths specified, but only ~entry_point_count:int entry points given",
+    }
 )
 
-err(
-    "cannot deduce source language",
-    12,
-    "can't deduce language for input file '~path'"
-)
+err("cannot deduce source language", 12, "can't deduce language for input file '~path'")
 
 err(
     "unknown code generation target",
@@ -335,11 +321,7 @@ err(
     span { loc = "location", message = "unknown downstream compiler '~compiler'" }
 )
 
-err(
-    "unable to generate code for target",
-    28,
-    "unable to generate code for target '~target'"
-)
+err("unable to generate code for target", 28, "unable to generate code for target '~target'")
 
 warning(
     "same stage specified more than once",
@@ -347,11 +329,7 @@ warning(
     "the stage '~stage' was specified more than once for entry point '~entry_point'"
 )
 
-err(
-    "conflicting stages for entry point",
-    31,
-    "conflicting stages have been specified for entry point '~entry_point'"
-)
+err("conflicting stages for entry point", 31, "conflicting stages have been specified for entry point '~entry_point'")
 
 warning(
     "explicit stage doesnt match implied stage",
@@ -377,23 +355,11 @@ err(
     "no stage was specified for entry point '~entry_point'; when using the '-pass-through' option, stages must be fully specified on the command line"
 )
 
-err(
-    "expecting an integer",
-    36,
-    "expecting an integer value"
-)
+err("expecting an integer", 36, "expecting an integer value")
 
-warning(
-    "same profile specified more than once",
-    40,
-    "the '~profile' was specified more than once for target '~target'"
-)
+warning("same profile specified more than once", 40, "the '~profile' was specified more than once for target '~target'")
 
-err(
-    "conflicting profiles specified for target",
-    41,
-    "conflicting profiles have been specified for target '~target'"
-)
+err("conflicting profiles specified for target", 41, "conflicting profiles have been specified for target '~target'")
 
 err(
     "profile specification ignored because no targets",
@@ -419,23 +385,11 @@ err(
     "when using multiple targets, any target options must follow the '-target' they apply to"
 )
 
-err(
-    "duplicate targets",
-    50,
-    "the target '~target' has been specified more than once"
-)
+err("duplicate targets", 50, "the target '~target' has been specified more than once")
 
-err(
-    "unhandled language for source embedding",
-    51,
-    "unhandled source language for source embedding"
-)
+err("unhandled language for source embedding", 51, "unhandled source language for source embedding")
 
-err(
-    "cannot deduce output format from path",
-    60,
-    "cannot infer an output format from the output path '~path'"
-)
+err("cannot deduce output format from path", 60, "cannot infer an output format from the output path '~path'")
 
 err(
     "cannot match output file to target",
@@ -443,17 +397,9 @@ err(
     "no specified '-target' option matches the output path '~path', which implies the '~format' format"
 )
 
-err(
-    "unknown command line value",
-    62,
-    "unknown value for option. Valid values are '~valid_values'"
-)
+err("unknown command line value", 62, "unknown value for option. Valid values are '~valid_values'")
 
-err(
-    "unknown help category",
-    63,
-    "unknown help category"
-)
+err("unknown help category", 63, "unknown help category")
 
 err(
     "cannot match output file to entry point",
@@ -461,11 +407,7 @@ err(
     "the output path '~path' is not associated with any entry point; a '-o' option for a compiled kernel must follow the '-entry' option for its corresponding entry point"
 )
 
-err(
-    "invalid type conformance option string",
-    71,
-    "syntax error in type conformance option '~option'."
-)
+err("invalid type conformance option string", 71, "syntax error in type conformance option '~option'.")
 
 err(
     "invalid type conformance option no type",
@@ -473,11 +415,7 @@ err(
     "invalid conformance option '~option', type '~type_name' is not found."
 )
 
-err(
-    "cannot create type conformance",
-    73,
-    "cannot create type conformance '~conformance'."
-)
+err("cannot create type conformance", 73, "cannot create type conformance '~conformance'.")
 
 err(
     "duplicate output paths for entry point and target",
@@ -485,29 +423,13 @@ err(
     "multiple output paths have been specified entry point '~entry_point:Name' on target '~target'"
 )
 
-err(
-    "duplicate output paths for target",
-    81,
-    "multiple output paths have been specified for target '~target'"
-)
+err("duplicate output paths for target", 81, "multiple output paths have been specified for target '~target'")
 
-err(
-    "duplicate dependency output paths",
-    82,
-    "the -dep argument can only be specified once"
-)
+err("duplicate dependency output paths", 82, "the -dep argument can only be specified once")
 
-err(
-    "unable to write repro file",
-    82,
-    "unable to write repro file '~path'"
-)
+err("unable to write repro file", 82, "unable to write repro file '~path'")
 
-err(
-    "unable to create module container",
-    86,
-    "unable to create module container"
-)
+err("unable to create module container", 86, "unable to create module container")
 
 err(
     "unable to set default downstream compiler",
@@ -515,11 +437,7 @@ err(
     "unable to set default downstream compiler for source language '~language' to '~compiler'"
 )
 
-err(
-    "expecting slang riff container",
-    89,
-    "expecting a slang riff container"
-)
+err("expecting slang riff container", 89, "expecting a slang riff container")
 
 err(
     "incompatible riff semantic version",
@@ -527,59 +445,23 @@ err(
     "incompatible riff semantic version ~actual_version expecting ~expected_version"
 )
 
-err(
-    "riff hash mismatch",
-    91,
-    "riff hash mismatch - incompatible riff"
-)
+err("riff hash mismatch", 91, "riff hash mismatch - incompatible riff")
 
-err(
-    "unable to create directory",
-    92,
-    "unable to create directory '~path'"
-)
+err("unable to create directory", 92, "unable to create directory '~path'")
 
-err(
-    "unable to extract repro to directory",
-    93,
-    "unable to extract repro to directory '~path'"
-)
+err("unable to extract repro to directory", 93, "unable to extract repro to directory '~path'")
 
-err(
-    "unable to read riff",
-    94,
-    "unable to read as 'riff'/not a 'riff' file"
-)
+err("unable to read riff", 94, "unable to read as 'riff'/not a 'riff' file")
 
-err(
-    "unknown library kind",
-    95,
-    "unknown library kind '~kind'"
-)
+err("unknown library kind", 95, "unknown library kind '~kind'")
 
-err(
-    "kind not linkable",
-    96,
-    "not a known linkable kind '~kind'"
-)
+err("kind not linkable", 96, "not a known linkable kind '~kind'")
 
-err(
-    "library does not exist",
-    97,
-    "library '~path' does not exist"
-)
+err("library does not exist", 97, "library '~path' does not exist")
 
-err(
-    "cannot access as blob",
-    98,
-    "cannot access as a blob"
-)
+err("cannot access as blob", 98, "cannot access as a blob")
 
-err(
-    "failed to load downstream compiler",
-    100,
-    "failed to load downstream compiler '~compiler'"
-)
+err("failed to load downstream compiler", 100, "failed to load downstream compiler '~compiler'")
 
 err(
     "downstream compiler doesnt support whole program compilation",
@@ -587,17 +469,9 @@ err(
     "downstream compiler '~compiler' doesn't support whole program compilation"
 )
 
-standalone_note(
-    "downstream compile time",
-    102,
-    "downstream compile time: ~time"
-)
+standalone_note("downstream compile time", 102, "downstream compile time: ~time")
 
-standalone_note(
-    "performance benchmark result",
-    103,
-    "compiler performance benchmark:\\n~benchmark_output"
-)
+standalone_note("performance benchmark result", 103, "compiler performance benchmark:\\n~benchmark_output")
 
 err(
     "need to enable experiment feature",
@@ -606,17 +480,9 @@ err(
     span { loc = "loc" }
 )
 
-err(
-    "null component type",
-    105,
-    "componentTypes[~index:Int] is `nullptr`"
-)
+err("null component type", 105, "componentTypes[~index:Int] is `nullptr`")
 
-standalone_note(
-    "note failed to load dynamic library",
-    99999,
-    "failed to load dynamic library '~path'"
-)
+standalone_note("note failed to load dynamic library", 99999, "failed to load dynamic library '~path'")
 
 --
 -- 15xxx - Preprocessing
@@ -647,11 +513,7 @@ err(
 )
 
 -- Standalone note for seeDirective - used by multiple diagnostics
-standalone_note(
-    "see directive",
-    -1,
-    "see '$0' directive"
-)
+standalone_note("see directive", -1, "see '$0' directive")
 
 -- 151xx - directive parsing
 err(
@@ -731,7 +593,10 @@ warning(
     "undefined identifier in preprocessor expression",
     15205,
     "undefined identifier in preprocessor",
-    span { loc = "location", message = "undefined identifier '~identifier' in preprocessor expression will evaluate to zero" }
+    span {
+        loc = "location",
+        message = "undefined identifier '~identifier' in preprocessor expression will evaluate to zero",
+    }
 )
 
 err(
@@ -748,12 +613,7 @@ err(
     span { loc = "location", message = "unknown language version '~version'" }
 )
 
-err(
-    "unknown language",
-    15208,
-    "unknown language",
-    span { loc = "location", message = "unknown language '~language'" }
-)
+err("unknown language", 15208, "unknown language", span { loc = "location", message = "unknown language '~language'" })
 
 err(
     "language version differs from including module",
@@ -763,19 +623,10 @@ err(
 )
 
 -- Standalone note for includeOutput - used to output include hierarchy
-standalone_note(
-    "include output",
-    -1,
-    "include ~content"
-)
+standalone_note("include output", -1, "include ~content")
 
 -- Note for genericSignatureTried - used by overload resolution to point at the declaration
-standalone_note(
-    "generic signature tried",
-    -1,
-    "see declaration of ~signature",
-    span { loc = "location" }
-)
+standalone_note("generic signature tried", -1, "see declaration of ~signature", span { loc = "location" })
 
 -- 153xx - #include
 err(
@@ -792,12 +643,7 @@ err(
     span { loc = "location", message = "failed to find imported file '~path'" }
 )
 
-err(
-    "cyclic include",
-    15302,
-    "cyclic include",
-    span { loc = "location", message = "cyclic `#include` of file '~path'" }
-)
+err("cyclic include", 15302, "cyclic include", span { loc = "location", message = "cyclic `#include` of file '~path'" })
 
 err(
     "no include handler specified",
@@ -925,7 +771,10 @@ warning(
     "pragma once ignored",
     15602,
     "pragma once ignored",
-    span { loc = "location", message = "pragma once was ignored - this is typically because it is not placed in an include" }
+    span {
+        loc = "location",
+        message = "pragma once was ignored - this is typically because it is not placed in an include",
+    }
 )
 
 warning(
@@ -971,12 +820,7 @@ standalone_note(
 )
 
 -- 159xx - user-defined error/warning
-err(
-    "user defined error",
-    15900,
-    "preprocessor error",
-    span { loc = "location", message = "#error: ~message" }
-)
+err("user defined error", 15900, "preprocessor error", span { loc = "location", message = "#error: ~message" })
 
 warning(
     "user defined warning",
@@ -990,60 +834,89 @@ local parsing_module = dofile(debug.getinfo(1).source:match("@?(.*/)") .. "slang
 parsing_module(helpers)
 
 -- Load semantic checking diagnostics (part 1)
-local semantic_checking_1_module = dofile(debug.getinfo(1).source:match("@?(.*/)") .. "slang-diagnostics-semantic-checking-1.lua")
+local semantic_checking_1_module =
+    dofile(debug.getinfo(1).source:match("@?(.*/)") .. "slang-diagnostics-semantic-checking-1.lua")
 semantic_checking_1_module(helpers)
 
 -- Load semantic checking diagnostics (part 2)
-local semantic_checking_2_module = dofile(debug.getinfo(1).source:match("@?(.*/)") .. "slang-diagnostics-semantic-checking-2.lua")
+local semantic_checking_2_module =
+    dofile(debug.getinfo(1).source:match("@?(.*/)") .. "slang-diagnostics-semantic-checking-2.lua")
 semantic_checking_2_module(helpers)
 
 -- Load semantic checking diagnostics (part 3) - Include, Visibility, and Capability
-local semantic_checking_3_module = dofile(debug.getinfo(1).source:match("@?(.*/)") .. "slang-diagnostics-semantic-checking-3.lua")
+local semantic_checking_3_module =
+    dofile(debug.getinfo(1).source:match("@?(.*/)") .. "slang-diagnostics-semantic-checking-3.lua")
 semantic_checking_3_module(helpers)
 
 -- Load semantic checking diagnostics (part 4) - Attributes
-local semantic_checking_4_module = dofile(debug.getinfo(1).source:match("@?(.*/)") .. "slang-diagnostics-semantic-checking-4.lua")
+local semantic_checking_4_module =
+    dofile(debug.getinfo(1).source:match("@?(.*/)") .. "slang-diagnostics-semantic-checking-4.lua")
 semantic_checking_4_module(helpers)
 
 -- Load semantic checking diagnostics (part 5) - COM Interface, DerivativeMember, Extern Decl, Custom Derivative
-local semantic_checking_5_module = dofile(debug.getinfo(1).source:match("@?(.*/)") .. "slang-diagnostics-semantic-checking-5.lua")
+local semantic_checking_5_module =
+    dofile(debug.getinfo(1).source:match("@?(.*/)") .. "slang-diagnostics-semantic-checking-5.lua")
 semantic_checking_5_module(helpers)
 
 -- Load semantic checking diagnostics (part 6) - Differentiation, Modifiers, GLSL/HLSL specifics, Interfaces, Control flow, Enums, Generics
-local semantic_checking_6_module = dofile(debug.getinfo(1).source:match("@?(.*/)") .. "slang-diagnostics-semantic-checking-6.lua")
+local semantic_checking_6_module =
+    dofile(debug.getinfo(1).source:match("@?(.*/)") .. "slang-diagnostics-semantic-checking-6.lua")
 semantic_checking_6_module(helpers)
 
 -- Load semantic checking diagnostics (part 7) - Link Time, Cyclic Refs, Generics, Initializers, Variables, Parameters, Inheritance, Extensions, Subscripts
-local semantic_checking_7_module = dofile(debug.getinfo(1).source:match("@?(.*/)") .. "slang-diagnostics-semantic-checking-7.lua")
+local semantic_checking_7_module =
+    dofile(debug.getinfo(1).source:match("@?(.*/)") .. "slang-diagnostics-semantic-checking-7.lua")
 semantic_checking_7_module(helpers)
 
 -- Load semantic checking diagnostics (part 8) - Accessors, Bit Fields, Integer Constants, Overloads, Switch, Generics, Ambiguity
-local semantic_checking_8_module = dofile(debug.getinfo(1).source:match("@?(.*/)") .. "slang-diagnostics-semantic-checking-8.lua")
+local semantic_checking_8_module =
+    dofile(debug.getinfo(1).source:match("@?(.*/)") .. "slang-diagnostics-semantic-checking-8.lua")
 semantic_checking_8_module(helpers)
 
 -- Load semantic checking diagnostics (part 9) - Operators, Literals, Entry Points, Specialization
-local semantic_checking_9_module = dofile(debug.getinfo(1).source:match("@?(.*/)") .. "slang-diagnostics-semantic-checking-9.lua")
+local semantic_checking_9_module =
+    dofile(debug.getinfo(1).source:match("@?(.*/)") .. "slang-diagnostics-semantic-checking-9.lua")
 semantic_checking_9_module(helpers)
 
 -- Load semantic checking diagnostics (part 10) - Interface Requirements, Global Generics, Differentiation, Modules
-local semantic_checking_10_module = dofile(debug.getinfo(1).source:match("@?(.*/)") .. "slang-diagnostics-semantic-checking-10.lua")
+local semantic_checking_10_module =
+    dofile(debug.getinfo(1).source:match("@?(.*/)") .. "slang-diagnostics-semantic-checking-10.lua")
 semantic_checking_10_module(helpers)
 
 -- Load semantic checking diagnostics (part 11) - Type layout and parameter binding
-local semantic_checking_11_module = dofile(debug.getinfo(1).source:match("@?(.*/)") .. "slang-diagnostics-semantic-checking-11.lua")
+local semantic_checking_11_module =
+    dofile(debug.getinfo(1).source:match("@?(.*/)") .. "slang-diagnostics-semantic-checking-11.lua")
 semantic_checking_11_module(helpers)
 
 -- Load semantic checking diagnostics (part 12) - IL code generation
-local semantic_checking_12_module = dofile(debug.getinfo(1).source:match("@?(.*/)") .. "slang-diagnostics-semantic-checking-12.lua")
+local semantic_checking_12_module =
+    dofile(debug.getinfo(1).source:match("@?(.*/)") .. "slang-diagnostics-semantic-checking-12.lua")
 semantic_checking_12_module(helpers)
 
 -- Load semantic checking diagnostics (part 13) - AnyValue, Autodiff, Static assertions, Atomics, etc.
-local semantic_checking_13_module = dofile(debug.getinfo(1).source:match("@?(.*/)") .. "slang-diagnostics-semantic-checking-13.lua")
+local semantic_checking_13_module =
+    dofile(debug.getinfo(1).source:match("@?(.*/)") .. "slang-diagnostics-semantic-checking-13.lua")
 semantic_checking_13_module(helpers)
 
 -- Load semantic checking diagnostics (part 14) - Target code generation
-local semantic_checking_14_module = dofile(debug.getinfo(1).source:match("@?(.*/)") .. "slang-diagnostics-semantic-checking-14.lua")
+local semantic_checking_14_module =
+    dofile(debug.getinfo(1).source:match("@?(.*/)") .. "slang-diagnostics-semantic-checking-14.lua")
 semantic_checking_14_module(helpers)
+
+-- Load semantic checking diagnostics (part 15) - Target code generation and platform-specific diagnostics
+local semantic_checking_15_module =
+    dofile(debug.getinfo(1).source:match("@?(.*/)") .. "slang-diagnostics-semantic-checking-15.lua")
+semantic_checking_15_module(helpers)
+
+-- Load semantic checking diagnostics (part 16) - Internal compiler errors, ray tracing, and cooperative matrix
+local semantic_checking_16_module =
+    dofile(debug.getinfo(1).source:match("@?(.*/)") .. "slang-diagnostics-semantic-checking-16.lua")
+semantic_checking_16_module(helpers)
+
+-- Load semantic checking diagnostics (part 17) - Standalone notes for cross-referencing
+local semantic_checking_17_module =
+    dofile(debug.getinfo(1).source:match("@?(.*/)") .. "slang-diagnostics-semantic-checking-17.lua")
+semantic_checking_17_module(helpers)
 
 -- Process and validate all diagnostics
 processed_diagnostics, validation_errors = helpers.process_diagnostics(helpers.diagnostics)

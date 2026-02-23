@@ -2,6 +2,7 @@
 
 #include "slang-ir-insts.h"
 #include "slang-ir.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -227,7 +228,8 @@ static void diagnoseRemainingSSBOs(IRModule* module, DiagnosticSink* sink)
         {
             if (const auto ssbo = as<IRGLSLShaderStorageBufferType>(inst))
             {
-                sink->diagnose(ssbo, Diagnostics::unhandledGLSLSSBOType);
+                sink->diagnose(
+                    Diagnostics::UnhandledGlslSsboType{.location = ssbo->sourceLoc});
             }
         });
 }

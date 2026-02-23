@@ -10232,9 +10232,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         else
         {
             getSink()->diagnose(
-                decl->loc,
-                Diagnostics::unimplemented,
-                "lower unknown AggType to IR");
+                Diagnostics::Unimplemented{
+                    .feature = "lower unknown AggType to IR",
+                    .location = decl->loc});
             return LoweredValInfo::simple(subBuilder->getVoidType());
         }
 

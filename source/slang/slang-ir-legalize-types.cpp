@@ -2269,8 +2269,8 @@ static LegalVal legalizeCoopMatMapElementIFunc(
                 // can't handle this case very easily at the moment, so diagnose an error
                 // instead of crashing.
                 context->m_sink->diagnose(
-                    inst->getIFuncCall(),
-                    Diagnostics::cooperativeMatrixUnsupportedCapture);
+                    Diagnostics::CooperativeMatrixUnsupportedCapture{
+                        .location = inst->getIFuncCall()->sourceLoc});
                 return LegalVal();
             }
         }

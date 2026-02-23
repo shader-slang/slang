@@ -2404,9 +2404,9 @@ struct LLVMEmitter
                     // support in the core module becomes a thing, that can be
                     // used for this too.
                     getSink()->diagnose(
-                        inst,
-                        Diagnostics::unimplemented,
-                        "unexpected string hash for non-literal string");
+                        Diagnostics::Unimplemented{
+                            .feature = "unexpected string hash for non-literal string",
+                            .location = inst->sourceLoc});
                 }
             }
             break;

@@ -13,6 +13,7 @@
 #include "slang-ir-ssa-simplification.h"
 #include "slang-ir-util.h"
 #include "slang-ir-validate.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -318,9 +319,9 @@ InstPair ForwardDiffTranscriber::transcribeBinaryArith(IRBuilder* builder, IRIns
             }
         default:
             getSink()->diagnose(
-                origArith->sourceLoc,
-                Diagnostics::unimplemented,
-                "this arithmetic instruction cannot be differentiated");
+                Diagnostics::Unimplemented{
+                    .feature = "this arithmetic instruction cannot be differentiated",
+                    .location = origArith->sourceLoc});
         }
     }
 
@@ -692,9 +693,8 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
         // TODO(sai): Should probably get checked in the front-end.
         //
         getSink()->diagnose(
-            origCall->sourceLoc,
-            Diagnostics::internalCompilerError,
-            "attempting to differentiate unresolved callee");
+            Diagnostics::InternalCompilerError{
+                .location = origCall->sourceLoc});
 
         return InstPair(nullptr, nullptr);
     }
@@ -1084,9 +1084,9 @@ InstPair ForwardDiffTranscriber::transcribeControlFlow(IRBuilder* builder, IRIns
     }
 
     getSink()->diagnose(
-        origInst->sourceLoc,
-        Diagnostics::unimplemented,
-        "attempting to differentiate unhandled control flow");
+        Diagnostics::Unimplemented{
+            .feature = "attempting to differentiate unhandled control flow",
+            .location = origInst->sourceLoc});
 
     return InstPair(nullptr, nullptr);
 }
@@ -1103,9 +1103,9 @@ InstPair ForwardDiffTranscriber::transcribeConst(IRBuilder*, IRInst* origInst)
     }
 
     getSink()->diagnose(
-        origInst->sourceLoc,
-        Diagnostics::unimplemented,
-        "attempting to differentiate unhandled const type");
+        Diagnostics::Unimplemented{
+            .feature = "attempting to differentiate unhandled const type",
+            .location = origInst->sourceLoc});
 
     return InstPair(nullptr, nullptr);
 }

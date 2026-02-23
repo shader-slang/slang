@@ -5,6 +5,7 @@
 // mismatch of target abstract atoms
 [require(hlsl)]
 interface IFoo0
+//CHECK:  ^^^^^ see declaration of 'IFoo0'
 {
 }
 [require(hlsl)]
@@ -13,7 +14,6 @@ struct Foo0 : IFoo0
 /*CHECK:
        ^^^^ dependencies not compatible on target
        ^^^^ 'Foo0' has dependencies that are not compatible on the required compilation target 'spirv'.
-              ^^^^^ see declaration of 'IFoo0'
 */
 {
 }
@@ -22,6 +22,7 @@ struct Foo0 : IFoo0
 [require(hlsl)]
 [require(spirv)]
 interface IFoo1
+//CHECK:  ^^^^^ see declaration of 'IFoo1'
 {
 }
 [require(hlsl)]
@@ -29,7 +30,6 @@ struct Foo1 : IFoo1
 /*CHECK:
        ^^^^ subtype missing target/stage support
        ^^^^ subtype 'Foo1' must have the same target/stage support as the supertype; 'Foo1' is missing 'spirv'
-              ^^^^^ see declaration of 'IFoo1'
 */
 {
 }
@@ -37,6 +37,7 @@ struct Foo1 : IFoo1
 // subtype is superset
 [require(sm_4_0)]
 interface IFoo2
+//CHECK:  ^^^^^ see declaration of 'IFoo2'
 {
 }
 [require(sm_5_0)]
@@ -44,7 +45,6 @@ struct Foo2 : IFoo2
 /*CHECK:
        ^^^^ capability incompatible with supertype
        ^^^^ 'Foo2' uses capability 'sm_5_0' that is incompatable with the supertype
-              ^^^^^ see declaration of 'IFoo2'
 */
 {
 }
@@ -62,6 +62,7 @@ struct Foo3 : IFoo3
 // mismatch of stage abstract atoms
 [require(hlsl, compute)]
 interface IFoo4
+//CHECK:  ^^^^^ see declaration of 'IFoo4'
 {
 }
 [require(hlsl, fragment)]
@@ -69,7 +70,6 @@ struct Foo4 : IFoo4
 /*CHECK:
        ^^^^ subtype missing target/stage support
        ^^^^ subtype 'Foo4' must have the same target/stage support as the supertype; 'Foo4' is missing 'compute'
-              ^^^^^ see declaration of 'IFoo4'
 */
 {
 }
@@ -78,6 +78,7 @@ struct Foo4 : IFoo4
 [require(fragment)]
 [require(vertex)]
 interface IFoo5
+//CHECK:  ^^^^^ see declaration of 'IFoo5'
 {
 }
 [require(fragment)]
@@ -85,7 +86,6 @@ struct Foo5 : IFoo5
 /*CHECK:
        ^^^^ subtype missing target/stage support
        ^^^^ subtype 'Foo5' must have the same target/stage support as the supertype; 'Foo5' is missing 'vertex'
-              ^^^^^ see declaration of 'IFoo5'
 */
 {
 }

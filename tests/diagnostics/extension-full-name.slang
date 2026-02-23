@@ -183,14 +183,19 @@ extension Container.Nested
 
     // Extension type mismatches - assign value type to extension type
     state1 = 0;    // Error: expected expr of type 'GenericType<half>.State', got 'int'
+//diag:      ^ type mismatch in expression
 //diag:      ^ expected an expression of type 'GenericType<half>.State', got 'int'
     options1 = 0;  // Error: expected expr of type 'GenericType<float>.InnerType.Options', got 'int'
+//diag:        ^ type mismatch in expression
 //diag:        ^ expected an expression of type 'GenericType<float>.InnerType.Options', got 'int'
     config1 = 0;   // Error: expected expr of type 'NonGenericType.Config', got 'int'
+//diag:       ^ type mismatch in expression
 //diag:       ^ expected an expression of type 'NonGenericType.Config', got 'int'
     settings1 = 0; // Error: expected expr of type 'Container.Nested.Settings', got 'int'
+//diag:         ^ type mismatch in expression
 //diag:         ^ expected an expression of type 'Container.Nested.Settings', got 'int'
     record1 = 0;   // Error: expected expr of type 'Container.Nested.DeepNested.Record', got 'int'
+//diag:       ^ type mismatch in expression
 //diag:       ^ expected an expression of type 'Container.Nested.DeepNested.Record', got 'int'
 //diag:       ^ explicit conversion from 'int' to 'Container.Nested.DeepNested.Record' is possible
 
@@ -233,12 +238,15 @@ extension Container.Nested
     options1 =
         halfType
             .createState(); // Error: expected expr of type 'GenericType<float>.InnerType.Options',
+//diag:                 ^ type mismatch in expression
 //diag:                 ^ expected an expression of type 'GenericType<float>.InnerType.Options', got 'GenericType<half>.State'
                             // got 'GenericType<half>.State'
     state1 = nonGenType.createConfig(); // Error: expected expr of type 'GenericType<half>.State',
+//diag:                             ^ type mismatch in expression
 //diag:                             ^ expected an expression of type 'GenericType<half>.State', got 'NonGenericType.Config'
                                         // got 'NonGenericType.Config'
     config1 = nested.createSettings();  // Error: expected expr of type 'NonGenericType.Config', got
+//diag:                            ^ type mismatch in expression
 //diag:                            ^ expected an expression of type 'NonGenericType.Config', got 'Container.Nested.Settings'
                                         // 'Container.Nested.Settings'
 }
@@ -314,6 +322,7 @@ void testArrayExtension()
 
     // Type mismatch errors
     barStats = 0; // Error: expected expr of type 'Bar[3].DataStats', got 'int'
+//diag:        ^ type mismatch in expression
 //diag:        ^ expected an expression of type 'Bar[3].DataStats', got 'int'
 
     // This won't compile - Baz doesn't implement IFoo
@@ -323,6 +332,7 @@ void testArrayExtension()
     // Type mismatch between different extension instantiations
     Array<Bar, 2>.DataStats bar2Stats;
     bar2Stats = barArray.computeStats(); // Error: expected expr of type 'Bar[2].DataStats', got 'Bar[3].DataStats'
+//diag:                              ^ type mismatch in expression
 //diag:                              ^ expected an expression of type 'Bar[2].DataStats', got 'Bar[3].DataStats'
 }
 
@@ -367,5 +377,6 @@ void testNamespaceExtensions()
 
     // Generate a type error to check the output format
     config = 0; // Error: expected expr of type 'SimpleBase.NamedConfig', got 'int'
+//diag:      ^ type mismatch in expression
 //diag:      ^ expected an expression of type 'SimpleBase.NamedConfig', got 'int'
 }

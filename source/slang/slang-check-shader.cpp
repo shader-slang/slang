@@ -2265,9 +2265,7 @@ void parseSpecializationArgStrings(
         if (!argExpr)
         {
             sink->diagnose(
-                SourceLoc(),
-                Diagnostics::internalCompilerError,
-                "couldn't parse specialization argument");
+                Diagnostics::InternalCompilerError{});
             return;
         }
 

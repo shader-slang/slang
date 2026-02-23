@@ -386,4 +386,11 @@ err(
     span { loc = "expr:Expr", message = "expected a string literal" }
 )
 
+err(
+    "expected array expression",
+    30020,
+    "expected an array expression",
+    span { loc = "expr:Expr", message = "expected an array expression, got '~actual_type:QualType'" }
+)
+
 end

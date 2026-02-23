@@ -334,9 +334,9 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
                     if (diagSink)
                     {
                         diagSink->diagnose(
-                            typeExp.exp,
-                            Diagnostics::unimplemented,
-                            "can't fill in default for generic type parameter");
+                            Diagnostics::Unimplemented{
+                                .feature = "can't fill in default for generic type parameter",
+                                .location = typeExp.exp->loc});
                         *outProperType = m_astBuilder->getErrorType();
                     }
                     return false;

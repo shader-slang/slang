@@ -2968,7 +2968,7 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
             if (trailingArrayField && !isOpaqueHandleType(trailingArrayType->getElementType()))
             {
                 getSink()->diagnose(Diagnostics::CannotUseUnsizedTypeInConstantBuffer{.type = trailingArrayType, .field = trailingArrayField});
-                getSink()->diagnose(varDecl->loc, Diagnostics::seeConstantBufferDefinition);
+                getSink()->diagnose(Diagnostics::SeeConstantBufferDefinition{.location = varDecl->loc});
             }
         }
     }
@@ -3739,12 +3739,12 @@ struct SemanticsDeclDifferentialConformanceVisitor
         auto diffDiffType = tryGetDifferentialType(m_astBuilder, differentialType);
         if (!differentialType->equals(diffDiffType))
         {
-            SourceLoc sourceLoc = differentialType->getDeclRef().getDecl()->loc;
             getSink()->diagnose(Diagnostics::DifferentialTypeShouldServeAsItsOwnDifferentialType{
                 .type = differentialType,
                 .diff_type = diffDiffType,
                 .inheritance = inheritanceDecl});
-            getSink()->diagnose(sourceLoc, Diagnostics::seeDefinitionOf, differentialType);
+            getSink()->diagnose(Diagnostics::SeeDefinitionOf{
+                .decl = differentialType->getDeclRef().getDecl()});
         }
 
         // Check that all [DerivativeMember(...)] attributes have their references checked.
@@ -7178,10 +7178,8 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
                 .type = subType,
                 .member = requiredMemberDeclRef.getName() ? requiredMemberDeclRef.getName()->text : String(),
                 .location = inheritanceDecl->loc});
-            getSink()->diagnose(
-                requiredMemberDeclRef,
-                Diagnostics::seeDeclarationOf,
-                requiredMemberDeclRef);
+            getSink()->diagnose(Diagnostics::SeeDeclarationOf{
+                .decl = requiredMemberDeclRef.getDecl()});
             return false;
         }
     }
@@ -7308,13 +7306,14 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
                 .location = inheritanceDecl->loc});
 
             for (auto& item : lookupResult)
-                getSink()->diagnose(item.declRef, Diagnostics::seeOverloadConsidered, item.declRef);
+            {
+                getSink()->diagnose(Diagnostics::SeeOverloadConsidered{
+                    .decl = item.declRef.getDecl()});
+            }
         }
     }
-    getSink()->diagnose(
-        requiredMemberDeclRef,
-        Diagnostics::seeDeclarationOfInterfaceRequirement,
-        requiredMemberDeclRef);
+    getSink()->diagnose(Diagnostics::SeeDeclarationOfInterfaceRequirement{
+        .decl = requiredMemberDeclRef.getDecl()});
     return false;
 }
 
@@ -9275,7 +9274,8 @@ Result SemanticsVisitor::checkFuncRedeclaration(FuncDecl* newDecl, FuncDecl* old
             .new_return_type = resultType,
             .prev_return_type = prevResultType,
             .decl = newDecl});
-        getSink()->diagnose(oldDecl, Diagnostics::seePreviousDeclarationOf, newDecl->getName());
+        getSink()->diagnose(Diagnostics::SeePreviousDeclarationOf{
+            .decl = oldDecl});
 
         // Don't bother emitting other errors at this point
         return SLANG_FAIL;
@@ -9319,11 +9319,7 @@ Result SemanticsVisitor::checkFuncRedeclaration(FuncDecl* newDecl, FuncDecl* old
 
         bool hasConflict = false;
 
-        //
-        // Example testcase for new diagnostics, the flow below is very much as
-        // it was except instead of emitting diagnostics as we go, we build up
-        // this Diagnositcs::FunctionRedefinition struct and emit it at the end
-        //
+        // Build up the FunctionRedefinition diagnostic struct and emit it at the end
         Diagnostics::FunctionRedefinition diagnostic;
 
         for (auto& [target, value] : newTargets)
@@ -9331,32 +9327,12 @@ Result SemanticsVisitor::checkFuncRedeclaration(FuncDecl* newDecl, FuncDecl* old
             auto found = currentTargets.tryGetValue(target);
             if (found)
             {
-                if (getOptionSet().shouldEmitRichDiagnostics())
+                if (!hasConflict)
                 {
-                    if (!hasConflict)
-                    {
-                        diagnostic = Diagnostics::FunctionRedefinition{.function = newDecl};
-                    }
-                    auto prevDecl = *found;
-                    diagnostic.original = prevDecl;
+                    diagnostic = Diagnostics::FunctionRedefinition{.function = newDecl};
                 }
-                else
-                {
-                    // Redefinition
-                    if (!hasConflict)
-                    {
-                        getSink()->diagnose(
-                            newDecl,
-                            Diagnostics::functionRedefinition,
-                            newDecl->getName());
-                    }
-
-                    auto prevDecl = *found;
-                    getSink()->diagnose(
-                        prevDecl,
-                        Diagnostics::seePreviousDefinitionOf,
-                        prevDecl->getName());
-                }
+                auto prevDecl = *found;
+                diagnostic.original = prevDecl;
 
                 hasConflict = true;
             }
@@ -9364,10 +9340,7 @@ Result SemanticsVisitor::checkFuncRedeclaration(FuncDecl* newDecl, FuncDecl* old
 
         if (hasConflict)
         {
-            if (getOptionSet().shouldEmitRichDiagnostics())
-            {
-                getSink()->diagnose(diagnostic);
-            }
+            getSink()->diagnose(diagnostic);
             return SLANG_FAIL;
         }
     }
@@ -9438,7 +9411,8 @@ Result SemanticsVisitor::checkRedeclaration(Decl* newDecl, Decl* oldDecl)
     // and point to the old declaration for context.
     //
     getSink()->diagnose(Diagnostics::Redeclaration{.decl = newDecl});
-    getSink()->diagnose(oldDecl, Diagnostics::seePreviousDeclarationOf, oldDecl->getName());
+    getSink()->diagnose(Diagnostics::SeePreviousDeclarationOf{
+        .decl = oldDecl});
     return SLANG_FAIL;
 }
 
@@ -13153,10 +13127,8 @@ void checkDerivativeOfAttributeImpl(
                 .decl = calleeDeclRef.getDecl(),
                 .attr_name = getDerivativeAttrName<TDerivativeAttr>(),
                 .attr = derivativeOfAttr->loc});
-        visitor->getSink()->diagnose(
-            existingModifier->loc,
-            Diagnostics::seeDeclarationOf,
-            calleeDeclRef.getDecl());
+        visitor->getSink()->diagnose(Diagnostics::SeeDeclarationOf{
+            .decl = calleeDeclRef.getDecl()});
     }
 
     derivativeOfAttr->funcExpr = calleeDeclRefExpr;
@@ -13858,9 +13830,8 @@ static void _propagateSeeDefinitionOf(
         visitor->getSink(),
         visitor->getOptionSet(),
         diagnosticCategory,
-        funcDecl,
-        Diagnostics::seeDefinitionOf,
-        funcDecl);
+        Diagnostics::SeeDefinitionOf{
+            .decl = funcDecl});
 }
 
 static void _propagateRequirement(
@@ -14509,9 +14480,8 @@ void SemanticsDeclCapabilityVisitor::visitInheritanceDecl(InheritanceDecl* inher
                     getSink(),
                     getOptionSet(),
                     DiagnosticCategory::Capability,
-                    requirementDecl,
-                    Diagnostics::seeDeclarationOf,
-                    requirementDecl);
+                    Diagnostics::SeeDeclarationOf{
+                        .decl = requirementDecl});
             }
             else if (
                 checkCapabilityResult ==
@@ -14530,9 +14500,8 @@ void SemanticsDeclCapabilityVisitor::visitInheritanceDecl(InheritanceDecl* inher
                     getSink(),
                     getOptionSet(),
                     DiagnosticCategory::Capability,
-                    requirementDecl,
-                    Diagnostics::seeDeclarationOf,
-                    requirementDecl);
+                    Diagnostics::SeeDeclarationOf{
+                        .decl = requirementDecl});
             }
         }
     }
@@ -14547,6 +14516,11 @@ void SemanticsDeclCapabilityVisitor::visitInheritanceDecl(InheritanceDecl* inher
         failedAvailableCapabilityConjunction,
         checkCapabilityResult);
 
+    // Get the base type decl from the inheritance clause for pointing to in diagnostics
+    Decl* baseDecl = nullptr;
+    if (auto baseDeclRefType = as<DeclRefType>(inheritanceDecl->base.type))
+        baseDecl = baseDeclRefType->getDeclRef().getDecl();
+
     if (checkCapabilityResult ==
         CheckCapabilityRequirementResult::AvailableIsNotASuperSetToRequired)
     {
@@ -14555,13 +14529,16 @@ void SemanticsDeclCapabilityVisitor::visitInheritanceDecl(InheritanceDecl* inher
             UndeclaredCapabilityDiagnosticKind::UseOfUndeclaredCapabilityOfInheritanceDecl,
             failedAvailableCapabilityConjunction,
             false);
-        maybeDiagnose(
-            getSink(),
-            getOptionSet(),
-            DiagnosticCategory::Capability,
-            inheritanceDecl->base,
-            Diagnostics::seeDeclarationOf,
-            inheritanceDecl->base);
+        // Point to the base type in the inheritance clause
+        if (baseDecl)
+        {
+            maybeDiagnose(
+                getSink(),
+                getOptionSet(),
+                DiagnosticCategory::Capability,
+                Diagnostics::SeeDeclarationOf{
+                    .decl = baseDecl});
+        }
     }
     else if (
         checkCapabilityResult == CheckCapabilityRequirementResult::RequiredIsMissingAbstractAtoms)
@@ -14575,13 +14552,16 @@ void SemanticsDeclCapabilityVisitor::visitInheritanceDecl(InheritanceDecl* inher
             Diagnostics::SubTypeHasSubsetOfAbstractAtomsToSuperType{
                 .missing_caps = capsSb.produceString(),
                 .decl = inheritanceParentDecl});
-        maybeDiagnose(
-            getSink(),
-            getOptionSet(),
-            DiagnosticCategory::Capability,
-            inheritanceDecl->base,
-            Diagnostics::seeDeclarationOf,
-            inheritanceDecl->base);
+        // Point to the base type in the inheritance clause
+        if (baseDecl)
+        {
+            maybeDiagnose(
+                getSink(),
+                getOptionSet(),
+                DiagnosticCategory::Capability,
+                Diagnostics::SeeDeclarationOf{
+                    .decl = baseDecl});
+        }
     }
 }
 
@@ -14887,17 +14867,16 @@ void diagnoseMissingCapabilityProvenance(
             sink,
             optionSet,
             DiagnosticCategory::Capability,
-            provNode.referenceLoc,
-            Diagnostics::seeUsingOf,
-            referencedDecl);
+            Diagnostics::SeeUsingOf{
+                .decl = referencedDecl,
+                .location = provNode.referenceLoc});
         // Diagnose the definition as the problem
         maybeDiagnose(
             sink,
             optionSet,
             DiagnosticCategory::Capability,
-            referencedDecl->loc,
-            Diagnostics::seeDefinitionOf,
-            referencedDecl);
+            Diagnostics::SeeDefinitionOf{
+                .decl = referencedDecl});
         // If we find a 'require' modifier, this is contributing to the overall capability
         // incompatibility. We should hint to the user that this declaration is problematic.
         if (auto requireCapabilityAttribute =
@@ -14906,19 +14885,20 @@ void diagnoseMissingCapabilityProvenance(
                 sink,
                 optionSet,
                 DiagnosticCategory::Capability,
-                requireCapabilityAttribute->loc,
-                Diagnostics::seeDeclarationOf,
-                requireCapabilityAttribute);
+                Diagnostics::SeeDeclarationOfModifier{
+                    .modifier = requireCapabilityAttribute});
     }
     else
     {
+        StringBuilder sb;
+        printDiagnosticArg(sb, provNode.referencedNode->astNodeType);
         maybeDiagnose(
             sink,
             optionSet,
             DiagnosticCategory::Capability,
-            provNode.referenceLoc,
-            Diagnostics::seeUsingOf,
-            provNode.referencedNode->astNodeType);
+            Diagnostics::SeeUsingOfNodeType{
+                .node_type = sb.produceString(),
+                .location = provNode.referenceLoc});
     }
 }
 
@@ -14940,13 +14920,15 @@ void diagnoseCapabilityProvenance(
             auto referencedDecl = as<Decl>(provenance.referencedNode);
             if (!referencedDecl)
             {
+                StringBuilder sb;
+                printDiagnosticArg(sb, provenance.referencedNode->astNodeType);
                 maybeDiagnose(
                     sink,
                     optionSet,
                     DiagnosticCategory::Capability,
-                    provenance.referenceLoc,
-                    Diagnostics::seeUsingOf,
-                    provenance.referencedNode->astNodeType);
+                    Diagnostics::SeeUsingOfNodeType{
+                        .node_type = sb.produceString(),
+                        .location = provenance.referenceLoc});
                 break;
             }
 
@@ -14956,9 +14938,9 @@ void diagnoseCapabilityProvenance(
                 sink,
                 optionSet,
                 DiagnosticCategory::Capability,
-                provenance.referenceLoc,
-                Diagnostics::seeUsingOf,
-                referencedDecl);
+                Diagnostics::SeeUsingOf{
+                    .decl = referencedDecl,
+                    .location = provenance.referenceLoc});
             declToPrint = referencedDecl;
             if (printedDecls.contains(declToPrint))
                 break;
@@ -14977,9 +14959,8 @@ void diagnoseCapabilityProvenance(
             sink,
             optionSet,
             DiagnosticCategory::Capability,
-            declToPrint->loc,
-            Diagnostics::seeDefinitionOf,
-            declToPrint);
+            Diagnostics::SeeDefinitionOf{
+                .decl = declToPrint});
     }
 }
 
