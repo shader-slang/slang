@@ -569,6 +569,12 @@ configure_package_config_file(
     INSTALL_DESTINATION ${SLANG_CMAKE_CONFIG_DIR}
 )
 
+configure_file(
+    "${PROJECT_SOURCE_DIR}/extras/pkgconfig/slang-compiler.pc.in"
+    "${PROJECT_BINARY_DIR}/slang-compiler.pc"
+    @ONLY
+)
+
 # Conditionally handle the case for Emscripten where slang does not create
 # linkable targets. In this case do not export the targets. Otherwise, just
 # export the slang targets.
@@ -581,6 +587,11 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
             DESTINATION ${SLANG_CMAKE_CONFIG_DIR}
         )
     endif()
+
+    install(
+        FILES "${PROJECT_BINARY_DIR}/slang-compiler.pc"
+        DESTINATION "${CMAKE_INSTALL_LIBDIR}/pkgconfig"
+    )
 endif()
 
 install(
