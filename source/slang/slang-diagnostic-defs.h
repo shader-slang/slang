@@ -2560,6 +2560,12 @@ DIAGNOSTIC(
     "compiler not defined for transition '$0' to '$1'.")
 
 DIAGNOSTIC(
+    52008,
+    Error,
+    dynamicDispatchOnSpecializeOnlyInterface,
+    "type '$0' is marked for specialization only, but dynamic dispatch is needed for the call.")
+
+DIAGNOSTIC(
     52009,
     Error,
     cannotEmitReflectionWithoutTarget,
