@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
 
 public struct Visibility
 {
@@ -10,7 +10,7 @@ public struct Visibility
 
 void test()
 {
-    //CHECK: error 39999: too many arguments to call (got 2, expected 1)
     Visibility t1 = {1, 2};
+//CHECK:            ^ too many arguments to call
 }
 

@@ -1,12 +1,12 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK_HLSL): -entry main1 -stage mesh -target hlsl
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -entry main1 -stage mesh -target spirv
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -entry main1 -stage mesh -target glsl
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -entry main1 -stage mesh -target metal
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -entry main1 -stage mesh -target hlsl
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -entry main1 -stage mesh -target spirv
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -entry main1 -stage mesh -target glsl
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -entry main1 -stage mesh -target metal
 
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK_POINT_HLSL): -entry main2 -stage mesh -target hlsl
-//TEST:SIMPLE(filecheck=CHECK_POINT): -entry main2 -stage mesh -target spirv
-//TEST:SIMPLE(filecheck=CHECK_POINT): -entry main2 -stage mesh -target glsl
-//TEST:SIMPLE(filecheck=CHECK_POINT): -entry main2 -stage mesh -target metal
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK2,non-exhaustive): -entry main2 -stage mesh -target hlsl
+//TEST:SIMPLE(filecheck=CHECK_OK): -entry main2 -stage mesh -target spirv
+//TEST:SIMPLE(filecheck=CHECK_OK): -entry main2 -stage mesh -target glsl
+//TEST:SIMPLE(filecheck=CHECK_OK): -entry main2 -stage mesh -target metal
 
 
 struct TaskPayload {
@@ -18,10 +18,11 @@ struct Output {
 };
 
 
-// CHECK_HLSL: 50060: Invalid{{.*}}asdqwe{{.*}}of: 'line', 'triangle'
-// CHECK: 50060: Invalid{{.*}}asdqwe{{.*}}of: 'point', 'line', 'triangle'
 [numthreads(32, 1, 1)]
 [outputtopology("asdqwe")]
+/*CHECK:
+ ^^^^^^^^^^^^^^ invalid mesh output topology
+*/
 [shader("mesh")]
 void main1(
     uint ThreadIndex: SV_GroupIndex,
@@ -33,10 +34,12 @@ void main1(
 }
 
 // 'point' is not valid for HLSL only, other targets must compile successfully.
-// CHECK_POINT_HLSL: 50060: Invalid{{.*}}point{{.*}}of: 'line', 'triangle'
-// CHECK_POINT: main
+// CHECK_OK: main
 [numthreads(32, 1, 1)]
 [outputtopology("point")]
+/*CHECK2:
+ ^^^^^^^^^^^^^^ invalid mesh output topology
+*/
 [shader("mesh")]
 void main2(
     uint ThreadIndex: SV_GroupIndex,

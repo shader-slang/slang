@@ -1,5 +1,5 @@
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -line-directive-mode none -entry computeMain -stage compute
-//TEST:SIMPLE(filecheck=CHECK): -target cuda -line-directive-mode none -entry computeMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target hlsl -line-directive-mode none -entry computeMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target cuda -line-directive-mode none -entry computeMain -stage compute
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
@@ -13,9 +13,8 @@ struct Foo : IDifferentiable
     typealias Differential = Foo2;
 
     float x[3];
-    // CHECK: error[E30102]: differentiable member missing in differential type
-    // CHECK-NEXT: float x[3];
-    // CHECK-NEXT:       ^
+//CHECK:  ^ missing field in differential type
+//CHECK:  ^ differentiable member 'x' should have a corresponding field in 'Foo2'
 };
 
 [Differentiable]

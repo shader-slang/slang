@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv
 
 // Test that system value semantic validation works for struct fields.
 // SV_ semantics inside structs should be validated for correct stage and direction.
@@ -8,8 +8,8 @@
 struct VertexOutput
 {
     float4 pos : SV_Position;
-    // CHECK: ([[# @LINE+1]]): error 30702: system value semantic 'SV_VertexID' cannot be used as output in 'vertex' shader stage
     uint vertexId : SV_VertexID;
+//CHECK: ^^^^^^^^ system value semantic 'SV_VertexID' cannot be used as output in 'vertex' shader stage
 };
 
 [shader("vertex")]
@@ -26,8 +26,8 @@ VertexOutput vsMain(uint id : SV_VertexID)
 struct FragmentInput
 {
     float4 pos : SV_Position;
-    // CHECK: ([[# @LINE+1]]): error 30702: system value semantic 'SV_Depth' cannot be used as input in 'pixel' shader stage
     float depth : SV_Depth;
+//CHECK:  ^^^^^ system value semantic 'SV_Depth' cannot be used as input in 'pixel' shader stage
 };
 
 [shader("fragment")]

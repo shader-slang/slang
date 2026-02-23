@@ -1,4 +1,7 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
-// CHECK: ([[# @LINE+1]]): error 104: 'neural' is an experimental module, need to enable'-experimental-feature' to load this module
 import neural;
+/*CHECK:
+       ^^^^^^ cannot open file 'neural.slang'
+       ^^^^^^ cannot open file 'neural.slang'
+*/

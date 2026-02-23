@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
 
 // Test: Array of nested struct containing ParameterBlock - should error
 
@@ -22,5 +22,5 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     outputBuffer[dispatchThreadID.x] = arrayOfNestedStruct[dispatchThreadID.x % 2].nested.pb;
 }
 
-//CHECK: ([[# @LINE+1]]): error 30027
 uniform NestedStruct arrayOfNestedStruct[2];
+//CHECK:             ^^^^^^^^^^^^^^^^^^^ arrays of non-addressable type not allowed
