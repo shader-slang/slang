@@ -1,6 +1,8 @@
-// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=0 -emit-spirv-directly
-// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=0
-// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=1
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_HALF=0 -xslang -DTEST_POINTER=0 -emit-spirv-directly
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=0 -xslang -DTEST_POINTER=0
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=1 -xslang -DTEST_POINTER=0
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=0 -xslang -DTEST_POINTER=1
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=1 -xslang -DTEST_POINTER=1
 
 import neural;
 
@@ -10,28 +12,31 @@ typealias ElementType = half;
 typealias ElementType = float;
 #endif
 
-// set up a 2x4 matrix for input parameters, the last 2 elements are for bias
-//TEST_INPUT: ubuffer(data=[1.0 2.0 3.0 4.0 5.0 6.0 7.0 8.0 9.0 10.0], stride=4):name=parametersFloat
-// 1 2 3 4
-// 5 6 7 8
-// bias = {9.0, 10.0}
-RWStructuredBuffer<float> parametersFloat;
-
-//TEST_INPUT: ubuffer(data=[0 0 0 0 0 0 0 0 0 0], stride=2):name=parameters
-RWStructuredBuffer<ElementType> parameters;
-
 // Create a buffer to store the test result
 //TEST_INPUT: ubuffer(data=[0 0], stride=4):out,name=testResult
 RWStructuredBuffer<uint> testResult;
 
-//TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4):name=dInput
-RWStructuredBuffer<ElementType> dInput;
+// set up a 2x4 matrix for input parameters, the last 2 elements are for bias
+//TEST_INPUT: set parametersFloat = ubuffer(data=[1.0 2.0 3.0 4.0 5.0 6.0 7.0 8.0 9.0 10.0], stride=4)
+// 1 2 3 4
+// 5 6 7 8
+// bias = {9.0, 10.0}
+uniform RWStructuredBuffer<float> parametersFloat;
+
+//TEST_INPUT: set parameters = ubuffer(data=[0 0 0 0 0 0 0 0 0 0], stride=2)
 
 // set up a 2x4 matrix for derivative of parameters, the last 2 elements are for derivative of bias
-//TEST_INPUT: ubuffer(data=[0 0 0 0 0 0 0 0 0 0], stride=4):name=dParameters
-RWStructuredBuffer<ElementType> dParameters;
+//TEST_INPUT: set dParameters = ubuffer(data=[0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0], stride=4)
 
-typealias BufferStorage = StructuredBufferStorage<ElementType>;
+#if TEST_POINTER
+    uniform ElementType* parameters;
+    uniform ElementType* dParameters;
+    typealias Address = PointerAddress<ElementType>;
+#else
+    uniform RWStructuredBuffer<ElementType>.Handle parameters;
+    uniform RWStructuredBuffer<ElementType>.Handle dParameters;
+    typealias Address = BindlessAddress<ElementType>;
+#endif
 
 static const int InputSize = 4;
 static const int OutputSize = 2;
@@ -47,26 +52,23 @@ typealias SPtr<T> = Ptr<T, Access::ReadWrite, AddressSpace::GroupShared>;
 [Differentiable]
 OutputVector MatVecMul<InputVector, OutputVector>(
     InputVector input,
-    BufferStorage weightStorage,
-    BufferStorage.Address weightAddress)
+    Address address)
     where InputVector : IVector<ElementType>
     where OutputVector : IVector<ElementType>
 {
-    var outputVec = input.linearTransform<BufferStorage, LinearLayout, OutputVector>(weightStorage, weightAddress);
+    var outputVec = input.linearTransform<Address, LinearLayout, OutputVector>(address);
     return outputVec;
 }
 
 [Differentiable]
 OutputVector MatVecMulAdd<InputVector, OutputVector>(
     InputVector input,
-    BufferStorage weightStorage,
-    BufferStorage biasStorage,
-    BufferStorage.Address weightAddress,
-    BufferStorage.Address biasAddress)
+    Address weightAddress,
+    Address biasAddress)
     where InputVector : IVector<ElementType>
     where OutputVector : IVector<ElementType>
 {
-    var outputVec = input.linearTransform<BufferStorage, LinearLayout, OutputVector>(weightStorage, biasStorage, weightAddress, biasAddress);
+    var outputVec = input.linearTransform<Address, LinearLayout, OutputVector>(weightAddress, biasAddress);
     return outputVec;
 }
 
@@ -80,12 +82,11 @@ void BasicTestWithoutBias(int tid, int resIndex)
     ElementType[InputSize] inputData = { ElementType(1.0), ElementType(2.0), ElementType(3.0), ElementType(4.0) };
     InVectorType input = InVectorType(inputData);
 
-    BufferStorage weightStorage = BufferStorage(parameters);
-    BufferStorage dweightStorage = BufferStorage(dParameters);
-    BufferStorage.Address weightAddress = 0;
+    Address weightAddress = Address(parameters);
+    Address dWeightAddress = Address(dParameters);
 
     // Run the forward pass
-    let outputVec = MatVecMul<InVectorType, OutVectorType>(input, weightStorage, weightAddress);
+    let outputVec = MatVecMul<InVectorType, OutVectorType>(input, weightAddress);
 
     // serialRead<16, half>(tid, __getAddress(shMem[0]));
     // serialRead<16, half>(tid, __getAddress(shMem[0]) + 32);
@@ -95,7 +96,7 @@ void BasicTestWithoutBias(int tid, int resIndex)
     bool isPassed = true;
     isPassed = isPassed && (outputVec[0] == 30.0 && outputVec[1] == 70.0);
 
-    var weightDiffPair = DifferentialPtrPair<BufferStorage>(weightStorage, dweightStorage);
+    var weightDiffPair = DifferentialPtrPair<Address>(weightAddress, dWeightAddress);
     let dRes = OutVectorType(1.0f);
     var dPair = diffPair(input);
 
@@ -103,7 +104,7 @@ void BasicTestWithoutBias(int tid, int resIndex)
     // dInput = W^T * dOutput
     // dInput = {6, 8, 10, 12}
     bwd_diff(MatVecMul<InVectorType, OutVectorType>)
-                (dPair, weightDiffPair, weightAddress, dRes);
+                (dPair, weightDiffPair, dRes);
 
     isPassed = isPassed &&
         dPair.d[0] == 6.0 && dPair.d[1] == 8.0 && dPair.d[2] == 10.0 && dPair.d[3] == 12.0;
@@ -134,23 +135,20 @@ void BasicTestWithBias(int tid, int resIndex)
     ElementType[InputSize] inputData = { ElementType(1.0), ElementType(2.0), ElementType(3.0), ElementType(4.0) };
     InVectorType input = InVectorType(inputData);
 
-    BufferStorage weightStorage = BufferStorage(parameters);
-    BufferStorage biasStorage = BufferStorage(parameters);
-    BufferStorage dweightStorage = BufferStorage(dParameters);
-    BufferStorage dbiasStorage = BufferStorage(dParameters);
-
-    BufferStorage.Address weightAddress = 0;
-    BufferStorage.Address biasAddress = 8;
+    Address weightAddress = Address(parameters);
+    Address biasAddress = weightAddress.getOffset(8);
+    Address dWeightAddress = Address(dParameters);
+    Address dBiasAddress = dWeightAddress.getOffset(8);
 
     // Run the forward pass
-    let outputVec = MatVecMulAdd<InVectorType, OutVectorType>(input, weightStorage, biasStorage, weightAddress, biasAddress);
+    let outputVec = MatVecMulAdd<InVectorType, OutVectorType>(input, weightAddress, biasAddress);
 
     bool isPassed = true;
     isPassed = isPassed && (outputVec[0] == ElementType(39.0) && outputVec[1] == ElementType(80.0));
 
 
-    var weightDiffPair = DifferentialPtrPair<BufferStorage>(weightStorage, dweightStorage);
-    var biasDiffPair = DifferentialPtrPair<BufferStorage>(biasStorage, dbiasStorage);
+    var weightDiffPair = DifferentialPtrPair<Address>(weightAddress, dWeightAddress);
+    var biasDiffPair = DifferentialPtrPair<Address>(biasAddress, dBiasAddress);
     let dOutput = OutVectorType(1.0);
     var dPair = diffPair(input);
 
@@ -158,7 +156,7 @@ void BasicTestWithBias(int tid, int resIndex)
     // dInput = W^T * dOutput
     // dInput = {6, 8, 10, 12}
     bwd_diff(MatVecMulAdd<InVectorType, OutVectorType>)
-                ( dPair, weightDiffPair, biasDiffPair, weightAddress, biasAddress, dOutput);
+                ( dPair, weightDiffPair, biasDiffPair, dOutput);
 
     isPassed = isPassed &&
         dPair.d[0] == 6.0 && dPair.d[1] == 8.0 && dPair.d[2] == 10.0 && dPair.d[3] == 12.0;

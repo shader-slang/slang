@@ -61,14 +61,23 @@ private:
     DiagnosticSink::SourceLocationLexer m_lexer;
     DiagnosticRenderOptions m_options;
 
+    // Colors safe on both dark and light terminal color schemes
+    // See https://blog.xoria.org/terminal-colors/
     enum class TerminalColor
     {
+        Regular,
+        BoldRegular,
         Red,
+        Green,
         Yellow,
+        Magenta,
         Cyan,
-        Blue,
-        Bold,
-        Reset
+        BrightRed,
+        BrightMagenta,
+        BoldRed,
+        BoldBrightRed,
+        BoldMagenta,
+        BoldBrightMagenta,
     };
 
     struct Glyphs
@@ -144,6 +153,7 @@ private:
             Int64 line = 0;
             Int64 col = 0;
             Int64 gutterIndent = 0;
+            PathInfo::Type pathType = PathInfo::Type::Unknown;
         } primaryLoc;
 
         SectionLayout primarySection;
@@ -165,26 +175,45 @@ private:
         const char* code = "";
         switch (c)
         {
-        case TerminalColor::Red:
-            code = "\x1B[31;1m";
-            break;
-        case TerminalColor::Yellow:
-            code = "\x1B[33;1m";
-            break;
-        case TerminalColor::Cyan:
-            code = "\x1B[36;1m";
-            break;
-        case TerminalColor::Blue:
-            code = "\x1B[34;1m";
-            break;
-        case TerminalColor::Bold:
-            code = "\x1B[1m";
-            break;
-        case TerminalColor::Reset:
+        case TerminalColor::Regular:
             code = "\x1B[0m";
             break;
-        default:
-            return text;
+        case TerminalColor::BoldRegular:
+            code = "\x1B[1m";
+            break;
+        case TerminalColor::Red:
+            code = "\x1B[31m";
+            break;
+        case TerminalColor::Green:
+            code = "\x1B[32m";
+            break;
+        case TerminalColor::Yellow:
+            code = "\x1B[33m";
+            break;
+        case TerminalColor::Magenta:
+            code = "\x1B[35m";
+            break;
+        case TerminalColor::Cyan:
+            code = "\x1B[36m";
+            break;
+        case TerminalColor::BrightRed:
+            code = "\x1B[91m";
+            break;
+        case TerminalColor::BrightMagenta:
+            code = "\x1B[95m";
+            break;
+        case TerminalColor::BoldRed:
+            code = "\x1B[1;31m";
+            break;
+        case TerminalColor::BoldBrightRed:
+            code = "\x1B[1;91m";
+            break;
+        case TerminalColor::BoldMagenta:
+            code = "\x1B[1;35m";
+            break;
+        case TerminalColor::BoldBrightMagenta:
+            code = "\x1B[1;95m";
+            break;
         }
         return String(code) + text + "\x1B[0m";
     }
@@ -192,7 +221,8 @@ private:
     String repeat(char c, Int64 n) const
     {
         String ret;
-        ret.appendRepeatedChar(c, n);
+        if (n > 0)
+            ret.appendRepeatedChar(c, n);
         return ret;
     }
 
@@ -260,12 +290,19 @@ private:
             line.number = span.line;
             if (line.content.getLength() == 0)
             {
-                SourceView* view = m_sourceManager->findSourceView(span.startLoc);
+                SourceView* view =
+                    m_sourceManager ? m_sourceManager->findSourceView(span.startLoc) : nullptr;
                 if (view)
-                    line.content = StringUtil::trimEndOfLine(
+                {
+                    // Get the line content and trim end-of-line characters and trailing whitespace
+                    UnownedStringSlice rawLine = StringUtil::trimEndOfLine(
                         view->getSourceFile()->getLineAtIndex(span.line - 1));
+                    // Trim trailing whitespace but preserve leading whitespace (indentation)
+                    line.content = UnownedStringSlice(rawLine.begin(), rawLine.trim().end());
+                }
             }
-            if (m_lexer && span.length <= 0)
+            if (m_lexer && span.length <= 0 && line.content.getLength() > 0 && span.col > 0 &&
+                span.col - 1 < line.content.getLength())
                 span.length = m_lexer(line.content.tail(span.col - 1)).getLength();
             line.spans.add({span.col, span.length, span.label, span.isPrimary});
         }
@@ -329,14 +366,18 @@ private:
         for (const auto& span : line.spans)
         {
             Int64 start = span.column - indent;
-            if (start > cursor)
+            if (start > cursor && cursor - 1 < content.getLength())
                 ss << content.subString(cursor - 1, start - cursor);
 
             TerminalColor c = span.isPrimary ? TerminalColor::Red : TerminalColor::Cyan;
-            ss << color(c, String(content.subString(std::max(Int64{0}, start - 1), span.length)));
+            Int64 startIdx = std::max(Int64{0}, start - 1);
+            Int64 safeLen =
+                std::max(Int64{0}, std::min(span.length, content.getLength() - startIdx));
+            if (safeLen > 0)
+                ss << color(c, String(content.subString(startIdx, safeLen)));
             cursor = start + span.length;
         }
-        if (cursor - 1 < content.getLength())
+        if (cursor - 1 >= 0 && cursor - 1 < content.getLength())
             ss << content.tail(cursor - 1);
     }
 
@@ -458,15 +499,15 @@ private:
             {
                 String label = String(line.number);
                 ss << repeat(' ', section.maxGutterWidth - label.getLength())
-                   << color(TerminalColor::Bold, label) << " "
-                   << color(TerminalColor::Blue, m_glyphs.vertical) << " ";
+                   << color(TerminalColor::BoldRegular, label) << " "
+                   << color(TerminalColor::Cyan, m_glyphs.vertical) << " ";
                 renderSourceLine(ss, line, section.commonIndent);
                 ss << "\n";
 
                 auto rows = buildAnnotationRows(line, section.commonIndent);
                 for (const auto& row : rows)
                     ss << repeat(' ', section.maxGutterWidth + 1)
-                       << color(TerminalColor::Blue, m_glyphs.vertical) << " " << row << "\n";
+                       << color(TerminalColor::Cyan, m_glyphs.vertical) << " " << row << "\n";
             }
         }
     }
@@ -479,10 +520,15 @@ private:
         layout.header.code = diag.code;
         layout.header.message = diag.message;
 
-        HumaneSourceLoc humaneLoc = m_sourceManager->getHumaneLoc(diag.primarySpan.range.begin);
+        HumaneSourceLoc humaneLoc;
+        if (m_sourceManager)
+        {
+            humaneLoc = m_sourceManager->getHumaneLoc(diag.primarySpan.range.begin);
+        }
         layout.primaryLoc.fileName = humaneLoc.pathInfo.foundPath;
         layout.primaryLoc.line = humaneLoc.line;
         layout.primaryLoc.col = humaneLoc.column;
+        layout.primaryLoc.pathType = humaneLoc.pathInfo.type;
 
         List<LayoutSpan> allSpans;
         allSpans.add(makeLayoutSpan(diag.primarySpan, true));
@@ -496,10 +542,15 @@ private:
         {
             DiagnosticLayout::NoteEntry noteEntry;
             noteEntry.message = note.message;
-            HumaneSourceLoc noteHumane = m_sourceManager->getHumaneLoc(note.span.range.begin);
+            HumaneSourceLoc noteHumane;
+            if (m_sourceManager)
+            {
+                noteHumane = m_sourceManager->getHumaneLoc(note.span.range.begin);
+            }
             noteEntry.loc.fileName = noteHumane.pathInfo.foundPath;
             noteEntry.loc.line = noteHumane.line;
             noteEntry.loc.col = noteHumane.column;
+            noteEntry.loc.pathType = noteHumane.pathInfo.type;
 
             List<LayoutSpan> noteSpans;
             noteSpans.add(makeLayoutSpan(note.span, false));
@@ -515,7 +566,11 @@ private:
 
     LayoutSpan makeLayoutSpan(const DiagnosticSpan& span, bool isPrimary)
     {
-        HumaneSourceLoc humane = m_sourceManager->getHumaneLoc(span.range.begin);
+        HumaneSourceLoc humane;
+        if (m_sourceManager)
+        {
+            humane = m_sourceManager->getHumaneLoc(span.range.begin);
+        }
         return {
             humane.line,
             humane.column,
@@ -525,6 +580,34 @@ private:
             span.range.begin};
     }
 
+    void renderLocation(StringBuilder& ss, const DiagnosticLayout::Location& loc) const
+    {
+        ss << repeat(' ', loc.gutterIndent) << color(TerminalColor::Cyan, m_glyphs.arrow) << " ";
+        if (loc.pathType == PathInfo::Type::CommandLine)
+        {
+            // For command line sources, don't show line:col
+            ss << loc.fileName << "\n";
+        }
+        else
+        {
+            ss << loc.fileName << ":" << loc.line << ":" << loc.col << "\n";
+        }
+    }
+
+    void renderNoteLocation(StringBuilder& ss, const DiagnosticLayout::Location& loc) const
+    {
+        ss << repeat(' ', loc.gutterIndent) << color(TerminalColor::Cyan, m_glyphs.noteDash) << " ";
+        if (loc.pathType == PathInfo::Type::CommandLine)
+        {
+            // For command line sources, don't show line:col
+            ss << loc.fileName << "\n";
+        }
+        else
+        {
+            ss << loc.fileName << ":" << loc.line << ":" << loc.col << "\n";
+        }
+    }
+
     String renderFromLayout(const DiagnosticLayout& layout)
     {
         StringBuilder ss;
@@ -532,31 +615,36 @@ private:
                                      ? TerminalColor::Red
                                      : TerminalColor::Yellow;
         ss << color(sevColor, layout.header.severity);
-        String codeStr = String(layout.header.code);
-        while (codeStr.getLength() < 4)
-            codeStr = "0" + codeStr;
-        ss << "[E" << codeStr << "]"
-           << ": " << color(TerminalColor::Bold, layout.header.message) << "\n";
-        ss << repeat(' ', layout.primaryLoc.gutterIndent)
-           << color(TerminalColor::Blue, m_glyphs.arrow) << " " << layout.primaryLoc.fileName << ":"
-           << layout.primaryLoc.line << ":" << layout.primaryLoc.col << "\n";
-
-        if (layout.primarySection.blocks.getCount() > 0)
+        if (layout.header.code >= 0)
         {
-            ss << repeat(' ', layout.primarySection.maxGutterWidth + 1)
-               << color(TerminalColor::Blue, m_glyphs.vertical) << "\n";
-            renderSectionBody(ss, layout.primarySection);
+            String codeStr = String(layout.header.code);
+            ss << "[E" << repeat('0', 5 - codeStr.getLength()) << codeStr << "]";
+        }
+        ss << ": " << color(TerminalColor::BoldRegular, layout.header.message) << "\n";
+
+        // Skip location and source snippet for diagnostics without meaningful locations
+        // (line 0 indicates SourceLoc() was used, meaning no source location)
+        bool hasValidLocation =
+            layout.primaryLoc.line > 0 || layout.primaryLoc.fileName.getLength() > 0;
+        if (hasValidLocation)
+        {
+            renderLocation(ss, layout.primaryLoc);
+
+            if (layout.primarySection.blocks.getCount() > 0)
+            {
+                ss << repeat(' ', layout.primarySection.maxGutterWidth + 1)
+                   << color(TerminalColor::Cyan, m_glyphs.vertical) << "\n";
+                renderSectionBody(ss, layout.primarySection);
+            }
         }
         for (const auto& note : layout.notes)
         {
             ss << "\n" << color(TerminalColor::Cyan, "note") << ": " << note.message << "\n";
-            ss << repeat(' ', note.loc.gutterIndent)
-               << color(TerminalColor::Blue, m_glyphs.noteDash) << " " << note.loc.fileName << ":"
-               << note.loc.line << ":" << note.loc.col << "\n";
+            renderNoteLocation(ss, note.loc);
             if (note.section.blocks.getCount() > 0)
             {
                 ss << repeat(' ', note.section.maxGutterWidth + 1)
-                   << color(TerminalColor::Blue, m_glyphs.vertical) << "\n";
+                   << color(TerminalColor::Cyan, m_glyphs.vertical) << "\n";
                 renderSectionBody(ss, note.section);
             }
         }
@@ -576,23 +664,69 @@ String renderDiagnostic(
     return renderer.render(diag);
 }
 
-String renderDiagnosticMachineReadable(SourceManager* sm, const GenericDiagnostic& diag)
+String renderDiagnosticMachineReadable(
+    DiagnosticSink::SourceLocationLexer sll,
+    SourceManager* sm,
+    const GenericDiagnostic& diag)
 {
     StringBuilder sb;
 
     // Format:
     // E<code>\t<severity>\t<filename>\t<beginline>\t<begincol>\t<endline>\t<endcol>\t<message>
 
-    // Format the error code as E#### (e.g., E0001, E1234)
-    String codeStr = String(diag.code);
-    while (codeStr.getLength() < 4)
-        codeStr = "0" + codeStr;
+    // Format the error code as E##### (e.g., E00001, E12345)
+    // Use empty string for negative codes (-1 is used as placeholder for no code)
+    String codeStr;
+    if (diag.code >= 0)
+    {
+        String numStr = String(diag.code);
+        String padding;
+        padding.appendRepeatedChar('0', std::max<Int64>(0, 5 - numStr.getLength()));
+        codeStr = padding + numStr;
+    }
 
     // Helper lambda to output a span in the machine-readable format
+    // Returns false if the span was skipped (0,0 location with no message)
     auto outputSpan = [&](const DiagnosticSpan& span, const char* severity, const String& message)
     {
         HumaneSourceLoc beginLoc = sm->getHumaneLoc(span.range.begin);
         HumaneSourceLoc endLoc = sm->getHumaneLoc(span.range.end);
+
+        // When span has zero length (begin == end), use the lexer to find token boundaries,
+        // mirroring the logic in buildSectionLayout for rich diagnostics
+        if (sll && span.range.begin == span.range.end && beginLoc.line > 0)
+        {
+            SourceView* view = sm->findSourceView(span.range.begin);
+            if (view)
+            {
+                UnownedStringSlice rawLine = StringUtil::trimEndOfLine(
+                    view->getSourceFile()->getLineAtIndex(beginLoc.line - 1));
+                UnownedStringSlice lineContent =
+                    UnownedStringSlice(rawLine.begin(), rawLine.trim().end());
+                if (lineContent.getLength() > 0 && beginLoc.column > 0 &&
+                    beginLoc.column - 1 < lineContent.getLength())
+                {
+                    Int64 tokenLen = sll(lineContent.tail(beginLoc.column - 1)).getLength();
+                    if (tokenLen > 0)
+                    {
+                        endLoc.line = beginLoc.line;
+                        endLoc.column = beginLoc.column + tokenLen;
+                    }
+                }
+            }
+        }
+
+        // Check for locationless span (0,0)
+        bool isLocationless = (beginLoc.line == 0 && beginLoc.column == 0);
+        if (isLocationless)
+        {
+            // Skip outputting 0,0 spans with no message - they provide no value
+            if ((strcmp(severity, "span") == 0 || strcmp(severity, "note-span") == 0) &&
+                message.getLength() == 0)
+            {
+                return false;
+            }
+        }
 
         sb << "E" << codeStr << "\t";
         sb << severity << "\t";
@@ -602,15 +736,19 @@ String renderDiagnosticMachineReadable(SourceManager* sm, const GenericDiagnosti
         sb << endLoc.line << "\t";
         sb << endLoc.column << "\t";
         sb << message << "\n";
+        return true;
     };
 
     // Output primary diagnostic
     outputSpan(diag.primarySpan, getSeverityName(diag.severity), diag.message);
 
+    // Output primary span message (if it has a valid location or message)
+    outputSpan(diag.primarySpan, "span", diag.primarySpan.message);
+
     // Output secondary spans
     for (const auto& secondarySpan : diag.secondarySpans)
     {
-        outputSpan(secondarySpan, "secondary", secondarySpan.message);
+        outputSpan(secondarySpan, "span", secondarySpan.message);
     }
 
     // Output notes
@@ -622,7 +760,7 @@ String renderDiagnosticMachineReadable(SourceManager* sm, const GenericDiagnosti
         // Output any secondary spans attached to the note
         for (const auto& secondarySpan : note.secondarySpans)
         {
-            outputSpan(secondarySpan, "note-secondary", secondarySpan.message);
+            outputSpan(secondarySpan, "note-span", secondarySpan.message);
         }
     }
 

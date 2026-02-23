@@ -36,32 +36,37 @@ runs:
       run: |
         LLVM_KEY="llvm-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ inputs.llvm-hash }}"
         GCS_PATH="gs://slang-ci-cache/llvm-prebuilts/${LLVM_KEY}.tar.gz"
+        PUBLIC_URL="https://storage.googleapis.com/slang-ci-cache/llvm-prebuilts/${LLVM_KEY}.tar.gz"
 
         echo "🔍 Checking for LLVM prebuilt: ${GCS_PATH}"
 
-        # Try to download (works without auth if object is public, or with Workload Identity if authenticated)
+        # Try with gcloud first (works if authenticated), fall back to curl for public access
         if gcloud storage ls "${GCS_PATH}" 2>/dev/null; then
-          echo "✅ Found LLVM prebuilt in GCS, downloading..."
+          echo "✅ Found LLVM prebuilt in GCS (authenticated access), downloading..."
           gcloud storage cp "${GCS_PATH}" /tmp/llvm-prebuilt.tar.gz
-
-          echo "📦 Extracting LLVM..."
-          mkdir -p build/llvm-project-install
-          tar -xzf /tmp/llvm-prebuilt.tar.gz -C build/llvm-project-install
-          rm /tmp/llvm-prebuilt.tar.gz
-
-          echo "cache-hit=true" >> $GITHUB_OUTPUT
-          echo "✅ LLVM restored from GCS"
-
-          echo "📊 LLVM installation size:"
-          du -sh build/llvm-project-install
-
-          # Set environment variables for CMake
-          echo "LLVM_DIR=${{ github.workspace }}/build/llvm-project-install" >> $GITHUB_ENV
-          echo "Clang_DIR=${{ github.workspace }}/build/llvm-project-install" >> $GITHUB_ENV
+        elif curl -f -s -I "${PUBLIC_URL}" >/dev/null 2>&1; then
+          echo "✅ Found LLVM prebuilt in GCS (public access), downloading..."
+          curl -L -o /tmp/llvm-prebuilt.tar.gz "${PUBLIC_URL}"
         else
           echo "⚠️  LLVM prebuilt not found in GCS"
           echo "cache-hit=false" >> $GITHUB_OUTPUT
+          exit 0
         fi
+
+        echo "📦 Extracting LLVM..."
+        mkdir -p build/llvm-project-install
+        tar -xzf /tmp/llvm-prebuilt.tar.gz -C build/llvm-project-install
+        rm /tmp/llvm-prebuilt.tar.gz
+
+        echo "cache-hit=true" >> $GITHUB_OUTPUT
+        echo "✅ LLVM restored from GCS"
+
+        echo "📊 LLVM installation size:"
+        du -sh build/llvm-project-install
+
+        # Set environment variables for CMake
+        echo "LLVM_DIR=${{ github.workspace }}/build/llvm-project-install" >> $GITHUB_ENV
+        echo "Clang_DIR=${{ github.workspace }}/build/llvm-project-install" >> $GITHUB_ENV
 
     - name: Build LLVM from source
       if: steps.download.outputs.cache-hit != 'true' && inputs.build-if-missing == 'true'

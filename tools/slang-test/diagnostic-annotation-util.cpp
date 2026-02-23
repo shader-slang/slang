@@ -36,6 +36,14 @@ struct Annotation
     int columnEnd = 0;        // Ending column (1-based)
 };
 
+// Helper to compute span length from begin/end columns (exclusive end convention)
+// Returns at least 1 to ensure we always have at least one caret
+static int getSpanLength(int beginCol, int endCol)
+{
+    int length = endCol - beginCol;
+    return length > 0 ? length : 1;
+}
+
 // Internal functions
 static SlangResult parseAnnotations(
     const UnownedStringSlice& sourceText,
@@ -72,12 +80,13 @@ static SlangResult parseAnnotations(
     outAnnotations.clear();
 
     // Build the comment markers we're looking for
+    // The colon after the prefix is required to avoid confusion with substring matching
     StringBuilder lineMarkerBuilder;
-    lineMarkerBuilder << "//" << prefix;
+    lineMarkerBuilder << "//" << prefix << ":";
     String lineMarker = lineMarkerBuilder.produceString();
 
     StringBuilder blockStartBuilder;
-    blockStartBuilder << "/*" << prefix;
+    blockStartBuilder << "/*" << prefix << ":";
     String blockStart = blockStartBuilder.produceString();
 
     // Split source into lines
@@ -144,8 +153,9 @@ static SlangResult parseAnnotations(
                 annotation.sourceLineNumber = blockCommentSourceLine + 1; // 1-based line numbers
                 // caretPos is the 0-based position of '^' in the line
                 // Adding 1 converts it to a 1-based column number
+                // columnEnd uses exclusive convention (one past the last column)
                 annotation.columnStart = int(caretPos + 1);
-                annotation.columnEnd = int(caretPos + caretCount);
+                annotation.columnEnd = int(caretPos + 1 + caretCount);
 
                 if (annotation.expectedSubstring.getLength() > 0)
                 {
@@ -207,8 +217,9 @@ static SlangResult parseAnnotations(
                 // column position in the source. Column numbering is 1-based.
                 // lineCaretStart is the 0-based position of '^' in the annotation line.
                 // Adding 1 converts it to a 1-based column number.
+                // columnEnd uses exclusive convention (one past the last column)
                 annotation.columnStart = int(lineCaretStart + 1);
-                annotation.columnEnd = int(lineCaretStart + caretCount);
+                annotation.columnEnd = int(lineCaretStart + 1 + caretCount);
             }
             else
             {
@@ -296,6 +307,29 @@ static void generateSuggestedAnnotations(
 {
     sb << "  ⋮\n"; // Vertical ellipsis (indented)
 
+    // Check if any diagnostic has column 0 (no valid location)
+    // These should use caretless format since position-based matching won't work
+    bool hasLocationlessDiagnostic = false;
+    for (const auto* diag : diagnostics)
+    {
+        if (diag->beginCol == 0)
+        {
+            hasLocationlessDiagnostic = true;
+            break;
+        }
+    }
+
+    // For locationless diagnostics (column 0), use simple caretless format
+    if (hasLocationlessDiagnostic)
+    {
+        for (const auto* diag : diagnostics)
+        {
+            sb << "//" << prefix << ": " << diag->message << "\n";
+        }
+        sb << "  ⋮\n"; // Trailing vertical ellipsis (indented)
+        return;
+    }
+
     // Show source line (no indentation)
     if (lineNumber >= 1 && lineNumber <= sourceLines.getCount())
     {
@@ -305,8 +339,8 @@ static void generateSuggestedAnnotations(
             sb << "\n";
     }
 
-    // Calculate the prefix length: "//" + prefix
-    int linePrefixLength = 2 + prefix.getLength();
+    // Calculate the prefix length: "//" + prefix + ":"
+    int linePrefixLength = 3 + int(prefix.getLength());
 
     // Check if we should use block comment
     bool useBlockComment = false;
@@ -322,7 +356,7 @@ static void generateSuggestedAnnotations(
     if (useBlockComment)
     {
         // Generate block comment format (no indentation)
-        sb << "/*" << prefix << "\n";
+        sb << "/*" << prefix << ":\n";
         for (const auto* diag : diagnostics)
         {
             // Generate spacing to align caret with column
@@ -335,7 +369,7 @@ static void generateSuggestedAnnotations(
             }
 
             StringBuilder caretBuilder;
-            int caretCount = diag->endCol - diag->beginCol + 1;
+            int caretCount = getSpanLength(diag->beginCol, diag->endCol);
             for (int i = 0; i < caretCount; ++i)
             {
                 caretBuilder << "^";
@@ -363,13 +397,13 @@ static void generateSuggestedAnnotations(
             }
 
             StringBuilder caretBuilder;
-            int caretCount = diag->endCol - diag->beginCol + 1;
+            int caretCount = getSpanLength(diag->beginCol, diag->endCol);
             for (int i = 0; i < caretCount; ++i)
             {
                 caretBuilder << "^";
             }
 
-            sb << "//" << prefix << spacingBuilder.getUnownedSlice()
+            sb << "//" << prefix << ":" << spacingBuilder.getUnownedSlice()
                << caretBuilder.getUnownedSlice() << " " << diag->message << "\n";
         }
     }
@@ -387,15 +421,11 @@ static bool checkAnnotations(
 {
     outMissingAnnotations.clear();
 
-    // Track which diagnostics are matched by annotations (for exhaustive checking)
     List<bool> diagnosticMatched;
-    if (exhaustive)
+    diagnosticMatched.setCount(diagnostics.getCount());
+    for (Index i = 0; i < diagnostics.getCount(); ++i)
     {
-        diagnosticMatched.setCount(diagnostics.getCount());
-        for (Index i = 0; i < diagnostics.getCount(); ++i)
-        {
-            diagnosticMatched[i] = false;
-        }
+        diagnosticMatched[i] = false;
     }
 
     for (const auto& annotation : annotations)
@@ -408,52 +438,32 @@ static bool checkAnnotations(
             // Can match against: message, severity, errorCode, or "severity errorCode"
             for (Index diagIdx = 0; diagIdx < diagnostics.getCount(); ++diagIdx)
             {
+                if (diagnosticMatched[diagIdx])
+                    continue;
+
                 const auto& diag = diagnostics[diagIdx];
                 UnownedStringSlice expected = annotation.expectedSubstring.getUnownedSlice();
 
-                // Check message
+                // Check message, severity, errorCode, or "severity errorCode"
+                bool matches = false;
                 if (diag.message.indexOf(expected) != -1)
+                    matches = true;
+                else if (diag.severity.indexOf(expected) != -1)
+                    matches = true;
+                else if (diag.errorCode.indexOf(expected) != -1)
+                    matches = true;
+                else
                 {
-                    found = true;
-                    if (exhaustive)
-                    {
-                        diagnosticMatched[diagIdx] = true;
-                    }
-                    break;
+                    StringBuilder combined;
+                    combined << diag.severity << " " << diag.errorCode;
+                    if (combined.produceString().indexOf(expected) != -1)
+                        matches = true;
                 }
 
-                // Check severity
-                if (diag.severity.indexOf(expected) != -1)
+                if (matches)
                 {
                     found = true;
-                    if (exhaustive)
-                    {
-                        diagnosticMatched[diagIdx] = true;
-                    }
-                    break;
-                }
-
-                // Check error code
-                if (diag.errorCode.indexOf(expected) != -1)
-                {
-                    found = true;
-                    if (exhaustive)
-                    {
-                        diagnosticMatched[diagIdx] = true;
-                    }
-                    break;
-                }
-
-                // Check "severity errorCode" combination
-                StringBuilder combined;
-                combined << diag.severity << " " << diag.errorCode;
-                if (combined.produceString().indexOf(expected) != -1)
-                {
-                    found = true;
-                    if (exhaustive)
-                    {
-                        diagnosticMatched[diagIdx] = true;
-                    }
+                    diagnosticMatched[diagIdx] = true;
                     break;
                 }
             }
@@ -528,11 +538,23 @@ static bool checkAnnotations(
                     else
                         diagInfo << diag.beginCol << "-" << diag.endCol;
                     diagInfo << ": \"" << diag.message << "\"";
+                    if (diagnosticMatched[diagIdx])
+                        diagInfo << " (already matched)";
                     candidateDiagnostics.add(diagInfo.produceString());
 
+                    if (diagnosticMatched[diagIdx])
+                        continue;
+
                     // Check if this is a full match
-                    if (diag.beginCol == annotation.columnStart &&
-                        diag.endCol == annotation.columnEnd)
+                    // Allow point diagnostics (beginCol == endCol) to match single-caret
+                    // annotations This handles cases like missing tokens where the lexer can't
+                    // expand the span
+                    bool columnMatch =
+                        (diag.beginCol == annotation.columnStart &&
+                         diag.endCol == annotation.columnEnd) ||
+                        (diag.beginCol == diag.endCol && diag.beginCol == annotation.columnStart &&
+                         annotation.columnEnd == annotation.columnStart + 1);
+                    if (columnMatch)
                     {
                         columnMatched = true;
                         UnownedStringSlice expected =
@@ -541,35 +563,24 @@ static bool checkAnnotations(
                         // Check message, severity, errorCode, or "severity errorCode"
                         bool matches = false;
                         if (diag.message.indexOf(expected) != -1)
-                        {
                             matches = true;
-                        }
                         else if (diag.severity.indexOf(expected) != -1)
-                        {
                             matches = true;
-                        }
                         else if (diag.errorCode.indexOf(expected) != -1)
-                        {
                             matches = true;
-                        }
                         else
                         {
                             StringBuilder combined;
                             combined << diag.severity << " " << diag.errorCode;
                             if (combined.produceString().indexOf(expected) != -1)
-                            {
                                 matches = true;
-                            }
                         }
 
                         if (matches)
                         {
                             messageMatched = true;
                             found = true;
-                            if (exhaustive)
-                            {
-                                diagnosticMatched[diagIdx] = true;
-                            }
+                            diagnosticMatched[diagIdx] = true;
                             break;
                         }
                     }
@@ -662,18 +673,19 @@ static bool checkAnnotations(
         }
     }
 
+    // Count unmatched diagnostics
+    List<const ParsedDiagnostic*> unmatchedDiagnostics;
+    for (Index i = 0; i < diagnostics.getCount(); ++i)
+    {
+        if (!diagnosticMatched[i])
+        {
+            unmatchedDiagnostics.add(&diagnostics[i]);
+        }
+    }
+
     // In exhaustive mode, check for diagnostics that weren't matched by any annotation
     if (exhaustive)
     {
-        List<const ParsedDiagnostic*> unmatchedDiagnostics;
-        for (Index i = 0; i < diagnostics.getCount(); ++i)
-        {
-            if (!diagnosticMatched[i])
-            {
-                unmatchedDiagnostics.add(&diagnostics[i]);
-            }
-        }
-
         if (unmatchedDiagnostics.getCount() > 0)
         {
             StringBuilder sb;
@@ -715,6 +727,19 @@ static bool checkAnnotations(
             sb << "\n  Or add 'non-exhaustive' to skip checking unannotated diagnostics:\n";
             sb << "  //DIAGNOSTIC_TEST:SIMPLE(diag=" << prefix << ",non-exhaustive):\n";
 
+            outMissingAnnotations.add(sb.produceString());
+        }
+    }
+    else
+    {
+        // In non-exhaustive mode, fail if non-exhaustive wasn't actually necessary
+        // (i.e., all diagnostics were matched by annotations)
+        if (unmatchedDiagnostics.getCount() == 0 && diagnostics.getCount() > 0)
+        {
+            StringBuilder sb;
+            sb << "Unnecessary 'non-exhaustive': All " << diagnostics.getCount()
+               << " diagnostic(s) were matched by annotations.\n";
+            sb << "Remove 'non-exhaustive' from the test directive to use exhaustive mode.\n";
             outMissingAnnotations.add(sb.produceString());
         }
     }
