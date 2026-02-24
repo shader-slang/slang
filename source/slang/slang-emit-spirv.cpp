@@ -6521,9 +6521,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     SpvInst* emitDescriptorHeapBuiltinVar(IRInst* builtinVarInst)
     {
         ensureExtensionDeclaration(UnownedStringSlice("SPV_EXT_descriptor_heap"));
-        ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_untyped_pointers"));
         requireSPIRVCapability(SpvCapabilityDescriptorHeapEXT);
-        requireSPIRVCapability(SpvCapabilityUntypedPointersKHR);
         requireSPIRVCapability(SpvCapabilityRuntimeDescriptorArrayEXT);
 
         auto uniformConstantUntypedPtrType =
@@ -6557,6 +6555,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         if (storageClass == SpvStorageClassUniformConstant && m_descriptorHeapUntypedPointerType)
             return m_descriptorHeapUntypedPointerType;
 
+        ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_untyped_pointers"));
+        requireSPIRVCapability(SpvCapabilityUntypedPointersKHR);
         auto type = emitInstMemoized(
             getSection(SpvLogicalSectionID::ConstantsAndTypes),
             nullptr,
