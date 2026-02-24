@@ -4824,11 +4824,55 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
         testList.tests.addRange(synthesizedTests);
     }
 
-    // We have found a test to run!
-    int subTestCount = 0;
-    for (auto& testDetails : testList.tests)
+    // If explicit test order is requested, reorder subtests by prefix order
+    List<Index> testOrder;
+    for (Index i = 0; i < testList.tests.getCount(); i++)
+        testOrder.add(i);
+
+    if (context->options.explicitTestOrder && context->options.testPrefixes.getCount() > 0)
     {
-        int subTestIndex = subTestCount++;
+        auto& prefixes = context->options.testPrefixes;
+        auto getTestPrefixIndex = [&](Index testIdx) -> Index
+        {
+            // Build the outputStem for this test
+            StringBuilder stem;
+            stem << filePath;
+            if (testIdx != 0)
+                stem << "." << testIdx;
+            String outputStem = stem.produceString();
+
+            for (Index i = 0; i < prefixes.getCount(); i++)
+            {
+                // Check if prefix matches this specific subtest
+                int prefixSubtest = getSubtestIndex(prefixes[i], filePath);
+                if (prefixSubtest >= 0)
+                {
+                    // Prefix specifies a subtest - check for exact match
+                    if (prefixSubtest == 0 && testIdx == 0)
+                        return i;
+                    if (outputStem == prefixes[i])
+                        return i;
+                }
+                else if (filePath.startsWith(prefixes[i]))
+                {
+                    // Non-specific prefix - matches all subtests in file
+                    return i;
+                }
+            }
+            return prefixes.getCount();
+        };
+
+        std::stable_sort(
+            testOrder.begin(),
+            testOrder.end(),
+            [&](Index a, Index b) { return getTestPrefixIndex(a) < getTestPrefixIndex(b); });
+    }
+
+    // We have found a test to run!
+    for (Index orderIdx = 0; orderIdx < testOrder.getCount(); orderIdx++)
+    {
+        Index subTestIndex = testOrder[orderIdx];
+        auto& testDetails = testList.tests[subTestIndex];
 
         // Check that the test passes our current category mask
         if (!testPassesCategoryMask(context, testDetails.options))
@@ -5187,6 +5231,11 @@ void runTestsInDirectory(TestContext* context)
             for (Index i = 0; i < prefixes.getCount(); i++)
             {
                 if (filePath.startsWith(prefixes[i]))
+                {
+                    return i;
+                }
+                // Also match subtest prefixes (e.g., "foo.slang.1" matches file "foo.slang")
+                if (getSubtestIndex(prefixes[i], filePath) >= 0)
                 {
                     return i;
                 }
