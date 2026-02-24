@@ -37,10 +37,7 @@ struct ProcessLateRequireCapabilityInstsContext
     {
     }
 
-    void checkCapability(
-        IRFunc* entry,
-        Profile profile,
-        IRCapabilitySet* capSet)
+    void checkCapability(IRFunc* entry, Profile profile, IRCapabilitySet* capSet)
     {
         CapabilitySet targetCaps = m_targetCaps;
         auto stageCapabilitySet = profile.getCapabilityName();
@@ -143,7 +140,8 @@ struct ProcessLateRequireCapabilityInstsContext
                             if (auto entryPointDecor =
                                     entryPoint->findDecoration<IREntryPointDecoration>())
                             {
-                                IRCapabilitySet* capSet = as<IRCapabilitySet>(lateRequireCap->getOperand(0));
+                                IRCapabilitySet* capSet =
+                                    as<IRCapabilitySet>(lateRequireCap->getOperand(0));
                                 checkCapability(entryPoint, entryPointDecor->getProfile(), capSet);
                             }
                         }
