@@ -818,7 +818,7 @@ float __glsl_shadow_lod_texture_level<TSampler, TCoord>(TSampler s, TCoord value
     __target_switch
     {
     case glsl:
-        __requireCapability("GL_EXT_texture_shadow_lod");
+        __requireCapability(GL_EXT_texture_shadow_lod);
         __intrinsic_asm "textureLod($0, $1, $2)";
     }
 }
@@ -830,7 +830,7 @@ float __glsl_shadow_lod_texture_level_cube_array_shadow<TSampler, TCoord>(TSampl
     __target_switch
     {
     case glsl:
-        __requireCapability("GL_EXT_texture_shadow_lod");
+        __requireCapability(GL_EXT_texture_shadow_lod);
         __intrinsic_asm "textureLod($0, $1, $2, $3)";
     }
 }
@@ -928,7 +928,7 @@ float __glsl_shadow_lod_texture_level<TTexture, TCoord>(TTexture t, SamplerCompa
     __target_switch
     {
     case glsl:
-        __requireCapability("GL_EXT_texture_shadow_lod");
+        __requireCapability(GL_EXT_texture_shadow_lod);
         __intrinsic_asm "textureLod($p, $2, $3)";
     }
 }
@@ -940,7 +940,7 @@ float __glsl_shadow_lod_texture_level_cube_array_shadow<TTexture, TCoord>(TTextu
     __target_switch
     {
     case glsl:
-        __requireCapability("GL_EXT_texture_shadow_lod");
+        __requireCapability(GL_EXT_texture_shadow_lod);
         __intrinsic_asm "textureLod($p, $2, $3, $4)";
     }
 }

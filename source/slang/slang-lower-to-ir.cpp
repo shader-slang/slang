@@ -7955,6 +7955,28 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             builder->addDecoration(switchInst, kIROp_BranchDecoration);
         }
     }
+
+    void visitRequireCapabilityStmt(RequireCapabilityStmt* stmt)
+    {
+        auto builder = getBuilder();
+
+        List<CapabilityName> capNames;
+        for (const Token &t : stmt->requiredCaps)
+        {
+            // note: capability names have already been validated
+            capNames.add(findCapabilityName(t.getContent()));
+        }
+
+        CapabilitySet capabilitySet(capNames);
+
+        IRInst* capSetInst = builder->getCapabilityValue(capabilitySet);
+
+        builder->emitIntrinsicInst(
+            builder->getVoidType(),
+            kIROp_LateRequireCapability,
+            1,
+            &capSetInst);
+    }
 };
 
 IRInst* getOrEmitDebugSource(IRGenContext* context, SourceLoc loc)
@@ -12981,11 +13003,6 @@ RefPtr<IRModule> generateIRForTranslationUnit(
 #endif
 
     validateIRModuleIfEnabled(compileRequest, module);
-
-    // Before any optimizations, check that the parameters to
-    // IRLateRequireCapability are valid. We don't want to postpone this until
-    // the first dead code elimination.
-    checkLateRequireCapabilityArguments(module, compileRequest->getSink());
 
     // We will perform certain "mandatory" optimization passes now.
     // These passes serve two purposes:

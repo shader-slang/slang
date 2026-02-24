@@ -217,6 +217,7 @@ public:
     ReturnStmt* ParseReturnStatement();
     DeferStmt* ParseDeferStatement();
     ThrowStmt* ParseThrowStatement();
+    RequireCapabilityStmt* ParseRequireCapabilityStatement();
     ExpressionStmt* ParseExpressionStatement();
     Expr* ParseExpression(Precedence level = Precedence::Comma);
 
@@ -6177,6 +6178,10 @@ Stmt* Parser::ParseStatement(Stmt* parentStmt)
     {
         statement = ParseThrowStatement();
     }
+    else if (LookAheadToken("__requireCapability"))
+    {
+        statement = ParseRequireCapabilityStatement();
+    }
     else if (LookAheadToken(TokenType::Identifier) || LookAheadToken(TokenType::Scope))
     {
         if (LookAheadToken(TokenType::Identifier) && LookAheadToken(TokenType::Colon, 1))
@@ -6787,6 +6792,38 @@ ExpressionStmt* Parser::ParseExpressionStatement()
     statement->expression = ParseExpression();
 
     ReadToken(TokenType::Semicolon);
+    return statement;
+}
+
+// '__requireCapability' '(' identifier (',' identifier)* ')' ';'
+RequireCapabilityStmt* Parser::ParseRequireCapabilityStatement()
+{
+    RequireCapabilityStmt* statement = astBuilder->create<RequireCapabilityStmt>();
+    FillPosition(statement);
+    ReadToken("__requireCapability");
+
+    ReadToken(TokenType::LParent);
+
+    while (true)
+    {
+        Token capToken = ReadToken(TokenType::Identifier);
+
+        UnownedStringSlice capNameStr = capToken.getContent();
+        CapabilityName capName = findCapabilityName(capNameStr);
+        if (capName != CapabilityName::Invalid)
+            statement->requiredCaps.add(capToken);
+        else
+            sink->diagnose(capToken, Diagnostics::unknownCapability, capNameStr);
+
+        if (!LookAheadToken(TokenType::Comma))
+            break;
+
+        ReadToken(TokenType::Comma);
+    }
+
+    ReadToken(TokenType::RParent);
+    ReadToken(TokenType::Semicolon);
+
     return statement;
 }
 

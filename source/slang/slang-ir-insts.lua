@@ -2988,8 +2988,7 @@ local insts = {
                 -- A capability requirement that is checked after linking, specialization, and IR-level dead
 		-- code elimination passes.
                 --
-                -- Parameters are a list of string constants that name capabilities. The semantics are the same as in
-                -- [require(capname, capname, ...)]
+                -- Parameters: IRCapabilitySet
         } }
 }
 

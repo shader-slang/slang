@@ -12,59 +12,6 @@
 namespace Slang
 {
 
-struct CheckLateRequireCapabilityInstsContext
-{
-    IRModule* m_module;
-    DiagnosticSink* m_sink;
-    SlangResult m_status = SLANG_OK;
-
-    void checkFunc(IRFunc* func)
-    {
-        // scan the function for IRLateRequireCapability instructions
-        for (auto block : func->getBlocks())
-        {
-            for (auto inst : block->getOrdinaryInsts())
-            {
-                if (auto lateRequireCap = as<IRLateRequireCapability>(inst))
-                {
-                    for (UInt i = 0; i < lateRequireCap->getOperandCount(); ++i)
-                    {
-                        IRConstant* capConstant = as<IRConstant>(inst->getOperand(i));
-                        if (!capConstant)
-                        {
-                            m_sink->diagnose(inst, Diagnostics::expectedAStringLiteral);
-                            m_status = SLANG_FAIL;
-                        }
-                        else
-                        {
-                            UnownedStringSlice capNameStr = capConstant->getStringSlice();
-                            CapabilityName capName = findCapabilityName(capNameStr);
-                            if (capName == CapabilityName::Invalid)
-                            {
-                                m_sink->diagnose(inst, Diagnostics::unknownCapability, capNameStr);
-                                m_status = SLANG_FAIL;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    void checkModule()
-    {
-        for (auto inst = m_module->getModuleInst()->getFirstChild(); inst;
-             inst = inst->getNextInst())
-        {
-            auto func = as<IRFunc>(inst);
-            if (!func)
-                continue;
-
-            checkFunc(func);
-        }
-    }
-};
-
 struct ProcessLateRequireCapabilityInstsContext
 {
     IRModule* const m_module;
@@ -92,14 +39,38 @@ struct ProcessLateRequireCapabilityInstsContext
 
     void checkCapability(
         IRFunc* entry,
-        IRLateRequireCapability* inst,
         Profile profile,
-        List<CapabilityName> capNames)
+        IRCapabilitySet* capSet)
     {
         CapabilitySet targetCaps = m_targetCaps;
         auto stageCapabilitySet = profile.getCapabilityName();
+        CapabilitySet required(capSet->getCaps());
+
+#if 0
+        {
+            StringBuilder sb;
+            printDiagnosticArg(sb, required);
+            fprintf(stderr, "required (full):    %s\n", sb.toString().getBuffer());
+
+            sb.clear();
+            printDiagnosticArg(sb, targetCaps);
+            fprintf(stderr, "target (full):      %s\n", sb.toString().getBuffer());
+
+            sb.clear();
+            printDiagnosticArg(sb, stageCapabilitySet);
+            fprintf(stderr, "stageCapabilitySet: %s\n", sb.toString().getBuffer());
+        }
+#endif
+
         targetCaps.join(stageCapabilitySet);
-        CapabilitySet required(capNames);
+
+#if 0
+        {
+            StringBuilder sb;
+            printDiagnosticArg(sb, targetCaps);
+            fprintf(stderr, "target (stage):     %s\n", sb.toString().getBuffer());
+        }
+#endif
 
         // check that we have the required caps for this stage
         if (targetCaps.atLeastOneSetImpliedInOther(required) ==
@@ -120,17 +91,15 @@ struct ProcessLateRequireCapabilityInstsContext
         }
 
 #if 0
-        StringBuilder sb;
-        printDiagnosticArg(sb, stageCapabilitySet);
-        fprintf(stderr, "stageCapabilitySet: %s\n", sb.toString().getBuffer());
+        {
+            StringBuilder sb;
+            printDiagnosticArg(sb, required);
+            fprintf(stderr, "required (stage):   %s\n", sb.toString().getBuffer());
 
-        sb.clear();
-        printDiagnosticArg(sb, required);
-        fprintf(stderr, "required:           %s\n", sb.toString().getBuffer());
-
-        sb.clear();
-        printDiagnosticArg(sb, addedAtoms);
-        fprintf(stderr, "difference:         %s\n", sb.toString().getBuffer());
+            sb.clear();
+            printDiagnosticArg(sb, addedAtoms);
+            fprintf(stderr, "diff:               %s\n", sb.toString().getBuffer());
+        }
 #endif
 
         maybeDiagnoseWarningOrError(
@@ -144,29 +113,11 @@ struct ProcessLateRequireCapabilityInstsContext
             m_optionSet.getProfile().getName(),
             addedAtoms.getElements<CapabilityAtom>());
 
-        m_sink->diagnose(inst->sourceLoc, Diagnostics::seeCallOfFunc, "__requireCapability()");
+        m_sink->diagnose(capSet->sourceLoc, Diagnostics::seeCallOfFunc, "__requireCapability()");
 
         // we'll fail only if restrictive capability check was requested
         if (m_optionSet.getBoolOption(CompilerOptionName::RestrictiveCapabilityCheck))
             m_status = SLANG_FAIL;
-    }
-
-    void processCapability(IRFunc* entry, Profile profile, IRLateRequireCapability* inst)
-    {
-        List<CapabilityName> capNames;
-
-        for (UInt i = 0; i < inst->getOperandCount(); ++i)
-        {
-            IRConstant* capConstant = as<IRConstant>(inst->getOperand(i));
-
-            // note: capName validity has already been checked by
-            // CheckLateRequireCapabilityInstsContext
-            UnownedStringSlice capNameStr = capConstant->getStringSlice();
-            CapabilityName capName = findCapabilityName(capNameStr);
-            capNames.add(capName);
-        }
-
-        checkCapability(entry, inst, profile, capNames);
     }
 
     void processFunc(IRFunc* func)
@@ -192,10 +143,8 @@ struct ProcessLateRequireCapabilityInstsContext
                             if (auto entryPointDecor =
                                     entryPoint->findDecoration<IREntryPointDecoration>())
                             {
-                                processCapability(
-                                    entryPoint,
-                                    entryPointDecor->getProfile(),
-                                    lateRequireCap);
+                                IRCapabilitySet* capSet = as<IRCapabilitySet>(lateRequireCap->getOperand(0));
+                                checkCapability(entryPoint, entryPointDecor->getProfile(), capSet);
                             }
                         }
                     }
@@ -224,15 +173,6 @@ struct ProcessLateRequireCapabilityInstsContext
         }
     }
 };
-
-/// Checks that the named capabilities exist.
-SlangResult checkLateRequireCapabilityArguments(IRModule* module, DiagnosticSink* sink)
-{
-    CheckLateRequireCapabilityInstsContext context(module, sink);
-
-    context.checkModule();
-    return context.m_status;
-}
 
 SlangResult processLateRequireCapabilityInsts(
     IRModule* module,
