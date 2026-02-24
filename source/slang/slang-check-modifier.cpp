@@ -1914,7 +1914,7 @@ Modifier* SemanticsVisitor::checkModifier(
                     genDecl->ownedScope);
                 if (!scrutineeResults.isValid())
                 {
-                    getSink()->diagnose(Diagnostics::UndefinedIdentifier2{
+                    getSink()->diagnose(Diagnostics::UndefinedIdentifier{
                         .name = targetIntrinsic->scrutinee.name,
                         .location = targetIntrinsic->scrutinee.loc});
                 }

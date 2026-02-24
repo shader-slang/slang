@@ -1355,7 +1355,7 @@ QualType getTypeForDeclRef(
         // an identifier that doesn't have a name.
         //
         sink->diagnose(
-            Diagnostics::UndefinedIdentifier2{.name = declRef.getName(), .location = loc});
+            Diagnostics::UndefinedIdentifier{.name = declRef.getName(), .location = loc});
     }
     return QualType(astBuilder->getErrorType());
 }

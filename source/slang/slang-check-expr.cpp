@@ -3519,7 +3519,7 @@ Expr* SemanticsExprVisitor::visitVarExpr(VarExpr* expr)
 
     if (!diagnosed)
         getSink()->diagnose(
-            Diagnostics::UndefinedIdentifier2{.name = expr->name, .location = expr->loc});
+            Diagnostics::UndefinedIdentifier{.name = expr->name, .location = expr->loc});
 
     return resultExpr;
 }

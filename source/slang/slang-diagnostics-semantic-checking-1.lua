@@ -65,7 +65,7 @@ err(
 )
 
 err(
-    "undefined identifier 2",
+    "undefined identifier",
     30015,
     "undefined identifier",
     span { loc = "location", message = "undefined identifier '~name:Name'." }
