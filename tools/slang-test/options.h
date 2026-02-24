@@ -163,6 +163,12 @@ struct Options
 
     /// Seed for shuffling deterministically
     uint32_t shuffleSeed = 1;
+
+    /// Whether to run tests in the order specified by test prefixes
+    bool explicitTestOrder = false;
+
+    /// Whether to list tests without running them
+    bool dryRun = false;
 };
 
 #endif // OPTIONS_H_INCLUDED
