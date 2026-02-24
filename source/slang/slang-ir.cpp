@@ -8716,6 +8716,7 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_MakeDifferentialPairUserCode:
     case kIROp_MakeDifferentialPtrPair:
     case kIROp_MakeStorageTypeLoweringConfig:
+    case kIROp_SPIRVLoadTexelPointerFromHeap:
         return false;
 
     case kIROp_UnboundedFuncElement:

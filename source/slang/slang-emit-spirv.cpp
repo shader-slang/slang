@@ -4671,7 +4671,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             break;
         case kIROp_SPIRVSamplerHeap:
         case kIROp_SPIRVResourceHeap:
-            return ensureDescriptorHeapBuiltinVar(inst);
+            return emitDescriptorHeapBuiltinVar(inst);
 
         case kIROp_GetVulkanRayTracingPayloadLocation:
             {
@@ -6521,7 +6521,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return varInst;
     }
 
-    SpvInst* ensureDescriptorHeapBuiltinVar(IRInst* builtinVarInst)
+    SpvInst* emitDescriptorHeapBuiltinVar(IRInst* builtinVarInst)
     {
         ensureExtensionDeclaration(UnownedStringSlice("SPV_EXT_descriptor_heap"));
         ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_untyped_pointers"));
