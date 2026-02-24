@@ -32,13 +32,12 @@ static const int MaxOutputSize = 64;
 typealias ShMemSize = SharedMemorySize< DType, TargetEnum.CUDA, ExecutionMode.Training, SubgroupSize, workgroupCount>;
 typealias Layer1 = ShMemSize.OfLayer1<InputSize, MaxOutputSize>;
 typealias TestPool = SharedMemoryPool<Layer1>;
-
 // Basic test on MatMul without bias, this test covers both forward and backward pass
 void TestBiasSumReduce<int OutputSize, TargetEnum Target>(uint tid)
 {
     Address biasAddress = Address(outputBuffer);
 
-    typealias MMA = MMAHelper<DType, InputSize, OutputSize, SubgroupSize, Target, TestPool, false>;
+    typealias MMA = MMAHelper<DType, InputSize, OutputSize, SubgroupSize, Target, Layer1, false>;
     const int OutSize = MMA.Uint4AlignedM;
     const int InSize = MMA.Uint4AlignedK;
 

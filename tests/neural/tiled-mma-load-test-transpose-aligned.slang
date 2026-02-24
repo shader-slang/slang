@@ -65,7 +65,7 @@ void testLoadShA<TargetEnum Target>(uint tid, uint tileIndex)
 
     Address address = Address(inputBuffer);
 
-    MMAHelper<half, InputSize, OutputSize, SubgroupSize, Target, TestPool, true>.loadShA<half, Address>(OffsetA, tileIndex, address);
+    MMAHelper<half, InputSize, OutputSize, SubgroupSize, Target, TestShMemSize, true>.loadShA<half, Address>(OffsetA, tileIndex, address);
     GroupMemoryBarrierWithWaveSync();
 }
 

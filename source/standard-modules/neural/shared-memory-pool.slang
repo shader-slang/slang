@@ -8,24 +8,14 @@ implementing neural;
 
 internal typealias SPtr<T> = Ptr<T, Access::ReadWrite, AddressSpace::GroupShared>;
 
-internal interface ISharedMemoryPool
-{
-    associatedtype MemSize: ISharedMemorySize;
-}
-
 public interface ISharedMemorySize
 {
     static const uint Bytes;
 }
 
-public struct SharedMemoryPool<ShMemSize: ISharedMemorySize> : ISharedMemoryPool
+public struct SharedMemoryPool<ShMemSize: ISharedMemorySize>
 {
-    typealias MemSize = ShMemSize;
-}
-
-VISIBILITY_LEVEL extension<T : ISharedMemoryPool> T
-{
-    VISIBILITY_LEVEL static groupshared uint4 data[T.MemSize.Bytes / sizeof(uint4)];
+    VISIBILITY_LEVEL static groupshared uint4 data[ShMemSize.Bytes / sizeof(uint4)];
 }
 
 internal struct SharedMemoryUsage<T, TargetEnum Target, ExecutionMode ExeMode, int InputSize, int OutputSize, int SubgroupSize>

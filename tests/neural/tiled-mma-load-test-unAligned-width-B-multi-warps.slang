@@ -104,7 +104,7 @@ void testLoadShB<TargetEnum Target>(uint tid, uint tileIndex)
     }
 
     uint subgroupIndex = tid / 32;
-    MMAHelper<half, InputSize, OutputSize, SubgroupSize, Target, TestPool, false>.loadVectorToShB(OffsetB, tileIndex, subgroupIndex, inputVector);
+    MMAHelper<half, InputSize, OutputSize, SubgroupSize, Target, TestShMemSize, false>.loadVectorToShB(OffsetB, tileIndex, subgroupIndex, inputVector);
     GroupMemoryBarrierWithWaveSync();
 }
 

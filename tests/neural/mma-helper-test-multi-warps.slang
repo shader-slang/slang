@@ -94,14 +94,14 @@ void identityWeightMatrix<int InputSize, bool Clear>(uint tid)
     }
 }
 
-DType[MMAHelper<DType, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA, TestPool>.Uint4AlignedM] testMatVecMul<int InputSize, int OutputSize, TargetEnum Target>(uint tid)
+DType[MMAHelper<DType, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA, TestShMemSize>.Uint4AlignedM] testMatVecMul<int InputSize, int OutputSize, TargetEnum Target>(uint tid)
 {
     typealias Address = BindlessAddress<DType>;
     Address address = Address(inputBuffer);
 
     // Construct the input vector as follow:
     // x = tid + 1
-    typealias MMA = MMAHelper<DType, InputSize, OutputSize, SubgroupSize, Target, TestPool, false>;
+    typealias MMA = MMAHelper<DType, InputSize, OutputSize, SubgroupSize, Target, TestShMemSize, false>;
     const int InSize = MMA.Uint4AlignedK;
     const int OutSize = MMA.Uint4AlignedM;
     DType inputVector[InSize] = {};
@@ -180,7 +180,7 @@ bool verifyResult<int OutputSize, T: IArray<DType>>(uint tid, T output)
 
 void test<int InputSize, int OutputSize>(uint tid, int resIndex)
 {
-    DType[MMAHelper<DType, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA, TestPool>.Uint4AlignedM] outputVector;
+    DType[MMAHelper<DType, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA, TestShMemSize>.Uint4AlignedM] outputVector;
 
     __target_switch
     {

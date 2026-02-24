@@ -153,10 +153,11 @@ struct TileInfo<T, int M, int N, int K, TargetEnum Target, bool TransposeA = fal
 //       we need the logic to be expand as much as possible during compile time. WaveGetLaneCount() is a runtime function,
 //       so if we use it directly in our mma function, some of branches won't be eliminated during compile time.
 [require(cooperative_matrix)]
-VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int SubgroupSize, TargetEnum Target, ShMemPool: ISharedMemoryPool, bool TransposeA = false>
+VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int SubgroupSize, TargetEnum Target, ShMemSize: ISharedMemorySize, bool TransposeA = false>
     where T : __BuiltinFloatingPointType
     where T.Differential == T
 {
+    typealias ShMemPool = SharedMemoryPool<ShMemSize>;
     typealias TileInfo = TileInfo<T, OutputSize, SubgroupSize, InputSize, Target, TransposeA>;
     typealias CMShape = CoopMatShape<T, Target>;
     typealias ShMemInfo = SharedMemoryUsage<T, Target, TransposeA ? ExecutionMode.Training : ExecutionMode.Inference,
@@ -952,7 +953,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
                 // So we can use transposed version of LoadShA/StoreShA to store the result. Because in transpose version, the major-ness is along
                 // K dimension. Note that column major in transpose case is just the row major in non-transpose case.
 
-                typealias MMA = MMAHelper<T, InputSize, OutputSize, SubgroupSize, Target, ShMemPool, true>;
+                typealias MMA = MMAHelper<T, InputSize, OutputSize, SubgroupSize, Target, ShMemSize, true>;
                 MMA.storeShA<U, Address>(sharedMemoryBOffset, i, weightAddress);
 
                 // Wait until all threads in the warp finish reading the shared memory and storing to the global memory.
@@ -1130,14 +1131,14 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
 // WaveTangledVector is a vector type that emulates the Cooperative Vector type by using Cooperative Matrix feature which is
 // supported by CUDA and SPIR-V.
 [require(cooperative_matrix, subgroup_basic)]
-public struct WaveTangledVector<T, ShMemPool : ISharedMemoryPool, int N, int SubgroupSize> : IVector<T>
+public struct WaveTangledVector<T, ShMemSize : ISharedMemorySize, int N, int SubgroupSize> : IVector<T>
     where T : __BuiltinFloatingPointType
     where T.Differential == T
 {
-    public typealias Differential = WaveTangledVector<T.Differential, ShMemPool, N, SubgroupSize>;
+    public typealias Differential = WaveTangledVector<T.Differential, ShMemSize, N, SubgroupSize>;
 
     public static const int Size = N;
-    public no_diff ShMemPool shMemPool;
+    public typealias ShMemPool = SharedMemoryPool<ShMemSize>;
 
     private typealias DTypeMatC = half;
 
@@ -1226,7 +1227,7 @@ public struct WaveTangledVector<T, ShMemPool : ISharedMemoryPool, int N, int Sub
         where Address.Differential : IPointerLikeAddress<T.Differential>
         where OutputVector : IVector<T>
     {
-        typealias MMA = MMAHelper<DTypeMatC, N, OutputVector.Size, SubgroupSize, Target, ShMemPool, false>;
+        typealias MMA = MMAHelper<DTypeMatC, N, OutputVector.Size, SubgroupSize, Target, ShMemSize, false>;
         uint shA = 0;
         uint shB = MMA.ShMemInfo.SharedMemSizeInVectorMatA;
         uint shC = shB;
@@ -1247,7 +1248,7 @@ public struct WaveTangledVector<T, ShMemPool : ISharedMemoryPool, int N, int Sub
         where OutputVector : IVector<T>
         where OutputVector.Differential : IVector<T.Differential>
     {
-        typealias MMA = MMAHelper<DTypeMatC, N, OutputVector.Size, SubgroupSize, Target, ShMemPool, true>;
+        typealias MMA = MMAHelper<DTypeMatC, N, OutputVector.Size, SubgroupSize, Target, ShMemSize, true>;
 
         uint shA = 0;
         uint shB = MMA.ShMemInfo.SharedMemSizeInVectorMatA;

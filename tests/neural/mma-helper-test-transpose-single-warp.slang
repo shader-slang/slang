@@ -95,14 +95,14 @@ void fillWeightMatrix<int InputSize, int OutputSize>(uint tid, bool clear = fals
     }
 }
 
-DType[MMAHelper<DType, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA, TestPool, true>.Uint4AlignedK] testMatTransposeVecMul<int InputSize, int OutputSize, TargetEnum Target>(uint tid)
+DType[MMAHelper<DType, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA, TestShMemSize, true>.Uint4AlignedK] testMatTransposeVecMul<int InputSize, int OutputSize, TargetEnum Target>(uint tid)
 {
     typealias Address = BindlessAddress<DType>;
     Address address = Address(inputBuffer);
 
     // Construct the input vector as follow:
     // x = tid + 1
-    typealias MMA = MMAHelper<DType, InputSize, OutputSize, SubgroupSize, Target, TestPool, true>;
+    typealias MMA = MMAHelper<DType, InputSize, OutputSize, SubgroupSize, Target, TestShMemSize, true>;
     const int OutSize = MMA.Uint4AlignedK;
     const int InSize = MMA.Uint4AlignedM;
 
@@ -172,7 +172,7 @@ void serialReadA(uint tid)
 
 void test<int InputSize, int OutputSize>(uint tid, int resIndex)
 {
-    DType[MMAHelper<DType, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA, TestPool, true>.Uint4AlignedK] outputVector;
+    DType[MMAHelper<DType, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA, TestShMemSize, true>.Uint4AlignedK] outputVector;
     __target_switch
     {
     case cuda:
