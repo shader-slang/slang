@@ -1674,6 +1674,9 @@ bool shouldDeclBeTreatedAsInterfaceRequirement(Decl* requirementDecl)
     return true;
 }
 
+// Returns the IRStructKey for the given interface requirement declaration,
+// used for witness table lookups. Returns nullptr if the decl is not
+// treated as a requirement (e.g. property decls, default impl stubs).
 IRStructKey* getInterfaceRequirementKey(IRGenContext* context, Decl* requirementDecl)
 {
     // Only specific types of decls are treated as requirements, e.g. methods and asssociated types.
