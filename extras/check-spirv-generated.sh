@@ -30,19 +30,19 @@ PYTHON="${PYTHON:-python3}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --cmake)
-      CMAKE="$2"
-      shift 2
-      ;;
-    --python)
-      PYTHON="$2"
-      shift 2
-      ;;
-    *)
-      echo_error "Unknown argument: $1"
-      echo "Usage: $0 [--cmake <path>] [--python <path>]"
-      exit 1
-      ;;
+  --cmake)
+    CMAKE="$2"
+    shift 2
+    ;;
+  --python)
+    PYTHON="$2"
+    shift 2
+    ;;
+  *)
+    echo_error "Unknown argument: $1"
+    echo "Usage: $0 [--cmake <path>] [--python <path>]"
+    exit 1
+    ;;
   esac
 done
 
