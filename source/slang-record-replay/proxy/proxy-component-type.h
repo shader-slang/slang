@@ -460,7 +460,7 @@ public:
 
     virtual SLANG_NO_THROW SlangInt32 SLANG_MCALL getDependencyFileCount() override
     {
-         if (!m_module)
+        if (!m_module)
             return 0;
         RECORD_CALL();
         auto result = m_module->getDependencyFileCount();

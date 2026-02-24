@@ -39,7 +39,7 @@ public:
     }                                    \
     ScopedReplayContext _scopedReplayContext;
 
-//#define REPLAY_TEST SLANG_IGNORE_TEST
+// #define REPLAY_TEST SLANG_IGNORE_TEST
 
 // =============================================================================
 // Helper: Round-trip test template
