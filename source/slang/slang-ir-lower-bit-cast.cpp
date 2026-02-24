@@ -366,6 +366,11 @@ struct BitCastLoweringContext
         {
             return;
         }
+        if (as<IRHLSLStructuredBufferTypeBase>(fromType) ||
+            as<IRHLSLStructuredBufferTypeBase>(toType))
+        {
+            return;
+        }
 
         if (fromTypeSize.size != toTypeSize.size)
             sink->diagnose(
