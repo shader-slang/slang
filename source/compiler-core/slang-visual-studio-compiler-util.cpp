@@ -302,6 +302,14 @@ static void _addFile(
         cmdLine.addArg(fileRep->getPath());
     }
 
+    // Add compiler specific options from user. Must run for all target types including
+    // SLANG_OBJECT_CODE so user flags (e.g. warning suppressions) apply in the two-stage flow.
+    for (auto compilerSpecificArg : options.compilerSpecificArguments)
+    {
+        const char* const arg = compilerSpecificArg;
+        cmdLine.addArg(arg);
+    }
+
     if (options.targetType != SLANG_OBJECT_CODE)
     {
         // Link options (parameters past /link go to linker)
@@ -321,7 +329,7 @@ static void _addFile(
 
             if (ArtifactDescUtil::isCpuBinary(desc) && desc.kind == ArtifactKind::Library)
             {
-                // Get the libray name and path
+                // Get the library name and path
                 ComPtr<IOSFileArtifactRepresentation> fileRep;
                 SLANG_RETURN_ON_FAIL(artifact->requireFile(ArtifactKeep::Yes, fileRep.writeRef()));
 
@@ -337,13 +345,6 @@ static void _addFile(
         {
             // Note that any escaping of the path is handled in the ProcessUtil::
             cmdLine.addPrefixPathArg("/LIBPATH:", libPath);
-        }
-
-        // Add compiler specific options from user.
-        for (auto compilerSpecificArg : options.compilerSpecificArguments)
-        {
-            const char* const arg = compilerSpecificArg;
-            cmdLine.addArg(arg);
         }
     }
 

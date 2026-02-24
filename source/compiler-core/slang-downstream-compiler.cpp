@@ -16,6 +16,7 @@
 #include "slang-artifact-representation-impl.h"
 #include "slang-artifact-util.h"
 #include "slang-com-helper.h"
+#include "slang-slice-allocator.h"
 
 namespace Slang
 {
@@ -159,13 +160,43 @@ SlangResult CommandLineDownstreamCompiler::compile(
             return SLANG_FAIL;
         }
 
-        // The object file (.o/.obj) should be the first artifact
-        SLANG_ASSERT(compileArtifacts[0]->getDesc().kind == ArtifactKind::ObjectCode);
-        objectArtifact = compileArtifacts[0];
+        // Find the object file (.o/.obj) artifact by kind (robust to artifact ordering changes)
+        for (auto& a : compileArtifacts)
+        {
+            if (a->getDesc().kind == ArtifactKind::ObjectCode)
+            {
+                objectArtifact = a;
+                break;
+            }
+        }
+        if (!objectArtifact)
+        {
+            *outArtifact = resultArtifact.detach();
+            return SLANG_FAIL;
+        }
 
         ExecuteResult compileResult;
-        if (SLANG_FAILED(ProcessUtil::execute(compileCmdLine, compileResult)) ||
-            SLANG_FAILED(parseOutput(compileResult, diagnostics)))
+        SlangResult executeRes = ProcessUtil::execute(compileCmdLine, compileResult);
+        if (SLANG_FAILED(executeRes))
+        {
+            ArtifactDiagnostic diagnostic;
+            diagnostic.severity = ArtifactDiagnostic::Severity::Error;
+            diagnostic.stage = ArtifactDiagnostic::Stage::Compile;
+            String executeErrorMsg("failed to execute compiler process");
+            diagnostic.text = SliceUtil::asTerminatedCharSlice(executeErrorMsg);
+            if (compileResult.standardError.getLength() > 0)
+            {
+                diagnostics->appendRaw(asCharSlice(compileResult.standardError.getUnownedSlice()));
+            }
+            diagnostics->add(diagnostic);
+            diagnostics->setResult(SLANG_FAIL);
+        }
+        if (SLANG_FAILED(parseOutput(compileResult, diagnostics)))
+        {
+            *outArtifact = resultArtifact.detach();
+            return SLANG_FAIL;
+        }
+        if (SLANG_FAILED(executeRes))
         {
             *outArtifact = resultArtifact.detach();
             return SLANG_FAIL;

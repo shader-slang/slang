@@ -3110,14 +3110,16 @@ static TestResult runCPPCompilerSharedLibrary(TestContext* context, TestInput& i
 
     ComPtr<IArtifact> artifact;
     // Not checking the result as some tests are supposed to make compilation or linking fail.
-    compiler->compile(options, artifact.writeRef());
+    const SlangResult compileRes = compiler->compile(options, artifact.writeRef());
 
-    auto diagnostics = findAssociatedRepresentation<IArtifactDiagnostics>(artifact);
+    auto diagnostics =
+        artifact ? findAssociatedRepresentation<IArtifactDiagnostics>(artifact) : nullptr;
 
-    if (diagnostics && SLANG_FAILED(diagnostics->getResult()))
+    if (SLANG_FAILED(compileRes) || (diagnostics && SLANG_FAILED(diagnostics->getResult())))
     {
         // Compilation failed
-        String actualOutput = _calcSummary(diagnostics);
+        String actualOutput =
+            diagnostics ? _calcSummary(diagnostics) : String("Compile: Error\n");
 
         // Write the output
         Slang::File::writeAllText(actualOutputPath, actualOutput);
