@@ -11967,7 +11967,6 @@ static DeclRef<SynthesizedStructDecl> addSynthesizedStruct(
     }
     else if (lookupResult.isOverloaded())
     {
-        // We have a problem.
         SLANG_UNEXPECTED("Multiple conflicting structs for the same synthesized struct name.");
     }
     else
