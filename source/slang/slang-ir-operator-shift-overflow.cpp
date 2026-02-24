@@ -47,8 +47,8 @@ void checkForOperatorShiftOverflowRecursive(IRInst* inst, DiagnosticSink* sink)
                             StringBuilder lhsTypeSb;
                             getTypeNameHint(lhsTypeSb, lhsType);
                             sink->diagnose(Diagnostics::OperatorShiftLeftOverflow{
-                                .lhs_type = lhsTypeSb.produceString(),
-                                .shift_amount = shiftAmount,
+                                .lhsType = lhsTypeSb.produceString(),
+                                .shiftAmount = shiftAmount,
                                 .location = opInst->sourceLoc,
                             });
                         }

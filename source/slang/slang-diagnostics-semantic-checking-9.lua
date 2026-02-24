@@ -21,7 +21,7 @@ err(
     "expected postfix operator",
     39999,
     "function called as postfix operator was not declared `__postfix`",
-    span { loc = "call_loc", message = "function called as postfix operator was not declared `__postfix`" },
+    span { loc = "callLoc", message = "function called as postfix operator was not declared `__postfix`" },
     note { message = "see definition of '~decl'", span { loc = "decl:Decl" } }
 )
 
@@ -64,21 +64,21 @@ warning(
     "integer literal truncated",
     39999,
     "integer literal truncated",
-    span { loc = "location", message = "integer literal '~literal' too large for type '~type' truncated to '~truncated_value'" }
+    span { loc = "location", message = "integer literal '~literal' too large for type '~type' truncated to '~truncatedValue'" }
 )
 
 warning(
     "float literal unrepresentable",
     39999,
     "floating-point literal unrepresentable",
-    span { loc = "location", message = "~type literal '~literal' unrepresentable, converted to '~converted_value'" }
+    span { loc = "location", message = "~type literal '~literal' unrepresentable, converted to '~convertedValue'" }
 )
 
 warning(
     "float literal too small",
     39999,
     "floating-point literal too small",
-    span { loc = "location", message = "'~literal' is smaller than the smallest representable value for type ~type, converted to '~converted_value'" }
+    span { loc = "location", message = "'~literal' is smaller than the smallest representable value for type ~type, converted to '~convertedValue'" }
 )
 
 err(
@@ -110,14 +110,14 @@ warning(
     "specified stage doesnt match attribute",
     38006,
     "entry point stage mismatch",
-    span { loc = "location", message = "entry point '~entry_point' being compiled for the '~compiled_stage' stage has a '[shader(...)]' attribute that specifies the '~attribute_stage' stage" }
+    span { loc = "location", message = "entry point '~entryPoint' being compiled for the '~compiledStage' stage has a '[shader(...)]' attribute that specifies the '~attributeStage' stage" }
 )
 
 err(
     "entry point has no stage",
     38007,
     "no stage specified for entry point",
-    span { loc = "location", message = "no stage specified for entry point '~entry_point'; use either a '[shader(\"name\")]' function attribute or the '-stage <name>' command-line option to specify a stage" }
+    span { loc = "location", message = "no stage specified for entry point '~entryPoint'; use either a '[shader(\"name\")]' function attribute or the '-stage <name>' command-line option to specify a stage" }
 )
 
 err(
@@ -152,7 +152,7 @@ err(
     "entry point cannot return resource type",
     38011,
     "entry point cannot return type that contains resource types",
-    span { loc = "location", message = "entry point '~entry_point:Name' cannot return type '~return_type:Type' that contains resource types" }
+    span { loc = "location", message = "entry point '~entryPoint:Name' cannot return type '~returnType:Type' that contains resource types" }
 )
 
 end

@@ -266,10 +266,10 @@ struct BitCastLoweringContext
                 getTypeNameHint(fromTypeSb, fromType);
                 getTypeNameHint(toTypeSb, toType);
                 sink->diagnose(Diagnostics::NotEqualBitCastSize{
-                    .from_type = fromTypeSb.produceString(),
-                    .from_size = fromTypeSize.size,
-                    .to_type = toTypeSb.produceString(),
-                    .to_size = toTypeSize.size,
+                    .fromType = fromTypeSb.produceString(),
+                    .fromSize = fromTypeSize.size,
+                    .toType = toTypeSb.produceString(),
+                    .toSize = toTypeSize.size,
                     .location = inst->sourceLoc,
                 });
             }
@@ -379,10 +379,10 @@ struct BitCastLoweringContext
             getTypeNameHint(fromTypeSb, fromType);
             getTypeNameHint(toTypeSb, toType);
             sink->diagnose(Diagnostics::NotEqualBitCastSize{
-                .from_type = fromTypeSb.produceString(),
-                .from_size = fromTypeSize.size,
-                .to_type = toTypeSb.produceString(),
-                .to_size = toTypeSize.size,
+                .fromType = fromTypeSb.produceString(),
+                .fromSize = fromTypeSize.size,
+                .toType = toTypeSb.produceString(),
+                .toSize = toTypeSize.size,
                 .location = inst->sourceLoc,
             });
         }

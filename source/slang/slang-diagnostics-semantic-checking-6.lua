@@ -28,7 +28,7 @@ warning(
     "no derivative on non differentiable this type",
     31159,
     "no derivative for member on non-differentiable struct",
-    span { loc = "member:Expr", message = "There is no derivative calculated for member '~member_decl:Decl' because the parent struct is not differentiable. If this is intended, consider using [NoDiffThis] on the function '~func:Decl' to suppress this warning. Alternatively, users can mark the parent struct as [Differentiable] to propagate derivatives." }
+    span { loc = "member:Expr", message = "There is no derivative calculated for member '~memberDecl:Decl' because the parent struct is not differentiable. If this is intended, consider using [NoDiffThis] on the function '~func:Decl' to suppress this warning. Alternatively, users can mark the parent struct as [Differentiable] to propagate derivatives." }
 )
 
 err(
@@ -44,7 +44,7 @@ warning(
     "deprecated usage",
     31200,
     "use of deprecated declaration",
-    span { loc = "location", message = "~decl_name:Name has been deprecated: ~message" }
+    span { loc = "location", message = "~declName:Name has been deprecated: ~message" }
 )
 
 err(
@@ -58,7 +58,7 @@ err(
     "duplicate modifier",
     31202,
     "duplicate modifier",
-    span { loc = "modifier:Modifier", message = "modifier '~modifier' is redundant or conflicting with existing modifier '~existing_modifier:Modifier'" }
+    span { loc = "modifier:Modifier", message = "modifier '~modifier' is redundant or conflicting with existing modifier '~existingModifier:Modifier'" }
 )
 
 err(
@@ -79,7 +79,7 @@ err(
     "require input decorated var for parameter",
     31208,
     "shader input required",
-    span { loc = "expr:Expr", message = "~func:Decl expects for argument ~param_number:Int a type which is a shader input (`in`) variable." }
+    span { loc = "expr:Expr", message = "~func:Decl expects for argument ~paramNumber:Int a type which is a shader input (`in`) variable." }
 )
 
 -- 3121x - Derivative group requirements
@@ -173,14 +173,14 @@ err(
     "invalid hlsl register name",
     31221,
     "invalid HLSL register name",
-    span { loc = "location", message = "invalid HLSL register name '~register_name'." }
+    span { loc = "location", message = "invalid HLSL register name '~registerName'." }
 )
 
 err(
     "invalid hlsl register name for type",
     31222,
     "invalid HLSL register name for type",
-    span { loc = "location", message = "invalid HLSL register name '~register_name' for type '~type:Type'." }
+    span { loc = "location", message = "invalid HLSL register name '~registerName' for type '~type:Type'." }
 )
 
 -- Extern/export and const variables
@@ -279,7 +279,7 @@ err(
     "cannot define ptr type to managed resource",
     30400,
     "pointer to managed resource invalid",
-    span { loc = "type_exp:Expr", message = "pointer to a managed resource is invalid, use `NativeRef<T>` instead" }
+    span { loc = "typeExp:Expr", message = "pointer to a managed resource is invalid, use `NativeRef<T>` instead" }
 )
 
 -- Control flow (305xx)
@@ -288,28 +288,28 @@ warning(
     "for loop side effect changing different var",
     30500,
     "for loop modifies wrong variable",
-    span { loc = "side_effect:Expr", message = "the for loop initializes and checks variable '~init_var:Decl' but the side effect expression is modifying '~modified_var:Decl'." }
+    span { loc = "sideEffect:Expr", message = "the for loop initializes and checks variable '~initVar:Decl' but the side effect expression is modifying '~modifiedVar:Decl'." }
 )
 
 warning(
     "for loop predicate checking different var",
     30501,
     "for loop predicate checks wrong variable",
-    span { loc = "predicate:Expr", message = "the for loop initializes and modifies variable '~init_var:Decl' but the predicate expression is checking '~predicate_var:Decl'." }
+    span { loc = "predicate:Expr", message = "the for loop initializes and modifies variable '~initVar:Decl' but the predicate expression is checking '~predicateVar:Decl'." }
 )
 
 warning(
     "for loop changing iteration variable in oppsoite direction",
     30502,
     "for loop modifies variable in wrong direction",
-    span { loc = "side_effect:Expr", message = "the for loop is modifiying variable '~var:Decl' in the opposite direction from loop exit condition." }
+    span { loc = "sideEffect:Expr", message = "the for loop is modifiying variable '~var:Decl' in the opposite direction from loop exit condition." }
 )
 
 warning(
     "for loop not modifying iteration variable",
     30503,
     "for loop step is zero",
-    span { loc = "side_effect:Expr", message = "the for loop is not modifiying variable '~var:Decl' because the step size evaluates to 0." }
+    span { loc = "sideEffect:Expr", message = "the for loop is not modifiying variable '~var:Decl' because the step size evaluates to 0." }
 )
 
 warning(

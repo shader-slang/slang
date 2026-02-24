@@ -37,7 +37,7 @@ err(
     "derivative member attribute must name a member in expected differential type",
     31130,
     "invalid DerivativeMember target",
-    span { loc = "attr", message = "[DerivativeMember] must reference to a member in the associated differential type '~diff_type:Type'." }
+    span { loc = "attr", message = "[DerivativeMember] must reference to a member in the associated differential type '~diffType:Type'." }
 )
 
 err(
@@ -62,7 +62,7 @@ err(
     "type of extern decl mismatches original definition",
     31140,
     "extern decl type mismatch",
-    span { loc = "decl:Decl", message = "type of `extern` decl '~decl' differs from its original definition. expected '~expected_type:Type'." }
+    span { loc = "decl:Decl", message = "type of `extern` decl '~decl' differs from its original definition. expected '~expectedType:Type'." }
 )
 
 err(
@@ -94,7 +94,7 @@ err(
     "decl already has attribute",
     31146,
     "duplicate attribute",
-    span { loc = "attr", message = "'~decl:Decl' already has attribute '[~attr_name]'." }
+    span { loc = "attr", message = "'~decl:Decl' already has attribute '[~attrName]'." }
 )
 
 --
@@ -119,14 +119,14 @@ err(
     "custom derivative signature mismatch at position",
     31149,
     "custom derivative parameter type mismatch",
-    span { loc = "attr", message = "invalid custom derivative. parameter type mismatch at position ~position:int. expected '~expected_type', got '~actual_type'" }
+    span { loc = "attr", message = "invalid custom derivative. parameter type mismatch at position ~position:int. expected '~expectedType', got '~actualType'" }
 )
 
 err(
     "custom derivative signature mismatch",
     31150,
     "custom derivative signature mismatch",
-    span { loc = "attr", message = "invalid custom derivative. could not resolve function with expected signature '~expected_signature'" }
+    span { loc = "attr", message = "invalid custom derivative. could not resolve function with expected signature '~expectedSignature'" }
 )
 
 err(

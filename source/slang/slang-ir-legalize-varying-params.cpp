@@ -2538,8 +2538,8 @@ protected:
                     StringBuilder typeNameSB;
                     getTypeNameHint(typeNameSB, permittedType);
                     m_sink->diagnose(Diagnostics::SystemValueTypeIncompatible{
-                        .semantic_name = semanticName,
-                        .required_type = typeNameSB.produceString(),
+                        .semanticName = semanticName,
+                        .requiredType = typeNameSB.produceString(),
                         .location = var->sourceLoc});
                 }
             }
@@ -2962,7 +2962,7 @@ private:
     void reportUnsupportedSystemAttribute(IRInst* param, String semanticName)
     {
         m_sink->diagnose(Diagnostics::SystemValueAttributeNotSupported{
-            .semantic_name = semanticName,
+            .semanticName = semanticName,
             .location = param->sourceLoc});
     }
 
@@ -4050,7 +4050,7 @@ protected:
             }
         default:
             m_sink->diagnose(Diagnostics::UnimplementedSystemValueSemantic{
-                .semantic_name = semanticName,
+                .semanticName = semanticName,
                 .location = parentVar->sourceLoc,
             });
             return result;
@@ -4673,7 +4673,7 @@ protected:
         default:
             {
                 m_sink->diagnose(Diagnostics::UnimplementedSystemValueSemantic{
-                    .semantic_name = semanticName,
+                    .semanticName = semanticName,
                     .location = parentVar->sourceLoc,
                 });
                 return result;

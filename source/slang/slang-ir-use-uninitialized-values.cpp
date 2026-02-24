@@ -558,15 +558,15 @@ static void checkConstructor(IRFunc* func, ReachabilityContext& reachability, Di
             if (synthesized)
             {
                 sink->diagnose(Diagnostics::FieldNotDefaultInitialized{
-                    .type_name = typeNameSb.produceString(),
-                    .field_name = fieldNameSb.produceString(),
+                    .typeName = typeNameSb.produceString(),
+                    .fieldName = fieldNameSb.produceString(),
                     .location = field->getKey()->sourceLoc,
                 });
             }
             else
             {
                 sink->diagnose(Diagnostics::ConstructorUninitializedField{
-                    .field_name = fieldNameSb.produceString(),
+                    .fieldName = fieldNameSb.produceString(),
                     .location = ret->sourceLoc,
                 });
             }
@@ -602,14 +602,14 @@ static void checkParameterAsOut(
         if (as<IRTerminatorInst>(load))
         {
             sink->diagnose(Diagnostics::ReturningWithUninitializedOut{
-                .param_name = paramNameSb.produceString(),
+                .paramName = paramNameSb.produceString(),
                 .location = load->sourceLoc,
             });
         }
         else
         {
             sink->diagnose(Diagnostics::UsingUninitializedOut{
-                .param_name = paramNameSb.produceString(),
+                .paramName = paramNameSb.produceString(),
                 .location = load->sourceLoc,
             });
         }
@@ -678,7 +678,7 @@ static void checkUninitializedValues(IRFunc* func, DiagnosticSink* sink)
                     StringBuilder varNameSb;
                     printDiagnosticArg(varNameSb, inst);
                     sink->diagnose(Diagnostics::UsingUninitializedVariable{
-                        .var_name = varNameSb.produceString(),
+                        .varName = varNameSb.produceString(),
                         .location = load->sourceLoc,
                     });
                 }
@@ -688,7 +688,7 @@ static void checkUninitializedValues(IRFunc* func, DiagnosticSink* sink)
                     StringBuilder typeNameSb;
                     printDiagnosticArg(typeNameSb, type);
                     sink->diagnose(Diagnostics::UsingUninitializedValue{
-                        .type_name = typeNameSb.produceString(),
+                        .typeName = typeNameSb.produceString(),
                         .location = load->sourceLoc,
                     });
                 }
@@ -745,7 +745,7 @@ static void checkUninitializedGlobals(IRGlobalVar* variable, DiagnosticSink* sin
         StringBuilder varNameSb;
         printDiagnosticArg(varNameSb, variable);
         sink->diagnose(Diagnostics::UsingUninitializedGlobalVariable{
-            .var_name = varNameSb.produceString(),
+            .varName = varNameSb.produceString(),
             .location = load->sourceLoc,
         });
     }

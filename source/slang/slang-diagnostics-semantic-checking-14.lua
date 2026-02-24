@@ -33,14 +33,14 @@ err(
     "invalid mesh stage output topology",
     50060,
     "invalid mesh output topology",
-    span { loc = "location", message = "Invalid mesh stage output topology '~topology' for target '~target', must be one of: ~valid_topologies" }
+    span { loc = "location", message = "Invalid mesh stage output topology '~topology' for target '~target', must be one of: ~validTopologies" }
 )
 
 err(
     "no type conformances found for interface",
     50100,
     "no type conformances found",
-    span { loc = "location", message = "No type conformances are found for interface '~interface_type'. Code generation for current target requires at least one implementation type present in the linkage." }
+    span { loc = "location", message = "No type conformances are found for interface '~interfaceType'. Code generation for current target requires at least one implementation type present in the linkage." }
 )
 
 err(
@@ -60,7 +60,7 @@ standalone_note(
 standalone_note(
     "specialized dynamic dispatch code generated here",
     50103,
-    "generated specialized dynamic dispatch code for this site. ~count:Int possible types: '~types'. specialization arguments: '~spec_args'.",
+    "generated specialized dynamic dispatch code for this site. ~count:Int possible types: '~types'. specialization arguments: '~specArgs'.",
     span { loc = "location" }
 )
 
@@ -110,7 +110,7 @@ err(
     "compiler not defined for transition",
     52006,
     "compiler not defined for transition",
-    span { loc = "location", message = "compiler not defined for transition '~source_target' to '~dest_target'." }
+    span { loc = "location", message = "compiler not defined for transition '~sourceTarget' to '~destTarget'." }
 )
 
 err(
@@ -180,14 +180,14 @@ err(
     "system value attribute not supported",
     55202,
     "system value semantic not supported",
-    span { loc = "location", message = "system value semantic '~semantic_name' is not supported for the current target." }
+    span { loc = "location", message = "system value semantic '~semanticName' is not supported for the current target." }
 )
 
 err(
     "system value type incompatible",
     55203,
     "system value type mismatch",
-    span { loc = "location", message = "system value semantic '~semantic_name' should have type '~required_type' or be convertible to type '~required_type'." }
+    span { loc = "location", message = "system value semantic '~semanticName' should have type '~requiredType' or be convertible to type '~requiredType'." }
 )
 
 err(
@@ -222,7 +222,7 @@ err(
     "use of uninitialized opaque handle",
     56003,
     "use of uninitialized opaque handle",
-    span { loc = "location", message = "use of uninitialized opaque handle '~handle_type'." }
+    span { loc = "location", message = "use of uninitialized opaque handle '~handleType'." }
 )
 
 end

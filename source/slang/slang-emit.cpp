@@ -278,14 +278,14 @@ static void reportCheckpointIntermediates(
             {
                 sink->diagnose(Diagnostics::ReportCheckpointCounter{
                     .size = (int64_t)fieldSize.size,
-                    .type_name = typeWriter.getContent(),
+                    .typeName = typeWriter.getContent(),
                     .location = field->sourceLoc});
             }
             else
             {
                 sink->diagnose(Diagnostics::ReportCheckpointVariable{
                     .size = (int64_t)fieldSize.size,
-                    .type_name = typeWriter.getContent(),
+                    .typeName = typeWriter.getContent(),
                     .location = field->sourceLoc});
             }
         }

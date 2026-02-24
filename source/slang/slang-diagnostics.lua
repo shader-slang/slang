@@ -21,12 +21,12 @@
 -- err(
 --     "function return type mismatch",
 --     30007,
---     "expression type ~expression.type does not match function's return type ~return_type:Type",
+--     "expression type ~expression.type does not match function's return type ~returnType:Type",
 --     span({loc = "expression:Expr", message = "expression type"}),        -- Declares expression:Expr
 --     span({loc = "function:Decl", message = "function return type"})
 -- )
 -- ~expression.type automatically extracts expression->type (Type*)
--- ~return_type:Type is a direct parameter
+-- ~returnType:Type is a direct parameter
 --
 -- err(
 --     "function redefinition",
@@ -51,7 +51,7 @@
 --     30009,
 --     "expression has multiple type errors",
 --     span({loc = "expression:Expr", message = "expression here"}),
---     variadic_span({cpp_name = "Error", loc = "error_expr:Expr", message = "type error: ~error_expr.type"})
+--     variadic_span({cpp_name = "Error", loc = "errorExpr:Expr", message = "type error: ~errorExpr.type"})
 -- )
 -- Variadic span: Creates nested struct Error with error_expr member, List<Error> errors
 --
@@ -62,8 +62,8 @@
 --     span({loc = "decl:Decl", message = "declaration here"}),
 --     note({message = "first attribute here",
 --          span({loc = "attr1:Decl"}),
---          span({loc = "attr1_arg:Expr", message = "with argument"}),
---          span({loc = "attr1_type:Type", message = "of type"})})
+--          span({loc = "attr1Arg:Expr", message = "with argument"}),
+--          span({loc = "attr1Type:Type", message = "of type"})})
 -- )
 -- Notes can have additional spans: First span is primary, additional spans are secondary
 -- span() message parameter is optional and defaults to empty string
@@ -98,8 +98,8 @@
 --     Cannot nest notes inside notes.
 --
 --   variadic_span(struct_name, location, message) - Create a variadic span
---     Positional: variadic_span("Error", "error_expr:Expr", "type error: ~error_expr.type")
---     Named:      variadic_span({cpp_name = "Error", loc = "error_expr:Expr", message = "type error: ~error_expr.type"})
+--     Positional: variadic_span("Error", "error_expr:Expr", "type error: ~errorExpr.type")
+--     Named:      variadic_span({cpp_name = "Error", loc = "errorExpr:Expr", message = "type error: ~errorExpr.type"})
 --     struct_name/cpp_name: Name for nested struct (e.g., "Error" -> struct Error, List<Error> errors)
 --     Exclusive interpolants become members of the nested struct
 --
@@ -125,7 +125,7 @@ local warning = helpers.warning
 err(
     "function return type mismatch",
     30007,
-    "expression type ~expression.type does not match function's return type ~return_type:Type",
+    "expression type ~expression.type does not match function's return type ~returnType:Type",
     span { loc = "expression:Expr", message = "expression type" },
     span { loc = "function:Decl", message = "function return type" }
 )
@@ -143,7 +143,7 @@ err(
     30202,
     "expression has multiple type errors",
     span { loc = "expression:Expr", message = "expression here" },
-    variadic_span { cpp_name = "Error", loc = "error_expr:Expr", message = "type error: ~error_expr.type" }
+    variadic_span { cpp_name = "Error", loc = "errorExpr:Expr", message = "type error: ~errorExpr.type" }
 )
 
 err(
@@ -151,7 +151,7 @@ err(
     39999,
     "ambiguous call to '~name' with arguments of type ~args",
     span { loc = "expr:Expr", message = "in call expression" },
-    variadic_note { cpp_name = "Candidate", message = "candidate: ~candidate_signature", span { loc = "candidate:Decl" } }
+    variadic_note { cpp_name = "Candidate", message = "candidate: ~candidateSignature", span { loc = "candidate:Decl" } }
 )
 
 err(
@@ -182,7 +182,7 @@ err(
     "type mismatch in expression",
     span {
         loc = "expr:Expr",
-        message = "expected an expression of type '~expected_type:Type', got '~actual_type:QualType'",
+        message = "expected an expression of type '~expectedType:Type', got '~actualType:QualType'",
     }
 )
 
@@ -191,7 +191,7 @@ warning(
     15400,
     "macro redefined",
     span { loc = "location", message = "redefinition of macro '~name:Name'" },
-    note { message = "see previous definition of '~name'", span { loc = "original_location" } }
+    note { message = "see previous definition of '~name'", span { loc = "originalLocation" } }
 )
 
 err(
@@ -205,7 +205,7 @@ err(
     "expected prefix operator",
     39999,
     "function called as prefix operator was not declared `__prefix`",
-    span { loc = "call_loc", message = "function called as prefix operator was not declared `__prefix`" },
+    span { loc = "callLoc", message = "function called as prefix operator was not declared `__prefix`" },
     note { message = "see definition of '~decl'", span { loc = "decl:Decl" } }
 )
 
@@ -213,7 +213,7 @@ err(
     "too many initializers",
     30500,
     "too many initializers in initializer list",
-    span { loc = "init_list:Expr", message = "too many initializers (expected ~expected:int, got ~got:int)" }
+    span { loc = "initList:Expr", message = "too many initializers (expected ~expected:int, got ~got:int)" }
 )
 
 err(
@@ -222,15 +222,15 @@ err(
     "array size mismatch prevents conversion",
     span {
         loc = "location",
-        message = "Cannot convert array of size ~source_size:int to array of size ~target_size:int as this would truncate data",
+        message = "Cannot convert array of size ~sourceSize:int to array of size ~targetSize:int as this would truncate data",
     }
 )
 
 err(
     "unknown stage",
     15,
-    "unknown stage '~stage_name'",
-    span { loc = "location", message = "unknown stage '~stage_name'" }
+    "unknown stage '~stageName'",
+    span { loc = "location", message = "unknown stage '~stageName'" }
 )
 
 --
@@ -261,7 +261,7 @@ err(
     "too many output paths specified",
     span {
         loc = "location",
-        message = "~output_count:int output paths specified, but only ~entry_point_count:int entry points given",
+        message = "~outputCount:int output paths specified, but only ~entryPointCount:int entry points given",
     }
 )
 
@@ -326,15 +326,15 @@ err("unable to generate code for target", 28, "unable to generate code for targe
 warning(
     "same stage specified more than once",
     30,
-    "the stage '~stage' was specified more than once for entry point '~entry_point'"
+    "the stage '~stage' was specified more than once for entry point '~entryPoint'"
 )
 
-err("conflicting stages for entry point", 31, "conflicting stages have been specified for entry point '~entry_point'")
+err("conflicting stages for entry point", 31, "conflicting stages have been specified for entry point '~entryPoint'")
 
 warning(
     "explicit stage doesnt match implied stage",
     32,
-    "the stage specified for entry point '~entry_point' ('~specified_stage') does not match the stage implied by the source file name ('~implied_stage')"
+    "the stage specified for entry point '~entryPoint' ('~specifiedStage') does not match the stage implied by the source file name ('~impliedStage')"
 )
 
 err(
@@ -352,7 +352,7 @@ err(
 err(
     "no stage specified in pass through mode",
     35,
-    "no stage was specified for entry point '~entry_point'; when using the '-pass-through' option, stages must be fully specified on the command line"
+    "no stage was specified for entry point '~entryPoint'; when using the '-pass-through' option, stages must be fully specified on the command line"
 )
 
 err("expecting an integer", 36, "expecting an integer value")
@@ -397,7 +397,7 @@ err(
     "no specified '-target' option matches the output path '~path', which implies the '~format' format"
 )
 
-err("unknown command line value", 62, "unknown value for option. Valid values are '~valid_values'")
+err("unknown command line value", 62, "unknown value for option. Valid values are '~validValues'")
 
 err("unknown help category", 63, "unknown help category")
 
@@ -412,7 +412,7 @@ err("invalid type conformance option string", 71, "syntax error in type conforma
 err(
     "invalid type conformance option no type",
     72,
-    "invalid conformance option '~option', type '~type_name' is not found."
+    "invalid conformance option '~option', type '~typeName' is not found."
 )
 
 err("cannot create type conformance", 73, "cannot create type conformance '~conformance'.")
@@ -420,7 +420,7 @@ err("cannot create type conformance", 73, "cannot create type conformance '~conf
 err(
     "duplicate output paths for entry point and target",
     80,
-    "multiple output paths have been specified entry point '~entry_point:Name' on target '~target'"
+    "multiple output paths have been specified entry point '~entryPoint:Name' on target '~target'"
 )
 
 err("duplicate output paths for target", 81, "multiple output paths have been specified for target '~target'")
@@ -442,7 +442,7 @@ err("expecting slang riff container", 89, "expecting a slang riff container")
 err(
     "incompatible riff semantic version",
     90,
-    "incompatible riff semantic version ~actual_version expecting ~expected_version"
+    "incompatible riff semantic version ~actualVersion expecting ~expectedVersion"
 )
 
 err("riff hash mismatch", 91, "riff hash mismatch - incompatible riff")
@@ -471,7 +471,7 @@ err(
 
 standalone_note("downstream compile time", 102, "downstream compile time: ~time")
 
-standalone_note("performance benchmark result", 103, "compiler performance benchmark:\\n~benchmark_output")
+standalone_note("performance benchmark result", 103, "compiler performance benchmark:\\n~benchmarkOutput")
 
 err(
     "need to enable experiment feature",
@@ -494,7 +494,7 @@ err(
     15000,
     "end of file encountered during preprocessor conditional",
     span { loc = "location" },
-    note { message = "see '~directive' directive", span { loc = "directive_loc" } }
+    note { message = "see '~directive' directive", span { loc = "directiveLoc" } }
 )
 
 err(
@@ -509,7 +509,7 @@ err(
     15002,
     "'~directive' directive after '#else'",
     span { loc = "location", message = "'~directive' directive after '#else'" },
-    note { message = "see '~else_directive' directive", span { loc = "else_loc" } }
+    note { message = "see '~elseDirective' directive", span { loc = "elseLoc" } }
 )
 
 -- Standalone note for seeDirective - used by multiple diagnostics
@@ -534,7 +534,7 @@ err(
     "expected token in preprocessor directive",
     15102,
     "preprocessor parse error",
-    span { loc = "location", message = "expected '~expected_token' in '~directive' directive" }
+    span { loc = "location", message = "expected '~expectedToken' in '~directive' directive" }
 )
 
 err(
@@ -556,8 +556,8 @@ err(
     "expected token in preprocessor expression",
     15200,
     "preprocessor parse error",
-    span { loc = "location", message = "expected '~expected_token' in preprocessor expression" },
-    span { loc = "opening_loc", message = "opening '~opening_token'" }
+    span { loc = "location", message = "expected '~expectedToken' in preprocessor expression" },
+    span { loc = "openingLoc", message = "opening '~openingToken'" }
 )
 
 err(
@@ -578,8 +578,8 @@ err(
     "expected token in defined expression",
     15203,
     "preprocessor parse error",
-    span { loc = "location", message = "expected '~expected_token' in 'defined' expression" },
-    span { loc = "opening_loc", message = "opening '~opening_token'" }
+    span { loc = "location", message = "expected '~expectedToken' in 'defined' expression" },
+    span { loc = "openingLoc", message = "opening '~openingToken'" }
 )
 
 warning(
@@ -662,7 +662,7 @@ err(
 err(
     "cannot resolve imported decl",
     15303,
-    "cannot resolve imported declaration '~decl_name' from precompiled module '~module_name'. Make sure module '~module_name' is up-to-date. If you suspect this to be a compiler bug, file an issue on GitHub (https://github.com/shader-slang/slang/issues) or join the Slang Discord for assistance",
+    "cannot resolve imported declaration '~declName' from precompiled module '~moduleName'. Make sure module '~moduleName' is up-to-date. If you suspect this to be a compiler bug, file an issue on GitHub (https://github.com/shader-slang/slang/issues) or join the Slang Discord for assistance",
     span { loc = "location" }
 )
 
@@ -678,7 +678,7 @@ err(
     "expected token in macro parameters",
     15403,
     "preprocessor parse error",
-    span { loc = "location", message = "expected '~expected_token' in macro parameters" }
+    span { loc = "location", message = "expected '~expectedToken' in macro parameters" }
 )
 
 warning(
@@ -728,7 +728,7 @@ warning(
     "expected token in macro arguments",
     15500,
     "macro invocation syntax error",
-    span { loc = "location", message = "expected '~expected_token' in macro invocation" }
+    span { loc = "location", message = "expected '~expectedToken' in macro invocation" }
 )
 
 err(
@@ -742,7 +742,7 @@ err(
     "error parsing to macro invocation argument",
     15502,
     "macro argument parse error",
-    span { loc = "location", message = "error parsing macro '~arg_index:Int' invocation argument to '~macro_name:Name'" }
+    span { loc = "location", message = "error parsing macro '~argIndex:Int' invocation argument to '~macroName:Name'" }
 )
 
 warning(

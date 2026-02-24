@@ -31,7 +31,7 @@ err(
     "int16 not supported in wgsl",
     56103,
     "16-bit integers not supported in WGSL",
-    span { loc = "location", message = "16-bit integer type '~type_name' is not supported by the WGSL backend." }
+    span { loc = "location", message = "16-bit integer type '~typeName' is not supported by the WGSL backend." }
 )
 
 err(
@@ -106,14 +106,14 @@ standalone_note(
 standalone_note(
     "report checkpoint variable",
     -1,
-    "~size:Int bytes (~type_name) used to checkpoint the following item:",
+    "~size:Int bytes (~typeName) used to checkpoint the following item:",
     span { loc = "location" }
 )
 
 standalone_note(
     "report checkpoint counter",
     -1,
-    "~size:Int bytes (~type_name) used for a loop counter here:",
+    "~size:Int bytes (~typeName) used for a loop counter here:",
     span { loc = "location" }
 )
 
@@ -140,7 +140,7 @@ err(
     "nvapi macro mismatch",
     81110,
     "conflicting NVAPI macro definitions",
-    span { loc = "location", message = "conflicting definitions for NVAPI macro '~macro_name': '~existing_value' and '~new_value'" }
+    span { loc = "location", message = "conflicting definitions for NVAPI macro '~macroName': '~existingValue' and '~newValue'" }
 )
 
 err(

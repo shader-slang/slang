@@ -984,7 +984,7 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
     }
 
     context->getSink()->diagnose(Diagnostics::UnknownSystemValueSemantic{
-        .semantic_name = semanticNameSpelling,
+        .semanticName = semanticNameSpelling,
         .location = varLayout->sourceLoc,
     });
     return nullptr;
@@ -1931,8 +1931,8 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
                     {
                         context->getSink()->diagnose(
                             Diagnostics::CannotConvertArrayOfSmallerToLargerSize{
-                                .source_size = fromSize,
-                                .target_size = toSize,
+                                .sourceSize = fromSize,
+                                .targetSize = toSize,
                                 .location = userDeclaredParamVarLayout->sourceLoc});
                     }
                 }

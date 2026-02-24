@@ -39,7 +39,7 @@ err(
     "set accessor param wrong type",
     31102,
     "'set' parameter type mismatch",
-    span { loc = "param:Decl", message = "'set' parameter '~param' has type '~actual_type:Type' which does not match the expected type '~expected_type:Type'" }
+    span { loc = "param:Decl", message = "'set' parameter '~param' has type '~actualType:Type' which does not match the expected type '~expectedType:Type'" }
 )
 
 --
@@ -49,7 +49,7 @@ err(
     "bit field too wide",
     31300,
     "bit-field size exceeds type width",
-    span { loc = "location", message = "bit-field size (~field_width:Int) exceeds the width of its type ~type:Type (~type_width:Int)" }
+    span { loc = "location", message = "bit-field size (~fieldWidth:Int) exceeds the width of its type ~type:Type (~typeWidth:Int)" }
 )
 
 err(
@@ -80,7 +80,7 @@ err(
     "expected ray tracing payload object at location but missing",
     39999,
     "raytracing payload missing",
-    span { loc = "location", message = "raytracing payload expected at location ~payload_location:Int but it is missing" }
+    span { loc = "location", message = "raytracing payload expected at location ~payloadLocation:Int but it is missing" }
 )
 
 err(

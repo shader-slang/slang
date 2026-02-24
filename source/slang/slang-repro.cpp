@@ -1271,8 +1271,8 @@ struct LoadContext
         g_semanticVersion.append(currentBuf);
 
         sink->diagnose(Diagnostics::IncompatibleRiffSemanticVersion{
-            .actual_version = headerBuf,
-            .expected_version = currentBuf});
+            .actualVersion = headerBuf,
+            .expectedVersion = currentBuf});
         return SLANG_FAIL;
     }
 

@@ -4334,7 +4334,7 @@ struct ExprLoweringContext
                 this->context->getSink()->diagnose(
                     Diagnostics::RequireInputDecoratedVarForParameter{
                         .func = decl,
-                        .param_number = glslRequireShaderInputParameter->parameterNumber,
+                        .paramNumber = glslRequireShaderInputParameter->parameterNumber,
                         .expr = expr});
             }
             return;

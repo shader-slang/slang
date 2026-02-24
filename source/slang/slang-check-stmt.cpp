@@ -455,7 +455,7 @@ void SemanticsStmtVisitor::visitTargetSwitchStmt(TargetSwitchStmt* stmt)
             if (!isStage && caseStmt->capability != (int32_t)CapabilityName::Invalid)
             {
                 getSink()->diagnose(Diagnostics::UnknownStageName{
-                    .stage_name = String(caseStmt->capabilityToken.getContent()),
+                    .stageName = String(caseStmt->capabilityToken.getContent()),
                     .location = caseStmt->capabilityToken.loc});
             }
             caseStmt->capability = (int32_t)canonicalStage;
@@ -596,8 +596,8 @@ void SemanticsStmtVisitor::visitReturnStmt(ReturnStmt* stmt)
         if (!m_parentLambdaDecl->funcDecl->returnType.type->equals(returnType))
         {
             getSink()->diagnose(Diagnostics::ReturnTypeMismatchInsideLambda{
-                .returned_type = returnType,
-                .previous_type = m_parentLambdaDecl->funcDecl->returnType.type,
+                .returnedType = returnType,
+                .previousType = m_parentLambdaDecl->funcDecl->returnType.type,
                 .stmt = stmt});
         }
     }
@@ -641,8 +641,8 @@ void SemanticsStmtVisitor::visitThrowStmt(ThrowStmt* stmt)
         if (!parentFunc->errorType->equals(stmt->expression->type))
         {
             getSink()->diagnose(Diagnostics::ThrowTypeIncompatibleWithErrorType{
-                .throw_type = stmt->expression->type.type,
-                .error_type = parentFunc->errorType,
+                .throwType = stmt->expression->type.type,
+                .errorType = parentFunc->errorType,
                 .expr = stmt->expression});
         }
     }
@@ -844,9 +844,9 @@ void SemanticsStmtVisitor::tryInferLoopMaxIterations(ForStmt* stmt)
             // it is most likely a bug, so we issue a warning.
             if (predicateVar == initialVar)
                 getSink()->diagnose(Diagnostics::ForLoopSideEffectChangingDifferentVar{
-                    .init_var = initialVar.getDecl(),
-                    .modified_var = varExpr->declRef.getDecl(),
-                    .side_effect = varExpr});
+                    .initVar = initialVar.getDecl(),
+                    .modifiedVar = varExpr->declRef.getDecl(),
+                    .sideEffect = varExpr});
             return;
         }
     }
@@ -874,8 +874,8 @@ void SemanticsStmtVisitor::tryInferLoopMaxIterations(ForStmt* stmt)
     {
         if (predicateVar)
             getSink()->diagnose(Diagnostics::ForLoopPredicateCheckingDifferentVar{
-                .init_var = initialVar.getDecl(),
-                .predicate_var = predicateVar.getDecl(),
+                .initVar = initialVar.getDecl(),
+                .predicateVar = predicateVar.getDecl(),
                 .predicate = stmt->predicateExpression});
         return;
     }
@@ -888,7 +888,7 @@ void SemanticsStmtVisitor::tryInferLoopMaxIterations(ForStmt* stmt)
         {
             getSink()->diagnose(Diagnostics::ForLoopChangingIterationVariableInOppsoiteDirection{
                 .var = initialVar.getDecl(),
-                .side_effect = stmt->sideEffectExpression});
+                .sideEffect = stmt->sideEffectExpression});
             return;
         }
     }
@@ -899,7 +899,7 @@ void SemanticsStmtVisitor::tryInferLoopMaxIterations(ForStmt* stmt)
         {
             getSink()->diagnose(Diagnostics::ForLoopChangingIterationVariableInOppsoiteDirection{
                 .var = initialVar.getDecl(),
-                .side_effect = stmt->sideEffectExpression});
+                .sideEffect = stmt->sideEffectExpression});
             return;
         }
     }
@@ -907,7 +907,7 @@ void SemanticsStmtVisitor::tryInferLoopMaxIterations(ForStmt* stmt)
     {
         getSink()->diagnose(Diagnostics::ForLoopNotModifyingIterationVariable{
             .var = initialVar.getDecl(),
-            .side_effect = stmt->sideEffectExpression});
+            .sideEffect = stmt->sideEffectExpression});
         return;
     }
 

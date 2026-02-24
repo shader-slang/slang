@@ -299,7 +299,7 @@ static void Unexpected(Parser* parser)
     if (!parser->isRecovering)
     {
         parser->diagnose(Diagnostics::UnexpectedToken{
-            .token_type = TokenTypeToString(parser->tokenReader.peekTokenType()),
+            .tokenType = TokenTypeToString(parser->tokenReader.peekTokenType()),
             .location = parser->tokenReader.peekLoc()});
 
         // Switch into recovery mode, to suppress additional errors
@@ -313,8 +313,8 @@ static void Unexpected(Parser* parser, char const* expected)
     if (!parser->isRecovering)
     {
         parser->sink->diagnose(Diagnostics::UnexpectedTokenExpectedTokenName{
-            .actual_token = TokenTypeToString(parser->tokenReader.peekTokenType()),
-            .expected_token_name = expected,
+            .actualToken = TokenTypeToString(parser->tokenReader.peekTokenType()),
+            .expectedTokenName = expected,
             .location = parser->tokenReader.peekLoc()});
 
         // Switch into recovery mode, to suppress additional errors
@@ -330,8 +330,8 @@ static void Unexpected(Parser* parser, TokenType expected)
         if (parser->lastErrorLoc != parser->tokenReader.peekLoc())
         {
             parser->sink->diagnose(Diagnostics::UnexpectedTokenExpectedTokenType{
-                .actual_token = TokenTypeToString(parser->tokenReader.peekTokenType()),
-                .expected_token = TokenTypeToString(expected),
+                .actualToken = TokenTypeToString(parser->tokenReader.peekTokenType()),
+                .expectedToken = TokenTypeToString(expected),
                 .location = parser->tokenReader.peekLoc()});
             parser->lastErrorLoc = parser->tokenReader.peekLoc();
         }
@@ -2396,7 +2396,7 @@ static Expr* parseGenericApp(Parser* parser, Expr* base)
         parser->ReadToken(TokenType::OpGreater);
     else
         parser->sink->diagnose(Diagnostics::TokenTypeExpected{
-            .token_type = "'>'",
+            .tokenType = "'>'",
             .location = parser->tokenReader.peekToken().loc});
     return genericApp;
 }
@@ -4311,7 +4311,7 @@ static void parseSemanticDeclBody(Parser* parser, SemanticDecl* decl)
     else
     {
         parser->sink->diagnose(Diagnostics::UnexpectedToken{
-            .token_type = TokenTypeToString(peekToken(parser).type),
+            .tokenType = TokenTypeToString(peekToken(parser).type),
             .location = parser->tokenReader.peekLoc()});
     }
 }
@@ -5040,7 +5040,7 @@ static void CompleteDecl(
             StringBuilder sb;
             printDiagnosticArg(sb, decl->astNodeType);
             parser->sink->diagnose(Diagnostics::DeclNotAllowed{
-                .decl_type = sb.produceString(),
+                .declType = sb.produceString(),
                 .location = decl->loc});
         }
         else
@@ -5057,7 +5057,7 @@ static void CompleteDecl(
                     StringBuilder sb;
                     printDiagnosticArg(sb, declToModify->astNodeType);
                     parser->sink->diagnose(Diagnostics::DeclNotAllowed{
-                        .decl_type = sb.produceString(),
+                        .declType = sb.produceString(),
                         .location = decl->loc});
                 }
             }
@@ -5239,7 +5239,7 @@ static DeclBase* ParseDeclWithModifiers(
             if (!parser->isRecovering)
             {
                 parser->sink->diagnose(Diagnostics::UnexpectedToken{
-                    .token_type = TokenTypeToString(parser->tokenReader.peekToken().type),
+                    .tokenType = TokenTypeToString(parser->tokenReader.peekToken().type),
                     .location = loc});
             }
             SkipBalancedToken(&parser->tokenReader);
@@ -5636,8 +5636,8 @@ Decl* Parser::ParseStruct()
                 if (!LookAheadToken(TokenType::Semicolon))
                 {
                     this->diagnose(Diagnostics::UnexpectedTokenExpectedTokenType{
-                        .actual_token = TokenTypeToString(this->tokenReader.peekToken().type),
-                        .expected_token = "';'",
+                        .actualToken = TokenTypeToString(this->tokenReader.peekToken().type),
+                        .expectedToken = "';'",
                         .location = this->tokenReader.peekToken().loc});
                 }
                 return rs;
@@ -5836,8 +5836,8 @@ static Stmt* parseTargetSwitchStmtImpl(Parser* parser, TargetSwitchStmt* stmt)
         if (caseNames.getCount() == 0)
         {
             parser->sink->diagnose(Diagnostics::UnexpectedTokenExpectedTokenType{
-                .actual_token = TokenTypeToString(parser->tokenReader.peekToken().type),
-                .expected_token = "'case' or 'default'",
+                .actualToken = TokenTypeToString(parser->tokenReader.peekToken().type),
+                .expectedToken = "'case' or 'default'",
                 .location = parser->tokenReader.peekLoc()});
             parser->isRecovering = true;
             goto recover;
@@ -6458,7 +6458,7 @@ DeclStmt* Parser::parseVarDeclrStatement(Modifiers modifiers)
         StringBuilder sb;
         printDiagnosticArg(sb, decl->astNodeType);
         sink->diagnose(
-            Diagnostics::DeclNotAllowed{.decl_type = sb.produceString(), .location = decl->loc});
+            Diagnostics::DeclNotAllowed{.declType = sb.produceString(), .location = decl->loc});
     }
     return varDeclrStatement;
 }
@@ -6625,8 +6625,8 @@ ForStmt* Parser::ParseForStatement()
         else
         {
             sink->diagnose(Diagnostics::UnexpectedTokenExpectedTokenType{
-                .actual_token = "statement",
-                .expected_token = "expression",
+                .actualToken = "statement",
+                .expectedToken = "expression",
                 .location = stmt->initialStatement->loc});
         }
     }
@@ -7410,7 +7410,7 @@ static IntegerLiteralValue _fixIntegerLiteral(
             sink->diagnose(Diagnostics::IntegerLiteralTruncated{
                 .literal = String(token->getContent()),
                 .type = String(BaseTypeInfo::asText(baseType)),
-                .truncated_value = String(truncatedValue),
+                .truncatedValue = String(truncatedValue),
                 .location = token->loc});
         }
 
@@ -8093,7 +8093,7 @@ static Expr* parseAtomicExpr(Parser* parser)
                     parser->sink->diagnose(Diagnostics::FloatLiteralTooSmall{
                         .literal = String(token.getContent()),
                         .type = String(BaseTypeInfo::asText(suffixBaseType)),
-                        .converted_value = String(fixedValue),
+                        .convertedValue = String(fixedValue),
                         .location = token.loc});
                     break;
                 }
@@ -8102,7 +8102,7 @@ static Expr* parseAtomicExpr(Parser* parser)
                     parser->sink->diagnose(Diagnostics::FloatLiteralUnrepresentable{
                         .type = String(BaseTypeInfo::asText(suffixBaseType)),
                         .literal = String(token.getContent()),
-                        .converted_value = String(fixedValue),
+                        .convertedValue = String(fixedValue),
                         .location = token.loc});
                     break;
                 }
@@ -8691,7 +8691,7 @@ static std::optional<SPIRVAsmInst> parseSPIRVAsmInst(Parser* parser)
             {
                 parser->diagnose(Diagnostics::SpirvInstructionWithTooManyOperands{
                     .opcode = ret.opcode.token.getContent(),
-                    .max_operands = opInfo->maxOperandCount,
+                    .maxOperands = opInfo->maxOperandCount,
                     .location = parser->tokenReader.peekLoc()});
             }
         }

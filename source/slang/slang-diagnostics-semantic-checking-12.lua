@@ -19,14 +19,14 @@ err(
     "unimplemented system value semantic",
     40006,
     "unknown system-value semantic",
-    span { loc = "location", message = "unknown system-value semantic '~semantic_name'" }
+    span { loc = "location", message = "unknown system-value semantic '~semanticName'" }
 )
 
 err(
     "unknown system value semantic",
     49999,
     "unknown system-value semantic",
-    span { loc = "location", message = "unknown system-value semantic '~semantic_name'" }
+    span { loc = "location", message = "unknown system-value semantic '~semanticName'" }
 )
 
 err(
@@ -54,7 +54,7 @@ err(
     "arg is not constexpr",
     40013,
     "argument is not a compile-time constant",
-    span { loc = "location", message = "arg ~arg_index:Int in '~func_name' is not a compile-time constant" }
+    span { loc = "location", message = "arg ~argIndex:Int in '~funcName' is not a compile-time constant" }
 )
 
 err(
@@ -68,7 +68,7 @@ err(
     "function never returns fatal",
     40030,
     "function never returns",
-    span { loc = "location", message = "function '~func_name' never returns, compilation ceased." }
+    span { loc = "location", message = "function '~funcName' never returns, compilation ceased." }
 )
 
 -- 41000 - IR-level validation issues
@@ -84,21 +84,21 @@ err(
     "recursive type",
     41001,
     "type contains cyclic reference",
-    span { loc = "location", message = "type '~type_name' contains cyclic reference to itself." }
+    span { loc = "location", message = "type '~typeName' contains cyclic reference to itself." }
 )
 
 err(
     "cyclic interface dependency",
     41002,
     "interface has cyclic dependency on itself",
-    span { loc = "interface_type:IRInst", message = "interface '~interface_type' has cyclic dependency on itself through its implementations." }
+    span { loc = "interfaceType:IRInst", message = "interface '~interfaceType' has cyclic dependency on itself through its implementations." }
 )
 
 err(
     "missing return error",
     41009,
     "non-void function must return",
-    span { loc = "location", message = "non-void function must return in all cases for target '~target_name'" }
+    span { loc = "location", message = "non-void function must return in all cases for target '~targetName'" }
 )
 
 warning(
@@ -119,63 +119,63 @@ warning(
     "profile implicitly upgraded",
     41012,
     "profile implicitly upgraded",
-    span { loc = "location", message = "entry point '~entry_point' uses additional capabilities that are not part of the specified profile '~profile'. The profile setting is automatically updated to include these capabilities: '~capabilities'" }
+    span { loc = "location", message = "entry point '~entryPoint' uses additional capabilities that are not part of the specified profile '~profile'. The profile setting is automatically updated to include these capabilities: '~capabilities'" }
 )
 
 err(
     "profile implicitly upgraded restrictive",
     41012,
     "entry point uses capabilities not in specified profile",
-    span { loc = "location", message = "entry point '~entry_point' uses capabilities that are not part of the specified profile '~profile'. Missing capabilities are: '~capabilities'" }
+    span { loc = "location", message = "entry point '~entryPoint' uses capabilities that are not part of the specified profile '~profile'. Missing capabilities are: '~capabilities'" }
 )
 
 warning(
     "using uninitialized out",
     41015,
     "use of uninitialized out parameter",
-    span { loc = "location", message = "use of uninitialized out parameter '~param_name'" }
+    span { loc = "location", message = "use of uninitialized out parameter '~paramName'" }
 )
 
 warning(
     "using uninitialized variable",
     41016,
     "use of uninitialized variable",
-    span { loc = "location", message = "use of uninitialized variable '~var_name'" }
+    span { loc = "location", message = "use of uninitialized variable '~varName'" }
 )
 
 warning(
     "using uninitialized value",
     41016,
     "use of uninitialized value",
-    span { loc = "location", message = "use of uninitialized value of type '~type_name'" }
+    span { loc = "location", message = "use of uninitialized value of type '~typeName'" }
 )
 
 warning(
     "using uninitialized global variable",
     41017,
     "use of uninitialized global variable",
-    span { loc = "location", message = "use of uninitialized global variable '~var_name'" }
+    span { loc = "location", message = "use of uninitialized global variable '~varName'" }
 )
 
 warning(
     "returning with uninitialized out",
     41018,
     "returning without initializing out parameter",
-    span { loc = "location", message = "returning without initializing out parameter '~param_name'" }
+    span { loc = "location", message = "returning without initializing out parameter '~paramName'" }
 )
 
 warning(
     "constructor uninitialized field",
     41020,
     "exiting constructor without initializing field",
-    span { loc = "location", message = "exiting constructor without initializing field '~field_name'" }
+    span { loc = "location", message = "exiting constructor without initializing field '~fieldName'" }
 )
 
 warning(
     "field not default initialized",
     41021,
     "default initializer will not initialize field",
-    span { loc = "location", message = "default initializer for '~type_name' will not initialize field '~field_name'" }
+    span { loc = "location", message = "default initializer for '~typeName' will not initialize field '~fieldName'" }
 )
 
 warning(
@@ -196,21 +196,21 @@ err(
     "cannot default initialize resource",
     41024,
     "cannot default-initialize resource type",
-    span { loc = "location", message = "cannot default-initialize ~resource_name with '{}'. Resource types must be explicitly initialized" }
+    span { loc = "location", message = "cannot default-initialize ~resourceName with '{}'. Resource types must be explicitly initialized" }
 )
 
 err(
     "cannot default initialize struct with uninitialized resource",
     41024,
     "cannot default-initialize struct with uninitialized resource",
-    span { loc = "location", message = "cannot default-initialize struct '~struct_name' with '{}' because it contains an uninitialized ~resource_name field" }
+    span { loc = "location", message = "cannot default-initialize struct '~structName' with '{}' because it contains an uninitialized ~resourceName field" }
 )
 
 err(
     "cannot default initialize struct containing resources",
     41024,
     "cannot default-initialize struct containing resource fields",
-    span { loc = "location", message = "cannot default-initialize struct '~struct_name' with '{}' because it contains resource fields" }
+    span { loc = "location", message = "cannot default-initialize struct '~structName' with '{}' because it contains resource fields" }
 )
 
 end

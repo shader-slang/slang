@@ -235,7 +235,7 @@ void inferAnyValueSizeWhereNecessary(
         if (nonSelfRefList.getCount() == 0 && selfRefList.getCount() > 0)
         {
             sink->diagnose(Diagnostics::CyclicInterfaceDependency{
-                .interface_type = interfaceType,
+                .interfaceType = interfaceType,
             });
         }
     }

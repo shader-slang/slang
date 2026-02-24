@@ -351,9 +351,9 @@ protected:
         if (existingValue != newValue)
         {
             m_sink->diagnose(Diagnostics::NvapiMacroMismatch{
-                .macro_name = macroName,
-                .existing_value = existingValue,
-                .new_value = newValue,
+                .macroName = macroName,
+                .existingValue = existingValue,
+                .newValue = newValue,
                 .location = loc});
         }
     }

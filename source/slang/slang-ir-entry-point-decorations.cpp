@@ -86,7 +86,7 @@ private:
         m_sink->diagnose(Diagnostics::InvalidMeshStageOutputTopology{
             .topology = String(decoration->getTopology()->getStringSlice()),
             .target = String(TypeTextUtil::getCompileTargetName(SlangCompileTarget(m_target))),
-            .valid_topologies = validTopologies,
+            .validTopologies = validTopologies,
             .location = decoration->sourceLoc});
     }
 

@@ -1846,7 +1846,7 @@ SlangResult OptionsParser::_getValue(
         StringBuilder buf;
         StringUtil::join(names.getBuffer(), names.getCount(), toSlice(", "), buf);
 
-        m_sink->diagnose(Diagnostics::UnknownCommandLineValue{.valid_values = buf});
+        m_sink->diagnose(Diagnostics::UnknownCommandLineValue{.validValues = buf});
         return SLANG_FAIL;
     }
 
@@ -1900,7 +1900,7 @@ SlangResult OptionsParser::_getValue(
     StringBuilder buf;
     StringUtil::join(names.getBuffer(), names.getCount(), toSlice(", "), buf);
 
-    m_sink->diagnose(Diagnostics::UnknownCommandLineValue{.valid_values = buf});
+    m_sink->diagnose(Diagnostics::UnknownCommandLineValue{.validValues = buf});
     return SLANG_FAIL;
 }
 
@@ -2420,7 +2420,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 else
                 {
                     m_sink->diagnose(Diagnostics::UnknownCommandLineValue{
-                        .valid_values = "always, never, auto"});
+                        .validValues = "always, never, auto"});
                     return SLANG_FAIL;
                 }
                 linkage->m_optionSet.set(optionKind, (int)colorValue);
@@ -2823,7 +2823,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 if (stage == Stage::Unknown)
                 {
                     m_sink->diagnose(
-                        Diagnostics::UnknownStage{.stage_name = name.value, .location = name.loc});
+                        Diagnostics::UnknownStage{.stageName = name.value, .location = name.loc});
                     return SLANG_FAIL;
                 }
                 else
@@ -3617,13 +3617,13 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             if (rawEntryPoint.conflictingStagesSet)
             {
                 m_sink->diagnose(
-                    Diagnostics::ConflictingStagesForEntryPoint{.entry_point = rawEntryPoint.name});
+                    Diagnostics::ConflictingStagesForEntryPoint{.entryPoint = rawEntryPoint.name});
             }
             else if (rawEntryPoint.redundantStageSet)
             {
                 m_sink->diagnose(Diagnostics::SameStageSpecifiedMoreThanOnce{
                     .stage = getStageName(rawEntryPoint.stage),
-                    .entry_point = rawEntryPoint.name});
+                    .entryPoint = rawEntryPoint.name});
             }
             else if (rawEntryPoint.translationUnitIndex != -1)
             {
@@ -3638,9 +3638,9 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                     rawTranslationUnit.impliedStage != rawEntryPoint.stage)
                 {
                     m_sink->diagnose(Diagnostics::ExplicitStageDoesntMatchImpliedStage{
-                        .entry_point = rawEntryPoint.name,
-                        .specified_stage = getStageName(rawEntryPoint.stage),
-                        .implied_stage = getStageName(rawTranslationUnit.impliedStage)});
+                        .entryPoint = rawEntryPoint.name,
+                        .specifiedStage = getStageName(rawEntryPoint.stage),
+                        .impliedStage = getStageName(rawTranslationUnit.impliedStage)});
                 }
             }
         }
@@ -3657,7 +3657,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 if (rawEntryPoint.stage == Stage::Unknown)
                 {
                     m_sink->diagnose(Diagnostics::NoStageSpecifiedInPassThroughMode{
-                        .entry_point = rawEntryPoint.name});
+                        .entryPoint = rawEntryPoint.name});
                 }
             }
         }
@@ -4125,7 +4125,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             if (targetInfo->entryPointOutputPaths.containsKey(entryPointID))
             {
                 m_sink->diagnose(Diagnostics::DuplicateOutputPathsForEntryPointAndTarget{
-                    .entry_point = entryPointReq->getName(),
+                    .entryPoint = entryPointReq->getName(),
                     .target = TypeTextUtil::getCompileTargetName(
                         SlangCompileTarget(target->getTarget()))});
             }

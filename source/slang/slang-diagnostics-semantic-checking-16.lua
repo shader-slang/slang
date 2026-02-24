@@ -45,7 +45,7 @@ err(
 err(
     "compilation aborted due to exception",
     99999,
-    "Slang compilation aborted due to an exception of ~exception_type: ~exception_message\\nFor assistance, file an issue on GitHub (https://github.com/shader-slang/slang/issues) or join the Slang Discord (https://khr.io/slangdiscord)"
+    "Slang compilation aborted due to an exception of ~exceptionType: ~exceptionMessage\\nFor assistance, file an issue on GitHub (https://github.com/shader-slang/slang/issues) or join the Slang Discord (https://khr.io/slangdiscord)"
 )
 
 internal(
@@ -74,7 +74,7 @@ internal(
 warning(
     "main entry point renamed",
     40100,
-    "entry point '~old_name' has been renamed to '~new_name'",
+    "entry point '~oldName' has been renamed to '~newName'",
     span { loc = "location" }
 )
 
@@ -93,7 +93,7 @@ err(
     "ray payload invalid stage in access qualifier",
     40001,
     "invalid stage name in ray payload access qualifier",
-    span { loc = "location", message = "invalid stage name '~stage_name' in ray payload access qualifier; valid stages are 'anyhit', 'closesthit', 'miss', and 'caller'" }
+    span { loc = "location", message = "invalid stage name '~stageName' in ray payload access qualifier; valid stages are 'anyhit', 'closesthit', 'miss', and 'caller'" }
 )
 
 --
@@ -104,14 +104,14 @@ err(
     "cooperative matrix unsupported element type",
     50000,
     "unsupported element type for cooperative matrix",
-    span { loc = "location", message = "Element type '~element_type' is not supported for matrix '~matrix_use'." }
+    span { loc = "location", message = "Element type '~elementType' is not supported for matrix '~matrixUse'." }
 )
 
 err(
     "cooperative matrix invalid shape",
     50000,
     "invalid shape for cooperative matrix",
-    span { loc = "location", message = "Invalid shape ['~row_count', '~col_count'] for cooperative matrix '~matrix_use'." }
+    span { loc = "location", message = "Invalid shape ['~rowCount', '~colCount'] for cooperative matrix '~matrixUse'." }
 )
 
 fatal(

@@ -3803,7 +3803,7 @@ void checkAutodiffPatterns(IRModule* module, TargetProgram* target, DiagnosticSi
                 {
                     sink->diagnose(
                         Diagnostics::PotentialIssuesWithPreferRecomputeOnSideEffectMethod{
-                            .func_name = String(nameHint->getName()),
+                            .funcName = String(nameHint->getName()),
                             .location = func->sourceLoc,
                         });
                 }

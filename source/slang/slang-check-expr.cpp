@@ -328,7 +328,7 @@ void SemanticsVisitor::diagnoseDeprecatedDeclRefUsage(
     if (auto deprecatedAttr = declRef.getDecl()->findModifier<DeprecatedAttribute>())
     {
         getSink()->diagnose(Diagnostics::DeprecatedUsage{
-            .decl_name = declRef.getName(),
+            .declName = declRef.getName(),
             .message = deprecatedAttr->message,
             .location = loc});
     }
@@ -1562,14 +1562,14 @@ void SemanticsVisitor::checkDerivativeMemberAttributeReferences(
         if (!diffType->equals(declRefExpr->type))
         {
             getSink()->diagnose(Diagnostics::TypeMismatch{
-                .expected_type = diffType,
-                .actual_type = declRefExpr->type,
+                .expectedType = diffType,
+                .actualType = declRefExpr->type,
                 .expr = declRefExpr});
         }
         if (!varDecl->parentDecl)
         {
             getSink()->diagnose(Diagnostics::AttributeNotApplicable{
-                .attr_name = derivativeMemberAttr->getKeywordName(),
+                .attrName = derivativeMemberAttr->getKeywordName(),
                 .attr = derivativeMemberAttr});
         }
         if (auto memberExpr = as<StaticMemberExpr>(declRefExpr))
@@ -1586,7 +1586,7 @@ void SemanticsVisitor::checkDerivativeMemberAttributeReferences(
     }
     getSink()->diagnose(
         Diagnostics::DerivativeMemberAttributeMustNameAMemberInExpectedDifferentialType{
-            .diff_type = diffThisType,
+            .diffType = diffThisType,
             .attr = derivativeMemberAttr->loc});
 }
 
@@ -1741,7 +1741,7 @@ void SemanticsVisitor::maybeCheckMissingNoDiffThis(Expr* expr)
             }
 
             getSink()->diagnose(Diagnostics::NoDerivativeOnNonDifferentiableThisType{
-                .member_decl = memberExpr->declRef.getDecl(),
+                .memberDecl = memberExpr->declRef.getDecl(),
                 .func = this->m_parentFunc,
                 .member = memberExpr});
         }
@@ -4100,8 +4100,8 @@ Expr* SemanticsExprVisitor::visitDispatchKernelExpr(DispatchKernelExpr* expr)
             m_astBuilder->getUIntType(),
             m_astBuilder->getIntVal(m_astBuilder->getIntType(), 3));
         getSink()->diagnose(Diagnostics::TypeMismatch{
-            .expected_type = uint3Type,
-            .actual_type = expr->threadGroupSize->type,
+            .expectedType = uint3Type,
+            .actualType = expr->threadGroupSize->type,
             .expr = expr->threadGroupSize});
     }
     expr->dispatchSize = dispatchExpr(expr->dispatchSize, *this);
@@ -4111,8 +4111,8 @@ Expr* SemanticsExprVisitor::visitDispatchKernelExpr(DispatchKernelExpr* expr)
             m_astBuilder->getUIntType(),
             m_astBuilder->getIntVal(m_astBuilder->getIntType(), 3));
         getSink()->diagnose(Diagnostics::TypeMismatch{
-            .expected_type = uint3Type,
-            .actual_type = expr->dispatchSize->type,
+            .expectedType = uint3Type,
+            .actualType = expr->dispatchSize->type,
             .expr = expr->dispatchSize});
     }
     PassthroughHighOrderExprCheckingActionsBase<DispatchKernelExpr> actions;
@@ -4156,7 +4156,7 @@ Expr* SemanticsExprVisitor::visitGetArrayLengthExpr(GetArrayLengthExpr* expr)
         if (!as<ErrorType>(expr->arrayExpr->type))
         {
             getSink()->diagnose(Diagnostics::ExpectedArrayExpression{
-                .actual_type = expr->arrayExpr->type,
+                .actualType = expr->arrayExpr->type,
                 .expr = expr->arrayExpr});
         }
         expr->type = m_astBuilder->getErrorType();
@@ -4320,7 +4320,7 @@ Expr* SemanticsExprVisitor::visitFloatBitCastExpr(FloatBitCastExpr* expr)
     {
         getSink()->diagnose(Diagnostics::FloatBitCastTypeMismatch{
             .intrinsic = "__floatAsInt",
-            .expected_type = "half, float, or double",
+            .expectedType = "half, float, or double",
             .expr = expr});
         expr->type = m_astBuilder->getErrorType();
         return expr;
@@ -4741,9 +4741,9 @@ Expr* SemanticsExprVisitor::visitTryExpr(TryExpr* expr)
         if (funcCallee && !parentFunc->errorType->equals(funcCallee->errorType))
         {
             getSink()->diagnose(Diagnostics::ErrorTypeOfCalleeIncompatibleWithCaller{
-                .callee_error_type = funcCallee->errorType,
+                .calleeErrorType = funcCallee->errorType,
                 .callee = funcCallee,
-                .caller_error_type = parentFunc->errorType,
+                .callerErrorType = parentFunc->errorType,
                 .expr = expr});
             return expr;
         }
@@ -6380,7 +6380,7 @@ Expr* SemanticsExprVisitor::visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
             failed = true;
             getSink()->diagnose(Diagnostics::SpirvInstructionWithTooManyOperands{
                 .opcode = inst.opcode.token.getContent(),
-                .max_operands = 0,
+                .maxOperands = 0,
                 .location = inst.opcode.token.loc});
             continue;
         }

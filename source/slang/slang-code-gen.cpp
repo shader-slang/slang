@@ -386,8 +386,8 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
             auto targetName = TypeTextUtil::getCompileTargetName(SlangCompileTarget(target));
 
             sink->diagnose(Diagnostics::CompilerNotDefinedForTransition{
-                .source_target = sourceName,
-                .dest_target = targetName});
+                .sourceTarget = sourceName,
+                .destTarget = targetName});
             return SLANG_FAIL;
         }
     }

@@ -176,8 +176,8 @@ struct UninitializedResourceDetectionContext
                             // Main error
                             sink->diagnose(
                                 Diagnostics::CannotDefaultInitializeStructWithUninitializedResource{
-                                    .struct_name = structName,
-                                    .resource_name = resourceName,
+                                    .structName = structName,
+                                    .resourceName = resourceName,
                                     .location = sourceLoc,
                                 });
 
@@ -194,7 +194,7 @@ struct UninitializedResourceDetectionContext
                             // Struct contains nested resources
                             sink->diagnose(
                                 Diagnostics::CannotDefaultInitializeStructContainingResources{
-                                    .struct_name = structName,
+                                    .structName = structName,
                                     .location = sourceLoc,
                                 });
                         }
@@ -204,7 +204,7 @@ struct UninitializedResourceDetectionContext
                         // Direct resource initialization
                         String resourceName = getResourceTypeName(uninitializedType);
                         sink->diagnose(Diagnostics::CannotDefaultInitializeResource{
-                            .resource_name = resourceName,
+                            .resourceName = resourceName,
                             .location = sourceLoc,
                         });
                     }

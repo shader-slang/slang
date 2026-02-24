@@ -19,70 +19,70 @@ warning(
     "unknown attribute name",
     31000,
     "unknown attribute",
-    span { loc = "attr:Modifier", message = "unknown attribute '~attr_name:Name'" }
+    span { loc = "attr:Modifier", message = "unknown attribute '~attrName:Name'" }
 )
 
 err(
     "attribute argument count mismatch",
     31001,
     "wrong number of attribute arguments",
-    span { loc = "attr:Modifier", message = "attribute '~attr_name:Name' expects ~expected arguments (~provided:Int provided)" }
+    span { loc = "attr:Modifier", message = "attribute '~attrName:Name' expects ~expected arguments (~provided:Int provided)" }
 )
 
 err(
     "attribute not applicable",
     31002,
     "invalid attribute placement",
-    span { loc = "attr:Modifier", message = "attribute '~attr_name:Name' is not valid here" }
+    span { loc = "attr:Modifier", message = "attribute '~attrName:Name' is not valid here" }
 )
 
 err(
     "badly defined patch constant func",
     31003,
     "invalid 'patchconstantfunc' attribute",
-    span { loc = "location:Modifier", message = "hull shader '~entry_point_name:Name' has badly defined 'patchconstantfunc' attribute." }
+    span { loc = "location:Modifier", message = "hull shader '~entryPointName:Name' has badly defined 'patchconstantfunc' attribute." }
 )
 
 err(
     "expected single int arg",
     31004,
     "expected single int argument",
-    span { loc = "attr:Modifier", message = "attribute '~attr_name:Name' expects a single int argument" }
+    span { loc = "attr:Modifier", message = "attribute '~attrName:Name' expects a single int argument" }
 )
 
 err(
     "expected single string arg",
     31005,
     "expected single string argument",
-    span { loc = "attr:Modifier", message = "attribute '~attr_name:Name' expects a single string argument" }
+    span { loc = "attr:Modifier", message = "attribute '~attrName:Name' expects a single string argument" }
 )
 
 err(
     "attribute function not found",
     31006,
     "function not found for attribute",
-    span { loc = "location:Expr", message = "Could not find function '~func_name:Name' for attribute '~attr_name'" }
+    span { loc = "location:Expr", message = "Could not find function '~funcName:Name' for attribute '~attrName'" }
 )
 
 err(
     "attribute expected int arg",
     31007,
     "expected int argument",
-    span { loc = "attr:Modifier", message = "attribute '~attr_name:Name' expects argument ~arg_index:Int to be int" }
+    span { loc = "attr:Modifier", message = "attribute '~attrName:Name' expects argument ~argIndex:Int to be int" }
 )
 
 err(
     "attribute expected string arg",
     31008,
     "expected string argument",
-    span { loc = "attr:Modifier", message = "attribute '~attr_name:Name' expects argument ~arg_index:Int to be string" }
+    span { loc = "attr:Modifier", message = "attribute '~attrName:Name' expects argument ~argIndex:Int to be string" }
 )
 
 err(
     "expected single float arg",
     31009,
     "expected single float argument",
-    span { loc = "attr:Modifier", message = "attribute '~attr_name:Name' expects a single floating point argument" }
+    span { loc = "attr:Modifier", message = "attribute '~attrName:Name' expects a single floating point argument" }
 )
 
 --
@@ -93,21 +93,21 @@ err(
     "unknown stage name",
     31100,
     "unknown stage name",
-    span { loc = "location", message = "unknown stage name '~stage_name'" }
+    span { loc = "location", message = "unknown stage name '~stageName'" }
 )
 
 err(
     "unknown image format name",
     31101,
     "unknown image format",
-    span { loc = "location:Expr", message = "unknown image format '~format_name'" }
+    span { loc = "location:Expr", message = "unknown image format '~formatName'" }
 )
 
 err(
     "unknown diagnostic name",
     31101,
     "unknown diagnostic",
-    span { loc = "location", message = "unknown diagnostic '~diagnostic_name'" }
+    span { loc = "location", message = "unknown diagnostic '~diagnosticName'" }
 )
 
 err(
@@ -156,7 +156,7 @@ err(
     "any value size exceeds limit",
     31121,
     "'anyValueSize' exceeds limit",
-    span { loc = "location", message = "'anyValueSize' cannot exceed ~max_size:Int" }
+    span { loc = "location", message = "'anyValueSize' cannot exceed ~maxSize:Int" }
 )
 
 err(

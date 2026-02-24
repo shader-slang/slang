@@ -17,29 +17,29 @@ err(
     "conflicting explicit bindings for parameter",
     39000,
     "conflicting explicit bindings",
-    span { loc = "decl:Decl", message = "conflicting explicit bindings for parameter '~param_name'" }
+    span { loc = "decl:Decl", message = "conflicting explicit bindings for parameter '~paramName'" }
 )
 
 warning(
     "parameter bindings overlap",
     39001,
     "explicit binding overlap",
-    span { loc = "param_a:Decl", message = "explicit binding for parameter '~param_a' overlaps with parameter '~param_b'" },
-    note { message = "see declaration of '~param_b'", span { loc = "param_b:Decl" } }
+    span { loc = "paramA:Decl", message = "explicit binding for parameter '~paramA' overlaps with parameter '~paramB'" },
+    note { message = "see declaration of '~paramB'", span { loc = "paramB:Decl" } }
 )
 
 err(
     "unknown register class",
     39007,
     "unknown register class",
-    span { loc = "location", message = "unknown register class: '~class_name'" }
+    span { loc = "location", message = "unknown register class: '~className'" }
 )
 
 err(
     "expected a register index",
     39008,
     "expected a register index",
-    span { loc = "location", message = "expected a register index after '~class_name'" }
+    span { loc = "location", message = "expected a register index after '~className'" }
 )
 
 err(
@@ -74,7 +74,7 @@ warning(
     "register modifier but no vulkan layout",
     39013,
     "D3D register without Vulkan binding",
-    span { loc = "location", message = "shader parameter '~param_name' has a 'register' specified for D3D, but no '[[vk::binding(...)]]` specified for Vulkan" }
+    span { loc = "location", message = "shader parameter '~paramName' has a 'register' specified for D3D, but no '[[vk::binding(...)]]` specified for Vulkan" }
 )
 
 err(
@@ -88,7 +88,7 @@ err(
     "whole space parameter requires zero binding",
     39015,
     "whole descriptor set requires binding 0",
-    span { loc = "location", message = "shader parameter '~param_name' consumes whole descriptor sets, so the binding must be in the form '[[vk::binding(0, ...)]]'; the non-zero binding '~binding:Int' is not allowed" }
+    span { loc = "location", message = "shader parameter '~paramName' consumes whole descriptor sets, so the binding must be in the form '[[vk::binding(0, ...)]]'; the non-zero binding '~binding:Int' is not allowed" }
 )
 
 err(
@@ -130,14 +130,14 @@ err(
     "mixing implicit and explicit binding for varying params",
     39023,
     "mixing implicit and explicit varying bindings",
-    span { loc = "location", message = "mixing explicit and implicit bindings for varying parameters is not supported (see '~implicit_name:Name' and '~explicit_name:Name')" }
+    span { loc = "location", message = "mixing explicit and implicit bindings for varying parameters is not supported (see '~implicitName:Name' and '~explicitName:Name')" }
 )
 
 err(
     "conflicting vulkan inferred binding for parameter",
     39025,
     "conflicting Vulkan inferred binding",
-    span { loc = "decl:Decl", message = "conflicting vulkan inferred binding for parameter '~param_name' overlap is ~overlap1 and ~overlap2" }
+    span { loc = "decl:Decl", message = "conflicting vulkan inferred binding for parameter '~paramName' overlap is ~overlap1 and ~overlap2" }
 )
 
 err(
@@ -158,7 +158,7 @@ err(
     "not valid varying parameter",
     39028,
     "not a valid varying parameter",
-    span { loc = "decl:Decl", message = "parameter '~param_name' is not a valid varying parameter." }
+    span { loc = "decl:Decl", message = "parameter '~paramName' is not a valid varying parameter." }
 )
 
 err(
@@ -172,7 +172,7 @@ warning(
     "register modifier but no vk binding nor shift",
     39029,
     "D3D register without Vulkan binding or shift",
-    span { loc = "location", message = "shader parameter '~param_name' has a 'register' specified for D3D, but no '[[vk::binding(...)]]` specified for Vulkan, nor is `-fvk-~class_name-shift` used." }
+    span { loc = "location", message = "shader parameter '~paramName' has a 'register' specified for D3D, but no '[[vk::binding(...)]]` specified for Vulkan, nor is `-fvk-~className-shift` used." }
 )
 
 warning(

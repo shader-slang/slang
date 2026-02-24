@@ -1130,7 +1130,7 @@ inline String CLikeSourceEmitter::maybeMakeEntryPointNameValid(String name, Diag
         {
             String newName = _generateUniqueName(name.getUnownedSlice());
             sink->diagnose(
-                Diagnostics::MainEntryPointRenamed{.old_name = name, .new_name = newName});
+                Diagnostics::MainEntryPointRenamed{.oldName = name, .newName = newName});
             return newName;
         }
     }

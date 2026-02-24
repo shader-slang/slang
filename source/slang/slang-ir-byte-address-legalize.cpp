@@ -268,7 +268,7 @@ struct ByteAddressBufferLegalizationContext
             }
             m_sink->diagnose(Diagnostics::ByteAddressBufferUnaligned{
                 .alignment = alignInst->getValue(),
-                .element_size = alignmentVal,
+                .elementSize = alignmentVal,
                 .location = offset->sourceLoc,
             });
         }

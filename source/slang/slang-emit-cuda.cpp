@@ -1278,8 +1278,8 @@ SlangResult CUDASourceEmitter::emitWMMAFragmentType(
     if (!typeCheck(elementType->getOp(), matrixUse))
     {
         getSink()->diagnose(Diagnostics::CooperativeMatrixUnsupportedElementType{
-            .element_type = typeName,
-            .matrix_use = matrixUse == 0 ? "A" : (matrixUse == 1 ? "B" : "C")});
+            .elementType = typeName,
+            .matrixUse = matrixUse == 0 ? "A" : (matrixUse == 1 ? "B" : "C")});
         SLANG_RELEASE_ASSERT(false);
         return SLANG_FAIL;
     }
@@ -1290,9 +1290,9 @@ SlangResult CUDASourceEmitter::emitWMMAFragmentType(
     if (!shape.isValid())
     {
         getSink()->diagnose(Diagnostics::CooperativeMatrixInvalidShape{
-            .row_count = String(rowCount),
-            .col_count = String(colCount),
-            .matrix_use = matrixUse == 0 ? "A" : (matrixUse == 1 ? "B" : "C")});
+            .rowCount = String(rowCount),
+            .colCount = String(colCount),
+            .matrixUse = matrixUse == 0 ? "A" : (matrixUse == 1 ? "B" : "C")});
         SLANG_RELEASE_ASSERT(false);
         return SLANG_FAIL;
     }

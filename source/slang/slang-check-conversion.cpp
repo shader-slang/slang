@@ -466,7 +466,7 @@ bool SemanticsVisitor::createInvokeExprForSynthesizedCtor(
         {
             diagnoseOnce(Diagnostics::CannotUseInitializerListForType{
                 .type = toType,
-                .init_list = fromInitializerListExpr});
+                .initList = fromInitializerListExpr});
         }
 
         return false;
@@ -597,8 +597,8 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
             if (outToExpr)
             {
                 getSink()->diagnose(Diagnostics::CannotUseInitializerListForVectorOfUnknownSize{
-                    .element_count = toElementCount,
-                    .init_list = fromInitializerListExpr});
+                    .elementCount = toElementCount,
+                    .initList = fromInitializerListExpr});
             }
             return false;
         }
@@ -640,8 +640,8 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
             if (outToExpr)
             {
                 getSink()->diagnose(Diagnostics::CannotUseInitializerListForCoopVectorOfUnknownSize{
-                    .element_count = toElementCount,
-                    .init_list = fromInitializerListExpr});
+                    .elementCount = toElementCount,
+                    .initList = fromInitializerListExpr});
             }
             return false;
         }
@@ -791,8 +791,8 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
             if (outToExpr)
             {
                 getSink()->diagnose(Diagnostics::CannotUseInitializerListForMatrixOfUnknownSize{
-                    .row_count = toMatrixType->getRowCount(),
-                    .init_list = fromInitializerListExpr});
+                    .rowCount = toMatrixType->getRowCount(),
+                    .initList = fromInitializerListExpr});
             }
             return false;
         }
@@ -905,7 +905,7 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
         {
             getSink()->diagnose(Diagnostics::CannotUseInitializerListForType{
                 .type = inToType,
-                .init_list = fromInitializerListExpr});
+                .initList = fromInitializerListExpr});
         }
         return false;
     }
@@ -997,7 +997,7 @@ bool SemanticsVisitor::_coerceInitializerList(
             getSink()->diagnose(Diagnostics::TooManyInitializers{
                 .expected = (int)argIndex,
                 .got = (int)argCount,
-                .init_list = fromInitializerListExpr});
+                .initList = fromInitializerListExpr});
         }
     }
     if (outToExpr)
@@ -1028,8 +1028,8 @@ bool SemanticsVisitor::_failedCoercion(
             if (sink)
             {
                 sink->diagnose(Diagnostics::TypeMismatch{
-                    .expected_type = toType,
-                    .actual_type = fromExpr->type,
+                    .expectedType = toType,
+                    .actualType = fromExpr->type,
                     .expr = fromExpr});
             }
         }
@@ -1925,8 +1925,8 @@ bool SemanticsVisitor::_coerce(
             if (sink)
             {
                 sink->diagnose(Diagnostics::AmbiguousConversion{
-                    .from_type = fromType.type,
-                    .to_type = toType,
+                    .fromType = fromType.type,
+                    .toType = toType,
                     .expr = fromExpr});
                 for (auto candidate : overloadContext.bestCandidates)
                 {
@@ -1990,12 +1990,12 @@ bool SemanticsVisitor::_coerce(
                 if (sink)
                 {
                     sink->diagnose(Diagnostics::TypeMismatch{
-                        .expected_type = toType,
-                        .actual_type = fromType,
+                        .expectedType = toType,
+                        .actualType = fromType,
                         .expr = fromExpr});
                     sink->diagnose(Diagnostics::NoteExplicitConversionPossible{
-                        .from_type = fromType.type,
-                        .to_type = toType,
+                        .fromType = fromType.type,
+                        .toType = toType,
                         .location = fromExpr->loc});
                 }
             }
@@ -2024,8 +2024,8 @@ bool SemanticsVisitor::_coerce(
                 if (shouldEmitGeneralWarning && sink)
                 {
                     sink->diagnose(Diagnostics::UnrecommendedImplicitConversion{
-                        .from_type = fromType.type,
-                        .to_type = toType,
+                        .fromType = fromType.type,
+                        .toType = toType,
                         .expr = fromExpr});
                 }
             }

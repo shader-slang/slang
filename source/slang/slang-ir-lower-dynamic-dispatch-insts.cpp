@@ -653,7 +653,7 @@ public:
             m_sink->diagnose(Diagnostics::SpecializedDynamicDispatchCodeGeneratedHere{
                 .count = (int64_t)count,
                 .types = tableElementsStr.produceString(),
-                .spec_args = specArgsStr.produceString(),
+                .specArgs = specArgsStr.produceString(),
                 .location = use->getUser()->sourceLoc});
         }
     }

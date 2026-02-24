@@ -57,7 +57,7 @@ struct CacheOfDataToReplaceOps
             // compiler
             resultVariable = builder.getIntValue(builder.getIntType(), 0);
             sink->diagnose(Diagnostics::ExpectedRayTracingPayloadObjectAtLocationButMissing{
-                .payload_location = intLitValue,
+                .payloadLocation = intLitValue,
                 .location = payloadVariable->sourceLoc});
         }
         else

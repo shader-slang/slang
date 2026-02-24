@@ -1520,7 +1520,7 @@ struct TypeFlowSpecializationContext
                 StringBuilder typeStr;
                 printDiagnosticArg(typeStr, interfaceType);
                 sink->diagnose(Diagnostics::NoTypeConformancesFoundForInterface{
-                    .interface_type = typeStr.produceString(),
+                    .interfaceType = typeStr.produceString(),
                     .location = inst->sourceLoc});
                 module->getContainerPool().free(&tables);
                 return none();
@@ -1767,7 +1767,7 @@ struct TypeFlowSpecializationContext
                             StringBuilder typeStr;
                             printDiagnosticArg(typeStr, interfaceType);
                             sink->diagnose(Diagnostics::NoTypeConformancesFoundForInterface{
-                                .interface_type = typeStr.produceString(),
+                                .interfaceType = typeStr.produceString(),
                                 .location = loadInst->sourceLoc});
                             module->getContainerPool().free(&tables);
                             return none();

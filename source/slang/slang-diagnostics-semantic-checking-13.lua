@@ -38,7 +38,7 @@ err(
     "loss of derivative due to call of non differentiable function",
     41020,
     "derivative cannot be propagated through non-differentiable call",
-    span { loc = "location", message = "derivative cannot be propagated through call to non-~diff_level-differentiable function `~func_name`, use 'no_diff' to clarify intention." }
+    span { loc = "location", message = "derivative cannot be propagated through call to non-~diffLevel-differentiable function `~funcName`, use 'no_diff' to clarify intention." }
 )
 
 err(
@@ -66,7 +66,7 @@ warning(
     "operator shift left overflow",
     41030,
     "left shift overflow",
-    span { loc = "location", message = "left shift amount exceeds the number of bits and the result will be always zero, (`~lhs_type' << `~shift_amount:Int`)." }
+    span { loc = "location", message = "left shift amount exceeds the number of bits and the result will be always zero, (`~lhsType' << `~shiftAmount:Int`)." }
 )
 
 err(
@@ -87,7 +87,7 @@ warning(
     "potential issues with prefer recompute on side effect method",
     42050,
     "[PreferRecompute] on function with side effects",
-    span { loc = "location", message = "~func_name has [PreferRecompute] and may have side effects. side effects may execute multiple times. use [PreferRecompute(SideEffectBehavior.Allow)], or mark function with [__NoSideEffect]" }
+    span { loc = "location", message = "~funcName has [PreferRecompute] and may have side effects. side effects may execute multiple times. use [PreferRecompute(SideEffectBehavior.Allow)], or mark function with [__NoSideEffect]" }
 )
 
 -- 45xxx - Linking
@@ -119,14 +119,14 @@ err(
     "not equal bit cast size",
     41202,
     "bit_cast size mismatch",
-    span { loc = "location", message = "invalid to bit_cast differently sized types: '~from_type' with size '~from_size:Int' casted into '~to_type' with size '~to_size:Int'" }
+    span { loc = "location", message = "invalid to bit_cast differently sized types: '~fromType' with size '~fromSize:Int' casted into '~toType' with size '~toSize:Int'" }
 )
 
 err(
     "byte address buffer unaligned",
     41300,
     "invalid byte address buffer alignment",
-    span { loc = "location", message = "invalid alignment `~alignment:Int` specified for the byte address buffer resource with the element size of `~element_size:Int`" }
+    span { loc = "location", message = "invalid alignment `~alignment:Int` specified for the byte address buffer resource with the element size of `~elementSize:Int`" }
 )
 
 err(

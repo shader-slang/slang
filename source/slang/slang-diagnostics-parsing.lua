@@ -19,63 +19,63 @@ err(
     "unexpected token",
     20003,
     "unexpected token",
-    span { loc = "location", message = "unexpected ~token_type" }
+    span { loc = "location", message = "unexpected ~tokenType" }
 )
 
 err(
     "unexpected token expected token type",
     20001,
     "unexpected token",
-    span { loc = "location", message = "unexpected ~actual_token, expected ~expected_token" }
+    span { loc = "location", message = "unexpected ~actualToken, expected ~expectedToken" }
 )
 
 err(
     "unexpected token expected token name",
     20001,
     "unexpected token",
-    span { loc = "location", message = "unexpected ~actual_token, expected '~expected_token_name'" }
+    span { loc = "location", message = "unexpected ~actualToken, expected '~expectedTokenName'" }
 )
 
 err(
     "token name expected but eof",
     0,
     "unexpected end of file",
-    span { loc = "location", message = "\"~token_name\" expected but end of file encountered." }
+    span { loc = "location", message = "\"~tokenName\" expected but end of file encountered." }
 )
 
 err(
     "token type expected but eof",
     0,
     "unexpected end of file",
-    span { loc = "location", message = "~token_type expected but end of file encountered." }
+    span { loc = "location", message = "~tokenType expected but end of file encountered." }
 )
 
 err(
     "token name expected",
     20001,
     "expected token",
-    span { loc = "location", message = "\"~token_name\" expected" }
+    span { loc = "location", message = "\"~tokenName\" expected" }
 )
 
 err(
     "token name expected but eof2",
     20001,
     "unexpected end of file",
-    span { loc = "location", message = "\"~token_name\" expected but end of file encountered." }
+    span { loc = "location", message = "\"~tokenName\" expected but end of file encountered." }
 )
 
 err(
     "token type expected",
     20001,
     "expected token",
-    span { loc = "location", message = "~token_type expected" }
+    span { loc = "location", message = "~tokenType expected" }
 )
 
 err(
     "token type expected but eof2",
     20001,
     "unexpected end of file",
-    span { loc = "location", message = "~token_type expected but end of file encountered." }
+    span { loc = "location", message = "~tokenType expected but end of file encountered." }
 )
 
 err(
@@ -173,7 +173,7 @@ err(
     "decl not allowed",
     30102,
     "declaration not allowed here",
-    span { loc = "location", message = "~decl_type is not allowed here." }
+    span { loc = "location", message = "~declType is not allowed here." }
 )
 
 -- 29xxx - Snippet parsing and inline asm
@@ -230,7 +230,7 @@ warning(
     "spirv instruction with too many operands",
     29106,
     "too many operands",
-    span { loc = "location", message = "too many operands for ~opcode (expected max ~max_operands:Int), did you forget a semicolon?" }
+    span { loc = "location", message = "too many operands for ~opcode (expected max ~maxOperands:Int), did you forget a semicolon?" }
 )
 
 err(

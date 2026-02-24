@@ -106,7 +106,7 @@ standalone_note(
 standalone_note(
     "note explicit conversion possible",
     -1,
-    "explicit conversion from '~from_type:Type' to '~to_type:Type' is possible",
+    "explicit conversion from '~fromType:Type' to '~toType:Type' is possible",
     span { loc = "location" }
 )
 
@@ -139,7 +139,7 @@ standalone_note(
 standalone_note(
     "see using of node type",
     -1,
-    "see using of '~node_type'",
+    "see using of '~nodeType'",
     span { loc = "location" }
 )
 

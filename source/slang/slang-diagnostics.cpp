@@ -74,7 +74,7 @@ SlangResult overrideDiagnostic(
         if (SLANG_FAILED(StringUtil::parseInt(identifier, diagnosticId)))
         {
             outDiagnostic->diagnose(
-                Diagnostics::UnknownDiagnosticName{.diagnostic_name = String(identifier)});
+                Diagnostics::UnknownDiagnosticName{.diagnosticName = String(identifier)});
             return SLANG_FAIL;
         }
 
@@ -90,7 +90,7 @@ SlangResult overrideDiagnostic(
         if (!diagnostic)
         {
             outDiagnostic->diagnose(
-                Diagnostics::UnknownDiagnosticName{.diagnostic_name = String(identifier)});
+                Diagnostics::UnknownDiagnosticName{.diagnosticName = String(identifier)});
             return SLANG_FAIL;
         }
         diagnosticId = diagnostic->id;
@@ -104,7 +104,7 @@ SlangResult overrideDiagnostic(
         // to be converted from, so it is an 'unknown name' in the context of severity...
         // Or perhaps we want another diagnostic
         outDiagnostic->diagnose(
-            Diagnostics::UnknownDiagnosticName{.diagnostic_name = String(identifier)});
+            Diagnostics::UnknownDiagnosticName{.diagnosticName = String(identifier)});
         return SLANG_FAIL;
     }
 

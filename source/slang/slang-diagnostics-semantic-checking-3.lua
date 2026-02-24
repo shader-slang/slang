@@ -19,21 +19,21 @@ err(
     "included file missing implementing",
     30500,
     "missing 'implementing' declaration",
-    span { loc = "location", message = "missing 'implementing' declaration in the included source file '~file_name'." }
+    span { loc = "location", message = "missing 'implementing' declaration in the included source file '~fileName'." }
 )
 
 err(
     "included file missing implementing do you mean import",
     30501,
     "missing 'implementing' declaration",
-    span { loc = "location", message = "missing 'implementing' declaration in the included source file '~file_name'. The file declares that it defines module '~module_name', do you mean 'import' instead?" }
+    span { loc = "location", message = "missing 'implementing' declaration in the included source file '~fileName'. The file declares that it defines module '~moduleName', do you mean 'import' instead?" }
 )
 
 err(
     "included file does not implement current module",
     30502,
     "module name mismatch in included file",
-    span { loc = "location", message = "the included source file is expected to implement module '~expected_module:Name', but it is implementing '~actual_module' instead." }
+    span { loc = "location", message = "the included source file is expected to implement module '~expectedModule:Name', but it is implementing '~actualModule' instead." }
 )
 
 err(
@@ -61,7 +61,7 @@ warning(
     "module implementation has file extension",
     30506,
     "file extension in module name",
-    span { loc = "location", message = "implementing directive contains file extension in module name '~module_name'. Module names should not include extensions. The compiler will use '~normalized_name' as the module name." }
+    span { loc = "location", message = "implementing directive contains file extension in module name '~moduleName'. Module names should not include extensions. The compiler will use '~normalizedName' as the module name." }
 )
 
 --
@@ -100,7 +100,7 @@ err(
     "invalid visibility modifier on type of decl",
     36005,
     "visibility modifier not allowed",
-    span { loc = "location", message = "visibility modifier is not allowed on '~ast_node_type'." }
+    span { loc = "location", message = "visibility modifier is not allowed on '~astNodeType'." }
 )
 
 --
@@ -111,21 +111,21 @@ err(
     "conflicting capability due to use of decl",
     36100,
     "conflicting capability requirement",
-    span { loc = "location", message = "'~referenced_decl:Decl' requires capability '~required_caps' that is conflicting with the '~context_decl:Decl's current capability requirement '~existing_caps'." }
+    span { loc = "location", message = "'~referencedDecl:Decl' requires capability '~requiredCaps' that is conflicting with the '~contextDecl:Decl's current capability requirement '~existingCaps'." }
 )
 
 err(
     "conflicting capability due to statement",
     36101,
     "conflicting capability requirement",
-    span { loc = "location", message = "statement requires capability '~required_caps' that is conflicting with the '~context's current capability requirement '~existing_caps'." }
+    span { loc = "location", message = "statement requires capability '~requiredCaps' that is conflicting with the '~context's current capability requirement '~existingCaps'." }
 )
 
 err(
     "conflicting capability due to statement enclosing func",
     36102,
     "conflicting capability requirement",
-    span { loc = "location", message = "statement requires capability '~required_caps' that is conflicting with the current function's capability requirement '~existing_caps'." }
+    span { loc = "location", message = "statement requires capability '~requiredCaps' that is conflicting with the current function's capability requirement '~existingCaps'." }
 )
 
 err(
@@ -223,21 +223,21 @@ err(
     "sub type has subset of abstract atoms to super type",
     36118,
     "subtype missing target/stage support",
-    span { loc = "decl:Decl", message = "subtype '~decl' must have the same target/stage support as the supertype; '~decl' is missing '~missing_caps'" }
+    span { loc = "decl:Decl", message = "subtype '~decl' must have the same target/stage support as the supertype; '~decl' is missing '~missingCaps'" }
 )
 
 err(
     "requirment has subset of abstract atoms to implementation",
     36119,
     "requirement missing target/stage support",
-    span { loc = "decl:Decl", message = "requirement '~decl' must have the same target/stage support as the implementation; '~decl' is missing '~missing_caps'" }
+    span { loc = "decl:Decl", message = "requirement '~decl' must have the same target/stage support as the implementation; '~decl' is missing '~missingCaps'" }
 )
 
 err(
     "target switch cap cases conflict",
     36120,
     "capability cases conflict in target_switch",
-    span { loc = "location", message = "the capability for case '~case_name' is '~case_caps', which is conflicts with previous case which requires '~prev_caps'. In target_switch, if two cases are belong to the same target, then one capability set has to be a subset of the other." }
+    span { loc = "location", message = "the capability for case '~caseName' is '~caseCaps', which is conflicts with previous case which requires '~prevCaps'. In target_switch, if two cases are belong to the same target, then one capability set has to be a subset of the other." }
 )
 
 end

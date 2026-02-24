@@ -33,7 +33,7 @@ err(
     "member return type mismatch",
     38106,
     "return type mismatch",
-    span { loc = "member:Decl", message = "member '~member' return type '~actual_type:Type' does not match interface requirement return type '~expected_type:Type'." }
+    span { loc = "member:Decl", message = "member '~member' return type '~actualType:Type' does not match interface requirement return type '~expectedType:Type'." }
 )
 
 err(
@@ -47,7 +47,7 @@ err(
     "parameter direction does not match requirement",
     38108,
     "parameter direction mismatch",
-    span { loc = "param:Decl", message = "parameter '~param' direction '~actual_direction' does not match interface requirement '~expected_direction'." }
+    span { loc = "param:Decl", message = "parameter '~param' direction '~actualDirection' does not match interface requirement '~expectedDirection'." }
 )
 
 --
@@ -90,7 +90,7 @@ err(
     "type argument for generic parameter does not conform to interface",
     38021,
     "type argument doesn't conform to interface",
-    span { loc = "location", message = "type argument `~type_arg:Type` for generic parameter `~param:Name` does not conform to interface `~interface:Type`." }
+    span { loc = "location", message = "type argument `~typeArg:Type` for generic parameter `~param:Name` does not conform to interface `~interface:Type`." }
 )
 
 err(
@@ -104,7 +104,7 @@ err(
     "cannot specialize global generic to another generic param",
     38023,
     "cannot specialize using another global type parameter",
-    span { loc = "location", message = "the global type parameter '~param:Name' cannot be specialized using another global type parameter ('~other_param:Name')" }
+    span { loc = "location", message = "the global type parameter '~param:Name' cannot be specialized using another global type parameter ('~otherParam:Name')" }
 )
 
 err(
@@ -132,7 +132,7 @@ err(
     "type argument does not conform to interface",
     38029,
     "type argument doesn't conform to interface",
-    span { loc = "location", message = "type argument '~type_arg:Type' does not conform to the required interface '~interface:Type'" }
+    span { loc = "location", message = "type argument '~typeArg:Type' does not conform to the required interface '~interface:Type'" }
 )
 
 --

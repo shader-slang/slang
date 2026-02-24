@@ -234,7 +234,7 @@ bool SemanticsVisitor::TryCheckOverloadCandidateFixity(
         if (context.mode != OverloadResolveContext::Mode::JustTrying)
         {
             getSink()->diagnose(
-                Diagnostics::ExpectedPrefixOperator{.call_loc = context.loc, .decl = decl});
+                Diagnostics::ExpectedPrefixOperator{.callLoc = context.loc, .decl = decl});
         }
 
         return false;
@@ -247,7 +247,7 @@ bool SemanticsVisitor::TryCheckOverloadCandidateFixity(
         if (context.mode != OverloadResolveContext::Mode::JustTrying)
         {
             getSink()->diagnose(
-                Diagnostics::ExpectedPostfixOperator{.call_loc = context.loc, .decl = decl});
+                Diagnostics::ExpectedPostfixOperator{.callLoc = context.loc, .decl = decl});
         }
 
         return false;
@@ -790,9 +790,9 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
                         name.append(paramIndex, 10);
 
                     getSink()->diagnose(Diagnostics::ConcreteArgumentToOutputInterface{
-                        .param_name = name,
-                        .arg_type = arg.type,
-                        .param_type = paramType.type,
+                        .paramName = name,
+                        .argType = arg.type,
+                        .paramType = paramType.type,
                         .location = context.loc});
                 }
                 return {nullptr, nullptr};
@@ -964,7 +964,7 @@ bool SemanticsVisitor::TryCheckOverloadCandidateDirections(
                 if (context.mode == OverloadResolveContext::Mode::ForReal)
                 {
                     getSink()->diagnose(Diagnostics::MutatingMethodOnImmutableValue{
-                        .method_name = funcDeclRef.getName(),
+                        .methodName = funcDeclRef.getName(),
                         .location = context.loc});
                     maybeDiagnoseConstVariableAssignment(context.baseExpr);
                 }
@@ -1072,7 +1072,7 @@ bool SemanticsVisitor::TryCheckOverloadCandidateConstraints(
             {
                 subTypeWitness = isSubtype(sub, sup, IsSubTypeOptions::None);
                 getSink()->diagnose(Diagnostics::TypeArgumentDoesNotConformToInterface{
-                    .type_arg = sub,
+                    .typeArg = sub,
                     .interface = sup,
                     .location = context.loc});
             }
@@ -3012,7 +3012,7 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
                             ASTPrinter::getDeclSignatureString(candidate.item, m_astBuilder);
                         Diagnostics::AmbiguousOverloadForNameWithArgs::Candidate c;
                         c.candidate = candidate.item.declRef.getDecl();
-                        c.candidate_signature = declString;
+                        c.candidateSignature = declString;
                         diagnostic.candidates.add(c);
                     }
 

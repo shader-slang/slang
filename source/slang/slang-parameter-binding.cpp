@@ -572,7 +572,7 @@ LayoutSemanticInfo extractHLSLLayoutSemanticInfo(
     if (kind == LayoutResourceKind::None)
     {
         sink->diagnose(Diagnostics::UnknownRegisterClass{
-            .class_name = registerClassName,
+            .className = registerClassName,
             .location = registerLoc});
         return info;
     }
@@ -582,7 +582,7 @@ LayoutSemanticInfo extractHLSLLayoutSemanticInfo(
     if (registerIndexDigits.getLength() == 0)
     {
         sink->diagnose(Diagnostics::ExpectedARegisterIndex{
-            .class_name = registerClassName,
+            .className = registerClassName,
             .location = registerLoc});
     }
 
@@ -888,7 +888,7 @@ static void addExplicitParameterBinding(
             bindingInfo.index != semanticInfo.index || bindingInfo.space != semanticInfo.space)
         {
             getSink(context)->diagnose(Diagnostics::ConflictingExplicitBindingsForParameter{
-                .param_name = getText(getReflectionName(varDecl)),
+                .paramName = getText(getReflectionName(varDecl)),
                 .decl = varDecl});
         }
 
@@ -957,7 +957,7 @@ static void addExplicitParameterBinding(
             else
             {
                 getSink(context)->diagnose(
-                    Diagnostics::ParameterBindingsOverlap{.param_a = paramA, .param_b = paramB});
+                    Diagnostics::ParameterBindingsOverlap{.paramA = paramA, .paramB = paramB});
             }
         }
     }
@@ -1089,7 +1089,7 @@ static bool _maybeDiagnoseMissingVulkanLayoutModifier(
             {
                 // Recommend [[vk::binding]] but not '-fvk-xxx-shift` for combined texture samplers
                 getSink(context)->diagnose(Diagnostics::RegisterModifierButNoVulkanLayout{
-                    .param_name = getText(varDecl.getName()),
+                    .paramName = getText(varDecl.getName()),
                     .location = registerModifier->loc});
                 return true;
             }
@@ -1103,8 +1103,8 @@ static bool _maybeDiagnoseMissingVulkanLayoutModifier(
             registerIndexDigits);
 
         getSink(context)->diagnose(Diagnostics::RegisterModifierButNoVkBindingNorShift{
-            .param_name = getText(varDecl.getName()),
-            .class_name = registerClassName,
+            .paramName = getText(varDecl.getName()),
+            .className = registerClassName,
             .location = registerModifier->loc});
         return true;
     }
@@ -1228,7 +1228,7 @@ static void addExplicitParameterBindings_GLSL(
                 if (attr->binding != 0)
                 {
                     getSink(context)->diagnose(Diagnostics::WholeSpaceParameterRequiresZeroBinding{
-                        .param_name = getText(varDecl.getName()),
+                        .paramName = getText(varDecl.getName()),
                         .binding = (int64_t)attr->binding,
                         .location = attr->loc});
                 }
@@ -2372,7 +2372,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                 if (!fieldTypeLayout)
                 {
                     getSink(context)->diagnose(Diagnostics::NotValidVaryingParameter{
-                        .param_name = fieldType ? fieldType->toString() : String("<unknown type>"),
+                        .paramName = fieldType ? fieldType->toString() : String("<unknown type>"),
                         .decl = varLayout->varDecl.getDecl()});
                     continue;
                 }
@@ -2449,7 +2449,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                     if (!fieldTypeLayout)
                     {
                         getSink(context)->diagnose(Diagnostics::NotValidVaryingParameter{
-                            .param_name = getText(field.getName()),
+                            .paramName = getText(field.getName()),
                             .decl = field.getDecl()});
                         continue;
                     }
@@ -2504,8 +2504,8 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                 {
                     getSink(context)->diagnose(
                         Diagnostics::MixingImplicitAndExplicitBindingForVaryingParams{
-                            .implicit_name = firstImplicit->getName(),
-                            .explicit_name = firstExplicit->getName(),
+                            .implicitName = firstImplicit->getName(),
+                            .explicitName = firstExplicit->getName(),
                             .location = firstImplicit->loc});
                 }
 
@@ -3948,7 +3948,7 @@ static void _maybeApplyHLSLToVulkanShifts(
 
                         // Report the clash.
                         sink->diagnose(Diagnostics::ConflictingVulkanInferredBindingForParameter{
-                            .param_name =
+                            .paramName =
                                 getText(getReflectionName(clashingVarLayout->getVariable())),
                             .overlap1 = curRangeBuf.produceString(),
                             .overlap2 = clashRangeBuf.produceString(),

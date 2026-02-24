@@ -126,7 +126,7 @@ Expr* SemanticsVisitor::ExpectATypeRepr(Expr* expr)
     }
 
     getSink()->diagnose(Diagnostics::ExpectedAType{
-        .what_we_got = expr->type.type ? String(expr->type.type->toString()) : String("null"),
+        .whatWeGot = expr->type.type ? String(expr->type.type->toString()) : String("null"),
         .expr = expr});
     return CreateErrorExpr(expr);
 }
@@ -275,7 +275,7 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
 
                 // Get the AST node type info, so we can output a 'got' name
                 diagSink->diagnose(Diagnostics::ExpectedAType{
-                    .what_we_got = originalExpr->getClass().getName(),
+                    .whatWeGot = originalExpr->getClass().getName(),
                     .expr = originalExpr});
             }
         }
@@ -316,7 +316,7 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
                     {
                         diagSink->diagnose(Diagnostics::GenericTypeNeedsArgs{
                             .type = typeExp.type,
-                            .type_exp = typeExp.exp});
+                            .typeExp = typeExp.exp});
                         *outProperType = m_astBuilder->getErrorType();
                     }
                     return false;
@@ -328,7 +328,7 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
                 {
                     diagSink->diagnose(Diagnostics::GenericTypeNeedsArgs{
                         .type = typeExp.type,
-                        .type_exp = typeExp.exp});
+                        .typeExp = typeExp.exp});
                     *outProperType = m_astBuilder->getErrorType();
                 }
                 return false;
@@ -363,7 +363,7 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
             {
                 diagSink->diagnose(Diagnostics::GenericTypeNeedsArgs{
                     .type = typeExp.type,
-                    .type_exp = typeExp.exp});
+                    .typeExp = typeExp.exp});
                 return false;
             }
             auto defaultType = CheckProperType(genericTypeParamDecl->initType);
@@ -371,7 +371,7 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
             {
                 diagSink->diagnose(Diagnostics::GenericTypeNeedsArgs{
                     .type = typeExp.type,
-                    .type_exp = typeExp.exp});
+                    .typeExp = typeExp.exp});
                 return false;
             }
             auto witness = tryGetSubtypeWitness(defaultType, CheckProperType(constraintParam->sup));
@@ -379,7 +379,7 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
             {
                 // diagnose
                 getSink()->diagnose(Diagnostics::TypeArgumentDoesNotConformToInterface{
-                    .type_arg = defaultType,
+                    .typeArg = defaultType,
                     .interface = CheckProperType(constraintParam->sup),
                     .location = genericTypeParamDecl->initType.exp->loc});
                 return false;
@@ -407,7 +407,7 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
         if (isManagedType(ptrType->getValueType()))
         {
             getSink()->diagnose(
-                Diagnostics::CannotDefinePtrTypeToManagedResource{.type_exp = typeExp.exp});
+                Diagnostics::CannotDefinePtrTypeToManagedResource{.typeExp = typeExp.exp});
         }
     }
 

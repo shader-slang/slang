@@ -56,7 +56,7 @@ err(
     "dyn interface cannot inherit non dyn interface",
     33077,
     "dyn interface inheritance error",
-    span { loc = "inheritance:Decl", message = "dyn interface '~dyn_interface:Decl' may only inherit 'dyn' interfaces. '~inherited:Decl' is not a dyn interface." }
+    span { loc = "inheritance:Decl", message = "dyn interface '~dynInterface:Decl' may only inherit 'dyn' interfaces. '~inherited:Decl' is not a dyn interface." }
 )
 
 err(
@@ -102,14 +102,14 @@ err(
     "ambiguous conversion",
     30080,
     "ambiguous conversion",
-    span { loc = "expr:Expr", message = "more than one conversion exists from '~from_type:Type' to '~to_type:Type'" }
+    span { loc = "expr:Expr", message = "more than one conversion exists from '~fromType:Type' to '~toType:Type'" }
 )
 
 warning(
     "unrecommended implicit conversion",
     30081,
     "implicit conversion not recommended",
-    span { loc = "expr:Expr", message = "implicit conversion from '~from_type:Type' to '~to_type:Type' is not recommended" }
+    span { loc = "expr:Expr", message = "implicit conversion from '~fromType:Type' to '~toType:Type' is not recommended" }
 )
 
 warning(
@@ -160,7 +160,7 @@ err(
     "error type of callee incompatible with caller",
     30095,
     "incompatible error types",
-    span { loc = "expr:Expr", message = "the error type `~callee_error_type:Type` of callee `~callee:Decl` is not compatible with the caller's error type `~caller_error_type:Type`." }
+    span { loc = "expr:Expr", message = "the error type `~calleeErrorType:Type` of callee `~callee:Decl` is not compatible with the caller's error type `~callerErrorType:Type`." }
 )
 
 -- Differentiable diagnostics
@@ -169,7 +169,7 @@ err(
     "differential type should serve as its own differential type",
     30096,
     "invalid differential type",
-    span { loc = "inheritance:Decl", message = "cannot use type '~type:Type' as a `Differential` type. A differential type's differential must be itself. However, the Differential of '~type:Type' is '~diff_type:Type'." }
+    span { loc = "inheritance:Decl", message = "cannot use type '~type:Type' as a `Differential` type. A differential type's differential must be itself. However, the Differential of '~type:Type' is '~diffType:Type'." }
 )
 
 err(
@@ -208,7 +208,7 @@ err(
     "float bit cast type mismatch",
     30084,
     "bit cast type mismatch",
-    span { loc = "expr:Expr", message = "'~intrinsic' requires a ~expected_type argument" }
+    span { loc = "expr:Expr", message = "'~intrinsic' requires a ~expectedType argument" }
 )
 
 err(
@@ -233,7 +233,7 @@ err(
     "differentiable member should have corresponding field in diff type",
     30102,
     "missing field in differential type",
-    span { loc = "location", message = "differentiable member '~member:Name' should have a corresponding field in '~diff_type:Type'. Use [DerivativeMember(...)] or mark as no_diff" }
+    span { loc = "location", message = "differentiable member '~member:Name' should have a corresponding field in '~diffType:Type'. Use [DerivativeMember(...)] or mark as no_diff" }
 )
 
 -- type pack diagnostics
@@ -302,7 +302,7 @@ err(
     "return type mismatch inside lambda",
     30111,
     "lambda return type mismatch",
-    span { loc = "stmt:Stmt", message = "returned values must have the same type among all 'return' statements inside a lambda expression: returned '~returned_type:Type' here, but '~previous_type:Type' previously." }
+    span { loc = "stmt:Stmt", message = "returned values must have the same type among all 'return' statements inside a lambda expression: returned '~returnedType:Type' here, but '~previousType:Type' previously." }
 )
 
 err(
@@ -339,7 +339,7 @@ err(
     "throw type incompatible with error type",
     30116,
     "throw type incompatible with error type",
-    span { loc = "expr:Expr", message = "the type `~throw_type:Type` of `throw` is not compatible with function's error type `~error_type:Type`." }
+    span { loc = "expr:Expr", message = "the type `~throwType:Type` of `throw` is not compatible with function's error type `~errorType:Type`." }
 )
 
 err(

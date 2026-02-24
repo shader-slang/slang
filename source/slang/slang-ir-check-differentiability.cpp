@@ -552,10 +552,10 @@ public:
                                 getResolvedInstForDecorations(call->getCallee()));
                             sink->diagnose(
                                 Diagnostics::LossOfDerivativeDueToCallOfNonDifferentiableFunction{
-                                    .diff_level = requiredDiffLevel == DifferentiableLevel::Forward
+                                    .diffLevel = requiredDiffLevel == DifferentiableLevel::Forward
                                                       ? "forward"
                                                       : "backward",
-                                    .func_name = funcNameSb.produceString(),
+                                    .funcName = funcNameSb.produceString(),
                                     .location = inst->sourceLoc,
                                 });
                         }

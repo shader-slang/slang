@@ -41,7 +41,7 @@ static void diagnoseMissingReturnForTarget(
     else
     {
         sink->diagnose(Diagnostics::MissingReturnError{
-            .target_name = TypeTextUtil::getCompileTargetName(SlangCompileTarget(target)),
+            .targetName = TypeTextUtil::getCompileTargetName(SlangCompileTarget(target)),
             .location = missingReturn->sourceLoc,
         });
     }

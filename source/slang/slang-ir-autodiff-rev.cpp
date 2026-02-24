@@ -662,7 +662,7 @@ SlangResult BackwardDiffTranscriberBase::prepareFuncForBackwardDiff(IRFunc* func
         StringBuilder funcNameSb;
         printDiagnosticArg(funcNameSb, func);
         getSink()->diagnose(Diagnostics::FunctionNeverReturnsFatal{
-            .func_name = funcNameSb.produceString(),
+            .funcName = funcNameSb.produceString(),
             .location = func->sourceLoc,
         });
     }

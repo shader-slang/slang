@@ -60,21 +60,21 @@ err(
     "generic type needs args",
     30400,
     "generic type '~type:Type' used without argument",
-    span { loc = "type_exp:Expr", message = "generic type '~type' used without argument" }
+    span { loc = "typeExp:Expr", message = "generic type '~type' used without argument" }
 )
 
 err(
     "invalid type for constraint",
     30401,
     "type '~type:Type' cannot be used as a constraint",
-    span { loc = "type_exp:Expr", message = "type '~type' cannot be used as a constraint" }
+    span { loc = "typeExp:Expr", message = "type '~type' cannot be used as a constraint" }
 )
 
 err(
     "invalid constraint sub type",
     30402,
     "type '~type:Type' is not a valid left hand side of a type constraint",
-    span { loc = "type_exp:Expr", message = "type '~type' is not a valid left hand side of a type constraint" }
+    span { loc = "typeExp:Expr", message = "type '~type' is not a valid left hand side of a type constraint" }
 )
 
 err(
@@ -88,7 +88,7 @@ err(
     "invalid equality constraint sup type",
     30404,
     "type '~type:Type' is not a proper type to use in a generic equality constraint",
-    span { loc = "type_exp:Expr", message = "type '~type' is not a proper type to use in a generic equality constraint" }
+    span { loc = "typeExp:Expr", message = "type '~type' is not a proper type to use in a generic equality constraint" }
 )
 
 err(
@@ -102,7 +102,7 @@ standalone_note(
     "invalid equality constraint sub type",
     30402,
     "type '~type:Type' cannot be constrained by a type equality",
-    span { loc = "type_exp:Expr", message = "type '~type' cannot be constrained by a type equality" }
+    span { loc = "typeExp:Expr", message = "type '~type' cannot be constrained by a type equality" }
 )
 
 warning(
@@ -120,29 +120,29 @@ warning(
 err(
     "cannot use initializer list for vector of unknown size",
     30502,
-    "cannot use initializer list for vector of statically unknown size '~element_count:Val'",
-    span { loc = "init_list:Expr", message = "cannot use initializer list for vector of statically unknown size '~element_count'" }
+    "cannot use initializer list for vector of statically unknown size '~elementCount:Val'",
+    span { loc = "initList:Expr", message = "cannot use initializer list for vector of statically unknown size '~elementCount'" }
 )
 
 err(
     "cannot use initializer list for matrix of unknown size",
     30503,
-    "cannot use initializer list for matrix of statically unknown size '~row_count:Val' rows",
-    span { loc = "init_list:Expr", message = "cannot use initializer list for matrix of statically unknown size '~row_count' rows" }
+    "cannot use initializer list for matrix of statically unknown size '~rowCount:Val' rows",
+    span { loc = "initList:Expr", message = "cannot use initializer list for matrix of statically unknown size '~rowCount' rows" }
 )
 
 err(
     "cannot use initializer list for type",
     30504,
     "cannot use initializer list for type '~type:Type'",
-    span { loc = "init_list:Expr", message = "cannot use initializer list for type '~type'" }
+    span { loc = "initList:Expr", message = "cannot use initializer list for type '~type'" }
 )
 
 err(
     "cannot use initializer list for coop vector of unknown size",
     30505,
-    "cannot use initializer list for CoopVector of statically unknown size '~element_count:Val'",
-    span { loc = "init_list:Expr", message = "cannot use initializer list for CoopVector of statically unknown size '~element_count'" }
+    "cannot use initializer list for CoopVector of statically unknown size '~elementCount:Val'",
+    span { loc = "initList:Expr", message = "cannot use initializer list for CoopVector of statically unknown size '~elementCount'" }
 )
 
 warning(
@@ -204,13 +204,13 @@ err(
     "output parameter cannot have default value",
     30700,
     "an 'out' or 'inout' parameter cannot have a default-value expression",
-    span { loc = "init_expr:Expr", message = "an 'out' or 'inout' parameter cannot have a default-value expression" }
+    span { loc = "initExpr:Expr", message = "an 'out' or 'inout' parameter cannot have a default-value expression" }
 )
 
 err(
     "system value semantic invalid type",
     30701,
-    "type '~type:Type' is not valid for system value semantic '~semantic'; expected '~expected_types'",
+    "type '~type:Type' is not valid for system value semantic '~semantic'; expected '~expectedTypes'",
     span { loc = "location" }
 )
 
@@ -227,36 +227,36 @@ err(
 err(
     "base of interface must be interface",
     30810,
-    "interface '~decl:Decl' cannot inherit from non-interface type '~base_type:Type'",
-    span { loc = "inheritance_decl:Decl", message = "interface '~decl' cannot inherit from non-interface type '~base_type'" }
+    "interface '~decl:Decl' cannot inherit from non-interface type '~baseType:Type'",
+    span { loc = "inheritanceDecl:Decl", message = "interface '~decl' cannot inherit from non-interface type '~baseType'" }
 )
 
 err(
     "base of struct must be interface",
     30811,
-    "struct '~decl:Decl' cannot inherit from non-interface type '~base_type:Type'",
-    span { loc = "inheritance_decl:Decl", message = "struct '~decl' cannot inherit from non-interface type '~base_type'" }
+    "struct '~decl:Decl' cannot inherit from non-interface type '~baseType:Type'",
+    span { loc = "inheritanceDecl:Decl", message = "struct '~decl' cannot inherit from non-interface type '~baseType'" }
 )
 
 err(
     "base of enum must be integer or interface",
     30812,
-    "enum '~decl:Decl' cannot inherit from type '~base_type:Type' that is neither an interface not a builtin integer type",
-    span { loc = "inheritance_decl:Decl", message = "enum '~decl' cannot inherit from type '~base_type' that is neither an interface not a builtin integer type" }
+    "enum '~decl:Decl' cannot inherit from type '~baseType:Type' that is neither an interface not a builtin integer type",
+    span { loc = "inheritanceDecl:Decl", message = "enum '~decl' cannot inherit from type '~baseType' that is neither an interface not a builtin integer type" }
 )
 
 err(
     "base of extension must be interface",
     30813,
-    "extension cannot inherit from non-interface type '~base_type:Type'",
-    span { loc = "inheritance_decl:Decl", message = "extension cannot inherit from non-interface type '~base_type'" }
+    "extension cannot inherit from non-interface type '~baseType:Type'",
+    span { loc = "inheritanceDecl:Decl", message = "extension cannot inherit from non-interface type '~baseType'" }
 )
 
 err(
     "base of class must be class or interface",
     30814,
-    "class '~decl:Decl' cannot inherit from type '~base_type:Type' that is neither a class nor an interface",
-    span { loc = "inheritance_decl:Decl", message = "class '~decl' cannot inherit from type '~base_type' that is neither a class nor an interface" }
+    "class '~decl:Decl' cannot inherit from type '~baseType:Type' that is neither a class nor an interface",
+    span { loc = "inheritanceDecl:Decl", message = "class '~decl' cannot inherit from type '~baseType' that is neither a class nor an interface" }
 )
 
 err(
@@ -270,49 +270,49 @@ warning(
     "inheritance unstable",
     30816,
     "support for inheritance is unstable and will be removed in future language versions, consider using composition instead",
-    span { loc = "inheritance_decl:Decl", message = "support for inheritance is unstable and will be removed in future language versions, consider using composition instead" }
+    span { loc = "inheritanceDecl:Decl", message = "support for inheritance is unstable and will be removed in future language versions, consider using composition instead" }
 )
 
 err(
     "base struct must be listed first",
     30820,
     "a struct type may only inherit from one other struct type, and that type must appear first in the list of bases",
-    span { loc = "inheritance_decl:Decl", message = "a struct type may only inherit from one other struct type, and that type must appear first in the list of bases" }
+    span { loc = "inheritanceDecl:Decl", message = "a struct type may only inherit from one other struct type, and that type must appear first in the list of bases" }
 )
 
 err(
     "tag type must be listed first",
     30821,
     "an enum type may only have a single tag type, and that type must be listed first in the list of bases",
-    span { loc = "inheritance_decl:Decl", message = "an enum type may only have a single tag type, and that type must be listed first in the list of bases" }
+    span { loc = "inheritanceDecl:Decl", message = "an enum type may only have a single tag type, and that type must be listed first in the list of bases" }
 )
 
 err(
     "base class must be listed first",
     30822,
     "a class type may only inherit from one other class type, and that type must appear first in the list of bases",
-    span { loc = "inheritance_decl:Decl", message = "a class type may only inherit from one other class type, and that type must appear first in the list of bases" }
+    span { loc = "inheritanceDecl:Decl", message = "a class type may only inherit from one other class type, and that type must appear first in the list of bases" }
 )
 
 err(
     "cannot inherit from explicitly sealed declaration in another module",
     30830,
-    "cannot inherit from type '~base_type:Type' marked 'sealed' in module '~module_name:Name'",
-    span { loc = "inheritance_decl:Decl", message = "cannot inherit from type '~base_type' marked 'sealed' in module '~module_name'" }
+    "cannot inherit from type '~baseType:Type' marked 'sealed' in module '~moduleName:Name'",
+    span { loc = "inheritanceDecl:Decl", message = "cannot inherit from type '~baseType' marked 'sealed' in module '~moduleName'" }
 )
 
 err(
     "cannot inherit from implicitly sealed declaration in another module",
     30831,
-    "cannot inherit from type '~base_type:Type' in module '~module_name:Name' because it is implicitly 'sealed'",
-    span { loc = "inheritance_decl:Decl", message = "cannot inherit from type '~base_type' in module '~module_name' because it is implicitly 'sealed'; mark the base type 'open' to allow inheritance across modules" }
+    "cannot inherit from type '~baseType:Type' in module '~moduleName:Name' because it is implicitly 'sealed'",
+    span { loc = "inheritanceDecl:Decl", message = "cannot inherit from type '~baseType' in module '~moduleName' because it is implicitly 'sealed'; mark the base type 'open' to allow inheritance across modules" }
 )
 
 err(
     "invalid type for inheritance",
     30832,
     "type '~type:Type' cannot be used for inheritance",
-    span { loc = "inheritance_decl:Decl", message = "type '~type' cannot be used for inheritance" }
+    span { loc = "inheritanceDecl:Decl", message = "type '~type' cannot be used for inheritance" }
 )
 
 --
@@ -322,21 +322,21 @@ err(
     "invalid extension on type",
     30850,
     "type '~type:Type' cannot be extended",
-    span { loc = "type_exp:Expr", message = "type '~type' cannot be extended. `extension` can only be used to extend a nominal type" }
+    span { loc = "typeExp:Expr", message = "type '~type' cannot be extended. `extension` can only be used to extend a nominal type" }
 )
 
 err(
     "invalid member type in extension",
     30851,
-    "~node_type cannot be a part of an `extension`",
-    span { loc = "decl:Decl", message = "~node_type cannot be a part of an `extension`" }
+    "~nodeType cannot be a part of an `extension`",
+    span { loc = "decl:Decl", message = "~nodeType cannot be a part of an `extension`" }
 )
 
 err(
     "invalid extension on interface",
     30852,
     "cannot extend interface type '~type:Type'",
-    span { loc = "type_exp:Expr", message = "cannot extend interface type '~type'. consider using a generic extension: `extension<T:~type> T {...}`" }
+    span { loc = "typeExp:Expr", message = "cannot extend interface type '~type'. consider using a generic extension: `extension<T:~type> T {...}`" }
 )
 
 err(
@@ -356,15 +356,15 @@ err(
 err(
     "unreferenced generic param in extension",
     30855,
-    "generic parameter '~param_name:Name' is not referenced by extension target type '~target_type:Type'",
-    span { loc = "decl:Decl", message = "generic parameter '~param_name' is not referenced by extension target type '~target_type'" }
+    "generic parameter '~paramName:Name' is not referenced by extension target type '~targetType:Type'",
+    span { loc = "decl:Decl", message = "generic parameter '~paramName' is not referenced by extension target type '~targetType'" }
 )
 
 warning(
     "generic param in extension not referenced by target type",
     30856,
-    "the extension is non-standard and may not work as intended because the generic parameter '~param_name:Name' is not referenced by extension target type '~target_type:Type'",
-    span { loc = "decl:Decl", message = "the extension is non-standard and may not work as intended because the generic parameter '~param_name' is not referenced by extension target type '~target_type'" }
+    "the extension is non-standard and may not work as intended because the generic parameter '~paramName:Name' is not referenced by extension target type '~targetType:Type'",
+    span { loc = "decl:Decl", message = "the extension is non-standard and may not work as intended because the generic parameter '~paramName' is not referenced by extension target type '~targetType'" }
 )
 
 --

@@ -19,7 +19,7 @@ bool checkTypeRecursionImpl(
             StringBuilder typeNameSb;
             printDiagnosticArg(typeNameSb, type);
             sink->diagnose(Diagnostics::RecursiveType{
-                .type_name = typeNameSb.produceString(),
+                .typeName = typeNameSb.produceString(),
                 .location = (field ? field : type)->sourceLoc,
             });
             return false;

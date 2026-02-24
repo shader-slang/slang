@@ -82,7 +82,7 @@ err(
     "disallowed array of non addressable type",
     30028,
     "arrays of non-addressable type not allowed",
-    span { loc = "location", message = "Arrays of non-addressable type '~element_type:Type' are not allowed" }
+    span { loc = "location", message = "Arrays of non-addressable type '~elementType:Type' are not allowed" }
 )
 
 err(
@@ -131,7 +131,7 @@ err(
     "mutating method on immutable value",
     30050,
     "mutating method cannot be called on immutable value",
-    span { loc = "location", message = "mutating method '~method_name:Name' cannot be called on an immutable value" }
+    span { loc = "location", message = "mutating method '~methodName:Name' cannot be called on an immutable value" }
 )
 
 err(
@@ -180,7 +180,7 @@ err(
     "expected a type",
     30060,
     "expected a type",
-    span { loc = "expr:Expr", message = "expected a type, got a '~what_we_got'" }
+    span { loc = "expr:Expr", message = "expected a type, got a '~whatWeGot'" }
 )
 
 err(
@@ -278,7 +278,7 @@ err(
     "concrete argument to output interface",
     30077,
     "concrete type passed to interface-typed output parameter",
-    span { loc = "location", message = "argument passed to parameter '~param_name' is of concrete type '~arg_type:QualType', but interface-typed output parameters require interface-typed arguments. To allow passing a concrete type to this function, you can replace '~param_type:Type ~param_name' with a generic 'T ~param_name' and a 'where T : ~param_type:Type' constraint." }
+    span { loc = "location", message = "argument passed to parameter '~paramName' is of concrete type '~argType:QualType', but interface-typed output parameters require interface-typed arguments. To allow passing a concrete type to this function, you can replace '~paramType:Type ~paramName' with a generic 'T ~paramName' and a 'where T : ~paramType:Type' constraint." }
 )
 
 standalone_note(
@@ -348,7 +348,7 @@ err(
     "function redeclaration with different return type",
     30202,
     "function return type mismatch",
-    span { loc = "decl:Decl", message = "function '~decl' declared to return '~new_return_type:Type' was previously declared to return '~prev_return_type:Type'" }
+    span { loc = "decl:Decl", message = "function '~decl' declared to return '~newReturnType:Type' was previously declared to return '~prevReturnType:Type'" }
 )
 
 err(
@@ -390,7 +390,7 @@ err(
     "expected array expression",
     30020,
     "expected an array expression",
-    span { loc = "expr:Expr", message = "expected an array expression, got '~actual_type:QualType'" }
+    span { loc = "expr:Expr", message = "expected an array expression, got '~actualType:QualType'" }
 )
 
 end
