@@ -30,40 +30,40 @@ internal(
 )
 
 internal(
-    "internal compiler error",
+    "internal-compiler-error",
     99999,
     "Slang internal compiler error\\nFor assistance, file an issue on GitHub (https://github.com/shader-slang/slang/issues) or join the Slang Discord (https://khr.io/slangdiscord)",
     span { loc = "location" }
 )
 
 err(
-    "compilation aborted",
+    "compilation-aborted",
     99999,
     "Slang compilation aborted due to internal error\\nFor assistance, file an issue on GitHub (https://github.com/shader-slang/slang/issues) or join the Slang Discord (https://khr.io/slangdiscord)"
 )
 
 err(
-    "compilation aborted due to exception",
+    "compilation-aborted-due-to-exception",
     99999,
     "Slang compilation aborted due to an exception of ~exceptionType: ~exceptionMessage\\nFor assistance, file an issue on GitHub (https://github.com/shader-slang/slang/issues) or join the Slang Discord (https://khr.io/slangdiscord)"
 )
 
 internal(
-    "serial debug verification failed",
+    "serial-debug-verification-failed",
     99999,
     "Verification of serial debug information failed.",
     span { loc = "location" }
 )
 
 internal(
-    "spirv validation failed",
+    "spirv-validation-failed",
     99999,
     "Validation of generated SPIR-V failed.",
     span { loc = "location" }
 )
 
 internal(
-    "no blocks or intrinsic",
+    "no-blocks-or-intrinsic",
     99999,
     "no blocks found for function definition",
     span { loc = "location", message = "no blocks found for function definition, is there a '~target' intrinsic missing?" }
@@ -72,7 +72,7 @@ internal(
 -- 40100 - Entry point renaming warning
 
 warning(
-    "main entry point renamed",
+    "main-entry-point-renamed",
     40100,
     "entry point '~oldName' has been renamed to '~newName'",
     span { loc = "location" }
@@ -83,14 +83,14 @@ warning(
 --
 
 err(
-    "ray payload field missing access qualifiers",
+    "ray-payload-field-missing-access-qualifiers",
     40000,
     "ray payload field missing access qualifiers",
     span { loc = "field:Decl", message = "field '~field' in ray payload struct must have either 'read' OR 'write' access qualifiers" }
 )
 
 err(
-    "ray payload invalid stage in access qualifier",
+    "ray-payload-invalid-stage-in-access-qualifier",
     40001,
     "invalid stage name in ray payload access qualifier",
     span { loc = "location", message = "invalid stage name '~stageName' in ray payload access qualifier; valid stages are 'anyhit', 'closesthit', 'miss', and 'caller'" }
@@ -101,21 +101,21 @@ err(
 --
 
 err(
-    "cooperative matrix unsupported element type",
+    "cooperative-matrix-unsupported-element-type",
     50000,
     "unsupported element type for cooperative matrix",
     span { loc = "location", message = "Element type '~elementType' is not supported for matrix '~matrixUse'." }
 )
 
 err(
-    "cooperative matrix invalid shape",
+    "cooperative-matrix-invalid-shape",
     50000,
     "invalid shape for cooperative matrix",
     span { loc = "location", message = "Invalid shape ['~rowCount', '~colCount'] for cooperative matrix '~matrixUse'." }
 )
 
 fatal(
-    "cooperative matrix unsupported capture",
+    "cooperative-matrix-unsupported-capture",
     51701,
     "'CoopMat.MapElement' per-element function cannot capture buffers, resources or any opaque type values",
     span { loc = "location", message = "'CoopMat.MapElement' per-element function cannot capture buffers, resources or any opaque type values. Consider pre-loading the content of any referenced buffers into a local variable before calling 'CoopMat.MapElement', or moving any referenced resources to global scope." }

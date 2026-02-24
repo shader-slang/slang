@@ -16,14 +16,14 @@ local warning = helpers.warning
 --
 
 err(
-    "struct cannot implement com interface",
+    "struct-cannot-implement-com-interface",
     31124,
     "struct types cannot implement COM interfaces",
     span { loc = "decl:Decl", message = "a struct type cannot implement a [COM] interface" }
 )
 
 err(
-    "interface inheriting com must be com",
+    "interface-inheriting-com-must-be-com",
     31124,
     "non-COM interface inheriting from COM interface",
     span { loc = "decl:Decl", message = "an interface type that inherits from a [COM] interface must itself be a [COM] interface" }
@@ -34,21 +34,21 @@ err(
 --
 
 err(
-    "derivative member attribute must name a member in expected differential type",
+    "derivative-member-attribute-must-name-a-member-in-expected-differential-type",
     31130,
     "invalid DerivativeMember target",
     span { loc = "attr", message = "[DerivativeMember] must reference to a member in the associated differential type '~diffType:Type'." }
 )
 
 err(
-    "invalid use of derivative member attribute parent type is not differentiable",
+    "invalid-use-of-derivative-member-attribute-parent-type-is-not-differentiable",
     31131,
     "DerivativeMember on non-differentiable type",
     span { loc = "attr", message = "invalid use of [DerivativeMember], parent type is not differentiable." }
 )
 
 err(
-    "derivative member attribute can only be used on members",
+    "derivative-member-attribute-can-only-be-used-on-members",
     31132,
     "DerivativeMember on non-member",
     span { loc = "attr", message = "[DerivativeMember] is allowed on members only." }
@@ -59,28 +59,28 @@ err(
 --
 
 err(
-    "type of extern decl mismatches original definition",
+    "type-of-extern-decl-mismatches-original-definition",
     31140,
     "extern decl type mismatch",
     span { loc = "decl:Decl", message = "type of `extern` decl '~decl' differs from its original definition. expected '~expectedType:Type'." }
 )
 
 err(
-    "definition of extern decl mismatches original definition",
+    "definition-of-extern-decl-mismatches-original-definition",
     31141,
     "extern decl definition mismatch",
     span { loc = "decl:Decl", message = "`extern` decl '~decl' is not consistent with its original definition." }
 )
 
 err(
-    "ambiguous original defintion of extern decl",
+    "ambiguous-original-defintion-of-extern-decl",
     31142,
     "ambiguous extern decl target",
     span { loc = "decl:Decl", message = "`extern` decl '~decl' has ambiguous original definitions." }
 )
 
 err(
-    "missing original defintion of extern decl",
+    "missing-original-defintion-of-extern-decl",
     31143,
     "no original definition for extern decl",
     span { loc = "decl:Decl", message = "no original definition found for `extern` decl '~decl'." }
@@ -91,7 +91,7 @@ err(
 --
 
 err(
-    "decl already has attribute",
+    "decl-already-has-attribute",
     31146,
     "duplicate attribute",
     span { loc = "attr", message = "'~decl:Decl' already has attribute '[~attrName]'." }
@@ -102,70 +102,70 @@ err(
 --
 
 err(
-    "cannot resolve original function for derivative",
+    "cannot-resolve-original-function-for-derivative",
     31147,
     "cannot resolve original function for derivative",
     span { loc = "attr", message = "cannot resolve the original function for the the custom derivative." }
 )
 
 err(
-    "cannot resolve derivative function",
+    "cannot-resolve-derivative-function",
     31148,
     "cannot resolve derivative function",
     span { loc = "attr", message = "cannot resolve the custom derivative function" }
 )
 
 err(
-    "custom derivative signature mismatch at position",
+    "custom-derivative-signature-mismatch-at-position",
     31149,
     "custom derivative parameter type mismatch",
     span { loc = "attr", message = "invalid custom derivative. parameter type mismatch at position ~position:int. expected '~expectedType', got '~actualType'" }
 )
 
 err(
-    "custom derivative signature mismatch",
+    "custom-derivative-signature-mismatch",
     31150,
     "custom derivative signature mismatch",
     span { loc = "attr", message = "invalid custom derivative. could not resolve function with expected signature '~expectedSignature'" }
 )
 
 err(
-    "cannot resolve generic argument for derivative function",
+    "cannot-resolve-generic-argument-for-derivative-function",
     31151,
     "cannot deduce generic arguments for derivative",
     span { loc = "attr", message = "The generic arguments to the derivative function cannot be deduced from the parameter list of the original function. Consider using [ForwardDerivative], [BackwardDerivative] or [PrimalSubstitute] attributes on the primal function with explicit generic arguments to associate it with a generic derivative function. Note that [ForwardDerivativeOf], [BackwardDerivativeOf], and [PrimalSubstituteOf] attributes are not supported when the generic arguments to the derivatives cannot be automatically deduced." }
 )
 
 err(
-    "cannot associate interface requirement with derivative",
+    "cannot-associate-interface-requirement-with-derivative",
     31152,
     "interface requirement cannot have derivative",
     span { loc = "attr", message = "cannot associate an interface requirement with a derivative." }
 )
 
 err(
-    "cannot use interface requirement as derivative",
+    "cannot-use-interface-requirement-as-derivative",
     31153,
     "interface requirement cannot be used as derivative",
     span { loc = "attr", message = "cannot use an interface requirement as a derivative." }
 )
 
 err(
-    "custom derivative signature this param mismatch",
+    "custom-derivative-signature-this-param-mismatch",
     31154,
     "custom derivative 'this' type mismatch",
     span { loc = "attr", message = "custom derivative does not match expected signature on `this`. Both original and derivative function must have the same `this` type." }
 )
 
 err(
-    "custom derivative expected static",
+    "custom-derivative-expected-static",
     31156,
     "expected static custom derivative",
     span { loc = "attr", message = "expected a static definition for the custom derivative." }
 )
 
 err(
-    "overloaded func used with derivative of attributes",
+    "overloaded-func-used-with-derivative-of-attributes",
     31157,
     "overloaded function in derivative-of attribute",
     span { loc = "attr", message = "cannot resolve overloaded functions for derivative-of attributes." }

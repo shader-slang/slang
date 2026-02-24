@@ -16,70 +16,70 @@ local warning = helpers.warning
 --
 
 warning(
-    "unknown attribute name",
+    "unknown-attribute-name",
     31000,
     "unknown attribute",
     span { loc = "attr:Modifier", message = "unknown attribute '~attrName:Name'" }
 )
 
 err(
-    "attribute argument count mismatch",
+    "attribute-argument-count-mismatch",
     31001,
     "wrong number of attribute arguments",
     span { loc = "attr:Modifier", message = "attribute '~attrName:Name' expects ~expected arguments (~provided:Int provided)" }
 )
 
 err(
-    "attribute not applicable",
+    "attribute-not-applicable",
     31002,
     "invalid attribute placement",
     span { loc = "attr:Modifier", message = "attribute '~attrName:Name' is not valid here" }
 )
 
 err(
-    "badly defined patch constant func",
+    "badly-defined-patch-constant-func",
     31003,
     "invalid 'patchconstantfunc' attribute",
     span { loc = "location:Modifier", message = "hull shader '~entryPointName:Name' has badly defined 'patchconstantfunc' attribute." }
 )
 
 err(
-    "expected single int arg",
+    "expected-single-int-arg",
     31004,
     "expected single int argument",
     span { loc = "attr:Modifier", message = "attribute '~attrName:Name' expects a single int argument" }
 )
 
 err(
-    "expected single string arg",
+    "expected-single-string-arg",
     31005,
     "expected single string argument",
     span { loc = "attr:Modifier", message = "attribute '~attrName:Name' expects a single string argument" }
 )
 
 err(
-    "attribute function not found",
+    "attribute-function-not-found",
     31006,
     "function not found for attribute",
     span { loc = "location:Expr", message = "Could not find function '~funcName:Name' for attribute '~attrName'" }
 )
 
 err(
-    "attribute expected int arg",
+    "attribute-expected-int-arg",
     31007,
     "expected int argument",
     span { loc = "attr:Modifier", message = "attribute '~attrName:Name' expects argument ~argIndex:Int to be int" }
 )
 
 err(
-    "attribute expected string arg",
+    "attribute-expected-string-arg",
     31008,
     "expected string argument",
     span { loc = "attr:Modifier", message = "attribute '~attrName:Name' expects argument ~argIndex:Int to be string" }
 )
 
 err(
-    "expected single float arg",
+    "expected-single-float-arg",
     31009,
     "expected single float argument",
     span { loc = "attr:Modifier", message = "attribute '~attrName:Name' expects a single floating point argument" }
@@ -90,84 +90,84 @@ err(
 --
 
 err(
-    "unknown stage name",
+    "unknown-stage-name",
     31100,
     "unknown stage name",
     span { loc = "location", message = "unknown stage name '~stageName'" }
 )
 
 err(
-    "unknown image format name",
+    "unknown-image-format-name",
     31101,
     "unknown image format",
     span { loc = "location:Expr", message = "unknown image format '~formatName'" }
 )
 
 err(
-    "unknown diagnostic name",
+    "unknown-diagnostic-name",
     31101,
     "unknown diagnostic",
     span { loc = "location", message = "unknown diagnostic '~diagnosticName'" }
 )
 
 err(
-    "non positive num threads",
+    "non-positive-num-threads",
     31102,
     "invalid 'numthreads' value",
     span { loc = "attr:Modifier", message = "expected a positive integer in 'numthreads' attribute, got '~value:Int'" }
 )
 
 err(
-    "invalid wave size",
+    "invalid-wave-size",
     31103,
     "invalid 'WaveSize' value",
     span { loc = "attr:Modifier", message = "expected a power of 2 between 4 and 128, inclusive, in 'WaveSize' attribute, got '~value:Int'" }
 )
 
 warning(
-    "explicit uniform location",
+    "explicit-uniform-location",
     31104,
     "explicit binding of uniform discouraged",
     span { loc = "var:Decl", message = "Explicit binding of uniform locations is discouraged. Prefer 'ConstantBuffer<~type:Type>' over 'uniform ~type:Type'" }
 )
 
 warning(
-    "image format unsupported by backend",
+    "image-format-unsupported-by-backend",
     31105,
     "Image format '~format' is not explicitly supported by the ~backend backend, using supported format '~replacement' instead.",
     span { loc = "location" }  -- No span message: this diagnostic has no meaningful source location
 )
 
 err(
-    "invalid attribute target",
+    "invalid-attribute-target",
     31120,
     "invalid syntax target for user defined attribute",
     span { loc = "attr:Modifier", message = "invalid syntax target for user defined attribute" }
 )
 
 err(
-    "attribute usage attribute must be on non generic struct",
+    "attribute-usage-attribute-must-be-on-non-generic-struct",
     31125,
     "[__AttributeUsage] requires non-generic struct",
     span { loc = "attr:Modifier", message = "[__AttributeUsage] can only be applied to non-generic struct definitions" }
 )
 
 err(
-    "any value size exceeds limit",
+    "any-value-size-exceeds-limit",
     31121,
     "'anyValueSize' exceeds limit",
     span { loc = "location", message = "'anyValueSize' cannot exceed ~maxSize:Int" }
 )
 
 err(
-    "associated type not allowed in com interface",
+    "associated-type-not-allowed-in-com-interface",
     31122,
     "associatedtype not allowed in [COM] interface",
     span { loc = "decl:Decl", message = "associatedtype not allowed in a [COM] interface" }
 )
 
 err(
-    "invalid guid",
+    "invalid-guid",
     31123,
     "invalid GUID",
     span { loc = "attr:Modifier", message = "'~guid' is not a valid GUID" }

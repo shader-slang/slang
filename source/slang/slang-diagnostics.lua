@@ -123,7 +123,7 @@ local warning = helpers.warning
 
 -- Define diagnostics
 err(
-    "function return type mismatch",
+    "function-return-type-mismatch",
     30007,
     "expression type ~expression.type does not match function's return type ~returnType:Type",
     span { loc = "expression:Expr", message = "expression type" },
@@ -131,7 +131,7 @@ err(
 )
 
 err(
-    "function redefinition",
+    "function-redefinition",
     30201,
     "function '~function' already has a body",
     span { loc = "function:Decl", message = "redeclared here" },
@@ -139,7 +139,7 @@ err(
 )
 
 err(
-    "multiple type errors",
+    "multiple-type-errors",
     30202,
     "expression has multiple type errors",
     span { loc = "expression:Expr", message = "expression here" },
@@ -147,7 +147,7 @@ err(
 )
 
 err(
-    "ambiguous overload for name with args",
+    "ambiguous-overload-for-name-with-args",
     39999,
     "ambiguous call to '~name' with arguments of type ~args",
     span { loc = "expr:Expr", message = "in call expression" },
@@ -155,7 +155,7 @@ err(
 )
 
 err(
-    "note with spans test",
+    "note-with-spans-test",
     39998,
     "this is a test diagnostic with spans in notes",
     span { loc = "expr:Expr", message = "main expression" },
@@ -168,7 +168,7 @@ err(
 )
 
 err(
-    "subscript non array",
+    "subscript-non-array",
     30013,
     "invalid subscript expression",
     span { loc = "expr:Expr", message = "no subscript declarations found for type '~type:Type'" }
@@ -177,7 +177,7 @@ err(
 -- Conversion examples from slang-diagnostic-defs.h
 
 err(
-    "type mismatch",
+    "type-mismatch",
     30019,
     "type mismatch in expression",
     span {
@@ -187,7 +187,7 @@ err(
 )
 
 warning(
-    "macro redefinition",
+    "macro-redefinition",
     15400,
     "macro redefined",
     span { loc = "location", message = "redefinition of macro '~name:Name'" },
@@ -195,14 +195,14 @@ warning(
 )
 
 err(
-    "invalid swizzle expr",
+    "invalid-swizzle-expr",
     30052,
     "invalid swizzle expression",
     span { loc = "expr:Expr", message = "invalid swizzle pattern '~pattern' on type '~type:Type'" }
 )
 
 err(
-    "expected prefix operator",
+    "expected-prefix-operator",
     39999,
     "function called as prefix operator was not declared `__prefix`",
     span { loc = "callLoc", message = "function called as prefix operator was not declared `__prefix`" },
@@ -210,14 +210,14 @@ err(
 )
 
 err(
-    "too many initializers",
+    "too-many-initializers",
     30500,
     "too many initializers in initializer list",
     span { loc = "initList:Expr", message = "too many initializers (expected ~expected:int, got ~got:int)" }
 )
 
 err(
-    "cannot convert array of smaller to larger size",
+    "cannot-convert-array-of-smaller-to-larger-size",
     30024,
     "array size mismatch prevents conversion",
     span {
@@ -227,7 +227,7 @@ err(
 )
 
 err(
-    "unknown stage",
+    "unknown-stage",
     15,
     "unknown stage '~stageName'",
     span { loc = "location", message = "unknown stage '~stageName'" }
@@ -237,26 +237,26 @@ err(
 -- 0xxxx - Command line and interaction with host platform APIs.
 --
 
-err("cannot open file", 1, "cannot open file '~path'", span { loc = "location", message = "cannot open file '~path'" })
+err("cannot-open-file", 1, "cannot open file '~path'", span { loc = "location", message = "cannot open file '~path'" })
 
-err("cannot find file", 2, "cannot find file '~path'", span { loc = "location", message = "cannot find file '~path'" })
+err("cannot-find-file", 2, "cannot find file '~path'", span { loc = "location", message = "cannot find file '~path'" })
 
 err(
-    "cannot write output file",
+    "cannot-write-output-file",
     4,
     "cannot write output file '~path'",
     span { loc = "location", message = "cannot write output file '~path'" }
 )
 
 err(
-    "failed to load dynamic library",
+    "failed-to-load-dynamic-library",
     5,
     "failed to load dynamic library '~path'",
     span { loc = "location", message = "failed to load dynamic library '~path'" }
 )
 
 err(
-    "too many output paths specified",
+    "too-many-output-paths-specified",
     6,
     "too many output paths specified",
     span {
@@ -265,224 +265,224 @@ err(
     }
 )
 
-err("cannot deduce source language", 12, "can't deduce language for input file '~path'")
+err("cannot-deduce-source-language", 12, "can't deduce language for input file '~path'")
 
 err(
-    "unknown code generation target",
+    "unknown-code-generation-target",
     13,
     "unknown code generation target '~target'",
     span { loc = "location", message = "unknown code generation target '~target'" }
 )
 
 err(
-    "unknown profile",
+    "unknown-profile",
     14,
     "unknown profile '~profile'",
     span { loc = "location", message = "unknown profile '~profile'" }
 )
 
 err(
-    "unknown pass through target",
+    "unknown-pass-through-target",
     16,
     "unknown pass-through target '~target'",
     span { loc = "location", message = "unknown pass-through target '~target'" }
 )
 
 err(
-    "unknown command line option",
+    "unknown-command-line-option",
     17,
     "unknown command-line option '~option'",
     span { loc = "location", message = "unknown command-line option '~option'" }
 )
 
 warning(
-    "separate debug info unsupported for target",
+    "separate-debug-info-unsupported-for-target",
     18,
     "'-separate-debug-info' is not supported for target '~target'"
 )
 
 err(
-    "unknown source language",
+    "unknown-source-language",
     19,
     "unknown source language '~language'",
     span { loc = "location", message = "unknown source language '~language'" }
 )
 
 err(
-    "entry points need to be associated with translation units",
+    "entry-points-need-to-be-associated-with-translation-units",
     20,
     "when using multiple source files, entry points must be specified after their corresponding source file(s)"
 )
 
 err(
-    "unknown downstream compiler",
+    "unknown-downstream-compiler",
     22,
     "unknown downstream compiler '~compiler'",
     span { loc = "location", message = "unknown downstream compiler '~compiler'" }
 )
 
-err("unable to generate code for target", 28, "unable to generate code for target '~target'")
+err("unable-to-generate-code-for-target", 28, "unable to generate code for target '~target'")
 
 warning(
-    "same stage specified more than once",
+    "same-stage-specified-more-than-once",
     30,
     "the stage '~stage' was specified more than once for entry point '~entryPoint'"
 )
 
-err("conflicting stages for entry point", 31, "conflicting stages have been specified for entry point '~entryPoint'")
+err("conflicting-stages-for-entry-point", 31, "conflicting stages have been specified for entry point '~entryPoint'")
 
 warning(
-    "explicit stage doesnt match implied stage",
+    "explicit-stage-doesnt-match-implied-stage",
     32,
     "the stage specified for entry point '~entryPoint' ('~specifiedStage') does not match the stage implied by the source file name ('~impliedStage')"
 )
 
 err(
-    "stage specification ignored because no entry points",
+    "stage-specification-ignored-because-no-entry-points",
     33,
     "one or more stages were specified, but no entry points were specified with '-entry'"
 )
 
 err(
-    "stage specification ignored because before all entry points",
+    "stage-specification-ignored-because-before-all-entry-points",
     34,
     "when compiling multiple entry points, any '-stage' options must follow the '-entry' option that they apply to"
 )
 
 err(
-    "no stage specified in pass through mode",
+    "no-stage-specified-in-pass-through-mode",
     35,
     "no stage was specified for entry point '~entryPoint'; when using the '-pass-through' option, stages must be fully specified on the command line"
 )
 
-err("expecting an integer", 36, "expecting an integer value")
+err("expecting-an-integer", 36, "expecting an integer value")
 
-warning("same profile specified more than once", 40, "the '~profile' was specified more than once for target '~target'")
+warning("same-profile-specified-more-than-once", 40, "the '~profile' was specified more than once for target '~target'")
 
-err("conflicting profiles specified for target", 41, "conflicting profiles have been specified for target '~target'")
+err("conflicting-profiles-specified-for-target", 41, "conflicting profiles have been specified for target '~target'")
 
 err(
-    "profile specification ignored because no targets",
+    "profile-specification-ignored-because-no-targets",
     42,
     "a '-profile' option was specified, but no target was specified with '-target'"
 )
 
 err(
-    "profile specification ignored because before all targets",
+    "profile-specification-ignored-because-before-all-targets",
     43,
     "when using multiple targets, any '-profile' option must follow the '-target' it applies to"
 )
 
 err(
-    "target flags ignored because no targets",
+    "target-flags-ignored-because-no-targets",
     44,
     "target options were specified, but no target was specified with '-target'"
 )
 
 err(
-    "target flags ignored because before all targets",
+    "target-flags-ignored-because-before-all-targets",
     45,
     "when using multiple targets, any target options must follow the '-target' they apply to"
 )
 
-err("duplicate targets", 50, "the target '~target' has been specified more than once")
+err("duplicate-targets", 50, "the target '~target' has been specified more than once")
 
-err("unhandled language for source embedding", 51, "unhandled source language for source embedding")
+err("unhandled-language-for-source-embedding", 51, "unhandled source language for source embedding")
 
-err("cannot deduce output format from path", 60, "cannot infer an output format from the output path '~path'")
+err("cannot-deduce-output-format-from-path", 60, "cannot infer an output format from the output path '~path'")
 
 err(
-    "cannot match output file to target",
+    "cannot-match-output-file-to-target",
     61,
     "no specified '-target' option matches the output path '~path', which implies the '~format' format"
 )
 
-err("unknown command line value", 62, "unknown value for option. Valid values are '~validValues'")
+err("unknown-command-line-value", 62, "unknown value for option. Valid values are '~validValues'")
 
-err("unknown help category", 63, "unknown help category")
+err("unknown-help-category", 63, "unknown help category")
 
 err(
-    "cannot match output file to entry point",
+    "cannot-match-output-file-to-entry-point",
     70,
     "the output path '~path' is not associated with any entry point; a '-o' option for a compiled kernel must follow the '-entry' option for its corresponding entry point"
 )
 
-err("invalid type conformance option string", 71, "syntax error in type conformance option '~option'.")
+err("invalid-type-conformance-option-string", 71, "syntax error in type conformance option '~option'.")
 
 err(
-    "invalid type conformance option no type",
+    "invalid-type-conformance-option-no-type",
     72,
     "invalid conformance option '~option', type '~typeName' is not found."
 )
 
-err("cannot create type conformance", 73, "cannot create type conformance '~conformance'.")
+err("cannot-create-type-conformance", 73, "cannot create type conformance '~conformance'.")
 
 err(
-    "duplicate output paths for entry point and target",
+    "duplicate-output-paths-for-entry-point-and-target",
     80,
     "multiple output paths have been specified entry point '~entryPoint:Name' on target '~target'"
 )
 
-err("duplicate output paths for target", 81, "multiple output paths have been specified for target '~target'")
+err("duplicate-output-paths-for-target", 81, "multiple output paths have been specified for target '~target'")
 
-err("duplicate dependency output paths", 82, "the -dep argument can only be specified once")
+err("duplicate-dependency-output-paths", 82, "the -dep argument can only be specified once")
 
-err("unable to write repro file", 82, "unable to write repro file '~path'")
+err("unable-to-write-repro-file", 82, "unable to write repro file '~path'")
 
-err("unable to create module container", 86, "unable to create module container")
+err("unable-to-create-module-container", 86, "unable to create module container")
 
 err(
-    "unable to set default downstream compiler",
+    "unable-to-set-default-downstream-compiler",
     87,
     "unable to set default downstream compiler for source language '~language' to '~compiler'"
 )
 
-err("expecting slang riff container", 89, "expecting a slang riff container")
+err("expecting-slang-riff-container", 89, "expecting a slang riff container")
 
 err(
-    "incompatible riff semantic version",
+    "incompatible-riff-semantic-version",
     90,
     "incompatible riff semantic version ~actualVersion expecting ~expectedVersion"
 )
 
-err("riff hash mismatch", 91, "riff hash mismatch - incompatible riff")
+err("riff-hash-mismatch", 91, "riff hash mismatch - incompatible riff")
 
-err("unable to create directory", 92, "unable to create directory '~path'")
+err("unable-to-create-directory", 92, "unable to create directory '~path'")
 
-err("unable to extract repro to directory", 93, "unable to extract repro to directory '~path'")
+err("unable-to-extract-repro-to-directory", 93, "unable to extract repro to directory '~path'")
 
-err("unable to read riff", 94, "unable to read as 'riff'/not a 'riff' file")
+err("unable-to-read-riff", 94, "unable to read as 'riff'/not a 'riff' file")
 
-err("unknown library kind", 95, "unknown library kind '~kind'")
+err("unknown-library-kind", 95, "unknown library kind '~kind'")
 
-err("kind not linkable", 96, "not a known linkable kind '~kind'")
+err("kind-not-linkable", 96, "not a known linkable kind '~kind'")
 
-err("library does not exist", 97, "library '~path' does not exist")
+err("library-does-not-exist", 97, "library '~path' does not exist")
 
-err("cannot access as blob", 98, "cannot access as a blob")
+err("cannot-access-as-blob", 98, "cannot access as a blob")
 
-err("failed to load downstream compiler", 100, "failed to load downstream compiler '~compiler'")
+err("failed-to-load-downstream-compiler", 100, "failed to load downstream compiler '~compiler'")
 
 err(
-    "downstream compiler doesnt support whole program compilation",
+    "downstream-compiler-doesnt-support-whole-program-compilation",
     101,
     "downstream compiler '~compiler' doesn't support whole program compilation"
 )
 
-standalone_note("downstream compile time", 102, "downstream compile time: ~time")
+standalone_note("downstream-compile-time", 102, "downstream compile time: ~time")
 
-standalone_note("performance benchmark result", 103, "compiler performance benchmark:\\n~benchmarkOutput")
+standalone_note("performance-benchmark-result", 103, "compiler performance benchmark:\\n~benchmarkOutput")
 
 err(
-    "need to enable experiment feature",
+    "need-to-enable-experiment-feature",
     104,
     "'~module' is an experimental module, need to enable '-experimental-feature' to load this module",
     span { loc = "loc" }
 )
 
-err("null component type", 105, "componentTypes[~index:Int] is `nullptr`")
+err("null-component-type", 105, "componentTypes[~index:Int] is `nullptr`")
 
-standalone_note("note failed to load dynamic library", 99999, "failed to load dynamic library '~path'")
+standalone_note("note-failed-to-load-dynamic-library", 99999, "failed to load dynamic library '~path'")
 
 --
 -- 15xxx - Preprocessing
@@ -490,7 +490,7 @@ standalone_note("note failed to load dynamic library", 99999, "failed to load dy
 
 -- 150xx - conditionals
 err(
-    "end of file in preprocessor conditional",
+    "end-of-file-in-preprocessor-conditional",
     15000,
     "end of file encountered during preprocessor conditional",
     span { loc = "location" },
@@ -498,14 +498,14 @@ err(
 )
 
 err(
-    "directive without if",
+    "directive-without-if",
     15001,
     "'~directive' directive without '#if'",
     span { loc = "location", message = "'~directive' directive without '#if'" }
 )
 
 err(
-    "directive after else",
+    "directive-after-else",
     15002,
     "'~directive' directive after '#else'",
     span { loc = "location", message = "'~directive' directive after '#else'" },
@@ -513,39 +513,39 @@ err(
 )
 
 -- Standalone note for seeDirective - used by multiple diagnostics
-standalone_note("see directive", -1, "see '$0' directive")
+standalone_note("see-directive", -1, "see '$0' directive")
 
 -- 151xx - directive parsing
 err(
-    "expected preprocessor directive name",
+    "expected-preprocessor-directive-name",
     15100,
     "expected preprocessor directive name",
     span { loc = "location", message = "expected preprocessor directive name" }
 )
 
 err(
-    "unknown preprocessor directive",
+    "unknown-preprocessor-directive",
     15101,
     "unknown directive",
     span { loc = "location", message = "unknown preprocessor directive '~directive'" }
 )
 
 err(
-    "expected token in preprocessor directive",
+    "expected-token-in-preprocessor-directive",
     15102,
     "preprocessor parse error",
     span { loc = "location", message = "expected '~expectedToken' in '~directive' directive" }
 )
 
 err(
-    "expected 2 tokens in preprocessor directive",
+    "expected-2-tokens-in-preprocessor-directive",
     15102,
     "preprocessor parse error",
     span { loc = "location", message = "expected '~token1' or '~token2' in '~directive' directive" }
 )
 
 err(
-    "unexpected tokens after directive",
+    "unexpected-tokens-after-directive",
     15103,
     "unexpected tokens after directive",
     span { loc = "location", message = "unexpected tokens following '~directive' directive" }
@@ -553,7 +553,7 @@ err(
 
 -- 152xx - preprocessor expressions
 err(
-    "expected token in preprocessor expression",
+    "expected-token-in-preprocessor-expression",
     15200,
     "preprocessor parse error",
     span { loc = "location", message = "expected '~expectedToken' in preprocessor expression" },
@@ -561,21 +561,21 @@ err(
 )
 
 err(
-    "syntax error in preprocessor expression",
+    "syntax-error-in-preprocessor-expression",
     15201,
     "preprocessor parse error",
     span { loc = "location", message = "syntax error in preprocessor expression" }
 )
 
 err(
-    "divide by zero in preprocessor expression",
+    "divide-by-zero-in-preprocessor-expression",
     15202,
     "division by zero",
     span { loc = "location", message = "division by zero in preprocessor expression" }
 )
 
 err(
-    "expected token in defined expression",
+    "expected-token-in-defined-expression",
     15203,
     "preprocessor parse error",
     span { loc = "location", message = "expected '~expectedToken' in 'defined' expression" },
@@ -583,14 +583,14 @@ err(
 )
 
 warning(
-    "directive expects expression",
+    "directive-expects-expression",
     15204,
     "missing expression",
     span { loc = "location", message = "'~directive' directive requires an expression" }
 )
 
 warning(
-    "undefined identifier in preprocessor expression",
+    "undefined-identifier-in-preprocessor-expression",
     15205,
     "undefined identifier in preprocessor",
     span {
@@ -600,67 +600,67 @@ warning(
 )
 
 err(
-    "expected integral version number",
+    "expected-integral-version-number",
     15206,
     "expected integer version",
     span { loc = "location", message = "expected integer for #version number" }
 )
 
 err(
-    "unknown language version",
+    "unknown-language-version",
     15207,
     "unknown language version",
     span { loc = "location", message = "unknown language version '~version'" }
 )
 
-err("unknown language", 15208, "unknown language", span { loc = "location", message = "unknown language '~language'" })
+err("unknown-language", 15208, "unknown language", span { loc = "location", message = "unknown language '~language'" })
 
 err(
-    "language version differs from including module",
+    "language-version-differs-from-including-module",
     15209,
     "language version mismatch",
     span { loc = "location", message = "the source file declares a different language version than the including module" }
 )
 
 -- Standalone note for includeOutput - used to output include hierarchy
-standalone_note("include output", -1, "include ~content")
+standalone_note("include-output", -1, "include ~content")
 
 -- Note for genericSignatureTried - used by overload resolution to point at the declaration
-standalone_note("generic signature tried", -1, "see declaration of ~signature", span { loc = "location" })
+standalone_note("generic-signature-tried", -1, "see declaration of ~signature", span { loc = "location" })
 
 -- 153xx - #include
 err(
-    "include failed",
+    "include-failed",
     15300,
     "include file not found",
     span { loc = "location", message = "failed to find include file '~path'" }
 )
 
 err(
-    "import failed",
+    "import-failed",
     15301,
     "import file not found",
     span { loc = "location", message = "failed to find imported file '~path'" }
 )
 
-err("cyclic include", 15302, "cyclic include", span { loc = "location", message = "cyclic `#include` of file '~path'" })
+err("cyclic-include", 15302, "cyclic include", span { loc = "location", message = "cyclic `#include` of file '~path'" })
 
 err(
-    "no include handler specified",
+    "no-include-handler-specified",
     -1,
     "no include handler",
     span { loc = "location", message = "no `#include` handler was specified" }
 )
 
 err(
-    "no unique identity",
+    "no-unique-identity",
     15302,
     "no unique file identity",
     span { loc = "location", message = "`#include` handler didn't generate a unique identity for file '~path'" }
 )
 
 err(
-    "cannot resolve imported decl",
+    "cannot-resolve-imported-decl",
     15303,
     "cannot resolve imported declaration '~declName' from precompiled module '~moduleName'. Make sure module '~moduleName' is up-to-date. If you suspect this to be a compiler bug, file an issue on GitHub (https://github.com/shader-slang/slang/issues) or join the Slang Discord for assistance",
     span { loc = "location" }
@@ -668,56 +668,56 @@ err(
 
 -- 154xx - macro definition
 warning(
-    "macro not defined",
+    "macro-not-defined",
     15401,
     "undefined macro",
     span { loc = "location", message = "macro '~name' is not defined" }
 )
 
 err(
-    "expected token in macro parameters",
+    "expected-token-in-macro-parameters",
     15403,
     "preprocessor parse error",
     span { loc = "location", message = "expected '~expectedToken' in macro parameters" }
 )
 
 warning(
-    "builtin macro redefinition",
+    "builtin-macro-redefinition",
     15404,
     "builtin macro redefined",
     span { loc = "location", message = "Redefinition of builtin macro '~name'" }
 )
 
 err(
-    "token paste at start",
+    "token-paste-at-start",
     15405,
     "invalid '##' position",
     span { loc = "location", message = "'##' is not allowed at the start of a macro body" }
 )
 
 err(
-    "token paste at end",
+    "token-paste-at-end",
     15406,
     "invalid '##' position",
     span { loc = "location", message = "'##' is not allowed at the end of a macro body" }
 )
 
 err(
-    "expected macro parameter after stringize",
+    "expected-macro-parameter-after-stringize",
     15407,
     "invalid '#' usage",
     span { loc = "location", message = "'#' in macro body must be followed by the name of a macro parameter" }
 )
 
 err(
-    "duplicate macro parameter name",
+    "duplicate-macro-parameter-name",
     15408,
     "duplicate parameter",
     span { loc = "location", message = "redefinition of macro parameter '~name'" }
 )
 
 err(
-    "variadic macro parameter must be last",
+    "variadic-macro-parameter-must-be-last",
     15409,
     "variadic parameter must be last",
     span { loc = "location", message = "a variadic macro parameter is only allowed at the end of the parameter list" }
@@ -725,28 +725,28 @@ err(
 
 -- 155xx - macro expansion
 warning(
-    "expected token in macro arguments",
+    "expected-token-in-macro-arguments",
     15500,
     "macro invocation syntax error",
     span { loc = "location", message = "expected '~expectedToken' in macro invocation" }
 )
 
 err(
-    "wrong number of arguments to macro",
+    "wrong-number-of-arguments-to-macro",
     15501,
     "wrong macro argument count",
     span { loc = "location", message = "wrong number of arguments to macro (expected ~expected:Int, got ~got:Int)" }
 )
 
 err(
-    "error parsing to macro invocation argument",
+    "error-parsing-to-macro-invocation-argument",
     15502,
     "macro argument parse error",
     span { loc = "location", message = "error parsing macro '~argIndex:Int' invocation argument to '~macroName:Name'" }
 )
 
 warning(
-    "invalid token paste result",
+    "invalid-token-paste-result",
     15503,
     "token paste failure",
     span { loc = "location", message = "token pasting with '##' resulted in the invalid token '~token'" }
@@ -754,21 +754,21 @@ warning(
 
 -- 156xx - pragmas
 err(
-    "expected pragma directive name",
+    "expected-pragma-directive-name",
     15600,
     "expected pragma name",
     span { loc = "location", message = "expected a name after '#pragma'" }
 )
 
 warning(
-    "unknown pragma directive ignored",
+    "unknown-pragma-directive-ignored",
     15601,
     "unknown pragma ignored",
     span { loc = "location", message = "ignoring unknown directive '#pragma ~directive'" }
 )
 
 warning(
-    "pragma once ignored",
+    "pragma-once-ignored",
     15602,
     "pragma once ignored",
     span {
@@ -778,52 +778,52 @@ warning(
 )
 
 warning(
-    "pragma warning pop empty",
+    "pragma-warning-pop-empty",
     15611,
     "unmatched pop",
     span { loc = "location", message = "detected #pragma warning(pop) with no corresponding #pragma warning(push)" }
 )
 
 warning(
-    "pragma warning push not popped",
+    "pragma-warning-push-not-popped",
     15612,
     "unmatched push",
     span { loc = "location", message = "detected #pragma warning(push) with no corresponding #pragma warning(pop)" }
 )
 
 warning(
-    "pragma warning unknown specifier",
+    "pragma-warning-unknown-specifier",
     15613,
     "unknown specifier",
     span { loc = "location", message = "unknown #pragma warning specifier '~specifier'" }
 )
 
 warning(
-    "pragma warning suppress cannot identify next line",
+    "pragma-warning-suppress-cannot-identify-next-line",
     15614,
     "cannot identify suppress target",
     span { loc = "location", message = "cannot identify the next line to suppress in #pragma warning suppress" }
 )
 
 warning(
-    "pragma warning cannot insert here",
+    "pragma-warning-cannot-insert-here",
     15615,
     "cannot insert pragma here",
     span { loc = "location", message = "cannot insert #pragma warning here for id '~id'" }
 )
 
 standalone_note(
-    "pragma warning point suppress",
+    "pragma-warning-point-suppress",
     15616,
     "#pragma warning for id '~id' was suppressed here",
     span { loc = "location" }
 )
 
 -- 159xx - user-defined error/warning
-err("user defined error", 15900, "preprocessor error", span { loc = "location", message = "#error: ~message" })
+err("user-defined-error", 15900, "preprocessor error", span { loc = "location", message = "#error: ~message" })
 
 warning(
-    "user defined warning",
+    "user-defined-warning",
     15901,
     "preprocessor warning",
     span { loc = "location", message = "#warning: ~message" }

@@ -25,21 +25,21 @@ local fatal = helpers.fatal
 -- location (via loc). The diagnostic system will extract the name for display.
 
 standalone_note(
-    "see definition of",
+    "see-definition-of",
     -1,
     "see definition of '~decl:Decl'",
     span { loc = "decl:Decl" }
 )
 
 standalone_note(
-    "see definition of struct",
+    "see-definition-of-struct",
     -1,
     "see definition of struct '~name'",
     span { loc = "location" }
 )
 
 standalone_note(
-    "see constant buffer definition",
+    "see-constant-buffer-definition",
     -1,
     "see constant buffer definition.",
     span { loc = "location" }
@@ -48,63 +48,63 @@ standalone_note(
 -- Note: seeUsingOf takes both a decl (for name) and a location (for where it's used)
 -- This allows pointing to the call site while showing the name of what's being used
 standalone_note(
-    "see using of",
+    "see-using-of",
     -1,
     "see using of '~decl:Decl'",
     span { loc = "location" }
 )
 
 standalone_note(
-    "see call of func",
+    "see-call-of-func",
     -1,
     "see call to '~name'",
     span { loc = "location" }
 )
 
 standalone_note(
-    "see previous definition",
+    "see-previous-definition",
     -1,
     "see previous definition",
     span { loc = "location" }
 )
 
 standalone_note(
-    "see previous definition of",
+    "see-previous-definition-of",
     -1,
     "see previous definition of '~decl:Decl'",
     span { loc = "decl:Decl" }
 )
 
 standalone_note(
-    "see declaration of",
+    "see-declaration-of",
     -1,
     "see declaration of '~decl:Decl'",
     span { loc = "decl:Decl" }
 )
 
 standalone_note(
-    "see declaration of interface requirement",
+    "see-declaration-of-interface-requirement",
     -1,
     "see interface requirement declaration of '~decl:Decl'",
     span { loc = "decl:Decl" }
 )
 
 standalone_note(
-    "see overload considered",
+    "see-overload-considered",
     -1,
     "see overloads considered: '~decl:Decl'.",
     span { loc = "decl:Decl" }
 )
 
 standalone_note(
-    "see previous declaration of",
+    "see-previous-declaration-of",
     -1,
     "see previous declaration of '~decl:Decl'",
     span { loc = "decl:Decl" }
 )
 
 standalone_note(
-    "note explicit conversion possible",
+    "note-explicit-conversion-possible",
     -1,
     "explicit conversion from '~fromType:Type' to '~toType:Type' is possible",
     span { loc = "location" }
@@ -114,14 +114,14 @@ standalone_note(
 -- These take IRInst* instead of Decl*
 
 standalone_note(
-    "see declaration of ir",
+    "see-declaration-of-ir",
     -1,
     "see declaration of '~inst:IRInst'",
     span { loc = "inst:IRInst" }
 )
 
 standalone_note(
-    "see call of func ir",
+    "see-call-of-func-ir",
     -1,
     "see call to '~inst:IRInst'",
     span { loc = "location" }
@@ -129,7 +129,7 @@ standalone_note(
 
 -- Modifier variant for notes
 standalone_note(
-    "see declaration of modifier",
+    "see-declaration-of-modifier",
     -1,
     "see declaration of '~modifier:Modifier'",
     span { loc = "modifier:Modifier" }
@@ -137,7 +137,7 @@ standalone_note(
 
 -- ASTNodeType variant for generic references
 standalone_note(
-    "see using of node type",
+    "see-using-of-node-type",
     -1,
     "see using of '~nodeType'",
     span { loc = "location" }

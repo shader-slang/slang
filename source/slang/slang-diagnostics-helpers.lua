@@ -53,6 +53,37 @@ end
 -- See: https://github.com/shader-slang/slang/issues/6736
 local allow_duplicate_diagnostic_codes = true
 
+-- Helper function to check if a string is valid kebab-case
+-- Valid kebab-case: lowercase letters, numbers, and hyphens only
+-- Must not start or end with a hyphen, no consecutive hyphens
+local function is_valid_kebab_case(name)
+  if not name or #name == 0 then
+    return false, "name is empty"
+  end
+  if name:sub(1, 1) == "-" then
+    return false, "name cannot start with a hyphen"
+  end
+  if name:sub(-1) == "-" then
+    return false, "name cannot end with a hyphen"
+  end
+  if name:find("--", 1, true) then
+    return false, "name cannot contain consecutive hyphens"
+  end
+  if name:find("[^a-z0-9-]") then
+    if name:find(" ", 1, true) then
+      return false, "name contains spaces; use hyphens instead (kebab-case)"
+    end
+    if name:find("[A-Z]") then
+      return false, "name contains uppercase letters; use lowercase only (kebab-case)"
+    end
+    if name:find("_", 1, true) then
+      return false, "name contains underscores; use hyphens instead (kebab-case)"
+    end
+    return false, "name contains invalid characters; only lowercase letters, numbers, and hyphens are allowed"
+  end
+  return true, nil
+end
+
 local diagnostics = {}
 
 -- Helper function to create a span
@@ -467,6 +498,14 @@ local function validate_diagnostic(diag, index)
   -- 1. Validate mandatory 'name' field
   if not diag.name or type(diag.name) ~= "string" then
     table.insert(errors, "diagnostic[" .. index .. "].name must be a string (got " .. type(diag.name) .. ")")
+  end
+
+  -- 1b. Validate that name is in kebab-case format
+  if type(diag.name) == "string" then
+    local valid, reason = is_valid_kebab_case(diag.name)
+    if not valid then
+      table.insert(errors, "diagnostic[" .. index .. "].name '" .. diag.name .. "' is not valid kebab-case: " .. reason)
+    end
   end
 
   -- 2. Validate mandatory 'code' field

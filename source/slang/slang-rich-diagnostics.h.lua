@@ -11,22 +11,22 @@ local diagnostics_module = dofile("source/slang/slang-diagnostics.lua")
 
 local M = {}
 
--- Helper function to convert space-separated name to PascalCase
+-- Helper function to convert kebab-case name to PascalCase
 function M.toPascalCase(name)
 	local result = ""
-	for word in name:gmatch("%S+") do
+	for word in name:gmatch("[^-]+") do
 		result = result .. word:sub(1, 1):upper() .. word:sub(2):lower()
 	end
 	return result
 end
 
--- Helper function to convert space-separated name to lowerCamelCase
+-- Helper function to convert kebab-case name to lowerCamelCase
 -- This matches the naming convention used by DiagnosticInfo::name in C++
 -- which is what the -Wno-xxx flag lookup converts from kebab-case to
 function M.toLowerCamelCase(name)
 	local result = ""
 	local first = true
-	for word in name:gmatch("%S+") do
+	for word in name:gmatch("[^-]+") do
 		if first then
 			result = result .. word:lower()
 			first = false
@@ -37,9 +37,9 @@ function M.toLowerCamelCase(name)
 	return result
 end
 
--- Helper function to convert space-separated name to snake_case
+-- Helper function to convert kebab-case name to snake_case
 function M.toSnakeCase(name)
-	return name:gsub("%s+", "_"):lower()
+	return name:gsub("-", "_"):lower()
 end
 
 -- Helper function to convert Lua type names to C++ types
