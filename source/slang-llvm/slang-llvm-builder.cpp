@@ -604,8 +604,10 @@ void LLVMBuilder::addFPModeFlags()
         FMF.clear();
         break;
     }
-    llvm::StringRef fp64DenormalMode = llvm::denormalModeKindName(getLLVMDenormalMode(options.fp64DenormalMode));
-    llvm::StringRef fp32DenormalMode = llvm::denormalModeKindName(getLLVMDenormalMode(options.fp64DenormalMode));
+    llvm::StringRef fp64DenormalMode =
+        llvm::denormalModeKindName(getLLVMDenormalMode(options.fp64DenormalMode));
+    llvm::StringRef fp32DenormalMode =
+        llvm::denormalModeKindName(getLLVMDenormalMode(options.fp32DenormalMode));
 
     for (llvm::Function& F : *llvmModule)
     {
