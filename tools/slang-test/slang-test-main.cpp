@@ -4793,17 +4793,15 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
 
     SLANG_ASSERT((apiUsedFlags & explictUsedApiFlags) == explictUsedApiFlags);
 
-    const RenderApiFlags availableRenderApiFlags =
-        apiUsedFlags ? _getAvailableRenderApiFlags(context) : 0;
-
     // If synthesized tests are wanted look into adding them
-    if (context->options.synthesizedTestApis && availableRenderApiFlags)
+    // We synthesize for all configured APIs, not just available ones - _canIgnore will
+    // report unavailable ones as "Ignored" so users see why a test didn't run.
+    if (context->options.synthesizedTestApis)
     {
         List<TestDetails> synthesizedTests;
 
         // What render options do we want to synthesize
-        RenderApiFlags missingApis =
-            (~apiUsedFlags) & (context->options.synthesizedTestApis & availableRenderApiFlags);
+        RenderApiFlags missingApis = (~apiUsedFlags) & context->options.synthesizedTestApis;
 
         // const Index numInitialTests = testList.tests.getCount();
 
