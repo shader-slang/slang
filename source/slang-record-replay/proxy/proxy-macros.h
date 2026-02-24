@@ -167,6 +167,7 @@ inline void recordInputs(ReplayContext&) {}
         if (result)                                                                         \
         {                                                                                   \
             SuppressRefCountRecording _guard;                                               \
+            ((ISlangUnknown*)result)->addRef();                                               \
             result = wrapObject(result);                                                    \
             m_loadedModules.add(Slang::ComPtr<slang::IModule>(Slang::INIT_ATTACH, result)); \
             _handle = _ctx.getProxyHandle(result);                                          \
