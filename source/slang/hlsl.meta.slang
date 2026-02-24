@@ -21727,7 +21727,7 @@ $}
         {
         case hlsl: __intrinsic_asm ".RayFlags";
         case glsl: __intrinsic_asm "rayQueryGetRayFlagsEXT";
-        case metal: 
+        case metal:
             __requirePrelude(R"(
                 uint _slang_intersection_params_to_ray_flags(raytracing::intersection_params params) {
                     uint flags = 0;
@@ -29098,11 +29098,14 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
         __target_switch
         {
         case spirv:
-            let ptr = __getStructuredBufferPtr(buffer);
+            // let ptr = __getStructuredBufferPtr(buffer);
             spirv_asm
             {
                 // TODO: Should this be a byte offset
-                OpCooperativeVectorStoreNV $ptr $byteOffset16ByteAligned $this None;
+                // OpCooperativeVectorStoreNV $ptr $byteOffset16ByteAligned $this None;
+                %storagePointerType = OpTypePointer StorageBuffer $$T;
+                %pointer:%storagePointerType = OpAccessChain $buffer $zero $element;
+                OpCooperativeMatrixStoreKHR %pointer $this $byteOffset16ByteAligned $this None;
             };
         default:
             for(int i = 0; i < N; ++i)
