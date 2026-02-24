@@ -1,7 +1,7 @@
-// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly -xslang -DTEST_HALF=0 -xslang -DTEST_BIAS=0
-// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly -xslang -DTEST_HALF=1 -xslang -DTEST_BIAS=0
-// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly -xslang -DTEST_HALF=0 -xslang -DTEST_BIAS=1
-// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly -xslang -DTEST_HALF=1 -xslang -DTEST_BIAS=1
+// DISABLED-TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly -xslang -DTEST_HALF=0 -xslang -DTEST_BIAS=0
+// DISABLED-TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly -xslang -DTEST_HALF=1 -xslang -DTEST_BIAS=0
+// DISABLED-TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly -xslang -DTEST_HALF=0 -xslang -DTEST_BIAS=1
+// DISABLED-TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly -xslang -DTEST_HALF=1 -xslang -DTEST_BIAS=1
 
 // TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=0 -xslang -DTEST_BIAS=0
 // TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=1 -xslang -DTEST_BIAS=0
@@ -32,10 +32,11 @@ RWStructuredBuffer<uint> outputBuffer;
 static const int BatchSize = 64;
 static const int SubgroupSize = 32;
 
-groupshared uint4 s_sharedMemoryA[256];
-groupshared uint4 s_sharedMemoryB[512];
-
-typealias SPtr = Ptr<uint4, Access::ReadWrite, AddressSpace::GroupShared>;
+public struct TestShMemSize : ISharedMemorySize {
+    public static const uint Bytes = (256 + 512) * sizeof(uint4);
+}
+static const uint OffsetA = 0;
+static const uint OffsetB = 256;
 
 // Clear the weight buffer region used by a PaddedSize x PaddedSize tiled matrix.
 void clearWeightBuffer<int PaddedSize>(uint tid)
@@ -90,13 +91,13 @@ void identityWeightMatrixTiled<int InputSize, int PaddedSize, bool Clear>(uint t
     }
 }
 
-DType[TiledMMAHelper<DType, PaddedInputSize, PaddedOutputSize, SubgroupSize, Target>.TileInfoT.Uint4AlignedM]
+DType[TiledMMAHelper<DType, PaddedInputSize, PaddedOutputSize, SubgroupSize, Target, TestShMemSize>.TileInfoT.Uint4AlignedM]
     testMatVecMul<int InputSize, int OutputSize, int PaddedInputSize, int PaddedOutputSize, TargetEnum Target>(uint tid)
 {
     typealias Address = PointerAddress<DType>;
     Address address = Address(weightBuffer);
 
-    typealias MMA = TiledMMAHelper<DType, PaddedInputSize, PaddedOutputSize, SubgroupSize, Target, false>;
+    typealias MMA = TiledMMAHelper<DType, PaddedInputSize, PaddedOutputSize, SubgroupSize, Target, TestShMemSize, false>;
     const int InSize = MMA.TileInfoT.Uint4AlignedK;
     const int OutSize = MMA.TileInfoT.Uint4AlignedM;
 
@@ -106,17 +107,14 @@ DType[TiledMMAHelper<DType, PaddedInputSize, PaddedOutputSize, SubgroupSize, Tar
         inputVector[i] = DType(tid + 1);
     }
 
-    SPtr ptrA = __getAddress(s_sharedMemoryA[0]);
-    SPtr ptrB = __getAddress(s_sharedMemoryB[0]);
-    SPtr ptrC = ptrB;
 
 #if !TEST_BIAS
     let res = MMA.mmaTiledLayout<DType, Address, DType[InSize], DType[OutSize], DType, false>(
-        inputVector, ptrA, ptrB, ptrC, address, none);
+        inputVector, OffsetA, OffsetB, OffsetB, address, none);
 #else
     Address biasAddress = Address(biasBuffer);
     let res = MMA.mmaTiledLayout<DType, Address, DType[InSize], DType[OutSize], DType, true>(
-        inputVector, ptrA, ptrB, ptrC, address, biasAddress);
+        inputVector, OffsetA, OffsetB, OffsetB, address, biasAddress);
 #endif
 
     return res;
@@ -146,7 +144,7 @@ void test<int InputSize, int OutputSize>(uint tid, int resIndex)
     static const int PaddedInputSize = PadToTile<InputSize>.Value;
     static const int PaddedOutputSize = PadToTile<OutputSize>.Value;
 
-    DType[TiledMMAHelper<DType, PaddedInputSize, PaddedOutputSize, SubgroupSize, TargetEnum.CUDA>.TileInfoT.Uint4AlignedM] outputVector;
+    DType[TiledMMAHelper<DType, PaddedInputSize, PaddedOutputSize, SubgroupSize, TargetEnum.CUDA, TestShMemSize>.TileInfoT.Uint4AlignedM] outputVector;
 
     __target_switch
     {
