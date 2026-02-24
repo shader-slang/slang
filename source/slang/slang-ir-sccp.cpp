@@ -747,20 +747,14 @@ struct SCCPContext
                 v0,
                 v1,
                 [shiftMask](IRUnsignedIntegerValue c0, IRUnsignedIntegerValue c1)
-                {
-                    return c0
-                           << (static_cast<IRUnsignedIntegerValue>(c1) % shiftMask);
-                });
+                { return c0 << (static_cast<IRUnsignedIntegerValue>(c1) % shiftMask); });
         }
         return evalBinaryIntImpl(
             type,
             v0,
             v1,
             [shiftMask](IRIntegerValue c0, IRIntegerValue c1)
-            {
-                return c0
-                       << (static_cast<IRUnsignedIntegerValue>(c1) % shiftMask);
-            });
+            { return c0 << (static_cast<IRUnsignedIntegerValue>(c1) % shiftMask); });
     }
     LatticeVal evalRsh(IRType* type, LatticeVal v0, LatticeVal v1)
     {
@@ -776,18 +770,14 @@ struct SCCPContext
                 v0,
                 v1,
                 [shiftMask](IRUnsignedIntegerValue c0, IRUnsignedIntegerValue c1)
-                {
-                    return c0 >> (static_cast<IRUnsignedIntegerValue>(c1) % shiftMask);
-                });
+                { return c0 >> (static_cast<IRUnsignedIntegerValue>(c1) % shiftMask); });
         }
         return evalBinaryIntImpl(
             type,
             v0,
             v1,
             [shiftMask](IRIntegerValue c0, IRIntegerValue c1)
-            {
-                return c0 >> (static_cast<IRUnsignedIntegerValue>(c1) % shiftMask);
-            });
+            { return c0 >> (static_cast<IRUnsignedIntegerValue>(c1) % shiftMask); });
     }
     LatticeVal evalNeg(IRType* type, LatticeVal v0)
     {
