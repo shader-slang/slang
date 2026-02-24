@@ -146,6 +146,8 @@ Session::~Session()
     //
     coreModules = decltype(coreModules)();
 
+    // LIFO teardown required: we must be the current session when destroyed.
+    SLANG_ASSERT(getCurrentASTBuilder() == m_rootASTBuilder);
     setCurrentASTBuilder(m_previousASTBuilder);
 }
 

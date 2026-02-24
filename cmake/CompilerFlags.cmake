@@ -220,6 +220,7 @@ function(set_default_compile_options target)
             /fsanitize=address
             -fsanitize=address
             -fsanitize=undefined
+            -fno-sanitize-recover=undefined
         )
         add_supported_cxx_linker_flags(
             ${target}
