@@ -234,10 +234,9 @@ void inferAnyValueSizeWhereNecessary(
         // there's no base case and AnyValue size cannot be calculated.
         if (nonSelfRefList.getCount() == 0 && selfRefList.getCount() > 0)
         {
-            sink->diagnose(
-                Diagnostics::CyclicInterfaceDependency{
-                    .interfaceType = interfaceType,
-                });
+            sink->diagnose(Diagnostics::CyclicInterfaceDependency{
+                .interfaceType = interfaceType,
+            });
         }
     }
 
@@ -274,18 +273,16 @@ void inferAnyValueSizeWhereNecessary(
 
             if (existingMaxSize < sizeAndAlignment.size)
             {
-                sink->diagnose(
-                    Diagnostics::TypeDoesNotFitAnyValueSize{
-                        .type = implType,
-                        .location = implType->sourceLoc,
-                    });
-                sink->diagnose(
-                    Diagnostics::TypeAndLimit{
-                        .type = implType,
-                        .size = sizeAndAlignment.size,
-                        .limit = existingMaxSize,
-                        .location = implType->sourceLoc,
-                    });
+                sink->diagnose(Diagnostics::TypeDoesNotFitAnyValueSize{
+                    .type = implType,
+                    .location = implType->sourceLoc,
+                });
+                sink->diagnose(Diagnostics::TypeAndLimit{
+                    .type = implType,
+                    .size = sizeAndAlignment.size,
+                    .limit = existingMaxSize,
+                    .location = implType->sourceLoc,
+                });
             }
         }
 
@@ -311,18 +308,16 @@ void inferAnyValueSizeWhereNecessary(
 
             if (existingMaxSize < sizeAndAlignment.size)
             {
-                sink->diagnose(
-                    Diagnostics::TypeDoesNotFitAnyValueSize{
-                        .type = implType,
-                        .location = implType->sourceLoc,
-                    });
-                sink->diagnose(
-                    Diagnostics::TypeAndLimit{
-                        .type = implType,
-                        .size = sizeAndAlignment.size,
-                        .limit = existingMaxSize,
-                        .location = implType->sourceLoc,
-                    });
+                sink->diagnose(Diagnostics::TypeDoesNotFitAnyValueSize{
+                    .type = implType,
+                    .location = implType->sourceLoc,
+                });
+                sink->diagnose(Diagnostics::TypeAndLimit{
+                    .type = implType,
+                    .size = sizeAndAlignment.size,
+                    .limit = existingMaxSize,
+                    .location = implType->sourceLoc,
+                });
             }
         }
 

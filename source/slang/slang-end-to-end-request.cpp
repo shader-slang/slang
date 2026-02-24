@@ -1533,8 +1533,8 @@ SlangResult EndToEndCompileRequest::compile()
         StringBuilder perfResult;
         PerformanceProfiler::getProfiler()->getResult(perfResult);
         perfResult << "\nType Dictionary Size: " << getSession()->m_typeDictionarySize << "\n";
-        getSink()->diagnose(Diagnostics::PerformanceBenchmarkResult{
-            .benchmarkOutput = perfResult.produceString()});
+        getSink()->diagnose(
+            Diagnostics::PerformanceBenchmarkResult{.benchmarkOutput = perfResult.produceString()});
     }
 
     // Repro dump handling

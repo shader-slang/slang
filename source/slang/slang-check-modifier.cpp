@@ -787,9 +787,8 @@ Modifier* SemanticsVisitor::validateAttribute(
             }
             else
             {
-                getSink()->diagnose(Diagnostics::ExpectedSingleIntArg{
-                    .attrName = attr->keywordName,
-                    .attr = attr});
+                getSink()->diagnose(
+                    Diagnostics::ExpectedSingleIntArg{.attrName = attr->keywordName, .attr = attr});
                 return nullptr;
             }
         }

@@ -2419,8 +2419,8 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                     colorValue = SLANG_DIAGNOSTIC_COLOR_AUTO;
                 else
                 {
-                    m_sink->diagnose(Diagnostics::UnknownCommandLineValue{
-                        .validValues = "always, never, auto"});
+                    m_sink->diagnose(
+                        Diagnostics::UnknownCommandLineValue{.validValues = "always, never, auto"});
                     return SLANG_FAIL;
                 }
                 linkage->m_optionSet.set(optionKind, (int)colorValue);

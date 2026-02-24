@@ -549,8 +549,8 @@ public:
                             sink->diagnose(
                                 Diagnostics::LossOfDerivativeDueToCallOfNonDifferentiableFunction{
                                     .diffLevel = requiredDiffLevel == DifferentiableLevel::Forward
-                                                      ? "forward"
-                                                      : "backward",
+                                                     ? "forward"
+                                                     : "backward",
                                     .funcName = getResolvedInstForDecorations(call->getCallee()),
                                     .location = inst->sourceLoc,
                                 });

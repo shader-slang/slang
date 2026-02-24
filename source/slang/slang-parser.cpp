@@ -5039,9 +5039,8 @@ static void CompleteDecl(
         {
             StringBuilder sb;
             printDiagnosticArg(sb, decl->astNodeType);
-            parser->sink->diagnose(Diagnostics::DeclNotAllowed{
-                .declType = sb.produceString(),
-                .location = decl->loc});
+            parser->sink->diagnose(
+                Diagnostics::DeclNotAllowed{.declType = sb.produceString(), .location = decl->loc});
         }
         else
         {

@@ -1976,9 +1976,8 @@ static LegalVal legalizeUndefined(IRTypeLegalizationContext* context, IRInst* in
         if (!loc.isValid())
             loc = getDiagnosticPos(opaqueType);
 
-        context->m_sink->diagnose(Diagnostics::UseOfUninitializedOpaqueHandle{
-            .handleType = opaqueType,
-            .location = loc});
+        context->m_sink->diagnose(
+            Diagnostics::UseOfUninitializedOpaqueHandle{.handleType = opaqueType, .location = loc});
     }
 
     // It is not ideal, but this pass legalizes an undefined value to... nothing.
