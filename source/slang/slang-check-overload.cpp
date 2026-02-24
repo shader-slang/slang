@@ -233,9 +233,8 @@ bool SemanticsVisitor::TryCheckOverloadCandidateFixity(
 
         if (context.mode != OverloadResolveContext::Mode::JustTrying)
         {
-            getSink()->diagnose(Diagnostics::ExpectedPrefixOperator{
-                .call_loc = context.loc,
-                .decl = decl});
+            getSink()->diagnose(
+                Diagnostics::ExpectedPrefixOperator{.call_loc = context.loc, .decl = decl});
         }
 
         return false;
@@ -247,9 +246,8 @@ bool SemanticsVisitor::TryCheckOverloadCandidateFixity(
 
         if (context.mode != OverloadResolveContext::Mode::JustTrying)
         {
-            getSink()->diagnose(Diagnostics::ExpectedPostfixOperator{
-                .call_loc = context.loc,
-                .decl = decl});
+            getSink()->diagnose(
+                Diagnostics::ExpectedPostfixOperator{.call_loc = context.loc, .decl = decl});
         }
 
         return false;
@@ -2981,9 +2979,8 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
             }
             else
             {
-                getSink()->diagnose(Diagnostics::NoApplicableWithArgs{
-                    .args = argsList,
-                    .expr = expr});
+                getSink()->diagnose(
+                    Diagnostics::NoApplicableWithArgs{.args = argsList, .expr = expr});
             }
         }
         else
@@ -3049,9 +3046,8 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
                 }
                 else
                 {
-                    getSink()->diagnose(Diagnostics::AmbiguousOverloadWithArgs{
-                        .args = argsList,
-                        .expr = expr});
+                    getSink()->diagnose(
+                        Diagnostics::AmbiguousOverloadWithArgs{.args = argsList, .expr = expr});
                 }
 
                 {
@@ -3328,10 +3324,9 @@ Expr* SemanticsVisitor::checkGenericAppWithCheckedArgs(GenericAppExpr* genericAp
 
             // TODO(tfoley): print a reasonable message here...
 
-            getSink()->diagnose(
-                Diagnostics::Unimplemented{
-                    .feature = "no applicable generic",
-                    .location = genericAppExpr->loc});
+            getSink()->diagnose(Diagnostics::Unimplemented{
+                .feature = "no applicable generic",
+                .location = genericAppExpr->loc});
 
             return CreateErrorExpr(genericAppExpr);
         }
@@ -3362,9 +3357,8 @@ Expr* SemanticsVisitor::checkGenericAppWithCheckedArgs(GenericAppExpr* genericAp
     else
     {
         // Nothing at all was found that we could even consider invoking
-        getSink()->diagnose(Diagnostics::ExpectedAGeneric{
-            .found = baseExpr->type,
-            .expr = genericAppExpr});
+        getSink()->diagnose(
+            Diagnostics::ExpectedAGeneric{.found = baseExpr->type, .expr = genericAppExpr});
         return CreateErrorExpr(genericAppExpr);
     }
 }

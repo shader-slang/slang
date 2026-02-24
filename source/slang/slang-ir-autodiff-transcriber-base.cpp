@@ -37,9 +37,7 @@ void AutoDiffTranscriberBase::mapPrimalInst(IRInst* origInst, IRInst* primalInst
     if (cloneEnv.mapOldValToNew.containsKey(origInst) &&
         cloneEnv.mapOldValToNew[origInst] != primalInst)
     {
-        getSink()->diagnose(
-            Diagnostics::InternalCompilerError{
-                .location = origInst->sourceLoc});
+        getSink()->diagnose(Diagnostics::InternalCompilerError{.location = origInst->sourceLoc});
     }
     else
     {
@@ -814,9 +812,7 @@ IRInst* AutoDiffTranscriberBase::getDifferentialZeroOfType(IRBuilder* builder, I
             return builder->getIntValue(primalType, 0);
         }
 
-        getSink()->diagnose(
-            Diagnostics::InternalCompilerError{
-                .location = primalType->sourceLoc});
+        getSink()->diagnose(Diagnostics::InternalCompilerError{.location = primalType->sourceLoc});
         return nullptr;
     }
 }
@@ -1162,9 +1158,7 @@ IRInst* AutoDiffTranscriberBase::transcribe(IRBuilder* builder, IRInst* origInst
         }
         return pair.differential;
     }
-    getSink()->diagnose(
-        Diagnostics::InternalCompilerError{
-            .location = origInst->sourceLoc});
+    getSink()->diagnose(Diagnostics::InternalCompilerError{.location = origInst->sourceLoc});
     return nullptr;
 }
 
@@ -1223,10 +1217,9 @@ InstPair AutoDiffTranscriberBase::transcribeInst(IRBuilder* builder, IRInst* ori
     if (result.primal == nullptr && result.differential == nullptr)
     {
         // If we reach this statement, the instruction type is likely unhandled.
-        getSink()->diagnose(
-            Diagnostics::Unimplemented{
-                .feature = "this instruction cannot be differentiated",
-                .location = origInst->sourceLoc});
+        getSink()->diagnose(Diagnostics::Unimplemented{
+            .feature = "this instruction cannot be differentiated",
+            .location = origInst->sourceLoc});
     }
 
     return result;

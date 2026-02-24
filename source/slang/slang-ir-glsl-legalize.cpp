@@ -1929,10 +1929,11 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
                     auto fromSize = getIntVal(declaredArraySize);
                     if (toSize < fromSize)
                     {
-                        context->getSink()->diagnose(Diagnostics::CannotConvertArrayOfSmallerToLargerSize{
-                            .source_size = fromSize,
-                            .target_size = toSize,
-                            .location = userDeclaredParamVarLayout->sourceLoc});
+                        context->getSink()->diagnose(
+                            Diagnostics::CannotConvertArrayOfSmallerToLargerSize{
+                                .source_size = fromSize,
+                                .target_size = toSize,
+                                .location = userDeclaredParamVarLayout->sourceLoc});
                     }
                 }
             }

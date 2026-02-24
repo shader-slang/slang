@@ -704,9 +704,8 @@ Modifier* SemanticsVisitor::validateAttribute(
         else
         {
             // always diagnose this error since nothing can compile with an invalid capability
-            getSink()->diagnose(Diagnostics::UnknownCapability{
-                .capability = capNameString,
-                .location = attr->loc});
+            getSink()->diagnose(
+                Diagnostics::UnknownCapability{.capability = capNameString, .location = attr->loc});
             return nullptr;
         }
     }
@@ -717,9 +716,8 @@ Modifier* SemanticsVisitor::validateAttribute(
         // Let it go thru iff single string attribute
         if (!hasStringArgs(attr, 1))
         {
-            getSink()->diagnose(Diagnostics::ExpectedSingleStringArg{
-                .attr_name = attr->keywordName,
-                .attr = attr});
+            getSink()->diagnose(
+                Diagnostics::ExpectedSingleStringArg{.attr_name = attr->keywordName, .attr = attr});
         }
     }
     else if (auto opAttr = as<SPIRVInstructionOpAttribute>(attr))
@@ -753,9 +751,8 @@ Modifier* SemanticsVisitor::validateAttribute(
     {
         if (!hasFloatArgs(attr, 1))
         {
-            getSink()->diagnose(Diagnostics::ExpectedSingleFloatArg{
-                .attr_name = attr->keywordName,
-                .attr = attr});
+            getSink()->diagnose(
+                Diagnostics::ExpectedSingleFloatArg{.attr_name = attr->keywordName, .attr = attr});
         }
     }
     else if (as<OutputControlPointsAttribute>(attr))
@@ -763,9 +760,8 @@ Modifier* SemanticsVisitor::validateAttribute(
         // Let it go thru iff single integral attribute
         if (!hasIntArgs(attr, 1))
         {
-            getSink()->diagnose(Diagnostics::ExpectedSingleIntArg{
-                .attr_name = attr->keywordName,
-                .attr = attr});
+            getSink()->diagnose(
+                Diagnostics::ExpectedSingleIntArg{.attr_name = attr->keywordName, .attr = attr});
         }
     }
     else if (auto attrUsageAttr = as<AttributeUsageAttribute>(attr))
@@ -774,14 +770,14 @@ Modifier* SemanticsVisitor::validateAttribute(
         auto structDecl = as<StructDecl>(attrTarget);
         if (!structDecl)
         {
-            getSink()->diagnose(Diagnostics::AttributeUsageAttributeMustBeOnNonGenericStruct{
-                .attr = attr});
+            getSink()->diagnose(
+                Diagnostics::AttributeUsageAttributeMustBeOnNonGenericStruct{.attr = attr});
             return nullptr;
         }
         if (findNextOuterGeneric(structDecl) != nullptr)
         {
-            getSink()->diagnose(Diagnostics::AttributeUsageAttributeMustBeOnNonGenericStruct{
-                .attr = attr});
+            getSink()->diagnose(
+                Diagnostics::AttributeUsageAttributeMustBeOnNonGenericStruct{.attr = attr});
             return nullptr;
         }
         if (attr->args.getCount() == 1)
@@ -1243,9 +1239,8 @@ AttributeBase* SemanticsVisitor::checkAttribute(
 
     if (!attrDecl)
     {
-        getSink()->diagnose(Diagnostics::UnknownAttributeName{
-            .attr_name = attrName,
-            .attr = uncheckedAttr});
+        getSink()->diagnose(
+            Diagnostics::UnknownAttributeName{.attr_name = attrName, .attr = uncheckedAttr});
         return uncheckedAttr;
     }
 
@@ -1358,9 +1353,8 @@ AttributeBase* SemanticsVisitor::checkAttribute(
 
     if (!validTarget)
     {
-        getSink()->diagnose(Diagnostics::AttributeNotApplicable{
-            .attr_name = attrName,
-            .attr = attr});
+        getSink()->diagnose(
+            Diagnostics::AttributeNotApplicable{.attr_name = attrName, .attr = attr});
         return uncheckedAttr;
     }
 
@@ -2121,9 +2115,7 @@ void SemanticsVisitor::checkVisibility(Decl* decl)
         DeclVisibility typeVisibility = getTypeVisibility(type);
         if (typeVisibility < thisVisibility)
         {
-            getSink()->diagnose(Diagnostics::UseOfLessVisibleType{
-                .type = type,
-                .decl = decl});
+            getSink()->diagnose(Diagnostics::UseOfLessVisibleType{.type = type, .decl = decl});
             break;
         }
     }
@@ -2140,9 +2132,8 @@ void SemanticsVisitor::checkVisibility(Decl* decl)
     auto parentVisibility = getDeclVisibility(parentDecl);
     if (thisVisibility > parentVisibility)
     {
-        getSink()->diagnose(Diagnostics::DeclCannotHaveHigherVisibility{
-            .parent = parentDecl,
-            .decl = decl});
+        getSink()->diagnose(
+            Diagnostics::DeclCannotHaveHigherVisibility{.parent = parentDecl, .decl = decl});
     }
 }
 
@@ -2218,7 +2209,9 @@ void SemanticsVisitor::checkModifiers(ModifiableSyntaxNode* syntaxNode)
         {
             if (mapExclusiveGroupToModifier.tryGetValue(conflictGroup, existingModifier))
             {
-                getSink()->diagnose(Diagnostics::DuplicateModifier{.existing_modifier = existingModifier, .modifier = modifier});
+                getSink()->diagnose(Diagnostics::DuplicateModifier{
+                    .existing_modifier = existingModifier,
+                    .modifier = modifier});
             }
             mapExclusiveGroupToModifier[conflictGroup] = modifier;
         }
@@ -2320,8 +2313,7 @@ void SemanticsVisitor::checkRayPayloadStructFields(StructDecl* structDecl)
         {
             // Emit the diagnostic error
             getSink()->diagnose(
-                Diagnostics::RayPayloadFieldMissingAccessQualifiers{
-                    .field = fieldVarDecl});
+                Diagnostics::RayPayloadFieldMissingAccessQualifiers{.field = fieldVarDecl});
         }
 
         // Check stage names in read qualifier
@@ -2332,10 +2324,9 @@ void SemanticsVisitor::checkRayPayloadStructFields(StructDecl* structDecl)
                 String stageName = stageToken.getContent();
                 if (!validStages.contains(stageName))
                 {
-                    getSink()->diagnose(
-                        Diagnostics::RayPayloadInvalidStageInAccessQualifier{
-                            .stage_name = stageName,
-                            .location = stageToken.loc});
+                    getSink()->diagnose(Diagnostics::RayPayloadInvalidStageInAccessQualifier{
+                        .stage_name = stageName,
+                        .location = stageToken.loc});
                 }
             }
         }
@@ -2348,10 +2339,9 @@ void SemanticsVisitor::checkRayPayloadStructFields(StructDecl* structDecl)
                 String stageName = stageToken.getContent();
                 if (!validStages.contains(stageName))
                 {
-                    getSink()->diagnose(
-                        Diagnostics::RayPayloadInvalidStageInAccessQualifier{
-                            .stage_name = stageName,
-                            .location = stageToken.loc});
+                    getSink()->diagnose(Diagnostics::RayPayloadInvalidStageInAccessQualifier{
+                        .stage_name = stageName,
+                        .location = stageToken.loc});
                 }
             }
         }

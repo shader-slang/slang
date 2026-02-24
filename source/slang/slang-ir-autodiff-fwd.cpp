@@ -318,10 +318,9 @@ InstPair ForwardDiffTranscriber::transcribeBinaryArith(IRBuilder* builder, IRIns
                 }
             }
         default:
-            getSink()->diagnose(
-                Diagnostics::Unimplemented{
-                    .feature = "this arithmetic instruction cannot be differentiated",
-                    .location = origArith->sourceLoc});
+            getSink()->diagnose(Diagnostics::Unimplemented{
+                .feature = "this arithmetic instruction cannot be differentiated",
+                .location = origArith->sourceLoc});
         }
     }
 
@@ -692,9 +691,7 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
         // differentiate such calls safely.
         // TODO(sai): Should probably get checked in the front-end.
         //
-        getSink()->diagnose(
-            Diagnostics::InternalCompilerError{
-                .location = origCall->sourceLoc});
+        getSink()->diagnose(Diagnostics::InternalCompilerError{.location = origCall->sourceLoc});
 
         return InstPair(nullptr, nullptr);
     }
@@ -1083,10 +1080,9 @@ InstPair ForwardDiffTranscriber::transcribeControlFlow(IRBuilder* builder, IRIns
         return InstPair(diffBranch, diffBranch);
     }
 
-    getSink()->diagnose(
-        Diagnostics::Unimplemented{
-            .feature = "attempting to differentiate unhandled control flow",
-            .location = origInst->sourceLoc});
+    getSink()->diagnose(Diagnostics::Unimplemented{
+        .feature = "attempting to differentiate unhandled control flow",
+        .location = origInst->sourceLoc});
 
     return InstPair(nullptr, nullptr);
 }
@@ -1102,10 +1098,9 @@ InstPair ForwardDiffTranscriber::transcribeConst(IRBuilder*, IRInst* origInst)
         return InstPair(origInst, origInst);
     }
 
-    getSink()->diagnose(
-        Diagnostics::Unimplemented{
-            .feature = "attempting to differentiate unhandled const type",
-            .location = origInst->sourceLoc});
+    getSink()->diagnose(Diagnostics::Unimplemented{
+        .feature = "attempting to differentiate unhandled const type",
+        .location = origInst->sourceLoc});
 
     return InstPair(nullptr, nullptr);
 }

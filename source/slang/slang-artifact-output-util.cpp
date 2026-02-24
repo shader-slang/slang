@@ -33,8 +33,8 @@ namespace Slang
     {
         if (sink)
         {
-            sink->diagnose(Diagnostics::CannotDisassemble{
-                .target = String(ArtifactDescUtil::getText(desc))});
+            sink->diagnose(
+                Diagnostics::CannotDisassemble{.target = String(ArtifactDescUtil::getText(desc))});
         }
         return SLANG_FAIL;
     }

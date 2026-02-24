@@ -641,8 +641,7 @@ bool DiagnosticSink::diagnoseRichImpl(
     Severity effectiveSeverity = diagnostic.severity;
     if (info)
     {
-        effectiveSeverity =
-            getEffectiveMessageSeverity(*info, diagnostic.primarySpan.range.begin);
+        effectiveSeverity = getEffectiveMessageSeverity(*info, diagnostic.primarySpan.range.begin);
     }
 
     // If the diagnostic has been disabled, don't emit it

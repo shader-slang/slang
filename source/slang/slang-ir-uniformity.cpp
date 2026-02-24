@@ -360,10 +360,11 @@ struct ValidateUniformityContext
                                             {
                                                 StringBuilder paramSb;
                                                 printDiagnosticArg(paramSb, param);
-                                                sink->diagnose(Diagnostics::ExpectDynamicUniformArgument{
-                                                    .param = paramSb.produceString(),
-                                                    .location = callInst->sourceLoc,
-                                                });
+                                                sink->diagnose(
+                                                    Diagnostics::ExpectDynamicUniformArgument{
+                                                        .param = paramSb.produceString(),
+                                                        .location = callInst->sourceLoc,
+                                                    });
                                             }
                                             else
                                             {

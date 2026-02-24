@@ -254,7 +254,11 @@ static void validateSystemValueSemanticForType(
         diagnoseCapabilityErrors(
             sink,
             visitor->getOptionSet(),
-            Diagnostics::SystemValueSemanticInvalidDirection{.semantic = baseName, .direction = directionStr, .stage = stageStr, .location = loc});
+            Diagnostics::SystemValueSemanticInvalidDirection{
+                .semantic = baseName,
+                .direction = directionStr,
+                .stage = stageStr,
+                .location = loc});
     }
     else if (!foundMatchingAccessor)
     {
@@ -270,7 +274,11 @@ static void validateSystemValueSemanticForType(
         diagnoseCapabilityErrors(
             sink,
             visitor->getOptionSet(),
-            Diagnostics::SystemValueSemanticInvalidType{.type = unwrapConditionalType(type), .semantic = baseName, .expected_types = validTypesStr, .location = loc});
+            Diagnostics::SystemValueSemanticInvalidType{
+                .type = unwrapConditionalType(type),
+                .semantic = baseName,
+                .expected_types = validTypesStr,
+                .location = loc});
     }
 }
 
@@ -979,8 +987,8 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         addModifier(param, getCurrentASTBuilder()->create<HLSLUniformModifier>());
         if (shouldWarnOnNonUniformParam)
         {
-            sink->diagnose(Diagnostics::NonUniformEntryPointParameterTreatedAsUniform{
-                .param = param});
+            sink->diagnose(
+                Diagnostics::NonUniformEntryPointParameterTreatedAsUniform{.param = param});
         }
     }
 
@@ -1855,10 +1863,11 @@ RefPtr<ComponentType::SpecializationInfo> Module::_validateSpecializationArgsImp
                         {
                             // We are trying to specialize a generic parameter using a *different*
                             // global generic type parameter.
-                            sink->diagnose(Diagnostics::CannotSpecializeGlobalGenericToAnotherGenericParam{
-                                .param = genericTypeParamDecl->getName(),
-                                .other_param = argGenericParamDeclRef.getName(),
-                                .location = genericTypeParamDecl->loc});
+                            sink->diagnose(
+                                Diagnostics::CannotSpecializeGlobalGenericToAnotherGenericParam{
+                                    .param = genericTypeParamDecl->getName(),
+                                    .other_param = argGenericParamDeclRef.getName(),
+                                    .location = genericTypeParamDecl->loc});
                             continue;
                         }
                     }
@@ -1887,11 +1896,12 @@ RefPtr<ComponentType::SpecializationInfo> Module::_validateSpecializationArgsImp
                     {
                         // If no witness was found, then we will be unable to satisfy
                         // the conformances required.
-                        sink->diagnose(Diagnostics::TypeArgumentForGenericParameterDoesNotConformToInterface{
-                            .type_arg = argType,
-                            .param = genericTypeParamDecl->nameAndLoc.name,
-                            .interface = interfaceType,
-                            .location = genericTypeParamDecl->loc});
+                        sink->diagnose(
+                            Diagnostics::TypeArgumentForGenericParameterDoesNotConformToInterface{
+                                .type_arg = argType,
+                                .param = genericTypeParamDecl->nameAndLoc.name,
+                                .interface = interfaceType,
+                                .location = genericTypeParamDecl->loc});
                     }
 
                     ModuleSpecializationInfo::GenericArgInfo constraintArgInfo;
@@ -2036,7 +2046,8 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
         if (genericArgCount < 0)
         {
             sink->diagnose(Diagnostics::MismatchSpecializationArguments{
-                .expected = (int)(genericSpecializationParamCount + existentialSpecializationParamCount),
+                .expected =
+                    (int)(genericSpecializationParamCount + existentialSpecializationParamCount),
                 .provided = (int)argCount});
             return nullptr;
         }
@@ -2126,7 +2137,8 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
     if (argCount < existentialSpecializationParamCount)
     {
         sink->diagnose(Diagnostics::MismatchSpecializationArguments{
-            .expected = (int)(genericSpecializationParamCount + existentialSpecializationParamCount),
+            .expected =
+                (int)(genericSpecializationParamCount + existentialSpecializationParamCount),
             .provided = (int)argCount});
         return nullptr;
     }
@@ -2264,8 +2276,7 @@ void parseSpecializationArgStrings(
 
         if (!argExpr)
         {
-            sink->diagnose(
-                Diagnostics::InternalCompilerError{});
+            sink->diagnose(Diagnostics::InternalCompilerError{});
             return;
         }
 

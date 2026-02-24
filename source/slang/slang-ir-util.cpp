@@ -2407,7 +2407,8 @@ void verifyComputeDerivativeGroupModifiers(
 
     if (quadAttr && linearAttr)
     {
-        sink->diagnose(Diagnostics::OnlyOneOfDerivativeGroupLinearOrQuadCanBeSet{.location = errorLoc});
+        sink->diagnose(
+            Diagnostics::OnlyOneOfDerivativeGroupLinearOrQuadCanBeSet{.location = errorLoc});
     }
 
     IRIntegerValue x = 1;
@@ -2423,12 +2424,14 @@ void verifyComputeDerivativeGroupModifiers(
     if (quadAttr)
     {
         if (x % 2 != 0 || y % 2 != 0)
-            sink->diagnose(Diagnostics::DerivativeGroupQuadMustBeMultiple2ForXyThreads{.location = errorLoc});
+            sink->diagnose(
+                Diagnostics::DerivativeGroupQuadMustBeMultiple2ForXyThreads{.location = errorLoc});
     }
     else if (linearAttr)
     {
         if ((x * y * z) % 4 != 0)
-            sink->diagnose(Diagnostics::DerivativeGroupLinearMustBeMultiple4ForTotalThreadCount{.location = errorLoc});
+            sink->diagnose(Diagnostics::DerivativeGroupLinearMustBeMultiple4ForTotalThreadCount{
+                .location = errorLoc});
     }
 }
 

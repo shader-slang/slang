@@ -2040,7 +2040,8 @@ SlangResult OptionsParser::_parseReproFileSystem(const CommandLineArg& arg)
         const Result res = ReproUtil::loadState(reproName.value, m_sink, buffer);
         if (SLANG_FAILED(res))
         {
-            m_sink->diagnose(Diagnostics::UnableToReadFile{.path = reproName.value, .location = reproName.loc});
+            m_sink->diagnose(
+                Diagnostics::UnableToReadFile{.path = reproName.value, .location = reproName.loc});
             return res;
         }
     }
@@ -2158,7 +2159,8 @@ SlangResult OptionsParser::_parseLoadRepro(const CommandLineArg& arg)
 
     if (SLANG_FAILED(_loadRepro(reproName.value, m_sink, m_requestImpl)))
     {
-        m_sink->diagnose(Diagnostics::UnableToReadFile{.path = reproName.value, .location = reproName.loc});
+        m_sink->diagnose(
+            Diagnostics::UnableToReadFile{.path = reproName.value, .location = reproName.loc});
         return SLANG_FAIL;
     }
 
@@ -3307,7 +3309,9 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                     ComPtr<slang::IBlob> disassemblyBlob;
                     if (SLANG_FAILED(module->disassemble(disassemblyBlob.writeRef())))
                     {
-                        m_sink->diagnose(Diagnostics::CannotDisassemble{.target = fileName.value, .location = arg.loc});
+                        m_sink->diagnose(Diagnostics::CannotDisassemble{
+                            .target = fileName.value,
+                            .location = arg.loc});
                         return SLANG_FAIL;
                     }
                     else
@@ -4098,8 +4102,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
             Int entryPointID = entryPoint.entryPointID;
             if (entryPointID == -1)
             {
-                m_sink->diagnose(Diagnostics::EntryPointFunctionNotFound{
-                    .name = entryPoint.name});
+                m_sink->diagnose(Diagnostics::EntryPointFunctionNotFound{.name = entryPoint.name});
                 continue;
             }
             auto entryPointReq = m_requestImpl->getFrontEndReq()->getEntryPointReqs()[entryPointID];

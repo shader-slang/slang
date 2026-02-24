@@ -228,8 +228,7 @@ static void diagnoseRemainingSSBOs(IRModule* module, DiagnosticSink* sink)
         {
             if (const auto ssbo = as<IRGLSLShaderStorageBufferType>(inst))
             {
-                sink->diagnose(
-                    Diagnostics::UnhandledGlslSsboType{.location = ssbo->sourceLoc});
+                sink->diagnose(Diagnostics::UnhandledGlslSsboType{.location = ssbo->sourceLoc});
             }
         });
 }

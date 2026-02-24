@@ -2763,10 +2763,10 @@ static SourceLoc FindNextEndOfLine(
 // Enum for preprocessor expect diagnostics (used with rich diagnostic system)
 enum class PreprocessorExpectDiag
 {
-    TokenInDirective,      // expectedTokenInPreprocessorDirective - uses directive name
-    TokenInExpression,     // expectedTokenInPreprocessorExpression - with opening token note
-    TokenInDefinedExpr,    // expectedTokenInDefinedExpression - with opening token note
-    TokenInMacroParams,    // expectedTokenInMacroParameters
+    TokenInDirective,   // expectedTokenInPreprocessorDirective - uses directive name
+    TokenInExpression,  // expectedTokenInPreprocessorExpression - with opening token note
+    TokenInDefinedExpr, // expectedTokenInDefinedExpression - with opening token note
+    TokenInMacroParams, // expectedTokenInMacroParameters
 };
 
 // ExpectRaw using rich diagnostics
@@ -2797,14 +2797,16 @@ static bool ExpectRaw(
             case PreprocessorExpectDiag::TokenInExpression:
                 sink->diagnose(Diagnostics::ExpectedTokenInPreprocessorExpression{
                     .expected_token = tokenStr,
-                    .opening_token = openingToken ? openingToken->getContent() : UnownedStringSlice(),
+                    .opening_token =
+                        openingToken ? openingToken->getContent() : UnownedStringSlice(),
                     .location = loc,
                     .opening_loc = openingToken ? openingToken->loc : SourceLoc()});
                 break;
             case PreprocessorExpectDiag::TokenInDefinedExpr:
                 sink->diagnose(Diagnostics::ExpectedTokenInDefinedExpression{
                     .expected_token = tokenStr,
-                    .opening_token = openingToken ? openingToken->getContent() : UnownedStringSlice(),
+                    .opening_token =
+                        openingToken ? openingToken->getContent() : UnownedStringSlice(),
                     .location = loc,
                     .opening_loc = openingToken ? openingToken->loc : SourceLoc()});
                 break;
@@ -2851,14 +2853,16 @@ static bool Expect(
             case PreprocessorExpectDiag::TokenInExpression:
                 sink->diagnose(Diagnostics::ExpectedTokenInPreprocessorExpression{
                     .expected_token = tokenStr,
-                    .opening_token = openingToken ? openingToken->getContent() : UnownedStringSlice(),
+                    .opening_token =
+                        openingToken ? openingToken->getContent() : UnownedStringSlice(),
                     .location = loc,
                     .opening_loc = openingToken ? openingToken->loc : SourceLoc()});
                 break;
             case PreprocessorExpectDiag::TokenInDefinedExpr:
                 sink->diagnose(Diagnostics::ExpectedTokenInDefinedExpression{
                     .expected_token = tokenStr,
-                    .opening_token = openingToken ? openingToken->getContent() : UnownedStringSlice(),
+                    .opening_token =
+                        openingToken ? openingToken->getContent() : UnownedStringSlice(),
                     .location = loc,
                     .opening_loc = openingToken ? openingToken->loc : SourceLoc()});
                 break;
@@ -3096,10 +3100,9 @@ static PreprocessorExpressionValue ParseAndEvaluateUnaryExpression(
             // An identifier here means it was not defined as a macro (or
             // it is defined, but as a function-like macro. These should
             // just evaluate to zero (possibly with a warning)
-            GetSink(context)->diagnose(
-                Diagnostics::UndefinedIdentifierInPreprocessorExpression{
-                    .identifier = token.getName()->text,
-                    .location = token.loc});
+            GetSink(context)->diagnose(Diagnostics::UndefinedIdentifierInPreprocessorExpression{
+                .identifier = token.getName()->text,
+                .location = token.loc});
             return 0;
         }
 
@@ -3596,20 +3599,13 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
     if (PeekRawTokenType(context) == TokenType::OpLess)
     {
         StringBuilder pathSB;
-        Expect(
-            context,
-            TokenType::OpLess,
-            PreprocessorExpectDiag::TokenInDirective,
-            &pathToken);
+        Expect(context, TokenType::OpLess, PreprocessorExpectDiag::TokenInDirective, &pathToken);
         while (PeekRawTokenType(context) != TokenType::OpGreater &&
                PeekRawTokenType(context) != TokenType::EndOfFile)
         {
             pathSB << AdvanceRawToken(context).getContent();
         }
-        if (!Expect(
-                context,
-                TokenType::OpGreater,
-                PreprocessorExpectDiag::TokenInDirective))
+        if (!Expect(context, TokenType::OpGreater, PreprocessorExpectDiag::TokenInDirective))
             return;
         path = pathSB.produceString();
         includeMode = IncludeSystem::Mode::System;
@@ -3633,8 +3629,10 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
     IncludeSystem* includeSystem = context->m_preprocessor->includeSystem;
     if (!includeSystem)
     {
-        GetSink(context)->diagnose(Diagnostics::IncludeFailed{.path = path, .location = pathToken.loc});
-        GetSink(context)->diagnose(Diagnostics::NoIncludeHandlerSpecified{.location = pathToken.loc});
+        GetSink(context)->diagnose(
+            Diagnostics::IncludeFailed{.path = path, .location = pathToken.loc});
+        GetSink(context)->diagnose(
+            Diagnostics::NoIncludeHandlerSpecified{.location = pathToken.loc});
         return;
     }
 
@@ -3644,14 +3642,16 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
             includeSystem
                 ->findFile(path, includedFromPathInfo.foundPath, filePathInfo, includeMode)))
     {
-        GetSink(context)->diagnose(Diagnostics::IncludeFailed{.path = path, .location = pathToken.loc});
+        GetSink(context)->diagnose(
+            Diagnostics::IncludeFailed{.path = path, .location = pathToken.loc});
         return;
     }
 
     // We must have a uniqueIdentity to be compare
     if (!filePathInfo.hasUniqueIdentity())
     {
-        GetSink(context)->diagnose(Diagnostics::NoUniqueIdentity{.path = path, .location = pathToken.loc});
+        GetSink(context)->diagnose(
+            Diagnostics::NoUniqueIdentity{.path = path, .location = pathToken.loc});
         return;
     }
 
@@ -3683,7 +3683,8 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
         ComPtr<ISlangBlob> foundSourceBlob;
         if (SLANG_FAILED(readFile(context, filePathInfo.foundPath, foundSourceBlob.writeRef())))
         {
-            GetSink(context)->diagnose(Diagnostics::IncludeFailed{.path = path, .location = pathToken.loc});
+            GetSink(context)->diagnose(
+                Diagnostics::IncludeFailed{.path = path, .location = pathToken.loc});
             return;
         }
 
@@ -3695,9 +3696,8 @@ static void HandleIncludeDirective(PreprocessorDirectiveContext* context)
     if (context->m_preprocessor->includedFiles.contains(fileIdentity))
     {
         // This file has already been included, we should diagnose an error and return.
-        GetSink(context)->diagnose(Diagnostics::CyclicInclude{
-            .path = pathToken.getContent(),
-            .location = pathToken.loc});
+        GetSink(context)->diagnose(
+            Diagnostics::CyclicInclude{.path = pathToken.getContent(), .location = pathToken.loc});
         return;
     }
 
@@ -3763,7 +3763,8 @@ static void _parseMacroOps(
                 if (paramNameToken.type != TokenType::Identifier)
                 {
                     GetSink(preprocessor)
-                        ->diagnose(Diagnostics::ExpectedMacroParameterAfterStringize{.location = token.loc});
+                        ->diagnose(Diagnostics::ExpectedMacroParameterAfterStringize{
+                            .location = token.loc});
                     continue;
                 }
                 auto paramName = paramNameToken.getName();
@@ -3771,7 +3772,8 @@ static void _parseMacroOps(
                 if (!mapParamNameToIndex.tryGetValue(paramName, paramIndex))
                 {
                     GetSink(preprocessor)
-                        ->diagnose(Diagnostics::ExpectedMacroParameterAfterStringize{.location = token.loc});
+                        ->diagnose(Diagnostics::ExpectedMacroParameterAfterStringize{
+                            .location = token.loc});
                     continue;
                 }
 
@@ -3786,13 +3788,15 @@ static void _parseMacroOps(
         case TokenType::PoundPound:
             if (macro->ops.getCount() == 0 && (spanBeginIndex == spanEndIndex))
             {
-                GetSink(preprocessor)->diagnose(Diagnostics::TokenPasteAtStart{.location = token.loc});
+                GetSink(preprocessor)
+                    ->diagnose(Diagnostics::TokenPasteAtStart{.location = token.loc});
                 continue;
             }
 
             if (macro->tokens.m_tokens[cursor].type == TokenType::EndOfFile)
             {
-                GetSink(preprocessor)->diagnose(Diagnostics::TokenPasteAtEnd{.location = token.loc});
+                GetSink(preprocessor)
+                    ->diagnose(Diagnostics::TokenPasteAtEnd{.location = token.loc});
                 continue;
             }
 
@@ -4000,8 +4004,8 @@ static void HandleDefineDirective(PreprocessorDirectiveContext* context)
             if (!param.isVariadic)
                 continue;
 
-            GetSink(context)->diagnose(Diagnostics::VariadicMacroParameterMustBeLast{
-                .location = param.nameLoc.loc});
+            GetSink(context)->diagnose(
+                Diagnostics::VariadicMacroParameterMustBeLast{.location = param.nameLoc.loc});
 
             // As a precaution, we will unmark the variadic-ness of the parameter, so that
             // logic downstream from this step doesn't have to deal with the possibility
@@ -4073,9 +4077,8 @@ static void HandleUndefDirective(PreprocessorDirectiveContext* context)
     else
     {
         // name wasn't defined
-        GetSink(context)->diagnose(Diagnostics::MacroNotDefined{
-            .name = name->text,
-            .location = nameToken.loc});
+        GetSink(context)->diagnose(
+            Diagnostics::MacroNotDefined{.name = name->text, .location = nameToken.loc});
     }
 }
 
@@ -4113,9 +4116,8 @@ static void HandleWarningDirective(PreprocessorDirectiveContext* context)
     _setLexerDiagnosticSuppression(getInputFile(context), false);
 
     // Report the custom error.
-    GetSink(context)->diagnose(Diagnostics::UserDefinedWarning{
-        .message = message,
-        .location = GetDirectiveLoc(context)});
+    GetSink(context)->diagnose(
+        Diagnostics::UserDefinedWarning{.message = message, .location = GetDirectiveLoc(context)});
 }
 
 // Handle a `#error` directive
@@ -4132,9 +4134,8 @@ static void HandleErrorDirective(PreprocessorDirectiveContext* context)
     _setLexerDiagnosticSuppression(getInputFile(context), false);
 
     // Report the custom error.
-    GetSink(context)->diagnose(Diagnostics::UserDefinedError{
-        .message = message,
-        .location = GetDirectiveLoc(context)});
+    GetSink(context)->diagnose(
+        Diagnostics::UserDefinedError{.message = message, .location = GetDirectiveLoc(context)});
 }
 
 static void _handleDefaultLineDirective(PreprocessorDirectiveContext* context)
@@ -4210,10 +4211,7 @@ static void HandleLineDirective(PreprocessorDirectiveContext* context)
         break;
 
     default:
-        Expect(
-            context,
-            TokenType::StringLiteral,
-            PreprocessorExpectDiag::TokenInDirective);
+        Expect(context, TokenType::StringLiteral, PreprocessorExpectDiag::TokenInDirective);
         return;
     }
 
@@ -4252,7 +4250,8 @@ SLANG_PRAGMA_DIRECTIVE_CALLBACK(handlePragmaOnceDirective)
     // Must have uniqueIdentity for a #pragma once to work
     if (!issuedFromPathInfo.hasUniqueIdentity())
     {
-        GetSink(context)->diagnose(Diagnostics::PragmaOnceIgnored{.location = subDirectiveToken.loc});
+        GetSink(context)->diagnose(
+            Diagnostics::PragmaOnceIgnored{.location = subDirectiveToken.loc});
         return;
     }
 
@@ -4310,7 +4309,8 @@ SLANG_PRAGMA_DIRECTIVE_CALLBACK(handlePragmaWarningDirective)
                 Token id;
                 if (PeekTokenType(context) != TokenType::Identifier)
                 {
-                    GetSink(context)->diagnose(Diagnostics::SyntaxError{.location = specifierLocation});
+                    GetSink(context)->diagnose(
+                        Diagnostics::SyntaxError{.location = specifierLocation});
                     return finish();
                 }
                 id = AdvanceToken(context);
@@ -4355,7 +4355,8 @@ SLANG_PRAGMA_DIRECTIVE_CALLBACK(handlePragmaWarningDirective)
                 }
                 if (PeekTokenType(context) != TokenType::Colon)
                 {
-                    GetSink(context)->diagnose(Diagnostics::SyntaxError{.location = PeekLoc(context)});
+                    GetSink(context)->diagnose(
+                        Diagnostics::SyntaxError{.location = PeekLoc(context)});
                     return finish();
                 }
                 AdvanceToken(context);

@@ -481,9 +481,8 @@ void diagnoseCallStack(IRInst* inst, DiagnosticSink* sink)
             auto user = use->getUser();
             if (auto call = as<IRCall>(user))
             {
-                sink->diagnose(Diagnostics::SeeCallOfFuncIr{
-                    .inst = func,
-                    .location = call->sourceLoc});
+                sink->diagnose(
+                    Diagnostics::SeeCallOfFuncIr{.inst = func, .location = call->sourceLoc});
                 inst = call;
                 shouldContinue = true;
                 break;
@@ -2735,8 +2734,7 @@ static SlangResult createArtifactFromIR(
                     compiler->validate((uint32_t*)spirv.getBuffer(), int(spirv.getCount() / 4))))
             {
                 compiler->disassemble((uint32_t*)spirv.getBuffer(), int(spirv.getCount() / 4));
-                codeGenContext->getSink()->diagnose(
-                    Diagnostics::SpirvValidationFailed{});
+                codeGenContext->getSink()->diagnose(Diagnostics::SpirvValidationFailed{});
             }
         }
 

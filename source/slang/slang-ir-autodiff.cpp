@@ -3801,10 +3801,11 @@ void checkAutodiffPatterns(IRModule* module, TargetProgram* target, DiagnosticSi
                 // Find function name. (don't diagnose on nameless functions)
                 if (auto nameHint = func->findDecoration<IRNameHintDecoration>())
                 {
-                    sink->diagnose(Diagnostics::PotentialIssuesWithPreferRecomputeOnSideEffectMethod{
-                        .func_name = String(nameHint->getName()),
-                        .location = func->sourceLoc,
-                    });
+                    sink->diagnose(
+                        Diagnostics::PotentialIssuesWithPreferRecomputeOnSideEffectMethod{
+                            .func_name = String(nameHint->getName()),
+                            .location = func->sourceLoc,
+                        });
                 }
             }
         }

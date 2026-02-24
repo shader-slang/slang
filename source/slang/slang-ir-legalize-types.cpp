@@ -2268,9 +2268,8 @@ static LegalVal legalizeCoopMatMapElementIFunc(
                 // If functor legalizes to one or many special (resource) values, we
                 // can't handle this case very easily at the moment, so diagnose an error
                 // instead of crashing.
-                context->m_sink->diagnose(
-                    Diagnostics::CooperativeMatrixUnsupportedCapture{
-                        .location = inst->getIFuncCall()->sourceLoc});
+                context->m_sink->diagnose(Diagnostics::CooperativeMatrixUnsupportedCapture{
+                    .location = inst->getIFuncCall()->sourceLoc});
                 return LegalVal();
             }
         }

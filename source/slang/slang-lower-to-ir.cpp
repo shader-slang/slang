@@ -4331,7 +4331,11 @@ struct ExprLoweringContext
             if (!irArgs[glslRequireShaderInputParameter->parameterNumber]
                      ->findDecoration<IRGlobalInputDecoration>())
             {
-                this->context->getSink()->diagnose(Diagnostics::RequireInputDecoratedVarForParameter{.func = decl, .param_number = glslRequireShaderInputParameter->parameterNumber, .expr = expr});
+                this->context->getSink()->diagnose(
+                    Diagnostics::RequireInputDecoratedVarForParameter{
+                        .func = decl,
+                        .param_number = glslRequireShaderInputParameter->parameterNumber,
+                        .expr = expr});
             }
             return;
         }
@@ -5469,7 +5473,8 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             {
                 if (auto interfaceDeclRef = declRefType->getDeclRef().as<InterfaceDecl>())
                 {
-                    context->getSink()->diagnose(Diagnostics::InterfaceDefaultInitializer{.expr = expr});
+                    context->getSink()->diagnose(
+                        Diagnostics::InterfaceDefaultInitializer{.expr = expr});
                 }
             }
 
@@ -6914,7 +6919,10 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
                 {
                     if (inferredMaxIters->value < constIntVal->getValue())
                     {
-                        context->getSink()->diagnose(Diagnostics::ForLoopTerminatesInFewerIterationsThanMaxIters{.iterations = (int)inferredMaxIters->value, .attr = maxIters});
+                        context->getSink()->diagnose(
+                            Diagnostics::ForLoopTerminatesInFewerIterationsThanMaxIters{
+                                .iterations = (int)inferredMaxIters->value,
+                                .attr = maxIters});
                     }
                 }
             }
@@ -10231,10 +10239,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
         else
         {
-            getSink()->diagnose(
-                Diagnostics::Unimplemented{
-                    .feature = "lower unknown AggType to IR",
-                    .location = decl->loc});
+            getSink()->diagnose(Diagnostics::Unimplemented{
+                .feature = "lower unknown AggType to IR",
+                .location = decl->loc});
             return LoweredValInfo::simple(subBuilder->getVoidType());
         }
 

@@ -125,7 +125,9 @@ Expr* SemanticsVisitor::ExpectATypeRepr(Expr* expr)
         return expr;
     }
 
-    getSink()->diagnose(Diagnostics::ExpectedAType{.what_we_got = expr->type.type ? String(expr->type.type->toString()) : String("null"), .expr = expr});
+    getSink()->diagnose(Diagnostics::ExpectedAType{
+        .what_we_got = expr->type.type ? String(expr->type.type->toString()) : String("null"),
+        .expr = expr});
     return CreateErrorExpr(expr);
 }
 
@@ -312,7 +314,9 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
                 {
                     if (diagSink)
                     {
-                        diagSink->diagnose(Diagnostics::GenericTypeNeedsArgs{.type = typeExp.type, .type_exp = typeExp.exp});
+                        diagSink->diagnose(Diagnostics::GenericTypeNeedsArgs{
+                            .type = typeExp.type,
+                            .type_exp = typeExp.exp});
                         *outProperType = m_astBuilder->getErrorType();
                     }
                     return false;
@@ -322,7 +326,9 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
             {
                 if (diagSink)
                 {
-                    diagSink->diagnose(Diagnostics::GenericTypeNeedsArgs{.type = typeExp.type, .type_exp = typeExp.exp});
+                    diagSink->diagnose(Diagnostics::GenericTypeNeedsArgs{
+                        .type = typeExp.type,
+                        .type_exp = typeExp.exp});
                     *outProperType = m_astBuilder->getErrorType();
                 }
                 return false;
@@ -333,10 +339,9 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
                 {
                     if (diagSink)
                     {
-                        diagSink->diagnose(
-                            Diagnostics::Unimplemented{
-                                .feature = "can't fill in default for generic type parameter",
-                                .location = typeExp.exp->loc});
+                        diagSink->diagnose(Diagnostics::Unimplemented{
+                            .feature = "can't fill in default for generic type parameter",
+                            .location = typeExp.exp->loc});
                         *outProperType = m_astBuilder->getErrorType();
                     }
                     return false;
@@ -356,13 +361,17 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
             auto genericTypeParamDecl = as<GenericTypeParamDecl>(genericParam.getDecl());
             if (!genericTypeParamDecl)
             {
-                diagSink->diagnose(Diagnostics::GenericTypeNeedsArgs{.type = typeExp.type, .type_exp = typeExp.exp});
+                diagSink->diagnose(Diagnostics::GenericTypeNeedsArgs{
+                    .type = typeExp.type,
+                    .type_exp = typeExp.exp});
                 return false;
             }
             auto defaultType = CheckProperType(genericTypeParamDecl->initType);
             if (!defaultType)
             {
-                diagSink->diagnose(Diagnostics::GenericTypeNeedsArgs{.type = typeExp.type, .type_exp = typeExp.exp});
+                diagSink->diagnose(Diagnostics::GenericTypeNeedsArgs{
+                    .type = typeExp.type,
+                    .type_exp = typeExp.exp});
                 return false;
             }
             auto witness = tryGetSubtypeWitness(defaultType, CheckProperType(constraintParam->sup));
@@ -397,7 +406,8 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
     {
         if (isManagedType(ptrType->getValueType()))
         {
-            getSink()->diagnose(Diagnostics::CannotDefinePtrTypeToManagedResource{.type_exp = typeExp.exp});
+            getSink()->diagnose(
+                Diagnostics::CannotDefinePtrTypeToManagedResource{.type_exp = typeExp.exp});
         }
     }
 

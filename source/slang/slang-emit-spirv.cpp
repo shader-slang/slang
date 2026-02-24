@@ -2,7 +2,6 @@
 
 #include "../core/slang-memory-arena.h"
 #include "slang-compiler.h"
-#include "slang-rich-diagnostics.h"
 #include "slang-emit-base.h"
 #include "slang-ir-call-graph.h"
 #include "slang-ir-entry-point-decorations.h"
@@ -14,6 +13,7 @@
 #include "slang-ir-util.h"
 #include "slang-ir.h"
 #include "slang-lookup-spirv.h"
+#include "slang-rich-diagnostics.h"
 #include "spirv/unified1/spirv.h"
 
 #include <type_traits>
@@ -3696,9 +3696,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     {
         if (!irFunc->getFirstBlock())
             m_sink->diagnose(
-                Diagnostics::NoBlocksOrIntrinsic{
-                    .target = "spirv",
-                    .location = irFunc->sourceLoc});
+                Diagnostics::NoBlocksOrIntrinsic{.target = "spirv", .location = irFunc->sourceLoc});
 
         // [2.4: Logical Layout of a Module]
         //
@@ -10430,8 +10428,8 @@ SlangResult emitSPIRVFromIR(
 
     if (!symbolsEmitted)
     {
-        sink->diagnose(Diagnostics::OutputSpvIsEmpty{
-            .location = irModule->getModuleInst()->sourceLoc});
+        sink->diagnose(
+            Diagnostics::OutputSpvIsEmpty{.location = irModule->getModuleInst()->sourceLoc});
         return SLANG_FAIL;
     }
 

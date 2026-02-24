@@ -1856,8 +1856,8 @@ static Stmt* parseOptBody(Parser* parser)
         // have the `;`, so we will provide a better diagnostic for it.
         if (peekTokenType(parser) == TokenType::LBrace)
         {
-            parser->sink->diagnose(Diagnostics::UnexpectedBodyAfterSemicolon{
-                .location = semiColonToken.loc});
+            parser->sink->diagnose(
+                Diagnostics::UnexpectedBodyAfterSemicolon{.location = semiColonToken.loc});
 
             // Fall through to parse the block stmt.
         }
@@ -3043,7 +3043,8 @@ static DeclBase* ParseDeclaratorDecl(
         auto result = declGroupBuilder.getResult();
         if (!result)
         {
-            parser->sink->diagnose(Diagnostics::DeclarationDidntDeclareAnything{.location = startPosition});
+            parser->sink->diagnose(
+                Diagnostics::DeclarationDidntDeclareAnything{.location = startPosition});
         }
         return result;
     }
@@ -5328,10 +5329,9 @@ static Decl* ParseSingleDecl(Parser* parser, ContainerDecl* containerDecl)
         }
     }
 
-    parser->sink->diagnose(
-        Diagnostics::Unimplemented{
-            .feature = "didn't expect multiple declarations here",
-            .location = declBase->loc});
+    parser->sink->diagnose(Diagnostics::Unimplemented{
+        .feature = "didn't expect multiple declarations here",
+        .location = declBase->loc});
     return nullptr;
 }
 
@@ -6276,8 +6276,8 @@ Stmt* Parser::ParseStatement(Stmt* parentStmt)
             // An empty statement after an `if` is probably a mistake,
             // so we will diagnose it as such.
             //
-            sink->diagnose(Diagnostics::UnintendedEmptyStatement{
-                .location = tokenReader.peekLoc()});
+            sink->diagnose(
+                Diagnostics::UnintendedEmptyStatement{.location = tokenReader.peekLoc()});
         }
         statement = astBuilder->create<EmptyStmt>();
         FillPosition(statement);
@@ -6457,9 +6457,8 @@ DeclStmt* Parser::parseVarDeclrStatement(Modifiers modifiers)
     {
         StringBuilder sb;
         printDiagnosticArg(sb, decl->astNodeType);
-        sink->diagnose(Diagnostics::DeclNotAllowed{
-            .decl_type = sb.produceString(),
-            .location = decl->loc});
+        sink->diagnose(
+            Diagnostics::DeclNotAllowed{.decl_type = sb.produceString(), .location = decl->loc});
     }
     return varDeclrStatement;
 }
@@ -9099,10 +9098,9 @@ static IROp parseIROp(Parser* parser, Token& outToken)
 
         if (op == kIROp_Invalid)
         {
-            parser->sink->diagnose(
-                Diagnostics::Unimplemented{
-                    .feature = "unknown intrinsic op",
-                    .location = outToken.loc});
+            parser->sink->diagnose(Diagnostics::Unimplemented{
+                .feature = "unknown intrinsic op",
+                .location = outToken.loc});
         }
         return op;
     }
@@ -9475,7 +9473,8 @@ static NodeBase* parseLayoutModifier(Parser* parser, void* /*userData*/)
 
             if (as<GLSLUnparsedLayoutModifier>(modifier))
             {
-                parser->diagnose(Diagnostics::UnrecognizedGlslLayoutQualifierOrRequiresAssignment{.location = modifier->loc});
+                parser->diagnose(Diagnostics::UnrecognizedGlslLayoutQualifierOrRequiresAssignment{
+                    .location = modifier->loc});
             }
 
             listBuilder.add(modifier);

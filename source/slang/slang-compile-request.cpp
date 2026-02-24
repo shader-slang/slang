@@ -479,8 +479,7 @@ void FrontEndCompileRequest::generateIR()
             if (SLANG_FAILED(
                     SerialContainerUtil::verifyIRSerialize(irModule, getSession(), options)))
             {
-                getSink()->diagnose(
-                Diagnostics::SerialDebugVerificationFailed{
+                getSink()->diagnose(Diagnostics::SerialDebugVerificationFailed{
                     .location = irModule->getModuleInst()->sourceLoc});
             }
         }

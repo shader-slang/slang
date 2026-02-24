@@ -1043,10 +1043,9 @@ protected:
     {
         SLANG_UNUSED(info);
 
-        m_sink->diagnose(
-            Diagnostics::Unimplemented{
-                .feature = "this target doesn't support this system-defined varying parameter",
-                .location = m_param->sourceLoc});
+        m_sink->diagnose(Diagnostics::Unimplemented{
+            .feature = "this target doesn't support this system-defined varying parameter",
+            .location = m_param->sourceLoc});
 
         return LegalizedVaryingVal();
     }
@@ -1055,10 +1054,9 @@ protected:
     {
         SLANG_UNUSED(info);
 
-        m_sink->diagnose(
-            Diagnostics::Unimplemented{
-                .feature = "this target doesn't support this user-defined varying parameter",
-                .location = m_param->sourceLoc});
+        m_sink->diagnose(Diagnostics::Unimplemented{
+            .feature = "this target doesn't support this user-defined varying parameter",
+            .location = m_param->sourceLoc});
 
         return LegalizedVaryingVal();
     }
@@ -2107,11 +2105,11 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                     /*the builder in use*/ &builder);
                 if (ioBaseAttributeIndex > 8)
                 {
-                    m_sink->diagnose(
-                        Diagnostics::Unexpected{
-                            .message = "the supplied hit attribute exceeds the maximum hit attribute structure "
-                                       "size (32 bytes)",
-                            .location = m_param->sourceLoc});
+                    m_sink->diagnose(Diagnostics::Unexpected{
+                        .message = "the supplied hit attribute exceeds the maximum hit attribute "
+                                   "structure "
+                                   "size (32 bytes)",
+                        .location = m_param->sourceLoc});
                     return LegalizedVaryingVal();
                 }
                 return LegalizedVaryingVal::makeValue(getHitAttributes);

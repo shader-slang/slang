@@ -546,13 +546,13 @@ static bool checkAnnotations(
                         continue;
 
                     // Check if this is a full match
-                    // Allow point diagnostics (beginCol == endCol) to match single-caret annotations
-                    // This handles cases like missing tokens where the lexer can't expand the span
+                    // Allow point diagnostics (beginCol == endCol) to match single-caret
+                    // annotations This handles cases like missing tokens where the lexer can't
+                    // expand the span
                     bool columnMatch =
                         (diag.beginCol == annotation.columnStart &&
                          diag.endCol == annotation.columnEnd) ||
-                        (diag.beginCol == diag.endCol &&
-                         diag.beginCol == annotation.columnStart &&
+                        (diag.beginCol == diag.endCol && diag.beginCol == annotation.columnStart &&
                          annotation.columnEnd == annotation.columnStart + 1);
                     if (columnMatch)
                     {

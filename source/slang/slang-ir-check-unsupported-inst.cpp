@@ -17,7 +17,8 @@ void checkUnsupportedInst(TargetRequest* target, IRFunc* func, DiagnosticSink* s
             switch (inst->getOp())
             {
             case kIROp_GetArrayLength:
-                sink->diagnose(Diagnostics::AttemptToQuerySizeOfUnsizedArray{.location = inst->sourceLoc});
+                sink->diagnose(
+                    Diagnostics::AttemptToQuerySizeOfUnsizedArray{.location = inst->sourceLoc});
                 break;
             }
         }

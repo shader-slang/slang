@@ -571,7 +571,9 @@ LayoutSemanticInfo extractHLSLLayoutSemanticInfo(
     LayoutResourceKind kind = findRegisterClassFromName(registerClassName);
     if (kind == LayoutResourceKind::None)
     {
-        sink->diagnose(Diagnostics::UnknownRegisterClass{.class_name = registerClassName, .location = registerLoc});
+        sink->diagnose(Diagnostics::UnknownRegisterClass{
+            .class_name = registerClassName,
+            .location = registerLoc});
         return info;
     }
 
@@ -579,7 +581,9 @@ LayoutSemanticInfo extractHLSLLayoutSemanticInfo(
     // how it works for varying input/output semantics).
     if (registerIndexDigits.getLength() == 0)
     {
-        sink->diagnose(Diagnostics::ExpectedARegisterIndex{.class_name = registerClassName, .location = registerLoc});
+        sink->diagnose(Diagnostics::ExpectedARegisterIndex{
+            .class_name = registerClassName,
+            .location = registerLoc});
     }
 
     UInt index = 0;
@@ -598,7 +602,9 @@ LayoutSemanticInfo extractHLSLLayoutSemanticInfo(
 
         if (kind == LayoutResourceKind::SubElementRegisterSpace)
         {
-            sink->diagnose(Diagnostics::UnexpectedSpecifierAfterSpace{.specifier = spaceName, .location = spaceLoc});
+            sink->diagnose(Diagnostics::UnexpectedSpecifierAfterSpace{
+                .specifier = spaceName,
+                .location = spaceLoc});
         }
         else if (spaceSpelling != UnownedTerminatedStringSlice("space"))
         {
@@ -950,9 +956,8 @@ static void addExplicitParameterBinding(
             }
             else
             {
-                getSink(context)->diagnose(Diagnostics::ParameterBindingsOverlap{
-                    .param_a = paramA,
-                    .param_b = paramB});
+                getSink(context)->diagnose(
+                    Diagnostics::ParameterBindingsOverlap{.param_a = paramA, .param_b = paramB});
             }
         }
     }
@@ -2497,10 +2502,11 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                 }
                 if (firstImplicit && firstExplicit)
                 {
-                    getSink(context)->diagnose(Diagnostics::MixingImplicitAndExplicitBindingForVaryingParams{
-                        .implicit_name = firstImplicit->getName(),
-                        .explicit_name = firstExplicit->getName(),
-                        .location = firstImplicit->loc});
+                    getSink(context)->diagnose(
+                        Diagnostics::MixingImplicitAndExplicitBindingForVaryingParams{
+                            .implicit_name = firstImplicit->getName(),
+                            .explicit_name = firstExplicit->getName(),
+                            .location = firstImplicit->loc});
                 }
 
                 return structLayout;
@@ -3942,7 +3948,8 @@ static void _maybeApplyHLSLToVulkanShifts(
 
                         // Report the clash.
                         sink->diagnose(Diagnostics::ConflictingVulkanInferredBindingForParameter{
-                            .param_name = getText(getReflectionName(clashingVarLayout->getVariable())),
+                            .param_name =
+                                getText(getReflectionName(clashingVarLayout->getVariable())),
                             .overlap1 = curRangeBuf.produceString(),
                             .overlap2 = clashRangeBuf.produceString(),
                             .decl = curVar});
@@ -4294,8 +4301,8 @@ RefPtr<ProgramLayout> generateParameterBindings(TargetProgram* targetProgram, Di
             LayoutResourceKind::ShaderRecord);
         if (numShaderRecordRegs > 1)
         {
-            sink->diagnose(Diagnostics::TooManyShaderRecordConstantBuffers{
-                .count = numShaderRecordRegs});
+            sink->diagnose(
+                Diagnostics::TooManyShaderRecordConstantBuffers{.count = numShaderRecordRegs});
         }
     }
 

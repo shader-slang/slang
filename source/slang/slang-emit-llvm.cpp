@@ -2403,10 +2403,9 @@ struct LLVMEmitter
                     // slang-rt or in core module. Ideally, if built-in hashing
                     // support in the core module becomes a thing, that can be
                     // used for this too.
-                    getSink()->diagnose(
-                        Diagnostics::Unimplemented{
-                            .feature = "unexpected string hash for non-literal string",
-                            .location = inst->sourceLoc});
+                    getSink()->diagnose(Diagnostics::Unimplemented{
+                        .feature = "unexpected string hash for non-literal string",
+                        .location = inst->sourceLoc});
                 }
             }
             break;

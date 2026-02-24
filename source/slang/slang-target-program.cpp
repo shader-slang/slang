@@ -118,10 +118,9 @@ IArtifact* TargetProgram::getOrCreateEntryPointResult(Int entryPointIndex, Diagn
     }
     catch (const Exception& e)
     {
-        sink->diagnose(
-            Diagnostics::CompilationAbortedDueToException{
-                .exception_type = typeid(e).name(),
-                .exception_message = e.Message});
+        sink->diagnose(Diagnostics::CompilationAbortedDueToException{
+            .exception_type = typeid(e).name(),
+            .exception_message = e.Message});
         return nullptr;
     }
 }

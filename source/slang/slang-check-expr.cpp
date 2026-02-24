@@ -327,7 +327,10 @@ void SemanticsVisitor::diagnoseDeprecatedDeclRefUsage(
     }
     if (auto deprecatedAttr = declRef.getDecl()->findModifier<DeprecatedAttribute>())
     {
-        getSink()->diagnose(Diagnostics::DeprecatedUsage{.decl_name = declRef.getName(), .message = deprecatedAttr->message, .location = loc});
+        getSink()->diagnose(Diagnostics::DeprecatedUsage{
+            .decl_name = declRef.getName(),
+            .message = deprecatedAttr->message,
+            .location = loc});
     }
 }
 
@@ -465,9 +468,8 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
             if (getSink() && m_parentFunc && m_parentFunc->hasModifier<HLSLStaticModifier>() &&
                 !isDeclUsableAsStaticMember(declRef.getDecl()) && as<ThisExpr>(baseExpr))
             {
-                getSink()->diagnose(Diagnostics::StaticRefToThis{
-                    .member = declRef.getName(),
-                    .location = loc});
+                getSink()->diagnose(
+                    Diagnostics::StaticRefToThis{.member = declRef.getName(), .location = loc});
                 expr->type = m_astBuilder->getErrorType();
             }
 
@@ -1162,7 +1164,9 @@ LookupResult SemanticsVisitor::filterLookupResultByCheckedOptionalAndDiagnose(
     auto result = filterLookupResultByCheckedOptional(lookupResult);
     if (lookupResult.isValid() && !result.isValid())
     {
-        getSink()->diagnose(Diagnostics::RequiredConstraintIsNotChecked{.decl = lookupResult.item.declRef.getDecl(), .location = loc});
+        getSink()->diagnose(Diagnostics::RequiredConstraintIsNotChecked{
+            .decl = lookupResult.item.declRef.getDecl(),
+            .location = loc});
         outDiagnosed = true;
 
         if (getShared()->isInLanguageServer())
@@ -1582,7 +1586,8 @@ void SemanticsVisitor::checkDerivativeMemberAttributeReferences(
     }
     getSink()->diagnose(
         Diagnostics::DerivativeMemberAttributeMustNameAMemberInExpectedDifferentialType{
-            .diff_type = diffThisType, .attr = derivativeMemberAttr->loc});
+            .diff_type = diffThisType,
+            .attr = derivativeMemberAttr->loc});
 }
 
 Type* SemanticsVisitor::getDifferentialType(ASTBuilder* builder, Type* type, SourceLoc loc)
@@ -1735,7 +1740,10 @@ void SemanticsVisitor::maybeCheckMissingNoDiffThis(Expr* expr)
                 return;
             }
 
-            getSink()->diagnose(Diagnostics::NoDerivativeOnNonDifferentiableThisType{.member_decl = memberExpr->declRef.getDecl(), .func = this->m_parentFunc, .member = memberExpr});
+            getSink()->diagnose(Diagnostics::NoDerivativeOnNonDifferentiableThisType{
+                .member_decl = memberExpr->declRef.getDecl(),
+                .func = this->m_parentFunc,
+                .member = memberExpr});
         }
     }
 }
@@ -2659,7 +2667,8 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
         }
         else if (subscriptExpr->indexExprs.getCount() != 0)
         {
-            getSink()->diagnose(Diagnostics::MultiDimensionalArrayNotSupported{.expr = subscriptExpr});
+            getSink()->diagnose(
+                Diagnostics::MultiDimensionalArrayNotSupported{.expr = subscriptExpr});
         }
 
         auto elementType = CoerceToUsableType(TypeExp(baseExpr, baseTypeType->getType()), nullptr);
@@ -2932,12 +2941,14 @@ void SemanticsVisitor::compareMemoryQualifierOfParamToArgument(ParamDecl* paramI
 
     if (argQualifiers & MemoryQualifierSetModifier::Flags::kCoherent &&
         !(paramQualifiers & MemoryQualifierSetModifier::Flags::kCoherent))
-        getSink()->diagnose(
-            Diagnostics::ArgumentHasMoreMemoryQualifiersThanParam{.qualifier = "coherent", .arg = arg});
+        getSink()->diagnose(Diagnostics::ArgumentHasMoreMemoryQualifiersThanParam{
+            .qualifier = "coherent",
+            .arg = arg});
     if (argQualifiers & MemoryQualifierSetModifier::Flags::kReadOnly &&
         !(paramQualifiers & MemoryQualifierSetModifier::Flags::kReadOnly))
-        getSink()->diagnose(
-            Diagnostics::ArgumentHasMoreMemoryQualifiersThanParam{.qualifier = "readonly", .arg = arg});
+        getSink()->diagnose(Diagnostics::ArgumentHasMoreMemoryQualifiersThanParam{
+            .qualifier = "readonly",
+            .arg = arg});
     if (argQualifiers & MemoryQualifierSetModifier::Flags::kWriteOnly &&
         !(paramQualifiers & MemoryQualifierSetModifier::Flags::kWriteOnly))
         getSink()->diagnose(Diagnostics::ArgumentHasMoreMemoryQualifiersThanParam{
@@ -2945,8 +2956,9 @@ void SemanticsVisitor::compareMemoryQualifierOfParamToArgument(ParamDecl* paramI
             .arg = arg});
     if (argQualifiers & MemoryQualifierSetModifier::Flags::kVolatile &&
         !(paramQualifiers & MemoryQualifierSetModifier::Flags::kVolatile))
-        getSink()->diagnose(
-            Diagnostics::ArgumentHasMoreMemoryQualifiersThanParam{.qualifier = "volatile", .arg = arg});
+        getSink()->diagnose(Diagnostics::ArgumentHasMoreMemoryQualifiersThanParam{
+            .qualifier = "volatile",
+            .arg = arg});
     // dropping a `restrict` qualifier from arguments is allowed in GLSL with memory qualifiers
 }
 
@@ -3136,11 +3148,10 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                                     else
                                     {
                                         // Fall back, in case there are other reasons...
-                                        getSink()->diagnose(
-                                            Diagnostics::ImplicitCastUsedAsLvalue{
-                                                .from = implicitCastExpr->arguments[0]->type.type,
-                                                .to = implicitCastExpr->type.type,
-                                                .expr = argExpr});
+                                        getSink()->diagnose(Diagnostics::ImplicitCastUsedAsLvalue{
+                                            .from = implicitCastExpr->arguments[0]->type.type,
+                                            .to = implicitCastExpr->type.type,
+                                            .expr = argExpr});
                                     }
                                 }
 
@@ -3389,7 +3400,8 @@ Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
         if (!lookupResult.isValid())
         {
             if (!diagnosed)
-                getSink()->diagnose(Diagnostics::CallOperatorNotFound{.type = baseType, .expr = expr});
+                getSink()->diagnose(
+                    Diagnostics::CallOperatorNotFound{.type = baseType, .expr = expr});
             return CreateErrorExpr(expr);
         }
         auto callFuncExpr = createLookupResultExpr(
@@ -3450,9 +3462,8 @@ Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
                         }
                         else
                         {
-                            getSink()->diagnose(
-                                Diagnostics::UseOfNoDiffOnDifferentiableFunc{
-                                    .expr = m_treatAsDifferentiableExpr});
+                            getSink()->diagnose(Diagnostics::UseOfNoDiffOnDifferentiableFunc{
+                                .expr = m_treatAsDifferentiableExpr});
                         }
                     }
                 }
@@ -3507,7 +3518,8 @@ Expr* SemanticsExprVisitor::visitVarExpr(VarExpr* expr)
     }
 
     if (!diagnosed)
-        getSink()->diagnose(Diagnostics::UndefinedIdentifier2{.name = expr->name, .location = expr->loc});
+        getSink()->diagnose(
+            Diagnostics::UndefinedIdentifier2{.name = expr->name, .location = expr->loc});
 
     return resultExpr;
 }
@@ -5084,8 +5096,8 @@ void SemanticsExprVisitor::maybeCheckKnownBuiltinInvocation(Expr* invokeExpr)
             auto vertexAttributeArgDeclRefExpr = as<DeclRefExpr>(vertexAttributeArg);
             if (!vertexAttributeArgDeclRefExpr)
             {
-                getSink()->diagnose(
-                    Diagnostics::GetAttributeAtVertexMustReferToPerVertexInput{.location = invokeExpr->loc});
+                getSink()->diagnose(Diagnostics::GetAttributeAtVertexMustReferToPerVertexInput{
+                    .location = invokeExpr->loc});
                 return;
             }
             auto vertexAttributeArgDecl = vertexAttributeArgDeclRefExpr->declRef.getDecl();
@@ -5742,8 +5754,10 @@ Expr* SemanticsVisitor::lookupMemberResultFailure(
     if (!supressDiagnostic)
     {
         if (!maybeDiagnoseAmbiguousReference(GetBaseExpr(expr)))
-            getSink()->diagnose(
-                Diagnostics::NoMemberOfNameInType{.name = expr->name, .type = baseType.type, .expr = expr});
+            getSink()->diagnose(Diagnostics::NoMemberOfNameInType{
+                .name = expr->name,
+                .type = baseType.type,
+                .expr = expr});
     }
     return expr;
 }
@@ -6293,10 +6307,9 @@ Val* SemanticsExprVisitor::checkTypeModifier(Modifier* modifier, Type* type)
     else
     {
         // TODO: more complete error message here
-        getSink()->diagnose(
-            Diagnostics::Unexpected{
-                .message = "unknown type modifier in semantic checking",
-                .location = modifier->loc});
+        getSink()->diagnose(Diagnostics::Unexpected{
+            .message = "unknown type modifier in semantic checking",
+            .location = modifier->loc});
         return nullptr;
     }
 }

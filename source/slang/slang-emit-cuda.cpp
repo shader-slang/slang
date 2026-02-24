@@ -1277,10 +1277,9 @@ SlangResult CUDASourceEmitter::emitWMMAFragmentType(
     // we can provide better diagnostic messages here.
     if (!typeCheck(elementType->getOp(), matrixUse))
     {
-        getSink()->diagnose(
-            Diagnostics::CooperativeMatrixUnsupportedElementType{
-                .element_type = typeName,
-                .matrix_use = matrixUse == 0 ? "A" : (matrixUse == 1 ? "B" : "C")});
+        getSink()->diagnose(Diagnostics::CooperativeMatrixUnsupportedElementType{
+            .element_type = typeName,
+            .matrix_use = matrixUse == 0 ? "A" : (matrixUse == 1 ? "B" : "C")});
         SLANG_RELEASE_ASSERT(false);
         return SLANG_FAIL;
     }
@@ -1290,11 +1289,10 @@ SlangResult CUDASourceEmitter::emitWMMAFragmentType(
     FragmentShape shape = computeShapeCombination(matrixUse, rowCount, colCount);
     if (!shape.isValid())
     {
-        getSink()->diagnose(
-            Diagnostics::CooperativeMatrixInvalidShape{
-                .row_count = String(rowCount),
-                .col_count = String(colCount),
-                .matrix_use = matrixUse == 0 ? "A" : (matrixUse == 1 ? "B" : "C")});
+        getSink()->diagnose(Diagnostics::CooperativeMatrixInvalidShape{
+            .row_count = String(rowCount),
+            .col_count = String(colCount),
+            .matrix_use = matrixUse == 0 ? "A" : (matrixUse == 1 ? "B" : "C")});
         SLANG_RELEASE_ASSERT(false);
         return SLANG_FAIL;
     }

@@ -1576,8 +1576,7 @@ IRInst* cloneGlobalValueWithLinkage(
             // Emit notes for all available declarations of this symbol
             for (IRSpecSymbol* ss = sym; ss; ss = ss->nextWithSameName)
             {
-                sink->diagnose(Diagnostics::SeeDeclarationOfIr{
-                    .inst = ss->irGlobalValue});
+                sink->diagnose(Diagnostics::SeeDeclarationOfIr{.inst = ss->irGlobalValue});
             }
         }
     }
@@ -1884,8 +1883,7 @@ static void diagnoseUnresolvedSymbols(TargetRequest* req, DiagnosticSink* sink, 
                         });
                         if (auto concreteType = witnessSym->getConcreteType())
                         {
-                            sink->diagnose(Diagnostics::SeeDeclarationOfIr{
-                                .inst = concreteType});
+                            sink->diagnose(Diagnostics::SeeDeclarationOfIr{.inst = concreteType});
                         }
                     }
                 }

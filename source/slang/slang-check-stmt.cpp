@@ -843,7 +843,10 @@ void SemanticsStmtVisitor::tryInferLoopMaxIterations(ForStmt* stmt)
             // If the user writes something like `for (int i = 0; i < 5; j++)`,
             // it is most likely a bug, so we issue a warning.
             if (predicateVar == initialVar)
-                getSink()->diagnose(Diagnostics::ForLoopSideEffectChangingDifferentVar{.init_var = initialVar.getDecl(), .modified_var = varExpr->declRef.getDecl(), .side_effect = varExpr});
+                getSink()->diagnose(Diagnostics::ForLoopSideEffectChangingDifferentVar{
+                    .init_var = initialVar.getDecl(),
+                    .modified_var = varExpr->declRef.getDecl(),
+                    .side_effect = varExpr});
             return;
         }
     }
@@ -870,7 +873,10 @@ void SemanticsStmtVisitor::tryInferLoopMaxIterations(ForStmt* stmt)
     if (predicateVar.getDecl() != initialVar.getDecl())
     {
         if (predicateVar)
-            getSink()->diagnose(Diagnostics::ForLoopPredicateCheckingDifferentVar{.init_var = initialVar.getDecl(), .predicate_var = predicateVar.getDecl(), .predicate = stmt->predicateExpression});
+            getSink()->diagnose(Diagnostics::ForLoopPredicateCheckingDifferentVar{
+                .init_var = initialVar.getDecl(),
+                .predicate_var = predicateVar.getDecl(),
+                .predicate = stmt->predicateExpression});
         return;
     }
     if (!stepSize)
@@ -880,7 +886,9 @@ void SemanticsStmtVisitor::tryInferLoopMaxIterations(ForStmt* stmt)
         if (sideEffectFuncOp == kIROp_Add && compareOp == kIROp_Greater ||
             sideEffectFuncOp == kIROp_Sub && compareOp == kIROp_Less)
         {
-            getSink()->diagnose(Diagnostics::ForLoopChangingIterationVariableInOppsoiteDirection{.var = initialVar.getDecl(), .side_effect = stmt->sideEffectExpression});
+            getSink()->diagnose(Diagnostics::ForLoopChangingIterationVariableInOppsoiteDirection{
+                .var = initialVar.getDecl(),
+                .side_effect = stmt->sideEffectExpression});
             return;
         }
     }
@@ -889,13 +897,17 @@ void SemanticsStmtVisitor::tryInferLoopMaxIterations(ForStmt* stmt)
         if (sideEffectFuncOp == kIROp_Add && compareOp == kIROp_Less ||
             sideEffectFuncOp == kIROp_Sub && compareOp == kIROp_Greater)
         {
-            getSink()->diagnose(Diagnostics::ForLoopChangingIterationVariableInOppsoiteDirection{.var = initialVar.getDecl(), .side_effect = stmt->sideEffectExpression});
+            getSink()->diagnose(Diagnostics::ForLoopChangingIterationVariableInOppsoiteDirection{
+                .var = initialVar.getDecl(),
+                .side_effect = stmt->sideEffectExpression});
             return;
         }
     }
     else
     {
-        getSink()->diagnose(Diagnostics::ForLoopNotModifyingIterationVariable{.var = initialVar.getDecl(), .side_effect = stmt->sideEffectExpression});
+        getSink()->diagnose(Diagnostics::ForLoopNotModifyingIterationVariable{
+            .var = initialVar.getDecl(),
+            .side_effect = stmt->sideEffectExpression});
         return;
     }
 

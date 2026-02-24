@@ -639,7 +639,8 @@ void validateVectorsAndMatrices(
                 if ((rowCount && (rowCount->getValue() == 1)) ||
                     (colCount && (colCount->getValue() == 1)))
                 {
-                    sink->diagnose(Diagnostics::MatrixColumnOrRowCountIsOne{.location = matrixType->sourceLoc});
+                    sink->diagnose(Diagnostics::MatrixColumnOrRowCountIsOne{
+                        .location = matrixType->sourceLoc});
                 }
             }
 

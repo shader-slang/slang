@@ -229,7 +229,8 @@ struct BindExistentialSlots
             // we should be detecting and diagnosing this problem before
             // we make it to back-end code generation.
             //
-            sink->diagnose(Diagnostics::MissingExistentialBindingsForParameter{.location = param->sourceLoc});
+            sink->diagnose(
+                Diagnostics::MissingExistentialBindingsForParameter{.location = param->sourceLoc});
             return;
         }
 
@@ -244,7 +245,8 @@ struct BindExistentialSlots
         UInt slotOperandCount = 2 * slotCount;
         if ((ioSlotOperandOffset + slotOperandCount) > bindOperandCount)
         {
-            sink->diagnose(Diagnostics::MissingExistentialBindingsForParameter{.location = param->sourceLoc});
+            sink->diagnose(
+                Diagnostics::MissingExistentialBindingsForParameter{.location = param->sourceLoc});
             return;
         }
         //

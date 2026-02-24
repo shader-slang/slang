@@ -1486,10 +1486,9 @@ SlangResult EndToEndCompileRequest::compile()
         {
             // If for some reason we didn't output any diagnostic, something is
             // going wrong, but we want to make sure we at least output something.
-            getSink()->diagnose(
-                Diagnostics::CompilationAbortedDueToException{
-                    .exception_type = typeid(e).name(),
-                    .exception_message = e.Message});
+            getSink()->diagnose(Diagnostics::CompilationAbortedDueToException{
+                .exception_type = typeid(e).name(),
+                .exception_message = e.Message});
         }
     }
     catch (const Exception& e)
@@ -1498,10 +1497,9 @@ SlangResult EndToEndCompileRequest::compile()
         // We will print out information on the exception to help out the user
         // in either filing a bug, or locating what in their code created
         // a problem.
-        getSink()->diagnose(
-            Diagnostics::CompilationAbortedDueToException{
-                .exception_type = typeid(e).name(),
-                .exception_message = e.Message});
+        getSink()->diagnose(Diagnostics::CompilationAbortedDueToException{
+            .exception_type = typeid(e).name(),
+            .exception_message = e.Message});
     }
     catch (...)
     {
@@ -1535,8 +1533,8 @@ SlangResult EndToEndCompileRequest::compile()
         StringBuilder perfResult;
         PerformanceProfiler::getProfiler()->getResult(perfResult);
         perfResult << "\nType Dictionary Size: " << getSession()->m_typeDictionarySize << "\n";
-        getSink()->diagnose(
-            Diagnostics::PerformanceBenchmarkResult{.benchmark_output = perfResult.produceString()});
+        getSink()->diagnose(Diagnostics::PerformanceBenchmarkResult{
+            .benchmark_output = perfResult.produceString()});
     }
 
     // Repro dump handling

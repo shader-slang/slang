@@ -34,25 +34,22 @@ SlangResult overrideDiagnostics(
 // Users of these macros must include slang-rich-diagnostics.h in their source files.
 
 #ifdef _DEBUG
-#define SLANG_INTERNAL_ERROR(sink, pos)                                                     \
-    (sink)->diagnose(                                                                       \
+#define SLANG_INTERNAL_ERROR(sink, pos) \
+    (sink)->diagnose(                   \
         Slang::Diagnostics::InternalCompilerError{Slang::SourceLoc(__LINE__, 0, 0, __FILE__)})
-#define SLANG_UNIMPLEMENTED(sink, pos, what)                                                \
-    (sink)->diagnose(                                                                       \
+#define SLANG_UNIMPLEMENTED(sink, pos, what) \
+    (sink)->diagnose(                        \
         Slang::Diagnostics::Unimplemented{(what), Slang::SourceLoc(__LINE__, 0, 0, __FILE__)})
 
 #else
-#define SLANG_INTERNAL_ERROR(sink, pos)                                                     \
-    (sink)->diagnose(                                                                       \
-        Slang::Diagnostics::InternalCompilerError{Slang::getDiagnosticPos(pos)})
-#define SLANG_UNIMPLEMENTED(sink, pos, what)                                                \
-    (sink)->diagnose(                                                                       \
-        Slang::Diagnostics::Unimplemented{(what), Slang::getDiagnosticPos(pos)})
+#define SLANG_INTERNAL_ERROR(sink, pos) \
+    (sink)->diagnose(Slang::Diagnostics::InternalCompilerError{Slang::getDiagnosticPos(pos)})
+#define SLANG_UNIMPLEMENTED(sink, pos, what) \
+    (sink)->diagnose(Slang::Diagnostics::Unimplemented{(what), Slang::getDiagnosticPos(pos)})
 
 #endif
 
-#define SLANG_DIAGNOSE_UNEXPECTED(sink, pos, message)                                       \
-    (sink)->diagnose(                                                                       \
-        Slang::Diagnostics::Unexpected{(message), Slang::getDiagnosticPos(pos)})
+#define SLANG_DIAGNOSE_UNEXPECTED(sink, pos, message) \
+    (sink)->diagnose(Slang::Diagnostics::Unexpected{(message), Slang::getDiagnosticPos(pos)})
 
 #endif

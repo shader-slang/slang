@@ -169,18 +169,16 @@ void NativeCallMarshallingContext::marshalManagedValueToNativeResultValue(
         break;
     case kIROp_StringType:
         {
-            diagnosticSink->diagnose(
-                Diagnostics::Unimplemented{
-                    .feature = "marshal string to native return value",
-                    .location = originalArg->sourceLoc});
+            diagnosticSink->diagnose(Diagnostics::Unimplemented{
+                .feature = "marshal string to native return value",
+                .location = originalArg->sourceLoc});
         }
         break;
     case kIROp_ClassType:
         {
-            diagnosticSink->diagnose(
-                Diagnostics::Unimplemented{
-                    .feature = "marshal class to native return value",
-                    .location = originalArg->sourceLoc});
+            diagnosticSink->diagnose(Diagnostics::Unimplemented{
+                .feature = "marshal class to native return value",
+                .location = originalArg->sourceLoc});
         }
         break;
     case kIROp_InterfaceType:

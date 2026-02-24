@@ -11,10 +11,10 @@
 #include "slang-ir-inst-pass-base.h"
 #include "slang-ir-loop-unroll.h"
 #include "slang-ir-redundancy-removal.h"
-#include "slang-rich-diagnostics.h"
 #include "slang-ir-single-return.h"
 #include "slang-ir-ssa-simplification.h"
 #include "slang-ir-util.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {

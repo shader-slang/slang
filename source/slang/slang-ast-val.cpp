@@ -1645,17 +1645,17 @@ Val* FuncCallIntVal::tryFoldImpl(
     }                                                                       \
     else
 
-#define DIV_OPERATOR_CASE(op)                                                        \
-    if (opNameSlice == toSlice(#op))                                                 \
-    {                                                                                \
-        if (constArgs[1]->getValue() == 0)                                           \
-        {                                                                            \
-            if (sink)                                                                \
+#define DIV_OPERATOR_CASE(op)                                                                \
+    if (opNameSlice == toSlice(#op))                                                         \
+    {                                                                                        \
+        if (constArgs[1]->getValue() == 0)                                                   \
+        {                                                                                    \
+            if (sink)                                                                        \
                 sink->diagnose(Diagnostics::DivideByZero{.location = newFuncDecl.getLoc()}); \
-            return nullptr;                                                          \
-        }                                                                            \
-        resultValue = constArgs[0]->getValue() op constArgs[1]->getValue();          \
-    }                                                                                \
+            return nullptr;                                                                  \
+        }                                                                                    \
+        resultValue = constArgs[0]->getValue() op constArgs[1]->getValue();                  \
+    }                                                                                        \
     else
 
 #define LOGICAL_OPERATOR_CASE(op)                                                          \

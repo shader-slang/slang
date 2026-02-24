@@ -2,7 +2,6 @@
 #include "slang-linkable.h"
 
 #include "compiler-core/slang-artifact-container-util.h"
-#include "slang-rich-diagnostics.h"
 #include "compiler-core/slang-artifact-desc-util.h"
 #include "compiler-core/slang-artifact-impl.h"
 #include "core/slang-char-util.h"
@@ -11,6 +10,7 @@
 #include "slang-compiler.h"
 #include "slang-lookup.h"
 #include "slang-mangle.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -744,10 +744,9 @@ IArtifact* ComponentType::getTargetArtifact(Int targetIndex, slang::IBlob** outD
             DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
             applySettingsToDiagnosticSink(&sink, &sink, linkage->m_optionSet);
             applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
-            sink.diagnose(
-                Diagnostics::CompilationAbortedDueToException{
-                    .exception_type = typeid(e).name(),
-                    .exception_message = e.Message});
+            sink.diagnose(Diagnostics::CompilationAbortedDueToException{
+                .exception_type = typeid(e).name(),
+                .exception_message = e.Message});
             sink.getBlobIfNeeded(outDiagnostics);
         }
         return nullptr;
