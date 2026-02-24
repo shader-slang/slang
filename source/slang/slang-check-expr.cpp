@@ -2126,8 +2126,8 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
             resultValue = (constArgVals[0] != 0) || (constArgVals[1] != 0);
         }
 
-        // simple binary operators
-#define CASE(OP)                                                                              \
+        // Unsigned/bitwise operators (bit pattern preserved, uint64_t cast is correct)
+#define CASE_UINT(OP)                                                                         \
     else if (opName == getName(#OP)) do                                                       \
     {                                                                                         \
         if (argCount != 2)                                                                    \
@@ -2137,30 +2137,64 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
     }                                                                                         \
     while (0)
 
-        CASE(+); // TODO: this can also be unary...
-        CASE(*);
-        CASE(&);
-        CASE(|);
-        CASE(^);
-        CASE(!=);
-        CASE(==);
-        CASE(>=);
-        CASE(<=);
-        CASE(<);
-        CASE(>);
-#undef CASE
-#define CASE(OP)                                                                                  \
-    else if (opName == getName(#OP)) do                                                           \
-    {                                                                                             \
-        if (argCount != 2)                                                                        \
-            return nullptr;                                                                       \
-        resultValue = constArgVals[0] OP(                                                         \
-            constArgVals[1] % std::numeric_limits<std::make_unsigned_t<IRIntegerValue>>::digits); \
-    }                                                                                             \
-    while (0)
-        CASE(<<);
-        CASE(>>);
-#undef CASE
+        CASE_UINT(+); // TODO: this can also be unary...
+        CASE_UINT(*);
+        CASE_UINT(&);
+        CASE_UINT(|);
+        CASE_UINT(^);
+        CASE_UINT(!=);
+        CASE_UINT(==);
+#undef CASE_UINT
+
+        // Signed comparison operators (uint64_t cast would break e.g. (-1 < 0))
+        else if (opName == getName(">="))
+        {
+            if (argCount != 2)
+                return nullptr;
+            resultValue = constArgVals[0] >= constArgVals[1];
+        }
+        else if (opName == getName("<="))
+        {
+            if (argCount != 2)
+                return nullptr;
+            resultValue = constArgVals[0] <= constArgVals[1];
+        }
+        else if (opName == getName("<"))
+        {
+            if (argCount != 2)
+                return nullptr;
+            resultValue = constArgVals[0] < constArgVals[1];
+        }
+        else if (opName == getName(">"))
+        {
+            if (argCount != 2)
+                return nullptr;
+            resultValue = constArgVals[0] > constArgVals[1];
+        }
+
+        // Shift operators: guard negative count (UB), use modulo for width
+        else if (opName == getName("<<"))
+        {
+            if (argCount != 2)
+                return nullptr;
+            if (constArgVals[1] < 0)
+                return nullptr;
+            const auto shiftCount =
+                static_cast<std::make_unsigned_t<IRIntegerValue>>(constArgVals[1]) %
+                std::numeric_limits<std::make_unsigned_t<IRIntegerValue>>::digits;
+            resultValue = constArgVals[0] << shiftCount;
+        }
+        else if (opName == getName(">>"))
+        {
+            if (argCount != 2)
+                return nullptr;
+            if (constArgVals[1] < 0)
+                return nullptr;
+            const auto shiftCount =
+                static_cast<std::make_unsigned_t<IRIntegerValue>>(constArgVals[1]) %
+                std::numeric_limits<std::make_unsigned_t<IRIntegerValue>>::digits;
+            resultValue = constArgVals[0] >> shiftCount;
+        }
         // binary operators with chance of divide-by-zero
         // TODO: issue a suitable error in that case
 #define CASE(OP)                                          \

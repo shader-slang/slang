@@ -184,10 +184,9 @@ inline HashCode32 combineHash(HashCode32 h)
 template<typename H1, typename H2, typename... Hs>
 auto combineHash(H1 n, H2 m, Hs... args)
 {
-    // TODO: restrict the types here more, currently we tend to throw
-    // unhashed integers in here along with proper hashes of objects.
-    static_assert(std::is_convertible_v<H1, HashCode64> || std::is_convertible_v<H1, HashCode32>);
-    static_assert(std::is_convertible_v<H2, HashCode64> || std::is_convertible_v<H2, HashCode32>);
+    // std::make_unsigned_t requires integral or unscoped enum types
+    static_assert(std::is_integral_v<std::remove_cv_t<H1>> || std::is_enum_v<std::remove_cv_t<H1>>);
+    static_assert(std::is_integral_v<std::remove_cv_t<H2>> || std::is_enum_v<std::remove_cv_t<H2>>);
     return combineHash(
         (static_cast<std::make_unsigned_t<H1>>(n) * 16777619U) ^
             static_cast<std::make_unsigned_t<H2>>(m),
