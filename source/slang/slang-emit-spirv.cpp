@@ -4561,7 +4561,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_SPIRVLoadTexelPointerFromHeap:
             {
                 auto loadDesc = as<IRSPIRVLoadTexelPointerFromHeap>(inst);
-                bool isBufferResource = false;
                 auto resourceType = loadDesc->getTextureType();
                 auto resourceArrayType = getDescriptorRuntimeArrayType(ensureInst(resourceType));
                 auto imagePtr = emitInst(
