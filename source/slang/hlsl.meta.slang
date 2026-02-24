@@ -29069,7 +29069,7 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
 
     /// Store all elements of this CoopVec into a buffer at a specified offset.
     /// Pointer accesses are 16-byte aligned.
-    /// @param buffer The destination buffer to store the values into.G
+    /// @param buffer The destination buffer to store the values into.
     /// @param byteOffset16ByteAligned The byte offset from the start of the buffer where the data will be stored. Must be 16-byte aligned.
     [require(cooperative_vector)]
     void store(RWByteAddressBuffer buffer, int32_t byteOffset16ByteAligned = 0)
