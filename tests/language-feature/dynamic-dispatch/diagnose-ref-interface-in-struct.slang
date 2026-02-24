@@ -29,14 +29,14 @@ struct Container
 }
 
 // Scenario 1: Struct containing interface passed by __ref
-// CHECK: ([[# @LINE+1]]): error 52010: '__ref' parameter of type 'Container' cannot be used in dynamic dispatch context.
+// CHECK: ([[# @LINE+1]]): error 52010: '__ref' parameter of type 'Container' cannot be used in a dynamic dispatch context.
 float processContainerRef(__ref Container c)
 {
     return c.member.getValue();
 }
 
 // Scenario 2: Struct containing interface passed by __constref
-// CHECK: ([[# @LINE+1]]): error 52010: '__constref' parameter of type 'Container' cannot be used in dynamic dispatch context.
+// CHECK: ([[# @LINE+1]]): error 52010: '__constref' parameter of type 'Container' cannot be used in a dynamic dispatch context.
 float processContainerConstref(__constref Container c)
 {
     return c.member.getValue();
@@ -53,8 +53,15 @@ struct Outer
     Inner inner;
 }
 
-// CHECK: ([[# @LINE+1]]): error 52010: '__ref' parameter of type 'Outer' cannot be used in dynamic dispatch context.
+// CHECK: ([[# @LINE+1]]): error 52010: '__ref' parameter of type 'Outer' cannot be used in a dynamic dispatch context.
 float processNested(__ref Outer o)
+{
+    return o.inner.iface.getValue();
+}
+
+// Scenario 4: Nested struct containing interface passed by __constref
+// CHECK: ([[# @LINE+1]]): error 52010: '__constref' parameter of type 'Outer' cannot be used in a dynamic dispatch context.
+float processNestedConst(__constref Outer o)
 {
     return o.inner.iface.getValue();
 }
@@ -78,4 +85,5 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     Outer o;
     o.inner.iface = factory(dispatchThreadID.x);
     outputBuffer[2] = processNested(o);
+    outputBuffer[3] = processNestedConst(o);
 }

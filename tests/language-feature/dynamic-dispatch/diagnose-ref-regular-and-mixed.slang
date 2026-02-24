@@ -28,7 +28,7 @@ struct RegularImpl : IRegular
     float getValue() { return v; }
 }
 
-// CHECK: ([[# @LINE+1]]): error 52010: '__ref' parameter of type 'IRegular' cannot be used in dynamic dispatch context.
+// CHECK: ([[# @LINE+1]]): error 52010: '__ref' parameter of type 'IRegular' cannot be used in a dynamic dispatch context.
 float processRegularRef(__ref IRegular obj)
 {
     return obj.getValue();
@@ -42,7 +42,7 @@ struct MixedContainer
     IRegular regularObj;
 }
 
-// CHECK: ([[# @LINE+1]]): error 52010: '__ref' parameter of type 'MixedContainer' cannot be used in dynamic dispatch context.
+// CHECK: ([[# @LINE+1]]): error 52010: '__ref' parameter of type 'MixedContainer' cannot be used in a dynamic dispatch context.
 float processMixedRef(__ref MixedContainer c)
 {
     return c.comObj.getValue() + c.regularObj.getValue();

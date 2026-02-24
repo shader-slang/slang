@@ -5,8 +5,8 @@
 //TEST:SIMPLE(filecheck=CHECK): -target cuda
 //
 // Target support: COM is documented as "valid only on CPU target" (core.meta.slang).
-// In practice the compiler accepts COM interfaces for cpp, hlsl, and cuda; this test
-// runs on spirv, hlsl, and cuda to document compiler behavior on those targets.
+// In practice the compiler accepts COM interfaces for spirv, hlsl, and cuda; this test
+// runs on those targets to document compiler behavior.
 
 // COM interfaces use vtable-based dispatch (pointer indirection) rather
 // than the tagged union (AnyValue) packing used by regular interfaces in
