@@ -2463,8 +2463,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                             [&]()
                             {
                                 emitOperand(arrayType);
-                                emitOperand(SpvLiteralInteger::from32(
-                                    SpvDecorationArrayStride));
+                                emitOperand(SpvLiteralInteger::from32(SpvDecorationArrayStride));
                                 emitOperand(SpvLiteralInteger::from32(stride));
                             });
                     }
