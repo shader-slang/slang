@@ -5,9 +5,10 @@
 
 # Usage: the script takes command-line arguments to specify the range of commits to include.
 # You can use either:
-# 1. Date-based range with --since: docs/scripts/release-note.sh --since 2025-08-06
-# 2. Hash-based range with --previous-hash: docs/scripts/release-note.sh --previous-hash abc123
-# 3. Legacy positional argument (deprecated): docs/scripts/release-note.sh 2024-07-01
+# 1. Default (no arguments): auto-detects the previous release tag via git describe
+# 2. Date-based range with --since: docs/scripts/release-note.sh --since 2025-08-06
+# 3. Hash-based range with --previous-hash: docs/scripts/release-note.sh --previous-hash abc123
+# 4. Help: docs/scripts/release-note.sh --help
 
 # This script is supposed to work on all Windows based shell systems including WSL and git-bash.
 # If you make any modifications, please test them, because CI doesn't test this script.
@@ -44,36 +45,40 @@ while [[ $# -gt 0 ]]; do
   --since)
     since="$2"
     use_hash=false
-    shift 2
+    shift
     ;;
   --previous-hash)
     previous_hash="$2"
     use_hash=true
-    shift 2
-    ;;
-  *)
-    # Legacy positional argument support
-    if [ "$since" = "" ] && [ "$previous_hash" = "" ]; then
-      since="$1"
-      use_hash=false
-    else
-      echo "Too many arguments or mixed argument styles"
-      exit 1
-    fi
     shift
     ;;
+  --help | -h)
+    echo "Usage: $0 [--since DATE | --previous-hash HASH | --help]"
+    echo "  (no arguments)        Auto-detect the previous release tag via 'git describe'"
+    echo "  --since DATE          Generate notes since the given date (e.g., 2025-08-06)"
+    echo "  --previous-hash HASH  Generate notes since the given commit hash"
+    echo "  --help, -h            Show this help message"
+    exit 0
+    ;;
+  *)
+    echo "Not recognized command-line argument: $1"
+    ;;
   esac
+  shift
 done
 
-# Validate arguments
 if [ "$since" = "" ] && [ "$previous_hash" = "" ]; then
-  echo "This script requires either --since or --previous-hash option."
-  echo "Usage: $0 [--since DATE | --previous-hash HASH]"
-  echo "  --since DATE          Generate notes since the given date (e.g., 2025-08-06)"
-  echo "  --previous-hash HASH  Generate notes since the given commit hash"
-  echo ""
-  echo "Legacy usage (deprecated): $0 DATE"
-  exit 1
+  $verbose && echo "Using auto-detect mode; use --help or -h for more information" >&2
+  previous_tag="$(git describe --tags --match 'v20[0-9][0-9].[0-9]*' --abbrev=0 2>/dev/null)"
+  if [ "$previous_tag" = "" ]; then
+    echo "Error: Could not auto-detect a previous release tag matching 'v20[YY].[N]*'." >&2
+    echo "Please specify --since DATE or --previous-hash HASH, or run with --help for usage." >&2
+    exit 1
+  fi
+  $verbose && echo "Auto-detected previous release tag: $previous_tag" >&2
+  $verbose && echo "Generating release notes since $previous_tag..." >&2
+  previous_hash="$previous_tag"
+  use_hash=true
 fi
 
 # Get commits based on the specified range
