@@ -1800,36 +1800,28 @@ FIDDLE() namespace Slang
         DAddFunc,                ///< The `IDifferentiable.dadd` function requirement
         DMulFunc,                ///< The `IDifferentiable.dmul` function requirement
 
-        InitLogicalFromInt,        ///< The `ILogical.__init` method.
-        Equals,                    ///< The `ILogical.equals` method.
-        LessThan,                  ///< The `ILogical.lessThan` method.
-        LessThanOrEquals,          ///< The `ILogical.lessThanOrEquals` method.
-        Shl,                       ///< The `ILogical.shl` method.
-        Shr,                       ///< The `ILogical.shr` method.
-        BitAnd,                    ///< The `ILogical.bitAnd` method.
-        BitOr,                     ///< The `ILogical.bitOr` method.
-        BitXor,                    ///< The `ILogical.bitXor` method.
-        BitNot,                    ///< The `ILogical.bitNot` method.
-        And,                       ///< The `ILogical.and` method.
-        Or,                        ///< The `ILogical.or` method.
-        Not,                       ///< The `ILogical.not` method.
-                                   // Requirement keys for new auto-diff system
-        ForwardDerivativeFuncType, ///< The "__fwd_diff_func_type" built-in associatedtype on
-                                   ///< functions
-        ForwardDerivativeFunc,
-        ForwardDerivativeAllowInline, ///< "IForwardDifferentiable::allowInline" built-in associated
-                                      ///< boolean constant.
+        InitLogicalFromInt, ///< The `ILogical.__init` method.
+        Equals,             ///< The `ILogical.equals` method.
+        LessThan,           ///< The `ILogical.lessThan` method.
+        LessThanOrEquals,   ///< The `ILogical.lessThanOrEquals` method.
+        Shl,                ///< The `ILogical.shl` method.
+        Shr,                ///< The `ILogical.shr` method.
+        BitAnd,             ///< The `ILogical.bitAnd` method.
+        BitOr,              ///< The `ILogical.bitOr` method.
+        BitXor,             ///< The `ILogical.bitXor` method.
+        BitNot,             ///< The `ILogical.bitNot` method.
+        And,                ///< The `ILogical.and` method.
+        Or,                 ///< The `ILogical.or` method.
+        Not,                ///< The `ILogical.not` method.
 
-        BwdCallableContextType,        ///< The "BwdCallable" built-in associatedtype on functions
-        BwdApplyFunc,                  ///< The "apply" built-in associated function on functions
-        BwdCallablePropFunc,           ///< The "BwdCallable::operator()" built-in function
-        BwdCallableGetValFunc,         ///< The "BwdCallable::getVal()" built-in function
-        LegacyBackwardDerivativeFunc,  ///< The "bwdDiff" built-in associated function on functions
-        BackwardDerivativeAllowInline, ///< "IBackwardDifferentiable::allowInline" built-in
-                                       ///< associated boolean constant.
+        // Requirement keys for auto-diff built-in requirements
+        ForwardDerivativeFunc,  ///< The "fwd_diff" built-in associated function
+        BwdCallableContextType, ///< The "BwdCallable" built-in associated type
+        BwdApplyFunc,           ///< The "apply_bwd" built-in associated function
+        BwdCallablePropFunc,    ///< The "BwdCallable::operator()" built-in associated function
+        BwdCallableGetValFunc,  ///< The "BwdCallable::getVal()" built-in associated function
+        LegacyBackwardDerivativeFunc, ///< The "bwdDiff" built-in associated function
     };
-
-    // How do we swap out applyFwd for applyBwd?
 
     enum class FunctionDifferentiableLevel
     {

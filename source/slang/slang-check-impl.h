@@ -870,8 +870,6 @@ private:
         Type* selfType,
         InheritanceCircularityInfo* circularityInfo);
 
-    ExtensionDecl* synthesizeExtensionForFunctionBaseType(DeclRefType* funcAsDeclRefType);
-
     void getDependentGenericParentImpl(DeclRef<GenericDecl>& genericParent, DeclRef<Decl> declRef);
 
     struct DirectBaseInfo
@@ -1684,7 +1682,6 @@ public:
     /// Registers a type as conforming to IDifferentiable, along with a witness
     /// describing the relationship.
     ///
-    void addDifferentiableTypeToDiffTypeRegistry(Type* type, SubtypeWitness* witness);
     void maybeRegisterDifferentiableTypeImplRecursive(ASTBuilder* builder, Type* type);
 
     // Construct the differential for 'type', if it exists.
@@ -2530,7 +2527,7 @@ public:
         ConversionCost typePromotionCost = kConversionCost_None;
     };
 
-    bool hasGeneric(ConstraintSystem& system, Decl* generic);
+    bool isRelevantGeneric(ConstraintSystem& system, Decl* generic);
 
     Type* TryJoinVectorAndScalarType(
         ConstraintSystem* constraints,

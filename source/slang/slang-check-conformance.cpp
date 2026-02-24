@@ -170,7 +170,21 @@ SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
     // For now we are continuing to conflate all the subtype-ish relationships but not
     // tangling convertibility into it.
 
-    // TODO: Un-special case this if possible.
+    // We intercept any conformance requests for `IHasDiffTypeInfo` and directly produce the
+    // appropriate witness instead of going through the normal inheritance machinery. This is to
+    // avoid a circular checking issue.
+    //
+    // e.g. If we are checking `func`'s bases, and we encounter an
+    // inheritance decl of the form `func : IForwardDifferentiable<func>`, then we will need to
+    // check if `func` conforms to `IHasDiffTypeInfo` (since this is requried by
+    // IForwardDifferentiable), but checking that conformance will require checking `func`'s bases,
+    // which causes a circularity.
+    //
+    // Until we have a system that allows us to gradually expand on the known bases for a
+    // declaration, we'll handle this as a special case.
+    //
+    // TODO: Un-special case this when possible.
+    //
     if (isDeclRefTypeOf<FunctionDeclBase>(subType) && as<DiffTypeInfoInterfaceType>(superType))
     {
         return getDiffTypeInfoWitness(

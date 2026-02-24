@@ -318,8 +318,6 @@ IRInst* _resolveInstRec(TranslationContext* ctx, IRInst* inst)
         return inst;
     }
 
-    // Otherwise we'll fall back to recreating the instruction
-
     List<IRInst*> operands;
     bool changed = false;
 

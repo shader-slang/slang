@@ -197,16 +197,6 @@ Val* DeclRefType::_substituteImplOverride(
     return DeclRefType::create(astBuilder, substDeclRef);
 }
 
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! BuiltinTypeFunction !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-/*Type* BuiltinTypeFunction::calculateType(SemanticsContext* context){
-    SLANG_AST_NODE_VIRTUAL_CALL(BuiltinTypeFunction, calculateType, (context))}
-
-Type* BuiltinTypeFunction::_calculateTypeOverride(SemanticsContext* context)
-{
-    SLANG_UNEXPECTED("BuiltinTypeFunction::_calculateTypeOverride not overridden");
-    return nullptr;
-}*/
-
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ArithmeticExpressionType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -892,9 +882,10 @@ Val* FwdDiffFuncType::_resolveImplOverride()
     }
     else
     {
-        return getCurrentASTBuilder()->getFwdDiffFuncType(
-            as<Type>(resolvedBase),
-            as<Witness>(resolvedWitness));
+        Val* args[] = {as<Type>(resolvedBase), as<Witness>(resolvedWitness)};
+        return getCurrentASTBuilder()->getSpecializedBuiltinType(
+            makeArrayView(args),
+            "FwdDiffFuncType");
     }
 }
 

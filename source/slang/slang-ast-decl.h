@@ -956,13 +956,6 @@ class GenericTypePackParamDecl : public GenericTypeParamDeclBase
     FIDDLE(...)
 };
 
-/*
-class GenericFuncTypeParamDecl : public GenericTypeParamDeclBase
-{
-    SLANG_AST_CLASS(GenericFuncTypeParamDecl)
-};
-*/
-
 // A constraint placed as part of a generic declaration
 FIDDLE()
 class GenericTypeConstraintDecl : public TypeConstraintDecl

@@ -1603,42 +1603,12 @@ FIDDLE()
 class DifferentiableAttribute : public Attribute
 {
     FIDDLE(...)
-    // TODO(tfoley): Why is there this duplication here?
-    List<KeyValuePair<Type*, SubtypeWitness*>> m_typeToIDifferentiableWitnessMappings;
     OrderedDictionary<Val*, OrderedDictionary<SlangInt, Val*>> m_associatedValMapping;
-
-    void addType(Type* declRef, SubtypeWitness* witness)
-    {
-        getMapTypeToIDifferentiableWitness();
-        if (m_mapToIDifferentiableWitness.addIfNotExists(declRef, witness))
-        {
-            m_typeToIDifferentiableWitnessMappings.add(
-                KeyValuePair<Type*, SubtypeWitness*>(declRef, witness));
-        }
-    }
 
     bool hasAssociatedVals(Val* targetVal) const
     {
         return m_associatedValMapping.containsKey(targetVal);
     }
-
-    /*OrderedDictionary<SlangInt, Val*>& tryGetAssociatedVals(Val* targetVal) const
-    {
-
-        if (!hasAssociatedVals(targetVal))
-            m_associatedValMapping[targetVal] = OrderedDictionary<SlangInt, Val*>();
-
-        return m_associatedValMapping[targetVal];
-    }*/
-
-    /*
-    UCount getAssociatedValCount(Val* targetVal) const
-    {
-        if (!hasAssociatedVals(targetVal))
-            return 0;
-        return m_associatedValMapping.tryGetValue(targetVal)->getCount();
-    }
-    */
 
     auto begin(Val* targetVal) const
     {
@@ -1669,13 +1639,7 @@ class DifferentiableAttribute : public Attribute
         m_associatedValMapping.tryGetValue(targetVal)->addIfNotExists(id, assocVal);
     }
 
-    /// Mapping from types to subtype witnesses for conformance to IDifferentiable.
-    const OrderedDictionary<Type*, SubtypeWitness*>& getMapTypeToIDifferentiableWitness();
-
     ValSet m_typeRegistrationWorkingSet;
-
-private:
-    OrderedDictionary<Type*, SubtypeWitness*> m_mapToIDifferentiableWitness;
 };
 
 FIDDLE()

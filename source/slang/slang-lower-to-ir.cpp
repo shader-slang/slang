@@ -11253,30 +11253,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         builder->addDecoration(inst, kIROp_DerivativeMemberDecoration, key);
     }
 
-    void lowerDifferentiableAttribute(
-        IRGenContext* subContext,
-        IRInst* inst,
-        DifferentiableAttribute* attr)
-    {
-        auto irDict = getBuilder()->addDifferentiableTypeDictionaryDecoration(inst);
-        for (auto& entry : attr->getMapTypeToIDifferentiableWitness())
-        {
-            // Lower type and witness.
-            IRType* irType = lowerType(subContext, entry.value->getSub());
-            IRInst* irWitness = lowerVal(subContext, entry.value).val;
-
-            SLANG_ASSERT(irType);
-
-            // If the witness can be lowered, and the differentiable type entry exists,
-            // add an entry to the context.
-            //
-            if (irWitness)
-            {
-                getBuilder()->addDifferentiableTypeEntry(irDict, irType, irWitness);
-            }
-        }
-    }
-
     LoweredValInfo lowerMemberVarDecl(VarDecl* fieldDecl)
     {
         // Each field declaration in the AST translates into

@@ -2136,12 +2136,6 @@ Val* WitnessLookupIntVal::_resolveImplOverride()
     if (!newWitness)
         return this;
 
-
-    /*auto witnessVal = tryLookUpRequirementWitness(astBuilder, newWitness, getKey());
-    if (witnessVal.getFlavor() == RequirementWitness::Flavor::val)
-    {
-        return witnessVal.getVal();
-    }*/
     if (auto val = tryFoldOrNull(astBuilder, newWitness, getKey()))
     {
         return val;
@@ -2184,8 +2178,10 @@ Val* WitnessLookupIntVal::_substituteImplOverride(
 
 Val* WitnessLookupIntVal::tryFoldOrNull(ASTBuilder* astBuilder, SubtypeWitness* witness, Decl* key)
 {
-    // auto witnessEntry = tryLookUpRequirementWitness(astBuilder, witness, key);
+    // Check if we can find an entry for this key.
     auto unspecializedEntry = getUnspecializedLookupRec(astBuilder, key, witness);
+
+    // If we found a relevant entry, try to specialize it.
     switch (unspecializedEntry.getFlavor())
     {
     case RequirementWitness::Flavor::val:

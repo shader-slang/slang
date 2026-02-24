@@ -57,7 +57,7 @@
 namespace Slang
 {
 
-bool SemanticsVisitor::hasGeneric(ConstraintSystem& system, Decl* generic)
+bool SemanticsVisitor::isRelevantGeneric(ConstraintSystem& system, Decl* generic)
 {
     for (auto genericDecl = system.genericDecl; genericDecl;
          genericDecl = as<GenericDecl>(genericDecl->parentDecl))
@@ -1101,7 +1101,7 @@ bool SemanticsVisitor::TryUnifyIntParam(
     // parameters of a generic function based on
     // calls in its body).
     // if (paramDecl->parentDecl != constraints.genericDecl)
-    if (!hasGeneric(constraints, paramDecl->parentDecl))
+    if (!isRelevantGeneric(constraints, paramDecl->parentDecl))
         return false;
 
     // We want to constrain the given parameter to equal the given value.
@@ -1221,7 +1221,7 @@ bool SemanticsVisitor::TryUnifyTypesByStructuralMatch(
 
         if (auto typeParamDecl = as<GenericTypeParamDecl>(fstDeclRef.getDecl()))
             // if (typeParamDecl->parentDecl == constraints.genericDecl)
-            if (hasGeneric(constraints, typeParamDecl->parentDecl))
+            if (isRelevantGeneric(constraints, typeParamDecl->parentDecl))
                 return TryUnifyTypeParam(constraints, unifyCtx, typeParamDecl, snd);
 
         if (auto sndDeclRefType = as<DeclRefType>(snd))
@@ -1229,7 +1229,7 @@ bool SemanticsVisitor::TryUnifyTypesByStructuralMatch(
             auto sndDeclRef = sndDeclRefType->getDeclRef();
 
             if (auto typeParamDecl = as<GenericTypeParamDecl>(sndDeclRef.getDecl()))
-                if (hasGeneric(constraints, typeParamDecl->parentDecl))
+                if (isRelevantGeneric(constraints, typeParamDecl->parentDecl))
                     return TryUnifyTypeParam(constraints, unifyCtx, typeParamDecl, fst);
 
             // If they refer to different declarations, we need to check if one type's super type
@@ -1748,12 +1748,12 @@ bool SemanticsVisitor::TryUnifyTypes(
 
         if (auto typeParamDecl = as<GenericTypeParamDecl>(fstDeclRef.getDecl()))
         {
-            if (hasGeneric(constraints, typeParamDecl->parentDecl))
+            if (isRelevantGeneric(constraints, typeParamDecl->parentDecl))
                 return TryUnifyTypeParam(constraints, unifyCtx, typeParamDecl, snd);
         }
         else if (auto typePackParamDecl = as<GenericTypePackParamDecl>(fstDeclRef.getDecl()))
         {
-            if (hasGeneric(constraints, typePackParamDecl->parentDecl) && isTypePack(snd))
+            if (isRelevantGeneric(constraints, typePackParamDecl->parentDecl) && isTypePack(snd))
                 return TryUnifyTypeParam(constraints, unifyCtx, typePackParamDecl, snd);
         }
     }
@@ -1764,12 +1764,12 @@ bool SemanticsVisitor::TryUnifyTypes(
 
         if (auto typeParamDecl = as<GenericTypeParamDeclBase>(sndDeclRef.getDecl()))
         {
-            if (hasGeneric(constraints, typeParamDecl->parentDecl))
+            if (isRelevantGeneric(constraints, typeParamDecl->parentDecl))
                 return TryUnifyTypeParam(constraints, unifyCtx, typeParamDecl, fst);
         }
         else if (auto typePackParamDecl = as<GenericTypePackParamDecl>(sndDeclRef.getDecl()))
         {
-            if (hasGeneric(constraints, typePackParamDecl->parentDecl) && isTypePack(fst))
+            if (isRelevantGeneric(constraints, typePackParamDecl->parentDecl) && isTypePack(fst))
                 return TryUnifyTypeParam(constraints, unifyCtx, typePackParamDecl, fst);
         }
     }
@@ -1845,7 +1845,7 @@ bool SemanticsVisitor::TryUnifyTypes(
             if (auto sndTypePackParamDecl =
                     as<GenericTypePackParamDecl>(innerSnd->getDeclRef().getDecl()))
             {
-                if (hasGeneric(constraints, innerSnd->getDeclRef().getDecl()->parentDecl))
+                if (isRelevantGeneric(constraints, innerSnd->getDeclRef().getDecl()->parentDecl))
                 {
                     return TryUnifyTypeParam(constraints, unifyCtx, sndTypePackParamDecl, fst);
                 }
@@ -1859,7 +1859,7 @@ bool SemanticsVisitor::TryUnifyTypes(
             if (auto fstTypePackParamDecl =
                     as<GenericTypePackParamDecl>(innerFst->getDeclRef().getDecl()))
             {
-                if (hasGeneric(constraints, innerFst->getDeclRef().getDecl()->parentDecl))
+                if (isRelevantGeneric(constraints, innerFst->getDeclRef().getDecl()->parentDecl))
                 {
                     return TryUnifyTypeParam(constraints, unifyCtx, fstTypePackParamDecl, snd);
                 }

@@ -20,7 +20,6 @@ void initializeTranslationDictionary(IRModule* module);
 void clearTranslationDictionary(IRModule* module);
 struct TranslationContext
 {
-    // AD 2.0 Translators
 
 public:
     TranslationContext(TargetProgram* target, IRModule* module, DiagnosticSink* inSink)

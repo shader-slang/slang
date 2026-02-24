@@ -3663,12 +3663,12 @@ void SemanticsDeclHeaderVisitor::visitTypeCoercionConstraintDecl(TypeCoercionCon
         decl->toType = TranslateTypeNodeForced(decl->toType);
 }
 
-static void _flattenAndType(Type* type, List<Type*>& outTypes)
+static void maybeFlattenConjunctionType(Type* type, List<Type*>& outTypes)
 {
     if (auto andType = as<AndType>(type))
     {
-        _flattenAndType(andType->getLeft(), outTypes);
-        _flattenAndType(andType->getRight(), outTypes);
+        maybeFlattenConjunctionType(andType->getLeft(), outTypes);
+        maybeFlattenConjunctionType(andType->getRight(), outTypes);
     }
     else
     {
@@ -3707,7 +3707,7 @@ void SemanticsDeclHeaderVisitor::visitGenericTypeConstraintDecl(GenericTypeConst
     if (decl->sup.type && !decl->isEqualityConstraint)
     {
         List<Type*> flattenedTypes;
-        _flattenAndType(decl->sup.type, flattenedTypes);
+        maybeFlattenConjunctionType(decl->sup.type, flattenedTypes);
         if (flattenedTypes.getCount() > 1)
         {
             auto parentDecl = as<ContainerDecl>(decl->parentDecl);
@@ -6350,6 +6350,7 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
 
     if (requiredMemberDeclRef.getParent().as<GenericDecl>())
     {
+        // Test signature and register in witness table.
         bool doesSignatureMatch = doesGenericSignatureMatchRequirement(
             synDeclRef.getParent().as<GenericDecl>(),
             requiredMemberDeclRef.getParent().as<GenericDecl>(),
@@ -6358,6 +6359,7 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
     }
     else
     {
+        // Test signature and register in witness table.
         bool doesSignatureMatch = doesSignatureMatchRequirement(
             synDeclRef.as<FuncDecl>(),
             requiredMemberDeclRef,
@@ -7073,25 +7075,9 @@ bool SemanticsVisitor::trySynthesizeRequirementWitness(
         return false;
     }
 
-    // For generic decl, check if we match DMulFunc, and synthesize the method.
     if (auto requiredGenericDeclRef = requiredMemberDeclRef.as<GenericDecl>())
     {
         auto inner = getInner(requiredGenericDeclRef);
-
-        // TODO: we should be able to remove DMul synthesis logic.
-        if (auto builtinAttr = inner->findModifier<BuiltinRequirementModifier>())
-        {
-            switch (builtinAttr->kind)
-            {
-            case BuiltinRequirementKind::DMulFunc:
-                return trySynthesizeDifferentialMethodRequirementWitness(
-                    context,
-                    requiredGenericDeclRef,
-                    witnessTable,
-                    SynthesisPattern::FixedFirstArg);
-            }
-        }
-
         if (as<CallableDecl>(inner))
         {
             return trySynthesizeRequirementWitness(
@@ -7974,6 +7960,7 @@ bool SemanticsVisitor::trySynthesizeDifferentialMethodRequirementWitness(
     //
     this->ensureDecl(witnessDecl, DeclCheckState::ReadyForLookup);
 
+    // Test signature and register in witness table.
     bool doesSignatureMatch = doesSignatureMatchRequirement(
         synthesizedWitnessDeclRef.as<CallableDecl>(),
         requirementDeclRef.as<CallableDecl>(),
@@ -7984,8 +7971,6 @@ bool SemanticsVisitor::trySynthesizeDifferentialMethodRequirementWitness(
     //
     SLANG_ASSERT(doesSignatureMatch);
 
-    // witnessTable->add(requirementDeclRef.getDecl(),
-    // RequirementWitness(synthesizedWitnessDeclRef));
     return true;
 }
 
@@ -8093,46 +8078,6 @@ bool SemanticsVisitor::findDefaultInterfaceImpl(
         SLANG_ASSERT(doesSignatureMatch);
         return doesSignatureMatch;
     }
-
-    /* If `bar_defaultImpl` is a generic method, we need to form an explicit
-    // declref to the inner method decl to stay consistent the existing format of
-    // witness table entries.
-    if (auto genDeclRef = as<GenericDecl>(resultDeclRef))
-        resultDeclRef = m_astBuilder->getMemberDeclRef(genDeclRef, genDeclRef.getDecl()->inner);
-
-    // Register the declref to the witness table.
-    auto callableDeclRef = as<CallableDecl>(resultDeclRef);
-    SLANG_ASSERT(callableDeclRef);
-
-    // Does requirement func have "type" constraints? We need to verify that the target function
-    // satisfies the same constraints.
-    //
-    if (requiredFuncDeclRef.getDecl()->getMembersOfType<GenericTypeConstraintDecl>().getCount() >
-        0)
-    {
-        // Add the satisfying member to the witness table so that self-references can be resolved.
-        auto requirementWitness = RequirementWitness(callableDeclRef);
-        witnessTable->m_requirementDictionary[requiredFuncDeclRef.getDecl()] = requirementWitness;
-
-        // We need to check that the satisfying member has the same constraints as the requirement.
-        auto satisfyingFuncAsType = DeclRefType::create(m_astBuilder, callableDeclRef);
-        bool conformance = doesTypeSatisfyAssociatedTypeConstraintRequirement(
-            satisfyingFuncAsType,
-            requiredFuncDeclRef,
-            witnessTable);
-
-        if (!conformance)
-        {
-            witnessTable->m_requirementDictionary.remove(requiredFuncDeclRef.getDecl());
-            return false;
-        }
-    }
-    else
-    {
-        // Directly add the satisfying member.
-        _addMethodWitness(witnessTable, requiredFuncDeclRef, callableDeclRef);
-    }
-    */
 
     return true;
 }
@@ -11683,7 +11628,10 @@ DeclaredSubtypeWitness* SemanticsVisitor::getThisTypeWitness(
     ASTBuilder* astBuilder,
     DeclRef<InterfaceDecl> inDeclRef)
 {
-    // Go find the this-type & this-type-witness manually for now. (TODO: This is a hack..)
+    //
+    // Find the this-type & this-type-witness for a given interface decl-ref.
+    // This is a bit hacky, but works.
+    //
 
     auto interfaceDeclRef =
         createDefaultSubstitutionsIfNeeded(astBuilder, this, inDeclRef.getDecl())
@@ -11825,7 +11773,6 @@ static DeclRef<SynthesizedFuncDecl> addSynthesizedFunc(
         addModifier(synFunc, astBuilder->create<HLSLStaticModifier>());
 
     parentDecl->addMember(synFunc);
-    // parentDecl->invalidateMemberDictionary();
 
     return synFunc;
 }
@@ -11847,7 +11794,7 @@ List<GenericDecl*> getGenericParents(Decl* decl)
     return genericParents;
 }
 
-static DeclRef<SynthesizedStructDecl> addSynthesizedStruct(
+static DeclRef<SynthesizedStructDecl> addOrExtendSynthesizedStruct(
     SemanticsVisitor* visitor,
     ContainerDecl* parentDecl,
     Name* name,
@@ -12009,7 +11956,6 @@ static DeclRef<Decl> buildQualifiedReference(SemanticsVisitor* visitor, Decl* de
                 substArgs.getArrayView(),
                 origGenericDecl->inner));
         declRef = substituteDeclRef(genericSubst, astBuilder, declRef);
-        // conformance = as<Type>(conformance->substitute(astBuilder, genericSubst));
     }
 
     return declRef;
@@ -12095,7 +12041,9 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
     }
 
     //
-    // Translate to AD 2.0 system be creating declarations of the form
+    // Generate extensions for this function decl that implement
+    // the auto-diff interfaces via synthesized declarations.
+    //
     // extension __func_as_type(decl) : IForwardDifferentiable<__func_as_type(decl)>
     // { /* ..empty.. */ }
     // and
@@ -12103,8 +12051,6 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
     // { /* ..empty.. */ }
     //
 
-    // Skip if this is a requirement (we need to add this as constraints in that case)
-    // TODO: Add as constraints for interface requirements.
     if (as<FunctionDeclBase>(decl))
     {
         auto funcDeclRef = decl->getDefaultDeclRef();
@@ -12199,7 +12145,7 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
                     auto funcAsTypeFromExtension =
                         as<DeclRefType>(funcAsType->substitute(getCurrentASTBuilder(), substSet));
 
-                    auto synContextStruct = addSynthesizedStruct(
+                    auto synContextStruct = addOrExtendSynthesizedStruct(
                         this,
                         bwdDiffExtension.getDecl(),
                         getName("BwdCallable"),
@@ -12248,7 +12194,7 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
                     auto funcAsTypeFromExtension =
                         as<DeclRefType>(funcAsType->substitute(getCurrentASTBuilder(), substSet));
 
-                    auto synContextStruct = addSynthesizedStruct(
+                    auto synContextStruct = addOrExtendSynthesizedStruct(
                         this,
                         bwdDiffExtension.getDecl(),
                         getName("BwdCallable"),
@@ -14135,7 +14081,6 @@ FunctionDifferentiableLevel SharedSemanticsContext::_getFuncDifferentiableLevelI
         switch (builtinReq->kind)
         {
         case BuiltinRequirementKind::DAddFunc:
-        case BuiltinRequirementKind::DMulFunc:
         case BuiltinRequirementKind::DZeroFunc:
             return FunctionDifferentiableLevel::Backward;
         default:
@@ -15545,7 +15490,7 @@ static void translateBwdDerivativeAttributeToAD2(
     synBwdDiffFunc =
         createDefaultSubstitutionsIfNeeded(getCurrentASTBuilder(), visitor, synBwdDiffFunc)
             .as<SynthesizedFuncDecl>();
-    auto synContextStruct = addSynthesizedStruct(
+    auto synContextStruct = addOrExtendSynthesizedStruct(
         visitor,
         bwdDiffExtension.getDecl(),
         visitor->getName("BwdCallable"),
@@ -15771,7 +15716,7 @@ static void checkDerivativeAttribute(
                 auto funcAsTypeFromExtension =
                     as<DeclRefType>(funcAsType->substitute(getCurrentASTBuilder(), substSet));
 
-                auto synContextStruct = addSynthesizedStruct(
+                auto synContextStruct = addOrExtendSynthesizedStruct(
                     visitor,
                     bwdDiffExtension.getDecl(),
                     visitor->getName("BwdCallable"),

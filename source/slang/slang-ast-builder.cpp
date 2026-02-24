@@ -695,12 +695,6 @@ DifferentialPairType* ASTBuilder::getDifferentialPairType(Type* valueType, Witne
         getSpecializedBuiltinType(makeArrayView(args), "DifferentialPairType"));
 }
 
-Type* ASTBuilder::getFwdDiffFuncType(Type* baseType, Witness* diffTypeInfoWitness)
-{
-    Val* args[] = {baseType, diffTypeInfoWitness};
-    return getSpecializedBuiltinType(makeArrayView(args), "FwdDiffFuncType");
-}
-
 DeclRef<InterfaceDecl> ASTBuilder::getDiffTypeInfoInterfaceDecl()
 {
     DeclRef<InterfaceDecl> declRef =

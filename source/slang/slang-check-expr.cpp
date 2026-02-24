@@ -782,25 +782,6 @@ Expr* SemanticsVisitor::maybeUseSynthesizedDeclForLookupResult(
             }
             break;
         }
-    case BuiltinRequirementKind::DifferentialPairType:
-        {
-            if (auto diffPairType = tryGetDifferentialPairType(subType))
-            {
-                auto typeDef = m_astBuilder->create<TypeAliasDecl>();
-                typeDef->nameAndLoc.name = item.declRef.getName();
-                typeDef->type.type = diffPairType;
-                addVisibilityModifier(typeDef, getDeclVisibility(parent));
-
-                synthesizedDecl = typeDef;
-
-                parent->addDirectMemberDecl(typeDef);
-            }
-            else
-            {
-                return nullptr;
-            }
-        }
-        break;
     default:
         return nullptr;
     }
@@ -1710,15 +1691,6 @@ Type* SemanticsVisitor::getDifferentialType(ASTBuilder* builder, Type* type, Sou
     return result;
 }
 
-void SemanticsVisitor::addDifferentiableTypeToDiffTypeRegistry(Type* type, SubtypeWitness* witness)
-{
-    SLANG_RELEASE_ASSERT(m_parentDifferentiableAttr);
-    if (witness)
-    {
-        m_parentDifferentiableAttr->addType(type, witness);
-    }
-}
-
 void SemanticsVisitor::maybeRegisterDifferentiableType(ASTBuilder* builder, Type* type)
 {
     if (!builder->isDifferentiableInterfaceAvailable())
@@ -1822,22 +1794,6 @@ void SemanticsVisitor::maybeRegisterDifferentiableTypeImplRecursive(ASTBuilder* 
 
     if (auto declRefType = as<DeclRefType>(type))
     {
-
-        /*if (auto subtypeWitness = as<SubtypeWitness>(tryGetInterfaceConformanceWitness(
-                type,
-                getASTBuilder()->getDifferentiableInterfaceType())))
-        {
-            addDifferentiableTypeToDiffTypeRegistry(type, subtypeWitness);
-        }
-
-        if (auto subtypeWitness = as<SubtypeWitness>(tryGetInterfaceConformanceWitness(
-                type,
-                getASTBuilder()->getDifferentiableRefInterfaceType())))
-        {
-            addDifferentiableTypeToDiffTypeRegistry(type, subtypeWitness);
-        }*/
-
-
         // TODO: Why? If an agg-type's member is accessed in the function, it should
         // come with an expr that uses that member, and that expr's type should be registered
         // separately.
@@ -1880,7 +1836,7 @@ void SemanticsVisitor::maybeRegisterDifferentiableTypeImplRecursive(ASTBuilder* 
         //
         // We'll 'cheat' a bit and register it as IDifferentiable.
         //
-        // The backend will take treat it as an existential pair.
+        // The backend will treat it as if its a tuple of existentials.
         //
         if (auto witness = tryGetInterfaceConformanceWitness(
                 type,
@@ -1971,16 +1927,6 @@ void SemanticsVisitor::maybeRegisterDifferentiableTypeImplRecursive(ASTBuilder* 
                 getCurrentASTBuilder()->getDifferentialPtrPairType(type, witness));
         }
     }
-
-    /* General check for types that may not be decl-ref-type, but still have some conformance to
-    // IDifferentiable/IDifferentiablePtrType
-    if (auto subtypeWitness = as<SubtypeWitness>(tryGetInterfaceConformanceWitness(
-            type,
-            getASTBuilder()->getDifferentiableInterfaceType())))
-    {
-        addDifferentiableTypeToDiffTypeRegistry(type, subtypeWitness);
-    }
-        */
 }
 
 // This checks that if a differentiable function access a non-diff type "This", in such case we
@@ -3337,8 +3283,8 @@ DeclRef<CallableDecl> getResolvedFunc(DeclRef<CallableDecl> declRef)
     return declRef;
 }
 
-// For AD 2.0, we represent derivatives as lookups
-// instead of operators.
+// Convert an expression of the form "hof(fn)" where "hof" is a higher-order function like
+// "fwd_diff" or "bwd_diff", into a lookup of the form "fn.fwd_diff" or "fn.bwd_diff"
 //
 static Expr* convertHigherOrderExprToLookup(
     SemanticsVisitor* visitor,
@@ -3648,42 +3594,6 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
 
             if (auto higherOrderInvoke = as<DifferentiateExpr>(invoke->functionExpr))
             {
-                /*FunctionDifferentiableLevel requiredLevel;
-                if (auto funcDeclExpr = as<DeclRefExpr>(
-                        getInnerMostExprFromHigherOrderExpr(higherOrderInvoke, requiredLevel)))
-                {
-                    auto funcDecl = as<FunctionDeclBase>(funcDeclExpr->declRef.getDecl());
-
-                    if (funcDecl)
-                    {
-                        if (requiredLevel == FunctionDifferentiableLevel::Forward &&
-                            !getShared()->isDifferentiableFunc(funcDecl))
-                        {
-                            getSink()->diagnose(
-                                funcDeclExpr,
-                                Diagnostics::functionNotMarkedAsDifferentiable,
-                                funcDecl,
-                                "forward");
-                        }
-                        if (requiredLevel == FunctionDifferentiableLevel::Backward &&
-                            !getShared()->isBackwardDifferentiableFunc(funcDecl))
-                        {
-                            getSink()->diagnose(
-                                funcDeclExpr,
-                                Diagnostics::functionNotMarkedAsDifferentiable,
-                                funcDecl,
-                                "backward");
-                        }
-                        if (!isEffectivelyStatic(funcDecl) && !isGlobalDecl(funcDecl))
-                        {
-                            getSink()->diagnose(
-                                invoke->functionExpr,
-                                Diagnostics::nonStaticMemberFunctionNotAllowedAsDiffOperand,
-                                funcDecl);
-                        }
-                    }
-                }*/
-
                 invoke->functionExpr = convertHigherOrderExprToLookup(this, higherOrderInvoke);
             }
         }

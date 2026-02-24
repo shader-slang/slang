@@ -632,8 +632,6 @@ public:
     Type* getDiffTypeInfoInterfaceType();
     DeclRef<InterfaceDecl> getDiffTypeInfoInterfaceDecl();
 
-    Type* getFwdDiffFuncType(Type* baseType, Witness* diffTypeInfoWitness);
-
     DeclRef<InterfaceDecl> getFunctionBaseInterfaceDecl();
 
     Type* getDifferentiableInterfaceType();

@@ -316,19 +316,13 @@ Val* LookupDeclRef::tryResolve(SubtypeWitness* newWitness, Type* newLookupSource
     auto astBuilder = getCurrentASTBuilder();
     Decl* requirementKey = getDecl();
 
-    /* We never register the generic itself as the key, but rather use
-    // the inner-most non-generic declaration.
-    //
-    UCount genericLevels = 0;
-    while (auto genericDecl = as<GenericDecl>(requirementKey))
-    {
-        genericLevels++;
-        requirementKey = getInner(genericDecl);
-    }
-    */
-
+    // Recursively find the value associated with the requirement key.
     RequirementWitness lookedUpVal =
         getUnspecializedLookupRec(astBuilder, requirementKey, newWitness);
+
+    // If we found something, we need to specialize it using the substitutions from the witness
+    // chain.
+    //
     if (lookedUpVal.getFlavor() != RequirementWitness::Flavor::none)
     {
         if (lookedUpVal.getFlavor() == RequirementWitness::Flavor::val ||
@@ -348,41 +342,8 @@ Val* LookupDeclRef::tryResolve(SubtypeWitness* newWitness, Type* newLookupSource
         }
     }
 
-    /*
-    RequirementWitness requirementWitness =
-        tryLookUpRequirementWitness(astBuilder, newWitness, requirementKey);
-    switch (requirementWitness.getFlavor())
-    {
-    default:
-        // No usable value was found, so there is nothing we can do.
-        break;
-    case RequirementWitness::Flavor::declRef:
-        {
-            auto satisfyingVal =
-                as<DeclRefBase>(requirementWitness.getDeclRef().declRefBase->resolve());
-            if (genericLevels == 0)
-                return satisfyingVal;
-            else
-            {
-                for (; satisfyingVal && genericLevels > 0;
-                     satisfyingVal = satisfyingVal->getParent())
-                {
-                    if (as<GenericDecl>(satisfyingVal->getParent()->getDecl()))
-                        genericLevels--;
-                }
-
-                return satisfyingVal;
-            }
-        }
-    case RequirementWitness::Flavor::val:
-        {
-            auto satisfyingVal = requirementWitness.getVal()->resolve();
-            SLANG_ASSERT(!genericLevels);
-            return satisfyingVal;
-        }
-        break;
-    }
-    */
+    // If we didn't find anything using a simple lookup, we might need to handle some special-case
+    // rules.
 
     // Hard code implementation of T.Differential.Differential == T.Differential rule.
     auto builtinReq = requirementKey->findModifier<BuiltinRequirementModifier>();
