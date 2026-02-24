@@ -287,6 +287,8 @@ jobs:
             mkdir -p "${base_libs}/lib"
             mkdir -p "${base_libs}/include"
             cp build.em/Release/lib/*.a "${base_libs}/lib/" 2>/dev/null || echo "No .a files in lib/"
+            cp build.em/external/lz4/build/cmake/Release/liblz4.a "${base_libs}/lib/" 2>/dev/null || true
+            cp build.em/external/miniz/Release/libminiz.a "${base_libs}/lib/" 2>/dev/null || true
             cp build.em/Release/include/*.h "${base_libs}/include/"
             (cd "${base_libs}" && zip -r "../${base_libs}.zip" .)
             echo "SLANG_WASM_LIBS_ARCHIVE=${base_libs}.zip" >> "$GITHUB_OUTPUT"

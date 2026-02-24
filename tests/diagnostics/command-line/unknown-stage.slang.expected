@@ -1,8 +1,0 @@
-result code = 1
-standard error = {
-(1): error 15: unknown stage 'green_hills_zone'
-tests/diagnostics/command-line/unknown-stage.slang -stage green_hills_zone
-                                                          ^
-}
-standard output = {
-}

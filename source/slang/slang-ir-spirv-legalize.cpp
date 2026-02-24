@@ -1454,6 +1454,44 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         inst->insertAtEnd(m_module->getModuleInst());
     }
 
+    void processDefaultConstruct(IRInst* inst)
+    {
+        // Handle DefaultConstruct for DescriptorHandleType.
+        // In SPIRV, DescriptorHandle is lowered to uint64 (spvBindlessTextureNV) or uint2.
+        // A default-constructed handle should be a zero value.
+        auto type = inst->getDataType();
+        if (type && type->getOp() == kIROp_DescriptorHandleType)
+        {
+            IRBuilder builder(m_module);
+            builder.setInsertBefore(inst);
+            auto targetCaps = m_sharedContext->m_targetProgram->getTargetReq()->getTargetCaps();
+
+            IRInst* castInst = nullptr;
+            if (targetCaps.implies(CapabilityAtom::spvBindlessTextureNV))
+            {
+                // spvBindlessTextureNV: DescriptorHandle is uint64_t
+                auto uint64Type = builder.getUInt64Type();
+                auto zero64 = builder.getIntValue(uint64Type, 0);
+                castInst =
+                    builder.emitIntrinsicInst(type, kIROp_CastUInt64ToDescriptorHandle, 1, &zero64);
+            }
+            else
+            {
+                // Default: DescriptorHandle is uint2
+                auto uint32Type = builder.getUIntType();
+                auto zero = builder.getIntValue(uint32Type, 0);
+                auto vecType =
+                    builder.getVectorType(uint32Type, builder.getIntValue(builder.getIntType(), 2));
+                auto zeroVec =
+                    builder.emitIntrinsicInst(vecType, kIROp_MakeVectorFromScalar, 1, &zero);
+                castInst =
+                    builder.emitIntrinsicInst(type, kIROp_CastUInt2ToDescriptorHandle, 1, &zeroVec);
+            }
+            inst->replaceUsesWith(castInst);
+            inst->removeAndDeallocate();
+        }
+    }
+
     void processConstructor(IRInst* inst)
     {
         maybeHoistConstructInstToGlobalScope(inst);
@@ -1871,6 +1909,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             case kIROp_PtrLit:
                 processPtrLit(inst);
                 break;
+            case kIROp_DefaultConstruct:
+                processDefaultConstruct(inst);
+                break;
             // kIROp_UnconditionalBranch is handled in default case that only
             // adds children inst and not target inst to work list.
             // Branch target should be added to work list via its parent,
@@ -1907,6 +1948,58 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                     addToWorkList(child);
                 }
                 break;
+            }
+        }
+    }
+
+    // Ensure NonUniform decoration is present on both access-chain ops and their index operands.
+    // This fills gaps after legalization where only the access-chain inst was decorated.
+    void propagateNonUniformAccessChainDecorations()
+    {
+        for (auto globalInst : m_module->getGlobalInsts())
+        {
+            auto func = as<IRFunc>(globalInst);
+            if (!func)
+                continue;
+
+            for (auto block : func->getBlocks())
+            {
+                for (auto inst : block->getChildren())
+                {
+                    IRInst* indexOperand = nullptr;
+                    switch (inst->getOp())
+                    {
+                    case kIROp_GetElement:
+                        indexOperand = inst->getOperand(1);
+                        break;
+                    case kIROp_GetElementPtr:
+                        indexOperand = inst->getOperand(1);
+                        break;
+                    case kIROp_RWStructuredBufferGetElementPtr:
+                        indexOperand = inst->getOperand(1);
+                        break;
+                    default:
+                        break;
+                    }
+
+                    if (!indexOperand)
+                        continue;
+
+                    auto indexDecorated =
+                        indexOperand->findDecoration<IRSPIRVNonUniformResourceDecoration>() !=
+                        nullptr;
+                    auto instDecorated =
+                        inst->findDecoration<IRSPIRVNonUniformResourceDecoration>() != nullptr;
+                    if (!indexDecorated && !instDecorated)
+                        continue;
+
+                    IRBuilder builder(inst);
+                    builder.setInsertBefore(inst);
+                    if (!indexDecorated)
+                        builder.addSPIRVNonUniformResourceDecoration(indexOperand);
+                    if (!instDecorated)
+                        builder.addSPIRVNonUniformResourceDecoration(inst);
+                }
             }
         }
     }
@@ -2382,6 +2475,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         // Inline all pack/unpack storage type functions generated during buffer element
         // lowering pass.
         performForceInlining(m_module);
+
+        propagateNonUniformAccessChainDecorations();
 
         // The above step may produce empty struct types, so we need to lower them out of
         // existence.

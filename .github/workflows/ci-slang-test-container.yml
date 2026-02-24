@@ -97,6 +97,11 @@ jobs:
             slang_test_args+=("-server-count" "${{ inputs.server-count }}")
           fi
 
+          # Skip most neural tests in debug builds to reduce CI time
+          if [[ "${{ inputs.config }}" == "debug" ]]; then
+            slang_test_args+=("-skip-list" "tests/skip-list-debug.txt")
+          fi
+
           "$bin_dir/slang-test" "${slang_test_args[@]}"
 
       - name: Run slangc tests
