@@ -54,7 +54,7 @@ err(
     "unknown patch constant parameter",
     57002,
     "unknown patch constant parameter",
-    span { loc = "location", message = "unknown patch constant parameter '~param'." }
+    span { loc = "location", message = "unknown patch constant parameter '~param:IRInst'." }
 )
 
 err(

@@ -1223,19 +1223,12 @@ void invokePathConstantFuncInHullShader(
     auto constantFunc = as<IRFunc>(patchConstantFuncDecor->getFunc());
     for (auto param : constantFunc->getParams())
     {
-        auto getParamName = [](IRParam* param) -> String
-        {
-            StringBuilder sb;
-            printDiagnosticArg(sb, param);
-            return sb.produceString();
-        };
-
         if (as<IRHLSLOutputPatchType>(param->getDataType()))
         {
             if (!outputPatchArg)
             {
                 context->getSink()->diagnose(Diagnostics::UnknownPatchConstantParameter{
-                    .param = getParamName(param),
+                    .param = param,
                     .location = param->sourceLoc});
                 return;
             }
@@ -1247,7 +1240,7 @@ void invokePathConstantFuncInHullShader(
             if (!inputPatchArg)
             {
                 context->getSink()->diagnose(Diagnostics::UnknownPatchConstantParameter{
-                    .param = getParamName(param),
+                    .param = param,
                     .location = param->sourceLoc});
                 return;
             }
@@ -1263,7 +1256,7 @@ void invokePathConstantFuncInHullShader(
             if (!layout)
             {
                 context->getSink()->diagnose(Diagnostics::UnknownPatchConstantParameter{
-                    .param = getParamName(param),
+                    .param = param,
                     .location = param->sourceLoc});
                 return;
             }
@@ -1271,7 +1264,7 @@ void invokePathConstantFuncInHullShader(
             if (!sysAttr)
             {
                 context->getSink()->diagnose(Diagnostics::UnknownPatchConstantParameter{
-                    .param = getParamName(param),
+                    .param = param,
                     .location = param->sourceLoc});
                 return;
             }
@@ -1288,7 +1281,7 @@ void invokePathConstantFuncInHullShader(
             else
             {
                 context->getSink()->diagnose(Diagnostics::UnknownPatchConstantParameter{
-                    .param = getParamName(param),
+                    .param = param,
                     .location = param->sourceLoc});
                 return;
             }
