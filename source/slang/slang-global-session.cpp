@@ -146,9 +146,13 @@ Session::~Session()
     //
     coreModules = decltype(coreModules)();
 
-    // LIFO teardown required: we must be the current session when destroyed.
-    SLANG_ASSERT(getCurrentASTBuilder() == m_rootASTBuilder);
-    setCurrentASTBuilder(m_previousASTBuilder);
+    // Only restore the previous AST builder if we are still the current session.
+    // When multiple Sessions exist (e.g. slangpy with multiple Devices), destruction
+    // order may not be LIFO (e.g. at process exit). If we are destroyed out of order,
+    // m_previousASTBuilder may point to an already-destroyed Session's root, so we must
+    // not call setCurrentASTBuilder in that case.
+    if (getCurrentASTBuilder() == m_rootASTBuilder)
+        setCurrentASTBuilder(m_previousASTBuilder);
 }
 
 SharedASTBuilder* Session::getSharedASTBuilder()
