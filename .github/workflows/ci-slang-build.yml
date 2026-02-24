@@ -154,6 +154,8 @@ jobs:
               echo "🔧 Using sccache with GCS: ${sccache_path}"
               cmake_launcher_defines+=("-DCMAKE_C_COMPILER_LAUNCHER=${sccache_path}")
               cmake_launcher_defines+=("-DCMAKE_CXX_COMPILER_LAUNCHER=${sccache_path}")
+              # Disable PCH when using sccache (known incompatibility causes linker errors)
+              cmake_launcher_defines+=("-DSLANG_ENABLE_PCH=OFF")
             elif [[ -n "${ccache_symlinks_path:-}" ]]; then
               echo "🔧 Using ccache (local): ${ccache_symlinks_path}"
               echo "🔧 CCACHE_DIR is set to: ${CCACHE_DIR:-'not set'}"

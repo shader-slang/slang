@@ -144,7 +144,6 @@ void BasicTestWithBias(int tid, int resIndex)
     bool isPassed = true;
     isPassed = isPassed && (outputVec[0] == ElementType(39.0) && outputVec[1] == ElementType(80.0));
 
-
     var weightDiffPair = DifferentialPtrPair<Address>(weightAddress, dWeightAddress);
     var biasDiffPair = DifferentialPtrPair<Address>(biasAddress, dBiasAddress);
     let dOutput = OutVectorType(1.0);
@@ -171,7 +170,6 @@ void BasicTestWithBias(int tid, int resIndex)
     // dBias = {1, 1}
     isPassed = isPassed &&
         dParameters[8] == 32.0 && dParameters[9] == 32.0;
-
 
     isPassed = WaveActiveAllTrue(isPassed);
     if (tid == 0)
@@ -249,5 +247,5 @@ void computeMain(uint tid : SV_DispatchThreadID)
 
     cleanupDParameters();
     BasicTestWithBias(tid, 1);
-    // BUFFER: 1
+    // BUFFER-NEXT: 1
 }
