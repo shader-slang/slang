@@ -1,0 +1,145 @@
+# Test workflow for Cloud Run GPU runners (proof of concept)
+#
+# This workflow validates that Cloud Run L4 GPU runners can execute
+# Slang's GPU test suite. It runs independently from the main CI
+# and must be triggered manually.
+#
+# Trigger:
+#   gh workflow run test-cloudrun-gpu.yml
+#
+# Prerequisites:
+#   - Cloud Run worker pool deployed (see cloudrun/setup.sh)
+#   - CREMA autoscaler running
+#   - L4 GPU quota available in us-east4
+
+name: Test Cloud Run GPU Runner
+
+on:
+  workflow_dispatch:
+    inputs:
+      test-scope:
+        description: "Test scope to run"
+        required: true
+        default: "smoke"
+        type: choice
+        options:
+          - smoke
+          - full
+
+jobs:
+  # Basic GPU validation - confirms the Cloud Run instance has working GPU
+  validate-gpu:
+    runs-on: [self-hosted, Linux, GPU]
+    timeout-minutes: 10
+
+    steps:
+      - name: GPU Information
+        run: |
+          echo "=== nvidia-smi ==="
+          nvidia-smi
+
+          echo ""
+          echo "=== CUDA Version ==="
+          nvcc --version || echo "nvcc not in PATH"
+
+          echo ""
+          echo "=== GPU Details ==="
+          nvidia-smi --query-gpu=name,driver_version,memory.total,compute_cap --format=csv
+
+      - name: Vulkan Information
+        run: |
+          echo "=== Vulkan ==="
+          vulkaninfo --summary 2>/dev/null || echo "Vulkan not available"
+
+      - name: Environment
+        run: |
+          echo "=== System ==="
+          uname -a
+          echo ""
+          echo "=== LD_LIBRARY_PATH ==="
+          echo "${LD_LIBRARY_PATH:-not set}"
+          echo ""
+          echo "=== Tools ==="
+          cmake --version | head -1
+          git --version
+          python3 --version
+
+  # Build Slang from source on the Cloud Run runner
+  build:
+    runs-on: [self-hosted, Linux, GPU]
+    needs: validate-gpu
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Configure
+        run: cmake --preset default
+
+      - name: Build (Release)
+        run: cmake --build --preset release >/dev/null 2>&1 || cmake --build --preset release
+
+      - name: Upload test binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: cloudrun-test-binaries
+          path: |
+            build/Release/bin/
+            build/Release/lib/
+          retention-days: 1
+
+  # Run GPU tests
+  test:
+    runs-on: [self-hosted, Linux, GPU]
+    needs: build
+    timeout-minutes: 120
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Download binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: cloudrun-test-binaries
+          path: artifacts
+
+      - name: Setup
+        run: |
+          chmod +x artifacts/bin/* 2>/dev/null || true
+          echo "LD_LIBRARY_PATH=$PWD/artifacts/lib:${LD_LIBRARY_PATH:-}" >> "$GITHUB_ENV"
+          echo "BIN_DIR=$PWD/artifacts/bin" >> "$GITHUB_ENV"
+
+      - name: Run GPU tests (${{ inputs.test-scope }})
+        run: |
+          export SLANG_RUN_SPIRV_VALIDATION=1
+          export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
+
+          test_args=(
+            "-category" "${{ inputs.test-scope }}"
+            "-expected-failure-list" "tests/expected-failure-github.txt"
+            "-skip-reference-image-generation"
+            "-show-adapter-info"
+            "-ignore-abort-msg"
+          )
+
+          # Use expected-failure-linux-gpu.txt only if it exists and is
+          # applicable. L4 may have different capabilities than T4.
+          if [ -f "tests/expected-failure-linux-gpu.txt" ]; then
+            test_args+=("-expected-failure-list" "tests/expected-failure-linux-gpu.txt")
+          fi
+
+          if [ "${{ inputs.test-scope }}" = "full" ]; then
+            test_args+=("-use-test-server" "-server-count" "4")
+          fi
+
+          "$BIN_DIR/slang-test" "${test_args[@]}"
+
+      - name: Run slangc tests
+        run: |
+          PATH="$BIN_DIR:$PATH" tools/slangc-test/test.sh
