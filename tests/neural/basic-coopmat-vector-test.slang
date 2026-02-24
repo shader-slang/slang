@@ -75,9 +75,8 @@ OutputVector MatVecMulAdd<InputVector, OutputVector>(
 // Basic test on MatMul without bias, this test covers both forward and backward pass
 void BasicTestWithoutBias(int tid, int resIndex)
 {
-    typealias ShMemPool = SharedMemoryPool<ShMemSizeLayer1>;
-    typealias InVectorType = WaveTangledVector<ElementType, ShMemPool, InputSize, SubgroupSize>;
-    typealias OutVectorType = WaveTangledVector<ElementType, ShMemPool, OutputSize, SubgroupSize>;
+    typealias InVectorType = WaveTangledVector<ElementType, ShMemSizeLayer1, InputSize, SubgroupSize>;
+    typealias OutVectorType = WaveTangledVector<ElementType, ShMemSizeLayer1, OutputSize, SubgroupSize>;
 
     ElementType[InputSize] inputData = { ElementType(1.0), ElementType(2.0), ElementType(3.0), ElementType(4.0) };
     InVectorType input = InVectorType(inputData);
@@ -128,9 +127,8 @@ void BasicTestWithoutBias(int tid, int resIndex)
 // Basic test on MatMul with bias, this test covers both forward and backward pass
 void BasicTestWithBias(int tid, int resIndex)
 {
-    typealias ShMemPool = SharedMemoryPool<ShMemSizeLayer1>;
-    typealias InVectorType = WaveTangledVector<ElementType, ShMemPool, InputSize, SubgroupSize>;
-    typealias OutVectorType = WaveTangledVector<ElementType, ShMemPool, OutputSize, SubgroupSize>;
+    typealias InVectorType = WaveTangledVector<ElementType, ShMemSizeLayer1, InputSize, SubgroupSize>;
+    typealias OutVectorType = WaveTangledVector<ElementType, ShMemSizeLayer1, OutputSize, SubgroupSize>;
 
     ElementType[InputSize] inputData = { ElementType(1.0), ElementType(2.0), ElementType(3.0), ElementType(4.0) };
     InVectorType input = InVectorType(inputData);
