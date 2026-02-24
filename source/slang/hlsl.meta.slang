@@ -30863,10 +30863,29 @@ CoopVec<T, M> __coopVecMatMulPacked_impl(
     __target_switch
     {
     case spirv:
-        return __coopVecMatMulPacked_impl<T, M, PackedK, U, uint32_t>(
-            input, inputInterpretation, k,
-            __getEquivalentStructuredBuffer<uint32_t>(matrix),
-            matrixOffset, matrixInterpretation, memoryLayout, transpose, matrixStride);
+        let m : int32_t = M;
+        let matrixInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(matrixInterpretation);
+        let inputInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(inputInterpretation);
+        let memoryLayoutSpirv : int32_t = __getSpvCoopVecMatrixLayout(memoryLayout);
+        let matrixBuf = __getEquivalentStructuredBuffer<uint32_t>(matrix);
+        let zero = 0;
+
+        int operands = 0;
+        if (__isSignedInt<U>())
+        {
+            operands |= 0x02;
+        }
+        if (__isSignedInt<T>())
+        {
+            operands |= 0x08;
+        }
+        return spirv_asm
+        {
+            %runtimeArrayType = OpTypeRuntimeArray $$uint32_t;
+            %storagePointerType = OpTypePointer StorageBuffer %runtimeArrayType;
+            %matrixPointer:%storagePointerType = OpAccessChain $matrixBuf $zero;
+            result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulNV $input $inputInterpretationSpirv %matrixPointer $matrixOffset $matrixInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride !operands;
+        };
 
     case hlsl:
         var ret = CoopVec<T, M>(0);
@@ -31093,13 +31112,32 @@ CoopVec<T, M> __coopVecMatMulAddPacked_impl<T : __BuiltinArithmeticType, let M :
     __target_switch
     {
     case spirv:
-        return __coopVecMatMulAddPacked_impl<T, M, PackedK, U, uint32_t>(
-            input, inputInterpretation, k,
-            __getEquivalentStructuredBuffer<uint32_t>(matrix),
-            matrixOffset, matrixInterpretation,
-            __getEquivalentStructuredBuffer<uint32_t>(bias),
-            biasOffset, biasInterpretation,
-            memoryLayout, transpose, matrixStride);
+        let m : int32_t = M;
+        let matrixInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(matrixInterpretation);
+        let biasInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(biasInterpretation);
+        let inputInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(inputInterpretation);
+        let memoryLayoutSpirv : int32_t = __getSpvCoopVecMatrixLayout(memoryLayout);
+        let matrixBuf = __getEquivalentStructuredBuffer<uint32_t>(matrix);
+        let biasBuf = __getEquivalentStructuredBuffer<uint32_t>(bias);
+        let zero = 0;
+
+        int operands = 0;
+        if (__isSignedInt<U>())
+        {
+            operands |= 0x02;
+        }
+        if (__isSignedInt<T>())
+        {
+            operands |= 0x08;
+        }
+        return spirv_asm
+        {
+            %runtimeArrayType = OpTypeRuntimeArray $$uint32_t;
+            %storagePointerType = OpTypePointer StorageBuffer %runtimeArrayType;
+            %matrixPointer:%storagePointerType = OpAccessChain $matrixBuf $zero;
+            %biasPointer:%storagePointerType = OpAccessChain $biasBuf $zero;
+            result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulAddNV $input $inputInterpretationSpirv %matrixPointer $matrixOffset $matrixInterpretationSpirv %biasPointer $biasOffset $biasInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride !operands;
+        };
 
     case hlsl:
         var ret = CoopVec<T, M>(0);
@@ -31353,10 +31391,18 @@ void coopVecOuterProductAccumulate<T : __BuiltinArithmeticType, let M : int, let
         uint memoryLayoutHLSL = __getHLSLCoopVecMatrixLayout(memoryLayout);
         return a.__OuterProductAccumulate(b, matrix, matrixOffset, matrixStride, memoryLayoutHLSL, matrixInterpretationHLSL);
     case spirv:
-        coopVecOuterProductAccumulate<T, M, N, uint32_t>(
-            a, b,
-            __getEquivalentStructuredBuffer<uint32_t>(matrix),
-            matrixOffset, matrixStride, memoryLayout, matrixInterpretation);
+        let matrixInterpretationSpirv : int = __getSpvCoopVecComponentType(matrixInterpretation);
+        let memoryLayoutSpirv : int = __getSpvCoopVecMatrixLayout(memoryLayout);
+        let matrixBuf = __getEquivalentStructuredBuffer<uint32_t>(matrix);
+        let zero = 0;
+        spirv_asm
+        {
+            OpCapability CooperativeVectorTrainingNV;
+            %runtimeArrayType = OpTypeRuntimeArray $$uint32_t;
+            %storagePointerType = OpTypePointer StorageBuffer %runtimeArrayType;
+            %matrixPointer:%storagePointerType = OpAccessChain $matrixBuf $zero;
+            OpCooperativeVectorOuterProductAccumulateNV %matrixPointer $matrixOffset $a $b $memoryLayoutSpirv $matrixInterpretationSpirv $matrixStride;
+        };
     case optix_coopvec:
         __intrinsic_asm "optixCoopVecOuterProductAccumulate($0, $1, (CUdeviceptr)(&$2), $3, $4)";
     default:
@@ -31438,10 +31484,16 @@ void coopVecReduceSumAccumulate<T : __BuiltinArithmeticType, let N : int>(
     case hlsl:
         __intrinsic_asm "__builtin_VectorAccumulate($0, $1, $2)";
     case spirv:
-        coopVecReduceSumAccumulate<T, N, uint32_t>(
-            v,
-            __getEquivalentStructuredBuffer<uint32_t>(buffer),
-            offset);
+        let bufBuf = __getEquivalentStructuredBuffer<uint32_t>(buffer);
+        let zero = 0;
+        spirv_asm
+        {
+            OpCapability CooperativeVectorTrainingNV;
+            %runtimeArrayType = OpTypeRuntimeArray $$uint32_t;
+            %storagePointerType = OpTypePointer StorageBuffer %runtimeArrayType;
+            %bufferPointer:%storagePointerType = OpAccessChain $bufBuf $zero;
+            OpCooperativeVectorReduceSumAccumulateNV %bufferPointer $offset $v;
+        };
     case optix_coopvec:
         __intrinsic_asm "optixCoopVecReduceSumAccumulate($0, (CUdeviceptr)(&$1), $2)";
     default:
