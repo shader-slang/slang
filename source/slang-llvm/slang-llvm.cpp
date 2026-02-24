@@ -797,7 +797,11 @@ SlangResult LLVMDownstreamCompiler::compile(
 
     //
     clang->createFileManager();
+#if LLVM_VERSION_MAJOR <= 21
+    clang->createSourceManager(clang->getFileManager());
+#else
     clang->createSourceManager();
+#endif
 
 
     std::unique_ptr<LLVMContext> llvmContext = std::make_unique<LLVMContext>();
