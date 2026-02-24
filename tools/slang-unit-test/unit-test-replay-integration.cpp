@@ -2,6 +2,8 @@
 // Integration tests: API calls, directory management
 
 #include "unit-test-replay-common.h"
+#include <chrono>
+#include <thread>
 
 // =============================================================================
 // Integration Test: Record actual API calls and verify exact bytes
@@ -288,7 +290,7 @@ SLANG_UNIT_TEST(replayContextFindLatestFolder)
     ctx().disable();
 
     // Small delay to ensure different timestamp
-    // (millisecond precision should be enough)
+    std::this_thread::sleep_for(std::chrono::milliseconds(5));
 
     // Second recording
     ctx().setMode(Mode::Record);
