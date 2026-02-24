@@ -123,6 +123,7 @@ jobs:
         run: |
           cmake --preset default --fresh \
             -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
+            -DSLANG_ENABLE_PCH=OFF \
             -DCMAKE_C_COMPILER_LAUNCHER="${sccache_path}" \
             -DCMAKE_CXX_COMPILER_LAUNCHER="${sccache_path}" \
             -DCMAKE_COMPILE_WARNING_AS_ERROR=true
@@ -177,6 +178,7 @@ jobs:
           fi
           cmake --preset default --fresh \
             -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
+            -DSLANG_ENABLE_PCH=OFF \
             -DCMAKE_C_COMPILER_LAUNCHER="${sccache_path}" \
             -DCMAKE_CXX_COMPILER_LAUNCHER="${sccache_path}" \
             -DCMAKE_COMPILE_WARNING_AS_ERROR=true
@@ -231,6 +233,7 @@ jobs:
           fi
           cmake --preset default --fresh \
             -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
+            -DSLANG_ENABLE_PCH=OFF \
             -DCMAKE_C_COMPILER_LAUNCHER="${sccache_path}" \
             -DCMAKE_CXX_COMPILER_LAUNCHER="${sccache_path}" \
             -DCMAKE_COMPILE_WARNING_AS_ERROR=false
@@ -285,6 +288,7 @@ jobs:
           fi
           cmake --preset default --fresh \
             -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
+            -DSLANG_ENABLE_PCH=OFF \
             -DCMAKE_C_COMPILER_LAUNCHER="${sccache_path}" \
             -DCMAKE_CXX_COMPILER_LAUNCHER="${sccache_path}" \
             -DCMAKE_COMPILE_WARNING_AS_ERROR=false
