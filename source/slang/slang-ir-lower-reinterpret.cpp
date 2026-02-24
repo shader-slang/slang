@@ -91,20 +91,16 @@ struct ReinterpretLoweringContext
         SlangInt fromTypeSize = getAnyValueSize(fromType, targetProgram->getTargetReq());
         if (fromTypeSize < 0)
         {
-            StringBuilder typeSb;
-            getTypeNameHint(typeSb, fromType);
             sink->diagnose(Diagnostics::TypeCannotBePackedIntoAnyValue{
-                .type = typeSb.produceString(),
+                .type = fromType,
                 .location = inst->sourceLoc,
             });
         }
         SlangInt toTypeSize = getAnyValueSize(toType, targetProgram->getTargetReq());
         if (toTypeSize < 0)
         {
-            StringBuilder typeSb;
-            getTypeNameHint(typeSb, toType);
             sink->diagnose(Diagnostics::TypeCannotBePackedIntoAnyValue{
-                .type = typeSb.produceString(),
+                .type = toType,
                 .location = inst->sourceLoc,
             });
         }

@@ -374,13 +374,14 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
                     .typeExp = typeExp.exp});
                 return false;
             }
-            auto witness = tryGetSubtypeWitness(defaultType, CheckProperType(constraintParam->sup));
+            auto constraintType = CheckProperType(constraintParam->sup);
+            auto witness = tryGetSubtypeWitness(defaultType, constraintType);
             if (!witness)
             {
                 // diagnose
                 getSink()->diagnose(Diagnostics::TypeArgumentDoesNotConformToInterface{
                     .typeArg = defaultType,
-                    .interface = CheckProperType(constraintParam->sup),
+                    .interface = constraintType,
                     .location = genericTypeParamDecl->initType.exp->loc});
                 return false;
             }

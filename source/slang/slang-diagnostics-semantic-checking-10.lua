@@ -47,7 +47,7 @@ err(
     "parameter direction does not match requirement",
     38108,
     "parameter direction mismatch",
-    span { loc = "param:Decl", message = "parameter '~param' direction '~actualDirection' does not match interface requirement '~expectedDirection'." }
+    span { loc = "param:Decl", message = "parameter '~param' direction '~actualDirection:ParamPassingMode' does not match interface requirement '~expectedDirection:ParamPassingMode'." }
 )
 
 --
@@ -233,7 +233,7 @@ err(
     "vector with disallowed element type encountered",
     38203,
     "disallowed vector element type",
-    span { loc = "location", message = "vector with disallowed element type '~type' encountered" }
+    span { loc = "location", message = "vector with disallowed element type '~type:IRInst' encountered" }
 )
 
 err(
@@ -247,7 +247,7 @@ err(
     "cannot use resource type in structured buffer",
     38204,
     "resource type in StructuredBuffer",
-    span { loc = "location", message = "StructuredBuffer element type '~type' cannot contain resource or opaque handle types" }
+    span { loc = "location", message = "StructuredBuffer element type '~type:IRInst' cannot contain resource or opaque handle types" }
 )
 
 err(

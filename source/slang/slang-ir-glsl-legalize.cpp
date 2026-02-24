@@ -5304,14 +5304,8 @@ void legalizeDynamicResourcesForGLSL(IRModule* module, CodeGenContext* context)
         }
         else
         {
-            // Get the name if available
-            String paramName;
-            if (auto nameHint = param->findDecoration<IRNameHintDecoration>())
-                paramName = nameHint->getName();
-            else
-                paramName = "unnamed parameter";
-            context->getSink()->diagnose(Diagnostics::AmbiguousReference{
-                .name = paramName,
+            context->getSink()->diagnose(Diagnostics::AmbiguousReferenceIr{
+                .inst = param,
                 .location = param->firstUse->getUser()->sourceLoc});
         }
     }

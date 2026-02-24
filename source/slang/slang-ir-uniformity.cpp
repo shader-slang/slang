@@ -358,11 +358,9 @@ struct ValidateUniformityContext
                                             auto param = getParamAt(func->getFirstBlock(), argi);
                                             if (param->findDecoration<IRDynamicUniformDecoration>())
                                             {
-                                                StringBuilder paramSb;
-                                                printDiagnosticArg(paramSb, param);
                                                 sink->diagnose(
                                                     Diagnostics::ExpectDynamicUniformArgument{
-                                                        .param = paramSb.produceString(),
+                                                        .param = param,
                                                         .location = callInst->sourceLoc,
                                                     });
                                             }

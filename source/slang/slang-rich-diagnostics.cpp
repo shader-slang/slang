@@ -4,6 +4,7 @@
 #include "slang-ast-modifier.h"
 #include "slang-ast-type.h"
 #include "slang-ir.h"
+#include "slang-target.h"
 
 //
 #include "slang-rich-diagnostics.cpp.fiddle"
@@ -84,6 +85,34 @@ String irInstToPrintableString(IRInst* inst)
         return "<unknown>";
     StringBuilder sb;
     printDiagnosticArg(sb, inst);
+    return sb.produceString();
+}
+
+String paramPassingModeToPrintableString(ParamPassingMode mode)
+{
+    StringBuilder sb;
+    printDiagnosticArg(sb, mode);
+    return sb.produceString();
+}
+
+String capabilityAtomListToPrintableString(const List<CapabilityAtom>& list)
+{
+    StringBuilder sb;
+    printDiagnosticArg(sb, list);
+    return sb.produceString();
+}
+
+String astNodeTypeToPrintableString(ASTNodeType nodeType)
+{
+    StringBuilder sb;
+    printDiagnosticArg(sb, nodeType);
+    return sb.produceString();
+}
+
+String codeGenTargetToPrintableString(CodeGenTarget target)
+{
+    StringBuilder sb;
+    printDiagnosticArg(sb, target);
     return sb.produceString();
 }
 
@@ -224,6 +253,14 @@ String irInstToPrintableString(IRInst* inst)
           modifierToPrintableString($(base_expr))
 %           elseif ptype == "irinst" then
           irInstToPrintableString($(base_expr))
+%           elseif ptype == "parampassingmode" then
+          paramPassingModeToPrintableString($(base_expr))
+%           elseif ptype == "capabilityatomlist" then
+          capabilityAtomListToPrintableString($(base_expr))
+%           elseif ptype == "astnodetype" then
+          astNodeTypeToPrintableString($(base_expr))
+%           elseif ptype == "codegentarget" then
+          codeGenTargetToPrintableString($(base_expr))
 %           elseif ptype == "expr" or ptype == "stmt" or ptype == "val" then
           $(base_expr)
 %           else

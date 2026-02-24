@@ -55,6 +55,10 @@ local cpp_type_map = {
 	val = "Val*",
 	modifier = "Modifier*",
 	irinst = "IRInst*",
+	parampassingmode = "ParamPassingMode",
+	capabilityatomlist = "List<CapabilityAtom>",
+	astnodetype = "ASTNodeType",
+	codegentarget = "CodeGenTarget",
 }
 function M.getCppType(lua_type)
 	local mapped = cpp_type_map[lua_type]

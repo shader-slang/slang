@@ -37,10 +37,8 @@ void checkUnsupportedInst(IRModule* module, TargetRequest* target, DiagnosticSin
                 if (!as<IRBasicType>(globalInst->getOperand(0)) &&
                     !as<IRPackedFloatType>(globalInst->getOperand(0)))
                 {
-                    StringBuilder sb;
-                    printDiagnosticArg(sb, globalInst);
                     sink->diagnose(Diagnostics::UnsupportedBuiltinType{
-                        .type = sb.produceString(),
+                        .type = globalInst,
                         .location = findFirstUseLoc(globalInst)});
                 }
                 break;

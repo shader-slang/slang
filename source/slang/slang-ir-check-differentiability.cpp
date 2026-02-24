@@ -546,16 +546,12 @@ public:
                         if (!isNeverDiffFuncType(cast<IRFuncType>(callee->getDataType())) &&
                             !shouldCallImpliesNoDiff(diffTypeContext, call))
                         {
-                            StringBuilder funcNameSb;
-                            printDiagnosticArg(
-                                funcNameSb,
-                                getResolvedInstForDecorations(call->getCallee()));
                             sink->diagnose(
                                 Diagnostics::LossOfDerivativeDueToCallOfNonDifferentiableFunction{
                                     .diffLevel = requiredDiffLevel == DifferentiableLevel::Forward
                                                       ? "forward"
                                                       : "backward",
-                                    .funcName = funcNameSb.produceString(),
+                                    .funcName = getResolvedInstForDecorations(call->getCallee()),
                                     .location = inst->sourceLoc,
                                 });
                         }

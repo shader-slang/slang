@@ -659,10 +659,8 @@ SlangResult BackwardDiffTranscriberBase::prepareFuncForBackwardDiff(IRFunc* func
     {
         // The function is ill-formed and never returns (such as having an infinite loop),
         // we can't possibly reverse-differentiate such functions, so we will diagnose it here.
-        StringBuilder funcNameSb;
-        printDiagnosticArg(funcNameSb, func);
         getSink()->diagnose(Diagnostics::FunctionNeverReturnsFatal{
-            .funcName = funcNameSb.produceString(),
+            .funcName = func,
             .location = func->sourceLoc,
         });
     }

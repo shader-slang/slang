@@ -377,10 +377,8 @@ static void generateCppBindingForFunc(IRFunc* func, DiagnosticSink* sink)
     auto hostReturnType = translateToTupleType(builder, func->getResultType());
     if (!hostReturnType)
     {
-        StringBuilder typeStr;
-        printDiagnosticArg(typeStr, func->getResultType());
         sink->diagnose(Diagnostics::InvalidTorchKernelReturnType{
-            .type = typeStr.produceString(),
+            .type = func->getResultType(),
             .location = func->sourceLoc});
         return;
     }
@@ -409,10 +407,8 @@ static void generateCppBindingForFunc(IRFunc* func, DiagnosticSink* sink)
         auto newParamType = translateToTupleType(builder, paramType);
         if (!newParamType)
         {
-            StringBuilder paramTypeStr;
-            printDiagnosticArg(paramTypeStr, paramType);
             sink->diagnose(Diagnostics::InvalidTorchKernelParamType{
-                .type = paramTypeStr.produceString(),
+                .type = paramType,
                 .location = param->sourceLoc});
             return;
         }
@@ -540,13 +536,9 @@ IRType* translateToHostType(
 
     if (sink)
     {
-        StringBuilder typeStr;
-        printDiagnosticArg(typeStr, type);
-        StringBuilder funcStr;
-        printDiagnosticArg(funcStr, func);
         sink->diagnose(Diagnostics::UnableToAutoMapCudaTypeToHostType{
-            .type = typeStr.produceString(),
-            .func = funcStr.produceString(),
+            .type = type,
+            .func = func,
             .location = type->sourceLoc});
     }
     return nullptr;

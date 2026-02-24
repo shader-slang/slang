@@ -1976,10 +1976,8 @@ static LegalVal legalizeUndefined(IRTypeLegalizationContext* context, IRInst* in
         if (!loc.isValid())
             loc = getDiagnosticPos(opaqueType);
 
-        StringBuilder typeStr;
-        printDiagnosticArg(typeStr, opaqueType);
         context->m_sink->diagnose(Diagnostics::UseOfUninitializedOpaqueHandle{
-            .handleType = typeStr.produceString(),
+            .handleType = opaqueType,
             .location = loc});
     }
 

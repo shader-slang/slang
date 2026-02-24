@@ -40,10 +40,8 @@ static const int SubgroupSize = 32;
 
 typealias ShMemSize = SharedMemorySize<ElementType, TargetEnum.CUDA, ExecutionMode.Training, SubgroupSize, BatchSize / SubgroupSize>;
 typealias ShMemSizeLayer1 = ShMemSize.OfLayer1<InputSize, OutputSize>;
-typealias ShMemPool = SharedMemoryPool<ShMemSizeLayer1>;
-
-typealias InVec = WaveTangledVector<ElementType, ShMemPool, InputSize, SubgroupSize>;
-typealias OutVec = WaveTangledVector<ElementType, ShMemPool, OutputSize, SubgroupSize>;
+typealias InVec = WaveTangledVector<ElementType, ShMemSizeLayer1, InputSize, SubgroupSize>;
+typealias OutVec = WaveTangledVector<ElementType, ShMemSizeLayer1, OutputSize, SubgroupSize>;
 
 // FFLayer with WaveTangledVector and LinearLayout
 typealias Layer = FFLayer<ElementType, InVec, OutVec, LinearLayout, IdentityActivation<ElementType>, true>;

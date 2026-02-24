@@ -2535,11 +2535,9 @@ protected:
                 // If we can't convert the value, report an error.
                 for (auto permittedType : info.permittedTypes)
                 {
-                    StringBuilder typeNameSB;
-                    getTypeNameHint(typeNameSB, permittedType);
                     m_sink->diagnose(Diagnostics::SystemValueTypeIncompatible{
                         .semanticName = semanticName,
-                        .requiredType = typeNameSB.produceString(),
+                        .requiredType = permittedType,
                         .location = var->sourceLoc});
                 }
             }

@@ -7300,12 +7300,9 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
     }
     else if (failureDetails.reason == WitnessSynthesisFailureReason::ParameterDirMismatch)
     {
-        StringBuilder actualDirSb, expectedDirSb;
-        printDiagnosticArg(actualDirSb, failureDetails.actualDir);
-        printDiagnosticArg(expectedDirSb, failureDetails.expectedDir);
         getSink()->diagnose(Diagnostics::ParameterDirectionDoesNotMatchRequirement{
-            .actualDirection = actualDirSb.produceString(),
-            .expectedDirection = expectedDirSb.produceString(),
+            .actualDirection = failureDetails.actualDir,
+            .expectedDirection = failureDetails.expectedDir,
             .param = failureDetails.paramDecl});
     }
     else if (failureDetails.reason == WitnessSynthesisFailureReason::GenericSignatureMismatch)

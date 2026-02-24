@@ -91,7 +91,7 @@ err(
     "inconsistent pointer address space",
     58003,
     "inconsistent pointer address space",
-    span { loc = "location", message = "'~inst': use of pointer with inconsistent address space." }
+    span { loc = "location", message = "'~inst:IRInst': use of pointer with inconsistent address space." }
 )
 
 -- Autodiff checkpoint reporting notes (-1)
@@ -99,7 +99,7 @@ err(
 standalone_note(
     "report checkpoint intermediates",
     -1,
-    "checkpointing context of ~size:Int bytes associated with function: '~func'",
+    "checkpointing context of ~size:Int bytes associated with function: '~func:IRInst'",
     span { loc = "location" }
 )
 

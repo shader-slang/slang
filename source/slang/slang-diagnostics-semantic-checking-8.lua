@@ -166,6 +166,13 @@ err(
 )
 
 err(
+    "ambiguous reference ir",
+    39999,
+    "ambiguous reference to '~inst:IRInst'",
+    span { loc = "location", message = "ambiguous reference to '~inst:IRInst'" }
+)
+
+err(
     "ambiguous expression",
     39999,
     "ambiguous reference",

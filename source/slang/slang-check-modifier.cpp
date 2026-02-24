@@ -692,11 +692,9 @@ Modifier* SemanticsVisitor::validateAttribute(
                 atomsToPrint.reserve(stageToBeUsed.getCount());
                 for (auto i : stageToBeUsed)
                     atomsToPrint.add(i);
-                StringBuilder stagesSb;
-                printDiagnosticArg(stagesSb, atomsToPrint);
                 getSink()->diagnose(Diagnostics::CapabilityHasMultipleStages{
                     .capability = capNameString,
-                    .stages = stagesSb.produceString(),
+                    .stages = atomsToPrint,
                     .location = attr->loc});
             }
             return entryPointAttr;
@@ -1943,10 +1941,8 @@ Modifier* SemanticsVisitor::checkModifier(
         }
         if (as<NamespaceDeclBase>(syntaxNode))
         {
-            StringBuilder astTypeSb;
-            printDiagnosticArg(astTypeSb, syntaxNode->astNodeType);
             getSink()->diagnose(Diagnostics::InvalidVisibilityModifierOnTypeOfDecl{
-                .astNodeType = astTypeSb.produceString(),
+                .astNodeType = syntaxNode->astNodeType,
                 .location = m->loc});
             return m;
         }
@@ -1965,10 +1961,8 @@ Modifier* SemanticsVisitor::checkModifier(
     {
         if (as<NamespaceDeclBase>(syntaxNode))
         {
-            StringBuilder astTypeSb;
-            printDiagnosticArg(astTypeSb, syntaxNode->astNodeType);
             getSink()->diagnose(Diagnostics::InvalidVisibilityModifierOnTypeOfDecl{
-                .astNodeType = astTypeSb.produceString(),
+                .astNodeType = syntaxNode->astNodeType,
                 .location = m->loc});
             return m;
         }

@@ -865,10 +865,8 @@ struct UntaggedUnionLoweringContext : public InstPassBase
             //
             if (sink && !canTypeBeStored(type))
             {
-                StringBuilder typeSb;
-                getTypeNameHint(typeSb, type);
                 sink->diagnose(Diagnostics::TypeCannotBePackedIntoAnyValue{
-                    .type = typeSb.produceString(),
+                    .type = type,
                     .location = type->sourceLoc,
                 });
             }

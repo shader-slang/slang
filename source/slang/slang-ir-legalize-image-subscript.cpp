@@ -38,10 +38,8 @@ void legalizeStore(
 
     if (seperateSampleCoord && isMetalTarget(target))
     {
-        StringBuilder targetSb;
-        printDiagnosticArg(targetSb, target->getTarget());
         sink->diagnose(Diagnostics::MultiSampledTextureDoesNotAllowWrites{
-            .target = targetSb.produceString(),
+            .target = target->getTarget(),
             .location = imageSubscript->getImage()->sourceLoc,
         });
     }

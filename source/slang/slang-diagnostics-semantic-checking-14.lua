@@ -152,28 +152,28 @@ err(
     "invalid torch kernel return type",
     55101,
     "invalid pytorch kernel return type",
-    span { loc = "location", message = "'~type' is not a valid return type for a pytorch kernel function." }
+    span { loc = "location", message = "'~type:IRInst' is not a valid return type for a pytorch kernel function." }
 )
 
 err(
     "invalid torch kernel param type",
     55102,
     "invalid pytorch kernel parameter type",
-    span { loc = "location", message = "'~type' is not a valid parameter type for a pytorch kernel function." }
+    span { loc = "location", message = "'~type:IRInst' is not a valid parameter type for a pytorch kernel function." }
 )
 
 err(
     "unsupported builtin type",
     55200,
     "unsupported builtin type",
-    span { loc = "location", message = "'~type' is not a supported builtin type for the target." }
+    span { loc = "location", message = "'~type:IRInst' is not a supported builtin type for the target." }
 )
 
 err(
     "unsupported recursion",
     55201,
     "recursion not allowed",
-    span { loc = "location", message = "recursion detected in call to '~callee', but the current code generation target does not allow recursion." }
+    span { loc = "location", message = "recursion detected in call to '~callee:IRInst', but the current code generation target does not allow recursion." }
 )
 
 err(
@@ -187,7 +187,7 @@ err(
     "system value type incompatible",
     55203,
     "system value type mismatch",
-    span { loc = "location", message = "system value semantic '~semanticName' should have type '~requiredType' or be convertible to type '~requiredType'." }
+    span { loc = "location", message = "system value semantic '~semanticName' should have type '~requiredType:IRInst' or be convertible to type '~requiredType:IRInst'." }
 )
 
 err(
@@ -208,7 +208,7 @@ err(
     "unable to auto map cuda type to host type",
     56001,
     "CUDA type mapping failed",
-    span { loc = "location", message = "Could not automatically map '~type' to a host type. Automatic binding generation failed for '~func'" }
+    span { loc = "location", message = "Could not automatically map '~type:IRInst' to a host type. Automatic binding generation failed for '~func:IRInst'" }
 )
 
 err(
@@ -222,7 +222,7 @@ err(
     "use of uninitialized opaque handle",
     56003,
     "use of uninitialized opaque handle",
-    span { loc = "location", message = "use of uninitialized opaque handle '~handleType'." }
+    span { loc = "location", message = "use of uninitialized opaque handle '~handleType:IRInst'." }
 )
 
 end

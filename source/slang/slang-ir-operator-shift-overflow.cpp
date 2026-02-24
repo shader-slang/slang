@@ -44,10 +44,8 @@ void checkForOperatorShiftOverflowRecursive(IRInst* inst, DiagnosticSink* sink)
                         IRIntegerValue shiftAmount = rhsLit->getValue();
                         if (sizeAlignment.size * 8 <= shiftAmount)
                         {
-                            StringBuilder lhsTypeSb;
-                            getTypeNameHint(lhsTypeSb, lhsType);
                             sink->diagnose(Diagnostics::OperatorShiftLeftOverflow{
-                                .lhsType = lhsTypeSb.produceString(),
+                                .lhsType = lhsType,
                                 .shiftAmount = shiftAmount,
                                 .location = opInst->sourceLoc,
                             });

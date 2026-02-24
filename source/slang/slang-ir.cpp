@@ -46,6 +46,11 @@ void printDiagnosticArg(StringBuilder& sb, IRInst* irObject)
         sb << linkage->getMangledName();
         return;
     }
+    if (as<IRParam>(irObject))
+    {
+        sb << "unnamed parameter";
+        return;
+    }
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

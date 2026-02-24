@@ -262,13 +262,10 @@ struct BitCastLoweringContext
         {
             if (fromTypeSize.size != toTypeSize.size)
             {
-                StringBuilder fromTypeSb, toTypeSb;
-                getTypeNameHint(fromTypeSb, fromType);
-                getTypeNameHint(toTypeSb, toType);
                 sink->diagnose(Diagnostics::NotEqualBitCastSize{
-                    .fromType = fromTypeSb.produceString(),
+                    .fromType = fromType,
                     .fromSize = fromTypeSize.size,
-                    .toType = toTypeSb.produceString(),
+                    .toType = toType,
                     .toSize = toTypeSize.size,
                     .location = inst->sourceLoc,
                 });
@@ -372,16 +369,18 @@ struct BitCastLoweringContext
         {
             return;
         }
+        if (as<IRHLSLStructuredBufferTypeBase>(fromType) ||
+            as<IRHLSLStructuredBufferTypeBase>(toType))
+        {
+            return;
+        }
 
         if (fromTypeSize.size != toTypeSize.size)
         {
-            StringBuilder fromTypeSb, toTypeSb;
-            getTypeNameHint(fromTypeSb, fromType);
-            getTypeNameHint(toTypeSb, toType);
             sink->diagnose(Diagnostics::NotEqualBitCastSize{
-                .fromType = fromTypeSb.produceString(),
+                .fromType = fromType,
                 .fromSize = fromTypeSize.size,
-                .toType = toTypeSb.produceString(),
+                .toType = toType,
                 .toSize = toTypeSize.size,
                 .location = inst->sourceLoc,
             });

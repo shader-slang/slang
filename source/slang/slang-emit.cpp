@@ -255,11 +255,9 @@ static void reportCheckpointIntermediates(
             continue;
 
         auto func = checkpointDecoration->getSourceFunction();
-        StringBuilder funcNameBuilder;
-        printDiagnosticArg(funcNameBuilder, func);
         sink->diagnose(Diagnostics::ReportCheckpointIntermediates{
             .size = (int64_t)structSize.size,
-            .func = funcNameBuilder.produceString(),
+            .func = func,
             .location = structType->sourceLoc});
         nonEmptyStructs++;
 

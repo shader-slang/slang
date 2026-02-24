@@ -17,13 +17,13 @@ err(
     "type does not fit any value size",
     41011,
     "type does not fit in size required by interface",
-    span { loc = "location", message = "type '~type' does not fit in the size required by its conforming interface." }
+    span { loc = "location", message = "type '~type:IRInst' does not fit in the size required by its conforming interface." }
 )
 
 standalone_note(
     "type and limit",
     -1,
-    "sizeof(~type) is ~size:Int, limit is ~limit:Int",
+    "sizeof(~type:IRInst) is ~size:Int, limit is ~limit:Int",
     span { loc = "location" }
 )
 
@@ -31,14 +31,14 @@ err(
     "type cannot be packed into any value",
     41014,
     "type cannot be packed for dynamic dispatch",
-    span { loc = "location", message = "type '~type' contains fields that cannot be packed into ordinary bytes for dynamic dispatch." }
+    span { loc = "location", message = "type '~type:IRInst' contains fields that cannot be packed into ordinary bytes for dynamic dispatch." }
 )
 
 err(
     "loss of derivative due to call of non differentiable function",
     41020,
     "derivative cannot be propagated through non-differentiable call",
-    span { loc = "location", message = "derivative cannot be propagated through call to non-~diffLevel-differentiable function `~funcName`, use 'no_diff' to clarify intention." }
+    span { loc = "location", message = "derivative cannot be propagated through call to non-~diffLevel-differentiable function `~funcName:IRInst`, use 'no_diff' to clarify intention." }
 )
 
 err(
@@ -66,7 +66,7 @@ warning(
     "operator shift left overflow",
     41030,
     "left shift overflow",
-    span { loc = "location", message = "left shift amount exceeds the number of bits and the result will be always zero, (`~lhsType' << `~shiftAmount:Int`)." }
+    span { loc = "location", message = "left shift amount exceeds the number of bits and the result will be always zero, (`~lhsType:IRInst' << `~shiftAmount:Int`)." }
 )
 
 err(
@@ -96,7 +96,7 @@ err(
     "unresolved symbol",
     45001,
     "unresolved external symbol",
-    span { loc = "location", message = "unresolved external symbol '~symbol'." }
+    span { loc = "location", message = "unresolved external symbol '~symbol:IRInst'." }
 )
 
 -- 41xxx - Semantic checking (continued)
@@ -105,7 +105,7 @@ warning(
     "expect dynamic uniform argument",
     41201,
     "argument might not be dynamic uniform",
-    span { loc = "location", message = "argument for '~param' might not be a dynamic uniform, use `asDynamicUniform()` to silence this warning." }
+    span { loc = "location", message = "argument for '~param:IRInst' might not be a dynamic uniform, use `asDynamicUniform()` to silence this warning." }
 )
 
 warning(
@@ -119,7 +119,7 @@ err(
     "not equal bit cast size",
     41202,
     "bit_cast size mismatch",
-    span { loc = "location", message = "invalid to bit_cast differently sized types: '~fromType' with size '~fromSize:Int' casted into '~toType' with size '~toSize:Int'" }
+    span { loc = "location", message = "invalid to bit_cast differently sized types: '~fromType:IRInst' with size '~fromSize:Int' casted into '~toType:IRInst' with size '~toSize:Int'" }
 )
 
 err(
@@ -154,7 +154,7 @@ err(
     "multi sampled texture does not allow writes",
     41402,
     "cannot write to multisampled texture",
-    span { loc = "location", message = "cannot write to a multisampled texture with target '~target'." }
+    span { loc = "location", message = "cannot write to a multisampled texture with target '~target:CodeGenTarget'." }
 )
 
 err(

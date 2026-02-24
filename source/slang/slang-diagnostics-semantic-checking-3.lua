@@ -100,7 +100,7 @@ err(
     "invalid visibility modifier on type of decl",
     36005,
     "visibility modifier not allowed",
-    span { loc = "location", message = "visibility modifier is not allowed on '~astNodeType'." }
+    span { loc = "location", message = "visibility modifier is not allowed on '~astNodeType:ASTNodeType'." }
 )
 
 --
@@ -209,7 +209,7 @@ err(
     "capability has multiple stages",
     36116,
     "capability targets multiple stages",
-    span { loc = "location", message = "Capability '~capability' is targeting stages '~stages', only allowed to use 1 unique stage here." }
+    span { loc = "location", message = "Capability '~capability' is targeting stages '~stages:CapabilityAtomList', only allowed to use 1 unique stage here." }
 )
 
 err(

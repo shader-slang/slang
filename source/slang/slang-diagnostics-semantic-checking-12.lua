@@ -54,7 +54,7 @@ err(
     "arg is not constexpr",
     40013,
     "argument is not a compile-time constant",
-    span { loc = "location", message = "arg ~argIndex:Int in '~funcName' is not a compile-time constant" }
+    span { loc = "location", message = "arg ~argIndex:Int in '~funcName:IRInst' is not a compile-time constant" }
 )
 
 err(
@@ -68,7 +68,7 @@ err(
     "function never returns fatal",
     40030,
     "function never returns",
-    span { loc = "location", message = "function '~funcName' never returns, compilation ceased." }
+    span { loc = "location", message = "function '~funcName:IRInst' never returns, compilation ceased." }
 )
 
 -- 41000 - IR-level validation issues
@@ -84,7 +84,7 @@ err(
     "recursive type",
     41001,
     "type contains cyclic reference",
-    span { loc = "location", message = "type '~typeName' contains cyclic reference to itself." }
+    span { loc = "location", message = "type '~typeName:IRInst' contains cyclic reference to itself." }
 )
 
 err(

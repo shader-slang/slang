@@ -451,11 +451,9 @@ bool propagateConstExprBackward(PropagateConstExprContext* context, IRGlobalValu
                                 // that. This is not expected.
                                 if (!isConstExpr(arg))
                                 {
-                                    StringBuilder funcNameSb;
-                                    printDiagnosticArg(funcNameSb, calleeFunc);
                                     context->getSink()->diagnose(Diagnostics::ArgIsNotConstexpr{
                                         .argIndex = static_cast<int64_t>(pp + 1),
-                                        .funcName = funcNameSb.produceString(),
+                                        .funcName = calleeFunc,
                                         .location = callInst->sourceLoc,
                                     });
                                     return false;

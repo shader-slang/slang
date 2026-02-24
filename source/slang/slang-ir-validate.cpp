@@ -561,10 +561,8 @@ static void validateVectorOrMatrixElementType(
 {
     auto emitDisallowedTypeError = [&]()
     {
-        StringBuilder sb;
-        getTypeNameHint(sb, elementType);
         sink->diagnose(Diagnostics::VectorWithDisallowedElementTypeEncountered{
-            .type = sb.produceString(),
+            .type = elementType,
             .location = sourceLoc});
     };
 
@@ -747,10 +745,8 @@ void StructuredBufferValidationContext::validateStructuredBufferVariable(IRInst*
     // Check if the element type contains any resource/opaque handle types
     if (containsOpaqueHandleTypeCached(elementType))
     {
-        StringBuilder sb;
-        getTypeNameHint(sb, elementType);
         m_sink->diagnose(Diagnostics::CannotUseResourceTypeInStructuredBuffer{
-            .type = sb.produceString(),
+            .type = elementType,
             .location = inst->sourceLoc});
         m_hasErrors = true;
     }

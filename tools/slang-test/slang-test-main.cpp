@@ -4999,7 +4999,7 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
             else
             {
                 testResult = runTest(context, filePath, outputStem, testName, testDetails.options);
-                if (testResult == TestResult::Fail &&
+                if (testResult == TestResult::Fail && !context->options.disableRetries &&
                     !context->getTestReporter()->m_expectedFailureList.contains(testName))
                 {
                     RefPtr<FileTestInfoImpl> fileTestInfo = new FileTestInfoImpl();
@@ -5462,7 +5462,7 @@ static SlangResult runUnitTestModule(
 
                 // If the test failed and it is not an expected failure, add it to the list of
                 // failed unit tests so that we can retry.
-                if (isFailed && !context->isRetry &&
+                if (isFailed && !context->isRetry && !context->options.disableRetries &&
                     !context->getTestReporter()->m_expectedFailureList.contains(test.testName))
                 {
                     std::lock_guard lock(context->mutexFailedTests);
@@ -5774,7 +5774,7 @@ SlangResult innerMain(int argc, char** argv)
                 context.isRetry = isRetry;
                 if (isRetry)
                 {
-                    if (context.failedUnitTests.getCount() == 0)
+                    if (context.options.disableRetries || context.failedUnitTests.getCount() == 0)
                         break;
 
                     printf("Retrying unit tests...\n");
@@ -5803,43 +5803,48 @@ SlangResult innerMain(int argc, char** argv)
         // If we have a couple failed tests, they maybe intermittent failures due to parallel
         // excution or driver instability. We can try running them again. Debug build has more
         // instability at this moment, so we allow more retries.
+        if (!context.options.disableRetries)
+        {
 #if _DEBUG
-        static constexpr int kFailedTestLimitForRetry = 100;
+            static constexpr int kFailedTestLimitForRetry = 100;
 #else
-        static constexpr int kFailedTestLimitForRetry = 16;
+            static constexpr int kFailedTestLimitForRetry = 16;
 #endif
-        if (context.failedFileTests.getCount() <= kFailedTestLimitForRetry)
-        {
-            if (context.failedFileTests.getCount() > 0)
-                printf("Retrying %d failed tests...\n", (int)context.failedFileTests.getCount());
-            for (auto& test : context.failedFileTests)
+            if (context.failedFileTests.getCount() <= kFailedTestLimitForRetry)
             {
-                context.isRetry = true;
-                FileTestInfoImpl* fileTestInfo = static_cast<FileTestInfoImpl*>(test.Ptr());
-                TestReporter::SuiteScope suiteScope(&reporter, "tests");
-                TestReporter::TestScope scope(&reporter, fileTestInfo->testName);
-                auto newResult = runTest(
-                    &context,
-                    fileTestInfo->filePath,
-                    fileTestInfo->outputStem,
-                    fileTestInfo->testName,
-                    fileTestInfo->options);
-                reporter.addResult(newResult);
+                if (context.failedFileTests.getCount() > 0)
+                    printf(
+                        "Retrying %d failed tests...\n",
+                        (int)context.failedFileTests.getCount());
+                for (auto& test : context.failedFileTests)
+                {
+                    context.isRetry = true;
+                    FileTestInfoImpl* fileTestInfo = static_cast<FileTestInfoImpl*>(test.Ptr());
+                    TestReporter::SuiteScope suiteScope(&reporter, "tests");
+                    TestReporter::TestScope scope(&reporter, fileTestInfo->testName);
+                    auto newResult = runTest(
+                        &context,
+                        fileTestInfo->filePath,
+                        fileTestInfo->outputStem,
+                        fileTestInfo->testName,
+                        fileTestInfo->options);
+                    reporter.addResult(newResult);
+                }
             }
-        }
-        else
-        {
-            // If there are too many failed tests, don't bother retrying.
-            printf(
-                "Too many failed tests for retry(%d) - setting all to failed\n",
-                (int)context.failedFileTests.getCount());
-            fflush(stdout);
-            for (auto& test : context.failedFileTests)
+            else
             {
-                FileTestInfoImpl* fileTestInfo = static_cast<FileTestInfoImpl*>(test.Ptr());
-                TestReporter::SuiteScope suiteScope(&reporter, "tests");
-                TestReporter::TestScope scope(&reporter, fileTestInfo->testName);
-                reporter.addResult(TestResult::Fail);
+                // If there are too many failed tests, don't bother retrying.
+                printf(
+                    "Too many failed tests for retry(%d) - setting all to failed\n",
+                    (int)context.failedFileTests.getCount());
+                fflush(stdout);
+                for (auto& test : context.failedFileTests)
+                {
+                    FileTestInfoImpl* fileTestInfo = static_cast<FileTestInfoImpl*>(test.Ptr());
+                    TestReporter::SuiteScope suiteScope(&reporter, "tests");
+                    TestReporter::TestScope scope(&reporter, fileTestInfo->testName);
+                    reporter.addResult(TestResult::Fail);
+                }
             }
         }
 

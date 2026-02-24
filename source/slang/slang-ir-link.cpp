@@ -1566,10 +1566,8 @@ IRInst* cloneGlobalValueWithLinkage(
     {
         if (auto sink = context->shared->sink)
         {
-            StringBuilder symbolSb;
-            printDiagnosticArg(symbolSb, bestVal);
             sink->diagnose(Diagnostics::UnresolvedSymbol{
-                .symbol = symbolSb.produceString(),
+                .symbol = bestVal,
                 .location = bestVal->sourceLoc,
             });
 
@@ -1845,10 +1843,8 @@ static void diagnoseUnresolvedSymbols(TargetRequest* req, DiagnosticSink* sink, 
                 {
                     if (constant->getOperandCount() == 0)
                     {
-                        StringBuilder symbolSb;
-                        printDiagnosticArg(symbolSb, globalSym);
                         sink->diagnose(Diagnostics::UnresolvedSymbol{
-                            .symbol = symbolSb.produceString(),
+                            .symbol = globalSym,
                             .location = globalSym->sourceLoc,
                         });
                     }
@@ -1863,10 +1859,8 @@ static void diagnoseUnresolvedSymbols(TargetRequest* req, DiagnosticSink* sink, 
                     if (!doesFuncHaveDefinition(funcSym) &&
                         !doesTargetAllowUnresolvedFuncSymbol(req))
                     {
-                        StringBuilder symbolSb;
-                        printDiagnosticArg(symbolSb, globalSym);
                         sink->diagnose(Diagnostics::UnresolvedSymbol{
-                            .symbol = symbolSb.produceString(),
+                            .symbol = globalSym,
                             .location = globalSym->sourceLoc,
                         });
                     }
@@ -1875,10 +1869,8 @@ static void diagnoseUnresolvedSymbols(TargetRequest* req, DiagnosticSink* sink, 
                 {
                     if (!doesWitnessTableHaveDefinition(witnessSym))
                     {
-                        StringBuilder symbolSb;
-                        printDiagnosticArg(symbolSb, witnessSym);
                         sink->diagnose(Diagnostics::UnresolvedSymbol{
-                            .symbol = symbolSb.produceString(),
+                            .symbol = witnessSym,
                             .location = globalSym->sourceLoc,
                         });
                         if (auto concreteType = witnessSym->getConcreteType())

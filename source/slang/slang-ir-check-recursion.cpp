@@ -16,10 +16,8 @@ bool checkTypeRecursionImpl(
     {
         if (!stack.add(elementType))
         {
-            StringBuilder typeNameSb;
-            printDiagnosticArg(typeNameSb, type);
             sink->diagnose(Diagnostics::RecursiveType{
-                .typeName = typeNameSb.produceString(),
+                .typeName = type,
                 .location = (field ? field : type)->sourceLoc,
             });
             return false;
@@ -88,10 +86,8 @@ bool checkFunctionRecursionImpl(
                 continue;
             if (!callStack.add(callee))
             {
-                StringBuilder calleeName;
-                printDiagnosticArg(calleeName, callee);
                 sink->diagnose(Diagnostics::UnsupportedRecursion{
-                    .callee = calleeName.produceString(),
+                    .callee = callee,
                     .location = callInst->sourceLoc});
                 return false;
             }
