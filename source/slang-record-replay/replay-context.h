@@ -634,7 +634,6 @@ public:
     }
 
 private:
-
     // Internal recording functions
     SLANG_API void recordRaw(RecordFlag flags, void* data, size_t size);
     SLANG_API void recordTypeId(TypeId id);

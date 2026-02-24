@@ -19,8 +19,7 @@ void printUsage()
 {
     printf("Usage: slang-replay [options] <record-file>\n");
     printf("Options:\n");
-    printf(
-        "  --decode, -d: Decode the binary stream to human-readable text.\n");
+    printf("  --decode, -d: Decode the binary stream to human-readable text.\n");
     printf(
         "                If given a folder with index.bin, uses structured call-by-call output.\n");
     printf("  --raw, -R: Force raw value-by-value output (ignore index.bin even if present).\n");
