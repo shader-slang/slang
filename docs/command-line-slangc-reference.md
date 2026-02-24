@@ -12,14 +12,14 @@ slangc -help-style markdown -h
 ```
 ### Quick Links
 
-* [General](#General)
-* [Target](#Target)
-* [Downstream](#Downstream)
-* [Debugging](#Debugging)
-* [Repro](#Repro)
-* [Experimental](#Experimental)
-* [Internal](#Internal)
-* [Deprecated](#Deprecated)
+* [General](#general)
+* [Target](#target)
+* [Downstream](#downstream)
+* [Debugging](#debugging)
+* [Repro](#repro)
+* [Experimental](#experimental)
+* [Internal](#internal)
+* [Deprecated](#deprecated)
 * [compiler](#compiler)
 * [language](#language)
 * [language-version](#language-version)
@@ -33,19 +33,19 @@ slangc -help-style markdown -h
 * [debug-level](#debug-level)
 * [file-system-type](#file-system-type)
 * [source-embed-style](#source-embed-style)
-* [target](#target)
+* [target](#target-1)
 * [stage](#stage)
 * [vulkan-shift](#vulkan-shift)
 * [capability](#capability)
 * [file-extension](#file-extension)
 * [help-category](#help-category)
 
-<a id="General"></a>
+<a id="general"></a>
 ## General
 
 General options 
 
-<a id="D"></a>
+<a id="d"></a>
 ### -D
 
 **-D&lt;name&gt;\[=&lt;value&gt;\], -D &lt;name&gt;\[=&lt;value&gt;\]**
@@ -108,7 +108,7 @@ Print this message, or help in specified category.
 Help formatting style 
 
 
-<a id="I"></a>
+<a id="i"></a>
 ### -I
 
 **-I&lt;path&gt;, -I &lt;path&gt;**
@@ -174,7 +174,7 @@ Set the module name to use when compiling multiple .slang source files into a si
 
 Specify a path where generated output should be written. 
 
-If no [-target](#target-1) or [-stage](#stage-1) is specified, one may be inferred from file extension (see [&lt;file-extension&gt;](#file-extension)). If multiple [-target](#target-1) options and a single [-entry](#entry) are present, each [-o](#o) associates with the first [-target](#target-1) to its left. Otherwise, if multiple [-entry](#entry) options are present, each [-o](#o) associates with the first [-entry](#entry) to its left, and with the [-target](#target-1) that matches the one inferred from &lt;path&gt;. 
+If no [-target](#target-2) or [-stage](#stage-1) is specified, one may be inferred from file extension (see [&lt;file-extension&gt;](#file-extension)). If multiple [-target](#target-2) options and a single [-entry](#entry) are present, each [-o](#o) associates with the first [-target](#target-2) to its left. Otherwise, if multiple [-entry](#entry) options are present, each [-o](#o) associates with the first [-entry](#entry) to its left, and with the [-target](#target-2) that matches the one inferred from &lt;path&gt;. 
 
 
 <a id="profile"></a>
@@ -196,7 +196,7 @@ Additional profiles that include [-stage](#stage-1) information:
 
 See [-capability](#capability-1) for information on [&lt;capability&gt;](#capability) 
 
-When multiple [-target](#target-1) options are present, each [-profile](#profile) associates with the first [-target](#target-1) to its left. 
+When multiple [-target](#target-2) options are present, each [-profile](#profile) associates with the first [-target](#target-2) to its left. 
 
 
 <a id="stage-1"></a>
@@ -211,10 +211,10 @@ When multiple [-entry](#entry) options are present, each [-stage](#stage-1) asso
 May be omitted if entry-point function has a \[shader(...)\] attribute; otherwise required for each [-entry](#entry) option. 
 
 
-<a id="target-1"></a>
+<a id="target-2"></a>
 ### -target
 
-**-target &lt;[target](#target)&gt;**
+**-target &lt;[target](#target-1)&gt;**
 
 Specifies the format in which code should be generated. 
 
@@ -254,7 +254,7 @@ all - Treat all warnings as errors.
 Disable specific warning ids. 
 
 
-<a id="W"></a>
+<a id="w"></a>
 ### -W
 
 **-W&lt;id&gt;**
@@ -262,7 +262,7 @@ Disable specific warning ids.
 Enable a warning with the specified id. 
 
 
-<a id="Wno"></a>
+<a id="wno"></a>
 ### -Wno-
 
 **-Wno-&lt;id&gt;**
@@ -377,7 +377,7 @@ Pack bitfields according to MSVC rules (msb first, new field when underlying typ
 
 
 
-<a id="Target"></a>
+<a id="target"></a>
 ## Target
 
 Target code generation options 
@@ -461,7 +461,7 @@ Sets how the `#line` directives should be produced. Available options are:
 If not specified, default behavior is to use C-style `#line` directives for HLSL and C/C++ output, and traditional GLSL-style `#line` directives for GLSL output. 
 
 
-<a id="O"></a>
+<a id="o-1"></a>
 ### -O
 
 **-O&lt;[optimization-level](#optimization-level)&gt;**
@@ -496,11 +496,9 @@ Make data accessed through ConstantBuffer, ParameterBlock, StructuredBuffer, Byt
 
 For example '-fvk-b-shift &lt;N&gt; &lt;space&gt;' shifts by N the inferred binding numbers for all resources in 'b' registers of space &lt;space&gt;. For a resource attached with :register(bX, &lt;space&gt;) but not \[vk::binding(...)\], sets its Vulkan descriptor set to &lt;space&gt; and binding number to X + N. If you need to shift the inferred binding numbers for more than one space, provide more than one such option. If more than one such option is provided for the same space, the last one takes effect. If you need to shift the inferred binding numbers for all sets, use 'all' as &lt;space&gt;. 
 
-* \[DXC description\](https://github.com/Microsoft/DirectXShaderCompiler/blob/main/docs/SPIR-V.rst#implicit-binding-number-assignment) 
-
-* \[GLSL wiki\](https://github.com/KhronosGroup/glslang/wiki/HLSL-FAQ#auto-mapped-binding-numbers) 
-
-
+Links:
+* [DXC description](https://github.com/Microsoft/DirectXShaderCompiler/blob/main/docs/SPIR-V.rst#implicit-binding-number-assignment)
+* [GLSL wiki](https://github.com/KhronosGroup/glslang/wiki/HLSL-FAQ#auto-mapped-binding-numbers)
 
 
 <a id="fvk-bind-globals"></a>
@@ -512,9 +510,8 @@ Places the $Globals cbuffer at descriptor set &lt;descriptor-set&gt; and binding
 
 It lets you specify the descriptor for the source at a certain register. 
 
-* \[DXC description\](https://github.com/Microsoft/DirectXShaderCompiler/blob/main/docs/SPIR-V.rst#implicit-binding-number-assignment) 
-
-
+Links:
+* [DXC description](https://github.com/Microsoft/DirectXShaderCompiler/blob/main/docs/SPIR-V.rst#implicit-binding-number-assignment)
 
 
 <a id="fvk-invert-y"></a>
@@ -615,7 +612,7 @@ Sets a comma-separates list of architecture-specific features for the LLVM targe
 
 
 
-<a id="Downstream"></a>
+<a id="downstream"></a>
 ## Downstream
 
 Downstream compiler options 
@@ -638,12 +635,12 @@ Specify path to a downstream [&lt;compiler&gt;](#compiler) executable or library
 Set a default compiler for the given language. See [-lang](#lang) for the list of languages. 
 
 
-<a id="X"></a>
+<a id="x"></a>
 ### -X
 
 **-X&lt;[compiler](#compiler)&gt; &lt;option&gt; -X&lt;[compiler](#compiler)&gt;... &lt;options&gt; -X.**
 
-Pass arguments to downstream [&lt;compiler&gt;](#compiler). Just [-X&lt;compiler&gt;](#X) passes just the next argument to the downstream compiler. [-X&lt;compiler&gt;](#X)... options [-X](#X). will pass *all* of the options inbetween the opening [-X](#X) and [-X](#X). to the downstream compiler. 
+Pass arguments to downstream [&lt;compiler&gt;](#compiler). Just [-X&lt;compiler&gt;](#x) passes just the next argument to the downstream compiler. [-X&lt;compiler&gt;](#x)... options [-X](#x). will pass *all* of the options inbetween the opening [-X](#x) and [-X](#x). to the downstream compiler. 
 
 
 <a id="pass-through"></a>
@@ -657,7 +654,7 @@ These are intended for debugging/testing purposes, when you want to be able to s
 
 
 
-<a id="Debugging"></a>
+<a id="debugging"></a>
 ## Debugging
 
 Compiler debugging/instrumentation options 
@@ -690,7 +687,7 @@ Dump the IR after every pass for debugging.
 Dump the IDs with [-dump-ir](#dump-ir) (debug builds only) 
 
 
-<a id="E"></a>
+<a id="e"></a>
 ### -E, -output-preprocessor
 Output the preprocessing result and exit. 
 
@@ -767,7 +764,7 @@ Print the minimum and maximum module versions this compiler supports
 
 
 
-<a id="Repro"></a>
+<a id="repro"></a>
 ## Repro
 
 Slang repro system related 
@@ -827,7 +824,7 @@ There are two *special* directories:
 
 
 
-<a id="Experimental"></a>
+<a id="experimental"></a>
 ## Experimental
 
 Experimental options (use at your own risk) 
@@ -909,7 +906,7 @@ Control colored diagnostic output (auto uses color if stderr is a tty)
 
 
 
-<a id="Internal"></a>
+<a id="internal"></a>
 ## Internal
 
 Internal-use options (use at your own risk) 
@@ -1002,7 +999,7 @@ Generate code for all entry points in a single output (library mode).
 
 
 
-<a id="Deprecated"></a>
+<a id="deprecated"></a>
 ## Deprecated
 
 Deprecated options (allowed but ignored; may be removed in future) 
@@ -1162,7 +1159,7 @@ Source Embed Style
 * `u32` : Embed as uint32_t. 
 * `u64` : Embed as uint64_t. 
 
-<a id="target"></a>
+<a id="target-1"></a>
 ## target
 
 Target 
