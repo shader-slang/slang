@@ -133,7 +133,7 @@ option(
     SLANG_ENABLE_TIME_TRACE
     "Enable Clang time trace profiling for build analysis"
 )
-option(SLANG_ENABLE_PCH "Enable precompiled headers for faster builds" ON)
+option(SLANG_ENABLE_PCH "Enable precompiled headers for faster builds" OFF)
 
 option(
     SLANG_STANDARD_MODULE_DEVELOP_BUILD
