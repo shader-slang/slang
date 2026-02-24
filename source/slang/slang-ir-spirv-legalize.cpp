@@ -1952,6 +1952,58 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
     }
 
+    // Ensure NonUniform decoration is present on both access-chain ops and their index operands.
+    // This fills gaps after legalization where only the access-chain inst was decorated.
+    void propagateNonUniformAccessChainDecorations()
+    {
+        for (auto globalInst : m_module->getGlobalInsts())
+        {
+            auto func = as<IRFunc>(globalInst);
+            if (!func)
+                continue;
+
+            for (auto block : func->getBlocks())
+            {
+                for (auto inst : block->getChildren())
+                {
+                    IRInst* indexOperand = nullptr;
+                    switch (inst->getOp())
+                    {
+                    case kIROp_GetElement:
+                        indexOperand = inst->getOperand(1);
+                        break;
+                    case kIROp_GetElementPtr:
+                        indexOperand = inst->getOperand(1);
+                        break;
+                    case kIROp_RWStructuredBufferGetElementPtr:
+                        indexOperand = inst->getOperand(1);
+                        break;
+                    default:
+                        break;
+                    }
+
+                    if (!indexOperand)
+                        continue;
+
+                    auto indexDecorated =
+                        indexOperand->findDecoration<IRSPIRVNonUniformResourceDecoration>() !=
+                        nullptr;
+                    auto instDecorated =
+                        inst->findDecoration<IRSPIRVNonUniformResourceDecoration>() != nullptr;
+                    if (!indexDecorated && !instDecorated)
+                        continue;
+
+                    IRBuilder builder(inst);
+                    builder.setInsertBefore(inst);
+                    if (!indexDecorated)
+                        builder.addSPIRVNonUniformResourceDecoration(indexOperand);
+                    if (!instDecorated)
+                        builder.addSPIRVNonUniformResourceDecoration(inst);
+                }
+            }
+        }
+    }
+
     void determineSpirvVersion()
     {
         // Determine minimum spirv version from target request.
@@ -2423,6 +2475,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         // Inline all pack/unpack storage type functions generated during buffer element
         // lowering pass.
         performForceInlining(m_module);
+
+        propagateNonUniformAccessChainDecorations();
 
         // The above step may produce empty struct types, so we need to lower them out of
         // existence.
