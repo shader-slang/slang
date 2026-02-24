@@ -36,8 +36,6 @@ struct ImplB : ISelfOp
 
 RWStructuredBuffer<float> outputBuffer;
 
-// CHECK: error 30019
-
 [numthreads(1, 1, 1)]
 void computeMain()
 {
@@ -48,5 +46,6 @@ void computeMain()
         obj = ImplB(5.0);
 
     ISelfOp copy = obj.clone();
+    // CHECK: error 30019
     outputBuffer[0] = obj.matches(copy) ? 1.0 : 0.0;
 }

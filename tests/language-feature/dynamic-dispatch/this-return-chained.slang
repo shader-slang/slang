@@ -32,9 +32,9 @@ struct Multiplier : ITransformable
 float applyTwice(ITransformable obj, float factor)
 {
     return obj.transform(factor).transform(factor).getValue();
-    // REPORT: {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
-    // REPORT: {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
-    // REPORT: {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
+    // REPORT: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
+    // REPORT: ([[# @LINE-2]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
+    // REPORT: ([[# @LINE-3]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
 }
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0], stride=4):out,name=outputBuffer
@@ -63,7 +63,11 @@ void computeMain()
     outputBuffer[2] = applyTwice(mid, 3.0);
     // CHECK: 107.0
 
-    // Same patterns with a known type to verify specialization
+    // Same patterns with a known type to verify specialization. The compiler
+    // specializes away dynamic dispatch when the concrete type (Multiplier) is
+    // statically known at the assignment, so no dispatch sites are emitted for
+    // mul.transform or applyTwice(mul, ...). The REPORT test above only runs
+    // on computeMain and thus only checks the interface-typed obj path.
     ITransformable mul = Multiplier(2.0);
     outputBuffer[3] = mul.transform(3.0).transform(4.0).getValue();
     // CHECK: 24.0
