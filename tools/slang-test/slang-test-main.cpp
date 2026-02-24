@@ -5066,6 +5066,32 @@ void runTestsInDirectory(TestContext* context)
         std::shuffle(files.begin(), files.end(), mt);
     }
 
+    // If explicit test order is requested, reorder tests by the order of their matching prefixes.
+    // Tests matching the same prefix maintain alphabetical order (from the sort above).
+    // Tests not matching any prefix appear at the end in alphabetical order.
+    if (context->options.explicitTestOrder && context->options.testPrefixes.getCount() > 0)
+    {
+        auto& prefixes = context->options.testPrefixes;
+        auto getPrefixIndex = [&](const String& filePath) -> Index
+        {
+            for (Index i = 0; i < prefixes.getCount(); i++)
+            {
+                if (filePath.startsWith(prefixes[i]))
+                {
+                    return i;
+                }
+            }
+            return prefixes.getCount(); // No match - put at end
+        };
+
+        // Use stable sort to preserve alphabetical order within same prefix
+        std::stable_sort(
+            files.begin(),
+            files.end(),
+            [&](const String& a, const String& b)
+            { return getPrefixIndex(a) < getPrefixIndex(b); });
+    }
+
     auto processFile = [&](String file)
     {
         if (shouldRunTest(context, file))
