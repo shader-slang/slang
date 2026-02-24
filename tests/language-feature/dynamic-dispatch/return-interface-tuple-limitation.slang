@@ -5,7 +5,9 @@
 // tuple types containing existential elements when they flow through dispatch
 // wrapper functions.
 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl -stage compute -entry computeMain -conformance "FactoryA:IFactory=0" -conformance "FactoryB:IFactory=1" -conformance "FooA:IFoo=0" -conformance "FooB:IFoo=1"
+// Disabled: ICE — SLANG_ASSERT(loweredTupleInfo) only fires in Debug builds;
+// in Release, the null dereference is UB and won't produce error 99999. (#10172)
+//DISABLE_TEST:SIMPLE(filecheck=CHECK):-target hlsl -stage compute -entry computeMain -conformance "FactoryA:IFactory=0" -conformance "FactoryB:IFactory=1" -conformance "FooA:IFoo=0" -conformance "FooB:IFoo=1"
 
 RWStructuredBuffer<float> outputBuffer;
 
