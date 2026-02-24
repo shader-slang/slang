@@ -3118,8 +3118,7 @@ static TestResult runCPPCompilerSharedLibrary(TestContext* context, TestInput& i
     if (SLANG_FAILED(compileRes) || (diagnostics && SLANG_FAILED(diagnostics->getResult())))
     {
         // Compilation failed
-        String actualOutput =
-            diagnostics ? _calcSummary(diagnostics) : String("Compile: Error\n");
+        String actualOutput = diagnostics ? _calcSummary(diagnostics) : String("Compile: Error\n");
 
         // Write the output
         Slang::File::writeAllText(actualOutputPath, actualOutput);
