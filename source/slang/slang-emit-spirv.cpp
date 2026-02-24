@@ -2644,7 +2644,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             return nullptr;
         case kIROp_SPIRVSamplerHeap:
         case kIROp_SPIRVResourceHeap:
-            return ensureDescriptorHeapBuiltinVar(inst);
+            return emitDescriptorHeapBuiltinVar(inst);
         default:
             {
                 if (isSpecConstRateType(inst->getFullType()))
@@ -4669,9 +4669,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 }
             }
             break;
-        case kIROp_SPIRVSamplerHeap:
-        case kIROp_SPIRVResourceHeap:
-            return emitDescriptorHeapBuiltinVar(inst);
 
         case kIROp_GetVulkanRayTracingPayloadLocation:
             {
