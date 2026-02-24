@@ -7120,7 +7120,6 @@ bool SemanticsVisitor::trySynthesizeRequirementWitness(
                     requiredAssocTypeDeclRef,
                     witnessTable);
             case BuiltinRequirementKind::BwdCallableContextType:
-                // case BuiltinRequirementKind::FwdCallableContextType:
                 return trySynthesizeDiffContextTypeRequirementWitness(
                     context,
                     requiredAssocTypeDeclRef,
@@ -12357,6 +12356,19 @@ void SemanticsDeclHeaderVisitor::checkInterfaceRequirement(Decl* decl)
         if (decl->hasModifier<OverrideModifier>())
         {
             getSink()->diagnose(decl, Diagnostics::interfaceRequirementCannotBeOverride);
+        }
+        // [TreatAsDifferentiable] cannot be applied to an interface requirement.
+        if (decl->findModifier<TreatAsDifferentiableAttribute>())
+        {
+            getSink()->diagnose(decl, Diagnostics::treatAsDifferentiableOnInterfaceRequirement);
+        }
+    }
+    else
+    {
+        // [MaybeDifferentiable] can only be applied to interface requirements.
+        if (decl->findModifier<MaybeDifferentiableAttribute>())
+        {
+            getSink()->diagnose(decl, Diagnostics::maybeDifferentiableOnNonInterfaceRequirement);
         }
     }
 }

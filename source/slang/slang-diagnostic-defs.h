@@ -1458,6 +1458,17 @@ DIAGNOSTIC(
     Error,
     interfaceRequirementCannotBeOverride,
     "interface requirement cannot override a base declaration.")
+DIAGNOSTIC(
+    30313,
+    Error,
+    treatAsDifferentiableOnInterfaceRequirement,
+    "'[TreatAsDifferentiable]' cannot be applied to an interface requirement; it can only be "
+    "applied to concrete function definitions.")
+DIAGNOSTIC(
+    30314,
+    Error,
+    maybeDifferentiableOnNonInterfaceRequirement,
+    "'[MaybeDifferentiable]' can only be applied to interface requirements.")
 
 // Interop
 DIAGNOSTIC(
