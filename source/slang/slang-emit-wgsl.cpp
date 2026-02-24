@@ -445,8 +445,7 @@ const char* WGSLSourceEmitter::getWgslImageFormat(IRTextureTypeBase* type)
         getSink()->diagnose(Diagnostics::ImageFormatUnsupportedByBackend{
             .format = imageFormatInfo.name,
             .backend = "WGSL",
-            .replacement = "rgba32float",
-            .location = SourceLoc()});
+            .replacement = "rgba32float"});
         return "rgba32float";
     }
 }

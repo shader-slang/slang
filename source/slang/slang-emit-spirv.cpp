@@ -2753,8 +2753,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             m_sink->diagnose(Diagnostics::ImageFormatUnsupportedByBackend{
                 .format = imageFormatInfo.name,
                 .backend = "SPIRV",
-                .replacement = "unknown",
-                .location = SourceLoc()});
+                .replacement = "unknown"});
             return SpvImageFormatUnknown;
         }
     }

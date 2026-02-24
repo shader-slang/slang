@@ -790,7 +790,7 @@ Expr* ComponentType::parseExprFromString(String exprStr, DiagnosticSink* sink)
     Scope* scope = _getOrCreateScopeForLegacyLookup(astBuilder);
     Expr* expr = linkage->parseTermString(exprStr, scope);
     if (!expr || as<IncompleteExpr>(expr))
-        sink->diagnose(Diagnostics::SyntaxError{.location = SourceLoc()});
+        sink->diagnose(Diagnostics::SyntaxError{});
     return expr;
 }
 

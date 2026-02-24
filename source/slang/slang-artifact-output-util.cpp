@@ -180,8 +180,7 @@ static SlangResult _requireBlob(
     const auto res = write(artifact->getDesc(), blob, writer);
     if (SLANG_FAILED(res))
     {
-        sink->diagnose(
-            Diagnostics::CannotWriteOutputFile{.path = writerName, .location = SourceLoc()});
+        sink->diagnose(Diagnostics::CannotWriteOutputFile{.path = writerName});
     }
     return res;
 }
@@ -259,7 +258,7 @@ static SlangResult _requireBlob(
     const auto res = writeToFile(artifact, path);
     if (SLANG_FAILED(res) && sink)
     {
-        sink->diagnose(Diagnostics::CannotWriteOutputFile{.path = path, .location = SourceLoc()});
+        sink->diagnose(Diagnostics::CannotWriteOutputFile{.path = path});
     }
 
     return res;

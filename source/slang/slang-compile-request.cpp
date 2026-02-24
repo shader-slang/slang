@@ -663,7 +663,7 @@ void FrontEndCompileRequest::addTranslationUnitSourceFile(
     if (SLANG_FAILED(existsRes))
     {
         // Emit a diagnostic!
-        getSink()->diagnose(Diagnostics::CannotOpenFile{.path = path, .location = SourceLoc()});
+        getSink()->diagnose(Diagnostics::CannotOpenFile{.path = path});
         return;
     }
 

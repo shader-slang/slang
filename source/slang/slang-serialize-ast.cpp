@@ -1566,8 +1566,7 @@ NodeBase* ASTSerialReadContext::_readImportedDecl(ASTSerializer const& serialize
     {
         _sink->diagnose(Diagnostics::CannotResolveImportedDecl{
             .decl_name = mangledName,
-            .module_name = importedFromModule->getName(),
-            .location = SourceLoc()});
+            .module_name = importedFromModule->getName()});
     }
     return importedDecl;
 }

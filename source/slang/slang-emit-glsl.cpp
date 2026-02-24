@@ -660,8 +660,7 @@ void GLSLSourceEmitter::_emitGLSLImageFormatModifier(IRInst* var, IRTextureType*
             getSink()->diagnose(Diagnostics::ImageFormatUnsupportedByBackend{
                 .format = formatInfo.name,
                 .backend = "GLSL",
-                .replacement = "unknown",
-                .location = SourceLoc()});
+                .replacement = "unknown"});
             format = ImageFormat::unknown;
         }
 
