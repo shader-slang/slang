@@ -4707,6 +4707,48 @@ static bool _canIgnore(TestContext* context, const TestDetails& details)
     return false;
 }
 
+// Insert a subtest index into a test name, after the file path but before any suffix.
+// e.g., "foo.slang (vk)" with index 0 -> "foo.slang.0 (vk)"
+static String insertSubtestIndex(const String& testName, int index)
+{
+    Index spacePos = testName.indexOf(' ');
+    StringBuilder result;
+    if (spacePos >= 0)
+    {
+        result << testName.subString(0, spacePos) << "." << index
+               << testName.subString(spacePos, testName.getLength() - spacePos);
+    }
+    else
+    {
+        result << testName << "." << index;
+    }
+    return result.produceString();
+}
+
+// Check if a prefix specifies a subtest index (e.g., "foo.slang.1" or "foo.slang.0")
+// Returns the subtest index if found, or -1 if not a subtest prefix.
+static int getSubtestIndex(const String& prefix, const String& filePath)
+{
+    if (prefix.getLength() <= filePath.getLength() || !prefix.startsWith(filePath))
+        return -1;
+
+    auto suffix = prefix.getUnownedSlice().tail(filePath.getLength());
+    if (suffix.getLength() < 2 || suffix[0] != '.')
+        return -1;
+
+    // Check all remaining chars are digits
+    int index = 0;
+    for (Index i = 1; i < suffix.getLength(); i++)
+    {
+        char c = suffix[i];
+        if (c < '0' || c > '9')
+            return -1;
+        index = index * 10 + (c - '0');
+    }
+
+    return index;
+}
+
 static SlangResult _runTestsOnFile(TestContext* context, String filePath)
 {
     // Gather a list of tests to run
@@ -4836,6 +4878,68 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
             testName << ")";
         }
 
+        // Check if any prefix is more specific than the file path (has subtest index).
+        // If so, filter to only run tests whose outputStem matches the prefix.
+        if (context->options.testPrefixes.getCount() > 0)
+        {
+            bool matchesSpecificPrefix = false;
+            bool hasSpecificPrefix = false;
+
+            for (auto& p : context->options.testPrefixes)
+            {
+                int prefixSubtestIndex = getSubtestIndex(p, filePath);
+                if (prefixSubtestIndex >= 0)
+                {
+                    hasSpecificPrefix = true;
+                    // Handle .0 specially - it refers to the first test (no suffix in outputStem)
+                    if (prefixSubtestIndex == 0)
+                    {
+                        if (outputStem == filePath)
+                        {
+                            matchesSpecificPrefix = true;
+                            break;
+                        }
+                    }
+                    else
+                    {
+                        // outputStem must match exactly (e.g., .10 shouldn't match .100)
+                        if (outputStem == p)
+                        {
+                            matchesSpecificPrefix = true;
+                            break;
+                        }
+                    }
+                }
+                else if (filePath.startsWith(p))
+                {
+                    // Non-specific prefix that matches the file - always run
+                    matchesSpecificPrefix = true;
+                    break;
+                }
+            }
+
+            if (hasSpecificPrefix && !matchesSpecificPrefix)
+            {
+                continue;
+            }
+        }
+
+        // In dry-run mode, just print the test name without running
+        if (context->options.dryRun)
+        {
+            // For the first test, show .0 suffix only if there are multiple tests
+            // so users know what to type to select just this test
+            if (subTestIndex == 0 && testList.tests.getCount() > 1)
+            {
+                printf("%s\n", insertSubtestIndex(testName, 0).getBuffer());
+            }
+            else
+            {
+                printf("%s\n", testName.getBuffer());
+            }
+            continue;
+        }
+
         // Report the test and run/ignore
         {
             TestReporter::TestScope scope(context->getTestReporter(), testName);
@@ -4960,6 +5064,12 @@ static bool shouldRunTest(TestContext* context, String filePath)
     for (auto& p : context->options.testPrefixes)
     {
         if (filePath.startsWith(p))
+        {
+            return true;
+        }
+        // Also match if the prefix specifies a subtest index
+        // (e.g., prefix "foo.slang.1" should include file "foo.slang")
+        if (getSubtestIndex(p, filePath) >= 0)
         {
             return true;
         }
@@ -5096,12 +5206,6 @@ void runTestsInDirectory(TestContext* context)
     {
         if (shouldRunTest(context, file))
         {
-            if (context->options.dryRun)
-            {
-                printf("%s\n", file.getBuffer());
-                return;
-            }
-
             SlangResult result = _runTestsOnFile(context, file);
             if (SLANG_FAILED(result))
             {
