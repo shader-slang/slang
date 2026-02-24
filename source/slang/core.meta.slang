@@ -718,7 +718,7 @@ interface IBackwardDifferentiable<FType> where FType : IHasDiffTypeInfo
     __associatedfunc ApplyForBwdFuncType<FType, This.BwdCallable> apply_bwd; // -> apply_bwd
 
     __builtin_requirement($( (int)BuiltinRequirementKind::LegacyBackwardDerivativeFunc))
-    __associatedfunc BwdDiffFuncType<FType> bwd_diff; // -> primal_ctx
+    __associatedfunc BwdDiffFuncType<FType> bwd_diff; // -> bwd_diff
 };
 
 /// `DifferentialPair<T>` is a built-in type that carries both the original and derivative value of a term.

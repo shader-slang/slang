@@ -8158,6 +8158,46 @@ Type* SemanticsVisitor::getBwdCallableBaseType(Type* baseType)
     return m_astBuilder->getBwdCallableBaseType(baseType, diffTypeInfoWitness);
 }
 
+// Walk the witness chain to determine if `targetDecl` appears along the
+// canonical lookup path.  This handles `LookupDeclRef` chains as well as
+// `ExpandSubtypeWitness` / `EachSubtypeWitness` wrappers.
+//
+static bool doesWitnessLookupPathContainDecl(SubtypeWitness* witness, Decl* targetDecl)
+{
+    auto currentWitness = witness;
+    for (;;)
+    {
+        if (auto declaredSubtypeWitness = as<DeclaredSubtypeWitness>(currentWitness))
+        {
+            if (auto lookupDeclRef =
+                    as<LookupDeclRef>(declaredSubtypeWitness->getDeclRef().declRefBase))
+            {
+                if (lookupDeclRef->getDecl() == targetDecl)
+                    return true;
+
+                currentWitness = lookupDeclRef->getWitness();
+            }
+            else
+            {
+                break;
+            }
+        }
+        else if (auto expandWitness = as<ExpandSubtypeWitness>(currentWitness))
+        {
+            currentWitness = expandWitness->getPatternTypeWitness();
+        }
+        else if (auto eachWitness = as<EachSubtypeWitness>(currentWitness))
+        {
+            currentWitness = eachWitness->getPatternTypeWitness();
+        }
+        else
+        {
+            break;
+        }
+    }
+    return false;
+}
+
 bool SemanticsVisitor::findWitnessForInterfaceRequirement(
     ConformanceCheckingContext* context,
     Type* subType,
@@ -8219,42 +8259,13 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
         // TODO: we *really* need a linearization step here!!!!
 
         auto reqType = getBaseType(m_astBuilder, requiredInheritanceDeclRef);
-
-        /*auto interfaceIsReqWitness = m_astBuilder->getDeclaredSubtypeWitness(
-            superInterfaceType,
-            reqType,
-            requiredInheritanceDeclRef);*/
-        // ...
-
-        /*auto subIsReqWitness = m_astBuilder->getTransitiveSubtypeWitness(
-            subTypeConformsToSuperInterfaceWitness,
-            interfaceIsReqWitness);*/
-
-        /*auto subIsReqWitness = m_astBuilder->getDeclaredSubtypeWitness(
-            subTypeConformsToSuperInterfaceWitness->getSub(),
-            reqType,
-            m_astBuilder->getLookupDeclRef(
-                subTypeConformsToSuperInterfaceWitness,
-                requiredInheritanceDeclRef.getDecl()));*/
         auto subIsReqWitness = tryGetSubtypeWitness(subType, reqType);
 
-        // Tiny bit of a hack..
-        bool isCriticalPath = false;
-        if (auto declaredSubtypeWitness = as<DeclaredSubtypeWitness>(subIsReqWitness))
+        bool isOnCanonicalPath =
+            doesWitnessLookupPathContainDecl(subIsReqWitness, requiredInheritanceDeclRef.getDecl());
+        if (isOnCanonicalPath)
         {
-            if (auto lookupDeclRef =
-                    as<LookupDeclRef>(declaredSubtypeWitness->getDeclRef().declRefBase))
-            {
-                if (lookupDeclRef->getDecl() == requiredInheritanceDeclRef.getDecl())
-                {
-                    isCriticalPath = true;
-                }
-            }
-        }
-
-        // Only lower the witness table if this is the critical path.
-        if (isCriticalPath)
-        {
+            // Only create a nested witness table if this is the canonical path.
             RefPtr<WitnessTable> satisfyingWitnessTable = new WitnessTable();
             satisfyingWitnessTable->witnessedType = subType;
             satisfyingWitnessTable->baseType = reqType;
@@ -8276,6 +8287,7 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
         }
         else
         {
+            // Otherwise, store a reference to the canonical path instead.
             witnessTable->add(
                 requiredInheritanceDeclRef.getDecl(),
                 RequirementWitness(subIsReqWitness));
@@ -9230,52 +9242,10 @@ void SemanticsVisitor::_fillInGenericConstraintWitnessTableForInheritance(
         if (!subIsReqWitness)
             continue;
 
-        // Determine if this is the canonical path.
-        // If the witness is a LookupDeclRef that points to the same inheritance decl
-        // we're currently processing, then this is the canonical/critical path.
-        bool isCriticalPath = false;
-
-        auto currentWitness = subIsReqWitness;
-        for (;;)
+        bool isOnCanonicalPath = doesWitnessLookupPathContainDecl(subIsReqWitness, inheritanceDecl);
+        if (isOnCanonicalPath)
         {
-            if (auto declaredSubtypeWitness = as<DeclaredSubtypeWitness>(currentWitness))
-            {
-                if (auto lookupDeclRef =
-                        as<LookupDeclRef>(declaredSubtypeWitness->getDeclRef().declRefBase))
-                {
-                    if (lookupDeclRef->getDecl() == inheritanceDecl)
-                    {
-                        isCriticalPath = true;
-                    }
-
-                    currentWitness = lookupDeclRef->getWitness();
-                }
-                else
-                {
-                    break;
-                }
-            }
-            else if (auto expandWitness = as<ExpandSubtypeWitness>(currentWitness))
-            {
-                currentWitness = expandWitness->getPatternTypeWitness();
-            }
-            else if (auto eachWitness = as<EachSubtypeWitness>(currentWitness))
-            {
-                currentWitness = eachWitness->getPatternTypeWitness();
-            }
-            else
-            {
-                break;
-            }
-        }
-
-        // If this is the critical/canonical path, we need to create a nested witness
-        // table and recursively check for nested inheritance requirements.
-        // If this is NOT the critical path, we store a reference to the canonical
-        // witness so that lookups can be redirected.
-        if (isCriticalPath)
-        {
-            // Create a nested witness table for this inheritance requirement
+            // Create a nested witness table if we are on the canonical path.
             RefPtr<WitnessTable> nestedWitnessTable = new WitnessTable();
             nestedWitnessTable->witnessedType = subType;
             nestedWitnessTable->baseType = reqType;
@@ -9288,8 +9258,9 @@ void SemanticsVisitor::_fillInGenericConstraintWitnessTableForInheritance(
                 reqType,
                 nestedWitnessTable);
         }
-        else if (!isCriticalPath)
+        else
         {
+            // Otherwise, store a reference to the canonical path instead.
             witnessTable->add(inheritanceDecl, RequirementWitness(subIsReqWitness));
         }
     }
