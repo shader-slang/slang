@@ -8,9 +8,11 @@ namespace SlangRecord
 {
 
 #ifndef SLANG_FUNC_SIG
-#ifdef __FUNCSIG__
+#if defined(__FUNCSIG__)
 #define SLANG_FUNC_SIG __FUNCSIG__
-#elif defined(__PRETTY_FUNCTION__)
+#elif defined(__GNUC__) || defined(__clang__)
+// __PRETTY_FUNCTION__ is a predefined identifier (not a macro) in GCC/Clang,
+// so it cannot be detected with defined(), so we test for the compiler instead.
 #define SLANG_FUNC_SIG __PRETTY_FUNCTION__
 #elif defined(__FUNCTION__)
 #define SLANG_FUNC_SIG __FUNCTION__
