@@ -698,13 +698,21 @@ struct TypeFlowSpecializationContext
             {
                 if (conformanceType)
                     return;
-                auto witnessTable = as<IRWitnessTable>(table);
-                if (!witnessTable)
-                    return;
-                auto witnessTableType = as<IRWitnessTableType>(witnessTable->getDataType());
-                if (!witnessTableType)
-                    return;
-                auto ifaceType = witnessTableType->getConformanceType();
+                IRInst* ifaceType = nullptr;
+                if (auto witnessTable = as<IRWitnessTable>(table))
+                {
+                    auto witnessTableType = as<IRWitnessTableType>(witnessTable->getDataType());
+                    if (witnessTableType)
+                        ifaceType = witnessTableType->getConformanceType();
+                }
+                else if (auto unbounded = as<IRUnboundedWitnessTableElement>(table))
+                {
+                    ifaceType = unbounded->getBaseInterfaceType();
+                }
+                else if (auto uninit = as<IRUninitializedWitnessTableElement>(table))
+                {
+                    ifaceType = uninit->getBaseInterfaceType();
+                }
                 if (ifaceType && ifaceType->findDecoration<IRSpecializeDecoration>())
                     conformanceType = ifaceType;
             });
@@ -4386,7 +4394,10 @@ struct TypeFlowSpecializationContext
                         cast<IRSetTagType>(tableTag->getDataType())->getSet());
 
                     if (diagnoseSpecializeOnlyInterface(tableSet, inst->sourceLoc))
+                    {
+                        module->getContainerPool().free(&callArgs);
                         return false;
+                    }
 
                     IRBuilder builder(module);
 
@@ -4410,7 +4421,10 @@ struct TypeFlowSpecializationContext
                     auto lookupKey = cast<IRStructKey>(innerTagMapOperand->getOperand(1));
 
                     if (diagnoseSpecializeOnlyInterface(tableSet, inst->sourceLoc))
+                    {
+                        module->getContainerPool().free(&callArgs);
                         return false;
+                    }
 
                     List<IRInst*> specArgs;
                     for (UInt argIdx = 1; argIdx < specializedTagMapOperand->getOperandCount();
