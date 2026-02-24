@@ -53,16 +53,6 @@ public:
     String render(const GenericDiagnostic& diag)
     {
         DiagnosticLayout layout = createLayout(diag);
-
-        // If we're skipping the source snippet (no valid location), ensure the span message
-        // is empty - otherwise we would be silently dropping important diagnostic information
-        bool hasValidLocation =
-            layout.primaryLoc.line > 0 || layout.primaryLoc.fileName.getLength() > 0;
-        if (!hasValidLocation)
-        {
-            SLANG_ASSERT(diag.primarySpan.message.getLength() == 0);
-        }
-
         return renderFromLayout(layout);
     }
 
@@ -300,7 +290,8 @@ private:
             line.number = span.line;
             if (line.content.getLength() == 0)
             {
-                SourceView* view = m_sourceManager->findSourceView(span.startLoc);
+                SourceView* view =
+                    m_sourceManager ? m_sourceManager->findSourceView(span.startLoc) : nullptr;
                 if (view)
                 {
                     // Get the line content and trim end-of-line characters and trailing whitespace
@@ -529,7 +520,11 @@ private:
         layout.header.code = diag.code;
         layout.header.message = diag.message;
 
-        HumaneSourceLoc humaneLoc = m_sourceManager->getHumaneLoc(diag.primarySpan.range.begin);
+        HumaneSourceLoc humaneLoc;
+        if (m_sourceManager)
+        {
+            humaneLoc = m_sourceManager->getHumaneLoc(diag.primarySpan.range.begin);
+        }
         layout.primaryLoc.fileName = humaneLoc.pathInfo.foundPath;
         layout.primaryLoc.line = humaneLoc.line;
         layout.primaryLoc.col = humaneLoc.column;
@@ -547,7 +542,11 @@ private:
         {
             DiagnosticLayout::NoteEntry noteEntry;
             noteEntry.message = note.message;
-            HumaneSourceLoc noteHumane = m_sourceManager->getHumaneLoc(note.span.range.begin);
+            HumaneSourceLoc noteHumane;
+            if (m_sourceManager)
+            {
+                noteHumane = m_sourceManager->getHumaneLoc(note.span.range.begin);
+            }
             noteEntry.loc.fileName = noteHumane.pathInfo.foundPath;
             noteEntry.loc.line = noteHumane.line;
             noteEntry.loc.col = noteHumane.column;
@@ -567,7 +566,11 @@ private:
 
     LayoutSpan makeLayoutSpan(const DiagnosticSpan& span, bool isPrimary)
     {
-        HumaneSourceLoc humane = m_sourceManager->getHumaneLoc(span.range.begin);
+        HumaneSourceLoc humane;
+        if (m_sourceManager)
+        {
+            humane = m_sourceManager->getHumaneLoc(span.range.begin);
+        }
         return {
             humane.line,
             humane.column,
@@ -661,7 +664,10 @@ String renderDiagnostic(
     return renderer.render(diag);
 }
 
-String renderDiagnosticMachineReadable(SourceManager* sm, const GenericDiagnostic& diag)
+String renderDiagnosticMachineReadable(
+    DiagnosticSink::SourceLocationLexer sll,
+    SourceManager* sm,
+    const GenericDiagnostic& diag)
 {
     StringBuilder sb;
 
@@ -686,17 +692,38 @@ String renderDiagnosticMachineReadable(SourceManager* sm, const GenericDiagnosti
         HumaneSourceLoc beginLoc = sm->getHumaneLoc(span.range.begin);
         HumaneSourceLoc endLoc = sm->getHumaneLoc(span.range.end);
 
+        // When span has zero length (begin == end), use the lexer to find token boundaries,
+        // mirroring the logic in buildSectionLayout for rich diagnostics
+        if (sll && span.range.begin == span.range.end && beginLoc.line > 0)
+        {
+            SourceView* view = sm->findSourceView(span.range.begin);
+            if (view)
+            {
+                UnownedStringSlice rawLine = StringUtil::trimEndOfLine(
+                    view->getSourceFile()->getLineAtIndex(beginLoc.line - 1));
+                UnownedStringSlice lineContent =
+                    UnownedStringSlice(rawLine.begin(), rawLine.trim().end());
+                if (lineContent.getLength() > 0 && beginLoc.column > 0 &&
+                    beginLoc.column - 1 < lineContent.getLength())
+                {
+                    Int64 tokenLen = sll(lineContent.tail(beginLoc.column - 1)).getLength();
+                    if (tokenLen > 0)
+                    {
+                        endLoc.line = beginLoc.line;
+                        endLoc.column = beginLoc.column + tokenLen;
+                    }
+                }
+            }
+        }
+
         // Check for locationless span (0,0)
         bool isLocationless = (beginLoc.line == 0 && beginLoc.column == 0);
         if (isLocationless)
         {
-            // Assert that locationless spans don't have span messages (primary diagnostic
-            // message is fine, but span-specific messages shouldn't appear for locationless
-            // diagnostics)
-            if (strcmp(severity, "span") == 0 || strcmp(severity, "note-span") == 0)
+            // Skip outputting 0,0 spans with no message - they provide no value
+            if ((strcmp(severity, "span") == 0 || strcmp(severity, "note-span") == 0) &&
+                message.getLength() == 0)
             {
-                SLANG_ASSERT(message.getLength() == 0);
-                // Skip outputting 0,0 spans with no message
                 return false;
             }
         }

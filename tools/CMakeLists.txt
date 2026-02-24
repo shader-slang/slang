@@ -273,6 +273,7 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
             slangd
             test-server
             test-process
+            slang-neural-module
         OPTIONAL_REQUIRES
             slang-rt
             slang-glslang
