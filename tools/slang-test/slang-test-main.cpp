@@ -5096,6 +5096,12 @@ void runTestsInDirectory(TestContext* context)
     {
         if (shouldRunTest(context, file))
         {
+            if (context->options.dryRun)
+            {
+                printf("%s\n", file.getBuffer());
+                return;
+            }
+
             SlangResult result = _runTestsOnFile(context, file);
             if (SLANG_FAILED(result))
             {
@@ -5244,6 +5250,12 @@ static SlangResult runUnitTestModule(
 
     auto runUnitTest = [&](TestItem test)
     {
+        if (context->options.dryRun)
+        {
+            printf("%s\n", test.command.getBuffer());
+            return;
+        }
+
         auto reporter = context->getTestReporter();
         TestOptions options = testOptions;
         options.command = test.command;

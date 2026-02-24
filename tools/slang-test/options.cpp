@@ -95,6 +95,7 @@ static bool _isSubCommand(const char* arg)
         "  -shuffle-seed <seed>           Set shuffle seed (default: 1)\n"
         "  -explicit-test-order           Run tests in the order specified on command line\n"
         "                                 (alphabetical for prefixes matching multiple tests)\n"
+        "  -dry-run                       List tests that would be run without running them\n"
 
         // Recent Windows runtime versions started opening a dialog popup window when
         // `abort()` is called, which breaks the CI workflow and some scripts that
@@ -284,6 +285,10 @@ static bool _isSubCommand(const char* arg)
         else if (strcmp(arg, "-explicit-test-order") == 0)
         {
             optionsOut->explicitTestOrder = true;
+        }
+        else if (strcmp(arg, "-dry-run") == 0)
+        {
+            optionsOut->dryRun = true;
         }
         else if (strcmp(arg, "-shuffle-seed") == 0)
         {
