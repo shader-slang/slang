@@ -1307,6 +1307,8 @@ A capability describes an optional feature that a target may or may not support.
 * `SPV_NV_cooperative_matrix2` : enables the SPV_NV_cooperative_matrix2 extension 
 * `SPV_NV_bindless_texture` : enables the SPV_NV_bindless_texture extension 
 * `SPV_EXT_float8` : enables the SPV_EXT_float8 extension 
+* `SPV_EXT_descriptor_heap` : enables the SPV_EXT_descriptor_heap extension 
+* `SPV_KHR_untyped_pointers` : enables the SPV_KHR_untyped_pointers extension 
 * `SPV_KHR_bfloat16` : enables the SPV_KHR_bfloat16 extension 
 * `spvDeviceGroup` 
 * `spvAtomicFloat32AddEXT` 
@@ -1364,6 +1366,7 @@ A capability describes an optional feature that a target may or may not support.
 * `spvVulkanMemoryModelKHR` 
 * `spvVulkanMemoryModelDeviceScopeKHR` 
 * `spvBindlessTextureNV` 
+* `spvDescriptorHeapEXT` 
 * `ser_hlsl_native` 
 * `metallib_latest` 
 * `dxil_lib` 
