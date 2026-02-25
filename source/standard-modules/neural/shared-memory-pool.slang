@@ -2,34 +2,20 @@
 // So we can test this single file by providing -DUNIT_TEST to the compiler.
 implementing neural;
 
-#ifdef UNIT_TEST
-#define VISIBILITY_LEVEL public
-#else
-#define VISIBILITY_LEVEL internal
-#endif
+#include "common-def.slang"
 
 #define Max(A, B) ((A) > (B) ? (A) : (B))
 
 internal typealias SPtr<T> = Ptr<T, Access::ReadWrite, AddressSpace::GroupShared>;
 
-internal interface ISharedMemoryPool
-{
-    internal static SPtr<uint4> getPointer();
-}
-
 public interface ISharedMemorySize
 {
-    public static const uint Bytes;
+    static const uint Bytes;
 }
 
-public struct SharedMemoryPool<ShMemSize: ISharedMemorySize> : ISharedMemoryPool
+public struct SharedMemoryPool<ShMemSize: ISharedMemorySize>
 {
-    public static const uint sizeInBytes = ShMemSize.Bytes;
-    internal static groupshared uint4 data[sizeInBytes / sizeof(uint4)];
-    VISIBILITY_LEVEL static SPtr<uint4> getPointer()
-    {
-        return __getAddress(data[0]);
-    }
+    VISIBILITY_LEVEL static groupshared uint4 data[ShMemSize.Bytes / sizeof(uint4)];
 }
 
 internal struct SharedMemoryUsage<T, TargetEnum Target, ExecutionMode ExeMode, int InputSize, int OutputSize, int SubgroupSize>

@@ -554,7 +554,7 @@ static void validateVectorOrMatrixElementType(
     const DiagnosticInfo& disallowedElementTypeEncountered,
     TargetRequest* targetRequest)
 {
-    if (!isFloatingType(elementType))
+    if (!isFloatingType(elementType) && !isPackedFloatType(elementType))
     {
         if (isIntegralType(elementType))
         {

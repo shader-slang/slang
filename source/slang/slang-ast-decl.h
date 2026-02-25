@@ -704,6 +704,30 @@ class RefAccessorDecl : public AccessorDecl
     FIDDLE(...)
 };
 
+/// A semantic declaration that defines valid types and stages for a system value semantic.
+/// Used to validate `: SV_*` annotations on shader parameters.
+FIDDLE()
+class SemanticDecl : public ContainerDecl
+{
+    FIDDLE(...)
+};
+
+/// A typed getter accessor for a semantic declaration: "get : <type>;"
+FIDDLE()
+class SemanticGetterDecl : public Decl
+{
+    FIDDLE(...)
+    FIDDLE() TypeExp type;
+};
+
+/// A typed setter accessor for a semantic declaration: "set : <type>;"
+FIDDLE()
+class SemanticSetterDecl : public Decl
+{
+    FIDDLE(...)
+    FIDDLE() TypeExp type;
+};
+
 FIDDLE()
 class FuncDecl : public FunctionDeclBase
 {
@@ -994,7 +1018,7 @@ class DerivativeRequirementDecl : public FunctionDeclBase
     FIDDLE() Decl* originalRequirementDecl = nullptr;
 
     // Type to use for 'ThisType'
-    FIDDLE() Type* diffThisType;
+    FIDDLE() Type* diffThisType = nullptr;
 };
 
 // A reference to a synthesized decl representing a differentiable function requirement, this decl

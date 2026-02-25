@@ -23,6 +23,11 @@ Error getLastError()
     return currentError;
 }
 
+std::string getVersionString()
+{
+    return std::string(spGetBuildTagString());
+}
+
 emscripten::val getCompileTargets()
 {
     struct TargetPair

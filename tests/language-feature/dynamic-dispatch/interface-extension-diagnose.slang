@@ -1,9 +1,15 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -gnone
+// The generic extension `extension<T : IInterface> T` adds methods to concrete types
+// conforming to IInterface, but does not extend the interface itself. When a function
+// parameter is interface-typed (dynamic dispatch), the extension method is not
+// available because it is not part of IInterface.
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
-RWStructuredBuffer<float> outputBuffer;
+//TEST:SIMPLE(filecheck=CHECK): -target spirv
+//TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK): -target glsl -stage compute -entry computeMain
 
 #lang slang 2025
+
+RWStructuredBuffer<float> outputBuffer;
 
 interface IInterface
 {
@@ -18,11 +24,6 @@ struct A : IInterface
 struct B : IInterface
 {
     float calc(float x) { return x * x; }
-};
-
-struct C : IInterface
-{
-    float calc(float x) { return x; }
 };
 
 extension<T : IInterface> T
@@ -57,5 +58,5 @@ float f(uint id, float x)
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     outputBuffer[0] = f(0, 3);
-    outputBuffer[1] = f(1, 3); 
+    outputBuffer[1] = f(1, 3);
 }

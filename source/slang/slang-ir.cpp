@@ -2373,6 +2373,15 @@ IRInst* IRBuilder::getFloatValue(IRType* type, IRFloatingPointValue inValue)
     case kIROp_HalfType:
         keyInst.value.floatVal = HalfToFloat(FloatToHalf((float)inValue));
         break;
+    case kIROp_FloatE4M3Type:
+        keyInst.value.floatVal = FloatE4M3ToFloat(FloatToFloatE4M3((float)inValue));
+        break;
+    case kIROp_FloatE5M2Type:
+        keyInst.value.floatVal = FloatE5M2ToFloat(FloatToFloatE5M2((float)inValue));
+        break;
+    case kIROp_BFloat16Type:
+        keyInst.value.floatVal = BFloat16ToFloat(FloatToBFloat16((float)inValue));
+        break;
     default:
         keyInst.value.floatVal = inValue;
         break;
@@ -2795,14 +2804,22 @@ IRExpandTypeOrVal* IRBuilder::getExpandTypeOrVal(
 
 IRRefParamType* IRBuilder::getRefParamType(IRType* valueType, AddressSpace addrSpace)
 {
-    return (IRRefParamType*)
-        getPtrType(kIROp_RefParamType, valueType, AccessQualifier::ReadWrite, addrSpace);
+    return (IRRefParamType*)getPtrType(
+        kIROp_RefParamType,
+        valueType,
+        AccessQualifier::ReadWrite,
+        addrSpace,
+        getDefaultBufferLayoutType());
 }
 
 IRBorrowInParamType* IRBuilder::getBorrowInParamType(IRType* valueType, AddressSpace addrSpace)
 {
-    return (IRBorrowInParamType*)
-        getPtrType(kIROp_BorrowInParamType, valueType, AccessQualifier::Read, addrSpace);
+    return (IRBorrowInParamType*)getPtrType(
+        kIROp_BorrowInParamType,
+        valueType,
+        AccessQualifier::Read,
+        addrSpace,
+        getDefaultBufferLayoutType());
 }
 
 
@@ -2828,7 +2845,8 @@ IRPtrTypeBase* IRBuilder::getPtrTypeWithAddressSpace(
             ptrWithAddrSpace->getOp(),
             valueType,
             ptrWithAddrSpace->getAccessQualifier(),
-            ptrWithAddrSpace->getAddressSpace());
+            ptrWithAddrSpace->getAddressSpace(),
+            ptrWithAddrSpace->getDataLayout());
     return (IRPtrTypeBase*)getPtrType(ptrWithAddrSpace->getOp(), valueType);
 }
 
@@ -2836,23 +2854,30 @@ IRPtrType* IRBuilder::getPtrType(
     IROp op,
     IRType* valueType,
     AccessQualifier accessQualifier,
-    AddressSpace addressSpace)
+    AddressSpace addressSpace,
+    IRType* dataLayoutType)
 {
     return (IRPtrType*)getPtrType(
         op,
         valueType,
         getIntValue(getUInt64Type(), static_cast<IRIntegerValue>(accessQualifier)),
-        getIntValue(getUInt64Type(), static_cast<IRIntegerValue>(addressSpace)));
+        getIntValue(getUInt64Type(), static_cast<IRIntegerValue>(addressSpace)),
+        dataLayoutType);
 }
 
 IRPtrType* IRBuilder::getPtrType(
     IROp op,
     IRType* valueType,
     IRInst* accessQualifier,
-    IRInst* addressSpace)
+    IRInst* addressSpace,
+    IRType* dataLayoutType)
 {
-    IRInst* operands[] = {valueType, accessQualifier, addressSpace};
-    return (IRPtrType*)getType(op, addressSpace ? 3 : 1, operands);
+    IRInst* operands[] = {
+        valueType,
+        accessQualifier,
+        addressSpace,
+        dataLayoutType ? dataLayoutType : getDefaultBufferLayoutType()};
+    return (IRPtrType*)getType(op, addressSpace ? (dataLayoutType ? 4 : 3) : 1, operands);
 }
 
 IRArrayTypeBase* IRBuilder::getArrayTypeBase(
@@ -3704,6 +3729,9 @@ IRInst* IRBuilder::emitDefaultConstruct(IRType* type, bool fallback)
     case kIROp_FloatType:
     case kIROp_HalfType:
     case kIROp_DoubleType:
+    case kIROp_FloatE4M3Type:
+    case kIROp_FloatE5M2Type:
+    case kIROp_BFloat16Type:
         return getFloatValue(type, 0.0);
     case kIROp_VoidType:
         return getVoidValue();
@@ -3867,6 +3895,9 @@ static TypeCastStyle _getTypeStyleId(IRType* type)
     case kIROp_FloatType:
     case kIROp_HalfType:
     case kIROp_DoubleType:
+    case kIROp_FloatE4M3Type:
+    case kIROp_FloatE5M2Type:
+    case kIROp_BFloat16Type:
         return TypeCastStyle::Float;
     case kIROp_BoolType:
         return TypeCastStyle::Bool;
@@ -5068,7 +5099,8 @@ IRType* maybePropagateAddressSpace(IRBuilder* builder, IRInst* basePtr, IRType* 
                     resultPtrType->getOp(),
                     resultPtrType->getValueType(),
                     basePtrType->getAccessQualifier(),
-                    basePtrType->getAddressSpace());
+                    basePtrType->getAddressSpace(),
+                    basePtrType->getDataLayout());
             }
         }
     }
@@ -5079,12 +5111,14 @@ IRInst* IRBuilder::emitFieldAddress(IRInst* basePtr, IRInst* fieldKey)
 {
     AddressSpace addrSpace = AddressSpace::Generic;
     AccessQualifier accessQualifier = AccessQualifier::ReadWrite;
+    IRType* dataLayoutType = getDefaultBufferLayoutType();
     IRInst* valueType = nullptr;
     auto basePtrType = unwrapAttributedType(basePtr->getDataType());
     if (auto ptrType = as<IRPtrTypeBase>(basePtrType))
     {
         accessQualifier = ptrType->getAccessQualifier();
         addrSpace = ptrType->getAddressSpace();
+        dataLayoutType = ptrType->getDataLayout();
         valueType = ptrType->getValueType();
     }
     else if (auto ptrLikeType = as<IRPointerLikeType>(basePtrType))
@@ -5106,7 +5140,10 @@ IRInst* IRBuilder::emitFieldAddress(IRInst* basePtr, IRInst* fieldKey)
         }
     }
     SLANG_RELEASE_ASSERT(resultType);
-    return emitFieldAddress(getPtrType(resultType, accessQualifier, addrSpace), basePtr, fieldKey);
+    return emitFieldAddress(
+        getPtrType(resultType, accessQualifier, addrSpace, dataLayoutType),
+        basePtr,
+        fieldKey);
 }
 
 IRInst* IRBuilder::emitFieldAddress(IRType* type, IRInst* base, IRInst* field)
@@ -5126,6 +5163,9 @@ IRInst* IRBuilder::emitElementExtract(IRType* type, IRInst* base, IRInst* index)
         return vectorFromScalar->getOperand(0);
     if (base->getOp() == kIROp_MakeArrayFromElement)
         return base->getOperand(0);
+
+    if (as<IRTupleType>(base->getDataType()))
+        return emitGetTupleElement(type, base, index);
 
     auto inst = createInst<IRGetElement>(this, kIROp_GetElement, type, base, index);
 
@@ -5211,6 +5251,7 @@ IRInst* IRBuilder::emitElementAddress(IRInst* basePtr, IRInst* index)
 {
     AddressSpace addrSpace = AddressSpace::Generic;
     AccessQualifier accessQualifier = AccessQualifier::ReadWrite;
+    IRType* dataLayoutType = getDefaultBufferLayoutType();
     IRInst* valueType = nullptr;
     auto basePtrType = unwrapAttributedType(basePtr->getDataType());
     if (auto ptrType = as<IRPtrTypeBase>(basePtrType))
@@ -5227,6 +5268,7 @@ IRInst* IRBuilder::emitElementAddress(IRInst* basePtr, IRInst* index)
         {
             addrSpace = ptrType->getAddressSpace();
         }
+        dataLayoutType = ptrType->getDataLayout();
         valueType = ptrType->getValueType();
     }
     else if (auto ptrLikeType = as<IRPointerLikeType>(basePtrType))
@@ -5254,7 +5296,7 @@ IRInst* IRBuilder::emitElementAddress(IRInst* basePtr, IRInst* index)
     auto inst = createInst<IRGetElementPtr>(
         this,
         kIROp_GetElementPtr,
-        getPtrType(type, accessQualifier, addrSpace),
+        getPtrType(type, accessQualifier, addrSpace, dataLayoutType),
         basePtr,
         index);
 
@@ -6399,11 +6441,21 @@ IRInst* IRBuilder::emitRWStructuredBufferGetElementPtr(IRInst* structuredBuffer,
     const auto sbt = cast<IRHLSLStructuredBufferTypeBase>(structuredBuffer->getDataType());
     SLANG_ASSERT(sbt);
     const auto t = getPtrType(sbt->getElementType());
+    return emitRWStructuredBufferGetElementPtr(t->getCanonicalType(), structuredBuffer, index);
+}
+
+IRInst* IRBuilder::emitRWStructuredBufferGetElementPtr(
+    IRType* pointerType,
+    IRInst* structuredBuffer,
+    IRInst* index)
+{
+    const auto sbt = cast<IRHLSLStructuredBufferTypeBase>(structuredBuffer->getDataType());
+    SLANG_ASSERT(sbt);
     IRInst* const operands[2] = {structuredBuffer, index};
     const auto i = createInst<IRRWStructuredBufferGetElementPtr>(
         this,
         kIROp_RWStructuredBufferGetElementPtr,
-        t,
+        pointerType,
         2,
         operands);
     addInst(i);
@@ -7690,6 +7742,11 @@ bool isFloatingType(IRType* t)
     return false;
 }
 
+bool isPackedFloatType(IRType* t)
+{
+    return as<IRPackedFloatType>(t) != nullptr;
+}
+
 Int getIntTypeWidth(TargetRequest* targetReq, IRType* intType)
 {
     switch (intType->getOp())
@@ -7805,11 +7862,16 @@ FloatInfo getFloatingTypeInfo(const IRType* floatType)
     switch (floatType->getOp())
     {
     case kIROp_HalfType:
+    case kIROp_BFloat16Type:
         return {16};
     case kIROp_FloatType:
         return {32};
     case kIROp_DoubleType:
         return {64};
+    case kIROp_FloatE4M3Type:
+    case kIROp_FloatE5M2Type:
+        return {8};
+
     default:
         SLANG_UNEXPECTED("Unhandled type passed to getFloatTypeInfo");
     }
@@ -8682,6 +8744,16 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
         return false;
 
     case kIROp_FRem:
+        return false;
+
+    case kIROp_IsBool:
+    case kIROp_IsFloat:
+    case kIROp_IsCoopFloat:
+    case kIROp_IsInt:
+    case kIROp_IsSignedInt:
+    case kIROp_IsUnsignedInt:
+    case kIROp_IsHalf:
+    case kIROp_IsType:
         return false;
     }
     return true;

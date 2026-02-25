@@ -719,5 +719,16 @@ return {
 	["Decoration.DisallowSpecializationWithExistentialsDecoration"] = 717,
 	["makeCoopMatrixFromScalar"] = 718,
 	["getOptiXPayloadRegister"] = 719,
-	["setOptiXPayloadRegister"] = 720
+	["setOptiXPayloadRegister"] = 720,
+	["Type.PackedFloatType.FloatE4M3Type"] = 721,
+	["Type.PackedFloatType.FloatE5M2Type"] = 722,
+	["Type.PackedFloatType.BFloat16Type"] = 723,
+	["IsCoopFloat"] = 724,
+	["Type.OptionalNoneType"] = 725,
+	["ReinterpretOptional"] = 726,
+	["Type.DefaultPushConstantLayout"] = 727,
+	["Type.D3DConstantBufferLayout"] = 728,
+	["Type.MetalParameterBlockLayout"] = 729,
+	["Type.CUDALayout"] = 730,
+	["Type.LLVMLayout"] = 731,
 }

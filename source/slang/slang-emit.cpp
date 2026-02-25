@@ -746,6 +746,8 @@ Result linkAndOptimizeIR(
     if (!isKhronosTarget(targetRequest) && requiredLoweringPassSet.glslSSBO)
         SLANG_PASS(lowerGLSLShaderStorageBufferObjectsToStructuredBuffers, sink);
 
+    SLANG_PASS(translateEntryPointInParamToBorrow, sink);
+
     if (requiredLoweringPassSet.globalVaryingVar)
         SLANG_PASS(translateGlobalVaryingVar, codeGenContext);
 
@@ -1054,6 +1056,9 @@ Result linkAndOptimizeIR(
         SLANG_PASS(lowerResultType, targetProgram, sink);
 
     if (requiredLoweringPassSet.optionalType)
+        SLANG_PASS(lowerReinterpretOptional, targetProgram, sink);
+
+    if (requiredLoweringPassSet.optionalType)
         SLANG_PASS(lowerOptionalType, sink);
 
     if (requiredLoweringPassSet.nonVectorCompositeSelect)
@@ -1343,6 +1348,19 @@ Result linkAndOptimizeIR(
         //  we need to replace it with just an `X`, after which we
         //  will have (more) legal shader code.
         //
+        // For DXIL/HLSL with NVAPI and SPIRV: add dummy fields to empty ray payloads
+        if (isD3DTarget(targetRequest) || isSPIRV(targetRequest->getTarget()))
+        {
+            SLANG_PASS(legalizeEmptyRayPayloadsForHLSL);
+        }
+
+        // For DXIL only: unwrap ForceVarIntoRayPayloadStructTemporarily instructions
+        // (must run before legalizeExistentialTypeLayout removes empty struct parameters)
+        if (isD3DTarget(targetRequest))
+        {
+            SLANG_PASS(legalizeNonStructParameterToStructForHLSL);
+        }
+
         if (requiredLoweringPassSet.existentialTypeLayout)
         {
             SLANG_PASS(legalizeExistentialTypeLayout, targetProgram, sink);
@@ -1667,7 +1685,10 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::ShaderObjectCode:
     case CodeGenTarget::ShaderHostCallable:
         {
-            SLANG_PASS(legalizeEntryPointVaryingParamsForCPU, codeGenContext->getSink());
+            SLANG_PASS(
+                legalizeEntryPointVaryingParamsForCPU,
+                targetProgram,
+                codeGenContext->getSink());
         }
         break;
 
@@ -1698,10 +1719,6 @@ Result linkAndOptimizeIR(
     if (isD3DTarget(targetRequest) || isKhronosTarget(targetRequest) ||
         isWGPUTarget(targetRequest) || isMetalTarget(targetRequest))
         SLANG_PASS(legalizeLogicalAndOr, targetProgram);
-
-    // Legalize non struct parameters that are expected to be structs for HLSL.
-    if (isD3DTarget(targetRequest))
-        SLANG_PASS(legalizeNonStructParameterToStructForHLSL);
 
     // Create aliases for all dynamic resource parameters.
     if (requiredLoweringPassSet.dynamicResource && isKhronosTarget(targetRequest))
@@ -2608,7 +2625,14 @@ static SlangResult createArtifactFromIR(
     ComPtr<IArtifact>& dbgArtifact)
 {
     List<uint8_t> spirv, outSpirv;
-    emitSPIRVFromIR(codeGenContext, irModule, irEntryPoints, spirv);
+    SLANG_RETURN_ON_FAIL(emitSPIRVFromIR(codeGenContext, irModule, irEntryPoints, spirv));
+
+    // If SPIR-V emission reported any errors, do not continue with
+    // downstream linking/validation/optimization on partial output.
+    if (codeGenContext->getSink()->getErrorCount() != 0)
+    {
+        return SLANG_FAIL;
+    }
 
     auto targetRequest = codeGenContext->getTargetReq();
     auto targetCompilerOptions = targetRequest->getOptionSet();

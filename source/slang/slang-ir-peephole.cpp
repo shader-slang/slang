@@ -1376,6 +1376,41 @@ struct PeepholeContext : InstPassBase
                 }
                 break;
             }
+        case kIROp_IsCoopFloat:
+            {
+                auto type = inst->getOperand(0)->getDataType();
+                if (auto vectorType = as<IRVectorType>(type))
+                    type = vectorType->getElementType();
+                if (auto matType = as<IRMatrixType>(type))
+                    type = matType->getElementType();
+                if (isConcreteType(type))
+                {
+                    bool result = false;
+                    if (isFloatingType(type))
+                    {
+                        result = true;
+                    }
+                    else
+                    {
+                        switch (type->getOp())
+                        {
+                        case kIROp_FloatE5M2Type:
+                        case kIROp_FloatE4M3Type:
+                        case kIROp_BFloat16Type:
+                            result = true;
+                            break;
+                        }
+                    }
+                    IRBuilder builder(module);
+                    IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+                    builder.setInsertBefore(inst);
+
+                    inst->replaceUsesWith(builder.getBoolValue(result));
+                    maybeRemoveOldInst(inst);
+                    changed = true;
+                }
+                break;
+            }
         case kIROp_Load:
             {
                 // An attempt to load from an undefined pointer value

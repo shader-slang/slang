@@ -126,6 +126,8 @@ struct SCCPContext
         case kIROp_Leq:
         case kIROp_Geq:
         case kIROp_Less:
+        case kIROp_And:
+        case kIROp_Or:
         case kIROp_IRem:
         case kIROp_FRem:
         case kIROp_Greater:
@@ -330,6 +332,9 @@ struct SCCPContext
         case kIROp_FloatType:
         case kIROp_DoubleType:
         case kIROp_HalfType:
+        case kIROp_FloatE4M3Type:
+        case kIROp_FloatE5M2Type:
+        case kIROp_BFloat16Type:
             switch (irConstant->getOp())
             {
             case kIROp_FloatLit:
@@ -389,6 +394,9 @@ struct SCCPContext
         case kIROp_FloatType:
         case kIROp_DoubleType:
         case kIROp_HalfType:
+        case kIROp_FloatE4M3Type:
+        case kIROp_FloatE5M2Type:
+        case kIROp_BFloat16Type:
             resultVal = getBuilder()->getFloatValue(type, (IRFloatingPointValue)0.0);
             break;
 
@@ -930,7 +938,7 @@ struct SCCPContext
         //
         // For now we implement only basic folding operations for
         // scalar values.
-        if (!as<IRBasicType>(inst->getDataType()))
+        if (!as<IRBasicType>(inst->getDataType()) && !as<IRPackedFloatType>(inst->getDataType()))
             return LatticeVal::getAny();
 
         switch (inst->getOp())

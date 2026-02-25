@@ -97,10 +97,13 @@ bool opCanBeConstExpr(IROp op)
     case kIROp_Less:
     case kIROp_Neq:
     case kIROp_Eql:
+    case kIROp_And:
+    case kIROp_Or:
     case kIROp_BitAnd:
     case kIROp_BitOr:
     case kIROp_BitXor:
     case kIROp_BitNot:
+    case kIROp_Not:
     case kIROp_Lsh:
     case kIROp_Rsh:
     case kIROp_Select:

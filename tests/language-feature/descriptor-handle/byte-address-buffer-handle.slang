@@ -32,7 +32,7 @@ struct PushConstant
 [[vk::push_constant]] PushConstant constant;
 
 [shader("fragment")]
-void main_test_fs(float2 fragment_coord: SV_Position, out float4 color: SV_Target)
+void main_test_fs(float4 fragment_coord: SV_Position, out float4 color: SV_Target)
 {
     color = float4(constant.test_buffer.Load<uint3>(0), 1.0);
 }

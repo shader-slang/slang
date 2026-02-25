@@ -579,6 +579,9 @@ Extensions
 `SPV_EXT_descriptor_indexing`
 > Represents the SPIR-V extension for descriptor indexing.
 
+`SPV_EXT_float8`
+> Represents the SPIR-V extension for SPV_EXT_float8.
+
 `SPV_EXT_fragment_fully_covered`
 > Represents the SPIR-V extension for SPV_EXT_fragment_fully_covered.
 
@@ -610,6 +613,9 @@ Extensions
 
 `SPV_GOOGLE_user_type`
 > Represents the SPIR-V extension for SPV_GOOGLE_user_type.
+
+`SPV_KHR_bfloat16`
+> Represents the SPIR-V extension for BFloat16 types.
 
 `SPV_KHR_compute_shader_derivatives`
 > Represents the SPIR-V extension for compute shader derivatives.
@@ -706,6 +712,9 @@ Extensions
 `spvAtomicFloat64MinMaxEXT`
 > Represents the SPIR-V capability for atomic float 64 min/max operations.
 
+`spvBFloat16KHR`
+> Represents the SPIR-V capability for using bf16 floating point type.
+
 `spvBindlessTextureNV`
 > Represents the SPIR-V capability for the bindless texture.
 
@@ -744,6 +753,9 @@ Extensions
 
 `spvDeviceGroup`
 > Represents the SPIR-V capability for DeviceGroup.
+
+`spvFloat8EXT`
+> Represents the SPIR-V capability for using 8-bit floating point types.
 
 `spvFragmentBarycentricKHR`
 > Represents the SPIR-V capability for using SPV_KHR_fragment_shader_barycentric.
@@ -898,6 +910,9 @@ Compound Capabilities
 `atomic64`
 > Capabilities needed for int64/uint64 atomic operations
 
+`atomic_bfloat16`
+> Atomic operations on BFloat16 types. Requires SM 9.0 (Hopper) or higher on CUDA.
+
 `atomic_glsl`
 > (GLSL/SPIRV) Capabilities required to use GLSL-400 atomic operations
 
@@ -939,6 +954,10 @@ Compound Capabilities
 
 `atomic_hlsl_sm_6_6`
 > (hlsl only) Capabilities required to use hlsl sm_6_6 atomics
+
+`atomic_reduce`
+> Atomic reduction operations using PTX `red` instruction. Requires SM 7.0 on CUDA.
+> On non-CUDA targets, falls back to regular atomic operations with no additional requirement.
 
 `atomicfloat`
 > Capabilities needed to use GLSL-tier-1 float-atomic operations
@@ -1124,6 +1143,9 @@ Compound Capabilities
 
 `cuda_spirv`
 > CUDA and SPIRV code-gen targets
+
+`descriptor_handle`
+> Targets that support DescriptorHandle types for bindless descriptor access.
 
 `domain_hull`
 > Collection of shader stages

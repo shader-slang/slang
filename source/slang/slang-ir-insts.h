@@ -2614,6 +2614,11 @@ struct IRDebugVar : IRInst
     IRInst* getLine() { return getOperand(1); }
     IRInst* getCol() { return getOperand(2); }
     IRInst* getArgIndex() { return getOperandCount() >= 4 ? getOperand(3) : nullptr; }
+    void setArgIndex(IRInst* argIndex)
+    {
+        if (getOperandCount() >= 4)
+            setOperand(3, argIndex);
+    }
 };
 
 FIDDLE()
@@ -2960,10 +2965,18 @@ struct IR$(inst.struct_name) : IR$(inst.parent_struct)
     }
 %   end
 %   for _, operand in ipairs(inst.operands) do
-%     if operand.has_type then
-    $(operand.type)* $(operand.getter_name)() { return ($(operand.type)*)getOperand($(operand.index)); }
+%     if operand.optional then
+%       if operand.has_type then
+    $(operand.type)* $(operand.getter_name)() { return getOperandCount() > $(operand.index) ? ($(operand.type)*)getOperand($(operand.index)) : nullptr; }
+%       else
+    IRInst* $(operand.getter_name)() { return getOperandCount() > $(operand.index) ? getOperand($(operand.index)) : nullptr; }
+%       end
 %     else
+%       if operand.has_type then
+    $(operand.type)* $(operand.getter_name)() { return ($(operand.type)*)getOperand($(operand.index)); }
+%       else
     IRInst* $(operand.getter_name)() { return getOperand($(operand.index)); }
+%       end
 %     end
 %   end
 };
@@ -3305,26 +3318,37 @@ $(type_info.return_type) $(type_info.method_name)(
         IROp op,
         IRType* valueType,
         AccessQualifier accessQualifier,
-        AddressSpace addressSpace);
+        AddressSpace addressSpace,
+        IRType* dataLayoutType);
     IRPtrType* getPtrType(
         IROp op,
         IRType* valueType,
         IRInst* accessQualifier,
-        IRInst* addressSpace);
-    IRPtrType* getPtrType(IROp op, IRType* valueType, AddressSpace addressSpace)
+        IRInst* addressSpace,
+        IRType* dataLayoutType);
+    IRPtrType* getPtrType(
+        IROp op,
+        IRType* valueType,
+        AddressSpace addressSpace,
+        IRType* dataLayoutType)
     {
-        return getPtrType(op, valueType, AccessQualifier::ReadWrite, addressSpace);
+        return getPtrType(op, valueType, AccessQualifier::ReadWrite, addressSpace, dataLayoutType);
     }
     IRPtrType* getPtrType(
         IRType* valueType,
         AccessQualifier accessQualifier,
-        AddressSpace addressSpace)
+        AddressSpace addressSpace,
+        IRType* dataLayoutType)
     {
-        return getPtrType(kIROp_PtrType, valueType, accessQualifier, addressSpace);
+        return getPtrType(kIROp_PtrType, valueType, accessQualifier, addressSpace, dataLayoutType);
     }
     IRPtrType* getPtrType(IRType* valueType, AddressSpace addressSpace)
     {
-        return getPtrType(valueType, AccessQualifier::ReadWrite, addressSpace);
+        return getPtrType(
+            valueType,
+            AccessQualifier::ReadWrite,
+            addressSpace,
+            getDefaultBufferLayoutType());
     }
     // Copies the op-type of the oldPtrType, access-qualifier and address-space.
     // Does not reuse the same `inst` for access-qualifier and address-space.
@@ -3334,7 +3358,8 @@ $(type_info.return_type) $(type_info.method_name)(
             oldPtrType->getOp(),
             valueType,
             oldPtrType->getAccessQualifier(),
-            oldPtrType->getAddressSpace());
+            oldPtrType->getAddressSpace(),
+            oldPtrType->getDataLayout());
     }
 
     /// Get a GLSL output parameter group type
@@ -4163,6 +4188,10 @@ $(type_info.return_type) $(type_info.method_name)(
     IRInst* emitGenericAsm(UnownedStringSlice asmText);
 
     IRInst* emitRWStructuredBufferGetElementPtr(IRInst* structuredBuffer, IRInst* index);
+    IRInst* emitRWStructuredBufferGetElementPtr(
+        IRType* pointerType,
+        IRInst* structuredBuffer,
+        IRInst* index);
 
     IRInst* emitNonUniformResourceIndexInst(IRInst* val);
 

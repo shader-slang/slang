@@ -15,10 +15,14 @@ public:
     SemanticVersion m_smVersion;
 
     void requireBaseType(BaseType baseType) { m_baseTypeFlags |= _getFlag(baseType); }
+    void requireBfloat16() { m_requireBF16 = true; }
+    void requireFp8() { m_requireFp8 = true; }
     bool isBaseTypeRequired(BaseType baseType)
     {
         return (m_baseTypeFlags & _getFlag(baseType)) != 0;
     }
+    bool isFp8Required() { return m_requireFp8; }
+    bool isBfloat16Required() { return m_requireBF16; }
     void requireBaseTypes(BaseTypeFlags flags) { m_baseTypeFlags |= flags; }
 
     /// Ensure that the generated code is compiled for at least CUDA SM `version`
@@ -32,7 +36,8 @@ public:
 
 protected:
     static BaseTypeFlags _getFlag(BaseType baseType) { return BaseTypeFlags(1) << int(baseType); }
-
+    bool m_requireBF16 = false;
+    bool m_requireFp8 = false;
     BaseTypeFlags m_baseTypeFlags = 0;
 };
 

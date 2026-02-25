@@ -1,7 +1,12 @@
 -- Lua helper functions for rich diagnostic data processing
 -- This file provides helper functions for FIDDLE templates in slang-rich-diagnostics.h
 
--- Load the diagnostic definitions
+-- Load shared helpers for edit distance functions
+local helpers = dofile("source/slang/slang-diagnostics-helpers.lua")
+local edit_distance = helpers.edit_distance
+local find_similar = helpers.find_similar
+
+-- Load the diagnostic definitions (this processes using helpers internally)
 local diagnostics_module = dofile("source/slang/slang-diagnostics.lua")
 
 local M = {}
@@ -24,6 +29,7 @@ end
 local cpp_type_map = {
 	string = "String",
 	type = "Type*",
+	qualtype = "QualType",
 	int = "int",
 	name = "Name*",
 	decl = "Decl*",
@@ -39,12 +45,26 @@ function M.getCppType(lua_type)
 			supported[#supported + 1] = key
 		end
 		table.sort(supported)
-		error(
-			"Unknown type '"
-				.. lua_type
-				.. "' in diagnostic parameter. Supported types: "
-				.. table.concat(supported, ", ")
-		)
+
+		-- Find similar types using edit distance
+		local similar = find_similar(lua_type, supported, 3)
+
+		local msg = "Unknown type '" .. lua_type .. "' in diagnostic parameter."
+
+		if #similar > 0 then
+			msg = msg .. "\n  Did you mean: "
+			local suggestions = {}
+			for i, s in ipairs(similar) do
+				if i <= 3 then  -- Limit to top 3 suggestions
+					table.insert(suggestions, "'" .. s.name .. "'")
+				end
+			end
+			msg = msg .. table.concat(suggestions, ", ") .. "?"
+		end
+
+		msg = msg .. "\n  Supported types: " .. table.concat(supported, ", ")
+
+		error(msg)
 	end
 	return mapped
 end
@@ -58,17 +78,53 @@ function M.getLocationExpr(location_name, location_type)
 
 	-- Map types to their location extraction methods
 	local location_extractors = {
-		decl = location_name .. "->getNameLoc()",
+		decl = "getDiagnosticPos(" .. location_name .. ")",
 		expr = location_name .. "->loc",
 		stmt = location_name .. "->loc",
 		type = location_name .. "->loc",
 		val = location_name .. "->loc",
 		name = location_name .. "->loc",
+		modifier = location_name .. "->loc",
+		irinst = location_name .. "->sourceLoc",
 	}
 
 	local extractor = location_extractors[location_type]
 	if not extractor then
-		error("Unknown location type '" .. location_type .. "' for location '" .. location_name .. "'")
+		-- Build a list of valid types for suggestion
+		local valid_types = {}
+		for k in pairs(location_extractors) do
+			table.insert(valid_types, k)
+		end
+
+		-- Find similar types
+		local similar = find_similar(location_type, valid_types, 3)
+
+		-- Check if user might have meant SourceLoc
+		local sourceloc_dist = edit_distance(location_type:lower(), "sourceloc")
+		local might_mean_sourceloc = sourceloc_dist <= 3
+
+		-- Build error message with suggestions
+		local msg = "Unknown location type '" .. location_type .. "' for location '" .. location_name .. "'."
+
+		if might_mean_sourceloc then
+			msg = msg .. "\n  Hint: For a plain SourceLoc, omit the type annotation: use '" .. location_name .. "' instead of '" .. location_name .. ":" .. location_type .. "'."
+		end
+
+		if #similar > 0 then
+			msg = msg .. "\n  Did you mean: "
+			local suggestions = {}
+			for i, s in ipairs(similar) do
+				if i <= 3 then  -- Limit to top 3 suggestions
+					table.insert(suggestions, "'" .. s.name .. "'")
+				end
+			end
+			msg = msg .. table.concat(suggestions, ", ") .. "?"
+		end
+
+		table.sort(valid_types)
+		msg = msg .. "\n  Valid location types: " .. table.concat(valid_types, ", ")
+
+		error(msg)
 	end
 
 	return extractor

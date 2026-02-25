@@ -109,6 +109,30 @@ class BasicExpressionType : public ArithmeticExpressionType
     BasicExpressionType(DeclRefBase* inDeclRef) { setOperands(inDeclRef); }
 };
 
+FIDDLE(abstract)
+class Fp8Type : public DeclRefType
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class FloatE4M3Type : public Fp8Type
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class FloatE5M2Type : public Fp8Type
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class BFloat16Type : public DeclRefType
+{
+    FIDDLE(...)
+};
+
 // Base type for things that are built in to the compiler,
 // and will usually have special behavior or a custom
 // mapping to the IR level.
@@ -534,6 +558,15 @@ class ArrayExpressionType : public DeclRefType
     IntVal* getElementCount();
 };
 
+// Conditional<T, hasValue> type - a compile-time conditional wrapper
+// that either holds a value of type T (if hasValue is true) or is empty.
+FIDDLE()
+class ConditionalType : public DeclRefType
+{
+    FIDDLE(...)
+    Type* getValueType();
+};
+
 FIDDLE()
 class AtomicType : public DeclRefType
 {
@@ -687,6 +720,7 @@ class PtrTypeBase : public BuiltinType
     Type* getValueType();
     Val* getAccessQualifier();
     Val* getAddressSpace();
+    Type* getDataLayout();
 
     std::optional<AccessQualifier> tryGetAccessQualifierValue();
 };

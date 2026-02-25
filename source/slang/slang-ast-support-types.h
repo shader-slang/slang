@@ -617,6 +617,7 @@ FIDDLE() namespace Slang
 
         operator Type*() { return type; }
         Type* operator->() { return type; }
+        explicit operator bool() const { return type != nullptr; }
     };
 
     class ASTBuilder;
@@ -1277,6 +1278,7 @@ FIDDLE() namespace Slang
         Value = 0x4,
         Attribute = 0x8,
         SyntaxDecl = 0x10,
+        Semantic = 0x20,
         Default = type | Function | Value | SyntaxDecl,
     };
 

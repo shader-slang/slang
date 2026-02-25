@@ -16,70 +16,6 @@ public struct LinearLayout : IStorageLayout
 }
 
 /**
-Storage interface for accessing neural network parameters.
-Provides an abstraction for reading/writing parameters from various storage backends
-(GPU buffers, shared memory, etc.). Supports automatic differentiation for gradient accumulation.
-@param T The element type (must be a floating-point type).
-@remarks Type constraints:
-- `T` must conform to `__BuiltinFloatingPointType` (float, double, half, etc.)
-- `T.Differential` must conform to `__BuiltinFloatingPointType` for automatic differentiation
-@see `StructuredBufferStorage`, `BindlessBufferStorage`
-@category neural
-*/
-public interface IStorage<T> : IDifferentiablePtrType
-    where T : __BuiltinFloatingPointType
-    where T.Differential == T
-{
-    /**
-    Address type for this storage backend.
-    @remarks Different storage types may use different addressing schemes (indices, pointers, etc.).
-    */
-    public associatedtype Address;
-
-    /**
-    Reads a value from storage.
-    @param[in] address The address to read from.
-    @return The value at the specified address.
-    */
-    public T read(Address address);
-
-    /**
-    Reads sequential 4 elements starting from the given address and packed into a uint4.
-    */
-
-    internal uint4 readUint4<DstType, bool IsAligned, uint ActualBoundary>(Address baseAddress, Address address)
-        where DstType : __BuiltinFloatingPointType
-        where DstType.Differential == DstType;
-
-    internal void writeUint4Atomic<SrcType, bool IsAligned, uint ActualBoundary>(Address baseAddress, Address address, uint4 value)
-        where SrcType : __BuiltinFloatingPointType
-        where SrcType.Differential == SrcType;
-
-    /**
-    Atomically adds a value to storage (for gradient accumulation).
-    @param[in] address The address to add to.
-    @param[in] value The value to add.
-    */
-    [require(cuda_glsl_hlsl_metal_spirv, sm_6_6)]
-    public void atomicAdd(Address address, T value);
-
-    /**
-    Writes a value to storage.
-    @param[in] address The address to write to.
-    @param[in] value The value to write.
-    */
-    public void write(Address address, T value);
-
-    /**
-    Computes an offset address.
-    @param[in] base The base address.
-    @param[in] elements Number of elements to offset by.
-    @return The offset address.
-    */
-    public static Address getOffset(Address base, int elements);
-}
-
-/**
 Interface for pointer-like addressing with direct subscript access.
 Provides array-like access patterns for storage backends that support pointer arithmetic.
 @param T The element type.
@@ -114,4 +50,28 @@ public interface IPointerLikeAddress<T> : IDifferentiablePtrType
     */
     [require(cuda_glsl_hlsl_metal_spirv, sm_6_6)]
     public void atomicAdd(uint index, T value);
+
+    /**
+    Atomically adds a vector of 2 values using packed atomic operations where available.
+    @param[in] index The element index (must be aligned to 2 elements).
+    @param[in] value The vector of 2 values to add.
+    */
+    public void atomicAdd(uint index, vector<T, 2> value);
+
+    /**
+    Reads sequential elements starting from the given offset address, packed into a uint4.
+    */
+    [ForceInline]
+    internal uint4 readUint4<DstType, bool IsAligned, uint ActualBoundary>(int offsetIndex)
+        where DstType : __BuiltinFloatingPointType
+        where DstType.Differential == DstType;
+
+    /**
+    Atomically writes unpacked uint4 values back to storage.
+    */
+    [ForceInline]
+    internal void writeUint4Atomic<SrcType, bool IsAligned, uint ActualBoundary>(int offsetIndex, uint4 value)
+        where SrcType : __BuiltinFloatingPointType
+        where SrcType.Differential == SrcType;
+
 }

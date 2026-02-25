@@ -76,17 +76,17 @@ struct BinaryLLVMOutputStream : public llvm::raw_pwrite_stream
     void reserveExtraSpace(uint64_t ExtraSize) override { output.reserve(tell() + ExtraSize); }
 };
 
-llvm::DenormalMode getLLVMDenormalMode(SlangFpDenormalMode mode)
+llvm::DenormalMode::DenormalModeKind getLLVMDenormalMode(SlangFpDenormalMode mode)
 {
     switch (mode)
     {
     default:
     case SLANG_FP_DENORM_MODE_ANY:
-        return llvm::DenormalMode::getDefault();
+        return llvm::DenormalMode::IEEE;
     case SLANG_FP_DENORM_MODE_PRESERVE:
-        return llvm::DenormalMode::getPreserveSign();
+        return llvm::DenormalMode::PreserveSign;
     case SLANG_FP_DENORM_MODE_FTZ:
-        return llvm::DenormalMode::getPositiveZero();
+        return llvm::DenormalMode::PositiveZero;
     }
 }
 
@@ -178,6 +178,12 @@ public:
     ~LLVMBuilder();
 
     IArtifact* createErrorArtifact(const ArtifactDiagnostic& diagnostic);
+
+    // FP mode flags are set per-instruction, and some of those instructions
+    // may be coming from inline IR. This function does a pass over all relevant
+    // instructions and annotates them properly for the selected FP mode.
+    void addFPModeFlags();
+    void addLoopMetadata(llvm::Instruction* inst, llvm::Metadata* MD);
 
     void optimizeKernel(llvm::OptimizationLevel level);
     void optimizeHost(llvm::OptimizationLevel level);
@@ -414,6 +420,9 @@ public:
 
     SLANG_NO_THROW void SLANG_MCALL setPointerDereferenceable(LLVMInst* ptr, uint64_t bytes) override;
     SLANG_NO_THROW void SLANG_MCALL setLoadInvariant(LLVMInst* load) override;
+    SLANG_NO_THROW void SLANG_MCALL setLifetimeStart(LLVMInst* alloca) override;
+    SLANG_NO_THROW void SLANG_MCALL setLifetimeEnd(LLVMInst* alloca) override;
+    SLANG_NO_THROW void SLANG_MCALL setLoopUnroll(LLVMInst* loopBranch, bool unroll) override;
 };
 
 LLVMBuilder::LLVMBuilder(LLVMBuilderOptions options, IArtifact** outErrorArtifact)
@@ -460,8 +469,10 @@ LLVMBuilder::LLVMBuilder(LLVMBuilderOptions options, IArtifact** outErrorArtifac
     if (options.targetTriple.count != 0)
         targetTripleStr = std::string(options.targetTriple.begin(), options.targetTriple.count);
 
+    llvm::Triple targetTriple(targetTripleStr);
+
     std::string error;
-    const llvm::Target* target = llvm::TargetRegistry::lookupTarget(targetTripleStr, error);
+    const llvm::Target* target = llvm::TargetRegistry::lookupTarget(targetTriple, error);
     if (!target)
     {
         ArtifactDiagnostic diagnostic;
@@ -480,25 +491,19 @@ LLVMBuilder::LLVMBuilder(LLVMBuilderOptions options, IArtifact** outErrorArtifac
 
     opt.NoTrappingFPMath = 1;
 
-    opt.setFPDenormalMode(getLLVMDenormalMode(options.fp64DenormalMode));
-    opt.setFP32DenormalMode(getLLVMDenormalMode(options.fp64DenormalMode));
-
     switch (options.fpMode)
     {
     default:
     case SLANG_FLOATING_POINT_MODE_DEFAULT:
         break;
     case SLANG_FLOATING_POINT_MODE_FAST:
-        opt.UnsafeFPMath = 1;
+        opt.HonorSignDependentRoundingFPMathOption = 0;
         opt.NoSignedZerosFPMath = 1;
-        opt.ApproxFuncFPMath = 1;
         break;
     case SLANG_FLOATING_POINT_MODE_PRECISE:
-        opt.UnsafeFPMath = 0;
         opt.NoInfsFPMath = 0;
         opt.NoNaNsFPMath = 0;
         opt.NoSignedZerosFPMath = 0;
-        opt.ApproxFuncFPMath = 0;
         break;
     }
 
@@ -519,8 +524,6 @@ LLVMBuilder::LLVMBuilder(LLVMBuilderOptions options, IArtifact** outErrorArtifac
         optLevel = llvm::CodeGenOptLevel::Aggressive;
         break;
     }
-
-    llvm::Triple targetTriple(targetTripleStr);
 
     targetMachine = target->createTargetMachine(
         targetTriple,
@@ -613,6 +616,92 @@ IArtifact* LLVMBuilder::createErrorArtifact(const ArtifactDiagnostic& diagnostic
         ArtifactUtil::createArtifact(ArtifactDesc::make(ArtifactKind::None, ArtifactPayload::None));
     ArtifactUtil::addAssociated(artifact, diagnostics);
     return artifact.detach();
+}
+
+void LLVMBuilder::addFPModeFlags()
+{
+    llvm::FastMathFlags FMF;
+    switch (options.fpMode)
+    {
+    default:
+    case SLANG_FLOATING_POINT_MODE_DEFAULT:
+        break;
+    case SLANG_FLOATING_POINT_MODE_FAST:
+        FMF.setAllowReassoc(true);
+        FMF.setNoNaNs(true);
+        FMF.setNoInfs(true);
+        FMF.setNoSignedZeros(true);
+        FMF.setAllowReciprocal(true);
+        FMF.setAllowContract(true);
+        FMF.setApproxFunc(true);
+        break;
+    case SLANG_FLOATING_POINT_MODE_PRECISE:
+        FMF.clear();
+        break;
+    }
+    llvm::StringRef fp64DenormalMode =
+        llvm::denormalModeKindName(getLLVMDenormalMode(options.fp64DenormalMode));
+    llvm::StringRef fp32DenormalMode =
+        llvm::denormalModeKindName(getLLVMDenormalMode(options.fp32DenormalMode));
+
+    for (llvm::Function& F : *llvmModule)
+    {
+        if (options.fpMode == SLANG_FLOATING_POINT_MODE_PRECISE)
+            F.addFnAttr(llvm::Attribute::AttrKind::StrictFP);
+
+        if (options.fp32DenormalMode != SLANG_FP_DENORM_MODE_ANY)
+            F.addFnAttr("denormal-fp-math-f32", fp32DenormalMode);
+
+        if (options.fp64DenormalMode != SLANG_FP_DENORM_MODE_ANY)
+            F.addFnAttr("denormal-fp-math", fp64DenormalMode);
+
+        for (llvm::BasicBlock& BB : F)
+        {
+            for (llvm::Instruction& I : BB)
+            {
+                switch (I.getOpcode())
+                {
+                case llvm::Instruction::FNeg:
+                case llvm::Instruction::FAdd:
+                case llvm::Instruction::FSub:
+                case llvm::Instruction::FMul:
+                case llvm::Instruction::FDiv:
+                case llvm::Instruction::FRem:
+                case llvm::Instruction::FCmp:
+                case llvm::Instruction::FPTrunc:
+                case llvm::Instruction::FPExt:
+                    I.setFastMathFlags(FMF);
+                    break;
+                case llvm::Instruction::PHI:
+                case llvm::Instruction::Select:
+                case llvm::Instruction::Call:
+                    if (I.getType()->isFPOrFPVectorTy())
+                        I.setFastMathFlags(FMF);
+                    break;
+                default:
+                    break;
+                }
+            }
+        }
+    }
+}
+
+void LLVMBuilder::addLoopMetadata(llvm::Instruction* inst, llvm::Metadata* MD)
+{
+    llvm::MDNode* loopMD = inst->getMetadata(llvm::LLVMContext::MD_loop);
+    if (!loopMD)
+    {
+        llvm::SmallVector<llvm::Metadata*> loopProperties;
+        // This gets replaced by the metadata node itself later.
+        loopProperties.push_back(nullptr);
+
+        loopMD = llvm::MDNode::getDistinct(*llvmContext, loopProperties);
+
+        inst->setMetadata(llvm::LLVMContext::MD_loop, loopMD);
+        loopMD->replaceOperandWith(0, loopMD);
+    }
+
+    cast<llvm::MDTuple>(loopMD)->push_back(MD);
 }
 
 struct KernelInstVisitor : llvm::InstVisitor<KernelInstVisitor>
@@ -756,6 +845,7 @@ void LLVMBuilder::finalize()
             "llvm.global_ctors");
     }
 
+    addFPModeFlags();
 #if 0
     // Dump pre-verification, pre-optimization LLVM IR to stdout.
     // Check this if you get verification errors.
@@ -1046,6 +1136,7 @@ LLVMInst* LLVMBuilder::declareFunction(LLVMType* funcType, CharSlice name, uint3
         func->addFnAttr(llvm::Attribute::AttrKind::NoInline);
     if (attributes & SLANG_LLVM_FUNC_ATTR_READNONE)
         func->setOnlyAccessesArgMemory();
+
     return func;
 }
 
@@ -2054,6 +2145,27 @@ void LLVMBuilder::setLoadInvariant(LLVMInst* load)
     cast<llvm::LoadInst>(load)->setMetadata(llvm::LLVMContext::MD_invariant_load, emptyMD);
 }
 
+void LLVMBuilder::setLifetimeStart(LLVMInst* alloca)
+{
+    llvmBuilder->CreateLifetimeStart(alloca);
+}
+
+void LLVMBuilder::setLifetimeEnd(LLVMInst* alloca)
+{
+    llvmBuilder->CreateLifetimeEnd(alloca);
+}
+
+void LLVMBuilder::setLoopUnroll(LLVMInst* loopBranch, bool unroll)
+{
+    llvm::MDNode* MD = nullptr;
+    if (unroll)
+        MD = llvm::MDNode::get(*llvmContext, {llvm::MDString::get(*llvmContext, "llvm.loop.unroll.enable")});
+    else
+        MD = llvm::MDNode::get(*llvmContext, {llvm::MDString::get(*llvmContext, "llvm.loop.unroll.disable")});
+
+    addLoopMetadata(cast<llvm::Instruction>(loopBranch), MD);
+}
+
 LLVMInst* LLVMBuilder::emitInlineIRFunction(LLVMInst* func, CharSlice content)
 {
     auto llvmFunc = llvm::cast<llvm::Function>(func);
@@ -2209,42 +2321,37 @@ LLVMInst* LLVMBuilder::emitComputeEntryPointWorkGroup(
             llvm::Twine("ptrThreadID_").concat(axis));
     }
 
-
     exitBlock = llvm::BasicBlock::Create(*llvmContext, llvm::Twine("exit"), dispatcher);
 
     auto annotateParallelLoop = [&](llvm::BranchInst* branchInst){
-        llvm::SmallVector<llvm::Metadata*> loopProperties;
-        // This gets replaced by the metadata node itself later.
-        loopProperties.push_back(nullptr);
-
         // As long as all loads / stores are denoted with wiParallelAccessGroup,
         // the loop should be considered parallel by LLVM, enabling far more
         // aggressive vectorization as potential cross-iteration data
         // dependencies are ignored.
-        loopProperties.push_back(llvm::MDNode::get(
-            *llvmContext, {llvm::MDString::get(*llvmContext, "llvm.loop.parallel_accesses"), wiParallelAccessGroup}));
+        //
+        // TODO: Can't enable this yet due to potential miscompiles!
+        // See: https://github.com/llvm/llvm-project/issues/179272
+        //
+        //addLoopMetadata(branchInst, llvm::MDNode::get(
+        //    *llvmContext, {llvm::MDString::get(*llvmContext, "llvm.loop.parallel_accesses"), wiParallelAccessGroup}));
 
-        auto trueVal = llvm::ConstantAsMetadata::get(llvm::ConstantInt::getTrue(llvm::Type::getInt1Ty(*llvmContext)));
+        auto trueVal = llvm::ConstantAsMetadata::get(llvm::ConstantInt::getTrue(*llvmContext));
 
         // Explicitly request vectorization.
-        loopProperties.push_back(llvm::MDNode::get(
+        addLoopMetadata(branchInst, llvm::MDNode::get(
             *llvmContext, {llvm::MDString::get(*llvmContext, "llvm.loop.vectorize.enable"), trueVal}));
 
         // Disable unrolling so that vectorization occurs instead.
-        loopProperties.push_back(llvm::MDNode::get(
+        addLoopMetadata(branchInst, llvm::MDNode::get(
             *llvmContext, {llvm::MDString::get(*llvmContext, "llvm.loop.disable_nonforced")}));
 
         // Allow splitting loop up if only parts are vectorizable.
-        loopProperties.push_back(llvm::MDNode::get(
+        addLoopMetadata(branchInst, llvm::MDNode::get(
             *llvmContext, {llvm::MDString::get(*llvmContext, "llvm.loop.distribute.enable"), trueVal}));
 
         // Allows predicated instructions.
-        loopProperties.push_back(llvm::MDNode::get(
+        addLoopMetadata(branchInst, llvm::MDNode::get(
             *llvmContext, {llvm::MDString::get(*llvmContext, "llvm.loop.vectorize.predicate.enable"), trueVal}));
-
-        llvm::MDNode* loopMD = llvm::MDNode::getDistinct(*llvmContext, loopProperties);
-        loopMD->replaceOperandWith(0, loopMD);
-        branchInst->setMetadata(llvm::LLVMContext::MD_loop, loopMD);
     };
 
     llvm::BasicBlock* loopHeader = llvm::BasicBlock::Create(

@@ -1,0 +1,3 @@
+# Slang Language Goals
+
+TODO

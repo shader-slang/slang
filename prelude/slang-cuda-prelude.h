@@ -32,6 +32,14 @@
 #include <cuda_fp16.h>
 #endif
 
+#ifdef SLANG_CUDA_ENABLE_FP8
+#include <cuda_fp8.h>
+#endif
+
+#ifdef SLANG_CUDA_ENABLE_BF16
+#include <cuda_bf16.h>
+#endif
+
 #ifdef SLANG_CUDA_ENABLE_OPTIX
 #include <optix.h>
 #endif
@@ -351,6 +359,60 @@ struct __align__(4) __half4
 };
 #endif
 
+#if SLANG_CUDA_ENABLE_BF16
+
+// Add the other vector bfloat16 types
+struct __nv_bfloat161
+{
+    __nv_bfloat16 x;
+};
+struct __nv_bfloat163
+{
+    __nv_bfloat16 x, y, z;
+};
+struct __nv_bfloat164
+{
+    __nv_bfloat16 x, y, z, w;
+};
+#endif
+
+#if SLANG_CUDA_ENABLE_FP8
+
+// Add the other vector fp8 types
+struct __nv_fp8_e4m31
+{
+    __nv_fp8_e4m3 x;
+};
+struct __nv_fp8_e4m32
+{
+    __nv_fp8_e4m3 x, y;
+};
+struct __nv_fp8_e4m33
+{
+    __nv_fp8_e4m3 x, y, z;
+};
+struct __nv_fp8_e4m34
+{
+    __nv_fp8_e4m3 x, y, z, w;
+};
+struct __nv_fp8_e5m21
+{
+    __nv_fp8_e5m2 x;
+};
+struct __nv_fp8_e5m22
+{
+    __nv_fp8_e5m2 x, y;
+};
+struct __nv_fp8_e5m23
+{
+    __nv_fp8_e5m2 x, y, z;
+};
+struct __nv_fp8_e5m24
+{
+    __nv_fp8_e5m2 x, y, z, w;
+};
+#endif
+
 #define SLANG_VECTOR_GET_ELEMENT(T)                                                   \
     SLANG_FORCE_INLINE SLANG_CUDA_CALL T _slang_vector_get_element(T##1 x, int index) \
     {                                                                                 \
@@ -412,6 +474,49 @@ SLANG_VECTOR_GET_ELEMENT_PTR(double)
 #if SLANG_CUDA_ENABLE_HALF
 SLANG_VECTOR_GET_ELEMENT(__half)
 SLANG_VECTOR_GET_ELEMENT_PTR(__half)
+#endif
+
+#if SLANG_CUDA_ENABLE_BF16
+SLANG_VECTOR_GET_ELEMENT(__nv_bfloat16)
+SLANG_VECTOR_GET_ELEMENT_PTR(__nv_bfloat16)
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __nv_bfloat16
+_slang_vector_dot(__nv_bfloat162 v0, __nv_bfloat162 v1)
+{
+    __nv_bfloat16 result = __nv_bfloat16(0.0f);
+    for (int i = 0; i < 2; i++)
+    {
+        result += _slang_vector_get_element(v0, i) * _slang_vector_get_element(v1, i);
+    }
+    return result;
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __nv_bfloat16
+_slang_vector_dot(__nv_bfloat163 v0, __nv_bfloat163 v1)
+{
+    __nv_bfloat16 result = __nv_bfloat16(0.0f);
+    for (int i = 0; i < 3; i++)
+    {
+        result += _slang_vector_get_element(v0, i) * _slang_vector_get_element(v1, i);
+    }
+    return result;
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __nv_bfloat16
+_slang_vector_dot(__nv_bfloat164 v0, __nv_bfloat164 v1)
+{
+    __nv_bfloat16 result = __nv_bfloat16(0.0f);
+    for (int i = 0; i < 4; i++)
+    {
+        result += _slang_vector_get_element(v0, i) * _slang_vector_get_element(v1, i);
+    }
+    return result;
+}
+#endif
+
+#if SLANG_CUDA_ENABLE_FP8
+SLANG_VECTOR_GET_ELEMENT(__nv_fp8_e4m3)
+SLANG_VECTOR_GET_ELEMENT_PTR(__nv_fp8_e4m3)
+SLANG_VECTOR_GET_ELEMENT(__nv_fp8_e5m2)
+SLANG_VECTOR_GET_ELEMENT_PTR(__nv_fp8_e5m2)
 #endif
 
 #define SLANG_CUDA_VECTOR_BINARY_OP(T, n, op)                                                 \
@@ -554,6 +659,15 @@ SLANG_MAKE_VECTOR(ulonglong)
 SLANG_MAKE_VECTOR(__half)
 #endif
 
+#if SLANG_CUDA_ENABLE_BF16
+SLANG_MAKE_VECTOR(__nv_bfloat16)
+#endif
+
+#if SLANG_CUDA_ENABLE_FP8
+SLANG_MAKE_VECTOR(__nv_fp8_e4m3)
+SLANG_MAKE_VECTOR(__nv_fp8_e5m2)
+#endif
+
 SLANG_FORCE_INLINE SLANG_CUDA_CALL bool1 make_bool1(bool x)
 {
     return bool1{x};
@@ -635,6 +749,30 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL __half1 make___half1(__half x)
 }
 #endif
 #endif
+#if SLANG_CUDA_ENABLE_BF16
+SLANG_MAKE_VECTOR_FROM_SCALAR(__nv_bfloat16)
+#if !SLANG_CUDA_RTC
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __nv_bfloat16 make___nv_bfloat161(__nv_bfloat16 x)
+{
+    return __nv_bfloat16{x};
+}
+#endif
+#endif
+
+#if SLANG_CUDA_ENABLE_FP8
+SLANG_MAKE_VECTOR_FROM_SCALAR(__nv_fp8_e4m3)
+SLANG_MAKE_VECTOR_FROM_SCALAR(__nv_fp8_e5m2)
+#if !SLANG_CUDA_RTC
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __nv_fp8_e4m3 make___nv_fp8_e4m31(__nv_fp8_e4m3 x)
+{
+    return __nv_fp8_e4m3{x};
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __nv_fp8_e5m2 make___nv_fp8_e5m21(__nv_fp8_e5m2 x)
+{
+    return __nv_fp8_e5m2{x};
+}
+#endif
+#endif
 
 #define SLANG_CUDA_VECTOR_ATOMIC_BINARY_IMPL(Fn, T, N)                                            \
     SLANG_FORCE_INLINE SLANG_CUDA_CALL T##N Fn(T##N* address, T##N val)                           \
@@ -700,6 +838,14 @@ GET_VECTOR_TYPE_IMPL_N(double)
 #if SLANG_CUDA_ENABLE_HALF
 GET_VECTOR_TYPE_IMPL_N(__half)
 #endif
+#if SLANG_CUDA_ENABLE_BF16
+GET_VECTOR_TYPE_IMPL_N(__nv_bfloat16)
+#endif
+#if SLANG_CUDA_ENABLE_FP8
+GET_VECTOR_TYPE_IMPL_N(__nv_fp8_e4m3)
+GET_VECTOR_TYPE_IMPL_N(__nv_fp8_e5m2)
+#endif
+
 template<typename T, int n>
 using Vector = typename GetVectorTypeImpl<T, n>::type;
 
@@ -2526,6 +2672,240 @@ __device__ __forceinline__ float atomicCAS(float* address, float compare, float 
     int old = atomicCAS(addr_as_int, __float_as_int(compare), __float_as_int(val));
     return __int_as_float(old);
 }
+
+// =====================================================================
+// Atomic Reduction Operations (PTX `red` instruction)
+// These are in-place atomic operations that don't return the old value.
+// They are faster than the corresponding atomic operations that return values
+// because they use the PTX `red` instruction with relaxed memory ordering.
+//
+// Supported operations based on PTX ISA:
+// - add: .s32, .u32, .u64, .s64, .f16, .f16x2, .bf16, .bf16x2, .f32, .f64
+// - min/max: .s32, .u32, .s64, .u64, .f32, .f64, .f16, .f16x2
+// - and/or/xor: .b32, .b64
+// - inc/dec: .u32
+// =====================================================================
+
+// Atomic reduction ADD operations
+__device__ __forceinline__ void __slang_atomic_reduce_add(int32_t* addr, int32_t val, int order)
+{
+    asm volatile("red.relaxed.gpu.global.add.s32 [%0], %1;" : : "l"(addr), "r"(val) : "memory");
+}
+
+__device__ __forceinline__ void __slang_atomic_reduce_add(uint32_t* addr, uint32_t val, int order)
+{
+    asm volatile("red.relaxed.gpu.global.add.u32 [%0], %1;" : : "l"(addr), "r"(val) : "memory");
+}
+
+__device__ __forceinline__ void __slang_atomic_reduce_add(int64_t* addr, int64_t val, int order)
+{
+    asm volatile("red.relaxed.gpu.global.add.s64 [%0], %1;" : : "l"(addr), "l"(val) : "memory");
+}
+
+__device__ __forceinline__ void __slang_atomic_reduce_add(uint64_t* addr, uint64_t val, int order)
+{
+    asm volatile("red.relaxed.gpu.global.add.u64 [%0], %1;" : : "l"(addr), "l"(val) : "memory");
+}
+
+__device__ __forceinline__ void __slang_atomic_reduce_add(float* addr, float val, int order)
+{
+    asm volatile("red.relaxed.gpu.global.add.f32 [%0], %1;" : : "l"(addr), "f"(val) : "memory");
+}
+
+__device__ __forceinline__ void __slang_atomic_reduce_add(double* addr, double val, int order)
+{
+    asm volatile("red.relaxed.gpu.global.add.f64 [%0], %1;" : : "l"(addr), "d"(val) : "memory");
+}
+
+#if SLANG_CUDA_ENABLE_HALF
+__device__ __forceinline__ void __slang_atomic_reduce_add(__half* addr, __half val, int order)
+{
+    unsigned short val_as_ushort = *reinterpret_cast<unsigned short*>(&val);
+    asm volatile("red.relaxed.gpu.global.add.noftz.f16 [%0], %1;"
+                 :
+                 : "l"(addr), "h"(val_as_ushort)
+                 : "memory");
+}
+
+__device__ __forceinline__ void __slang_atomic_reduce_add(__half2* addr, __half2 val, int order)
+{
+    unsigned int val_as_uint = *reinterpret_cast<unsigned int*>(&val);
+    asm volatile("red.relaxed.gpu.global.add.noftz.f16x2 [%0], %1;"
+                 :
+                 : "l"(addr), "r"(val_as_uint)
+                 : "memory");
+}
+#endif
+
+#if SLANG_CUDA_ENABLE_BF16
+__device__ __forceinline__ void __slang_atomic_reduce_add(
+    __nv_bfloat16* addr,
+    __nv_bfloat16 val,
+    int order)
+{
+    unsigned short val_as_ushort = *reinterpret_cast<unsigned short*>(&val);
+    asm volatile("red.relaxed.gpu.global.add.noftz.bf16 [%0], %1;"
+                 :
+                 : "l"(addr), "h"(val_as_ushort)
+                 : "memory");
+}
+
+__device__ __forceinline__ void __slang_atomic_reduce_add(
+    __nv_bfloat162* addr,
+    __nv_bfloat162 val,
+    int order)
+{
+    unsigned int val_as_uint = *reinterpret_cast<unsigned int*>(&val);
+    asm volatile("red.relaxed.gpu.global.add.noftz.bf16x2 [%0], %1;"
+                 :
+                 : "l"(addr), "r"(val_as_uint)
+                 : "memory");
+}
+#endif
+
+// Atomic reduction MIN operations
+__device__ __forceinline__ void __slang_atomic_reduce_min(int32_t* addr, int32_t val, int order)
+{
+    asm volatile("red.relaxed.gpu.global.min.s32 [%0], %1;" : : "l"(addr), "r"(val) : "memory");
+}
+
+__device__ __forceinline__ void __slang_atomic_reduce_min(uint32_t* addr, uint32_t val, int order)
+{
+    asm volatile("red.relaxed.gpu.global.min.u32 [%0], %1;" : : "l"(addr), "r"(val) : "memory");
+}
+
+__device__ __forceinline__ void __slang_atomic_reduce_min(int64_t* addr, int64_t val, int order)
+{
+    asm volatile("red.relaxed.gpu.global.min.s64 [%0], %1;" : : "l"(addr), "l"(val) : "memory");
+}
+
+__device__ __forceinline__ void __slang_atomic_reduce_min(uint64_t* addr, uint64_t val, int order)
+{
+    asm volatile("red.relaxed.gpu.global.min.u64 [%0], %1;" : : "l"(addr), "l"(val) : "memory");
+}
+
+// NOTE: PTX `red` instruction does NOT support min/max for floating-point types.
+// Only integer types (.u32, .u64, .s32, .s64) are supported for min/max.
+// For floating-point min/max atomics, use the regular `atom` instruction via
+// __atomic_min/__atomic_max.
+
+// Atomic reduction MAX operations
+__device__ __forceinline__ void __slang_atomic_reduce_max(int32_t* addr, int32_t val, int order)
+{
+    asm volatile("red.relaxed.gpu.global.max.s32 [%0], %1;" : : "l"(addr), "r"(val) : "memory");
+}
+
+__device__ __forceinline__ void __slang_atomic_reduce_max(uint32_t* addr, uint32_t val, int order)
+{
+    asm volatile("red.relaxed.gpu.global.max.u32 [%0], %1;" : : "l"(addr), "r"(val) : "memory");
+}
+
+__device__ __forceinline__ void __slang_atomic_reduce_max(int64_t* addr, int64_t val, int order)
+{
+    asm volatile("red.relaxed.gpu.global.max.s64 [%0], %1;" : : "l"(addr), "l"(val) : "memory");
+}
+
+__device__ __forceinline__ void __slang_atomic_reduce_max(uint64_t* addr, uint64_t val, int order)
+{
+    asm volatile("red.relaxed.gpu.global.max.u64 [%0], %1;" : : "l"(addr), "l"(val) : "memory");
+}
+
+// NOTE: PTX `red` instruction does NOT support min/max for floating-point types.
+// Only integer types (.u32, .u64, .s32, .s64) are supported for min/max.
+// For floating-point min/max atomics, use the regular `atom` instruction via
+// __atomic_min/__atomic_max.
+
+// Atomic reduction AND operations (bitwise, integers only)
+__device__ __forceinline__ void __slang_atomic_reduce_and(int32_t* addr, int32_t val, int order)
+{
+    asm volatile("red.relaxed.gpu.global.and.b32 [%0], %1;" : : "l"(addr), "r"(val) : "memory");
+}
+
+__device__ __forceinline__ void __slang_atomic_reduce_and(uint32_t* addr, uint32_t val, int order)
+{
+    asm volatile("red.relaxed.gpu.global.and.b32 [%0], %1;" : : "l"(addr), "r"(val) : "memory");
+}
+
+__device__ __forceinline__ void __slang_atomic_reduce_and(int64_t* addr, int64_t val, int order)
+{
+    asm volatile("red.relaxed.gpu.global.and.b64 [%0], %1;" : : "l"(addr), "l"(val) : "memory");
+}
+
+__device__ __forceinline__ void __slang_atomic_reduce_and(uint64_t* addr, uint64_t val, int order)
+{
+    asm volatile("red.relaxed.gpu.global.and.b64 [%0], %1;" : : "l"(addr), "l"(val) : "memory");
+}
+
+// Atomic reduction OR operations (bitwise, integers only)
+__device__ __forceinline__ void __slang_atomic_reduce_or(int32_t* addr, int32_t val, int order)
+{
+    asm volatile("red.relaxed.gpu.global.or.b32 [%0], %1;" : : "l"(addr), "r"(val) : "memory");
+}
+
+__device__ __forceinline__ void __slang_atomic_reduce_or(uint32_t* addr, uint32_t val, int order)
+{
+    asm volatile("red.relaxed.gpu.global.or.b32 [%0], %1;" : : "l"(addr), "r"(val) : "memory");
+}
+
+__device__ __forceinline__ void __slang_atomic_reduce_or(int64_t* addr, int64_t val, int order)
+{
+    asm volatile("red.relaxed.gpu.global.or.b64 [%0], %1;" : : "l"(addr), "l"(val) : "memory");
+}
+
+__device__ __forceinline__ void __slang_atomic_reduce_or(uint64_t* addr, uint64_t val, int order)
+{
+    asm volatile("red.relaxed.gpu.global.or.b64 [%0], %1;" : : "l"(addr), "l"(val) : "memory");
+}
+
+// Atomic reduction XOR operations (bitwise, integers only)
+__device__ __forceinline__ void __slang_atomic_reduce_xor(int32_t* addr, int32_t val, int order)
+{
+    asm volatile("red.relaxed.gpu.global.xor.b32 [%0], %1;" : : "l"(addr), "r"(val) : "memory");
+}
+
+__device__ __forceinline__ void __slang_atomic_reduce_xor(uint32_t* addr, uint32_t val, int order)
+{
+    asm volatile("red.relaxed.gpu.global.xor.b32 [%0], %1;" : : "l"(addr), "r"(val) : "memory");
+}
+
+__device__ __forceinline__ void __slang_atomic_reduce_xor(int64_t* addr, int64_t val, int order)
+{
+    asm volatile("red.relaxed.gpu.global.xor.b64 [%0], %1;" : : "l"(addr), "l"(val) : "memory");
+}
+
+__device__ __forceinline__ void __slang_atomic_reduce_xor(uint64_t* addr, uint64_t val, int order)
+{
+    asm volatile("red.relaxed.gpu.global.xor.b64 [%0], %1;" : : "l"(addr), "l"(val) : "memory");
+}
+
+// Atomic reduction INC/DEC operations (unsigned 32-bit only in PTX)
+// Note: PTX inc/dec have specific semantics:
+//   inc: d = (old >= b) ? 0 : old + 1
+//   dec: d = ((old == 0) || (old > b)) ? b : old - 1
+// For simple increment by 1, we use add instead
+__device__ __forceinline__ void __slang_atomic_reduce_inc(uint32_t* addr, int order)
+{
+    asm volatile("red.relaxed.gpu.global.add.u32 [%0], 1;" : : "l"(addr) : "memory");
+}
+
+__device__ __forceinline__ void __slang_atomic_reduce_inc(int32_t* addr, int order)
+{
+    asm volatile("red.relaxed.gpu.global.add.s32 [%0], 1;" : : "l"(addr) : "memory");
+}
+
+__device__ __forceinline__ void __slang_atomic_reduce_dec(uint32_t* addr, int order)
+{
+    asm volatile("red.relaxed.gpu.global.add.u32 [%0], -1;" : : "l"(addr) : "memory");
+}
+
+__device__ __forceinline__ void __slang_atomic_reduce_dec(int32_t* addr, int order)
+{
+    asm volatile("red.relaxed.gpu.global.add.s32 [%0], -1;" : : "l"(addr) : "memory");
+}
+
+// =====================================================================
+// End of Atomic Reduction Operations
+// =====================================================================
 
 // Missing support for Load with status
 struct RWByteAddressBuffer
@@ -5192,6 +5572,15 @@ static __forceinline__ __device__ void optixInvoke(
         optixInvoke(r0, r1);
     }
 }
+
+// Overload for empty payloads (when payload is eliminated by type legalization)
+static __forceinline__ __device__ void optixInvoke(
+    OptixTraversableHandle AccelerationStructure,
+    OptixTraversableHandle* HitOrMiss)
+{
+    // Call OptiX invoke with no payload for empty payload case
+    optixInvoke();
+}
 #endif
 
 #if (OPTIX_VERSION >= 80100)
@@ -5406,6 +5795,8 @@ typedef unsigned long long OptixTraversableHandle;
 static const int kSlangTorchTensorMaxDim = 5;
 
 // TensorView
+// NOTE: If you change this struct's layout, also update the hard-coded size/alignment
+// in _createTypeLayout() in slang-type-layout.cpp.
 struct TensorView
 {
     uint8_t* data;
@@ -6299,6 +6690,27 @@ struct PtxTypeName<half>
 };
 #endif // #if SLANG_CUDA_ENABLE_HALF
 
+#if SLANG_CUDA_ENABLE_FP8
+template<>
+struct PtxTypeName<__nv_fp8_e4m3>
+{
+    static constexpr const char name[] = "f8e4m3";
+};
+template<>
+struct PtxTypeName<__nv_fp8_e5m2>
+{
+    static constexpr const char name[] = "f8e5m2";
+};
+#endif // #if SLANG_CUDA_ENABLE_FP8
+
+#if SLANG_CUDA_ENABLE_BF16
+template<>
+struct PtxTypeName<__nv_bfloat16>
+{
+    static constexpr const char name[] = "bf16";
+};
+#endif
+
 template<>
 struct PtxTypeName<float>
 {
@@ -6349,6 +6761,30 @@ struct RegisterCount<half, M, N, K, MatrixUse::MatrixD>
     static constexpr int value = 4;
 };
 #endif // #if SLANG_CUDA_ENABLE_HALF
+
+#if SLANG_CUDA_ENABLE_BF16
+// bfloat16 - 8 regs for A/B, 4 regs for C/D
+template<int M, int N, int K>
+struct RegisterCount<__nv_bfloat16, M, N, K, MatrixUse::MatrixA>
+{
+    static constexpr int value = 8;
+};
+template<int M, int N, int K>
+struct RegisterCount<__nv_bfloat16, M, N, K, MatrixUse::MatrixB>
+{
+    static constexpr int value = 8;
+};
+template<int M, int N, int K>
+struct RegisterCount<__nv_bfloat16, M, N, K, MatrixUse::MatrixC>
+{
+    static constexpr int value = 4;
+};
+template<int M, int N, int K>
+struct RegisterCount<__nv_bfloat16, M, N, K, MatrixUse::MatrixD>
+{
+    static constexpr int value = 4;
+};
+#endif // #if SLANG_CUDA_ENABLE_BF16
 
 // Float (f32) - 8 regs for C/D only
 template<int M, int N, int K>
@@ -6437,6 +6873,71 @@ struct RegisterCount<char, 32, 8, 16, MatrixUse::MatrixB>
 {
     static constexpr int value = 1;
 };
+
+#if SLANG_CUDA_ENABLE_FP8
+// fp8 - same as u8
+template<>
+struct RegisterCount<__nv_fp8_e4m3, 16, 16, 16, MatrixUse::MatrixA>
+{
+    static constexpr int value = 2;
+};
+template<>
+struct RegisterCount<__nv_fp8_e4m3, 16, 16, 16, MatrixUse::MatrixB>
+{
+    static constexpr int value = 2;
+};
+template<>
+struct RegisterCount<__nv_fp8_e4m3, 8, 32, 16, MatrixUse::MatrixA>
+{
+    static constexpr int value = 1;
+};
+template<>
+struct RegisterCount<__nv_fp8_e4m3, 8, 32, 16, MatrixUse::MatrixB>
+{
+    static constexpr int value = 4;
+};
+template<>
+struct RegisterCount<__nv_fp8_e4m3, 32, 8, 16, MatrixUse::MatrixA>
+{
+    static constexpr int value = 4;
+};
+template<>
+struct RegisterCount<__nv_fp8_e4m3, 32, 8, 16, MatrixUse::MatrixB>
+{
+    static constexpr int value = 1;
+};
+
+template<>
+struct RegisterCount<__nv_fp8_e5m2, 16, 16, 16, MatrixUse::MatrixA>
+{
+    static constexpr int value = 2;
+};
+template<>
+struct RegisterCount<__nv_fp8_e5m2, 16, 16, 16, MatrixUse::MatrixB>
+{
+    static constexpr int value = 2;
+};
+template<>
+struct RegisterCount<__nv_fp8_e5m2, 8, 32, 16, MatrixUse::MatrixA>
+{
+    static constexpr int value = 1;
+};
+template<>
+struct RegisterCount<__nv_fp8_e5m2, 8, 32, 16, MatrixUse::MatrixB>
+{
+    static constexpr int value = 4;
+};
+template<>
+struct RegisterCount<__nv_fp8_e5m2, 32, 8, 16, MatrixUse::MatrixA>
+{
+    static constexpr int value = 4;
+};
+template<>
+struct RegisterCount<__nv_fp8_e5m2, 32, 8, 16, MatrixUse::MatrixB>
+{
+    static constexpr int value = 1;
+};
+#endif
 
 
 // ====================================================================================

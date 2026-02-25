@@ -2188,6 +2188,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         IRType* irValueType = lowerType(context, astValueType);
         IRInst* accessQualifier = nullptr;
         IRInst* addrSpace = nullptr;
+        IRType* dataLayout = nullptr;
 
         if (auto astAccessQualifier = type->getAccessQualifier())
         {
@@ -2207,7 +2208,13 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
                 (IRIntegerValue)AddressSpace::Generic);
         }
 
-        return getBuilder()->getPtrType(kIROp_PtrType, irValueType, accessQualifier, addrSpace);
+        if (auto dataLayoutType = type->getDataLayout())
+        {
+            dataLayout = lowerType(context, dataLayoutType);
+        }
+
+        return getBuilder()
+            ->getPtrType(kIROp_PtrType, irValueType, accessQualifier, addrSpace, dataLayout);
     }
 
     IRType* visitDeclRefType(DeclRefType* type)
@@ -3552,104 +3559,6 @@ void maybeAddReturnDestinationParam(ParameterLists* ioParameterLists, Type* resu
     }
 }
 
-/// Does the given `declRef` appear to be a declaration of an entry point?
-///
-/// This function does a best-effort job of detecting whether something is
-/// a shader entry point, but it cannot answer the question definitively,
-/// because the compilation model of Slang allows functions to be tagged
-/// as entry points separately from their declaration in the AST.
-///
-bool doesDeclAppearToBeAnEntryPoint(DeclRef<CallableDecl> const& declRef)
-{
-    auto decl = declRef.getDecl();
-    if (decl->hasModifier<EntryPointAttribute>())
-        return true;
-    if (decl->hasModifier<NumThreadsAttribute>())
-        return true;
-    return false;
-}
-
-/// Does a parameter appear to be a declaration of an entry-point varying input.
-///
-/// The `paramInfo` represents the parameter being inspected, and
-/// the `funcDeclRef` should represent the outer declaration that
-/// might or might not be an entry point.
-///
-/// This function is only able to do a best-effort check for what is an
-/// entry point (see `doesDeclAppearToBeAnEntryPoint()`), and cannot be
-/// fully robust in detection.
-///
-bool doesParamAppearToBeAnEntryPointVaryingInput(
-    IRLoweringParameterInfo const& paramInfo,
-    DeclRef<CallableDecl> const& funcDeclRef)
-{
-    // If the outer declaration doesn't appear to be an entry
-    // point, then it seems this isn't an entry point parameter
-    // at all, much less an input.
-    //
-    if (!doesDeclAppearToBeAnEntryPoint(funcDeclRef))
-        return false;
-
-    // We are only intereste in parameters that would otherwise
-    // be lowered to just use `in`.
-    //
-    if (paramInfo.actualParamPassingModeToUse != ParamPassingMode::In)
-        return false;
-
-    // We are only concerned with varying parameters, so `uniform`
-    // parameters aren't relevant.
-    //
-    if (paramInfo.decl->findModifier<HLSLUniformModifier>())
-        return false;
-
-    // Certain types conceptually represent uniform parameters even
-    // if they aren't declared with `uniform`, so we also want to
-    // ignore those.
-    //
-    // TODO: It would be best for logic like this to be factored into
-    // a shared subroutine somewhere, so that we don't have multiple
-    // places in the code doing ad hoc checks for a particular list
-    // of types, that might change over time.
-    //
-    if (as<HLSLPatchType>(paramInfo.type))
-        return false;
-
-    if (as<MeshOutputType>(paramInfo.type))
-        return false;
-
-    return true;
-}
-
-/// Modify the parameter passing mode for the given parameter, if it can
-/// be detected that it seems to be used as a varying input to an entry point.
-///
-/// If a varying `in` parameter is detected, its actual parameter-passing
-/// mode will be changed to `borrow in`.
-///
-/// This function is only able to do a best-effort check for what is an
-/// entry point (see `doesDeclAppearToBeAnEntryPoint()`), and cannot be
-/// fully robust in detection.
-///
-void maybeModifyParamPassingModeForDetectedEntryPointVaryingInput(
-    IRLoweringParameterInfo& ioParamInfo,
-    DeclRef<CallableDecl> const& funcDeclRef)
-{
-    // If we cannot detect that this seems to be a varying `in`
-    // parameter of an entry point, then we'll just skip it.
-    //
-    // There's no way for this code to be sure it isn't skipping
-    // over a function it shouldn't, but there's nothign we can
-    // do about it from here.
-    //
-    if (!doesParamAppearToBeAnEntryPointVaryingInput(ioParamInfo, funcDeclRef))
-        return;
-
-    // We basically just want to change the parameter from `in`
-    // to `borrow in`, so that it is an immutable by-reference parameter.
-    //
-    ioParamInfo.actualParamPassingModeToUse = ParamPassingMode::BorrowIn;
-}
-
 //
 // And here is our function that will do the recursive walk:
 void collectParameterLists(
@@ -3893,20 +3802,6 @@ void collectParameterLists(
     for (auto paramDeclRef : getParameters(context->astBuilder, callableDeclRef))
     {
         auto paramInfo = getParameterInfo(context, paramDeclRef);
-
-        // One unfortunate wrinkle that arises is that all the downstream
-        // logic in the Slang IR *really* wants the varying input parameters
-        // to a shader entry point to use `ParamPassingMode::BorrowIn`,
-        // so that they don't force copying, but syntactically such parameters
-        // are conventionally declared using `in` (meaning `ParamPassingMode::In`).
-        //
-        // We include logic here to switch up the parameter-passing mode
-        // in the case where we can statically detect that something is
-        // being compiled as an entry point. Note, however, that this logic
-        // is inherently fragile, since not every entry point that a user specifies
-        // is guaranteed to have had a `[shader(...)]` attribute on it.
-        //
-        maybeModifyParamPassingModeForDetectedEntryPointVaryingInput(paramInfo, callableDeclRef);
 
         ioParameterLists->params.add(paramInfo);
     }
@@ -8035,21 +7930,54 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
     }
 };
 
-IRInst* getOrEmitDebugSource(IRGenContext* context, PathInfo path)
+IRInst* getOrEmitDebugSource(IRGenContext* context, SourceLoc loc)
 {
-    if (auto result = context->shared->mapSourcePathToDebugSourceInst.tryGetValue(path.foundPath))
-        return *result;
+    auto sourceManager = context->getLinkage()->getSourceManager();
+    auto sourceView = sourceManager->findSourceView(loc);
+    if (!sourceView)
+        return nullptr;
 
+    IRInst* debugSourceInst = nullptr;
+
+    // Do a best-effort attempt to retrieve the nominal source file.
+    auto pathInfo = sourceView->getPathInfo(loc, SourceLocType::Emit);
+    String sourcePath = pathInfo.getName();
+
+    // If the source file path corresponds to an existing SourceFile in the source manager, use it.
+    auto source = sourceManager->findSourceFileByPathRecursively(sourcePath);
+    if (!source)
+    {
+        sourcePath = pathInfo.getMostUniqueIdentity();
+        source = sourceManager->findSourceFile(sourcePath);
+    }
+    if (source &&
+        context->shared->mapSourceFileToDebugSourceInst.tryGetValue(source, debugSourceInst))
+    {
+        return debugSourceInst;
+    }
+
+    if (sourcePath.getLength() == 0)
+    {
+        return nullptr;
+    }
+
+    if (context->shared->mapSourcePathToDebugSourceInst.tryGetValue(sourcePath, debugSourceInst))
+    {
+        return debugSourceInst;
+    }
+
+    // If the source manager does not have an entry for the corresponding file name, make sure we
+    // still emit a source file entry in the spirv module.
     ComPtr<ISlangBlob> outBlob;
     UnownedStringSlice content;
 
     // Only embed source content for Standard and Maximal debug level
     if (context->debugInfoLevel >= DebugInfoLevel::Standard)
     {
-        if (path.hasFileFoundPath())
+        if (pathInfo.hasFileFoundPath())
         {
             context->getLinkage()->getFileSystemExt()->loadFile(
-                path.foundPath.getBuffer(),
+                pathInfo.foundPath.getBuffer(),
                 outBlob.writeRef());
         }
         if (outBlob)
@@ -8059,9 +7987,13 @@ IRInst* getOrEmitDebugSource(IRGenContext* context, PathInfo path)
 
     IRBuilder builder(*context->irBuilder);
     builder.setInsertInto(context->irBuilder->getModule());
-    auto debugSrcInst = builder.emitDebugSource(path.foundPath.getUnownedSlice(), content, false);
-    context->shared->mapSourcePathToDebugSourceInst[path.foundPath] = debugSrcInst;
-    return debugSrcInst;
+    debugSourceInst = builder.emitDebugSource(sourcePath.getUnownedSlice(), content, false);
+    context->shared->mapSourcePathToDebugSourceInst[sourcePath] = debugSourceInst;
+    if (source)
+    {
+        context->shared->mapSourceFileToDebugSourceInst.add(source, debugSourceInst);
+    }
+    return debugSourceInst;
 }
 
 void maybeEmitDebugLine(
@@ -8083,31 +8015,13 @@ void maybeEmitDebugLine(
             loc = stmt->loc;
     }
 
-    auto sourceManager = context->getLinkage()->getSourceManager();
-    auto sourceView = sourceManager->findSourceView(loc);
-    if (!sourceView)
+    IRInst* debugSourceInst = getOrEmitDebugSource(context, loc);
+    if (!debugSourceInst)
         return;
 
-    IRInst* debugSourceInst = nullptr;
+    auto sourceManager = context->getLinkage()->getSourceManager();
     auto humaneLoc = sourceManager->getHumaneLoc(loc, SourceLocType::Emit);
 
-    // Do a best-effort attempt to retrieve the nominal source file.
-    auto pathInfo = sourceView->getPathInfo(loc, SourceLocType::Emit);
-
-    // If the source file path correspond to an existing SourceFile in the source manager, use it.
-    auto source = sourceManager->findSourceFileByPathRecursively(pathInfo.foundPath);
-    if (!source)
-        source = sourceManager->findSourceFile(pathInfo.getMostUniqueIdentity());
-    if (source)
-    {
-        context->shared->mapSourceFileToDebugSourceInst.tryGetValue(source, debugSourceInst);
-    }
-    // If the source manager does not have an entry for the corresponding file name, make sure we
-    // still emit an source file entry in the spirv module.
-    if (!debugSourceInst)
-    {
-        debugSourceInst = getOrEmitDebugSource(context, pathInfo);
-    }
     if (visitor)
         visitor->startBlockIfNeeded(stmt);
     context->irBuilder->emitDebugLine(
@@ -8123,19 +8037,16 @@ void maybeAddDebugLocationDecoration(IRGenContext* context, IRInst* inst)
     // Only emit debug location info if debug level is at least Minimal
     if (context->debugInfoLevel == DebugInfoLevel::None)
         return;
-    auto sourceView = context->getLinkage()->getSourceManager()->findSourceView(inst->sourceLoc);
-    if (!sourceView)
+
+    IRInst* debugSourceInst = getOrEmitDebugSource(context, inst->sourceLoc);
+    if (!debugSourceInst)
         return;
-    auto source = sourceView->getSourceFile();
-    IRInst* debugSourceInst = nullptr;
-    if (context->shared->mapSourceFileToDebugSourceInst.tryGetValue(source, debugSourceInst))
-    {
-        auto humaneLoc = context->getLinkage()->getSourceManager()->getHumaneLoc(
-            inst->sourceLoc,
-            SourceLocType::Emit);
-        context->irBuilder
-            ->addDebugLocationDecoration(inst, debugSourceInst, humaneLoc.line, humaneLoc.column);
-    }
+
+    auto sourceManager = context->getLinkage()->getSourceManager();
+    auto humaneLoc = sourceManager->getHumaneLoc(inst->sourceLoc, SourceLocType::Emit);
+
+    context->irBuilder
+        ->addDebugLocationDecoration(inst, debugSourceInst, humaneLoc.line, humaneLoc.column);
 }
 
 void lowerStmt(IRGenContext* context, Stmt* stmt)
@@ -8815,6 +8726,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     IGNORED_CASE(ModuleDeclarationDecl)
     IGNORED_CASE(FileDecl)
     IGNORED_CASE(RequireCapabilityDecl)
+    IGNORED_CASE(SemanticDecl)
 
 #undef IGNORED_CASE
 
@@ -9829,29 +9741,21 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                         SourceLocType::Emit);
 
                     // Find the debug source for this file
-                    auto sourceView =
-                        context->getLinkage()->getSourceManager()->findSourceView(decl->loc);
-                    if (sourceView)
+                    IRInst* debugSourceInst = getOrEmitDebugSource(context, decl->loc);
+                    if (debugSourceInst)
                     {
-                        auto source = sourceView->getSourceFile();
-                        IRInst* debugSourceInst = nullptr;
-                        if (context->shared->mapSourceFileToDebugSourceInst.tryGetValue(
-                                source,
-                                debugSourceInst))
-                        {
-                            auto debugVar = builder->emitDebugVar(
-                                varType,
-                                debugSourceInst,
-                                builder->getIntValue(builder->getUIntType(), humaneLoc.line),
-                                builder->getIntValue(builder->getUIntType(), humaneLoc.column),
-                                nullptr);
+                        auto debugVar = builder->emitDebugVar(
+                            varType,
+                            debugSourceInst,
+                            builder->getIntValue(builder->getUIntType(), humaneLoc.line),
+                            builder->getIntValue(builder->getUIntType(), humaneLoc.column),
+                            nullptr);
 
-                            // Copy name hint from the declaration
-                            addNameHint(context, debugVar, decl);
+                        // Copy name hint from the declaration
+                        addNameHint(context, debugVar, decl);
 
-                            // Emit debug value to associate the constant with the debug variable
-                            builder->emitDebugValue(debugVar, initVal.val);
-                        }
+                        // Emit debug value to associate the constant with the debug variable
+                        builder->emitDebugValue(debugVar, initVal.val);
                     }
                 }
 
