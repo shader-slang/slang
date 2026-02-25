@@ -761,7 +761,9 @@ struct SCCPContext
             {
                 if (static_cast<IRUnsignedIntegerValue>(c1) >= bitWidth)
                     return IRIntegerValue(0);
-                return c0 << static_cast<IRUnsignedIntegerValue>(c1);
+                return static_cast<IRIntegerValue>(
+                    static_cast<IRUnsignedIntegerValue>(c0)
+                    << static_cast<IRUnsignedIntegerValue>(c1));
             });
     }
     LatticeVal evalRsh(IRType* type, LatticeVal v0, LatticeVal v1)
