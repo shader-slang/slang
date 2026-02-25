@@ -3993,8 +3993,31 @@ struct SemanticsDeclFunctionConformancesVisitor
     {
         // Only process extensions on functions.
         if (auto targetType = as<DeclRefType>(extensionDecl->targetType))
+        {
             if (targetType->getDeclRef().as<FunctionDeclBase>())
+            {
+                // Check that all inherited interfaces have [__FunctionInterface].
+                for (auto inheritanceDecl : extensionDecl->getMembersOfType<InheritanceDecl>())
+                {
+                    if (auto baseType = as<DeclRefType>(inheritanceDecl->base.type))
+                    {
+                        if (auto interfaceDecl = baseType->getDeclRef().as<InterfaceDecl>())
+                        {
+                            if (!interfaceDecl.getDecl()
+                                     ->findModifier<FunctionInterfaceAttribute>())
+                            {
+                                getSink()->diagnose(
+                                    inheritanceDecl,
+                                    Diagnostics::interfaceMissingFunctionInterfaceModifier,
+                                    interfaceDecl.getDecl());
+                            }
+                        }
+                    }
+                }
+
                 checkExtensionConformance(extensionDecl);
+            }
+        }
     }
 };
 
@@ -9447,6 +9470,17 @@ void SemanticsDeclBasesVisitor::visitCallableDecl(CallableDecl* decl)
         auto baseDeclRef = baseDeclRefType->getDeclRef();
         if (auto baseInterfaceDeclRef = baseDeclRef.as<InterfaceDecl>())
         {
+            // Check that the interface has the [__FunctionInterface] attribute,
+            // since only interfaces explicitly marked as function interfaces
+            // can be used as constraints on functions.
+            //
+            if (!baseInterfaceDeclRef.getDecl()->findModifier<FunctionInterfaceAttribute>())
+            {
+                getSink()->diagnose(
+                    inheritanceDecl,
+                    Diagnostics::interfaceMissingFunctionInterfaceModifier,
+                    baseInterfaceDeclRef.getDecl());
+            }
         }
         else
         {

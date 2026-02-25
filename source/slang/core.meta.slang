@@ -399,6 +399,9 @@ interface __BuiltinRealType : __BuiltinSignedArithmeticType {}
 __attributeTarget(AggTypeDecl)
 attribute_syntax [__NonCopyableType] : NonCopyableTypeAttribute;
 
+__attributeTarget(InterfaceDecl)
+attribute_syntax [__FunctionInterface] : FunctionInterfaceAttribute;
+
 __attributeTarget(FunctionDeclBase)
 attribute_syntax [__NoSideEffect] : NoSideEffectAttribute;
 
@@ -688,6 +691,7 @@ struct FuncResultType<FType, CtxType> where FType : IHasDiffTypeInfo
 
 __magic_type(ForwardDiffFuncInterfaceType)
 [KnownBuiltin($((int)KnownBuiltinDeclName::IForwardDifferentiable))]
+[__FunctionInterface]
 interface IForwardDifferentiable<FType> where FType : IHasDiffTypeInfo
 {
     __builtin_requirement($( (int)BuiltinRequirementKind::ForwardDerivativeFunc))
@@ -709,6 +713,7 @@ interface IBwdCallable<FType> where FType : IHasDiffTypeInfo
 
 __magic_type(BwdDiffFuncInterfaceType)
 [KnownBuiltin($((int)KnownBuiltinDeclName::IBackwardDifferentiable))]
+[__FunctionInterface]
 interface IBackwardDifferentiable<FType> where FType : IHasDiffTypeInfo
 {
     __builtin_requirement($( (int)BuiltinRequirementKind::BwdCallableContextType)) 

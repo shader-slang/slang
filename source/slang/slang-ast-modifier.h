@@ -2161,4 +2161,10 @@ class ExperimentalModuleAttribute : public Attribute
     FIDDLE(...)
 };
 
+FIDDLE()
+class FunctionInterfaceAttribute : public Attribute
+{
+    FIDDLE(...)
+};
+
 } // namespace Slang

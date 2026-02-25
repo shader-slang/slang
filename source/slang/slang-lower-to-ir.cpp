@@ -9532,7 +9532,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                         for (Index i = specializationLayers.getCount(); i > 0; --i)
                         {
                             auto& specializationArgs = specializationLayers[i - 1];
-                            // SLANG_ASSERT(!as<IRGeneric>(irSatisfyingVal->getDataType()));
+
                             // Copy specialization arguments onto the outer generic
                             irSatisfyingVal = subIRBuilder.emitSpecializeInst(
                                 as<IRGeneric>(irSatisfyingVal)
@@ -9560,13 +9560,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                             astReqWitnessTable,
                             irSatisfyingWitnessTable))
                     {
-                        //
-                        // TODO: Need to lower conforming witness tables using the base type
-                        // that is consistent with the one in the requirement.
-                        //
-                        // Maybe we should lower the witness table twice?
-                        //
-
                         // Need to construct a sub-witness-table
                         auto irWitnessTableBaseType =
                             lowerType(subContext, astReqWitnessTable->baseType);
@@ -9616,6 +9609,63 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
 
             subBuilder->createWitnessTableEntry(irWitnessTable, irRequirementKey, irSatisfyingVal);
+        }
+    }
+
+    /// Lower a list of Val operands to their corresponding IR instructions.
+    ///
+    /// Each operand is resolved and lowered as follows:
+    /// - DeclRefBase to a FunctionDeclBase: emitted via emitDeclRef with its function type.
+    /// - DeclRefBase to another decl: emitted via emitDeclRef as a type kind.
+    /// - Other Val: lowered via lowerVal.
+    ///
+    void lowerValOperandsToIR(
+        IRGenContext* subContext,
+        List<Val*> const& valOperands,
+        List<IRInst*>& outIROperands)
+    {
+        auto subBuilder = subContext->irBuilder;
+        for (auto operand : valOperands)
+        {
+            if (auto declRefOperand = as<DeclRefBase>(operand->resolve()))
+            {
+                if (auto funcDeclRef = DeclRef<Decl>(declRefOperand).as<FunctionDeclBase>())
+                {
+                    FuncDeclBaseTypeInfo innerInfo;
+                    _lowerFuncDeclBaseTypeInfo(subContext, funcDeclRef, innerInfo);
+
+                    auto targetDeclRefInfo = emitDeclRef(subContext, funcDeclRef, innerInfo.type);
+
+                    SLANG_ASSERT(targetDeclRefInfo.flavor == LoweredValInfo::Flavor::Simple);
+                    auto irFunc = getSimpleVal(subContext, targetDeclRefInfo);
+                    outIROperands.add(irFunc);
+                }
+                else
+                {
+                    LoweredValInfo info =
+                        emitDeclRef(subContext, declRefOperand, subBuilder->getTypeKind());
+                    if (info.flavor == LoweredValInfo::Flavor::Simple)
+                    {
+                        outIROperands.add(getSimpleVal(subContext, info));
+                    }
+                    else
+                    {
+                        SLANG_UNEXPECTED("Unexpected operand type in synthesized function");
+                    }
+                }
+            }
+            else
+            {
+                LoweredValInfo info = lowerVal(subContext, operand);
+                if (info.flavor == LoweredValInfo::Flavor::Simple)
+                {
+                    outIROperands.add(getSimpleVal(subContext, info));
+                }
+                else
+                {
+                    SLANG_UNEXPECTED("Unexpected operand type in synthesized function");
+                }
+            }
         }
     }
 
@@ -9767,6 +9817,12 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             irWitnessTable = subBuilder->createWitnessTable(irWitnessTableBaseType, irSubType);
         else
         {
+            // Lower a synthesized inheritance declaration.
+            //
+            // This will be lowered as a simple IR op rather than a witness table.
+            // The backend passes will generate the witness tables based on the operands
+            // if necessary.
+            //
             auto synModifier = inheritanceDecl->findModifier<SynthesizedModifier>();
 
             List<Val*> valOperands;
@@ -9776,56 +9832,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 valOperands.add(subType);
 
             for (auto arg : synModifier->operands)
-            {
                 valOperands.add(arg);
-            }
 
-            // TODO: de-duplicate this logic.
             List<IRInst*> irOperands;
-            for (auto operand : valOperands)
-            {
-                if (auto declRefOperand = as<DeclRefBase>(operand->resolve()))
-                {
-                    if (auto funcDeclRef = DeclRef<Decl>(declRefOperand).as<FunctionDeclBase>())
-                    {
-                        FuncDeclBaseTypeInfo innerInfo;
-                        _lowerFuncDeclBaseTypeInfo(subContext, funcDeclRef, innerInfo);
-
-                        auto targetDeclRefInfo =
-                            emitDeclRef(subContext, funcDeclRef, innerInfo.type);
-
-                        SLANG_ASSERT(targetDeclRefInfo.flavor == LoweredValInfo::Flavor::Simple);
-                        auto _targetIRFunc = getSimpleVal(subContext, targetDeclRefInfo);
-                        irOperands.add(_targetIRFunc);
-                    }
-                    else
-                    {
-                        // Assume that we have a type here...
-                        LoweredValInfo info =
-                            emitDeclRef(subContext, declRefOperand, subBuilder->getTypeKind());
-                        if (info.flavor == LoweredValInfo::Flavor::Simple)
-                        {
-                            irOperands.add(getSimpleVal(subContext, info));
-                        }
-                        else
-                        {
-                            SLANG_UNEXPECTED("Unexpected operand type in synthesized function");
-                        }
-                    }
-                }
-                else
-                {
-                    LoweredValInfo info = lowerVal(subContext, operand);
-                    if (info.flavor == LoweredValInfo::Flavor::Simple)
-                    {
-                        irOperands.add(getSimpleVal(subContext, info));
-                    }
-                    else
-                    {
-                        SLANG_UNEXPECTED("Unexpected operand type in synthesized function");
-                    }
-                }
-            }
+            lowerValOperandsToIR(subContext, valOperands, irOperands);
 
             irWitnessTable = subBuilder->emitIntrinsicInst(
                 subBuilder->getWitnessTableType(irWitnessTableBaseType),
@@ -10682,14 +10692,13 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     callableDecl = as<CallableDecl>(genDecl->inner);
                 else
                     callableDecl = as<CallableDecl>(requirementDeclRef.getDecl());
+
                 if (callableDecl)
                 {
                     for (auto constraintDeclRef : getMembersOfType<TypeConstraintDecl>(
                              subContext->astBuilder,
                              createDefaultSpecializedDeclRef(subContext, nullptr, callableDecl)))
                     {
-                        // Need additional handling if we're inside a generic context.
-                        // SLANG_ASSERT(!as<GenericDecl>(callableDecl->parentDecl));
                         if (!isGenericInterfaceRequirementConstraint(constraintDeclRef.getDecl()))
                         {
                             auto constraintKey =

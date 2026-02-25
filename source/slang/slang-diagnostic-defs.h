@@ -1320,6 +1320,12 @@ DIAGNOSTIC(
     Error,
     invalidAddressOf,
     "'__getAddress' only supports groupshared variables and members of groupshared/device memory.")
+DIAGNOSTIC(
+    31161,
+    Error,
+    interfaceMissingFunctionInterfaceModifier,
+    "interface '$0' cannot be used as a constraint on a function type because it does not have the "
+    "[__FunctionInterface] attribute.")
 DIAGNOSTIC(31200, Warning, deprecatedUsage, "$0 has been deprecated: $1")
 DIAGNOSTIC(31201, Error, modifierNotAllowed, "modifier '$0' is not allowed here.")
 DIAGNOSTIC(

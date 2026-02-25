@@ -647,9 +647,6 @@ struct SpecializationContext
         case kIROp_FuncTypeOf:
             return maybeSpecializeFuncTypeOf(inst);
 
-            // case kIROp_ContextTypeOf:
-            //     return maybeSpecializeContextTypeOf(inst);
-
         case kIROp_Func:
 
             if (tryExpandParameterPack(as<IRFunc>(inst)))

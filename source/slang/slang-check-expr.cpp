@@ -3695,49 +3695,6 @@ Expr* SemanticsExprVisitor::convertToLogicOperatorExpr(InvokeExpr* expr)
     return newExpr;
 }
 
-/*
-// Check if a witness is synthesized.
-bool isConcreteWitness(SubtypeWitness* witness)
-{
-    if (auto declaredWitness = as<DeclaredSubtypeWitness>(witness))
-    {
-        if (auto inheritanceDecl = as<InheritanceDecl>(declaredWitness->getDeclRef().getDecl()))
-        {
-            // An inheritance decl is concrete if it is not marked with the `synthesized` modifier.
-            return !inheritanceDecl->findModifier<SynthesizedModifier>();
-        }
-    }
-    else if (auto transitiveWitness = as<TransitiveSubtypeWitness>(witness))
-    {
-        return isConcreteWitness(transitiveWitness->getSubToMid()) &&
-               isConcreteWitness(transitiveWitness->getMidToSup());
-    }
-
-    return true;
-}
-
-// Check if a lookup uses any synthesized witnesses.
-bool isConcreteLookup(DeclRefBase* declRef)
-{
-    if (as<DirectDeclRef>(declRef))
-        return (
-            !as<InheritanceDecl>(declRef->getDecl()) ||
-            declRef->getDecl()->findModifier<SynthesizedModifier>() == nullptr);
-    else if (auto genDeclRef = as<GenericAppDeclRef>(declRef))
-        return isConcreteLookup(genDeclRef->getBase());
-    else if (auto lookupDeclRef = as<LookupDeclRef>(declRef))
-        return isConcreteWitness(lookupDeclRef->getWitness()) &&
-               isConcreteLookup(lookupDeclRef->getBase());
-    else if (auto memberDeclRef = as<MemberDeclRef>(declRef))
-        return isConcreteLookup(memberDeclRef->getBase()) &&
-               (!as<InheritanceDecl>(memberDeclRef->getDecl()) ||
-                memberDeclRef->getDecl()->findModifier<SynthesizedModifier>() == nullptr);
-    else
-        return true;
-}
-*/
-
-
 Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
 {
     // check the base expression first
