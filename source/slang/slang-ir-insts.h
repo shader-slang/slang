@@ -1708,7 +1708,7 @@ struct IRLoad : IRInst
 {
     FIDDLE(leafInst())
     IRUse ptr;
-
+    IRUse* getPtrOperand() { return &ptr; }
     IRInst* getPtr() { return ptr.get(); }
 };
 
@@ -3349,6 +3349,16 @@ $(type_info.return_type) $(type_info.method_name)(
             oldPtrType->getAccessQualifier(),
             oldPtrType->getAddressSpace());
     }
+    // Copies the access-qualifier and address-space from oldPtrType. Use new pointer type opcode
+    // and value type.
+    IRPtrTypeBase* getPtrType(IROp ptrTypeOp, IRType* valueType, IRPtrTypeBase* oldPtrType)
+    {
+        return getPtrType(
+            ptrTypeOp,
+            valueType,
+            oldPtrType->getAccessQualifier(),
+            oldPtrType->getAddressSpace());
+    }
 
     /// Get a GLSL output parameter group type
     IRGLSLOutputParameterGroupType* getGLSLOutputParameterGroupType(IRType* elementType);
@@ -4548,6 +4558,11 @@ $(type_info.return_type) $(type_info.method_name)(
     void addLoopForceUnrollDecoration(IRInst* value, IntegerLiteralValue iters)
     {
         addDecoration(value, kIROp_ForceUnrollDecoration, getIntValue(getIntType(), iters));
+    }
+
+    void addAlignmentDecoration(IRInst* value, IntegerLiteralValue alignment)
+    {
+        addDecoration(value, kIROp_AlignmentDecoration, getIntValue(getIntType(), alignment));
     }
 
     IRSemanticDecoration* addSemanticDecoration(

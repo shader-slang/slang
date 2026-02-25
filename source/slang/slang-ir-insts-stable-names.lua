@@ -727,4 +727,5 @@ return {
 	["Type.OptionalNoneType"] = 725,
 	["ReinterpretOptional"] = 726,
 	["Type.DefaultPushConstantLayout"] = 727,
+	["Decoration.AlignmentDecoration"] = 728,
 }

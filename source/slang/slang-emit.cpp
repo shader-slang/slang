@@ -1924,9 +1924,11 @@ Result linkAndOptimizeIR(
 
     // If we are generating code for CUDA, we should translate all immutable buffer loads to
     // using `__ldg` intrinsic for improved performance.
+    // For aligned loads, we will also create a wrapper struct type with an alignment decorator,
+    // and rewrite the load to load the wrapper struct.
     if (isCUDATarget(targetRequest))
     {
-        SLANG_PASS(lowerImmutableBufferLoadForCUDA, targetProgram);
+        SLANG_PASS(lowerImmutableOrAlignedBufferLoadForCUDA, targetProgram);
     }
 
     SLANG_PASS(performForceInlining);

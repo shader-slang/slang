@@ -346,6 +346,16 @@ void CUDASourceEmitter::emitEntryPointAttributesImpl(
     SLANG_UNUSED(entryPointDecor);
 }
 
+void CUDASourceEmitter::emitPostKeywordTypeAttributesImpl(IRInst* inst)
+{
+    if (auto alignmentDecor = inst->findDecoration<IRAlignmentDecoration>())
+    {
+        m_writer->emit("__align__(");
+        m_writer->emit(getIntVal(alignmentDecor->getAlignmentOperand()));
+        m_writer->emit(") ");
+    }
+}
+
 void CUDASourceEmitter::emitFunctionPreambleImpl(IRInst* inst)
 {
     if (!inst)
