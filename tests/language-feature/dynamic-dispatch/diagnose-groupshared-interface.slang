@@ -1,18 +1,11 @@
-// Groupshared variables with interface types are not supported because
-// existential type lowering (type tag + AnyValue packing) is incompatible
-// with workgroup-shared memory allocation, which requires fixed layout
-// known at compile time.
+// Direct groupshared variables with interface types currently trigger an
+// ICE because the existential lowering passes do not handle groupshared-rate
+// variables. The existential layout is known after compilation, so this may
+// be a fixable limitation rather than a fundamental incompatibility.
+// Disabled until the fix lands. See https://github.com/shader-slang/slang/issues/10144
 //
-// Currently this causes an internal compiler error (ICE 99999) during
-// code emission because the existential lowering passes do not handle
-// groupshared-rate variables. Once a proper diagnostic is added during
-// semantic checking, these tests should be enabled.
-//
-// Scenarios:
-//   1. Direct groupshared interface variable
-//   2. Groupshared array of interface-typed values
-//   3. Groupshared struct containing interface field (currently compiles
-//      but correctness is unverified; may need separate validation)
+// The struct-wrapping workaround is validated by
+// groupshared-struct-with-interface.slang.
 
 // --- Scenario 1: Direct groupshared interface variable ---
 //DISABLE_TEST:SIMPLE(filecheck=CHK1): -target spirv -stage compute -entry scenario1
@@ -35,7 +28,6 @@ struct DoubleValue : IValue
     float get() { return v * 2.0; }
 }
 
-// CHK1: error
 groupshared IValue sharedVal;
 
 RWStructuredBuffer<float> outputBuffer;
@@ -53,7 +45,6 @@ void scenario1(uint3 tid : SV_DispatchThreadID)
 //DISABLE_TEST:SIMPLE(filecheck=CHK2): -target spirv -stage compute -entry scenario2
 //DISABLE_TEST:SIMPLE(filecheck=CHK2): -target hlsl -stage compute -entry scenario2
 
-// CHK2: error
 groupshared IValue sharedArray[4];
 
 [numthreads(4, 1, 1)]
