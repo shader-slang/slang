@@ -404,50 +404,10 @@ static void _lookUpMembersInType(
 static void _lookUpMembersInSuperTypeImpl(
     ASTBuilder* astBuilder,
     Name* name,
-    Type* leafType,
     Type* superType,
-    SubtypeWitness* leafIsSuperWitness,
     LookupRequest const& request,
     LookupResult& ioResult,
     BreadcrumbInfo* inBreadcrumbs);
-
-static void _lookUpMembersInSuperType(
-    ASTBuilder* astBuilder,
-    Name* name,
-    Type* leafType,
-    Type* superType,
-    SubtypeWitness* leafIsSuperWitness,
-    LookupRequest const& request,
-    LookupResult& ioResult,
-    BreadcrumbInfo* inBreadcrumbs)
-{
-    // If we are looking up through an interface type, then
-    // we need to be sure that we add an appropriate
-    // "this type" substitution here, since that needs to
-    // be applied to any members we look up.
-    //
-    superType = _maybeSpecializeSuperType(astBuilder, superType, leafIsSuperWitness);
-
-    // We need to track the indirection we took in lookup,
-    // so that we can construct an appropriate AST on the other
-    // side that includes the "upcast" from sub-type to super-type.
-    //
-    BreadcrumbInfo breadcrumb;
-    breadcrumb.prev = inBreadcrumbs;
-    breadcrumb.kind = LookupResultItem::Breadcrumb::Kind::SuperType;
-    breadcrumb.val = leafIsSuperWitness;
-    breadcrumb.prev = inBreadcrumbs;
-
-    _lookUpMembersInSuperTypeImpl(
-        astBuilder,
-        name,
-        leafType,
-        superType,
-        leafIsSuperWitness,
-        request,
-        ioResult,
-        &breadcrumb);
-}
 
 static void _lookupMembersInSuperTypeFacets(
     ASTBuilder* astBuilder,
@@ -627,9 +587,7 @@ static void _lookUpMembersInSuperTypeDeclImpl(
 static void _lookUpMembersInSuperTypeImpl(
     ASTBuilder* astBuilder,
     Name* name,
-    Type* leafType,
     Type* superType,
-    SubtypeWitness* leafIsSuperWitness,
     LookupRequest const& request,
     LookupResult& ioResult,
     BreadcrumbInfo* inBreadcrumbs)
@@ -735,15 +693,7 @@ static void _lookUpMembersInType(
         return;
     }
 
-    _lookUpMembersInSuperTypeImpl(
-        astBuilder,
-        name,
-        type,
-        type,
-        nullptr,
-        request,
-        ioResult,
-        breadcrumbs);
+    _lookUpMembersInSuperTypeImpl(astBuilder, name, type, request, ioResult, breadcrumbs);
 }
 
 /// Look up members by `name` in the given `valueDeclRef`.
