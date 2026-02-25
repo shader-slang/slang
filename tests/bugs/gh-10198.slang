@@ -1,4 +1,6 @@
-//TEST_IGNORE_FILE:
+//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk
+// CHECK: 78
+//TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
 
 // Regression test: SPIRV structured control flow violation with switch-continue
 // Issue: https://github.com/shader-slang/slang/issues/10198
