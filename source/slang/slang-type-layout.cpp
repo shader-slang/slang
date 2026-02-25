@@ -52,9 +52,15 @@ static size_t _roundUpToPowerOfTwo(size_t value)
     value--;
 #if SLANG_VC && 0
     // TODO: Disabled to avoid build failure on aarch64/windows
-    return 1ULL << (64 - (size_t)__lzcnt64(value));
+    if constexpr (sizeof(size_t) > 4)
+        return size_t(1) << (sizeof(size_t) * 8 - __lzcnt64(value));
+    else
+        return size_t(1) << (sizeof(size_t) * 8 - __lzcnt(value));
 #elif SLANG_GCC || SLANG_CLANG
-    return 1ULL << (sizeof(size_t) * 8 - __builtin_clzll(value));
+    if constexpr (sizeof(size_t) > 4)
+        return size_t(1) << (sizeof(size_t) * 8 - __builtin_clzll(value));
+    else
+        return size_t(1) << (sizeof(size_t) * 8 - __builtin_clzl(value));
 #else
     value |= value >> 1;
     value |= value >> 2;
@@ -1990,29 +1996,39 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getConstantBufferRules(
     CompilerOptionSet& compilerOptions,
     Type* containerType)
 {
-    if (compilerOptions.shouldUseScalarLayout())
-        return &kScalarLayoutRulesImpl_;
-    else if (compilerOptions.shouldUseCLayout())
-        return &kCLayoutRulesImpl_;
-    else if (compilerOptions.shouldUseDXLayout())
-        return &kFXCConstantBufferLayoutRulesFamilyImpl;
+    // Explicit layout rule in ConstantBuffer should take precedence over global options.
     if (auto cbufferType = as<ConstantBufferType>(containerType))
     {
         switch (cbufferType->getLayoutType()->astNodeType)
         {
-        case ASTNodeType::DefaultDataLayoutType:
         case ASTNodeType::Std140DataLayoutType:
             return &kStd140LayoutRulesImpl_;
-        case ASTNodeType::DefaultPushConstantDataLayoutType:
         case ASTNodeType::Std430DataLayoutType:
             return &kStd430LayoutRulesImpl_;
         case ASTNodeType::ScalarDataLayoutType:
             return &kScalarLayoutRulesImpl_;
         case ASTNodeType::CDataLayoutType:
             return &kCLayoutRulesImpl_;
+        case ASTNodeType::DefaultDataLayoutType:
+        case ASTNodeType::DefaultPushConstantDataLayoutType:
+            break;
         default:
             break;
         }
+    }
+    // Default layout types fall through to global options.
+    if (compilerOptions.shouldUseScalarLayout())
+        return &kScalarLayoutRulesImpl_;
+    else if (compilerOptions.shouldUseCLayout())
+        return &kCLayoutRulesImpl_;
+    else if (compilerOptions.shouldUseDXLayout())
+        return &kFXCConstantBufferLayoutRulesFamilyImpl;
+    // When no global option is set, use the default for each layout type.
+    if (auto cbufferType = as<ConstantBufferType>(containerType))
+    {
+        if (cbufferType->getLayoutType()->astNodeType ==
+            ASTNodeType::DefaultPushConstantDataLayoutType)
+            return &kStd430LayoutRulesImpl_;
     }
     return &kStd140LayoutRulesImpl_;
 }
@@ -3459,6 +3475,37 @@ SourceLanguage getIntermediateSourceLanguageForTarget(TargetProgram* targetProgr
 bool areResourceTypesBindlessOnTarget(TargetRequest* targetReq)
 {
     return isCPUTarget(targetReq) || isCUDATarget(targetReq) || isMetalTarget(targetReq);
+}
+
+/// Auto-promote the descriptor_handle capability on the target when DescriptorHandle
+/// types are encountered, but only when no specific profile or capability was requested
+/// by the user (auto-promotion mode).
+static void maybePromoteDescriptorHandleCapability(TargetRequest* targetReq)
+{
+    if (!targetReq)
+        return;
+
+    auto& targetOptionSet = targetReq->getOptionSet();
+    bool specificProfileRequested =
+        targetOptionSet.hasOption(CompilerOptionName::Profile) &&
+        (targetOptionSet.getIntOption(CompilerOptionName::Profile) != SLANG_PROFILE_UNKNOWN);
+    bool specificCapabilityRequested = false;
+    for (auto atomVal : targetOptionSet.getArray(CompilerOptionName::Capability))
+    {
+        if ((atomVal.kind == CompilerOptionValueKind::Int &&
+             atomVal.intValue != SLANG_CAPABILITY_UNKNOWN) ||
+            atomVal.kind == CompilerOptionValueKind::String)
+        {
+            specificCapabilityRequested = true;
+            break;
+        }
+    }
+    if (!specificProfileRequested && !specificCapabilityRequested)
+    {
+        auto targetCaps = targetReq->getTargetCaps();
+        targetCaps.addUnexpandedCapabilites(CapabilityName::descriptor_handle);
+        targetReq->setTargetCaps(targetCaps);
+    }
 }
 
 static bool isD3D11Target(TargetRequest*)
@@ -5363,6 +5410,16 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
             type,
             rules);
     }
+    else if (as<TensorViewType>(type))
+    {
+        // TensorView<T> is a __magic_type whose layout is defined in the CUDA prelude
+        // (slang-cuda-prelude.h) as: uint8_t* data (8) + uint32_t strides[5] (20) +
+        // uint32_t sizes[5] (20) + uint32_t dimensionCount (4) + padding (4) = 56 bytes.
+        return createSimpleTypeLayout(
+            SimpleLayoutInfo(LayoutResourceKind::Uniform, 56, 8),
+            type,
+            rules);
+    }
     else if (auto vecType = as<VectorExpressionType>(type))
     {
         auto elementType = vecType->getElementType();
@@ -5539,6 +5596,8 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
     }
     else if (auto resPtrType = as<DescriptorHandleType>(type))
     {
+        maybePromoteDescriptorHandleCapability(context.targetReq);
+
         // For spvBindlessTextureNV, DescriptorHandle<T> has the layout of uint64_t
         if (context.targetReq &&
             context.targetReq->getTargetCaps().implies(CapabilityAtom::spvBindlessTextureNV))
@@ -6201,6 +6260,8 @@ RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
     }
     else if (auto descriptorHandleType = as<DescriptorHandleType>(type))
     {
+        maybePromoteDescriptorHandleCapability(context.targetReq);
+
         RefPtr<TypeLayout> typeLayout = new TypeLayout();
         typeLayout->type = type; // Preserve the original DescriptorHandle type
         typeLayout->rules = rules;

@@ -108,8 +108,9 @@ vkd3d-proton.cache.write
 .*.swp
 .*.swo
 
-# Claude local settings and memory
+# Claude local settings, memory, and worktrees
 /.claude/settings.local.json
+/.claude/worktrees/
 CLAUDE.local.md
 
 # Other temporary files
@@ -133,3 +134,9 @@ perf.data.*
 
 # gh command
 .gh-pm.yml
+
+# act local testing (secrets, vars, event payloads)
+.secrets
+.vars
+.github/test-events/
+__pycache__/

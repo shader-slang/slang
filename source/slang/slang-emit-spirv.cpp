@@ -3566,7 +3566,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 kIROp_PtrType,
                 spvAsmBuiltinVar->getDataType(),
                 AccessQualifier::ReadWrite,
-                AddressSpace::BuiltinInput),
+                AddressSpace::BuiltinInput,
+                builder.getDefaultBufferLayoutType()),
             kind,
             spvAsmBuiltinVar);
         registerInst(spvAsmBuiltinVar, varInst);
@@ -7735,9 +7736,13 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         SLANG_ASSERT(destPtrType);
 
         auto addrSpace = AddressSpace::Function;
+        IRType* dataLayout = builder.getDefaultBufferLayoutType();
         if (destPtrType->hasAddressSpace())
             addrSpace = destPtrType->getAddressSpace();
-        auto ptrElementType = builder.getPtrType(kIROp_PtrType, sourceElementType, addrSpace);
+        if (destPtrType->getDataLayout() != nullptr)
+            dataLayout = destPtrType->getDataLayout();
+        auto ptrElementType =
+            builder.getPtrType(kIROp_PtrType, sourceElementType, addrSpace, dataLayout);
 
         // Compute memory access operands for PhysicalStorageBuffer alignment
         int memoryAccessMask = 0;
@@ -7844,7 +7849,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return builder.getPtrType(
             ptrTypeWithNoAddressSpace->getOp(),
             ptrTypeWithNoAddressSpace->getValueType(),
-            addressSpace);
+            addressSpace,
+            ptrTypeWithNoAddressSpace->getDataLayout());
     }
 
     SpvInst* emitStructuredBufferGetElementPtr(SpvInstParent* parent, IRInst* inst)
@@ -7910,7 +7916,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return emitOpAccessChain(
             parent,
             inst,
-            builder.getPtrType(arrayType, addressSpace),
+            builder.getPtrType(
+                arrayType,
+                AccessQualifier::ReadWrite,
+                addressSpace,
+                bufPtrType->getDataLayout()),
             inst->getOperand(0),
             makeArray(emitIntConstant(0, builder.getIntType())));
     }
@@ -8024,6 +8034,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             return inner;
         }
 
+        maybeRequireCoopMatConversionNV(fromTypeV, toTypeV);
+
         const auto fromInfo = getIntTypeInfo(m_targetRequest, fromType);
         const auto toInfo = getIntTypeInfo(m_targetRequest, toType);
 
@@ -8095,6 +8107,24 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return emitCompositeConstruct(parent, inst, toTypeM, rowVectorsConverted);
     }
 
+    void maybeRequireCoopMatConversionNV(IRType* fromType, IRType* toType)
+    {
+        // When converting between different cooperative matrix types that have different matrix
+        // use, we need to require the SPIRV capability and extension for cooperative matrix
+        // conversions.
+        if (auto fromCoopMatType = as<IRCoopMatrixType>(fromType))
+        {
+            if (auto toCoopMatType = as<IRCoopMatrixType>(toType))
+            {
+                if (fromCoopMatType->getMatrixUse() != toCoopMatType->getMatrixUse())
+                {
+                    requireSPIRVCapability(SpvCapabilityCooperativeMatrixConversionsNV);
+                    ensureExtensionDeclaration(toSlice("SPV_NV_cooperative_matrix2"));
+                }
+            }
+        }
+    }
+
     SpvInst* emitFloatCast(SpvInstParent* parent, IRFloatCast* inst)
     {
         const auto fromTypeV = inst->getOperand(0)->getDataType();
@@ -8154,6 +8184,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 as<IRMatrixType>(toTypeV));
         }
 
+        maybeRequireCoopMatConversionNV(fromTypeV, toTypeV);
+
         return emitOpFConvert(parent, inst, toTypeV, inst->getOperand(0));
     }
 
@@ -8170,6 +8202,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         if (isIntegralType(fromType))
         {
             const auto fromInfo = getIntTypeInfo(m_targetRequest, fromType);
+            maybeRequireCoopMatConversionNV(fromTypeV, toTypeV);
 
             return fromInfo.isSigned
                        ? emitOpConvertSToF(parent, inst, toTypeV, inst->getOperand(0))
@@ -8242,6 +8275,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     zero);
             }
         }
+
+        maybeRequireCoopMatConversionNV(fromTypeV, toTypeV);
 
         SLANG_ASSERT(isIntegralType(toType));
 

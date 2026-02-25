@@ -131,11 +131,14 @@ struct AddressInstEliminationContext
                 if (auto ptrType = as<IRPtrTypeBase>(inst->getDataType()))
                 {
                     auto valType = unwrapAttributedType(ptrType->getValueType());
-                    if (!getResolvedInstForDecorations(valType)
-                             ->findDecoration<IRNonCopyableTypeDecoration>())
-                    {
-                        workList.add(inst);
-                    }
+                    if (getResolvedInstForDecorations(valType)
+                            ->findDecoration<IRNonCopyableTypeDecoration>())
+                        continue;
+
+                    if (ptrType->getAddressSpace() == AddressSpace::UserPointer)
+                        continue;
+
+                    workList.add(inst);
                 }
             }
         }

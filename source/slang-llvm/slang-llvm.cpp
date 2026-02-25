@@ -5,7 +5,6 @@
 #include "clang/CodeGen/ObjectFilePCHContainerWriter.h"
 #include "clang/Config/config.h"
 #include "clang/Driver/DriverDiagnostic.h"
-#include "clang/Driver/Options.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Frontend/CompilerInvocation.h"
 #include "clang/Frontend/FrontendAction.h"
@@ -790,7 +789,7 @@ SlangResult LLVMDownstreamCompiler::compile(
 #endif
 
     // Create the actual diagnostics engine.
-    clang->createDiagnostics(*llvm::vfs::getRealFileSystem());
+    clang->createDiagnostics(*llvm::vfs::getRealFileSystem(), diagOpts);
     clang->setDiagnostics(diags.get());
 
     if (!clang->hasDiagnostics())
@@ -798,7 +797,11 @@ SlangResult LLVMDownstreamCompiler::compile(
 
     //
     clang->createFileManager();
+#if LLVM_VERSION_MAJOR <= 21
     clang->createSourceManager(clang->getFileManager());
+#else
+    clang->createSourceManager();
+#endif
 
 
     std::unique_ptr<LLVMContext> llvmContext = std::make_unique<LLVMContext>();
