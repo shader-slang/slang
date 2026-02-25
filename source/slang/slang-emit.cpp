@@ -1784,7 +1784,10 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::ShaderObjectCode:
     case CodeGenTarget::ShaderHostCallable:
         {
-            SLANG_PASS(legalizeEntryPointVaryingParamsForCPU, codeGenContext->getSink());
+            SLANG_PASS(
+                legalizeEntryPointVaryingParamsForCPU,
+                targetProgram,
+                codeGenContext->getSink());
         }
         break;
 

@@ -2802,14 +2802,22 @@ IRExpandTypeOrVal* IRBuilder::getExpandTypeOrVal(
 
 IRRefParamType* IRBuilder::getRefParamType(IRType* valueType, AddressSpace addrSpace)
 {
-    return (IRRefParamType*)
-        getPtrType(kIROp_RefParamType, valueType, AccessQualifier::ReadWrite, addrSpace);
+    return (IRRefParamType*)getPtrType(
+        kIROp_RefParamType,
+        valueType,
+        AccessQualifier::ReadWrite,
+        addrSpace,
+        getDefaultBufferLayoutType());
 }
 
 IRBorrowInParamType* IRBuilder::getBorrowInParamType(IRType* valueType, AddressSpace addrSpace)
 {
-    return (IRBorrowInParamType*)
-        getPtrType(kIROp_BorrowInParamType, valueType, AccessQualifier::Read, addrSpace);
+    return (IRBorrowInParamType*)getPtrType(
+        kIROp_BorrowInParamType,
+        valueType,
+        AccessQualifier::Read,
+        addrSpace,
+        getDefaultBufferLayoutType());
 }
 
 
@@ -2835,7 +2843,8 @@ IRPtrTypeBase* IRBuilder::getPtrTypeWithAddressSpace(
             ptrWithAddrSpace->getOp(),
             valueType,
             ptrWithAddrSpace->getAccessQualifier(),
-            ptrWithAddrSpace->getAddressSpace());
+            ptrWithAddrSpace->getAddressSpace(),
+            ptrWithAddrSpace->getDataLayout());
     return (IRPtrTypeBase*)getPtrType(ptrWithAddrSpace->getOp(), valueType);
 }
 
@@ -2843,23 +2852,30 @@ IRPtrType* IRBuilder::getPtrType(
     IROp op,
     IRType* valueType,
     AccessQualifier accessQualifier,
-    AddressSpace addressSpace)
+    AddressSpace addressSpace,
+    IRType* dataLayoutType)
 {
     return (IRPtrType*)getPtrType(
         op,
         valueType,
         getIntValue(getUInt64Type(), static_cast<IRIntegerValue>(accessQualifier)),
-        getIntValue(getUInt64Type(), static_cast<IRIntegerValue>(addressSpace)));
+        getIntValue(getUInt64Type(), static_cast<IRIntegerValue>(addressSpace)),
+        dataLayoutType);
 }
 
 IRPtrType* IRBuilder::getPtrType(
     IROp op,
     IRType* valueType,
     IRInst* accessQualifier,
-    IRInst* addressSpace)
+    IRInst* addressSpace,
+    IRType* dataLayoutType)
 {
-    IRInst* operands[] = {valueType, accessQualifier, addressSpace};
-    return (IRPtrType*)getType(op, addressSpace ? 3 : 1, operands);
+    IRInst* operands[] = {
+        valueType,
+        accessQualifier,
+        addressSpace,
+        dataLayoutType ? dataLayoutType : getDefaultBufferLayoutType()};
+    return (IRPtrType*)getType(op, addressSpace ? (dataLayoutType ? 4 : 3) : 1, operands);
 }
 
 IRArrayTypeBase* IRBuilder::getArrayTypeBase(
@@ -5318,7 +5334,8 @@ IRType* maybePropagateAddressSpace(IRBuilder* builder, IRInst* basePtr, IRType* 
                     resultPtrType->getOp(),
                     resultPtrType->getValueType(),
                     basePtrType->getAccessQualifier(),
-                    basePtrType->getAddressSpace());
+                    basePtrType->getAddressSpace(),
+                    basePtrType->getDataLayout());
             }
         }
     }
@@ -5329,12 +5346,14 @@ IRInst* IRBuilder::emitFieldAddress(IRInst* basePtr, IRInst* fieldKey)
 {
     AddressSpace addrSpace = AddressSpace::Generic;
     AccessQualifier accessQualifier = AccessQualifier::ReadWrite;
+    IRType* dataLayoutType = getDefaultBufferLayoutType();
     IRInst* valueType = nullptr;
     auto basePtrType = unwrapAttributedType(basePtr->getDataType());
     if (auto ptrType = as<IRPtrTypeBase>(basePtrType))
     {
         accessQualifier = ptrType->getAccessQualifier();
         addrSpace = ptrType->getAddressSpace();
+        dataLayoutType = ptrType->getDataLayout();
         valueType = ptrType->getValueType();
     }
     else if (auto ptrLikeType = as<IRPointerLikeType>(basePtrType))
@@ -5356,7 +5375,10 @@ IRInst* IRBuilder::emitFieldAddress(IRInst* basePtr, IRInst* fieldKey)
         }
     }
     SLANG_RELEASE_ASSERT(resultType);
-    return emitFieldAddress(getPtrType(resultType, accessQualifier, addrSpace), basePtr, fieldKey);
+    return emitFieldAddress(
+        getPtrType(resultType, accessQualifier, addrSpace, dataLayoutType),
+        basePtr,
+        fieldKey);
 }
 
 IRInst* IRBuilder::emitFieldAddress(IRType* type, IRInst* base, IRInst* field)
@@ -5469,6 +5491,7 @@ IRInst* IRBuilder::emitElementAddress(IRInst* basePtr, IRInst* index)
 {
     AddressSpace addrSpace = AddressSpace::Generic;
     AccessQualifier accessQualifier = AccessQualifier::ReadWrite;
+    IRType* dataLayoutType = getDefaultBufferLayoutType();
     IRInst* valueType = nullptr;
     auto basePtrType = unwrapAttributedType(basePtr->getDataType());
     if (auto ptrType = as<IRPtrTypeBase>(basePtrType))
@@ -5485,6 +5508,7 @@ IRInst* IRBuilder::emitElementAddress(IRInst* basePtr, IRInst* index)
         {
             addrSpace = ptrType->getAddressSpace();
         }
+        dataLayoutType = ptrType->getDataLayout();
         valueType = ptrType->getValueType();
     }
     else if (auto ptrLikeType = as<IRPointerLikeType>(basePtrType))
@@ -5512,7 +5536,7 @@ IRInst* IRBuilder::emitElementAddress(IRInst* basePtr, IRInst* index)
     auto inst = createInst<IRGetElementPtr>(
         this,
         kIROp_GetElementPtr,
-        getPtrType(type, accessQualifier, addrSpace),
+        getPtrType(type, accessQualifier, addrSpace, dataLayoutType),
         basePtr,
         index);
 
@@ -6692,11 +6716,21 @@ IRInst* IRBuilder::emitRWStructuredBufferGetElementPtr(IRInst* structuredBuffer,
     const auto sbt = cast<IRHLSLStructuredBufferTypeBase>(structuredBuffer->getDataType());
     SLANG_ASSERT(sbt);
     const auto t = getPtrType(sbt->getElementType());
+    return emitRWStructuredBufferGetElementPtr(t->getCanonicalType(), structuredBuffer, index);
+}
+
+IRInst* IRBuilder::emitRWStructuredBufferGetElementPtr(
+    IRType* pointerType,
+    IRInst* structuredBuffer,
+    IRInst* index)
+{
+    const auto sbt = cast<IRHLSLStructuredBufferTypeBase>(structuredBuffer->getDataType());
+    SLANG_ASSERT(sbt);
     IRInst* const operands[2] = {structuredBuffer, index};
     const auto i = createInst<IRRWStructuredBufferGetElementPtr>(
         this,
         kIROp_RWStructuredBufferGetElementPtr,
-        t,
+        pointerType,
         2,
         operands);
     addInst(i);

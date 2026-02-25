@@ -800,6 +800,7 @@ class PtrTypeBase : public BuiltinType
     Type* getValueType();
     Val* getAccessQualifier();
     Val* getAddressSpace();
+    Type* getDataLayout();
 
     std::optional<AccessQualifier> tryGetAccessQualifierValue();
 };
