@@ -1219,15 +1219,30 @@ public struct WaveTangledVector<T, ShMemSize : ISharedMemorySize, int N, int Sub
         where Address : IPointerLikeAddress<T>
         where Address.Differential : IPointerLikeAddress<T.Differential>
         where OutputVector : IVector<T>
+        where Layout : IStorageLayout
     {
-        typealias MMA = MMAHelper<T, N, OutputVector.Size, SubgroupSize, Target, ShMemSize, false>;
-        uint shA = 0;
-        uint shB = MMA.ShMemInfo.SharedMemSizeInVectorMatA;
-        uint shC = shB;
-        const int AlignedOutSize = MMA.TileInfo.Uint4AlignedM;
-        let outputArray = MMA.mma<T, Address, T[Uint4AlignedInputSize], T[AlignedOutSize], T, Bias
-                            >( data, shA, shB, shC, weightAddress, biasAddress);
-        return OutputVector(outputArray);
+        if (Layout.Layout == LayoutType.Optimal)
+        {
+            typealias MMA = TiledMMAHelper<T, N, OutputVector.Size, SubgroupSize, Target, ShMemSize, false>;
+            uint shA = 0;
+            uint shB = MMA.ShMemInfo.SharedMemSizeInVectorMatA;
+            uint shC = shB;
+            const int AlignedOutSize = MMA.TileInfoT.Uint4AlignedM;
+            let outputArray = MMA.mma<T, Address, T[Uint4AlignedInputSize], T[AlignedOutSize], T, Bias
+                                >( data, shA, shB, shC, weightAddress, biasAddress);
+            return OutputVector(outputArray);
+        }
+        else
+        {
+            typealias MMA = MMAHelper<T, N, OutputVector.Size, SubgroupSize, Target, ShMemSize, false>;
+            uint shA = 0;
+            uint shB = MMA.ShMemInfo.SharedMemSizeInVectorMatA;
+            uint shC = shB;
+            const int AlignedOutSize = MMA.TileInfo.Uint4AlignedM;
+            let outputArray = MMA.mma<T, Address, T[Uint4AlignedInputSize], T[AlignedOutSize], T, Bias
+                                >( data, shA, shB, shC, weightAddress, biasAddress);
+            return OutputVector(outputArray);
+        }
     }
 
     [ForceInline]
@@ -1240,6 +1255,7 @@ public struct WaveTangledVector<T, ShMemSize : ISharedMemorySize, int N, int Sub
         where Address.Differential : IPointerLikeAddress<T.Differential>
         where OutputVector : IVector<T>
         where OutputVector.Differential : IVector<T.Differential>
+        where Layout : IStorageLayout
     {
         typealias MMA = MMAHelper<T, N, OutputVector.Size, SubgroupSize, Target, ShMemSize, true>;
 

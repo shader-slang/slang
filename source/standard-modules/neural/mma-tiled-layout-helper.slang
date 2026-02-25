@@ -8,6 +8,12 @@ implementing neural;
 
 #include "common-def.slang"
 
+// Round up a compile-time integer to the next multiple of 16 (cooperative matrix tile size).
+internal struct TileAlignedSize<int Size>
+{
+    internal static const int Value = ((Size + 15) / 16) * 16;
+}
+
 /// Cooperative-matrix operations with tiled (OptimalLayout) weight storage.
 ///
 /// Tiled layout:
@@ -35,33 +41,30 @@ VISIBILITY_LEVEL struct TiledMMAHelper<T, int InputSize, int OutputSize, int Sub
     // (input-vector loading, output-vector store-back, cross-warp reduction).
     typealias BaseMMA = MMAHelper<T, InputSize, OutputSize, SubgroupSize, Target, ShMemSize, TransposeA>;
 
-    VISIBILITY_LEVEL typealias TileInfoT = TileInfo<T, OutputSize, SubgroupSize, InputSize, Target, TransposeA>;
-    typealias CMShape = CoopMatShape<T, Target>;
-    typealias ShMemInfo = SharedMemoryUsage<T, Target, TransposeA ? ExecutionMode.Training : ExecutionMode.Inference,
-                                                   InputSize, OutputSize, SubgroupSize>;
+    VISIBILITY_LEVEL typealias TileInfoT = BaseMMA.TileInfo;
+    typealias CMShape = BaseMMA.CMShape;
+    typealias ShMemInfo = BaseMMA.ShMemInfo;
 
-    static const linalg.CoopMatMatrixLayout RowMajor = linalg.CoopMatMatrixLayout.RowMajor;
-    static const linalg.CoopMatMatrixLayout ColumnMajor = linalg.CoopMatMatrixLayout.ColumnMajor;
+    static const linalg.CoopMatMatrixLayout RowMajor = BaseMMA.RowMajor;
+    static const linalg.CoopMatMatrixLayout ColumnMajor = BaseMMA.ColumnMajor;
 
-    static const int M = OutputSize;
-    static const int N = SubgroupSize;
-    static const int K = InputSize;
+    static const int M = BaseMMA.M;
+    static const int N = BaseMMA.N;
+    static const int K = BaseMMA.K;
 
-    // A/B can only be half; C can be T (half or float).
-    typealias MatA = linalg.CoopMat<half, MemoryScope.Subgroup, CMShape.ROW_A,    CMShape.COLUMN_A, linalg.CoopMatMatrixUse.MatrixA>;
-    typealias MatB = linalg.CoopMat<half, MemoryScope.Subgroup, CMShape.COLUMN_B, CMShape.COLUMN_B, linalg.CoopMatMatrixUse.MatrixB>;
-    typealias MatC = linalg.CoopMat<T,    MemoryScope.Subgroup, CMShape.ROW_C,    CMShape.COLUMN_C, linalg.CoopMatMatrixUse.MatrixAccumulator>;
+    typealias MatA = BaseMMA.MatA;
+    typealias MatB = BaseMMA.MatB;
+    typealias MatC = BaseMMA.MatC;
 
     // =========================================================================
     // Tiled-layout addressing
     // =========================================================================
 
-    static const int NTileRows = M / CMShape.ROW_A;
-    static const int NTileCols = K / CMShape.COLUMN_A;
+    static const int NTileRows = (M + CMShape.ROW_A - 1) / CMShape.ROW_A;
+    static const int NTileCols = (K + CMShape.COLUMN_A - 1) / CMShape.COLUMN_A;
 
-    // Per-tile sizes (in half elements and uint4 vectors).
-    static const int TileSizeInElements = CMShape.ROW_A * CMShape.COLUMN_A;        // 256
-    static const int TileSizeInUint4    = TileSizeInElements / CMShape.ElementCountPerVector; // 32
+    static const int TileSizeInElements = CMShape.SizeAInElements;          // 256
+    static const int TileSizeInUint4    = CMShape.CoopMatASizeInVector;    // 32
 
     // Row stride inside a tile, in uint4 units.
     static const int TileStrideInUint4 = CMShape.COLUMN_A / CMShape.ElementCountPerVector; // 2
@@ -195,7 +198,8 @@ VISIBILITY_LEVEL struct TiledMMAHelper<T, int InputSize, int OutputSize, int Sub
     ///    warps see the data before loading into CoopMat registers.
     [ForceInline]
     [require(cooperative_matrix, subgroup_basic)]
-    VISIBILITY_LEVEL static OutArrayType mmaTiledLayout<U, Address, InArrayType, OutArrayType, V, bool Bias = false>(InArrayType inputVector,
+    VISIBILITY_LEVEL static OutArrayType mma<U, Address, InArrayType, OutArrayType, V, bool Bias = false>(
+        InArrayType inputVector,
         uint sharedMemoryAOffset,
         uint sharedMemoryBOffset,
         uint sharedMemoryCOffset,
@@ -235,7 +239,6 @@ VISIBILITY_LEVEL struct TiledMMAHelper<T, int InputSize, int OutputSize, int Sub
         {
             uint tileCol = k / CMShape.COLUMN_A;
 
-            // Phase 1: Load weight tiles into CoopMat A registers.
             MatA matA[TileInfoT.NCoopMatRow];
 
             if (U is half)
@@ -243,12 +246,15 @@ VISIBILITY_LEVEL struct TiledMMAHelper<T, int InputSize, int OutputSize, int Sub
                 // Fast path: each warp loads weight tiles directly from global memory,
                 // then loads its input vector into per-warp shared memory B.
                 // Only a warp-level sync is needed (for shared memory B visibility).
+
+                // Phase 1: Load weight tiles into CoopMat A.
                 [ForceUnroll]
                 for (uint i = 0; i < TileInfoT.NCoopMatRow; i++)
                 {
                     matA[i] = loadTileDirect<U, Address>(i, tileCol, weightAddress);
                 }
 
+                // Phase 2: Load input vector into shared memory B.
                 BaseMMA.loadVectorToShB(sharedMemoryBOffset, tileCol, subgroupIndex, inputVector);
                 GroupMemoryBarrierWithWaveSync();
             }
@@ -257,12 +263,16 @@ VISIBILITY_LEVEL struct TiledMMAHelper<T, int InputSize, int OutputSize, int Sub
                 // Slow path: first warp loads the entire column of tiles to
                 // workgroup-shared memory for type conversion. All warps load
                 // their input vectors in parallel. A single GroupSync covers both.
+
+                // Phase 1: Load weight tiles into shared memory first, because we can't
+                // load them directly into CoopMat A.
                 if (subgroupIndex == 0)
                 {
                     loadTileColumnViaSharedMemory<U, Address>(sharedMemoryAOffset, tileCol, weightAddress);
                 }
-                BaseMMA.loadVectorToShB(sharedMemoryBOffset, tileCol, subgroupIndex, inputVector);
 
+                // Phase 2: Load input vector into shared memory B.
+                BaseMMA.loadVectorToShB(sharedMemoryBOffset, tileCol, subgroupIndex, inputVector);
                 GroupMemoryBarrierWithGroupSync();
 
                 [ForceUnroll]
