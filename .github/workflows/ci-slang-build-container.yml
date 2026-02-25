@@ -126,8 +126,10 @@ jobs:
           echo "cmake_config=$cmake_config" >> $GITHUB_ENV
 
           # Configure with CUDA support, use LLVM from GCS, use sccache
+          # Disable PCH when using sccache (known incompatibility causes linker errors)
           cmake --preset default --fresh \
             -DSLANG_ENABLE_CUDA=ON \
+            -DSLANG_ENABLE_PCH=OFF \
             -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
             -DCMAKE_C_COMPILER_LAUNCHER="${sccache_path}" \
             -DCMAKE_CXX_COMPILER_LAUNCHER="${sccache_path}"
