@@ -52,9 +52,15 @@ static size_t _roundUpToPowerOfTwo(size_t value)
     value--;
 #if SLANG_VC && 0
     // TODO: Disabled to avoid build failure on aarch64/windows
-    return 1ULL << (64 - (size_t)__lzcnt64(value));
+    if constexpr (sizeof(size_t) > 4)
+        return size_t(1) << (sizeof(size_t) * 8 - __lzcnt64(value));
+    else
+        return size_t(1) << (sizeof(size_t) * 8 - __lzcnt(value));
 #elif SLANG_GCC || SLANG_CLANG
-    return 1ULL << (sizeof(size_t) * 8 - __builtin_clzll(value));
+    if constexpr (sizeof(size_t) > 4)
+        return size_t(1) << (sizeof(size_t) * 8 - __builtin_clzll(value));
+    else
+        return size_t(1) << (sizeof(size_t) * 8 - __builtin_clzl(value));
 #else
     value |= value >> 1;
     value |= value >> 2;
@@ -1990,29 +1996,39 @@ LayoutRulesImpl* GLSLLayoutRulesFamilyImpl::getConstantBufferRules(
     CompilerOptionSet& compilerOptions,
     Type* containerType)
 {
-    if (compilerOptions.shouldUseScalarLayout())
-        return &kScalarLayoutRulesImpl_;
-    else if (compilerOptions.shouldUseCLayout())
-        return &kCLayoutRulesImpl_;
-    else if (compilerOptions.shouldUseDXLayout())
-        return &kFXCConstantBufferLayoutRulesFamilyImpl;
+    // Explicit layout rule in ConstantBuffer should take precedence over global options.
     if (auto cbufferType = as<ConstantBufferType>(containerType))
     {
         switch (cbufferType->getLayoutType()->astNodeType)
         {
-        case ASTNodeType::DefaultDataLayoutType:
         case ASTNodeType::Std140DataLayoutType:
             return &kStd140LayoutRulesImpl_;
-        case ASTNodeType::DefaultPushConstantDataLayoutType:
         case ASTNodeType::Std430DataLayoutType:
             return &kStd430LayoutRulesImpl_;
         case ASTNodeType::ScalarDataLayoutType:
             return &kScalarLayoutRulesImpl_;
         case ASTNodeType::CDataLayoutType:
             return &kCLayoutRulesImpl_;
+        case ASTNodeType::DefaultDataLayoutType:
+        case ASTNodeType::DefaultPushConstantDataLayoutType:
+            break;
         default:
             break;
         }
+    }
+    // Default layout types fall through to global options.
+    if (compilerOptions.shouldUseScalarLayout())
+        return &kScalarLayoutRulesImpl_;
+    else if (compilerOptions.shouldUseCLayout())
+        return &kCLayoutRulesImpl_;
+    else if (compilerOptions.shouldUseDXLayout())
+        return &kFXCConstantBufferLayoutRulesFamilyImpl;
+    // When no global option is set, use the default for each layout type.
+    if (auto cbufferType = as<ConstantBufferType>(containerType))
+    {
+        if (cbufferType->getLayoutType()->astNodeType ==
+            ASTNodeType::DefaultPushConstantDataLayoutType)
+            return &kStd430LayoutRulesImpl_;
     }
     return &kStd140LayoutRulesImpl_;
 }

@@ -110,13 +110,30 @@ static SlangResult _addCUDAPrelude(const String& rootPath, slang::IGlobalSession
     return SLANG_OK;
 }
 
+// Gets the canonical path for exePath, falling back to /proc/self/exe on Linux
+// when exePath is just a bare command name (e.g., when invoked via PATH).
+static SlangResult _getCanonicalOrExecutablePath(const char* exePath, String& outPath)
+{
+    if (SLANG_SUCCEEDED(Path::getCanonical(exePath, outPath)))
+    {
+        return SLANG_OK;
+    }
+    // On Linux, when invoked via PATH, argv[0] is just the bare command name
+    // and realpath() fails. Fall back to /proc/self/exe.
+    outPath = Path::getExecutablePath();
+    if (outPath.getLength() == 0)
+    {
+        return SLANG_FAIL;
+    }
+    return SLANG_OK;
+}
+
 /* static */ SlangResult TestToolUtil::getExeDirectoryPath(
     const char* exePath,
     String& outExeDirectoryPath)
 {
     String canonicalPath;
-    SLANG_RETURN_ON_FAIL(Path::getCanonical(exePath, canonicalPath));
-    // Get the directory
+    SLANG_RETURN_ON_FAIL(_getCanonicalOrExecutablePath(exePath, canonicalPath));
     outExeDirectoryPath = Path::getParentDirectory(canonicalPath);
     return SLANG_OK;
 }
@@ -126,9 +143,7 @@ static SlangResult _addCUDAPrelude(const String& rootPath, slang::IGlobalSession
     String& outDllDirectoryPath)
 {
     String canonicalPath;
-    SLANG_RETURN_ON_FAIL(Path::getCanonical(exePath, canonicalPath));
-
-    // Get the directory
+    SLANG_RETURN_ON_FAIL(_getCanonicalOrExecutablePath(exePath, canonicalPath));
     String binPath = Path::getParentDirectory(canonicalPath);
 
     // Windows puts the dlls in the same directory as the exe, while on other platforms they are in

@@ -15,4 +15,5 @@ Contents
 * [Statements](statements.md)
 * [Declarations](declarations.md)
 * [Attributes](attributes.md)
+* [Graphics Shaders and Compute Kernels](shaders-and-kernels.md)
 * [Glossary](glossary.md)

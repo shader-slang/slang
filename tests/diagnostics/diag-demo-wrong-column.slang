@@ -8,6 +8,6 @@ struct S {};
 void test()
 {
     if (1);
-//CHECK        ^ empty statement
+//CHECK:       ^ empty statement
     // The diagnostic is actually at column 11, not column 16
 }

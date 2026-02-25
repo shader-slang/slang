@@ -68,7 +68,11 @@ IArtifact* TargetProgram::_createEntryPointResult(
     CodeGenContext::Shared sharedCodeGenContext(this, entryPointIndices, sink, endToEndReq);
     CodeGenContext codeGenContext(&sharedCodeGenContext);
 
-    codeGenContext.emitEntryPoints(m_entryPointResults[entryPointIndex]);
+    if (SLANG_FAILED(codeGenContext.emitEntryPoints(m_entryPointResults[entryPointIndex])))
+    {
+        m_entryPointResults[entryPointIndex].setNull();
+        return nullptr;
+    }
 
     return m_entryPointResults[entryPointIndex];
 }
