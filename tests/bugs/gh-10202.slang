@@ -1,5 +1,6 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -output-using-type
-// CHECK: 0
+// CHECK: type: uint64_t
+// CHECK-NEXT: 0
 //TEST_INPUT:ubuffer(data=[0], stride=8):out,name=outputBuffer
 
 // Regression test: constant folding >> 64 on uint64_t produces wrong value (UB in compiler)
