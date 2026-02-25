@@ -63,10 +63,9 @@ void Session::init()
     auto rootASTBuilder = new RootASTBuilder(this);
     m_rootASTBuilder = rootASTBuilder;
 
-    // Set the root AST builder as current AST builder as a workaround for code that would get a
-    // null pointer from `getCurrentASTBuilder()` and call non-static member functions on it, which
-    // is undefined behavior.
-    m_previousASTBuilder = getCurrentASTBuilder();
+    // Provide a non-null default for getCurrentASTBuilder(). Code inside compilation
+    // functions uses SLANG_AST_BUILDER_RAII to scope the builder properly; this just
+    // covers call sites that run outside those scopes (e.g. unit tests).
     setCurrentASTBuilder(m_rootASTBuilder);
 
     // Make sure our source manager is initialized
@@ -146,13 +145,8 @@ Session::~Session()
     //
     coreModules = decltype(coreModules)();
 
-    // Only restore the previous AST builder if we are still the current session.
-    // When multiple Sessions exist (e.g. slangpy with multiple Devices), destruction
-    // order may not be LIFO (e.g. at process exit). If we are destroyed out of order,
-    // m_previousASTBuilder may point to an already-destroyed Session's root, so we must
-    // not call setCurrentASTBuilder in that case.
     if (getCurrentASTBuilder() == m_rootASTBuilder)
-        setCurrentASTBuilder(m_previousASTBuilder);
+        setCurrentASTBuilder(nullptr);
 }
 
 SharedASTBuilder* Session::getSharedASTBuilder()

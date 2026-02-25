@@ -1202,8 +1202,8 @@ DeclRef<Decl> _getMemberDeclRef(ASTBuilder* builder, DeclRef<Decl> parent, Decl*
 }
 
 
-// Session installs its root AST builder here during init() and restores the previous
-// value in its destructor. Session destruction must occur in LIFO order.
+// Session installs its root AST builder here during init() and nulls it on destruction.
+// Compilation functions use SLANG_AST_BUILDER_RAII to scope the active builder.
 thread_local ASTBuilder* gCurrentASTBuilder = nullptr;
 
 ASTBuilder* getCurrentASTBuilder()

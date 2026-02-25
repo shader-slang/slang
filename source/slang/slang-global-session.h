@@ -372,10 +372,6 @@ private:
     /// The AST builder that will be used for builtin modules.
     ///
     RefPtr<ASTBuilder> m_rootASTBuilder;
-
-    /// Saved value of gCurrentASTBuilder before this Session installed its root builder.
-    /// Session destruction must occur in LIFO order relative to creation.
-    ASTBuilder* m_previousASTBuilder = nullptr;
 };
 
 /* Returns SLANG_OK if pass through support is available */
