@@ -9,7 +9,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cpu -compute -shaderobj -output-using-type
 //TEST:SIMPLE(filecheck=REPORT):-target hlsl -stage compute -entry computeMain -report-dynamic-dispatch-sites
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
 interface ICounter
@@ -45,8 +45,9 @@ ICounter makeCounter(int id)
         return DoubleCounter(0);
 }
 
-// Mutating through nested dispatch: IContainer calls [mutating] on an ICounter
-// passed as a parameter (the ICounter is also existential).
+// Nested dispatch: IContainer.updateItem copies the ICounter parameter into a
+// local var, calls [mutating] increment() on it, then reads the result. This
+// exercises [mutating] dynamic dispatch inside another dispatched method.
 interface IContainer
 {
     [mutating] void updateItem(ICounter counter);
@@ -59,7 +60,9 @@ struct MyContainer : IContainer
 
     [mutating] void updateItem(ICounter counter)
     {
-        cached = counter.get();
+        var local = counter;
+        local.increment();
+        cached = local.get();
     }
 
     int getCached() { return cached; }
@@ -72,7 +75,9 @@ struct OffsetContainer : IContainer
 
     [mutating] void updateItem(ICounter counter)
     {
-        cached = counter.get() + offset;
+        var local = counter;
+        local.increment();
+        cached = local.get() + offset;
     }
 
     int getCached() { return cached; }
@@ -147,16 +152,27 @@ void computeMain(int id : SV_DispatchThreadID)
     // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
     // CHECK: 17
 
-    // --- Test 5: Nested dispatch — IContainer reading ICounter ---
+    // --- Test 5: Nested dispatch — [mutating] on ICounter inside dispatched IContainer method ---
     var g = makeCounter(id);
     g.add(42);
     // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
     var container = makeContainer(id);
-    container.updateItem(g);
+    container.updateItem(g);                    // updateItem copies counter, calls increment(), reads get()
     // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
-    outputBuffer[6] = container.getCached();    // MyContainer cached = 42
+    outputBuffer[6] = container.getCached();    // MyContainer: local.increment() on Counter(42) → 43
     // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
-    // CHECK: 42
+    // CHECK: 43
+
+    // --- Test 5b: Nested dispatch — OffsetContainer path ---
+    var g2 = makeCounter(id);
+    g2.add(10);
+    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
+    var container2 = makeContainer(id + 1);
+    container2.updateItem(g2);                    // OffsetContainer: local.increment() on Counter(10) → 11, + offset 100
+    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
+    outputBuffer[7] = container2.getCached();     // OffsetContainer: 11 + 100 = 111
+    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
+    // CHECK: 111
 
     // --- Test 6: Mutation after copy does not affect original (value semantics) ---
     var h = makeCounter(id);
@@ -165,10 +181,10 @@ void computeMain(int id : SV_DispatchThreadID)
     var copy = h;
     copy.add(50);
     // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
-    outputBuffer[7] = h.get();     // original: still 100
+    outputBuffer[8] = h.get();     // original: still 100
     // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
     // CHECK: 100
-    outputBuffer[8] = copy.get();  // copy: 100 + 50 = 150
+    outputBuffer[9] = copy.get();  // copy: 100 + 50 = 150
     // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
     // CHECK: 150
 }
