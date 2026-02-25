@@ -241,9 +241,9 @@ struct DeadCodeEliminationContext
             //
             if (inst->hasUses())
             {
-                traverseUsers<IRAssociatedInstAnnotation>(
+                traverseUsers<IRAnnotation>(
                     inst,
-                    [&](IRAssociatedInstAnnotation* annotation)
+                    [&](IRAnnotation* annotation)
                     {
                         if (annotation->getTarget() == inst)
                             annotation->removeAndDeallocate();
@@ -678,7 +678,7 @@ bool isWeakReferenceOperand(IRInst* inst, UInt operandIndex)
         return true;
     case kIROp_WeakUse:
         return true;
-    case kIROp_AssociatedInstAnnotation:
+    case kIROp_Annotation:
         if (operandIndex == 0)
             return true;
         break;

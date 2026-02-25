@@ -3197,21 +3197,21 @@ IRInst* IRBuilder::tryLookupCompilerDictionaryValue(
     return entry->getValue();
 }
 
-void IRBuilder::addAnnotation(IRInst* target, ValAssociationKind kind, IRInst* annotation)
+void IRBuilder::addAnnotation(IRInst* target, AnnotationKind kind, IRInst* annotation)
 {
     IRInst* args[] = {target, getIntValue(getUIntType(), (UInt)kind), annotation};
-    emitIntrinsicInst(getVoidType(), kIROp_AssociatedInstAnnotation, 3, args);
-    this->getModule()->getAssociatedInstCache()->remove({target, kind});
+    emitIntrinsicInst(getVoidType(), kIROp_Annotation, 3, args);
+    this->getModule()->getAnnotationLookupCache()->remove({target, kind});
 }
 
-IRInst* IRBuilder::tryLookupAnnotation(IRInst* target, ValAssociationKind kind)
+IRInst* IRBuilder::tryLookupAnnotation(IRInst* target, AnnotationKind kind)
 {
     if (!target)
         return nullptr;
 
-    ValAssociationCacheKey key = {target, kind};
-    if (IRAssociatedInstAnnotation* cachedResult;
-        getModule()->getAssociatedInstCache()->tryGetValue(key, cachedResult))
+    AnnotationCacheKey key = {target, kind};
+    if (IRAnnotation* cachedResult;
+        getModule()->getAnnotationLookupCache()->tryGetValue(key, cachedResult))
     {
         if (!cachedResult)
             return nullptr;
@@ -3220,7 +3220,7 @@ IRInst* IRBuilder::tryLookupAnnotation(IRInst* target, ValAssociationKind kind)
             // The cached result has been removed from the IR, so we should remove it from the cache
             // as well.
             //
-            getModule()->getAssociatedInstCache()->remove(key);
+            getModule()->getAnnotationLookupCache()->remove(key);
 
             // Fall through to do a lookup as if it wasn't cached.
         }
@@ -3230,10 +3230,10 @@ IRInst* IRBuilder::tryLookupAnnotation(IRInst* target, ValAssociationKind kind)
         }
     }
 
-    IRAssociatedInstAnnotation* result = nullptr;
+    IRAnnotation* result = nullptr;
     for (auto use = target->firstUse; use; use = use->nextUse)
     {
-        if (auto annotation = as<IRAssociatedInstAnnotation>(use->getUser()))
+        if (auto annotation = as<IRAnnotation>(use->getUser()))
         {
             if (annotation->getConformanceID() == (IRIntegerValue)kind &&
                 annotation->getTarget() == target)
@@ -3244,7 +3244,7 @@ IRInst* IRBuilder::tryLookupAnnotation(IRInst* target, ValAssociationKind kind)
         }
     }
 
-    getModule()->getAssociatedInstCache()->add(key, result);
+    getModule()->getAnnotationLookupCache()->add(key, result);
     return result ? result->getInst() : nullptr;
 }
 
@@ -8438,7 +8438,7 @@ static void _replaceInstUsesWith(IRInst* thisInst, IRInst* other)
                         dedupContext->getInstReplacementMap().tryGetValue(existingVal, existingVal);
                         addToWorkList(user, existingVal);
 
-                        if (!user->hasUses() && (as<IRAssociatedInstAnnotation>(user)))
+                        if (!user->hasUses() && (as<IRAnnotation>(user)))
                             duplicateAnnotations.add(user);
                     }
                     else
@@ -9005,7 +9005,7 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_FRem:
         return false;
 
-    case kIROp_AssociatedInstAnnotation:
+    case kIROp_Annotation:
         if (getOperand(0)->getOp() == kIROp_Poison)
             return false;
         else

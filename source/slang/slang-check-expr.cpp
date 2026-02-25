@@ -1712,7 +1712,7 @@ Val* maybeRegisterVal(
     Type* baseForLookup,
     Val* baseForRegistry,
     Name* name,
-    ValAssociationKind kind)
+    AnnotationKind kind)
 {
     auto lookupResult = lookUpMember(
         visitor->getASTBuilder(),
@@ -1740,7 +1740,7 @@ Val* maybeRegisterWitness(
     Type* baseForLookup,
     Val* baseForRegistry,
     Type* superType,
-    ValAssociationKind kind)
+    AnnotationKind kind)
 {
     if (auto witness = visitor->tryGetSubtypeWitness(baseForLookup, superType))
     {
@@ -1844,11 +1844,11 @@ void SemanticsVisitor::maybeRegisterDifferentiableTypeImplRecursive(ASTBuilder* 
         {
             this->getParentDifferentiableAttribute()->addAssocVal(
                 type,
-                (SlangInt)ValAssociationKind::DifferentialPairType,
+                (SlangInt)AnnotationKind::DifferentialPairType,
                 getCurrentASTBuilder()->getDifferentialPairType(type, witness));
             this->getParentDifferentiableAttribute()->addAssocVal(
                 type,
-                (SlangInt)ValAssociationKind::DifferentialType,
+                (SlangInt)AnnotationKind::DifferentialType,
                 getCurrentASTBuilder()->getDifferentiableInterfaceType());
             // Leave the rest unregistered for now. The backend will take care of it.
         }
@@ -1883,23 +1883,13 @@ void SemanticsVisitor::maybeRegisterDifferentiableTypeImplRecursive(ASTBuilder* 
                 type,
                 type,
                 getName("Differential"),
-                ValAssociationKind::DifferentialType);
+                AnnotationKind::DifferentialType);
             this->getParentDifferentiableAttribute()->addAssocVal(
                 type,
-                (SlangInt)ValAssociationKind::DifferentialPairType,
+                (SlangInt)AnnotationKind::DifferentialPairType,
                 getCurrentASTBuilder()->getDifferentialPairType(type, witness));
-            maybeRegisterVal(
-                this,
-                type,
-                type,
-                getName("dzero"),
-                ValAssociationKind::DifferentialZero);
-            maybeRegisterVal(
-                this,
-                type,
-                type,
-                getName("dadd"),
-                ValAssociationKind::DifferentialAdd);
+            maybeRegisterVal(this, type, type, getName("dzero"), AnnotationKind::DifferentialZero);
+            maybeRegisterVal(this, type, type, getName("dadd"), AnnotationKind::DifferentialAdd);
         }
 
         if (auto witness = tryGetInterfaceConformanceWitness(
@@ -1920,10 +1910,10 @@ void SemanticsVisitor::maybeRegisterDifferentiableTypeImplRecursive(ASTBuilder* 
                 type,
                 type,
                 getName("Differential"),
-                ValAssociationKind::DifferentialPtrType);
+                AnnotationKind::DifferentialPtrType);
             this->getParentDifferentiableAttribute()->addAssocVal(
                 type,
-                (SlangInt)ValAssociationKind::DifferentialPtrPairType,
+                (SlangInt)AnnotationKind::DifferentialPtrPairType,
                 getCurrentASTBuilder()->getDifferentialPtrPairType(type, witness));
         }
     }
@@ -2837,7 +2827,7 @@ void registerAssociatedMethods(SemanticsVisitor* context, DeclRef<Decl> declRef)
                 funcAsType,
                 declRef.declRefBase,
                 context->getName("fwd_diff"),
-                ValAssociationKind::ForwardDerivative))
+                AnnotationKind::ForwardDerivative))
         {
             // Lower the associated fwd_diff : IForwardDifferentiable witness table
             maybeRegisterWitness(
@@ -2845,7 +2835,7 @@ void registerAssociatedMethods(SemanticsVisitor* context, DeclRef<Decl> declRef)
                 funcAsType,
                 declRef.declRefBase,
                 context->getForwardDiffFuncInterfaceType(funcAsType),
-                ValAssociationKind::ForwardDerivativeWitnessTable);
+                AnnotationKind::ForwardDerivativeWitnessTable);
 
             // Lower the fwd_diff : IBackwardDifferentiable witness table
             maybeRegisterWitness(
@@ -2853,7 +2843,7 @@ void registerAssociatedMethods(SemanticsVisitor* context, DeclRef<Decl> declRef)
                 funcAsType,
                 declRef.declRefBase,
                 context->getBackwardDiffFuncInterfaceType(funcAsType),
-                ValAssociationKind::BackwardDerivativeWitnessTable);
+                AnnotationKind::BackwardDerivativeWitnessTable);
         }
 
         if (maybeRegisterVal(
@@ -2861,14 +2851,14 @@ void registerAssociatedMethods(SemanticsVisitor* context, DeclRef<Decl> declRef)
                 funcAsType,
                 declRef.declRefBase,
                 context->getName("apply_bwd"),
-                ValAssociationKind::BackwardDerivativeApply))
+                AnnotationKind::BackwardDerivativeApply))
         {
             auto bwdCallableType = as<DeclRefBase>(maybeRegisterVal(
                 context,
                 funcAsType,
                 declRef.declRefBase,
                 context->getName("BwdCallable"),
-                ValAssociationKind::BackwardDerivativeContext));
+                AnnotationKind::BackwardDerivativeContext));
             SLANG_ASSERT(bwdCallableType); // TODO: Diagnose if not found.
 
             maybeRegisterVal(
@@ -2876,14 +2866,14 @@ void registerAssociatedMethods(SemanticsVisitor* context, DeclRef<Decl> declRef)
                 DeclRefType::create(getCurrentASTBuilder(), bwdCallableType),
                 declRef.declRefBase,
                 context->getName("()"),
-                ValAssociationKind::BackwardDerivativePropagate);
+                AnnotationKind::BackwardDerivativePropagate);
 
             maybeRegisterVal(
                 context,
                 DeclRefType::create(getCurrentASTBuilder(), bwdCallableType),
                 declRef.declRefBase,
                 context->getName("val"),
-                ValAssociationKind::BackwardDerivativeContextGetVal);
+                AnnotationKind::BackwardDerivativeContextGetVal);
         }
     }
 }

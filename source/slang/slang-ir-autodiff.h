@@ -167,7 +167,7 @@ struct DifferentiableTypeConformanceContext
 
                     if (auto diffPairType = tryGetAssociationOfKind(
                             paramType,
-                            ValAssociationKind::DifferentialPairType))
+                            AnnotationKind::DifferentialPairType))
                     {
                         paramTypes.add(
                             fromDirectionAndType(builder, paramDirection, (IRType*)diffPairType));
@@ -175,7 +175,7 @@ struct DifferentiableTypeConformanceContext
                     else if (
                         auto diffPtrPairType = tryGetAssociationOfKind(
                             paramType,
-                            ValAssociationKind::DifferentialPtrPairType))
+                            AnnotationKind::DifferentialPtrPairType))
                     {
                         paramTypes.add(fromDirectionAndType(
                             builder,
@@ -192,14 +192,14 @@ struct DifferentiableTypeConformanceContext
                 IRType* resultType = innerFnType->getResultType();
                 if (auto diffPairType = tryGetAssociationOfKind(
                         innerFnType->getResultType(),
-                        ValAssociationKind::DifferentialPairType))
+                        AnnotationKind::DifferentialPairType))
                 {
                     resultType = (IRType*)diffPairType;
                 }
                 else if (
                     auto diffPtrPairType = tryGetAssociationOfKind(
                         innerFnType->getResultType(),
-                        ValAssociationKind::DifferentialPtrPairType))
+                        AnnotationKind::DifferentialPtrPairType))
                 {
                     resultType = (IRType*)diffPtrPairType;
                 }
@@ -238,7 +238,7 @@ struct DifferentiableTypeConformanceContext
                                 {ParameterDirectionInfo::Kind::BorrowInOut},
                                 (IRType*)tryGetAssociationOfKind(
                                     paramType,
-                                    ValAssociationKind::DifferentialPairType)));
+                                    AnnotationKind::DifferentialPairType)));
                             break;
                         case ParameterDirectionInfo::Kind::Out:
                             paramTypes.add(fromDirectionAndType(
@@ -252,7 +252,7 @@ struct DifferentiableTypeConformanceContext
                                 {ParameterDirectionInfo::Kind::BorrowInOut},
                                 (IRType*)tryGetAssociationOfKind(
                                     paramType,
-                                    ValAssociationKind::DifferentialPairType)));
+                                    AnnotationKind::DifferentialPairType)));
                             break;
                         default:
                             SLANG_UNEXPECTED(
@@ -270,7 +270,7 @@ struct DifferentiableTypeConformanceContext
                                 {ParameterDirectionInfo::Kind::In},
                                 (IRType*)tryGetAssociationOfKind(
                                     paramType,
-                                    ValAssociationKind::DifferentialPtrPairType)));
+                                    AnnotationKind::DifferentialPtrPairType)));
                             break;
                         default:
                             SLANG_UNEXPECTED(
@@ -329,7 +329,7 @@ struct DifferentiableTypeConformanceContext
                             paramDirection,
                             (IRType*)tryGetAssociationOfKind(
                                 paramType,
-                                ValAssociationKind::DifferentialPtrPairType)));
+                                AnnotationKind::DifferentialPtrPairType)));
                     }
                     else
                         paramTypes.add(innerFnType->getParamType(i));
@@ -389,7 +389,7 @@ struct DifferentiableTypeConformanceContext
         return (IRType*)typeInst;
     }
 
-    IRInst* tryGetAssociationOfKind(IRInst* target, ValAssociationKind kind);
+    IRInst* tryGetAssociationOfKind(IRInst* target, AnnotationKind kind);
 
     IRInst* getDiffTypeFromPairType(IRBuilder* builder, IRDifferentialPairTypeBase* type);
 
@@ -411,7 +411,7 @@ struct DifferentiableTypeConformanceContext
             return builder.getTypePack(diffTypes.getCount(), diffTypes.getBuffer());
         }
 
-        return tryGetAssociationOfKind(origType, ValAssociationKind::DifferentialType);
+        return tryGetAssociationOfKind(origType, AnnotationKind::DifferentialType);
     }
 
     IRInst* tryGetDifferentiablePtrType(IRType* origType)
@@ -430,7 +430,7 @@ struct DifferentiableTypeConformanceContext
             return builder.getTypePack(diffTypes.getCount(), diffTypes.getBuffer());
         }
 
-        return tryGetAssociationOfKind(origType, ValAssociationKind::DifferentialPtrType);
+        return tryGetAssociationOfKind(origType, AnnotationKind::DifferentialPtrType);
     }
 
     IRType* tryGetDiffPairType(IRType* originalType)
@@ -454,13 +454,12 @@ struct DifferentiableTypeConformanceContext
         // If we're not, then the split & merge are no-ops.
         //
         auto [passingMode, baseType] = splitParameterDirectionAndType(originalType);
-        auto basePairType =
-            tryGetAssociationOfKind(baseType, ValAssociationKind::DifferentialPairType);
+        auto basePairType = tryGetAssociationOfKind(baseType, AnnotationKind::DifferentialPairType);
 
         if (!basePairType)
         {
             basePairType =
-                tryGetAssociationOfKind(baseType, ValAssociationKind::DifferentialPtrPairType);
+                tryGetAssociationOfKind(baseType, AnnotationKind::DifferentialPtrPairType);
         }
 
         if (!basePairType)
@@ -518,13 +517,13 @@ struct DifferentiableTypeConformanceContext
     IRInst* getZeroMethodForType(IRBuilder* builder, IRType* origType)
     {
         SLANG_UNUSED(builder);
-        return tryGetAssociationOfKind(origType, ValAssociationKind::DifferentialZero);
+        return tryGetAssociationOfKind(origType, AnnotationKind::DifferentialZero);
     }
 
     IRInst* getAddMethodForType(IRBuilder* builder, IRType* origType)
     {
         SLANG_UNUSED(builder);
-        return tryGetAssociationOfKind(origType, ValAssociationKind::DifferentialAdd);
+        return tryGetAssociationOfKind(origType, AnnotationKind::DifferentialAdd);
     }
 
     IRInst* emitNullDifferential(IRBuilder* builder)

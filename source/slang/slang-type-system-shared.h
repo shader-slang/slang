@@ -151,10 +151,11 @@ enum class AccessQualifier : uint64_t
     Immutable = 2,
 };
 
-enum class ValAssociationKind
+enum class AnnotationKind
 {
     Unknown = 0,
-    // Associations for differentiable functions/callables.
+
+    // Annotations for differentiable functions/callables.
     ForwardDerivative = 1,
     ForwardDerivativeWitnessTable = 2,
     BackwardDerivativeWitnessTable = 3,
@@ -164,11 +165,8 @@ enum class ValAssociationKind
     BackwardDerivativeContextGetVal = 6,
     BackwardDerivativePropagate = 7,
 
-    // Associations for differentiable types.
+    // Annotations for differentiable types.
     DifferentialPairType = 8,
-    DifferentialPairMake = 9,
-    DifferentialPairGetPrimal = 10,
-    DifferentialPairGetDifferential = 11,
     DifferentialType = 12,
     DifferentialPtrType = 13,
     DifferentialPtrPairType = 14,

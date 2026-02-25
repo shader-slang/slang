@@ -2650,7 +2650,7 @@ local insts = {
 	-- Differentiable Type Annotation (for run-time types)
 	{ DifferentiableTypeAnnotation = { operands = { { "baseType" }, { "witness" } }, hoistable = true } },
 	{ WitnessTableAnnotation = { min_operands = 2, hoistable = true } }, -- TODO: remove this..
-	{ AssociatedInstAnnotation = { min_operands = 2, hoistable = true } },
+	{ Annotation = { min_operands = 2, hoistable = true } },
 	{ BeginFragmentShaderInterlock = {} },
 	{
 		EndFragmentShaderInterlock = { struct_name = "EndFragmentShaderInterlock" },

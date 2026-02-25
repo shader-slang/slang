@@ -1275,7 +1275,7 @@ struct DiffTransposePass
 
         auto bwdPropFunc = diffTypeContext.tryGetAssociationOfKind(
             baseFn,
-            ValAssociationKind::BackwardDerivativePropagate);
+            AnnotationKind::BackwardDerivativePropagate);
 
         List<IRInst*> bwdPropArgs;
         List<std::pair<IRInst*, IRVar*>> writebacks;
@@ -2238,11 +2238,10 @@ struct DiffTransposePass
 
         // If we reach this point, revValue must be a differentiable type.
         // TODO: Maybe avoid going through the differentiable pair type..
-        auto revTypeWitness =
-            as<IRDifferentialPairType>(diffTypeContext.tryGetAssociationOfKind(
-                                           fwdInst->getDataType(),
-                                           ValAssociationKind::DifferentialPairType))
-                ->getWitness();
+        auto revTypeWitness = as<IRDifferentialPairType>(diffTypeContext.tryGetAssociationOfKind(
+                                                             fwdInst->getDataType(),
+                                                             AnnotationKind::DifferentialPairType))
+                                  ->getWitness();
         SLANG_ASSERT(revTypeWitness);
 
         auto baseExistential = fwdInst->getOperand(0);

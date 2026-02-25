@@ -175,13 +175,13 @@ public:
         IRInst* func,
         DiffCheckingLevel level)
     {
-        if (ctx.tryGetAssociationOfKind(func, ValAssociationKind::ForwardDerivative))
+        if (ctx.tryGetAssociationOfKind(func, AnnotationKind::ForwardDerivative))
         {
             if (level == DiffCheckingLevel::Forward)
                 return true;
         }
 
-        if (ctx.tryGetAssociationOfKind(func, ValAssociationKind::BackwardDerivativeApply))
+        if (ctx.tryGetAssociationOfKind(func, AnnotationKind::BackwardDerivativeApply))
         {
             return true;
         }

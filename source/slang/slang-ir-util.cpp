@@ -78,7 +78,7 @@ bool isPointerOfType(IRInst* type, IRInst* elementType)
 
 bool isAnnotation(IRInst* inst)
 {
-    return as<IRAssociatedInstAnnotation>(inst);
+    return as<IRAnnotation>(inst);
 }
 
 bool isPtrToClassType(IRInst* type)
@@ -1636,9 +1636,9 @@ bool isSideEffectFreeFunctionalCall(IRCall* call, SideEffectAnalysisOptions opti
 template<typename TFunc>
 void forEachAssociatedCallee(IRInst* callee, TFunc callback)
 {
-    traverseUsers<IRAssociatedInstAnnotation>(
+    traverseUsers<IRAnnotation>(
         callee,
-        [&](IRAssociatedInstAnnotation* annotation)
+        [&](IRAnnotation* annotation)
         {
             if (annotation->getTarget() == callee)
                 callback(annotation->getInst());

@@ -192,9 +192,9 @@ IRInst* cloneInst(
 static void cloneAnnotations(IRSpecContextBase* context, IRInst* clonedInst, IRInst* originalInst)
 {
     SLANG_UNUSED(clonedInst);
-    traverseUsers<IRAssociatedInstAnnotation>(
+    traverseUsers<IRAnnotation>(
         originalInst,
-        [&](IRAssociatedInstAnnotation* annotation)
+        [&](IRAnnotation* annotation)
         {
             if (annotation->getTarget() == originalInst)
                 cloneInst(context, context->builder, annotation, annotation);

@@ -305,7 +305,7 @@ AutoDiffSharedContext::AutoDiffSharedContext(
 
 IRInst* DifferentiableTypeConformanceContext::tryGetAssociationOfKind(
     IRInst* target,
-    ValAssociationKind kind)
+    AnnotationKind kind)
 {
     IRBuilder builder(sharedContext->moduleInst);
     return builder.tryLookupAnnotation(target, kind);
@@ -469,7 +469,7 @@ IRInst* DifferentiableTypeConformanceContext::buildDifferentiablePairWitness(
         auto innerWitness = as<IRDifferentialPairTypeBase>(pairType)->getWitness();
 
         auto diffDiffPairType =
-            (IRType*)tryGetAssociationOfKind(diffType, ValAssociationKind::DifferentialPairType);
+            (IRType*)tryGetAssociationOfKind(diffType, AnnotationKind::DifferentialPairType);
 
         auto addMethod = builder->createFunc();
         auto zeroMethod = builder->createFunc();
@@ -1024,9 +1024,9 @@ struct RemoveTypeAnnotationInstsPass : InstPassBase
     }
     void processModule()
     {
-        processInstsOfType<IRAssociatedInstAnnotation>(
-            kIROp_AssociatedInstAnnotation,
-            [&](IRAssociatedInstAnnotation* annotation) { annotation->removeAndDeallocate(); });
+        processInstsOfType<IRAnnotation>(
+            kIROp_Annotation,
+            [&](IRAnnotation* annotation) { annotation->removeAndDeallocate(); });
     }
 };
 

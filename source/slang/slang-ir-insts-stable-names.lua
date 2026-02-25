@@ -746,7 +746,7 @@ return {
 	["Type.FuncResultType"] = 749,
 	["Type.BwdCallableFuncType"] = 750,
 	["WitnessTableAnnotation"] = 751,
-	["AssociatedInstAnnotation"] = 752,
+	["Annotation"] = 752,
 	["FuncTypeOf"] = 753,
 	["TranslateBase.MakeIDifferentiableWitness"] = 754,
 	["SumVectorElements"] = 755,

@@ -485,7 +485,7 @@ struct SpecializationContext
             inst,
             [&](IRInst* user)
             {
-                if (user->getOp() != kIROp_AssociatedInstAnnotation)
+                if (user->getOp() != kIROp_Annotation)
                     hasNonTrivialUses = true;
             });
 

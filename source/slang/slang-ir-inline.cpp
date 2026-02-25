@@ -1179,9 +1179,9 @@ struct PreAutoDiffForceInliningPass : InliningPassBase
         // function (just like the differentiability of functions).
         //
         bool allowPreTranslationInlining = true;
-        traverseUsers<IRAssociatedInstAnnotation>(
+        traverseUsers<IRAnnotation>(
             info.callee,
-            [&](IRAssociatedInstAnnotation* annotation)
+            [&](IRAnnotation* annotation)
             {
                 if (annotation->getTarget() == info.callee)
                     allowPreTranslationInlining = false;

@@ -30,24 +30,24 @@ static void emitAnnotationsFromWitnessTable(
         witnessTable,
         context->sharedContext->differentialAssocTypeStructKey,
         builder->getTypeType());
-    builder->addAnnotation(targetInst, ValAssociationKind::DifferentialType, diffType);
+    builder->addAnnotation(targetInst, AnnotationKind::DifferentialType, diffType);
 
     auto diffDZeroMethod = _lookupWitness(
         builder,
         witnessTable,
         context->sharedContext->zeroMethodStructKey,
         context->sharedContext->zeroMethodType);
-    builder->addAnnotation(targetInst, ValAssociationKind::DifferentialZero, diffDZeroMethod);
+    builder->addAnnotation(targetInst, AnnotationKind::DifferentialZero, diffDZeroMethod);
 
     auto diffDAddMethod = _lookupWitness(
         builder,
         witnessTable,
         context->sharedContext->addMethodStructKey,
         context->sharedContext->addMethodType);
-    builder->addAnnotation(targetInst, ValAssociationKind::DifferentialAdd, diffDAddMethod);
+    builder->addAnnotation(targetInst, AnnotationKind::DifferentialAdd, diffDAddMethod);
 
     auto diffPairType = builder->getDifferentialPairType((IRType*)targetInst, witnessTable);
-    builder->addAnnotation(targetInst, ValAssociationKind::DifferentialPairType, diffPairType);
+    builder->addAnnotation(targetInst, AnnotationKind::DifferentialPairType, diffPairType);
 }
 
 static void maybeAddTypeAnnotationsForHigherOrderDiff(
@@ -68,7 +68,7 @@ static void maybeAddTypeAnnotationsForHigherOrderDiff(
         // TODO: lower the witness as a sepearate annotation rather than going through the pair.
         auto diffWitness = as<IRDifferentialPairType>(diffTypeContext->tryGetAssociationOfKind(
                                                           origType,
-                                                          ValAssociationKind::DifferentialPairType))
+                                                          AnnotationKind::DifferentialPairType))
                                ->getWitness();
         if (as<IRStructKey>(diffWitness))
         {
@@ -88,9 +88,8 @@ static void maybeAddTypeAnnotationsForHigherOrderDiff(
         emitAnnotationsFromWitnessTable(diffTypeContext, builder, diffType, diffWitnessDiffWitness);
     }
 
-    auto pairType = as<IRDifferentialPairType>(diffTypeContext->tryGetAssociationOfKind(
-        origType,
-        ValAssociationKind::DifferentialPairType));
+    auto pairType = as<IRDifferentialPairType>(
+        diffTypeContext->tryGetAssociationOfKind(origType, AnnotationKind::DifferentialPairType));
     if (pairType && !diffTypeContext->isDifferentiableType(pairType))
     {
         IRInst* args[] = {pairType};
@@ -352,10 +351,9 @@ struct ForwardDiffTranslationContext
     }
 
 
-    InstPair translateAssociatedInstAnnotation(IRBuilder* builder, IRInst* origInst)
+    InstPair translateAnnotation(IRBuilder* builder, IRInst* origInst)
     {
-        auto primalAnnotation =
-            as<IRAssociatedInstAnnotation>(maybeCloneForPrimalInst(builder, origInst));
+        auto primalAnnotation = as<IRAnnotation>(maybeCloneForPrimalInst(builder, origInst));
 
         builder->markInstAsPrimal(primalAnnotation);
 
@@ -806,12 +804,12 @@ struct ForwardDiffTranslationContext
         IRInst* primalCallee)
     {
         auto fwdDiffCallee =
-            context->tryGetAssociationOfKind(primalCallee, ValAssociationKind::ForwardDerivative);
+            context->tryGetAssociationOfKind(primalCallee, AnnotationKind::ForwardDerivative);
 
         // Pull up `primal : IForwardDifferentiable`
         if (auto fwdDiffTable = context->tryGetAssociationOfKind(
                 primalCallee,
-                ValAssociationKind::ForwardDerivativeWitnessTable))
+                AnnotationKind::ForwardDerivativeWitnessTable))
         {
             IRInterfaceType* fwdDiffInterfaceType = cast<IRInterfaceType>(
                 getGenericReturnVal(context->sharedContext->forwardDifferentiableInterfaceType));
@@ -887,12 +885,12 @@ struct ForwardDiffTranslationContext
 
             builder->addAnnotation(
                 fwdDiffCallee,
-                ValAssociationKind::ForwardDerivative,
+                AnnotationKind::ForwardDerivative,
                 higherOrderFwdDiffFunc);
 
             builder->addAnnotation(
                 fwdDiffCallee,
-                ValAssociationKind::ForwardDerivativeWitnessTable,
+                AnnotationKind::ForwardDerivativeWitnessTable,
                 higherOrderFwdDiffTable);
 
             // Lookup `primal.fwd_diff : IBackwardDifferentiable`
@@ -909,7 +907,7 @@ struct ForwardDiffTranslationContext
 
             builder->addAnnotation(
                 fwdDiffCallee,
-                ValAssociationKind::BackwardDerivativeWitnessTable,
+                AnnotationKind::BackwardDerivativeWitnessTable,
                 higherOrderBwdDiffTable);
 
 
@@ -922,7 +920,7 @@ struct ForwardDiffTranslationContext
 
             builder->addAnnotation(
                 fwdDiffCallee,
-                ValAssociationKind::BackwardDerivativeContext,
+                AnnotationKind::BackwardDerivativeContext,
                 higherOrderContextType);
 
 
@@ -942,7 +940,7 @@ struct ForwardDiffTranslationContext
 
             builder->addAnnotation(
                 fwdDiffCallee,
-                ValAssociationKind::BackwardDerivativeApply,
+                AnnotationKind::BackwardDerivativeApply,
                 higherOrderBwdDiffFunc);
 
 
@@ -976,7 +974,7 @@ struct ForwardDiffTranslationContext
 
             builder->addAnnotation(
                 fwdDiffCallee,
-                ValAssociationKind::BackwardDerivativePropagate,
+                AnnotationKind::BackwardDerivativePropagate,
                 higherOrderBwdPropFunc);
 
 
@@ -996,7 +994,7 @@ struct ForwardDiffTranslationContext
 
             builder->addAnnotation(
                 fwdDiffCallee,
-                ValAssociationKind::BackwardDerivativeContextGetVal,
+                AnnotationKind::BackwardDerivativeContextGetVal,
                 higherOrderGetValFunc);
         }
     }
@@ -1027,7 +1025,7 @@ struct ForwardDiffTranslationContext
         auto primalCallee = findOrTranslatePrimalInst(builder, origCallee);
         IRInst* diffCallee = (this->diffTypeContext.tryGetAssociationOfKind(
             primalCallee,
-            ValAssociationKind::ForwardDerivative));
+            AnnotationKind::ForwardDerivative));
 
         if (!diffCallee || as<IRVoidLit>(diffCallee))
         {
@@ -1039,7 +1037,7 @@ struct ForwardDiffTranslationContext
                 // See if the callee is backward differentiable.
                 if (this->diffTypeContext.tryGetAssociationOfKind(
                         primalCallee,
-                        ValAssociationKind::BackwardDerivativeApply))
+                        AnnotationKind::BackwardDerivativeApply))
                 {
                     // If yes, then we want to generate a trivial forward function.
                     IRInst* args[] = {primalCallee->getDataType()};
@@ -1910,7 +1908,7 @@ struct ForwardDiffTranslationContext
                 auto diffTypeDiffWitness =
                     as<IRDifferentialPairType>(diffTypeContext.tryGetAssociationOfKind(
                                                    diffWrappedType,
-                                                   ValAssociationKind::DifferentialPairType))
+                                                   AnnotationKind::DifferentialPairType))
                         ->getWitness();
                 return InstPair(
                     primalResult,
@@ -2397,8 +2395,8 @@ struct ForwardDiffTranslationContext
         case kIROp_Reinterpret:
             return translateReinterpret(builder, origInst);
 
-        case kIROp_AssociatedInstAnnotation:
-            return translateAssociatedInstAnnotation(builder, origInst);
+        case kIROp_Annotation:
+            return translateAnnotation(builder, origInst);
 
             // Differentiable insts that should have been lowered in a previous pass.
         case kIROp_SwizzledStore:
@@ -2538,14 +2536,14 @@ struct ForwardDiffTranslationContext
 
         auto diffPairBaseType = (IRType*)this->diffTypeContext.tryGetAssociationOfKind(
             origParamBaseType,
-            ValAssociationKind::DifferentialPairType);
+            AnnotationKind::DifferentialPairType);
         bool isMixedDifferential = true;
 
         if (!diffPairBaseType)
         {
             diffPairBaseType = (IRType*)this->diffTypeContext.tryGetAssociationOfKind(
                 origParamBaseType,
-                ValAssociationKind::DifferentialPtrPairType);
+                AnnotationKind::DifferentialPtrPairType);
             if (diffPairBaseType)
                 isMixedDifferential = false;
         }
@@ -2801,7 +2799,7 @@ struct ForwardDiffTranslationContext
                 inst,
                 [&](IRInst* user)
                 {
-                    if (auto diffAnnotation = as<IRAssociatedInstAnnotation>(user))
+                    if (auto diffAnnotation = as<IRAnnotation>(user))
                     {
                         if (diffAnnotation->getTarget() == inst)
                             maybeCloneForPrimalInst(builder, user);
@@ -2821,11 +2819,11 @@ struct ForwardDiffTranslationContext
 
         auto diffValuePairType = (IRType*)diffTypeContext.tryGetAssociationOfKind(
             primalType,
-            ValAssociationKind::DifferentialPairType);
+            AnnotationKind::DifferentialPairType);
 
         auto diffPtrPairType = (IRType*)diffTypeContext.tryGetAssociationOfKind(
             primalType,
-            ValAssociationKind::DifferentialPtrPairType);
+            AnnotationKind::DifferentialPtrPairType);
 
         SLANG_ASSERT(diffValuePairType || diffPtrPairType);
 
@@ -3384,7 +3382,7 @@ IRInst* maybeTranslateForwardDerivativeWitness(
         as<IRInterfaceRequirementEntry>(baseConformanceType->getOperand(2))->getRequirementKey(),
         higherOrderFwdDiffBwdWitness);
 
-    builder.addAnnotation(fwdDiffFunc, ValAssociationKind::ForwardDerivative, higherOrderfwdDiffFn);
+    builder.addAnnotation(fwdDiffFunc, AnnotationKind::ForwardDerivative, higherOrderfwdDiffFn);
     return newWitnessTable;
 }
 

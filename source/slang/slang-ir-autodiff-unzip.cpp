@@ -211,7 +211,7 @@ struct UnzippingContext
 
         auto applyBwdFunc = diffTypeContext.tryGetAssociationOfKind(
             baseFn,
-            ValAssociationKind::BackwardDerivativeApply);
+            AnnotationKind::BackwardDerivativeApply);
         auto applyBwdFuncType = cast<IRFuncType>(
             diffTypeContext.resolveType(&globalBuilder, applyBwdFunc->getDataType()));
 
@@ -234,7 +234,7 @@ struct UnzippingContext
 
         auto getValFunc = diffTypeContext.tryGetAssociationOfKind(
             baseFn,
-            ValAssociationKind::BackwardDerivativeContextGetVal);
+            AnnotationKind::BackwardDerivativeContextGetVal);
         SLANG_ASSERT(getValFunc);
 
         // Extract the primal return value from the context.

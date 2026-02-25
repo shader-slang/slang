@@ -757,7 +757,7 @@ struct IRPrimalSubstitute : IRInst
 };
 
 FIDDLE()
-struct IRAssociatedInstAnnotation : IRInst
+struct IRAnnotation : IRInst
 {
     FIDDLE(leafInst())
     IRInst* getTarget() { return getOperand(0); }
@@ -3489,8 +3489,8 @@ $(type_info.return_type) $(type_info.method_name)(
     IRInst* tryLookupCompilerDictionaryValue(IRCompilerDictionary* dict, IRInst* translationInst);
 
     // Annotation helpers.
-    void addAnnotation(IRInst* target, ValAssociationKind kind, IRInst* value);
-    IRInst* tryLookupAnnotation(IRInst* target, ValAssociationKind kind);
+    void addAnnotation(IRInst* target, AnnotationKind kind, IRInst* value);
+    IRInst* tryLookupAnnotation(IRInst* target, AnnotationKind kind);
 
     IRInst* emitSymbolAlias(IRInst* aliasedSymbol);
 

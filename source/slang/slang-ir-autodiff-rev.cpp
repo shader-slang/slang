@@ -262,7 +262,7 @@ struct BackwardDiffTranslationContext
                 splitParameterDirectionAndType(targetFunc->getParamType(i));
             auto diffValueParamType = (IRType*)diffTypeContext.tryGetAssociationOfKind(
                 paramType,
-                ValAssociationKind::DifferentialType);
+                AnnotationKind::DifferentialType);
 
             if (diffValueParamType)
                 propagateParamTypes.add(fromDirectionAndType(
@@ -276,7 +276,7 @@ struct BackwardDiffTranslationContext
         auto resultType = targetFunc->getResultType();
         auto diffResultType = (IRType*)diffTypeContext.tryGetAssociationOfKind(
             resultType,
-            ValAssociationKind::DifferentialType);
+            AnnotationKind::DifferentialType);
         if (diffResultType)
         {
             propagateResultType =
@@ -575,7 +575,7 @@ IRInst* maybeTranslateLegacyToNewBackwardDerivative(
 
         if (!diffTypeContext.tryGetAssociationOfKind(
                 primalFuncParamType,
-                ValAssociationKind::DifferentialPtrType))
+                AnnotationKind::DifferentialPtrType))
         {
             // Simple case: just pass the param as-is.
             primalFuncArgs.add(param);

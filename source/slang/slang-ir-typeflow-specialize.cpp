@@ -3589,7 +3589,7 @@ struct TypeFlowSpecializationContext
         for (auto block : func->getBlocks())
         {
             for (auto child : block->getChildren())
-                if (as<IRAssociatedInstAnnotation>(child))
+                if (as<IRAnnotation>(child))
                     annotationsToRemove.add(child);
         }
 

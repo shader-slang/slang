@@ -1958,11 +1958,11 @@ struct IRConstantKey
     HashCode getHashCode() const { return inst->getHashCode(); }
 };
 
-struct ValAssociationCacheKey
+struct AnnotationCacheKey
 {
     IRInst* inst;
-    ValAssociationKind associationKind;
-    bool operator==(const ValAssociationCacheKey& other) const
+    AnnotationKind associationKind;
+    bool operator==(const AnnotationCacheKey& other) const
     {
         return inst == other.inst && associationKind == other.associationKind;
     }
@@ -2083,9 +2083,9 @@ public:
 
     Dictionary<IRInst*, UInt>* getUniqueIdMap() { return &m_mapInstToUniqueId; }
 
-    Dictionary<ValAssociationCacheKey, IRAssociatedInstAnnotation*>* getAssociatedInstCache()
+    Dictionary<AnnotationCacheKey, IRAnnotation*>* getAnnotationLookupCache()
     {
-        return &m_associationCache;
+        return &m_annotationLookupCache;
     }
 
     IRDominatorTree* findDominatorTree(IRGlobalValueWithCode* func)
@@ -2219,7 +2219,7 @@ private:
     IRCompilerDictionary* m_translationDict = nullptr;
 
     // (inst, association-kind) -> associated-inst
-    Dictionary<ValAssociationCacheKey, IRAssociatedInstAnnotation*> m_associationCache;
+    Dictionary<AnnotationCacheKey, IRAnnotation*> m_annotationLookupCache;
 };
 
 
