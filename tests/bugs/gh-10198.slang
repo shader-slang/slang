@@ -4,7 +4,7 @@
 // Issue: https://github.com/shader-slang/slang/issues/10198
 // Note: gh-7748-switch-continue-bug.slang covers the CPU path. This tests SPIRV.
 
-RWStructuredBuffer<int> out;
+RWStructuredBuffer<int> outputBuffer;
 
 int test(int value) {
     int result = 0;
@@ -28,5 +28,5 @@ int test(int value) {
 [shader("compute")]
 [numthreads(1,1,1)]
 void computeMain() {
-    out[0] = test(0) + test(1) + test(2);
+    outputBuffer[0] = test(0) + test(1) + test(2);
 }
