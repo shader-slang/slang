@@ -6522,7 +6522,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     {
         ensureExtensionDeclaration(UnownedStringSlice("SPV_EXT_descriptor_heap"));
         requireSPIRVCapability(SpvCapabilityDescriptorHeapEXT);
-        requireSPIRVCapability(SpvCapabilityRuntimeDescriptorArrayEXT);
 
         auto uniformConstantUntypedPtrType =
             ensureUntypedPointerType(SpvStorageClassUniformConstant);
