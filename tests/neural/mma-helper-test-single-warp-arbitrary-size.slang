@@ -174,7 +174,7 @@ void test<int InputSize, int OutputSize>(uint tid, int resIndex)
 [shader("compute")]
 void computeMain(uint tid : SV_DispatchThreadID)
 {
-    initBias<DType, 64>(tid, biasBuffer);
+    initBias<DType, 64, BatchSize>(tid, biasBuffer);
 
     {
         fillWeightMatrix<3, 5>(tid);

@@ -118,11 +118,11 @@ DType[TiledMMAHelper<DType, PaddedInputSize, PaddedOutputSize, SubgroupSize, Tar
 
 
 #if !TEST_BIAS
-    let res = MMA.mmaTiledLayout<DType, Address, DType[InSize], DType[OutSize], DType, false>(
+    let res = MMA.mma<DType, Address, DType[InSize], DType[OutSize], DType, false>(
         inputVector, OffsetA, OffsetB, OffsetB, address, none);
 #else
     Address biasAddress = Address(biasBuffer);
-    let res = MMA.mmaTiledLayout<DType, Address, DType[InSize], DType[OutSize], DType, true>(
+    let res = MMA.mma<DType, Address, DType[InSize], DType[OutSize], DType, true>(
         inputVector, OffsetA, OffsetB, OffsetB, address, biasAddress);
 #endif
 
