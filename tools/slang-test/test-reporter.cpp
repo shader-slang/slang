@@ -700,6 +700,7 @@ void TestReporter::outputSummary()
             if (!m_totalTestCount)
             {
                 printf("no tests run\n");
+                fflush(stdout);
                 return;
             }
 

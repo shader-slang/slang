@@ -5585,11 +5585,11 @@ Ptr<uint[]> __getByteAddressBufferPtr(RWByteAddressBuffer buffer);
 
 __intrinsic_op($(kIROp_GetStructuredBufferPtr))
 [require(spirv, structuredbuffer)]
-Ptr<T[]> __getStructuredBufferPtr<T>(StructuredBuffer<T> buffer);
+LayoutPtr<T[], L> __getStructuredBufferPtr<T, L:IBufferDataLayout>(StructuredBuffer<T, L> buffer);
 
 __intrinsic_op($(kIROp_GetStructuredBufferPtr))
 [require(spirv, structuredbuffer_rw)]
-Ptr<T[]> __getStructuredBufferPtr<T>(RWStructuredBuffer<T> buffer);
+LayoutPtr<T[], L> __getStructuredBufferPtr<T, L:IBufferDataLayout>(RWStructuredBuffer<T, L> buffer);
 
 /**
 Represents an opaque handle to a read-only structured buffer allocated in global memory.
