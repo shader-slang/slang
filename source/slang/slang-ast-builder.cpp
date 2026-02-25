@@ -1035,50 +1035,6 @@ top:
     auto aType = aIsSubtypeOfBWitness->getSub();
     auto cType = bIsSubtypeOfCWitness->getSup();
 
-    // If the right-hand side is a conjunction witness for `B <: C`
-    // of the form `(B <: X)&(B <: Y)`, then we have it that `C = X&Y`
-    // and we'd rather form a conjunction witness for `A <: C`
-    // that is of the form `(A <: X)&(A <: Y)`.
-    //
-    if (auto bIsSubtypeOfXAndY = as<ConjunctionSubtypeWitness>(bIsSubtypeOfCWitness))
-    {
-        auto bIsSubtypeOfXWitness = bIsSubtypeOfXAndY->getLeftWitness();
-        auto bIsSubtypeOfYWitness = bIsSubtypeOfXAndY->getRightWitness();
-
-        return getConjunctionSubtypeWitness(
-            aType,
-            cType,
-            getTransitiveSubtypeWitness(aIsSubtypeOfBWitness, bIsSubtypeOfXWitness),
-            getTransitiveSubtypeWitness(aIsSubtypeOfBWitness, bIsSubtypeOfYWitness));
-    }
-
-    // If the right-hand witness `R` is of the form `extract(i, W)`, then
-    // `W` is a witness that `B <: X&Y&...` for some conjunction, where `C`
-    // is one component of that conjunction.
-    //
-    if (auto bIsSubtypeViaExtraction =
-            as<ExtractFromConjunctionSubtypeWitness>(bIsSubtypeOfCWitness))
-    {
-        // We decompose the witness `extract(i, W)` to get both
-        // the witness `W` that `B <: X&Y&...` as well as the index
-        // `i` of `C` within the conjunction.
-        //
-        auto bIsSubtypeOfConjunction = bIsSubtypeViaExtraction->getConjunctionWitness();
-        auto indexOfCInConjunction = bIsSubtypeViaExtraction->getIndexInConjunction();
-
-        // We lift the extraction to the outside of the composition, by
-        // forming a witness for `A <: C` that is of the form
-        // `extract(i, L . W )`, where `L` is the left-hand witnes (for `A <: B`).
-        // The composition `L . W` is a witness that `A <: X&Y&...`, and
-        // the `i`th component of it should be a witness that `A <: C`.
-        //
-        return getExtractFromConjunctionSubtypeWitness(
-            aType,
-            cType,
-            getTransitiveSubtypeWitness(aIsSubtypeOfBWitness, bIsSubtypeOfConjunction),
-            indexOfCInConjunction);
-    }
-
     // If left hand is a TypePackSubtypeWitness, then we should also return a TypePackSubtypeWitness
     // where each witness in the pack is the transitive subtype witness of the corresponding
     // witness in the original pack.
@@ -1141,80 +1097,6 @@ top:
         aIsSubtypeOfBWitness,
         bIsSubtypeOfCWitness);
     return transitiveWitness;
-}
-
-SubtypeWitness* ASTBuilder::getExtractFromConjunctionSubtypeWitness(
-    Type* subType,
-    Type* superType,
-    SubtypeWitness* conjunctionWitness,
-    int indexOfSuperTypeInConjunction)
-{
-    // We are taking a witness `W` for `S <: L&R` and
-    // using it to produce a witness for `S <: L`
-    // or `S <: R`.
-
-    // If it turns out that the witness `W` is itself
-    // formed as a conjuction of witnesses: `(S <: L) & (S <: R)`,
-    // then we can simply re-use the appropriate sub-witness.
-    //
-    if (auto conjWitness = as<ConjunctionSubtypeWitness>(conjunctionWitness))
-    {
-        return conjWitness->getComponentWitness(indexOfSuperTypeInConjunction);
-    }
-
-    // TODO: Are there other simplification cases we should be paying attention
-    // to here? For example:
-    //
-    // * What if the original witness is transitive?
-
-    auto witness = getOrCreate<ExtractFromConjunctionSubtypeWitness>(
-        subType,
-        superType,
-        conjunctionWitness,
-        indexOfSuperTypeInConjunction);
-    return witness;
-}
-
-SubtypeWitness* ASTBuilder::getConjunctionSubtypeWitness(
-    Type* sub,
-    Type* lAndR,
-    SubtypeWitness* subIsLWitness,
-    SubtypeWitness* subIsRWitness)
-{
-    // If a conjunction witness for `S <: L&R` is being formed,
-    // where the constituent witnesses for `S <: L` and `S <: R`
-    // are themselves extractions of the first and second
-    // components, respectively, of a single witness `W`, then
-    // we can simply use `W` as-is.
-    //
-    auto lExtract = as<ExtractFromConjunctionSubtypeWitness>(subIsLWitness);
-    auto rExtract = as<ExtractFromConjunctionSubtypeWitness>(subIsRWitness);
-    if (lExtract && rExtract)
-    {
-        if (lExtract->getIndexInConjunction() == 0 && rExtract->getIndexInConjunction() == 1)
-        {
-            auto lInner = lExtract->getConjunctionWitness();
-            auto rInner = rExtract->getConjunctionWitness();
-            if (lInner == rInner)
-            {
-                return lInner;
-            }
-        }
-    }
-
-    // TODO: Depending on how we decide our canonicalized witnesses
-    // should be structured, we could detect the case where the
-    // `S <: L` and `S <: R` witnesses are both transitive compositions
-    // of the form `X . A` and `X . B`, such that we *could* form
-    // a composition around a conjunction - that is, produce
-    // `X . (A & B)` rather than `(X . A) & (X . B)`.
-    //
-    // For now we are favoring putting the composition (transitive
-    // witness) deeper, so that we have more chances to expose a
-    // conjunction witness at higher levels.
-
-    auto witness = getOrCreate<ConjunctionSubtypeWitness>(sub, lAndR, subIsLWitness, subIsRWitness);
-    return witness;
 }
 
 TypeCoercionWitness* ASTBuilder::getTypeCoercionWitness(

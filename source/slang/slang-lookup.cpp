@@ -703,66 +703,11 @@ static void _lookUpMembersInSuperTypeImpl(
             ioResult,
             inBreadcrumbs);
     }
-    else if (auto andType = as<AndType>(superType))
+    else if (as<AndType>(superType))
     {
-        // We have a type of the form `leftType & rightType` and we need to perform
-        // lookup in both `leftType` and `rightType`.
-        //
-        auto leftType = andType->getLeft();
-        auto rightType = andType->getRight();
-
-        // Operationally, we are in a situation where we have a witness
-        // that the `leafType` we are doing lookup on is an subtype
-        // of `superType` (which is `leftType & rightType`) and now we need
-        // to construct a witness that `leafType` is a subtype of
-        // the `Left` type.
-        //
-        // Effectively, we have a witness that `T : X & Y` and we
-        // need to extract from it a witness that `T : X`.
-        //
-        //
-        auto leafIsLeftWitness = astBuilder->getExtractFromConjunctionSubtypeWitness(
-            leafType,
-            leftType,
-            leafIsSuperWitness,
-            0);
-
-
-        // The witness for the fact that `leafType : rightType` is the
-        // same as for the left case, just with a different index into
-        // the conjunction.
-        //
-        auto leafIsRightWitness = astBuilder->getExtractFromConjunctionSubtypeWitness(
-            leafType,
-            rightType,
-            leafIsSuperWitness,
-            1);
-
-        // We then perform lookup on both sides of the conjunction, and
-        // accumulate whatever items are found on either/both sides.
-        //
-        // For each recursive lookup, we pass the appropriate pair of
-        // the type to look up in and the witness of the subtype
-        // relationship.
-        //
-        _lookUpMembersInSuperType(
-            astBuilder,
-            name,
-            leafType,
-            leftType,
-            leafIsLeftWitness,
-            request,
-            ioResult,
-            inBreadcrumbs);
-        _lookUpMembersInSuperType(
-            astBuilder,
-            name,
-            leafType,
-            rightType,
-            leafIsRightWitness,
-            request,
-            ioResult,
-            inBreadcrumbs);
+        // AndType constraints should have been flattened into individual constraints
+        // during visitGenericTypeConstraintDecl. If we get here, something is wrong.
+        SLANG_UNEXPECTED("AndType should have been flattened before reaching member lookup");
     }
 }
 

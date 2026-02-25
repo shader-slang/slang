@@ -683,20 +683,6 @@ public:
         SubtypeWitness* aIsSubtypeOfBWitness,
         SubtypeWitness* bIsSubtypeOfCWitness);
 
-    /// Produce a witness that `T <: L` or `T <: R` given `T <: L&R`
-    SubtypeWitness* getExtractFromConjunctionSubtypeWitness(
-        Type* subType,
-        Type* superType,
-        SubtypeWitness* subIsSubtypeOfConjunction,
-        int indexOfSuperTypeInConjunction);
-
-    /// Produce a witnes that `S <: L&R` given witnesses that `S <: L` and `S <: R`
-    SubtypeWitness* getConjunctionSubtypeWitness(
-        Type* sub,
-        Type* lAndR,
-        SubtypeWitness* subIsLWitness,
-        SubtypeWitness* subIsRWitness);
-
     TypeCoercionWitness* getTypeCoercionWitness(
         Type* fromType,
         Type* toType,

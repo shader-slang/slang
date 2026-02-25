@@ -3494,6 +3494,19 @@ void SemanticsDeclHeaderVisitor::visitTypeCoercionConstraintDecl(TypeCoercionCon
         decl->toType = TranslateTypeNodeForced(decl->toType);
 }
 
+static void maybeFlattenConjunctionType(Type* type, List<Type*>& outTypes)
+{
+    if (auto andType = as<AndType>(type))
+    {
+        maybeFlattenConjunctionType(andType->getLeft(), outTypes);
+        maybeFlattenConjunctionType(andType->getRight(), outTypes);
+    }
+    else
+    {
+        outTypes.add(type);
+    }
+}
+
 void SemanticsDeclHeaderVisitor::visitGenericTypeConstraintDecl(GenericTypeConstraintDecl* decl)
 {
     CheckConstraintSubType(decl->sub);
@@ -3502,6 +3515,34 @@ void SemanticsDeclHeaderVisitor::visitGenericTypeConstraintDecl(GenericTypeConst
         decl->sub = TranslateTypeNodeForced(decl->sub);
     if (!decl->sup.type)
         decl->sup = TranslateTypeNodeForced(decl->sup);
+
+    // If the super-type is an AndType (e.g. `T : A & B`), flatten it and create
+    // individual GenericTypeConstraintDecls for each element in the conjunction.
+    if (decl->sup.type && !decl->isEqualityConstraint)
+    {
+        List<Type*> flattenedTypes;
+        maybeFlattenConjunctionType(decl->sup.type, flattenedTypes);
+        if (flattenedTypes.getCount() > 1)
+        {
+            auto parentDecl = as<ContainerDecl>(decl->parentDecl);
+            SLANG_ASSERT(parentDecl);
+
+            // Update the current decl's sup to the first type in the flattened list.
+            decl->sup = TypeExp(flattenedTypes[0]);
+
+            // Create new constraint decls for the remaining types.
+            for (Index i = 1; i < flattenedTypes.getCount(); i++)
+            {
+                auto newConstraint = m_astBuilder->create<GenericTypeConstraintDecl>();
+                newConstraint->sub = decl->sub;
+                newConstraint->sup = TypeExp(flattenedTypes[i]);
+                newConstraint->loc = decl->loc;
+                newConstraint->parentDecl = parentDecl;
+                parentDecl->addDirectMemberDecl(newConstraint);
+                ensureDecl(newConstraint, DeclCheckState::SignatureChecked);
+            }
+        }
+    }
 
     if (getLinkage()->m_optionSet.shouldRunNonEssentialValidation())
     {

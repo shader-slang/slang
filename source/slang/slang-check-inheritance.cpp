@@ -1097,81 +1097,11 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
             extractExistentialType,
             circularityInfo);
     }
-    else if (auto conjunctionType = as<AndType>(type))
+    else if (as<AndType>(type))
     {
-        // In this case, we have a type of the form `L & R`,
-        // such that it is a subtype of both `L` and `R`.
-        //
-        auto leftType = conjunctionType->getLeft();
-        auto rightType = conjunctionType->getRight();
-
-        // The linearized inheritance list for the conjunction
-        // must include all the facets from the lists for `L`
-        // and `R`, respectively.
-        //
-        auto leftInfo = getInheritanceInfo(leftType, circularityInfo);
-        auto rightInfo = getInheritanceInfo(rightType, circularityInfo);
-
-        // We have a case of subtype witness that can show that
-        // `T : L` or `T : R` based on `T : L&R`. In this case,
-        // though, the type `T` is actually `L&R` itself, so
-        // we need to construct an identity witness for `L&R : L&R`
-        // to give it something to start from.
-        //
-        auto selfIsSelf = astBuilder->getTypeEqualityWitness(conjunctionType);
-        auto selfIsSubtypeOfLeft = _getASTBuilder()->getExtractFromConjunctionSubtypeWitness(
-            type,
-            leftType,
-            selfIsSelf,
-            0);
-        auto selfIsSubtypeOfRight = _getASTBuilder()->getExtractFromConjunctionSubtypeWitness(
-            type,
-            rightType,
-            selfIsSelf,
-            1);
-
-        // We will set up to perform a merge between the facet
-        // lists for the two "bases" `L` and `R`. Note that  the
-        // information we write into the `facetImpl` in each case
-        // is largely just for completeness and debugging, since
-        // we are *not* going to add those facets into a list
-        // of direct base facets to be merged.
-        //
-        DirectBaseInfo leftBaseInfo;
-        leftBaseInfo.facetImpl = FacetImpl(
-            astBuilder,
-            Facet::Kind::Type,
-            Facet::Directness::Direct,
-            DeclRef<Decl>(),
-            leftType,
-            selfIsSubtypeOfLeft);
-        leftBaseInfo.facets = leftInfo.facets;
-
-        DirectBaseInfo rightBaseInfo;
-        rightBaseInfo.facetImpl = FacetImpl(
-            astBuilder,
-            Facet::Kind::Type,
-            Facet::Directness::Direct,
-            DeclRef<Decl>(),
-            rightType,
-            selfIsSubtypeOfRight);
-        rightBaseInfo.facets = rightInfo.facets;
-
-        DirectBaseList::Builder directBases;
-        directBases.add(&leftBaseInfo);
-        directBases.add(&rightBaseInfo);
-
-        // The merging step is then the same as for the more "standard" case,
-        // with the only detail that we are not passing in a list of facets
-        // to represent the directly-declared bases (since there are none;
-        // this is a structural rather than nominal type).
-        //
-        FacetList::Builder mergedFacets;
-        _mergeFacetLists(directBases, FacetList(), mergedFacets);
-
-        InheritanceInfo info;
-        info.facets = mergedFacets;
-        return info;
+        // AndType constraints should have been flattened into individual constraints
+        // during visitGenericTypeConstraintDecl. If we get here, something is wrong.
+        SLANG_UNEXPECTED("AndType should have been flattened before reaching getInheritanceInfo");
     }
     else if (auto eachType = as<EachType>(type))
     {
