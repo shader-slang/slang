@@ -7,9 +7,12 @@
 // the existential's byte-level layout at compile time, and bit_cast fails with
 // a size mismatch.
 //
-// Once issue #9920 is resolved, the compiler should expose a stable existential
-// layout so that bit_cast<RawType>(interfaceValue) and
-// bit_cast<IFoo>(rawValue) produce correct round-trip results.
+// Two sub-issues block this feature:
+//   #10221 — bit_cast extracts concrete payload instead of full existential
+//   #10222 — specialization lowers existential to compact tagged-union
+//
+// Once resolved, bit_cast<RawType>(interfaceValue) and
+// bit_cast<IFoo>(rawValue) should produce correct round-trip results.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -stage compute -entry computeMain -conformance "FooA:IFoo=0" -conformance "FooB:IFoo=1"
 
@@ -45,6 +48,9 @@ float testRoundTrip(int typeId, float val)
     IFoo foo = createDynamicObject<IFoo>(typeId, val);
     // CHECK: error 41202
     RawExistential raw = bit_cast<RawExistential>(foo);
+    // The reverse cast would also fail, but the compiler bails out after the
+    // first error above so no second diagnostic is emitted today.  A partial
+    // fix to #10221 or #10222 could change that; add a CHECK here when it does.
     IFoo foo2 = bit_cast<IFoo>(raw);
     return foo2.eval();
 }

@@ -1,10 +1,10 @@
 // Manual serialization of interface-typed values into a raw uint buffer using
 // bit_cast, then deserialization back to interface type.
 //
-// This is blocked on the same limitation as bit-cast-interface-roundtrip:
-// the compiler's tagged-union representation for existentials does not match
-// the expected full existential tuple layout, causing a size mismatch in
-// bit_cast.  See issue #9920.
+// Blocked on the same two sub-issues as bit-cast-interface-roundtrip:
+//   #10221 — bit_cast extracts concrete payload instead of full existential
+//   #10222 — specialization lowers existential to compact tagged-union
+// See parent issue #9920.
 
 //TEST:SIMPLE(filecheck=CHECK):-target hlsl -stage compute -entry computeMain -conformance "FooA:IFoo=0" -conformance "FooB:IFoo=1"
 
@@ -46,6 +46,9 @@ IFoo deserialize(RWStructuredBuffer<uint> buf, int baseSlot)
     RawExistential raw;
     for (int i = 0; i < kRawUints; i++)
         raw.data[i] = buf[baseSlot + i];
+    // This cast would also fail, but the compiler bails out after the first
+    // error in serialize() so no second diagnostic is emitted today.  A partial
+    // fix to #10221 or #10222 could change that; add a CHECK here when it does.
     return bit_cast<IFoo>(raw);
 }
 
