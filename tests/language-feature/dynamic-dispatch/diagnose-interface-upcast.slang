@@ -1,6 +1,6 @@
 // Upcasting an existential (interface-typed) value from a derived
-// interface to a base interface causes ICE 99999. This affects both
-// generic and non-generic interface hierarchies.
+// interface to a base interface currently triggers an ICE.
+// Disabled until the fix lands. See https://github.com/shader-slang/slang/issues/10156
 
 //DISABLE_TEST:SIMPLE(filecheck=CHK1):-target hlsl -stage compute -entry scenario1
 //DISABLE_TEST:SIMPLE(filecheck=CHK2):-target hlsl -stage compute -entry scenario2
@@ -57,8 +57,7 @@ struct GenImplB : IGenDerived<float>
 
 RWStructuredBuffer<float> outputBuffer;
 
-// Scenario 1: Non-generic upcast -- ICE 99999
-// CHK1: error 99999
+// Scenario 1: Non-generic upcast
 [numthreads(1, 1, 1)]
 void scenario1()
 {
@@ -72,8 +71,7 @@ void scenario1()
     outputBuffer[0] = base.getValue();
 }
 
-// Scenario 2: Generic upcast -- ICE 99999
-// CHK2: error 99999
+// Scenario 2: Generic upcast
 [numthreads(1, 1, 1)]
 void scenario2()
 {
