@@ -894,8 +894,6 @@ IRInst* AstOrIRType::getIRType(IRGenContext* context)
     return irType;
 }
 
-IRStructKey* getInterfaceRequirementKey(IRGenContext* context, Decl* requirementDecl);
-
 // Given a `DeclRef` for something callable, along with a bunch of
 // arguments, emit an appropriate call to it.
 LoweredValInfo emitCallToDeclRef(
@@ -938,47 +936,6 @@ LoweredValInfo emitCallToDeclRef(
     // Fallback case is to emit an actual call.
     //
     LoweredValInfo funcVal = emitDeclRef(context, funcDeclRef, funcType);
-
-    // When calling an interface method on an existential value obtained through
-    // an interface property, the declRef may have a trivial ThisType substitution
-    // that causes emitDeclRef to return the bare interface method declaration
-    // instead of a lookupWitness. Detect this and emit proper witness dispatch.
-    // (GitHub issue #9816)
-    if (argCount > 0 && isInterfaceRequirement(funcDecl))
-    {
-        auto irFuncVal = getSimpleVal(context, funcVal);
-        if (as<IRFunc>(irFuncVal))
-        {
-            auto thisArg = args[0];
-            if (as<IRInterfaceType>(thisArg->getDataType()))
-            {
-                auto witnessTable = builder->emitExtractExistentialWitnessTable(thisArg);
-                auto requirementKey = getInterfaceRequirementKey(context, funcDecl);
-                if (requirementKey)
-                {
-                    auto irLookup = builder->emitLookupInterfaceMethodInst(
-                        funcType,
-                        witnessTable,
-                        requirementKey);
-                    auto existentialType = builder->emitExtractExistentialType(thisArg);
-                    auto concreteVal =
-                        builder->emitExtractExistentialValue(existentialType, thisArg);
-                    List<IRInst*> newArgs;
-                    newArgs.add(concreteVal);
-                    for (UInt i = 1; i < argCount; i++)
-                        newArgs.add(args[i]);
-                    return emitCallToVal(
-                        context,
-                        type,
-                        LoweredValInfo::simple(irLookup),
-                        newArgs.getCount(),
-                        newArgs.getBuffer(),
-                        tryEnv);
-                }
-            }
-        }
-    }
-
     return emitCallToVal(context, type, funcVal, argCount, args, tryEnv);
 }
 
@@ -1674,9 +1631,6 @@ bool shouldDeclBeTreatedAsInterfaceRequirement(Decl* requirementDecl)
     return true;
 }
 
-// Returns the IRStructKey for the given interface requirement declaration,
-// used for witness table lookups. Returns nullptr if the decl is not
-// treated as a requirement (e.g. property decls, default impl stubs).
 IRStructKey* getInterfaceRequirementKey(IRGenContext* context, Decl* requirementDecl)
 {
     // Only specific types of decls are treated as requirements, e.g. methods and asssociated types.
