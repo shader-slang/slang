@@ -4058,7 +4058,6 @@ IRInst* IRBuilder::emitConstexprCast(IRType* type, IRInst* value)
     };
 
     // Constexpr casting table for Int, Float, Bool, Enum (4x4).
-    // For Float->Bool, we use CastFloatToInt + IntCast instead of Neq.
     static const OpSeq opMap[4][4] = {
         /*      To:      Int, Float, Bool, Enum */
         /* From Int   */
@@ -4069,7 +4068,7 @@ IRInst* IRBuilder::emitConstexprCast(IRType* type, IRInst* value)
         /* From Float */
         {kIROp_ConstexprCastFloatToInt,
          kIROp_ConstexprFloatCast,
-         {kIROp_ConstexprCastFloatToInt, kIROp_ConstexprIntCast},
+         kIROp_ConstexprNeq,
          {kIROp_ConstexprCastFloatToInt, kIROp_ConstexprCastIntToEnum}},
         /* From Bool  */
         {kIROp_ConstexprIntCast,
