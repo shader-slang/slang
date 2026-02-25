@@ -96,6 +96,7 @@ static bool _isSubCommand(const char* arg)
         "  -explicit-test-order           Run tests in the order specified on command line\n"
         "                                 (alphabetical for prefixes matching multiple tests)\n"
         "  -dry-run                       List tests that would be run without running them\n"
+        "  -disable-retries               Disable automatic retries of failed tests\n"
 
         // Recent Windows runtime versions started opening a dialog popup window when
         // `abort()` is called, which breaks the CI workflow and some scripts that
@@ -289,6 +290,10 @@ static bool _isSubCommand(const char* arg)
         else if (strcmp(arg, "-dry-run") == 0)
         {
             optionsOut->dryRun = true;
+        }
+        else if (strcmp(arg, "-disable-retries") == 0)
+        {
+            optionsOut->disableRetries = true;
         }
         else if (strcmp(arg, "-shuffle-seed") == 0)
         {

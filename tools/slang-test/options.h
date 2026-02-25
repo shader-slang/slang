@@ -169,6 +169,9 @@ struct Options
 
     /// Whether to list tests without running them
     bool dryRun = false;
+
+    /// Whether to disable automatic retries of failed tests
+    bool disableRetries = false;
 };
 
 #endif // OPTIONS_H_INCLUDED
