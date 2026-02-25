@@ -8897,7 +8897,6 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_ConstexprSub:
     case kIROp_ConstexprMul:
     case kIROp_ConstexprNeg:
-    case kIROp_ConstexprIRem:
     case kIROp_ConstexprShl:
     case kIROp_ConstexprShr:
     case kIROp_ConstexprBitAnd:
