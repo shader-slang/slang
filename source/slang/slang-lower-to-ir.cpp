@@ -1774,10 +1774,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     }                                                                                      \
     else
 
-            // Arithmetic
-            CONSTEXPR_BINARY_OP("+", emitConstexprAdd)
-            CONSTEXPR_BINARY_OP("-", emitConstexprSub)
-            CONSTEXPR_BINARY_OP("*", emitConstexprMul)
+            // Arithmetic (+,*,- are handled by PolynomialIntVal)
             CONSTEXPR_BINARY_OP("/", emitConstexprDiv)
             CONSTEXPR_BINARY_OP("%", emitConstexprIRem)
             // Shifts
