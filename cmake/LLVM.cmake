@@ -38,7 +38,6 @@ function(fetch_or_build_slang_llvm)
             endif()
         endif()
     elseif(SLANG_SLANG_LLVM_FLAVOR STREQUAL "USE_SYSTEM_LLVM")
-        find_package(LLVM 21.1 REQUIRED CONFIG)
         find_package(Clang REQUIRED CONFIG)
 
         if(LLVM_LINK_LLVM_DYLIB)

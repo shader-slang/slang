@@ -460,6 +460,11 @@ Val* PtrTypeBase::getAddressSpace()
     return _getGenericTypeArg(this, 2);
 }
 
+Type* PtrTypeBase::getDataLayout()
+{
+    return as<Type>(_getGenericTypeArg(this, 3));
+}
+
 std::optional<AccessQualifier> tryGetAccessQualifierValue(Val* val)
 {
     if (auto cintVal = as<ConstantIntVal>(val))
@@ -532,6 +537,21 @@ void maybePrintAccessQualifierOperand(StringBuilder& out, AccessQualifier access
     }
 }
 
+void maybePrintDataLayoutOperand(StringBuilder& out, Type* dataLayout)
+{
+    const char* name = "DefaultDataLayout";
+    if (as<Std140DataLayoutType>(dataLayout))
+        name = "Std140DataLayout";
+    else if (as<Std430DataLayoutType>(dataLayout))
+        name = "Std430DataLayout";
+    else if (as<ScalarDataLayoutType>(dataLayout))
+        name = "ScalarDataLayout";
+    else if (as<CDataLayoutType>(dataLayout))
+        name = "CDataLayout";
+
+    out << toSlice(", ") << name;
+}
+
 void PtrType::_toTextOverride(StringBuilder& out)
 {
     auto addrSpace = tryGetAddressSpaceValue(getAddressSpace());
@@ -539,6 +559,7 @@ void PtrType::_toTextOverride(StringBuilder& out)
     if (auto optionalAccessQualifier = tryGetAccessQualifierValue())
         maybePrintAccessQualifierOperand(out, *optionalAccessQualifier);
     maybePrintAddrSpaceOperand(out, addrSpace);
+    maybePrintDataLayoutOperand(out, getDataLayout());
     out << toSlice(">");
 }
 
@@ -549,6 +570,7 @@ void ExplicitRefType::_toTextOverride(StringBuilder& out)
     if (auto optionalAccessQualifier = tryGetAccessQualifierValue())
         maybePrintAccessQualifierOperand(out, *optionalAccessQualifier);
     maybePrintAddrSpaceOperand(out, addrSpace);
+    maybePrintDataLayoutOperand(out, getDataLayout());
     out << toSlice(">");
 }
 
