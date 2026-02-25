@@ -29,7 +29,7 @@ struct ImplA : ISelfOp
 struct ImplB : ISelfOp
 {
     float v;
-    This clone() { return ImplB(v * 2.0); }
+    This clone() { return ImplB(v); }
     bool matches(ImplB other) { return v == other.v; }
     float getValue() { return v; }
 }

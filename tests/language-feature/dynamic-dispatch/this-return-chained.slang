@@ -1,7 +1,7 @@
 // When an interface method returns `This`, each call in a chain must go
 // through dynamic dispatch to select the correct implementation. This test
 // exercises multi-step chaining (obj.f().f().g()), storing intermediate
-// This-typed results, and passing them to functions that chain further.
+// interface-typed results, and passing them to functions that chain further.
 
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-dx12 -compute -shaderobj -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type
@@ -53,7 +53,7 @@ void computeMain()
     outputBuffer[0] = obj.transform(10.0).transform(5.0).getValue();
     // CHECK: 16.0
 
-    // Store intermediate This-typed result and use later
+    // Store intermediate result as interface-typed value (This identity erased via dispatch)
     ITransformable mid = obj.transform(100.0);
     outputBuffer[1] = mid.getValue();
     // CHECK: 101.0
@@ -63,11 +63,11 @@ void computeMain()
     outputBuffer[2] = applyTwice(mid, 3.0);
     // CHECK: 107.0
 
-    // Same patterns with a known type to verify specialization. The compiler
-    // specializes away dynamic dispatch when the concrete type (Multiplier) is
-    // statically known at the assignment, so no dispatch sites are emitted for
-    // mul.transform or applyTwice(mul, ...). The REPORT test above only runs
-    // on computeMain and thus only checks the interface-typed obj path.
+    // Same patterns with a statically-known Multiplier to exercise the
+    // specialization path. Because the concrete type is known at assignment,
+    // the compiler specializes away dynamic dispatch for the mul.* call sites.
+    // The REPORT patterns above are in applyTwice, which is reached from the
+    // interface-typed obj path only.
     ITransformable mul = Multiplier(2.0);
     outputBuffer[3] = mul.transform(3.0).transform(4.0).getValue();
     // CHECK: 24.0
