@@ -3571,7 +3571,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 kIROp_PtrType,
                 spvAsmBuiltinVar->getDataType(),
                 AccessQualifier::ReadWrite,
-                AddressSpace::BuiltinInput),
+                AddressSpace::BuiltinInput,
+                builder.getDefaultBufferLayoutType()),
             kind,
             spvAsmBuiltinVar);
         registerInst(spvAsmBuiltinVar, varInst);
@@ -7740,9 +7741,13 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         SLANG_ASSERT(destPtrType);
 
         auto addrSpace = AddressSpace::Function;
+        IRType* dataLayout = builder.getDefaultBufferLayoutType();
         if (destPtrType->hasAddressSpace())
             addrSpace = destPtrType->getAddressSpace();
-        auto ptrElementType = builder.getPtrType(kIROp_PtrType, sourceElementType, addrSpace);
+        if (destPtrType->getDataLayout() != nullptr)
+            dataLayout = destPtrType->getDataLayout();
+        auto ptrElementType =
+            builder.getPtrType(kIROp_PtrType, sourceElementType, addrSpace, dataLayout);
 
         // Compute memory access operands for PhysicalStorageBuffer alignment
         int memoryAccessMask = 0;
@@ -7849,7 +7854,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return builder.getPtrType(
             ptrTypeWithNoAddressSpace->getOp(),
             ptrTypeWithNoAddressSpace->getValueType(),
-            addressSpace);
+            addressSpace,
+            ptrTypeWithNoAddressSpace->getDataLayout());
     }
 
     SpvInst* emitStructuredBufferGetElementPtr(SpvInstParent* parent, IRInst* inst)
@@ -7915,7 +7921,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return emitOpAccessChain(
             parent,
             inst,
-            builder.getPtrType(arrayType, addressSpace),
+            builder.getPtrType(
+                arrayType,
+                AccessQualifier::ReadWrite,
+                addressSpace,
+                bufPtrType->getDataLayout()),
             inst->getOperand(0),
             makeArray(emitIntConstant(0, builder.getIntType())));
     }

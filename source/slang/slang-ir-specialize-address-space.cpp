@@ -107,7 +107,8 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                     ptrType->getOp(),
                     ptrType->getValueType(),
                     ptrType->getAccessQualifier(),
-                    paramAddrSpace);
+                    paramAddrSpace,
+                    ptrType->getDataLayout());
                 param->setFullType(newParamType);
                 mapInstToAddrSpace[param] = paramAddrSpace;
             }
@@ -303,7 +304,8 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                                         ptrResultType->getOp(),
                                         ptrResultType->getValueType(),
                                         ptrResultType->getAccessQualifier(),
-                                        addrSpace);
+                                        addrSpace,
+                                        ptrResultType->getDataLayout());
                                     fixUpFuncType(func, newResultType);
                                     retValAddrSpaceChanged = true;
                                 }
@@ -346,7 +348,8 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
                         ptrType->getOp(),
                         ptrType->getValueType(),
                         ptrType->getAccessQualifier(),
-                        addrSpace);
+                        addrSpace,
+                        ptrType->getDataLayout());
                     setDataType(inst, newType);
                 }
             }
