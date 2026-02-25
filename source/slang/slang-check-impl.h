@@ -1933,7 +1933,7 @@ public:
         DeclRef<GenericDecl> requirementGenDecl,
         RefPtr<WitnessTable> witnessTable);
 
-    bool doesTypeSatisfyAssociatedTypeConstraintRequirement(
+    bool doesTypeSatisfyConstraintRequirements(
         Type* satisfyingType,
         DeclRef<ContainerDecl> requiredAssociatedTypeDeclRef,
         RefPtr<WitnessTable> witnessTable);

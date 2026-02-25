@@ -239,6 +239,17 @@ struct DeadCodeEliminationContext
             // because they must have been dead too (since we always
             // mark the parent of a live instruction as live).
             //
+
+            //
+            // We'll also remove any annotations on this inst.
+            //
+            // Annotations are always treated as live even if they
+            // have no uses, so we'll need to be explicit about removing
+            // them.
+            //
+            // TODO: Would it be better to do this during removeAndDeallocate()
+            // instead?
+            //
             if (inst->hasUses())
             {
                 traverseUsers<IRAnnotation>(

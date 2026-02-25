@@ -167,11 +167,11 @@ enum class AnnotationKind
 
     // Annotations for differentiable types.
     DifferentialPairType = 8,
-    DifferentialType = 12,
-    DifferentialPtrType = 13,
-    DifferentialPtrPairType = 14,
-    DifferentialZero = 15,
-    DifferentialAdd = 16,
+    DifferentialType = 9,
+    DifferentialPtrType = 10,
+    DifferentialPtrPairType = 11,
+    DifferentialZero = 12,
+    DifferentialAdd = 13,
 };
 
 
