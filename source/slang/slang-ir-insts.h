@@ -4153,6 +4153,31 @@ $(type_info.return_type) $(type_info.method_name)(
     IRInst* emitSub(IRType* type, IRInst* left, IRInst* right);
     IRInst* emitMul(IRType* type, IRInst* left, IRInst* right);
     IRInst* emitDiv(IRType* type, IRInst* numerator, IRInst* denominator);
+
+    // Constexpr arithmetic ops - hoistable variants used for IntVal lowering
+    IRInst* emitConstexprAdd(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitConstexprSub(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitConstexprMul(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitConstexprDiv(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitConstexprNeg(IRType* type, IRInst* value);
+    IRInst* emitConstexprCast(IRType* type, IRInst* value);
+    IRInst* emitConstexprIRem(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitConstexprShl(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitConstexprShr(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitConstexprBitAnd(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitConstexprBitOr(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitConstexprBitXor(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitConstexprBitNot(IRType* type, IRInst* value);
+    IRInst* emitConstexprNot(IRType* type, IRInst* value);
+    IRInst* emitConstexprEql(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitConstexprNeq(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitConstexprGreater(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitConstexprLess(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitConstexprGeq(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitConstexprLeq(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitConstexprAnd(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitConstexprOr(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitConstexprSelect(IRType* type, IRInst* condition, IRInst* ifTrue, IRInst* ifFalse);
     IRInst* emitEql(IRInst* left, IRInst* right);
     IRInst* emitNeq(IRInst* left, IRInst* right);
     IRInst* emitLess(IRInst* left, IRInst* right);
