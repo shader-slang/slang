@@ -572,27 +572,35 @@ struct AnyValueMarshallingContext
             IRType* dataType,
             IRInst* concreteVar) override
         {
-            SLANG_UNUSED(dataType);
             ensureOffsetAt4ByteBoundary();
-            if (fieldOffset + 1 < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
+
+            IRSizeAndAlignment sizeAndAlign;
+            IRIntegerValue size = 8;
+            if (SLANG_SUCCEEDED(
+                    getNaturalSizeAndAlignment(targetRequest, dataType, &sizeAndAlign)) &&
+                sizeAndAlign.size > 0)
+            {
+                size = sizeAndAlign.size;
+            }
+
+            IRIntegerValue numUints = (size + 3) / 4;
+            if (fieldOffset + numUints - 1 <
+                static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
             {
                 auto srcVal = builder->emitLoad(concreteVar);
-                // Use uint2 instead of uint64 to avoid Int64 capability requirement
-                auto uint2Type = builder->getVectorType(builder->getUIntType(), 2);
-                auto uint2Val = builder->emitBitCast(uint2Type, srcVal);
-                auto lowBits = builder->emitElementExtract(uint2Val, IRIntegerValue(0));
-                auto highBits = builder->emitElementExtract(uint2Val, IRIntegerValue(1));
-                auto dstAddr1 = builder->emitFieldAddress(
-                    uintPtrType,
-                    anyValueVar,
-                    anyValInfo->fieldKeys[fieldOffset]);
-                builder->emitStore(dstAddr1, lowBits);
-                auto dstAddr2 = builder->emitFieldAddress(
-                    uintPtrType,
-                    anyValueVar,
-                    anyValInfo->fieldKeys[fieldOffset + 1]);
-                builder->emitStore(dstAddr2, highBits);
-                advanceOffset(8);
+                auto uintNType =
+                    builder->getVectorType(builder->getUIntType(), (IRIntegerValue)numUints);
+                auto uintNVal = builder->emitBitCast(uintNType, srcVal);
+                for (IRIntegerValue i = 0; i < numUints; i++)
+                {
+                    auto bits = builder->emitElementExtract(uintNVal, i);
+                    auto dstAddr = builder->emitFieldAddress(
+                        uintPtrType,
+                        anyValueVar,
+                        anyValInfo->fieldKeys[fieldOffset + (uint32_t)i]);
+                    builder->emitStore(dstAddr, bits);
+                }
+                advanceOffset((uint32_t)size);
             }
         }
 
@@ -942,27 +950,36 @@ struct AnyValueMarshallingContext
             IRInst* concreteVar) override
         {
             ensureOffsetAt4ByteBoundary();
-            if (fieldOffset + 1 < static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
+
+            IRSizeAndAlignment sizeAndAlign;
+            IRIntegerValue size = 8;
+            if (SLANG_SUCCEEDED(
+                    getNaturalSizeAndAlignment(targetRequest, dataType, &sizeAndAlign)) &&
+                sizeAndAlign.size > 0)
             {
-                auto srcAddr = builder->emitFieldAddress(
-                    uintPtrType,
-                    anyValueVar,
-                    anyValInfo->fieldKeys[fieldOffset]);
-                auto lowBits = builder->emitLoad(srcAddr);
+                size = sizeAndAlign.size;
+            }
 
-                auto srcAddr1 = builder->emitFieldAddress(
-                    uintPtrType,
-                    anyValueVar,
-                    anyValInfo->fieldKeys[fieldOffset + 1]);
-                auto highBits = builder->emitLoad(srcAddr1);
-
-                // Use uint2 instead of uint64 to avoid Int64 capability requirement
-                auto uint2Type = builder->getVectorType(builder->getUIntType(), 2);
-                IRInst* components[2] = {lowBits, highBits};
-                auto uint2Val = builder->emitMakeVector(uint2Type, 2, components);
-                auto combinedBits = builder->emitBitCast(dataType, uint2Val);
+            IRIntegerValue numUints = (size + 3) / 4;
+            if (fieldOffset + numUints - 1 <
+                static_cast<uint32_t>(anyValInfo->fieldKeys.getCount()))
+            {
+                auto uintNType =
+                    builder->getVectorType(builder->getUIntType(), (IRIntegerValue)numUints);
+                List<IRInst*> components;
+                for (IRIntegerValue i = 0; i < numUints; i++)
+                {
+                    auto srcAddr = builder->emitFieldAddress(
+                        uintPtrType,
+                        anyValueVar,
+                        anyValInfo->fieldKeys[fieldOffset + (uint32_t)i]);
+                    components.add(builder->emitLoad(srcAddr));
+                }
+                auto uintNVal =
+                    builder->emitMakeVector(uintNType, (UInt)numUints, components.getBuffer());
+                auto combinedBits = builder->emitBitCast(dataType, uintNVal);
                 builder->emitStore(concreteVar, combinedBits);
-                advanceOffset(8);
+                advanceOffset((uint32_t)size);
             }
         }
 
