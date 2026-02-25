@@ -700,7 +700,7 @@ struct ASTLookupStmtVisitor : public StmtVisitor<ASTLookupStmtVisitor, bool>
 
     bool visitExpressionStmt(ExpressionStmt* stmt) { return checkExpr(stmt->expression); }
 
-    bool visitRequireCapabilityStmt(RequireCapabilityStmt* stmt) { return false; }
+    bool visitRequireCapabilityStmt(RequireCapabilityStmt*) { return false; }
 };
 
 bool _findAstNodeImpl(ASTLookupContext& context, SyntaxNode* node)
