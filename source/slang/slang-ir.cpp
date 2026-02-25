@@ -9025,6 +9025,7 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_Div:
     case kIROp_ConstexprDiv:
     case kIROp_IRem:
+    case kIROp_ConstexprIRem:
         if (isIntegralScalarOrCompositeType(getFullType()))
         {
             if (auto intLit = as<IRIntLit>(getOperand(1)))
