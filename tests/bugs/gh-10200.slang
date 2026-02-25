@@ -1,4 +1,4 @@
-//TEST_IGNORE_FILE:
+//TEST:SIMPLE: -target spirv -entry computeMain -stage compute
 
 // Regression test: extension variable declarations crash SPIRV backend
 // Issue: https://github.com/shader-slang/slang/issues/10200
