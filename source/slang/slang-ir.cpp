@@ -9014,6 +9014,8 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_ConstexprAnd:
     case kIROp_ConstexprOr:
     case kIROp_ConstexprSelect:
+    case kIROp_CoopMatMulAdd:
+    case kIROp_CoopVecMatMulAdd:
     case kIROp_Lsh:
     case kIROp_Rsh:
     case kIROp_Eql:

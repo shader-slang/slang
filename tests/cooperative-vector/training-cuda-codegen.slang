@@ -1,7 +1,7 @@
 //TEST:SIMPLE(filecheck=CHECK): -target cuda -capability optix_coopvec -entry computeMain -stage compute
 
-// CHECK: optixCoopVecOuterProductAccumulate(({{.*}}), ({{.*}}), (CUdeviceptr)(&(globalParams_{{.*}})), (int(0)), (32U))
-// CHECK: optixCoopVecReduceSumAccumulate(({{.*}}), (CUdeviceptr)(&(globalParams_{{.*}})), (int(0)))
+// CHECK: optixCoopVecOuterProductAccumulate({{.*}}, {{.*}}, (CUdeviceptr)(&({{.*}})), int(0), 32U)
+// CHECK: optixCoopVecReduceSumAccumulate({{.*}}, (CUdeviceptr)(&({{.*}})), int(0))
 
 RWByteAddressBuffer outerProductOutput;
 RWByteAddressBuffer reduceSumOutput;

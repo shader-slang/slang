@@ -857,6 +857,23 @@ typedef uint32_t SlangSizeT;
         SLANG_STAGE_PIXEL = SLANG_STAGE_FRAGMENT,
     };
 
+    typedef SlangUInt32 SlangCooperativeMatrixUseIntegral;
+    enum SlangCooperativeMatrixUse : SlangCooperativeMatrixUseIntegral
+    {
+        SLANG_COOPERATIVE_MATRIX_USE_A,
+        SLANG_COOPERATIVE_MATRIX_USE_B,
+        SLANG_COOPERATIVE_MATRIX_USE_ACCUMULATOR,
+    };
+
+    typedef SlangUInt32 SlangCooperativeVectorMatrixLayoutIntegral;
+    enum SlangCooperativeVectorMatrixLayout : SlangCooperativeVectorMatrixLayoutIntegral
+    {
+        SLANG_COOPERATIVE_VECTOR_MATRIX_LAYOUT_ROW_MAJOR,
+        SLANG_COOPERATIVE_VECTOR_MATRIX_LAYOUT_COLUMN_MAJOR,
+        SLANG_COOPERATIVE_VECTOR_MATRIX_LAYOUT_INFERENCING_OPTIMAL,
+        SLANG_COOPERATIVE_VECTOR_MATRIX_LAYOUT_TRAINING_OPTIMAL,
+    };
+
     typedef SlangUInt32 SlangDebugInfoLevelIntegral;
     enum SlangDebugInfoLevel : SlangDebugInfoLevelIntegral
     {
