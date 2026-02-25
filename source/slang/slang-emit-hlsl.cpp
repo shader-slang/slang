@@ -29,6 +29,66 @@ double _slang_asdouble(uint64_t x)
 }
 )";
 
+static bool _isFloatOrSignedIntScalarType(IRType* type)
+{
+    switch (type->getOp())
+    {
+    case kIROp_HalfType:
+    case kIROp_FloatType:
+    case kIROp_DoubleType:
+    case kIROp_FloatE4M3Type:
+    case kIROp_FloatE5M2Type:
+    case kIROp_BFloat16Type:
+    case kIROp_Int8Type:
+    case kIROp_Int16Type:
+    case kIROp_IntType:
+    case kIROp_Int64Type:
+        return true;
+    default:
+        return false;
+    }
+}
+
+static int32_t _mapSlangCoopVecComponentTypeToHLSL(int32_t slangValue)
+{
+    switch (slangValue)
+    {
+    case SLANG_COOPERATIVE_COMPONENT_TYPE_FLOAT_E4M3:
+        return 21; // FloatE4M3
+    case SLANG_COOPERATIVE_COMPONENT_TYPE_FLOAT_E5M2:
+        return 22; // FloatE5M2
+    case SLANG_COOPERATIVE_COMPONENT_TYPE_FLOAT16:
+        return 8; // Float16
+    case SLANG_COOPERATIVE_COMPONENT_TYPE_FLOAT32:
+        return 9; // Float32
+    case SLANG_COOPERATIVE_COMPONENT_TYPE_FLOAT64:
+        return 10; // Float64
+    case SLANG_COOPERATIVE_COMPONENT_TYPE_INT8:
+        return 20; // SignedInt8
+    case SLANG_COOPERATIVE_COMPONENT_TYPE_INT16:
+        return 2; // SignedInt16
+    case SLANG_COOPERATIVE_COMPONENT_TYPE_INT32:
+        return 4; // SignedInt32
+    case SLANG_COOPERATIVE_COMPONENT_TYPE_INT64:
+        return 6; // SignedInt64
+    case SLANG_COOPERATIVE_COMPONENT_TYPE_INT8_PACKED:
+        return 17; // SignedInt8Packed
+    case SLANG_COOPERATIVE_COMPONENT_TYPE_UINT8:
+        return 19; // UnsignedInt8
+    case SLANG_COOPERATIVE_COMPONENT_TYPE_UINT16:
+        return 3; // UnsignedInt16
+    case SLANG_COOPERATIVE_COMPONENT_TYPE_UINT32:
+        return 5; // UnsignedInt32
+    case SLANG_COOPERATIVE_COMPONENT_TYPE_UINT64:
+        return 7; // UnsignedInt64
+    case SLANG_COOPERATIVE_COMPONENT_TYPE_UINT8_PACKED:
+        return 18; // UnsignedInt8Packed
+    default:
+        SLANG_UNEXPECTED("Unsupported cooperative vector component type for HLSL emission");
+        return 0;
+    }
+}
+
 void HLSLSourceEmitter::_emitHLSLDecorationSingleString(
     const char* name,
     IRFunc* entryPoint,
@@ -593,6 +653,15 @@ void HLSLSourceEmitter::emitEntryPointAttributesImpl(
     }
 }
 
+void HLSLSourceEmitter::emitMappedCoopVecComponentType(IRInst* operand)
+{
+    auto intLit = as<IRIntLit>(operand);
+    if (!intLit)
+        SLANG_UNEXPECTED("CoopVec component type must be a constant for HLSL emission");
+
+    m_writer->emit(_mapSlangCoopVecComponentTypeToHLSL((int32_t)intLit->getValue()));
+}
+
 bool HLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
 {
     auto diagnoseFloatAtommic = [&]()
@@ -778,6 +847,136 @@ bool HLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             m_writer->emit(", -1, ");
             m_writer->emit(getName(inst));
             m_writer->emit(");");
+            return true;
+        }
+    case kIROp_CoopVecMatMul:
+        {
+            auto coopVecMatMul = as<IRCoopVecMatMul>(inst);
+            SLANG_ASSERT(coopVecMatMul);
+
+            auto resultType = as<IRCoopVectorType>(inst->getDataType());
+            auto inputType = as<IRCoopVectorType>(coopVecMatMul->getInput()->getDataType());
+            if (!resultType || !inputType)
+                return false;
+
+            const bool outputIsUnsigned =
+                !_isFloatOrSignedIntScalarType(resultType->getElementType());
+            const bool inputIsUnsigned =
+                !_isFloatOrSignedIntScalarType(inputType->getElementType());
+
+            emitInstResultDecl(inst);
+            emitType(inst->getDataType());
+            m_writer->emit("(0);\n");
+
+            m_writer->emit("__builtin_MatVecMul(");
+            m_writer->emit(getName(inst));
+            m_writer->emit(outputIsUnsigned ? ", true, " : ", false, ");
+            emitOperand(coopVecMatMul->getInput(), getInfo(EmitOp::General));
+            m_writer->emit(inputIsUnsigned ? ", true, " : ", false, ");
+            emitMappedCoopVecComponentType(coopVecMatMul->getInputInterpretation());
+            m_writer->emit(", ");
+            emitOperand(coopVecMatMul->getMatrixPtr(), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(coopVecMatMul->getMatrixOffset(), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitMappedCoopVecComponentType(coopVecMatMul->getMatrixInterpretation());
+            m_writer->emit(", ");
+            emitOperand(resultType->getElementCount(), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(coopVecMatMul->getK(), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(coopVecMatMul->getMemoryLayout(), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(coopVecMatMul->getTranspose(), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(coopVecMatMul->getMatrixStride(), getInfo(EmitOp::General));
+            m_writer->emit(");\n");
+            return true;
+        }
+    case kIROp_CoopVecMatMulAdd:
+        {
+            auto coopVecMatMulAdd = as<IRCoopVecMatMulAdd>(inst);
+            SLANG_ASSERT(coopVecMatMulAdd);
+
+            auto resultType = as<IRCoopVectorType>(inst->getDataType());
+            auto inputType = as<IRCoopVectorType>(coopVecMatMulAdd->getInput()->getDataType());
+            if (!resultType || !inputType)
+                return false;
+
+            const bool outputIsUnsigned =
+                !_isFloatOrSignedIntScalarType(resultType->getElementType());
+            const bool inputIsUnsigned =
+                !_isFloatOrSignedIntScalarType(inputType->getElementType());
+
+            emitInstResultDecl(inst);
+            emitType(inst->getDataType());
+            m_writer->emit("(0);\n");
+
+            m_writer->emit("__builtin_MatVecMulAdd(");
+            m_writer->emit(getName(inst));
+            m_writer->emit(outputIsUnsigned ? ", true, " : ", false, ");
+            emitOperand(coopVecMatMulAdd->getInput(), getInfo(EmitOp::General));
+            m_writer->emit(inputIsUnsigned ? ", true, " : ", false, ");
+            emitMappedCoopVecComponentType(coopVecMatMulAdd->getInputInterpretation());
+            m_writer->emit(", ");
+            emitOperand(coopVecMatMulAdd->getMatrixPtr(), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(coopVecMatMulAdd->getMatrixOffset(), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitMappedCoopVecComponentType(coopVecMatMulAdd->getMatrixInterpretation());
+            m_writer->emit(", ");
+            emitOperand(resultType->getElementCount(), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(coopVecMatMulAdd->getK(), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(coopVecMatMulAdd->getMemoryLayout(), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(coopVecMatMulAdd->getTranspose(), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(coopVecMatMulAdd->getMatrixStride(), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(coopVecMatMulAdd->getBiasPtr(), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(coopVecMatMulAdd->getBiasOffset(), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitMappedCoopVecComponentType(coopVecMatMulAdd->getBiasInterpretation());
+            m_writer->emit(");\n");
+            return true;
+        }
+    case kIROp_CoopVecOuterProductAccumulate:
+        {
+            auto outerProduct = as<IRCoopVecOuterProductAccumulate>(inst);
+            SLANG_ASSERT(outerProduct);
+
+            m_writer->emit("__builtin_OuterProductAccumulate(");
+            emitOperand(outerProduct->getA(), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(outerProduct->getB(), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(outerProduct->getMatrixPtr(), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(outerProduct->getMatrixOffset(), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitMappedCoopVecComponentType(outerProduct->getMatrixInterpretation());
+            m_writer->emit(", ");
+            emitOperand(outerProduct->getMemoryLayout(), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(outerProduct->getMatrixStride(), getInfo(EmitOp::General));
+            m_writer->emit(");\n");
+            return true;
+        }
+    case kIROp_CoopVecReduceSumAccumulate:
+        {
+            auto reduceSum = as<IRCoopVecReduceSumAccumulate>(inst);
+            SLANG_ASSERT(reduceSum);
+
+            m_writer->emit("__builtin_VectorAccumulate(");
+            emitOperand(reduceSum->getValue(), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(reduceSum->getBufferPtr(), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(reduceSum->getOffset(), getInfo(EmitOp::General));
+            m_writer->emit(");\n");
             return true;
         }
     default:

@@ -2,8 +2,8 @@
 
 // CHECK: RWByteAddressBuffer outerProductOutput_0 : register
 // CHECK: RWByteAddressBuffer reduceSumOutput_0 : register
-// CHECK-DAG: __builtin_OuterProductAccumulate((_S{{[0-9]+}}), (_S{{[0-9]+}}), (outerProductOutput_0), (int(0)), (8U), (3U), (32U));
-// CHECK-DAG: __builtin_VectorAccumulate((vecA_0), (reduceSumOutput_0), (int(0)));
+// CHECK-DAG: __builtin_OuterProductAccumulate(vecA_0, vecB_0, outerProductOutput_0, int(0), 8, int(3), 32U);
+// CHECK-DAG: __builtin_VectorAccumulate(vecA_0, reduceSumOutput_0, int(0));
 
 RWByteAddressBuffer outerProductOutput;
 RWByteAddressBuffer reduceSumOutput;
