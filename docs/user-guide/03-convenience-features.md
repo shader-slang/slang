@@ -682,8 +682,7 @@ Default behavior assigns binding-indicies based on descriptor types:
 
 > `ACCELERATION_STRUCTURE` is excluded from the list of types since Slang by default uses the handle to a `RaytracingAccelerationStructure` as a GPU address, casting the handle to a `RaytracingAccelerationStructure`. This removes the need for a binding-slot of `RaytracingAccelerationStructure`.
 
-When the `spvDescriptorHeapEXT` capability is requested (either via the `-capability` commandline option, via the compilation API, or by declaring
-`[require(spvDescriptorHeapEXT)]` attribute on the entrypoint function), Slang will map descriptor handles to the `SPV_EXT_descriptor_heap` extension
+When the `spvDescriptorHeapEXT` capability is requested (either via the `-capability` commandline option or via the compilation API), Slang will map descriptor handles to the `SPV_EXT_descriptor_heap` extension
 without declaring any explicit descriptor sets. Descriptor handles are still lowered to `uint2`.
 For resources other than `CombinedTextureSampler`, Slang uses `uint2.x` as the index to access the global sampler or resource heap.
 For `CombinedTextureSampler` handles, Slang uses `uint2.x` to index into the resource heap to obtain the texture, and `uint2.y` to index into the sampler
