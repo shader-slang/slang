@@ -1157,7 +1157,7 @@ struct IRTerminatorInst : IRInst
 
 // A function parameter is owned by a basic block, and represents
 // either an incoming function parameter (in the entry block), or
-// a value that flows from one SSA block to another (in a non-entry
+// a value that flows from one SSA block to (in a non-entry
 // block).
 //
 // In each case, the basic idea is that a block is a "label with
@@ -1960,6 +1960,24 @@ struct IRConstantKey
     HashCode getHashCode() const { return inst->getHashCode(); }
 };
 
+struct AnnotationCacheKey
+{
+    IRInst* inst;
+    AnnotationKind associationKind;
+    bool operator==(const AnnotationCacheKey& other) const
+    {
+        return inst == other.inst && associationKind == other.associationKind;
+    }
+
+    HashCode getHashCode() const
+    {
+        Hasher hasher;
+        hasher.hashValue(inst);
+        hasher.hashValue(static_cast<int>(associationKind));
+        return hasher.getResult();
+    }
+};
+
 // State owned by IRModule for global value deduplication.
 // Not supposed to be used/instantiated outside IRModule.
 struct IRDeduplicationContext
@@ -2067,6 +2085,11 @@ public:
 
     Dictionary<IRInst*, UInt>* getUniqueIdMap() { return &m_mapInstToUniqueId; }
 
+    Dictionary<AnnotationCacheKey, IRAnnotation*>* getAnnotationLookupCache()
+    {
+        return &m_annotationLookupCache;
+    }
+
     IRDominatorTree* findDominatorTree(IRGlobalValueWithCode* func)
     {
         IRAnalysis* analysis = m_mapInstToAnalysis.tryGetValue(func);
@@ -2116,6 +2139,10 @@ public:
     }
 
     ContainerPool& getContainerPool() { return m_containerPool; }
+
+    // TODO: Could be better...
+    IRCompilerDictionary* getTranslationDict() { return m_translationDict; }
+    void setTranslationDict(IRCompilerDictionary* dict) { m_translationDict = dict; }
 
     //
     // The range of module versions this compiler supports
@@ -2189,6 +2216,12 @@ private:
     /// insts when unnecessary.
     ///
     Dictionary<IRInst*, UInt> m_mapInstToUniqueId;
+
+    // Translation cache.
+    IRCompilerDictionary* m_translationDict = nullptr;
+
+    // (inst, association-kind) -> associated-inst
+    Dictionary<AnnotationCacheKey, IRAnnotation*> m_annotationLookupCache;
 };
 
 

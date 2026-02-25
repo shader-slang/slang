@@ -24,5 +24,5 @@ public interface ILayer<T, InputVector, OutputVector, Layout, Activation>
     [Differentiable]
     public OutputVector eval<A>(InputVector input, A weightAddress, Optional<A> biasAddress = none)
         where A : IPointerLikeAddress<T>
-        where A.Differential : IPointerLikeAddress<T.Differential>;
+        where A.Differential : IPointerLikeAddress<T>;
 }

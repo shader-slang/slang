@@ -43,7 +43,7 @@ float sin_series(float x, int iterations)
 // This test inparticular checks that can identify induction variables through
 // branching control flow
 
-// CHECK: struct s_bwd_prop_sin_series_Intermediates
+// CHECK: struct s_bwdCallableCtx_sin_series
 // CHECK-NOT: int {{[A-Za-z0-9_]+}}[{{.*}}]
 // CHECK: }
 

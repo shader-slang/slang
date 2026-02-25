@@ -163,6 +163,7 @@ struct PeepholeContext : InstPassBase
         switch (inst->getOp())
         {
         case kIROp_Add:
+        case kIROp_ConstexprAdd:
             if (isZero(inst->getOperand(0)))
             {
                 return tryReplace(inst->getOperand(1));
@@ -173,6 +174,7 @@ struct PeepholeContext : InstPassBase
             }
             break;
         case kIROp_Sub:
+        case kIROp_ConstexprSub:
             if (isZero(inst->getOperand(1)))
             {
                 return tryReplace(inst->getOperand(0));
@@ -186,6 +188,7 @@ struct PeepholeContext : InstPassBase
             }
             break;
         case kIROp_Mul:
+        case kIROp_ConstexprMul:
             if (isOne(inst->getOperand(0)))
             {
                 return tryReplace(inst->getOperand(1));
@@ -204,6 +207,7 @@ struct PeepholeContext : InstPassBase
             }
             break;
         case kIROp_Div:
+        case kIROp_ConstexprDiv:
             if (allowUnsafeOptimizations && isZero(inst->getOperand(0)))
             {
                 return tryReplace(inst->getOperand(0));
@@ -1127,6 +1131,10 @@ struct PeepholeContext : InstPassBase
         case kIROp_Mul:
         case kIROp_Sub:
         case kIROp_Div:
+        case kIROp_ConstexprAdd:
+        case kIROp_ConstexprMul:
+        case kIROp_ConstexprSub:
+        case kIROp_ConstexprDiv:
         case kIROp_And:
         case kIROp_Or:
             changed |= tryOptimizeArithmeticInst(inst);

@@ -30,7 +30,7 @@ bool containsOperand(IRInst* inst, IRInst* operand)
     return false;
 }
 
-static bool isDifferentialInst(IRInst* inst)
+static bool _isDifferentialInst(IRInst* inst)
 {
     auto parent = inst->getParent();
     if (parent->findDecoration<IRDifferentialInstDecoration>())
@@ -429,7 +429,7 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
         for (auto operand = inst->getOperands(); opIndex < inst->getOperandCount();
              operand++, opIndex++)
         {
-            if (!isDifferentialInst(operand->get()) && !as<IRFunc>(operand->get()) &&
+            if (!_isDifferentialInst(operand->get()) && !as<IRFunc>(operand->get()) &&
                 !as<IRBlock>(operand->get()) && !(as<IRModuleInst>(operand->get()->getParent())) &&
                 !isDifferentialBlock(getBlock(operand->get())))
                 workList.add(operand);
@@ -472,15 +472,6 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
 
             // General case: we'll add all primal operands to the work list.
             addPrimalOperandsToWorkList(child);
-
-            // Also add type annotations to the list, since these have to be made available to the
-            // function context.
-            //
-            if (as<IRDifferentiableTypeAnnotation>(child))
-            {
-                checkpointInfo->recomputeSet.add(child);
-                addPrimalOperandsToWorkList(child);
-            }
 
             // We'll be conservative with the decorations we consider as differential uses
             // of a primal inst, in order to avoid weird behaviour with some decorations
@@ -536,7 +527,7 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
                 SLANG_ASSERT(!checkpointInfo->storeSet.contains(result.instToRecompute));
                 checkpointInfo->recomputeSet.add(result.instToRecompute);
 
-                if (isDifferentialInst(use.user) && use.irUse)
+                if (_isDifferentialInst(use.user) && use.irUse)
                     usesToReplace.add(use.irUse);
 
                 if (auto param = as<IRParam>(result.instToRecompute))
@@ -659,7 +650,7 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
                 //
                 for (auto use = var->firstUse; use; use = use->nextUse)
                 {
-                    if (isDifferentialInst(use->getUser()))
+                    if (_isDifferentialInst(use->getUser()))
                         usesToReplace.add(use);
                 }
             }
@@ -687,7 +678,7 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
 
                 for (auto use = call->firstUse; use; use = use->nextUse)
                 {
-                    if (isDifferentialInst(use->getUser()))
+                    if (_isDifferentialInst(use->getUser()))
                         usesToReplace.add(use);
                 }
             }
@@ -1415,11 +1406,6 @@ void applyToInst(
     }
 }
 
-static IRBlock* getParamPreludeBlock(IRGlobalValueWithCode* func)
-{
-    return func->getFirstBlock()->getNextBlock();
-}
-
 void applyCheckpointSet(
     CheckpointSetInfo* checkpointInfo,
     IRGlobalValueWithCode* func,
@@ -1433,13 +1419,8 @@ void applyCheckpointSet(
         cloneCtx->pendingUses.add(use);
 
     // Go back over the insts and move/clone them accoridngly.
-    auto paramPreludeBlock = getParamPreludeBlock(func);
     for (auto block : func->getBlocks())
     {
-        // Skip parameter block and the param prelude block.
-        if (block == func->getFirstBlock() || block == paramPreludeBlock)
-            continue;
-
         if (isDifferentialBlock(block))
             continue;
 
@@ -1568,8 +1549,11 @@ IRVar* emitIndexedLocalVar(
     IRBlock* varBlock,
     IRType* baseType,
     const List<IndexTrackingInfo>& defBlockIndices,
-    SourceLoc location)
+    SourceLoc location,
+    bool shouldInitialize = true)
 {
+    SLANG_UNUSED(shouldInitialize);
+
     // Cannot store pointers. Case should have been handled by now.
     SLANG_RELEASE_ASSERT(!asRelevantPtrType(baseType));
 
@@ -1584,7 +1568,6 @@ IRVar* emitIndexedLocalVar(
     IRType* varType = getTypeForLocalStorage(&varBuilder, baseType, defBlockIndices);
 
     auto var = varBuilder.emitVar(varType);
-    varBuilder.emitStore(var, varBuilder.emitDefaultConstruct(varType));
 
     return var;
 }
@@ -1646,19 +1629,36 @@ IRInst* emitIndexedLoadAddressForVar(
     return loadAddr;
 }
 
+static bool isFuncParam(IRInst* inst)
+{
+    return as<IRParam>(inst) && as<IRBlock>(as<IRParam>(inst)->getParent()) &&
+           as<IRBlock>(as<IRParam>(inst)->getParent()) ==
+               inst->getParent()->getParent()->getFirstBlock();
+}
+
 IRVar* storeIndexedValue(
     IRBuilder* builder,
     IRBlock* defaultVarBlock,
     IRInst* instToStore,
     const List<IndexTrackingInfo>& defBlockIndices)
 {
+    // TODO: This is for AD 2.0 (func param storage)
+    // clean this up.. really don't need all this logic.
+    //
+    if (isFuncParam(instToStore))
+        defaultVarBlock = as<IRBlock>(instToStore->getParent());
+
     IRVar* localVar = emitIndexedLocalVar(
         defaultVarBlock,
         instToStore->getDataType(),
         defBlockIndices,
-        instToStore->sourceLoc);
+        instToStore->sourceLoc,
+        !isFuncParam(instToStore));
 
     IRInst* addr = emitIndexedStoreAddressForVar(builder, localVar, defBlockIndices);
+
+    if (isFuncParam(instToStore))
+        builder->setInsertAfter(addr);
 
     builder->emitStore(addr, instToStore);
 
@@ -2639,15 +2639,12 @@ static bool shouldStoreInst(IRInst* inst)
     case kIROp_MakeMatrix:
     case kIROp_MakeArrayFromElement:
     case kIROp_MakeDifferentialPair:
-    case kIROp_MakeDifferentialPairUserCode:
     case kIROp_MakeDifferentialPtrPair:
     case kIROp_MakeOptionalNone:
     case kIROp_MakeOptionalValue:
     case kIROp_MakeExistential:
     case kIROp_DifferentialPairGetDifferential:
     case kIROp_DifferentialPairGetPrimal:
-    case kIROp_DifferentialPairGetDifferentialUserCode:
-    case kIROp_DifferentialPairGetPrimalUserCode:
     case kIROp_DifferentialPtrPairGetDifferential:
     case kIROp_DifferentialPtrPairGetPrimal:
     case kIROp_ExtractExistentialValue:
@@ -2728,6 +2725,7 @@ static bool shouldStoreInst(IRInst* inst)
                 return true;
             }
 
+
             // If not, we'll default to recomputing calls that don't have side effects & don't
             // load from non-local variables. A previous data-flow pass should have already tagged
             // functions with the appropriate decorations.
@@ -2735,6 +2733,13 @@ static bool shouldStoreInst(IRInst* inst)
             auto callee = getResolvedInstForDecorations(inst->getOperand(0), true);
             if (callee->findDecoration<IRReadNoneDecoration>())
                 return false;
+
+            // Treat 'get-val' funcs as effectively a simple extraction.
+            if (callee->getOp() == kIROp_BackwardContextGetValFromLegacyBwdDiffFunc ||
+                callee->getOp() == kIROp_BackwardContextGetPrimalVal)
+            {
+                return false;
+            }
 
             break;
         }
@@ -2820,6 +2825,15 @@ bool DefaultCheckpointPolicy::canRecompute(UseOrPseudoUse use)
             {
                 if (loop->getTargetBlock() == parentBlock)
                     return false;
+            }
+        }
+
+        // We can't recompute function parameters. (param is in the first block of a function)
+        if (auto paramParentBlock = as<IRBlock>(param->getParent()))
+        {
+            if (paramParentBlock == paramParentBlock->getParent()->getFirstBlock())
+            {
+                return false;
             }
         }
     }

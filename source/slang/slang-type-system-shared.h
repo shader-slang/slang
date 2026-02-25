@@ -151,6 +151,30 @@ enum class AccessQualifier : uint64_t
     Immutable = 2,
 };
 
+enum class AnnotationKind
+{
+    Unknown = 0,
+
+    // Annotations for differentiable functions/callables.
+    ForwardDerivative = 1,
+    ForwardDerivativeWitnessTable = 2,
+    BackwardDerivativeWitnessTable = 3,
+
+    BackwardDerivativeApply = 4,
+    BackwardDerivativeContext = 5,
+    BackwardDerivativeContextGetVal = 6,
+    BackwardDerivativePropagate = 7,
+
+    // Annotations for differentiable types.
+    DifferentialPairType = 8,
+    DifferentialType = 9,
+    DifferentialPtrType = 10,
+    DifferentialPtrPairType = 11,
+    DifferentialZero = 12,
+    DifferentialAdd = 13,
+};
+
+
 } // namespace Slang
 
 #endif

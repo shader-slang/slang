@@ -141,18 +141,6 @@ void printDiagnosticArg(StringBuilder& sb, ASTNodeType nodeType)
     case ASTNodeType::FuncDecl:
         sb << "function";
         break;
-    case ASTNodeType::DerivativeRequirementDecl:
-        sb << "DerivativeRequirementDecl";
-        break;
-    case ASTNodeType::ForwardDerivativeRequirementDecl:
-        sb << "ForwardDerivativeRequirementDecl";
-        break;
-    case ASTNodeType::BackwardDerivativeRequirementDecl:
-        sb << "BackwardDerivativeRequirementDecl";
-        break;
-    case ASTNodeType::DerivativeRequirementReferenceDecl:
-        sb << "DerivativeRequirementReferenceDecl";
-        break;
     case ASTNodeType::SubscriptDecl:
         sb << "__subscript";
         break;
@@ -582,6 +570,9 @@ RequirementWitness RequirementWitness::specialize(
     }
 }
 
+// TODO: Make it so we can handle a recursive lookup (don't substitute the entire
+// table at each lookup, just find the entry and make all the substitutions at once).
+//
 RequirementWitness tryLookUpRequirementWitness(
     ASTBuilder* astBuilder,
     SubtypeWitness* subtypeWitness,
@@ -908,6 +899,37 @@ NamedExpressionType* getNamedType(ASTBuilder* astBuilder, DeclRef<TypeDefDecl> c
     return astBuilder->getOrCreate<NamedExpressionType>(specializedDeclRef);
 }
 
+std::tuple<Type*, ParamPassingMode> splitParameterTypeAndDirection(
+    ASTBuilder* astBuilder,
+    Type* paramTypeWithDirection)
+{
+    SLANG_UNUSED(astBuilder);
+    if (as<OutParamType>(paramTypeWithDirection))
+    {
+        auto outParamType = as<OutParamType>(paramTypeWithDirection);
+        return {outParamType->getValueType(), ParamPassingMode::Out};
+    }
+    else if (as<BorrowInOutParamType>(paramTypeWithDirection))
+    {
+        auto inoutParamType = as<BorrowInOutParamType>(paramTypeWithDirection);
+        return {inoutParamType->getValueType(), ParamPassingMode::BorrowInOut};
+    }
+    else if (as<RefParamType>(paramTypeWithDirection))
+    {
+        auto refParamType = as<RefParamType>(paramTypeWithDirection);
+        return {refParamType->getValueType(), ParamPassingMode::Ref};
+    }
+    else if (as<BorrowInParamType>(paramTypeWithDirection))
+    {
+        auto constRefParamType = as<BorrowInParamType>(paramTypeWithDirection);
+        return {constRefParamType->getValueType(), ParamPassingMode::BorrowIn};
+    }
+    else
+    {
+        return {paramTypeWithDirection, ParamPassingMode::In};
+    }
+}
+
 FuncType* getFuncType(ASTBuilder* astBuilder, DeclRef<CallableDecl> const& declRef)
 {
     List<Type*> paramTypes;
@@ -1227,6 +1249,45 @@ char const* getTryClauseTypeName(TryClauseType c)
         return "Assert";
     default:
         return "Unknown";
+    }
+}
+
+ModifiedType* getTypeWithModifier(Type* baseType, Val* typeModifier)
+{
+    // If the type is not a modified type already, just create one.
+    // If the type already has modifiers:
+    //   if the modifier already exists on the type, just return the regular type.
+    //   otherwise, pull them into a list, add the new modifier, and create a new modified type.
+    //
+    auto astBuilder = getCurrentASTBuilder();
+
+    if (auto modifiedType = as<ModifiedType>(baseType))
+    {
+        // Check if the modifier already exists
+        for (Index i = 0; i < modifiedType->getModifierCount(); i++)
+        {
+            if (modifiedType->getModifier(i) == typeModifier)
+            {
+                // Modifier already exists, return the type as is
+                return modifiedType;
+            }
+        }
+
+        // Collect all existing modifiers and add the new one
+        List<Val*> modifiers;
+        for (Index i = 0; i < modifiedType->getModifierCount(); i++)
+        {
+            modifiers.add(modifiedType->getModifier(i));
+        }
+        modifiers.add(typeModifier);
+
+        // Create a new modified type with all modifiers
+        return as<ModifiedType>(astBuilder->getModifiedType(modifiedType->getBase(), modifiers));
+    }
+    else
+    {
+        // Type is not a modified type, create one with the single modifier
+        return as<ModifiedType>(astBuilder->getModifiedType(baseType, 1, &typeModifier));
     }
 }
 

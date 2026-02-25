@@ -1539,57 +1539,69 @@ static Decl* ParseGenericParamDecl(Parser* parser, GenericDecl* genericDecl)
     }
     else
     {
-        // Disambiguate between a type parameter and a value parameter.
-        // If next token is "typename", then it is a type parameter.
-        bool isTypeParam = AdvanceIf(parser, "typename");
-        if (!isTypeParam)
+        if (AdvanceIf(parser, "functype"))
         {
-            // Otherwise, if the next token is an identifier, followed by a colon, comma, '=' or
-            // '>', then it is a type parameter.
-            isTypeParam = parser->LookAheadToken(TokenType::Identifier);
-            auto nextNextTokenType = peekTokenType(parser, 1);
-            switch (nextNextTokenType)
-            {
-            case TokenType::Colon:
-            case TokenType::Comma:
-            case TokenType::OpGreater:
-            case TokenType::OpAssign:
-                break;
-            default:
-                isTypeParam = false;
-                break;
-            }
-        }
-
-        if (isTypeParam)
-        {
-            // Parse as a type parameter.
+            // Parse a functype generic param.
             paramDecl = parser->astBuilder->create<GenericTypeParamDecl>();
-            parser->FillPosition(paramDecl);
             paramDecl->nameAndLoc = NameLoc(parser->ReadToken(TokenType::Identifier));
+
+            // Create a func-type-constraint and add it.
+            auto paramConstraint = parser->astBuilder->create<GenericTypeConstraintDecl>();
+            parser->FillPosition(paramConstraint);
         }
         else
         {
-            // Parse as a traditional syntax value parameter in the form of `type paramName`.
-            auto valueParamDecl = parser->astBuilder->create<GenericValueParamDecl>();
-            parser->FillPosition(valueParamDecl);
-            valueParamDecl->type = parser->ParseTypeExp();
-            valueParamDecl->nameAndLoc = NameLoc(parser->ReadToken(TokenType::Identifier));
-            if (AdvanceIf(parser, TokenType::OpAssign))
+            // Disambiguate between a type parameter and a value parameter.
+            // If next token is "typename", then it is a type parameter.
+            bool isTypeParam = AdvanceIf(parser, "typename");
+            if (!isTypeParam)
             {
-                valueParamDecl->initExpr = parser->ParseInitExpr();
+                // Otherwise, if the next token is an identifier, followed by a colon, comma, '=' or
+                // '>', then it is a type parameter.
+                isTypeParam = parser->LookAheadToken(TokenType::Identifier);
+                auto nextNextTokenType = peekTokenType(parser, 1);
+                switch (nextNextTokenType)
+                {
+                case TokenType::Colon:
+                case TokenType::Comma:
+                case TokenType::OpGreater:
+                case TokenType::OpAssign:
+                    break;
+                default:
+                    isTypeParam = false;
+                    break;
+                }
             }
-            return valueParamDecl;
+
+            if (isTypeParam)
+            {
+                // Parse as a type parameter.
+                paramDecl = parser->astBuilder->create<GenericTypeParamDecl>();
+                parser->FillPosition(paramDecl);
+                paramDecl->nameAndLoc = NameLoc(parser->ReadToken(TokenType::Identifier));
+            }
+            else
+            {
+                // Parse as a traditional syntax value parameter in the form of `type paramName`.
+                auto valueParamDecl = parser->astBuilder->create<GenericValueParamDecl>();
+                parser->FillPosition(valueParamDecl);
+                valueParamDecl->type = parser->ParseTypeExp();
+                valueParamDecl->nameAndLoc = NameLoc(parser->ReadToken(TokenType::Identifier));
+                if (AdvanceIf(parser, TokenType::OpAssign))
+                {
+                    valueParamDecl->initExpr = parser->ParseInitExpr();
+                }
+                return valueParamDecl;
+            }
         }
     }
     if (AdvanceIf(parser, TokenType::Colon))
     {
         // The user is apply a constraint to this type parameter...
+        auto paramType = DeclRefType::create(parser->astBuilder, DeclRef<Decl>(paramDecl));
 
         auto paramConstraint = parser->astBuilder->create<GenericTypeConstraintDecl>();
         parser->FillPosition(paramConstraint);
-
-        auto paramType = DeclRefType::create(parser->astBuilder, DeclRef<Decl>(paramDecl));
 
         auto paramTypeExpr = parser->astBuilder->create<SharedTypeExpr>();
         paramTypeExpr->loc = paramDecl->loc;
@@ -1749,7 +1761,7 @@ static NodeBase* parseGenericDecl(Parser* parser, void*)
     return decl;
 }
 
-static void parseParameterList(Parser* parser, CallableDecl* decl)
+static void parseParameterList(Parser* parser, ContainerDecl* decl)
 {
     parser->ReadToken(TokenType::LParent);
 
@@ -1895,6 +1907,67 @@ static Stmt* parseOptBody(Parser* parser)
     return unparsedStmt;
 }
 
+
+static void parseOptionalGenericConstraints(Parser* parser, ContainerDecl* decl)
+{
+    if (AdvanceIf(parser, TokenType::Colon))
+    {
+        do
+        {
+            GenericTypeConstraintDecl* paramConstraint =
+                parser->astBuilder->create<GenericTypeConstraintDecl>();
+            parser->FillPosition(paramConstraint);
+
+            // substitution needs to be filled during check
+            Type* paramType = nullptr;
+            if (as<GenericTypeParamDeclBase>(decl) || as<FuncDecl>(decl) ||
+                as<GlobalGenericParamDecl>(decl))
+            {
+                paramType = DeclRefType::create(parser->astBuilder, DeclRef<Decl>(decl));
+
+                SharedTypeExpr* typeExpr = parser->astBuilder->create<SharedTypeExpr>();
+                typeExpr->loc = decl->loc;
+                typeExpr->base.type = paramType;
+                typeExpr->type = QualType(parser->astBuilder->getTypeType(paramType));
+
+                paramConstraint->sub = TypeExp(typeExpr);
+            }
+            else if (as<AssocTypeDecl>(decl))
+            {
+                auto varExpr = parser->astBuilder->create<VarExpr>();
+                varExpr->scope = parser->currentScope;
+                varExpr->name = decl->getName();
+                paramConstraint->sub.exp = varExpr;
+            }
+
+            paramConstraint->sup = parser->ParseTypeExp();
+            AddMember(decl, paramConstraint);
+        } while (AdvanceIf(parser, TokenType::Comma));
+    }
+}
+
+static void parseOptionalInheritanceClause(Parser* parser, ContainerDecl* decl)
+{
+    if (AdvanceIf(parser, TokenType::Colon))
+    {
+        do
+        {
+            auto base = parser->ParseTypeExp();
+
+            auto inheritanceDecl = parser->astBuilder->create<InheritanceDecl>();
+            inheritanceDecl->loc = base.exp->loc;
+            inheritanceDecl->nameAndLoc.name = getName(parser, "$inheritance");
+            inheritanceDecl->base = base;
+
+            AddMember(decl, inheritanceDecl);
+
+            if (parser->pendingModifiers->hasModifier<ExternModifier>())
+                addModifier(inheritanceDecl, parser->astBuilder->create<ExternModifier>());
+
+        } while (AdvanceIf(parser, TokenType::Comma));
+    }
+}
+
 /// Complete parsing of a function using traditional (C-like) declarator syntax
 static Decl* parseTraditionalFuncDecl(Parser* parser, DeclaratorInfo const& declaratorInfo)
 {
@@ -1932,12 +2005,20 @@ static Decl* parseTraditionalFuncDecl(Parser* parser, DeclaratorInfo const& decl
             {
                 decl->errorType = parser->ParseTypeExp();
             }
-
             _parseOptSemantics(parser, decl);
+            // TODO: Fix this (make sure semantics can also be
+            // parsed)
+            //
+            // parseOptionalInheritanceClause(parser, decl);
 
             auto funcScope = parser->currentScope;
             parser->PopScope();
-            maybeParseGenericConstraints(parser, genericParent);
+
+            // TODO: Need to figure out how to parse interface requirements constraints as
+            // constraints & regular function constraints as inheritance decls.
+            //
+            // parseOptionalGenericConstraints(parser, decl);       // Parse ":"
+            maybeParseGenericConstraints(parser, genericParent); // Parse "where"
             parser->PushScope(funcScope);
 
             decl->body = parseOptBody(parser);
@@ -2022,7 +2103,7 @@ typedef unsigned int DeclaratorParseOptions;
 enum
 {
     kDeclaratorParseOptions_None = 0,
-    kDeclaratorParseOption_AllowEmpty = 1 << 0,
+    kDeclaratorParseOption_AllowEmpty = 1 << 0
 };
 
 static RefPtr<Declarator> parseDeclarator(Parser* parser, DeclaratorParseOptions options);
@@ -2070,7 +2151,6 @@ static RefPtr<Declarator> parseDirectAbstractDeclarator(
             parser->ReadMatchingToken(TokenType::RParent);
         }
         break;
-
     default:
         if (options & kDeclaratorParseOption_AllowEmpty)
         {
@@ -2078,7 +2158,7 @@ static RefPtr<Declarator> parseDirectAbstractDeclarator(
         }
         else
         {
-            // If an empty declarator is now allowed, then we
+            // If an empty declarator is not allowed, then we
             // will give the user an error message saying that
             // an identifier was expected.
             //
@@ -2617,7 +2697,7 @@ static NodeBase* parseForwardDifferentiate(Parser* parser, void* /* unused */)
     return parseForwardDifferentiate(parser);
 }
 
-/// Parse an expression of the form __bwd_diff(fn) where fn is an
+/// Parse an expression of the form bwd_diff(fn) where fn is an
 /// identifier pointing to a function.
 static Expr* parseBackwardDifferentiate(Parser* parser)
 {
@@ -2636,6 +2716,23 @@ static Expr* parseBackwardDifferentiate(Parser* parser)
 static NodeBase* parseBackwardDifferentiate(Parser* parser, void* /* unused */)
 {
     return parseBackwardDifferentiate(parser);
+}
+
+static Expr* parseFuncAsTypeExpr(Parser* parser)
+{
+    // Parse an expr of the form `__func_as_type(fn)`
+    FuncAsTypeExpr* funcAsTypeExpr = parser->astBuilder->create<FuncAsTypeExpr>();
+    parser->ReadToken(TokenType::LParent);
+    funcAsTypeExpr->base = parser->ParseExpression();
+    parser->ReadToken(TokenType::RParent);
+
+    return funcAsTypeExpr;
+}
+
+// parseFuncAsTypeExpr
+static NodeBase* parseFuncAsTypeExpr(Parser* parser, void* /* unused */)
+{
+    return parseFuncAsTypeExpr(parser);
 }
 
 static Expr* parseDispatchKernel(Parser* parser)
@@ -2834,7 +2931,8 @@ static TypeSpec _parseSimpleTypeSpec(Parser* parser)
 {
     TypeSpec typeSpec;
 
-    // We may see a `struct` (or `enum` or `class`) tag specified here, and need to act accordingly
+    // We may see a `struct` (or `enum` or `class`) tag specified here, and need to act
+    // accordingly
     //
     // TODO(tfoley): Handle the case where the user is just using `struct`
     // as a way to name an existing struct "tag" (e.g., `struct Foo foo;`)
@@ -2887,6 +2985,11 @@ static TypeSpec _parseSimpleTypeSpec(Parser* parser)
     else if (AdvanceIf(parser, "functype"))
     {
         typeSpec.expr = parseFuncTypeExpr(parser);
+        return typeSpec;
+    }
+    else if (AdvanceIf(parser, "__func_as_type"))
+    {
+        typeSpec.expr = parseFuncAsTypeExpr(parser);
         return typeSpec;
     }
 
@@ -3199,8 +3302,8 @@ static void parseHLSLRegisterNameAndOptionalComponentMask(
 ///
 /// The syntax matched is:
 ///
-///     register-semantic ::= 'register' '(' register-name-and-component-mask register-space? ')'
-///     register-space ::= ',' identifier
+///     register-semantic ::= 'register' '(' register-name-and-component-mask register-space?
+///     ')' register-space ::= ',' identifier
 ///
 static void parseHLSLRegisterSemantic(Parser* parser, HLSLRegisterSemantic* semantic)
 {
@@ -3620,28 +3723,6 @@ static NodeBase* parseGLSLShaderStorageBufferDecl(Parser* parser, String layoutT
     return ParseBufferBlockDecl(parser, "GLSLShaderStorageBuffer", &layoutType);
 }
 
-static void parseOptionalInheritanceClause(Parser* parser, AggTypeDeclBase* decl)
-{
-    if (AdvanceIf(parser, TokenType::Colon))
-    {
-        do
-        {
-            auto base = parser->ParseTypeExp();
-
-            auto inheritanceDecl = parser->astBuilder->create<InheritanceDecl>();
-            inheritanceDecl->loc = base.exp->loc;
-            inheritanceDecl->nameAndLoc.name = getName(parser, "$inheritance");
-            inheritanceDecl->base = base;
-
-            AddMember(decl, inheritanceDecl);
-
-            if (parser->pendingModifiers->hasModifier<ExternModifier>())
-                addModifier(inheritanceDecl, parser->astBuilder->create<ExternModifier>());
-
-        } while (AdvanceIf(parser, TokenType::Comma));
-    }
-}
-
 static NodeBase* parseExtensionDecl(Parser* parser, void* /*userData*/)
 {
     return parseOptGenericDecl(
@@ -3658,44 +3739,6 @@ static NodeBase* parseExtensionDecl(Parser* parser, void* /*userData*/)
         });
 }
 
-
-static void parseOptionalGenericConstraints(Parser* parser, ContainerDecl* decl)
-{
-    if (AdvanceIf(parser, TokenType::Colon))
-    {
-        do
-        {
-            GenericTypeConstraintDecl* paramConstraint =
-                parser->astBuilder->create<GenericTypeConstraintDecl>();
-            parser->FillPosition(paramConstraint);
-
-            // substitution needs to be filled during check
-            Type* paramType = nullptr;
-            if (as<GenericTypeParamDeclBase>(decl) || as<GlobalGenericParamDecl>(decl))
-            {
-                paramType = DeclRefType::create(parser->astBuilder, DeclRef<Decl>(decl));
-
-                SharedTypeExpr* paramTypeExpr = parser->astBuilder->create<SharedTypeExpr>();
-                paramTypeExpr->loc = decl->loc;
-                paramTypeExpr->base.type = paramType;
-                paramTypeExpr->type = QualType(parser->astBuilder->getTypeType(paramType));
-
-                paramConstraint->sub = TypeExp(paramTypeExpr);
-            }
-            else if (as<AssocTypeDecl>(decl))
-            {
-                auto varExpr = parser->astBuilder->create<VarExpr>();
-                varExpr->scope = parser->currentScope;
-                varExpr->name = decl->getName();
-                paramConstraint->sub.exp = varExpr;
-            }
-
-            paramConstraint->sup = parser->ParseTypeExp();
-            AddMember(decl, paramConstraint);
-        } while (AdvanceIf(parser, TokenType::Comma));
-    }
-}
-
 static NodeBase* parseAssocType(Parser* parser, void*)
 {
     AssocTypeDecl* assocTypeDecl = parser->astBuilder->create<AssocTypeDecl>();
@@ -3707,6 +3750,23 @@ static NodeBase* parseAssocType(Parser* parser, void*)
     maybeParseGenericConstraints(parser, assocTypeDecl);
     parser->ReadToken(TokenType::Semicolon);
     return assocTypeDecl;
+}
+
+static NodeBase* parseAssocFunc(Parser* parser, void*)
+{
+    // parse a type expression, and then the name of the function
+    FuncDecl* funcDecl = parser->astBuilder->create<FuncDecl>();
+
+    auto typeExp = parser->ParseTypeExp();
+    funcDecl->funcType = typeExp;
+
+    /*auto nameToken = parser->ReadToken(TokenType::Identifier);
+    funcDecl->nameAndLoc = NameLoc(nameToken);
+    funcDecl->loc = nameToken.loc;*/
+    funcDecl->nameAndLoc = ParseDeclName(parser);
+
+    parser->ReadToken(TokenType::Semicolon);
+    return funcDecl;
 }
 
 static NodeBase* parseGlobalGenericTypeParamDecl(Parser* parser, void*)
@@ -3762,6 +3822,7 @@ static NodeBase* parseInterfaceDecl(Parser* parser, void* /*userData*/)
             return decl;
         });
 }
+
 
 static NodeBase* parseNamespaceDecl(Parser* parser, void* /*userData*/)
 {
@@ -4158,8 +4219,8 @@ static NodeBase* parseSubscriptDecl(Parser* parser, void* /*userData*/)
         });
 }
 
-/// Peek in the token stream and return `true` if it looks like a modern-style variable declaration
-/// is coming up.
+/// Peek in the token stream and return `true` if it looks like a modern-style variable
+/// declaration is coming up.
 static bool _peekModernStyleVarDecl(Parser* parser)
 {
     // A modern-style variable declaration always starts with an identifier
@@ -4360,8 +4421,8 @@ static NodeBase* parseVarDecl(Parser* parser, void* /*userData*/)
     return decl;
 }
 
-/// Parse the common structured of a traditional-style parameter declaration (excluding the trailing
-/// semicolon)
+/// Parse the common structured of a traditional-style parameter declaration (excluding the
+/// trailing semicolon)
 static void _parseTraditionalParamDeclCommonBase(
     Parser* parser,
     VarDeclBase* decl,
@@ -6864,6 +6925,36 @@ TypeExp Parser::ParseTypeExp()
     return TypeExp(ParseType());
 }
 
+// Parse a function reference expression.
+// This won't parse any invokes "( )",
+// But will allow lookups through `.` and `::`
+//
+/*
+static Expr* _parseFunctionRefExpr(Parser* parser)
+{
+    // Loop & keep parsing atomic type expressions and linking up
+    // "." and "::" into MemberExpr or ScopeExpr as appropriate.
+    //
+    auto leftExpr = _parseAtomicTypeExpr(parser);
+    for (;;)
+    {
+        auto token = parser->tokenReader.peekToken();
+        if (token.type == TokenType::Dot || token.type == TokenType::Scope)
+        {
+            parser->ReadToken();
+            auto rightExpr = _parseAtomicTypeExpr(parser);
+            leftExpr = parser->astBuilder->create<MemberExpr>(leftExpr, rightExpr);
+        }
+        else
+        {
+            break;
+        }
+    }
+    return leftExpr;
+}
+*/
+
+
 enum class Associativity
 {
     Left,
@@ -7501,7 +7592,8 @@ static bool _isCast(Parser* parser, Expr* expr)
     // =========
     //
     // - : Can be unary and therefore a cast or a binary subtract, and therefore an expression
-    // + : Can be unary and therefore could be a cast, or a binary add and therefore an expression
+    // + : Can be unary and therefore could be a cast, or a binary add and therefore an
+    // expression
     //
     // Arbitrary
     // =========
@@ -7536,14 +7628,14 @@ static bool _isCast(Parser* parser, Expr* expr)
             //
             // (Some::Stuff) + 3
             // (Some::Stuff) - 3
-            // Strictly I can only tell if this is an expression or a cast if I know Some::Stuff is
-            // a type or not but we can't know here in general because we allow out-of-order
+            // Strictly I can only tell if this is an expression or a cast if I know Some::Stuff
+            // is a type or not but we can't know here in general because we allow out-of-order
             // declarations.
 
             // If we can determine it's a type, then it must be a cast, and we are done.
             //
-            // NOTE! This test can only determine if it's a type *iff* it has already been defined.
-            // A future out of order declaration, will not be correctly found here.
+            // NOTE! This test can only determine if it's a type *iff* it has already been
+            // defined. A future out of order declaration, will not be correctly found here.
             //
             // This means the semantics change depending on the order of definition (!)
             Decl* decl = _tryResolveDecl(parser, expr);
@@ -7574,8 +7666,8 @@ static bool _isCast(Parser* parser, Expr* expr)
             //
             // For now we'll assume it's not a cast if it's not a StaticMemberExpr
             // The reason for the restriction (which perhaps can be broadened), is we don't
-            // want the interpretation of something in parentheses to be determined by something as
-            // common as + or - whitespace.
+            // want the interpretation of something in parentheses to be determined by something
+            // as common as + or - whitespace.
 
             if (const auto staticMemberExpr = dynamicCast<StaticMemberExpr>(expr))
             {
@@ -8052,11 +8144,11 @@ static Expr* parseAtomicExpr(Parser* parser)
             }
 
             // TODO(JS):
-            // It is worth noting here that because of the way that the lexer works, that literals
-            // are always handled as if they are positive (a preceding - is taken as a negate on a
-            // positive value).
-            // The code here is designed to work with positive and negative values, as this behavior
-            // might change in the future, and is arguably more 'correct'.
+            // It is worth noting here that because of the way that the lexer works, that
+            // literals are always handled as if they are positive (a preceding - is taken as a
+            // negate on a positive value). The code here is designed to work with positive and
+            // negative values, as this behavior might change in the future, and is arguably
+            // more 'correct'.
 
             FloatingPointLiteralValue fixedValue = value;
             auto fixType = _fixFloatLiteralValue(suffixBaseType, value, fixedValue);
@@ -8479,8 +8571,8 @@ static std::optional<SPIRVAsmOperand> parseSPIRVAsmOperand(Parser* parser)
     }
     else if (AdvanceIf(parser, "__rayPayloadFromLocation"))
     {
-        // reference a magic number to a layout(location) for late compiler resolution of rayPayload
-        // objects
+        // reference a magic number to a layout(location) for late compiler resolution of
+        // rayPayload objects
         parser->ReadToken(TokenType::LParent);
         auto operand = SPIRVAsmOperand{
             SPIRVAsmOperand::RayPayloadFromLocation,
@@ -8667,10 +8759,10 @@ static std::optional<SPIRVAsmInst> parseSPIRVAsmInst(Parser* parser)
 
         if (opInfo && ret.operands.getCount() == opInfo->maxOperandCount)
         {
-            // The SPIRV grammar says we are providing more arguments than expected operand count.
-            // We will issue a warning if it is likely that the user missed a semicolon.
-            // This is likely the case when the next operand starts with "Op" or is an assignment
-            // in the form of %something = ....
+            // The SPIRV grammar says we are providing more arguments than expected operand
+            // count. We will issue a warning if it is likely that the user missed a semicolon.
+            // This is likely the case when the next operand starts with "Op" or is an
+            // assignment in the form of %something = ....
             //
             auto token = parser->tokenReader.peekToken();
             if (token.getContent().startsWith("Op") ||
@@ -9695,6 +9787,7 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
 
     _makeParseDecl("typedef", parseTypeDef),
     _makeParseDecl("associatedtype", parseAssocType),
+    _makeParseDecl("__associatedfunc", parseAssocFunc),
     _makeParseDecl("type_param", parseGlobalGenericTypeParamDecl),
     _makeParseDecl("cbuffer", parseHLSLCBufferDecl),
     _makeParseDecl("tbuffer", parseHLSLTBufferDecl),
@@ -9835,6 +9928,7 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseExpr("no_diff", parseTreatAsDifferentiableExpr),
     _makeParseExpr("__fwd_diff", parseForwardDifferentiate),
     _makeParseExpr("__bwd_diff", parseBackwardDifferentiate),
+    _makeParseExpr("__func_as_type", parseFuncAsTypeExpr),
     _makeParseExpr("fwd_diff", parseForwardDifferentiate),
     _makeParseExpr("bwd_diff", parseBackwardDifferentiate),
     _makeParseExpr("__dispatch_kernel", parseDispatchKernel),

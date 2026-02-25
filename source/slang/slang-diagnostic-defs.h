@@ -1320,6 +1320,12 @@ DIAGNOSTIC(
     Error,
     invalidAddressOf,
     "'__getAddress' only supports groupshared variables and members of groupshared/device memory.")
+DIAGNOSTIC(
+    31161,
+    Error,
+    interfaceMissingFunctionInterfaceModifier,
+    "interface '$0' cannot be used as a constraint on a function type because it does not have the "
+    "[__FunctionInterface] attribute.")
 DIAGNOSTIC(31200, Warning, deprecatedUsage, "$0 has been deprecated: $1")
 DIAGNOSTIC(31201, Error, modifierNotAllowed, "modifier '$0' is not allowed here.")
 DIAGNOSTIC(
@@ -1442,6 +1448,11 @@ DIAGNOSTIC(
     valueRequirementMustBeCompileTimeConst,
     "requirement in the form of a simple value must be declared as 'static const'.")
 DIAGNOSTIC(30310, Error, typeIsNotDifferentiable, "type '$0' is not differentiable.")
+DIAGNOSTIC(
+    30311,
+    Error,
+    typeCannotConformToBothValueAndPointerDiffInterfaces,
+    "type '$0' should conform only to one of IDifferentiable or IDifferentiablePtrType, not both.")
 
 DIAGNOSTIC(
     30311,
@@ -1453,6 +1464,17 @@ DIAGNOSTIC(
     Error,
     interfaceRequirementCannotBeOverride,
     "interface requirement cannot override a base declaration.")
+DIAGNOSTIC(
+    30313,
+    Error,
+    treatAsDifferentiableOnInterfaceRequirement,
+    "'[TreatAsDifferentiable]' cannot be applied to an interface requirement; it can only be "
+    "applied to concrete function definitions.")
+DIAGNOSTIC(
+    30314,
+    Error,
+    maybeDifferentiableOnNonInterfaceRequirement,
+    "'[MaybeDifferentiable]' can only be applied to interface requirements.")
 
 // Interop
 DIAGNOSTIC(
@@ -2078,6 +2100,12 @@ DIAGNOSTIC(
     Error,
     cannotUseConstRefOnDifferentiableMemberMethod,
     "cannot use '[constref]' on a differentiable member method of a differentiable type.")
+DIAGNOSTIC(
+    38035,
+    Error,
+    encounteredNonDifferentiableFunctionDuringHigherOrderDiff,
+    "cannot propagate through non-differentiable function. mismatch encountered during "
+    "higher-order differentiation")
 
 DIAGNOSTIC(
     38040,

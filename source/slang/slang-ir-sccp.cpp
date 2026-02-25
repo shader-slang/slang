@@ -107,48 +107,6 @@ struct SCCPContext
         bool operator!=(LatticeVal const& that) { return !(*this == that); }
     };
 
-    static bool isEvaluableOpCode(IROp op)
-    {
-        switch (op)
-        {
-        case kIROp_IntLit:
-        case kIROp_BoolLit:
-        case kIROp_FloatLit:
-        case kIROp_StringLit:
-        case kIROp_Add:
-        case kIROp_Sub:
-        case kIROp_Mul:
-        case kIROp_Div:
-        case kIROp_Neg:
-        case kIROp_Not:
-        case kIROp_Eql:
-        case kIROp_Neq:
-        case kIROp_Leq:
-        case kIROp_Geq:
-        case kIROp_Less:
-        case kIROp_And:
-        case kIROp_Or:
-        case kIROp_IRem:
-        case kIROp_FRem:
-        case kIROp_Greater:
-        case kIROp_Lsh:
-        case kIROp_Rsh:
-        case kIROp_BitAnd:
-        case kIROp_BitOr:
-        case kIROp_BitXor:
-        case kIROp_BitNot:
-        case kIROp_BitCast:
-        case kIROp_CastIntToFloat:
-        case kIROp_CastFloatToInt:
-        case kIROp_IntCast:
-        case kIROp_FloatCast:
-        case kIROp_Select:
-            return true;
-        default:
-            return false;
-        }
-    }
-
     // If we imagine a variable (actually an SSA phi node...) that
     // might be assigned lattice value A at one point in the code,
     // and lattice value B at another point, we need a way to
@@ -944,9 +902,16 @@ struct SCCPContext
         switch (inst->getOp())
         {
         case kIROp_IntCast:
+        case kIROp_ConstexprIntCast:
         case kIROp_FloatCast:
+        case kIROp_ConstexprFloatCast:
         case kIROp_CastIntToFloat:
+        case kIROp_ConstexprCastIntToFloat:
         case kIROp_CastFloatToInt:
+        case kIROp_ConstexprCastFloatToInt:
+        case kIROp_ConstexprCastIntToEnum:
+        case kIROp_ConstexprCastEnumToInt:
+        case kIROp_ConstexprEnumCast:
             switch (inst->getOperandCount())
             {
             case 1:
@@ -958,21 +923,25 @@ struct SCCPContext
         case kIROp_DefaultConstruct:
             return evalDefaultConstruct(inst->getDataType());
         case kIROp_Add:
+        case kIROp_ConstexprAdd:
             return evalAdd(
                 inst->getDataType(),
                 getLatticeVal(inst->getOperand(0)),
                 getLatticeVal(inst->getOperand(1)));
         case kIROp_Sub:
+        case kIROp_ConstexprSub:
             return evalSub(
                 inst->getDataType(),
                 getLatticeVal(inst->getOperand(0)),
                 getLatticeVal(inst->getOperand(1)));
         case kIROp_Mul:
+        case kIROp_ConstexprMul:
             return evalMul(
                 inst->getDataType(),
                 getLatticeVal(inst->getOperand(0)),
                 getLatticeVal(inst->getOperand(1)));
         case kIROp_Div:
+        case kIROp_ConstexprDiv:
             {
                 // Detect divide by zero error.
                 auto divisor = getLatticeVal(inst->getOperand(1));
@@ -1073,6 +1042,7 @@ struct SCCPContext
         case kIROp_BitCast:
             return evalBitCast(inst->getDataType(), getLatticeVal(inst->getOperand(0)));
         case kIROp_Neg:
+        case kIROp_ConstexprNeg:
             return evalNeg(inst->getDataType(), getLatticeVal(inst->getOperand(0)));
         case kIROp_Lsh:
             return evalLsh(
@@ -1410,26 +1380,35 @@ struct SCCPContext
 
         bool changed = false;
         // Replace the insts with their values.
-        List<IRInst*> instsToRemove;
+
+        List<IRInst*> instsToProcess;
         for (auto child : scopeInst->getChildren())
         {
             if (!isEvaluableOpCode(child->getOp()))
                 continue;
+            instsToProcess.add(child);
+        }
 
+        List<IRInst*> instsToRemove;
+        for (auto child : instsToProcess)
+        {
             auto latticeVal = getLatticeVal(child);
             if (latticeVal.flavor == LatticeVal::Flavor::Constant && latticeVal.value != child)
             {
                 child->replaceUsesWith(latticeVal.value);
-                instsToRemove.add(child);
+                child->removeAndDeallocate();
+                // instsToRemove.add(child);
             }
         }
 
+        /*
         if (instsToRemove.getCount())
         {
             changed = true;
             for (auto inst : instsToRemove)
                 inst->removeAndDeallocate();
         }
+                */
         return changed;
     }
 
@@ -1904,6 +1883,60 @@ IRInst* tryConstantFoldInst(IRModule* module, TargetProgram* targetProgram, IRIn
     }
     inst->replaceUsesWith(foldResult.value);
     return foldResult.value;
+}
+
+bool isEvaluableOpCode(IROp op)
+{
+    switch (op)
+    {
+    case kIROp_IntLit:
+    case kIROp_BoolLit:
+    case kIROp_FloatLit:
+    case kIROp_StringLit:
+    case kIROp_Add:
+    case kIROp_Sub:
+    case kIROp_Mul:
+    case kIROp_Div:
+    case kIROp_Neg:
+    case kIROp_Not:
+    case kIROp_Eql:
+    case kIROp_Neq:
+    case kIROp_Leq:
+    case kIROp_Geq:
+    case kIROp_Less:
+    case kIROp_And:
+    case kIROp_Or:
+    case kIROp_IRem:
+    case kIROp_FRem:
+    case kIROp_Greater:
+    case kIROp_Lsh:
+    case kIROp_Rsh:
+    case kIROp_BitAnd:
+    case kIROp_BitOr:
+    case kIROp_BitXor:
+    case kIROp_BitNot:
+    case kIROp_BitCast:
+    case kIROp_CastIntToFloat:
+    case kIROp_CastFloatToInt:
+    case kIROp_IntCast:
+    case kIROp_FloatCast:
+    case kIROp_Select:
+    case kIROp_ConstexprAdd:
+    case kIROp_ConstexprSub:
+    case kIROp_ConstexprMul:
+    case kIROp_ConstexprDiv:
+    case kIROp_ConstexprNeg:
+    case kIROp_ConstexprIntCast:
+    case kIROp_ConstexprCastIntToFloat:
+    case kIROp_ConstexprCastFloatToInt:
+    case kIROp_ConstexprFloatCast:
+    case kIROp_ConstexprCastIntToEnum:
+    case kIROp_ConstexprCastEnumToInt:
+    case kIROp_ConstexprEnumCast:
+        return true;
+    default:
+        return false;
+    }
 }
 
 } // namespace Slang

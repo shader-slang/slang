@@ -58,25 +58,39 @@ struct OutOfBoundAccessChecker : public InstPassBase
 
     void processModule()
     {
-        processAllInsts(
-            [&](IRInst* inst)
+        // We'll process all `IRFunc` instructions in the module.
+        //
+        // By this point, we assume that all generics of non-trivial functions
+        // have been specialized away into `IRFunc`s
+        //
+        for (auto globalInst : module->getGlobalInsts())
+        {
+            auto func = as<IRFunc>(globalInst);
+            if (!func)
+                continue;
+
+            for (auto block : func->getBlocks())
             {
-                switch (inst->getOp())
+                for (auto inst : block->getChildren())
                 {
-                case kIROp_GetElement:
-                case kIROp_GetElementPtr:
+                    switch (inst->getOp())
                     {
-                        if (inst->getOperandCount() < 2)
-                            return;
-
-                        auto base = inst->getOperand(0);
-                        auto index = inst->getOperand(1);
-
-                        checkArrayAccess(inst, base, index);
+                    case kIROp_GetElement:
+                        {
+                            auto getElem = as<IRGetElement>(inst);
+                            checkArrayAccess(inst, getElem->getBase(), getElem->getIndex());
+                        }
+                        break;
+                    case kIROp_GetElementPtr:
+                        {
+                            auto getElemPtr = as<IRGetElementPtr>(inst);
+                            checkArrayAccess(inst, getElemPtr->getBase(), getElemPtr->getIndex());
+                        }
+                        break;
                     }
-                    break;
                 }
-            });
+            }
+        }
     }
 };
 

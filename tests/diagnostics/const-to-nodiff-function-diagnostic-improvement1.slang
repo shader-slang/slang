@@ -17,7 +17,7 @@ void exp_BackwardAutoDiff<T : __BuiltinFloatingPointType, let K : int>(inout Dif
 [Differentiable]
 CoopVec<T, K> eval<T : __BuiltinFloatingPointType, let K : int>(CoopVec<T, K> x)
 {
-    // CHECK-NOT: ([[# @LINE+1]]): error 41020
+    // CHECK-NOT: ([[# @LINE+1]]): error 41020: {{.*}} CoopVec.$init
     return exp(x) - CoopVec<T, K>(1.);
 }
 
