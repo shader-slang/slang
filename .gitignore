@@ -139,3 +139,5 @@ perf.data.*
 .secrets
 .vars
 .github/test-events/
+gha-creds-*.json
+sccache-*/

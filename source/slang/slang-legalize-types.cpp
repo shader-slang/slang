@@ -163,9 +163,21 @@ RefPtr<TupleLegalElementWrappingObj> LegalElementWrapping::getTuple() const
 
 bool isResourceType(IRType* type)
 {
-    while (auto arrayType = as<IRArrayTypeBase>(type))
+    for (;;)
     {
-        type = arrayType->getElementType();
+        if (auto arrayType = as<IRArrayTypeBase>(type))
+        {
+            type = arrayType->getElementType();
+            continue;
+        }
+        // Unwrap vector types to check if the element is a resource type.
+        // This handles cases like vector<Sampler2D, 1> from Conditional<Sampler2D, true>.
+        if (auto vecType = as<IRVectorType>(type))
+        {
+            type = vecType->getElementType();
+            continue;
+        }
+        break;
     }
 
     if (const auto resourceTypeBase = as<IRResourceTypeBase>(type))
@@ -1286,8 +1298,20 @@ LegalType legalizeTypeImpl(TypeLegalizationContext* context, IRType* type)
     {
         return LegalType::simple(type);
     }
-    else if (as<IRVectorType>(type))
+    else if (auto vecType = as<IRVectorType>(type))
     {
+        // When a vector's element type is a resource type (e.g., vector<Sampler2D, 1>
+        // from Conditional<Sampler2D, true>), we need to legalize it by extracting
+        // the resource element type rather than treating the vector as a simple type.
+        auto elementType = vecType->getElementType();
+        if (context->isSpecialType(elementType))
+        {
+            auto countLit = as<IRIntLit>(vecType->getElementCount());
+            if (countLit && countLit->getValue() == 0)
+                return LegalType();
+            SLANG_ASSERT(countLit && countLit->getValue() == 1);
+            return legalizeType(context, elementType);
+        }
         return LegalType::simple(type);
     }
     else if (as<IRMatrixType>(type))
