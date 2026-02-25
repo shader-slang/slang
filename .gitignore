@@ -139,6 +139,7 @@ perf.data.*
 .secrets
 .vars
 .github/test-events/
+__pycache__/
 
 .slang-replays*
 log*.txt

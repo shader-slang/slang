@@ -24,6 +24,32 @@ echo_warning() {
   echo "WARNING: $1"
 }
 
+# Parse command-line arguments
+CMAKE="${CMAKE:-cmake}"
+PYTHON="${PYTHON:-python3}"
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+  --cmake)
+    CMAKE="$2"
+    shift 2
+    ;;
+  --python)
+    PYTHON="$2"
+    shift 2
+    ;;
+  *)
+    echo_error "Unknown argument: $1"
+    echo "Usage: $0 [--cmake <path>] [--python <path>]"
+    exit 1
+    ;;
+  esac
+done
+
+echo_info "Using cmake:  $CMAKE"
+echo_info "Using python: $PYTHON"
+echo ""
+
 echo_info "Verifying SPIRV-Tools generated files are up-to-date..."
 echo ""
 
@@ -78,7 +104,7 @@ fi
 
 # git-sync-deps needs to be run to get additional dependencies
 echo_info "Running git-sync-deps (this may take a moment)..."
-if ! python3 utils/git-sync-deps; then
+if ! "$PYTHON" utils/git-sync-deps; then
   echo_error "Failed to sync spirv-tools dependencies"
   echo_error "This may be due to network issues or missing git credentials"
   cd ../..
@@ -95,12 +121,22 @@ echo_info "Building spirv-tools generation targets in $BUILD_DIR..."
 mkdir -p "$BUILD_DIR"
 
 # Configure CMake (suppress warnings from external project)
-cmake -Wno-dev -B "$BUILD_DIR" external/spirv-tools
+"$CMAKE" -Wno-dev -B "$BUILD_DIR" external/spirv-tools
+
+# Generate build-version.inc directly (spirv-tools-build-version convenience target
+# was removed in KhronosGroup/SPIRV-Tools PR #6549)
+echo_info "Generating build-version.inc..."
+if ! "$PYTHON" external/spirv-tools/utils/update_build_version.py \
+  external/spirv-tools/CHANGES \
+  "$BUILD_DIR/build-version.inc"; then
+  echo_error "Failed to generate build-version.inc"
+  rm -rf "$BUILD_DIR"
+  exit 1
+fi
 
 # Build only the generation targets (faster than full build)
 echo_info "Building generation targets (this may take a few minutes)..."
-if ! cmake --build "$BUILD_DIR" \
-  --target spirv-tools-build-version \
+if ! "$CMAKE" --build "$BUILD_DIR" \
   --target core_tables \
   --target extinst_tables; then
   echo_error "Failed to build spirv-tools generation targets"
@@ -246,7 +282,8 @@ if [ "$DIFF_FOUND" = true ]; then
   echo "  cd external/spirv-tools"
   echo "  python3 utils/git-sync-deps"
   echo "  cmake . -B build"
-  echo "  cmake --build build --target spirv-tools-build-version --target core_tables --target extinst_tables"
+  echo "  python3 utils/update_build_version.py CHANGES build/build-version.inc"
+  echo "  cmake --build build --target core_tables --target extinst_tables"
   echo "  cd ../.."
   echo "  rm external/spirv-tools-generated/*.h external/spirv-tools-generated/*.inc"
   echo "  cp external/spirv-tools/build/*.h external/spirv-tools-generated/"
