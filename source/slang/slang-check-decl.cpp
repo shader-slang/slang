@@ -3709,6 +3709,33 @@ void SemanticsDeclBasesVisitor::visitInheritanceDecl(InheritanceDecl* inheritanc
     base = baseVistor.TranslateTypeNode(base);
     inheritanceDecl->base = base;
 
+    // If the base type is an AndType (e.g. `struct Foo : IBar & IBaz`), flatten it
+    // into individual InheritanceDecls for each element in the conjunction.
+    if (base.type)
+    {
+        List<Type*> flattenedTypes;
+        maybeFlattenConjunctionType(base.type, flattenedTypes);
+        if (flattenedTypes.getCount() > 1)
+        {
+            auto parentDecl = as<ContainerDecl>(inheritanceDecl->parentDecl);
+            SLANG_ASSERT(parentDecl);
+
+            // Update the current decl's base to the first type in the flattened list.
+            inheritanceDecl->base = TypeExp(flattenedTypes[0]);
+
+            // Create new inheritance decls for the remaining types.
+            for (Index i = 1; i < flattenedTypes.getCount(); i++)
+            {
+                auto newInheritance = m_astBuilder->create<InheritanceDecl>();
+                newInheritance->base = TypeExp(flattenedTypes[i]);
+                newInheritance->loc = inheritanceDecl->loc;
+                newInheritance->parentDecl = parentDecl;
+                parentDecl->addDirectMemberDecl(newInheritance);
+                ensureDecl(newInheritance, DeclCheckState::ReadyForLookup);
+            }
+        }
+    }
+
     // Note: we do not check whether the type being inherited from
     // is valid to use for inheritance here, because there could
     // be contextual factors that need to be taken into account
