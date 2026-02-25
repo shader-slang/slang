@@ -33,9 +33,11 @@ struct FooB : IFoo
 
 // Raw representation sized for the full existential tuple:
 // RTTI [uint2 = 8B] + WitnessTableID [uint2 = 8B] + AnyValue [16B] = 32B = 8 uints
+static const int kRawUints = 8;
+
 struct RawExistential
 {
-    uint data[8];
+    uint data[kRawUints];
 }
 
 float testRoundTrip(int typeId, float val)
@@ -47,11 +49,7 @@ float testRoundTrip(int typeId, float val)
     return foo2.eval();
 }
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
-
-//TEST_INPUT: type_conformance FooA:IFoo = 0
-//TEST_INPUT: type_conformance FooB:IFoo = 1
 
 [numthreads(1, 1, 1)]
 void computeMain(int id : SV_DispatchThreadID)

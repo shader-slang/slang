@@ -49,13 +49,7 @@ IFoo deserialize(RWStructuredBuffer<uint> buf, int baseSlot)
     return bit_cast<IFoo>(raw);
 }
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
-
-//TEST_INPUT: type_conformance FooA:IFoo = 0
-//TEST_INPUT: type_conformance FooB:IFoo = 1
-
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):name=storageBuf
 RWStructuredBuffer<uint> storageBuf;
 
 [numthreads(1, 1, 1)]
