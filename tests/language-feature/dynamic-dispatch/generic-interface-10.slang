@@ -41,12 +41,21 @@ interface IProcessor<T>
 
 struct AddOneProcessor : IProcessor<float>
 {
-    float process(IValue<float> input) { return input.get() + 1.0; }
+    float process(IValue<float> input)
+    {
+        return input.get() + 1.0;
+        // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
+    }
 }
 
 struct SquareProcessor : IProcessor<float>
 {
-    float process(IValue<float> input) { return input.get() * input.get(); }
+    float process(IValue<float> input)
+    {
+        let x = input.get();
+        // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
+        return x * x;
+    }
 }
 
 IProcessor<float> makeProcessor(int id)
