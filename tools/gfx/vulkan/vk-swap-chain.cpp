@@ -198,7 +198,13 @@ SwapchainImpl::~SwapchainImpl()
         m_api->vkDestroySurfaceKHR(m_api->m_instance, m_surface, nullptr);
         m_surface = VK_NULL_HANDLE;
     }
-    m_renderer->m_api.vkDestroySemaphore(m_renderer->m_api.m_device, m_nextImageSemaphore, nullptr);
+    for (Index i = 0; i < m_nextImageSemaphores.getCount(); ++i)
+    {
+        m_renderer->m_api.vkDestroySemaphore(
+            m_renderer->m_api.m_device,
+            m_nextImageSemaphores[i],
+            nullptr);
+    }
 #if SLANG_APPLE_FAMILY
     CocoaUtil::destroyMetalLayer(m_metalLayer);
 #endif
@@ -229,11 +235,15 @@ Result SwapchainImpl::init(DeviceImpl* renderer, const ISwapchain::Desc& desc, W
 
     VkSemaphoreCreateInfo semaphoreCreateInfo = {};
     semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-    SLANG_VK_RETURN_ON_FAIL(renderer->m_api.vkCreateSemaphore(
-        renderer->m_api.m_device,
-        &semaphoreCreateInfo,
-        nullptr,
-        &m_nextImageSemaphore));
+    for (uint32_t i = 0; i < m_desc.imageCount; ++i)
+    {
+        m_nextImageSemaphores.add({});
+        SLANG_VK_RETURN_ON_FAIL(renderer->m_api.vkCreateSemaphore(
+            renderer->m_api.m_device,
+            &semaphoreCreateInfo,
+            nullptr,
+            &m_nextImageSemaphores[i]));
+    }
 
     m_queue = static_cast<CommandQueueImpl*>(desc.queue);
 
@@ -385,7 +395,7 @@ int SwapchainImpl::acquireNextImage()
         m_api->m_device,
         m_swapChain,
         UINT64_MAX,
-        m_nextImageSemaphore,
+        m_nextImageSemaphores[m_currentSemaphoreIndex],
         VK_NULL_HANDLE,
         (uint32_t*)&m_currentImageIndex);
 
@@ -399,8 +409,9 @@ int SwapchainImpl::acquireNextImage()
         destroySwapchainAndImages();
         return m_currentImageIndex;
     }
-    // Make the queue's next submit wait on `m_nextImageSemaphore`.
-    m_queue->m_pendingWaitSemaphores[1] = m_nextImageSemaphore;
+    // Make the queue's next submit wait on `m_nextImageSemaphores[m_currentSemaphoreIndex]`.
+    m_queue->m_pendingWaitSemaphores[1] = m_nextImageSemaphores[m_currentSemaphoreIndex];
+    m_currentSemaphoreIndex = (m_currentSemaphoreIndex + 1) % m_nextImageSemaphores.getCount();
     return m_currentImageIndex;
 }
 
