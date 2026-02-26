@@ -348,25 +348,6 @@ DeclRef<Decl> _maybeSpecializeSuperTypeDeclRef(
     return declRefToSpecialize;
 }
 
-// Same as the above, but we are specializing a type instead of a decl-ref
-static Type* _maybeSpecializeSuperType(
-    ASTBuilder* astBuilder,
-    Type* superType,
-    SubtypeWitness* subIsSuperWitness)
-{
-    if (auto superDeclRefType = as<DeclRefType>(superType))
-    {
-        auto specializedDeclRef = _maybeSpecializeSuperTypeDeclRef(
-            astBuilder,
-            superDeclRefType->getDeclRef(),
-            superType,
-            subIsSuperWitness);
-        return DeclRefType::create(astBuilder, specializedDeclRef);
-    }
-
-    return superType;
-}
-
 void FacetImpl::init(ASTBuilder* astBuilder)
 {
     if (directness != Facet::Directness::Self)
