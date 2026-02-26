@@ -101,6 +101,12 @@ inputs:
     required: false
     default: "claude/"
 
+  # Permission configuration
+  allowed-non-write-users:
+    description: "Comma-separated list of usernames to allow without write permissions, or '*' to allow all users. Only works when github_token is provided."
+    required: false
+    default: ""
+
   # AWS/Bedrock configuration (LLMGW path uses Bedrock with bearer token)
   aws-region:
     description: "AWS region"
@@ -482,6 +488,7 @@ runs:
       with:
         anthropic_api_key: ${{ steps.auth-token.outputs.token }}
         github_token: ${{ steps.github-token.outputs.token }}
+        allowed_non_write_users: ${{ inputs.allowed-non-write-users }}
         trigger_phrase: ${{ inputs.trigger-phrase }}
         assignee_trigger: ${{ inputs.assignee-trigger }}
         label_trigger: ${{ inputs.label-trigger }}
@@ -530,6 +537,7 @@ runs:
       with:
         use_bedrock: "true"
         github_token: ${{ steps.github-token.outputs.token }}
+        allowed_non_write_users: ${{ inputs.allowed-non-write-users }}
         trigger_phrase: ${{ inputs.trigger-phrase }}
         assignee_trigger: ${{ inputs.assignee-trigger }}
         label_trigger: ${{ inputs.label-trigger }}
