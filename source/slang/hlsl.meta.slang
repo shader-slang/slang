@@ -5585,11 +5585,11 @@ Ptr<uint[]> __getByteAddressBufferPtr(RWByteAddressBuffer buffer);
 
 __intrinsic_op($(kIROp_GetStructuredBufferPtr))
 [require(spirv, structuredbuffer)]
-Ptr<T[]> __getStructuredBufferPtr<T>(StructuredBuffer<T> buffer);
+LayoutPtr<T[], L> __getStructuredBufferPtr<T, L:IBufferDataLayout>(StructuredBuffer<T, L> buffer);
 
 __intrinsic_op($(kIROp_GetStructuredBufferPtr))
 [require(spirv, structuredbuffer_rw)]
-Ptr<T[]> __getStructuredBufferPtr<T>(RWStructuredBuffer<T> buffer);
+LayoutPtr<T[], L> __getStructuredBufferPtr<T, L:IBufferDataLayout>(RWStructuredBuffer<T, L> buffer);
 
 /**
 Represents an opaque handle to a read-only structured buffer allocated in global memory.
@@ -23166,6 +23166,8 @@ struct HitObject
         case cuda: __intrinsic_asm "slangOptixHitObjectSetSbtRecordIndex";
         case _GL_EXT_shader_invocation_reorder:
             __intrinsic_asm "hitObjectSetShaderBindingTableRecordIndexEXT($0, $RecordIndex)";
+        case spvShaderInvocationReorderNV:
+            static_assert(false, "SetShaderTableIndex() has no SPIRV NV equivalent (OpHitObjectSetShaderBindingTableRecordIndexNV does not exist). Use SPV_EXT_shader_invocation_reorder instead.");
         case spvShaderInvocationReorderEXT:
             spirv_asm
             {
@@ -23718,6 +23720,9 @@ struct HitObject
         {
         case hlsl: __intrinsic_asm ".GetRayFlags";
         case _GL_EXT_shader_invocation_reorder: __intrinsic_asm "hitObjectGetRayFlagsEXT($0)";
+        case spvShaderInvocationReorderNV:
+            static_assert(false, "GetRayFlags() has no SPIRV NV equivalent (OpHitObjectGetRayFlagsNV does not exist). Use GetRayDesc() or SPV_EXT_shader_invocation_reorder instead.");
+            return 0u;
         case spvShaderInvocationReorderEXT:
             return spirv_asm
             {
@@ -23740,6 +23745,13 @@ struct HitObject
         {
         case hlsl: __intrinsic_asm ".GetRayTMin";
         case _GL_EXT_shader_invocation_reorder: __intrinsic_asm "hitObjectGetRayTMinEXT($0)";
+        case spvShaderInvocationReorderNV:
+            return spirv_asm
+            {
+                OpExtension "SPV_NV_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderNV;
+                result:$$float = OpHitObjectGetRayTMinNV &this;
+            };
         case spvShaderInvocationReorderEXT:
             return spirv_asm
             {
@@ -23774,6 +23786,13 @@ struct HitObject
         {
         case hlsl: __intrinsic_asm ".GetWorldRayOrigin";
         case _GL_EXT_shader_invocation_reorder: __intrinsic_asm "hitObjectGetWorldRayOriginEXT($0)";
+        case spvShaderInvocationReorderNV:
+            return spirv_asm
+            {
+                OpExtension "SPV_NV_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderNV;
+                result:$$float3 = OpHitObjectGetWorldRayOriginNV &this;
+            };
         case spvShaderInvocationReorderEXT:
             return spirv_asm
             {
@@ -23796,6 +23815,13 @@ struct HitObject
         {
         case hlsl: __intrinsic_asm ".GetWorldRayDirection";
         case _GL_EXT_shader_invocation_reorder: __intrinsic_asm "hitObjectGetWorldRayDirectionEXT($0)";
+        case spvShaderInvocationReorderNV:
+            return spirv_asm
+            {
+                OpExtension "SPV_NV_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderNV;
+                result:$$float3 = OpHitObjectGetWorldRayDirectionNV &this;
+            };
         case spvShaderInvocationReorderEXT:
             return spirv_asm
             {
@@ -26508,6 +26534,16 @@ T __loadSamplerDescriptorFromHeap<T>(uint index);
 __intrinsic_op($(kIROp_LoadResourceDescriptorFromHeap))
 T __loadResourceDescriptorFromHeap<T>(uint index);
 
+// Used by the SPIRV backend, load a descriptor from the descriptor heap.
+__intrinsic_op($(kIROp_SPIRVLoadDescriptorFromHeap))
+internal T __spirvLoadDescriptorFromHeap<T>(uint heap, uint index);
+
+__intrinsic_op($(kIROp_SPIRVSamplerHeap))
+internal uint __spirvSamplerHeap();
+
+__intrinsic_op($(kIROp_SPIRVResourceHeap))
+internal uint __spirvResourceHeap();
+
 // Used by the HLSL and Metal backends only,
 // create a combined texture sampler object from a bindless handle.
 __intrinsic_op($(kIROp_MakeCombinedTextureSamplerFromHandle))
@@ -26536,8 +26572,6 @@ T defaultGetDescriptorFromHandle<T:IOpaqueDescriptor>(DescriptorHandle<T> handle
             return __makeCombinedTextureSamplerFromHandle<T>((uint2)handleValue);
         else
             return __loadResourceDescriptorFromHeap<T>(((uint2)handleValue).x);
-    case spvBindlessTextureNV:
-        return __castDescriptorHandleToResource<T>(handleValue);
     case spirv:
     case glsl:
 
@@ -26614,6 +26648,15 @@ $}
     }
     case wgsl:
         return __getDynamicResourceHeap<T>()[((uint2)handleValue).x];
+    case spvBindlessTextureNV:
+        return __castDescriptorHandleToResource<T>(handleValue);
+    case spvDescriptorHeapEXT:
+        if (T.kind == DescriptorKind.Sampler)
+            return __spirvLoadDescriptorFromHeap<T>(__spirvSamplerHeap(), ((uint2)handleValue).x);
+        else if (T.kind == DescriptorKind.CombinedTextureSampler)
+            return __makeCombinedTextureSamplerFromHandle<T>((uint2)handleValue);
+        else
+            return __spirvLoadDescriptorFromHeap<T>(__spirvResourceHeap(), ((uint2)handleValue).x);
     default:
         return __castDescriptorHandleToResource<T>(handleValue);
     }
@@ -27538,7 +27581,6 @@ struct CoopMat
     }
 
     /// Stores the cooperative matrix into a groupshared (workgroup) memory array with a different element type.
-    /// Vulkan only.
     /// @param matrixLayout The memory layout (RowMajor or ColMajor) to use when storing.
     /// @param U The element type of the groupshared array (may differ from T).
     /// @param V The size of the groupshared array.
@@ -27546,20 +27588,29 @@ struct CoopMat
     /// @param element The starting element index in the array.
     /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
     [ForceInline]
-    [require(cooperative_matrix_spirv)]
+    [require(cooperative_matrix)]
     void Store<
         let matrixLayout : CoopMatMatrixLayout,
         U,
         let V : int
     >(__ref groupshared U[V] data, uint element, uint stride)
     {
-        let alignment = 16U;
-        spirv_asm
+        __target_switch
         {
-            %workgroupPointerType = OpTypePointer Workgroup $$U;
-            %pointer:%workgroupPointerType = OpAccessChain &data $element;
-            OpCooperativeMatrixStoreKHR %pointer $this $matrixLayout $stride Aligned !alignment;
-        };
+        case spirv:
+            let alignment = 16U;
+            spirv_asm
+            {
+                %workgroupPointerType = OpTypePointer Workgroup $$U;
+                %pointer:%workgroupPointerType = OpAccessChain &data $element;
+                OpCooperativeMatrixStoreKHR %pointer $this $matrixLayout $stride Aligned !alignment;
+            };
+        case cuda:
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::RowMajor>(($1)->m_data + $2, $3)";
+            else
+                __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::ColMajor>(($1)->m_data + $2, $3)";
+        }
     }
 
     [ForceInline]
@@ -27777,7 +27828,6 @@ $}
     }
 
     /// Loads a cooperative matrix from a groupshared (workgroup) memory array with a different element type.
-    /// Vulkan only.
     /// @param matrixLayout The memory layout (RowMajor or ColMajor) of the data in the array.
     /// @param U The element type of the groupshared array (may differ from T).
     /// @param V The size of the groupshared array.
@@ -27786,20 +27836,29 @@ $}
     /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
     /// @return A cooperative matrix loaded from the groupshared array.
     [ForceInline]
-    [require(cooperative_matrix_spirv)]
+    [require(cooperative_matrix)]
     static This Load<
         let matrixLayout : CoopMatMatrixLayout,
         U,
         let V : int
     >(__constref groupshared U[V] data, uint element, uint stride)
     {
-        let alignment = 16U;
-        return spirv_asm
+        __target_switch
         {
-            %workgroupPointerType = OpTypePointer Workgroup $$U;
-            %pointer:%workgroupPointerType = OpAccessChain &data $element;
-            result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned !alignment;
-        };
+        case spirv:
+            let alignment = 16U;
+            return spirv_asm
+            {
+                %workgroupPointerType = OpTypePointer Workgroup $$U;
+                %pointer:%workgroupPointerType = OpAccessChain &data $element;
+                result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned !alignment;
+            };
+        case cuda:
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::RowMajor>(($0)->m_data + $1, $2)";
+            else
+                __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::ColMajor>(($0)->m_data + $1, $2)";
+        }
     }
 
     [ForceInline]

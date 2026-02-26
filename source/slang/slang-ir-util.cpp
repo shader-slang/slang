@@ -3065,4 +3065,34 @@ IRIntegerValue getInterfaceAnyValueSize(IRInst* type, SourceLoc usageLoc)
     return kDefaultAnyValueSize;
 }
 
+IRType* getTextureTypeFromCombinedTextureSampler(IRType* type)
+{
+    IRBuilder builder(type);
+    builder.setInsertBefore(type);
+    auto textureType = as<IRTextureTypeBase>(type);
+    return builder.getTextureType(
+        textureType->getElementType(),
+        textureType->getShapeInst(),
+        textureType->getIsArrayInst(),
+        textureType->getIsMultisampleInst(),
+        textureType->getSampleCountInst(),
+        textureType->getAccessInst(),
+        textureType->getIsShadowInst(),
+        builder.getIntValue(builder.getIntType(), 0),
+        textureType->getFormatInst());
+}
+
+IRType* getSamplerTypeFromCombinedTextureSampler(IRType* type)
+{
+    IRBuilder builder(type);
+    builder.setInsertBefore(type);
+
+    auto textureType = as<IRTextureTypeBase>(type);
+
+    if (getIntVal(textureType->getIsShadowInst()) != 0)
+        return builder.getType(kIROp_SamplerComparisonStateType);
+    else
+        return builder.getType(kIROp_SamplerStateType);
+}
+
 } // namespace Slang

@@ -1292,8 +1292,8 @@ A capability describes an optional feature that a target may or may not support.
 * `SPV_NV_shader_subgroup_partitioned` : enables the SPV_NV_shader_subgroup_partitioned extension 
 * `SPV_KHR_subgroup_rotate` : enables the SPV_KHR_subgroup_rotate extension 
 * `SPV_NV_ray_tracing_motion_blur` : enables the SPV_NV_ray_tracing_motion_blur extension 
-* `SPV_NV_shader_invocation_reorder` : enables the SPV_NV_shader_invocation_reorder extension 
 * `SPV_EXT_shader_invocation_reorder` : enables the SPV_EXT_shader_invocation_reorder extension 
+* `SPV_NV_shader_invocation_reorder` : enables the SPV_NV_shader_invocation_reorder extension 
 * `SPV_NV_cluster_acceleration_structure` : enables the SPV_NV_cluster_acceleration_structure extension 
 * `SPV_NV_linear_swept_spheres` : enables the SPV_NV_linear_swept_spheres extension 
 * `SPV_NV_shader_image_footprint` : enables the SPV_NV_shader_image_footprint extension 
@@ -1307,6 +1307,8 @@ A capability describes an optional feature that a target may or may not support.
 * `SPV_NV_cooperative_matrix2` : enables the SPV_NV_cooperative_matrix2 extension 
 * `SPV_NV_bindless_texture` : enables the SPV_NV_bindless_texture extension 
 * `SPV_EXT_float8` : enables the SPV_EXT_float8 extension 
+* `SPV_EXT_descriptor_heap` : enables the SPV_EXT_descriptor_heap extension 
+* `SPV_KHR_untyped_pointers` : enables the SPV_KHR_untyped_pointers extension 
 * `SPV_KHR_bfloat16` : enables the SPV_KHR_bfloat16 extension 
 * `spvDeviceGroup` 
 * `spvAtomicFloat32AddEXT` 
@@ -1340,8 +1342,8 @@ A capability describes an optional feature that a target may or may not support.
 * `spvRayTracingPositionFetchKHR` 
 * `spvRayQueryKHR` 
 * `spvRayQueryPositionFetchKHR` 
-* `spvShaderInvocationReorderNV` 
 * `spvShaderInvocationReorderEXT` 
+* `spvShaderInvocationReorderNV` 
 * `spvRayTracingClusterAccelerationStructureNV` 
 * `spvRayTracingLinearSweptSpheresGeometryNV` 
 * `spvShaderClockKHR` 
@@ -1364,6 +1366,7 @@ A capability describes an optional feature that a target may or may not support.
 * `spvVulkanMemoryModelKHR` 
 * `spvVulkanMemoryModelDeviceScopeKHR` 
 * `spvBindlessTextureNV` 
+* `spvDescriptorHeapEXT` 
 * `ser_hlsl_native` 
 * `metallib_latest` 
 * `dxil_lib` 
