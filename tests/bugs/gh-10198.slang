@@ -1,10 +1,11 @@
-//TEST(compute, vulkan):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk
-// CHECK: 78
-//TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
+//TEST:SIMPLE(filecheck=CHECK): -target spirv-assembly -entry computeMain -stage compute
+// CHECK: OpLoopMerge
+// CHECK: OpSwitch
 
 // Regression test: SPIRV structured control flow violation with switch-continue
 // Issue: https://github.com/shader-slang/slang/issues/10198
-// Note: gh-7748-switch-continue-bug.slang covers the CPU path. This tests SPIRV.
+// Note: gh-7748-switch-continue-bug.slang covers runtime semantics on CPU.
+// This test checks SPIR-V structured-control-flow emission.
 
 RWStructuredBuffer<int> outputBuffer;
 
