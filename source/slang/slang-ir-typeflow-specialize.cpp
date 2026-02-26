@@ -686,9 +686,7 @@ struct TypeFlowSpecializationContext
     //
     // Returns SLANG_FAIL if the interface is specialize-only (caller should bail out).
     //
-    SlangResult rejectSpecializeOnlyInterface(
-        IRWitnessTableSet* tableSet,
-        SourceLoc callSiteLoc)
+    SlangResult rejectSpecializeOnlyInterface(IRWitnessTableSet* tableSet, SourceLoc callSiteLoc)
     {
         IRInst* conformanceType = nullptr;
         forEachInSet(
