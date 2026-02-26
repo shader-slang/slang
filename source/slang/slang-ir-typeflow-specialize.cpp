@@ -684,9 +684,11 @@ struct TypeFlowSpecializationContext
     // If so, emit error 52008 — the compiler has determined that dynamic dispatch
     // is needed, but the interface was explicitly marked for specialization only.
     //
-    // Returns true if the interface is specialize-only (caller should bail out).
+    // Returns SLANG_FAIL if the interface is specialize-only (caller should bail out).
     //
-    bool rejectSpecializeOnlyInterface(IRWitnessTableSet* tableSet, SourceLoc callSiteLoc)
+    SlangResult rejectSpecializeOnlyInterface(
+        IRWitnessTableSet* tableSet,
+        SourceLoc callSiteLoc)
     {
         IRInst* conformanceType = nullptr;
         forEachInSet(
@@ -720,9 +722,9 @@ struct TypeFlowSpecializationContext
                 callSiteLoc,
                 Diagnostics::dynamicDispatchOnSpecializeOnlyInterface,
                 conformanceType);
-            return true;
+            return SLANG_FAIL;
         }
-        return false;
+        return SLANG_OK;
     }
 
     // Creates an 'empty' inst (denoted by nullptr), that
@@ -4390,7 +4392,7 @@ struct TypeFlowSpecializationContext
                     auto tableSet = cast<IRWitnessTableSet>(
                         cast<IRSetTagType>(tableTag->getDataType())->getSet());
 
-                    if (rejectSpecializeOnlyInterface(tableSet, inst->sourceLoc))
+                    if (SLANG_FAILED(rejectSpecializeOnlyInterface(tableSet, inst->sourceLoc)))
                     {
                         module->getContainerPool().free(&callArgs);
                         return false;
@@ -4417,7 +4419,7 @@ struct TypeFlowSpecializationContext
                         cast<IRSetTagType>(tableTag->getDataType())->getSet());
                     auto lookupKey = cast<IRStructKey>(innerTagMapOperand->getOperand(1));
 
-                    if (rejectSpecializeOnlyInterface(tableSet, inst->sourceLoc))
+                    if (SLANG_FAILED(rejectSpecializeOnlyInterface(tableSet, inst->sourceLoc)))
                     {
                         module->getContainerPool().free(&callArgs);
                         return false;
