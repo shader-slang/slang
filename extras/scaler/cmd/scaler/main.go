@@ -153,6 +153,12 @@ func parseFlags() config {
 		os.Exit(1)
 	}
 
+	if cfg.gcpPlatform != "windows" && cfg.gcpPlatform != "linux" {
+		fmt.Fprintf(os.Stderr, "error: --platform must be 'windows' or 'linux', got %q\n", cfg.gcpPlatform)
+		flag.Usage()
+		os.Exit(1)
+	}
+
 	// Allow environment variables to override auth flags.
 	// This lets systemd's EnvironmentFile provide credentials.
 	if v := os.Getenv("SCALER_TOKEN"); v != "" && cfg.token == "" {
