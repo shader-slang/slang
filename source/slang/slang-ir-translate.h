@@ -52,9 +52,6 @@ private:
 
     // Shared context.
     AutoDiffSharedContext autodiffContext;
-
-    // Shallow translation.
-    bool m_translateWitnessesOnly = false;
 };
 
 }; // namespace Slang

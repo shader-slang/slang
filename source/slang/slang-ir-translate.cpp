@@ -110,10 +110,6 @@ IRInst* TranslationContext::maybeTranslateInst(IRInst* inst)
         break;
     }
 
-    // Stop here if we are only translating witnesses.
-    if (m_translateWitnessesOnly)
-        return translationResult;
-
     switch (inst->getOp())
     {
     case kIROp_BackwardDifferentiate:
