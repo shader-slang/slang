@@ -268,7 +268,7 @@ jobs:
           # Use MCP tools (add_issue_comment) for multi-line content like review summaries.
           allowed-tools: |
             View,GlobTool,GrepTool,BatchTool,
-            Bash(git diff*),Bash(git log*),Bash(git show*),Bash(git status*),
+            Bash(git *),
             Bash(grep *),Bash(grep -*),
             Bash(cat *),Bash(head *),Bash(tail *),
             Bash(ls *),Bash(find *),Bash(wc *),
