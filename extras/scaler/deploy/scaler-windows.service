@@ -1,0 +1,39 @@
+[Unit]
+Description=GitHub Actions Windows GPU Runner Scaler
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=scaler
+Group=scaler
+
+ExecReload=/bin/kill -USR1 $MAINPID
+ExecStart=/opt/scaler/scaler \
+    --url=https://github.com/shader-slang/slang \
+    --name=windows-gpu-runners \
+    --labels=Windows,self-hosted,GCP-T4 \
+    --max-runners=5 \
+    --min-runners=0 \
+    --gcp-project=slang-runners \
+    --gcp-zones=us-east1-c,us-east1-d,us-central1-a,us-west1-a \
+    --gcp-instance-template=windows-gpu-runner
+
+EnvironmentFile=/opt/scaler/scaler.env
+
+Restart=always
+RestartSec=10
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=scaler-windows
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadOnlyPaths=/opt/scaler
+
+[Install]
+WantedBy=multi-user.target

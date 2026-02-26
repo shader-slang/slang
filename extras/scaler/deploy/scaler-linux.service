@@ -1,0 +1,40 @@
+[Unit]
+Description=GitHub Actions Linux GPU Runner Scaler
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=scaler
+Group=scaler
+
+ExecReload=/bin/kill -USR1 $MAINPID
+ExecStart=/opt/scaler/scaler \
+    --url=https://github.com/shader-slang/slang \
+    --name=linux-gpu-runners \
+    --labels=Linux,self-hosted,GPU \
+    --max-runners=10 \
+    --min-runners=0 \
+    --gcp-project=slang-runners \
+    --gcp-zones=us-east1-c,us-east1-d,us-central1-a,us-west1-a \
+    --gcp-instance-template=linux-gpu-runner \
+    --platform=linux
+
+EnvironmentFile=/opt/scaler/scaler.env
+
+Restart=always
+RestartSec=10
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=scaler-linux
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadOnlyPaths=/opt/scaler
+
+[Install]
+WantedBy=multi-user.target
