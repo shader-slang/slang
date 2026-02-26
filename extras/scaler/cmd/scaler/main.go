@@ -40,6 +40,10 @@ import (
 	gcpvm "extras/scaler/internal/gcp"
 )
 
+// errDrainComplete is returned when drain mode finishes and all VMs have
+// completed their jobs. It causes a clean exit without error.
+var errDrainComplete = errors.New("drain complete")
+
 type config struct {
 	// GitHub configuration
 	registrationURL string // e.g. https://github.com/shader-slang/slang
@@ -114,7 +118,7 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
-	if err := run(ctx, cfg, logger); err != nil && !errors.Is(err, context.Canceled) {
+	if err := run(ctx, cfg, logger); err != nil && !errors.Is(err, context.Canceled) && !errors.Is(err, errDrainComplete) {
 		slog.Error("scaler exited with error", "error", err)
 		os.Exit(1)
 	}
@@ -353,7 +357,7 @@ func (s *gcpRunnerScaler) HandleDesiredRunnerCount(ctx context.Context, count in
 	if s.isDraining() {
 		if currentCount == 0 {
 			s.logger.Info("all VMs finished, exiting drain mode")
-			os.Exit(0)
+			return 0, errDrainComplete
 		}
 		s.logger.Info("draining", "active_vms", currentCount, "pending_jobs", count)
 		return currentCount, nil
