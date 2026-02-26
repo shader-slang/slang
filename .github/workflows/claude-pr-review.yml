@@ -195,7 +195,7 @@ jobs:
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.inputs.pr_number || github.event.pull_request.number }}
 
-            Create append the current time and date to a file file `source/slang/log.txt` to leave the log.
+            Append the current time and date to a file file `source/slang/log.txt` to leave the log.
             And push the log file to github shader-slang/slang repo master branch.
 
             Review this PR for the Slang shader compiler. Read CLAUDE.md for compiler architecture context.
