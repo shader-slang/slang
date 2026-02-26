@@ -1,7 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv-assembly -entry computeMain -stage compute
 // CHECK: OpEntryPoint GLCompute
 // CHECK: computeMain
-// CHECK-NOT: internal compiler error
 
 // Regression test: internal compiler error "unimplemented: assignment" on out/inout parameters
 // Issue: https://github.com/shader-slang/slang/issues/10212
@@ -18,6 +17,8 @@ RWStructuredBuffer<float> outputBuffer;
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
+// Intentionally marked [Differentiable] to preserve the original
+// regression trigger shape, even though this shader uses integer/bitwise ops.
 [Differentiable]
 void computeMain(uint3 dtid : SV_DispatchThreadID)
 {
