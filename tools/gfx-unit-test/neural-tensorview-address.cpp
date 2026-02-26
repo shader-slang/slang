@@ -21,7 +21,10 @@ struct TensorViewForTest
     uint32_t dimensionCount;
 };
 
-static TensorViewForTest makeTensorView1D(IBuffer* buffer, uint32_t elementCount, uint32_t elementSize)
+static TensorViewForTest makeTensorView1D(
+    IBuffer* buffer,
+    uint32_t elementCount,
+    uint32_t elementSize)
 {
     TensorViewForTest tv = {};
 
@@ -95,7 +98,11 @@ void neuralTensorViewAddressTestImpl(IDevice* device, UnitTestContext* context)
         ComPtr<IShaderProgram> shaderProgram;
         slang::ProgramLayout* slangReflection;
         GFX_CHECK_CALL_ABORT(loadComputeProgram(
-            device, shaderProgram, "neural-tensorview-address", "forwardMain", slangReflection));
+            device,
+            shaderProgram,
+            "neural-tensorview-address",
+            "forwardMain",
+            slangReflection));
 
         ComputePipelineDesc pipelineDesc = {};
         pipelineDesc.program = shaderProgram.get();
@@ -128,7 +135,11 @@ void neuralTensorViewAddressTestImpl(IDevice* device, UnitTestContext* context)
             device->readBuffer(outputBuffer, 0, 2 * sizeof(float), blob.writeRef());
             auto* r = (const float*)blob->getBufferPointer();
             if (abs(r[0] - 39.0f) > 0.01f || abs(r[1] - 80.0f) > 0.01f)
-                fprintf(stderr, "  Forward MISMATCH: y = [%.4f, %.4f] (expected [39.0, 80.0])\n", r[0], r[1]);
+                fprintf(
+                    stderr,
+                    "  Forward MISMATCH: y = [%.4f, %.4f] (expected [39.0, 80.0])\n",
+                    r[0],
+                    r[1]);
         }
         compareComputeResult(device, outputBuffer, std::array{39.0f, 80.0f});
     }
@@ -144,7 +155,11 @@ void neuralTensorViewAddressTestImpl(IDevice* device, UnitTestContext* context)
         ComPtr<IShaderProgram> shaderProgram;
         slang::ProgramLayout* slangReflection;
         GFX_CHECK_CALL_ABORT(loadComputeProgram(
-            device, shaderProgram, "neural-tensorview-address", "backwardMain", slangReflection));
+            device,
+            shaderProgram,
+            "neural-tensorview-address",
+            "backwardMain",
+            slangReflection));
 
         ComputePipelineDesc pipelineDesc = {};
         pipelineDesc.program = shaderProgram.get();
@@ -181,7 +196,12 @@ void neuralTensorViewAddressTestImpl(IDevice* device, UnitTestContext* context)
             auto* r = (const float*)blob->getBufferPointer();
             for (int i = 0; i < 4; i++)
                 if (abs(r[i] - expected[i]) > 0.01f)
-                    fprintf(stderr, "  Backward dInput[%d] MISMATCH: %.4f (expected %.1f)\n", i, r[i], expected[i]);
+                    fprintf(
+                        stderr,
+                        "  Backward dInput[%d] MISMATCH: %.4f (expected %.1f)\n",
+                        i,
+                        r[i],
+                        expected[i]);
         }
         compareComputeResult(device, outputBuffer, std::array{6.0f, 8.0f, 10.0f, 12.0f});
 
@@ -193,7 +213,12 @@ void neuralTensorViewAddressTestImpl(IDevice* device, UnitTestContext* context)
             auto* r = (const float*)blob->getBufferPointer();
             for (int i = 0; i < paramCount; i++)
                 if (abs(r[i] - expected[i]) > 0.01f)
-                    fprintf(stderr, "  Backward gradParams[%d] MISMATCH: %.4f (expected %.1f)\n", i, r[i], expected[i]);
+                    fprintf(
+                        stderr,
+                        "  Backward gradParams[%d] MISMATCH: %.4f (expected %.1f)\n",
+                        i,
+                        r[i],
+                        expected[i]);
         }
         compareComputeResult(
             device,
