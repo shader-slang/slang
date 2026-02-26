@@ -95,7 +95,7 @@ for i in $(seq "$commitsCount"); do
   line="$(echo "$commits" | head -n "$i" | tail -1)"
 
   # Get PR number from the git commit title
-  pr="$(echo "$line" | grep '#[1-9][0-9][0-9][0-9][0-9]*' | sed 's|.* (\#\([1-9][0-9][0-9][0-9][0-9]*\))|\1|')"
+  pr="$(echo "$line" | grep '#[1-9][0-9][0-9][0-9][0-9]*' | sed 's|.*(\#\([1-9][0-9][0-9][0-9][0-9]*\))$|\1|')"
   [ "$pr" = "" ] && continue
 
   # Check if the PR is marked as a breaking change
@@ -115,7 +115,7 @@ for i in $(seq "$commitsCount"); do
 
   result="$line"
   # Get PR number from the git commit title
-  pr="$(echo "$line" | grep '#[1-9][0-9][0-9][0-9][0-9]*' | sed 's|.* (\#\([1-9][0-9][0-9][0-9][0-9]*\))|\1|')"
+  pr="$(echo "$line" | grep '#[1-9][0-9][0-9][0-9][0-9]*' | sed 's|.*(\#\([1-9][0-9][0-9][0-9][0-9]*\))$|\1|')"
   if [ "$pr" != "" ]; then
     # Mark breaking changes with "[BREAKING]"
     if "$gh" issue view "$pr" --json labels | grep -q 'pr: breaking change'; then

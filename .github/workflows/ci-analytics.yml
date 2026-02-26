@@ -1,0 +1,56 @@
+name: CI Analytics
+
+on:
+  schedule:
+    - cron: "0 6 * * *" # Daily at 6 AM UTC
+  workflow_dispatch: {} # Manual trigger
+
+jobs:
+  collect-and-publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Checkout analytics repo
+        uses: actions/checkout@v4
+        with:
+          repository: shader-slang/slang-ci-analytics
+          path: ci_analytics_repo
+          token: ${{ secrets.CI_ANALYTICS_PAT }}
+
+      - name: Collect job data
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Incremental update: fetch new data and merge with existing
+          if [ -f ci_analytics_repo/ci_jobs.json ]; then
+            cp ci_analytics_repo/ci_jobs.json /tmp/ci_jobs.json
+          fi
+          python3 extras/ci/analytics/ci_job_collector.py \
+            --output /tmp/ci_jobs.json \
+            --workflow CI \
+            --verbose
+
+      - name: Generate visualizations
+        run: |
+          python3 extras/ci/analytics/ci_visualization.py \
+            --input /tmp/ci_jobs.json \
+            --output ci_analytics_repo
+
+      - name: Push to analytics repo
+        run: |
+          cd ci_analytics_repo
+          # Copy updated data file
+          cp /tmp/ci_jobs.json ci_jobs.json
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet || {
+            git commit -m "Update CI analytics $(date -u +%Y-%m-%d)" &&
+            git push
+          }
