@@ -41,11 +41,11 @@ jobs:
           workload_identity_provider: "projects/125098404903/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider"
           service_account: "github-ci@slang-runners.iam.gserviceaccount.com"
 
+      # Setup sccache with local disk backend (no GCS)
       - name: Setup sccache
         uses: ./.github/actions/setup-sccache
         with:
           platform: linux
-          gcs-bucket: ${{ env.IS_FORK_PR != 'true' && 'slang-ci-cache' || '' }}
 
       - name: Install build dependencies
         run: |
