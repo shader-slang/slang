@@ -576,6 +576,9 @@ Extensions
 `SPV_EXT_demote_to_helper_invocation`
 > Represents the SPIR-V extension for demoting to helper invocation.
 
+`SPV_EXT_descriptor_heap`
+> Represents the SPIR-V extension for descriptor heaps.
+
 `SPV_EXT_descriptor_indexing`
 > Represents the SPIR-V extension for descriptor indexing.
 
@@ -653,6 +656,9 @@ Extensions
 
 `SPV_KHR_subgroup_rotate`
 > Represents the SPIR-V extension enables rotating values across invocations within a subgroup.
+
+`SPV_KHR_untyped_pointers`
+> Represents the SPIR-V extension for untyped pointers.
 
 `SPV_KHR_vulkan_memory_model`
 > Represents the SPIR-V extension for SPV_KHR_vulkan_memory_model.
@@ -750,6 +756,9 @@ Extensions
 
 `spvDerivativeControl`
 > Represents the SPIR-V capability for 'derivative control' operations.
+
+`spvDescriptorHeapEXT`
+> Represents the SPIR-V capability for descriptor heaps.
 
 `spvDeviceGroup`
 > Represents the SPIR-V capability for DeviceGroup.

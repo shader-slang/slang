@@ -59,22 +59,9 @@ struct LowerCombinedSamplerContext
             getIntVal(textureType->getAccessInst()) == kCoreModule_ResourceAccessReadOnly ? false
                                                                                           : true;
 
-        info.textureType = builder.getTextureType(
-            textureType->getElementType(),
-            textureType->getShapeInst(),
-            textureType->getIsArrayInst(),
-            textureType->getIsMultisampleInst(),
-            textureType->getSampleCountInst(),
-            textureType->getAccessInst(),
-            textureType->getIsShadowInst(),
-            builder.getIntValue(builder.getIntType(), 0),
-            textureType->getFormatInst());
+        info.textureType = getTextureTypeFromCombinedTextureSampler(textureType);
         builder.createStructField(structType, info.texture, info.textureType);
-
-        if (getIntVal(textureType->getIsShadowInst()) != 0)
-            info.samplerType = builder.getType(kIROp_SamplerComparisonStateType);
-        else
-            info.samplerType = builder.getType(kIROp_SamplerStateType);
+        info.samplerType = getSamplerTypeFromCombinedTextureSampler(textureType);
         builder.createStructField(structType, info.sampler, info.samplerType);
 
         // Type layout.

@@ -615,7 +615,7 @@ where `IOpaqueDescriptor` is an interface implemented by all resource types, inc
 
 You may also write `Texture2D.Handle` as a short-hand of `DescriptorHandle<Texture2D>`.
 
-`DescriptorHandle<T>` supports `operator *`, `operator ->`, and can implicitly convert to `T`, for example:
+`DescriptorHandle<T>` can implicitly convert to `T`, for example:
 
 ```slang
 uniform StructuredBuffer<DescriptorHandle<Texture2D>> textures;
@@ -630,7 +630,7 @@ void main()
     output[0] = textures[textureIndex].Load(int3(0));
 
     // Alternatively, this syntax is also valid:
-    (*output)[0] = textures[textureIndex]->Load(int3(0));
+    (*output)[0] = textures[textureIndex].Load(int3(0));
 }
 ```
 
@@ -659,7 +659,10 @@ void test()
 }
 ```
 
-When targeting SPIRV, Slang will introduce a global array of descriptors and fetch from the global array.
+When targeting SPIRV, Slang can generate two flavors of code for descriptor handles depending on whether
+the `spvDescriptorHeapEXT` capability is declared or requested on the compilation request.
+By default (without requesting `spvDescriptorHeapEXT`), Slang introduces a global array of descriptors and
+fetch from the global array.
 The descriptor set ID of the global descriptor array can be configured with the `-bindless-space-index`
 (or `CompilerOptionName::BindlessSpaceIndex` when using the API) option.
 
@@ -679,12 +682,13 @@ Default behavior assigns binding-indicies based on descriptor types:
 
 > `ACCELERATION_STRUCTURE` is excluded from the list of types since Slang by default uses the handle to a `RaytracingAccelerationStructure` as a GPU address, casting the handle to a `RaytracingAccelerationStructure`. This removes the need for a binding-slot of `RaytracingAccelerationStructure`.
 
-> #### Note
-> The default implementation for SPIRV may change in the future if SPIRV is extended to provide what is
-> equivalent to D3D's `ResourceDescriptorHeap` construct.
+When the `spvDescriptorHeapEXT` capability is requested (either via the `-capability` commandline option or via the compilation API), Slang will map descriptor handles to the `SPV_EXT_descriptor_heap` extension
+without declaring any explicit descriptor sets. Descriptor handles are still lowered to `uint2`.
+For resources other than `CombinedTextureSampler`, Slang uses `uint2.x` as the index to access the global sampler or resource heap.
+For `CombinedTextureSampler` handles, Slang uses `uint2.x` to index into the resource heap to obtain the texture, and `uint2.y` to index into the sampler
+heap to obtain the sampler state, and combines the objects with an `OpSampledImage` instruction.
 
-Users can override the default behavior of convering from bindless handle to resource handle, by providing a
-`getDescriptorFromHandle` in user code. For example:
+Additionally, if none of the above behaviors are desired, users can customize the conversion logic from descriptor handle to resource objects by providing a `getDescriptorFromHandle` in user code. For example:
 
 ```slang
 // All texture and buffer handles are defined in descriptor set 100.

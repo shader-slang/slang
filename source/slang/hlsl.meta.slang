@@ -26508,6 +26508,16 @@ T __loadSamplerDescriptorFromHeap<T>(uint index);
 __intrinsic_op($(kIROp_LoadResourceDescriptorFromHeap))
 T __loadResourceDescriptorFromHeap<T>(uint index);
 
+// Used by the SPIRV backend, load a descriptor from the descriptor heap.
+__intrinsic_op($(kIROp_SPIRVLoadDescriptorFromHeap))
+internal T __spirvLoadDescriptorFromHeap<T>(uint heap, uint index);
+
+__intrinsic_op($(kIROp_SPIRVSamplerHeap))
+internal uint __spirvSamplerHeap();
+
+__intrinsic_op($(kIROp_SPIRVResourceHeap))
+internal uint __spirvResourceHeap();
+
 // Used by the HLSL and Metal backends only,
 // create a combined texture sampler object from a bindless handle.
 __intrinsic_op($(kIROp_MakeCombinedTextureSamplerFromHandle))
@@ -26536,8 +26546,6 @@ T defaultGetDescriptorFromHandle<T:IOpaqueDescriptor>(DescriptorHandle<T> handle
             return __makeCombinedTextureSamplerFromHandle<T>((uint2)handleValue);
         else
             return __loadResourceDescriptorFromHeap<T>(((uint2)handleValue).x);
-    case spvBindlessTextureNV:
-        return __castDescriptorHandleToResource<T>(handleValue);
     case spirv:
     case glsl:
 
@@ -26614,6 +26622,15 @@ $}
     }
     case wgsl:
         return __getDynamicResourceHeap<T>()[((uint2)handleValue).x];
+    case spvBindlessTextureNV:
+        return __castDescriptorHandleToResource<T>(handleValue);
+    case spvDescriptorHeapEXT:
+        if (T.kind == DescriptorKind.Sampler)
+            return __spirvLoadDescriptorFromHeap<T>(__spirvSamplerHeap(), ((uint2)handleValue).x);
+        else if (T.kind == DescriptorKind.CombinedTextureSampler)
+            return __makeCombinedTextureSamplerFromHandle<T>((uint2)handleValue);
+        else
+            return __spirvLoadDescriptorFromHeap<T>(__spirvResourceHeap(), ((uint2)handleValue).x);
     default:
         return __castDescriptorHandleToResource<T>(handleValue);
     }
