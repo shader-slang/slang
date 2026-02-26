@@ -61,7 +61,6 @@ jobs:
     with:
       config: release
       runs-on: '["ubuntu-22.04"]'
-      use-local-sccache: true
 
   build-linux-debug:
     needs: check-changes
@@ -74,7 +73,6 @@ jobs:
     with:
       config: debug
       runs-on: '["ubuntu-22.04"]'
-      use-local-sccache: true
 
   build-macos-release:
     needs: check-changes
@@ -300,6 +298,40 @@ jobs:
           path: /tmp/.cache/sccache
           key: sccache-linux-gcc-aarch64-debug-${{ needs.check-changes.outputs.last-commit }}
 
+  build-windows-release:
+    needs: check-changes
+    if: needs.check-changes.outputs.should-build == 'true'
+    uses: ./.github/workflows/ci-slang-build.yml
+    permissions:
+      id-token: write
+      contents: read
+    with:
+      os: windows
+      compiler: cl
+      platform: x86_64
+      config: release
+      runs-on: '["Windows", "self-hosted", "GCP-T4"]'
+      warnings-as-errors: true
+      build-llvm: true
+      save-sccache: true
+
+  build-windows-debug:
+    needs: check-changes
+    if: needs.check-changes.outputs.should-build == 'true'
+    uses: ./.github/workflows/ci-slang-build.yml
+    permissions:
+      id-token: write
+      contents: read
+    with:
+      os: windows
+      compiler: cl
+      platform: x86_64
+      config: debug
+      runs-on: '["Windows", "self-hosted", "GCP-T4"]'
+      warnings-as-errors: true
+      build-llvm: true
+      save-sccache: true
+
   mark-cached:
     needs:
       [
@@ -310,6 +342,8 @@ jobs:
         build-macos-debug,
         build-linux-aarch64-release,
         build-linux-aarch64-debug,
+        build-windows-release,
+        build-windows-debug,
       ]
     if: |
       always() &&
@@ -319,7 +353,9 @@ jobs:
       needs.build-macos-release.result == 'success' &&
       needs.build-macos-debug.result == 'success' &&
       needs.build-linux-aarch64-release.result == 'success' &&
-      needs.build-linux-aarch64-debug.result == 'success'
+      needs.build-linux-aarch64-debug.result == 'success' &&
+      needs.build-windows-release.result == 'success' &&
+      needs.build-windows-debug.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

@@ -1203,9 +1203,24 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             // image operand here.
             auto image = subscript->getImage();
             if (auto load = as<IRLoad>(image))
+            {
                 subscript->setOperand(0, load->getPtr());
-
-            addUsersToWorkList(subscript);
+                addUsersToWorkList(subscript);
+            }
+            else if (auto loadDescriptor = as<IRSPIRVLoadDescriptorFromHeap>(image))
+            {
+                auto texelPtr = builder.emitSPIRVLoadTexelPointerFromHeap(
+                    newPtrType,
+                    loadDescriptor->getHeap(),
+                    loadDescriptor->getIndex(),
+                    loadDescriptor->getDataType(),
+                    subscript->getCoord(),
+                    subscript->hasSampleCoord() ? subscript->getSampleCoord()
+                                                : builder.getIntValue(builder.getIntType(), 0));
+                subscript->replaceUsesWith(texelPtr);
+                subscript->removeAndDeallocate();
+                addUsersToWorkList(texelPtr);
+            }
         }
     }
 
@@ -1548,6 +1563,31 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             auto newMakeVector = builder.emitMakeVector(inst->getDataType(), args);
             inst->replaceUsesWith(newMakeVector);
         }
+    }
+
+    void processMakeCombinedTextureSamplerFromHandle(IRInst* inst)
+    {
+        // Rewrite `MakeCombinedTextureSamplerFromHandle(uint2_handle)` to
+        // `MakeCombinedTextureSampler(
+        //      LoadDescriptorFromHeap(ResourceHeap, uint2_handle.x),
+        //      LoadDescriptorFromHeap(SamplerHeap, uint2_handle.y))`
+        auto textureType = getTextureTypeFromCombinedTextureSampler(inst->getDataType());
+        auto samplerType = getSamplerTypeFromCombinedTextureSampler(inst->getDataType());
+
+        IRBuilder builder(inst);
+        builder.setInsertBefore(inst);
+        auto texture = builder.emitLoadDescriptorFromHeap(
+            textureType,
+            builder.emitSPIRVResourceDescriptorHeap(),
+            builder.emitElementExtract(inst->getOperand(0), IRIntegerValue(0)));
+        auto sampler = builder.emitLoadDescriptorFromHeap(
+            samplerType,
+            builder.emitSPIRVSamplerDescriptorHeap(),
+            builder.emitElementExtract(inst->getOperand(0), IRIntegerValue(1)));
+        auto newInst =
+            builder.emitMakeCombinedTextureSampler(inst->getDataType(), texture, sampler);
+        inst->replaceUsesWith(newInst);
+        inst->removeAndDeallocate();
     }
 
     static bool isAsmInst(IRInst* inst)
@@ -1927,6 +1967,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             case kIROp_MakeOptionalValue:
             case kIROp_MakeOptionalNone:
                 processConstructor(inst);
+                break;
+            case kIROp_MakeCombinedTextureSamplerFromHandle:
+                processMakeCombinedTextureSamplerFromHandle(inst);
                 break;
             case kIROp_PtrLit:
                 processPtrLit(inst);
