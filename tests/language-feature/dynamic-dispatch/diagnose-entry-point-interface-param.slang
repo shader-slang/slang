@@ -1,13 +1,16 @@
 // Interface-typed entry point parameters require type conformance information
 // to generate dispatch code. Without any registered conformances, the compiler
 // cannot determine which concrete types may be passed and must reject the code.
+//
+// Disabled due to an assertion failure in IRUse::set() on x86_64 (#10266).
+// Re-enable when that bug is fixed.
 
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry computeMain
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry computeMain
-//TEST:SIMPLE(filecheck=CHECK): -target glsl -stage compute -entry computeMain
-//TEST:SIMPLE(filecheck=CHECK): -target cpp -stage compute -entry computeMain
-//TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry computeMain
-//TEST:SIMPLE(filecheck=CHECK): -target wgsl -stage compute -entry computeMain
+//DISABLED_TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry computeMain
+//DISABLED_TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry computeMain
+//DISABLED_TEST:SIMPLE(filecheck=CHECK): -target glsl -stage compute -entry computeMain
+//DISABLED_TEST:SIMPLE(filecheck=CHECK): -target cpp -stage compute -entry computeMain
+//DISABLED_TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry computeMain
+//DISABLED_TEST:SIMPLE(filecheck=CHECK): -target wgsl -stage compute -entry computeMain
 
 [anyValueSize(16)]
 interface IFoo

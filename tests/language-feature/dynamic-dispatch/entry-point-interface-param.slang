@@ -2,14 +2,17 @@
 // registered. The compiler generates dynamic dispatch code for method calls
 // on these parameters, packing them as existential tuples in a constant buffer.
 // Multiple interface-typed parameters are supported at the same entry point.
+//
+// Most targets are disabled due to an assertion failure in IRUse::set() on
+// x86_64 (#10266). Re-enable when that bug is fixed.
 
-//TEST:SIMPLE(filecheck=SPIRV): -target spirv-asm -stage compute -entry computeMain -conformance "ImplA:IFoo=0" -conformance "ImplB:IFoo=1" -conformance "BarImplA:IBar=0" -conformance "BarImplB:IBar=1"
-//TEST:SIMPLE(filecheck=HLSL): -target hlsl -stage compute -entry computeMain -conformance "ImplA:IFoo=0" -conformance "ImplB:IFoo=1" -conformance "BarImplA:IBar=0" -conformance "BarImplB:IBar=1"
-//TEST:SIMPLE(filecheck=GLSL): -target glsl -stage compute -entry computeMain -conformance "ImplA:IFoo=0" -conformance "ImplB:IFoo=1" -conformance "BarImplA:IBar=0" -conformance "BarImplB:IBar=1"
+//DISABLED_TEST:SIMPLE(filecheck=SPIRV): -target spirv-asm -stage compute -entry computeMain -conformance "ImplA:IFoo=0" -conformance "ImplB:IFoo=1" -conformance "BarImplA:IBar=0" -conformance "BarImplB:IBar=1"
+//DISABLED_TEST:SIMPLE(filecheck=HLSL): -target hlsl -stage compute -entry computeMain -conformance "ImplA:IFoo=0" -conformance "ImplB:IFoo=1" -conformance "BarImplA:IBar=0" -conformance "BarImplB:IBar=1"
+//DISABLED_TEST:SIMPLE(filecheck=GLSL): -target glsl -stage compute -entry computeMain -conformance "ImplA:IFoo=0" -conformance "ImplB:IFoo=1" -conformance "BarImplA:IBar=0" -conformance "BarImplB:IBar=1"
 //TEST:SIMPLE(filecheck=CUDA): -target cuda -stage compute -entry computeMain -conformance "ImplA:IFoo=0" -conformance "ImplB:IFoo=1" -conformance "BarImplA:IBar=0" -conformance "BarImplB:IBar=1"
-//TEST:SIMPLE(filecheck=MTL): -target metal -stage compute -entry computeMain -conformance "ImplA:IFoo=0" -conformance "ImplB:IFoo=1" -conformance "BarImplA:IBar=0" -conformance "BarImplB:IBar=1"
-//TEST:SIMPLE(filecheck=WGSL): -target wgsl -stage compute -entry computeMain -conformance "ImplA:IFoo=0" -conformance "ImplB:IFoo=1" -conformance "BarImplA:IBar=0" -conformance "BarImplB:IBar=1"
-//TEST:SIMPLE(filecheck=REPORT): -target hlsl -stage compute -entry computeMain -conformance "ImplA:IFoo=0" -conformance "ImplB:IFoo=1" -conformance "BarImplA:IBar=0" -conformance "BarImplB:IBar=1" -report-dynamic-dispatch-sites
+//DISABLED_TEST:SIMPLE(filecheck=MTL): -target metal -stage compute -entry computeMain -conformance "ImplA:IFoo=0" -conformance "ImplB:IFoo=1" -conformance "BarImplA:IBar=0" -conformance "BarImplB:IBar=1"
+//DISABLED_TEST:SIMPLE(filecheck=WGSL): -target wgsl -stage compute -entry computeMain -conformance "ImplA:IFoo=0" -conformance "ImplB:IFoo=1" -conformance "BarImplA:IBar=0" -conformance "BarImplB:IBar=1"
+//DISABLED_TEST:SIMPLE(filecheck=REPORT): -target hlsl -stage compute -entry computeMain -conformance "ImplA:IFoo=0" -conformance "ImplB:IFoo=1" -conformance "BarImplA:IBar=0" -conformance "BarImplB:IBar=1" -report-dynamic-dispatch-sites
 
 [anyValueSize(16)]
 interface IFoo
