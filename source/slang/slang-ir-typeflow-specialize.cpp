@@ -686,11 +686,8 @@ struct TypeFlowSpecializationContext
     //
     // Returns true if the interface is specialize-only (caller should bail out).
     //
-    bool diagnoseSpecializeOnlyInterface(IRWitnessTableSet* tableSet, SourceLoc callSiteLoc)
+    bool rejectSpecializeOnlyInterface(IRWitnessTableSet* tableSet, SourceLoc callSiteLoc)
     {
-        if (!sink)
-            return false;
-
         IRInst* conformanceType = nullptr;
         forEachInSet(
             tableSet,
@@ -4393,7 +4390,7 @@ struct TypeFlowSpecializationContext
                     auto tableSet = cast<IRWitnessTableSet>(
                         cast<IRSetTagType>(tableTag->getDataType())->getSet());
 
-                    if (diagnoseSpecializeOnlyInterface(tableSet, inst->sourceLoc))
+                    if (rejectSpecializeOnlyInterface(tableSet, inst->sourceLoc))
                     {
                         module->getContainerPool().free(&callArgs);
                         return false;
@@ -4420,7 +4417,7 @@ struct TypeFlowSpecializationContext
                         cast<IRSetTagType>(tableTag->getDataType())->getSet());
                     auto lookupKey = cast<IRStructKey>(innerTagMapOperand->getOperand(1));
 
-                    if (diagnoseSpecializeOnlyInterface(tableSet, inst->sourceLoc))
+                    if (rejectSpecializeOnlyInterface(tableSet, inst->sourceLoc))
                     {
                         module->getContainerPool().free(&callArgs);
                         return false;
