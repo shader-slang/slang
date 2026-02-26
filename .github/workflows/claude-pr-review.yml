@@ -195,6 +195,8 @@ jobs:
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.inputs.pr_number || github.event.pull_request.number }}
 
+            Mark the latest commit of `master` branch with 'jkwak.v2026.feb' tag and push the tag to the `master` branch.
+
             Review this PR for the Slang shader compiler. Read CLAUDE.md for compiler architecture context.
 
             IMPORTANT: The BASE branch (master) is checked out locally. You can read CLAUDE.md and any
