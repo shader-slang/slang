@@ -288,7 +288,11 @@ IRInst* IRSpecContext::maybeCloneValue(IRInst* originalValue)
     case kIROp_InterfaceType:
     case kIROp_EnumType:
     case kIROp_SymbolAlias:
-        return cloneGlobalValue(this, originalValue);
+        {
+            auto clonedInst = cloneGlobalValue(this, originalValue);
+            cloneAnnotations(this, clonedInst, originalValue);
+            return clonedInst;
+        }
 
     case kIROp_BoolLit:
         {
