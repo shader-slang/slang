@@ -5773,14 +5773,7 @@ Expr* SemanticsVisitor::maybeInsertImplicitOpForMemberBase(
     CheckBaseContext checkBaseContext,
     bool& outNeedDeref)
 {
-    auto derefExpr = maybeDereference(baseExpr, checkBaseContext);
-
-    if (derefExpr != baseExpr)
-        outNeedDeref = true;
-
-    baseExpr = derefExpr;
-
-    // In case our base expressin is still overloaded, we can perform
+    // In case our base expression is still overloaded, we can perform
     // some more refinement.
     //
     // Handle the case of an overloaded base expression
@@ -5815,17 +5808,14 @@ Expr* SemanticsVisitor::maybeInsertImplicitOpForMemberBase(
             overloadedExpr->loc,
             overloadedExpr);
         // TODO: handle other cases of OverloadedExpr that need filtering.
-
-        // The filtering may have resolved the OverloadedExpr into a concrete
-        // expression whose type is dereferenceable (e.g. a pointer to an
-        // interface). Since maybeDereference was already called before the
-        // OverloadedExpr filtering and could not dereference the OverloadedType,
-        // we need to try again now that the type is known.
-        auto derefExpr2 = maybeDereference(baseExpr, checkBaseContext);
-        if (derefExpr2 != baseExpr)
-            outNeedDeref = true;
-        baseExpr = derefExpr2;
     }
+
+    // Dereference after resolving overloaded expressions, so that the
+    // concrete type is available for pointer-like dereferences.
+    auto derefExpr = maybeDereference(baseExpr, checkBaseContext);
+    if (derefExpr != baseExpr)
+        outNeedDeref = true;
+    baseExpr = derefExpr;
 
     // If the base of the member lookup has an interface type
     // *without* a suitable this-type substitution, then we are
