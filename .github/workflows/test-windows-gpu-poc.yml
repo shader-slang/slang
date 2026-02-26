@@ -1,0 +1,80 @@
+# Test workflow for Windows GPU auto-scaling POC
+#
+# Targets runners with the 'poc' label so it only runs on the
+# test Scale Set Client runner, not on existing static runners.
+#
+# Trigger:
+#   gh workflow run test-windows-gpu-poc.yml
+
+name: Test Windows GPU POC
+
+on:
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: [self-hosted, Windows, GCP-T4, poc]
+    timeout-minutes: 30
+
+    steps:
+      - name: GPU check
+        run: nvidia-smi
+
+      - name: System info
+        run: |
+          systeminfo | findstr /B /C:"OS Name" /C:"OS Version"
+          echo.
+          echo === GPU ===
+          nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv
+        shell: cmd
+
+      - name: Build tools check
+        shell: pwsh
+        run: |
+          Write-Host "=== Checking build tools ==="
+
+          $tools = @{
+            "git"    = { git --version }
+            "cmake"  = { cmake --version | Select-Object -First 1 }
+            "ninja"  = { ninja --version }
+            "python" = { python --version }
+          }
+
+          foreach ($tool in $tools.GetEnumerator()) {
+            try {
+              $result = & $tool.Value
+              Write-Host "  $($tool.Key): $result"
+            } catch {
+              Write-Host "  $($tool.Key): NOT FOUND"
+            }
+          }
+
+      - name: sccache check
+        shell: pwsh
+        run: |
+          Write-Host "=== sccache ==="
+          try {
+            sccache --version
+            sccache --show-stats
+          } catch {
+            Write-Host "sccache not available (expected if using existing image without sccache)"
+          }
+
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 1
+
+      - name: Configure
+        shell: cmd
+        run: cmake --preset default
+
+      - name: Build (Release)
+        shell: cmd
+        run: cmake --build --preset release --target slangc
+
+      - name: Smoke test
+        shell: cmd
+        run: |
+          build\Release\bin\slangc.exe -help
+          echo Build and run succeeded!

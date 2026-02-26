@@ -1111,7 +1111,7 @@ DIAGNOSTIC(
     36120,
     Error,
     targetSwitchCapCasesConflict,
-    "the capability for case '$0' is '$1', which is conflicts with previous case which requires "
+    "the capability for case '$0' is '$1', which conflicts with previous case which requires "
     "'$2'."
     "In target_switch, if two cases are belong to the same target, then one capability set has to "
     "be a subset of the other.")

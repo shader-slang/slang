@@ -242,6 +242,7 @@ local insts = {
 								{ "valueType", "IRType" },
 								{ "accessQualifierOperand", "IRIntLit", optional = true },
 								{ "addressSpaceOperand", "IRIntLit", optional = true },
+								{ "dataLayout", "IRType", optional = true },
 							},
 						},
 					},
@@ -252,6 +253,7 @@ local insts = {
 								{ "valueType", "IRType" },
 								{ "accessQualifierOperand", "IRIntLit", optional = true },
 								{ "addressSpaceOperand", "IRIntLit", optional = true },
+								{ "dataLayout", "IRType", optional = true },
 							},
 						},
 					},
@@ -262,6 +264,7 @@ local insts = {
 								{ "valueType", "IRType" },
 								{ "accessQualifierOperand", "IRIntLit", optional = true },
 								{ "addressSpaceOperand", "IRIntLit", optional = true },
+								{ "dataLayout", "IRType", optional = true },
 							},
 						},
 					},
@@ -276,6 +279,7 @@ local insts = {
 								{ "valueType", "IRType" },
 								{ "accessQualifierOperand", "IRIntLit", optional = true },
 								{ "addressSpaceOperand", "IRIntLit", optional = true },
+								{ "dataLayout", "IRType", optional = true },
 							},
 						},
 					},
@@ -336,6 +340,10 @@ local insts = {
 			{ Std430Layout = { struct_name = "Std430BufferLayoutType", hoistable = true } },
 			{ ScalarLayout = { struct_name = "ScalarBufferLayoutType", hoistable = true } },
 			{ CLayout = { struct_name = "CBufferLayoutType", hoistable = true } },
+			{ D3DConstantBufferLayout = { struct_name = "D3DConstantBufferLayoutType", hoistable = true } },
+			{ MetalParameterBlockLayout = { struct_name = "MetalParameterBlockLayoutType", hoistable = true } },
+			{ CUDALayout = { struct_name = "CUDABufferLayoutType", hoistable = true } },
+			{ LLVMLayout = { struct_name = "LLVMBufferLayoutType", hoistable = true } },
 			{
 				SubpassInputType = {
 					operands = { { "elementType", "IRType" }, { "isMultisampleInst" } },
@@ -923,6 +931,7 @@ local insts = {
 	{ makeTuple = {} },
 	{ makeTargetTuple = { struct_name = "MakeTargetTuple" } },
 	{ makeValuePack = {} },
+	{ makeCombinedTextureSampler = { operands = { {"texture"}, {"sampler"} } } },
 	{ getTargetTupleElement = {} },
 	{
 		getTupleElement = {
@@ -934,6 +943,22 @@ local insts = {
 		LoadSamplerDescriptorFromHeap = {
 			operands = { { "index" } },
 		},
+	},
+	{
+		SPIRVLoadDescriptorFromHeap = {
+			operands = { { "heap" }, { "index" } },
+		},
+	},
+	{
+		SPIRVLoadTexelPointerFromHeap = {
+			operands = { { "heap" }, { "index" }, { "textureType" }, { "coord" }, { "sampleIndex" } },
+		},
+	},
+	{
+		SPIRVResourceHeap = { hoistable = true }
+	},
+	{
+		SPIRVSamplerHeap = { hoistable = true }
 	},
 	{ MakeCombinedTextureSamplerFromHandle = { operands = { { "handle" } } } },
 	{
