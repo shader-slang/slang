@@ -13,6 +13,7 @@ ExecStart=/opt/scaler/scaler \
     --url=https://github.com/shader-slang/slang \
     --name=windows-gpu-runners \
     --labels=Windows,self-hosted,GCP-T4 \
+    --platform=windows \
     --max-runners=5 \
     --min-runners=0 \
     --gcp-project=slang-runners \
