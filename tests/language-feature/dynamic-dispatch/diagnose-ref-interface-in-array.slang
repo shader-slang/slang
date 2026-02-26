@@ -71,7 +71,7 @@ float processMultipleArrays(__constref MultipleArrays c)
 }
 
 // Transitive nesting: struct field that is itself a struct containing an
-// interface array. Exercises typeInvolvesDynamicDispatchInterface() recursion
+// interface array. Exercises typeIncludesDynamicDispatch() recursion
 // through struct fields.
 struct InnerWithArray
 {

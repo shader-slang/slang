@@ -638,7 +638,9 @@ bool isOptionalExistentialType(IRInst* inst)
 
 // Returns true if the type is or transitively contains an interface type
 // that would require dynamic dispatch (i.e., not a COM interface and not builtin).
-static bool typeInvolvesDynamicDispatchInterface(IRType* type)
+// Note: does not currently unwrap IRSpecialize or IRPtrTypeBase; these are not
+// expected in practice for GPU shader parameters.
+static bool typeIncludesDynamicDispatch(IRType* type)
 {
     if (auto interfaceType = as<IRInterfaceType>(type))
         return !isComInterfaceType(interfaceType) && !isBuiltin(interfaceType);
@@ -647,22 +649,22 @@ static bool typeInvolvesDynamicDispatchInterface(IRType* type)
     {
         for (auto field : structType->getFields())
         {
-            if (typeInvolvesDynamicDispatchInterface((IRType*)field->getFieldType()))
+            if (typeIncludesDynamicDispatch((IRType*)field->getFieldType()))
                 return true;
         }
     }
 
     if (auto arrayType = as<IRArrayType>(type))
-        return typeInvolvesDynamicDispatchInterface((IRType*)arrayType->getElementType());
+        return typeIncludesDynamicDispatch((IRType*)arrayType->getElementType());
 
     if (auto optionalType = as<IROptionalType>(type))
-        return typeInvolvesDynamicDispatchInterface((IRType*)optionalType->getValueType());
+        return typeIncludesDynamicDispatch((IRType*)optionalType->getValueType());
 
     if (auto tupleType = as<IRTupleType>(type))
     {
         for (UInt i = 0; i < tupleType->getOperandCount(); i++)
         {
-            if (typeInvolvesDynamicDispatchInterface((IRType*)tupleType->getOperand(i)))
+            if (typeIncludesDynamicDispatch((IRType*)tupleType->getOperand(i)))
                 return true;
         }
     }
@@ -1413,7 +1415,7 @@ struct TypeFlowSpecializationContext
                         //
                         if ((paramDirection.kind == ParameterDirectionInfo::Kind::Ref ||
                              paramDirection.kind == ParameterDirectionInfo::Kind::BorrowIn) &&
-                            typeInvolvesDynamicDispatchInterface(paramType))
+                            typeIncludesDynamicDispatch(paramType))
                         {
                             if (!diagnosedRefParams.contains(param))
                             {
