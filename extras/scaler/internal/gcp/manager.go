@@ -141,17 +141,6 @@ func (m *Manager) selectZone(ctx context.Context) (string, error) {
 
 	var quotas []regionQuota
 
-	// Count how many of our VMs are already in each region
-	m.mu.Lock()
-	regionUsage := make(map[string]int)
-	for _, vm := range m.vms {
-		parts := strings.Split(vm.zone, "-")
-		if len(parts) >= 2 {
-			regionUsage[parts[0]+"-"+parts[1]]++
-		}
-	}
-	m.mu.Unlock()
-
 	quotaMetric := gpuQuotaMetric(m.config.GPUType)
 
 	for region, rzones := range regionZones {
@@ -167,7 +156,9 @@ func (m *Manager) selectZone(ctx context.Context) (string, error) {
 
 		for _, q := range regionInfo.GetQuotas() {
 			if q.GetMetric() == quotaMetric {
-				available := q.GetLimit() - q.GetUsage() - float64(regionUsage[region])
+				// GCP's reported usage already includes our running VMs,
+				// so we only need limit - usage (no double-subtraction).
+				available := q.GetLimit() - q.GetUsage()
 				quotas = append(quotas, regionQuota{
 					region:    region,
 					zone:      rzones[0],
@@ -177,7 +168,6 @@ func (m *Manager) selectZone(ctx context.Context) (string, error) {
 					"region", region,
 					"limit", q.GetLimit(),
 					"usage", q.GetUsage(),
-					"our_vms", regionUsage[region],
 					"available", available,
 				)
 				break
