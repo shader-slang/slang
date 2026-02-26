@@ -4,8 +4,6 @@
 // Expected: output[0] == 1.0 (gradient of d(test)/db)
 // Actual:   output[0] == 0.0 (gradient is lost)
 
-//TEST_IGNORE_FILE:
-
 struct S {
     float a;
     float b;
@@ -23,10 +21,12 @@ float test(float a, float b) {
     return s.a;
 }
 
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -entry computeMain -stage compute
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
+//TEST_INPUT:ubuffer(data=[0], stride=4):out,name=output
 
 RWStructuredBuffer<float> output;
 
+[shader("compute")]
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
     float a_val = 1.0;
@@ -42,4 +42,4 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID) {
     output[0] = dpB.d;
 }
 
-// CHECK: 1.0
+// CHECK: 1
