@@ -16,6 +16,7 @@ RWStructuredBuffer<float> output;
 float useBase(IBase b) { return b.base(); }
 float useDerived(IDerived d) { return d.derived() + useBase(d); }
 
+[shader("compute")]
 [numthreads(1,1,1)]
 void computeMain() {
     Impl i;
