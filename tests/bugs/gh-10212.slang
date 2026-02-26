@@ -1,4 +1,7 @@
-//DIAGNOSTIC_TEST:SIMPLE: -target spirv -entry computeMain -stage compute
+//TEST:SIMPLE(filecheck=CHECK): -target spirv-assembly -entry computeMain -stage compute
+// CHECK: OpEntryPoint GLCompute
+// CHECK: computeMain
+// CHECK-NOT: internal compiler error
 
 // Regression test: internal compiler error "unimplemented: assignment" on out/inout parameters
 // Issue: https://github.com/shader-slang/slang/issues/10212
