@@ -2269,10 +2269,10 @@ public:
 
     void checkGenericConstraintConformances(GenericDecl* genericDecl);
 
-    void _fillInGenericConstraintWitnessTableForInheritance(
+    void _fillInGenericConstraintPathResolutionTableForInheritance(
         Type* subType,
         Type* interfaceType,
-        WitnessTable* witnessTable);
+        WitnessTable* pathResolutionTable);
 
     bool isIntegerBaseType(BaseType baseType);
 

@@ -9180,10 +9180,10 @@ void SemanticsVisitor::calcOverridableCompletionCandidates(
 
 // Helper function to recursively fill in witness table entries for inheritance requirements
 // on generic type constraints. This establishes canonical paths for diamond conformance patterns.
-void SemanticsVisitor::_fillInGenericConstraintWitnessTableForInheritance(
+void SemanticsVisitor::_fillInGenericConstraintPathResolutionTableForInheritance(
     Type* subType,
     Type* interfaceType,
-    WitnessTable* witnessTable)
+    WitnessTable* pathResolutionTable)
 {
     auto interfaceDeclRefType = as<DeclRefType>(interfaceType);
     if (!interfaceDeclRefType)
@@ -9214,10 +9214,10 @@ void SemanticsVisitor::_fillInGenericConstraintWitnessTableForInheritance(
             nestedWitnessTable->witnessedType = subType;
             nestedWitnessTable->baseType = reqType;
 
-            witnessTable->add(inheritanceDecl, RequirementWitness(nestedWitnessTable));
+            pathResolutionTable->add(inheritanceDecl, RequirementWitness(nestedWitnessTable));
 
-            // Recursively fill in the nested witness table
-            _fillInGenericConstraintWitnessTableForInheritance(
+            // Recursively fill in the nested path resolution table
+            _fillInGenericConstraintPathResolutionTableForInheritance(
                 subType,
                 reqType,
                 nestedWitnessTable);
@@ -9225,7 +9225,7 @@ void SemanticsVisitor::_fillInGenericConstraintWitnessTableForInheritance(
         else
         {
             // Otherwise, store a reference to the canonical path instead.
-            witnessTable->add(inheritanceDecl, RequirementWitness(subIsReqWitness));
+            pathResolutionTable->add(inheritanceDecl, RequirementWitness(subIsReqWitness));
         }
     }
 }
@@ -9261,21 +9261,21 @@ void SemanticsVisitor::checkGenericConstraintConformances(GenericDecl* genericDe
         if (!superInterfaceDecl)
             continue;
 
-        // Create a witness table for this constraint
-        RefPtr<WitnessTable> constraintWitnessTable = constraintDecl->witnessTable;
-        if (!constraintWitnessTable)
+        // Create a path resolution table for this constraint
+        RefPtr<WitnessTable> pathResolutionTable = constraintDecl->pathResolutionTable;
+        if (!pathResolutionTable)
         {
-            constraintWitnessTable = new WitnessTable();
-            constraintWitnessTable->witnessedType = subType;
-            constraintWitnessTable->baseType = superType;
-            constraintDecl->witnessTable = constraintWitnessTable;
+            pathResolutionTable = new WitnessTable();
+            pathResolutionTable->witnessedType = subType;
+            pathResolutionTable->baseType = superType;
+            constraintDecl->pathResolutionTable = pathResolutionTable;
         }
 
-        // Recursively fill in the witness table for inheritance requirements
-        _fillInGenericConstraintWitnessTableForInheritance(
+        // Recursively fill in the path resolution table for inheritance requirements
+        _fillInGenericConstraintPathResolutionTableForInheritance(
             subType,
             superType,
-            constraintWitnessTable);
+            pathResolutionTable);
     }
 }
 

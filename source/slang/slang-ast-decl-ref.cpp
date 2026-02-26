@@ -227,7 +227,7 @@ RequirementWitness getUnspecializedLookupRec(
         {
             // For generic type constraints, we also have a witness table that stores
             // canonical paths for diamond conformance patterns.
-            witnessTable = constraintDeclRef.getDecl()->witnessTable;
+            witnessTable = constraintDeclRef.getDecl()->pathResolutionTable;
         }
 
         RequirementWitness requirementWitness;
