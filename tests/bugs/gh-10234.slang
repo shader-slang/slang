@@ -1,6 +1,6 @@
 //DIAGNOSTIC_TEST:SIMPLE: -target wgsl -entry main -stage compute
 
-// Regression test: int8_t/uint8_t on WGSL triggers ICE instead of diagnostic
+// Regression test: int8_t on WGSL triggers ICE instead of diagnostic
 // Issue: https://github.com/shader-slang/slang/issues/10234
 
 RWStructuredBuffer<int8_t> outputBuffer;
