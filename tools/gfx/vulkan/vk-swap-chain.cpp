@@ -27,9 +27,17 @@ void SwapchainImpl::destroySwapchainAndImages()
         m_api->vkDestroySwapchainKHR(m_api->m_device, m_swapChain, nullptr);
         m_swapChain = VK_NULL_HANDLE;
     }
+    for (Index i = 0; i < m_nextImageSemaphores.getCount(); ++i)
+    {
+        m_renderer->m_api.vkDestroySemaphore(
+            m_renderer->m_api.m_device,
+            m_nextImageSemaphores[i],
+            nullptr);
+    }
 
     // Mark that it is no longer used
     m_images.clear();
+    m_nextImageSemaphores.clear();
 }
 
 void SwapchainImpl::getWindowSize(int* widthOut, int* heightOut) const
@@ -165,6 +173,18 @@ Result SwapchainImpl::createSwapchainAndImages()
             vkImages.getBuffer());
     }
 
+    VkSemaphoreCreateInfo semaphoreCreateInfo = {};
+    semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+    m_nextImageSemaphores.setCount(numSwapChainImages);
+    for (Index i = 0; i < m_nextImageSemaphores.getCount(); ++i)
+    {
+        SLANG_VK_RETURN_ON_FAIL(m_api->vkCreateSemaphore(
+            m_api->m_device,
+            &semaphoreCreateInfo,
+            nullptr,
+            &m_nextImageSemaphores[i]));
+    }
+
     for (GfxIndex i = 0; i < m_desc.imageCount; i++)
     {
         ITextureResource::Desc imageDesc = {};
@@ -198,13 +218,6 @@ SwapchainImpl::~SwapchainImpl()
         m_api->vkDestroySurfaceKHR(m_api->m_instance, m_surface, nullptr);
         m_surface = VK_NULL_HANDLE;
     }
-    for (Index i = 0; i < m_nextImageSemaphores.getCount(); ++i)
-    {
-        m_renderer->m_api.vkDestroySemaphore(
-            m_renderer->m_api.m_device,
-            m_nextImageSemaphores[i],
-            nullptr);
-    }
 #if SLANG_APPLE_FAMILY
     CocoaUtil::destroyMetalLayer(m_metalLayer);
 #endif
@@ -232,20 +245,6 @@ Result SwapchainImpl::init(DeviceImpl* renderer, const ISwapchain::Desc& desc, W
     m_api = &renderer->m_api;
     m_queue = static_cast<CommandQueueImpl*>(desc.queue);
     m_windowHandle = window;
-
-    VkSemaphoreCreateInfo semaphoreCreateInfo = {};
-    semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-    for (uint32_t i = 0; i < m_desc.imageCount; ++i)
-    {
-        m_nextImageSemaphores.add({});
-        SLANG_VK_RETURN_ON_FAIL(renderer->m_api.vkCreateSemaphore(
-            renderer->m_api.m_device,
-            &semaphoreCreateInfo,
-            nullptr,
-            &m_nextImageSemaphores[i]));
-    }
-
-    m_queue = static_cast<CommandQueueImpl*>(desc.queue);
 
     // Make sure it's not set initially
     m_vkformat = VK_FORMAT_UNDEFINED;
