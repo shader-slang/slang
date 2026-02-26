@@ -1924,6 +1924,22 @@ struct ForwardDiffTranslationContext
         return InstPair(primalResult, nullptr);
     }
 
+    InstPair translateMakeOptionalNone(IRBuilder* builder, IRMakeOptionalNone* origMakeOptionalNone)
+    {
+        auto primalType =
+            (IRType*)findOrTranslatePrimalInst(builder, origMakeOptionalNone->getDataType());
+
+        auto primalResult = builder->emitMakeOptionalNone(primalType);
+
+        IRInst* diffResult = nullptr;
+
+        if (auto diffType = differentiateType(builder, primalType))
+        {
+            diffResult = builder->emitMakeOptionalNone(diffType);
+        }
+        return InstPair(primalResult, diffResult);
+    }
+
     InstPair translateDefaultConstruct(IRBuilder* builder, IRInst* origInst)
     {
         IRInst* primalConstruct = maybeCloneForPrimalInst(builder, origInst);
@@ -2382,6 +2398,9 @@ struct ForwardDiffTranslationContext
         case kIROp_MakeExistential:
             return translateMakeExistential(builder, as<IRMakeExistential>(origInst));
 
+        case kIROp_MakeOptionalNone:
+            return translateMakeOptionalNone(builder, as<IRMakeOptionalNone>(origInst));
+
         case kIROp_WrapExistential:
             return translateWrapExistential(builder, origInst);
 
@@ -2480,7 +2499,6 @@ struct ForwardDiffTranslationContext
         case kIROp_MakeResultError:
         case kIROp_IsResultError:
         case kIROp_GetResultError:
-        case kIROp_MakeOptionalNone:
         case kIROp_OptionalHasValue:
         case kIROp_LookupWitnessMethod:
         case kIROp_ExtractExistentialType:
