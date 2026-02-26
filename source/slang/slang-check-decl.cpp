@@ -7630,13 +7630,13 @@ bool SemanticsVisitor::checkConformance(
             auto superTypeDecl = superDeclRefType->getDeclRef().getDecl();
             if (superTypeDecl->findModifier<ComInterfaceAttribute>())
             {
-                // A struct cannot implement a COM Interface.
-                if (auto classDecl = as<ClassDecl>(superTypeDecl))
+                auto subTypeDecl = declRef.getDecl();
+                if (auto classDecl = as<ClassDecl>(subTypeDecl))
                 {
-                    // OK.
+                    // Classes can implement COM interfaces.
                     SLANG_UNUSED(classDecl);
                 }
-                else if (auto subInterfaceDecl = as<InterfaceDecl>(superTypeDecl))
+                else if (auto subInterfaceDecl = as<InterfaceDecl>(subTypeDecl))
                 {
                     if (!subInterfaceDecl->findModifier<ComInterfaceAttribute>())
                     {
@@ -7645,7 +7645,7 @@ bool SemanticsVisitor::checkConformance(
                             Diagnostics::interfaceInheritingComMustBeCom);
                     }
                 }
-                else if (const auto structDecl = as<StructDecl>(superTypeDecl))
+                else if (const auto structDecl = as<StructDecl>(subTypeDecl))
                 {
                     getSink()->diagnose(
                         inheritanceDecl,
@@ -8073,6 +8073,14 @@ void SemanticsDeclBasesVisitor::visitInterfaceDecl(InterfaceDecl* decl)
         // a circular inheritance relationship.
 
         _validateCrossModuleInheritance(decl, inheritanceDecl);
+
+        if (baseInterfaceDeclRef.getDecl()->findModifier<ComInterfaceAttribute>())
+        {
+            if (!decl->findModifier<ComInterfaceAttribute>())
+            {
+                getSink()->diagnose(inheritanceDecl, Diagnostics::interfaceInheritingComMustBeCom);
+            }
+        }
     }
 
     if (decl->findModifier<ComInterfaceAttribute>())
