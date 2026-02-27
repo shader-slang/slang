@@ -4503,7 +4503,8 @@ static PtrType* getValidTypeForAddressOf(
                 return m_astBuilder->getPtrType(
                     variableType,
                     AccessQualifier::ReadWrite,
-                    AddressSpace::Generic);
+                    AddressSpace::Generic,
+                    m_astBuilder->getDefaultLayoutType());
             }
             // Handle 'groupshared' variables.
             else if (hasHLSLGroupSharedModifier)
@@ -4511,7 +4512,8 @@ static PtrType* getValidTypeForAddressOf(
                 return m_astBuilder->getPtrType(
                     variableType,
                     AccessQualifier::ReadWrite,
-                    AddressSpace::GroupShared);
+                    AddressSpace::GroupShared,
+                    m_astBuilder->getDefaultLayoutType());
             }
         }
     }
@@ -4537,7 +4539,8 @@ static PtrType* getValidTypeForAddressOf(
         return m_astBuilder->getPtrType(
             variableType,
             ptrType->getAccessQualifier(),
-            ptrType->getAddressSpace());
+            ptrType->getAddressSpace(),
+            ptrType->getDataLayout());
     };
 
     // This logic handles the recursive lookup of "does our operation lead up
@@ -6266,7 +6269,8 @@ Expr* SemanticsExprVisitor::visitPointerTypeExpr(PointerTypeExpr* expr)
     auto ptrType = m_astBuilder->getPtrType(
         expr->base.type,
         AccessQualifier::ReadWrite,
-        AddressSpace::UserPointer);
+        AddressSpace::UserPointer,
+        m_astBuilder->getDefaultLayoutType());
     expr->type = m_astBuilder->getTypeType(ptrType);
     return expr;
 }

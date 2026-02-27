@@ -1,12 +1,9 @@
 name: Setup sccache
-description: Install and configure sccache with GCS backend (if bucket provided) or local disk backend for Linux and macOS
+description: Install and configure sccache with local disk backend for Linux, macOS, and Windows
 
 inputs:
-  gcs-bucket:
-    description: "GCS bucket name for sccache (optional - uses local disk if not provided)"
-    required: false
   platform:
-    description: "Platform: linux or macos"
+    description: "Platform: linux, macos, or windows"
     required: true
 
 runs:
@@ -49,33 +46,73 @@ runs:
         brew install sccache
         sccache --version
 
-    # Configure sccache backend (GCS or local disk)
-    - name: Configure sccache
+    - name: Install sccache (Windows)
+      if: inputs.platform == 'windows'
+      shell: pwsh
+      run: |
+        if (Get-Command sccache -ErrorAction SilentlyContinue) {
+          Write-Host "✅ sccache already installed: $(sccache --version)"
+        } else {
+          # Verify x64 architecture
+          if ($env:PROCESSOR_ARCHITECTURE -ne "AMD64") {
+            Write-Host "Unsupported Windows architecture: $env:PROCESSOR_ARCHITECTURE"
+            exit 1
+          }
+
+          Write-Host "Installing sccache for Windows..."
+          $installDir = Join-Path $env:RUNNER_TEMP "sccache-bin"
+          New-Item -ItemType Directory -Force -Path $installDir | Out-Null
+          $archive = Join-Path $env:RUNNER_TEMP "sccache.tar.gz"
+          curl -L -o $archive https://github.com/mozilla/sccache/releases/download/v0.7.4/sccache-v0.7.4-x86_64-pc-windows-msvc.tar.gz
+          tar xzf $archive -C $env:RUNNER_TEMP
+          Move-Item (Join-Path $env:RUNNER_TEMP "sccache-v0.7.4-x86_64-pc-windows-msvc/sccache.exe") (Join-Path $installDir "sccache.exe")
+          $installDir | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+          & (Join-Path $installDir "sccache.exe") --version
+        }
+
+    # Configure sccache with local disk backend
+    - name: Configure sccache (Unix)
+      if: inputs.platform != 'windows'
       shell: bash
       run: |
-        # Configure backend based on whether GCS bucket is provided
-        if [[ -n "${{ inputs.gcs-bucket }}" ]]; then
-          # GCS backend (internal PRs with authentication)
-          echo "SCCACHE_GCS_BUCKET=${{ inputs.gcs-bucket }}" >> $GITHUB_ENV
-          echo "SCCACHE_GCS_RW_MODE=READ_WRITE" >> $GITHUB_ENV
-          echo "🔧 sccache configured for GCS backend: ${{ inputs.gcs-bucket }}"
-        else
-          # Local disk backend (fork PRs without GCS access)
-          echo "🔧 sccache configured for local disk backend"
-        fi
-
         echo "SCCACHE_CACHE_ZSTD_LEVEL=3" >> $GITHUB_ENV
         echo "SCCACHE_IGNORE_SERVER_IO_ERROR=1" >> $GITHUB_ENV
         echo "SCCACHE_IDLE_TIMEOUT=0" >> $GITHUB_ENV
-        echo "SCCACHE_DIR=/tmp/.cache/sccache" >> $GITHUB_ENV
         echo "SCCACHE_BASE_DIR=$PWD" >> $GITHUB_ENV
+        echo "SCCACHE_CACHE_SIZE=2G" >> $GITHUB_ENV
+        echo "SCCACHE_DIR=/tmp/.cache/sccache" >> $GITHUB_ENV
+        echo "sccache_cache_dir=/tmp/.cache/sccache" >> $GITHUB_ENV
+        mkdir -p /tmp/.cache/sccache
 
-        # Limit local cache size to avoid disk space issues on runners
-        # Only applies to local disk backend (GCS has unlimited storage)
-        if [[ -z "${{ inputs.gcs-bucket }}" ]]; then
-          echo "SCCACHE_CACHE_SIZE=2G" >> $GITHUB_ENV
-        fi
-
-        # Get sccache path for CMake
         sccache_path=$(which sccache)
         echo "sccache_path=$sccache_path" >> $GITHUB_ENV
+
+        echo "🔧 sccache configured for local disk backend"
+
+    - name: Configure sccache (Windows)
+      if: inputs.platform == 'windows'
+      shell: pwsh
+      run: |
+        "SCCACHE_CACHE_ZSTD_LEVEL=3" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+        "SCCACHE_IGNORE_SERVER_IO_ERROR=1" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+        "SCCACHE_IDLE_TIMEOUT=0" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+        "SCCACHE_BASE_DIR=$PWD" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+        "SCCACHE_CACHE_SIZE=2G" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+        # Set Windows cache directory
+        $sccacheDir = "C:\sccache"
+        if (-not (Test-Path $sccacheDir -ErrorAction SilentlyContinue)) {
+          try {
+            New-Item -ItemType Directory -Force -Path $sccacheDir | Out-Null
+          } catch {
+            $sccacheDir = Join-Path $env:RUNNER_TEMP "sccache"
+            New-Item -ItemType Directory -Force -Path $sccacheDir | Out-Null
+          }
+        }
+        "SCCACHE_DIR=$sccacheDir" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+        "sccache_cache_dir=$sccacheDir" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+        $sccachePath = (Get-Command sccache).Source
+        "sccache_path=$sccachePath" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+        Write-Host "🔧 sccache configured for local disk backend ($sccacheDir)"

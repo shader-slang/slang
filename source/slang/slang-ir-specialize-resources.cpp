@@ -1437,7 +1437,8 @@ void legalizeModesOfNonCopyableOpaqueTypedParamsForGLSL(
                 kIROp_BorrowInParamType,
                 paramValueType,
                 paramPtrType->getAccessQualifier(),
-                paramPtrType->getAddressSpace());
+                paramPtrType->getAddressSpace(),
+                paramPtrType->getDataLayout());
             builder.setDataType(param, newParamPtrType);
         }
     }

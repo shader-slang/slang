@@ -58,6 +58,8 @@ void buildEntryPointReferenceGraph(
         {
         case kIROp_GlobalParam:
         case kIROp_SPIRVAsmOperandBuiltinVar:
+        case kIROp_SPIRVResourceHeap:
+        case kIROp_SPIRVSamplerHeap:
             registerEntryPointReference(entryPoint, inst);
             break;
         case kIROp_Block:
@@ -89,6 +91,8 @@ void buildEntryPointReferenceGraph(
             case kIROp_GlobalVar:
             case kIROp_SPIRVAsmOperandBuiltinVar:
             case kIROp_Generic:
+            case kIROp_SPIRVResourceHeap:
+            case kIROp_SPIRVSamplerHeap:
                 addToWorkList({entryPoint, operand});
                 break;
             }

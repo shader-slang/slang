@@ -343,6 +343,16 @@ runs:
           rm -f "$TOKEN_FILE"
         fi
 
+    # Clear raw secrets after auth — only the derived token is needed downstream.
+    # Writing empty values to GITHUB_ENV clears them for ALL subsequent steps.
+    - name: Clear raw credentials
+      shell: bash
+      run: |
+        echo "LLMGW_ID=" >> $GITHUB_ENV
+        echo "LLMGW_SECRET=" >> $GITHUB_ENV
+        echo "LLMGW_TOKEN_URL=" >> $GITHUB_ENV
+        echo "NV_INFERENCE_TOKEN=" >> $GITHUB_ENV
+
     # Run setup commands if provided
     - name: Run setup commands
       id: setup-commands
@@ -370,6 +380,65 @@ runs:
             fi
             ;;
         esac
+
+    # Try OIDC → Claude App token (posts as claude[bot]).
+    # Falls back to GITHUB_TOKEN if exchange fails (posts as github-actions[bot]).
+    # See claude-code-action#713 for pull_request_target OIDC limitation.
+    - name: Obtain GitHub Token
+      id: github-token
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+      run: |
+        set -euo pipefail
+        AUDIENCE="claude-code-github-action"
+        EXCHANGE_URL="https://api.anthropic.com/api/github/github-app-token-exchange"
+
+        # Get OIDC token
+        if [ -z "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" ] || [ -z "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ]; then
+          echo "OIDC not available, using GITHUB_TOKEN fallback"
+          echo "token=$GITHUB_TOKEN" >> $GITHUB_OUTPUT
+          echo "source=github-token" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+
+        OIDC_TOKEN=$(curl -s -f --max-time 10 \
+          -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+          "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=${AUDIENCE}" 2>/dev/null \
+          | jq -r '.value // empty' 2>/dev/null || true)
+
+        if [ -z "$OIDC_TOKEN" ]; then
+          echo "OIDC token request failed, using GITHUB_TOKEN fallback"
+          echo "token=$GITHUB_TOKEN" >> $GITHUB_OUTPUT
+          echo "source=github-token" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+
+        # Exchange OIDC token for Claude App installation token
+        EXCHANGE_RESPONSE="${RUNNER_TEMP:-/tmp}/oidc_exchange.json"
+        HTTP_CODE=$(curl -s -w "%{http_code}" -o "$EXCHANGE_RESPONSE" --max-time 15 \
+          -X POST "$EXCHANGE_URL" \
+          -H "Authorization: Bearer $OIDC_TOKEN" \
+          -H "Content-Type: application/json" \
+          -d '{"permissions":{"contents":"read","pull_requests":"write","issues":"write","actions":"read"}}' \
+          2>/dev/null || echo "000")
+
+        if [ "$HTTP_CODE" = "200" ] && [ -f "$EXCHANGE_RESPONSE" ]; then
+          APP_TOKEN=$(jq -r '.token // .app_token // empty' "$EXCHANGE_RESPONSE" 2>/dev/null || true)
+          if [ -n "$APP_TOKEN" ]; then
+            echo "::add-mask::$APP_TOKEN"
+            echo "token=$APP_TOKEN" >> $GITHUB_OUTPUT
+            echo "source=claude-app" >> $GITHUB_OUTPUT
+            rm -f "$EXCHANGE_RESPONSE"
+            echo "Using Claude App token"
+            exit 0
+          fi
+        fi
+
+        rm -f "$EXCHANGE_RESPONSE"
+        echo "OIDC exchange failed (HTTP $HTTP_CODE), using GITHUB_TOKEN fallback"
+        echo "token=$GITHUB_TOKEN" >> $GITHUB_OUTPUT
+        echo "source=github-token" >> $GITHUB_OUTPUT
 
     # Determine model based on auth provider
     - name: Determine Model
@@ -411,8 +480,8 @@ runs:
         ANTHROPIC_DEFAULT_SONNET_MODEL: ${{ inputs.nv-inference-sonnet-model || 'aws/anthropic/bedrock-claude-sonnet-4-5-v1' }}
         ANTHROPIC_DEFAULT_HAIKU_MODEL: ${{ inputs.nv-inference-haiku-model || 'aws/anthropic/claude-haiku-4-5-v1' }}
       with:
-        # Pass API key via the action's input (not env) - action sets ANTHROPIC_API_KEY internally
         anthropic_api_key: ${{ steps.auth-token.outputs.token }}
+        github_token: ${{ steps.github-token.outputs.token }}
         trigger_phrase: ${{ inputs.trigger-phrase }}
         assignee_trigger: ${{ inputs.assignee-trigger }}
         label_trigger: ${{ inputs.label-trigger }}
@@ -423,7 +492,6 @@ runs:
         include_fix_links: ${{ inputs.include-fix-links }}
         use_sticky_comment: ${{ inputs.use-sticky-comment }}
         branch_prefix: ${{ inputs.branch-prefix }}
-        additional_permissions: "actions: read"
         show_full_output: ${{ inputs.show-debug-output }}
         claude_args: |
           --system-prompt "${{ inputs.custom-instructions }}"
@@ -460,6 +528,7 @@ runs:
         ANTHROPIC_SMALL_FAST_MODEL: ${{ inputs.small-fast-model || 'us.anthropic.claude-sonnet-4-5-20250929-v1:0' }}
       with:
         use_bedrock: "true"
+        github_token: ${{ steps.github-token.outputs.token }}
         trigger_phrase: ${{ inputs.trigger-phrase }}
         assignee_trigger: ${{ inputs.assignee-trigger }}
         label_trigger: ${{ inputs.label-trigger }}
@@ -470,7 +539,6 @@ runs:
         include_fix_links: ${{ inputs.include-fix-links }}
         use_sticky_comment: ${{ inputs.use-sticky-comment }}
         branch_prefix: ${{ inputs.branch-prefix }}
-        additional_permissions: "actions: read"
         show_full_output: ${{ inputs.show-debug-output }}
         claude_args: |
           --system-prompt "${{ inputs.custom-instructions }}"
