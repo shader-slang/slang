@@ -665,17 +665,20 @@ public:
 #endif
         }
     }
-#if SLANG_GCC
+#if SLANG_GCC && __GNUC__ == 11
 // GCC 11 emits many incorrect warnings about the `strcmp` call below, e.g.:
 // ```
 // warning: `int strcmp(const char*, const char*)` of a string of length 2 and an array of size 1
 // evaluates to nonzero [-Wstring-compare]
 // ```
+// This is a false positive: GCC sees that getData() can return a static char[1]
+// and concludes that strcmp against longer strings is always nonzero, without
+// considering the dynamic m_buffer path.
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wstring-compare"
 #endif
     bool operator==(const char* strbuffer) const { return (strcmp(begin(), strbuffer) == 0); }
-#if SLANG_GCC
+#if SLANG_GCC && __GNUC__ == 11
 #pragma GCC diagnostic pop
 #endif
 
