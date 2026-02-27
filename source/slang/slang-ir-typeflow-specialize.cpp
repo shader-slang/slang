@@ -636,6 +636,42 @@ bool isOptionalExistentialType(IRInst* inst)
     return false;
 }
 
+// Returns true if the type is or transitively contains an interface type
+// that would require dynamic dispatch (i.e., not a COM interface and not builtin).
+// Note: does not currently unwrap IRSpecialize or IRPtrTypeBase; these are not
+// expected in practice for GPU shader parameters.
+static bool typeIncludesDynamicDispatch(IRType* type)
+{
+    if (auto interfaceType = as<IRInterfaceType>(type))
+        return !isComInterfaceType(interfaceType) && !isBuiltin(interfaceType);
+
+    if (auto structType = as<IRStructType>(type))
+    {
+        for (auto field : structType->getFields())
+        {
+            if (typeIncludesDynamicDispatch((IRType*)field->getFieldType()))
+                return true;
+        }
+    }
+
+    if (auto arrayType = as<IRArrayType>(type))
+        return typeIncludesDynamicDispatch((IRType*)arrayType->getElementType());
+
+    if (auto optionalType = as<IROptionalType>(type))
+        return typeIncludesDynamicDispatch((IRType*)optionalType->getValueType());
+
+    if (auto tupleType = as<IRTupleType>(type))
+    {
+        for (UInt i = 0; i < tupleType->getOperandCount(); i++)
+        {
+            if (typeIncludesDynamicDispatch((IRType*)tupleType->getOperand(i)))
+                return true;
+        }
+    }
+
+    return false;
+}
+
 // Parent context for the full type-flow pass.
 struct TypeFlowSpecializationContext
 {
@@ -1373,6 +1409,29 @@ struct TypeFlowSpecializationContext
                         const auto [paramDirection, paramType] =
                             splitParameterDirectionAndType(param->getDataType());
 
+                        // Reject __ref and __constref parameters that involve
+                        // interface types in dynamic dispatch contexts.
+                        // These are incompatible with the tagged union representation.
+                        //
+                        if ((paramDirection.kind == ParameterDirectionInfo::Kind::Ref ||
+                             paramDirection.kind == ParameterDirectionInfo::Kind::BorrowIn) &&
+                            typeIncludesDynamicDispatch(paramType))
+                        {
+                            if (!diagnosedRefParams.contains(param))
+                            {
+                                diagnosedRefParams.add(param);
+                                sink->diagnose(
+                                    param->sourceLoc,
+                                    Diagnostics::refParamWithInterfaceTypeInDynamicDispatch,
+                                    paramDirection.kind == ParameterDirectionInfo::Kind::Ref
+                                        ? UnownedStringSlice("__ref")
+                                        : UnownedStringSlice("__constref"),
+                                    paramType);
+                            }
+                            argIndex++;
+                            continue;
+                        }
+
                         // Only update if the parameter is not a concrete type.
                         //
                         // This is primarily just an optimization.
@@ -1395,6 +1454,7 @@ struct TypeFlowSpecializationContext
                         case ParameterDirectionInfo::Kind::Out:
                         case ParameterDirectionInfo::Kind::BorrowInOut:
                         case ParameterDirectionInfo::Kind::BorrowIn:
+                        case ParameterDirectionInfo::Kind::Ref:
                             {
                                 IRBuilder builder(module);
                                 if (!argInfo)
@@ -5627,6 +5687,10 @@ struct TypeFlowSpecializationContext
     // Basic context
     IRModule* module;
     DiagnosticSink* sink;
+
+    // Set of parameters already diagnosed for ref/constref interface issues,
+    // to avoid emitting duplicate diagnostics per call edge.
+    HashSet<IRInst*> diagnosedRefParams;
 
     // Mapping from (context, inst) --> propagated info
     Dictionary<InstWithContext, IRInst*> propagationMap;

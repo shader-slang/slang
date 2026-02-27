@@ -593,16 +593,16 @@ def SPV_KHR_subgroup_rotate : _spirv_1_3;
 /// [EXT]
 def SPV_NV_ray_tracing_motion_blur : _spirv_1_0;
 
-/// Represents the SPIR-V extension for shader invocation reorder (NVIDIA-specific).
-/// Requires SPV_KHR_ray_tracing.
-/// [EXT]
-def SPV_NV_shader_invocation_reorder : _spirv_1_5 + SPV_KHR_ray_tracing;
-
 /// Represents the SPIR-V extension for shader invocation reorder (cross-vendor standard).
 /// Requires SPV_KHR_ray_tracing and SPIR-V 1.5 (which includes physical storage buffer).
 /// Note: Spec allows SPIR-V 1.4 + physical_storage_buffer extension, but we require 1.5 for simplicity.
 /// [EXT]
 def SPV_EXT_shader_invocation_reorder : _spirv_1_5 + SPV_KHR_ray_tracing;
+
+/// Represents the SPIR-V extension for shader invocation reorder (NVIDIA-specific).
+/// Inherits from SPV_EXT_shader_invocation_reorder so NV implies EXT.
+/// [EXT]
+def SPV_NV_shader_invocation_reorder : SPV_EXT_shader_invocation_reorder;
 
 /// Represents the SPIR-V extension for cluster acceleration structure.
 /// [EXT]
@@ -659,6 +659,14 @@ def SPV_NV_bindless_texture: _spirv_1_0;
 /// Represents the SPIR-V extension for SPV_EXT_float8.
 /// [EXT]
 def SPV_EXT_float8: _spirv_1_0;
+
+/// Represents the SPIR-V extension for descriptor heaps.
+/// [EXT]
+def SPV_EXT_descriptor_heap : _spirv_1_0;
+
+/// Represents the SPIR-V extension for untyped pointers.
+/// [EXT]
+def SPV_KHR_untyped_pointers : _spirv_1_0;
 
 /// Represents the SPIR-V extension for BFloat16 types.
 /// [EXT]
@@ -795,13 +803,14 @@ def spvRayQueryKHR : SPV_KHR_ray_query;
 /// [EXT]
 def spvRayQueryPositionFetchKHR : SPV_KHR_ray_tracing_position_fetch + spvRayQueryKHR;
 
-/// Represents the SPIR-V capability for shader invocation reorder (NVIDIA-specific).
-/// [EXT]
-def spvShaderInvocationReorderNV : SPV_NV_shader_invocation_reorder;
-
 /// Represents the SPIR-V capability for shader invocation reorder (cross-vendor standard).
 /// [EXT]
 def spvShaderInvocationReorderEXT : SPV_EXT_shader_invocation_reorder;
+
+/// Represents the SPIR-V capability for shader invocation reorder (NVIDIA-specific).
+/// Inherits from spvShaderInvocationReorderEXT so that NV implies EXT capability.
+/// [EXT]
+def spvShaderInvocationReorderNV : SPV_NV_shader_invocation_reorder + spvShaderInvocationReorderEXT;
 
 /// Represents the SPIR-V capability for shader invocation reorder + motion blur (NVIDIA-specific).
 /// Used for motion blur variants of SER functions that require both extensions.
@@ -901,6 +910,10 @@ def spvVulkanMemoryModelDeviceScopeKHR : SPV_KHR_vulkan_memory_model;
 /// [EXT]
 def spvBindlessTextureNV : SPV_NV_bindless_texture;
 
+/// Represents the SPIR-V capability for descriptor heaps.
+/// [EXT]
+def spvDescriptorHeapEXT : SPV_EXT_descriptor_heap + SPV_KHR_untyped_pointers;
+
 // The following capabilities all pertain to how ray tracing shaders are translated
 // to GLSL, where there are two different extensions that can provide the core
 // functionality of `TraceRay` and the related operations.
@@ -976,8 +989,8 @@ def _GL_NV_gpu_shader5 : _GL_ARB_gpu_shader5;
 def _GL_NV_ray_tracing : _GL_EXT_ray_tracing;
 def _GL_NV_ray_tracing_motion_blur : _GLSL_460;
 def _GL_NV_shader_atomic_fp16_vector : _GL_NV_gpu_shader5;
-def _GL_NV_shader_invocation_reorder : _GLSL_460;
 def _GL_EXT_shader_invocation_reorder : _GLSL_460;
+def _GL_NV_shader_invocation_reorder : _GL_EXT_shader_invocation_reorder;
 alias _GL_NV_shader_invocation_reorder_motion = _GL_NV_shader_invocation_reorder + _GL_NV_ray_tracing_motion_blur;
 alias _GL_EXT_shader_invocation_reorder_motion = _GL_EXT_shader_invocation_reorder + _GL_NV_ray_tracing_motion_blur;
 def _GL_NV_shader_subgroup_partitioned : _GLSL_140;

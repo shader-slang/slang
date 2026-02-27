@@ -1268,19 +1268,30 @@ public struct WaveTangledVector<T, ShMemSize : ISharedMemorySize, int N, int Sub
         dthis = DifferentialPair<This>(dthis.p, dInput);
 
         // dW = dOut * input^T
+        // outerProductAccumulate uses per-warp shared memory for both A (dOutput vectors)
+        // and B (input vectors). The B region must start after ALL per-warp A regions to
+        // avoid overlapping writes between warps (warp i's A would alias warp (i-1)'s B).
+        static const int _outerRows = (MMA.M + MMA.CMShape.ROW_A - 1) / MMA.CMShape.ROW_A;
+        static const int _outerPerWarpA = _outerRows * MMA.CMShape.ROW_A / MMA.CMShape.ElementCountPerVector * MMA.CMShape.COLUMN_A;
+        uint shB_outer = shA + uint(getWaveCount() * _outerPerWarpA);
+
         MMA.outerProductAccumulate<T.Differential, Address.Differential,
                                    T.Differential, OutputVector.Differential,
                                    T, T[Uint4AlignedInputSize]
-                                  >( shA, shB, doutput, dthis.p.data, dWeightAddress.d);
+                                  >( shA, shB_outer, doutput, dthis.p.data, dWeightAddress.d);
 #else
         let dInput = MMA.mma<T, Address, OutputVector.Differential, This.Differential
                         >( doutput, shA, shB, shC, dWeightAddress.p, none);
         dthis = DifferentialPair<This>(dthis.p, dInput);
 
+        static const int _outerRows2 = (MMA.M + MMA.CMShape.ROW_A - 1) / MMA.CMShape.ROW_A;
+        static const int _outerPerWarpA2 = _outerRows2 * MMA.CMShape.ROW_A / MMA.CMShape.ElementCountPerVector * MMA.CMShape.COLUMN_A;
+        uint shB_outer2 = shA + uint(getWaveCount() * _outerPerWarpA2);
+
         MMA.outerProductAccumulate<T.Differential, Address.Differential,
                                     T.Differential, OutputVector.Differential,
                                     T, This
-                                  >( shA, shB, doutput, dthis.p, dWeightAddress.d);
+                                  >( shA, shB_outer2, doutput, dthis.p, dWeightAddress.d);
 #endif
 
         if (Bias)
