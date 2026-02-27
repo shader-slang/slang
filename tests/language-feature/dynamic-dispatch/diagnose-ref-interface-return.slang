@@ -1,5 +1,5 @@
-// Tests disabled: diagnostic 52010 not yet implemented (see #9906).
-// Enable when __ref/__constref dynamic dispatch diagnostic is added.
+// Tests disabled: diagnostic 52010 covers __ref/__constref parameters (#9906)
+// but has not been extended to ref accessor returns yet (see #10244).
 //DISABLED_TEST:SIMPLE(filecheck=CHECK): -target spirv
 //DISABLED_TEST:SIMPLE(filecheck=CHECK): -target hlsl
 
