@@ -2458,11 +2458,16 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
                     if (stride != 0)
                     {
-                        emitOpDecorateArrayStride(
+                        emitInstMemoizedNoResultIDCustomOperandFunc(
                             getSection(SpvLogicalSectionID::Annotations),
                             nullptr,
-                            arrayType,
-                            SpvLiteralInteger::from32(stride));
+                            SpvOpDecorate,
+                            [&]()
+                            {
+                                emitOperand(arrayType);
+                                emitOperand(SpvLiteralInteger::from32(SpvDecorationArrayStride));
+                                emitOperand(SpvLiteralInteger::from32(stride));
+                            });
                     }
                 }
                 return arrayType;
