@@ -636,6 +636,42 @@ bool isOptionalExistentialType(IRInst* inst)
     return false;
 }
 
+// Returns true if the type is or transitively contains an interface type
+// that would require dynamic dispatch (i.e., not a COM interface and not builtin).
+// Note: does not currently unwrap IRSpecialize or IRPtrTypeBase; these are not
+// expected in practice for GPU shader parameters.
+static bool typeIncludesDynamicDispatch(IRType* type)
+{
+    if (auto interfaceType = as<IRInterfaceType>(type))
+        return !isComInterfaceType(interfaceType) && !isBuiltin(interfaceType);
+
+    if (auto structType = as<IRStructType>(type))
+    {
+        for (auto field : structType->getFields())
+        {
+            if (typeIncludesDynamicDispatch((IRType*)field->getFieldType()))
+                return true;
+        }
+    }
+
+    if (auto arrayType = as<IRArrayType>(type))
+        return typeIncludesDynamicDispatch((IRType*)arrayType->getElementType());
+
+    if (auto optionalType = as<IROptionalType>(type))
+        return typeIncludesDynamicDispatch((IRType*)optionalType->getValueType());
+
+    if (auto tupleType = as<IRTupleType>(type))
+    {
+        for (UInt i = 0; i < tupleType->getOperandCount(); i++)
+        {
+            if (typeIncludesDynamicDispatch((IRType*)tupleType->getOperand(i)))
+                return true;
+        }
+    }
+
+    return false;
+}
+
 // Parent context for the full type-flow pass.
 struct TypeFlowSpecializationContext
 {
@@ -678,6 +714,51 @@ struct TypeFlowSpecializationContext
         return builder.getTaggedUnionType(
             tableSet,
             cast<IRTypeSet>(builder.getSet(kIROp_TypeSet, typeSet)));
+    }
+
+    // Check if a witness table set references a [Specialize]-only interface.
+    // If so, emit error 52008 — the compiler has determined that dynamic dispatch
+    // is needed, but the interface was explicitly marked for specialization only.
+    //
+    // Returns SLANG_FAIL if the interface is specialize-only (caller should bail out).
+    //
+    SlangResult rejectSpecializeOnlyInterface(IRWitnessTableSet* tableSet, SourceLoc callSiteLoc)
+    {
+        IRInst* conformanceType = nullptr;
+        forEachInSet(
+            tableSet,
+            [&](IRInst* table)
+            {
+                if (conformanceType)
+                    return;
+                IRInst* ifaceType = nullptr;
+                if (auto witnessTable = as<IRWitnessTable>(table))
+                {
+                    auto witnessTableType = as<IRWitnessTableType>(witnessTable->getDataType());
+                    if (witnessTableType)
+                        ifaceType = witnessTableType->getConformanceType();
+                }
+                else if (auto unbounded = as<IRUnboundedWitnessTableElement>(table))
+                {
+                    ifaceType = unbounded->getBaseInterfaceType();
+                }
+                else if (auto uninit = as<IRUninitializedWitnessTableElement>(table))
+                {
+                    ifaceType = uninit->getBaseInterfaceType();
+                }
+                if (ifaceType && ifaceType->findDecoration<IRSpecializeDecoration>())
+                    conformanceType = ifaceType;
+            });
+
+        if (conformanceType)
+        {
+            sink->diagnose(
+                callSiteLoc,
+                Diagnostics::dynamicDispatchOnSpecializeOnlyInterface,
+                conformanceType);
+            return SLANG_FAIL;
+        }
+        return SLANG_OK;
     }
 
     // Creates an 'empty' inst (denoted by nullptr), that
@@ -1373,6 +1454,29 @@ struct TypeFlowSpecializationContext
                         const auto [paramDirection, paramType] =
                             splitParameterDirectionAndType(param->getDataType());
 
+                        // Reject __ref and __constref parameters that involve
+                        // interface types in dynamic dispatch contexts.
+                        // These are incompatible with the tagged union representation.
+                        //
+                        if ((paramDirection.kind == ParameterDirectionInfo::Kind::Ref ||
+                             paramDirection.kind == ParameterDirectionInfo::Kind::BorrowIn) &&
+                            typeIncludesDynamicDispatch(paramType))
+                        {
+                            if (!diagnosedRefParams.contains(param))
+                            {
+                                diagnosedRefParams.add(param);
+                                sink->diagnose(
+                                    param->sourceLoc,
+                                    Diagnostics::refParamWithInterfaceTypeInDynamicDispatch,
+                                    paramDirection.kind == ParameterDirectionInfo::Kind::Ref
+                                        ? UnownedStringSlice("__ref")
+                                        : UnownedStringSlice("__constref"),
+                                    paramType);
+                            }
+                            argIndex++;
+                            continue;
+                        }
+
                         // Only update if the parameter is not a concrete type.
                         //
                         // This is primarily just an optimization.
@@ -1395,6 +1499,7 @@ struct TypeFlowSpecializationContext
                         case ParameterDirectionInfo::Kind::Out:
                         case ParameterDirectionInfo::Kind::BorrowInOut:
                         case ParameterDirectionInfo::Kind::BorrowIn:
+                        case ParameterDirectionInfo::Kind::Ref:
                             {
                                 IRBuilder builder(module);
                                 if (!argInfo)
@@ -4344,6 +4449,13 @@ struct TypeFlowSpecializationContext
 
                     auto tableSet = cast<IRWitnessTableSet>(
                         cast<IRSetTagType>(tableTag->getDataType())->getSet());
+
+                    if (SLANG_FAILED(rejectSpecializeOnlyInterface(tableSet, inst->sourceLoc)))
+                    {
+                        module->getContainerPool().free(&callArgs);
+                        return false;
+                    }
+
                     IRBuilder builder(module);
 
                     callee = builder.emitGetDispatcher(
@@ -4364,6 +4476,12 @@ struct TypeFlowSpecializationContext
                     auto tableSet = cast<IRWitnessTableSet>(
                         cast<IRSetTagType>(tableTag->getDataType())->getSet());
                     auto lookupKey = cast<IRStructKey>(innerTagMapOperand->getOperand(1));
+
+                    if (SLANG_FAILED(rejectSpecializeOnlyInterface(tableSet, inst->sourceLoc)))
+                    {
+                        module->getContainerPool().free(&callArgs);
+                        return false;
+                    }
 
                     List<IRInst*> specArgs;
                     for (UInt argIdx = 1; argIdx < specializedTagMapOperand->getOperandCount();
@@ -5627,6 +5745,10 @@ struct TypeFlowSpecializationContext
     // Basic context
     IRModule* module;
     DiagnosticSink* sink;
+
+    // Set of parameters already diagnosed for ref/constref interface issues,
+    // to avoid emitting duplicate diagnostics per call edge.
+    HashSet<IRInst*> diagnosedRefParams;
 
     // Mapping from (context, inst) --> propagated info
     Dictionary<InstWithContext, IRInst*> propagationMap;

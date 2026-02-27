@@ -95,6 +95,7 @@ protected:
         IRInst* varInst,
         IRType* valueType,
         IRVarLayout* layout) SLANG_OVERRIDE;
+    virtual void _emitType(IRType* type, DeclaratorInfo* declarator) SLANG_OVERRIDE;
     virtual void emitSimpleTypeImpl(IRType* type) SLANG_OVERRIDE;
     virtual void emitVectorTypeNameImpl(IRType* elementType, IRIntegerValue elementCount)
         SLANG_OVERRIDE;

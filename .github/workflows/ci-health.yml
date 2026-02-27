@@ -1,0 +1,42 @@
+name: CI Health
+
+on:
+  schedule:
+    - cron: "*/15 * * * *" # Every 15 minutes
+  workflow_dispatch: {} # Manual trigger
+
+jobs:
+  update-health:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Checkout analytics repo
+        uses: actions/checkout@v4
+        with:
+          repository: shader-slang/slang-ci-analytics
+          path: ci_analytics_repo
+          token: ${{ secrets.CI_ANALYTICS_PAT }}
+
+      - name: Generate health page
+        env:
+          GH_TOKEN: ${{ secrets.CI_ANALYTICS_PAT }}
+        run: |
+          python3 extras/ci/analytics/ci_health.py \
+            --output ci_analytics_repo
+
+      - name: Push health page
+        run: |
+          cd ci_analytics_repo
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add health.html
+          git add health_snapshots.jsonl 2>/dev/null || true
+          git diff --cached --quiet || {
+            git commit -m "Update CI health $(date -u +%Y-%m-%dT%H:%M)" &&
+            git push
+          }
