@@ -5710,6 +5710,12 @@ SlangResult innerMain(int argc, char** argv)
     // If -only-api-detection mode, run API detection and exit
     if (options.apiDetectionOnly)
     {
+        // Create a TestReporter since _getAvailableRenderApiFlags may use it in verbose mode
+        TestReporter reporter;
+        SLANG_RETURN_ON_FAIL(reporter.init(options.outputMode, options.expectedFailureList));
+        context.setTestReporter(&reporter);
+        reporter.m_verbosity = options.verbosity;
+
         _getAvailableRenderApiFlags(&context);
 
         // Print which APIs were not checked

@@ -462,10 +462,22 @@ static bool _isSubCommand(const char* arg)
         }
         else if (strcmp(arg, "-skip-api-detection") == 0)
         {
+            if (optionsOut->apiDetectionOnly)
+            {
+                stdError.print(
+                    "error: -only-api-detection and -skip-api-detection are mutually exclusive\n");
+                return SLANG_FAIL;
+            }
             optionsOut->skipApiDetection = true;
         }
         else if (strcmp(arg, "-only-api-detection") == 0)
         {
+            if (optionsOut->skipApiDetection)
+            {
+                stdError.print(
+                    "error: -only-api-detection and -skip-api-detection are mutually exclusive\n");
+                return SLANG_FAIL;
+            }
             optionsOut->apiDetectionOnly = true;
         }
         else if (strcmp(arg, "-emit-spirv-via-glsl") == 0)
