@@ -772,6 +772,16 @@ void initCommandOptions(CommandOptions& options)
          "-bindless-space-index",
          "-bindless-space-index <index>",
          "Specify the space index for the system defined global bindless resource array."},
+        {OptionKind::SPIRVResourceHeapStride,
+         "-spirv-resource-heap-stride",
+         "-spirv-resource-heap-stride <stride>",
+         "Specify the byte stride for the resource descriptor heap when generating SPIRV with "
+         "spvDescriptorHeapEXT. Defaults to 0, which will use OpConstantSizeOfEXT(ResourceType)."},
+        {OptionKind::SPIRVSamplerHeapStride,
+         "-spirv-sampler-heap-stride",
+         "-spirv-sampler-heap-stride <stride>",
+         "Specify the byte stride for the sampler descriptor heap when generating SPIRV with "
+         "spvDescriptorHeapEXT. Defaults to 0, which will use OpConstantSizeOfEXT(OpTypeSampler)."},
         {OptionKind::EmitSeparateDebug,
          "-separate-debug-info",
          nullptr,
@@ -3259,10 +3269,12 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 break;
             }
         case OptionKind::BindlessSpaceIndex:
+        case OptionKind::SPIRVSamplerHeapStride:
+        case OptionKind::SPIRVResourceHeapStride:
             {
                 Int index = 0;
                 SLANG_RETURN_ON_FAIL(_expectInt(arg, index));
-                linkage->m_optionSet.add(OptionKind::BindlessSpaceIndex, (int)index);
+                linkage->m_optionSet.add(optionKind, (int)index);
                 break;
             }
         case OptionKind::DumpModule:
