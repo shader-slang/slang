@@ -1,7 +1,5 @@
-// Tests disabled: diagnostic 52010 not yet implemented (see #9906).
-// Enable when __ref/__constref dynamic dispatch diagnostic is added.
-//DISABLED_TEST:SIMPLE(filecheck=CHECK): -target spirv
-//DISABLED_TEST:SIMPLE(filecheck=CHECK): -target hlsl
+//TEST:SIMPLE(filecheck=CHECK): -target spirv
+//TEST:SIMPLE(filecheck=CHECK): -target hlsl
 
 // __ref and __constref parameters with interface types are not supported
 // in dynamic dispatch contexts. This test checks that the compiler
@@ -26,14 +24,14 @@ struct ImplB : IFoo
 }
 
 // Scenario 1: Direct __ref interface parameter
-// CHECK: ([[# @LINE+1]]): error 52010: '__ref' parameter of type 'IFoo' cannot be used in dynamic dispatch context.
+// CHECK: ([[# @LINE+1]]): error 52010: '__ref' parameter of type 'IFoo' cannot be used in a dynamic dispatch context.
 float processRef(__ref IFoo obj)
 {
     return obj.getValue();
 }
 
 // Scenario 2: Direct __constref interface parameter
-// CHECK: ([[# @LINE+1]]): error 52010: '__constref' parameter of type 'IFoo' cannot be used in dynamic dispatch context.
+// CHECK: ([[# @LINE+1]]): error 52010: '__constref' parameter of type 'IFoo' cannot be used in a dynamic dispatch context.
 float processConstref(__constref IFoo obj)
 {
     return obj.getValue();
