@@ -44,10 +44,14 @@ public:
         , m_hasRegisteredCoreModule(false)
     {
 
+        // Each queryInterface below addRef's the returned pointer. The immediate
+        // release() is safe because m_actual (a ComPtr) holds a strong reference
+        // to the same underlying object, so the QI result is never the sole ref.
         // IComponentType is always expected to be supported
         actual->queryInterface(slang::IComponentType::getTypeGuid(), (void**)&m_componentType);
         if (m_componentType)
-            m_componentType->release(); // undo addRef - m_actual holds the ref
+            m_componentType->release();
+        SLANG_ASSERT(m_componentType);
 
         // Probe for derived interfaces
         actual->queryInterface(slang::IModule::getTypeGuid(), (void**)&m_module);
@@ -70,6 +74,10 @@ public:
         m_returnedEntryPoints.clear();
     }
 
+    // Uses Slang AST internals to discover the core module so it can be wrapped
+    // for replay handle tracking. There is currently no public API on IGlobalSession
+    // or ISession to retrieve builtin/core modules (getLoadedModule only returns
+    // user-loaded modules).
     void tryRegisterCoreModule()
     {
         if (!m_module || m_hasRegisteredCoreModule)
@@ -80,7 +88,12 @@ public:
             slang::TypeReflection* coreType = layout->findTypeByName("int");
             Slang::DeclRefType* declRefType =
                 Slang::as<Slang::DeclRefType>(Slang::asInternal(coreType));
+            SLANG_ASSERT(declRefType);
+            if (!declRefType)
+                return;
             IModule* owningModule = Slang::getModule(declRefType->getDeclRef().getDecl());
+            if (!owningModule)
+                return;
             wrapObject(owningModule);
             m_hasRegisteredCoreModule = true;
         }
