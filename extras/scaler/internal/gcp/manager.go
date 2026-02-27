@@ -361,6 +361,10 @@ func (m *Manager) cleanupTerminatedVMs(ctx context.Context) {
 	ticker := time.NewTicker(2 * time.Minute)
 	defer ticker.Stop()
 
+	// Run one pass immediately on startup so orphaned VMs are reclaimed
+	// without waiting for the first ticker interval.
+	m.doCleanupTerminatedVMs(ctx)
+
 	for {
 		select {
 		case <-ctx.Done():
