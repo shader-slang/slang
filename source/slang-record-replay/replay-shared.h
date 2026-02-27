@@ -66,6 +66,10 @@ struct SuppressRefCountRecording
 /// of which interface or inheritance path the input pointer came through.
 /// Suppresses ref-count recording so proxy addRef/release are not logged.
 /// Returns nullptr if obj is nullptr or queryInterface fails.
+///
+/// IMPORTANT: The returned pointer is valid only as long as the object is kept
+/// alive by some other strong reference (e.g. a ComPtr, m_actual, or the caller's
+/// own ref). The QI addRef is immediately undone, so the result is a borrowed pointer.
 template<typename T>
 inline ISlangUnknown* toSlangUnknown(T* obj)
 {
