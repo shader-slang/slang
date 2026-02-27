@@ -101,6 +101,8 @@ public:
         ISlangBlob** outDiagnostics) override
     {
         RECORD_CALL();
+        // recordArray calls record() per element, which dispatches to
+        // recordInterfaceImpl and unwraps each proxy to its implementation.
         RECORD_INPUT_ARRAY(componentTypes, componentTypeCount);
         PREPARE_POINTER_OUTPUT(outCompositeComponentType);
         PREPARE_POINTER_OUTPUT(outDiagnostics);
