@@ -1964,6 +1964,12 @@ DIAGNOSTIC(
     "entry point '$0' cannot return type '$1' that contains resource types")
 
 DIAGNOSTIC(
+    38012,
+    Error,
+    entryPointCannotReturnArrayType,
+    "entry point '$0' cannot return array type '$1'")
+
+DIAGNOSTIC(
     38100,
     Error,
     typeDoesntImplementInterfaceRequirement,
