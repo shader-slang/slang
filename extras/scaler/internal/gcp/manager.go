@@ -422,7 +422,12 @@ func (m *Manager) doCleanupTerminatedVMs(ctx context.Context) {
 
 			// Also remove from tracked VMs if still there
 			m.mu.Lock()
-			delete(m.vms, name)
+			for runnerName, vm := range m.vms {
+				if runnerName == name || vm.vmName == name {
+					delete(m.vms, runnerName)
+					break
+				}
+			}
 			m.mu.Unlock()
 		}
 		cancelList()
