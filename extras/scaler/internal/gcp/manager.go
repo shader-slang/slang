@@ -23,6 +23,7 @@ import (
 const (
 	cleanupZoneScanTimeout = 30 * time.Second
 	cleanupDeleteTimeout   = 45 * time.Second
+	defaultCleanupInterval = 2 * time.Minute
 )
 
 //go:embed startup.ps1
@@ -39,6 +40,7 @@ type ManagerConfig struct {
 	GPUType          string // GPU accelerator type (e.g., "nvidia-tesla-t4")
 	Platform         string // "windows" or "linux"
 	VMPrefix         string // VM name prefix for cleanup (e.g., "win-runner" or "linux-runner")
+	CleanupInterval  time.Duration
 }
 
 type vmInfo struct {
@@ -78,6 +80,9 @@ func NewManager(ctx context.Context, cfg ManagerConfig) (*Manager, error) {
 	}
 	if cfg.Platform == "" {
 		cfg.Platform = "windows"
+	}
+	if cfg.CleanupInterval <= 0 {
+		cfg.CleanupInterval = defaultCleanupInterval
 	}
 
 	cleanupCtx, cancelCleanup := context.WithCancel(ctx)
@@ -364,7 +369,7 @@ func (m *Manager) deleteVM(ctx context.Context, vmName, zone string) error {
 // This catches VMs that self-terminated (via shutdown in the startup script)
 // but weren't cleaned up by the scaler (e.g., after a restart).
 func (m *Manager) cleanupTerminatedVMs(ctx context.Context) {
-	ticker := time.NewTicker(2 * time.Minute)
+	ticker := time.NewTicker(m.config.CleanupInterval)
 	defer ticker.Stop()
 
 	m.runCleanupLoop(ctx, ticker.C)

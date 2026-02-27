@@ -32,6 +32,7 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/actions/scaleset"
 	"github.com/actions/scaleset/listener"
@@ -65,6 +66,7 @@ type config struct {
 	gcpInstanceTemplate string
 	gcpGPUType          string
 	gcpPlatform         string
+	gcpCleanupInterval  time.Duration
 }
 
 func (c *config) buildLabels() []scaleset.Label {
@@ -144,6 +146,7 @@ func parseFlags() config {
 	flag.StringVar(&cfg.gcpInstanceTemplate, "gcp-instance-template", "windows-gpu-runner", "GCP instance template name")
 	flag.StringVar(&cfg.gcpGPUType, "gcp-gpu-type", "nvidia-tesla-t4", "GPU accelerator type")
 	flag.StringVar(&cfg.gcpPlatform, "platform", "windows", "Runner platform: windows or linux")
+	flag.DurationVar(&cfg.gcpCleanupInterval, "gcp-cleanup-interval", 2*time.Minute, "Interval for scanning and deleting terminated VMs")
 
 	flag.Parse()
 
@@ -175,6 +178,14 @@ func parseFlags() config {
 	}
 	if v := os.Getenv("SCALER_APP_PRIVATE_KEY"); v != "" && cfg.appPrivateKey == "" {
 		cfg.appPrivateKey = v
+	}
+	if v := os.Getenv("SCALER_GCP_CLEANUP_INTERVAL"); v != "" {
+		d, err := time.ParseDuration(v)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: invalid SCALER_GCP_CLEANUP_INTERVAL %q: %v\n", v, err)
+			os.Exit(1)
+		}
+		cfg.gcpCleanupInterval = d
 	}
 
 	return cfg
@@ -269,6 +280,7 @@ func run(ctx context.Context, cfg config, logger *slog.Logger) error {
 		GPUType:          cfg.gcpGPUType,
 		Platform:         cfg.gcpPlatform,
 		VMPrefix:         vmPrefix,
+		CleanupInterval:  cfg.gcpCleanupInterval,
 	})
 	if err != nil {
 		return fmt.Errorf("creating GCP VM manager: %w", err)
