@@ -118,6 +118,10 @@ IFoo factory(uint id)
 
 RWStructuredBuffer<float> outputBuffer;
 
+// The diagnostic fires at the ref accessor declaration for all five
+// scenarios above. Only scenarios 1-3 are exercised below to show
+// typical consumer patterns; scenarios 4-5 (Tuple, Optional) don't
+// need runtime usage since the error is caught at declaration time.
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
