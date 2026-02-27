@@ -49,6 +49,15 @@ target_include_directories(
     INTERFACE ${SLANG_FIDDLE_OUTPUT_DIR}
 )
 
+# Optimize slang-rich-diagnostics.cpp for size regardless of build type.
+# This file includes generated fiddle code that can be large.
+set_source_files_properties(
+    slang-rich-diagnostics.cpp
+    PROPERTIES
+        COMPILE_OPTIONS
+            "$<IF:$<CXX_COMPILER_ID:MSVC>,/O1;/Os,-Oz>"
+)
+
 #
 # generate capability files
 #
