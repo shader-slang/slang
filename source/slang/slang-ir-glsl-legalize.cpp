@@ -2362,8 +2362,11 @@ ScalarizedVal extractField(
                     }
                 }
             }
+            auto fieldType = getFieldType(dataType, fieldKey);
+            if (!fieldType)
+                return ScalarizedVal();
             return ScalarizedVal::value(
-                builder->emitFieldExtract(getFieldType(dataType, fieldKey), val.irValue, fieldKey));
+                builder->emitFieldExtract(fieldType, val.irValue, fieldKey));
         }
 
     case ScalarizedVal::Flavor::address:
