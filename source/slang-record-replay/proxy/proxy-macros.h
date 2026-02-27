@@ -55,7 +55,10 @@ namespace SlangRecord
 #define RECORD_OUTPUT(arg) _ctx.record(RecordFlag::Output, *arg)
 
 // Prepare a pointer output parameter (T** style)
-// Creates a temporary local variable if the pointer is null
+// Creates a temporary local variable if the pointer is null.
+// The temporary lives until the end of the enclosing scope, so this macro
+// must be used at function-body scope (not inside an inner block) to ensure
+// the temporary outlives all subsequent uses of `arg`.
 // Usage: PREPARE_POINTER_OUTPUT(outBlob) where outBlob is ISlangBlob**
 //        or PREPARE_POINTER_OUTPUT(pathTypeOut) where pathTypeOut is SlangPathType*
 #define PREPARE_POINTER_OUTPUT(arg)             \
@@ -211,13 +214,14 @@ struct DefaultValue<T*>
     static T* get() { return nullptr; }
 };
 
-// Specialization for reference types - need static storage
+// Specialization for reference types - need static storage.
+// thread_local so concurrent replay threads don't share (and race on) the same object.
 template<typename T>
 struct DefaultValue<T&>
 {
     static T& get()
     {
-        static T value{};
+        thread_local static T value{};
         return value;
     }
 };
@@ -227,7 +231,7 @@ struct DefaultValue<const T&>
 {
     static const T& get()
     {
-        static T value{};
+        thread_local static T value{};
         return value;
     }
 };
