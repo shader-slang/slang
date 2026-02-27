@@ -16,7 +16,6 @@
 #include "slang-artifact-representation-impl.h"
 #include "slang-artifact-util.h"
 #include "slang-com-helper.h"
-#include "slang-slice-allocator.h"
 
 namespace Slang
 {
@@ -88,16 +87,6 @@ SlangResult CommandLineDownstreamCompiler::compile(
     auto diagnostics = ArtifactDiagnostics::create();
     ArtifactUtil::addAssociated(resultArtifact, diagnostics);
 
-    // Separate compilation and linking into two stages for C++ host targets.
-    // This is needed so that when Slang is built with sanitizers (ASan), the sanitizer runtime
-    // is linked only during the link stage without instrumenting the Slang-generated C++ code.
-    // Only applies to targets that go through a C++ compile+link flow; shader targets (e.g.
-    // Metal) must not be split as they have their own single-stage compilation model.
-    bool shouldSeparateCompileAndLink = options.targetType == SLANG_HOST_EXECUTABLE ||
-                                        options.targetType == SLANG_SHADER_SHARED_LIBRARY ||
-                                        options.targetType == SLANG_HOST_SHARED_LIBRARY ||
-                                        options.targetType == SLANG_SHADER_HOST_CALLABLE;
-
     auto helper = DefaultArtifactHelper::getSingleton();
 
     List<ComPtr<IArtifact>> artifactList;
@@ -131,91 +120,6 @@ SlangResult CommandLineDownstreamCompiler::compile(
         modulePath = lockFile->getPath();
 
         options.modulePath = SliceUtil::asTerminatedCharSlice(modulePath);
-    }
-
-    // Compile stage if executable target: compile source to object code
-
-    List<ComPtr<IArtifact>> compileArtifacts;
-    ComPtr<IArtifact> objectArtifact;
-
-    if (shouldSeparateCompileAndLink)
-    {
-        CompileOptions compileOptions = options;
-        compileOptions.targetType = SLANG_OBJECT_CODE;
-
-        CommandLine compileCmdLine(m_cmdLine);
-        if (SLANG_FAILED(calcArgs(compileOptions, compileCmdLine)))
-        {
-            *outArtifact = resultArtifact.detach();
-            return SLANG_FAIL;
-        }
-
-        if (SLANG_FAILED(calcCompileProducts(
-                compileOptions,
-                DownstreamProductFlag::All,
-                lockFile,
-                compileArtifacts)))
-        {
-            *outArtifact = resultArtifact.detach();
-            return SLANG_FAIL;
-        }
-
-        // Find the object file (.o/.obj) artifact by kind (robust to artifact ordering changes)
-        for (auto& a : compileArtifacts)
-        {
-            if (a->getDesc().kind == ArtifactKind::ObjectCode)
-            {
-                objectArtifact = a;
-                break;
-            }
-        }
-        if (!objectArtifact)
-        {
-            *outArtifact = resultArtifact.detach();
-            return SLANG_FAIL;
-        }
-
-        ExecuteResult compileResult;
-        SlangResult executeRes = ProcessUtil::execute(compileCmdLine, compileResult);
-        if (SLANG_FAILED(executeRes))
-        {
-            ArtifactDiagnostic diagnostic;
-            diagnostic.severity = ArtifactDiagnostic::Severity::Error;
-            diagnostic.stage = ArtifactDiagnostic::Stage::Compile;
-            String executeErrorMsg("failed to execute compiler process");
-            diagnostic.text = SliceUtil::asTerminatedCharSlice(executeErrorMsg);
-            if (compileResult.standardError.getLength() > 0)
-            {
-                diagnostics->appendRaw(asCharSlice(compileResult.standardError.getUnownedSlice()));
-            }
-            diagnostics->add(diagnostic);
-            diagnostics->setResult(SLANG_FAIL);
-        }
-        if (SLANG_FAILED(parseOutput(compileResult, diagnostics)))
-        {
-            *outArtifact = resultArtifact.detach();
-            return SLANG_FAIL;
-        }
-        if (SLANG_FAILED(executeRes))
-        {
-            *outArtifact = resultArtifact.detach();
-            return SLANG_FAIL;
-        }
-
-        // If compilation failed, return the diagnostics
-        if (compileResult.resultCode != 0 || !objectArtifact->exists())
-        {
-            *outArtifact = resultArtifact.detach();
-            return SLANG_FAIL;
-        }
-    }
-
-    // Link stage if executable target, or single-stage compile for all other targets
-
-    if (shouldSeparateCompileAndLink)
-    {
-        // Pass compiled object to linker
-        options.sourceArtifacts = makeSlice(objectArtifact.readRef(), 1);
     }
 
     CommandLine cmdLine(m_cmdLine);
@@ -291,7 +195,12 @@ SlangResult CommandLineDownstreamCompiler::compile(
 
     // Parse output into diagnostics (created earlier, before execution).
     // We always parse even if the compiler returned non-zero, so diagnostics are available.
-    parseOutput(exeRes, diagnostics);
+    if (SLANG_FAILED(parseOutput(exeRes, diagnostics)))
+    {
+        diagnostics->setResult(SLANG_FAIL);
+        *outArtifact = resultArtifact.detach();
+        return SLANG_FAIL;
+    }
 
     // Go through the list of artifacts in the artifactList and check if they exist.
     //

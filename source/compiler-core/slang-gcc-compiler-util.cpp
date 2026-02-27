@@ -136,11 +136,14 @@ SlangResult GCCDownstreamCompilerUtil::calcVersion(
     // Try each known version prefix pattern
     for (const auto& pattern : s_compilerVersionPatterns)
     {
-        outDesc.type = pattern.compilerType;
+        DownstreamCompilerDesc candidateDesc;
+        candidateDesc.type = pattern.compilerType;
         UnownedStringSlice prefix(pattern.versionPrefix);
 
-        if (SLANG_SUCCEEDED(parseVersion(exeRes.standardError.getUnownedSlice(), prefix, outDesc)))
+        if (SLANG_SUCCEEDED(
+                parseVersion(exeRes.standardError.getUnownedSlice(), prefix, candidateDesc)))
         {
+            outDesc = candidateDesc;
             return SLANG_OK;
         }
     }
@@ -1111,37 +1114,10 @@ static SlangResult _parseGCCFamilyLine(
 
     switch (options.targetType)
     {
-    case SLANG_HOST_EXECUTABLE:
-        // If Slang was built using Clang or GCC and with sanitizers, the same `-fsanitize=...` flag
-        // used for Slang must also be used when linking host executables as we might be trying to
-        // link them with Slang libraries, in which case we must link them with the sanitizer
-        // runtime as well or else they will fail to either link or run.
-        // __has_feature is Clang-only; __SANITIZE_ADDRESS__ is defined by GCC and MSVC.
-#if defined(__has_feature)
-#if __has_feature(address_sanitizer)
-#if SLANG_CLANG || SLANG_GCC
-        cmdLine.addArg("-fsanitize=address");
-#endif // SLANG_CLANG || SLANG_GCC
-#if SLANG_CLANG
-        cmdLine.addArg("-shared-libsan");
-#endif // SLANG_CLANG
-#endif // __has_feature(address_sanitizer)
-#elif defined(__SANITIZE_ADDRESS__)
-#if SLANG_CLANG || SLANG_GCC
-        cmdLine.addArg("-fsanitize=address");
-#endif // SLANG_CLANG || SLANG_GCC
-#if SLANG_CLANG
-        cmdLine.addArg("-shared-libsan");
-#endif // SLANG_CLANG
-#endif // defined(__has_feature)
-        break;
-
     case SLANG_SHADER_SHARED_LIBRARY:
     case SLANG_SHADER_HOST_CALLABLE:
+    case SLANG_HOST_SHARED_LIBRARY:
     case SLANG_OBJECT_CODE:
-        // SLANG_HOST_SHARED_LIBRARY relies on the two-stage flow (see shouldSeparateCompileAndLink)
-        // so the compile stage emits SLANG_OBJECT_CODE which receives -fPIC here. If
-        // SLANG_HOST_SHARED_LIBRARY ever bypasses the two-stage path it must be added here.
         if (!PlatformUtil::isFamily(PlatformFamily::Apple, platformKind) &&
             !PlatformUtil::isFamily(PlatformFamily::Microsoft, platformKind))
         {
@@ -1153,6 +1129,8 @@ static SlangResult _parseGCCFamilyLine(
             //   at run-time ("Compiler encountered an internal error" or Mach IPC hanging forever).
             cmdLine.addArg("-fPIC");
         }
+        break;
+    default:
         break;
     }
 
