@@ -7959,6 +7959,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
     void visitRequireCapabilityStmt(RequireCapabilityStmt* stmt)
     {
         auto builder = getBuilder();
+        startBlockIfNeeded(stmt);
 
         List<CapabilityName> capNames;
         for (const Token& t : stmt->requiredCaps)
