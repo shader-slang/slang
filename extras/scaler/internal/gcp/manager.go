@@ -415,12 +415,7 @@ func (m *Manager) removeTrackedVMByVMName(vmName string) {
 	}
 }
 
-func (m *Manager) listTerminatedVMNames(ctx context.Context, zone string) ([]string, error) {
-	if m.listTerminated != nil {
-		return m.listTerminated(ctx, zone)
-	}
-
-	filter := cleanupFilter(m.config.VMPrefix)
+func (m *Manager) listVMNamesByFilter(ctx context.Context, zone, filter string) ([]string, error) {
 	req := &computepb.ListInstancesRequest{
 		Project: m.config.Project,
 		Zone:    zone,
@@ -440,6 +435,24 @@ func (m *Manager) listTerminatedVMNames(ctx context.Context, zone string) ([]str
 		names = append(names, instance.GetName())
 	}
 	return names, nil
+}
+
+func (m *Manager) listTerminatedVMNames(ctx context.Context, zone string) ([]string, error) {
+	if m.listTerminated != nil {
+		return m.listTerminated(ctx, zone)
+	}
+	return m.listVMNamesByFilter(ctx, zone, cleanupFilter(m.config.VMPrefix))
+}
+
+func runningFilter(vmPrefix string) string {
+	return fmt.Sprintf("name=%s-* AND status=RUNNING", vmPrefix)
+}
+
+func (m *Manager) listRunningVMNames(ctx context.Context, zone string) ([]string, error) {
+	if m.instancesClient == nil {
+		return nil, nil
+	}
+	return m.listVMNamesByFilter(ctx, zone, runningFilter(m.config.VMPrefix))
 }
 
 func (m *Manager) deleteVMForCleanup(ctx context.Context, vmName, zone string) error {
@@ -484,4 +497,64 @@ func (m *Manager) doCleanupTerminatedVMs(ctx context.Context) {
 	}
 
 	slog.Info("terminated VM cleanup pass completed", "terminated_vms_deleted", deletedCount)
+
+	// Reconcile: remove tracked VMs that no longer exist as RUNNING instances.
+	// This prevents ActiveCount() from drifting above reality, which would
+	// cause the scaler to stop creating new VMs.
+	m.reconcileTrackedVMs(ctx)
+}
+
+// reconcileTrackedVMs checks all tracked VMs against actual GCP instance state
+// and removes entries for VMs that are no longer RUNNING. This prevents the
+// in-memory tracker from drifting when VMs terminate outside the scaler's
+// control (e.g., via shutdown in the startup script).
+func (m *Manager) reconcileTrackedVMs(ctx context.Context) {
+	if m.instancesClient == nil {
+		return // No GCP client (test mode), skip reconciliation
+	}
+
+	m.mu.Lock()
+	if len(m.vms) == 0 {
+		m.mu.Unlock()
+		return
+	}
+
+	// Snapshot tracked VMs grouped by zone
+	zoneVMs := make(map[string][]string) // zone -> []runnerName
+	for runnerName, vm := range m.vms {
+		zoneVMs[vm.zone] = append(zoneVMs[vm.zone], runnerName)
+	}
+	m.mu.Unlock()
+
+	// Collect all RUNNING VM names across zones
+	runningVMs := make(map[string]bool)
+	for zone := range zoneVMs {
+		listCtx, cancel := context.WithTimeout(ctx, cleanupZoneScanTimeout)
+		names, err := m.listRunningVMNames(listCtx, zone)
+		cancel()
+		if err != nil {
+			slog.Warn("reconcile: failed to list running VMs", "zone", zone, "error", err)
+			// Don't evict entries for this zone if we can't verify
+			continue
+		}
+		for _, name := range names {
+			runningVMs[name] = true
+		}
+	}
+
+	// Remove tracked entries whose VMs are no longer RUNNING
+	m.mu.Lock()
+	evicted := 0
+	for runnerName, vm := range m.vms {
+		if !runningVMs[vm.vmName] {
+			slog.Info("reconcile: removing stale tracked VM", "runner", runnerName, "vm", vm.vmName, "zone", vm.zone)
+			delete(m.vms, runnerName)
+			evicted++
+		}
+	}
+	m.mu.Unlock()
+
+	if evicted > 0 {
+		slog.Info("reconcile: evicted stale VM entries", "count", evicted, "tracked_after", m.ActiveCount())
+	}
 }
