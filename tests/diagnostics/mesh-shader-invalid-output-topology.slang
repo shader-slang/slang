@@ -1,9 +1,9 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -entry main1 -stage mesh -target hlsl
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -entry main1 -stage mesh -target spirv
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -entry main1 -stage mesh -target glsl
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -entry main1 -stage mesh -target metal
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -entry main1 -stage mesh -target hlsl
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -entry main1 -stage mesh -target spirv
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -entry main1 -stage mesh -target glsl
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -entry main1 -stage mesh -target metal
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK2,non-exhaustive): -entry main2 -stage mesh -target hlsl
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK2): -entry main2 -stage mesh -target hlsl
 //TEST:SIMPLE(filecheck=CHECK_OK): -entry main2 -stage mesh -target spirv
 //TEST:SIMPLE(filecheck=CHECK_OK): -entry main2 -stage mesh -target glsl
 //TEST:SIMPLE(filecheck=CHECK_OK): -entry main2 -stage mesh -target metal
@@ -22,6 +22,7 @@ struct Output {
 [outputtopology("asdqwe")]
 /*CHECK:
  ^^^^^^^^^^^^^^ invalid mesh output topology
+ ^^^^^^^^^^^^^^ Invalid mesh stage output topology
 */
 [shader("mesh")]
 void main1(
@@ -39,6 +40,7 @@ void main1(
 [outputtopology("point")]
 /*CHECK2:
  ^^^^^^^^^^^^^^ invalid mesh output topology
+ ^^^^^^^^^^^^^^ Invalid mesh stage output topology
 */
 [shader("mesh")]
 void main2(

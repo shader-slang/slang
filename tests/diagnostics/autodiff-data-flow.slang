@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=diag,non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=diag):
 
 float nonDiff(float x)
 {
@@ -13,6 +13,7 @@ float f(float x)
         val = x + 1;
     else
         val = nonDiff(x * 2.0f);
+//diag:              ^ derivative cannot be propagated through non-differentiable call
 //diag:              ^ derivative cannot be propagated through call to non-forward-differentiable function `nonDiff`, use 'no_diff' to clarify intention.
     // Not all path propagates derivatives through.
     return val;

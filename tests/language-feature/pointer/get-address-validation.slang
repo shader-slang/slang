@@ -26,7 +26,8 @@ typealias GroupSharedPtr<T> = Ptr<T, Access::ReadWrite, AddressSpace::GroupShare
 GroupSharedPtr<T> paramGroupShared<T : __BuiltinIntegerType>(out groupshared T[100] ptr)
 {
     T* ptr1 = __getAddress(ptr[5]);
-//diag:       ^^^^^^^^^^^^ expected an expression of type 'Ptr<T, Access.ReadWrite, AddressSpace.Device>', got 'Ptr<T, Access.ReadWrite, AddressSpace.GroupShared>'
+//diag:       ^^^^^^^^^^^^ type mismatch in expression
+//diag:       ^^^^^^^^^^^^ expected an expression of type 'Ptr<T, Access.ReadWrite, AddressSpace.Device, DefaultDataLayout>', got 'Ptr<T, Access.ReadWrite, AddressSpace.GroupShared, DefaultDataLayout>'
 
     GroupSharedPtr<T> ptr2 = __getAddress(ptr[5]);
 
@@ -41,10 +42,12 @@ void computeMain(int id : SV_DispatchThreadID)
 //diag:         ^^^^^^^^^^^^ '__getAddress' only supports groupshared variables and members of groupshared/device memory.
 
     int[100]* ptr2 = __getAddress(bufferGroupShared);
-//diag:              ^^^^^^^^^^^^ expected an expression of type 'Ptr<int[100], Access.ReadWrite, AddressSpace.Device>', got 'Ptr<int[100], Access.ReadWrite, AddressSpace.GroupShared>'
+//diag:              ^^^^^^^^^^^^ type mismatch in expression
+//diag:              ^^^^^^^^^^^^ expected an expression of type 'Ptr<int[100], Access.ReadWrite, AddressSpace.Device, DefaultDataLayout>', got 'Ptr<int[100], Access.ReadWrite, AddressSpace.GroupShared, DefaultDataLayout>'
 
     int* ptr3 = __getAddress(bufferGroupShared[id.x]);
-//diag:         ^^^^^^^^^^^^ expected an expression of type 'Ptr<int, Access.ReadWrite, AddressSpace.Device>', got 'Ptr<int, Access.ReadWrite, AddressSpace.GroupShared>'
+//diag:         ^^^^^^^^^^^^ type mismatch in expression
+//diag:         ^^^^^^^^^^^^ expected an expression of type 'Ptr<int, Access.ReadWrite, AddressSpace.Device, DefaultDataLayout>', got 'Ptr<int, Access.ReadWrite, AddressSpace.GroupShared, DefaultDataLayout>'
 
     int* ptr4 = __getAddress(bufferUserPointer[id.x]);
 

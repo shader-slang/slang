@@ -9,7 +9,7 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=ERROR,non-exhaustive):-target hlsl -profile sm_6_5 -capability hlsl_nvapi -entry rayGenShaderSetAndGetShaderTableIndex -stage raygeneration
 // Using non-exhaustive because the error originates from hlsl.meta.slang (not this file)
 
-//ERROR: __target_switch has no compatible target
+//ERROR: __target_switch has no compatable target
 
 [raypayload]
 struct RayPayload

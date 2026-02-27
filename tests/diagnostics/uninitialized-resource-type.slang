@@ -1,6 +1,7 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK1,non-exhaustive): -target hlsl -DTEST_1
-// non-exhaustive due to pre-existing internal error (99999) triggered after diagnostic
+// non-exhaustive due to extra short error message on first test
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK2,non-exhaustive): -target hlsl -DTEST_2
+// non-exhaustive due to pre-existing internal error (99999) triggered after diagnostic
 
 SamplerState sampler;
 

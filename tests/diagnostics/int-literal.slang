@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 int doSomething(int a)
 {
@@ -28,10 +28,12 @@ int doSomething(int a)
     // Warning, integer literal is too large for signed 64 bit, must be interpreted as unsigned.
     uint64_t d0 = 18446744073709551615;
 //CHECK:          ^^^^^^^^^^^^^^^^^^^^ integer literal is too large
+//CHECK:          ^^^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in a signed integer type, interpreting as unsigned
 
     // Warning, integer literal is too small for signed 64 bit, must be interpreted as unsigned.
     uint64_t d1 = -9223372036854775809;
 //CHECK:           ^^^^^^^^^^^^^^^^^^^ integer literal is too large
+//CHECK:           ^^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in a signed integer type, interpreting as unsigned
 
     // This is INT64_MIN and valid negative signed integer, but warning will be emitted as negative(-) is scanned
     // separately in the lexer, and the positive literal portion will emit a warning.
@@ -40,10 +42,12 @@ int doSomething(int a)
     // To not have this warning the lexer must scan the negative operator and number together.
     uint64_t d2 = -9223372036854775808;
 //CHECK:           ^^^^^^^^^^^^^^^^^^^ integer literal is too large
+//CHECK:           ^^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in a signed integer type, interpreting as unsigned
 
     // Warning, integer literal is too large for signed 64 bit, must be interpreted as unsigned.
     int x4 = 0xFFFFFFFFFFFFFFFF;
 //CHECK:     ^^^^^^^^^^^^^^^^^^ integer literal is too large
+//CHECK:     ^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in a signed integer type, interpreting as unsigned
 
     return a + int(b);
 }
