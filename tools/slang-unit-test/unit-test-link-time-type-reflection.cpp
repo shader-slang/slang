@@ -120,7 +120,23 @@ SLANG_UNIT_TEST(linkTimeTypeReflection)
     SLANG_CHECK(var3->getTypeLayout()->getSize() == 32);
 
     ComPtr<slang::IBlob> codeBlob;
-    linkedProgram->getTargetCode(0, codeBlob.writeRef(), diagnosticBlob.writeRef());
+    SlangResult codeRes =
+        linkedProgram->getTargetCode(0, codeBlob.writeRef(), diagnosticBlob.writeRef());
+    if (SLANG_FAILED(codeRes) || !codeBlob)
+    {
+        fprintf(
+            stderr,
+            "[DEBUG aarch64] linkTimeTypeReflection: getTargetCode failed: result=0x%08x\n",
+            (unsigned)codeRes);
+        if (diagnosticBlob)
+            fprintf(
+                stderr,
+                "[DEBUG aarch64] diagnostics:\n%.*s\n",
+                (int)diagnosticBlob->getBufferSize(),
+                (const char*)diagnosticBlob->getBufferPointer());
+        else
+            fprintf(stderr, "[DEBUG aarch64] no diagnostic blob\n");
+    }
 
     SLANG_CHECK_ABORT(codeBlob.get());
 
