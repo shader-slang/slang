@@ -180,58 +180,50 @@ jobs:
 
             core.info(`Cleanup: minimized ${minimized} reviews/comments, resolved ${resolved} threads`);
 
-      - name: PR Review
+      - name: PR Review with Multi-Agent Skill
         uses: ./.github/actions/claude-code-runner
         with:
           show-debug-output: ${{ (vars.SLANG_CLAUDE_DEBUG_ENV == '1' || vars.SLANG_CLAUDE_DEBUG_ENV == 'true') && 'true' || 'false' }}
+          # Allow external contributors — PR review is read-only (COMMENT only, no approve/merge)
+          # See: https://github.com/anthropics/claude-code-action/issues/974
+          allowed-non-write-users: "*"
           nv-inference-opus-model: ${{ vars.CLAUDE_NV_OPUS_MODEL }}
           nv-inference-sonnet-model: ${{ vars.CLAUDE_NV_SONNET_MODEL }}
           nv-inference-haiku-model: ${{ vars.CLAUDE_NV_HAIKU_MODEL }}
           max-turns: "500"
           use-sticky-comment: "false"
           track-progress: "false"
+          # Invoke the /review-pr skill which dispatches 6 specialized subagents.
+          # The skill definition lives in .claude/commands/review-pr.md and the
+          # agent definitions in .claude/agents/*.md. See those files for details.
+          #
+          # NOTE: Any previous Claude reviews on this PR have been automatically minimized
+          # and their threads resolved by the cleanup step above.
           prompt: |
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.inputs.pr_number || github.event.pull_request.number }}
 
-            Review this PR for the Slang shader compiler. Read CLAUDE.md for compiler architecture context.
+            /review-pr
 
-            IMPORTANT: The BASE branch (master) is checked out locally. You can read CLAUDE.md and any
-            existing source files locally to understand repo structure and surrounding code context.
-            However, the PR branch is NOT checked out — to see what the PR actually changes, you MUST
-            use `gh pr diff` or GitHub MCP tools. Do NOT assume local files reflect the PR's changes.
-
-            ### How to review
-            1. Fetch the PR diff with `gh pr diff <number>` and the changed files list
-            2. For each changed file, read the diff carefully. If you need surrounding context beyond
-               what the diff shows, read the base version of the file from the local filesystem.
-            3. Create a PENDING review with mcp__github__create_pending_pull_request_review
-            4. Add inline comments using mcp__github__add_comment_to_pending_review ONLY for:
-               - Bugs or correctness issues (high confidence)
-               - Design concerns that could cause problems
-               - Missing error handling or edge cases that matter
-               Do NOT add inline comments for: praise, style preferences, minor naming suggestions,
-               obvious observations, or anything the author likely already considered.
-               Fewer high-signal comments are better than many low-signal ones. Zero inline comments
-               is fine if the code is solid.
-            5. Submit the review with mcp__github__submit_pending_pull_request_review with event "COMMENT".
-               The review body MUST include:
-               - Summary of what the PR does
-               - Key findings (bugs, design concerns, suggestions)
-               - Positive aspects worth noting
-               - Overall assessment and verdict
-            6. (Optional) If the review submission fails or you have additional context that didn't fit
-               in inline comments, post a PR comment via mcp__github__add_issue_comment as a fallback.
-
-            NOTE: Any previous Claude reviews on this PR have been automatically minimized
-            and their threads resolved. You are posting a fresh, self-contained review.
-            Do NOT reference previous reviews — just review the PR as it currently stands.
-
-            Quality over quantity: only comment inline when you have something the author needs to act on or consider.
-
-          # Note: CLAUDE.md is auto-loaded and covers compiler pipeline, IR system, CLI conventions, etc.
-          # These instructions cover ONLY review-specific priorities and patterns.
+          # Safety rails and project-specific context.
+          # CLAUDE.md is auto-loaded for compiler architecture. These instructions
+          # cover ONLY review-specific constraints.
           custom-instructions: |
+            ### **Review Constraints**
+            CRITICAL: NEVER submit a review with event "APPROVE" or "REQUEST_CHANGES". ALWAYS use event "COMMENT".
+            Do NOT write LGTM, "looks good to me", "ship it", or any approval-like language.
+            You are providing technical analysis, not granting approval.
+
+            ### **Tone**
+            Be terse. No greeting, no sign-off, no boilerplate. If no significant findings,
+            submit a 1-2 sentence review body. Zero findings is normal for solid code.
+
+            ### **Do NOT Comment On**
+            - Code formatting or style — CI enforces via `./extras/formatting.sh`
+            - Naming conventions unless genuinely confusing
+            - Pre-existing issues not introduced by this PR
+            - Pedantic nitpicks that don't affect correctness
+
             ### **Review Priorities**
             - IR pass changes: verify SSA form and type invariants are maintained
             - Emit changes: all target backends (SPIRV, HLSL, GLSL, Metal, CUDA, WGSL) should be consistent;
@@ -248,6 +240,13 @@ jobs:
             - Emit code doing complex transforms instead of delegating to IR passes
             - Missing `break` or `return` in exhaustive IROp switches
 
+            ### **Project Workflow Reminders**
+            When relevant, include in the review body:
+            - Proposal docs in external/spec/proposals/ need status update to "implemented"
+            - New built-ins in prelude/ need docs/user-guide/ updates
+            - Changes to include/slang.h need "pr: breaking" label consideration
+            - New language features need cross-backend test coverage
+
           mcp-config: |
             {
               "mcpServers": {
@@ -263,7 +262,7 @@ jobs:
           # Note: Bash glob '*' does NOT match newlines, so multi-line commands are blocked.
           # Use MCP tools (add_issue_comment) for multi-line content like review summaries.
           allowed-tools: |
-            View,GlobTool,GrepTool,BatchTool,
+            View,GlobTool,GrepTool,BatchTool,Skill,
             Bash(git diff*),Bash(git log*),Bash(git show*),Bash(git status*),
             Bash(grep *),Bash(grep -*),
             Bash(cat *),Bash(head *),Bash(tail *),
@@ -271,8 +270,10 @@ jobs:
             Bash(gh pr diff*),Bash(gh pr view*),Bash(gh pr list*),Bash(gh pr checks*),
             Bash(gh api *),
             mcp__github__get_pull_request,
+            mcp__github__get_pull_request_diff,
             mcp__github__get_pull_request_files,
             mcp__github__get_pull_request_reviews,
+            mcp__github__get_file_contents,
             mcp__github__get_pull_request_status,
             mcp__github__get_issue,
             mcp__github__get_issue_comments,

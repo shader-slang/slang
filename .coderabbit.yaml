@@ -1,14 +1,18 @@
 # yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
 
 language: "en-US"
+tone_instructions: >-
+  Be direct and technical. This is a compiler project — prioritize correctness,
+  performance, and cross-platform consistency over style preferences.
 
 reviews:
+  profile: "chill"
   high_level_summary: false
   auto_title_placeholder: ""
-  poem: true
+  poem: false
   in_progress_fortune: false
   collapse_walkthrough: true
-  sequence_diagrams: true
+  sequence_diagrams: false
   review_effort: false
   issue_assessment: false
   related_issues: false
@@ -17,6 +21,7 @@ reviews:
   auto_label: false
   reviewers: false
   auto_assign_reviewers: false
+  request_changes_workflow: false
 
   path_filters:
     - "!build/**"
@@ -24,9 +29,75 @@ reviews:
 
   auto_review:
     enabled: true
+    auto_incremental_review: true
     drafts: false
+    ignore_title_keywords:
+      - "WIP"
+      - "DO NOT MERGE"
+      - "wip"
+    base_branches:
+      - master
+    ignore_usernames:
+      - "dependabot[bot]"
+      - "github-actions[bot]"
 
-  prompts_for_ai_agents: false
+  path_instructions:
+    - path: "**"
+      instructions: |
+        This is the Slang shading language compiler (shader-slang/slang).
+        Focus reviews on:
+        - Bugs, logic errors, and unhandled edge cases (this is the highest value).
+        - Inconsistencies across similar changes (e.g. if a PR adds a new enum value in
+          multiple switch statements, check that ALL relevant switches are updated).
+        - Comments or documentation in the changed code that are now stale or inaccurate
+          due to the PR's changes.
+        Do NOT comment on:
+        - Code formatting or style (this is enforced by CI via extras/formatting.sh).
+        - Minor stylistic preferences.
+        Keep comments concise. Prefer one high-quality comment over several low-value ones.
+
+    - path: "source/slang/**"
+      instructions: |
+        Core compiler code. Pay attention to:
+        - IR pass correctness — does the transform preserve semantics?
+        - Type system consistency in slang-check-*.cpp files.
+        - New IR instructions should be defined in slang-ir-insts.lua.
+        - Emit logic (slang-emit-*.cpp) should be kept simple; heavy transforms
+          belong in IR passes, not in emission.
+
+    - path: "docs/**"
+      instructions: |
+        Documentation changes. Check that:
+        - The target-compatibility.md table is updated if this PR adds or changes
+          target/feature support.
+        - User guide pages reflect any new language features or changed behavior.
+        - If a language feature was previously marked experimental, check if the
+          docs should be updated to reflect its current maturity status.
+
+    - path: "tests/**"
+      instructions: |
+        Test files. Check that:
+        - New tests use the correct TEST directives (COMPARE_COMPUTE, INTERPRET, etc.).
+        - Tests cover both positive and negative cases where appropriate.
+        - FileCheck patterns are specific enough to catch regressions.
+
+    - path: "include/slang.h"
+      instructions: |
+        Public API header. Any changes here affect all downstream users.
+        Check for ABI compatibility — new functions should be additive.
+        Verify that the PR is labeled "pr: breaking" if it changes existing API signatures.
+
+    - path: "prelude/**"
+      instructions: |
+        Built-in language definitions and standard library. Changes here affect
+        all Slang programs. Verify backward compatibility and check that
+        docs/stdlib-doc.md is updated if public-facing functions change.
+
+  prompts_for_ai_agents: true
+
+  # Reminder for PRs that touch language features:
+  # If your PR implements a feature from a spec proposal, please update the
+  # proposal status in the external/spec repo to "implemented".
 
 chat:
   auto_reply: false

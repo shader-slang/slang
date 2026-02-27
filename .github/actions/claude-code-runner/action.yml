@@ -49,6 +49,10 @@ inputs:
     description: "Comma-separated list of allowed bot usernames, or '*' to allow all bots"
     required: false
     default: ""
+  allowed-non-write-users:
+    description: "Comma-separated list of non-write users allowed to trigger, or '*' to allow all"
+    required: false
+    default: ""
 
   # Environment and setup
   prompt:
@@ -482,6 +486,7 @@ runs:
       with:
         anthropic_api_key: ${{ steps.auth-token.outputs.token }}
         github_token: ${{ steps.github-token.outputs.token }}
+        allowed_non_write_users: ${{ inputs.allowed-non-write-users }}
         trigger_phrase: ${{ inputs.trigger-phrase }}
         assignee_trigger: ${{ inputs.assignee-trigger }}
         label_trigger: ${{ inputs.label-trigger }}
@@ -529,6 +534,7 @@ runs:
       with:
         use_bedrock: "true"
         github_token: ${{ steps.github-token.outputs.token }}
+        allowed_non_write_users: ${{ inputs.allowed-non-write-users }}
         trigger_phrase: ${{ inputs.trigger-phrase }}
         assignee_trigger: ${{ inputs.assignee-trigger }}
         label_trigger: ${{ inputs.label-trigger }}
