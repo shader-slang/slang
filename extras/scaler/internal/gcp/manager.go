@@ -53,6 +53,7 @@ type Manager struct {
 	instancesClient *compute.InstancesClient
 	regionsClient   *compute.RegionsClient
 	cancelCleanup   context.CancelFunc
+	cleanupPass     func(context.Context)
 
 	mu sync.Mutex
 	// runnerName -> vmInfo
@@ -366,16 +367,43 @@ func (m *Manager) cleanupTerminatedVMs(ctx context.Context) {
 	ticker := time.NewTicker(2 * time.Minute)
 	defer ticker.Stop()
 
+	m.runCleanupLoop(ctx, ticker.C)
+}
+
+func (m *Manager) runCleanupLoop(ctx context.Context, ticks <-chan time.Time) {
 	// Run one pass immediately on startup so orphaned VMs are reclaimed
 	// without waiting for the first ticker interval.
-	m.doCleanupTerminatedVMs(ctx)
+	m.runCleanupPass(ctx)
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case <-ticker.C:
-			m.doCleanupTerminatedVMs(ctx)
+		case <-ticks:
+			m.runCleanupPass(ctx)
+		}
+	}
+}
+
+func (m *Manager) runCleanupPass(ctx context.Context) {
+	if m.cleanupPass != nil {
+		m.cleanupPass(ctx)
+		return
+	}
+	m.doCleanupTerminatedVMs(ctx)
+}
+
+func cleanupFilter(vmPrefix string) string {
+	return fmt.Sprintf("name=%s-* AND status=TERMINATED", vmPrefix)
+}
+
+func (m *Manager) removeTrackedVMByVMName(vmName string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for runnerName, vm := range m.vms {
+		if runnerName == vmName || vm.vmName == vmName {
+			delete(m.vms, runnerName)
+			return
 		}
 	}
 }
@@ -390,7 +418,7 @@ func (m *Manager) doCleanupTerminatedVMs(ctx context.Context) {
 			continue
 		}
 
-		filter := fmt.Sprintf("name=%s-* AND status=TERMINATED", m.config.VMPrefix)
+		filter := cleanupFilter(m.config.VMPrefix)
 		req := &computepb.ListInstancesRequest{
 			Project: m.config.Project,
 			Zone:    zone,
@@ -421,14 +449,7 @@ func (m *Manager) doCleanupTerminatedVMs(ctx context.Context) {
 			}
 
 			// Also remove from tracked VMs if still there
-			m.mu.Lock()
-			for runnerName, vm := range m.vms {
-				if runnerName == name || vm.vmName == name {
-					delete(m.vms, runnerName)
-					break
-				}
-			}
-			m.mu.Unlock()
+			m.removeTrackedVMByVMName(name)
 		}
 		cancelList()
 	}
