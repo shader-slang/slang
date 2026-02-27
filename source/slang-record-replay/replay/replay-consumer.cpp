@@ -318,7 +318,7 @@ SlangResult CommonInterfaceReplayer::linkWithOptions(
     ObjectID objectId,
     ObjectID outLinkedComponentTypeId,
     uint32_t compilerOptionEntryCount,
-    slang::CompilerOptionEntry* compilerOptionEntries,
+    slang::CompilerOptionEntry const* compilerOptionEntries,
     ObjectID outDiagnosticsId)
 {
     InputObjectSanityCheck(objectId);
@@ -1426,7 +1426,7 @@ void ReplayConsumer::IModule_linkWithOptions(
     ObjectID objectId,
     ObjectID outLinkedComponentTypeId,
     uint32_t compilerOptionEntryCount,
-    slang::CompilerOptionEntry* compilerOptionEntries,
+    slang::CompilerOptionEntry const* compilerOptionEntries,
     ObjectID outDiagnosticsId)
 {
     SlangResult res = m_commonReplayer.linkWithOptions(
@@ -1566,7 +1566,7 @@ void ReplayConsumer::IEntryPoint_linkWithOptions(
     ObjectID objectId,
     ObjectID outLinkedComponentTypeId,
     uint32_t compilerOptionEntryCount,
-    slang::CompilerOptionEntry* compilerOptionEntries,
+    slang::CompilerOptionEntry const* compilerOptionEntries,
     ObjectID outDiagnosticsId)
 {
     SlangResult res = m_commonReplayer.linkWithOptions(
@@ -1706,7 +1706,7 @@ void ReplayConsumer::ICompositeComponentType_linkWithOptions(
     ObjectID objectId,
     ObjectID outLinkedComponentTypeId,
     uint32_t compilerOptionEntryCount,
-    slang::CompilerOptionEntry* compilerOptionEntries,
+    slang::CompilerOptionEntry const* compilerOptionEntries,
     ObjectID outDiagnosticsId)
 {
     SlangResult res = m_commonReplayer.linkWithOptions(
@@ -1855,7 +1855,7 @@ void ReplayConsumer::ITypeConformance_linkWithOptions(
     ObjectID objectId,
     ObjectID outLinkedComponentTypeId,
     uint32_t compilerOptionEntryCount,
-    slang::CompilerOptionEntry* compilerOptionEntries,
+    slang::CompilerOptionEntry const* compilerOptionEntries,
     ObjectID outDiagnosticsId)
 {
     SlangResult res = m_commonReplayer.linkWithOptions(

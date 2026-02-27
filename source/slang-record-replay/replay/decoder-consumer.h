@@ -277,7 +277,7 @@ public:
         ObjectID objectId,
         ObjectID outLinkedComponentTypeId,
         uint32_t compilerOptionEntryCount,
-        slang::CompilerOptionEntry* compilerOptionEntries,
+        slang::CompilerOptionEntry const* compilerOptionEntries,
         ObjectID outDiagnosticsId) = 0;
 
     // IEntryPoint
@@ -335,7 +335,7 @@ public:
         ObjectID objectId,
         ObjectID outLinkedComponentTypeId,
         uint32_t compilerOptionEntryCount,
-        slang::CompilerOptionEntry* compilerOptionEntries,
+        slang::CompilerOptionEntry const* compilerOptionEntries,
         ObjectID outDiagnosticsId) = 0;
 
     // ICompositeComponentType
@@ -396,7 +396,7 @@ public:
         ObjectID objectId,
         ObjectID outLinkedComponentTypeId,
         uint32_t compilerOptionEntryCount,
-        slang::CompilerOptionEntry* compilerOptionEntries,
+        slang::CompilerOptionEntry const* compilerOptionEntries,
         ObjectID outDiagnosticsId) = 0;
 
     virtual void ICompositeComponentType_queryInterface(
@@ -462,7 +462,7 @@ public:
         ObjectID objectId,
         ObjectID outLinkedComponentTypeId,
         uint32_t compilerOptionEntryCount,
-        slang::CompilerOptionEntry* compilerOptionEntries,
+        slang::CompilerOptionEntry const* compilerOptionEntries,
         ObjectID outDiagnosticsId) = 0;
 
     // IComponentType2 methods.
