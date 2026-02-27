@@ -1308,6 +1308,8 @@ struct OptionsParser
 
     SlangResult _expectValue(ValueCategory valueCategory, CommandOptions::UserValue& outValue);
     SlangResult _expectInt(const CommandLineArg& arg, Int& outInt);
+    SlangResult _expectUInt(const CommandLineArg& arg, Int& outInt);
+
 
     template<typename T>
     SlangResult _expectValue(T& ioValue)
@@ -1936,11 +1938,24 @@ SlangResult OptionsParser::_expectInt(const CommandLineArg& initArg, Int& outInt
 
     if (SLANG_FAILED(StringUtil::parseInt(arg.value.getUnownedSlice(), outInt)))
     {
-        m_sink->diagnose(arg.loc, Diagnostics::expectingAnInteger);
+        m_sink->diagnose(arg.loc, Diagnostics::expectingAnInteger, initArg.value);
         return SLANG_FAIL;
     }
     return SLANG_OK;
 }
+
+SlangResult OptionsParser::_expectUInt(const CommandLineArg& initArg, Int& outInt)
+{
+    SLANG_RETURN_ON_FAIL(_expectInt(initArg, outInt));
+    if (outInt < 0)
+    {
+        m_sink
+            ->diagnose(initArg.loc, Diagnostics::expectingAUnsignedInteger, initArg.value, outInt);
+        return SLANG_FAIL;
+    }
+    return SLANG_OK;
+}
+
 
 SlangResult createArtifactFromReferencedModule(
     String path,
@@ -3273,7 +3288,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         case OptionKind::SPIRVResourceHeapStride:
             {
                 Int index = 0;
-                SLANG_RETURN_ON_FAIL(_expectInt(arg, index));
+                SLANG_RETURN_ON_FAIL(_expectUInt(arg, index));
                 linkage->m_optionSet.add(optionKind, (int)index);
                 break;
             }
