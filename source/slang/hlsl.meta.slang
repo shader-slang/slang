@@ -1562,7 +1562,7 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
             // - float textureLod(sampler2DArrayShadow sampler, vec4 P, float lod)
             // - float textureLod(samplerCubeShadow sampler, vec4 P, float lod)
             // - float textureLod(samplerCubeArrayShadow sampler, vec4 P, float compare, float lod)
-
+            //
             // Anything else requires additional capabilities
 
             if (Shape.dimensions == 1)
