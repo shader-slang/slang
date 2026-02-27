@@ -1824,7 +1824,7 @@ void OptionsParser::_appendMinimalUsage(StringBuilder& out)
 
 SlangResult OptionsParser::_getValue(
     ValueCategory valueCategory,
-    const CommandLineArg& arg,
+    [[maybe_unused]] const CommandLineArg& arg,
     const UnownedStringSlice& name,
     CommandOptions::UserValue& outValue)
 {
@@ -1864,7 +1864,7 @@ SlangResult OptionsParser::_getValue(
 
 SlangResult OptionsParser::_getValue(
     const ConstArrayView<ValueCategory>& valueCategories,
-    const CommandLineArg& arg,
+    [[maybe_unused]] const CommandLineArg& arg,
     const UnownedStringSlice& name,
     ValueCategory& outCat,
     CommandOptions::UserValue& outValue)
