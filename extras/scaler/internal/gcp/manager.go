@@ -56,6 +56,8 @@ type Manager struct {
 	regionsClient   *compute.RegionsClient
 	cancelCleanup   context.CancelFunc
 	cleanupPass     func(context.Context)
+	listTerminated  func(context.Context, string) ([]string, error)
+	deleteVMFunc    func(context.Context, string, string) error
 
 	mu sync.Mutex
 	// runnerName -> vmInfo
@@ -413,6 +415,40 @@ func (m *Manager) removeTrackedVMByVMName(vmName string) {
 	}
 }
 
+func (m *Manager) listTerminatedVMNames(ctx context.Context, zone string) ([]string, error) {
+	if m.listTerminated != nil {
+		return m.listTerminated(ctx, zone)
+	}
+
+	filter := cleanupFilter(m.config.VMPrefix)
+	req := &computepb.ListInstancesRequest{
+		Project: m.config.Project,
+		Zone:    zone,
+		Filter:  proto.String(filter),
+	}
+
+	it := m.instancesClient.List(ctx, req)
+	var names []string
+	for {
+		instance, err := it.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+		names = append(names, instance.GetName())
+	}
+	return names, nil
+}
+
+func (m *Manager) deleteVMForCleanup(ctx context.Context, vmName, zone string) error {
+	if m.deleteVMFunc != nil {
+		return m.deleteVMFunc(ctx, vmName, zone)
+	}
+	return m.deleteVM(ctx, vmName, zone)
+}
+
 func (m *Manager) doCleanupTerminatedVMs(ctx context.Context) {
 	zones := strings.Split(m.config.Zones, ",")
 	deletedCount := 0
@@ -423,29 +459,18 @@ func (m *Manager) doCleanupTerminatedVMs(ctx context.Context) {
 			continue
 		}
 
-		filter := cleanupFilter(m.config.VMPrefix)
-		req := &computepb.ListInstancesRequest{
-			Project: m.config.Project,
-			Zone:    zone,
-			Filter:  proto.String(filter),
+		listCtx, cancelList := context.WithTimeout(ctx, cleanupZoneScanTimeout)
+		names, err := m.listTerminatedVMNames(listCtx, zone)
+		cancelList()
+		if err != nil {
+			slog.Warn("failed to list instances for cleanup", "zone", zone, "error", err)
+			continue
 		}
 
-		listCtx, cancelList := context.WithTimeout(ctx, cleanupZoneScanTimeout)
-		it := m.instancesClient.List(listCtx, req)
-		for {
-			instance, err := it.Next()
-			if err == iterator.Done {
-				break
-			}
-			if err != nil {
-				slog.Warn("failed to list instances for cleanup", "zone", zone, "error", err)
-				break
-			}
-
-			name := instance.GetName()
+		for _, name := range names {
 			slog.Info("cleaning up terminated VM", "vm", name, "zone", zone)
 			deleteCtx, cancelDelete := context.WithTimeout(ctx, cleanupDeleteTimeout)
-			err = m.deleteVM(deleteCtx, name, zone)
+			err = m.deleteVMForCleanup(deleteCtx, name, zone)
 			cancelDelete()
 			if err != nil {
 				slog.Warn("failed to delete terminated VM", "vm", name, "zone", zone, "error", err)
@@ -456,7 +481,6 @@ func (m *Manager) doCleanupTerminatedVMs(ctx context.Context) {
 			// Also remove from tracked VMs if still there
 			m.removeTrackedVMByVMName(name)
 		}
-		cancelList()
 	}
 
 	slog.Info("terminated VM cleanup pass completed", "terminated_vms_deleted", deletedCount)

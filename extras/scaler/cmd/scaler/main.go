@@ -180,15 +180,23 @@ func parseFlags() config {
 		cfg.appPrivateKey = v
 	}
 	if v := os.Getenv("SCALER_GCP_CLEANUP_INTERVAL"); v != "" {
-		d, err := time.ParseDuration(v)
+		d, err := parseCleanupInterval(v)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "error: invalid SCALER_GCP_CLEANUP_INTERVAL %q: %v\n", v, err)
+			fmt.Fprintf(os.Stderr, "error: invalid SCALER_GCP_CLEANUP_INTERVAL: %v\n", err)
 			os.Exit(1)
 		}
 		cfg.gcpCleanupInterval = d
 	}
 
 	return cfg
+}
+
+func parseCleanupInterval(v string) (time.Duration, error) {
+	d, err := time.ParseDuration(v)
+	if err != nil {
+		return 0, fmt.Errorf("%q: %w", v, err)
+	}
+	return d, nil
 }
 
 func run(ctx context.Context, cfg config, logger *slog.Logger) error {
