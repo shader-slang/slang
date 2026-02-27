@@ -95,6 +95,11 @@ catch {
     Write-Log "WARNING: sccache start failed (builds will be uncached)"
 }
 
+# Step 3.5: Configure git safe directory to avoid "dubious ownership" errors.
+# The runner runs as SYSTEM but the workspace may be owned by NETWORK SERVICE.
+Write-Log "Configuring git safe directory..."
+git config --global --add safe.directory '*'
+
 # Step 4: Configure and run the GitHub Actions runner with JIT config
 Write-Log "Starting runner with JIT config..."
 Set-Location $runnerDir
