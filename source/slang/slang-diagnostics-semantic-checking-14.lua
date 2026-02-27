@@ -114,10 +114,24 @@ err(
 )
 
 err(
+    "dynamic-dispatch-on-specialize-only-interface",
+    52008,
+    "dynamic dispatch on specialize-only type",
+    span { loc = "location", message = "type '~conformanceType:IRInst' is marked for specialization only, but dynamic dispatch is needed for the call." }
+)
+
+err(
     "cannot-emit-reflection-without-target",
     52009,
     "cannot emit reflection JSON",
     span { loc = "location", message = "cannot emit reflection JSON; no compilation target available" }
+)
+
+err(
+    "ref-param-with-interface-type-in-dynamic-dispatch",
+    52010,
+    "ref parameter incompatible with dynamic dispatch",
+    span { loc = "location", message = "'~paramKind' parameter of type '~paramType:IRInst' cannot be used in a dynamic dispatch context." }
 )
 
 warning(

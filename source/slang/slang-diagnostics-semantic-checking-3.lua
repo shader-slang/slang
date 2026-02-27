@@ -237,7 +237,7 @@ err(
     "target-switch-cap-cases-conflict",
     36120,
     "capability cases conflict in target_switch",
-    span { loc = "location", message = "the capability for case '~caseName' is '~caseCaps', which is conflicts with previous case which requires '~prevCaps'. In target_switch, if two cases are belong to the same target, then one capability set has to be a subset of the other." }
+    span { loc = "location", message = "the capability for case '~caseName' is '~caseCaps', which conflicts with previous case which requires '~prevCaps'. In target_switch, if two cases are belong to the same target, then one capability set has to be a subset of the other." }
 )
 
 end

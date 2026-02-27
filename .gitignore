@@ -139,3 +139,4 @@ perf.data.*
 .secrets
 .vars
 .github/test-events/
+__pycache__/

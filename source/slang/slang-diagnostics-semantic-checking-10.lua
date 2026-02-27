@@ -192,6 +192,20 @@ err(
     span { loc = "location", message = "cannot cast non-integer specialization constant to compile-time integer" }
 )
 
+err(
+    "implicit-type-coerce-constraint-with-non-implicit-conversion",
+    38042,
+    "implicit conversion constraint not satisfied",
+    span { loc = "location", message = "'~fromType:Type' is not implicitly convertible to '~toType:Type', not satisfying the type coerce constraint '~toType:Type(~fromType:Type)'" }
+)
+
+err(
+    "type-coerce-constraint-missing-conversion",
+    38043,
+    "type coerce constraint not satisfied",
+    span { loc = "location", message = "'~fromType:Type' is not convertible to '~toType:Type', not satisfying the type coerce constraint '~toType:Type(~fromType:Type)'" }
+)
+
 --
 -- 382xx: module imports
 --

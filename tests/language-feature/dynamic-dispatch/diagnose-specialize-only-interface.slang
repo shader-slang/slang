@@ -3,8 +3,7 @@
 // dynamic dispatch code (witness table switch), it must reject the program with
 // error 52008 rather than silently producing dynamic dispatch for such interfaces.
 
-// Disabled: requires compiler fix to emit error 52008 for [Specialize] interfaces
-//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target spirv -gnone
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -gnone
 
 #lang slang 2025
 
