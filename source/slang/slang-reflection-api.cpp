@@ -446,6 +446,10 @@ SLANG_API SlangTypeKind spReflectionType_GetKind(SlangReflectionType* inType)
     {
         return SLANG_TYPE_KIND_RESOURCE;
     }
+    else if (const auto subpassInputType = as<SubpassInputType>(type))
+    {
+        return SLANG_TYPE_KIND_RESOURCE;
+    }
     else if (const auto feedbackType = as<FeedbackType>(type))
     {
         return SLANG_TYPE_KIND_FEEDBACK;
@@ -832,6 +836,12 @@ SLANG_API SlangResourceShape spReflectionType_GetResourceShape(SlangReflectionTy
         return textureType->getShape();
     }
 
+    if (auto subpassInputType = as<SubpassInputType>(type))
+    {
+        return subpassInputType->isMultisample() ? SLANG_TEXTURE_SUBPASS_MULTISAMPLE
+                                                 : SLANG_TEXTURE_SUBPASS;
+    }
+
     // TODO: need a better way to handle this stuff...
 #define CASE(TYPE, SHAPE, ACCESS) \
     else if (as<TYPE>(type)) do   \
@@ -879,6 +889,11 @@ SLANG_API SlangResourceAccess spReflectionType_GetResourceAccess(SlangReflection
     if (auto textureType = as<TextureTypeBase>(type))
     {
         return textureType->getAccess();
+    }
+
+    if (as<SubpassInputType>(type))
+    {
+        return SLANG_RESOURCE_ACCESS_READ;
     }
 
     // TODO: need a better way to handle this stuff...
@@ -1223,6 +1238,11 @@ SLANG_API SlangReflectionType* spReflectionType_GetResourceResultType(SlangRefle
     if (auto textureType = as<TextureTypeBase>(type))
     {
         return convert(textureType->getElementType());
+    }
+
+    if (auto subpassInputType = as<SubpassInputType>(type))
+    {
+        return convert(subpassInputType->getElementType());
     }
 
     // TODO: need a better way to handle this stuff...
