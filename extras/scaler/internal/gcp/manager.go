@@ -382,6 +382,7 @@ func (m *Manager) cleanupTerminatedVMs(ctx context.Context) {
 
 func (m *Manager) doCleanupTerminatedVMs(ctx context.Context) {
 	zones := strings.Split(m.config.Zones, ",")
+	deletedCount := 0
 
 	for _, zone := range zones {
 		zone = strings.TrimSpace(zone)
@@ -415,6 +416,8 @@ func (m *Manager) doCleanupTerminatedVMs(ctx context.Context) {
 			cancelDelete()
 			if err != nil {
 				slog.Warn("failed to delete terminated VM", "vm", name, "zone", zone, "error", err)
+			} else {
+				deletedCount++
 			}
 
 			// Also remove from tracked VMs if still there
@@ -424,4 +427,6 @@ func (m *Manager) doCleanupTerminatedVMs(ctx context.Context) {
 		}
 		cancelList()
 	}
+
+	slog.Info("terminated VM cleanup pass completed", "terminated_vms_deleted", deletedCount)
 }
