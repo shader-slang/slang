@@ -12,6 +12,9 @@
 namespace Slang
 {
 
+// TODO: This needs to come from a header
+void diagnoseCallStack(IRInst* inst, DiagnosticSink* sink);
+
 struct ProcessLateRequireCapabilityInstsContext
 {
     IRModule* const m_module;
@@ -22,6 +25,8 @@ struct ProcessLateRequireCapabilityInstsContext
     SlangResult m_status = SLANG_OK;
 
     Dictionary<IRInst*, HashSet<IRFunc*>> m_mapInstToReferencingEntryPoints;
+
+    HashSet<String> m_diagnosedCapsStrs;
 
     ProcessLateRequireCapabilityInstsContext(
         IRModule* module,
@@ -37,15 +42,16 @@ struct ProcessLateRequireCapabilityInstsContext
     {
     }
 
-    void checkCapability(IRFunc* entry, Profile profile, IRCapabilitySet* capSet)
+    void checkCapability(IRFunc* entry, Profile profile, IRLateRequireCapability *irInst, IRCapabilitySet* capSet)
     {
         CapabilitySet targetCaps = m_targetCaps;
         auto stageCapabilitySet = profile.getCapabilityName();
         CapabilitySet required(capSet->getCaps());
+        StringBuilder sb;
 
 #if 0
         {
-            StringBuilder sb;
+            sb.clear();
             printDiagnosticArg(sb, required);
             fprintf(stderr, "required (full):    %s\n", sb.toString().getBuffer());
 
@@ -63,7 +69,7 @@ struct ProcessLateRequireCapabilityInstsContext
 
 #if 0
         {
-            StringBuilder sb;
+            sb.clear();
             printDiagnosticArg(sb, targetCaps);
             fprintf(stderr, "target (stage):     %s\n", sb.toString().getBuffer());
         }
@@ -87,15 +93,22 @@ struct ProcessLateRequireCapabilityInstsContext
             }
         }
 
+        sb.clear();
+        printDiagnosticArg(sb, addedAtoms);
+        String missingCapsStr = sb.toString();
+
+        // Add if not already added
+        if (!m_diagnosedCapsStrs.add(missingCapsStr))
+            return; // already added, don't diagnose again
+
 #if 0
         {
-            StringBuilder sb;
+            sb.clear();
             printDiagnosticArg(sb, required);
             fprintf(stderr, "required (stage):   %s\n", sb.toString().getBuffer());
 
             sb.clear();
-            printDiagnosticArg(sb, addedAtoms);
-            fprintf(stderr, "diff:               %s\n", sb.toString().getBuffer());
+            fprintf(stderr, "diff:               %s\n", missingCapsStr.getBuffer());
         }
 #endif
 
@@ -108,9 +121,10 @@ struct ProcessLateRequireCapabilityInstsContext
             Diagnostics::profileImplicitlyUpgradedRestrictive,
             entry,
             m_optionSet.getProfile().getName(),
-            addedAtoms.getElements<CapabilityAtom>());
+            missingCapsStr);
 
-        m_sink->diagnose(capSet->sourceLoc, Diagnostics::seeCallOfFunc, "__requireCapability()");
+        m_sink->diagnose(irInst->sourceLoc, Diagnostics::seeCallOfFunc, "__requireCapability");
+        diagnoseCallStack(irInst, m_sink);
 
         // we'll fail only if restrictive capability check was requested
         if (m_optionSet.getBoolOption(CompilerOptionName::RestrictiveCapabilityCheck))
@@ -142,7 +156,7 @@ struct ProcessLateRequireCapabilityInstsContext
                             {
                                 IRCapabilitySet* capSet =
                                     as<IRCapabilitySet>(lateRequireCap->getCapabilitySet());
-                                checkCapability(entryPoint, entryPointDecor->getProfile(), capSet);
+                                checkCapability(entryPoint, entryPointDecor->getProfile(), lateRequireCap, capSet);
                             }
                         }
                     }
