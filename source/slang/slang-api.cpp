@@ -6,6 +6,7 @@
 #include "../core/slang-shared-library.h"
 #include "../core/slang-signal.h"
 #include "../slang-record-replay/proxy/proxy-base.h"
+#include "../slang-record-replay/proxy/proxy-macros.h"
 #include "../slang-record-replay/replay-context.h"
 #include "slang-capability.h"
 #include "slang-compiler.h"
@@ -259,12 +260,9 @@ SLANG_API SlangResult slang_createGlobalSession2(
     const SlangGlobalSessionDesc* desc,
     slang::IGlobalSession** outGlobalSession)
 {
-    // Replay system code is manually written here for simplicity. It does nothing if replays aren't
-    // active.
     using namespace SlangRecord;
-    auto& _ctx = ReplayContext::get();
-    _ctx.beginStaticCall(SLANG_FUNC_SIG);
-    _ctx.record(RecordFlag::Input, *const_cast<SlangGlobalSessionDesc*>(desc));
+    RECORD_STATIC_CALL();
+    RECORD_INPUT(*desc);
 
     // Main internal call (regardless of replay state)
     Slang::GlobalSessionInternalDesc internalDesc = {};
