@@ -2283,6 +2283,21 @@ ScalarizedVal createGLSLGlobalVaryings(
         namehintSB);
 }
 
+// Compute the result type of extracting a struct field through possibly nested
+// array layers. For example, extracting field `a: Int` from `Array<Array<S, M>, N>`
+// yields `Array<Array<Int, M>, N>`.
+IRType* getFieldTypeThroughArrays(IRBuilder* builder, IRType* type, IRStructKey* fieldKey)
+{
+    if (auto arrayType = as<IRArrayType>(type))
+    {
+        auto innerType = getFieldTypeThroughArrays(builder, arrayType->getElementType(), fieldKey);
+        if (innerType)
+            return builder->getArrayType(innerType, arrayType->getElementCount());
+        return nullptr;
+    }
+    return getFieldType(type, fieldKey);
+}
+
 ScalarizedVal extractField(
     IRBuilder* builder,
     ScalarizedVal const& val,
@@ -2296,10 +2311,54 @@ ScalarizedVal extractField(
         return ScalarizedVal();
 
     case ScalarizedVal::Flavor::value:
-        return ScalarizedVal::value(builder->emitFieldExtract(
-            getFieldType(val.irValue->getDataType(), fieldKey),
-            val.irValue,
-            fieldKey));
+        {
+            auto dataType = val.irValue->getDataType();
+            if (auto arrayType = as<IRArrayType>(dataType))
+            {
+                auto arraySize = arrayType->getElementCount();
+                auto resultType = getFieldTypeThroughArrays(builder, dataType, fieldKey);
+                if (!resultType)
+                    break;
+
+                if (auto intLit = as<IRIntLit>(arraySize))
+                {
+                    List<IRInst*> fieldValues;
+                    for (IRIntegerValue i = 0; i < intLit->getValue(); i++)
+                    {
+                        auto elem = builder->emitElementExtract(val.irValue, i);
+                        auto elemField =
+                            extractField(builder, ScalarizedVal::value(elem), fieldIndex, fieldKey);
+                        fieldValues.add(elemField.irValue);
+                    }
+                    return ScalarizedVal::value(builder->emitMakeArray(
+                        resultType,
+                        fieldValues.getCount(),
+                        fieldValues.getBuffer()));
+                }
+                else
+                {
+                    auto resultVar = builder->emitVar(resultType);
+                    IRBlock* loopBodyBlock;
+                    IRBlock* loopBreakBlock;
+                    auto loopParam = emitLoopBlocks(
+                        builder,
+                        builder->getIntValue(builder->getIntType(), 0),
+                        arraySize,
+                        loopBodyBlock,
+                        loopBreakBlock);
+                    builder->setInsertBefore(loopBodyBlock->getFirstOrdinaryInst());
+                    auto loopElem = builder->emitElementExtract(val.irValue, loopParam);
+                    auto loopField =
+                        extractField(builder, ScalarizedVal::value(loopElem), fieldIndex, fieldKey);
+                    auto dstAddr = builder->emitElementAddress(resultVar, loopParam);
+                    builder->emitStore(dstAddr, loopField.irValue);
+                    builder->setInsertInto(loopBreakBlock);
+                    return ScalarizedVal::value(builder->emitLoad(resultVar));
+                }
+            }
+            return ScalarizedVal::value(
+                builder->emitFieldExtract(getFieldType(dataType, fieldKey), val.irValue, fieldKey));
+        }
 
     case ScalarizedVal::Flavor::address:
         {
