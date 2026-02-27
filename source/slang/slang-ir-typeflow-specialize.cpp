@@ -2409,7 +2409,7 @@ struct TypeFlowSpecializationContext
             IRBuilder builder(module);
             return builder.getTupleType(elementInfos);
         }
-        else if (auto arrayType = as<IRArrayType>(oldValueType))
+        else if (as<IRArrayType>(oldValueType))
         {
             // For arrays, we can't track per-element info, so just return the old value's info.
             auto oldValueInfo = tryGetInfo(context, oldValue);

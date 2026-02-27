@@ -322,7 +322,7 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
                     return false;
                 }
             }
-            else if (auto typePack = as<GenericTypePackParamDecl>(member))
+            else if (as<GenericTypePackParamDecl>(member))
             {
                 if (diagSink)
                 {
