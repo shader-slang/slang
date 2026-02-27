@@ -63,9 +63,11 @@ runs:
           $installDir = Join-Path $env:RUNNER_TEMP "sccache-bin"
           New-Item -ItemType Directory -Force -Path $installDir | Out-Null
           $archive = Join-Path $env:RUNNER_TEMP "sccache.tar.gz"
-          curl -L -o $archive https://github.com/mozilla/sccache/releases/download/v0.7.4/sccache-v0.7.4-x86_64-pc-windows-msvc.tar.gz
-          tar xzf $archive -C $env:RUNNER_TEMP
-          Move-Item (Join-Path $env:RUNNER_TEMP "sccache-v0.7.4-x86_64-pc-windows-msvc/sccache.exe") (Join-Path $installDir "sccache.exe")
+          curl.exe -L -o $archive https://github.com/mozilla/sccache/releases/download/v0.7.4/sccache-v0.7.4-x86_64-pc-windows-msvc.tar.gz
+          Push-Location $env:RUNNER_TEMP
+          tar xzf $archive
+          Pop-Location
+          Move-Item (Join-Path $env:RUNNER_TEMP "sccache-v0.7.4-x86_64-pc-windows-msvc\sccache.exe") (Join-Path $installDir "sccache.exe")
           $installDir | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
           & (Join-Path $installDir "sccache.exe") --version
         }

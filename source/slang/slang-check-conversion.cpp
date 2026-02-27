@@ -149,6 +149,7 @@ bool SemanticsVisitor::_readValueFromInitializerList(
             firstInitExpr->type,
             firstInitExpr,
             getSink(),
+            nullptr,
             nullptr);
     }
 
@@ -552,6 +553,7 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
                 arg->type,
                 arg,
                 getSink(),
+                nullptr,
                 nullptr);
         }
         else
@@ -1202,8 +1204,17 @@ bool SemanticsVisitor::_coerce(
     QualType fromType,
     Expr* fromExpr,
     DiagnosticSink* sink,
-    ConversionCost* outCost)
+    ConversionCost* outCost,
+    TypeCoercionWitness** outWitnessOfConversion)
 {
+    auto setWitnessOfConversionToBuiltinConversion = [&]()
+    {
+        if (outWitnessOfConversion)
+            *outWitnessOfConversion =
+                getASTBuilder()->getBuiltinTypeCoercionWitness(fromType, toType);
+    };
+
+
     // If we are about to try and coerce an overloaded expression,
     // then we should start by trying to resolve the ambiguous reference
     // based on prioritization of the different candidates.
@@ -1241,7 +1252,8 @@ bool SemanticsVisitor::_coerce(
                 coercibleCandidates[0]->type,
                 coercibleCandidates[0],
                 sink,
-                outCost);
+                outCost,
+                outWitnessOfConversion);
         }
         if (sink)
         {
@@ -1271,6 +1283,7 @@ bool SemanticsVisitor::_coerce(
             *outToExpr = fromExpr;
         if (outCost)
             *outCost = kConversionCost_None;
+        setWitnessOfConversionToBuiltinConversion();
         return true;
     }
 
@@ -1320,6 +1333,7 @@ bool SemanticsVisitor::_coerce(
                                 *outToExpr = fromExpr;
                             if (outCost)
                                 *outCost = kConversionCost_None;
+                            setWitnessOfConversionToBuiltinConversion();
                             return true;
                         }
                     }
@@ -1335,6 +1349,7 @@ bool SemanticsVisitor::_coerce(
             *outToExpr = fromExpr;
         if (outCost)
             *outCost = kConversionCost_None;
+        setWitnessOfConversionToBuiltinConversion();
         return true;
     }
 
@@ -1476,6 +1491,7 @@ bool SemanticsVisitor::_coerce(
             {
                 *outCost = kConversionCost_None;
             }
+            setWitnessOfConversionToBuiltinConversion();
 
             return true;
         }
@@ -1699,7 +1715,15 @@ bool SemanticsVisitor::_coerce(
         }
 
         ConversionCost subCost = kConversionCost_None;
-        if (!_coerce(site, toType, outToExpr, fromElementType, derefExpr, sink, &subCost))
+        if (!_coerce(
+                site,
+                toType,
+                outToExpr,
+                fromElementType,
+                derefExpr,
+                sink,
+                &subCost,
+                outWitnessOfConversion))
         {
             return false;
         }
@@ -1785,7 +1809,15 @@ bool SemanticsVisitor::_coerce(
             openRefExpr = maybeOpenRef(fromExpr);
         }
 
-        if (!_coerce(site, toType, outToExpr, fromValueType, openRefExpr, sink, &subCost))
+        if (!_coerce(
+                site,
+                toType,
+                outToExpr,
+                fromValueType,
+                openRefExpr,
+                sink,
+                &subCost,
+                outWitnessOfConversion))
         {
             return false;
         }
@@ -1855,6 +1887,11 @@ bool SemanticsVisitor::_coerce(
         }
         overloadContext.bestCandidateStorage = cachedMethod->conversionFuncOverloadCandidate;
         overloadContext.bestCandidate = &overloadContext.bestCandidateStorage;
+        if (outWitnessOfConversion)
+            *outWitnessOfConversion = getASTBuilder()->getDeclRefTypeCoercionWitness(
+                fromType,
+                toType,
+                overloadContext.bestCandidate->item.declRef);
         if (!outToExpr)
         {
             // If we are not requesting to create an expression, we can return early.
@@ -1948,6 +1985,11 @@ bool SemanticsVisitor::_coerce(
             getShared()->cacheImplicitCastMethod(implicitCastKey, method);
         }
 
+        if (outWitnessOfConversion)
+            *outWitnessOfConversion = getASTBuilder()->getDeclRefTypeCoercionWitness(
+                fromType,
+                toType,
+                method.conversionFuncOverloadCandidate.item.declRef);
         if (outCost)
             *outCost = bestCost;
         return result;
@@ -2304,8 +2346,15 @@ bool SemanticsVisitor::canCoerce(
     // which suppresses emission of any diagnostics
     // during the coercion process.
     //
-
-    bool rs = _coerce(CoercionSite::General, toType, nullptr, fromType, fromExpr, getSink(), &cost);
+    bool rs = _coerce(
+        CoercionSite::General,
+        toType,
+        nullptr,
+        fromType,
+        fromExpr,
+        getSink(),
+        &cost,
+        nullptr);
 
     if (outCost)
         *outCost = cost;
@@ -2374,7 +2423,7 @@ Expr* SemanticsVisitor::coerce(
     DiagnosticSink* sink)
 {
     Expr* expr = nullptr;
-    if (!_coerce(site, toType, &expr, fromExpr->type, fromExpr, sink, nullptr))
+    if (!_coerce(site, toType, &expr, fromExpr->type, fromExpr, sink, nullptr, nullptr))
     {
         // Note(tfoley): We don't call `CreateErrorExpr` here, because that would
         // clobber the type on `fromExpr`, and an invariant here is that coercion
