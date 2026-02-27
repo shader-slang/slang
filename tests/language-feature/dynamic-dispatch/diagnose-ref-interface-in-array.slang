@@ -1,8 +1,5 @@
-// Tests disabled: diagnostic 52010 not yet implemented (see #9906).
-// Enable when __ref/__constref dynamic dispatch diagnostic is added.
-//DISABLED_TEST:SIMPLE(filecheck=CHECK): -target spirv
-//DISABLED_TEST:SIMPLE(filecheck=CHECK): -target hlsl
-//DISABLED_TEST:SIMPLE(filecheck=CHECK): -target cuda
+//TEST:SIMPLE(filecheck=CHECK): -target spirv
+//TEST:SIMPLE(filecheck=CHECK): -target hlsl
 
 // The diagnostic for __ref/__constref with interface types in dynamic
 // dispatch is applied recursively: if a struct contains an array whose
@@ -34,13 +31,13 @@ struct ArrayContainer
     IFoo items[4];
 }
 
-// CHECK: ([[# @LINE+1]]): error 52010: '__ref' parameter of type 'ArrayContainer' cannot be used in dynamic dispatch context.
+// CHECK: ([[# @LINE+1]]): error 52010: '__ref' parameter of type 'ArrayContainer' cannot be used in a dynamic dispatch context.
 float processArrayRef(__ref ArrayContainer c)
 {
     return c.items[0].getValue();
 }
 
-// CHECK: ([[# @LINE+1]]): error 52010: '__constref' parameter of type 'ArrayContainer' cannot be used in dynamic dispatch context.
+// CHECK: ([[# @LINE+1]]): error 52010: '__constref' parameter of type 'ArrayContainer' cannot be used in a dynamic dispatch context.
 float processArrayConstref(__constref ArrayContainer c)
 {
     return c.items[1].getValue();
@@ -52,7 +49,7 @@ struct MultiDimContainer
     IFoo grid[2][3];
 }
 
-// CHECK: ([[# @LINE+1]]): error 52010: '__ref' parameter of type 'MultiDimContainer' cannot be used in dynamic dispatch context.
+// CHECK: ([[# @LINE+1]]): error 52010: '__ref' parameter of type 'MultiDimContainer' cannot be used in a dynamic dispatch context.
 float processMultiDim(__ref MultiDimContainer c)
 {
     return c.grid[0][1].getValue();
@@ -67,10 +64,29 @@ struct MultipleArrays
     IFoo second[3];
 }
 
-// CHECK: ([[# @LINE+1]]): error 52010: '__constref' parameter of type 'MultipleArrays' cannot be used in dynamic dispatch context.
+// CHECK: ([[# @LINE+1]]): error 52010: '__constref' parameter of type 'MultipleArrays' cannot be used in a dynamic dispatch context.
 float processMultipleArrays(__constref MultipleArrays c)
 {
     return c.first[0].getValue() + c.second[0].getValue();
+}
+
+// Transitive nesting: struct field that is itself a struct containing an
+// interface array. Exercises typeIncludesDynamicDispatch() recursion
+// through struct fields.
+struct InnerWithArray
+{
+    IFoo items[2];
+}
+
+struct OuterWithInner
+{
+    InnerWithArray inner;
+}
+
+// CHECK: ([[# @LINE+1]]): error 52010: '__ref' parameter of type 'OuterWithInner' cannot be used in a dynamic dispatch context.
+float processOuter(__ref OuterWithInner o)
+{
+    return o.inner.items[0].getValue();
 }
 
 IFoo factory(uint id)
@@ -97,4 +113,8 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     ma.first[0] = factory(dispatchThreadID.x);
     ma.second[0] = factory(dispatchThreadID.x);
     outputBuffer[3] = processMultipleArrays(ma);
+
+    OuterWithInner owi;
+    owi.inner.items[0] = factory(dispatchThreadID.x);
+    outputBuffer[4] = processOuter(owi);
 }

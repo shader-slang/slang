@@ -356,7 +356,7 @@ template<typename T>
 SpvInst* emitOpTypeRuntimeArray(IRInst* inst, const T& elementType)
 {
     static_assert(isSingular<T>);
-    return emitInst(
+    return emitInstMemoized(
         getSection(SpvLogicalSectionID::ConstantsAndTypes),
         inst,
         SpvOpTypeRuntimeArray,

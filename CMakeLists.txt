@@ -398,6 +398,52 @@ if(NOT SLANG_EXCLUDE_TINT)
 endif()
 
 #
+# sccache support
+#
+# Enable sccache as the compiler launcher for faster rebuilds. Can be activated
+# via -DSLANG_USE_SCCACHE=ON or by setting the SLANG_USE_SCCACHE environment
+# variable to a truthy value. When enabled, precompiled headers are automatically
+# disabled due to a known incompatibility that causes linker errors.
+#
+option(
+    SLANG_USE_SCCACHE
+    "Use sccache as compiler launcher for faster rebuilds"
+    OFF
+)
+if(NOT CMAKE_C_COMPILER_LAUNCHER AND NOT CMAKE_CXX_COMPILER_LAUNCHER)
+    if(
+        NOT SLANG_USE_SCCACHE
+        AND DEFINED ENV{SLANG_USE_SCCACHE}
+        AND "$ENV{SLANG_USE_SCCACHE}"
+    )
+        set(SLANG_USE_SCCACHE ON CACHE BOOL "" FORCE)
+    endif()
+    if(SLANG_USE_SCCACHE)
+        find_program(SCCACHE_PROGRAM sccache)
+        if(SCCACHE_PROGRAM)
+            message(STATUS "Using sccache: ${SCCACHE_PROGRAM}")
+            set(CMAKE_C_COMPILER_LAUNCHER "${SCCACHE_PROGRAM}")
+            set(CMAKE_CXX_COMPILER_LAUNCHER "${SCCACHE_PROGRAM}")
+            # Re-run the MSVC debug-info workaround now that the launcher is set
+            include(CCacheDebugInfoWorkaround)
+            # Disable PCH: sccache + PCH causes linker errors
+            if(SLANG_ENABLE_PCH)
+                message(
+                    STATUS
+                    "Disabling precompiled headers (incompatible with sccache)"
+                )
+                set(SLANG_ENABLE_PCH OFF CACHE BOOL "" FORCE)
+            endif()
+        else()
+            message(
+                WARNING
+                "SLANG_USE_SCCACHE is ON but sccache was not found in PATH"
+            )
+        endif()
+    endif()
+endif()
+
+#
 # Option validation
 #
 
