@@ -737,7 +737,7 @@ SpvInst* emitOpDecorateArrayStride(
     return emitInst(parent, inst, SpvOpDecorate, target, SpvDecorationArrayStride, arrayStride);
 }
 
-// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpDecorate
+// https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html#OpDecorateId
 template<typename T, typename U>
 SpvInst* emitOpDecorateArrayStrideIdEXT(
     SpvInstParent* parent,
