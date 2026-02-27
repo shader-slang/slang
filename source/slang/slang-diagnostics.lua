@@ -123,118 +123,6 @@ local warning = helpers.warning
 local internal = helpers.internal
 local fatal = helpers.fatal
 
--- Define diagnostics
-err(
-    "function-return-type-mismatch",
-    30007,
-    "expression type ~expression.type does not match function's return type ~returnType:Type",
-    span { loc = "expression:Expr", message = "expression type" },
-    span { loc = "function:Decl", message = "function return type" }
-)
-
-err(
-    "function-redefinition",
-    30201,
-    "function '~function' already has a body",
-    span { loc = "function:Decl", message = "redeclared here" },
-    note { message = "see previous definition of '~function'", span { loc = "original:Decl" } }
-)
-
-err(
-    "multiple-type-errors",
-    30202,
-    "expression has multiple type errors",
-    span { loc = "expression:Expr", message = "expression here" },
-    variadic_span { cpp_name = "Error", loc = "errorExpr:Expr", message = "type error: ~errorExpr.type" }
-)
-
-err(
-    "ambiguous-overload-for-name-with-args",
-    39999,
-    "ambiguous call to '~name' with arguments of type ~args",
-    span { loc = "expr:Expr", message = "in call expression" },
-    variadic_note { cpp_name = "Candidate", message = "candidate: ~candidateSignature", span { loc = "candidate:Decl" } }
-)
-
-err(
-    "note-with-spans-test",
-    39998,
-    "this is a test diagnostic with spans in notes",
-    span { loc = "expr:Expr", message = "main expression" },
-    note {
-        message = "a note",
-        span { loc = "decl:Decl", message = "see declaration here" },
-        span { loc = "attr:Decl", message = "with attribute" },
-        span { loc = "param:Expr", message = "used here" },
-    }
-)
-
-err(
-    "subscript-non-array",
-    30013,
-    "invalid subscript expression",
-    span { loc = "expr:Expr", message = "no subscript declarations found for type '~type:Type'" }
-)
-
--- Conversion examples from slang-diagnostic-defs.h
-
-err(
-    "type-mismatch",
-    30019,
-    "type mismatch in expression",
-    span {
-        loc = "expr:Expr",
-        message = "expected an expression of type '~expectedType:Type', got '~actualType:QualType'",
-    }
-)
-
-warning(
-    "macro-redefinition",
-    15400,
-    "macro redefined",
-    span { loc = "location", message = "redefinition of macro '~name:Name'" },
-    note { message = "see previous definition of '~name'", span { loc = "originalLocation" } }
-)
-
-err(
-    "invalid-swizzle-expr",
-    30052,
-    "invalid swizzle expression",
-    span { loc = "expr:Expr", message = "invalid swizzle pattern '~pattern' on type '~type:Type'" }
-)
-
-err(
-    "expected-prefix-operator",
-    39999,
-    "function called as prefix operator was not declared `__prefix`",
-    span { loc = "callLoc", message = "function called as prefix operator was not declared `__prefix`" },
-    note { message = "see definition of '~decl'", span { loc = "decl:Decl" } }
-)
-
-err(
-    "too-many-initializers",
-    30500,
-    "too many initializers in initializer list",
-    span { loc = "initList:Expr", message = "too many initializers (expected ~expected:int, got ~got:int)" }
-)
-
-err(
-    "cannot-convert-array-of-smaller-to-larger-size",
-    30024,
-    "array size mismatch prevents conversion",
-    span {
-        loc = "location",
-        message = "Cannot convert array of size ~sourceSize:int to array of size ~targetSize:int as this would truncate data",
-    }
-)
-
-err(
-    "unknown-stage",
-    15,
-    "unknown stage '~stageName'",
-    span { loc = "location", message = "unknown stage '~stageName'" }
-)
-
 --
 -- 0xxxx - Command line and interaction with host platform APIs.
 --
@@ -281,6 +169,13 @@ err(
     14,
     "unknown profile '~profile'",
     span { loc = "location", message = "unknown profile '~profile'" }
+)
+
+err(
+    "unknown-stage",
+    15,
+    "unknown stage '~stageName'",
+    span { loc = "location", message = "unknown stage '~stageName'" }
 )
 
 err(
@@ -669,6 +564,14 @@ err(
 )
 
 -- 154xx - macro definition
+warning(
+    "macro-redefinition",
+    15400,
+    "macro redefined",
+    span { loc = "location", message = "redefinition of macro '~name:Name'" },
+    note { message = "see previous definition of '~name'", span { loc = "originalLocation" } }
+)
+
 warning(
     "macro-not-defined",
     15401,
@@ -1170,6 +1073,13 @@ err(
 )
 
 err(
+    "subscript-non-array",
+    30013,
+    "invalid subscript expression",
+    span { loc = "expr:Expr", message = "no subscript declarations found for type '~type:Type'" }
+)
+
+err(
     "call-operator-not-found",
     30016,
     "no call operation found for type",
@@ -1181,6 +1091,26 @@ err(
     30015,
     "undefined identifier",
     span { loc = "location", message = "undefined identifier '~name:Name'." }
+)
+
+err(
+    "type-mismatch",
+    30019,
+    "type mismatch in expression",
+    span {
+        loc = "expr:Expr",
+        message = "expected an expression of type '~expectedType:Type', got '~actualType:QualType'",
+    }
+)
+
+err(
+    "cannot-convert-array-of-smaller-to-larger-size",
+    30024,
+    "array size mismatch prevents conversion",
+    span {
+        loc = "location",
+        message = "Cannot convert array of size ~sourceSize:int to array of size ~targetSize:int as this would truncate data",
+    }
 )
 
 err(
@@ -1244,6 +1174,13 @@ err(
     30050,
     "mutating method cannot be called on immutable value",
     span { loc = "location", message = "mutating method '~methodName:Name' cannot be called on an immutable value" }
+)
+
+err(
+    "invalid-swizzle-expr",
+    30052,
+    "invalid swizzle expression",
+    span { loc = "expr:Expr", message = "invalid swizzle pattern '~pattern' on type '~type:Type'" }
 )
 
 err(
@@ -1454,6 +1391,14 @@ err(
     30200,
     "conflicting declaration",
     span { loc = "decl:Decl", message = "declaration of '~decl' conflicts with existing declaration" }
+)
+
+err(
+    "function-redefinition",
+    30201,
+    "function '~function' already has a body",
+    span { loc = "function:Decl", message = "redeclared here" },
+    note { message = "see previous definition of '~function'", span { loc = "original:Decl" } }
 )
 
 err(
@@ -2868,7 +2813,13 @@ warning(
 --
 -- 305xx: initializer lists
 --
--- Note: tooManyInitializers (30500) already exists in the main lua file
+
+err(
+    "too-many-initializers",
+    30500,
+    "too many initializers in initializer list",
+    span { loc = "initList:Expr", message = "too many initializers (expected ~expected:int, got ~got:int)" }
+)
 
 err(
     "cannot-use-initializer-list-for-vector-of-unknown-size",
@@ -3227,10 +3178,13 @@ err(
     span { loc = "expr:Expr", message = "no overload applicable to arguments of type ~args" }
 )
 
--- Note: "ambiguous overload for name with args" already exists in slang-diagnostics.lua
--- with rich diagnostic support (variadic_note). The old diagnostic in slang-diagnostic-defs.h
--- (ambiguousOverloadForNameWithArgs) is kept for backward compatibility when rich diagnostics
--- are not enabled. See slang-check-overload.cpp:2981-3015 for usage.
+err(
+    "ambiguous-overload-for-name-with-args",
+    39999,
+    "ambiguous call to '~name' with arguments of type ~args",
+    span { loc = "expr:Expr", message = "ambiguous call to '~name' with arguments of type ~args" },
+    variadic_note { cpp_name = "Candidate", message = "candidate: ~candidateSignature", span { loc = "candidate:Decl" } }
+)
 
 err(
     "ambiguous-overload-with-args",
@@ -3324,7 +3278,13 @@ err(
 -- 39999: operators and other errors
 --
 
--- Note: expectedPrefixOperator (39999) already exists in slang-diagnostics.lua
+err(
+    "expected-prefix-operator",
+    39999,
+    "function called as prefix operator was not declared `__prefix`",
+    span { loc = "callLoc", message = "function called as prefix operator was not declared `__prefix`" },
+    note { message = "see definition of '~decl'", span { loc = "decl:Decl" } }
+)
 
 err(
     "expected-postfix-operator",
