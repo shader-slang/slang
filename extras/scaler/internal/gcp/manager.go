@@ -430,7 +430,7 @@ func (m *Manager) listVMNamesByFilter(ctx context.Context, zone, filter string) 
 			break
 		}
 		if err != nil {
-			return nil, err
+			return names, err
 		}
 		names = append(names, instance.GetName())
 	}
@@ -477,7 +477,9 @@ func (m *Manager) doCleanupTerminatedVMs(ctx context.Context) {
 		cancelList()
 		if err != nil {
 			slog.Warn("failed to list instances for cleanup", "zone", zone, "error", err)
-			continue
+			if len(names) == 0 {
+				continue
+			}
 		}
 
 		for _, name := range names {

@@ -162,3 +162,33 @@ func TestDoCleanupTerminatedVMsDeleteErrorStillRemovesTrackedEntry(t *testing.T)
 		t.Fatalf("runner-a should be removed from tracked map even when delete fails")
 	}
 }
+
+func TestDoCleanupTerminatedVMsDeletesPartialListResultsOnError(t *testing.T) {
+	m := &Manager{
+		config: ManagerConfig{
+			Zones: "us-east1-c",
+		},
+		vms: map[string]*vmInfo{
+			"runner-a": {vmName: "win-runner-a"},
+		},
+	}
+
+	m.listTerminated = func(_ context.Context, _ string) ([]string, error) {
+		return []string{"win-runner-a"}, errors.New("partial page read failed")
+	}
+
+	deleted := make([]string, 0, 1)
+	m.deleteVMFunc = func(_ context.Context, vmName, _ string) error {
+		deleted = append(deleted, vmName)
+		return nil
+	}
+
+	m.doCleanupTerminatedVMs(context.Background())
+
+	if !slices.Equal(deleted, []string{"win-runner-a"}) {
+		t.Fatalf("deleted VMs = %v, want [win-runner-a]", deleted)
+	}
+	if _, ok := m.vms["runner-a"]; ok {
+		t.Fatalf("runner-a should be removed after deleting partial list result")
+	}
+}
