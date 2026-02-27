@@ -141,7 +141,7 @@ struct ProcessLateRequireCapabilityInstsContext
                                     entryPoint->findDecoration<IREntryPointDecoration>())
                             {
                                 IRCapabilitySet* capSet =
-                                    as<IRCapabilitySet>(lateRequireCap->getOperand(0));
+                                    as<IRCapabilitySet>(lateRequireCap->getCapabilitySet());
                                 checkCapability(entryPoint, entryPointDecor->getProfile(), capSet);
                             }
                         }
