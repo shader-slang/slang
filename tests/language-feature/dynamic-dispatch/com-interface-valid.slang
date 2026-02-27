@@ -20,6 +20,7 @@ interface ICOMDerived : ICOMBase
 // CHECK-NOT: error 31122
 // CHECK-NOT: error 31123
 // CHECK-NOT: error 31124
+// CHECK-NOT: error
 
 [numthreads(1, 1, 1)]
 void computeMain()

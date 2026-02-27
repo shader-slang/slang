@@ -4,7 +4,8 @@
 // implement COM interfaces.
 
 // Disabled: error 31124 does not fire due to a bug in checkConformance()
-// that checks the parent type instead of the child type. Enable when fixed.
+// that checks the parent type instead of the child type.
+// Enable when #10228 is fixed.
 //DISABLED_TEST:SIMPLE(filecheck=CHECK): -target spirv
 
 [COM("00000000-0000-0000-0000-000000000001")]
