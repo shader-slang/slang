@@ -202,11 +202,11 @@ all IPointerLikeAddress operations to it.
 @category neural
 */
 
-public struct TensorViewAddress<T> : IPointerLikeAddress<T>
+public struct TorchTensorViewAddress<T> : IPointerLikeAddress<T>
     where T : __BuiltinFloatingPointType
     where T.Differential == T
 {
-    public typealias Differential = TensorViewAddress<T.Differential>;
+    public typealias Differential = TorchTensorViewAddress<T.Differential>;
 
     internal PointerAddress<T> inner;
 

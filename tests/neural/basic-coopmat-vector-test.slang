@@ -4,7 +4,7 @@
 // TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=0 -xslang -DTEST_POINTER=1 -xslang -DTEST_TENSORVIEW=0
 // TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=1 -xslang -DTEST_POINTER=1 -xslang -DTEST_TENSORVIEW=0
 //
-// Compile-only test for TensorViewAddress (CUDA target):
+// Compile-only test for TorchTensorViewAddress (CUDA target):
 // TEST:SIMPLE(filecheck=CHECK): -target ptx -stage compute -entry computeMain -capability cuda_sm_7_0 -DTEST_HALF=0 -DTEST_TENSORVIEW=1 -DTEST_POINTER=0 -experimental-feature
 // CHECK: computeMain
 
@@ -35,7 +35,7 @@ uniform RWStructuredBuffer<float> parametersFloat;
 #if TEST_TENSORVIEW
     uniform TensorView<ElementType> parameters;
     uniform TensorView<ElementType> dParameters;
-    typealias Address = TensorViewAddress<ElementType>;
+    typealias Address = TorchTensorViewAddress<ElementType>;
 #elif TEST_POINTER
     uniform ElementType* parameters;
     uniform ElementType* dParameters;

@@ -5,7 +5,7 @@
 // TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-mtl -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTEST_TENSORVIEW=0
 // TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -xslang -experimental-feature -xslang -DTEST_TENSORVIEW=0
 //
-// Compile-only test for TensorViewAddress (CUDA target):
+// Compile-only test for TorchTensorViewAddress (CUDA target):
 //TEST:SIMPLE(filecheck=CHECK): -target ptx -stage compute -entry computeMain -capability cuda_sm_7_0 -DTEST_TENSORVIEW=1 -experimental-feature
 // CHECK: computeMain
 
@@ -17,7 +17,7 @@ RWStructuredBuffer<uint> testResult;
 #if TEST_TENSORVIEW
 uniform TensorView<float> weights;
 uniform TensorView<float> bias;
-typealias Address = TensorViewAddress<float>;
+typealias Address = TorchTensorViewAddress<float>;
 #else
 // Weights (Output=1, Input=2): [w0, w1]
 //TEST_INPUT: set weights = ubuffer(data=[3.0 4.0], stride=4)

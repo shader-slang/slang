@@ -6,7 +6,7 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTEST_POINTER=0 -xslang -DTEST_TENSORVIEW=0
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTEST_POINTER=1 -xslang -DTEST_TENSORVIEW=0
 //
-// Compile-only test for TensorViewAddress (CUDA target):
+// Compile-only test for TorchTensorViewAddress (CUDA target):
 //TEST:SIMPLE(filecheck=CHECK): -target ptx -stage compute -entry computeMain -capability cuda_sm_7_0 -DTEST_TENSORVIEW=1 -DTEST_POINTER=0 -experimental-feature
 // CHECK: computeMain
 
@@ -21,7 +21,7 @@ import neural;
 #if TEST_TENSORVIEW
     uniform TensorView<float> params;
     uniform TensorView<float> gradParams;
-    typealias Address = TensorViewAddress<float>;
+    typealias Address = TorchTensorViewAddress<float>;
 #elif TEST_POINTER
     uniform float* params;
     uniform float* gradParams;

@@ -1,6 +1,6 @@
 import neural;
 
-typealias Address = TensorViewAddress<float>;
+typealias Address = TorchTensorViewAddress<float>;
 typealias Vec4 = InlineVector<float, 4>;
 typealias Vec2 = InlineVector<float, 2>;
 typealias Layer = FFLayer<float, Vec4, Vec2, LinearLayout, IdentityActivation<float>, true>;
