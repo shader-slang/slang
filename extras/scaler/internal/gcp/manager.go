@@ -10,9 +10,11 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	compute "cloud.google.com/go/compute/apiv1"
 	computepb "cloud.google.com/go/compute/apiv1/computepb"
+	"google.golang.org/api/iterator"
 	"google.golang.org/protobuf/proto"
 
 	regionspb "cloud.google.com/go/compute/apiv1/computepb"
@@ -31,6 +33,7 @@ type ManagerConfig struct {
 	InstanceTemplate string // Name of the instance template
 	GPUType          string // GPU accelerator type (e.g., "nvidia-tesla-t4")
 	Platform         string // "windows" or "linux"
+	VMPrefix         string // VM name prefix for cleanup (e.g., "win-runner" or "linux-runner")
 }
 
 type vmInfo struct {
@@ -44,6 +47,7 @@ type Manager struct {
 	config          ManagerConfig
 	instancesClient *compute.InstancesClient
 	regionsClient   *compute.RegionsClient
+	cancelCleanup   context.CancelFunc
 
 	mu sync.Mutex
 	// runnerName -> vmInfo
@@ -70,16 +74,31 @@ func NewManager(ctx context.Context, cfg ManagerConfig) (*Manager, error) {
 		cfg.Platform = "windows"
 	}
 
-	return &Manager{
+	cleanupCtx, cancelCleanup := context.WithCancel(ctx)
+
+	mgr := &Manager{
 		config:          cfg,
 		instancesClient: instancesClient,
 		regionsClient:   regionsClient,
+		cancelCleanup:   cancelCleanup,
 		vms:             make(map[string]*vmInfo),
-	}, nil
+	}
+
+	// Start background loop to clean up TERMINATED VMs.
+	// VMs self-terminate via shutdown in the startup script after the job
+	// completes. The scaler normally deletes them via HandleJobCompleted,
+	// but after a restart or if the deletion fails, they linger as
+	// TERMINATED. This loop catches those orphans.
+	if cfg.VMPrefix != "" {
+		go mgr.cleanupTerminatedVMs(cleanupCtx)
+	}
+
+	return mgr, nil
 }
 
 // Close shuts down the manager.
 func (m *Manager) Close() {
+	m.cancelCleanup()
 	m.instancesClient.Close()
 	m.regionsClient.Close()
 }
@@ -332,4 +351,63 @@ func (m *Manager) deleteVM(ctx context.Context, vmName, zone string) error {
 
 	slog.Info("VM deleted", "vm", vmName, "zone", zone)
 	return nil
+}
+
+// cleanupTerminatedVMs periodically scans all configured zones for VMs
+// matching our name prefix that are in TERMINATED state, and deletes them.
+// This catches VMs that self-terminated (via shutdown in the startup script)
+// but weren't cleaned up by the scaler (e.g., after a restart).
+func (m *Manager) cleanupTerminatedVMs(ctx context.Context) {
+	ticker := time.NewTicker(2 * time.Minute)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			m.doCleanupTerminatedVMs(ctx)
+		}
+	}
+}
+
+func (m *Manager) doCleanupTerminatedVMs(ctx context.Context) {
+	zones := strings.Split(m.config.Zones, ",")
+
+	for _, zone := range zones {
+		zone = strings.TrimSpace(zone)
+		if zone == "" {
+			continue
+		}
+
+		filter := fmt.Sprintf("name=%s-* AND status=TERMINATED", m.config.VMPrefix)
+		req := &computepb.ListInstancesRequest{
+			Project: m.config.Project,
+			Zone:    zone,
+			Filter:  proto.String(filter),
+		}
+
+		it := m.instancesClient.List(ctx, req)
+		for {
+			instance, err := it.Next()
+			if err == iterator.Done {
+				break
+			}
+			if err != nil {
+				slog.Warn("failed to list instances for cleanup", "zone", zone, "error", err)
+				break
+			}
+
+			name := instance.GetName()
+			slog.Info("cleaning up terminated VM", "vm", name, "zone", zone)
+			if err := m.deleteVM(ctx, name, zone); err != nil {
+				slog.Warn("failed to delete terminated VM", "vm", name, "zone", zone, "error", err)
+			}
+
+			// Also remove from tracked VMs if still there
+			m.mu.Lock()
+			delete(m.vms, name)
+			m.mu.Unlock()
+		}
+	}
 }

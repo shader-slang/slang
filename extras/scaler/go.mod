@@ -6,6 +6,7 @@ require (
 	cloud.google.com/go/compute v1.29.0
 	github.com/actions/scaleset v0.1.0
 	github.com/google/uuid v1.6.0
+	google.golang.org/api v0.203.0
 	google.golang.org/protobuf v1.36.9
 )
 
@@ -34,7 +35,6 @@ require (
 	golang.org/x/oauth2 v0.35.0 // indirect
 	golang.org/x/sys v0.38.0 // indirect
 	golang.org/x/text v0.31.0 // indirect
-	google.golang.org/api v0.203.0 // indirect
 	google.golang.org/genproto v0.0.0-20241015192408-796eee8c2d53 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250218202821-56aae31c358a // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250218202821-56aae31c358a // indirect

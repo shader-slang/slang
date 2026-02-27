@@ -255,6 +255,12 @@ func run(ctx context.Context, cfg config, logger *slog.Logger) error {
 		}
 	}()
 
+	// Runner name prefix based on platform
+	vmPrefix := "win-runner"
+	if cfg.gcpPlatform == "linux" {
+		vmPrefix = "linux-runner"
+	}
+
 	// Initialize GCP VM manager
 	vmManager, err := gcpvm.NewManager(ctx, gcpvm.ManagerConfig{
 		Project:          cfg.gcpProject,
@@ -262,6 +268,7 @@ func run(ctx context.Context, cfg config, logger *slog.Logger) error {
 		InstanceTemplate: cfg.gcpInstanceTemplate,
 		GPUType:          cfg.gcpGPUType,
 		Platform:         cfg.gcpPlatform,
+		VMPrefix:         vmPrefix,
 	})
 	if err != nil {
 		return fmt.Errorf("creating GCP VM manager: %w", err)
@@ -288,12 +295,6 @@ func run(ctx context.Context, cfg config, logger *slog.Logger) error {
 	})
 	if err != nil {
 		return fmt.Errorf("creating listener: %w", err)
-	}
-
-	// Runner name prefix based on platform
-	vmPrefix := "win-runner"
-	if cfg.gcpPlatform == "linux" {
-		vmPrefix = "linux-runner"
 	}
 
 	// Create the scaler (implements listener.Scaler interface)
