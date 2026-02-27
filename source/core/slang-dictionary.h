@@ -473,7 +473,7 @@ private:
     inline int getHashPos(T& key) const
     {
         const unsigned int hash = (unsigned int)getHashCode(key);
-        return static_cast<int>((hash * 2654435761UL) % m_bucketCountMinusOne);
+        return static_cast<int>((hash * 2654435761U) % m_bucketCountMinusOne);
     }
     template<typename T>
     FindPositionResult findPosition(const T& key) const

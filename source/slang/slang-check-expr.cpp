@@ -2182,7 +2182,9 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
             const auto shiftCount =
                 static_cast<std::make_unsigned_t<IRIntegerValue>>(constArgVals[1]) %
                 std::numeric_limits<std::make_unsigned_t<IRIntegerValue>>::digits;
-            resultValue = constArgVals[0] << shiftCount;
+            resultValue = static_cast<IntegerLiteralValue>(
+                static_cast<std::make_unsigned_t<IntegerLiteralValue>>(constArgVals[0])
+                << shiftCount);
         }
         else if (opName == getName(">>"))
         {
