@@ -20,6 +20,11 @@ import (
 	regionspb "cloud.google.com/go/compute/apiv1/computepb"
 )
 
+const (
+	cleanupZoneScanTimeout = 30 * time.Second
+	cleanupDeleteTimeout   = 45 * time.Second
+)
+
 //go:embed startup.ps1
 var windowsStartupScript string
 
@@ -391,7 +396,8 @@ func (m *Manager) doCleanupTerminatedVMs(ctx context.Context) {
 			Filter:  proto.String(filter),
 		}
 
-		it := m.instancesClient.List(ctx, req)
+		listCtx, cancelList := context.WithTimeout(ctx, cleanupZoneScanTimeout)
+		it := m.instancesClient.List(listCtx, req)
 		for {
 			instance, err := it.Next()
 			if err == iterator.Done {
@@ -404,7 +410,10 @@ func (m *Manager) doCleanupTerminatedVMs(ctx context.Context) {
 
 			name := instance.GetName()
 			slog.Info("cleaning up terminated VM", "vm", name, "zone", zone)
-			if err := m.deleteVM(ctx, name, zone); err != nil {
+			deleteCtx, cancelDelete := context.WithTimeout(ctx, cleanupDeleteTimeout)
+			err = m.deleteVM(deleteCtx, name, zone)
+			cancelDelete()
+			if err != nil {
 				slog.Warn("failed to delete terminated VM", "vm", name, "zone", zone, "error", err)
 			}
 
@@ -413,5 +422,6 @@ func (m *Manager) doCleanupTerminatedVMs(ctx context.Context) {
 			delete(m.vms, name)
 			m.mu.Unlock()
 		}
+		cancelList()
 	}
 }
