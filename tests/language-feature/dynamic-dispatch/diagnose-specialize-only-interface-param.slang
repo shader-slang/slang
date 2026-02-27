@@ -2,8 +2,7 @@
 // type cannot be determined at the call site, the compiler must reject the program
 // because dynamic dispatch would be required for a specialization-only interface.
 
-// Disabled: requires compiler fix to emit error 52008 for [Specialize] interfaces
-//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target spirv -gnone
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -gnone
 
 #lang slang 2025
 

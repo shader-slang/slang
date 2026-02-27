@@ -1583,6 +1583,15 @@ static RenderApiFlags _getAvailableRenderApiFlags(TestContext* context)
                         SLANG_PASS_THROUGH_GENERIC_C_CPP)))
                 {
                     availableRenderApiFlags |= RenderApiFlags(1) << int(apiType);
+                    StdWriters::getOut().print(
+                        "Check %s: Supported\n",
+                        RenderApiUtil::getApiName(apiType).begin());
+                }
+                else
+                {
+                    StdWriters::getOut().print(
+                        "Check %s: Not Supported\n",
+                        RenderApiUtil::getApiName(apiType).begin());
                 }
                 continue;
             }
@@ -4793,17 +4802,15 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
 
     SLANG_ASSERT((apiUsedFlags & explictUsedApiFlags) == explictUsedApiFlags);
 
-    const RenderApiFlags availableRenderApiFlags =
-        apiUsedFlags ? _getAvailableRenderApiFlags(context) : 0;
-
     // If synthesized tests are wanted look into adding them
-    if (context->options.synthesizedTestApis && availableRenderApiFlags)
+    // We synthesize for all configured APIs, not just available ones - _canIgnore will
+    // report unavailable ones as "Ignored" so users see why a test didn't run.
+    if (context->options.synthesizedTestApis)
     {
         List<TestDetails> synthesizedTests;
 
         // What render options do we want to synthesize
-        RenderApiFlags missingApis =
-            (~apiUsedFlags) & (context->options.synthesizedTestApis & availableRenderApiFlags);
+        RenderApiFlags missingApis = (~apiUsedFlags) & context->options.synthesizedTestApis;
 
         // const Index numInitialTests = testList.tests.getCount();
 
@@ -4999,7 +5006,7 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
             else
             {
                 testResult = runTest(context, filePath, outputStem, testName, testDetails.options);
-                if (testResult == TestResult::Fail &&
+                if (testResult == TestResult::Fail && !context->options.disableRetries &&
                     !context->getTestReporter()->m_expectedFailureList.contains(testName))
                 {
                     RefPtr<FileTestInfoImpl> fileTestInfo = new FileTestInfoImpl();
@@ -5462,7 +5469,7 @@ static SlangResult runUnitTestModule(
 
                 // If the test failed and it is not an expected failure, add it to the list of
                 // failed unit tests so that we can retry.
-                if (isFailed && !context->isRetry &&
+                if (isFailed && !context->isRetry && !context->options.disableRetries &&
                     !context->getTestReporter()->m_expectedFailureList.contains(test.testName))
                 {
                     std::lock_guard lock(context->mutexFailedTests);
@@ -5700,6 +5707,52 @@ SlangResult innerMain(int argc, char** argv)
     _disableD3D12Backend(&context);
 #endif
 
+    // If -only-api-detection mode, run API detection and exit
+    if (options.apiDetectionOnly)
+    {
+        // Create a TestReporter since _getAvailableRenderApiFlags may use it in verbose mode
+        TestReporter reporter;
+        SLANG_RETURN_ON_FAIL(reporter.init(options.outputMode, options.expectedFailureList));
+        context.setTestReporter(&reporter);
+        reporter.m_verbosity = options.verbosity;
+
+        _getAvailableRenderApiFlags(&context);
+
+        // Print which APIs were not checked
+        printf("Not checked:");
+        bool anyNotChecked = false;
+        for (int i = 0; i < int(RenderApiType::CountOf); ++i)
+        {
+            const RenderApiType apiType = RenderApiType(i);
+
+            // An API was "not checked" if it's not available on this platform
+            bool wasChecked = false;
+            if (apiType == RenderApiType::CPU)
+            {
+                wasChecked = (context.availableBackendFlags & PassThroughFlag::Generic_C_CPP) != 0;
+            }
+            else
+            {
+                wasChecked = RenderApiUtil::calcHasApi(apiType);
+            }
+
+            if (!wasChecked)
+            {
+                auto name = RenderApiUtil::getApiName(apiType);
+                printf(" %.*s", (int)name.getLength(), name.begin());
+                anyNotChecked = true;
+            }
+        }
+        if (!anyNotChecked)
+        {
+            printf(" (none)");
+        }
+        printf("\n");
+        fflush(stdout);
+
+        return SLANG_OK;
+    }
+
     if (options.subCommand.getLength())
     {
         // Get the function from the tool
@@ -5774,7 +5827,7 @@ SlangResult innerMain(int argc, char** argv)
                 context.isRetry = isRetry;
                 if (isRetry)
                 {
-                    if (context.failedUnitTests.getCount() == 0)
+                    if (context.options.disableRetries || context.failedUnitTests.getCount() == 0)
                         break;
 
                     printf("Retrying unit tests...\n");
@@ -5803,43 +5856,48 @@ SlangResult innerMain(int argc, char** argv)
         // If we have a couple failed tests, they maybe intermittent failures due to parallel
         // excution or driver instability. We can try running them again. Debug build has more
         // instability at this moment, so we allow more retries.
+        if (!context.options.disableRetries)
+        {
 #if _DEBUG
-        static constexpr int kFailedTestLimitForRetry = 100;
+            static constexpr int kFailedTestLimitForRetry = 100;
 #else
-        static constexpr int kFailedTestLimitForRetry = 16;
+            static constexpr int kFailedTestLimitForRetry = 16;
 #endif
-        if (context.failedFileTests.getCount() <= kFailedTestLimitForRetry)
-        {
-            if (context.failedFileTests.getCount() > 0)
-                printf("Retrying %d failed tests...\n", (int)context.failedFileTests.getCount());
-            for (auto& test : context.failedFileTests)
+            if (context.failedFileTests.getCount() <= kFailedTestLimitForRetry)
             {
-                context.isRetry = true;
-                FileTestInfoImpl* fileTestInfo = static_cast<FileTestInfoImpl*>(test.Ptr());
-                TestReporter::SuiteScope suiteScope(&reporter, "tests");
-                TestReporter::TestScope scope(&reporter, fileTestInfo->testName);
-                auto newResult = runTest(
-                    &context,
-                    fileTestInfo->filePath,
-                    fileTestInfo->outputStem,
-                    fileTestInfo->testName,
-                    fileTestInfo->options);
-                reporter.addResult(newResult);
+                if (context.failedFileTests.getCount() > 0)
+                    printf(
+                        "Retrying %d failed tests...\n",
+                        (int)context.failedFileTests.getCount());
+                for (auto& test : context.failedFileTests)
+                {
+                    context.isRetry = true;
+                    FileTestInfoImpl* fileTestInfo = static_cast<FileTestInfoImpl*>(test.Ptr());
+                    TestReporter::SuiteScope suiteScope(&reporter, "tests");
+                    TestReporter::TestScope scope(&reporter, fileTestInfo->testName);
+                    auto newResult = runTest(
+                        &context,
+                        fileTestInfo->filePath,
+                        fileTestInfo->outputStem,
+                        fileTestInfo->testName,
+                        fileTestInfo->options);
+                    reporter.addResult(newResult);
+                }
             }
-        }
-        else
-        {
-            // If there are too many failed tests, don't bother retrying.
-            printf(
-                "Too many failed tests for retry(%d) - setting all to failed\n",
-                (int)context.failedFileTests.getCount());
-            fflush(stdout);
-            for (auto& test : context.failedFileTests)
+            else
             {
-                FileTestInfoImpl* fileTestInfo = static_cast<FileTestInfoImpl*>(test.Ptr());
-                TestReporter::SuiteScope suiteScope(&reporter, "tests");
-                TestReporter::TestScope scope(&reporter, fileTestInfo->testName);
-                reporter.addResult(TestResult::Fail);
+                // If there are too many failed tests, don't bother retrying.
+                printf(
+                    "Too many failed tests for retry(%d) - setting all to failed\n",
+                    (int)context.failedFileTests.getCount());
+                fflush(stdout);
+                for (auto& test : context.failedFileTests)
+                {
+                    FileTestInfoImpl* fileTestInfo = static_cast<FileTestInfoImpl*>(test.Ptr());
+                    TestReporter::SuiteScope suiteScope(&reporter, "tests");
+                    TestReporter::TestScope scope(&reporter, fileTestInfo->testName);
+                    reporter.addResult(TestResult::Fail);
+                }
             }
         }
 

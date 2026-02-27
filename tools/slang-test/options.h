@@ -169,6 +169,12 @@ struct Options
 
     /// Whether to list tests without running them
     bool dryRun = false;
+
+    /// Whether to disable automatic retries of failed tests
+    bool disableRetries = false;
+
+    /// Only run API detection and print results, then exit
+    bool apiDetectionOnly = false;
 };
 
 #endif // OPTIONS_H_INCLUDED

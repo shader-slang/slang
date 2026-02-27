@@ -1937,11 +1937,34 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             context->irBuilder->getTypeEqualityWitness(witnessType, subType, supType));
     }
 
-    LoweredValInfo visitTypeCoercionWitness(TypeCoercionWitness*)
+    LoweredValInfo visitBuiltinTypeCoercionWitness(BuiltinTypeCoercionWitness* witness)
     {
-        // When we fully support type coercion constraints, we should lower the witness into a
-        // function that does the conversion.
-        return LoweredValInfo();
+        auto irBuilder = getBuilder();
+        auto fromType = lowerType(context, witness->getFromType());
+        auto toType = lowerType(context, witness->getToType());
+        auto funcType = getBuilder()->getFuncType(1, &fromType, toType);
+        IRFunc* irFunc = irBuilder->createFunc();
+        irFunc->setFullType(funcType);
+        getBuilder()->addForceInlineDecoration(irFunc);
+
+        IRBuilderInsertLocScope insertScope(irBuilder);
+        irBuilder->setInsertInto(irFunc);
+        irBuilder->emitBlock();
+        auto param = irBuilder->emitParam(fromType);
+        auto cast = irBuilder->emitCast(toType, param);
+        irBuilder->emitReturn(cast);
+        return LoweredValInfo::simple(irFunc);
+    }
+
+    LoweredValInfo visitDeclRefTypeCoercionWitness(DeclRefTypeCoercionWitness* witness)
+    {
+        if (!witness->getDeclRef())
+            return LoweredValInfo();
+
+        auto fromType = lowerType(context, witness->getFromType());
+        auto toType = lowerType(context, witness->getToType());
+        auto funcType = getBuilder()->getFuncType(1, &fromType, toType);
+        return emitDeclRef(context, witness->getDeclRef(), funcType);
     }
 
     LoweredValInfo visitTransitiveSubtypeWitness(TransitiveSubtypeWitness* val)
@@ -2188,6 +2211,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         IRType* irValueType = lowerType(context, astValueType);
         IRInst* accessQualifier = nullptr;
         IRInst* addrSpace = nullptr;
+        IRType* dataLayout = nullptr;
 
         if (auto astAccessQualifier = type->getAccessQualifier())
         {
@@ -2207,7 +2231,13 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
                 (IRIntegerValue)AddressSpace::Generic);
         }
 
-        return getBuilder()->getPtrType(kIROp_PtrType, irValueType, accessQualifier, addrSpace);
+        if (auto dataLayoutType = type->getDataLayout())
+        {
+            dataLayout = lowerType(context, dataLayoutType);
+        }
+
+        return getBuilder()
+            ->getPtrType(kIROp_PtrType, irValueType, accessQualifier, addrSpace, dataLayout);
     }
 
     IRType* visitDeclRefType(DeclRefType* type)
