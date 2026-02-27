@@ -2317,43 +2317,49 @@ ScalarizedVal extractField(
             {
                 auto arraySize = arrayType->getElementCount();
                 auto resultType = getFieldTypeThroughArrays(builder, dataType, fieldKey);
-                if (!resultType)
-                    break;
-
-                if (auto intLit = as<IRIntLit>(arraySize))
+                if (resultType)
                 {
-                    List<IRInst*> fieldValues;
-                    for (IRIntegerValue i = 0; i < intLit->getValue(); i++)
+                    if (auto intLit = as<IRIntLit>(arraySize))
                     {
-                        auto elem = builder->emitElementExtract(val.irValue, i);
-                        auto elemField =
-                            extractField(builder, ScalarizedVal::value(elem), fieldIndex, fieldKey);
-                        fieldValues.add(elemField.irValue);
+                        List<IRInst*> fieldValues;
+                        for (IRIntegerValue i = 0; i < intLit->getValue(); i++)
+                        {
+                            auto elem = builder->emitElementExtract(val.irValue, i);
+                            auto elemField = extractField(
+                                builder,
+                                ScalarizedVal::value(elem),
+                                fieldIndex,
+                                fieldKey);
+                            fieldValues.add(elemField.irValue);
+                        }
+                        return ScalarizedVal::value(builder->emitMakeArray(
+                            resultType,
+                            fieldValues.getCount(),
+                            fieldValues.getBuffer()));
                     }
-                    return ScalarizedVal::value(builder->emitMakeArray(
-                        resultType,
-                        fieldValues.getCount(),
-                        fieldValues.getBuffer()));
-                }
-                else
-                {
-                    auto resultVar = builder->emitVar(resultType);
-                    IRBlock* loopBodyBlock;
-                    IRBlock* loopBreakBlock;
-                    auto loopParam = emitLoopBlocks(
-                        builder,
-                        builder->getIntValue(builder->getIntType(), 0),
-                        arraySize,
-                        loopBodyBlock,
-                        loopBreakBlock);
-                    builder->setInsertBefore(loopBodyBlock->getFirstOrdinaryInst());
-                    auto loopElem = builder->emitElementExtract(val.irValue, loopParam);
-                    auto loopField =
-                        extractField(builder, ScalarizedVal::value(loopElem), fieldIndex, fieldKey);
-                    auto dstAddr = builder->emitElementAddress(resultVar, loopParam);
-                    builder->emitStore(dstAddr, loopField.irValue);
-                    builder->setInsertInto(loopBreakBlock);
-                    return ScalarizedVal::value(builder->emitLoad(resultVar));
+                    else
+                    {
+                        auto resultVar = builder->emitVar(resultType);
+                        IRBlock* loopBodyBlock;
+                        IRBlock* loopBreakBlock;
+                        auto loopParam = emitLoopBlocks(
+                            builder,
+                            builder->getIntValue(builder->getIntType(), 0),
+                            arraySize,
+                            loopBodyBlock,
+                            loopBreakBlock);
+                        builder->setInsertBefore(loopBodyBlock->getFirstOrdinaryInst());
+                        auto loopElem = builder->emitElementExtract(val.irValue, loopParam);
+                        auto loopField = extractField(
+                            builder,
+                            ScalarizedVal::value(loopElem),
+                            fieldIndex,
+                            fieldKey);
+                        auto dstAddr = builder->emitElementAddress(resultVar, loopParam);
+                        builder->emitStore(dstAddr, loopField.irValue);
+                        builder->setInsertInto(loopBreakBlock);
+                        return ScalarizedVal::value(builder->emitLoad(resultVar));
+                    }
                 }
             }
             return ScalarizedVal::value(
