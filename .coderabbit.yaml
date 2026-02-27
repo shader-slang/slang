@@ -93,7 +93,7 @@ reviews:
         all Slang programs. Verify backward compatibility and check that
         docs/stdlib-doc.md is updated if public-facing functions change.
 
-  prompts_for_ai_agents: true
+  enable_prompt_for_ai_agents: true
 
   # Reminder for PRs that touch language features:
   # If your PR implements a feature from a spec proposal, please update the
