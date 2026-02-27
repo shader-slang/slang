@@ -1,0 +1,68 @@
+{
+  "label_groups": [
+    {
+      "labels": ["Linux", "self-hosted", "GPU"],
+      "name": "Linux GPU",
+      "self_hosted": true,
+      "runner_count": 3
+    },
+    {
+      "labels": ["Windows", "self-hosted", "GCP-T4"],
+      "name": "Windows GPU (GCP)",
+      "self_hosted": true,
+      "runner_count": 5
+    },
+    {
+      "labels": ["Windows", "self-hosted", "regression-test"],
+      "name": "Windows test",
+      "self_hosted": true,
+      "runner_count": 3
+    },
+    {
+      "labels": ["Windows", "self-hosted", "benchmark"],
+      "name": "Windows test",
+      "self_hosted": true,
+      "runner_count": 3
+    },
+    {
+      "labels": ["Windows", "self-hosted", "falcor"],
+      "name": "Windows test",
+      "self_hosted": true,
+      "runner_count": 3
+    },
+    {
+      "labels": ["Windows", "self-hosted", "perf"],
+      "name": "Windows test",
+      "self_hosted": true,
+      "runner_count": 3
+    },
+    {
+      "labels": ["ubuntu-22.04"],
+      "name": "GitHub Linux x64",
+      "self_hosted": false
+    },
+    {
+      "labels": ["ubuntu-latest"],
+      "name": "GitHub Linux x64",
+      "self_hosted": false
+    },
+    {
+      "labels": ["ubuntu-24.04-arm"],
+      "name": "GitHub Linux ARM64",
+      "self_hosted": false
+    },
+    {
+      "labels": ["macos-latest"],
+      "name": "GitHub macOS",
+      "self_hosted": false
+    },
+    {
+      "labels": ["windows-latest"],
+      "name": "GitHub Windows",
+      "self_hosted": false
+    }
+  ],
+  "non_production_periods": {
+    "runners": {}
+  }
+}

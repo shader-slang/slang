@@ -1595,6 +1595,8 @@ struct IRPtrTypeBase : IRType
                    ? (AddressSpace) static_cast<IRIntLit*>(getOperand(2))->getValue()
                    : AddressSpace::Generic;
     }
+
+    IRType* getDataLayout() { return getOperandCount() > 3 ? (IRType*)getOperand(3) : nullptr; }
 };
 
 
@@ -2131,7 +2133,7 @@ public:
     // anything to do with serialization format
     //
     const static UInt k_minSupportedModuleVersion = 4;
-    const static UInt k_maxSupportedModuleVersion = 6;
+    const static UInt k_maxSupportedModuleVersion = 7;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
 private:

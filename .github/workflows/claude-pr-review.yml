@@ -1,7 +1,8 @@
 name: Claude PR Review
 
-# Automated PR review for the Slang compiler
-# Triggers on PRs to master that touch core source, tests, build, or tools
+# Automated PR review using pull_request_target (supports fork PRs, no approval gate).
+# Only the base branch is checked out — PR changes are read via gh/API, never executed.
+# Previous Claude reviews are minimized on each push; one fresh review at a time.
 
 on:
   workflow_dispatch:
@@ -10,7 +11,7 @@ on:
         description: "PR number to review"
         required: true
         type: number
-  pull_request:
+  pull_request_target:
     branches: [master]
     types: [opened, synchronize, ready_for_review, reopened]
     paths:
@@ -31,16 +32,13 @@ permissions:
 
 jobs:
   review:
-    # Skip draft PRs, bot PRs, fork PRs, and Claude's own branches (loop prevention)
-    # Fork PRs are skipped because GitHub does not expose secrets to fork PR workflows.
-    # Use workflow_dispatch with pr_number to review fork PRs manually.
+    # Skip draft PRs, bot PRs, and Claude's own branches (loop prevention)
     # workflow_dispatch bypasses these checks (manual trigger = intentional)
     if: |
       github.event_name == 'workflow_dispatch' || (
         github.event.pull_request.draft == false &&
         !contains(github.event.pull_request.user.login, '[bot]') &&
-        !startsWith(github.event.pull_request.head.ref, 'claude/') &&
-        github.event.pull_request.head.repo.full_name == github.repository
+        !startsWith(github.event.pull_request.head.ref, 'claude/')
       )
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -58,12 +56,132 @@ jobs:
       cancel-in-progress: true
 
     steps:
-      - name: Checkout repository
+      # Security: checkout the BASE branch (master), NOT the PR head.
+      # This ensures we never execute untrusted fork code.
+      # Claude reads the PR diff via `gh pr diff` and GitHub MCP tools.
+      - name: Checkout repository (base branch only)
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.repository.default_branch }}
           fetch-depth: 1
 
-      - name: PR Review with Progress Tracking
+      # Minimize previous Claude reviews/comments and resolve threads.
+      # Targets both 'claude' (OIDC) and 'github-actions' (fallback) logins.
+      - name: Clean up previous Claude reviews
+        continue-on-error: true
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = context.payload.pull_request?.number
+              || parseInt('${{ github.event.inputs.pr_number }}' || '0');
+            if (!prNumber) {
+              core.info('No PR number found, skipping cleanup');
+              return;
+            }
+
+            // Match both Claude auth paths.
+            // Note: GraphQL returns 'github-actions' (no [bot] suffix),
+            // while REST API returns 'github-actions[bot]'.
+            const CLAUDE_LOGINS = ['claude', 'github-actions'];
+
+            const query = `query($owner: String!, $repo: String!, $pr: Int!) {
+              repository(owner: $owner, name: $repo) {
+                pullRequest(number: $pr) {
+                  reviews(last: 100) {
+                    nodes {
+                      id
+                      author { login }
+                      state
+                    }
+                  }
+                  reviewThreads(last: 100) {
+                    nodes {
+                      id
+                      isResolved
+                      comments(first: 1) {
+                        nodes {
+                          author { login }
+                        }
+                      }
+                    }
+                  }
+                  comments(last: 100) {
+                    nodes {
+                      id
+                      author { login }
+                      isMinimized
+                    }
+                  }
+                }
+              }
+            }`;
+
+            const result = await github.graphql(query, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pr: prNumber
+            });
+
+            const pr = result.repository.pullRequest;
+            let minimized = 0, resolved = 0;
+
+            // 1. Minimize all previous Claude PR review bodies
+            const claudeReviews = pr.reviews.nodes.filter(r =>
+              CLAUDE_LOGINS.includes(r.author?.login)
+            );
+            for (const review of claudeReviews) {
+              try {
+                await github.graphql(`mutation($id: ID!, $classifier: ReportedContentClassifiers!) {
+                  minimizeComment(input: { subjectId: $id, classifier: $classifier }) {
+                    minimizedComment { isMinimized }
+                  }
+                }`, { id: review.id, classifier: 'OUTDATED' });
+                minimized++;
+              } catch (e) {
+                core.info(`Could not minimize review ${review.id}: ${e.message}`);
+              }
+            }
+
+            // 2. Resolve all Claude-authored unresolved review threads
+            const claudeThreads = pr.reviewThreads.nodes.filter(t =>
+              !t.isResolved &&
+              t.comments.nodes.length > 0 &&
+              CLAUDE_LOGINS.includes(t.comments.nodes[0].author?.login)
+            );
+            for (const thread of claudeThreads) {
+              try {
+                await github.graphql(`mutation($threadId: ID!) {
+                  resolveReviewThread(input: { threadId: $threadId }) {
+                    thread { isResolved }
+                  }
+                }`, { threadId: thread.id });
+                resolved++;
+              } catch (e) {
+                core.warning(`Could not resolve thread ${thread.id}: ${e.message}`);
+              }
+            }
+
+            // 3. Minimize all bot issue comments (tracking/progress comments)
+            const botComments = pr.comments.nodes.filter(c =>
+              !c.isMinimized &&
+              CLAUDE_LOGINS.includes(c.author?.login)
+            );
+            for (const comment of botComments) {
+              try {
+                await github.graphql(`mutation($id: ID!, $classifier: ReportedContentClassifiers!) {
+                  minimizeComment(input: { subjectId: $id, classifier: $classifier }) {
+                    minimizedComment { isMinimized }
+                  }
+                }`, { id: comment.id, classifier: 'OUTDATED' });
+                minimized++;
+              } catch (e) {
+                core.info(`Could not minimize comment ${comment.id}: ${e.message}`);
+              }
+            }
+
+            core.info(`Cleanup: minimized ${minimized} reviews/comments, resolved ${resolved} threads`);
+
+      - name: PR Review
         uses: ./.github/actions/claude-code-runner
         with:
           show-debug-output: ${{ (vars.SLANG_CLAUDE_DEBUG_ENV == '1' || vars.SLANG_CLAUDE_DEBUG_ENV == 'true') && 'true' || 'false' }}
@@ -71,15 +189,23 @@ jobs:
           nv-inference-sonnet-model: ${{ vars.CLAUDE_NV_SONNET_MODEL }}
           nv-inference-haiku-model: ${{ vars.CLAUDE_NV_HAIKU_MODEL }}
           max-turns: "500"
+          use-sticky-comment: "false"
+          track-progress: "false"
           prompt: |
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.inputs.pr_number || github.event.pull_request.number }}
 
             Review this PR for the Slang shader compiler. Read CLAUDE.md for compiler architecture context.
-            IMPORTANT: The repo is checked out locally. Use View/GlobTool/GrepTool for file reads and `gh pr diff` for the diff. Use MCP tools and `gh pr view` for PR metadata.
+
+            IMPORTANT: The BASE branch (master) is checked out locally. You can read CLAUDE.md and any
+            existing source files locally to understand repo structure and surrounding code context.
+            However, the PR branch is NOT checked out — to see what the PR actually changes, you MUST
+            use `gh pr diff` or GitHub MCP tools. Do NOT assume local files reflect the PR's changes.
+
             ### How to review
             1. Fetch the PR diff with `gh pr diff <number>` and the changed files list
-            2. Read each changed file IN FULL in the repository (not just the diff) to understand context
+            2. For each changed file, read the diff carefully. If you need surrounding context beyond
+               what the diff shows, read the base version of the file from the local filesystem.
             3. Create a PENDING review with mcp__github__create_pending_pull_request_review
             4. Add inline comments using mcp__github__add_comment_to_pending_review ONLY for:
                - Bugs or correctness issues (high confidence)
@@ -97,6 +223,10 @@ jobs:
                - Overall assessment and verdict
             6. (Optional) If the review submission fails or you have additional context that didn't fit
                in inline comments, post a PR comment via mcp__github__add_issue_comment as a fallback.
+
+            NOTE: Any previous Claude reviews on this PR have been automatically minimized
+            and their threads resolved. You are posting a fresh, self-contained review.
+            Do NOT reference previous reviews — just review the PR as it currently stands.
 
             Quality over quantity: only comment inline when you have something the author needs to act on or consider.
 
@@ -140,6 +270,7 @@ jobs:
             Bash(cat *),Bash(head *),Bash(tail *),
             Bash(ls *),Bash(find *),Bash(wc *),
             Bash(gh pr diff*),Bash(gh pr view*),Bash(gh pr list*),Bash(gh pr checks*),
+            Bash(gh api *),
             mcp__github__get_pull_request,
             mcp__github__get_pull_request_files,
             mcp__github__get_pull_request_reviews,
