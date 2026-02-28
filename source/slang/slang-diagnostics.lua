@@ -2721,7 +2721,7 @@ warning(
 -- 39xxx: cyclic references
 --
 -- TODO: need to assign numbers to all these extra diagnostics...
-err(
+fatal(
     "cyclic-reference",
     39999,
     "cyclic reference '~decl'",
@@ -2742,7 +2742,7 @@ err(
     span { loc = "decl:Decl", message = "the initial-value expression for variable '~decl' depends on the value of the variable itself" }
 )
 
-err(
+fatal(
     "cannot-process-include",
     39901,
     "internal compiler error: cannot process '__include' in the current semantic checking context",
@@ -3647,7 +3647,7 @@ err(
 )
 
 -- Note: compilationCeased is a fatal diagnostic that is locationless
-err(
+fatal(
     "compilation-ceased",
     39999,
     "compilation ceased",
@@ -3883,7 +3883,7 @@ err(
     span { loc = "location", message = "unknown system-value semantic '~semanticName'" }
 )
 
-err(
+internal(
     "ir-validation-failed",
     40007,
     "IR validation failed",
@@ -3918,7 +3918,7 @@ err(
     span { loc = "location", message = "loop does not terminate within the limited number of iterations, unrolling is aborted." }
 )
 
-err(
+fatal(
     "function-never-returns-fatal",
     40030,
     "function never returns",
@@ -4232,7 +4232,7 @@ err(
 -- 5xxxx - Target code generation.
 --
 
-err(
+internal(
     "missing-existential-bindings-for-parameter",
     50010,
     "missing argument for existential parameter slot",
@@ -4449,7 +4449,7 @@ err(
     span { loc = "location", message = "cannot obtain the size of an unsized array." }
 )
 
-err(
+fatal(
     "use-of-uninitialized-opaque-handle",
     56003,
     "use of uninitialized opaque handle",
