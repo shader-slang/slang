@@ -381,8 +381,8 @@ RefPtr<ComponentType> ComponentType::specialize(
     if (consumedArgCount != specializationArgCount)
     {
         sink->diagnose(Diagnostics::MismatchSpecializationArguments{
-            .expected = (int)Math::Max(consumedArgCount, getSpecializationParamCount()),
-            .provided = (int)specializationArgCount});
+            .expected = (int64_t)Math::Max(consumedArgCount, getSpecializationParamCount()),
+            .provided = (int64_t)specializationArgCount});
     }
     if (sink->getErrorCount() != 0)
         return nullptr;

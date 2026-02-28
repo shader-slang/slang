@@ -1538,8 +1538,6 @@ err(
 )
 
 -- Conversion diagnostics
--- Note: noteExplicitConversionPossible is kept in slang-diagnostic-defs.h because
--- it's used with diagnoseWithoutSourceView which doesn't support rich diagnostics
 
 err(
     "ambiguous-conversion",

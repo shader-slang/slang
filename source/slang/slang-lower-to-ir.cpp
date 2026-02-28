@@ -6951,7 +6951,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
                     {
                         context->getSink()->diagnose(
                             Diagnostics::ForLoopTerminatesInFewerIterationsThanMaxIters{
-                                .iterations = (int)inferredMaxIters->value,
+                                .iterations = (int64_t)inferredMaxIters->value,
                                 .attr = maxIters});
                     }
                 }

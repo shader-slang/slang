@@ -1321,7 +1321,7 @@ struct SemanticsVisitor : public SemanticsContext
         StringBuilder keyBuilder;
         keyBuilder << D::getInfo()->id;
         keyBuilder << "|" << genericDiag.primarySpan.range.begin.getRaw();
-        keyBuilder << "|" << genericDiag.message;
+        keyBuilder << "|" << genericDiag.primarySpan.message;
         String key = keyBuilder.produceString();
         if (!getShared()->m_reportedDiagnosticKeys.add(key))
             return; // Already reported

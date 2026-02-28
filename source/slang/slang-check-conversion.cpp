@@ -997,8 +997,8 @@ bool SemanticsVisitor::_coerceInitializerList(
         if (outToExpr)
         {
             getSink()->diagnose(Diagnostics::TooManyInitializers{
-                .expected = (int)argIndex,
-                .got = (int)argCount,
+                .expected = (int64_t)argIndex,
+                .got = (int64_t)argCount,
                 .initList = fromInitializerListExpr});
         }
     }

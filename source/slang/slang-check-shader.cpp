@@ -1791,8 +1791,8 @@ RefPtr<ComponentType::SpecializationInfo> Module::_validateSpecializationArgsImp
     if (argCount < getSpecializationParamCount())
     {
         sink->diagnose(Diagnostics::MismatchSpecializationArguments{
-            .expected = (int)getSpecializationParamCount(),
-            .provided = (int)argCount});
+            .expected = (int64_t)getSpecializationParamCount(),
+            .provided = (int64_t)argCount});
         return nullptr;
     }
     outConsumedArgCount = getSpecializationParamCount();
@@ -2046,9 +2046,9 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
         if (genericArgCount < 0)
         {
             sink->diagnose(Diagnostics::MismatchSpecializationArguments{
-                .expected =
-                    (int)(genericSpecializationParamCount + existentialSpecializationParamCount),
-                .provided = (int)argCount});
+                .expected = (int64_t)(genericSpecializationParamCount +
+                                      existentialSpecializationParamCount),
+                .provided = (int64_t)argCount});
             return nullptr;
         }
 
@@ -2088,7 +2088,7 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
             }
             else
             {
-                sink->diagnose(Diagnostics::InvalidFormOfSpecializationArg{.index = (int)(ii + 1)});
+                sink->diagnose(Diagnostics::InvalidFormOfSpecializationArg{.index = ii + 1});
             }
         }
         auto genAppExpr = astBuilder->create<GenericAppExpr>();
@@ -2138,8 +2138,8 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
     {
         sink->diagnose(Diagnostics::MismatchSpecializationArguments{
             .expected =
-                (int)(genericSpecializationParamCount + existentialSpecializationParamCount),
-            .provided = (int)argCount});
+                (int64_t)(genericSpecializationParamCount + existentialSpecializationParamCount),
+            .provided = (int64_t)argCount});
         return nullptr;
     }
 
@@ -2350,8 +2350,8 @@ static RefPtr<ComponentType> _createSpecializedProgramImpl(
     if (specializationArgCount != specializationParamCount)
     {
         sink->diagnose(Diagnostics::MismatchSpecializationArguments{
-            .expected = (int)specializationParamCount,
-            .provided = (int)specializationArgCount});
+            .expected = (int64_t)specializationParamCount,
+            .provided = (int64_t)specializationArgCount});
         return nullptr;
     }
 

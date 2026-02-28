@@ -423,7 +423,7 @@ Modifier* SemanticsVisitor::validateAttribute(
                     if (constIntVal->getValue() < 1)
                     {
                         getSink()->diagnose(Diagnostics::NonPositiveNumThreads{
-                            .value = (int)constIntVal->getValue(),
+                            .value = constIntVal->getValue(),
                             .attr = attr});
                         return nullptr;
                     }
@@ -475,7 +475,7 @@ Modifier* SemanticsVisitor::validateAttribute(
                 if (!isValidWaveSize)
                 {
                     getSink()->diagnose(Diagnostics::InvalidWaveSize{
-                        .value = (int)constIntVal->getValue(),
+                        .value = constIntVal->getValue(),
                         .attr = attr});
                     return nullptr;
                 }
@@ -509,7 +509,7 @@ Modifier* SemanticsVisitor::validateAttribute(
         if (value->getValue() > kMaxAnyValueSize)
         {
             getSink()->diagnose(Diagnostics::AnyValueSizeExceedsLimit{
-                .maxSize = (int)kMaxAnyValueSize,
+                .maxSize = (int64_t)kMaxAnyValueSize,
                 .location = anyValueSizeAttr->loc});
             return nullptr;
         }
@@ -727,7 +727,7 @@ Modifier* SemanticsVisitor::validateAttribute(
             sink->diagnose(Diagnostics::AttributeArgumentCountMismatch{
                 .attrName = attr->keywordName,
                 .expected = "1...2",
-                .provided = (int)argsCount,
+                .provided = (int64_t)argsCount,
                 .attr = attr});
         }
         else if (!as<IntegerLiteralExpr>(opAttr->args[0]))
@@ -1315,7 +1315,7 @@ AttributeBase* SemanticsVisitor::checkAttribute(
         getSink()->diagnose(Diagnostics::AttributeArgumentCountMismatch{
             .attrName = attrName,
             .expected = String(paramCount),
-            .provided = (int)argCount,
+            .provided = (int64_t)argCount,
             .attr = attr});
         return uncheckedAttr;
     }
@@ -2037,7 +2037,7 @@ Modifier* SemanticsVisitor::checkModifier(
                     else if (cintVal->getValue() < 1)
                     {
                         getSink()->diagnose(Diagnostics::NonPositiveNumThreads{
-                            .value = (int)cintVal->getValue(),
+                            .value = cintVal->getValue(),
                             .attr = attr});
                         return nullptr;
                     }

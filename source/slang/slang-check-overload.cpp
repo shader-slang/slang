@@ -3047,7 +3047,7 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
                 if (candidateIndex != candidateCount)
                 {
                     getSink()->diagnose(Diagnostics::MoreOverloadCandidates{
-                        .count = (int)(candidateCount - candidateIndex),
+                        .count = (int64_t)(candidateCount - candidateIndex),
                         .location = expr->loc});
                 }
             }
@@ -3099,7 +3099,7 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
                     if (candidateIndex != candidateCount)
                     {
                         getSink()->diagnose(Diagnostics::MoreOverloadCandidates{
-                            .count = (int)(candidateCount - candidateIndex),
+                            .count = (int64_t)(candidateCount - candidateIndex),
                             .location = expr->loc});
                     }
                 }

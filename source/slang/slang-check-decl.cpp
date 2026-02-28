@@ -12748,7 +12748,7 @@ void checkDerivativeAttributeImpl(
                 {
                     visitor->getSink()->diagnose(
                         Diagnostics::CustomDerivativeSignatureMismatchAtPosition{
-                            .position = (int)ii,
+                            .position = (int64_t)ii,
                             .expectedType = qualTypeToString(argList[ii]->type),
                             .actualType = funcType->getParamTypeWithModeWrapper(ii)->toString(),
                             .attr = attr->loc});
@@ -13853,9 +13853,9 @@ void SemanticsDeclAttributesVisitor::visitStructDecl(StructDecl* structDecl)
         if (thisFieldWidth > thisFieldTypeWidth)
         {
             getSink()->diagnose(Diagnostics::BitFieldTooWide{
-                .fieldWidth = (int)thisFieldWidth,
+                .fieldWidth = (int64_t)thisFieldWidth,
                 .type = t,
-                .typeWidth = (int)thisFieldTypeWidth,
+                .typeWidth = (int64_t)thisFieldTypeWidth,
                 .location = v->loc});
             // Not much we can do with this field, just ignore it
             continue;
