@@ -1496,7 +1496,6 @@ struct LoweredElementTypeContext
             {
                 auto call = callWorkList[c];
                 auto calleeFunc = as<IRGlobalValueWithParams>(call->getCallee());
-
                 // We compute the func type for the specialized func based on the arguments
                 // provided, and check the specialization cache to reuse existing specialization
                 // when possible.
