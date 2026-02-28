@@ -1496,13 +1496,25 @@ struct LoweredElementTypeContext
             {
                 auto call = callWorkList[c];
                 auto calleeFunc = as<IRGlobalValueWithParams>(call->getCallee());
+
                 // We compute the func type for the specialized func based on the arguments
                 // provided, and check the specialization cache to reuse existing specialization
                 // when possible.
-                List<IRInst*> oldParams;
-                for (auto param : calleeFunc->getParams())
-                    oldParams.add(param);
-                SLANG_ASSERT(oldParams.getCount() == (Index)call->getArgCount());
+                List<IRType*> oldParamTypes;
+                if (auto func = as<IRFunc>(calleeFunc))
+                {
+                    // Fetching parameter types from the function type is a bit
+                    // more reliable than iterating over getParams(), because
+                    // this also works for forward-declared external functions.
+                    for (auto paramType : func->getDataType()->getParamTypes())
+                        oldParamTypes.add(paramType);
+                }
+                else
+                {
+                    for (auto param : calleeFunc->getParams())
+                        oldParamTypes.add(param->getDataType());
+                }
+                SLANG_ASSERT(oldParamTypes.getCount() == (Index)call->getArgCount());
 
                 ShortList<IRType*> paramTypes;
                 ShortList<IRInst*> newArgs;
@@ -1511,7 +1523,7 @@ struct LoweredElementTypeContext
                     auto arg = call->getArg(i);
                     if (auto castArg = as<IRCastStorageToLogical>(arg))
                     {
-                        auto oldParamPtrType = oldParams[i]->getDataType();
+                        auto oldParamPtrType = oldParamTypes[i];
                         auto storageValueType = tryGetPointedToOrBufferElementType(
                             &builder,
                             castArg->getOperand(0)->getDataType());
