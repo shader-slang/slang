@@ -4380,9 +4380,6 @@ struct ISession : public ISlangUnknown
     virtual SLANG_NO_THROW bool SLANG_MCALL
     isBinaryModuleUpToDate(const char* modulePath, slang::IBlob* binaryModuleBlob) = 0;
 
-    virtual SLANG_NO_THROW slang::SourceLocation SLANG_MCALL
-    getDeclSourceLocation(slang::DeclReflection* decl) = 0;
-
     /** Load a module from a string.
      */
     virtual SLANG_NO_THROW IModule* SLANG_MCALL loadModuleFromSourceString(
@@ -4431,6 +4428,13 @@ struct ISession : public ISlangUnknown
         SlangInt& outModuleVersion,
         const char*& outModuleCompilerVersion,
         const char*& outModuleName) = 0;
+
+    /** Get the source location of a declaration.
+     *
+     * The returned filePath pointer is valid for as long as the session.
+     */
+    virtual SLANG_NO_THROW slang::SourceLocation SLANG_MCALL
+    getDeclSourceLocation(slang::DeclReflection* decl) = 0;
 };
 
     #define SLANG_UUID_ISession ISession::getTypeGuid()
