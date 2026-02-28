@@ -1,9 +1,0 @@
-result code = -1
-standard error = {
-token paste(1): error 20001: unexpected '++', expected identifier
-tests/diagnostics/token-paste-location.slang(10): note: see token pasted location
-++
-^~
-}
-standard output = {
-}

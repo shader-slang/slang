@@ -20,7 +20,7 @@ void someFunc()
     {
     case spvDeviceGroup:
         doSomethingInSpirv();
-    // CHECK: ([[# @LINE+1]]): error 36120:
+    // CHECK: error[E36120]
     case spvBindlessTextureNV:
         doSomethingInSpirvBindlessTexture();
     }

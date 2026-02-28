@@ -1,6 +1,10 @@
 result code = -1
 standard error = {
-tests/diagnostics/uninitialized-resource-type.slang(10): error 30504: cannot use initializer list for type 'Texture2D<vector<float,4>>'
-    Texture2D<float4> bar = {};
-                            ^
+error[E30504]: cannot use initializer list for type 'Texture2D<vector<float,4>>'
+   ╭╼ tests/diagnostics/uninitialized-resource-type.slang:10:29
+   │
+10 │ Texture2D<float4> bar = {};
+   │                         ━ cannot use initializer list for type 'Texture2D<vector<float,4>>'
+}
+standard output = {
 }

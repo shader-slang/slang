@@ -11,7 +11,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-mtl -compute -shaderobj -output-using-type
 
-//TEST:SIMPLE(filecheck=REPORT):-target hlsl -stage compute -entry computeMain -report-dynamic-dispatch-sites
+//DIAGNOSTIC_TEST:SIMPLE(diag=REPORT,non-exhaustive):-target hlsl -stage compute -entry computeMain -report-dynamic-dispatch-sites
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -47,8 +47,8 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     state.transform = Identity();
     GroupMemoryBarrierWithGroupSync();
     outputBuffer[0] = state.transform.apply(state.baseValue);
+//REPORT: generated dynamic dispatch code for this site. 2 possible types
     // CHECK: 10.0
-    // REPORT-DAG: ([[# @LINE-2]]): {{.*}} generated {{.*}} dispatch code
 
     state.transform = Doubler(3.0);
     GroupMemoryBarrierWithGroupSync();
