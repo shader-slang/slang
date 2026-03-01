@@ -1495,7 +1495,7 @@ struct LoweredElementTypeContext
             for (Index c = 0; c < callWorkList.getCount(); c++)
             {
                 auto call = callWorkList[c];
-                auto calleeFunc = as<IRFunc>(call->getCallee());
+                auto calleeFunc = cast<IRFunc>(call->getCallee());
                 // We compute the func type for the specialized func based on the arguments
                 // provided, and check the specialization cache to reuse existing specialization
                 // when possible.
