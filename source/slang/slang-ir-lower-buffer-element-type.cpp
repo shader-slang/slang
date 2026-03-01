@@ -1807,7 +1807,7 @@ struct LoweredElementTypeContext
         {
             if (original->hasUses() || specializations.getCount() > 1)
             {
-                for (auto specialization: specializations)
+                for (auto specialization : specializations)
                     removeLinkageDecorations(specialization);
             }
             else
