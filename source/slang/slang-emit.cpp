@@ -27,6 +27,7 @@
 #include "slang-ir-autodiff.h"
 #include "slang-ir-bind-existentials.h"
 #include "slang-ir-byte-address-legalize.h"
+#include "slang-ir-check-optional-none-usage.h"
 #include "slang-ir-check-recursion.h"
 #include "slang-ir-check-shader-parameter-type.h"
 #include "slang-ir-check-unsupported-inst.h"
@@ -1057,6 +1058,13 @@ Result linkAndOptimizeIR(
 
     if (requiredLoweringPassSet.optionalType)
         SLANG_PASS(lowerReinterpretOptional, targetProgram, sink);
+
+    // Check for accessing .value on an Optional that is always none.
+    // This must run after simplifyIR (which eliminates dead branches that
+    // might access a none value) but before lowerOptionalType (which removes
+    // IRMakeOptionalNone instructions).
+    if (targetProgram->getOptionSet().shouldRunNonEssentialValidation())
+        SLANG_PASS(checkForOptionalNoneUsage, sink);
 
     if (requiredLoweringPassSet.optionalType)
         SLANG_PASS(lowerOptionalType, sink);
