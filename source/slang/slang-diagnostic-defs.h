@@ -719,6 +719,11 @@ DIAGNOSTIC(
     cannotTakeConstantPointers,
     "Not allowed to take the address of an immutable object")
 DIAGNOSTIC(
+    30086,
+    Error,
+    addressOfOperatorNotSupported,
+    "the '&' operator for taking addresses is no longer supported in Slang")
+DIAGNOSTIC(
     33180,
     Error,
     cannotSpecializeGenericWithExistential,

@@ -3003,6 +3003,24 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
             if (funcDeclRefExpr)
                 funcDeclBase = as<FunctionDeclBase>(funcDeclRefExpr->declRef.getDecl());
 
+            if (funcDeclRefExpr)
+            {
+                auto knownBuiltinAttrDeclRef = getDeclRef(m_astBuilder, funcDeclRefExpr)
+                                                   .getDecl()
+                                                   ->findModifier<KnownBuiltinAttribute>();
+                if (auto knownBuiltinAttr = as<KnownBuiltinAttribute>(knownBuiltinAttrDeclRef))
+                {
+                    if (auto constantIntVal = as<ConstantIntVal>(knownBuiltinAttr->name))
+                    {
+                        if (constantIntVal->getValue() ==
+                            (int)KnownBuiltinDeclName::OperatorAddressOf)
+                        {
+                            getSink()->diagnose(invoke, Diagnostics::addressOfOperatorNotSupported);
+                        }
+                    }
+                }
+            }
+
             Index paramCount = funcType->getParamCount();
             for (Index pp = 0; pp < paramCount; ++pp)
             {
