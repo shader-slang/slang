@@ -469,6 +469,7 @@ struct LoweredElementTypeContext
     };
     // Specialized functions that takes storage-typed pointers instead of logical-typed pointers.
     Dictionary<SpecializationKey, IRFunc*> specializedFuncs;
+    Dictionary<IRFunc*, List<IRFunc*>> specializedFuncsByOriginal;
 
     LoweredElementTypeContext(TargetProgram* target, BufferElementTypeLoweringOptions inOptions)
         : target(target), options(inOptions)
@@ -1544,15 +1545,7 @@ struct LoweredElementTypeContext
                     call->getDataType());
                 auto key = SpecializationKey{calleeFunc, specializedFuncType};
                 IRFunc* specializedFunc = nullptr;
-                if (!calleeFunc->getFirstBlock())
-                {
-                    // If this is a forward declaration of an external function,
-                    // we don't need to specialize it here as the only thing
-                    // that can change is the type. It will be corrected at the
-                    // end of the processModule().
-                    specializedFunc = calleeFunc;
-                }
-                else if (!specializedFuncs.tryGetValue(key, specializedFunc))
+                if (!specializedFuncs.tryGetValue(key, specializedFunc))
                 {
                     specializedFunc = createSpecializedFuncThatUseStorageType(
                         call,
@@ -1637,7 +1630,9 @@ struct LoweredElementTypeContext
                 builder.replaceOperand(use, castedParam);
         }
         clonedFunc->setFullType(specializedFuncType);
-        removeLinkageDecorations(clonedFunc);
+        // Keep track of the specialized functions. This is used to remove
+        // clashing linkage decorations if we need to retain the original too.
+        specializedFuncsByOriginal[(IRFunc*)call->getCallee()].add(clonedFunc);
 
         // Add all `CastStorageToLogical` insts in the cloned func to the worklist
         // for further processing.
@@ -1710,7 +1705,6 @@ struct LoweredElementTypeContext
                 continue;
             bufferTypeInsts.add(BufferTypeInfo{(IRType*)globalInst, elementType});
         }
-
 
         List<IRCastStorageToLogicalBase*> castInstWorkList;
 
@@ -1805,6 +1799,23 @@ struct LoweredElementTypeContext
                 continue;
             bufferTypeInst.bufferType->replaceUsesWith(bufferTypeInst.loweredBufferType);
             bufferTypeInst.bufferType->removeAndDeallocate();
+        }
+
+        // Remove linkage decorations from specialized functions if they don't
+        // cleanly replace the original.
+        for (auto& [original, specializations] : specializedFuncsByOriginal)
+        {
+            if (original->hasUses() || specializations.getCount() > 1)
+            {
+                for (auto specialization: specializations)
+                    removeLinkageDecorations(specialization);
+            }
+            else
+            {
+                // Remove original, because the specialized function replaced
+                // it. If we don't remove it, the linkage decorations clash.
+                original->removeAndDeallocate();
+            }
         }
     }
 
