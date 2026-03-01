@@ -98,7 +98,7 @@
 --     Cannot nest notes inside notes.
 --
 --   variadic_span(struct_name, location, message) - Create a variadic span
---     Positional: variadic_span("Error", "error_expr:Expr", "type error: ~errorExpr.type")
+--     Positional: variadic_span("Error", "errorExpr:Expr", "type error: ~errorExpr.type")
 --     Named:      variadic_span({cpp_name = "Error", loc = "errorExpr:Expr", message = "type error: ~errorExpr.type"})
 --     struct_name/cpp_name: Name for nested struct (e.g., "Error" -> struct Error, List<Error> errors)
 --     Exclusive interpolants become members of the nested struct
