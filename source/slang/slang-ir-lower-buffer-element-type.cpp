@@ -1495,24 +1495,14 @@ struct LoweredElementTypeContext
             for (Index c = 0; c < callWorkList.getCount(); c++)
             {
                 auto call = callWorkList[c];
-                auto calleeFunc = as<IRGlobalValueWithParams>(call->getCallee());
+                auto calleeFunc = as<IRFunc>(call->getCallee());
                 // We compute the func type for the specialized func based on the arguments
                 // provided, and check the specialization cache to reuse existing specialization
                 // when possible.
                 List<IRType*> oldParamTypes;
-                if (auto func = as<IRFunc>(calleeFunc))
-                {
-                    // Fetching parameter types from the function type is a bit
-                    // more reliable than iterating over getParams(), because
-                    // this also works for forward-declared external functions.
-                    for (auto paramType : func->getDataType()->getParamTypes())
-                        oldParamTypes.add(paramType);
-                }
-                else
-                {
-                    for (auto param : calleeFunc->getParams())
-                        oldParamTypes.add(param->getDataType());
-                }
+                for (auto paramType : calleeFunc->getDataType()->getParamTypes())
+                    oldParamTypes.add(paramType);
+
                 SLANG_ASSERT(oldParamTypes.getCount() == (Index)call->getArgCount());
 
                 ShortList<IRType*> paramTypes;
@@ -1547,13 +1537,22 @@ struct LoweredElementTypeContext
                         newArgs.add(arg);
                     }
                 }
+
                 auto specializedFuncType = builder.getFuncType(
                     (UInt)paramTypes.getCount(),
                     paramTypes.getArrayView().getBuffer(),
                     call->getDataType());
-                auto key = SpecializationKey{(IRFunc*)calleeFunc, specializedFuncType};
+                auto key = SpecializationKey{calleeFunc, specializedFuncType};
                 IRFunc* specializedFunc = nullptr;
-                if (!specializedFuncs.tryGetValue(key, specializedFunc))
+                if (!calleeFunc->getFirstBlock())
+                {
+                    // If this is a forward declaration of an external function,
+                    // we don't need to specialize it here as the only thing
+                    // that can change is the type. It will be corrected at the
+                    // end of the processModule().
+                    specializedFunc = calleeFunc;
+                }
+                else if (!specializedFuncs.tryGetValue(key, specializedFunc))
                 {
                     specializedFunc = createSpecializedFuncThatUseStorageType(
                         call,
