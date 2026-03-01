@@ -5,6 +5,7 @@ error[E30504]: cannot use initializer list for type 'Texture2D<vector<float,4>>'
    │
 10 │ Texture2D<float4> bar = {};
    │                         ━ cannot use initializer list for type 'Texture2D<vector<float,4>>'
+───╯
 }
 standard output = {
 }

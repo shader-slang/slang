@@ -5,6 +5,7 @@ error[E38100]: missing interface member
    │
 10 │ struct T : IFoo
    │            ━━━━ type 'T' does not provide required interface member 'bar'
+───╯
 tests/diagnostics/interface-requirement-not-satisfied.slang(7): note: see declaration of 'bar'
     void bar();
          ^~~

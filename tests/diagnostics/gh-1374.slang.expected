@@ -5,21 +5,25 @@ error[E39999]: the initial-value expression for variable 'kVal' depends on the v
   │
 9 │ static const int kVal = kVal;
   │                  ━━━━ the initial-value expression for variable 'kVal' depends on the value of the variable itself
+──╯
 error[E39999]: the initial-value expression for variable 'kInf' depends on the value of the variable itself
    ╭╼ tests/diagnostics/gh-1374.slang:11:19
    │
 11 │ static const int kInf = kInf + 1;
    │                  ━━━━ the initial-value expression for variable 'kInf' depends on the value of the variable itself
+───╯
 error[E39999]: the initial-value expression for variable 'kB' depends on the value of the variable itself
    ╭╼ tests/diagnostics/gh-1374.slang:14:19
    │
 14 │ static const int kB = kA;
    │                  ━━ the initial-value expression for variable 'kB' depends on the value of the variable itself
+───╯
 error[E39999]: the initial-value expression for variable 'kA' depends on the value of the variable itself
    ╭╼ tests/diagnostics/gh-1374.slang:13:19
    │
 13 │ static const int kA = kB;
    │                  ━━ the initial-value expression for variable 'kA' depends on the value of the variable itself
+───╯
 }
 standard output = {
 }
