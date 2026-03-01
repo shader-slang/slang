@@ -5,6 +5,7 @@
 #include "slang-emit-source-writer.h"
 #include "slang-ir-util.h"
 #include "slang-mangled-lexer.h"
+#include "slang-parameter-binding.h"
 
 #include <assert.h>
 
@@ -1684,12 +1685,24 @@ void HLSLSourceEmitter::emitSemanticsImpl(IRInst* inst, bool allowOffsets)
     {
         m_writer->emit(" : ");
         auto semanticName = semanticDecoration->getSemanticName();
-        m_writer->emit(semanticName);
+        UnownedStringSlice semanticBaseName;
+        UnownedStringSlice semanticIndexDigits;
+        bool hasExplicitIndex =
+            splitNameAndIndex(semanticName, semanticBaseName, semanticIndexDigits);
+        auto emittedName = hasExplicitIndex ? semanticBaseName : semanticName;
+        m_writer->emit(emittedName);
 
         // Only emit semantic index for semantics that accept them
-        if (doesHLSLSemanticAcceptIndex(semanticName))
+        if (doesHLSLSemanticAcceptIndex(emittedName))
         {
-            m_writer->emit(semanticDecoration->getSemanticIndex());
+            if (hasExplicitIndex)
+            {
+                m_writer->emit(semanticIndexDigits);
+            }
+            else
+            {
+                m_writer->emit(semanticDecoration->getSemanticIndex());
+            }
         }
         return;
     }
