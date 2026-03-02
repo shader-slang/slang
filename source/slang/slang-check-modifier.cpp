@@ -666,7 +666,7 @@ Modifier* SemanticsVisitor::validateAttribute(
                     this->getOptionSet(),
                     DiagnosticCategory::Capability,
                     Diagnostics::UsingInternalCapabilityName{
-                        .decl = capabilityNameToString((CapabilityName)capName),
+                        .decl = capNameString,
                         .capability = capabilityNameToString((CapabilityName)capName),
                         .location = attr->loc});
 
@@ -1165,7 +1165,7 @@ Modifier* SemanticsVisitor::validateAttribute(
                 this->getOptionSet(),
                 DiagnosticCategory::Capability,
                 Diagnostics::UnexpectedCapability{
-                    .decl = String(),
+                    .decl = attr->keywordName->text,
                     .capability = capabilityNameToString(CapabilityName::Invalid),
                     .location = attr->loc});
     }

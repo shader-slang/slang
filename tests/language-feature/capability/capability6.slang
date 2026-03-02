@@ -4,7 +4,7 @@
 [require(spirv, hlsl)]
 /*CHECK:
  ^^^^^^^ disallowed capability
- ^^^^^^^ '' resolves into a disallowed `Invalid` Capability.
+ ^^^^^^^ 'require' resolves into a disallowed `Invalid` Capability.
 */
 void computeMain()
 {

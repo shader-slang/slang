@@ -386,10 +386,11 @@ bool addTypeCoercionWitnessToArgs(
                 if (auto declRefTypeCoercionWitness =
                         as<DeclRefTypeCoercionWitness>(typeCoercionWitness))
                 {
-                    visitor->getSink()->diagnose(Diagnostics::SeeDefinitionOf{
+                    visitor->getSink()->diagnose(Diagnostics::SeeDefinitionOfConversionFunction{
                         .decl = declRefTypeCoercionWitness->getDeclRef().getDecl()});
                 }
-                visitor->getSink()->diagnose(Diagnostics::SeeDefinitionOf{.decl = constraintDecl});
+                visitor->getSink()->diagnose(
+                    Diagnostics::SeeDefinitionOfConstraint{.decl = constraintDecl});
             }
             return false;
         }

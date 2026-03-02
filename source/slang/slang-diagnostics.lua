@@ -4742,6 +4742,20 @@ standalone_note(
 )
 
 standalone_note(
+    "see-definition-of-conversion-function",
+    -1,
+    "see definition of the conversion function '~decl:Decl'",
+    span { loc = "decl:Decl" }
+)
+
+standalone_note(
+    "see-definition-of-constraint",
+    -1,
+    "see definition of the unsatisfied constraint '~decl:Decl'",
+    span { loc = "decl:Decl" }
+)
+
+standalone_note(
     "see-definition-of-struct",
     -1,
     "see definition of struct '~name'",
