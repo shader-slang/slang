@@ -5,9 +5,8 @@ GitHub Actions CI Visualization
 Generates static HTML files with interactive visualizations of CI job data.
 Reads JSON data from ci_job_collector.py and produces:
 - index.html: Landing page with summary and links
-- statistics.html: Trend charts (Chart.js)
+- statistics.html: All charts (trends, capacity, runner analysis)
 - month_YYYY-MM.html: Daily Gantt-style timeline per runner
-- capacity.html: Runner utilization analysis
 
 Usage:
     python3 ci_visualization.py
@@ -41,19 +40,75 @@ def parse_args():
     return parser.parse_args()
 
 
+def validate_config(config):
+    """Validate expected config structure."""
+    if not isinstance(config, dict):
+        raise ValueError("Config root must be an object.")
+    label_groups = config.get("label_groups", [])
+    if not isinstance(label_groups, list):
+        raise ValueError("Config 'label_groups' must be a list.")
+    for i, group in enumerate(label_groups):
+        if not isinstance(group, dict):
+            raise ValueError(f"label_groups[{i}] must be an object.")
+        if "name" not in group or not isinstance(group["name"], str) or not group["name"]:
+            raise ValueError(f"label_groups[{i}].name must be a non-empty string.")
+        labels = group.get("labels")
+        if not isinstance(labels, list) or not all(isinstance(l, str) and l for l in labels):
+            raise ValueError(f"label_groups[{i}].labels must be a list of non-empty strings.")
+        if "runner_count" in group and (
+            not isinstance(group["runner_count"], int) or group["runner_count"] < 0
+        ):
+            raise ValueError(f"label_groups[{i}].runner_count must be a non-negative integer.")
+    # Validate runner_name_prefixes
+    prefixes = config.get("runner_name_prefixes", [])
+    if not isinstance(prefixes, list):
+        raise ValueError("Config 'runner_name_prefixes' must be a list.")
+    for i, p in enumerate(prefixes):
+        if not isinstance(p, dict):
+            raise ValueError(f"runner_name_prefixes[{i}] must be an object.")
+        prefix = p.get("prefix")
+        if not isinstance(prefix, str) or not prefix:
+            raise ValueError(f"runner_name_prefixes[{i}].prefix must be a non-empty string.")
+        if "name" not in p or not isinstance(p["name"], str) or not p["name"]:
+            raise ValueError(f"runner_name_prefixes[{i}].name must be a non-empty string.")
+
+    non_prod = config.get("non_production_periods", {})
+    if not isinstance(non_prod, dict):
+        raise ValueError("Config 'non_production_periods' must be an object.")
+    if "runners" in non_prod and not isinstance(non_prod["runners"], dict):
+        raise ValueError("Config 'non_production_periods.runners' must be an object.")
+
+
 def load_config():
     """Load runner group config from runner_config.json."""
     config_path = os.path.join(
         os.path.dirname(os.path.abspath(__file__)), "runner_config.json"
     )
-    if os.path.exists(config_path):
-        with open(config_path) as f:
-            return json.load(f)
-    return {"label_groups": [], "non_production_periods": {"runners": {}}}
+    default = {"label_groups": [], "non_production_periods": {"runners": {}}}
+    if not os.path.exists(config_path):
+        return default
+    try:
+        with open(config_path, encoding="utf-8") as f:
+            config = json.load(f)
+        validate_config(config)
+        return config
+    except (OSError, json.JSONDecodeError, ValueError) as e:
+        print(f"Error: invalid runner config at {config_path}: {e}", file=sys.stderr)
+        sys.exit(2)
 
 
-def classify_group(labels, config):
-    """Map job labels to a runner group name."""
+def classify_group(labels, config, runner_name=""):
+    """Map runner name or job labels to a runner group name.
+
+    Checks runner name prefixes first (scale set runners have empty labels),
+    then falls back to label matching for legacy/static runners.
+    """
+    # Check runner name prefix first (scale set runners have no labels)
+    if runner_name:
+        for prefix_group in config.get("runner_name_prefixes", []):
+            if runner_name.startswith(prefix_group["prefix"]):
+                return prefix_group["name"], prefix_group.get("self_hosted", False)
+    # Then try label matching
     label_set = set(labels) if labels else set()
     for group in config.get("label_groups", []):
         required = set(group["labels"])
@@ -92,6 +147,19 @@ CONCLUSION_COLORS = {
     "skipped": "#6c757d",
 }
 
+CHART_PALETTE = [
+    "#0d6efd",
+    "#28a745",
+    "#ffc107",
+    "#dc3545",
+    "#6f42c1",
+    "#fd7e14",
+    "#20c997",
+    "#e83e8c",
+    "#17a2b8",
+    "#6610f2",
+]
+
 
 def chart_section(chart_id, title, description="", canvas_style=""):
     """Generate HTML for a chart section with anchor link and download button."""
@@ -120,7 +188,7 @@ def nav_html(active=""):
     links = [
         ("index.html", "Home"),
         ("statistics.html", "Statistics"),
-        ("capacity.html", "Capacity"),
+        ("health.html", "Health"),
     ]
     items = []
     for href, label in links:
@@ -204,7 +272,7 @@ def process_jobs(jobs_data, config):
 
     # Classify runner groups
     for job in jobs_data:
-        group, is_sh = classify_group(job.get("labels", []), config)
+        group, is_sh = classify_group(job.get("labels", []), config, job.get("runner_name", ""))
         job["_group"] = group
         job["_self_hosted"] = is_sh
 
@@ -364,37 +432,95 @@ def _avg_last_n_days(by_date, dates, n):
     return sum(all_vals) / len(all_vals) if all_vals else 0
 
 
+def build_os_phase_dataset_js(os_list, os_phase_avg_by_date, dates, phase):
+    datasets = []
+    for i, os_name in enumerate(os_list):
+        key = f"{os_name}_{phase}"
+        if key not in os_phase_avg_by_date:
+            continue
+        series = os_phase_avg_by_date.get(key, [0] * len(dates))
+        datasets.append(
+            (
+                "{"
+                f"label:'{os_name}', "
+                f"data:sliceData({json.dumps(series)},30), "
+                f"_allData:{json.dumps(series)}, "
+                f"borderColor:'{CHART_PALETTE[i % len(CHART_PALETTE)]}', "
+                "fill:false, tension:0.1"
+                "}"
+            )
+        )
+    return ",".join(datasets)
+
+
 def generate_index(data, output_dir):
-    active = data["active_jobs"]
+    # Filter to CI workflow only
+    ci_filter = lambda j: j.get("workflow_name") == "CI"
+    active = [j for j in data["active_jobs"] if ci_filter(j)]
     dates = data["dates"]
     total = len(active)
     success = sum(1 for j in active if j.get("conclusion") == "success")
     success_rate = (success / total * 100) if total > 0 else 0
 
-    # Last 3 days key figures
-    ci_tat_3d = _avg_last_n_days(data.get("ci_turnaround_by_date", {}), dates, 3)
+    # Compute metrics for a 3-day window
+    def _compute_3d_metrics(window_dates):
+        tat = 0
+        ci_tat_data = data.get("ci_turnaround_by_date", {})
+        tat_vals = []
+        for d in window_dates:
+            tat_vals.extend(ci_tat_data.get(d, []))
+        tat = sum(tat_vals) / len(tat_vals) if tat_vals else 0
 
-    # Active PRs: count unique PR branches in last 3 days
+        pr_branches = set()
+        for d in window_dates:
+            for j in data["jobs_by_date"].get(d, []):
+                if ci_filter(j) and j.get("event") == "pull_request" and j.get("head_branch"):
+                    pr_branches.add(j["head_branch"])
+        prs = len(pr_branches) / len(window_dates) if window_dates else 0
+
+        s, f = 0, 0
+        for d in window_dates:
+            for j in data["jobs_by_date"].get(d, []):
+                if not ci_filter(j):
+                    continue
+                c = j.get("conclusion")
+                if c == "success":
+                    s += 1
+                elif c == "failure":
+                    f += 1
+        total_sf = s + f
+        fr = (f / total_sf * 100) if total_sf > 0 else 0
+        return tat, prs, fr
+
     recent_dates = dates[-3:] if len(dates) >= 3 else dates
-    pr_branches = set()
-    for d in recent_dates:
-        for j in data["jobs_by_date"].get(d, []):
-            if j.get("event") == "pull_request" and j.get("head_branch"):
-                pr_branches.add(j["head_branch"])
-    prs_3d = len(pr_branches) / len(recent_dates) if recent_dates else 0
+    prev_dates = dates[-6:-3] if len(dates) >= 6 else []
 
-    # Queue wait: average across last 3 days
-    queue_vals = []
-    for d in recent_dates:
-        for j in data["jobs_by_date"].get(d, []):
-            q = j.get("queued_seconds")
-            if q and q >= 0:
-                queue_vals.append(q / 60)
-    queue_3d = sum(queue_vals) / len(queue_vals) if queue_vals else 0
+    ci_tat_3d, prs_3d, failure_rate_3d = _compute_3d_metrics(recent_dates)
+    ci_tat_prev, prs_prev, failure_rate_prev = _compute_3d_metrics(prev_dates)
 
-    # Build and test wait
-    bw_3d = _avg_last_n_days(data.get("build_wait_by_date", {}), dates, 3)
-    tw_3d = _avg_last_n_days(data.get("test_wait_by_date", {}), dates, 3)
+    def _delta_str(current, previous, unit="", invert=False):
+        """Format a delta value. invert=True means lower is better."""
+        if not previous:
+            return ""
+        diff = current - previous
+        if abs(diff) < 0.05:
+            return '<span style="color:#6c757d;font-size:0.6em"> (flat)</span>'
+        if invert:
+            color = "#28a745" if diff < 0 else "#dc3545"
+        else:
+            color = "#28a745" if diff > 0 else "#dc3545"
+        sign = "+" if diff > 0 else ""
+        if unit == "%":
+            txt = f"{sign}{diff:.1f}pp"
+        elif unit == "m":
+            txt = f"{sign}{diff:.0f}m"
+        else:
+            txt = f"{sign}{diff:.1f}"
+        return f'<span style="color:{color};font-size:0.6em"> ({txt})</span>'
+
+    tat_delta = _delta_str(ci_tat_3d, ci_tat_prev, "m", invert=True)
+    prs_delta = _delta_str(prs_3d, prs_prev)
+    fr_delta = _delta_str(failure_rate_3d, failure_rate_prev, "%", invert=True)
 
     months_html = ""
     for month in reversed(data["months"]):
@@ -403,25 +529,17 @@ def generate_index(data, output_dir):
 
     body = f"""
 <h1>Slang CI Analytics</h1>
+<p style="color:#6c757d">CI workflow only. Excludes skipped jobs. Data range: {dates[0] if dates else 'N/A'} to {dates[-1] if dates else 'N/A'}.</p>
 <h2>Last 3 Days</h2>
 <div>
-  <div class="stat-card"><div class="value">{ci_tat_3d:.0f}m</div><div class="label">CI Turnaround (avg)</div></div>
-  <div class="stat-card"><div class="value">{prs_3d:.0f}</div><div class="label">Active PRs / day</div></div>
-  <div class="stat-card"><div class="value">{queue_3d:.1f}m</div><div class="label">Avg Queue Wait</div></div>
-  <div class="stat-card"><div class="value">{bw_3d:.1f}m</div><div class="label">Build Wait</div></div>
-  <div class="stat-card"><div class="value">{tw_3d:.1f}m</div><div class="label">Test Wait (after build)</div></div>
+  <div class="stat-card"><div class="value">{ci_tat_3d:.0f}m{tat_delta}</div><div class="label">CI Turnaround (avg)</div></div>
+  <div class="stat-card"><div class="value">{prs_3d:.1f}{prs_delta}</div><div class="label">Active PRs / day</div></div>
+  <div class="stat-card"><div class="value">{failure_rate_3d:.1f}%{fr_delta}</div><div class="label">Failure Rate</div></div>
 </div>
-<h2>Overall</h2>
-<div>
-  <div class="stat-card"><div class="value">{total}</div><div class="label">Total Jobs</div></div>
-  <div class="stat-card"><div class="value">{success_rate:.1f}%</div><div class="label">Success Rate</div></div>
-</div>
-<p style="color:#6c757d;margin-top:10px">Excludes skipped jobs. Data range: {dates[0] if dates else 'N/A'} to {dates[-1] if dates else 'N/A'}</p>
 
 <h2>Pages</h2>
 <ul>
   <li><a href="statistics.html">Statistics &amp; Trends</a></li>
-  <li><a href="capacity.html">Runner Capacity Analysis</a></li>
 </ul>
 
 <h2>Monthly Timelines</h2>
@@ -436,10 +554,16 @@ def generate_index(data, output_dir):
 # --- Statistics page ---
 
 
-def generate_statistics(data, output_dir):
+def generate_statistics(data, config, output_dir):
     dates = data["dates"]
-    jobs_by_date = data["jobs_by_date"]
-    active = data["active_jobs"]
+
+    # Filter everything to CI workflow only
+    ci_filter = lambda j: j.get("workflow_name") == "CI"
+    active = [j for j in data["active_jobs"] if ci_filter(j)]
+    jobs_by_date = {
+        d: [j for j in jobs if ci_filter(j)]
+        for d, jobs in data["jobs_by_date"].items()
+    }
 
     # Per-day stats
     labels_json = json.dumps(dates)
@@ -474,10 +598,14 @@ def generate_statistics(data, output_dir):
         durs = [j["duration_seconds"] for j in djobs if j.get("duration_seconds") and j["duration_seconds"] > 0]
         avg_duration_per_day.append(round(sum(durs) / len(durs) / 60, 1) if durs else 0)
 
-        queues = [j["queued_seconds"] for j in djobs if j.get("queued_seconds") and j["queued_seconds"] >= 0]
+        queues = [
+            j["queued_seconds"]
+            for j in djobs
+            if j.get("queued_seconds") is not None and j["queued_seconds"] >= 0
+        ]
         avg_queue_per_day.append(round(sum(queues) / len(queues) / 60, 1) if queues else 0)
 
-        total_day = s + f + c
+        total_day = s + f
         failure_rate_per_day.append(round(f / total_day * 100, 1) if total_day > 0 else 0)
 
     # 7-day moving average for duration
@@ -565,12 +693,67 @@ def generate_statistics(data, output_dir):
     group_names = sorted(group_counts.keys())
     group_values = [group_counts[g] for g in group_names]
 
-    # Jobs by event type
-    event_counts = defaultdict(int)
-    for j in active:
-        event_counts[j.get("event", "unknown")] += 1
-    event_names = sorted(event_counts.keys())
-    event_values = [event_counts[e] for e in event_names]
+    # Parallelization rate per runner group (from former capacity page)
+    sh_groups = {}
+    for g in config.get("label_groups", []):
+        if g.get("self_hosted"):
+            name = g["name"]
+            if name not in sh_groups:
+                sh_groups[name] = g.get("runner_count", 0)
+
+    group_parallel_per_day = defaultdict(list)
+    cap_avg_queue = []
+    cap_p50_queue = []
+    cap_p90_queue = []
+    cap_p95_queue = []
+
+    for date in dates:
+        djobs = jobs_by_date[date]
+        queues = sorted(
+            [
+                j["queued_seconds"]
+                for j in djobs
+                if j.get("queued_seconds") is not None and j["queued_seconds"] >= 0
+            ]
+        )
+        if queues:
+            cap_avg_queue.append(round(sum(queues) / len(queues) / 60, 1))
+            cap_p50_queue.append(round(queues[len(queues) // 2] / 60, 1))
+            cap_p90_queue.append(round(queues[int(len(queues) * 0.9)] / 60, 1))
+            cap_p95_queue.append(round(queues[int(len(queues) * 0.95)] / 60, 1))
+        else:
+            cap_avg_queue.append(0)
+            cap_p50_queue.append(0)
+            cap_p90_queue.append(0)
+            cap_p95_queue.append(0)
+
+        group_busy = defaultdict(float)
+        for j in djobs:
+            g = j.get("_group", "Other")
+            if g not in sh_groups:
+                continue
+            dur = j.get("duration_seconds")
+            if dur and dur > 0:
+                group_busy[g] += dur
+        for g in sorted(sh_groups):
+            group_parallel_per_day[g].append(round(group_busy[g] / 86400, 2))
+
+    parallel_datasets = []
+    ci = 0
+    for g in sorted(sh_groups):
+        # Only include groups that have actual data
+        if not any(v > 0 for v in group_parallel_per_day[g]):
+            continue
+        color = CHART_PALETTE[ci % len(CHART_PALETTE)]
+        ci += 1
+        parallel_datasets.append({
+            "label": g,
+            "data": group_parallel_per_day[g],
+            "borderColor": color,
+            "backgroundColor": color + "33",
+            "fill": True,
+            "tension": 0.1,
+        })
 
     # Build and test wait times per day
     build_wait_by_date = data.get("build_wait_by_date", {})
@@ -583,8 +766,16 @@ def generate_statistics(data, output_dir):
         tw = test_wait_by_date.get(date, [])
         avg_test_wait.append(round(sum(tw) / len(tw), 1) if tw else 0)
 
+    build_os_datasets_js = build_os_phase_dataset_js(
+        os_list, os_phase_avg_by_date, dates, "build"
+    )
+    test_os_datasets_js = build_os_phase_dataset_js(
+        os_list, os_phase_avg_by_date, dates, "test"
+    )
+
     body = f"""
 <h1>Statistics &amp; Trends</h1>
+<p style="color:#6c757d">CI workflow only. Excludes skipped jobs. Data range: {dates[0] if dates else 'N/A'} to {dates[-1] if dates else 'N/A'}.</p>
 
 <div style="margin-bottom:15px">
   <label>Date range: </label>
@@ -597,32 +788,44 @@ def generate_statistics(data, output_dir):
 </div>
 
 {chart_section("turnaround", "CI Turnaround Time (minutes)",
-    "Main CI workflow only. Time from workflow trigger to last job completed per run. Speed of light = max(build+test) across platforms, assuming full parallelization.")}
+    "Time from workflow trigger to last job completed per run. Speed of light = max(build+test) across platforms, assuming full parallelization.")}
 
-{chart_section("prsPerDay", "Active PRs per Day")}
+{chart_section("prsPerDay", "Active PRs per Day",
+    "Unique PR branches with CI activity per day.")}
 
 {chart_section("buildTestWait", "Build and Test Wait Times (minutes)",
     "Build wait: run trigger to first build started. Test wait: last build completed to first test started (worst platform).")}
 
 {chart_section("buildByOs", "Build Duration by OS (minutes)",
-    "Average build job duration per day, CI workflow only.")}
+    "Average build job duration per day.")}
 
 {chart_section("testByOs", "Test Duration by OS (minutes)",
-    "Average test job duration per day, CI workflow only.")}
+    "Average test job duration per day.")}
 
-{chart_section("jobsPerDay", "Jobs per Day")}
+{chart_section("jobsPerDay", "Jobs per Day",
+    "Stacked by conclusion: success, failure, cancelled.")}
 
-{chart_section("runsPerDay", "Workflow Runs per Day")}
+{chart_section("runsPerDay", "Workflow Runs per Day",
+    "Number of distinct workflow runs per day.")}
 
-{chart_section("avgDuration", "Average Job Duration (minutes)")}
+{chart_section("avgDuration", "Average Job Duration (minutes)",
+    "Mean duration across all jobs per day, with 7-day moving average.")}
 
-{chart_section("avgQueue", "Average Queue Wait Time (minutes)")}
+{chart_section("avgQueue", "Average Queue Wait Time (minutes)",
+    "Mean time jobs spent waiting for a runner before starting.")}
 
-{chart_section("failureRate", "Failure Rate (%)")}
+{chart_section("failureRate", "Failure Rate (%)",
+    "Percentage of jobs that failed (excludes skipped and cancelled).")}
 
-{chart_section("byGroup", "Jobs by Runner Group", canvas_style="max-width:800px")}
+{chart_section("byGroup", "Jobs by Runner Group",
+    "Total jobs per runner group over the full date range.", canvas_style="max-width:800px")}
 
-{chart_section("byEvent", "Jobs by Event Type", canvas_style="max-width:500px")}
+{chart_section("parallelRate", "Average Concurrent Runners",
+    "Average number of self-hosted runners busy at any moment, per group. Computed as total busy time / 24h.")}
+
+{chart_section("queueWait", "Queue Wait Time Percentiles (minutes)",
+    "Time each job spent waiting in the CI queue for a runner before execution started. Shows average, median (p50), p90, and p95 per day.")}
+
 
 <script src="{CHARTJS_CDN}"></script>
 <script>
@@ -701,11 +904,7 @@ makeChart('buildTestWait_canvas', 'line', {{
 makeChart('buildByOs_canvas', 'line', {{
   data: {{
     labels: sliceData(allLabels, 30),
-    datasets: [{','.join(
-      f"""{{label:'{os_name}', data:sliceData({json.dumps(os_phase_avg_by_date.get(f'{os_name}_build', [0]*len(dates)))},30), _allData:{json.dumps(os_phase_avg_by_date.get(f'{os_name}_build', [0]*len(dates)))}, borderColor:'{["#0d6efd","#28a745","#ffc107","#dc3545","#6f42c1","#fd7e14","#20c997","#e83e8c","#17a2b8","#6610f2"][i % 10]}', fill:false, tension:0.1}}"""
-      for i, os_name in enumerate(os_list)
-      if f'{os_name}_build' in os_phase_avg_by_date
-    )}]
+    datasets: [{build_os_datasets_js}]
   }},
   options: {{responsive:true, scales:{{y:{{title:{{display:true,text:'Minutes'}}}}}}}}
 }});
@@ -714,11 +913,7 @@ makeChart('buildByOs_canvas', 'line', {{
 makeChart('testByOs_canvas', 'line', {{
   data: {{
     labels: sliceData(allLabels, 30),
-    datasets: [{','.join(
-      f"""{{label:'{os_name}', data:sliceData({json.dumps(os_phase_avg_by_date.get(f'{os_name}_test', [0]*len(dates)))},30), _allData:{json.dumps(os_phase_avg_by_date.get(f'{os_name}_test', [0]*len(dates)))}, borderColor:'{["#0d6efd","#28a745","#ffc107","#dc3545","#6f42c1","#fd7e14","#20c997","#e83e8c","#17a2b8","#6610f2"][i % 10]}', fill:false, tension:0.1}}"""
-      for i, os_name in enumerate(os_list)
-      if f'{os_name}_test' in os_phase_avg_by_date
-    )}]
+    datasets: [{test_os_datasets_js}]
   }},
   options: {{responsive:true, scales:{{y:{{title:{{display:true,text:'Minutes'}}}}}}}}
 }});
@@ -794,14 +989,29 @@ new Chart(document.getElementById('byGroup_canvas').getContext('2d'), {{
   options: {{responsive:true, indexAxis:'y'}}
 }});
 
-// By event type (static)
-new Chart(document.getElementById('byEvent_canvas').getContext('2d'), {{
-  type: 'pie',
+// Parallelization rate
+new Chart(document.getElementById('parallelRate_canvas').getContext('2d'), {{
+  type: 'line',
   data: {{
-    labels: {json.dumps(event_names)},
-    datasets: [{{data:{json.dumps(event_values)}, backgroundColor:['#0d6efd','#28a745','#ffc107','#dc3545','#6f42c1','#fd7e14','#20c997','#e83e8c']}}]
+    labels: {json.dumps(dates)},
+    datasets: {json.dumps(parallel_datasets)}
   }},
-  options: {{responsive:true}}
+  options: {{responsive:true, scales:{{y:{{min:0,title:{{display:true,text:'Avg Concurrent Runners'}}}}}}}}
+}});
+
+// Queue wait time percentiles
+new Chart(document.getElementById('queueWait_canvas').getContext('2d'), {{
+  type: 'line',
+  data: {{
+    labels: {json.dumps(dates)},
+    datasets: [
+      {{label:'Avg', data:{json.dumps(cap_avg_queue)}, borderColor:'#0d6efd', fill:false, tension:0.1}},
+      {{label:'p50', data:{json.dumps(cap_p50_queue)}, borderColor:'#28a745', borderDash:[5,5], fill:false, tension:0.1}},
+      {{label:'p90', data:{json.dumps(cap_p90_queue)}, borderColor:'#ffc107', borderDash:[5,5], fill:false, tension:0.1}},
+      {{label:'p95', data:{json.dumps(cap_p95_queue)}, borderColor:'#dc3545', borderDash:[5,5], fill:false, tension:0.1}},
+    ]
+  }},
+  options: {{responsive:true, scales:{{y:{{title:{{display:true,text:'Minutes'}}}}}}}}
 }});
 </script>
 """
@@ -882,17 +1092,18 @@ def generate_month_page(month, month_jobs, config, output_dir):
 
                 conclusion = job.get("conclusion", "")
                 color = CONCLUSION_COLORS.get(conclusion, "#6c757d")
-                name = html_mod.escape(job.get("name", ""))
-                wf = html_mod.escape(job.get("workflow_name", ""))
-                branch = html_mod.escape(job.get("head_branch", ""))
+                name = html_mod.escape(job.get("name", ""), quote=True)
+                wf = html_mod.escape(job.get("workflow_name", ""), quote=True)
+                branch = html_mod.escape(job.get("head_branch", ""), quote=True)
                 dur = format_duration((completed - started).total_seconds())
                 queue = format_duration(job.get("queued_seconds"))
                 url = html_mod.escape(job.get("html_url", ""), quote=True)
 
-                tooltip = f"{name}\\n{wf} / {branch}\\nDuration: {dur}, Queue: {queue}\\nConclusion: {conclusion}"
+                conclusion_esc = html_mod.escape(conclusion, quote=True)
+                tooltip = f"{name}\\n{wf} / {branch}\\nDuration: {dur}, Queue: {queue}\\nConclusion: {conclusion_esc}"
 
                 rows_html.append(
-                    f'<a href="{url}" target="_blank" '
+                    f'<a href="{url}" target="_blank" rel="noopener noreferrer" '
                     f'class="job-block" '
                     f'data-wf="{wf}" data-branch="{branch}" '
                     f'style="position:absolute;left:{left}px;top:{top + 2}px;'
@@ -966,141 +1177,25 @@ function filterJobs() {{
         f.write(page_template(f"Timeline {month}", body, ""))
 
 
-# --- Capacity page ---
+# --- Health page ---
 
 
-def generate_capacity(data, config, output_dir):
-    """Generate capacity analysis page."""
-    dates = data["dates"]
-    jobs_by_date = data["jobs_by_date"]
+def generate_health(output_dir):
+    """Generate placeholder health page only if it doesn't exist yet.
 
-    # Find self-hosted groups and their configured runner counts.
-    sh_groups = {}  # name -> runner_count
-    for g in config.get("label_groups", []):
-        if g.get("self_hosted"):
-            name = g["name"]
-            if name not in sh_groups:
-                sh_groups[name] = g.get("runner_count", 0)
-
-    # Per-day parallelization rate: average concurrent runners busy
-    # = total_busy_seconds / 86400
-    # No dependency on fleet size — purely demand-driven.
-    group_parallel_per_day = defaultdict(list)
-    avg_queue_per_day = []
-    p50_queue = []
-    p90_queue = []
-    p95_queue = []
-
-    for date in dates:
-        djobs = jobs_by_date[date]
-
-        # Queue time percentiles
-        queues = sorted([j["queued_seconds"] for j in djobs if j.get("queued_seconds") and j["queued_seconds"] >= 0])
-        if queues:
-            avg_queue_per_day.append(round(sum(queues) / len(queues) / 60, 1))
-            p50_queue.append(round(queues[len(queues) // 2] / 60, 1))
-            p90_queue.append(round(queues[int(len(queues) * 0.9)] / 60, 1))
-            p95_queue.append(round(queues[int(len(queues) * 0.95)] / 60, 1))
-        else:
-            avg_queue_per_day.append(0)
-            p50_queue.append(0)
-            p90_queue.append(0)
-            p95_queue.append(0)
-
-        # Parallelization per group
-        group_busy = defaultdict(float)
-        for j in djobs:
-            g = j.get("_group", "Other")
-            if g not in sh_groups:
-                continue
-            dur = j.get("duration_seconds")
-            if dur and dur > 0:
-                group_busy[g] += dur
-
-        for g in sorted(sh_groups):
-            parallel = group_busy[g] / 86400
-            group_parallel_per_day[g].append(round(parallel, 2))
-
-    # Build datasets: parallelization line + capacity line per group
-    colors = ["#0d6efd", "#28a745", "#ffc107", "#dc3545", "#6f42c1", "#fd7e14", "#20c997", "#e83e8c", "#17a2b8", "#6610f2"]
-    parallel_datasets = []
-    for i, g in enumerate(sorted(sh_groups)):
-        color = colors[i % len(colors)]
-        parallel_datasets.append({
-            "label": g,
-            "data": group_parallel_per_day[g],
-            "borderColor": color,
-            "backgroundColor": color + "33",
-            "fill": True,
-            "tension": 0.1,
-        })
-        # Capacity line (not rendered for now, but data is available)
-        # rc = sh_groups[g]
-        # if rc > 0:
-        #     parallel_datasets.append({
-        #         "label": f"{g} capacity ({rc})",
-        #         "data": [rc] * len(dates),
-        #         "borderColor": color,
-        #         "borderDash": [4, 4],
-        #         "pointRadius": 0,
-        #         "fill": False,
-        #         "tension": 0,
-        #     })
-
-    # Summary table
-    table_rows = ""
-    for g in sorted(sh_groups):
-        vals = group_parallel_per_day[g]
-        avg = sum(vals) / len(vals) if vals else 0
-        peak = max(vals) if vals else 0
-        rc = sh_groups[g]
-        rc_str = str(rc) if rc > 0 else "dynamic"
-        table_rows += f"<tr><td>{g}</td><td>{rc_str}</td><td>{avg:.1f}</td><td>{peak:.1f}</td></tr>\n"
-
-    body = f"""
-<h1>Runner Capacity Analysis</h1>
-
-{chart_section("parallelRate", "Average Concurrent Runners (Parallelization Rate)",
-    "Total busy time / 24h per runner group.")}
-
-{chart_section("queueWait", "Queue Wait Time (minutes)")}
-
-<h2>Runner Group Summary</h2>
-<table>
-  <tr><th>Group</th><th>Fleet Size</th><th>Avg Concurrent</th><th>Peak Concurrent</th></tr>
-  {table_rows}
-</table>
-
-<script src="{CHARTJS_CDN}"></script>
-<script>
-{DOWNLOAD_JS}
-
-new Chart(document.getElementById('parallelRate_canvas').getContext('2d'), {{
-  type: 'line',
-  data: {{
-    labels: {json.dumps(dates)},
-    datasets: {json.dumps(parallel_datasets)}
-  }},
-  options: {{responsive:true, scales:{{y:{{min:0,title:{{display:true,text:'Avg Concurrent Runners'}}}}}}}}
-}});
-
-new Chart(document.getElementById('queueWait_canvas').getContext('2d'), {{
-  type: 'line',
-  data: {{
-    labels: {json.dumps(dates)},
-    datasets: [
-      {{label:'Avg', data:{json.dumps(avg_queue_per_day)}, borderColor:'#0d6efd', fill:false, tension:0.1}},
-      {{label:'p50', data:{json.dumps(p50_queue)}, borderColor:'#28a745', borderDash:[5,5], fill:false, tension:0.1}},
-      {{label:'p90', data:{json.dumps(p90_queue)}, borderColor:'#ffc107', borderDash:[5,5], fill:false, tension:0.1}},
-      {{label:'p95', data:{json.dumps(p95_queue)}, borderColor:'#dc3545', borderDash:[5,5], fill:false, tension:0.1}},
-    ]
-  }},
-  options: {{responsive:true, scales:{{y:{{title:{{display:true,text:'Minutes'}}}}}}}}
-}});
-</script>
+    The real health page is generated by ci_health.py on a 15-minute
+    schedule. This only creates the initial placeholder.
+    """
+    path = os.path.join(output_dir, "health.html")
+    if os.path.exists(path):
+        return
+    body = """
+<h1>CI System Health</h1>
+<p style="color:#6c757d">Live status of CI infrastructure. Updated every 15 minutes.</p>
+<p>Waiting for first health update...</p>
 """
-    with open(os.path.join(output_dir, "capacity.html"), "w") as f:
-        f.write(page_template("Capacity", body, "Capacity"))
+    with open(path, "w") as f:
+        f.write(page_template("Health", body, "Health"))
 
 
 # --- Main ---
@@ -1112,8 +1207,24 @@ def main():
 
     # Load job data
     print(f"Loading job data from {args.input}...")
-    with open(args.input) as f:
-        jobs_data = json.load(f)
+    try:
+        with open(args.input, encoding="utf-8") as f:
+            jobs_data = json.load(f)
+    except FileNotFoundError:
+        print(f"Error: input JSON not found: {args.input}", file=sys.stderr)
+        sys.exit(2)
+    except json.JSONDecodeError as e:
+        print(f"Error: invalid JSON in {args.input}: {e}", file=sys.stderr)
+        sys.exit(2)
+    except OSError as e:
+        print(f"Error: failed reading {args.input}: {e}", file=sys.stderr)
+        sys.exit(2)
+    if not isinstance(jobs_data, list):
+        print(
+            f"Error: expected top-level array in {args.input}, got {type(jobs_data).__name__}",
+            file=sys.stderr,
+        )
+        sys.exit(2)
     print(f"Loaded {len(jobs_data)} jobs")
 
     # Process
@@ -1129,10 +1240,10 @@ def main():
     generate_index(data, args.output)
 
     print("Generating statistics.html...")
-    generate_statistics(data, args.output)
+    generate_statistics(data, config, args.output)
 
-    print("Generating capacity.html...")
-    generate_capacity(data, config, args.output)
+    print("Generating health.html...")
+    generate_health(args.output)
 
     for month in data["months"]:
         print(f"Generating month_{month}.html...")
