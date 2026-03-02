@@ -1798,7 +1798,7 @@ Linkage::getDeclSourceLocation(slang::DeclReflection* inDecl)
     {
         auto humaneLoc = sourceView->getHumaneLoc(decl->getNameLoc());
         slang::SourceLocation loc;
-        
+
         if (humaneLoc.pathInfo.hasFoundPath())
         {
             auto pathSlice = m_stringSlicePool.addAndGetSlice(humaneLoc.pathInfo.foundPath);
