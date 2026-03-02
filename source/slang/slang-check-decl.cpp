@@ -3531,6 +3531,7 @@ void SemanticsDeclHeaderVisitor::visitGenericTypeConstraintDecl(GenericTypeConst
             decl->sup = TypeExp(flattenedTypes[0]);
 
             // Create new constraint decls for the remaining types.
+            List<GenericTypeConstraintDecl*> newConstraints;
             for (Index i = 1; i < flattenedTypes.getCount(); i++)
             {
                 auto newConstraint = m_astBuilder->create<GenericTypeConstraintDecl>();
@@ -3539,6 +3540,15 @@ void SemanticsDeclHeaderVisitor::visitGenericTypeConstraintDecl(GenericTypeConst
                 newConstraint->loc = decl->loc;
                 newConstraint->parentDecl = parentDecl;
                 parentDecl->addDirectMemberDecl(newConstraint);
+                newConstraints.add(newConstraint);
+            }
+
+            // Clear cached substitutions before proceeding with checking.
+            if (auto genericParentDecl = as<GenericDecl>(parentDecl))
+                genericParentDecl->_cachedArgsForDefaultSubstitution.clear();
+
+            for (auto newConstraint : newConstraints)
+            {
                 ensureDecl(newConstraint, DeclCheckState::SignatureChecked);
             }
         }
@@ -9208,12 +9218,22 @@ List<Val*> getDefaultSubstitutionArgs(
 
     bool shouldCache = true;
 
-    // create default substitution arguments for constraints
+    // check all constraints. It is possible that checking the constraint can split it
+    // into multiple constraints, so we will check all the constraints first, and then proceed with
+    // constructing the args list.
+    //
+    if (semantics)
+    {
+        for (auto genericTypeConstraintDecl :
+             genericDecl->getDirectMemberDeclsOfType<GenericTypeConstraintDecl>())
+        {
+            semantics->ensureDecl(genericTypeConstraintDecl, DeclCheckState::ReadyForReference);
+        }
+    }
+
     for (auto genericTypeConstraintDecl :
          genericDecl->getDirectMemberDeclsOfType<GenericTypeConstraintDecl>())
     {
-        if (semantics)
-            semantics->ensureDecl(genericTypeConstraintDecl, DeclCheckState::ReadyForReference);
         auto constraintDeclRef =
             astBuilder->getDirectDeclRef<GenericTypeConstraintDecl>(genericTypeConstraintDecl);
         auto supType = getSup(astBuilder, constraintDeclRef);
