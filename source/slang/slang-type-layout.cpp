@@ -5396,14 +5396,14 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
             type,
             rules);
     }
-    else if (auto fp8Type = as<Fp8Type>(type))
+    else if ([[maybe_unused]] auto fp8Type = as<Fp8Type>(type))
     {
         return createSimpleTypeLayout(
             rules->GetScalarLayout(BaseType::UInt8, context),
             type,
             rules);
     }
-    else if (auto bf168Type = as<BFloat16Type>(type))
+    else if ([[maybe_unused]] auto bf16Type = as<BFloat16Type>(type))
     {
         return createSimpleTypeLayout(
             rules->GetScalarLayout(BaseType::UInt16, context),
