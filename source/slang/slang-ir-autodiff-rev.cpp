@@ -14,6 +14,7 @@
 #include "slang-ir-single-return.h"
 #include "slang-ir-ssa-simplification.h"
 #include "slang-ir-util.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -658,7 +659,10 @@ SlangResult BackwardDiffTranscriberBase::prepareFuncForBackwardDiff(IRFunc* func
     {
         // The function is ill-formed and never returns (such as having an infinite loop),
         // we can't possibly reverse-differentiate such functions, so we will diagnose it here.
-        getSink()->diagnose(func->sourceLoc, Diagnostics::functionNeverReturnsFatal, func);
+        getSink()->diagnose(Diagnostics::FunctionNeverReturnsFatal{
+            .funcName = func,
+            .location = func->sourceLoc,
+        });
     }
 
     eliminateContinueBlocksInFunc(func->getModule(), func);

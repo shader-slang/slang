@@ -3,7 +3,7 @@
 
 //TEST:SIMPLE(filecheck=CHECK): -allow-glsl -stage compute -entry computeMain -target glsl -DQUAD_GLSL
 //TEST:SIMPLE(filecheck=CHECK): -allow-glsl -stage compute -entry computeMain -target spirv -DQUAD_GLSL
-// CHECK: error 31210
+// CHECK: error[E31210]
 
 buffer MyBlockName
 {

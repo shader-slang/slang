@@ -1104,7 +1104,7 @@ TypeCoercionWitness* ASTBuilder::getTypeCoercionWitness(
     Type* superType,
     DeclRef<Decl> declRef)
 {
-    return getOrCreate<TypeCoercionWitness>(subType, superType, declRef.declRefBase);
+    return getOrCreate<DeclRefTypeCoercionWitness>(fromType, toType, declRef);
 }
 
 DeclRef<Decl> _getMemberDeclRef(ASTBuilder* builder, DeclRef<Decl> parent, Decl* decl)

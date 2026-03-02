@@ -670,13 +670,37 @@ class TypeEqualityWitness : public SubtypeWitness
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
-FIDDLE()
+FIDDLE(abstract)
 class TypeCoercionWitness : public Witness
 {
     FIDDLE(...)
     Type* getFromType() { return as<Type>(getOperand(0)); }
     Type* getToType() { return as<Type>(getOperand(1)); }
+};
 
+// Witness to non-user defined type-cast
+FIDDLE()
+class BuiltinTypeCoercionWitness : public TypeCoercionWitness
+{
+    FIDDLE(...)
+    BuiltinTypeCoercionWitness(Type* fromType, Type* toType) { setOperands(fromType, toType); }
+
+    void _toTextOverride(StringBuilder& out);
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    Val* _resolveImplOverride();
+};
+
+// Witness to user defined type-cast
+FIDDLE()
+class DeclRefTypeCoercionWitness : public TypeCoercionWitness
+{
+    FIDDLE(...)
+    DeclRefTypeCoercionWitness(Type* fromType, Type* toType, DeclRef<Decl> declRef)
+    {
+        setOperands(fromType, toType, declRef);
+    }
+
+    // DeclRef<> used for the cast
     DeclRef<Decl> getDeclRef() { return as<DeclRefBase>(getOperand(2)); }
 
     void _toTextOverride(StringBuilder& out);

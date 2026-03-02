@@ -46,6 +46,11 @@ void printDiagnosticArg(StringBuilder& sb, IRInst* irObject)
         sb << linkage->getMangledName();
         return;
     }
+    if (as<IRParam>(irObject))
+    {
+        sb << "unnamed parameter";
+        return;
+    }
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -3083,6 +3088,38 @@ IRInst* IRBuilder::emitByteAddressBufferStore(
 {
     IRInst* args[] = {byteAddressBuffer, offset, alignment, value};
     return emitIntrinsicInst(getVoidType(), kIROp_ByteAddressBufferStore, 4, args);
+}
+
+IRInst* IRBuilder::emitLoadDescriptorFromHeap(IRType* type, IRInst* heap, IRInst* index)
+{
+    IRInst* args[] = {heap, index};
+    return emitIntrinsicInst(type, kIROp_SPIRVLoadDescriptorFromHeap, 2, args);
+}
+
+IRInst* IRBuilder::emitSPIRVLoadTexelPointerFromHeap(
+    IRType* type,
+    IRInst* heap,
+    IRInst* index,
+    IRInst* textureType,
+    IRInst* coord,
+    IRInst* sampleIndex)
+{
+    IRInst* args[] = {heap, index, textureType, coord, sampleIndex};
+    return emitIntrinsicInst(type, kIROp_SPIRVLoadTexelPointerFromHeap, 5, args);
+}
+
+IRInst* IRBuilder::emitSPIRVResourceDescriptorHeap()
+{
+    return emitIntrinsicInst(getUIntType(), kIROp_SPIRVResourceHeap, 0, nullptr);
+}
+IRInst* IRBuilder::emitSPIRVSamplerDescriptorHeap()
+{
+    return emitIntrinsicInst(getUIntType(), kIROp_SPIRVSamplerHeap, 0, nullptr);
+}
+IRInst* IRBuilder::emitMakeCombinedTextureSampler(IRType* type, IRInst* texture, IRInst* sampler)
+{
+    IRInst* args[] = {texture, sampler};
+    return emitIntrinsicInst(type, kIROp_MakeCombinedTextureSampler, 2, args);
 }
 
 IRInst* IRBuilder::emitReinterpret(IRInst* type, IRInst* value)
@@ -8559,6 +8596,8 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_Block:
     case kIROp_Each:
     case kIROp_TypeEqualityWitness:
+    case kIROp_SPIRVResourceHeap:
+    case kIROp_SPIRVSamplerHeap:
         return false;
 
         /// Liveness markers have no side effects
@@ -8610,6 +8649,11 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_RWStructuredBufferGetElementPtr:
     case kIROp_CombinedTextureSamplerGetSampler:
     case kIROp_CombinedTextureSamplerGetTexture:
+    case kIROp_MakeCombinedTextureSampler:
+    case kIROp_MakeCombinedTextureSamplerFromHandle:
+    case kIROp_LoadSamplerDescriptorFromHeap:
+    case kIROp_LoadResourceDescriptorFromHeap:
+    case kIROp_SPIRVLoadDescriptorFromHeap:
     case kIROp_Load: // We are ignoring the possibility of loads from bad addresses, or
                      // `volatile` loads
     case kIROp_LoadReverseGradient:
@@ -8711,6 +8755,7 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_MakeDifferentialPairUserCode:
     case kIROp_MakeDifferentialPtrPair:
     case kIROp_MakeStorageTypeLoweringConfig:
+    case kIROp_SPIRVLoadTexelPointerFromHeap:
         return false;
 
     case kIROp_UnboundedFuncElement:
