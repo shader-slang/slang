@@ -793,7 +793,7 @@ struct SCCPContext
             [bitWidth](IRIntegerValue c0, IRIntegerValue c1)
             {
                 if (static_cast<IRUnsignedIntegerValue>(c1) >= bitWidth)
-                    return IRIntegerValue(0);
+                    return (c0 < 0) ? IRIntegerValue(-1) : IRIntegerValue(0);
                 return c0 >> static_cast<IRUnsignedIntegerValue>(c1);
             });
     }
