@@ -215,6 +215,6 @@ jobs:
           client-payload: |
             {
               "slang_pr_number": "${{ github.event.pull_request.number }}",
-              "slang_commit_sha": "${{ github.sha }}",
-              "slang_ref": "${{ github.ref }}"
+              "slang_commit_sha": "${{ github.event.pull_request.head.sha }}",
+              "slang_ref": "${{ github.event.pull_request.head.sha }}"
             }
