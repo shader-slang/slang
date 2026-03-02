@@ -3815,8 +3815,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         // Similar to the case for entry points, if there is a single target,
         // then we allow some of its options to come from the "default"
         // target state.
-        auto defaultTargetFloatingPointMode =
-            m_defaultTarget.optionSet.getFloatingPointMode();
+        auto defaultTargetFloatingPointMode = m_defaultTarget.optionSet.getFloatingPointMode();
 
         if (m_rawTargets.getCount() == 1)
         {
