@@ -2466,11 +2466,13 @@ protected:
         {
             if (semanticDecoration->getSemanticName().startsWithCaseInsensitive(toSlice("sv_")))
             {
+                auto idx = semanticDecoration->getSemanticIndex();
+                // An index of -1 means the semantic index is not specified, so we use 0 as the default index.
                 return {
                     {var,
                      varType,
                      String(semanticDecoration->getSemanticName()).toLower(),
-                     (UInt)semanticDecoration->getSemanticIndex()}};
+                     (UInt)(idx >= 0 ? idx : 0)}};
             }
         }
 
@@ -2996,7 +2998,8 @@ private:
             {
                 if (semanticDecor->getSemanticName().startsWithCaseInsensitive(toSlice("sv_")))
                 {
-                    auto indexAsString = String(UInt(semanticDecor->getSemanticIndex()));
+                    auto rawIdx = semanticDecor->getSemanticIndex();
+                    auto indexAsString = String(UInt(rawIdx >= 0 ? rawIdx : 0));
                     auto sysValInfo =
                         getSystemValueInfo(semanticDecor->getSemanticName(), &indexAsString, field);
                     if (sysValInfo.isUnsupported)
@@ -3564,8 +3567,9 @@ private:
 
                 auto loweredName = String(outName).toLower();
                 auto loweredNameSlice = getUserSemanticNameSlice(loweredName, isUserSemantic);
+                auto rawIndex = semanticDecoration->getSemanticIndex();
                 auto semanticIndex =
-                    hasStringIndex ? stringToInt(outIndex) : semanticDecoration->getSemanticIndex();
+                    hasStringIndex ? stringToInt(outIndex) : (rawIndex >= 0 ? rawIndex : 0);
                 auto newDecoration =
                     builder.addSemanticDecoration(key, loweredNameSlice, semanticIndex);
 

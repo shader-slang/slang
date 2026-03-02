@@ -4582,7 +4582,7 @@ $(type_info.return_type) $(type_info.method_name)(
     IRSemanticDecoration* addSemanticDecoration(
         IRInst* value,
         UnownedStringSlice const& text,
-        IRIntegerValue index = 0)
+        IRIntegerValue index = -1)
     {
         return as<IRSemanticDecoration>(addDecoration(
             value,

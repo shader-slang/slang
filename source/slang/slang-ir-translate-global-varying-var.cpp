@@ -179,9 +179,11 @@ struct GlobalVarTranslationContext
                 varLayoutBuilder.setStage(entryPointDecor->getProfile().getStage());
                 if (auto semanticDecor = input->findDecoration<IRSemanticDecoration>())
                 {
+                    auto idx = semanticDecor->getSemanticIndex();
+                    // An index of -1 means the semantic index is not specified, so we use 0 as the default index.
                     varLayoutBuilder.setSystemValueSemantic(
                         semanticDecor->getSemanticName(),
-                        semanticDecor->getSemanticIndex());
+                        idx >= 0 ? idx : 0);
                 }
                 else
                 {
@@ -315,9 +317,10 @@ struct GlobalVarTranslationContext
                     varLayoutBuilder.setStage(entryPointDecor->getProfile().getStage());
                     if (auto semanticDecor = output->findDecoration<IRSemanticDecoration>())
                     {
+                        auto idx = semanticDecor->getSemanticIndex();
                         varLayoutBuilder.setSystemValueSemantic(
                             semanticDecor->getSemanticName(),
-                            semanticDecor->getSemanticIndex());
+                            idx >= 0 ? idx : 0);
                     }
                     else
                     {
