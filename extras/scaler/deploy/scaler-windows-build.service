@@ -19,7 +19,8 @@ ExecStart=/opt/scaler/scaler \
     --gcp-project=slang-runners \
     --gcp-zones=us-east1-c,us-east1-d,us-central1-a,us-west1-a,us-west1-b \
     --gcp-instance-template=windows-build-runner \
-    --gcp-gpu-type=none
+    --gcp-gpu-type=none \
+    --vm-prefix=win-build
 
 EnvironmentFile=/opt/scaler/scaler.env
 

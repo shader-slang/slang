@@ -66,6 +66,7 @@ type config struct {
 	gcpInstanceTemplate string
 	gcpGPUType          string
 	gcpPlatform         string
+	gcpVMPrefix         string
 	gcpCleanupInterval  time.Duration
 }
 
@@ -146,6 +147,7 @@ func parseFlags() config {
 	flag.StringVar(&cfg.gcpInstanceTemplate, "gcp-instance-template", "windows-gpu-runner", "GCP instance template name")
 	flag.StringVar(&cfg.gcpGPUType, "gcp-gpu-type", "nvidia-tesla-t4", "GPU accelerator type")
 	flag.StringVar(&cfg.gcpPlatform, "platform", "windows", "Runner platform: windows or linux")
+	flag.StringVar(&cfg.gcpVMPrefix, "vm-prefix", "", "VM name prefix (default: win-test for windows, linux-test for linux)")
 	flag.DurationVar(&cfg.gcpCleanupInterval, "gcp-cleanup-interval", 2*time.Minute, "Interval for scanning and deleting terminated VMs")
 
 	flag.Parse()
@@ -274,10 +276,14 @@ func run(ctx context.Context, cfg config, logger *slog.Logger) error {
 		}
 	}()
 
-	// Runner name prefix based on platform
-	vmPrefix := "win-runner"
-	if cfg.gcpPlatform == "linux" {
-		vmPrefix = "linux-runner"
+	// Runner name prefix
+	vmPrefix := cfg.gcpVMPrefix
+	if vmPrefix == "" {
+		if cfg.gcpPlatform == "linux" {
+			vmPrefix = "linux-test"
+		} else {
+			vmPrefix = "win-test"
+		}
 	}
 
 	// Initialize GCP VM manager
