@@ -8,6 +8,7 @@
 
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cpu -compute -shaderobj -output-using-type
 //TEST:SIMPLE(filecheck=REPORT):-target hlsl -stage compute -entry computeMain -report-dynamic-dispatch-sites
+//TEST:SIMPLE(filecheck=SIZE):-target spirv-asm -stage compute -entry computeMain -dump-ir-after inferAnyValueSizeWhereNecessary
 
 //TEST_INPUT:ubuffer(data=[0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
@@ -64,6 +65,12 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     outputBuffer[dispatchThreadID.x] = s.compute();
     // REPORT: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
 }
+// Verify inferred AnyValueSize and struct sizes via IR dump.
+// SIZE: AnyValueSize(16 : Int)
+// SIZE: SizeAndAlignment({{.*}}, 4 : Int64, {{.*}})
+// SIZE: struct %Circle
+// SIZE: SizeAndAlignment({{.*}}, 16 : Int64, {{.*}})
+// SIZE: struct %Rectangle
 // Circle(radius=5): 5*5 = 25
 // Rectangle(3x4): 3*4 = 12
 // CHECK: 25

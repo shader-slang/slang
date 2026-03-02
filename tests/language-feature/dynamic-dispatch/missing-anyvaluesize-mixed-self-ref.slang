@@ -12,6 +12,7 @@
 
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cpu -compute -shaderobj -output-using-type
 //TEST:SIMPLE(filecheck=REPORT):-target hlsl -stage compute -entry computeMain -report-dynamic-dispatch-sites
+//TEST:SIMPLE(filecheck=SIZE):-target spirv-asm -stage compute -entry computeMain -dump-ir-after inferAnyValueSizeWhereNecessary
 
 //TEST_INPUT:ubuffer(data=[0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
@@ -88,6 +89,14 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     outputBuffer[dispatchThreadID.x] = n.getValue();
     // REPORT: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 3 possible types:
 }
+// Verify inferred AnyValueSize and struct sizes via IR dump.
+// SIZE: AnyValueSize(16 : Int)
+// SIZE: SizeAndAlignment({{.*}}, 4 : Int64, {{.*}})
+// SIZE: struct %LeafNode
+// SIZE: SizeAndAlignment({{.*}}, 12 : Int64, {{.*}})
+// SIZE: struct %DataNode
+// SIZE: SizeAndAlignment({{.*}}, 16 : Int64, {{.*}})
+// SIZE: struct %LinkedNode
 // LeafNode: value = 10
 // DataNode: x+y+z = 1+2+3 = 6
 // LinkedNode: value = 42 (next is nullptr, not dereferenced)
