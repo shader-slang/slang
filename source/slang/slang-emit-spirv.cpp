@@ -6645,8 +6645,45 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         if (auto found = m_descriptorHeapRuntimeArrayTypes.tryGetValue(descriptorElementType))
             return *found;
 
+        SpvInst* stride = nullptr;
+        int userDefinedStride = 0;
+        if (descriptorElementType->opcode == SpvOpTypeSampler)
+        {
+            userDefinedStride = m_targetProgram->getOptionSet().getIntOption(
+                CompilerOptionName::SPIRVSamplerHeapStride);
+        }
+        else
+        {
+            userDefinedStride = m_targetProgram->getOptionSet().getIntOption(
+                CompilerOptionName::SPIRVResourceHeapStride);
+        }
+        if (userDefinedStride == 0)
+        {
+            IRBuilder builder(m_irModule);
+            builder.setInsertInto(m_irModule->getModuleInst());
+
+            stride = emitOpConstantSizeOfEXT(nullptr, builder.getUIntType(), descriptorElementType);
+        }
+
         auto runtimeArrayType = emitOpTypeRuntimeArray(nullptr, descriptorElementType);
         m_descriptorHeapRuntimeArrayTypes[descriptorElementType] = runtimeArrayType;
+
+        if (stride)
+        {
+            emitOpDecorateArrayStrideIdEXT(
+                getSection(SpvLogicalSectionID::Annotations),
+                nullptr,
+                runtimeArrayType,
+                stride);
+        }
+        else
+        {
+            emitOpDecorateArrayStride(
+                getSection(SpvLogicalSectionID::Annotations),
+                nullptr,
+                runtimeArrayType,
+                SpvLiteralInteger::from32(userDefinedStride));
+        }
         return runtimeArrayType;
     }
 

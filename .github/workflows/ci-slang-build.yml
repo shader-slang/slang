@@ -52,6 +52,15 @@ jobs:
         shell: bash
 
     steps:
+      # Ensure Git Bash tools (gzip, tar) are in PATH for Windows
+      # Needed by actions/cache before common-setup adds them
+      - name: Add Git Bash to PATH (Windows)
+        if: inputs.os == 'windows'
+        shell: pwsh
+        run: |
+          Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\bin"
+          Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\usr\\bin"
+
       - uses: actions/checkout@v4
         with:
           submodules: "recursive"

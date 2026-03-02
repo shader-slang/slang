@@ -26,7 +26,7 @@ runs:
         fi
 
         echo "Installing sccache for $ARCH ($SCCACHE_ARCH)"
-        curl -L https://github.com/mozilla/sccache/releases/download/v0.7.4/sccache-v0.7.4-${SCCACHE_ARCH}.tar.gz | tar xz
+        curl -fL https://github.com/mozilla/sccache/releases/download/v0.7.4/sccache-v0.7.4-${SCCACHE_ARCH}.tar.gz | tar xz
 
         # Try with sudo if available, otherwise install directly (for containers running as root)
         if command -v sudo &> /dev/null; then
@@ -62,10 +62,12 @@ runs:
           Write-Host "Installing sccache for Windows..."
           $installDir = Join-Path $env:RUNNER_TEMP "sccache-bin"
           New-Item -ItemType Directory -Force -Path $installDir | Out-Null
-          $archive = Join-Path $env:RUNNER_TEMP "sccache.tar.gz"
-          curl -L -o $archive https://github.com/mozilla/sccache/releases/download/v0.7.4/sccache-v0.7.4-x86_64-pc-windows-msvc.tar.gz
-          tar xzf $archive -C $env:RUNNER_TEMP
-          Move-Item (Join-Path $env:RUNNER_TEMP "sccache-v0.7.4-x86_64-pc-windows-msvc/sccache.exe") (Join-Path $installDir "sccache.exe")
+
+          # Use .zip release to avoid tar path issues on Windows
+          $zipFile = Join-Path $env:RUNNER_TEMP "sccache.zip"
+          curl.exe -L -o $zipFile https://github.com/mozilla/sccache/releases/download/v0.7.4/sccache-v0.7.4-x86_64-pc-windows-msvc.zip
+          Expand-Archive -Path $zipFile -DestinationPath $env:RUNNER_TEMP -Force
+          Move-Item (Join-Path $env:RUNNER_TEMP "sccache-v0.7.4-x86_64-pc-windows-msvc\sccache.exe") (Join-Path $installDir "sccache.exe")
           $installDir | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
           & (Join-Path $installDir "sccache.exe") --version
         }
