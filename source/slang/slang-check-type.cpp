@@ -318,7 +318,7 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
                     return false;
                 }
             }
-            else if (auto typePack = as<GenericTypePackParamDecl>(member))
+            else if ([[maybe_unused]] auto typePack = as<GenericTypePackParamDecl>(member))
             {
                 if (diagSink)
                 {
