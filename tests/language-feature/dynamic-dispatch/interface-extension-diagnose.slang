@@ -44,7 +44,7 @@ IInterface factoryAB(uint id, float x)
 
 float calcTwice(IInterface obj, float y)
 {
-    // CHECK: ([[# @LINE+1]]): error 33180
+    // CHECK: error[E33180]
     return obj.calcTwice(y);
 }
 

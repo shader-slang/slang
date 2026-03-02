@@ -58,7 +58,7 @@ void computeMain()
     // Using explicit IProcessor annotation breaks associated type
     // scope tracking — the compiler treats proc.Handler at different
     // scope depths, causing a false type mismatch.
-    // CHECK: error 30019
+    // CHECK: error[E30019]
     IProcessor proc = createProcessor(0, 1.0);
     proc.Handler h = proc.getHandler();
     outputBuffer[0] = h.handle(5);

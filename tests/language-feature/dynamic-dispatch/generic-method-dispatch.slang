@@ -50,7 +50,8 @@ float testDoubledFloat(int id, float x)
 {
     ISerializer s = makeSerializer(id);
     return s.doubled<float>(x);
-    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dynamic dispatch code{{.*}} 2 possible types:
+    // REPORT-DAG: note[E5010{{[23]}}]: generated {{.*}} dynamic dispatch code{{.*}} 2 possible types:
+    // REPORT-DAG: {{.*}}:[[# @LINE-2]]:
 }
 
 // Test: same generic method called with int argument; 2 possible dispatch targets
@@ -58,7 +59,8 @@ int testDoubledInt(int id, int x)
 {
     ISerializer s = makeSerializer(id);
     return s.doubled<int>(x);
-    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dynamic dispatch code{{.*}} 2 possible types:
+    // REPORT-DAG: note[E5010{{[23]}}]: generated {{.*}} dynamic dispatch code{{.*}} 2 possible types:
+    // REPORT-DAG: {{.*}}:[[# @LINE-2]]:
 }
 
 // Test: unconstrained identity<T> called with float
@@ -66,7 +68,8 @@ float testIdentityFloat(int id, float x)
 {
     ISerializer s = makeSerializer(id);
     return s.identity<float>(x);
-    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dynamic dispatch code{{.*}} 2 possible types:
+    // REPORT-DAG: note[E5010{{[23]}}]: generated {{.*}} dynamic dispatch code{{.*}} 2 possible types:
+    // REPORT-DAG: {{.*}}:[[# @LINE-2]]:
 }
 
 // Test: unconstrained identity<T> called with int
@@ -74,7 +77,8 @@ int testIdentityInt(int id, int x)
 {
     ISerializer s = makeSerializer(id);
     return s.identity<int>(x);
-    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dynamic dispatch code{{.*}} 2 possible types:
+    // REPORT-DAG: note[E5010{{[23]}}]: generated {{.*}} dynamic dispatch code{{.*}} 2 possible types:
+    // REPORT-DAG: {{.*}}:[[# @LINE-2]]:
 }
 
 [numthreads(1, 1, 1)]

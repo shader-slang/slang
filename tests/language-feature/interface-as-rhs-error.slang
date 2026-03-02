@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv
+//DIAGNOSTIC_TEST:SIMPLE(diag=diag): -target spirv
 
 interface IMyInterface
 {
@@ -15,24 +15,20 @@ struct AnotherType
     float value;
 }
 
-// No error messages should show for concrete types above
-//CHECK-NOT:: error
-
 // These should produce errors - interface types as RHS
 bool testIsOperatorWithInterface<T>()
 {
-    //CHECK: ([[# @LINE+1]]): error 30301: cannot use 'is' operator with an interface type as the right-hand side
     return (T is IMyInterface);
+//diag:       ^^ cannot use 'is' with interface on right-hand side
+//diag:       ^^ cannot use 'is' operator with an interface type as the right-hand side without a corresponding optional constraint. Use a concrete type instead, or add an optional constraint for the interface type.
 }
 
 void testAsOperatorWithInterface<T>(T value)
 {
-    //CHECK: ([[# @LINE+1]]): error 30302: cannot use 'as' operator with an interface type as the right-hand side
     let result = value as IMyInterface;
+//diag:                ^^ cannot use 'as' with interface on right-hand side
+//diag:                ^^ cannot use 'as' operator with an interface type as the right-hand side. Use a concrete type instead. If you want to use an optional constraint, use an 'if (T is IInterface)' block instead.
 }
-
-// No error messages should show for concrete types below
-//CHECK-NOT:: error
 
 // These should work - concrete types as RHS
 bool testIsOperatorWithConcreteType<T>()

@@ -1,23 +1,37 @@
 result code = -1
 standard error = {
-(0): note: include 'tests/preprocessor/output-includes.slang'
-(0): note: include   'tests/preprocessor/include-a.slang.h'
-(0): note: include   'tests/preprocessor/include/include-pragma-once-c.h'
-(0): note: include     'tests/preprocessor/include/pragma-once-c.h'
-(0): note: include   'tests/preprocessor/include-a.slang.h'
-(0): note: include   'tests/preprocessor/include-a.slang.h'
-tests/preprocessor/include-a.slang.h(3): error 30201: function 'bar' already has a body
-int bar()
-    ^~~
-tests/preprocessor/include-a.slang.h(3): note: see previous definition of 'bar'
-int bar()
-    ^~~
-tests/preprocessor/include-a.slang.h(3): error 30201: function 'bar' already has a body
-int bar()
-    ^~~
-tests/preprocessor/include-a.slang.h(3): note: see previous definition of 'bar'
-int bar()
-    ^~~
+note: include 'tests/preprocessor/output-includes.slang'
+note: include   'tests/preprocessor/include-a.slang.h'
+note: include   'tests/preprocessor/include/include-pragma-once-c.h'
+note: include     'tests/preprocessor/include/pragma-once-c.h'
+note: include   'tests/preprocessor/include-a.slang.h'
+note: include   'tests/preprocessor/include-a.slang.h'
+error[E30201]: function 'bar' already has a body
+  ╭╼ tests/preprocessor/include-a.slang.h:3:5
+  │
+3 │ int bar()
+  │     ━━━ redeclared here
+──╯
+
+note: see previous definition of 'bar'
+  ╭╼ tests/preprocessor/include-a.slang.h:3:5
+  │
+3 │ int bar()
+  │     ───
+──╯
+error[E30201]: function 'bar' already has a body
+  ╭╼ tests/preprocessor/include-a.slang.h:3:5
+  │
+3 │ int bar()
+  │     ━━━ redeclared here
+──╯
+
+note: see previous definition of 'bar'
+  ╭╼ tests/preprocessor/include-a.slang.h:3:5
+  │
+3 │ int bar()
+  │     ───
+──╯
 }
 standard output = {
 }
