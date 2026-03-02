@@ -43,7 +43,7 @@ See [type specifier syntax](types.md#syntax) for full type specifier syntax.
   a [fundamental type](types-fundamental.md), [vector/matrix generic type](types-vector-and-matrix.md),
   user-defined type such as a named [structure type](types-struct.md), [interface type](types-interface.md),
   [enumeration type](types-enum.md), type alias, or a type provided by a module.
-- *`generic-params-decl`* is a generic parameters declaration. See [Generics (TODO)](TODO).
+- *`generic-params-decl`* is a [generic parameters declaration](generics.md).
 - **`'['`** [*`constant-index-expr`*] **`']'`** is an [array dimension declaration](types-array.md) with an
   optional constant integral expression specifying the dimension length.
 - **`'*'`** is a [pointer declaration](types-pointer.md).

@@ -39,7 +39,7 @@ Associated named type declaration:
 
 ## Description
 
-An `interface` specifies a set of member functions that a conforming type must provide. An interface can then
+An `interface` specifies a set of members that a conforming type must provide. An interface can then
 be used in place of a concrete type, allowing for the same code to use different concrete types via the
 methods defined by the interface.
 

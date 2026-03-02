@@ -50,12 +50,14 @@ git fetch https://github.com/shader-slang/slang.git 'refs/tags/*:refs/tags/*'
 > please see [building with an older cmake](#building-with-an-older-cmake)
 
 For a Ninja based build system (all platforms) run:
+
 ```bash
 cmake --preset default
 cmake --build --preset releaseWithDebugInfo # or --preset debug, or --preset release
 ```
 
 For Visual Studio run:
+
 ```bash
 cmake --preset vs2022 # or 'vs2019' or 'vs2026'
 start devenv ./build/slang.sln # to optionally open the project in Visual Studio
@@ -73,38 +75,39 @@ information about [Emscripten](https://emscripten.org/).
 
 You need to clone the EMSDK repo. And you need to install and activate the latest.
 
-
 ```bash
 git clone https://github.com/emscripten-core/emsdk.git
 cd emsdk
 ```
 
 For non-Windows platforms
+
 ```bash
 ./emsdk install latest
 ./emsdk activate latest
 ```
 
 For Windows
+
 ```cmd
 emsdk.bat install latest
 emsdk.bat activate latest
 ```
 
-After EMSDK is activated, Slang needs to be built in a cross compiling setup: 
+After EMSDK is activated, Slang needs to be built in a cross compiling setup:
 
 - build the `generators` target for the build platform
 - configure the build with `emcmake` for the host platform
 - build for the host platform.
 
-> Note: For more details on cross compiling please refer to the 
+> Note: For more details on cross compiling please refer to the
 > [cross-compiling](docs/building.md#cross-compiling) section.
 
 ```bash
 # Build generators.
 cmake --workflow --preset generators --fresh
 mkdir generators
-cmake --install build --prefix generators --component generators
+cmake --install build --config Release --prefix generators --component generators
 
 # Configure the build with emcmake.
 # emcmake is available only when emsdk_env setup the environment correctly.
@@ -119,6 +122,40 @@ cmake --build --preset emscripten --target slang-wasm
 
 > Note: If the last build step fails, try running the command that `emcmake`
 > outputs, directly.
+
+### Android build
+
+In order to build Slang for Android, you need the Android NDK installed and the `ANDROID_NDK_HOME` environment variable set to point to your NDK installation.
+
+Android builds are a cross compiling setup, so build the generators for the build platform first:
+
+```bash
+# Build generators.
+cmake --workflow --preset generators --fresh
+mkdir generators
+cmake --install build --prefix generators --component generators
+```
+
+Then configure and build for the desired architecture:
+
+```bash
+# ARM64 (arm64-v8a)
+cmake --preset android-arm64 --fresh -DSLANG_GENERATORS_PATH=generators/bin
+cmake --build --preset android-arm64-release
+
+# x86_64
+cmake --preset android-x86_64 --fresh -DSLANG_GENERATORS_PATH=generators/bin
+cmake --build --preset android-x86_64-release
+```
+
+Other build presets are also provided for both architectures:
+
+- `android-arm64-debug`
+- `android-arm64-releaseWithDebugInfo`
+- `android-x86_64-debug`
+- `android-x86_64-releaseWithDebugInfo`
+
+> Note: Android presets disable some features to reduce dependencies, including GFX, tests, slangd, replayer, LLVM, examples, xlib, CUDA, OptiX, NVAPI, and Aftermath.
 
 ## Installing
 
@@ -153,6 +190,25 @@ build/Debug/bin/slang-test
 
 See the [documentation on testing](../tools/slang-test/README.md) for more information.
 
+## Using sccache for faster rebuilds
+
+[sccache](https://github.com/mozilla/sccache) caches compilation results so
+that subsequent builds are significantly faster. To enable it, either set the
+CMake option or the environment variable:
+
+```bash
+# Via CMake option
+cmake --preset default -DSLANG_USE_SCCACHE=ON
+
+# Via environment variable
+SLANG_USE_SCCACHE=1 cmake --preset default
+```
+
+When sccache is enabled, precompiled headers are automatically disabled because
+of a known incompatibility that causes linker errors. If
+`CMAKE_C_COMPILER_LAUNCHER` or `CMAKE_CXX_COMPILER_LAUNCHER` is already set
+(e.g. to ccache), the `SLANG_USE_SCCACHE` option is ignored to avoid conflicts.
+
 ## Debugging
 
 See the [documentation on debugging](/docs/debugging.md).
@@ -175,7 +231,7 @@ library filename, but the the same guidance about stability of the ABI applies.
 Downstream users of Slang distributing their products as binaries should
 therefor **on all platforms, including Windows** redistribute the Slang
 libraries they linked against, or otherwise communicate the specific version
-dependency to their users. It is *not the case* that a user of your product can
+dependency to their users. It is _not the case_ that a user of your product can
 just install any recent Slang release and have an installation of Slang that
 works for any given binary.
 
@@ -184,7 +240,7 @@ works for any given binary.
 ### CMake options
 
 | Option                            | Default                    | Description                                                                                  |
-|-----------------------------------|----------------------------|----------------------------------------------------------------------------------------------|
+| --------------------------------- | -------------------------- | -------------------------------------------------------------------------------------------- |
 | `SLANG_VERSION`                   | Latest `v*` tag            | The project version, detected using git if available                                         |
 | `SLANG_EMBED_CORE_MODULE`         | `TRUE`                     | Build slang with an embedded version of the core module                                      |
 | `SLANG_EMBED_CORE_MODULE_SOURCE`  | `TRUE`                     | Embed the core module source in the binary                                                   |
@@ -207,6 +263,7 @@ works for any given binary.
 | `SLANG_ENABLE_SPLIT_DEBUG_INFO`   | `TRUE`                     | Enable generating split debug info for Debug and RelWithDebInfo configs                      |
 | `SLANG_SLANG_LLVM_FLAVOR`         | `FETCH_BINARY_IF_POSSIBLE` | How to set up llvm support                                                                   |
 | `SLANG_SLANG_LLVM_BINARY_URL`     | System dependent           | URL specifying the location of the slang-llvm prebuilt library                               |
+| `SLANG_USE_SCCACHE`               | `FALSE`                    | Use sccache as compiler launcher (auto-disables PCH)                                         |
 | `SLANG_GENERATORS_PATH`           | ``                         | Path to an installed `all-generators` target for cross compilation                           |
 
 The following options relate to optional dependencies for additional backends
@@ -215,7 +272,7 @@ they can be set to `OFF` to prevent their usage, or set to `ON` to make it an
 error if they can't be found.
 
 | Option                   | CMake hints                    | Notes                                                                                        |
-|--------------------------|--------------------------------|----------------------------------------------------------------------------------------------|
+| ------------------------ | ------------------------------ | -------------------------------------------------------------------------------------------- |
 | `SLANG_ENABLE_CUDA`      | `CUDAToolkit_ROOT` `CUDA_PATH` | Enable running tests with the CUDA backend, doesn't affect the targets Slang itself supports |
 | `SLANG_ENABLE_OPTIX`     | `Optix_ROOT_DIR`               | Requires CUDA                                                                                |
 | `SLANG_ENABLE_NVAPI`     | `NVAPI_ROOT_DIR`               | Only available for builds targeting Windows                                                  |
@@ -225,7 +282,7 @@ error if they can't be found.
 ### Advanced options
 
 | Option                             | Default | Description                                                                                                                    |
-|------------------------------------|---------|--------------------------------------------------------------------------------------------------------------------------------|
+| ---------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------ |
 | `SLANG_ENABLE_DX_ON_VK`            | `FALSE` | Enable running the DX11 and DX12 tests on non-warning Windows platforms via vkd3d-proton, requires system-provided d3d headers |
 | `SLANG_ENABLE_SLANG_RHI`           | `TRUE`  | Enable building and using [slang-rhi](https://github.com/shader-slang/slang-rhi) for tests                                     |
 | `SLANG_USE_SYSTEM_MINIZ`           | `FALSE` | Build using system Miniz library instead of the bundled version in [./external](./external)                                    |
@@ -241,26 +298,26 @@ There are several options for getting llvm-support:
 
 - Use a prebuilt binary slang-llvm library:
   `-DSLANG_SLANG_LLVM_FLAVOR=FETCH_BINARY` or `-DSLANG_SLANG_LLVM_FLAVOR=FETCH_BINARY_IF_POSSIBLE` (this is the default)
-    - You can set `SLANG_SLANG_LLVM_BINARY_URL` to point to a local
-      `libslang-llvm.so/slang-llvm.dll` or set it to a URL of an zip/archive
-      containing such a file
-    - If this isn't set then the build system tries to download it from the
-      release on github matching the current tag. If such a tag doesn't exist
-      or doesn't have the correct os\*arch combination then the latest release
-      will be tried.
-    - If `SLANG_SLANG_LLVM_BINARY_URL` is `FETCH_BINARY_IF_POSSIBLE` then in
-      the case that a prebuilt binary can't be found then the build will proceed
-      as though `DISABLE` was chosen
+  - You can set `SLANG_SLANG_LLVM_BINARY_URL` to point to a local
+    `libslang-llvm.so/slang-llvm.dll` or set it to a URL of an zip/archive
+    containing such a file
+  - If this isn't set then the build system tries to download it from the
+    release on github matching the current tag. If such a tag doesn't exist
+    or doesn't have the correct os\*arch combination then the latest release
+    will be tried.
+  - If `SLANG_SLANG_LLVM_BINARY_URL` is `FETCH_BINARY_IF_POSSIBLE` then in
+    the case that a prebuilt binary can't be found then the build will proceed
+    as though `DISABLE` was chosen
 - Use a system supplied LLVM: `-DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM`, you
   must have llvm-21.1 and a matching libclang installed. It's important that
   either:
-    - You don't end up linking to a dynamic libllvm.so, this will almost
-      certainly cause multiple versions of LLVM to be loaded at runtime,
-      leading to errors like `opt: CommandLine Error: Option
-      'asm-macro-max-nesting-depth' registered more than once!`. Avoid this by
-      compiling LLVM without the dynamic library.
-    - Anything else which may be linked in (for example Mesa, also dynamically
-      loads the same llvm object)
+  - You don't end up linking to a dynamic libllvm.so, this will almost
+    certainly cause multiple versions of LLVM to be loaded at runtime,
+    leading to errors like `opt: CommandLine Error: Option
+'asm-macro-max-nesting-depth' registered more than once!`. Avoid this by
+    compiling LLVM without the dynamic library.
+  - Anything else which may be linked in (for example Mesa, also dynamically
+    loads the same llvm object)
 - Do not enable LLVM support: `-DSLANG_SLANG_LLVM_FLAVOR=DISABLE`
 
 To build only a standalone slang-llvm, you can run:

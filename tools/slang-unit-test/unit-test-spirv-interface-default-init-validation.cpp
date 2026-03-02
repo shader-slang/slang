@@ -177,9 +177,23 @@ SLANG_UNIT_TEST(spirvInterfaceDefaultInitValidation)
     SlangResult codeRes =
         linkedProgram->getEntryPointCode(0, 0, code.writeRef(), diagnostics.writeRef());
 
-    // Expected behavior: compilation should succeed and validation should not fail.
-    // Current buggy behavior: `codeRes` fails and diagnostics contain
-    // "Validation of generated SPIR-V failed."
+    if (SLANG_FAILED(codeRes) || !code)
+    {
+        fprintf(
+            stderr,
+            "[DEBUG aarch64] spirvInterfaceDefaultInitValidation: getEntryPointCode failed: "
+            "result=0x%08x\n",
+            (unsigned)codeRes);
+        if (diagnostics)
+            fprintf(
+                stderr,
+                "[DEBUG aarch64] diagnostics:\n%.*s\n",
+                (int)diagnostics->getBufferSize(),
+                (const char*)diagnostics->getBufferPointer());
+        else
+            fprintf(stderr, "[DEBUG aarch64] no diagnostic blob\n");
+    }
+
     SLANG_CHECK(codeRes == SLANG_OK);
     SLANG_CHECK(code != nullptr);
     if (code)

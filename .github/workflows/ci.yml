@@ -6,11 +6,13 @@ on:
     types: [checks_requested]
   pull_request:
     branches: [master]
+    types: [opened, synchronize, reopened, ready_for_review]
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name != 'push' }}
 jobs:
   filter:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft != true
     runs-on: ubuntu-latest
     outputs:
       should-run: ${{ steps.filter.outputs.should-run }}
@@ -129,7 +131,7 @@ jobs:
       compiler: cl
       platform: x86_64
       config: debug
-      runs-on: '["Windows", "self-hosted", "GCP-T4"]'
+      runs-on: '["Windows", "self-hosted", "build"]'
 
   build-windows-release-cl-x86_64-gpu:
     needs: [filter]
@@ -140,7 +142,7 @@ jobs:
       compiler: cl
       platform: x86_64
       config: release
-      runs-on: '["Windows", "self-hosted", "GCP-T4"]'
+      runs-on: '["Windows", "self-hosted", "build"]'
 
   # Linux tests (self-hosted GPU runner, containerized)
   test-linux-debug-gcc-x86_64:
@@ -268,7 +270,7 @@ jobs:
         test-materialx-windows-release,
       ]
     runs-on: ubuntu-latest
-    if: always() # Always run, even if dependencies fail
+    if: always() && (github.event_name != 'pull_request' || github.event.pull_request.draft != true)
     steps:
       - name: Check CI Results
         run: |

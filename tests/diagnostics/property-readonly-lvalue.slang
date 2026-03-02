@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 // use read-only property as l-value
 
 struct MyType
@@ -9,6 +9,7 @@ struct MyType
 void test()
 {
     MyType t;
-    // CHECK: {{.*}}error 30047: argument passed to parameter '0' must be l-value.
     t.prop.x += 1.0;
+//CHECK:   ^ argument must be l-value
+//CHECK:   ^ argument passed to parameter '0' must be l-value.
 }

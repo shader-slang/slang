@@ -5,6 +5,7 @@
 #include "slang-emit-source-writer.h"
 #include "slang-ir-util.h"
 #include "slang-mangled-lexer.h"
+#include "slang-rich-diagnostics.h"
 
 #include <assert.h>
 
@@ -596,10 +597,9 @@ bool HLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
 {
     auto diagnoseFloatAtommic = [&]()
     {
-        getSink()->diagnose(
-            inst,
-            Diagnostics::unsupportedTargetIntrinsic,
-            "floating point atomic operation");
+        getSink()->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
+            .operation = "floating point atomic operation",
+            .location = inst->sourceLoc});
     };
     switch (inst->getOp())
     {

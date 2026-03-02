@@ -3806,6 +3806,19 @@ $(type_info.return_type) $(type_info.method_name)(
         IRInst* alignment,
         IRInst* value);
 
+    IRInst* emitLoadDescriptorFromHeap(IRType* type, IRInst* heap, IRInst* index);
+    IRInst* emitSPIRVLoadTexelPointerFromHeap(
+        IRType* type,
+        IRInst* heap,
+        IRInst* index,
+        IRInst* textureType,
+        IRInst* coord,
+        IRInst* sampleIndex);
+
+    IRInst* emitSPIRVResourceDescriptorHeap();
+    IRInst* emitSPIRVSamplerDescriptorHeap();
+    IRInst* emitMakeCombinedTextureSampler(IRType* type, IRInst* texture, IRInst* sampler);
+
     IRInst* emitEmbeddedDownstreamIR(CodeGenTarget target, ISlangBlob* blob);
 
     IRFunc* createFunc();

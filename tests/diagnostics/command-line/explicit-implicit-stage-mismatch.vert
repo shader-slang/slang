@@ -1,5 +1,6 @@
 // explicit-implicit-stage-mismatch.vert
 
-//TEST:SIMPLE(filecheck=CHECK):-stage fragment
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-stage fragment
+//CHECK: the stage specified for entry point 'main' ('pixel') does not match the stage implied by the source file name ('vertex')
 
-//CHECK: warning 32:
+void main() {}

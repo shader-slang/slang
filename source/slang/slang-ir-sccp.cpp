@@ -3,6 +3,7 @@
 
 #include "slang-ir-insts.h"
 #include "slang-ir.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -1024,7 +1025,8 @@ struct SCCPContext
                         if (c->value.intVal == 0)
                         {
                             if (shared->sink)
-                                shared->sink->diagnose(inst->sourceLoc, Diagnostics::divideByZero);
+                                shared->sink->diagnose(
+                                    Diagnostics::DivideByZero{.location = inst->sourceLoc});
                             return LatticeVal::getAny();
                         }
                     }
@@ -1045,7 +1047,8 @@ struct SCCPContext
                         if (c->value.intVal == 0)
                         {
                             if (shared->sink)
-                                shared->sink->diagnose(inst->sourceLoc, Diagnostics::divideByZero);
+                                shared->sink->diagnose(
+                                    Diagnostics::DivideByZero{.location = inst->sourceLoc});
                             return LatticeVal::getAny();
                         }
                     }
