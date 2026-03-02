@@ -1148,14 +1148,22 @@ Modifier* SemanticsVisitor::validateAttribute(
             {
                 capabilityNames.add(capName);
                 if (isInternalCapabilityName(capName))
+                {
+                    // Get the original text from the argument expression
+                    String argText;
+                    if (auto varExpr = as<VarExpr>(arg))
+                        argText = getText(varExpr->name);
+                    else
+                        argText = capabilityNameToString((CapabilityName)capName);
                     maybeDiagnose(
                         getSink(),
                         this->getOptionSet(),
                         DiagnosticCategory::Capability,
                         Diagnostics::UsingInternalCapabilityName{
-                            .decl = capabilityNameToString((CapabilityName)capName),
+                            .decl = argText,
                             .capability = capabilityNameToString((CapabilityName)capName),
                             .location = attr->loc});
+                }
             }
         }
         requireCapAttr->capabilitySet = CapabilitySet(capabilityNames).freeze(getASTBuilder());
