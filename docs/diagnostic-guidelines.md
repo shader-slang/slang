@@ -9,7 +9,7 @@ The Slang compiler aims to provide clear, actionable, and user-friendly diagnost
 A complete diagnostic in Slang consists of:
 
 ```
-error[E0000]: main error message
+error[E00000]: main error message
   --> file.slang:LL:CC
    |
 LL | <code>
@@ -106,7 +106,7 @@ Off-by-default informational messages:
 3. **Include relevant context**
 
 ```
-error[E0277]: interface `IAddable` is not implemented for type `String`
+error[E00277]: interface `IAddable` is not implemented for type `String`
   --> file.slang:7:22
    |
 4  | interface IAddable { This add(This other); }
@@ -156,7 +156,7 @@ error[E0277]: interface `IAddable` is not implemented for type `String`
 When type aliases are involved, show the underlying type when it helps clarify the error:
 
 ```
-error[E0308]: type mismatch
+error[E00308]: type mismatch
   --> file.slang:10:23
    |
 10 |     ColorRGBA color = 0.5;
@@ -246,7 +246,7 @@ help: consider adding the `[shader("compute")]` attribute
 ### Example
 
 ```
-error[E0308]: type mismatch in function call
+error[E00308]: type mismatch in function call
   --> file.slang:10:11
    |
 8  | void expectInt(int x) { }
@@ -272,7 +272,7 @@ To avoid overwhelming users with follow-on errors:
 Example:
 
 ```
-error[E0412]: the type `MyTexture` is not defined
+error[E00412]: the type `MyTexture` is not defined
   --> file.slang:5:5
    |
 5  |     MyTexture tex;
@@ -342,7 +342,7 @@ Define logical groups:
 When dealing with complex generic types, highlight differences:
 
 ```
-error[E0308]: type mismatch
+error[E00308]: type mismatch
   = note: expected `RWStructuredBuffer<float4>`
           found    `RWStructuredBuffer<float3>`
                            ^^^^^^ types differ here
@@ -353,7 +353,7 @@ error[E0308]: type mismatch
 Show the expansion chain for errors in macros:
 
 ```
-error[E0369]: invalid operation
+error[E00369]: invalid operation
   --> file.slang:20:5
    |
 20 |     MY_MACRO!(x + y);
@@ -368,7 +368,7 @@ error[E0369]: invalid operation
 ### Similar Name Suggestions
 
 ```
-error[E0425]: cannot find `printn` in scope
+error[E00425]: cannot find `printn` in scope
   --> file.slang:5:5
    |
 5  |     printn("hello");
@@ -560,7 +560,7 @@ Before adding a new diagnostic:
 ### Type Mismatch
 
 ```
-error[E0308]: mismatched types
+error[E00308]: mismatched types
   --> src/main.slang:5:16
    |
 4  | float3 expectVec3(float3 v) { return v; }
@@ -575,7 +575,7 @@ error[E0308]: mismatched types
 ### Missing Interface Implementation
 
 ```
-error[E0277]: type `String` doesn't implement interface `IArithmetic`
+error[E00277]: type `String` doesn't implement interface `IArithmetic`
   --> src/main.slang:10:24
    |
 10 |     String result = s1 + s2;

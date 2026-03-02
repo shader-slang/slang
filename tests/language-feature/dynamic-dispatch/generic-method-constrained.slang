@@ -62,7 +62,8 @@ float testComputeConstant(int id, float val)
     IProcessor p = makeProcessor(id);
     Constant c = { val };
     return p.compute<Constant>(c);
-    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dynamic dispatch code{{.*}} 2 possible types:
+    // REPORT-DAG: note[E5010{{[23]}}]: generated {{.*}} dynamic dispatch code{{.*}} 2 possible types:
+    // REPORT-DAG: {{.*}}:[[# @LINE-2]]:
 }
 
 // Test: compute<Doubled> — same method, different conforming type argument
@@ -71,7 +72,8 @@ float testComputeDoubled(int id, float val)
     IProcessor p = makeProcessor(id);
     Doubled d = { val };
     return p.compute<Doubled>(d);
-    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dynamic dispatch code{{.*}} 2 possible types:
+    // REPORT-DAG: note[E5010{{[23]}}]: generated {{.*}} dynamic dispatch code{{.*}} 2 possible types:
+    // REPORT-DAG: {{.*}}:[[# @LINE-2]]:
 }
 
 // Test: two-argument generic method with interface constraint
@@ -80,7 +82,8 @@ float testComputeScaled(int id, float val, float scale)
     IProcessor p = makeProcessor(id);
     Constant c = { val };
     return p.computeScaled<Constant>(c, scale);
-    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dynamic dispatch code{{.*}} 2 possible types:
+    // REPORT-DAG: note[E5010{{[23]}}]: generated {{.*}} dynamic dispatch code{{.*}} 2 possible types:
+    // REPORT-DAG: {{.*}}:[[# @LINE-2]]:
 }
 
 [numthreads(1, 1, 1)]

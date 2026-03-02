@@ -10,6 +10,7 @@
 #include "slang-emit-source-writer.h"
 #include "slang-lower-to-ir.h"
 #include "slang-parser.h"
+#include "slang-rich-diagnostics.h"
 #include "slang-serialize-container.h"
 
 namespace Slang
@@ -155,7 +156,7 @@ static void _outputInclude(SourceFile* sourceFile, Index depth, DiagnosticSink* 
     // Perhaps I output in two sections, one the hierarchy and the other the locations of the
     // includes?
 
-    sink->diagnose(SourceLoc(), Diagnostics::includeOutput, buf);
+    sink->diagnose(Diagnostics::IncludeOutput{.content = buf.toString()});
 }
 
 static void _outputIncludesRec(
@@ -478,9 +479,8 @@ void FrontEndCompileRequest::generateIR()
             if (SLANG_FAILED(
                     SerialContainerUtil::verifyIRSerialize(irModule, getSession(), options)))
             {
-                getSink()->diagnose(
-                    irModule->getModuleInst()->sourceLoc,
-                    Diagnostics::serialDebugVerificationFailed);
+                getSink()->diagnose(Diagnostics::SerialDebugVerificationFailed{
+                    .location = irModule->getModuleInst()->sourceLoc});
             }
         }
 
@@ -663,7 +663,7 @@ void FrontEndCompileRequest::addTranslationUnitSourceFile(
     if (SLANG_FAILED(existsRes))
     {
         // Emit a diagnostic!
-        getSink()->diagnose(SourceLoc(), Diagnostics::cannotOpenFile, path);
+        getSink()->diagnose(Diagnostics::CannotOpenFile{.path = path});
         return;
     }
 

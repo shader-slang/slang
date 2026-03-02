@@ -22,7 +22,7 @@ int test(int val, int a, int b)
 void computeMain(
 
 //TEST_INPUT:uniform(data=[256 1]):name=d
-// WARNING: ([[# @LINE+1]]): warning 38040
+// WARNING: warning[E38040]
 	Data d,
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer

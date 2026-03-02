@@ -10,7 +10,7 @@ struct SingleFieldStruct
     int a;
 }
 
-// SINGLE: error 38012
+// SINGLE: error[E38012]
 [shader("vertex")]
 Array<SingleFieldStruct, 1> singleField()
 {
@@ -23,7 +23,7 @@ struct MultiFieldStruct
     float b;
 }
 
-// MULTI: error 38012
+// MULTI: error[E38012]
 [shader("vertex")]
 Array<MultiFieldStruct, 3> multiField()
 {
@@ -40,7 +40,7 @@ struct NestedStruct
     float b;
 }
 
-// NESTED: error 38012
+// NESTED: error[E38012]
 [shader("vertex")]
 Array<Array<NestedStruct, 2>, 3> nestedArray()
 {
