@@ -739,8 +739,7 @@ Result linkAndOptimizeIR(
     // Debug info is added by the front-end, and therefore needs to be stripped out by targets
     // that opt out of debug info.
     if (requiredLoweringPassSet.debugInfo &&
-        (targetCompilerOptions.getIntOption(CompilerOptionName::DebugInformation) ==
-         SLANG_DEBUG_INFO_LEVEL_NONE))
+        (targetCompilerOptions.getDebugInfoLevel() == DebugInfoLevel::None))
         SLANG_PASS(stripDebugInfo);
 
     if (!isKhronosTarget(targetRequest) && requiredLoweringPassSet.glslSSBO)
