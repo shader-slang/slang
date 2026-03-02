@@ -282,7 +282,8 @@ void WGSLSourceEmitter::emitSemanticsPrefixImpl(IRInst* inst)
         if (auto semanticDecoration = inst->findDecoration<IRSemanticDecoration>())
         {
             auto index = semanticDecoration->getSemanticIndex();
-            // An index of -1 means the semantic index is not specified, so we use 0 as the default index.
+            // An index of -1 means the semantic index is not specified, so we use 0 as the default
+            // index.
             m_writer->emit("@location(");
             m_writer->emit(index >= 0 ? index : 0);
             m_writer->emit(")");

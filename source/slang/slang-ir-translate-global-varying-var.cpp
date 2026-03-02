@@ -180,7 +180,8 @@ struct GlobalVarTranslationContext
                 if (auto semanticDecor = input->findDecoration<IRSemanticDecoration>())
                 {
                     auto idx = semanticDecor->getSemanticIndex();
-                    // An index of -1 means the semantic index is not specified, so we use 0 as the default index.
+                    // An index of -1 means the semantic index is not specified, so we use 0 as the
+                    // default index.
                     varLayoutBuilder.setSystemValueSemantic(
                         semanticDecor->getSemanticName(),
                         idx >= 0 ? idx : 0);
@@ -318,7 +319,8 @@ struct GlobalVarTranslationContext
                     if (auto semanticDecor = output->findDecoration<IRSemanticDecoration>())
                     {
                         auto idx = semanticDecor->getSemanticIndex();
-                        // An index of -1 means the semantic index is not specified, so we use 0 as the default index.
+                        // An index of -1 means the semantic index is not specified, so we use 0 as
+                        // the default index.
                         varLayoutBuilder.setSystemValueSemantic(
                             semanticDecor->getSemanticName(),
                             idx >= 0 ? idx : 0);
