@@ -46,48 +46,44 @@ struct ProcessLateRequireCapabilityInstsContext
         IRLateRequireCapability* irInst,
         IRCapabilitySet* capSet)
     {
-        CapabilitySet targetCaps = m_targetCaps;
-        auto stageCapabilitySet = profile.getCapabilityName();
+        CapabilitySet stageTargetCaps = m_targetCaps;
+        CapabilitySet stageCapabilitySet = profile.getCapabilityName();
         CapabilitySet required(capSet->getCaps());
         StringBuilder sb;
 
+        stageTargetCaps.join(stageCapabilitySet);
+        required.join(stageCapabilitySet);
+
 #if 0
         {
             sb.clear();
-            printDiagnosticArg(sb, required);
+            printDiagnosticArg(sb, capSet->getCaps());
             fprintf(stderr, "required (full):    %s\n", sb.toString().getBuffer());
 
             sb.clear();
-            printDiagnosticArg(sb, targetCaps);
+            printDiagnosticArg(sb, m_targetCaps);
             fprintf(stderr, "target (full):      %s\n", sb.toString().getBuffer());
 
             sb.clear();
-            printDiagnosticArg(sb, stageCapabilitySet);
+            printDiagnosticArg(sb, profile.getCapabilityName());
             fprintf(stderr, "stageCapabilitySet: %s\n", sb.toString().getBuffer());
-        }
-#endif
 
-        targetCaps.join(stageCapabilitySet);
-
-#if 0
-        {
             sb.clear();
-            printDiagnosticArg(sb, targetCaps);
+            printDiagnosticArg(sb, stageTargetCaps);
             fprintf(stderr, "target (stage):     %s\n", sb.toString().getBuffer());
         }
 #endif
 
         // check that we have the required caps for this stage
-        if (targetCaps.atLeastOneSetImpliedInOther(required) ==
+        if (stageTargetCaps.atLeastOneSetImpliedInOther(required) ==
             CapabilitySet::ImpliesReturnFlags::Implied)
             return;
 
-        required.join(stageCapabilitySet);
 
         // figure out the missing delta
         CapabilityAtomSet addedAtoms{};
 
-        if (auto stageCapSet = targetCaps.getAtomSets())
+        if (auto stageCapSet = stageTargetCaps.getAtomSets())
         {
             if (auto requiredSet = required.getAtomSets())
             {
