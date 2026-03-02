@@ -26,7 +26,8 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
     int tid = dispatchThreadID.x;
 
 #if defined(EXPLICIT)
-    //CHECK_EXPLICIT: error 30019: expected an expression of type 'CoopMatMatrixLayout', got 'int'
+    //CHECK_EXPLICIT: error[E30019]: type mismatch in expression
+    //CHECK_EXPLICIT: expected an expression of type 'CoopMatMatrixLayout', got 'int'
     //CHECK_EXPLICIT: note: explicit conversion from 'int' to 'CoopMatMatrixLayout' is possible
     int outVal = Load<0>(tid);
 

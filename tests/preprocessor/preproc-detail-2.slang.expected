@@ -1,9 +1,0 @@
-result code = 0
-standard error = {
-tests/preprocessor/preproc-detail-2.slang(7): error 15408: redefinition of macro parameter 'A'
-#define A(x, x) a x b x c
-             ^
-}
-standard output = {
-a b c 
-}

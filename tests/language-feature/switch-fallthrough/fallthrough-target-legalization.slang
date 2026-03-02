@@ -12,7 +12,7 @@
 
 // HLSL SM 6.0+ should have fall-through - case 0 does NOT have break before case 1
 // Warning should NOT be emitted for DXC (supports fall-through)
-// CHECK-HLSL6-NOT: warning 41026
+// CHECK-HLSL6-NOT: warning[E41026]
 // CHECK-HLSL6: case int(0):
 // CHECK-HLSL6: x_{{.*}} = int(100)
 // CHECK-HLSL6-NOT: break
@@ -20,7 +20,7 @@
 
 // HLSL SM 5.x should NOT have fall-through - case 0 has break before case 1
 // Warning should be emitted for FXC (doesn't support fall-through)
-// CHECK-HLSL5: warning 41026
+// CHECK-HLSL5: warning[E41026]
 // CHECK-HLSL5: case int(0):
 // CHECK-HLSL5: x_{{.*}} = int(100)
 // CHECK-HLSL5: break
@@ -28,7 +28,7 @@
 
 // WGSL should NOT have fall-through - case 0 has break before case 1
 // Warning should be emitted for WGSL (doesn't support fall-through)
-// CHECK-WGSL: warning 41026
+// CHECK-WGSL: warning[E41026]
 // CHECK-WGSL: case i32(0):
 // CHECK-WGSL: x_{{.*}} = i32(100)
 // CHECK-WGSL: break
@@ -36,7 +36,7 @@
 
 // Metal should have fall-through - case 0 does NOT have break before case 1
 // No warning should be emitted for Metal (supports fall-through)
-// CHECK-METAL-NOT: warning 41026
+// CHECK-METAL-NOT: warning[E41026]
 // CHECK-METAL: case int(0):
 // CHECK-METAL: x_{{.*}} = int(100)
 // CHECK-METAL-NOT: break

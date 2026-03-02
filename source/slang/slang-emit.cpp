@@ -130,6 +130,7 @@
 #include "slang-lower-to-ir.h"
 #include "slang-mangle.h"
 #include "slang-pass-wrapper.h"
+#include "slang-rich-diagnostics.h"
 #include "slang-syntax.h"
 #include "slang-type-layout.h"
 #include "slang-visitor.h"
@@ -254,11 +255,10 @@ static void reportCheckpointIntermediates(
             continue;
 
         auto func = checkpointDecoration->getSourceFunction();
-        sink->diagnose(
-            structType,
-            Diagnostics::reportCheckpointIntermediates,
-            func,
-            structSize.size);
+        sink->diagnose(Diagnostics::ReportCheckpointIntermediates{
+            .size = (int64_t)structSize.size,
+            .func = func,
+            .location = structType->sourceLoc});
         nonEmptyStructs++;
 
         for (auto field : structType->getFields())
@@ -272,18 +272,25 @@ static void reportCheckpointIntermediates(
             typeWriter.clearContent();
             emitter.emitType(fieldType);
 
-            sink->diagnose(
-                field->sourceLoc,
-                field->findDecoration<IRLoopCounterDecoration>()
-                    ? Diagnostics::reportCheckpointCounter
-                    : Diagnostics::reportCheckpointVariable,
-                fieldSize.size,
-                typeWriter.getContent());
+            if (field->findDecoration<IRLoopCounterDecoration>())
+            {
+                sink->diagnose(Diagnostics::ReportCheckpointCounter{
+                    .size = (int64_t)fieldSize.size,
+                    .typeName = typeWriter.getContent(),
+                    .location = field->sourceLoc});
+            }
+            else
+            {
+                sink->diagnose(Diagnostics::ReportCheckpointVariable{
+                    .size = (int64_t)fieldSize.size,
+                    .typeName = typeWriter.getContent(),
+                    .location = field->sourceLoc});
+            }
         }
     }
 
     if (nonEmptyStructs == 0)
-        sink->diagnose(SourceLoc(), Diagnostics::reportCheckpointNone);
+        sink->diagnose(Diagnostics::ReportCheckpointNone{});
 }
 
 struct LinkingAndOptimizationOptions
@@ -472,7 +479,8 @@ void diagnoseCallStack(IRInst* inst, DiagnosticSink* sink)
             auto user = use->getUser();
             if (auto call = as<IRCall>(user))
             {
-                sink->diagnose(call, Diagnostics::seeCallOfFunc, func);
+                sink->diagnose(
+                    Diagnostics::SeeCallOfFuncIr{.inst = func, .location = call->sourceLoc});
                 inst = call;
                 shouldContinue = true;
                 break;
@@ -497,21 +505,25 @@ bool checkStaticAssert(IRInst* inst, DiagnosticSink* sink)
                     IRInst* msg = inst->getOperand(1);
                     if (auto msgLit = as<IRStringLit>(msg))
                     {
-                        sink->diagnose(
-                            inst,
-                            Diagnostics::staticAssertionFailure,
-                            msgLit->getStringSlice());
+                        sink->diagnose(Diagnostics::StaticAssertionFailure{
+                            .message = String(msgLit->getStringSlice()),
+                            .location = inst->sourceLoc,
+                        });
                     }
                     else
                     {
-                        sink->diagnose(inst, Diagnostics::staticAssertionFailureWithoutMessage);
+                        sink->diagnose(Diagnostics::StaticAssertionFailureWithoutMessage{
+                            .location = inst->sourceLoc,
+                        });
                     }
                     diagnoseCallStack(inst, sink);
                 }
             }
             else
             {
-                sink->diagnose(condi, Diagnostics::staticAssertionConditionNotConstant);
+                sink->diagnose(Diagnostics::StaticAssertionConditionNotConstant{
+                    .location = condi->sourceLoc,
+                });
             }
 
             return true;
@@ -2193,10 +2205,8 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
 
     if (!sourceEmitter)
     {
-        sink->diagnose(
-            SourceLoc(),
-            Diagnostics::unableToGenerateCodeForTarget,
-            TypeTextUtil::getCompileTargetName(SlangCompileTarget(target)));
+        sink->diagnose(Diagnostics::UnableToGenerateCodeForTarget{
+            .target = TypeTextUtil::getCompileTargetName(SlangCompileTarget(target))});
         return SLANG_FAIL;
     }
 
@@ -2646,7 +2656,7 @@ static SlangResult createArtifactFromIR(
     String optErr;
     if (SLANG_FAILED(optimizeSPIRV(spirv, optErr, outSpirv)))
     {
-        codeGenContext->getSink()->diagnose(SourceLoc(), Diagnostics::spirvOptFailed, optErr);
+        codeGenContext->getSink()->diagnose(Diagnostics::SpirvOptFailed{.error = optErr});
         spirv = _Move(outSpirv);
     }
 #endif
@@ -2730,9 +2740,7 @@ static SlangResult createArtifactFromIR(
                     compiler->validate((uint32_t*)spirv.getBuffer(), int(spirv.getCount() / 4))))
             {
                 compiler->disassemble((uint32_t*)spirv.getBuffer(), int(spirv.getCount() / 4));
-                codeGenContext->getSink()->diagnoseWithoutSourceView(
-                    SourceLoc{},
-                    Diagnostics::spirvValidationFailed);
+                codeGenContext->getSink()->diagnose(Diagnostics::SpirvValidationFailed{});
             }
         }
 
@@ -2884,10 +2892,8 @@ SlangResult emitLLVMForEntryPoints(CodeGenContext* codeGenContext, ComPtr<IArtif
     ISlangSharedLibrary* library = codeGenContext->getSession()->getOrLoadSlangLLVM();
     if (!library)
     {
-        codeGenContext->getSink()->diagnose(
-            SourceLoc(),
-            Diagnostics::unableToGenerateCodeForTarget,
-            TypeTextUtil::getCompileTargetName(SlangCompileTarget(target)));
+        codeGenContext->getSink()->diagnose(Diagnostics::UnableToGenerateCodeForTarget{
+            .target = TypeTextUtil::getCompileTargetName(SlangCompileTarget(target))});
         return SLANG_FAIL;
     }
 

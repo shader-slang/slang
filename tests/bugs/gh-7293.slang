@@ -12,4 +12,4 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
     }
 }
 
-// CHECK-NOT: 30505
+// CHECK-NOT: [E30505]

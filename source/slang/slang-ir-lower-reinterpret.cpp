@@ -4,7 +4,9 @@
 #include "slang-ir-any-value-marshalling.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
+#include "slang-ir-util.h"
 #include "slang-ir.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -89,18 +91,18 @@ struct ReinterpretLoweringContext
         SlangInt fromTypeSize = getAnyValueSize(fromType, targetProgram->getTargetReq());
         if (fromTypeSize < 0)
         {
-            sink->diagnose(
-                inst->sourceLoc,
-                Slang::Diagnostics::typeCannotBePackedIntoAnyValue,
-                fromType);
+            sink->diagnose(Diagnostics::TypeCannotBePackedIntoAnyValue{
+                .type = fromType,
+                .location = inst->sourceLoc,
+            });
         }
         SlangInt toTypeSize = getAnyValueSize(toType, targetProgram->getTargetReq());
         if (toTypeSize < 0)
         {
-            sink->diagnose(
-                inst->sourceLoc,
-                Slang::Diagnostics::typeCannotBePackedIntoAnyValue,
-                toType);
+            sink->diagnose(Diagnostics::TypeCannotBePackedIntoAnyValue{
+                .type = toType,
+                .location = inst->sourceLoc,
+            });
         }
         SlangInt anyValueSize = Math::Max(fromTypeSize, toTypeSize);
 

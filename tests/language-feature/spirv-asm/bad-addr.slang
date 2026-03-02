@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 RWStructuredBuffer<float> buf;
 
@@ -11,8 +11,8 @@ int foo(const int constParam)
     return spirv_asm
     {
         OpLoad $$int %foo &buf;
-        // CHECK: bad-addr.slang([[#@LINE-1]]): note {{.*}}: unable to take the address of this address-of asm operand
+//CHECK:                   ^^^ unable to take the address of this address-of asm operand
         OpLoad $$int result &constParam;
-        // CHECK: bad-addr.slang([[#@LINE-1]]): note {{.*}}: unable to take the address of this address-of asm operand
+//CHECK:                     ^^^^^^^^^^ unable to take the address of this address-of asm operand
     };
 }

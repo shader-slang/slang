@@ -11,7 +11,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cpu -compute -shaderobj -output-using-type
-//TEST:SIMPLE(filecheck=REPORT):-target hlsl -stage compute -entry computeMain -report-dynamic-dispatch-sites -conformance "FactoryA:IFactory=0" -conformance "FactoryB:IFactory=1" -conformance "FooA:IFoo=0" -conformance "FooB:IFoo=1"
+//DIAGNOSTIC_TEST:SIMPLE(diag=REPORT,non-exhaustive):-target hlsl -stage compute -entry computeMain -report-dynamic-dispatch-sites -conformance "FactoryA:IFactory=0" -conformance "FactoryB:IFactory=1" -conformance "FooA:IFoo=0" -conformance "FooB:IFoo=1"
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -71,7 +71,7 @@ float testCreate(int id)
     IFactory factory = createFactory(uint(id));
     IFoo foo = factory.create();
     return foo.eval();
-    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
+//REPORT: generated dynamic dispatch code for this site. 2 possible types
 }
 
 float testCreateOut(int id)
@@ -80,7 +80,6 @@ float testCreateOut(int id)
     IFoo result;
     factory.createOut(result);
     return result.eval();
-    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
 }
 
 float testModify(int id)
@@ -89,7 +88,6 @@ float testModify(int id)
     IFoo item = FooA(100.0);
     factory.modify(item);
     return item.eval();
-    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
 }
 
 [numthreads(1, 1, 1)]

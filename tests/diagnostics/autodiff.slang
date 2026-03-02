@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE:
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 float nonDiff(float x)
 {
@@ -28,10 +28,16 @@ float f(float x)
 float m(float x)
 {
     float x1 = no_diff x; // invalid use of no_diff here.
+//CHECK:       ^^^^^^^ invalid 'no_diff' usage
+//CHECK:       ^^^^^^^ 'no_diff' can only be used to decorate a call or a subscript operation
     return no_diff f(x);  // no_diff on a differentiable call has no meaning.
+//CHECK:   ^^^^^^^ 'no_diff' on differentiable function has no meaning
+//CHECK:   ^^^^^^^ use 'no_diff' on a call to a differentiable function has no meaning.
 }
 
 float n(float x)
 {
     return no_diff nonDiff(x); // no_diff in a non-differentiable function
+//CHECK:   ^^^^^^^ 'no_diff' in non-differentiable function
+//CHECK:   ^^^^^^^ cannot use 'no_diff' in a non-differentiable function.
 }
