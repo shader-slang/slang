@@ -224,8 +224,8 @@ def build_history_chart(snapshots):
     timestamps = [_round_time(s["timestamp"][11:16]) for s in snapshots]
 
     # Only show GCP VM groups (Linux GPU and Windows GPU), exclude scaler host and test runners
-    gcp_vm_groups = ["Linux GPU (GCP)", "Windows GPU (GCP)"]
-    palette = {"Linux GPU (GCP)": "#0d6efd", "Windows GPU (GCP)": "#28a745"}
+    gcp_vm_groups = ["Linux GPU (GCP)", "Windows Build (GCP)", "Windows GPU (GCP)"]
+    palette = {"Linux GPU (GCP)": "#0d6efd", "Windows Build (GCP)": "#fd7e14", "Windows GPU (GCP)": "#28a745"}
 
     # Queue depth over time
     queued_data = [s.get("jobs_queued", 0) for s in snapshots]
@@ -363,7 +363,7 @@ def generate_health_html(queue_data, failures, output_dir):
     fetched_at = now.strftime(f"%Y-%m-%d {rounded_time} UTC")
 
     # Runner status section — only online GCP GPU runners
-    GCP_GPU_GROUPS = {"Linux GPU (GCP)", "Windows GPU (GCP)"}
+    GCP_GPU_GROUPS = {"Linux GPU (GCP)", "Windows Build (GCP)", "Windows GPU (GCP)"}
     runners_html = ""
     if queue_data and queue_data.get("self_hosted_runners"):
         runners = queue_data["self_hosted_runners"]
