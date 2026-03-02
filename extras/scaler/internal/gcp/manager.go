@@ -143,15 +143,26 @@ func (m *Manager) MarkBusy(runnerName string) {
 	}
 }
 
-// selectZone picks the best zone for creating a new GPU VM by checking
-// quota availability across all configured zones. Zones are grouped by
-// region; quota is checked per-region (since GPU quota is regional in GCP).
-// Returns the zone with the most available GPU quota.
+// selectZone picks the best zone for creating a VM. For GPU VMs, it checks
+// quota availability across regions. For non-GPU VMs (GPUType == "none"),
+// it round-robins through configured zones.
 func (m *Manager) selectZone(ctx context.Context) (string, error) {
 	zones := strings.Split(m.config.Zones, ",")
 	for i := range zones {
 		zones[i] = strings.TrimSpace(zones[i])
 	}
+
+	// Non-GPU VMs: simple round-robin, no quota check needed
+	if m.config.GPUType == "none" {
+		m.mu.Lock()
+		count := len(m.vms)
+		m.mu.Unlock()
+		zone := zones[count%len(zones)]
+		slog.Info("selected zone (no GPU)", "zone", zone)
+		return zone, nil
+	}
+
+	// GPU VMs: select zone by quota availability
 
 	// Group zones by region (e.g., "us-east1-c" -> "us-east1")
 	regionZones := make(map[string][]string)
