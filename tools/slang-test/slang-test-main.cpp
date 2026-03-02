@@ -1583,6 +1583,15 @@ static RenderApiFlags _getAvailableRenderApiFlags(TestContext* context)
                         SLANG_PASS_THROUGH_GENERIC_C_CPP)))
                 {
                     availableRenderApiFlags |= RenderApiFlags(1) << int(apiType);
+                    StdWriters::getOut().print(
+                        "Check %s: Supported\n",
+                        RenderApiUtil::getApiName(apiType).begin());
+                }
+                else
+                {
+                    StdWriters::getOut().print(
+                        "Check %s: Not Supported\n",
+                        RenderApiUtil::getApiName(apiType).begin());
                 }
                 continue;
             }
@@ -5697,6 +5706,52 @@ SlangResult innerMain(int argc, char** argv)
     // sm_6_6.
     _disableD3D12Backend(&context);
 #endif
+
+    // If -only-api-detection mode, run API detection and exit
+    if (options.apiDetectionOnly)
+    {
+        // Create a TestReporter since _getAvailableRenderApiFlags may use it in verbose mode
+        TestReporter reporter;
+        SLANG_RETURN_ON_FAIL(reporter.init(options.outputMode, options.expectedFailureList));
+        context.setTestReporter(&reporter);
+        reporter.m_verbosity = options.verbosity;
+
+        _getAvailableRenderApiFlags(&context);
+
+        // Print which APIs were not checked
+        printf("Not checked:");
+        bool anyNotChecked = false;
+        for (int i = 0; i < int(RenderApiType::CountOf); ++i)
+        {
+            const RenderApiType apiType = RenderApiType(i);
+
+            // An API was "not checked" if it's not available on this platform
+            bool wasChecked = false;
+            if (apiType == RenderApiType::CPU)
+            {
+                wasChecked = (context.availableBackendFlags & PassThroughFlag::Generic_C_CPP) != 0;
+            }
+            else
+            {
+                wasChecked = RenderApiUtil::calcHasApi(apiType);
+            }
+
+            if (!wasChecked)
+            {
+                auto name = RenderApiUtil::getApiName(apiType);
+                printf(" %.*s", (int)name.getLength(), name.begin());
+                anyNotChecked = true;
+            }
+        }
+        if (!anyNotChecked)
+        {
+            printf(" (none)");
+        }
+        printf("\n");
+        fflush(stdout);
+
+        return SLANG_OK;
+    }
 
     if (options.subCommand.getLength())
     {

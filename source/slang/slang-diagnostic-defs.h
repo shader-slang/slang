@@ -117,7 +117,12 @@ DIAGNOSTIC(
     noStageSpecifiedInPassThroughMode,
     "no stage was specified for entry point '$0'; when using the '-pass-through' option, stages "
     "must be fully specified on the command line")
-DIAGNOSTIC(36, Error, expectingAnInteger, "expecting an integer value")
+DIAGNOSTIC(36, Error, expectingAnInteger, "expecting an integer value for option '$0'.")
+DIAGNOSTIC(
+    37,
+    Error,
+    expectingAUnsignedInteger,
+    "expecting an unsigned integer value for option '$0', but got '$1'.")
 
 DIAGNOSTIC(
     40,
@@ -2091,6 +2096,19 @@ DIAGNOSTIC(
     intValFromNonIntSpecConstEncountered,
     "cannot cast non-integer specialization constant to compile-time integer")
 
+DIAGNOSTIC(
+    38042,
+    Error,
+    ImplicitTypeCoerceConstraintWithNonImplicitConversion,
+    "'$0' is not implicitly convertible to '$1', not satisfying the type coerce constraint "
+    "'$1($0)'")
+
+DIAGNOSTIC(
+    38043,
+    Error,
+    TypeCoerceConstraintMissingConversion,
+    "'$0' is not convertible to '$1', not satisfying the type coerce constraint '$1($0)'")
+
 DIAGNOSTIC(38200, Error, recursiveModuleImport, "module `$0` recursively imports itself")
 DIAGNOSTIC(
     39999,
@@ -2560,11 +2578,21 @@ DIAGNOSTIC(
     "compiler not defined for transition '$0' to '$1'.")
 
 DIAGNOSTIC(
+    52008,
+    Error,
+    dynamicDispatchOnSpecializeOnlyInterface,
+    "type '$0' is marked for specialization only, but dynamic dispatch is needed for the call.")
+
+DIAGNOSTIC(
     52009,
     Error,
     cannotEmitReflectionWithoutTarget,
     "cannot emit reflection JSON; no compilation target available")
-
+DIAGNOSTIC(
+    52010,
+    Error,
+    refParamWithInterfaceTypeInDynamicDispatch,
+    "'$0' parameter of type '$1' cannot be used in a dynamic dispatch context.")
 DIAGNOSTIC(54001, Warning, meshOutputMustBeOut, "Mesh shader outputs must be declared with 'out'.")
 DIAGNOSTIC(54002, Error, meshOutputMustBeArray, "HLSL style mesh shader outputs must be arrays")
 DIAGNOSTIC(

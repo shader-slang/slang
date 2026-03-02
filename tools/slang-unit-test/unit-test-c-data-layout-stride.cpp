@@ -181,7 +181,24 @@ static void _testCDataLayoutReflectionStride(UnitTestContext* context, bool forc
     SLANG_CHECK_ABORT(spirvAsmLinked != nullptr);
 
     ComPtr<slang::IBlob> spirvAsmBlob;
-    spirvAsmLinked->getTargetCode(0, spirvAsmBlob.writeRef(), diagnosticBlob.writeRef());
+    SlangResult spirvAsmRes =
+        spirvAsmLinked->getTargetCode(0, spirvAsmBlob.writeRef(), diagnosticBlob.writeRef());
+    if (SLANG_FAILED(spirvAsmRes) || !spirvAsmBlob)
+    {
+        fprintf(
+            stderr,
+            "[DEBUG aarch64] getTargetCode failed: result=0x%08x, forceScalarLayout=%d\n",
+            (unsigned)spirvAsmRes,
+            (int)forceScalarLayout);
+        if (diagnosticBlob)
+            fprintf(
+                stderr,
+                "[DEBUG aarch64] diagnostics:\n%.*s\n",
+                (int)diagnosticBlob->getBufferSize(),
+                (const char*)diagnosticBlob->getBufferPointer());
+        else
+            fprintf(stderr, "[DEBUG aarch64] no diagnostic blob\n");
+    }
     SLANG_CHECK_ABORT(spirvAsmBlob != nullptr);
 
     const char* spirvAsm = (const char*)spirvAsmBlob->getBufferPointer();

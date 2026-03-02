@@ -6,11 +6,13 @@ on:
     types: [checks_requested]
   pull_request:
     branches: [master]
+    types: [opened, synchronize, reopened, ready_for_review]
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name != 'push' }}
 jobs:
   filter:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft != true
     runs-on: ubuntu-latest
     outputs:
       should-run: ${{ steps.filter.outputs.should-run }}
@@ -268,7 +270,7 @@ jobs:
         test-materialx-windows-release,
       ]
     runs-on: ubuntu-latest
-    if: always() # Always run, even if dependencies fail
+    if: always() && (github.event_name != 'pull_request' || github.event.pull_request.draft != true)
     steps:
       - name: Check CI Results
         run: |
