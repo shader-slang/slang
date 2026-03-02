@@ -865,6 +865,13 @@ struct IRSemanticDecoration : public IRDecoration
 
     UnownedStringSlice getSemanticName() { return getSemanticNameOperand()->getStringSlice(); }
     int getSemanticIndex() { return int(getIntVal(getSemanticIndexOperand())); }
+
+    /// Returns the semantic index, treating -1 (unspecified) as 0.
+    int getEffectiveSemanticIndex()
+    {
+        auto idx = getSemanticIndex();
+        return idx >= 0 ? idx : 0;
+    }
 };
 
 FIDDLE()
