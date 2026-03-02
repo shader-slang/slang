@@ -2605,6 +2605,16 @@ DIAGNOSTIC(
     Warning,
     unnecessaryHLSLMeshOutputModifier,
     "Unnecessary HLSL style mesh shader output modifier")
+DIAGNOSTIC(
+    54005,
+    Error,
+    attemptToReadFromMeshShaderOutput,
+    "Cannot read values from mesh shader outputs")
+DIAGNOSTIC(
+    54006,
+    Error,
+    invalidParameterPassingModeForWriteOnlyReference,
+    "Invalid parameter passing mode for argument which is write-only.")
 
 DIAGNOSTIC(
     55101,
