@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
 
 // Test: Array of deeply nested struct containing ParameterBlock - should error
 
@@ -16,5 +16,5 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
 }
 
-//CHECK: ([[# @LINE+1]]): error 30027
 uniform DeeplyNested arrayOfDeeplyNested[4];
+//CHECK:             ^^^^^^^^^^^^^^^^^^^ arrays of non-addressable type not allowed
