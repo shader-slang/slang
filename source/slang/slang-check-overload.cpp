@@ -395,8 +395,13 @@ bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
                 else
                 {
                     // Otherwise, the generic decl had better provide a default value
-                    // or this reference is ill-formed.
-                    auto substType = typeParamRef.substitute(
+                    // or this reference is ill-formed. Because the default value
+                    // may depend on prior generic args, we need to resolve it
+                    // with a substitution set that includes the prior args.
+                    auto genSubst = m_astBuilder->getGenericAppDeclRef(
+                        genericDeclRef,
+                        checkedArgs.getArrayView());
+                    auto substType = SubstitutionSet(genSubst).applyToType(
                         m_astBuilder,
                         typeParamRef.getDecl()->initType.type);
                     if (!substType)

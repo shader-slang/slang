@@ -772,6 +772,16 @@ void initCommandOptions(CommandOptions& options)
          "-bindless-space-index",
          "-bindless-space-index <index>",
          "Specify the space index for the system defined global bindless resource array."},
+        {OptionKind::SPIRVResourceHeapStride,
+         "-spirv-resource-heap-stride",
+         "-spirv-resource-heap-stride <stride>",
+         "Specify the byte stride for the resource descriptor heap when generating SPIRV with "
+         "spvDescriptorHeapEXT. Defaults to 0, which will use OpConstantSizeOfEXT(ResourceType)."},
+        {OptionKind::SPIRVSamplerHeapStride,
+         "-spirv-sampler-heap-stride",
+         "-spirv-sampler-heap-stride <stride>",
+         "Specify the byte stride for the sampler descriptor heap when generating SPIRV with "
+         "spvDescriptorHeapEXT. Defaults to 0, which will use OpConstantSizeOfEXT(OpTypeSampler)."},
         {OptionKind::EmitSeparateDebug,
          "-separate-debug-info",
          nullptr,
@@ -1298,6 +1308,8 @@ struct OptionsParser
 
     SlangResult _expectValue(ValueCategory valueCategory, CommandOptions::UserValue& outValue);
     SlangResult _expectInt(const CommandLineArg& arg, Int& outInt);
+    SlangResult _expectUInt(const CommandLineArg& arg, Int& outInt);
+
 
     template<typename T>
     SlangResult _expectValue(T& ioValue)
@@ -1926,11 +1938,24 @@ SlangResult OptionsParser::_expectInt(const CommandLineArg& initArg, Int& outInt
 
     if (SLANG_FAILED(StringUtil::parseInt(arg.value.getUnownedSlice(), outInt)))
     {
-        m_sink->diagnose(arg.loc, Diagnostics::expectingAnInteger);
+        m_sink->diagnose(arg.loc, Diagnostics::expectingAnInteger, initArg.value);
         return SLANG_FAIL;
     }
     return SLANG_OK;
 }
+
+SlangResult OptionsParser::_expectUInt(const CommandLineArg& initArg, Int& outInt)
+{
+    SLANG_RETURN_ON_FAIL(_expectInt(initArg, outInt));
+    if (outInt < 0)
+    {
+        m_sink
+            ->diagnose(initArg.loc, Diagnostics::expectingAUnsignedInteger, initArg.value, outInt);
+        return SLANG_FAIL;
+    }
+    return SLANG_OK;
+}
+
 
 SlangResult createArtifactFromReferencedModule(
     String path,
@@ -3259,10 +3284,12 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 break;
             }
         case OptionKind::BindlessSpaceIndex:
+        case OptionKind::SPIRVSamplerHeapStride:
+        case OptionKind::SPIRVResourceHeapStride:
             {
                 Int index = 0;
-                SLANG_RETURN_ON_FAIL(_expectInt(arg, index));
-                linkage->m_optionSet.add(OptionKind::BindlessSpaceIndex, (int)index);
+                SLANG_RETURN_ON_FAIL(_expectUInt(arg, index));
+                linkage->m_optionSet.add(optionKind, (int)index);
                 break;
             }
         case OptionKind::DumpModule:

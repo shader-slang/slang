@@ -4148,6 +4148,13 @@ String CLikeSourceEmitter::_emitLiteralOneWithType(int bitWidth)
         }
     }
 
+    // uint32_t is only available in HLSL 2018+ (-HV 2018), so we use uint
+    // which is valid in all HLSL versions and maps to the same DXIL type.
+    if (getTarget() == CodeGenTarget::HLSL && bitWidth == 32)
+    {
+        return "uint(1)";
+    }
+
     String one;
     switch (bitWidth)
     {
