@@ -24,7 +24,8 @@ struct ProcessLateRequireCapabilityInstsContext
 
     Dictionary<IRInst*, HashSet<IRFunc*>> m_mapInstToReferencingEntryPoints;
 
-    HashSet<String> m_diagnosedCapsStrs;
+    // entry point --> diagnosed capability strings
+    Dictionary<IRFunc*, HashSet<String>> m_diagnosedCapsStrs;
 
     ProcessLateRequireCapabilityInstsContext(
         IRModule* module,
@@ -96,7 +97,7 @@ struct ProcessLateRequireCapabilityInstsContext
         String missingCapsStr = sb.toString();
 
         // Add if not already added
-        if (!m_diagnosedCapsStrs.add(missingCapsStr))
+        if (!m_diagnosedCapsStrs[entry].add(missingCapsStr))
             return; // already added, don't diagnose again
 
 #if 0
@@ -166,8 +167,7 @@ struct ProcessLateRequireCapabilityInstsContext
                             if (IREntryPointDecoration* entryPointDecor =
                                     entryPoint->findDecoration<IREntryPointDecoration>())
                             {
-                                IRCapabilitySet* capSet =
-                                    as<IRCapabilitySet>(lateRequireCap->getCapabilitySet());
+                                IRCapabilitySet* capSet = lateRequireCap->getCapabilitySet();
                                 checkCapability(
                                     entryPoint,
                                     entryPointDecor->getProfile(),
