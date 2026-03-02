@@ -2,6 +2,7 @@
 
 #include "slang-ir-late-require-capability.h"
 
+#include "slang-check-impl.h"
 #include "slang-ir-call-graph.h"
 #include "slang-ir-insts.h"
 #include "slang-ir.h"
@@ -11,9 +12,6 @@
 
 namespace Slang
 {
-
-// TODO: This needs to come from a header
-void diagnoseCallStack(IRInst* inst, DiagnosticSink* sink);
 
 struct ProcessLateRequireCapabilityInstsContext
 {
@@ -116,18 +114,32 @@ struct ProcessLateRequireCapabilityInstsContext
         }
 #endif
 
+        sb.clear();
+        printDiagnosticArg(sb, entry);
+        String entryName = sb.toString();
+
         maybeDiagnoseWarningOrError(
             m_sink,
             m_optionSet,
             DiagnosticCategory::Capability,
-            getDiagnosticPos(entry),
-            Diagnostics::profileImplicitlyUpgraded,
-            Diagnostics::profileImplicitlyUpgradedRestrictive,
-            entry,
-            m_optionSet.getProfile().getName(),
-            missingCapsStr);
+            Diagnostics::ProfileImplicitlyUpgraded{
+                .entryPoint = entryName,
+                .profile = m_optionSet.getProfile().getName(),
+                .capabilities = missingCapsStr,
+                .location = entry->sourceLoc,
+            },
+            Diagnostics::ProfileImplicitlyUpgradedRestrictive{
+                .entryPoint = entryName,
+                .profile = m_optionSet.getProfile().getName(),
+                .capabilities = missingCapsStr,
+                .location = entry->sourceLoc,
+            });
 
-        m_sink->diagnose(irInst->sourceLoc, Diagnostics::seeCallOfFunc, "__requireCapability");
+        m_sink->diagnose(
+            Diagnostics::SeeCallOfFunc{
+                .name = "__requireCapability",
+                .location = irInst->sourceLoc
+            });
         diagnoseCallStack(irInst, m_sink);
 
         // we'll fail only if restrictive capability check was requested
@@ -155,7 +167,7 @@ struct ProcessLateRequireCapabilityInstsContext
                     {
                         for (auto entryPoint : *entryPoints)
                         {
-                            if (auto entryPointDecor =
+                            if (IREntryPointDecoration* entryPointDecor =
                                     entryPoint->findDecoration<IREntryPointDecoration>())
                             {
                                 IRCapabilitySet* capSet =

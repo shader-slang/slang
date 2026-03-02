@@ -6815,7 +6815,9 @@ RequireCapabilityStmt* Parser::ParseRequireCapabilityStatement()
         if (capName != CapabilityName::Invalid)
             statement->requiredCaps.add(capToken);
         else
-            sink->diagnose(capToken, Diagnostics::unknownCapability, capNameStr);
+            sink->diagnose(Diagnostics::UnknownCapability{
+                    .capability = capNameStr,
+                    .location = capToken.loc});
 
         if (!AdvanceIf(this, TokenType::Comma))
             break;
