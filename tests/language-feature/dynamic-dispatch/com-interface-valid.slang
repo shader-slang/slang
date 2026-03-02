@@ -18,9 +18,8 @@ interface ICOMDerived : ICOMBase
 }
 
 // CHECK: result code = 0
-// CHECK-NOT: error 31122
-// CHECK-NOT: error 31123
-// CHECK-NOT: error 31124
+// CHECK: standard error = {
+// CHECK-NEXT: }
 
 [numthreads(1, 1, 1)]
 void computeMain()
