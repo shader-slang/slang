@@ -9,64 +9,62 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cpu -compute -shaderobj -output-using-type
 //TEST:SIMPLE(filecheck=REPORT):-target hlsl -stage compute -entry computeMain -report-dynamic-dispatch-sites
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
-RWStructuredBuffer<float> outputBuffer;
+//TEST_INPUT:ubuffer(data=[0 0], stride=4):out,name=outputBuffer
+RWStructuredBuffer<int> outputBuffer;
 
 // No [anyValueSize] -- the compiler infers from the largest conforming type.
 interface IShape
 {
-    float area();
+    int compute();
 }
 
-// Small implementation: 1 float field = 4 bytes
+// Small implementation: 1 int field = 4 bytes
 struct Circle : IShape
 {
-    float radius;
-    float area() { return 3.14159f * radius * radius; }
+    int radius;
+    int compute() { return radius * radius; }
 }
 
-// Large implementation: 4 float fields = 16 bytes.
+// Large implementation: 4 int fields = 16 bytes.
 // The inferred AnyValue size must be at least 16 to fit this type.
 struct Rectangle : IShape
 {
-    float x;
-    float y;
-    float width;
-    float height;
-    float area() { return width * height; }
+    int x;
+    int y;
+    int width;
+    int height;
+    int compute() { return width * height; }
 }
 
-float computeArea(uint id)
+IShape createShape(uint id)
 {
     IShape s;
     if (id == 0)
     {
         Circle c;
-        c.radius = 1.0;
+        c.radius = 5;
         s = c;
     }
     else
     {
         Rectangle r;
-        r.x = 0.0;
-        r.y = 0.0;
-        r.width = 3.0;
-        r.height = 4.0;
+        r.x = 0;
+        r.y = 0;
+        r.width = 3;
+        r.height = 4;
         s = r;
     }
-
-    return s.area();
-    // REPORT: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
+    return s;
 }
 
-[numthreads(1, 1, 1)]
+[numthreads(2, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
-    // Circle with radius=1: area = pi * 1 * 1 = 3.14159
-    outputBuffer[0] = computeArea(0);
-    // CHECK: 3.14159
-
-    // Rectangle 3x4: area = 12.0
-    outputBuffer[1] = computeArea(1);
-    // CHECK: 12.0
+    IShape s = createShape(dispatchThreadID.x);
+    outputBuffer[dispatchThreadID.x] = s.compute();
+    // REPORT: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
 }
+// Circle(radius=5): 5*5 = 25
+// Rectangle(3x4): 3*4 = 12
+// CHECK: 25
+// CHECK: 12

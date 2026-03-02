@@ -13,82 +13,84 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cpu -compute -shaderobj -output-using-type
 //TEST:SIMPLE(filecheck=REPORT):-target hlsl -stage compute -entry computeMain -report-dynamic-dispatch-sites
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
-RWStructuredBuffer<float> outputBuffer;
+//TEST_INPUT:ubuffer(data=[0 0 0], stride=4):out,name=outputBuffer
+RWStructuredBuffer<int> outputBuffer;
 
 // No [anyValueSize] -- compiler infers using two-pass algorithm.
 interface INode
 {
-    float getValue();
+    int getValue();
 }
 
-// Non-self-referential: 4 bytes (1 float)
+// Non-self-referential: 4 bytes (1 int)
 struct LeafNode : INode
 {
-    float value;
-    float getValue() { return value; }
+    int value;
+    int getValue() { return value; }
 }
 
-// Non-self-referential: 12 bytes (3 floats) -- drives the base size
+// Non-self-referential: 12 bytes (3 ints) -- drives the base size
 struct DataNode : INode
 {
-    float x;
-    float y;
-    float z;
-    float getValue() { return x + y + z; }
+    int x;
+    int y;
+    int z;
+    int getValue() { return x + y + z; }
 }
 
 // Self-referential: contains INode* (pointer to interface).
-// The pointer has fixed size (8 bytes), but its AnyValue storage is computed
-// from the base size set by LeafNode/DataNode in the first pass.
+// Its AnyValue storage is computed in the second inference pass,
+// after the base size is determined from LeafNode/DataNode.
 struct LinkedNode : INode
 {
-    float value;
+    int value;
     INode* next;
-    float getValue() { return value; }
+    int getValue() { return value; }
 }
 
-float getNodeValue(uint id)
+INode createNode(uint id)
 {
     INode n;
     if (id == 0)
     {
         LeafNode leaf;
-        leaf.value = 10.0;
+        leaf.value = 10;
         n = leaf;
     }
     else if (id == 1)
     {
         DataNode data;
-        data.x = 1.0;
-        data.y = 2.0;
-        data.z = 3.0;
+        data.x = 1;
+        data.y = 2;
+        data.z = 3;
         n = data;
     }
-    else
+    else if (id == 2)
     {
         LinkedNode linked;
-        linked.value = 42.0;
+        linked.value = 42;
         linked.next = nullptr;
         n = linked;
     }
-
-    return n.getValue();
-    // REPORT: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 3 possible types:
+    else
+    {
+        LeafNode fallback;
+        fallback.value = -1;
+        n = fallback;
+    }
+    return n;
 }
 
-[numthreads(1, 1, 1)]
+[numthreads(3, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
-    // LeafNode: value = 10.0
-    outputBuffer[0] = getNodeValue(0);
-    // CHECK: 10.0
-
-    // DataNode: x + y + z = 1 + 2 + 3 = 6.0
-    outputBuffer[1] = getNodeValue(1);
-    // CHECK: 6.0
-
-    // LinkedNode: value = 42.0 (next is nullptr, not dereferenced)
-    outputBuffer[2] = getNodeValue(2);
-    // CHECK: 42.0
+    INode n = createNode(dispatchThreadID.x);
+    outputBuffer[dispatchThreadID.x] = n.getValue();
+    // REPORT: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 3 possible types:
 }
+// LeafNode: value = 10
+// DataNode: x+y+z = 1+2+3 = 6
+// LinkedNode: value = 42 (next is nullptr, not dereferenced)
+// CHECK: 10
+// CHECK: 6
+// CHECK: 42
