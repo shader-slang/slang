@@ -35,6 +35,6 @@ RWStructuredBuffer<float> outputBuffer;
 [numthreads(1, 1, 1)]
 void computeMain()
 {
-    // CHECK: error 50100
+    // CHECK: error 50100{{.*}}IFoo
     outputBuffer[0] = gFoo.getValue();
 }
