@@ -13034,8 +13034,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     constructSSA(module);
     applySparseConditionalConstantPropagation(module, nullptr, compileRequest->getSink());
 
-    bool minimumOptimizations =
-        linkage->m_optionSet.getBoolOption(CompilerOptionName::MinimumSlangOptimization);
+    bool minimumOptimizations = linkage->m_optionSet.shouldPerformMinimumOptimizations();
     if (!minimumOptimizations)
     {
         simplifyCFG(module, CFGSimplificationOptions::getDefault());
