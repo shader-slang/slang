@@ -32,11 +32,11 @@ $jitConfig = $null
 
 for ($i = 1; $i -le $maxRetries; $i++) {
     try {
-        $jitConfig = Invoke-RestMethod -Uri $metadataUrl -Headers @{ "Metadata-Flavor" = "Google" }
+        $jitConfig = Invoke-RestMethod -Uri $metadataUrl -Headers @{ "Metadata-Flavor" = "Google" } -TimeoutSec 10
         break
     }
     catch {
-        Write-Log "  Attempt $i/$maxRetries: Metadata not available yet, waiting..."
+        Write-Log "  Attempt ${i}/${maxRetries}: Metadata not available yet, waiting..."
         Start-Sleep -Seconds 5
     }
 }

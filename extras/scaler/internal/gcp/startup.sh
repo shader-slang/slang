@@ -3,7 +3,7 @@
 #
 # This script runs as root (GCE metadata scripts always run as root).
 # The GitHub Actions runner must run as the user who owns the runner
-# directory (typically 'jkiviluoto'), not as root.
+# directory owner), not as root.
 #
 # Steps:
 # 1. Removes any pre-existing runner service from the base image
@@ -72,14 +72,22 @@ done
 # loads the module and creates /dev/nvidia* device files that the CI workflow
 # mounts into Docker containers (--device /dev/nvidia-modeset, /dev/dri, etc.)
 log "Initializing NVIDIA GPU..."
+gpu_ready=false
 for attempt in $(seq 1 10); do
   if nvidia-smi >/dev/null 2>&1; then
     log "  GPU initialized successfully."
+    gpu_ready=true
     break
   fi
   log "  Attempt ${attempt}/10: nvidia-smi not ready, waiting..."
   sleep 5
 done
+
+if [ "$gpu_ready" != "true" ]; then
+  log "ERROR: GPU initialization failed after 10 attempts"
+  shutdown -h now
+  exit 1
+fi
 
 # Create nvidia-modeset device if it doesn't exist (needed for Vulkan)
 if [ ! -e /dev/nvidia-modeset ]; then
@@ -99,7 +107,7 @@ MAX_RETRIES=10
 JIT_CONFIG=""
 
 for i in $(seq 1 "$MAX_RETRIES"); do
-  JIT_CONFIG=$(curl -sf -H "Metadata-Flavor: Google" "$METADATA_URL") && break
+  JIT_CONFIG=$(curl -sf --max-time 10 --connect-timeout 5 -H "Metadata-Flavor: Google" "$METADATA_URL") && break
   log "  Attempt ${i}/${MAX_RETRIES}: Metadata not available yet, waiting..."
   sleep 5
 done

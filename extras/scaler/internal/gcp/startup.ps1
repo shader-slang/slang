@@ -60,7 +60,7 @@ $jitConfig = $null
 
 for ($i = 1; $i -le $maxRetries; $i++) {
     try {
-        $jitConfig = Invoke-RestMethod -Uri $metadataUrl -Headers @{ "Metadata-Flavor" = "Google" }
+        $jitConfig = Invoke-RestMethod -Uri $metadataUrl -Headers @{ "Metadata-Flavor" = "Google" } -TimeoutSec 10
         break
     }
     catch {

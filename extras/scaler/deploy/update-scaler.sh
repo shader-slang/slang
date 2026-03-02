@@ -34,16 +34,25 @@ gcloud compute scp "${BINARY}" "${VM_NAME}:/tmp/scaler" \
 
 echo "Stopping services, replacing binary, restarting..."
 gcloud compute ssh "${VM_NAME}" --zone="${ZONE}" --project="${PROJECT}" --command="
-    sudo systemctl stop scaler-windows scaler-linux 2>/dev/null || true
+    sudo systemctl stop scaler-windows scaler-linux scaler-windows-build 2>/dev/null || true
     sudo mv /tmp/scaler /opt/scaler/scaler
     sudo chmod 755 /opt/scaler/scaler
     sudo chown scaler:scaler /opt/scaler/scaler
-    sudo systemctl start scaler-windows 2>/dev/null || true
-    sudo systemctl start scaler-linux 2>/dev/null || true
-    echo ''
-    echo 'Service status:'
-    sudo systemctl is-active scaler-windows 2>/dev/null && echo '  scaler-windows: active' || echo '  scaler-windows: inactive'
-    sudo systemctl is-active scaler-linux 2>/dev/null && echo '  scaler-linux: active' || echo '  scaler-linux: inactive'
+    failed=0
+    for svc in scaler-windows scaler-linux scaler-windows-build; do
+        if sudo systemctl is-enabled \$svc 2>/dev/null | grep -q enabled; then
+            sudo systemctl start \$svc
+            if sudo systemctl is-active \$svc >/dev/null 2>&1; then
+                echo \"  \$svc: active\"
+            else
+                echo \"  \$svc: FAILED TO START\"
+                failed=1
+            fi
+        else
+            echo \"  \$svc: not enabled\"
+        fi
+    done
+    exit \$failed
 "
 
 echo ""

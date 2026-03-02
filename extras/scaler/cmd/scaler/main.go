@@ -174,9 +174,11 @@ func parseFlags() config {
 	}
 	if v := os.Getenv("SCALER_APP_INSTALLATION_ID"); v != "" && cfg.appInstallationID == 0 {
 		id, err := strconv.ParseInt(v, 10, 64)
-		if err == nil {
-			cfg.appInstallationID = id
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: invalid SCALER_APP_INSTALLATION_ID %q: %v\n", v, err)
+			os.Exit(1)
 		}
+		cfg.appInstallationID = id
 	}
 	if v := os.Getenv("SCALER_APP_PRIVATE_KEY"); v != "" && cfg.appPrivateKey == "" {
 		cfg.appPrivateKey = v

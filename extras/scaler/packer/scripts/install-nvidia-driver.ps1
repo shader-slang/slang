@@ -14,7 +14,7 @@ if (-not $driverVersion) {
 Write-Host "=== Installing NVIDIA Driver $driverVersion ==="
 
 # GCP provides NVIDIA drivers via a special bucket
-$driverUrl = "https://storage.googleapis.com/nvidia-drivers-us-public/GRID/vGPU17.5/580.126.09_grid_win10_win11_server2022_dch_64bit_international.exe"
+$driverUrl = "https://storage.googleapis.com/nvidia-drivers-us-public/GRID/vGPU17.5/${driverVersion}_grid_win10_win11_server2022_dch_64bit_international.exe"
 
 # Download driver
 $installerPath = "$env:TEMP\nvidia-driver.exe"
