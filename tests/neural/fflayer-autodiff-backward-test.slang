@@ -9,7 +9,7 @@
 //TEST:SIMPLE(filecheck=CHECK): -target ptx -stage compute -entry computeMain -capability cuda_sm_7_0 -DTEST_TENSORVIEW=1 -DTEST_POINTER=0 -experimental-feature
 // CHECK: computeMain
 
-import neural;
+import slang.neural;
 
 // Weights: W = [[1,2],[3,4]], bias = [0.5, -0.5]
 //TEST_INPUT: set params = ubuffer(data=[1.0 2.0 3.0 4.0 0.5 -0.5], stride=4)

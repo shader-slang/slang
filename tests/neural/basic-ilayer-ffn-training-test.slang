@@ -5,7 +5,7 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-mtl -compute -shaderobj -output-using-type -xslang -experimental-feature
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -xslang -experimental-feature
 
-import neural;
+import slang.neural;
 
 // Parameter packing:
 // Layer1: FFLayer<float, InlineVector<float,2>, InlineVector<float,2>, IdentityActivation<float>, HasBias=true>

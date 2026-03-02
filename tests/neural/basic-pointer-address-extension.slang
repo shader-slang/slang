@@ -13,7 +13,7 @@
 //DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -output-using-type -emit-spirv-directly -xslang -experimental-feature -xslang -DTEST_HALF=0
 //DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-mtl -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTEST_HALF=0
 
-import neural;
+import slang.neural;
 
 #if TEST_HALF
 typealias ElementType = half;

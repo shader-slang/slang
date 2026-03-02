@@ -20,7 +20,7 @@
 // TEST:SIMPLE(filecheck=CHECK): -target ptx -stage compute -entry computeMain -capability cuda_sm_7_0 -DTEST_TENSORVIEW=1 -DTEST_POINTER=0 -DWARP_COUNT=1 -experimental-feature
 // CHECK: computeMain
 
-import neural;
+import slang.neural;
 
 #ifndef WARP_COUNT
 #define WARP_COUNT 1
