@@ -1183,6 +1183,17 @@ DIAGNOSTIC(
     imageFormatUnsupportedByBackend,
     "Image format '$0' is not explicitly supported by the $1 backend, using supported format '$2' "
     "instead.")
+DIAGNOSTIC(
+    31106,
+    Warning,
+    specialTypeLeaksFromParameterGroup,
+    "Parameter group type includes some members with types which cannot be included in the same "
+    "binding. These types will be moved into another parameter binding slot.")
+DIAGNOSTIC(
+    31107,
+    Warning,
+    specialTypeLeaksFromParameterGroupElement,
+    "Structure member will leak into separate binding.")
 
 DIAGNOSTIC(31120, Error, invalidAttributeTarget, "invalid syntax target for user defined attribute")
 DIAGNOSTIC(
