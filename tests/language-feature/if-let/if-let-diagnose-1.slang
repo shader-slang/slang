@@ -29,14 +29,14 @@ int test(IFoo foo, int idx)
     {
         val = a.foo(idx);
     }
-    // CHECK: error 30015: undefined identifier 'a'.
+    // CHECK: error[E30015]: undefined identifier
     else if(a == none)
     {
         val = -1;
     }
     else
     {
-        // CHECK: error 30015: undefined identifier 'a'.
+        // CHECK: error[E30015]: undefined identifier
         if (a == none)
         {
             val = -1;

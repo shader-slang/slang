@@ -1,4 +1,4 @@
-//TEST:SIMPLE:-profile cs_5_0
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-profile cs_5_0
 
 // Missing opening `{` sends parser into infinite loop
 
@@ -16,9 +16,11 @@ void main()
     uint numLights = 0;
     uint stride;
     gLightIn.GetDimensions(numLights, stride);
-    
+
     for (uint i = 0; i < numLights; i++)
-    
+
         gLightOut.Append(gLightIn[i]);
     }
 }
+//CHECK: unexpected token
+//CHECK: unexpected '}', expected identifier

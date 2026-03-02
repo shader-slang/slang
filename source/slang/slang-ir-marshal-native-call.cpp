@@ -3,6 +3,7 @@
 
 #include "slang-ir-insts.h"
 #include "slang-ir.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -168,18 +169,16 @@ void NativeCallMarshallingContext::marshalManagedValueToNativeResultValue(
         break;
     case kIROp_StringType:
         {
-            diagnosticSink->diagnose(
-                originalArg,
-                Diagnostics::unimplemented,
-                "marshal string to native return value");
+            diagnosticSink->diagnose(Diagnostics::Unimplemented{
+                .feature = "marshal string to native return value",
+                .location = originalArg->sourceLoc});
         }
         break;
     case kIROp_ClassType:
         {
-            diagnosticSink->diagnose(
-                originalArg,
-                Diagnostics::unimplemented,
-                "marshal class to native return value");
+            diagnosticSink->diagnose(Diagnostics::Unimplemented{
+                .feature = "marshal class to native return value",
+                .location = originalArg->sourceLoc});
         }
         break;
     case kIROp_InterfaceType:

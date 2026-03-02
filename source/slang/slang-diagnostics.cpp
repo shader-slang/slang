@@ -7,35 +7,30 @@
 #include "../core/slang-dictionary.h"
 #include "../core/slang-memory-arena.h"
 #include "../core/slang-string-util.h"
+#include "slang-rich-diagnostics.h"
 namespace Slang
 {
 
-namespace Diagnostics
-{
-#define DIAGNOSTIC(id, severity, name, messageFormat) \
-    const DiagnosticInfo name = {id, Severity::severity, #name, messageFormat};
-#include "slang-diagnostic-defs.h"
-#undef DIAGNOSTIC
-} // namespace Diagnostics
-
-static const DiagnosticInfo* const kCompilerDiagnostics[] = {
-#define DIAGNOSTIC(id, severity, name, messageFormat) &Diagnostics::name,
-#include "slang-diagnostic-defs.h"
-#undef DIAGNOSTIC
-};
+// All diagnostics are now defined in slang-diagnostics.lua and generated
+// via slang-rich-diagnostics.h. The old slang-diagnostic-defs.h has been removed.
 
 static DiagnosticsLookup* _newDiagnosticsLookup()
 {
-    DiagnosticsLookup* lookup =
-        new DiagnosticsLookup(kCompilerDiagnostics, SLANG_COUNT_OF(kCompilerDiagnostics));
+    // Use rich diagnostics defined in slang-diagnostics.lua
+    DiagnosticsLookup* lookup = new DiagnosticsLookup(
+        Diagnostics::getRichDiagnosticsInfo(),
+        Diagnostics::getRichDiagnosticsInfoCount());
 
-    // Add all the diagnostics in 'core'
+    // Add all the diagnostics in 'core', skipping conflicts
     DiagnosticsLookup* coreLookup = getCoreDiagnosticsLookup();
     if (coreLookup)
     {
         for (auto diagnostic : coreLookup->getDiagnostics())
         {
-            lookup->add(diagnostic);
+            if (!lookup->findDiagnosticByExactName(UnownedStringSlice(diagnostic->name)))
+            {
+                lookup->add(diagnostic);
+            }
         }
     }
 
@@ -78,7 +73,8 @@ SlangResult overrideDiagnostic(
     {
         if (SLANG_FAILED(StringUtil::parseInt(identifier, diagnosticId)))
         {
-            outDiagnostic->diagnose(SourceLoc(), Diagnostics::unknownDiagnosticName, identifier);
+            outDiagnostic->diagnose(
+                Diagnostics::UnknownDiagnosticName{.diagnosticName = String(identifier)});
             return SLANG_FAIL;
         }
 
@@ -93,20 +89,22 @@ SlangResult overrideDiagnostic(
         diagnostic = diagnosticsLookup->findDiagnosticByName(identifier);
         if (!diagnostic)
         {
-            outDiagnostic->diagnose(SourceLoc(), Diagnostics::unknownDiagnosticName, identifier);
+            outDiagnostic->diagnose(
+                Diagnostics::UnknownDiagnosticName{.diagnosticName = String(identifier)});
             return SLANG_FAIL;
         }
         diagnosticId = diagnostic->id;
     }
 
-    // If we are only allowing certain original severities check it's the right type
+    // If we are only allowing certain original severities check it's the right type.
     if (diagnostic && originalSeverity != Severity::Disable &&
         diagnostic->severity != originalSeverity)
     {
         // Strictly speaking the diagnostic name is known, but it's not the right severity
         // to be converted from, so it is an 'unknown name' in the context of severity...
         // Or perhaps we want another diagnostic
-        outDiagnostic->diagnose(SourceLoc(), Diagnostics::unknownDiagnosticName, identifier);
+        outDiagnostic->diagnose(
+            Diagnostics::UnknownDiagnosticName{.diagnosticName = String(identifier)});
         return SLANG_FAIL;
     }
 
