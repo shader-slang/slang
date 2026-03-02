@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -target spirv -entry computeMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=diag): -target spirv -entry computeMain -stage compute
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBufferPrimal
 RWStructuredBuffer<float> outputBufferPrimal;
@@ -15,8 +15,11 @@ struct BufferWithGrad
     void add(float value) { primal[0] = primal[0] + detach(value); }
 
     // check for diagnostic:
-    // CHECK-DAG: ([[# @LINE+1]]): error 31158
     [PrimalSubstituteOf(add)]
+/*diag:
+     ^^^^^^^^^^^^^^^^^^ primal substitute requires differentiable target
+     ^^^^^^^^^^^^^^^^^^ primal substitute function for differentiable method must also be differentiable.
+*/
     void add_subst(float value)
     {
     }
@@ -39,6 +42,6 @@ void diffCall(BufferWithGrad result)
 void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
     BufferWithGrad bg = {outputBufferPrimal, gradBuffer};
-    diffCall(bg); 
+    diffCall(bg);
     bwd_diff(diffCall)(bg);
 }

@@ -1,5 +1,5 @@
-//TEST:SIMPLE(filecheck=CHECK): -stage compute -entry computeMain -allow-glsl -target glsl
-//TEST:SIMPLE(filecheck=CHECK): -stage compute -entry computeMain -allow-glsl -target spirv -emit-spirv-directly
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -stage compute -entry computeMain -allow-glsl -target glsl
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -stage compute -entry computeMain -allow-glsl -target spirv -emit-spirv-directly
 
 volatile buffer MyBlockName1
 {
@@ -10,8 +10,10 @@ volatile buffer MyBlockName1
 layout(local_size_x = 1) in;
 void computeMain()
 {
-//CHECK: error 30011
     inputBuffer1.data2 = 1;
-//CHECK: error 30011
+//CHECK:               ^ left of '=' is not an l-value
+//CHECK:               ^ left of '=' is not an l-value.
     inputBuffer1.data3 = 1;
+//CHECK:               ^ left of '=' is not an l-value
+//CHECK:               ^ left of '=' is not an l-value.
 }

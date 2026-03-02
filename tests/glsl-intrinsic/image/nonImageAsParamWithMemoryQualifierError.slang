@@ -10,7 +10,7 @@ buffer MyBlockName2
 
 layout(local_size_x = 4) in;
 
-// CHECK: error 31206
+// CHECK: error[E31206]
 bool checkAllImageSizes(writeonly uint val)
 {
     return true
