@@ -4586,7 +4586,7 @@ Expr* SemanticsExprVisitor::visitAddressOfExpr(AddressOfExpr* expr)
         getValidTypeForAddressOf(this, m_astBuilder, expr->arg, getType(m_astBuilder, expr->arg));
     if (!expr->type)
     {
-        getSink()->diagnose(Diagnostics::InvalidAddressOf{.expr = expr});
+        getSink()->diagnose(Diagnostics::InvalidAddressOf{.location = expr->loc});
         expr->type = m_astBuilder->getErrorType();
     }
     return expr;

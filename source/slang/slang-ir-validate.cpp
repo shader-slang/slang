@@ -838,7 +838,9 @@ static void validateGetAddressUsageImpl(DiagnosticSink* sink, IRInst* inst)
                 continue;
             if (isFunctionLocalAddress(store->getVal()))
             {
-                sink->diagnose(inst->sourceLoc, Diagnostics::invalidAddressOf);
+                sink->diagnose(Diagnostics::InvalidAddressOf{
+                    .location = inst->sourceLoc,
+                });
             }
         }
     }

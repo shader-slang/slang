@@ -2389,7 +2389,7 @@ err(
     "invalid-address-of",
     31160,
     "invalid __getAddress usage",
-    span { loc = "expr:Expr", message = "'__getAddress' only supports groupshared variables and members of groupshared/device memory." }
+    span { loc = "location", message = "'__getAddress' only supports groupshared variables and members of groupshared/device memory." }
 )
 
 -- 312xx - Modifiers and Deprecation
