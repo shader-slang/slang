@@ -3357,6 +3357,17 @@ Expr* SemanticsVisitor::checkGenericAppWithCheckedArgs(GenericAppExpr* genericAp
                 auto candidateExpr = CompleteOverloadCandidate(context, candidate);
                 overloadedExpr->candidateExprs.add(candidateExpr);
             }
+            if (!overloadedExpr->base)
+            {
+                for (auto candidateExpr : overloadedExpr->candidateExprs)
+                {
+                    if (auto baseFromCandidate = GetBaseExpr(candidateExpr))
+                    {
+                        overloadedExpr->base = baseFromCandidate;
+                        break;
+                    }
+                }
+            }
             return overloadedExpr;
         }
     }
