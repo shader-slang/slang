@@ -1380,6 +1380,7 @@ A capability describes an optional feature that a target may or may not support.
 * `cpp_cuda_spirv` 
 * `cpp_cuda_spirv_llvm` 
 * `cpp_cuda_metal_spirv` 
+* `cpp_cuda_metal_spirv_llvm` 
 * `cuda_spirv` 
 * `cpp_cuda_glsl_spirv` 
 * `cpp_cuda_glsl_hlsl` 
