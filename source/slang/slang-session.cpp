@@ -168,7 +168,9 @@ Linkage::loadModule(const char* moduleName, slang::IBlob** outDiagnostics)
 
     if (isInLanguageServer())
     {
-        sink.setFlags(DiagnosticSink::Flag::HumaneLoc | DiagnosticSink::Flag::LanguageServer);
+        sink.setFlags(
+            DiagnosticSink::Flag::HumaneLoc | DiagnosticSink::Flag::LanguageServer |
+            DiagnosticSink::Flag::MachineReadableDiagnostics);
     }
 
     try
@@ -211,7 +213,9 @@ slang::IModule* Linkage::loadModuleFromBlob(
 
     if (isInLanguageServer())
     {
-        sink.setFlags(DiagnosticSink::Flag::HumaneLoc | DiagnosticSink::Flag::LanguageServer);
+        sink.setFlags(
+            DiagnosticSink::Flag::HumaneLoc | DiagnosticSink::Flag::LanguageServer |
+            DiagnosticSink::Flag::MachineReadableDiagnostics);
     }
 
 

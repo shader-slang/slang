@@ -639,7 +639,9 @@ private:
                 renderSectionBody(ss, layout.primarySection);
                 ss << color(
                           TerminalColor::Cyan,
-                          repeat(m_glyphs.secondaryUnderline, layout.primarySection.maxGutterWidth + 1) +
+                          repeat(
+                              m_glyphs.secondaryUnderline,
+                              layout.primarySection.maxGutterWidth + 1) +
                               m_glyphs.gutterCorner)
                    << "\n";
             }
