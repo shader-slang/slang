@@ -5,6 +5,7 @@
 #include "slang-ir-layout.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -233,7 +234,9 @@ void inferAnyValueSizeWhereNecessary(
         // there's no base case and AnyValue size cannot be calculated.
         if (nonSelfRefList.getCount() == 0 && selfRefList.getCount() > 0)
         {
-            sink->diagnose(interfaceType, Diagnostics::cyclicInterfaceDependency, interfaceType);
+            sink->diagnose(Diagnostics::CyclicInterfaceDependency{
+                .interfaceType = interfaceType,
+            });
         }
     }
 
@@ -270,13 +273,16 @@ void inferAnyValueSizeWhereNecessary(
 
             if (existingMaxSize < sizeAndAlignment.size)
             {
-                sink->diagnose(implType, Diagnostics::typeDoesNotFitAnyValueSize, implType);
-                sink->diagnoseWithoutSourceView(
-                    implType,
-                    Diagnostics::typeAndLimit,
-                    implType,
-                    sizeAndAlignment.size,
-                    existingMaxSize);
+                sink->diagnose(Diagnostics::TypeDoesNotFitAnyValueSize{
+                    .type = implType,
+                    .location = implType->sourceLoc,
+                });
+                sink->diagnose(Diagnostics::TypeAndLimit{
+                    .type = implType,
+                    .size = sizeAndAlignment.size,
+                    .limit = existingMaxSize,
+                    .location = implType->sourceLoc,
+                });
             }
         }
 
@@ -302,13 +308,16 @@ void inferAnyValueSizeWhereNecessary(
 
             if (existingMaxSize < sizeAndAlignment.size)
             {
-                sink->diagnose(implType, Diagnostics::typeDoesNotFitAnyValueSize, implType);
-                sink->diagnoseWithoutSourceView(
-                    implType,
-                    Diagnostics::typeAndLimit,
-                    implType,
-                    sizeAndAlignment.size,
-                    existingMaxSize);
+                sink->diagnose(Diagnostics::TypeDoesNotFitAnyValueSize{
+                    .type = implType,
+                    .location = implType->sourceLoc,
+                });
+                sink->diagnose(Diagnostics::TypeAndLimit{
+                    .type = implType,
+                    .size = sizeAndAlignment.size,
+                    .limit = existingMaxSize,
+                    .location = implType->sourceLoc,
+                });
             }
         }
 

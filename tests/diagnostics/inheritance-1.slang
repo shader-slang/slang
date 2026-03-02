@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 // Tests that we will diagnose a warning on struct inheritance being unstable
 // before Slang 2026.
@@ -7,7 +7,8 @@
 
 struct Base {}
 
-//CHECK: ([[# @LINE+1]]): warning 30816:
 struct Derived : Base {}
+//CHECK:         ^^^^ support for inheritance is unstable and will be removed in future language versions, consider using composition instead
+//CHECK:         ^^^^ support for inheritance is unstable and will be removed in future language versions, consider using composition instead
 
 struct Base1 {}

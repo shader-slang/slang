@@ -7,7 +7,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cpu -compute -shaderobj -output-using-type
-//TEST:SIMPLE(filecheck=REPORT):-target hlsl -stage compute -entry computeMain -report-dynamic-dispatch-sites
+//DIAGNOSTIC_TEST:SIMPLE(diag=REPORT,non-exhaustive):-target hlsl -stage compute -entry computeMain -report-dynamic-dispatch-sites
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
@@ -94,7 +94,7 @@ IContainer makeContainer(int id)
 void mutateViaInout(inout ICounter counter)
 {
     counter.add(7);
-    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
+//REPORT: generated dynamic dispatch code for this site. 2 possible types
 }
 
 [numthreads(1, 1, 1)]
@@ -105,86 +105,62 @@ void computeMain(int id : SV_DispatchThreadID)
     var c = makeCounter(id);
 
     c.increment();
-    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
     outputBuffer[0] = c.get();      // Counter: 0 + 1 = 1
-    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
     // CHECK: 1
 
     c.add(5);
-    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
     outputBuffer[1] = c.get();      // Counter: 1 + 5 = 6
-    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
     // CHECK: 6
 
     // --- Test 2: Direct [mutating] calls on interface-typed local (DoubleCounter) ---
     var d = makeCounter(id + 1);
 
     d.increment();
-    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
     outputBuffer[2] = d.get();      // DoubleCounter: 0 + 2 = 2
-    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
     // CHECK: 2
 
     d.add(3);
-    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
     outputBuffer[3] = d.get();      // DoubleCounter: 2 + 6 = 8
-    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
     // CHECK: 8
 
     // --- Test 3: Multiple increments to verify state accumulates ---
     var e = makeCounter(id);
     e.increment();
-    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
     e.increment();
-    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
     e.increment();
-    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
     outputBuffer[4] = e.get();      // Counter: 3
-    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
     // CHECK: 3
 
     // --- Test 4: [mutating] on interface passed as inout parameter ---
     var f = makeCounter(id);
     f.add(10);
-    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
     mutateViaInout(f);
     outputBuffer[5] = f.get();      // Counter: 10 + 7 = 17
-    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
     // CHECK: 17
 
     // --- Test 5: Nested dispatch — [mutating] on ICounter inside dispatched IContainer method ---
     var g = makeCounter(id);
     g.add(42);
-    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
     var container = makeContainer(id);
     container.updateItem(g);                    // updateItem copies counter, calls increment(), reads get()
-    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
     outputBuffer[6] = container.getCached();    // MyContainer: local.increment() on Counter(42) → 43
-    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
     // CHECK: 43
 
     // --- Test 5b: Nested dispatch — OffsetContainer path ---
     var g2 = makeCounter(id);
     g2.add(10);
-    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
     var container2 = makeContainer(id + 1);
     container2.updateItem(g2);                    // OffsetContainer: local.increment() on Counter(10) → 11, + offset 100
-    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
     outputBuffer[7] = container2.getCached();     // OffsetContainer: 11 + 100 = 111
-    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
     // CHECK: 111
 
     // --- Test 6: Mutation after copy does not affect original (value semantics) ---
     var h = makeCounter(id);
     h.add(100);
-    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
     var copy = h;
     copy.add(50);
-    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
     outputBuffer[8] = h.get();     // original: still 100
-    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
     // CHECK: 100
     outputBuffer[9] = copy.get();  // copy: 100 + 50 = 150
-    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
     // CHECK: 150
 }

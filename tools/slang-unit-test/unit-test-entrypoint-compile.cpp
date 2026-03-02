@@ -79,7 +79,23 @@ SLANG_UNIT_TEST(entryPointCompile)
     SLANG_CHECK_ABORT(linkedProgram != nullptr);
 
     ComPtr<slang::IBlob> code;
-    linkedProgram->getEntryPointCode(0, 0, code.writeRef(), diagnosticBlob.writeRef());
+    SlangResult codeRes =
+        linkedProgram->getEntryPointCode(0, 0, code.writeRef(), diagnosticBlob.writeRef());
+    if (SLANG_FAILED(codeRes) || !code)
+    {
+        fprintf(
+            stderr,
+            "[DEBUG aarch64] entryPointCompile: getEntryPointCode failed: result=0x%08x\n",
+            (unsigned)codeRes);
+        if (diagnosticBlob)
+            fprintf(
+                stderr,
+                "[DEBUG aarch64] diagnostics:\n%.*s\n",
+                (int)diagnosticBlob->getBufferSize(),
+                (const char*)diagnosticBlob->getBufferPointer());
+        else
+            fprintf(stderr, "[DEBUG aarch64] no diagnostic blob\n");
+    }
     SLANG_CHECK_ABORT(code != nullptr);
 
     SLANG_CHECK_ABORT(code->getBufferSize() != 0);
