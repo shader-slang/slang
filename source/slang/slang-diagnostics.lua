@@ -421,9 +421,6 @@ err(
     note { message = "see '~elseDirective' directive", span { loc = "elseLoc" } }
 )
 
--- Standalone note for seeDirective - used by multiple diagnostics
-standalone_note("see-directive", -1, "see '$0' directive")
-
 -- 151xx - directive parsing
 err(
     "expected-preprocessor-directive-name",
