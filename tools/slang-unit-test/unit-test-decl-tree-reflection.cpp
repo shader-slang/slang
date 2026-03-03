@@ -29,7 +29,8 @@ static void printRefl(slang::ISession* session, slang::DeclReflection* refl, uns
     auto sourceLocation = session->getDeclSourceLocation(refl);
     const char* filePath = sourceLocation.filePath ? sourceLocation.filePath : "<null>";
     std::cout << "[" << names[(unsigned int)refl->getKind()] << "] (" << refl->getChildrenCount()
-              << ") " << filePath << ":" << sourceLocation.line << ":" << sourceLocation.column << std::endl;
+              << ") " << filePath << ":" << sourceLocation.line << ":" << sourceLocation.column
+              << std::endl;
 
     for (auto* child : refl->getChildren())
     {
