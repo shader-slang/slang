@@ -43,4 +43,4 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     }
 }
 
-//CHK: (0): note: no checkpoint contexts to report
+//CHK: note: no checkpoint contexts to report

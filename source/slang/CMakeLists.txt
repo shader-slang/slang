@@ -49,6 +49,20 @@ target_include_directories(
     INTERFACE ${SLANG_FIDDLE_OUTPUT_DIR}
 )
 
+# Optimize slang-rich-diagnostics.cpp for size regardless of build type.
+# This file includes generated fiddle code that can be large.
+# Use /O1;/Os for MSVC, -Oz for Clang, -Os for GCC.
+# For MSVC, we must disable PCH for this file since changing optimization
+# level is incompatible with precompiled headers (warning C4653).
+# Skip optimization entirely in Debug builds to avoid /RTC1 conflicts.
+set_source_files_properties(
+    slang-rich-diagnostics.cpp
+    PROPERTIES
+        SKIP_PRECOMPILE_HEADERS ON
+        COMPILE_OPTIONS
+            "$<$<NOT:$<CONFIG:Debug>>:$<IF:$<CXX_COMPILER_ID:MSVC>,/O1;/Os,$<IF:$<CXX_COMPILER_ID:GNU>,-Os,-Oz>>>"
+)
+
 #
 # generate capability files
 #
