@@ -5497,6 +5497,7 @@ static SlangResult runUnitTestModule(
 
             try
             {
+                slang_replayMarker(test.testName.getBuffer());
                 test.testFunc(&unitTestContext);
 
                 // Check for VVL errors after test completion

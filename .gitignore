@@ -140,3 +140,7 @@ perf.data.*
 .vars
 .github/test-events/
 __pycache__/
+
+.slang-replays*
+log*.txt
+replay-capture
