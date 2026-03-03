@@ -493,6 +493,10 @@ def process_jobs(jobs_data, config):
             file=sys.stderr,
         )
 
+    generated_at = datetime.datetime.now(datetime.timezone.utc).strftime(
+        "%Y-%m-%d %H:%M UTC"
+    )
+
     return {
         "all_jobs": jobs_data,
         "active_jobs": active_jobs,
@@ -505,6 +509,7 @@ def process_jobs(jobs_data, config):
         "test_wait_by_date": dict(test_wait_by_date),
         "dates": sorted(jobs_by_date.keys()),
         "months": sorted(jobs_by_month.keys()),
+        "generated_at": generated_at,
     }
 
 
@@ -617,7 +622,7 @@ def generate_index(data, output_dir):
 
     body = f"""
 <h1>Slang CI Analytics</h1>
-<p style="color:#6c757d">CI workflow only. Excludes skipped jobs. Data range: {dates[0] if dates else 'N/A'} to {dates[-1] if dates else 'N/A'}.</p>
+<p style="color:#6c757d">Last updated: {data['generated_at']}. CI workflow only. Excludes skipped jobs. Data range: {dates[0] if dates else 'N/A'} to {dates[-1] if dates else 'N/A'}.</p>
 <h2>Last 3 Days</h2>
 <div>
   <div class="stat-card"><div class="value">{ci_tat_3d:.0f}m{tat_delta}</div><div class="label">CI Turnaround (avg)</div></div>
@@ -788,6 +793,11 @@ def generate_statistics(data, config, output_dir):
             name = g["name"]
             if name not in sh_groups:
                 sh_groups[name] = g.get("runner_count", 0)
+    for p in config.get("runner_name_prefixes", []):
+        if p.get("self_hosted"):
+            name = p["name"]
+            if name not in sh_groups:
+                sh_groups[name] = p.get("runner_count", 0)
 
     group_parallel_per_day = defaultdict(list)
     cap_avg_queue = []
@@ -863,7 +873,7 @@ def generate_statistics(data, config, output_dir):
 
     body = f"""
 <h1>Statistics &amp; Trends</h1>
-<p style="color:#6c757d">CI workflow only. Excludes skipped jobs. Data range: {dates[0] if dates else 'N/A'} to {dates[-1] if dates else 'N/A'}.</p>
+<p style="color:#6c757d">Last updated: {data['generated_at']}. CI workflow only. Excludes skipped jobs. Data range: {dates[0] if dates else 'N/A'} to {dates[-1] if dates else 'N/A'}.</p>
 
 <div style="margin-bottom:15px">
   <label>Date range: </label>
@@ -1110,7 +1120,7 @@ new Chart(document.getElementById('queueWait_canvas').getContext('2d'), {{
 # --- Monthly timeline pages ---
 
 
-def generate_month_page(month, month_jobs, config, output_dir):
+def generate_month_page(month, month_jobs, config, output_dir, generated_at=""):
     """Generate a monthly timeline page with daily Gantt views."""
     # Group by date, then by runner
     days = defaultdict(lambda: defaultdict(list))
@@ -1233,8 +1243,9 @@ def generate_month_page(month, month_jobs, config, output_dir):
         for b in sorted(branches) if b
     )
 
+    updated_html = f'\n<p style="color:#6c757d">Last updated: {generated_at}.</p>' if generated_at else ""
     body = f"""
-<h1>Timeline: {month}</h1>
+<h1>Timeline: {month}</h1>{updated_html}
 <div style="margin-bottom:15px">
   <label>Workflow: </label>
   <select id="wfFilter" onchange="filterJobs()">
@@ -1335,7 +1346,7 @@ def main():
 
     for month in data["months"]:
         print(f"Generating month_{month}.html...")
-        generate_month_page(month, data["jobs_by_month"][month], config, args.output)
+        generate_month_page(month, data["jobs_by_month"][month], config, args.output, data["generated_at"])
 
     print(f"\nDone! Output written to {args.output}/")
     print(f"Open {args.output}/index.html in a browser to view.")

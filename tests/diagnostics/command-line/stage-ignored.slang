@@ -6,4 +6,5 @@
 // A `-stage` option before any `-entry`, possibly because
 // the user is specifying things in the wrong order.
 //
-//DIAGNOSTIC_TEST:SIMPLE:-stage vertex -entry vsMain -stage fragment -entry psMain
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-stage vertex -entry vsMain -stage fragment -entry psMain
+//CHECK: when compiling multiple entry points, any '-stage' options must follow the '-entry' option that they apply to

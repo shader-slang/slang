@@ -20,7 +20,7 @@ void computeMain(ConstantBuffer<int> cb)
     let stride = 16;
     CoopMatType mat1 = CoopMatType.Load<CoopMatMatrixLayout.RowMajor>(input1, 0, stride);
 
-    // CHECK: ([[# @LINE+1]]):{{.*}}error 51701:
+    // CHECK: fatal error[E51701]:
     let result = mat1.MapElement((uint r, uint c, int x)=>x+cb);
 
     result.Store<CoopMatMatrixLayout.RowMajor>(outputBuffer, 0, stride);
