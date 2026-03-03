@@ -214,19 +214,27 @@ function(set_default_compile_options target)
     )
 
     if(SLANG_ENABLE_ASAN)
-        add_supported_cxx_flags(
-            ${target}
-            PRIVATE
-            /fsanitize=address
-            -fsanitize=address
-        )
-        add_supported_cxx_linker_flags(
-            ${target}
-            BEFORE
-            PUBLIC
-            /INCREMENTAL:NO
-            -fsanitize=address
-        )
+        if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+            # Clang defaults to statically linking the sanitizer runtime (except on macOS/Darwin),
+            # which is not compatible with `-Wl,--no-undefined`, so we need to use dynamic linking
+            # instead (`-shared-libsan`).
+            target_compile_options(
+                ${target}
+                PRIVATE -fsanitize=address -shared-libsan
+            )
+            target_link_options(
+                ${target}
+                PUBLIC -fsanitize=address -shared-libsan
+            )
+        elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+            target_compile_options(${target} PRIVATE -fsanitize=address)
+            target_link_options(${target} PUBLIC -fsanitize=address)
+        elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
+            target_compile_options(${target} PRIVATE /fsanitize=address)
+            target_link_options(${target} PRIVATE /INCREMENTAL:NO)
+        else()
+            message(FATAL_ERROR "SLANG_ENABLE_ASAN: unsupported C++ compiler")
+        endif()
     endif()
 
     if(SLANG_ENABLE_COVERAGE)
