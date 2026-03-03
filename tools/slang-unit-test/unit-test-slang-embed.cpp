@@ -17,9 +17,16 @@ static void encodeByteAsOctal(char c, char* buf, size_t bufSize)
     snprintf(buf, bufSize, "\\%03o", (unsigned char)c);
 }
 
+// Reproduce the original buggy logic (no cast) to confirm it produces
+// sign-extended output on platforms where char is signed.
+static void encodeByteAsOctalBuggy(char c, char* buf, size_t bufSize)
+{
+    snprintf(buf, bufSize, "\\%03o", c);
+}
+
 SLANG_UNIT_TEST(slangEmbedOctalEscape)
 {
-    char buf[16];
+    char buf[32];
 
     // The UTF-8 encoding of the em dash U+2014 is three bytes: 0xE2, 0x80, 0x94.
     // On signed-char platforms these are negative values (-30, -128, -108).
@@ -49,4 +56,17 @@ SLANG_UNIT_TEST(slangEmbedOctalEscape)
     // Verify ASCII bytes still encode correctly (0x1B == 27 == octal 033)
     encodeByteAsOctal('\x1B', buf, sizeof(buf));
     SLANG_CHECK(strcmp(buf, "\\033") == 0);
+
+    // Negative test: reproduce the original bug to confirm detection.
+    // On platforms where char is signed, passing a non-ASCII byte without the
+    // (unsigned char) cast sign-extends the value to int, so %o formats it as
+    // a large number (e.g. 0xFFFFFFE2 == 037777777742 for 0xE2).
+    // The result must NOT be a compact 3-digit escape.
+    if ((char)0xFF < 0)
+    {
+        // char is signed on this platform: verify the bug actually manifests.
+        encodeByteAsOctalBuggy((char)0xE2, buf, sizeof(buf));
+        SLANG_CHECK(strcmp(buf, "\\342") != 0); // must be oversized, not \342
+        SLANG_CHECK(strlen(buf) > 4);           // oversized escape is longer than \NNN
+    }
 }
