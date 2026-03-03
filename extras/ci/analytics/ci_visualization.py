@@ -788,6 +788,11 @@ def generate_statistics(data, config, output_dir):
             name = g["name"]
             if name not in sh_groups:
                 sh_groups[name] = g.get("runner_count", 0)
+    for p in config.get("runner_name_prefixes", []):
+        if p.get("self_hosted"):
+            name = p["name"]
+            if name not in sh_groups:
+                sh_groups[name] = p.get("runner_count", 0)
 
     group_parallel_per_day = defaultdict(list)
     cap_avg_queue = []
