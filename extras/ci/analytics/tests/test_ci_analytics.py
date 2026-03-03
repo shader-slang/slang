@@ -127,6 +127,57 @@ class TestRunnerTypeCoverage(unittest.TestCase):
         self.assertIn("Windows GPU (GCP)", html)
 
 
+class TestStatisticsRunnerNamePrefixes(unittest.TestCase):
+    def test_statistics_parallel_chart_includes_runner_name_prefix_groups(self):
+        """generate_statistics must pick up self-hosted groups defined only
+        in runner_name_prefixes (e.g. Windows Build) so they appear in the
+        Average Concurrent Runners chart."""
+        config = {
+            "label_groups": [
+                {"labels": ["Linux", "self-hosted", "GPU"], "name": "Linux GPU (GCP)", "self_hosted": True},
+            ],
+            "runner_name_prefixes": [
+                {"prefix": "win-build-", "name": "Windows Build (GCP)", "self_hosted": True},
+            ],
+            "non_production_periods": {"runners": {}},
+        }
+
+        # Two days ago so process_jobs doesn't skip it as "today"
+        yesterday = (datetime.now(timezone.utc).replace(hour=12, minute=0, second=0, microsecond=0)
+                     - ci_health.timedelta(days=2))
+        ts = yesterday.strftime("%Y-%m-%dT%H:%M:%SZ")
+        completed = (yesterday + ci_health.timedelta(minutes=30)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+        jobs = [
+            {
+                "name": "build-windows",
+                "workflow_name": "CI",
+                "run_id": 1,
+                "run_created_at": ts,
+                "created_at": ts,
+                "started_at": ts,
+                "completed_at": completed,
+                "conclusion": "success",
+                "event": "push",
+                "head_branch": "main",
+                "labels": [],
+                "runner_name": "win-build-42",
+                "duration_seconds": 1800,
+                "queued_seconds": 10,
+                "html_url": "",
+            },
+        ]
+
+        data = ci_visualization.process_jobs(jobs, config)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            ci_visualization.generate_statistics(data, config, tmp)
+            with open(os.path.join(tmp, "statistics.html"), encoding="utf-8") as f:
+                html = f.read()
+
+        self.assertIn("Windows Build (GCP)", html)
+
+
 class TestUtilityBehavior(unittest.TestCase):
     def test_round_time_rounds_down(self):
         self.assertEqual(ci_health._round_time("12:44"), "12:30")
