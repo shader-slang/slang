@@ -8056,7 +8056,8 @@ void SemanticsDeclBasesVisitor::visitInterfaceDecl(InterfaceDecl* decl)
         {
             if (!decl->findModifier<ComInterfaceAttribute>())
             {
-                getSink()->diagnose(inheritanceDecl, Diagnostics::interfaceInheritingComMustBeCom);
+                getSink()->diagnose(
+                    Diagnostics::InterfaceInheritingComMustBeCom{.decl = inheritanceDecl});
             }
         }
     }

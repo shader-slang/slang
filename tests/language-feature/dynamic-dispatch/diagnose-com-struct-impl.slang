@@ -3,7 +3,7 @@
 // not support the pointer-based object model COM requires, so structs cannot
 // implement COM interfaces.
 
-//TEST:SIMPLE(filecheck=CHECK): -target spirv
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv
 
 [COM("00000000-0000-0000-0000-000000000001")]
 interface ICOMService
@@ -11,8 +11,9 @@ interface ICOMService
     float query();
 }
 
-// CHECK: ([[# @LINE+1]]): error 31124
 struct BadImpl : ICOMService
+//CHECK:         ^^^^^^^^^^^ E31124
+//CHECK:         ^^^^^^^^^^^ a struct type cannot implement a [COM] interface
 {
     float v;
     float query() { return v; }
