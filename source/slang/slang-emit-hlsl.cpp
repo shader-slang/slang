@@ -1686,11 +1686,10 @@ void HLSLSourceEmitter::emitSemanticsImpl(IRInst* inst, bool allowOffsets)
         auto semanticName = semanticDecoration->getSemanticName();
         m_writer->emit(semanticName);
 
-        // Only emit semantic index for semantics that accept them
-        if (doesHLSLSemanticAcceptIndex(semanticName))
-        {
-            m_writer->emit(semanticDecoration->getSemanticIndex());
-        }
+        auto semanticIndex = semanticDecoration->getSemanticIndex();
+        // Only emit semantic index for semantics that specify an index and accept an index
+        if (semanticIndex >= 0 && doesHLSLSemanticAcceptIndex(semanticName))
+            m_writer->emit(semanticIndex);
         return;
     }
     else if (auto packOffsetDecoration = inst->findDecoration<IRPackOffsetDecoration>())
