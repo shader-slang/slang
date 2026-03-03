@@ -1,5 +1,8 @@
 name: Trigger SlangPy CI
 
+permissions:
+  contents: read
+
 # Use pull_request_target so this workflow has access to repository secrets
 # even for PRs from forks. This is safe because the workflow only dispatches
 # metadata (PR number, SHA) and never checks out or executes PR code.
@@ -19,7 +22,7 @@ jobs:
 
     steps:
       - name: Trigger SlangPy CI
-        uses: peter-evans/repository-dispatch@v3
+        uses: peter-evans/repository-dispatch@ff45666b9427631e3450c54a1bcbee4d9ff4d7c0 # v3
         with:
           token: ${{ secrets.SLANGPY_DISPATCH_TOKEN }}
           repository: shader-slang/slangpy
