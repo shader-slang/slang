@@ -22045,7 +22045,8 @@ struct HitObject
                     Payload = p;
                 }
             }
-        case glsl:
+        case glsl: // use GL_EXT until KHR is available.
+        //case _GL_EXT_shader_invocation_reorder: // Not sure why, but needs to be commented out.
             {
                 // Conditional: if T is int (location), pass directly; else convert data to location
                 if (T is int)
@@ -22248,7 +22249,8 @@ struct HitObject
                     Payload = p;
                 }
             }
-        case glsl:
+        case glsl: // use GL_EXT until KHR is available.
+        //case _GL_EXT_shader_invocation_reorder: // Not sure why, but needs to be commented out.
             {
                 // Conditional: if T is int (location), pass directly; else convert data to location
                 if (T is int)
@@ -22742,8 +22744,9 @@ struct HitObject
         {
         case hlsl_nvapi: __intrinsic_asm "($2=NvMakeMiss($0,$1))";
         case _GL_NV_shader_invocation_reorder:
-            __glslMakeMiss(__return_val, MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax);
-        case glsl:
+            __glslMakeMissNV(__return_val, MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax);
+        case glsl: // use GL_EXT until KHR is available.
+        //case _GL_EXT_shader_invocation_reorder: // Not sure why, but needs to be commented out.
             // EXT spec requires RayFlags parameter, pass 0 as default
             __glslMakeMissEXT(__return_val, 0, MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax);
         case cuda: __intrinsic_asm "optixMakeMissHitObject";
@@ -22784,10 +22787,11 @@ struct HitObject
         __target_switch
         {
         case _GL_NV_shader_invocation_reorder:
-            __glslMakeMotionMiss(__return_val, MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax, CurrentTime);
-        case glsl:
+            __glslMakeMissMotionNV(__return_val, MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax, CurrentTime);
+        case glsl: // use GL_EXT until KHR is available.
+        //case _GL_EXT_shader_invocation_reorder: // Not sure why, but needs to be commented out.
             // EXT requires RayFlags parameter - use 0 as default
-            __intrinsic_asm "hitObjectRecordMissMotionEXT($R, 0, $0, $1.Origin, $1.TMin, $1.Direction, $1.TMax, $2)";
+            __glslMakeMissMotionEXT(__return_val, 0, MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax, CurrentTime);
         case cuda: __intrinsic_asm "optixMakeMissHitObject";
         case spvShaderInvocationReorderNV:
             {
@@ -22855,8 +22859,9 @@ struct HitObject
             __intrinsic_asm "($0 = NvMakeNop())";
         case _GL_NV_shader_invocation_reorder:
             __glslMakeNop(__return_val);
-        case glsl:
-            __intrinsic_asm "hitObjectRecordEmptyEXT($R)";
+        case glsl: // use GL_EXT until KHR is available.
+        case _GL_EXT_shader_invocation_reorder:
+            __intrinsic_asm "hitObjectRecordEmptyEXT(__return_val)";
         case cuda: __intrinsic_asm "slangOptixMakeNopHitObject";
         case spvShaderInvocationReorderNV:
             spirv_asm
@@ -22930,7 +22935,8 @@ struct HitObject
                 // Write payload result
                 Payload = p;
             }
-        case glsl:
+        case glsl: // use GL_EXT until KHR is available.
+        //case _GL_EXT_shader_invocation_reorder: // Not sure why, but needs to be commented out.
             {
                 [__vulkanRayPayload]
                 static payload_t p;
@@ -23000,8 +23006,11 @@ struct HitObject
         __target_switch
         {
         case hlsl: __intrinsic_asm ".IsMiss";
-        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectIsMissNV($0)";
-        case glsl: __intrinsic_asm "hitObjectIsMissEXT($0)";
+        case _GL_NV_shader_invocation_reorder:
+            __intrinsic_asm "hitObjectIsMissNV($0)";
+        case glsl: // use GL_EXT until KHR is available.
+        case _GL_EXT_shader_invocation_reorder:
+            __intrinsic_asm "hitObjectIsMissEXT($0)";
         case cuda: __intrinsic_asm "slangOptixHitObjectIsMiss";
         case spvShaderInvocationReorderNV:
             return spirv_asm
@@ -23028,8 +23037,11 @@ struct HitObject
         __target_switch
         {
         case hlsl: __intrinsic_asm ".IsHit";
-        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectIsHitNV($0)";
-        case glsl: __intrinsic_asm "hitObjectIsHitEXT($0)";
+        case _GL_NV_shader_invocation_reorder:
+            __intrinsic_asm "hitObjectIsHitNV($0)";
+        case glsl: // use GL_EXT until KHR is available.
+        case _GL_EXT_shader_invocation_reorder:
+            __intrinsic_asm "hitObjectIsHitEXT($0)";
         case cuda: __intrinsic_asm "slangOptixHitObjectIsHit";
         case spvShaderInvocationReorderNV:
             return spirv_asm
@@ -23056,8 +23068,11 @@ struct HitObject
         __target_switch
         {
         case hlsl: __intrinsic_asm ".IsNop";
-        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectIsEmptyNV($0)";
-        case glsl: __intrinsic_asm "hitObjectIsEmptyEXT($0)";
+        case _GL_NV_shader_invocation_reorder:
+            __intrinsic_asm "hitObjectIsEmptyNV($0)";
+        case glsl: // use GL_EXT until KHR is available.
+        case _GL_EXT_shader_invocation_reorder:
+            __intrinsic_asm "hitObjectIsEmptyEXT($0)";
         case cuda: __intrinsic_asm "slangOptixHitObjectIsNop";
         case spvShaderInvocationReorderNV:
             return spirv_asm
@@ -23092,7 +23107,8 @@ struct HitObject
                 RayDesc ray = { __glslGetRayWorldOrigin(), __glslGetTMin(), __glslGetRayWorldDirection(), __glslGetTMax() };
                 return ray;
             }
-        case glsl:
+        case glsl: // use GL_EXT until KHR is available.
+        case _GL_EXT_shader_invocation_reorder:
             {
                 RayDesc ray = { __glslGetRayWorldOriginEXT(), __glslGetTMinEXT(), __glslGetRayWorldDirectionEXT(), __glslGetTMaxEXT() };
                 return ray;
@@ -23133,8 +23149,11 @@ struct HitObject
         {
         case hlsl:
             __intrinsic_asm ".GetShaderTableIndex";
-        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectGetShaderBindingTableRecordIndexNV($0)";
-        case glsl: __intrinsic_asm "hitObjectGetShaderBindingTableRecordIndexEXT($0)";
+        case _GL_NV_shader_invocation_reorder:
+            __intrinsic_asm "hitObjectGetShaderBindingTableRecordIndexNV($0)";
+        case glsl: // use GL_EXT until KHR is available.
+        case _GL_EXT_shader_invocation_reorder:
+            __intrinsic_asm "hitObjectGetShaderBindingTableRecordIndexEXT($0)";
         case cuda: __intrinsic_asm "slangOptixHitObjectGetSbtRecordIndex";
         case spvShaderInvocationReorderNV:
             return spirv_asm
@@ -23187,8 +23206,11 @@ struct HitObject
         {
         case hlsl:
             __intrinsic_asm ".GetInstanceIndex";
-        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectGetInstanceIdNV($0)";
-        case glsl: __intrinsic_asm "hitObjectGetInstanceIdEXT($0)";
+        case _GL_NV_shader_invocation_reorder:
+            __intrinsic_asm "hitObjectGetInstanceIdNV($0)";
+        case glsl: // use GL_EXT until KHR is available.
+        case _GL_EXT_shader_invocation_reorder:
+            __intrinsic_asm "hitObjectGetInstanceIdEXT($0)";
         case cuda: __intrinsic_asm "slangOptixHitObjectGetInstanceIndex";
         case spvShaderInvocationReorderNV:
             return spirv_asm
@@ -23217,8 +23239,11 @@ struct HitObject
         {
         case hlsl:
             __intrinsic_asm ".GetInstanceID";
-        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectGetInstanceCustomIndexNV($0)";
-        case glsl: __intrinsic_asm "hitObjectGetInstanceCustomIndexEXT($0)";
+        case _GL_NV_shader_invocation_reorder:
+            __intrinsic_asm "hitObjectGetInstanceCustomIndexNV($0)";
+        case glsl: // use GL_EXT until KHR is available.
+        case _GL_EXT_shader_invocation_reorder:
+            __intrinsic_asm "hitObjectGetInstanceCustomIndexEXT($0)";
         case cuda: __intrinsic_asm "slangOptixHitObjectGetInstanceId";
         case spvShaderInvocationReorderNV:
             return spirv_asm
@@ -23247,8 +23272,11 @@ struct HitObject
         {
         case hlsl:
             __intrinsic_asm ".GetGeometryIndex";
-        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectGetGeometryIndexNV($0)";
-        case glsl: __intrinsic_asm "hitObjectGetGeometryIndexEXT($0)";
+        case _GL_NV_shader_invocation_reorder:
+            __intrinsic_asm "hitObjectGetGeometryIndexNV($0)";
+        case glsl: // use GL_EXT until KHR is available.
+        case _GL_EXT_shader_invocation_reorder:
+            __intrinsic_asm "hitObjectGetGeometryIndexEXT($0)";
         case cuda: __intrinsic_asm "slangOptixHitObjectGetSbtGASIndex";
         case spvShaderInvocationReorderNV:
             return spirv_asm
@@ -23277,8 +23305,11 @@ struct HitObject
         {
         case hlsl:
             __intrinsic_asm ".GetPrimitiveIndex";
-        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectGetPrimitiveIndexNV($0)";
-        case glsl: __intrinsic_asm "hitObjectGetPrimitiveIndexEXT($0)";
+        case _GL_NV_shader_invocation_reorder:
+            __intrinsic_asm "hitObjectGetPrimitiveIndexNV($0)";
+        case glsl: // use GL_EXT until KHR is available.
+        case _GL_EXT_shader_invocation_reorder:
+            __intrinsic_asm "hitObjectGetPrimitiveIndexEXT($0)";
         case cuda: __intrinsic_asm "slangOptixHitObjectGetPrimitiveIndex";
         case spvShaderInvocationReorderNV:
             return spirv_asm
@@ -23307,8 +23338,11 @@ struct HitObject
         {
         case hlsl:
             __intrinsic_asm ".GetHitKind";
-        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectGetHitKindNV($0)";
-        case glsl: __intrinsic_asm "hitObjectGetHitKindEXT($0)";
+        case _GL_NV_shader_invocation_reorder:
+            __intrinsic_asm "hitObjectGetHitKindNV($0)";
+        case glsl: // use GL_EXT until KHR is available.
+        case _GL_EXT_shader_invocation_reorder:
+            __intrinsic_asm "hitObjectGetHitKindEXT($0)";
         case cuda: __intrinsic_asm "optixHitObjectGetHitKind()";
         case spvShaderInvocationReorderNV:
             return spirv_asm
@@ -23463,8 +23497,11 @@ struct HitObject
         __target_switch
         {
         case hlsl_nvapi: __intrinsic_asm ".GetWorldToObject";
-        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectGetWorldToObjectNV($0)";
-        case glsl: __intrinsic_asm "hitObjectGetWorldToObjectEXT($0)";
+        case _GL_NV_shader_invocation_reorder:
+            __intrinsic_asm "hitObjectGetWorldToObjectNV($0)";
+        case glsl: // use GL_EXT until KHR is available.
+        case _GL_EXT_shader_invocation_reorder:
+            __intrinsic_asm "hitObjectGetWorldToObjectEXT($0)";
         case cuda: __intrinsic_asm "slangOptixHitObjectGetWorldToObject";
         case spvShaderInvocationReorderNV:
             return spirv_asm
@@ -23495,8 +23532,11 @@ struct HitObject
         __target_switch
         {
         case hlsl_nvapi: __intrinsic_asm ".GetObjectToWorld";
-        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectGetObjectToWorldNV($0)";
-        case glsl: __intrinsic_asm "hitObjectGetObjectToWorldEXT($0)";
+        case _GL_NV_shader_invocation_reorder:
+            __intrinsic_asm "hitObjectGetObjectToWorldNV($0)";
+        case glsl: // use GL_EXT until KHR is available.
+        case _GL_EXT_shader_invocation_reorder:
+            __intrinsic_asm "hitObjectGetObjectToWorldEXT($0)";
         case cuda: __intrinsic_asm "slangOptixHitObjectGetObjectToWorld";
         case spvShaderInvocationReorderNV:
             return spirv_asm
@@ -23522,7 +23562,8 @@ struct HitObject
         {
         case _GL_NV_shader_invocation_reorder:
             __intrinsic_asm "hitObjectGetCurrentTimeNV($0)";
-        case glsl:
+        case glsl: // use GL_EXT until KHR is available.
+        case _GL_EXT_shader_invocation_reorder:
             __intrinsic_asm "hitObjectGetCurrentTimeEXT($0)";
         case cuda: __intrinsic_asm "slangOptixHitObjectGetRayTime";
         case spvShaderInvocationReorderNV:
@@ -23552,7 +23593,8 @@ struct HitObject
             __intrinsic_asm ".GetObjectRayOrigin";
         case _GL_NV_shader_invocation_reorder:
             __intrinsic_asm "hitObjectGetObjectRayOriginNV($0)";
-        case glsl:
+        case glsl: // use GL_EXT until KHR is available.
+        case _GL_EXT_shader_invocation_reorder:
             __intrinsic_asm "hitObjectGetObjectRayOriginEXT($0)";
         case cuda: __intrinsic_asm "optixGetObjectRayOrigin()";
         case spvShaderInvocationReorderNV:
@@ -23582,7 +23624,8 @@ struct HitObject
             __intrinsic_asm ".GetObjectRayDirection";
         case _GL_NV_shader_invocation_reorder:
             __intrinsic_asm "hitObjectGetObjectRayDirectionNV($0)";
-        case glsl:
+        case glsl: // use GL_EXT until KHR is available.
+        case _GL_EXT_shader_invocation_reorder:
             __intrinsic_asm "hitObjectGetObjectRayDirectionEXT($0)";
         case cuda: __intrinsic_asm "optixGetObjectRayDirection()";
         case spvShaderInvocationReorderNV:
@@ -23609,7 +23652,8 @@ struct HitObject
         {
         case _GL_NV_shader_invocation_reorder:
             __intrinsic_asm "hitObjectGetShaderRecordBufferHandleNV($0)";
-        case glsl:
+        case glsl: // use GL_EXT until KHR is available.
+        case _GL_EXT_shader_invocation_reorder:
             __intrinsic_asm "hitObjectGetShaderRecordBufferHandleEXT($0)";
         case spvShaderInvocationReorderNV:
             return spirv_asm
@@ -23656,7 +23700,8 @@ struct HitObject
                 // Return the attributes
                 return __hitObjectAttributes<attr_t>();
             }
-        case glsl:
+        case glsl: // use GL_EXT until KHR is available.
+        case _GL_EXT_shader_invocation_reorder:
             {
                 // Work out the location
                 int attributeLocation = __hitObjectAttributesLocation(__hitObjectAttributes<attr_t>());
@@ -24040,7 +24085,7 @@ struct HitObject
     __glsl_extension(GL_NV_shader_invocation_reorder)
     __glsl_extension(GL_EXT_ray_tracing)
     [require(glsl, ser_raygen_closesthit_miss)]
-    static void __glslMakeMiss(
+    static void __glslMakeMissNV(
         out HitObject hitObj,
         uint MissShaderIndex,
         float3 Origin,
@@ -24071,16 +24116,18 @@ struct HitObject
     {
         __target_switch
         {
-        case glsl: __intrinsic_asm "hitObjectRecordMissEXT";
+        case glsl:
+        case _GL_EXT_shader_invocation_reorder:
+            __intrinsic_asm "hitObjectRecordMissEXT";
         }
     }
 
     // "void hitObjectRecordMissMotionNV(hitObjectNV, uint, vec3, float, vec3, float, float);"
-    __glsl_extension(GL_NV_shader_invocation_reorder)
+    __glsl_extension(GL_NV_shader_invocation_reorder_motion)
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_ray_tracing_motion_blur)
     [require(glsl, ser_motion_raygen_closesthit_miss)]
-    static void __glslMakeMotionMiss(
+    static void __glslMakeMissMotionNV(
         out HitObject hitObj,
         uint MissShaderIndex,
         float3 Origin,
@@ -24095,6 +24142,30 @@ struct HitObject
         }
     }
 
+    // EXT version with RayFlags parameter
+    // "void hitObjectRecordMissMotionEXT(hitObjectEXT hitObject, uint rayFlags, uint sbtRecordIndex, vec3 origin, float Tmin, vec3 direction, float TMax, float currentTime)"
+    __glsl_extension(GL_EXT_shader_invocation_reorder_motion)
+    __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+    [require(glsl, ser_raygen_closesthit_miss)]
+    static void __glslMakeMissMotionEXT(
+        out HitObject hitObj,
+        uint RayFlags,
+        uint MissShaderIndex,
+        float3 Origin,
+        float TMin,
+        float3 Direction,
+        float TMax,
+        float currentTime)
+    {
+        __target_switch
+        {
+        case glsl:
+        case _GL_EXT_shader_invocation_reorder:
+            __intrinsic_asm "hitObjectRecordMissMotionEXT";
+        }
+    }
+
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
     [require(glsl, ser_raygen_closesthit_miss)]
@@ -24102,7 +24173,11 @@ struct HitObject
     {
         __target_switch
         {
-        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectRecordEmptyNV";
+        case _GL_NV_shader_invocation_reorder:
+            __intrinsic_asm "hitObjectRecordEmptyNV";
+        case glsl: // use GL_EXT until KHR is available.
+        case _GL_EXT_shader_invocation_reorder:
+            __intrinsic_asm "hitObjectRecordEmptyEXT";
         }
     }
 
@@ -24113,7 +24188,11 @@ struct HitObject
     {
         __target_switch
         {
-        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectGetObjectRayDirectionNV($0)";
+        case _GL_NV_shader_invocation_reorder:
+            __intrinsic_asm "hitObjectGetObjectRayDirectionNV($0)";
+        case glsl: // use GL_EXT until KHR is available.
+        case _GL_EXT_shader_invocation_reorder:
+            __intrinsic_asm "hitObjectGetObjectRayDirectionEXT($0)";
         }
     }
 
@@ -24124,7 +24203,11 @@ struct HitObject
     {
         __target_switch
         {
-        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectGetWorldRayDirectionNV($0)";
+        case _GL_NV_shader_invocation_reorder:
+            __intrinsic_asm "hitObjectGetWorldRayDirectionNV($0)";
+        case glsl: // use GL_EXT until KHR is available.
+        case _GL_EXT_shader_invocation_reorder:
+            __intrinsic_asm "hitObjectGetWorldRayDirectionEXT($0)";
         }
     }
 
@@ -24147,7 +24230,11 @@ struct HitObject
     {
         __target_switch
         {
-        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectGetWorldRayOriginNV($0)";
+        case _GL_NV_shader_invocation_reorder:
+            __intrinsic_asm "hitObjectGetWorldRayOriginNV($0)";
+        case glsl: // use GL_EXT until KHR is available.
+        case _GL_EXT_shader_invocation_reorder:
+            __intrinsic_asm "hitObjectGetWorldRayOriginEXT($0)";
         }
     }
 
@@ -24170,7 +24257,11 @@ struct HitObject
     {
         __target_switch
         {
-        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectGetRayTMaxNV($0)";
+        case _GL_NV_shader_invocation_reorder:
+            __intrinsic_asm "hitObjectGetRayTMaxNV($0)";
+        case glsl: // use GL_EXT until KHR is available.
+        case _GL_EXT_shader_invocation_reorder:
+            __intrinsic_asm "hitObjectGetRayTMaxEXT($0)";
         }
     }
 
@@ -24193,7 +24284,11 @@ struct HitObject
     {
         __target_switch
         {
-        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectGetRayTMinNV($0)";
+        case _GL_NV_shader_invocation_reorder:
+            __intrinsic_asm "hitObjectGetRayTMinNV($0)";
+        case glsl: // use GL_EXT until KHR is available.
+        case _GL_EXT_shader_invocation_reorder:
+            __intrinsic_asm "hitObjectGetRayTMinEXT($0)";
         }
     }
 
@@ -24319,7 +24414,11 @@ struct HitObject
     {
         __target_switch
         {
-        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectGetAttributesNV($0, $1)";
+        case _GL_NV_shader_invocation_reorder:
+            __intrinsic_asm "hitObjectGetAttributesNV($0, $1)";
+        case glsl: // use GL_EXT until KHR is available.
+        case _GL_EXT_shader_invocation_reorder:
+            __intrinsic_asm "hitObjectGetAttributesEXT($0, $1)";
         }
     }
 
@@ -24356,8 +24455,11 @@ struct HitObject
     {
         __target_switch
         {
-        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectTraceRayNV";
-        case glsl: __intrinsic_asm "hitObjectTraceRayEXT";
+        case _GL_NV_shader_invocation_reorder:
+            __intrinsic_asm "hitObjectTraceRayNV";
+        case glsl: // use GL_EXT until KHR is available.
+        case _GL_EXT_shader_invocation_reorder:
+            __intrinsic_asm "hitObjectTraceRayEXT";
         }
     }
 
@@ -24382,7 +24484,6 @@ struct HitObject
         __target_switch
         {
         case _GL_EXT_shader_invocation_reorder: __intrinsic_asm "hitObjectTraceRayEXT";
-        case glsl: __intrinsic_asm "hitObjectTraceRayEXT";
         }
     }
 
@@ -24876,8 +24977,11 @@ struct HitObject
     {
         __target_switch
         {
-        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectTraceRayMotionNV";
-        case glsl: __intrinsic_asm "hitObjectTraceRayMotionEXT";
+        case _GL_NV_shader_invocation_reorder:
+            __intrinsic_asm "hitObjectTraceRayMotionNV";
+        case glsl: // use GL_EXT until KHR is available.
+        case _GL_EXT_shader_invocation_reorder:
+            __intrinsic_asm "hitObjectTraceRayMotionEXT";
         }
     }
 
@@ -24916,7 +25020,11 @@ struct HitObject
     {
         __target_switch
         {
-        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectExecuteShaderNV";
+        case _GL_NV_shader_invocation_reorder:
+            __intrinsic_asm "hitObjectExecuteShaderNV";
+        case glsl: // use GL_EXT until KHR is available.
+        case _GL_EXT_shader_invocation_reorder:
+            __intrinsic_asm "hitObjectExecuteShaderEXT";
         }
     }
 
@@ -24953,8 +25061,11 @@ void ReorderThread( uint CoherenceHint, uint NumCoherenceHintBitsFromLSB )
     {
     case hlsl_nvapi: __intrinsic_asm "NvReorderThread";
     case hlsl: __intrinsic_asm "dx::MaybeReorderThread";
-    case _GL_NV_shader_invocation_reorder: __intrinsic_asm "reorderThreadNV";
-    case glsl: __intrinsic_asm "reorderThreadEXT";
+    case _GL_NV_shader_invocation_reorder:
+        __intrinsic_asm "reorderThreadNV";
+    case glsl: // use GL_EXT until KHR is available.
+    case _GL_EXT_shader_invocation_reorder:
+        __intrinsic_asm "reorderThreadEXT";
     case cuda: __intrinsic_asm "optixReorder";
     case spvShaderInvocationReorderNV:
         spirv_asm
@@ -25000,8 +25111,11 @@ void ReorderThread( HitObject HitOrMiss, uint CoherenceHint, uint NumCoherenceHi
     {
     case hlsl_nvapi: __intrinsic_asm "NvReorderThread";
     case hlsl: __intrinsic_asm "dx::MaybeReorderThread";
-    case _GL_NV_shader_invocation_reorder: __intrinsic_asm "reorderThreadNV";
-    case glsl: __intrinsic_asm "reorderThreadEXT";
+    case _GL_NV_shader_invocation_reorder:
+        __intrinsic_asm "reorderThreadNV";
+    case glsl: // use GL_EXT until KHR is available.
+    case _GL_EXT_shader_invocation_reorder:
+        __intrinsic_asm "reorderThreadEXT";
     case cuda: __intrinsic_asm "optixReorder($1, $2)";
     case spvShaderInvocationReorderNV:
         spirv_asm
@@ -25037,8 +25151,11 @@ void ReorderThread( HitObject HitOrMiss )
     {
     case hlsl_nvapi: __intrinsic_asm "NvReorderThread";
     case hlsl: __intrinsic_asm "dx::MaybeReorderThread";
-    case _GL_NV_shader_invocation_reorder: __intrinsic_asm "reorderThreadNV";
-    case glsl: __intrinsic_asm "reorderThreadEXT";
+    case _GL_NV_shader_invocation_reorder:
+        __intrinsic_asm "reorderThreadNV";
+    case glsl: // use GL_EXT until KHR is available.
+    case _GL_EXT_shader_invocation_reorder:
+        __intrinsic_asm "reorderThreadEXT";
     case cuda: __intrinsic_asm "optixReorder()";
     case spvShaderInvocationReorderNV:
         spirv_asm
