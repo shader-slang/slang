@@ -27,7 +27,7 @@ struct C : IInterface
 float calc<T : IInterface>(T obj, float y)
 {
     return T::calc(y);
-    // REPORT: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
+    // REPORT: note[E50102]: generated dynamic dispatch code
 }
 
 float f(uint id, float x)

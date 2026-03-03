@@ -686,7 +686,7 @@ When the `spvDescriptorHeapEXT` capability is requested (either via the `-capabi
 without declaring any explicit descriptor sets. Descriptor handles are still lowered to `uint2`.
 For resources other than `CombinedTextureSampler`, Slang uses `uint2.x` as the index to access the global sampler or resource heap.
 For `CombinedTextureSampler` handles, Slang uses `uint2.x` to index into the resource heap to obtain the texture, and `uint2.y` to index into the sampler
-heap to obtain the sampler state, and combines the objects with an `OpSampledImage` instruction.
+heap to obtain the sampler state, and combines the objects with an `OpSampledImage` instruction. By default, when using the `spvDescriptorHeapEXT` capability, Slang will reinterpret the resource or sampler heap as an array of requested resource type, whose stride is defined by the resource type, obtained from `OpConstantSizeOfEXT` instruction. The user can override this behavior and specify a different stride with the `-spirv-resource-heap-stride` or `-spirv-sampler-heap-stride` compiler options.
 
 Additionally, if none of the above behaviors are desired, users can customize the conversion logic from descriptor handle to resource objects by providing a `getDescriptorFromHandle` in user code. For example:
 

@@ -16,10 +16,10 @@ void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
         + (u8 << 5)
         + (u8 << 6)
         + (u8 << 7)
-        // CHECK-NOT: warning 41030:
-        // CHECK: ([[#@LINE+1]]): warning 41030: {{.*}}uint8{{.*}}8
+        // CHECK-NOT: warning[E41030]
+        // CHECK: warning[E41030]: left shift overflow
         + (u8 << 8)
-        // CHECK: ([[#@LINE+1]]): warning 41030: {{.*}}uint8{{.*}}9
+        // CHECK: warning[E41030]: left shift overflow
         + (u8 << 9)
         ;
 

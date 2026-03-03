@@ -1,6 +1,6 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+// Using non-exhaustive because this produces many cascading parse errors
 
-// CHECK: error 20001:
 struct test
 {
     float3 field;
@@ -9,4 +9,5 @@ void f()
 {
     test x; x
     vector<int,2> v;
+//CHECK:       ^ unexpected token
 }

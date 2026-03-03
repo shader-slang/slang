@@ -33,30 +33,30 @@ DEFAULT_TOP_WAITING = 15
 # Checked top-to-bottom; first match where required_labels is a subset of
 # the job's labels wins.
 DEFAULT_LABEL_GROUPS = [
-    ({"Linux", "self-hosted", "GPU"}, "Linux GPU (self-hosted)", True),
-    ({"Windows", "self-hosted", "GCP-T4"}, "Windows GPU (self-hosted, org)", True),
+    ({"Linux", "self-hosted", "GPU"}, "Linux GPU (GCP)", True),
+    ({"Windows", "self-hosted", "GCP-T4"}, "Windows GPU (GCP)", True),
     # These Windows runners share the same physical machines (SLANGWIN*)
-    ({"Windows", "self-hosted", "regression-test"}, "Windows test (self-hosted)", True),
-    ({"Windows", "self-hosted", "benchmark"}, "Windows test (self-hosted)", True),
-    ({"Windows", "self-hosted", "falcor"}, "Windows test (self-hosted)", True),
-    ({"Windows", "self-hosted", "perf"}, "Windows test (self-hosted)", True),
-    ({"ubuntu-22.04"}, "GitHub Linux x64", False),
-    ({"ubuntu-latest"}, "GitHub Linux x64", False),
-    ({"ubuntu-24.04-arm"}, "GitHub Linux ARM64", False),
-    ({"macos-latest"}, "GitHub macOS", False),
-    ({"windows-latest"}, "GitHub Windows", False),
+    ({"Windows", "self-hosted", "regression-test"}, "Windows", True),
+    ({"Windows", "self-hosted", "benchmark"}, "Windows", True),
+    ({"Windows", "self-hosted", "falcor"}, "Windows", True),
+    ({"Windows", "self-hosted", "perf"}, "Windows", True),
+    ({"ubuntu-22.04"}, "Linux (GH)", False),
+    ({"ubuntu-latest"}, "Linux (GH)", False),
+    ({"ubuntu-24.04-arm"}, "Linux ARM64 (GH)", False),
+    ({"macos-latest"}, "macOS (GH)", False),
+    ({"windows-latest"}, "Windows (GH)", False),
 ]
 
 
-def load_label_groups():
-    """Load label groups from analytics/runner_config.json if available."""
+def load_runner_config():
+    """Load label groups and name prefixes from analytics/runner_config.json."""
     config_path = os.path.join(
         os.path.dirname(os.path.abspath(__file__)),
         "analytics",
         "runner_config.json",
     )
     if not os.path.exists(config_path):
-        return DEFAULT_LABEL_GROUPS
+        return DEFAULT_LABEL_GROUPS, []
     try:
         with open(config_path, "r", encoding="utf-8") as f:
             config = json.load(f)
@@ -66,12 +66,18 @@ def load_label_groups():
             name = group.get("name", "Other")
             self_hosted = bool(group.get("self_hosted", False))
             groups.append((labels, name, self_hosted))
-        return groups or DEFAULT_LABEL_GROUPS
+        prefixes = []
+        for p in config.get("runner_name_prefixes", []):
+            prefix = p.get("prefix", "")
+            if not prefix:
+                continue
+            prefixes.append((prefix, p.get("name", "Other"), bool(p.get("self_hosted", False))))
+        return groups or DEFAULT_LABEL_GROUPS, prefixes
     except (OSError, json.JSONDecodeError):
-        return DEFAULT_LABEL_GROUPS
+        return DEFAULT_LABEL_GROUPS, []
 
 
-LABEL_GROUPS = load_label_groups()
+LABEL_GROUPS, NAME_PREFIXES = load_runner_config()
 
 
 def fetch_runs(repo, status):
@@ -172,8 +178,16 @@ def fetch_runners(repo):
 # --- Data processing ---
 
 
-def classify_group(labels):
-    """Map job labels to a (group_name, is_self_hosted) tuple."""
+def classify_group(labels, runner_name=""):
+    """Map runner name or job labels to a (group_name, is_self_hosted) tuple.
+
+    Checks runner name prefixes first (scale set runners have empty labels),
+    then falls back to label matching for legacy/static runners.
+    """
+    if runner_name:
+        for prefix, name, self_hosted in NAME_PREFIXES:
+            if runner_name.startswith(prefix):
+                return name, self_hosted
     label_set = set(labels) if labels else set()
     for required, name, self_hosted in LABEL_GROUPS:
         if required <= label_set:
@@ -258,7 +272,7 @@ def print_queue_by_group(all_jobs, runners, runners_available):
     group_names_seen = []
 
     for job in all_jobs:
-        group_name, is_self_hosted = classify_group(job.get("labels", []))
+        group_name, is_self_hosted = classify_group(job.get("labels", []), job.get("runner_name", ""))
         if group_name not in group_queued and group_name not in group_running:
             group_names_seen.append(group_name)
         group_self_hosted[group_name] = is_self_hosted
@@ -272,7 +286,7 @@ def print_queue_by_group(all_jobs, runners, runners_available):
     group_runners_idle = defaultdict(int)
     for runner in runners:
         labels = [l["name"] for l in runner.get("labels", [])]
-        group_name, is_self_hosted = classify_group(labels)
+        group_name, is_self_hosted = classify_group(labels, runner.get("name", ""))
         if is_self_hosted and runner.get("status") == "online":
             group_runners_total[group_name] += 1
             if not runner.get("busy", False):
@@ -405,7 +419,7 @@ def print_runner_status(runners, all_jobs, runners_available):
     groups = defaultdict(list)
     for runner in runners:
         labels = [l["name"] for l in runner.get("labels", [])]
-        group_name, is_self_hosted = classify_group(labels)
+        group_name, is_self_hosted = classify_group(labels, runner.get("name", ""))
         if is_self_hosted:
             groups[group_name].append(runner)
 
@@ -453,7 +467,7 @@ def build_json_output(queued_runs, inprogress_runs, all_jobs, runners, runners_a
     group_names_seen = []
 
     for job in all_jobs:
-        group_name, is_self_hosted = classify_group(job.get("labels", []))
+        group_name, is_self_hosted = classify_group(job.get("labels", []), job.get("runner_name", ""))
         if group_name not in group_queued and group_name not in group_running:
             group_names_seen.append(group_name)
         group_self_hosted[group_name] = is_self_hosted
@@ -467,7 +481,7 @@ def build_json_output(queued_runs, inprogress_runs, all_jobs, runners, runners_a
     if runners_available:
         for runner in runners:
             labels = [l["name"] for l in runner.get("labels", [])]
-            group_name, is_self_hosted = classify_group(labels)
+            group_name, is_self_hosted = classify_group(labels, runner.get("name", ""))
             if is_self_hosted and runner.get("status") == "online":
                 group_runners_total[group_name] += 1
                 if not runner.get("busy", False):
@@ -520,6 +534,7 @@ def build_json_output(queued_runs, inprogress_runs, all_jobs, runners, runners_a
                 "workflow": job.get("_workflow", ""),
                 "created_at": job.get("created_at"),
                 "runner_name": job.get("runner_name"),
+                "html_url": job.get("html_url", ""),
             }
         )
 
@@ -549,7 +564,7 @@ def build_json_output(queued_runs, inprogress_runs, all_jobs, runners, runners_a
 
         for runner in runners:
             labels = [l["name"] for l in runner.get("labels", [])]
-            group_name, is_self_hosted = classify_group(labels)
+            group_name, is_self_hosted = classify_group(labels, runner.get("name", ""))
             if not is_self_hosted:
                 continue
             entry = {
@@ -565,6 +580,7 @@ def build_json_output(queued_runs, inprogress_runs, all_jobs, runners, runners_a
                     "name": job.get("name"),
                     "branch": job.get("_branch", ""),
                     "workflow": job.get("_workflow", ""),
+                    "html_url": job.get("html_url", ""),
                 }
             runner_status.append(entry)
 

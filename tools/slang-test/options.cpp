@@ -80,6 +80,7 @@ static bool _isSubCommand(const char* arg)
         "  -api <expr>                    Enable specific APIs (e.g., 'vk+dx12' or '+dx11')\n"
         "  -synthesizedTestApi <expr>     Set APIs for synthesized tests\n"
         "  -skip-api-detection            Skip API availability detection\n"
+        "  -only-api-detection            Only run API detection and print results, then exit\n"
         "  -server-count <n>              Set number of test servers (default: 1)\n"
         "  -show-adapter-info             Show detailed adapter information\n"
         "  -generate-hlsl-baselines       Generate HLSL test baselines\n"
@@ -461,7 +462,23 @@ static bool _isSubCommand(const char* arg)
         }
         else if (strcmp(arg, "-skip-api-detection") == 0)
         {
+            if (optionsOut->apiDetectionOnly)
+            {
+                stdError.print(
+                    "error: -only-api-detection and -skip-api-detection are mutually exclusive\n");
+                return SLANG_FAIL;
+            }
             optionsOut->skipApiDetection = true;
+        }
+        else if (strcmp(arg, "-only-api-detection") == 0)
+        {
+            if (optionsOut->skipApiDetection)
+            {
+                stdError.print(
+                    "error: -only-api-detection and -skip-api-detection are mutually exclusive\n");
+                return SLANG_FAIL;
+            }
+            optionsOut->apiDetectionOnly = true;
         }
         else if (strcmp(arg, "-emit-spirv-via-glsl") == 0)
         {

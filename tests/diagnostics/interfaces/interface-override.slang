@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=diag):
 
 interface IBase
 {
@@ -7,22 +7,28 @@ interface IBase
 
 interface IDerived : IBase
 {
-    //CHECK-DAG: ([[# @LINE+1]]): error 30311:
     __init() {}
+/*diag:
+    ^^^^^^ interface requirement has body
+    ^^^^^^ non-method interface requirement cannot have a body.
+*/
 
     property int value{
         get;
 
-        //CHECK-DAG: ([[# @LINE+1]]): error 30311:
         set{ }
+//diag: ^^^ interface requirement has body
+//diag: ^^^ non-method interface requirement cannot have a body.
     }
 
     __subscript(int index)->int
     {
-        //CHECK-DAG: ([[# @LINE+1]]): error 30311:
         get{}
+//diag: ^^^ interface requirement has body
+//diag: ^^^ non-method interface requirement cannot have a body.
     }
 
-    //CHECK-DAG: ([[# @LINE+1]]): error 30312:
     override int f() {}
+//diag:          ^ interface requirement cannot override
+//diag:          ^ interface requirement cannot override a base declaration.
 }

@@ -94,8 +94,10 @@ public struct Sigmoid<T> : IActivation<T>
         [ForceUnroll]
         for (int i = 0; i < Vector.Size; i++)
         {
+            // Numerically stable: exp() argument is always <= 0
             let x = input[i];
-            output[i] = T(1) / (T(1) + exp(-x));
+            let ex = exp(x >= T(0) ? -x : x);
+            output[i] = x >= T(0) ? T(1) / (T(1) + ex) : ex / (T(1) + ex);
         }
         return output;
     }
@@ -185,8 +187,10 @@ public struct SiLU<T> : IActivation<T>
         [ForceUnroll]
         for (int i = 0; i < Vector.Size; i++)
         {
+            // x * sigmoid(x), numerically stable: exp() argument is always <= 0
             let x = input[i];
-            output[i] = x / (T(1) + exp(-x));  // x * sigmoid(x)
+            let ex = exp(x >= T(0) ? -x : x);
+            output[i] = x >= T(0) ? x / (T(1) + ex) : x * ex / (T(1) + ex);
         }
         return output;
     }
@@ -212,8 +216,11 @@ public struct QuickGELU<T> : IActivation<T>
         [ForceUnroll]
         for (int i = 0; i < Vector.Size; i++)
         {
+            // x * sigmoid(1.702 * x), numerically stable: exp() argument is always <= 0
             let x = input[i];
-            output[i] = x / (T(1) + exp(T(-1.702) * x));  // x * sigmoid(1.702 * x)
+            let sx = T(1.702) * x;
+            let ex = exp(sx >= T(0) ? -sx : sx);
+            output[i] = sx >= T(0) ? x / (T(1) + ex) : x * ex / (T(1) + ex);
         }
         return output;
     }

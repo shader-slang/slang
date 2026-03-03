@@ -1044,6 +1044,11 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
             }
             else
             {
+                // Ensure all warps finished reading shared memory from the previous
+                // tile iteration (or from the previous layer's output writeback in
+                // fused multi-layer kernels) before overwriting with new tile data.
+                GroupMemoryBarrierWithGroupSync();
+
                 loadShA<U, Address>(ptrAOffset[0], tileIndex, weightAddress);
                 loadVectorToShB(ptrBOffset[0], tileIndex, subgroupIndex, inputVector);
 
@@ -1271,6 +1276,13 @@ public struct WaveTangledVector<T, ShMemSize : ISharedMemorySize, int N, int Sub
         // outerProductAccumulate uses per-warp shared memory for both A (dOutput vectors)
         // and B (input vectors). The B region must start after ALL per-warp A regions to
         // avoid overlapping writes between warps (warp i's A would alias warp (i-1)'s B).
+        //
+        // Sync required: mma() above ends with warp-level sync only, but
+        // outerProductAccumulate reuses the same shared memory pool (starting at shA=0).
+        // Without a group sync, fast warps starting the outer product would corrupt
+        // slow warps still reading from mma's output writeback.
+        GroupMemoryBarrierWithGroupSync();
+
         static const int _outerRows = (MMA.M + MMA.CMShape.ROW_A - 1) / MMA.CMShape.ROW_A;
         static const int _outerPerWarpA = _outerRows * MMA.CMShape.ROW_A / MMA.CMShape.ElementCountPerVector * MMA.CMShape.COLUMN_A;
         uint shB_outer = shA + uint(getWaveCount() * _outerPerWarpA);
@@ -1283,6 +1295,8 @@ public struct WaveTangledVector<T, ShMemSize : ISharedMemorySize, int N, int Sub
         let dInput = MMA.mma<T, Address, OutputVector.Differential, This.Differential
                         >( doutput, shA, shB, shC, dWeightAddress.p, none);
         dthis = DifferentialPair<This>(dthis.p, dInput);
+
+        GroupMemoryBarrierWithGroupSync();
 
         static const int _outerRows2 = (MMA.M + MMA.CMShape.ROW_A - 1) / MMA.CMShape.ROW_A;
         static const int _outerPerWarpA2 = _outerRows2 * MMA.CMShape.ROW_A / MMA.CMShape.ElementCountPerVector * MMA.CMShape.COLUMN_A;
