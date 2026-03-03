@@ -541,13 +541,14 @@ func (m *Manager) reconcileTrackedVMs(ctx context.Context) {
 
 	// Collect all RUNNING VM names across zones
 	runningVMs := make(map[string]bool)
+	failedZones := make(map[string]bool)
 	for zone := range zoneVMs {
 		listCtx, cancel := context.WithTimeout(ctx, cleanupZoneScanTimeout)
 		names, err := m.listRunningVMNames(listCtx, zone)
 		cancel()
 		if err != nil {
 			slog.Warn("reconcile: failed to list running VMs", "zone", zone, "error", err)
-			// Don't evict entries for this zone if we can't verify
+			failedZones[zone] = true
 			continue
 		}
 		for _, name := range names {
@@ -555,10 +556,14 @@ func (m *Manager) reconcileTrackedVMs(ctx context.Context) {
 		}
 	}
 
-	// Remove tracked entries whose VMs are no longer RUNNING
+	// Remove tracked entries whose VMs are no longer RUNNING.
+	// Skip VMs in zones where the list call failed.
 	m.mu.Lock()
 	evicted := 0
 	for runnerName, vm := range m.vms {
+		if failedZones[vm.zone] {
+			continue
+		}
 		if !runningVMs[vm.vmName] {
 			slog.Info("reconcile: removing stale tracked VM", "runner", runnerName, "vm", vm.vmName, "zone", vm.zone)
 			delete(m.vms, runnerName)

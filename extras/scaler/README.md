@@ -6,9 +6,9 @@ queue depth. Uses the [GitHub Actions Scale Set Client](https://github.com/actio
 
 ## Architecture
 
-```
+```text
 ┌──────────────────────────────────────────┐
-│ e2-small VM ($15/month, always-on)       │
+│ e2-small VM (always-on)                  │
 │                                          │
 │  scaler (Windows)                        │
 │   --labels=Windows,self-hosted,GCP-T4    │
@@ -100,7 +100,7 @@ Zones are grouped by region (GPU quota is per-region in GCP), and the region
 with the most available GPUs is selected. This allows spreading VMs across
 regions to avoid quota limits.
 
-```
+```text
 Configured zones: us-east1-c, us-east1-d, us-central1-a, us-west1-a
                        ↓
 Query quota: us-east1 (5 free), us-central1 (3 free), us-west1 (0 free)
@@ -144,12 +144,14 @@ See `deploy/` directory:
 
 ```bash
 # First time setup
-cd extras/scaler && GOOS=linux GOARCH=amd64 go build -o scaler-linux ./cmd/scaler && cd ../..
+cd extras/scaler
+GOOS=linux GOARCH=amd64 go build -o scaler-linux ./cmd/scaler
 cp deploy/scaler.env.example deploy/scaler.env   # Add your GitHub token
 ./deploy/setup-scaler-host.sh
 
 # Update binary
-cd extras/scaler && GOOS=linux GOARCH=amd64 go build -o scaler-linux ./cmd/scaler && cd ../..
+cd extras/scaler
+GOOS=linux GOARCH=amd64 go build -o scaler-linux ./cmd/scaler
 ./deploy/update-scaler.sh
 ```
 
@@ -192,7 +194,9 @@ runner registration via JIT config on each boot.
 
 ## Cost
 
-- Control VM (e2-small, 24/7): ~$15/month
-- Windows runner VMs (n1-standard-4 + T4): ~$0.826/hour each
-- Linux runner VMs (n1-standard-4 + T4): ~$0.70/hour each
-- Estimated total: ~$515/month (vs ~$5,000/month for static runners)
+- Control VM: e2-small (24/7)
+- Windows GPU test runners: n1-standard-8 + T4 (on-demand)
+- Linux GPU test runners: n1-standard-8 + T4 (on-demand)
+- Windows build runners: n1-standard-8, no GPU (on-demand)
+
+See [GCP pricing](https://cloud.google.com/compute/vm-instance-pricing) for current rates.

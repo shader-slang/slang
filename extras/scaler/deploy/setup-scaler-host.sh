@@ -107,10 +107,13 @@ gcloud compute scp "${SCALER_DIR}/deploy/scaler-windows.service" "${VM_NAME}:/tm
   --zone="${ZONE}" --project="${PROJECT}"
 gcloud compute scp "${SCALER_DIR}/deploy/scaler-linux.service" "${VM_NAME}:/tmp/scaler-linux.service" \
   --zone="${ZONE}" --project="${PROJECT}"
+gcloud compute scp "${SCALER_DIR}/deploy/scaler-windows-build.service" "${VM_NAME}:/tmp/scaler-windows-build.service" \
+  --zone="${ZONE}" --project="${PROJECT}"
 
 gcloud compute ssh "${VM_NAME}" --zone="${ZONE}" --project="${PROJECT}" --command="
     sudo mv /tmp/scaler-windows.service /etc/systemd/system/scaler-windows.service
     sudo mv /tmp/scaler-linux.service /etc/systemd/system/scaler-linux.service
+    sudo mv /tmp/scaler-windows-build.service /etc/systemd/system/scaler-windows-build.service
     sudo systemctl daemon-reload
 "
 echo ""
