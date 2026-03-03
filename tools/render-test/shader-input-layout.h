@@ -77,6 +77,9 @@ struct InputBufferDesc
     // the default value of 0xffffffff indicates that a counter buffer should
     // not be assigned
     uint32_t counter = ~0u;
+
+    // User intended for the buffer to be passed via a T.Handle of the resource T
+    bool isHandle = false;
 };
 
 struct InputSamplerDesc

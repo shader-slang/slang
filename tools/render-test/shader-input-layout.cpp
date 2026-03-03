@@ -525,7 +525,14 @@ struct ShaderInputLayoutParser
             }
             sb << ">";
             parser.Read(">");
-            return sb.produceString();
+            typeName = sb.produceString();
+        }
+        if (parser.AdvanceIf("."))
+        {
+            StringBuilder sb;
+            sb << typeName << ".";
+            sb << parseTypeName(parser);
+            typeName = sb.produceString();
         }
         return typeName;
     }
@@ -706,6 +713,14 @@ struct ShaderInputLayoutParser
         {
             RefPtr<ShaderInputLayout::BufferVal> val = new ShaderInputLayout::BufferVal;
             val->bufferDesc.type = InputBufferType::StorageBuffer;
+            maybeParseOptions(parser, val.Ptr());
+            return val;
+        }
+        else if (parser.AdvanceIf("ubuffer_handle"))
+        {
+            RefPtr<ShaderInputLayout::BufferVal> val = new ShaderInputLayout::BufferVal;
+            val->bufferDesc.type = InputBufferType::StorageBuffer;
+            val->bufferDesc.isHandle = true;
             maybeParseOptions(parser, val.Ptr());
             return val;
         }
