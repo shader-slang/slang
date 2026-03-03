@@ -4714,9 +4714,19 @@ attribute_syntax [raypayload] : RayPayloadAttribute;
 
 semantic sv_position
 {
+    // HLSL allows declaring SV_Position with fewer components; the missing
+    // components are implicitly zero (w defaults to 1 via the rasterizer).
     [require(fragment)]
     [require(geometry)]
     get : float4;
+
+    [require(fragment)]
+    [require(geometry)]
+    get : float3;
+
+    [require(fragment)]
+    [require(geometry)]
+    get : float2;
 
     [require(vertex)]
     [require(geometry)]
@@ -4724,6 +4734,20 @@ semantic sv_position
     [require(domain)]
     [require(mesh)]
     set : float4;
+
+    [require(vertex)]
+    [require(geometry)]
+    [require(hull)]
+    [require(domain)]
+    [require(mesh)]
+    set : float3;
+
+    [require(vertex)]
+    [require(geometry)]
+    [require(hull)]
+    [require(domain)]
+    [require(mesh)]
+    set : float2;
 }
 
 semantic sv_depth
