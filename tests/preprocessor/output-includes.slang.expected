@@ -11,27 +11,27 @@ error[E30201]: function 'bar' already has a body
   |
 3 | int bar()
   |     ^^^ redeclared here
---´
+--'
 
 note: see previous definition of 'bar'
  --- tests/preprocessor/include-a.slang.h:3:5
   |
 3 | int bar()
   |     ---
---´
+--'
 error[E30201]: function 'bar' already has a body
  --> tests/preprocessor/include-a.slang.h:3:5
   |
 3 | int bar()
   |     ^^^ redeclared here
---´
+--'
 
 note: see previous definition of 'bar'
  --- tests/preprocessor/include-a.slang.h:3:5
   |
 3 | int bar()
   |     ---
---´
+--'
 }
 standard output = {
 }

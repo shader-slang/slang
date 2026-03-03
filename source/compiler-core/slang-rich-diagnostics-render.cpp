@@ -102,7 +102,7 @@ private:
         const char* gutterCorner;
     };
     constexpr static Glyphs s_unicodeGlyphs = {"━", "┯", "─", "┬", "│", "╰ ", " ╭╼", " ╭╼", "╯"};
-    constexpr static Glyphs s_asciiGlyphs = {"^", "^", "-", "-", "|", "`", "-->", "---", "´"};
+    constexpr static Glyphs s_asciiGlyphs = {"^", "^", "-", "-", "|", "`", "-->", "---", "'"};
     const Glyphs& m_glyphs;
 
     // A single highlight on a line, with an optional label to be connected

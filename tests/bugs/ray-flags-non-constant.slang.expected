@@ -5,7 +5,7 @@ error[E39999]: expression does not evaluate to a compile-time constant
    |
 11 | RayQuery<rayFlags> query;
    |          ^^^^^^^^ expression does not evaluate to a compile-time constant
----´
+---'
 }
 standard output = {
 }
