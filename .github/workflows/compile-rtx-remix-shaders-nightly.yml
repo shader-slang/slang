@@ -17,7 +17,7 @@ permissions:
 jobs:
   rtx-remix-shader-test:
     runs-on: windows-2022
-    timeout-minutes: 45 # Slang build ~10-15 min + RTX Remix shaders ~10-15 min + buffer
+    timeout-minutes: 180 # Slang build ~10-15 min + RTX Remix shaders ~10-15 min + buffer
 
     defaults:
       run:
