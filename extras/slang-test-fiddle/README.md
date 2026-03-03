@@ -9,7 +9,7 @@ The `slang-fiddle` tool has been extended with a test generation mode that proce
 ## Command Line Usage
 
 ```bash
-slang-fiddle -m test-gen -o <output-directory> <template.slang>
+slang-fiddle -m test-gen -o <output-directory> <template.slang> [<template2.slang> ...]
 ```
 
 ## Template Syntax
@@ -169,22 +169,11 @@ Comprehensive real-world example generating 29 test files with conditional test 
 
 ## Implementation Details
 
-### Modified Files
-
-The following files in `tools/slang-fiddle/` were modified to add test generation support:
-
-- `slang-fiddle-options.h` - Added `TestGen` mode enum and command-line options
-- `slang-fiddle-main.cpp` - Added test generation mode handler
-- `slang-fiddle-script.h` - Added test generation global state declarations
-- `slang-fiddle-script.cpp` - Implemented `emit_test_file()` Lua function
-- `slang-fiddle-template.h` - Added `hasTrailingNewline` field to splice statements
-- `slang-fiddle-template.cpp` - Fixed newline handling after identifier splices
-
 ### Test Generation Mode
 
 When invoked with `-m test-gen`:
 
-1. The template file is parsed using standard FIDDLE parsing
+1. Each template file is parsed using standard FIDDLE parsing
 2. RAW() and SPLICE() functions accumulate content into a buffer instead of generating `.fiddle` files
 3. Lua code executes, calling `emit_test_file()` to write accumulated content
 4. Each `emit_test_file()` call writes the buffer to the specified file and clears it
