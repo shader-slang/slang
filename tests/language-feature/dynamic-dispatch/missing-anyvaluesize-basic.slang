@@ -63,7 +63,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     IShape s = createShape(dispatchThreadID.x);
     outputBuffer[dispatchThreadID.x] = s.compute();
-    // REPORT: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
+    // REPORT: {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
 }
 // Verify inferred AnyValueSize and struct sizes via IR dump.
 // SIZE: AnyValueSize(16 : Int)

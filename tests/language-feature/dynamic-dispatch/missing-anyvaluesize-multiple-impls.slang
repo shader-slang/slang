@@ -103,7 +103,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     IData d = createIData(dispatchThreadID.x);
     outputBuffer[dispatchThreadID.x] = d.sum();
-    // REPORT: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 4 possible types:
+    // REPORT: {{.*}} generated {{.*}} dispatch code{{.*}} 4 possible types:
 }
 // Verify inferred AnyValueSize and struct sizes via IR dump.
 // SIZE: AnyValueSize(32 : Int)

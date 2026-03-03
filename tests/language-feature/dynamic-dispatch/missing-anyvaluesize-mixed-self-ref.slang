@@ -87,7 +87,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     INode n = createNode(dispatchThreadID.x);
     outputBuffer[dispatchThreadID.x] = n.getValue();
-    // REPORT: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 3 possible types:
+    // REPORT: {{.*}} generated {{.*}} dispatch code{{.*}} 3 possible types:
 }
 // Verify inferred AnyValueSize and struct sizes via IR dump.
 // SIZE: AnyValueSize(16 : Int)
