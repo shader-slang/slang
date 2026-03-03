@@ -98,7 +98,22 @@
       "self_hosted": true
     },
     {
+      "prefix": "linux-test-",
+      "name": "Linux GPU (GCP)",
+      "self_hosted": true
+    },
+    {
       "prefix": "win-runner-",
+      "name": "Windows GPU (GCP)",
+      "self_hosted": true
+    },
+    {
+      "prefix": "win-build-",
+      "name": "Windows Build (GCP)",
+      "self_hosted": true
+    },
+    {
+      "prefix": "win-test-",
       "name": "Windows GPU (GCP)",
       "self_hosted": true
     },

@@ -310,7 +310,7 @@ jobs:
       compiler: cl
       platform: x86_64
       config: release
-      runs-on: '["Windows", "self-hosted", "GCP-T4"]'
+      runs-on: '["Windows", "self-hosted", "build"]'
       warnings-as-errors: true
       build-llvm: true
       save-sccache: true
@@ -327,7 +327,7 @@ jobs:
       compiler: cl
       platform: x86_64
       config: debug
-      runs-on: '["Windows", "self-hosted", "GCP-T4"]'
+      runs-on: '["Windows", "self-hosted", "build"]'
       warnings-as-errors: true
       build-llvm: true
       save-sccache: true
