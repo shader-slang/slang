@@ -1,5 +1,5 @@
 [Unit]
-Description=GitHub Actions Windows Build Runner Scaler (no GPU)
+Description=GCP Runner Scaler (Windows builds, no GPU)
 After=network-online.target
 Wants=network-online.target
 

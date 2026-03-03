@@ -1,4 +1,4 @@
-# GPU Runner Scaler
+# GCP Runner Scaler
 
 Auto-scales Linux and Windows GPU VMs on GCP based on GitHub Actions job
 queue depth. Uses the [GitHub Actions Scale Set Client](https://github.com/actions/scaleset)

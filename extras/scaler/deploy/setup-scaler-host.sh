@@ -1,5 +1,5 @@
 #!/bin/bash
-# Deploy GPU Runner Scaler Host
+# Deploy GCP Runner Scaler Host
 #
 # Creates a small always-on VM and deploys the scaler binary as
 # systemd services. One service per platform (Linux GPU, Windows GPU).

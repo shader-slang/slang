@@ -1,4 +1,4 @@
-// Windows GPU Runner Scaler
+// GCP Runner Scaler
 //
 // A standalone service that auto-scales Windows GPU VMs on GCP based on
 // GitHub Actions job queue depth. Uses the GitHub Actions Scale Set Client
@@ -92,7 +92,7 @@ func (c *config) scalesetClient() (*scaleset.Client, error) {
 				PrivateKey:     c.appPrivateKey,
 			},
 			SystemInfo: scaleset.SystemInfo{
-				System:    "windows-gpu-scaler",
+				System:    "gcp-runner-scaler",
 				Subsystem: "scaler",
 			},
 		})
@@ -102,7 +102,7 @@ func (c *config) scalesetClient() (*scaleset.Client, error) {
 			GitHubConfigURL:     c.registrationURL,
 			PersonalAccessToken: c.token,
 			SystemInfo: scaleset.SystemInfo{
-				System:    "windows-gpu-scaler",
+				System:    "gcp-runner-scaler",
 				Subsystem: "scaler",
 			},
 		})
@@ -265,7 +265,7 @@ func run(ctx context.Context, cfg config, logger *slog.Logger) error {
 	)
 
 	ssClient.SetSystemInfo(scaleset.SystemInfo{
-		System:     "windows-gpu-scaler",
+		System:     "gcp-runner-scaler",
 		Subsystem:  "scaler",
 		ScaleSetID: ss.ID,
 	})
