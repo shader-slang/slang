@@ -352,7 +352,14 @@ void MarkdownCommandOptionsWriter::_appendDescriptionForCategory(Index categoryI
                 }
 
                 m_builder << "### ";
-                StringUtil::join(names.getBuffer(), names.getCount(), toSlice(", "), m_builder);
+                if (option.displayName.getLength())
+                {
+                    _appendEscapedMarkdown(option.displayName, m_builder);
+                }
+                else
+                {
+                    StringUtil::join(names.getBuffer(), names.getCount(), toSlice(", "), m_builder);
+                }
                 m_builder << "\n";
 
                 if (option.usage.getLength())
@@ -409,6 +416,20 @@ void MarkdownCommandOptionsWriter::_appendDescriptionForCategory(Index categoryI
             }
         }
 
+        if (m_hasLinks)
+        {
+            auto links = options.getLinksForOption(option);
+            if (links.getCount() > 0)
+            {
+                m_builder << "Links:\n";
+                for (const auto& link : links)
+                {
+                    m_builder << "* [" << link.text << "](" << link.url << ")\n";
+                }
+                m_builder << "\n";
+            }
+        }
+
         m_builder << "\n";
     }
 
@@ -433,7 +454,10 @@ UnownedStringSlice MarkdownCommandOptionsWriter::_getLinkName(const NameKey& key
     }
 
     StringBuilder buf;
-    buf << prefix;
+    for (char c : prefix)
+    {
+        buf.append(CharUtil::toLower(c));
+    }
 
     const auto bufLen = buf.getLength();
 
@@ -580,30 +604,49 @@ void TextCommandOptionsWriter::_appendDescriptionForCategory(Index categoryIndex
             _appendWrappedIndented(1, names, toSlice(", "));
         }
 
-        if (option.description.getLength() == 0)
+        auto links = options.getLinksForOption(option);
+
+        if (option.description.getLength() == 0 && links.getCount() == 0)
         {
             m_builder << "\n";
             continue;
         }
 
-        m_builder << ": ";
-
-        _appendText(2, option.description);
-
-        if (option.usage.getLength())
+        if (option.description.getLength() > 0)
         {
-            List<Index> usageCategoryIndices;
-            options.findCategoryIndicesFromUsage(option.usage, usageCategoryIndices);
+            m_builder << ": ";
 
-            for (auto usageCategoryIndex : usageCategoryIndices)
+            _appendText(2, option.description);
+
+            if (option.usage.getLength())
             {
-                auto& usageCat = categories[usageCategoryIndex];
+                List<Index> usageCategoryIndices;
+                options.findCategoryIndicesFromUsage(option.usage, usageCategoryIndices);
 
+                for (auto usageCategoryIndex : usageCategoryIndices)
+                {
+                    auto& usageCat = categories[usageCategoryIndex];
+
+                    m_builder << m_options.indent << m_options.indent;
+
+                    m_builder << "To get a list of values that can be used for <" << usageCat.name
+                              << ">, ";
+                    m_builder << "use \"slangc -h " << usageCat.name << "\"\n";
+                }
+            }
+        }
+        else
+        {
+            m_builder << "\n";
+        }
+
+        if (links.getCount() > 0)
+        {
+            m_builder << m_options.indent << m_options.indent << "Links:\n";
+            for (const auto& link : links)
+            {
                 m_builder << m_options.indent << m_options.indent;
-
-                m_builder << "To get a list of values that can be used for <" << usageCat.name
-                          << ">, ";
-                m_builder << "use \"slangc -h " << usageCat.name << "\"\n";
+                m_builder << "* " << link.text << ": " << link.url << "\n";
             }
         }
     }

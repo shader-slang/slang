@@ -1,7 +1,7 @@
 // Test that arrays of structs containing ParameterBlocks are properly diagnosed
-// with error 30027 instead of causing a compiler crash
+// with error 30028 instead of causing a compiler crash
 
-//TEST:SIMPLE(filecheck=CHECK): -target spirv
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target spirv
 
 // A struct that contains a ParameterBlock member
 struct MyStruct
@@ -19,12 +19,13 @@ interface IMyInterface
 [numthreads(1, 1, 1)]
 void computeMain()
 {
-    // CHECK: ([[# @LINE+1]]): error 30027:
     MyStruct arr[2];
-    
+//CHECK:     ^^^ arrays of non-addressable type not allowed
+
     // Also test with dynamic arrays
-    // CHECK: ([[# @LINE+1]]): error 30027: 
     MyStruct dynamicArr[];
+//CHECK:     ^^^^^^^^^^ arrays of non-addressable type not allowed
+//CHECK:     ^^^^^^^^^^ cannot instantiate unsized type
 }
 
 // Test nested structs as well
@@ -39,6 +40,6 @@ struct OuterStruct
 void computeMain2()
 {
     // Nested struct containing ParameterBlock should also trigger the error
-    // CHECK: ([[# @LINE+1]]): error 30027:
     OuterStruct nestedArr[3];
+//CHECK:        ^^^^^^^^^ arrays of non-addressable type not allowed
 }

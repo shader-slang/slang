@@ -18,7 +18,7 @@ SLANG_UNIT_TEST(imageFormatReflection)
     // Source for a module that contains an undecorated entrypoint.
     const char* userSourceBody = R"(
         Texture2D<uint4> g_tex : register(t0);
-        float4 fragMain(float4 pos:SV_Position) : SV_Position
+        float4 fragMain(float4 pos:SV_Position) : SV_Target
         {
             return pos;
         }

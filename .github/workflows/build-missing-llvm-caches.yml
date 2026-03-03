@@ -1,0 +1,200 @@
+name: Build Missing LLVM Caches
+
+on:
+  workflow_dispatch:
+    inputs:
+      force_rebuild:
+        description: "Force rebuild even if cache exists (for script changes)"
+        required: false
+        type: boolean
+        default: false
+  schedule:
+    # Run weekly on Sundays at 00:00 UTC to catch any new platforms or script changes
+    - cron: "0 0 * * 0"
+
+jobs:
+  # Check which LLVM caches are missing
+  check-caches:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.check.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for missing caches
+        id: check
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Define all platform combinations that need LLVM
+          # Format: os:compiler:platform:runs-on
+          configs=(
+            "linux:gcc:x86_64:ubuntu-22.04"
+            "linux:gcc:aarch64:ubuntu-24.04-arm"
+            "linux:clang-18:x86_64:ubuntu-22.04"
+            "macos:clang:aarch64:macos-latest"
+            "windows:cl:x86_64:windows-latest"
+          )
+
+          # Get all existing LLVM caches
+          echo "Fetching existing LLVM caches..."
+          existing_caches=$(gh api repos/${{ github.repository }}/actions/caches --jq '.actions_caches[] | select(.key | startswith("llvm-")) | .key')
+          echo "Existing caches:"
+          echo "$existing_caches"
+
+          # Build matrix JSON
+          matrix_json='{"include":['
+          first=true
+
+          for config in "${configs[@]}"; do
+            IFS=':' read -r os compiler platform runs_on <<< "$config"
+
+            # Generate cache key prefix (without hash)
+            cache_prefix="llvm-${os}-${compiler}-${platform}-"
+
+            # Check if any cache exists for this platform
+            cache_exists=false
+            while IFS= read -r cache_key; do
+              if [[ "$cache_key" == "$cache_prefix"* ]]; then
+                cache_exists=true
+                echo "✅ Cache exists for ${os}-${compiler}-${platform}: $cache_key"
+                break
+              fi
+            done <<< "$existing_caches"
+
+            # If force_rebuild is true or no cache exists, add to matrix
+            if [[ "${{ inputs.force_rebuild }}" == "true" ]] || [[ "$cache_exists" == "false" ]]; then
+              if [[ "$cache_exists" == "false" ]]; then
+                echo "❌ No cache found for ${os}-${compiler}-${platform} - will build"
+              else
+                echo "🔄 Force rebuild requested for ${os}-${compiler}-${platform}"
+              fi
+
+              if [ "$first" = true ]; then
+                first=false
+              else
+                matrix_json+=","
+              fi
+
+              matrix_json+="{\"os\":\"$os\",\"compiler\":\"$compiler\",\"platform\":\"$platform\",\"runs-on\":\"$runs_on\"}"
+            fi
+          done
+
+          matrix_json+=']}'
+
+          echo "Matrix: $matrix_json"
+          echo "matrix=$matrix_json" >> $GITHUB_OUTPUT
+
+  # Build LLVM for each missing cache
+  build-llvm:
+    needs: check-caches
+    if: needs.check-caches.outputs.matrix != ''
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.check-caches.outputs.matrix) }}
+
+    runs-on: ${{ matrix.runs-on }}
+    timeout-minutes: 180
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup dependencies (Linux)
+        if: matrix.os == 'linux'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build
+
+          # Set compiler
+          CC=${{ matrix.compiler }}
+          CXX=${{ matrix.compiler }}
+          # infer C++ compiler
+          CXX=${CXX/gcc/g++}
+          CXX=${CXX/clang/clang++}
+          # Correct gcc version on older ubuntu
+          gcc_version=$(gcc -dumpversion | cut -d'.' -f1)
+          if [ "$gcc_version" -lt 10 ]; then
+            CC=${CC/gcc/gcc-10}
+            CXX=${CXX/g++/g++-10}
+          fi
+          echo "CC=$CC" >> "$GITHUB_ENV"
+          echo "CXX=$CXX" >> "$GITHUB_ENV"
+
+      - name: Setup dependencies (macOS)
+        if: matrix.os == 'macos'
+        shell: bash
+        run: |
+          brew install ninja
+          echo "CC=${{ matrix.compiler }}" >> "$GITHUB_ENV"
+          echo "CXX=${{ matrix.compiler == 'clang' && 'clang++' || matrix.compiler }}" >> "$GITHUB_ENV"
+
+      - name: Setup dependencies (Windows)
+        if: matrix.os == 'windows'
+        shell: bash
+        run: |
+          choco install ninja
+          echo "CC=${{ matrix.compiler }}" >> "$GITHUB_ENV"
+          echo "CXX=${{ matrix.compiler }}" >> "$GITHUB_ENV"
+
+      - name: Set up MSVC dev tools (Windows)
+        if: matrix.os == 'windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Try to restore existing cache (unless force rebuild)
+        id: cache-restore
+        if: inputs.force_rebuild != true
+        uses: actions/cache/restore@v4
+        with:
+          path: build/llvm-project-install
+          key: llvm-${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.platform }}-${{ hashFiles('external/build-llvm.sh') }}
+          restore-keys: |
+            llvm-${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.platform }}-
+
+      - name: Build LLVM (if cache miss or force rebuild)
+        if: inputs.force_rebuild == true || steps.cache-restore.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          echo "🔨 Building LLVM for ${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.platform }}"
+          echo "This will take 20-40 minutes..."
+
+          ./external/build-llvm.sh \
+            --install-prefix "${{ github.workspace }}/build/llvm-project-install" \
+            --repo "https://${{ github.token }}@github.com/llvm/llvm-project"
+
+      - name: Verify LLVM build
+        if: inputs.force_rebuild == true || steps.cache-restore.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          if [ ! -d "build/llvm-project-install" ]; then
+            echo "❌ LLVM build failed - install directory not found"
+            exit 1
+          fi
+
+          echo "✅ LLVM built successfully"
+          echo "📊 Installation size:"
+          du -sh build/llvm-project-install || true
+
+      - name: Save LLVM cache
+        if: inputs.force_rebuild == true || steps.cache-restore.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: build/llvm-project-install
+          key: llvm-${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.platform }}-${{ hashFiles('external/build-llvm.sh') }}
+
+      - name: Report status
+        shell: bash
+        run: |
+          if [ "${{ inputs.force_rebuild }}" == "true" ]; then
+            echo "✅ LLVM rebuilt with force_rebuild flag"
+            echo "   Key: llvm-${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.platform }}-${{ hashFiles('external/build-llvm.sh') }}"
+          elif [ "${{ steps.cache-restore.outputs.cache-hit }}" == "true" ]; then
+            echo "✅ Cache already existed - no rebuild needed"
+            echo "   Key: ${{ steps.cache-restore.outputs.cache-matched-key }}"
+          else
+            echo "✅ LLVM cache created successfully!"
+            echo "   Key: llvm-${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.platform }}-${{ hashFiles('external/build-llvm.sh') }}"
+          fi

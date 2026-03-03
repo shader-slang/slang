@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv
+//DIAGNOSTIC_TEST:SIMPLE(diag=diag): -target spirv
 
 struct T2 {
     float4 _m0;
@@ -6,10 +6,12 @@ struct T2 {
 
 [[vk::binding(0)]]
 cbuffer ubo : register(b0)
+//diag: ^^^ see constant buffer definition.
 {
     int in_val;
-    // CHECK: ([[# @LINE+1]]): error 31215
     T2 _z0[]; // error 31215: cannot use unsized type 'T2[]' in a constant buffer.
+//diag:^^^ unsized type in constant buffer
+//diag:^^^ cannot use unsized type 'T2[]' in a constant buffer.
 }
 
 [shader("fragment")]

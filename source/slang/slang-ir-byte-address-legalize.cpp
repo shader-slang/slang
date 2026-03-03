@@ -11,6 +11,7 @@
 
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -38,6 +39,11 @@ struct ByteAddressBufferLegalizationContext
     IRModule* m_module;
     IRBuilder m_builder;
 
+    // Track ByteAddressBuffer parameters that have been replaced by StructuredBuffer.
+    // These need to be removed at the end to avoid leaving invalid types in the IR
+    // for targets like SPIR-V that don't support ByteAddressBuffer directly.
+    HashSet<IRGlobalParam*> m_replacedByteAddressBufferParams;
+
     // Everything starts with a request to process a module,
     // which delegates to the central recursive walk of the IR.
     //
@@ -47,6 +53,19 @@ struct ByteAddressBufferLegalizationContext
         m_builder = IRBuilder(m_module);
 
         processInstRec(module->getModuleInst());
+
+        // After processing, remove ByteAddressBuffer parameters that have been
+        // replaced by StructuredBuffer parameters. These are no longer needed
+        // and would cause errors in backends like SPIR-V that don't support
+        // ByteAddressBuffer types directly.
+        for (auto param : m_replacedByteAddressBufferParams)
+        {
+            // Only remove if it has no uses (its uses should have been replaced)
+            if (!param->hasUses())
+            {
+                param->removeAndDeallocate();
+            }
+        }
     }
 
     // We recursively walk the entire IR structure (except
@@ -247,11 +266,11 @@ struct ByteAddressBufferLegalizationContext
             {
                 return true;
             }
-            m_sink->diagnose(
-                offset->sourceLoc,
-                Slang::Diagnostics::byteAddressBufferUnaligned,
-                alignInst->getValue(),
-                alignmentVal);
+            m_sink->diagnose(Diagnostics::ByteAddressBufferUnaligned{
+                .alignment = alignInst->getValue(),
+                .elementSize = alignmentVal,
+                .location = offset->sourceLoc,
+            });
         }
         return false;
     }
@@ -1032,6 +1051,7 @@ struct ByteAddressBufferLegalizationContext
 
     void cloneBufferDecorations(IRBuilder& builder, IRInst* dest, IRInst* src)
     {
+        List<IRDecoration*> decorationsToRemove;
         for (auto decoration : src->getDecorations())
         {
             switch (decoration->getOp())
@@ -1041,9 +1061,29 @@ struct ByteAddressBufferLegalizationContext
                     dest,
                     as<IRMemoryQualifierSetDecoration>(decoration)->getMemoryQualifierBit());
                 break;
+            case kIROp_KeepAliveDecoration:
+                // Transfer KeepAlive to the new buffer and mark for removal from original
+                // This is needed when -preserve-params is used: the original ByteAddressBuffer
+                // should not be kept alive since it's replaced by the StructuredBuffer.
+                builder.addKeepAliveDecoration(dest);
+                decorationsToRemove.add(decoration);
+                break;
+            case kIROp_ExportDecoration:
+                // Transfer Export decoration to the new buffer and mark for removal from original
+                {
+                    auto exportDecor = as<IRExportDecoration>(decoration);
+                    builder.addExportDecoration(dest, exportDecor->getMangledName());
+                    decorationsToRemove.add(decoration);
+                }
+                break;
             default:
                 break;
             }
+        }
+        // Remove decorations from the original that were transferred to the new buffer
+        for (auto decoration : decorationsToRemove)
+        {
+            decoration->removeAndDeallocate();
         }
     }
 
@@ -1089,6 +1129,11 @@ struct ByteAddressBufferLegalizationContext
             paramBuilder.addLayoutDecoration(structuredBufferParam, layoutDecoration->getLayout());
         }
         cloneBufferDecorations(paramBuilder, structuredBufferParam, byteAddressBufferParam);
+
+        // Track that this ByteAddressBuffer parameter has been replaced.
+        // It will be removed at the end of the pass if it has no remaining uses.
+        m_replacedByteAddressBufferParams.add(byteAddressBufferParam);
+
         return structuredBufferParam;
     }
 

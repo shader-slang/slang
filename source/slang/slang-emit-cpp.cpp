@@ -558,8 +558,7 @@ void CPPSourceEmitter::_emitAccess(
     case 1:
         {
             // Vector, row count is biggest
-            const UnownedStringSlice* elemNames =
-                getVectorElementNames(dimension.elemType, dimension.rowCount);
+            const UnownedStringSlice* elemNames = getVectorElementNames(dimension.rowCount);
             writer->emit(".");
             const int index = (row > col) ? row : col;
             writer->emit(elemNames[index]);
@@ -568,8 +567,7 @@ void CPPSourceEmitter::_emitAccess(
     case 2:
         {
             // Vector cols biggest dimension
-            const UnownedStringSlice* elemNames =
-                getVectorElementNames(dimension.elemType, dimension.colCount);
+            const UnownedStringSlice* elemNames = getVectorElementNames(dimension.colCount);
             writer->emit(".");
             const int index = (row > col) ? row : col;
             writer->emit(elemNames[index]);
@@ -578,8 +576,7 @@ void CPPSourceEmitter::_emitAccess(
     case 3:
         {
             // Matrix
-            const UnownedStringSlice* elemNames =
-                getVectorElementNames(dimension.elemType, dimension.colCount);
+            const UnownedStringSlice* elemNames = getVectorElementNames(dimension.colCount);
 
             writer->emit(".rows[");
             writer->emit(row);
@@ -1062,11 +1059,25 @@ void CPPSourceEmitter::emitSimpleValueImpl(IRInst* inst)
     if (inst->getOp() == kIROp_FloatLit)
     {
         IRConstant* constantInst = static_cast<IRConstant*>(inst);
+        bool shouldExplicitTypeCast = false;
 
         IRType* type = constantInst->getDataType();
-        if (type && type->getOp() == kIROp_HalfType)
+        if (type)
         {
-            m_writer->emit("half(");
+            switch (type->getOp())
+            {
+            case kIROp_HalfType:
+            case kIROp_FloatE4M3Type:
+            case kIROp_FloatE5M2Type:
+            case kIROp_BFloat16Type:
+                shouldExplicitTypeCast = true;
+                break;
+            }
+        }
+        if (shouldExplicitTypeCast)
+        {
+            emitType(type);
+            m_writer->emit("(");
         }
 
         switch (constantInst->getFloatKind())
@@ -1103,7 +1114,7 @@ void CPPSourceEmitter::emitSimpleValueImpl(IRInst* inst)
             }
         }
 
-        if (type && type->getOp() == kIROp_HalfType)
+        if (shouldExplicitTypeCast)
         {
             m_writer->emit(")");
         }
@@ -1290,11 +1301,8 @@ void CPPSourceEmitter::emitLoopControlDecorationImpl(IRLoopControlDecoration* de
     }
 }
 
-const UnownedStringSlice* CPPSourceEmitter::getVectorElementNames(
-    BaseType baseType,
-    Index elemCount)
+const UnownedStringSlice* CPPSourceEmitter::getVectorElementNames(Index elemCount)
 {
-    SLANG_UNUSED(baseType);
     SLANG_UNUSED(elemCount);
 
     static const UnownedStringSlice elemNames[] = {
@@ -1310,11 +1318,7 @@ const UnownedStringSlice* CPPSourceEmitter::getVectorElementNames(
 const UnownedStringSlice* CPPSourceEmitter::getVectorElementNames(IRVectorType* vectorType)
 {
     Index elemCount = Index(getIntVal(vectorType->getElementCount()));
-
-    IRType* type = vectorType->getElementType()->getCanonicalType();
-    IRBasicType* basicType = as<IRBasicType>(type);
-    SLANG_ASSERT(basicType);
-    return getVectorElementNames(basicType->getBaseType(), elemCount);
+    return getVectorElementNames(elemCount);
 }
 
 bool CPPSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)

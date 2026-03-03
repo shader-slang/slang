@@ -2,7 +2,7 @@
 
 // Our code does not warn here since we specify profile 'sm_5_0' and a raygen shader.
 // raygen implicitly uses "raygen + raytracing" capabilities
-//CHECK: warning 36113
+//CHECK: warning[E36113]
 struct RayPayload
 {
     uint data;

@@ -1,7 +1,7 @@
 // Test that 8-bit types use OpBitcast per SPIR-V spec
 // Per spec: scalar or vector of numerical types must use OpBitcast
 
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly -O0
 
 // Per SPIR-V spec: 8-bit types MUST use direct OpBitcast (no lowering/splitting)
 // CHECK-DAG: OpBitcast %char %

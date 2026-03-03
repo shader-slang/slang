@@ -1,8 +1,10 @@
 // slang-ir-layout.cpp
 #include "slang-ir-layout.h"
 
+#include "slang-compiler-options.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
+#include "slang-target.h"
 
 // This file implements facilities for computing and caching layout
 // information on IR types.
@@ -103,10 +105,13 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
 
         BASE(Int8, 1);
         BASE(UInt8, 1);
+        BASE(FloatE5M2, 1);
+        BASE(FloatE4M3, 1);
 
         BASE(Int16, 2);
         BASE(UInt16, 2);
         BASE(Half, 2);
+        BASE(BFloat16, 2);
 
         BASE(Int, 4);
         BASE(UInt, 4);
@@ -369,6 +374,37 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
         return SLANG_OK;
     case kIROp_DescriptorHandleType:
         {
+            // Check for spvBindlessTextureNV capability
+            bool hasBindlessTextureNV = false;
+            for (auto atomVal : targetReq->getOptionSet().getArray(CompilerOptionName::Capability))
+            {
+                if (atomVal.kind == CompilerOptionValueKind::Int &&
+                    atomVal.intValue == (int)CapabilityName::spvBindlessTextureNV)
+                {
+                    hasBindlessTextureNV = true;
+                    break;
+                }
+            }
+
+            if (hasBindlessTextureNV)
+            {
+                // For spvBindlessTextureNV, DescriptorHandle<T> is uint64_t
+                *outSizeAndAlignment = IRSizeAndAlignment(8, 8);
+                return SLANG_OK;
+            }
+
+            // Check for bindless targets (CPU, CUDA, Metal)
+            if (areResourceTypesBindlessOnTarget(targetReq))
+            {
+                // On bindless targets, DescriptorHandle<T> has the layout of T
+                auto descriptorHandleType = cast<IRDescriptorHandleType>(type);
+                return calcSizeAndAlignment(
+                    targetReq,
+                    descriptorHandleType->getResourceType(),
+                    outSizeAndAlignment);
+            }
+
+            // Non-bindless targets: DescriptorHandle<T> is uint2 (8 bytes, 4-byte alignment)
             IRBuilder builder(type);
             builder.setInsertBefore(type);
             auto uintType = builder.getUIntType();
@@ -395,6 +431,22 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
     default:
         break;
     }
+
+    // Handle StructuredBuffer types
+    if (as<IRHLSLStructuredBufferTypeBase>(type))
+    {
+        // On CPU and CUDA, StructuredBuffer is a struct with a pointer and a count
+        // (T* data + size_t count = 16 bytes, 8-byte alignment)
+        if (isCPUTarget(targetReq) || isCUDATarget(targetReq))
+        {
+            *outSizeAndAlignment = IRSizeAndAlignment(16, 8);
+            return SLANG_OK;
+        }
+        // On other targets (including Metal), use default resource size (8 bytes)
+        *outSizeAndAlignment = IRSizeAndAlignment(8, 8);
+        return SLANG_OK;
+    }
+
     if (as<IRResourceTypeBase>(type) || as<IRSamplerStateTypeBase>(type))
     {
         *outSizeAndAlignment = IRSizeAndAlignment(8, 8);
@@ -571,6 +623,44 @@ struct CLayoutRules : IRTypeLayoutRules
         IRIntegerValue count)
     {
         return IRSizeAndAlignment(element.size * count, element.alignment);
+    }
+};
+
+// CUDA layout rules extend C layout rules with CUDA-specific vector alignment.
+// CUDA vector types (float2, float3, float4, etc.) have special alignment requirements:
+// - vec2: 2 * element size (e.g., float2 is 8-byte aligned)
+// - vec3: element size (e.g., float3 is 4-byte aligned, NOT 12 or 16)
+// - vec4: 4 * element size (e.g., float4 is 16-byte aligned)
+// This matches CUDA C++ compiler behavior for native vector types like float4, int2, etc.
+struct CUDALayoutRules : CLayoutRules
+{
+    CUDALayoutRules() { ruleName = IRTypeLayoutRuleName::CUDA; }
+
+    virtual IRSizeAndAlignment getVectorSizeAndAlignment(
+        IRSizeAndAlignment element,
+        IRIntegerValue count)
+    {
+        IRIntegerValue size = element.size * count;
+        IRIntegerValue alignment;
+
+        if (count == 3)
+        {
+            // vec3 has same alignment as element (e.g., float3 is 4-byte aligned)
+            alignment = element.alignment;
+        }
+        else
+        {
+            // vec2, vec4, etc. have power-of-2 alignment
+            // float2 -> 8-byte, float4 -> 16-byte, double2 -> 16-byte
+            alignment = element.alignment * count;
+        }
+
+        // CUDA caps vector alignment at 16 bytes (per vector_types.h)
+        // This ensures double4 and longlong4 use 16-byte alignment, not 32-byte
+        if (alignment > 16)
+            alignment = 16;
+
+        return IRSizeAndAlignment(size, (int)alignment);
     }
 };
 
@@ -796,6 +886,12 @@ IRTypeLayoutRules* IRTypeLayoutRules::getC()
     return &rules;
 }
 
+IRTypeLayoutRules* IRTypeLayoutRules::getCUDA()
+{
+    static CUDALayoutRules rules;
+    return &rules;
+}
+
 IRTypeLayoutRules* IRTypeLayoutRules::getLLVM()
 {
     static LLVMLayoutRules rules;
@@ -821,6 +917,8 @@ IRTypeLayoutRules* IRTypeLayoutRules::get(IRTypeLayoutRuleName name)
         return getNatural();
     case IRTypeLayoutRuleName::C:
         return getC();
+    case IRTypeLayoutRuleName::CUDA:
+        return getCUDA();
     case IRTypeLayoutRuleName::D3DConstantBuffer:
         return getConstantBuffer();
     case IRTypeLayoutRuleName::LLVM:

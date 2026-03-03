@@ -300,6 +300,8 @@ SlangResult FXCDownstreamCompiler::compile(const CompileOptions& inOptions, IArt
     case DebugInfoType::None:
         break;
 
+    // FXC has limited debug control options - it only supports a binary on/off for debug info
+    // This covers DebugInfoType::Minimal, DebugInfoType::Standard, and DebugInfoType::Maximal
     default:
         flags |= D3DCOMPILE_DEBUG;
         break;

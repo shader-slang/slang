@@ -252,6 +252,22 @@ public:
         getSink()->diagnose(loc, diagnostic, std::forward<Args>(args)...);
     }
 
+    /// Diagnose a rich diagnostic only once per unique key (diagnostic ID + serialized content).
+    template<typename D>
+    void diagnoseOnce(D const& diagnostic)
+    {
+        auto genericDiag = diagnostic.toGenericDiagnostic();
+        StringBuilder keyBuilder;
+        keyBuilder << D::getInfo()->id;
+        keyBuilder << "|" << genericDiag.primarySpan.range.begin.getRaw();
+        // Use the span message for uniqueness since it contains interpolated values
+        keyBuilder << "|" << genericDiag.primarySpan.message;
+        String key = keyBuilder.produceString();
+        if (!m_reportedDiagnosticKeys.add(key))
+            return; // Already reported
+        getSink()->diagnose(diagnostic);
+    }
+
     /// Get the code gen target
     CodeGenTarget getTarget() { return m_target; }
     /// Get the source style
@@ -639,6 +655,11 @@ protected:
     virtual void emitIfDecorationsImpl(IRIfElse* ifInst) { SLANG_UNUSED(ifInst); }
     virtual void emitSwitchDecorationsImpl(IRSwitch* switchInst) { SLANG_UNUSED(switchInst); }
     virtual void emitSwitchCaseSelectorsImpl(const SwitchRegion::Case* currentCase, bool isDefault);
+
+    /// Returns true if this target supports fall-through in switch statements.
+    /// Targets like HLSL (FXC) and WGSL don't support fall-through.
+    /// This is used by the restructure pass to decide whether to preserve fall-through.
+    virtual bool supportsSwitchFallThrough() { return true; }
 
     virtual void emitFuncDecorationImpl(IRDecoration* decoration) { SLANG_UNUSED(decoration); }
     virtual void emitLivenessImpl(IRInst* inst);

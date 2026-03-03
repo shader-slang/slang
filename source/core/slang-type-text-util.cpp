@@ -16,6 +16,10 @@ namespace
     x(Void, void) \
     x(Bool, bool) \
     x(Float16, half) \
+    x(UInt8, uint8_t) \
+    x(Int8, int8_t) \
+    x(UInt16, uint16_t) \
+    x(Int16, int16_t) \
     x(UInt32, uint32_t) \
     x(Int32, int32_t) \
     x(Int64, int64_t) \

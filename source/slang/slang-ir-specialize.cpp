@@ -89,6 +89,8 @@ struct SpecializationContext
         case kIROp_Leq:
         case kIROp_Geq:
         case kIROp_Less:
+        case kIROp_And:
+        case kIROp_Or:
         case kIROp_IRem:
         case kIROp_FRem:
         case kIROp_Greater:
@@ -1237,6 +1239,7 @@ struct SpecializationContext
             {
                 this->changed = true;
                 eliminateDeadCode(module->getModuleInst());
+                peepholeOptimizeGlobalScope(targetProgram, this->module);
                 applySparseConditionalConstantPropagationForGlobalScope(
                     this->module,
                     targetProgram,

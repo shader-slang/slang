@@ -1,0 +1,147 @@
+name: Populate LLVM Cache
+
+on:
+  workflow_dispatch:
+    inputs:
+      os:
+        description: "Operating system"
+        required: true
+        type: choice
+        options:
+          - linux
+          - macos
+          - windows
+      compiler:
+        description: "Compiler"
+        required: true
+        type: choice
+        options:
+          - gcc
+          - clang
+          - cl
+          - clang-18
+      platform:
+        description: "Platform architecture"
+        required: true
+        type: choice
+        options:
+          - x86_64
+          - aarch64
+          - wasm
+
+jobs:
+  build-and-cache-llvm:
+    runs-on: ${{ github.event.inputs.os == 'linux' && github.event.inputs.platform == 'aarch64' && '["ubuntu-24.04-arm"]' || (github.event.inputs.os == 'linux' && '["ubuntu-22.04"]') || (github.event.inputs.os == 'macos' && '["macos-latest"]') || (github.event.inputs.os == 'windows' && '["windows-latest"]') }}
+    timeout-minutes: 180
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup dependencies (Linux)
+        if: inputs.os == 'linux'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build
+
+          # Set compiler
+          CC=${{ inputs.compiler }}
+          CXX=${{ inputs.compiler }}
+          # infer C++ compiler
+          CXX=${CXX/gcc/g++}
+          CXX=${CXX/clang/clang++}
+          # Correct gcc version on older ubuntu
+          gcc_version=$(gcc -dumpversion | cut -d'.' -f1)
+          if [ "$gcc_version" -lt 10 ]; then
+            CC=${CC/gcc/gcc-10}
+            CXX=${CXX/g++/g++-10}
+          fi
+          echo "CC=$CC" >> "$GITHUB_ENV"
+          echo "CXX=$CXX" >> "$GITHUB_ENV"
+
+      - name: Setup dependencies (macOS)
+        if: inputs.os == 'macos'
+        shell: bash
+        run: |
+          brew install ninja
+          echo "CC=${{ inputs.compiler }}" >> "$GITHUB_ENV"
+          echo "CXX=${{ inputs.compiler == 'clang' && 'clang++' || inputs.compiler }}" >> "$GITHUB_ENV"
+
+      - name: Setup dependencies (Windows)
+        if: inputs.os == 'windows'
+        shell: bash
+        run: |
+          choco install ninja
+          echo "CC=${{ inputs.compiler }}" >> "$GITHUB_ENV"
+          echo "CXX=${{ inputs.compiler }}" >> "$GITHUB_ENV"
+
+      - name: Set up MSVC dev tools (Windows)
+        if: inputs.os == 'windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Check for existing cache
+        id: cache-check
+        uses: actions/cache/restore@v4
+        with:
+          path: build/llvm-project-install
+          key: llvm-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ hashFiles('external/build-llvm.sh') }}
+          lookup-only: true
+
+      - name: Report cache status
+        shell: bash
+        run: |
+          if [ "${{ steps.cache-check.outputs.cache-hit }}" == "true" ]; then
+            echo "✅ Cache already exists for: llvm-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}"
+            echo "Cache key: ${{ steps.cache-check.outputs.cache-primary-key }}"
+            echo ""
+            echo "⚠️  This will overwrite the existing cache. If you want to keep the existing cache, cancel this workflow now."
+          else
+            echo "ℹ️  No existing cache found for: llvm-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}"
+            echo "Cache key to be created: llvm-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ hashFiles('external/build-llvm.sh') }}"
+          fi
+
+      - name: Build LLVM
+        shell: bash
+        run: |
+          echo "🔨 Building LLVM for ${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}"
+          echo "This will take 20-40 minutes depending on the platform..."
+
+          ./external/build-llvm.sh \
+            --install-prefix "${{ github.workspace }}/build/llvm-project-install" \
+            --repo "https://${{ github.token }}@github.com/llvm/llvm-project"
+
+      - name: Verify LLVM build
+        shell: bash
+        run: |
+          if [ ! -d "build/llvm-project-install" ]; then
+            echo "❌ LLVM build failed - install directory not found"
+            exit 1
+          fi
+
+          echo "✅ LLVM built successfully"
+          echo "📊 Installation size:"
+          du -sh build/llvm-project-install
+          echo ""
+          echo "📁 Contents:"
+          ls -lh build/llvm-project-install/
+
+      - name: Save LLVM cache
+        uses: actions/cache/save@v4
+        with:
+          path: build/llvm-project-install
+          key: llvm-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ hashFiles('external/build-llvm.sh') }}
+
+      - name: Cache saved successfully
+        shell: bash
+        run: |
+          echo "✅ LLVM cache saved successfully!"
+          echo ""
+          echo "Cache details:"
+          echo "  Key: llvm-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ hashFiles('external/build-llvm.sh') }}"
+          echo "  OS: ${{ inputs.os }}"
+          echo "  Compiler: ${{ inputs.compiler }}"
+          echo "  Platform: ${{ inputs.platform }}"
+          echo ""
+          echo "This cache will now be available for CI builds on this configuration."

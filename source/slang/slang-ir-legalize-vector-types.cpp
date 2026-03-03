@@ -42,7 +42,15 @@ struct VectorTypeLoweringContext
         return lenLit ? getIntVal(lenLit) == 1 : false;
     };
 
+    bool is0Vector(IRType* t)
+    {
+        const auto lenLit = composeGetters<IRIntLit>(t, &IRVectorType::getElementCount);
+        return lenLit ? getIntVal(lenLit) == 0 : false;
+    };
+
     bool has1VectorType(IRInst* i) { return is1Vector(i->getDataType()); }
+
+    bool has0VectorType(IRInst* i) { return is0Vector(i->getDataType()); }
 
     bool has1VectorPtrType(IRInst* i)
     {
@@ -50,8 +58,14 @@ struct VectorTypeLoweringContext
         return ptr && is1Vector(ptr->getValueType());
     }
 
+    bool has0VectorPtrType(IRInst* i)
+    {
+        const auto ptr = as<IRPtrTypeBase>(i->getDataType());
+        return ptr && is0Vector(ptr->getValueType());
+    }
+
     // If necessary, this returns a new instruction which operates on the
-    // single component of a 1-vector.
+    // single component of a 1-vector or replaces 0-vectors with void.
     // If no new instruction was created, then the old one is returned
     // unmodified, when we replace the 1-vector type globally, only then
     // will the return type of that instruction be updated; thus you
@@ -70,13 +84,18 @@ struct VectorTypeLoweringContext
         replacement = instMatch<IRInst*>(
             inst,
             nullptr,
-            // The following match instructions which take a 1-vector as an
+            // The following match instructions which take a 1-vector or 0-vector as an
             // operand and are sensitive to the fact that it's a vector.
             // Likewise for pointers.
-            [&](IRGetElement* getElement)
+            [&](IRGetElement* getElement) -> IRInst*
             {
                 const auto base = getElement->getBase();
-                return has1VectorType(base) ? getReplacement(base) : nullptr;
+                if (has1VectorType(base))
+                    return getReplacement(base);
+                // 0-vectors don't have elements to get, replace with poison
+                if (has0VectorType(base))
+                    return (IRInst*)builder.emitPoison(getElement->getDataType());
+                return nullptr;
             },
             [&](IRSwizzle* swizzle) -> IRInst*
             {
@@ -92,36 +111,75 @@ struct VectorTypeLoweringContext
                         return scalar;
                     // Otherwise, create a broadcast of this scalar
                     else
-                        return builder.emitMakeVectorFromScalar(swizzle->getFullType(), scalar);
+                        return (IRInst*)builder.emitMakeVectorFromScalar(
+                            swizzle->getFullType(),
+                            scalar);
+                }
+                // Swizzling a 0-vector should produce poison (undefined)
+                if (has0VectorType(swizzled))
+                {
+                    return (IRInst*)builder.emitPoison(swizzle->getDataType());
                 }
                 return nullptr;
             },
-            [&](IRGetElementPtr* gep)
+            [&](IRGetElementPtr* gep) -> IRInst*
             {
                 const auto base = gep->getBase();
-                return has1VectorPtrType(base) ? getReplacement(base) : nullptr;
+                if (has1VectorPtrType(base))
+                    return getReplacement(base);
+                // 0-vector pointers can't be indexed, return poison
+                if (has0VectorPtrType(base))
+                    return (IRInst*)builder.emitPoison(gep->getDataType());
+                return nullptr;
             },
-            [&](IRSwizzledStore* swizzledStore)
+            [&](IRSwizzledStore* swizzledStore) -> IRInst*
             {
                 const auto base = swizzledStore->getDest();
-                return has1VectorPtrType(base)
-                           ? builder.emitStore(getReplacement(base), swizzledStore->getSource())
-                           : nullptr;
+                if (has1VectorPtrType(base))
+                    return (IRInst*)builder.emitStore(
+                        getReplacement(base),
+                        swizzledStore->getSource());
+                // Storing to a 0-vector does nothing, remove the instruction
+                if (has0VectorPtrType(base))
+                {
+                    swizzledStore->removeAndDeallocate();
+                }
+                return nullptr;
             },
             // The following should match any instruction which can construct,
-            // specifically, a 1-vector. For example 'MakeVector'
+            // specifically, a 1-vector or 0-vector. For example 'MakeVector'
             //
             // Instruction like, for example, arithmetic instructions don't
             // need to be handled here, and they'll be fixed by the global
             // 1-vector to scalar type replacement.
-            [&](IRMakeVectorFromScalar* makeVec)
-            { return has1VectorType(makeVec) ? getReplacement(makeVec->getOperand(0)) : nullptr; },
-            [&](IRMakeVector* makeVec)
-            { return has1VectorType(makeVec) ? getReplacement(makeVec->getOperand(0)) : nullptr; },
+            [&](IRMakeVectorFromScalar* makeVec) -> IRInst*
+            {
+                if (has1VectorType(makeVec))
+                    return getReplacement(makeVec->getOperand(0));
+                // 0-vectors can't be made from scalar, replace with void value
+                if (has0VectorType(makeVec))
+                    return (IRInst*)builder.getVoidValue();
+                return nullptr;
+            },
+            [&](IRMakeVector* makeVec) -> IRInst*
+            {
+                if (has1VectorType(makeVec))
+                    return getReplacement(makeVec->getOperand(0));
+                // 0-vectors have no operands, replace with void value
+                if (has0VectorType(makeVec))
+                    return (IRInst*)builder.getVoidValue();
+                return nullptr;
+            },
             // Otherwise if this is a 1-vector type itself, replace it with
-            // the scalar version.
-            [&](IRVectorType* vecTy)
-            { return is1Vector(vecTy) ? getReplacement(vecTy->getElementType()) : nullptr; });
+            // the scalar version. If it's a 0-vector, replace with void.
+            [&](IRVectorType* vecTy) -> IRInst*
+            {
+                if (is1Vector(vecTy))
+                    return getReplacement(vecTy->getElementType());
+                if (is0Vector(vecTy))
+                    return (IRInst*)builder.getVoidType();
+                return nullptr;
+            });
 
         // Sadly it's not really possible to catch missing cases here, as
         // there are heaps of instructions which don't do anything special

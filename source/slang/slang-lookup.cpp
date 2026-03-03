@@ -76,6 +76,16 @@ bool DeclPassesLookupMask(Decl* decl, LookupMask mask)
     {
         return (int(mask) & int(LookupMask::SyntaxDecl)) != 0;
     }
+    else if (const auto fileDecl = as<FileDecl>(decl))
+    {
+        // FileDecls should never be discovered via name lookups.
+        return false;
+    }
+    // semantic declaration
+    else if (const auto semanticDecl = as<SemanticDecl>(decl))
+    {
+        return (int(mask) & int(LookupMask::Semantic)) != 0;
+    }
     // default behavior is to assume a value declaration
     // (no overloading allowed)
 

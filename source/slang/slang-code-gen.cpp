@@ -7,6 +7,7 @@
 #include "slang-compiler.h"
 #include "slang-emit-cuda.h"         // for `CUDAExtensionTracker`
 #include "slang-extension-tracker.h" // for `ShaderExtensionTracker`
+#include "slang-rich-diagnostics.h"
 
 // TODO: The "artifact" system is a scourge.
 #include "../compiler-core/slang-artifact-desc-util.h"
@@ -384,11 +385,9 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
             auto sourceName = TypeTextUtil::getCompileTargetName(SlangCompileTarget(sourceTarget));
             auto targetName = TypeTextUtil::getCompileTargetName(SlangCompileTarget(target));
 
-            sink->diagnose(
-                SourceLoc(),
-                Diagnostics::compilerNotDefinedForTransition,
-                sourceName,
-                targetName);
+            sink->diagnose(Diagnostics::CompilerNotDefinedForTransition{
+                .sourceTarget = sourceName,
+                .destTarget = targetName});
             return SLANG_FAIL;
         }
     }
@@ -400,7 +399,7 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
     if (!compiler)
     {
         auto compilerName = TypeTextUtil::getPassThroughAsHumanText((SlangPassThrough)compilerType);
-        sink->diagnose(SourceLoc(), Diagnostics::passThroughCompilerNotFound, compilerName);
+        sink->diagnose(Diagnostics::PassThroughCompilerNotFound{.compiler = compilerName});
         return SLANG_FAIL;
     }
 
@@ -581,6 +580,14 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
             {
                 options.flags |= CompileOptions::Flag::EnableFloat16;
             }
+            if (cudaTracker->isBfloat16Required())
+            {
+                options.flags |= CompileOptions::Flag::EnableBfloat16;
+            }
+            if (cudaTracker->isFp8Required())
+            {
+                options.flags |= CompileOptions::Flag::EnableFloat8;
+            }
         }
         else if (ShaderExtensionTracker* glslTracker = as<ShaderExtensionTracker>(extensionTracker))
         {
@@ -673,10 +680,8 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
                 auto downstreamCompilerName =
                     TypeTextUtil::getPassThroughName((SlangPassThrough)compilerType);
 
-                sink->diagnose(
-                    SourceLoc(),
-                    Diagnostics::downstreamCompilerDoesntSupportWholeProgramCompilation,
-                    downstreamCompilerName);
+                sink->diagnose(Diagnostics::DownstreamCompilerDoesntSupportWholeProgramCompilation{
+                    .compiler = downstreamCompilerName});
                 return SLANG_FAIL;
             }
         }

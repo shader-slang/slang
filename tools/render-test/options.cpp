@@ -37,7 +37,6 @@ static bool isValidFeatureName(
         }
         return true;
     }
-
 #define SLANG_RHI_FEATURES_X(id, name) name,
     static const char* kValidFeatureNames[] = {SLANG_RHI_FEATURES(SLANG_RHI_FEATURES_X)};
 #undef SLANG_RHI_FEATURES_X

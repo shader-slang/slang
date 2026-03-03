@@ -527,6 +527,7 @@ enum class IRTypeLayoutRuleName
     D3DConstantBuffer,
     MetalParameterBlock,
     C,
+    CUDA,
     LLVM,
     _Count,
 };
@@ -996,6 +997,9 @@ bool isIntegralType(IRType* t);
 
 bool isFloatingType(IRType* t);
 
+// True if t is fp8 or bf16 types.
+bool isPackedFloatType(IRType* t);
+
 struct IntInfo
 {
     Int width;
@@ -1060,6 +1064,7 @@ struct IRConstant : IRInst
     union ValueUnion
     {
         IRIntegerValue intVal; ///< Used for integrals and boolean
+        IRUnsignedIntegerValue uintVal;
         IRFloatingPointValue floatVal;
         void* ptrVal;
 
@@ -1590,6 +1595,8 @@ struct IRPtrTypeBase : IRType
                    ? (AddressSpace) static_cast<IRIntLit*>(getOperand(2))->getValue()
                    : AddressSpace::Generic;
     }
+
+    IRType* getDataLayout() { return getOperandCount() > 3 ? (IRType*)getOperand(3) : nullptr; }
 };
 
 
@@ -1968,6 +1975,8 @@ public:
 
     void removeHoistableInstFromGlobalNumberingMap(IRInst* inst);
 
+    void removeInstFromConstantMap(IRInst* inst);
+
     void tryHoistInst(IRInst* inst);
 
     typedef Dictionary<IRInstKey, IRInst*> GlobalValueNumberingMap;
@@ -2124,7 +2133,7 @@ public:
     // anything to do with serialization format
     //
     const static UInt k_minSupportedModuleVersion = 4;
-    const static UInt k_maxSupportedModuleVersion = 5;
+    const static UInt k_maxSupportedModuleVersion = 7;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
 private:

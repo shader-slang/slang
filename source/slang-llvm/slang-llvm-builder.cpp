@@ -72,17 +72,17 @@ struct BinaryLLVMOutputStream : public llvm::raw_pwrite_stream
     void reserveExtraSpace(uint64_t ExtraSize) override { output.reserve(tell() + ExtraSize); }
 };
 
-llvm::DenormalMode getLLVMDenormalMode(SlangFpDenormalMode mode)
+llvm::DenormalMode::DenormalModeKind getLLVMDenormalMode(SlangFpDenormalMode mode)
 {
     switch (mode)
     {
     default:
     case SLANG_FP_DENORM_MODE_ANY:
-        return llvm::DenormalMode::getDefault();
+        return llvm::DenormalMode::IEEE;
     case SLANG_FP_DENORM_MODE_PRESERVE:
-        return llvm::DenormalMode::getPreserveSign();
+        return llvm::DenormalMode::PreserveSign;
     case SLANG_FP_DENORM_MODE_FTZ:
-        return llvm::DenormalMode::getPositiveZero();
+        return llvm::DenormalMode::PositiveZero;
     }
 }
 
@@ -162,6 +162,11 @@ public:
     ~LLVMBuilder();
 
     IArtifact* createErrorArtifact(const ArtifactDiagnostic& diagnostic);
+
+    // FP mode flags are set per-instruction, and some of those instructions
+    // may be coming from inline IR. This function does a pass over all relevant
+    // instructions and annotates them properly for the selected FP mode.
+    void addFPModeFlags();
 
     void optimize();
     void finalize();
@@ -434,8 +439,10 @@ LLVMBuilder::LLVMBuilder(LLVMBuilderOptions options, IArtifact** outErrorArtifac
     if (options.targetTriple.count != 0)
         targetTripleStr = std::string(options.targetTriple.begin(), options.targetTriple.count);
 
+    llvm::Triple targetTriple(targetTripleStr);
+
     std::string error;
-    const llvm::Target* target = llvm::TargetRegistry::lookupTarget(targetTripleStr, error);
+    const llvm::Target* target = llvm::TargetRegistry::lookupTarget(targetTriple, error);
     if (!target)
     {
         ArtifactDiagnostic diagnostic;
@@ -450,25 +457,19 @@ LLVMBuilder::LLVMBuilder(LLVMBuilderOptions options, IArtifact** outErrorArtifac
 
     opt.NoTrappingFPMath = 1;
 
-    opt.setFPDenormalMode(getLLVMDenormalMode(options.fp64DenormalMode));
-    opt.setFP32DenormalMode(getLLVMDenormalMode(options.fp64DenormalMode));
-
     switch (options.fpMode)
     {
     default:
     case SLANG_FLOATING_POINT_MODE_DEFAULT:
         break;
     case SLANG_FLOATING_POINT_MODE_FAST:
-        opt.UnsafeFPMath = 1;
+        opt.HonorSignDependentRoundingFPMathOption = 0;
         opt.NoSignedZerosFPMath = 1;
-        opt.ApproxFuncFPMath = 1;
         break;
     case SLANG_FLOATING_POINT_MODE_PRECISE:
-        opt.UnsafeFPMath = 0;
         opt.NoInfsFPMath = 0;
         opt.NoNaNsFPMath = 0;
         opt.NoSignedZerosFPMath = 0;
-        opt.ApproxFuncFPMath = 0;
         break;
     }
 
@@ -489,8 +490,6 @@ LLVMBuilder::LLVMBuilder(LLVMBuilderOptions options, IArtifact** outErrorArtifac
         optLevel = llvm::CodeGenOptLevel::Aggressive;
         break;
     }
-
-    llvm::Triple targetTriple(targetTripleStr);
 
     targetMachine = target->createTargetMachine(
         targetTriple,
@@ -584,6 +583,74 @@ IArtifact* LLVMBuilder::createErrorArtifact(const ArtifactDiagnostic& diagnostic
     return artifact.detach();
 }
 
+void LLVMBuilder::addFPModeFlags()
+{
+    llvm::FastMathFlags FMF;
+    switch (options.fpMode)
+    {
+    default:
+    case SLANG_FLOATING_POINT_MODE_DEFAULT:
+        break;
+    case SLANG_FLOATING_POINT_MODE_FAST:
+        FMF.setAllowReassoc(true);
+        FMF.setNoNaNs(true);
+        FMF.setNoInfs(true);
+        FMF.setNoSignedZeros(true);
+        FMF.setAllowReciprocal(true);
+        FMF.setAllowContract(true);
+        FMF.setApproxFunc(true);
+        break;
+    case SLANG_FLOATING_POINT_MODE_PRECISE:
+        FMF.clear();
+        break;
+    }
+    llvm::StringRef fp64DenormalMode =
+        llvm::denormalModeKindName(getLLVMDenormalMode(options.fp64DenormalMode));
+    llvm::StringRef fp32DenormalMode =
+        llvm::denormalModeKindName(getLLVMDenormalMode(options.fp32DenormalMode));
+
+    for (llvm::Function& F : *llvmModule)
+    {
+        if (options.fpMode == SLANG_FLOATING_POINT_MODE_PRECISE)
+            F.addFnAttr(llvm::Attribute::AttrKind::StrictFP);
+
+        if (options.fp32DenormalMode != SLANG_FP_DENORM_MODE_ANY)
+            F.addFnAttr("denormal-fp-math-f32", fp32DenormalMode);
+
+        if (options.fp64DenormalMode != SLANG_FP_DENORM_MODE_ANY)
+            F.addFnAttr("denormal-fp-math", fp64DenormalMode);
+
+        for (llvm::BasicBlock& BB : F)
+        {
+            for (llvm::Instruction& I : BB)
+            {
+                switch (I.getOpcode())
+                {
+                case llvm::Instruction::FNeg:
+                case llvm::Instruction::FAdd:
+                case llvm::Instruction::FSub:
+                case llvm::Instruction::FMul:
+                case llvm::Instruction::FDiv:
+                case llvm::Instruction::FRem:
+                case llvm::Instruction::FCmp:
+                case llvm::Instruction::FPTrunc:
+                case llvm::Instruction::FPExt:
+                    I.setFastMathFlags(FMF);
+                    break;
+                case llvm::Instruction::PHI:
+                case llvm::Instruction::Select:
+                case llvm::Instruction::Call:
+                    if (I.getType()->isFPOrFPVectorTy())
+                        I.setFastMathFlags(FMF);
+                    break;
+                default:
+                    break;
+                }
+            }
+        }
+    }
+}
+
 void LLVMBuilder::optimize()
 {
     llvm::LoopAnalysisManager loopAnalysisManager;
@@ -644,6 +711,8 @@ void LLVMBuilder::finalize()
             ctorArray,
             "llvm.global_ctors");
     }
+
+    addFPModeFlags();
 
     // std::string out;
     // llvm::raw_string_ostream rso(out);
@@ -868,6 +937,7 @@ LLVMInst* LLVMBuilder::declareFunction(LLVMType* funcType, CharSlice name, uint3
         func->addFnAttr(llvm::Attribute::AttrKind::NoInline);
     if (attributes & SLANG_LLVM_FUNC_ATTR_READNONE)
         func->setOnlyAccessesArgMemory();
+
     return func;
 }
 

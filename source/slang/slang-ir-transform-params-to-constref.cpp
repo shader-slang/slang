@@ -20,7 +20,7 @@ struct TransformParamsToConstRefContext
     }
 
     // Check if a type should be transformed (struct, array, or other composite types)
-    bool shouldTransformParam(IRParam* param)
+    virtual bool shouldTransformParam(IRParam* param)
     {
         auto type = param->getDataType();
         if (!type)
@@ -97,6 +97,7 @@ struct TransformParamsToConstRefContext
                                 auto fieldExtract = as<IRFieldExtract>(userInst);
                                 builder.setInsertBefore(fieldExtract);
                                 auto fieldAddr = builder.emitFieldAddress(
+                                    builder.getPtrType(userInst->getDataType()),
                                     loadInst->getPtr(),
                                     fieldExtract->getField());
                                 auto loadFieldAddr = as<IRLoad>(builder.emitLoad(fieldAddr));
@@ -120,6 +121,7 @@ struct TransformParamsToConstRefContext
                                 auto getElement = as<IRGetElement>(userInst);
                                 builder.setInsertBefore(getElement);
                                 auto getElementPtr = builder.emitElementAddress(
+                                    builder.getPtrType(userInst->getDataType()),
                                     loadInst->getPtr(),
                                     getElement->getIndex());
                                 auto loadElementPtr = as<IRLoad>(builder.emitLoad(getElementPtr));
@@ -253,7 +255,7 @@ struct TransformParamsToConstRefContext
     }
 
     // Check if function should be excluded from transformation
-    bool shouldProcessFunction(IRFunc* func)
+    virtual bool shouldProcessFunction(IRFunc* func)
     {
         // Skip functions without definitions
         if (!func->isDefinition())
@@ -418,6 +420,60 @@ struct TransformParamsToConstRefContext
 SlangResult transformParamsToConstRef(IRModule* module, DiagnosticSink* sink)
 {
     TransformParamsToConstRefContext context(module, sink);
+    return context.processModule();
+}
+
+struct EntryPointInParamToBorrowContext : public TransformParamsToConstRefContext
+{
+    EntryPointInParamToBorrowContext(IRModule* module, DiagnosticSink* sink)
+        : TransformParamsToConstRefContext(module, sink)
+    {
+    }
+    virtual bool shouldProcessFunction(IRFunc* func) override
+    {
+        if (!func->isDefinition())
+            return false;
+        if (func->findDecoration<IREntryPointDecoration>() != nullptr)
+            return true;
+        return false;
+    }
+    virtual bool shouldTransformParam(IRParam* param) override
+    {
+        auto type = param->getDataType();
+        if (as<IRPointerLikeType>(type))
+            return false;
+        if (as<IRPtrTypeBase>(type))
+            return false;
+        if (as<IRMeshOutputType>(type))
+            return false;
+        if (as<IRHLSLPatchType>(type))
+            return false;
+
+        // Skip uniform parameters.
+        // We expect all entry-point parameters to have layout information,
+        // but we will be defensive and skip parameters without the required
+        // information when we are in a release build.
+        //
+        auto layoutDecoration = param->findDecoration<IRLayoutDecoration>();
+        SLANG_ASSERT(layoutDecoration);
+        if (!layoutDecoration)
+            return false;
+        auto paramLayout = as<IRVarLayout>(layoutDecoration->getLayout());
+        SLANG_ASSERT(paramLayout);
+        if (!paramLayout)
+            return false;
+        if (!isVaryingParameter(paramLayout))
+            return false;
+
+        // If we reach here, we are dealing with a varying in parameter.
+        // We need to rewrite it to be a `borrow in` parameter.
+        return true;
+    }
+};
+
+SlangResult translateEntryPointInParamToBorrow(IRModule* module, DiagnosticSink* sink)
+{
+    EntryPointInParamToBorrowContext context(module, sink);
     return context.processModule();
 }
 

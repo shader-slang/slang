@@ -186,8 +186,8 @@ namespace Slang
 bool File::exists(const String& fileName)
 {
 #ifdef _WIN32
-    struct _stat32 statVar;
-    return ::_wstat32(((String)fileName).toWString(), &statVar) != -1;
+    struct _stat64 statVar;
+    return ::_wstat64(((String)fileName).toWString(), &statVar) != -1;
 #else
     struct stat statVar;
     return ::stat(fileName.getBuffer(), &statVar) == 0;
@@ -642,8 +642,8 @@ bool Path::createDirectoryRecursive(const String& path)
 {
 #ifdef _WIN32
     // https://msdn.microsoft.com/en-us/library/14h5k7ff.aspx
-    struct _stat32 statVar;
-    if (::_wstat32(String(path).toWString(), &statVar) == 0)
+    struct _stat64 statVar;
+    if (::_wstat64(String(path).toWString(), &statVar) == 0)
     {
         if (statVar.st_mode & _S_IFDIR)
         {
@@ -816,7 +816,7 @@ SlangResult Path::remove(const String& path)
     auto widePath = path.toWString();
     Index widePathLen = wcslen(widePath);
     wchar_t* doubleNullPath = (wchar_t*)_alloca((widePathLen + 2) * sizeof(wchar_t));
-    wcscpy(doubleNullPath, widePath);
+    wcscpy_s(doubleNullPath, widePathLen + 2, widePath);
     doubleNullPath[widePathLen] = L'\0';     // First null terminator
     doubleNullPath[widePathLen + 1] = L'\0'; // Second null terminator for SHFileOperationW
 
@@ -1215,8 +1215,8 @@ SlangResult File::writeAllTextIfChanged(const String& fileName, UnownedStringSli
 
 /* static */ SlangResult File::writeNativeText(const String& path, const void* data, size_t size)
 {
-    FILE* file = fopen(path.getBuffer(), "w");
-    if (!file)
+    FILE* file = nullptr;
+    if (fopen_s(&file, path.getBuffer(), "w") != 0 || !file)
     {
         return SLANG_FAIL;
     }

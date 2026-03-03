@@ -911,6 +911,13 @@ typedef uint32_t SlangSizeT;
         SLANG_EMIT_CPU_VIA_LLVM,
     };
 
+    enum SlangDiagnosticColor
+    {
+        SLANG_DIAGNOSTIC_COLOR_AUTO = 0, // Use color if output sink is a tty
+        SLANG_DIAGNOSTIC_COLOR_ALWAYS,   // Always use color
+        SLANG_DIAGNOSTIC_COLOR_NEVER,    // Never use color
+    };
+
     // All compiler option names supported by Slang.
     namespace slang
     {
@@ -1030,6 +1037,8 @@ typedef uint32_t SlangSizeT;
         AllowGLSL,
         EnableExperimentalPasses,
         BindlessSpaceIndex, // int
+        SPIRVResourceHeapStride,
+        SPIRVSamplerHeapStride,
 
         // Internal
 
@@ -1107,6 +1116,11 @@ typedef uint32_t SlangSizeT;
         EnableRichDiagnostics, // bool, enable the experimental rich diagnostics
 
         ReportDynamicDispatchSites, // bool
+
+        EnableMachineReadableDiagnostics, // bool, enable machine-readable diagnostic output
+                                          // (implies EnableRichDiagnostics)
+
+        DiagnosticColor, // intValue0: SlangDiagnosticColor (always, never, auto)
 
         CountOf,
     };
@@ -1928,6 +1942,7 @@ public:                                                              \
         SLANG_TYPE_KIND_FEEDBACK,
         SLANG_TYPE_KIND_POINTER,
         SLANG_TYPE_KIND_DYNAMIC_RESOURCE,
+        SLANG_TYPE_KIND_ENUM,
         SLANG_TYPE_KIND_COUNT,
     };
 
@@ -1962,7 +1977,8 @@ public:                                                              \
         SLANG_DECL_KIND_MODULE,
         SLANG_DECL_KIND_GENERIC,
         SLANG_DECL_KIND_VARIABLE,
-        SLANG_DECL_KIND_NAMESPACE
+        SLANG_DECL_KIND_NAMESPACE,
+        SLANG_DECL_KIND_ENUM,
     };
 
 #ifndef SLANG_RESOURCE_SHAPE
@@ -2179,6 +2195,8 @@ public:                                                              \
     {
         SLANG_LAYOUT_RULES_DEFAULT,
         SLANG_LAYOUT_RULES_METAL_ARGUMENT_BUFFER_TIER_2,
+        SLANG_LAYOUT_RULES_DEFAULT_STRUCTURED_BUFFER,
+        SLANG_LAYOUT_RULES_DEFAULT_CONSTANT_BUFFER,
     };
 
     typedef SlangUInt32 SlangModifierIDIntegral;
@@ -2312,6 +2330,7 @@ struct TypeReflection
         Pointer = SLANG_TYPE_KIND_POINTER,
         DynamicResource = SLANG_TYPE_KIND_DYNAMIC_RESOURCE,
         MeshOutput = SLANG_TYPE_KIND_MESH_OUTPUT,
+        Enum = SLANG_TYPE_KIND_ENUM,
     };
 
     enum ScalarType : SlangScalarTypeIntegral
@@ -3024,6 +3043,11 @@ struct VariableReflection
         return spReflectionVariable_GetDefaultValueInt((SlangReflectionVariable*)this, value);
     }
 
+    SlangResult getDefaultValueFloat(float* value)
+    {
+        return spReflectionVariable_GetDefaultValueFloat((SlangReflectionVariable*)this, value);
+    }
+
     GenericReflection* getGenericContainer()
     {
         return (GenericReflection*)spReflectionVariable_GetGenericContainer(
@@ -3440,6 +3464,8 @@ enum class LayoutRules : SlangLayoutRulesIntegral
 {
     Default = SLANG_LAYOUT_RULES_DEFAULT,
     MetalArgumentBufferTier2 = SLANG_LAYOUT_RULES_METAL_ARGUMENT_BUFFER_TIER_2,
+    DefaultStructuredBuffer = SLANG_LAYOUT_RULES_DEFAULT_STRUCTURED_BUFFER,
+    DefaultConstantBuffer = SLANG_LAYOUT_RULES_DEFAULT_CONSTANT_BUFFER,
 };
 
 typedef struct ShaderReflection ProgramLayout;
@@ -3629,6 +3655,14 @@ struct ShaderReflection
     {
         return spReflection_ToJson((SlangReflection*)this, nullptr, outBlob);
     }
+
+    /** Get the descriptor set/space index allocated for the bindless resource heap.
+     *  Returns -1 if the program does not use bindless resource heap.
+     */
+    SlangInt getBindlessSpaceIndex()
+    {
+        return spReflection_getBindlessSpaceIndex((SlangReflection*)this);
+    }
 };
 
 
@@ -3643,6 +3677,7 @@ struct DeclReflection
         Generic = SLANG_DECL_KIND_GENERIC,
         Variable = SLANG_DECL_KIND_VARIABLE,
         Namespace = SLANG_DECL_KIND_NAMESPACE,
+        Enum = SLANG_DECL_KIND_ENUM,
     };
 
     char const* getName() { return spReflectionDecl_getName((SlangReflectionDecl*)this); }
@@ -4693,6 +4728,21 @@ struct IComponentType2 : public ISlangUnknown
         SlangInt targetIndex,
         ICompileResult** outCompileResult,
         IBlob** outDiagnostics = nullptr) = 0;
+    /** Get functions accessible through the ISlangSharedLibrary interface.
+
+    The functions remain in scope as long as the ISlangSharedLibrary interface is in scope.
+
+    NOTE! Requires a compilation target of SLANG_HOST_CALLABLE.
+
+    @param targetIndex      The index of the target to get code for (default: zero).
+    @param outSharedLibrary A pointer to a ISharedLibrary interface which functions can be queried
+    on.
+    @returns                A `SlangResult` to indicate success or failure.
+    */
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL getTargetHostCallable(
+        int targetIndex,
+        ISlangSharedLibrary** outSharedLibrary,
+        slang::IBlob** outDiagnostics = 0) = 0;
 };
     #define SLANG_UUID_IComponentType2 IComponentType2::getTypeGuid()
 

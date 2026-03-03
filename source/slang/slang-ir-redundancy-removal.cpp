@@ -217,6 +217,14 @@ static bool eliminateRedundantTemporaryCopyInFunc(IRFunc* func)
                     if (param->findDecoration<IRSemanticDecoration>())
                         continue;
 
+                // If loadPtr is an instruction (has a parent block), it must be in the same
+                // block as destPtr. Otherwise, if loadPtr is computed inside a conditional but
+                // destPtr is used outside, we would create a dominance violation after replacement.
+                auto loadPtrBlock = as<IRBlock>(loadPtr->getParent());
+                auto destPtrBlock = as<IRBlock>(destPtr->getParent());
+                if (loadPtrBlock && loadPtrBlock != destPtrBlock)
+                    continue;
+
                 // Check all uses of the destination variable
                 for (auto use = destPtr->firstUse; use; use = use->nextUse)
                 {

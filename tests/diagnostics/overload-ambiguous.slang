@@ -1,6 +1,8 @@
 // https://github.com/shader-slang/slang/issues/4476
 
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -enable-experimental-rich-diagnostics
+
 RWStructuredBuffer<uint> outputBuffer;
 
 namespace A1
@@ -33,13 +35,9 @@ void computeMain(uint3 threadID: SV_DispatchThreadID)
     using namespace A1;
     using namespace A1::A2;
     using namespace B1;
-    using namespace C1;
 
     // Only A1::func() and B1::func() will cause ambiguity because the distance from
     // the reference site to those two functions declaration are the same.
     outputBuffer[0] = func();
-    // CHECK-NOT: {{.*}}A2::func() -> uint
-    // CHECK: ambiguous call to 'func' with arguments of type ()
-    // CHECK: candidate: func B1::func() -> uint
-    // CHECK: candidate: func A1::func() -> uint
+//CHECK:                  ^ ambiguous call to 'func'
 }

@@ -47,6 +47,15 @@ local insts = {
 					{ NativeString = { struct_name = "NativeStringType" } },
 				},
 			},
+			-- Additional restricted (storage-only) floating point type.
+			{
+				PackedFloatType = {
+					hoistable = true,
+					{ FloatE4M3Type = {struct_name="FloatE4M3Type"} },
+					{ FloatE5M2Type = {struct_name="FloatE5M2Type"} },
+					{ BFloat16Type = {struct_name="BFloat16Type"} },
+				},
+			},
 			{ CapabilitySet = { struct_name = "CapabilitySetType", hoistable = true } },
 			{ DynamicType = { hoistable = true } },
 			{ AnyValueType = { operands = { { "size" } }, hoistable = true } },
@@ -233,6 +242,7 @@ local insts = {
 								{ "valueType", "IRType" },
 								{ "accessQualifierOperand", "IRIntLit", optional = true },
 								{ "addressSpaceOperand", "IRIntLit", optional = true },
+								{ "dataLayout", "IRType", optional = true },
 							},
 						},
 					},
@@ -243,6 +253,7 @@ local insts = {
 								{ "valueType", "IRType" },
 								{ "accessQualifierOperand", "IRIntLit", optional = true },
 								{ "addressSpaceOperand", "IRIntLit", optional = true },
+								{ "dataLayout", "IRType", optional = true },
 							},
 						},
 					},
@@ -253,6 +264,7 @@ local insts = {
 								{ "valueType", "IRType" },
 								{ "accessQualifierOperand", "IRIntLit", optional = true },
 								{ "addressSpaceOperand", "IRIntLit", optional = true },
+								{ "dataLayout", "IRType", optional = true },
 							},
 						},
 					},
@@ -267,6 +279,7 @@ local insts = {
 								{ "valueType", "IRType" },
 								{ "accessQualifierOperand", "IRIntLit", optional = true },
 								{ "addressSpaceOperand", "IRIntLit", optional = true },
+								{ "dataLayout", "IRType", optional = true },
 							},
 						},
 					},
@@ -322,10 +335,15 @@ local insts = {
 				},
 			},
 			{ DefaultLayout = { struct_name = "DefaultBufferLayoutType", hoistable = true } },
+			{ DefaultPushConstantLayout = { struct_name = "DefaultPushConstantBufferLayoutType", hoistable = true } },
 			{ Std140Layout = { struct_name = "Std140BufferLayoutType", hoistable = true } },
 			{ Std430Layout = { struct_name = "Std430BufferLayoutType", hoistable = true } },
 			{ ScalarLayout = { struct_name = "ScalarBufferLayoutType", hoistable = true } },
 			{ CLayout = { struct_name = "CBufferLayoutType", hoistable = true } },
+			{ D3DConstantBufferLayout = { struct_name = "D3DConstantBufferLayoutType", hoistable = true } },
+			{ MetalParameterBlockLayout = { struct_name = "MetalParameterBlockLayoutType", hoistable = true } },
+			{ CUDALayout = { struct_name = "CUDABufferLayoutType", hoistable = true } },
+			{ LLVMLayout = { struct_name = "LLVMBufferLayoutType", hoistable = true } },
 			{
 				SubpassInputType = {
 					operands = { { "elementType", "IRType" }, { "isMultisampleInst" } },
@@ -705,7 +723,14 @@ local insts = {
 				-- This is most commonly used to specialize the type of existential insts once the possibilities can be statically determined.
 				-- 
 				-- Operands are a TypeSet and a WitnessTableSet that represent the possibilities of the existential
-			} }
+			} },
+			{ OptionalNoneType = {
+				-- An element that represents an optional value known to be `none`
+				--
+				-- Used when propagating type information through optional values.
+				--
+				hoistable = true
+			} },
 		},
 	},
 	-- IRGlobalValueWithCode
@@ -901,10 +926,12 @@ local insts = {
 	{ makeArrayFromElement = { operands = { { "element" } } } },
 	{ makeCoopVector = {} },
 	{ makeCoopVectorFromValuePack = { operands = { { "valuePack" } } } },
+	{ makeCoopMatrixFromScalar = {} },
 	{ makeStruct = {} },
 	{ makeTuple = {} },
 	{ makeTargetTuple = { struct_name = "MakeTargetTuple" } },
 	{ makeValuePack = {} },
+	{ makeCombinedTextureSampler = { operands = { {"texture"}, {"sampler"} } } },
 	{ getTargetTupleElement = {} },
 	{
 		getTupleElement = {
@@ -916,6 +943,22 @@ local insts = {
 		LoadSamplerDescriptorFromHeap = {
 			operands = { { "index" } },
 		},
+	},
+	{
+		SPIRVLoadDescriptorFromHeap = {
+			operands = { { "heap" }, { "index" } },
+		},
+	},
+	{
+		SPIRVLoadTexelPointerFromHeap = {
+			operands = { { "heap" }, { "index" }, { "textureType" }, { "coord" }, { "sampleIndex" } },
+		},
+	},
+	{
+		SPIRVResourceHeap = { hoistable = true }
+	},
+	{
+		SPIRVSamplerHeap = { hoistable = true }
 	},
 	{ MakeCombinedTextureSamplerFromHandle = { operands = { { "handle" } } } },
 	{
@@ -938,7 +981,7 @@ local insts = {
 	{ getOptionalValue = { operands = { { "optionalOperand" } } } },
 	{ optionalHasValue = { operands = { { "optionalOperand" } } } },
 	{ makeOptionalValue = { operands = { { "value" } } } },
-	{ makeOptionalNone = { operands = { { "defaultValue" } } } },
+	{ makeOptionalNone = {} },
 	{ CombinedTextureSamplerGetTexture = { operands = { { "sampler" } } } },
 	{ CombinedTextureSamplerGetSampler = { operands = { { "sampler" } } } },
 	{ call = { operands = { { "callee" } } } },
@@ -1359,6 +1402,13 @@ local insts = {
 	-- Wrapper for OptiX intrinsics used to load shader binding table record data
 	-- using a pointer.
 	{ getOptiXSbtDataPointer = { struct_name = "GetOptiXSbtDataPtr" } },
+	-- Read a uint32 value from OptiX payload register N (0-31).
+	-- Operand 0: register index (int literal)
+	{ getOptiXPayloadRegister = { min_operands = 1 } },
+	-- Write a uint32 value to OptiX payload register N (0-31).
+	-- Operand 0: register index (int literal)
+	-- Operand 1: value to write (uint32)
+	{ setOptiXPayloadRegister = { min_operands = 2 } },
 	{ GetVulkanRayTracingPayloadLocation = { min_operands = 1 } },
 	{ GetLegalizedSPIRVGlobalParamAddr = { min_operands = 1 } },
 	{
@@ -2364,6 +2414,10 @@ local insts = {
 	{ BuiltinCast = { operands = { { "val" } } } },
 	{ bitCast = { operands = { { "val" } } } },
 	{ reinterpret = { operands = { { "val" } } } },
+	-- Reinterpret an optional type to another optional type.
+	-- This is lowered to an if-else block that checks hasValue and performs
+	-- a regular reinterpret on the inner value if present.
+	{ ReinterpretOptional = { operands = { { "val" } } } },
 	{ unmodified = { operands = { { "val" } } } },
 	{ outImplicitCast = { operands = { { "value" } } } },
 	{ inOutImplicitCast = { operands = { { "value" } } } },
@@ -2416,6 +2470,8 @@ local insts = {
 	{ IsInt = { operands = { { "value" } } } },
 	{ IsBool = { operands = { { "value" } } } },
 	{ IsFloat = { operands = { { "value" } } } },
+	-- Check whether an operand's type is floating point type or packed floating point type (fp8,bf16)
+	{ IsCoopFloat = {operands = { { "value" } } } },
 	{ IsHalf = { operands = { { "value" } } } },
 	{ IsUnsignedInt = { operands = { { "value" } } } },
 	{ IsSignedInt = { operands = { { "value" } } } },

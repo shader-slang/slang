@@ -4,6 +4,7 @@
 #include "slang-ir-dce.h"
 #include "slang-ir-dominators.h"
 #include "slang-ir-insts.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -135,6 +136,9 @@ IROp getTypeStyle(IROp op)
     case kIROp_HalfType:
     case kIROp_FloatType:
     case kIROp_DoubleType:
+    case kIROp_FloatE4M3Type:
+    case kIROp_FloatE5M2Type:
+    case kIROp_BFloat16Type:
         {
             // All float like
             return kIROp_FloatType;
@@ -544,10 +548,23 @@ void getTypeNameHint(StringBuilder& sb, IRInst* type)
         break;
     case kIROp_SubpassInputType:
         {
-            auto textureType = as<IRSubpassInputType>(type);
+            auto subpassInputType = as<IRSubpassInputType>(type);
             sb << "SubpassInput";
-            if (textureType->isMultisample())
-                sb << "MS";
+            // Handle isMultisample individually - if constant, use pretty name; if generic, include
+            // it
+            auto isMS = subpassInputType->getIsMultisampleInst();
+            if (auto isMSLit = as<IRIntLit>(isMS))
+            {
+                if (isMSLit->getValue() != 0)
+                    sb << "MS";
+            }
+            else
+            {
+                // Generic parameter - include in output for uniqueness
+                sb << "<";
+                getTypeNameHint(sb, isMS);
+                sb << ">";
+            }
             break;
         }
     case kIROp_TextureType:
@@ -574,59 +591,103 @@ void getTypeNameHint(StringBuilder& sb, IRInst* type)
             case SLANG_RESOURCE_ACCESS_READ:
                 break;
             }
-            if (textureType->isCombined())
+
+            auto isCombinedInst = textureType->getIsCombinedInst();
+            auto isCombinedLit = as<IRIntLit>(isCombinedInst);
+            if (isCombinedLit)
             {
-                switch (textureType->GetBaseShape())
+                bool isCombined = (isCombinedLit->getValue() != 0);
+                if (isCombined)
                 {
-                case SLANG_TEXTURE_1D:
-                    sb << "Sampler1D";
-                    break;
-                case SLANG_TEXTURE_2D:
-                    sb << "Sampler2D";
-                    break;
-                case SLANG_TEXTURE_3D:
-                    sb << "Sampler3D";
-                    break;
-                case SLANG_TEXTURE_CUBE:
-                    sb << "SamplerCube";
-                    break;
-                case SLANG_TEXTURE_BUFFER:
-                    sb << "SamplerBuffer";
-                    break;
+                    switch (textureType->GetBaseShape())
+                    {
+                    case SLANG_TEXTURE_1D:
+                        sb << "Sampler1D";
+                        break;
+                    case SLANG_TEXTURE_2D:
+                        sb << "Sampler2D";
+                        break;
+                    case SLANG_TEXTURE_3D:
+                        sb << "Sampler3D";
+                        break;
+                    case SLANG_TEXTURE_CUBE:
+                        sb << "SamplerCube";
+                        break;
+                    case SLANG_TEXTURE_BUFFER:
+                        sb << "SamplerBuffer";
+                        break;
+                    }
+                }
+                else
+                {
+                    switch (textureType->GetBaseShape())
+                    {
+                    case SLANG_TEXTURE_1D:
+                        sb << "Texture1D";
+                        break;
+                    case SLANG_TEXTURE_2D:
+                        sb << "Texture2D";
+                        break;
+                    case SLANG_TEXTURE_3D:
+                        sb << "Texture3D";
+                        break;
+                    case SLANG_TEXTURE_CUBE:
+                        sb << "TextureCube";
+                        break;
+                    case SLANG_TEXTURE_BUFFER:
+                        sb << "Buffer";
+                        break;
+                    }
                 }
             }
-            else
+
+            // Handle each boolean flag individually
+            auto isMultisampleInst = textureType->getIsMultisampleInst();
+            if (auto lit = as<IRIntLit>(isMultisampleInst))
             {
-                switch (textureType->GetBaseShape())
+                if (lit->getValue() != 0)
+                    sb << "MS";
+            }
+
+            auto isArrayInst = textureType->getIsArrayInst();
+            if (auto lit = as<IRIntLit>(isArrayInst))
+            {
+                if (lit->getValue() != 0)
+                    sb << "Array";
+            }
+
+            auto isShadowInst = textureType->getIsShadowInst();
+            if (auto lit = as<IRIntLit>(isShadowInst))
+            {
+                if (lit->getValue() != 0)
+                    sb << "Shadow";
+            }
+
+            // If any parameters are generic (not constants), append them for uniqueness
+            bool hasGenericParams = !as<IRIntLit>(textureType->getAccessInst()) || !isCombinedLit ||
+                                    !as<IRIntLit>(isMultisampleInst) ||
+                                    !as<IRIntLit>(isArrayInst) || !as<IRIntLit>(isShadowInst);
+
+            if (hasGenericParams)
+            {
+                sb << "<";
+                bool first = true;
+                auto appendParam = [&](IRInst* inst)
                 {
-                case SLANG_TEXTURE_1D:
-                    sb << "Texture1D";
-                    break;
-                case SLANG_TEXTURE_2D:
-                    sb << "Texture2D";
-                    break;
-                case SLANG_TEXTURE_3D:
-                    sb << "Texture3D";
-                    break;
-                case SLANG_TEXTURE_CUBE:
-                    sb << "TextureCube";
-                    break;
-                case SLANG_TEXTURE_BUFFER:
-                    sb << "Buffer";
-                    break;
-                }
-            }
-            if (textureType->isMultisample())
-            {
-                sb << "MS";
-            }
-            if (textureType->isArray())
-            {
-                sb << "Array";
-            }
-            if (textureType->isShadow())
-            {
-                sb << "Shadow";
+                    if (!as<IRIntLit>(inst))
+                    {
+                        if (!first)
+                            sb << ",";
+                        getTypeNameHint(sb, inst);
+                        first = false;
+                    }
+                };
+                appendParam(textureType->getAccessInst());
+                appendParam(isCombinedInst);
+                appendParam(isMultisampleInst);
+                appendParam(isArrayInst);
+                appendParam(isShadowInst);
+                sb << ">";
             }
         }
         break;
@@ -771,6 +832,15 @@ void getTypeNameHint(StringBuilder& sb, IRInst* type)
             sb << "ptr_";
             sb << (UInt64)ptrLit->getValue();
         }
+        break;
+    case kIROp_FloatE4M3Type:
+        sb << "FloatE4M3";
+        break;
+    case kIROp_FloatE5M2Type:
+        sb << "FloatE5M2";
+        break;
+    case kIROp_BFloat16Type:
+        sb << "BFloat16";
         break;
     default:
         if (auto decor = type->findDecoration<IRNameHintDecoration>())
@@ -1731,7 +1801,6 @@ bool isGlobalOrUnknownMutableAddress(IRGlobalValueWithCode* parentFunc, IRInst* 
     case kIROp_GlobalConstant:
     case kIROp_Var:
     case kIROp_Param:
-    case kIROp_DebugVar:
         break;
     case kIROp_Call:
         return true;
@@ -2338,7 +2407,8 @@ void verifyComputeDerivativeGroupModifiers(
 
     if (quadAttr && linearAttr)
     {
-        sink->diagnose(errorLoc, Diagnostics::onlyOneOfDerivativeGroupLinearOrQuadCanBeSet);
+        sink->diagnose(
+            Diagnostics::OnlyOneOfDerivativeGroupLinearOrQuadCanBeSet{.location = errorLoc});
     }
 
     IRIntegerValue x = 1;
@@ -2354,14 +2424,14 @@ void verifyComputeDerivativeGroupModifiers(
     if (quadAttr)
     {
         if (x % 2 != 0 || y % 2 != 0)
-            sink->diagnose(errorLoc, Diagnostics::derivativeGroupQuadMustBeMultiple2ForXYThreads);
+            sink->diagnose(
+                Diagnostics::DerivativeGroupQuadMustBeMultiple2ForXyThreads{.location = errorLoc});
     }
     else if (linearAttr)
     {
         if ((x * y * z) % 4 != 0)
-            sink->diagnose(
-                errorLoc,
-                Diagnostics::derivativeGroupLinearMustBeMultiple4ForTotalThreadCount);
+            sink->diagnose(Diagnostics::DerivativeGroupLinearMustBeMultiple4ForTotalThreadCount{
+                .location = errorLoc});
     }
 }
 
@@ -2781,6 +2851,8 @@ bool canOperationBeSpecConst(IROp op, IRType* resultType, IRInst* const* fixedAr
     case kIROp_Geq:
     case kIROp_Less:
     case kIROp_Greater:
+    case kIROp_And:
+    case kIROp_Or:
         {
             IRInst* operand1;
             IRInst* operand2;
@@ -2875,6 +2947,9 @@ bool isSignedType(IRType* type)
     {
     case kIROp_FloatType:
     case kIROp_DoubleType:
+    case kIROp_FloatE4M3Type:
+    case kIROp_FloatE5M2Type:
+    case kIROp_BFloat16Type:
         return true;
     case kIROp_IntType:
     case kIROp_Int16Type:
@@ -2990,6 +3065,36 @@ IRIntegerValue getInterfaceAnyValueSize(IRInst* type, SourceLoc usageLoc)
     // type without an explicit attribute as using that size.
     //
     return kDefaultAnyValueSize;
+}
+
+IRType* getTextureTypeFromCombinedTextureSampler(IRType* type)
+{
+    IRBuilder builder(type);
+    builder.setInsertBefore(type);
+    auto textureType = as<IRTextureTypeBase>(type);
+    return builder.getTextureType(
+        textureType->getElementType(),
+        textureType->getShapeInst(),
+        textureType->getIsArrayInst(),
+        textureType->getIsMultisampleInst(),
+        textureType->getSampleCountInst(),
+        textureType->getAccessInst(),
+        textureType->getIsShadowInst(),
+        builder.getIntValue(builder.getIntType(), 0),
+        textureType->getFormatInst());
+}
+
+IRType* getSamplerTypeFromCombinedTextureSampler(IRType* type)
+{
+    IRBuilder builder(type);
+    builder.setInsertBefore(type);
+
+    auto textureType = as<IRTextureTypeBase>(type);
+
+    if (getIntVal(textureType->getIsShadowInst()) != 0)
+        return builder.getType(kIROp_SamplerComparisonStateType);
+    else
+        return builder.getType(kIROp_SamplerStateType);
 }
 
 } // namespace Slang

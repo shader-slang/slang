@@ -5,7 +5,7 @@
 // CHECK: OpEntryPoint Fragment %main "main"
 struct PS_IN
 {
-    float3 pos : SV_Position;
+    float4 pos : SV_Position;
     float4 color : COLOR;
 }
 

@@ -6,6 +6,7 @@
 #include "slang-ir-layout.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -171,6 +172,7 @@ struct BitCastLoweringContext
         case kIROp_HalfType:
         case kIROp_Int16Type:
         case kIROp_UInt16Type:
+        case kIROp_BFloat16Type:
             {
                 auto object = extractValueAtOffset(builder, targetProgram, src, offset, 2);
                 object = builder.emitCast(builder.getUInt16Type(), object);
@@ -215,6 +217,8 @@ struct BitCastLoweringContext
             break;
         case kIROp_UInt8Type:
         case kIROp_Int8Type:
+        case kIROp_FloatE4M3Type:
+        case kIROp_FloatE5M2Type:
             {
                 auto object = extractValueAtOffset(builder, targetProgram, src, offset, 1);
                 object = builder.emitCast(builder.getUInt8Type(), object);
@@ -257,13 +261,15 @@ struct BitCastLoweringContext
         if (fromBasicType && toBasicType)
         {
             if (fromTypeSize.size != toTypeSize.size)
-                sink->diagnose(
-                    inst->sourceLoc,
-                    Diagnostics::notEqualBitCastSize,
-                    fromType,
-                    fromTypeSize.size,
-                    toType,
-                    toTypeSize.size);
+            {
+                sink->diagnose(Diagnostics::NotEqualBitCastSize{
+                    .fromType = fromType,
+                    .fromSize = fromTypeSize.size,
+                    .toType = toType,
+                    .toSize = toTypeSize.size,
+                    .location = inst->sourceLoc,
+                });
+            }
             // Both fromType and toType are basic types, no processing needed.
             return;
         }
@@ -363,15 +369,22 @@ struct BitCastLoweringContext
         {
             return;
         }
+        if (as<IRHLSLStructuredBufferTypeBase>(fromType) ||
+            as<IRHLSLStructuredBufferTypeBase>(toType))
+        {
+            return;
+        }
 
         if (fromTypeSize.size != toTypeSize.size)
-            sink->diagnose(
-                inst->sourceLoc,
-                Diagnostics::notEqualBitCastSize,
-                fromType,
-                fromTypeSize.size,
-                toType,
-                toTypeSize.size);
+        {
+            sink->diagnose(Diagnostics::NotEqualBitCastSize{
+                .fromType = fromType,
+                .fromSize = fromTypeSize.size,
+                .toType = toType,
+                .toSize = toTypeSize.size,
+                .location = inst->sourceLoc,
+            });
+        }
 
         // Enumerate all fields in to-type and obtain its value from operand object.
         IRBuilder builder(module);

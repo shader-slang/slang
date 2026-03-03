@@ -3,6 +3,7 @@
 
 #include "slang-ir-insts.h"
 #include "slang-ir.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -126,6 +127,8 @@ struct SCCPContext
         case kIROp_Leq:
         case kIROp_Geq:
         case kIROp_Less:
+        case kIROp_And:
+        case kIROp_Or:
         case kIROp_IRem:
         case kIROp_FRem:
         case kIROp_Greater:
@@ -330,6 +333,9 @@ struct SCCPContext
         case kIROp_FloatType:
         case kIROp_DoubleType:
         case kIROp_HalfType:
+        case kIROp_FloatE4M3Type:
+        case kIROp_FloatE5M2Type:
+        case kIROp_BFloat16Type:
             switch (irConstant->getOp())
             {
             case kIROp_FloatLit:
@@ -389,6 +395,9 @@ struct SCCPContext
         case kIROp_FloatType:
         case kIROp_DoubleType:
         case kIROp_HalfType:
+        case kIROp_FloatE4M3Type:
+        case kIROp_FloatE5M2Type:
+        case kIROp_BFloat16Type:
             resultVal = getBuilder()->getFloatValue(type, (IRFloatingPointValue)0.0);
             break;
 
@@ -401,12 +410,13 @@ struct SCCPContext
         return LatticeVal::getConstant(resultVal);
     }
 
-    template<typename TIntFunc, typename TFloatFunc>
+    template<typename TIntFunc, typename TUintFunc, typename TFloatFunc>
     LatticeVal evalBinaryImpl(
         IRType* type,
         LatticeVal v0,
         LatticeVal v1,
         const TIntFunc& intFunc,
+        const TUintFunc& uintFunc,
         const TFloatFunc& floatFunc)
     {
         SLANG_SCCP_RETURN_IF_NONE_OR_ANY(v0)
@@ -416,17 +426,20 @@ struct SCCPContext
         IRInst* resultVal = nullptr;
         switch (type->getOp())
         {
-        case kIROp_Int8Type:
-        case kIROp_Int16Type:
-        case kIROp_IntType:
-        case kIROp_Int64Type:
         case kIROp_UInt8Type:
         case kIROp_UInt16Type:
         case kIROp_UIntType:
         case kIROp_UInt64Type:
-        case kIROp_IntPtrType:
         case kIROp_UIntPtrType:
+            resultVal =
+                getBuilder()->getIntValue(type, uintFunc(c0->value.uintVal, c1->value.uintVal));
+            break;
         case kIROp_BoolType:
+        case kIROp_Int8Type:
+        case kIROp_Int16Type:
+        case kIROp_IntType:
+        case kIROp_Int64Type:
+        case kIROp_IntPtrType:
             resultVal =
                 getBuilder()->getIntValue(type, intFunc(c0->value.intVal, c1->value.intVal));
             break;
@@ -561,6 +574,7 @@ struct SCCPContext
             v0,
             v1,
             [](IRIntegerValue c0, IRIntegerValue c1) { return c0 + c1; },
+            [](IRUnsignedIntegerValue c0, IRUnsignedIntegerValue c1) { return c0 + c1; },
             [](IRFloatingPointValue c0, IRFloatingPointValue c1) { return c0 + c1; });
     }
     LatticeVal evalSub(IRType* type, LatticeVal v0, LatticeVal v1)
@@ -570,6 +584,7 @@ struct SCCPContext
             v0,
             v1,
             [](IRIntegerValue c0, IRIntegerValue c1) { return c0 - c1; },
+            [](IRUnsignedIntegerValue c0, IRUnsignedIntegerValue c1) { return c0 - c1; },
             [](IRFloatingPointValue c0, IRFloatingPointValue c1) { return c0 - c1; });
     }
     LatticeVal evalMul(IRType* type, LatticeVal v0, LatticeVal v1)
@@ -579,6 +594,7 @@ struct SCCPContext
             v0,
             v1,
             [](IRIntegerValue c0, IRIntegerValue c1) { return c0 * c1; },
+            [](IRUnsignedIntegerValue c0, IRUnsignedIntegerValue c1) { return c0 * c1; },
             [](IRFloatingPointValue c0, IRFloatingPointValue c1) { return c0 * c1; });
     }
     LatticeVal evalDiv(IRType* type, LatticeVal v0, LatticeVal v1)
@@ -588,6 +604,7 @@ struct SCCPContext
             v0,
             v1,
             [](IRIntegerValue c0, IRIntegerValue c1) { return c0 / c1; },
+            [](IRUnsignedIntegerValue c0, IRUnsignedIntegerValue c1) { return c0 / c1; },
             [](IRFloatingPointValue c0, IRFloatingPointValue c1) { return c0 / c1; });
     }
     LatticeVal evalRem(IRType* type, LatticeVal v0, LatticeVal v1)
@@ -597,6 +614,7 @@ struct SCCPContext
             v0,
             v1,
             [](IRIntegerValue c0, IRIntegerValue c1) { return c0 % c1; },
+            [](IRUnsignedIntegerValue c0, IRUnsignedIntegerValue c1) { return c0 % c1; },
             [](IRFloatingPointValue c0, IRFloatingPointValue c1) { return fmod(c0, c1); });
     }
     LatticeVal evalEql(IRType* type, LatticeVal v0, LatticeVal v1)
@@ -921,7 +939,7 @@ struct SCCPContext
         //
         // For now we implement only basic folding operations for
         // scalar values.
-        if (!as<IRBasicType>(inst->getDataType()))
+        if (!as<IRBasicType>(inst->getDataType()) && !as<IRPackedFloatType>(inst->getDataType()))
             return LatticeVal::getAny();
 
         switch (inst->getOp())
@@ -967,7 +985,8 @@ struct SCCPContext
                         if (c->value.intVal == 0)
                         {
                             if (shared->sink)
-                                shared->sink->diagnose(inst->sourceLoc, Diagnostics::divideByZero);
+                                shared->sink->diagnose(
+                                    Diagnostics::DivideByZero{.location = inst->sourceLoc});
                             return LatticeVal::getAny();
                         }
                     }
@@ -987,7 +1006,8 @@ struct SCCPContext
                         if (c->value.intVal == 0)
                         {
                             if (shared->sink)
-                                shared->sink->diagnose(inst->sourceLoc, Diagnostics::divideByZero);
+                                shared->sink->diagnose(
+                                    Diagnostics::DivideByZero{.location = inst->sourceLoc});
                             return LatticeVal::getAny();
                         }
                     }

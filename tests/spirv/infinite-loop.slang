@@ -1,7 +1,7 @@
 // Simple regression test for SPIRV compilation hang when there is cycle between unconditional branch and block.
 // The -g was necessary to reproduce the hang prior to fix for https://github.com/shader-slang/slang/issues/8669
 
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -stage fragment -entry main -g
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -stage fragment -entry main -g -O0
 //CHECK: main
 //CHECK: OpBranch
 //CHECK: OpUnreachable
