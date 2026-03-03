@@ -3431,13 +3431,6 @@ err(
     span { loc = "location", message = "entry point '~entryPoint:Name' cannot return type '~returnType:Type' that contains resource types" }
 )
 
-err(
-    "entry-point-cannot-return-array-type",
-    38012,
-    "entry point cannot return array type",
-    span { loc = "location", message = "entry point '~entryPoint:Name' cannot return array type '~returnType:Type'" }
-)
-
 
 -- Load semantic checking diagnostics (part 10) - Interface Requirements, Global Generics, Differentiation, Modules
 -- (inlined from slang-diagnostics-semantic-checking-10.lua)
