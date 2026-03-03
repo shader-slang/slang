@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
 
 module "this-module";
 
@@ -7,37 +7,20 @@ import "that-module";
 void test()
 {
     PublicStruct s;
-    // Error: accessing internal member
+    // CHECK:{{.*}}(11): error 30600:
     s.x = 1; // Error.
-/*CHECK:
-      ^ declaration not accessible
-      ^ 'x' is not accessible from the current context.
-*/
+    // CHECK-NOT:{{.*}}error
     s.y = 2; // OK.
     publicMethod(); // OK.
     publicFunc2();  // OK.
     Namespace.publicVar = 1; // OK.
     Namespace.publicVar2 = 1; // OK.
-    // Error: accessing internal var
+    // CHECK:{{.*}}(19): error 30600:
     Namespace.internalVar = 1; // error.
-//CHECK:      ^^^^^^^^^^^ declaration not accessible
-//CHECK:      ^^^^^^^^^^^ 'internalVar' is not accessible from the current context.
-    // Error: using internal enum
+    // CHECK:{{.*}}(21): error 30600:
     InternalEnum e; // Error.
-/*CHECK:
-    ^^^^^^^^^^^^ declaration not accessible
-    ^^^^^^^^^^^^ 'InternalEnum' is not accessible from the current context.
-*/
-    // Error: using internal struct
+    // CHECK:{{.*}}(23): error 30600:
     InternalStruct s1; // Error.
-/*CHECK:
-    ^^^^^^^^^^^^^^ declaration not accessible
-    ^^^^^^^^^^^^^^ 'InternalStruct' is not accessible from the current context.
-*/
-    // Error: calling internal method
+    // CHECK:{{.*}}(25): error 30600:
     internalMethod(); // Error.
-/*CHECK:
-    ^^^^^^^^^^^^^^ declaration not accessible
-    ^^^^^^^^^^^^^^ 'internalMethod' is not accessible from the current context.
-*/
 }

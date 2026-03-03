@@ -3,9 +3,7 @@
 
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
-#include "slang-ir-util.h"
 #include "slang-ir.h"
-#include "slang-rich-diagnostics.h"
 #include "slang.h"
 
 namespace Slang
@@ -44,11 +42,11 @@ void checkForOperatorShiftOverflowRecursive(IRInst* inst, DiagnosticSink* sink)
                         IRIntegerValue shiftAmount = rhsLit->getValue();
                         if (sizeAlignment.size * 8 <= shiftAmount)
                         {
-                            sink->diagnose(Diagnostics::OperatorShiftLeftOverflow{
-                                .lhsType = lhsType,
-                                .shiftAmount = shiftAmount,
-                                .location = opInst->sourceLoc,
-                            });
+                            sink->diagnose(
+                                opInst,
+                                Diagnostics::operatorShiftLeftOverflow,
+                                lhsType,
+                                shiftAmount);
                         }
                         break;
                     }

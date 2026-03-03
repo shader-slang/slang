@@ -1,0 +1,11 @@
+result code = 0
+standard error = {
+tests/diagnostics/missing-return.slang(7): warning 41010: non-void function does not return in all cases
+int bad(int a, int b)
+    ^~~
+tests/diagnostics/missing-return.slang(14): warning 41010: non-void function does not return in all cases
+int alsoBad(int a, int b)
+    ^~~~~~~
+}
+standard output = {
+}

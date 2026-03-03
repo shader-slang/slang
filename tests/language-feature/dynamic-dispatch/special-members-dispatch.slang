@@ -94,26 +94,22 @@ void computeMain(int id : SV_DispatchThreadID)
 
     // Property getter via dynamic dispatch
     outputBuffer[0] = objA.value;               // ImplA: float(10) = 10.0
-    // REPORT-DAG: :[[# @LINE-1]]:{{.*}}
-    // REPORT-DAG: note{{.*}}: generated {{.*}} dispatch code{{.*}} 2 possible types:
+    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
     // CHECK: 10.0
 
     // Subscript getter via dynamic dispatch
     outputBuffer[1] = objA[0];                  // ImplA: _storage = 10.0
-    // REPORT-DAG: :[[# @LINE-1]]:{{.*}}
-    // REPORT-DAG: note{{.*}}: generated {{.*}} dispatch code{{.*}} 2 possible types:
+    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
     // CHECK: 10.0
 
     // Function call operator via dynamic dispatch
     outputBuffer[2] = objA(2.0, 3.0);           // ImplA: 2.0 + 3.0 = 5.0
-    // REPORT-DAG: :[[# @LINE-1]]:{{.*}}
-    // REPORT-DAG: note{{.*}}: generated {{.*}} dispatch code{{.*}} 2 possible types:
+    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
     // CHECK: 5.0
 
     // Regular method to verify __init ran correctly
     outputBuffer[3] = float(objA.getValue());   // ImplA: _val = 10
-    // REPORT-DAG: :[[# @LINE-1]]:{{.*}}
-    // REPORT-DAG: note{{.*}}: generated {{.*}} dispatch code{{.*}} 2 possible types:
+    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
     // CHECK: 10.0
 
     // --- ImplB (id+1=1): ImplB(10) -> _val=20, _storage=10.0, _scale=2.0 ---
@@ -121,25 +117,21 @@ void computeMain(int id : SV_DispatchThreadID)
 
     // Property getter via dynamic dispatch
     outputBuffer[4] = objB.value;               // ImplB: float(20)*2.0 = 40.0
-    // REPORT-DAG: :[[# @LINE-1]]:{{.*}}
-    // REPORT-DAG: note{{.*}}: generated {{.*}} dispatch code{{.*}} 2 possible types:
+    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
     // CHECK: 40.0
 
     // Subscript getter via dynamic dispatch
     outputBuffer[5] = objB[0];                  // ImplB: 10.0*2.0 = 20.0
-    // REPORT-DAG: :[[# @LINE-1]]:{{.*}}
-    // REPORT-DAG: note{{.*}}: generated {{.*}} dispatch code{{.*}} 2 possible types:
+    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
     // CHECK: 20.0
 
     // Function call operator via dynamic dispatch
     outputBuffer[6] = objB(2.0, 3.0);           // ImplB: 2.0 * 3.0 = 6.0
-    // REPORT-DAG: :[[# @LINE-1]]:{{.*}}
-    // REPORT-DAG: note{{.*}}: generated {{.*}} dispatch code{{.*}} 2 possible types:
+    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
     // CHECK: 6.0
 
     // Regular method to verify __init ran correctly
     outputBuffer[7] = float(objB.getValue());   // ImplB: _val = 20
-    // REPORT-DAG: :[[# @LINE-1]]:{{.*}}
-    // REPORT-DAG: note{{.*}}: generated {{.*}} dispatch code{{.*}} 2 possible types:
+    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
     // CHECK: 20.0
 }

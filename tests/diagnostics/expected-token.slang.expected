@@ -1,0 +1,8 @@
+result code = -1
+standard error = {
+tests/diagnostics/expected-token.slang(6): error 20001: unexpected ']', expected ';'
+    int a = 3 ]
+              ^
+}
+standard output = {
+}

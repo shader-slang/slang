@@ -1,7 +1,7 @@
 //TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry computeMain
 RWStructuredBuffer<int> outputBuffer;
 
-//CHECK: error[E30851]
+//CHECK: error 30851
 
 struct DefaultStructNoInit
 {

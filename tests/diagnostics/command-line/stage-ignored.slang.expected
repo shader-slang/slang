@@ -1,0 +1,6 @@
+result code = 1
+standard error = {
+(0): error 34: when compiling multiple entry points, any '-stage' options must follow the '-entry' option that they apply to
+}
+standard output = {
+}

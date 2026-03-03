@@ -25,7 +25,7 @@ struct MyImpl1 : IFoo
 int test(IFoo foo, int idx)
 {
     int val = 0;
-    // CHECK: error[E20002]: syntax error
+    // CHECK: error 20002: syntax error.
     if ((let a = foo as MyImpl))
     {
         val = a.foo(idx);

@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -warnings-as-errors 30856
+//TEST:SIMPLE(filecheck=CHECK): -warnings-as-errors 30856
 
 interface ICompatibleWith<T> {}
 interface IBase {}
@@ -10,9 +10,8 @@ extension<EY : IBase> EY : ICompatibleWith<FLOAT> {}
 
 struct VECTOR<T> {}
 
+// CHECK: ([[# @LINE+1]]): error 30856: the extension is non-standard
 extension<T, U : ICompatibleWith<T>> VECTOR<U> : ICompatibleWith<VECTOR<T>> {}
-//CHECK:  ^ the extension is non-standard and may not work as intended because the generic parameter 'T' is not referenced by extension target type 'VECTOR<U>'
-//CHECK:  ^ the extension is non-standard and may not work as intended because the generic parameter 'T' is not referenced by extension target type 'VECTOR<U>'
 
 void main()
 {}

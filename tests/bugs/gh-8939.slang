@@ -1,7 +1,7 @@
 // Using SV_VertexID in a fragment shader should produce a proper diagnostic error,
 // not an internal compiler error. SV_VertexID is only valid in vertex shaders.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -skip-spirv-validation
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -skip-spirv-validation
 
 struct VsOutput
 {
@@ -18,9 +18,11 @@ VsOutput vs(uint vertex_id : SV_VertexID)
     return output;
 }
 
+// CHECK-NOT: error 99999
+// CHECK-NOT: internal error
+// CHECK: error {{.*}}SV_VertexID
 [shader("fragment")]
 float4 fs(VsOutput input, uint vertex_id : SV_VertexID) : SV_Target
-//CHECK:                       ^^^^^^^^^ system value semantic 'SV_VertexID' cannot be used as input in 'pixel' shader stage
 {
     return float4(input.position, 1.0) + vertex_id;
 }

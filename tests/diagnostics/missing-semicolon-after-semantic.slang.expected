@@ -1,0 +1,8 @@
+result code = -1
+standard error = {
+tests/diagnostics/missing-semicolon-after-semantic.slang(9): error 20001: unexpected '}', expected ';'
+};
+^
+}
+standard output = {
+}

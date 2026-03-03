@@ -10,7 +10,6 @@
 #include "slang-compiler.h"
 #include "slang-lookup.h"
 #include "slang-mangle.h"
-#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -380,9 +379,11 @@ RefPtr<ComponentType> ComponentType::specialize(
         sink);
     if (consumedArgCount != specializationArgCount)
     {
-        sink->diagnose(Diagnostics::MismatchSpecializationArguments{
-            .expected = (int64_t)Math::Max(consumedArgCount, getSpecializationParamCount()),
-            .provided = (int64_t)specializationArgCount});
+        sink->diagnose(
+            SourceLoc(),
+            Diagnostics::mismatchSpecializationArguments,
+            Math::Max(consumedArgCount, getSpecializationParamCount()),
+            specializationArgCount);
     }
     if (sink->getErrorCount() != 0)
         return nullptr;
@@ -744,9 +745,11 @@ IArtifact* ComponentType::getTargetArtifact(Int targetIndex, slang::IBlob** outD
             DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
             applySettingsToDiagnosticSink(&sink, &sink, linkage->m_optionSet);
             applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
-            sink.diagnose(Diagnostics::CompilationAbortedDueToException{
-                .exceptionType = typeid(e).name(),
-                .exceptionMessage = e.Message});
+            sink.diagnose(
+                SourceLoc(),
+                Diagnostics::compilationAbortedDueToException,
+                typeid(e).name(),
+                e.Message);
             sink.getBlobIfNeeded(outDiagnostics);
         }
         return nullptr;
@@ -790,7 +793,7 @@ Expr* ComponentType::parseExprFromString(String exprStr, DiagnosticSink* sink)
     Scope* scope = _getOrCreateScopeForLegacyLookup(astBuilder);
     Expr* expr = linkage->parseTermString(exprStr, scope);
     if (!expr || as<IncompleteExpr>(expr))
-        sink->diagnose(Diagnostics::SyntaxError{});
+        sink->diagnose(SourceLoc(), Diagnostics::syntaxError);
     return expr;
 }
 

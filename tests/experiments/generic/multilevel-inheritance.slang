@@ -5,14 +5,14 @@
 //TEST:SIMPLE(filecheck=CHECK_LEGACY): -target spirv -gnone -std legacy
 //TEST:SIMPLE(filecheck=CHECK_LEGACY): -target spirv -gminimal -std legacy
 
-// CHECK: error[E30811]
+// CHECK: error 30811
 // CHECK: struct Child : Parent {};
-// CHECK: error[E38029]
+// CHECK: error 38029
 // CHECK: getObject<Child>();
 
-// CHECK_LEGACY: warning[E30816]
+// CHECK_LEGACY: warning 30816
 // CHECK_LEGACY: struct Child : Parent {};
-// CHECK_LEGACY: error[E38029]
+// CHECK_LEGACY: error 38029
 // CHECK_LEGACY: getObject<Child>();
 
 interface IFoo {};

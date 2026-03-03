@@ -7,7 +7,6 @@
 #include "slang-ir-specialize-address-space.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
-#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -226,7 +225,7 @@ static void processInst(IRInst* inst, TargetProgram* targetProgram, DiagnosticSi
         legalizeBinaryOp(inst, sink, targetProgram);
         break;
     case kIROp_MeshOutputRef:
-        sink->diagnose(Diagnostics::AssignToRefNotSupported{.location = getDiagnosticPos(inst)});
+        sink->diagnose(getDiagnosticPos(inst), Diagnostics::assignToRefNotSupported);
         break;
     case kIROp_MetalCastToDepthTexture:
         {

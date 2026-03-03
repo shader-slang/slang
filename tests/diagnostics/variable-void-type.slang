@@ -1,11 +1,7 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=diag):
+//DIAGNOSTIC_TEST:SIMPLE:
 // variable with `void` type
 
 void foo()
 {
 	void a;
-/*diag:
- ^^^^ invalid type 'void'
- ^^^^ invalid type 'void'.
-*/
 }

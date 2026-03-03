@@ -1,6 +1,7 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=diag):
-// Test that #pragma warning (push) emits a warning when the stack is not empty at the end
+//TEST:SIMPLE(filecheck=CHECK):
+// #ifdef support
 
+// CHECK: ([[# @LINE+1]]): warning 15612:
 #pragma warning (push)
-//diag:          ^^^^ unmatched push
-//diag:          ^^^^ detected #pragma warning(push) with no corresponding #pragma warning(pop)
+
+// Test that #pragma warning (push) emits a warning when the stack is not empty at the end

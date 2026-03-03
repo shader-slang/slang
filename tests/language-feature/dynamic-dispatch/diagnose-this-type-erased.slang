@@ -9,7 +9,7 @@
 // A dedicated diagnostic should replace this with a clearer message
 // explaining that the `This` type is not resolvable after type erasure.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target hlsl -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK):-target hlsl -stage compute -entry computeMain
 
 interface ISelfOp
 {
@@ -46,6 +46,6 @@ void computeMain()
         obj = ImplB(5.0);
 
     ISelfOp copy = obj.clone();
+    // CHECK: error 30019
     outputBuffer[0] = obj.matches(copy) ? 1.0 : 0.0;
-//CHECK: type mismatch in expression
 }

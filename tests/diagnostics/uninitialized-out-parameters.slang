@@ -1,48 +1,35 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHK): -target spirv -entry computeMain
+//TEST:SIMPLE(filecheck=CHK): -target spirv -entry computeMain
 
 // Using before assigning
 float regular_undefined_use(out float3 v)
 {
+    //CHK-DAG: ([[# @LINE + 1]]): warning 41015: use of uninitialized out parameter 'v'
     float r = v.x + 1.0;
-//CHK:          ^ use of uninitialized out parameter
-//CHK:          ^ use of uninitialized out parameter 'v'
-
+    
+    //CHK-DAG: ([[# @LINE + 1]]): warning 41018: returning without initializing out parameter 'v'
     return r;
-/*CHK:
-    ^^^^^^ returning without initializing out parameter
-    ^^^^^^ returning without initializing out parameter 'v'
-*/
 }
 
 // Returning before assigning
 float returning_undefined_use(out float x)
 {
+    //CHK-DAG: ([[# @LINE + 1]]): warning 41018: returning without initializing out parameter 'x'
     return 0;
-/*CHK:
-    ^^^^^^ returning without initializing out parameter
-    ^^^^^^ returning without initializing out parameter 'x'
-*/
 }
 
 // Implicit, still returning before assigning
-void implicit_undefined_use(out float x)
+void implicit_undefined_use(out float x) 
 {
+    //CHK-DAG: ([[# @LINE + 1]]): warning 41018: returning without initializing out parameter 'x'
 }
-/*CHK:
-^ returning without initializing out parameter
-^ returning without initializing out parameter 'x'
-*/
 
 // Warn on potential return paths
 void control_flow_undefined(bool b, out float y)
 {
     if(b)
     {
+        //CHK-DAG: ([[# @LINE + 1]]): warning 41018: returning without initializing out parameter 'y'
         return;
-/*CHK:
-        ^^^^^^ returning without initializing out parameter
-        ^^^^^^ returning without initializing out parameter 'y'
-*/
     }
     y = 0;
     return;
@@ -69,12 +56,9 @@ void instrincs_defined(float x, out float exp)
 // Specialized handling for target switches
 void target_switching_undefined(float x, out float exp)
 {
+    //CHK-DAG: ([[# @LINE + 2]]): warning 41018: returning without initializing out parameter 'exp'
     __target_switch {}
 }
-/*CHK:
-^ returning without initializing out parameter
-^ returning without initializing out parameter 'exp'
-*/
 
 void target_switching_defined(float x, out float exp)
 {
@@ -106,8 +90,12 @@ void target_switching_blocks(uint x, out half v)
     }
 }
 
+//CHK-NOT: warning 41015
+//CHK-NOT: warning 41018
+
 [Shader("compute")]
 [NumThreads(4, 1, 1)]
 void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
 {
 }
+

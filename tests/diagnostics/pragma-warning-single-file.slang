@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
+//TEST:SIMPLE(filecheck=CHECK):
 
 module test_pragma_warning_single;
 
@@ -8,8 +8,6 @@ namespace test1
 
     // This SHOULD produce warning 30856 because it's not disabled
     extension<From : __BuiltinIntegerType, To : IConvertibleFrom<From>, let N : int>
-//CHECK:      ^^^^ the extension is non-standard and may not work as intended because the generic parameter 'From' is not referenced by extension target type 'vector<To,N>'
-//CHECK:      ^^^^ the extension is non-standard and may not work as intended because the generic parameter 'From' is not referenced by extension target type 'vector<To,N>'
     vector<To, N> : IConvertibleFrom<vector<From, N>> {}
 }
 
@@ -23,3 +21,6 @@ namespace test2
     extension<From : __BuiltinFloatingPointType, To : IConvertibleFrom<From>, let N : int>
     vector<To, N> : IConvertibleFrom<vector<From, N>> {}
 }
+
+// CHECK: warning 30856
+// CHECK-NOT: 30856

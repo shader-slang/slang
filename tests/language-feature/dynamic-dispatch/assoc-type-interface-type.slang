@@ -64,40 +64,32 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     // Test 1: ProcessorA -> DoubleHandler -> handle(5) = 10
     let procA = createProcessor(0, 1.0);
     let hA = procA.getHandler();
-    // REPORT-DAG: note[E50102]: generated {{.*}} dispatch code{{.*}} 2 possible types:
-    // REPORT-DAG: {{.*}}:[[# @LINE-2]]:
+    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
     outputBuffer[0] = hA.handle(5);
-    // REPORT-DAG: note[E50102]: generated {{.*}} dispatch code{{.*}} 2 possible types:
-    // REPORT-DAG: {{.*}}:[[# @LINE-2]]:
+    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
     // CHECK: 10
 
     // Test 2: ProcessorB -> TripleHandler -> handle(5) = 15
     let procB = createProcessor(1, 2.0);
     let hB = procB.getHandler();
-    // REPORT-DAG: note[E50102]: generated {{.*}} dispatch code{{.*}} 2 possible types:
-    // REPORT-DAG: {{.*}}:[[# @LINE-2]]:
+    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
     outputBuffer[1] = hB.handle(5);
-    // REPORT-DAG: note[E50102]: generated {{.*}} dispatch code{{.*}} 2 possible types:
-    // REPORT-DAG: {{.*}}:[[# @LINE-2]]:
+    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
     // CHECK: 15
 
     // Test 3: Using associated type annotation (proc.Handler)
     let proc2 = createProcessor(0, 3.0);
     proc2.Handler h2 = proc2.getHandler();
-    // REPORT-DAG: note[E50102]: generated {{.*}} dispatch code{{.*}} 2 possible types:
-    // REPORT-DAG: {{.*}}:[[# @LINE-2]]:
+    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
     outputBuffer[2] = h2.handle(3);
-    // REPORT-DAG: note[E50102]: generated {{.*}} dispatch code{{.*}} 2 possible types:
-    // REPORT-DAG: {{.*}}:[[# @LINE-2]]:
+    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
     // CHECK: 6
 
     // Test 4: Associated type annotation with ProcessorB
     let proc3 = createProcessor(1, 4.0);
     proc3.Handler h3 = proc3.getHandler();
-    // REPORT-DAG: note[E50102]: generated {{.*}} dispatch code{{.*}} 2 possible types:
-    // REPORT-DAG: {{.*}}:[[# @LINE-2]]:
+    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
     outputBuffer[3] = h3.handle(4);
-    // REPORT-DAG: note[E50102]: generated {{.*}} dispatch code{{.*}} 2 possible types:
-    // REPORT-DAG: {{.*}}:[[# @LINE-2]]:
+    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
     // CHECK: 12
 }

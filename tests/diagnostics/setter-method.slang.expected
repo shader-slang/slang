@@ -1,0 +1,13 @@
+result code = -1
+standard error = {
+tests/diagnostics/setter-method.slang(16): note 30049: attempting to assign to a const variable or immutable member; use '[mutating]' attribute on the containing method to allow modification
+tests/diagnostics/setter-method.slang(16): error 30011: left of '=' is not an l-value.
+        center = value;
+               ^
+tests/diagnostics/setter-method.slang(21): note 30049: attempting to assign to a const variable or immutable member; use '[mutating]' attribute on the containing method to allow modification
+tests/diagnostics/setter-method.slang(21): error 30011: left of '=' is not an l-value.
+        this.radius = value;
+                    ^
+}
+standard output = {
+}

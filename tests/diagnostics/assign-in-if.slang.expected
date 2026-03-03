@@ -1,0 +1,14 @@
+result code = 1
+standard error = {
+tests/diagnostics/assign-in-if.slang(8): error 30057: use an assignment operation as predicate expression is not allowed, wrap the assignment with '()' to clarify the intent.
+    if (a = 0) // error
+          ^
+tests/diagnostics/assign-in-if.slang(8): warning 30081: implicit conversion from 'int' to 'bool' is not recommended
+    if (a = 0) // error
+          ^
+tests/diagnostics/assign-in-if.slang(10): warning 30081: implicit conversion from 'int' to 'bool' is not recommended
+    if ((a = 0)) // ok.
+        ^
+}
+standard output = {
+}

@@ -1,6 +1,6 @@
 // generic-type-arg-overloaded.slang
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=diag):
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
 
 // Regression test to confirm that type checker
 // doesn't crash when an overloaded identifier
@@ -9,14 +9,10 @@
 interface IThing { int getVal(); }
 
 struct Stuff : IThing { int getVal() { return 1; } }
-//diag:^^^^^ see previous declaration of 'Stuff'
-//diag:^^^^^ candidate: struct Stuff
 
 // Conflicting declaration:
+//CHECK: ([[# @LINE+1]]): error 30200:
 struct Stuff {}
-//diag:^^^^^ conflicting declaration
-//diag:^^^^^ declaration of 'Stuff' conflicts with existing declaration
-//diag:^^^^^ candidate: struct Stuff
 
 int util<T : IThing>() { return 1; }
 
@@ -29,16 +25,10 @@ int test()
 	// rather than crash.
 	//
 	return util<Stuff>()
-//diag:      ^^^^^ ambiguous reference to 'Stuff'
-//diag:      ^^^^^ ambiguous reference to 'Stuff'
 
 	// Adding an extra call to also test the
 	// case of trying to speicalize something
 	// like a generic when it isn't one.
 	//
 		+ nonGeneric<G>();
-/*diag:
-    ^^^^^^^^^^ expected a generic when using '<...>'
-    ^^^^^^^^^^ expected a generic when using '<...>' (found: '() -> int')
-*/
 }

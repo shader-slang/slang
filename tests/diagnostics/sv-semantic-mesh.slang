@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -skip-spirv-validation
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -skip-spirv-validation
 
 // Test system value semantic validation for mesh shaders.
 // Mesh shaders have specific allowed inputs and outputs.
@@ -16,12 +16,12 @@ struct Primitive
     uint primId : SV_PrimitiveID;
 };
 
+// CHECK: ([[# @LINE+5]]): error 30702: system value semantic 'SV_VertexID' cannot be used as input in 'mesh' shader stage
 [outputtopology("triangle")]
 [numthreads(1, 1, 1)]
 [shader("mesh")]
 void meshMainInvalidInput(
     uint vertexId : SV_VertexID,
-//CHECK: ^^^^^^^^ system value semantic 'SV_VertexID' cannot be used as input in 'mesh' shader stage
     OutputVertices<Vertex, 3> verts,
     OutputIndices<uint3, 1> indices,
     OutputPrimitives<Primitive, 1> prims)
@@ -40,8 +40,8 @@ void meshMainInvalidInput(
 struct VertexWithDepth
 {
     float4 pos : SV_Position;
+    // CHECK: ([[# @LINE+1]]): error 30702: system value semantic 'SV_Depth' cannot be used as output in 'mesh' shader stage
     float depth : SV_Depth;
-//CHECK:  ^^^^^ system value semantic 'SV_Depth' cannot be used as output in 'mesh' shader stage
 };
 
 [outputtopology("triangle")]

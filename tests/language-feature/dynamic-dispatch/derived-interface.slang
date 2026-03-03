@@ -63,9 +63,9 @@ float f(uint id, float data, float scale)
 {
     let obj = createShape(id, data);
     let scaledObj = obj.scale(scale);
-    // REPORT-DAG: note[E50102]: generated dynamic dispatch code
+    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
     return scaledObj.getArea() + scaledObj.getPerimeter();
-    // REPORT-DAG: note[E50102]: generated dynamic dispatch code
+    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
 };
 
 

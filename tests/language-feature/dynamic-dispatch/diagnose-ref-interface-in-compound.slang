@@ -1,5 +1,5 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target hlsl
+//TEST:SIMPLE(filecheck=CHECK): -target spirv
+//TEST:SIMPLE(filecheck=CHECK): -target hlsl
 
 // Generic compound types (Tuple, Optional) are checked recursively for
 // interface members, just like structs and arrays. If any type argument
@@ -28,33 +28,29 @@ struct ImplB : IFoo
 // Tuple with an interface element: the interface slot is AnyValue-packed.
 typealias TupleWithInterface = Tuple<IFoo, float>;
 
+// CHECK: ([[# @LINE+1]]): error 52010: '__ref' parameter of type '{{.*}}' cannot be used in a dynamic dispatch context.
 float processTupleRef(__ref TupleWithInterface t)
-//CHECK:                                       ^ ref parameter incompatible with dynamic dispatch
-//CHECK:                                       ^ '__ref' parameter of type '' cannot be used in a dynamic dispatch context.
 {
     return t._0.getValue();
 }
 
+// CHECK: ([[# @LINE+1]]): error 52010: '__constref' parameter of type '{{.*}}' cannot be used in a dynamic dispatch context.
 float processTupleConstref(__constref TupleWithInterface t)
-//CHECK:                                                 ^ ref parameter incompatible with dynamic dispatch
-//CHECK:                                                 ^ '__constref' parameter of type '' cannot be used in a dynamic dispatch context.
 {
     return t._0.getValue() + t._1;
 }
 
 // Optional wrapping an interface: the contained value is AnyValue-packed.
+// CHECK: ([[# @LINE+1]]): error 52010: '__ref' parameter of type '{{.*}}' cannot be used in a dynamic dispatch context.
 float processOptionalRef(__ref Optional<IFoo> opt)
-//CHECK:                                      ^^^ ref parameter incompatible with dynamic dispatch
-//CHECK:                                      ^^^ '__ref' parameter of type '' cannot be used in a dynamic dispatch context.
 {
     if (opt.hasValue)
         return opt.value.getValue();
     return 0.0;
 }
 
+// CHECK: ([[# @LINE+1]]): error 52010: '__constref' parameter of type '{{.*}}' cannot be used in a dynamic dispatch context.
 float processOptionalConstref(__constref Optional<IFoo> opt)
-//CHECK:                                                ^^^ ref parameter incompatible with dynamic dispatch
-//CHECK:                                                ^^^ '__constref' parameter of type '' cannot be used in a dynamic dispatch context.
 {
     if (opt.hasValue)
         return opt.value.getValue();
@@ -64,9 +60,8 @@ float processOptionalConstref(__constref Optional<IFoo> opt)
 // Nested compounds: the check traverses Tuple -> Optional -> IFoo.
 typealias NestedCompound = Tuple<Optional<IFoo>, int>;
 
+// CHECK: ([[# @LINE+1]]): error 52010: '__ref' parameter of type '{{.*}}' cannot be used in a dynamic dispatch context.
 float processNestedRef(__ref NestedCompound nc)
-//CHECK:                                    ^^ ref parameter incompatible with dynamic dispatch
-//CHECK:                                    ^^ '__ref' parameter of type '' cannot be used in a dynamic dispatch context.
 {
     if (nc._0.hasValue)
         return nc._0.value.getValue();
@@ -80,9 +75,8 @@ struct TupleContainer
     Tuple<IFoo, IFoo> pair;
 }
 
+// CHECK: ([[# @LINE+1]]): error 52010: '__constref' parameter of type 'TupleContainer' cannot be used in a dynamic dispatch context.
 float processTupleContainer(__constref TupleContainer c)
-//CHECK:                                              ^ ref parameter incompatible with dynamic dispatch
-//CHECK:                                              ^ '__constref' parameter of type 'TupleContainer' cannot be used in a dynamic dispatch context.
 {
     return c.pair._0.getValue() + c.pair._1.getValue();
 }

@@ -24,7 +24,7 @@
 // SPVDHS-DAG: OpDecorate %[[SAMPLER_HEAP_ARRAY]] ArrayStride 64
 // SPVDHS-DAG: OpDecorate %[[RESOURCE_HEAP_ARRAY]] ArrayStride 32
 
-// SPVDHERR: expecting an unsigned integer value for option '-spirv-resource-heap-stride', but got '-32'
+// SPVDHERR: error 37: expecting an unsigned integer value for option '-spirv-resource-heap-stride', but got '-32'
 
 uniform StructuredBuffer<DescriptorHandle<Sampler2D>> t;
 uniform DescriptorHandle<RWStructuredBuffer<float4>> buffer;

@@ -22,7 +22,6 @@
 #include "slang-module.h"
 #include "slang-preprocessor.h"
 #include "slang-profile.h"
-#include "slang-rich-diagnostics.h"
 #include "slang-session.h"
 #include "slang-translation-unit.h"
 
@@ -350,11 +349,12 @@ protected:
     {
         if (existingValue != newValue)
         {
-            m_sink->diagnose(Diagnostics::NvapiMacroMismatch{
-                .macroName = macroName,
-                .existingValue = existingValue,
-                .newValue = newValue,
-                .location = loc});
+            m_sink->diagnose(
+                loc,
+                Diagnostics::nvapiMacroMismatch,
+                macroName,
+                existingValue,
+                newValue);
         }
     }
 };

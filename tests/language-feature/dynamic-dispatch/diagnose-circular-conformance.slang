@@ -19,7 +19,7 @@ interface IValue
     float get();
 }
 
-// CHECK: error[E{{[0-9]+}}]
+// CHECK: error {{[0-9]+}}
 struct BadImpl : IValue
 {
     IValue child;  // Circular: BadImpl contains IValue, BadImpl conforms to IValue

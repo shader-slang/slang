@@ -9,7 +9,6 @@
 #include "slang-ir-single-return.h"
 #include "slang-ir-ssa-simplification.h"
 #include "slang-ir-validate.h"
-#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -3802,10 +3801,9 @@ void checkAutodiffPatterns(IRModule* module, TargetProgram* target, DiagnosticSi
                 if (auto nameHint = func->findDecoration<IRNameHintDecoration>())
                 {
                     sink->diagnose(
-                        Diagnostics::PotentialIssuesWithPreferRecomputeOnSideEffectMethod{
-                            .funcName = String(nameHint->getName()),
-                            .location = func->sourceLoc,
-                        });
+                        func,
+                        Diagnostics::potentialIssuesWithPreferRecomputeOnSideEffectMethod,
+                        nameHint->getName());
                 }
             }
         }

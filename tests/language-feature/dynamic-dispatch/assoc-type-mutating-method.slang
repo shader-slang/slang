@@ -62,7 +62,7 @@ void computeMain(uint3 threadId: SV_DispatchThreadID)
     obj.Element x = obj.get();
 
     // Cannot pass associated type value to [mutating] method on the same object
-    // CHECK: error[E30019]
+    // CHECK: ([[# @LINE+1]]): error 30019
     obj.set(x);
 
     outputBuffer[0] = obj.toFloat();

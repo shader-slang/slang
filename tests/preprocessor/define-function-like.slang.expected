@@ -1,0 +1,11 @@
+result code = -1
+standard error = {
+tests/preprocessor/define-function-like.slang(16): error 30015: undefined identifier 'x'.
+#define M (x) - (x)
+           ^
+tests/preprocessor/define-function-like.slang(16): error 30015: undefined identifier 'x'.
+#define M (x) - (x)
+                 ^
+}
+standard output = {
+}

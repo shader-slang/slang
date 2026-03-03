@@ -1,0 +1,11 @@
+result code = 0
+standard error = {
+tests/diagnostics/gh-38-fs.hlsl(5): warning 39001: explicit binding for parameter 'overlappingB' overlaps with parameter 'overlappingA'
+Texture2D overlappingB : register(t0);
+          ^~~~~~~~~~~~
+tests/diagnostics/gh-38-vs.hlsl(5): note: see declaration of 'overlappingA'
+Texture2D overlappingA : register(t0);
+          ^~~~~~~~~~~~
+}
+standard output = {
+}

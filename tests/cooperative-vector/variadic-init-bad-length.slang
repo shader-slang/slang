@@ -7,8 +7,7 @@ RWStructuredBuffer<int32_t> outputBuffer;
 void computeMain()
 {
     let result = CoopVec<int32_t, 4>(1,2,3,4,5);
-    // CHECK: error[E41400]: static assertion failed
-    // CHECK: static assertion failed, number of arguments to CoopVec constructor must match number of elements
+    // CHECK: error 41400: static assertion failed, number of arguments to CoopVec constructor must match number of elements
 
     for(int i = 0; i < result.getCount(); ++i)
         outputBuffer[i] = result[i];

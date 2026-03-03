@@ -17,7 +17,7 @@ BUFFER_TYPE<int> buffer;
 BUFFER_TYPE buffer;
 #endif
 
-//CHECK: error[E36107]:
+//CHECK: error 36107:
 //CHECK: buffer.GetDimensions
 
 [shader("compute")]

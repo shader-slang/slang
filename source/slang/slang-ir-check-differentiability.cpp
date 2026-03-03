@@ -2,7 +2,6 @@
 
 #include "slang-ir-autodiff.h"
 #include "slang-ir-inst-pass-base.h"
-#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -315,9 +314,7 @@ public:
                     auto loc = inst->sourceLoc;
                     if (!loc.isValid())
                         loc = funcInst->sourceLoc;
-                    sink->diagnose(Diagnostics::InvalidUseOfTorchTensorTypeInDeviceFunc{
-                        .location = loc,
-                    });
+                    sink->diagnose(loc, Diagnostics::invalidUseOfTorchTensorTypeInDeviceFunc);
                     return;
                 }
             }
@@ -547,13 +544,11 @@ public:
                             !shouldCallImpliesNoDiff(diffTypeContext, call))
                         {
                             sink->diagnose(
-                                Diagnostics::LossOfDerivativeDueToCallOfNonDifferentiableFunction{
-                                    .diffLevel = requiredDiffLevel == DifferentiableLevel::Forward
-                                                     ? "forward"
-                                                     : "backward",
-                                    .funcName = getResolvedInstForDecorations(call->getCallee()),
-                                    .location = inst->sourceLoc,
-                                });
+                                inst,
+                                Diagnostics::lossOfDerivativeDueToCallOfNonDifferentiableFunction,
+                                getResolvedInstForDecorations(call->getCallee()),
+                                requiredDiffLevel == DifferentiableLevel::Forward ? "forward"
+                                                                                  : "backward");
                         }
                     }
                 }
@@ -644,8 +639,7 @@ public:
             }
             else
             {
-                sink->diagnose(Diagnostics::LoopInDiffFuncRequireUnrollOrMaxIters{
-                    .location = loop->sourceLoc});
+                sink->diagnose(loop->sourceLoc, Diagnostics::loopInDiffFuncRequireUnrollOrMaxIters);
             }
         }
 
@@ -662,9 +656,8 @@ public:
                         !canAddressHoldDerivative(diffTypeContext, storeInst->getPtr()))
                     {
                         sink->diagnose(
-                            Diagnostics::LossOfDerivativeAssigningToNonDifferentiableLocation{
-                                .location = storeInst->sourceLoc,
-                            });
+                            storeInst->sourceLoc,
+                            Diagnostics::lossOfDerivativeAssigningToNonDifferentiableLocation);
                     }
                 }
                 else if (auto callInst = as<IRCall>(inst))
@@ -687,10 +680,9 @@ public:
                             if (!canAddressHoldDerivative(diffTypeContext, arg))
                             {
                                 sink->diagnose(
+                                    arg->sourceLoc,
                                     Diagnostics::
-                                        LossOfDerivativeUsingNonDifferentiableLocationAsOutArg{
-                                            .location = arg->sourceLoc,
-                                        });
+                                        lossOfDerivativeUsingNonDifferentiableLocationAsOutArg);
                             }
                         }
                     }

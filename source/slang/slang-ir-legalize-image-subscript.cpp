@@ -7,7 +7,6 @@
 #include "slang-ir-util.h"
 #include "slang-ir.h"
 #include "slang-parameter-binding.h"
-#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -37,12 +36,10 @@ void legalizeStore(
     bool seperateSampleCoord = (textureType->isMultisample()); // seperate sample param
 
     if (seperateSampleCoord && isMetalTarget(target))
-    {
-        sink->diagnose(Diagnostics::MultiSampledTextureDoesNotAllowWrites{
-            .target = target->getTarget(),
-            .location = imageSubscript->getImage()->sourceLoc,
-        });
-    }
+        sink->diagnose(
+            imageSubscript->getImage(),
+            Diagnostics::multiSampledTextureDoesNotAllowWrites,
+            target->getTarget());
 
     IRType* indexingType = builder.getIntType();
     if (isMetalTarget(target))

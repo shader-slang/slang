@@ -25,46 +25,33 @@ SlangResult overrideDiagnostics(
     Severity originalSeverity,
     Severity overrideSeverity);
 
-// All diagnostics are now defined in slang-diagnostics.lua and generated
-// via slang-rich-diagnostics.h. The old slang-diagnostic-defs.h has been removed.
+namespace Diagnostics
+{
+#define DIAGNOSTIC(id, severity, name, messageFormat) extern const DiagnosticInfo name;
+#include "slang-diagnostic-defs.h"
+} // namespace Diagnostics
 } // namespace Slang
 
-// NOTE: The SLANG_INTERNAL_ERROR, SLANG_UNIMPLEMENTED, and SLANG_DIAGNOSE_UNEXPECTED macros
-// require the full struct definitions from slang-rich-diagnostics.h.
-// Users of these macros must include slang-rich-diagnostics.h in their source files.
-
-// Helper macros for stringification
-#define SLANG_DIAG_STRINGIFY_(x) #x
-#define SLANG_DIAG_STRINGIFY(x) SLANG_DIAG_STRINGIFY_(x)
-
 #ifdef _DEBUG
-// In debug builds, emit both the user's source location and the compiler location
-// Note is emitted first since the main diagnostic may abort compilation
-#define SLANG_INTERNAL_ERROR(sink, pos)                                                            \
-    do                                                                                             \
-    {                                                                                              \
-        (sink)->diagnoseRaw(                                                                       \
-            Slang::Severity::Note,                                                                 \
-            "note: internal error triggered at " __FILE__                                          \
-            ":" SLANG_DIAG_STRINGIFY(__LINE__) "\n");                                              \
-        (sink)->diagnose(Slang::Diagnostics::InternalCompilerError{Slang::getDiagnosticPos(pos)}); \
-    } while (0)
-#define SLANG_UNIMPLEMENTED(sink, pos, what)                                                       \
-    do                                                                                             \
-    {                                                                                              \
-        (sink)->diagnoseRaw(                                                                       \
-            Slang::Severity::Note,                                                                 \
-            "note: unimplemented triggered at " __FILE__ ":" SLANG_DIAG_STRINGIFY(__LINE__) "\n"); \
-        (sink)->diagnose(Slang::Diagnostics::Unimplemented{(what), Slang::getDiagnosticPos(pos)}); \
-    } while (0)
+#define SLANG_INTERNAL_ERROR(sink, pos)             \
+    (sink)->diagnose(                               \
+        Slang::SourceLoc(__LINE__, 0, 0, __FILE__), \
+        Slang::Diagnostics::internalCompilerError)
+#define SLANG_UNIMPLEMENTED(sink, pos, what)        \
+    (sink)->diagnose(                               \
+        Slang::SourceLoc(__LINE__, 0, 0, __FILE__), \
+        Slang::Diagnostics::unimplemented,          \
+        what)
+
 #else
 #define SLANG_INTERNAL_ERROR(sink, pos) \
-    (sink)->diagnose(Slang::Diagnostics::InternalCompilerError{Slang::getDiagnosticPos(pos)})
+    (sink)->diagnose(pos, Slang::Diagnostics::internalCompilerError)
 #define SLANG_UNIMPLEMENTED(sink, pos, what) \
-    (sink)->diagnose(Slang::Diagnostics::Unimplemented{(what), Slang::getDiagnosticPos(pos)})
+    (sink)->diagnose(pos, Slang::Diagnostics::unimplemented, what)
+
 #endif
 
 #define SLANG_DIAGNOSE_UNEXPECTED(sink, pos, message) \
-    (sink)->diagnose(Slang::Diagnostics::Unexpected{(message), Slang::getDiagnosticPos(pos)})
+    (sink)->diagnose(pos, Slang::Diagnostics::unexpected, message)
 
 #endif

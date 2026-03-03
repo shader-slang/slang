@@ -1,5 +1,5 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=diag): -stage compute -entry computeMain -allow-glsl -target glsl
-//DIAGNOSTIC_TEST:SIMPLE(diag=diag): -stage compute -entry computeMain -allow-glsl -target spirv -emit-spirv-directly
+//TEST:SIMPLE(filecheck=CHECK): -stage compute -entry computeMain -allow-glsl -target glsl
+//TEST:SIMPLE(filecheck=CHECK): -stage compute -entry computeMain -allow-glsl -target spirv -emit-spirv-directly
 
 volatile buffer MyBlockName1
 {
@@ -15,13 +15,10 @@ buffer MyBlockName2
 layout(local_size_x = 1) in;
 void computeMain()
 {
+//CHECK: error 30101
     int a = inputBuffer1.data2;
-//diag:                  ^^^^^ cannot read from writeonly
-//diag:                  ^^^^^ cannot read from writeonly, check modifiers.
+//CHECK: error 30101
     int b = inputBuffer1.data3;
-//diag:                  ^^^^^ cannot read from writeonly
-//diag:                  ^^^^^ cannot read from writeonly, check modifiers.
+//CHECK: error 30101
     outputBuffer.data = inputBuffer1.data2;
-//diag:                              ^^^^^ cannot read from writeonly
-//diag:                              ^^^^^ cannot read from writeonly, check modifiers.
 }

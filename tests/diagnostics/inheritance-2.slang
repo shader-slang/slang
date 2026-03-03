@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
 
 // Tests that we will diagnose an error on struct inheritance in language 2026 or later.
 
@@ -6,6 +6,5 @@
 
 struct Base {}
 
+//CHECK: ([[# @LINE+1]]): error 30811:
 struct Derived : Base {}
-//CHECK:         ^^^^ struct 'Derived' cannot inherit from non-interface type 'Base'
-//CHECK:         ^^^^ struct 'Derived' cannot inherit from non-interface type 'Base'

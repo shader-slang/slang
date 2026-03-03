@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv
+//TEST:SIMPLE(filecheck=CHECK): -target spirv
 
 struct Test {
     RWStructuredBuffer<int> val;
@@ -16,9 +16,8 @@ void computeMain()
     // test[0,0] is not an l-value because `test` is a read-only parameter,
     // and the `set` accessor is by-default `mutating`, which means that it is
     // only callable when `test` itself is l-value.
-
+    
+    // CHECK: ([[# @LINE+1]]): error 30011
     test[0,0] = 1;
-//CHECK:      ^ left of '=' is not an l-value
-//CHECK:      ^ left of '=' is not an l-value.
 
 }

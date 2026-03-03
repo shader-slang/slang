@@ -44,32 +44,32 @@ void main(int tid: SV_DispatchThreadID)
     int f = ub.a + tid;
     int ff = ub.a + produceNonUniform();
     
-    // Warning expected on next line
+    // CHECK-DAG: ([[# @LINE+1]]): warning 41201
     expectUniform(f);
-    // Warning expected on next line
+    // CHECK-DAG: ([[# @LINE+1]]): warning 41201
     expectUniform(ff);
 
     B obj = ub;
-    // Warning expected on next line
+    // CHECK-DAG: ([[# @LINE+1]]): warning 41201
     expectUniform(getBaFromInout(obj));
     obj.a = ff;
-    // Warning expected on next line
+    // CHECK-DAG: ([[# @LINE+1]]): warning 41201
     expectUniform(getBa(obj));
 
-    // Warning expected on next line
+    // CHECK-DAG: ([[# @LINE+1]]): warning 41201
     obj.d = ff;
 
     int t = 0;
     if (tid == 0)
         t = 1;
 
-    // Warning expected on next line
+    // CHECK-DAG: ([[# @LINE+1]]): warning 41201
     obj.d1 = t;
 
     int u = 0;
     if (ub.a == 0)
         u = 1;
-    // No warning expected here
+    // CHECK-NOT: ([[# @LINE+1]]): warning 41201
     obj.d2 = u;
 
     int vv = 0;
@@ -77,25 +77,22 @@ void main(int tid: SV_DispatchThreadID)
         vv = 2;
     else
         vv = 2;
-    // No warning expected here
+    // CHECK-NOT: ([[# @LINE+1]]): warning 41201
     obj.d3 = vv;
 
-    // No warning expected here
+    // CHECK-NOT: ([[# @LINE+1]]): warning 41201
     expectUniform(getBdFromInout(obj));
-
-    // No warning expected here
+    
+    // CHECK-NOT: ([[# @LINE+1]]): warning 41201
     obj.d4 = d; // OK
 
-    // No warning expected here
+    // CHECK-NOT: ([[# @LINE+1]]): warning 41201
     expectUniform(d);
 
-    // No warning expected here
+    // CHECK-NOT: ([[# @LINE+1]]): warning 41201
     expectUniform(getBa(ub));
 
-    // No warning expected here
+    // CHECK-NOT: ([[# @LINE+1]]): warning 41201
     expectUniform(asDynamicUniform(ff));
-
-// CHECK-COUNT-7: warning[E41201]
-// CHECK-NOT: warning[E41201]
 
 }

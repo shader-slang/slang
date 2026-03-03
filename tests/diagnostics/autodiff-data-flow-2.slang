@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=diag):
+//DIAGNOSTIC_TEST:SIMPLE:
 
 float nonDiff(float x)
 {
@@ -15,8 +15,6 @@ float f(float x)
 float g(float x)
 {
     float val = f(x + 1); // Error: f must also be backward-differentiable
-//diag:          ^ derivative cannot be propagated through non-differentiable call
-//diag:          ^ derivative cannot be propagated through call to non-backward-differentiable function `f`, use 'no_diff' to clarify intention.
     return val;
 }
 
@@ -29,10 +27,6 @@ float h(float x)
 
     // error: dynamic loop without [MaxIters] or [ForceUnroll]
     for (int i = 0; i < (int)x; i++)
-/*diag:
-    ^^^ loop in differentiable function needs attributes
-    ^^^ loops inside a differentiable function need to provide either '[MaxIters(n)]' or '[ForceUnroll]' attribute.
-*/
     {
         no_diff debugBreak();
     }

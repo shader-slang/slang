@@ -1,37 +1,23 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
 
-// Error: private visibility on global struct
+// CHECK-DAG:{{.*}}(4): error 30603
 private struct MyStruct
-/*CHECK:
-^^^^^^^ invalid private visibility
-^^^^^^^ 'MyStruct' cannot have private visibility because it is not a member of a type.
-*/
 {}
 
 struct IS
 {
-    // Error: public method in non-public struct
+    // CHECK-DAG:{{.*}}(10): error 30601
     public void fp();
-//CHECK:        ^^ visibility higher than parent
-//CHECK:        ^^ 'fp' cannot have a higher visibility than 'IS'.
 }
 
-// Error: public function returning internal type
+// CHECK-DAG:{{.*}}(14): error 30604
 public IS f() {}
-//CHECK:  ^ references less visible type
-//CHECK:  ^ 'f' references less visible type 'IS'.
 
 public struct PS
-//CHECK:      ^^ references less visible type
-//CHECK:      ^^ '$init' references less visible type 'IS'.
 {
-    // Error: public member of internal type
+    // CHECK-DAG:{{.*}}(19): error 30604
     public IS ii;
-//CHECK:      ^^ references less visible type
-//CHECK:      ^^ 'ii' references less visible type 'IS'.
 
-    // Error: public property of internal type
+    // CHECK-DAG:{{.*}}(22): error 30604
     public property IS ii2 { get { return {}; } };
-//CHECK:               ^^^ references less visible type
-//CHECK:               ^^^ 'ii2' references less visible type 'IS'.
 }

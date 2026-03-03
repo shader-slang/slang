@@ -11,14 +11,14 @@ float someNoDiffFunc(float x, no_diff float y)
 [Differentiable]
 float eval(float x)
 {
-    // CHECK-NOT: error[E41020]
+    // CHECK-NOT: ([[# @LINE+1]]): error 41020
     return exp(x) - someNoDiffFunc(1.0f, x);
 }
 
 [Differentiable]
 float eval1(float x)
 {
-    // CHECK: error[E41020]: derivative cannot be propagated through non-differentiable call
+    // CHECK: ([[# @LINE+1]]): error 41020
     return exp(x) - someNoDiffFunc(x, 1.0);
 }
 

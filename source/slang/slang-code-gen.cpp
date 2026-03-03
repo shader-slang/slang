@@ -7,7 +7,6 @@
 #include "slang-compiler.h"
 #include "slang-emit-cuda.h"         // for `CUDAExtensionTracker`
 #include "slang-extension-tracker.h" // for `ShaderExtensionTracker`
-#include "slang-rich-diagnostics.h"
 
 // TODO: The "artifact" system is a scourge.
 #include "../compiler-core/slang-artifact-desc-util.h"
@@ -385,9 +384,11 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
             auto sourceName = TypeTextUtil::getCompileTargetName(SlangCompileTarget(sourceTarget));
             auto targetName = TypeTextUtil::getCompileTargetName(SlangCompileTarget(target));
 
-            sink->diagnose(Diagnostics::CompilerNotDefinedForTransition{
-                .sourceTarget = sourceName,
-                .destTarget = targetName});
+            sink->diagnose(
+                SourceLoc(),
+                Diagnostics::compilerNotDefinedForTransition,
+                sourceName,
+                targetName);
             return SLANG_FAIL;
         }
     }
@@ -399,7 +400,7 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
     if (!compiler)
     {
         auto compilerName = TypeTextUtil::getPassThroughAsHumanText((SlangPassThrough)compilerType);
-        sink->diagnose(Diagnostics::PassThroughCompilerNotFound{.compiler = compilerName});
+        sink->diagnose(SourceLoc(), Diagnostics::passThroughCompilerNotFound, compilerName);
         return SLANG_FAIL;
     }
 
@@ -680,8 +681,10 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
                 auto downstreamCompilerName =
                     TypeTextUtil::getPassThroughName((SlangPassThrough)compilerType);
 
-                sink->diagnose(Diagnostics::DownstreamCompilerDoesntSupportWholeProgramCompilation{
-                    .compiler = downstreamCompilerName});
+                sink->diagnose(
+                    SourceLoc(),
+                    Diagnostics::downstreamCompilerDoesntSupportWholeProgramCompilation,
+                    downstreamCompilerName);
                 return SLANG_FAIL;
             }
         }

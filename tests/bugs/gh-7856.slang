@@ -45,7 +45,7 @@ void computeMain(uint3 threadId: SV_DispatchThreadID)
 {
     Foo<int, A.V1, B.V1> v1 = Foo<int, A.V1, B.V1>(1);
 
-    // CHECK: error[E30080]: ambiguous conversion
+    // CHECK: ([[# @LINE+1]]): error 30080
     Foo<float, A.V1, B.V2> v2 = Foo<float, A.V1, B.V2>(v1);
 
     output[0] = v1.a;

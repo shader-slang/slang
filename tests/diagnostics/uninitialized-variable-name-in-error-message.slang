@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHK):
+//TEST:SIMPLE(filecheck=CHK):
 
 // Test if the variable name is a part of the error message
 // when it is used inside of for-loop
@@ -6,13 +6,11 @@
 RWStructuredBuffer<float> gInput;
 RWStructuredBuffer<float> outputBuffer;
 
+//CHK-DAG: ([[#@LINE+1]]): warning 41016: use of uninitialized variable 'a'
 float func1() { float a; return a; }
-//CHK:                   ^^^^^^ use of uninitialized variable
-//CHK:                   ^^^^^^ use of uninitialized variable 'a'
 
+//CHK-DAG: ([[#@LINE+1]]): warning 41016: use of uninitialized variable 'b'
 float func2() { float b; return b; }
-//CHK:                   ^^^^^^ use of uninitialized variable
-//CHK:                   ^^^^^^ use of uninitialized variable 'b'
 
 int test(int inVal)
 {
@@ -29,13 +27,11 @@ void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
 
     for (int i = 0; i <2; ++i)
     {
+        // CHK-DAG: ([[#@LINE+1]]): warning 41016: use of uninitialized variable 'inVal1'
         int outVal = test(inVal1);
-//CHK:                   ^ use of uninitialized variable
-//CHK:                   ^ use of uninitialized variable 'inVal1'
 
+        // CHK-DAG: ([[#@LINE+1]]): warning 41016: use of uninitialized variable 'inVal2'
         outVal += test(inVal2);
-//CHK:                ^ use of uninitialized variable
-//CHK:                ^ use of uninitialized variable 'inVal2'
         outputBuffer[tid] = outVal;
     }
 }

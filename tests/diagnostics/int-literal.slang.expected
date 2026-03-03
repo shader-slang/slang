@@ -1,0 +1,17 @@
+result code = 0
+standard error = {
+tests/diagnostics/int-literal.slang(29): warning 39999: integer literal is too large to be represented in a signed integer type, interpreting as unsigned
+    uint64_t d0 = 18446744073709551615;
+                  ^~~~~~~~~~~~~~~~~~~~
+tests/diagnostics/int-literal.slang(32): warning 39999: integer literal is too large to be represented in a signed integer type, interpreting as unsigned
+    uint64_t d1 = -9223372036854775809;
+                   ^~~~~~~~~~~~~~~~~~~
+tests/diagnostics/int-literal.slang(39): warning 39999: integer literal is too large to be represented in a signed integer type, interpreting as unsigned
+    uint64_t d2 = -9223372036854775808;
+                   ^~~~~~~~~~~~~~~~~~~
+tests/diagnostics/int-literal.slang(42): warning 39999: integer literal is too large to be represented in a signed integer type, interpreting as unsigned
+    int x4 = 0xFFFFFFFFFFFFFFFF;
+             ^~~~~~~~~~~~~~~~~~
+}
+standard output = {
+}

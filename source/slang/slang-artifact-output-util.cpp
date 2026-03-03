@@ -12,7 +12,6 @@
 #include "../compiler-core/slang-artifact-desc-util.h"
 #include "../compiler-core/slang-artifact-util.h"
 #include "slang-compiler.h"
-#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -34,7 +33,9 @@ namespace Slang
         if (sink)
         {
             sink->diagnose(
-                Diagnostics::CannotDisassemble{.target = String(ArtifactDescUtil::getText(desc))});
+                SourceLoc(),
+                Diagnostics::cannotDisassemble,
+                ArtifactDescUtil::getText(desc));
         }
         return SLANG_FAIL;
     }
@@ -61,7 +62,7 @@ namespace Slang
         {
             auto compilerName =
                 TypeTextUtil::getPassThroughAsHumanText((SlangPassThrough)downstreamCompiler);
-            sink->diagnose(Diagnostics::PassThroughCompilerNotFound{.compiler = compilerName});
+            sink->diagnose(SourceLoc(), Diagnostics::passThroughCompilerNotFound, compilerName);
         }
         return SLANG_FAIL;
     }
@@ -156,7 +157,7 @@ static SlangResult _requireBlob(
     const auto res = artifact->loadBlob(ArtifactKeep::No, outBlob.writeRef());
     if (SLANG_FAILED(res))
     {
-        sink->diagnose(Diagnostics::CannotAccessAsBlob{});
+        sink->diagnose(SourceLoc(), Diagnostics::cannotAccessAsBlob);
         return res;
     }
     return SLANG_OK;
@@ -180,7 +181,7 @@ static SlangResult _requireBlob(
     const auto res = write(artifact->getDesc(), blob, writer);
     if (SLANG_FAILED(res))
     {
-        sink->diagnose(Diagnostics::CannotWriteOutputFile{.path = writerName});
+        sink->diagnose(SourceLoc(), Diagnostics::cannotWriteOutputFile, writerName);
     }
     return res;
 }
@@ -258,7 +259,7 @@ static SlangResult _requireBlob(
     const auto res = writeToFile(artifact, path);
     if (SLANG_FAILED(res) && sink)
     {
-        sink->diagnose(Diagnostics::CannotWriteOutputFile{.path = path});
+        sink->diagnose(SourceLoc(), Diagnostics::cannotWriteOutputFile, path);
     }
 
     return res;

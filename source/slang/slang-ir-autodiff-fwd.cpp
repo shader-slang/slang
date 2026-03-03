@@ -13,7 +13,6 @@
 #include "slang-ir-ssa-simplification.h"
 #include "slang-ir-util.h"
 #include "slang-ir-validate.h"
-#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -318,9 +317,10 @@ InstPair ForwardDiffTranscriber::transcribeBinaryArith(IRBuilder* builder, IRIns
                 }
             }
         default:
-            getSink()->diagnose(Diagnostics::Unimplemented{
-                .feature = "this arithmetic instruction cannot be differentiated",
-                .location = origArith->sourceLoc});
+            getSink()->diagnose(
+                origArith->sourceLoc,
+                Diagnostics::unimplemented,
+                "this arithmetic instruction cannot be differentiated");
         }
     }
 
@@ -691,7 +691,10 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
         // differentiate such calls safely.
         // TODO(sai): Should probably get checked in the front-end.
         //
-        getSink()->diagnose(Diagnostics::InternalCompilerError{.location = origCall->sourceLoc});
+        getSink()->diagnose(
+            origCall->sourceLoc,
+            Diagnostics::internalCompilerError,
+            "attempting to differentiate unresolved callee");
 
         return InstPair(nullptr, nullptr);
     }
@@ -1080,9 +1083,10 @@ InstPair ForwardDiffTranscriber::transcribeControlFlow(IRBuilder* builder, IRIns
         return InstPair(diffBranch, diffBranch);
     }
 
-    getSink()->diagnose(Diagnostics::Unimplemented{
-        .feature = "attempting to differentiate unhandled control flow",
-        .location = origInst->sourceLoc});
+    getSink()->diagnose(
+        origInst->sourceLoc,
+        Diagnostics::unimplemented,
+        "attempting to differentiate unhandled control flow");
 
     return InstPair(nullptr, nullptr);
 }
@@ -1098,9 +1102,10 @@ InstPair ForwardDiffTranscriber::transcribeConst(IRBuilder*, IRInst* origInst)
         return InstPair(origInst, origInst);
     }
 
-    getSink()->diagnose(Diagnostics::Unimplemented{
-        .feature = "attempting to differentiate unhandled const type",
-        .location = origInst->sourceLoc});
+    getSink()->diagnose(
+        origInst->sourceLoc,
+        Diagnostics::unimplemented,
+        "attempting to differentiate unhandled const type");
 
     return InstPair(nullptr, nullptr);
 }

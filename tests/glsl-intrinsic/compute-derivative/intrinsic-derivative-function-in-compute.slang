@@ -22,7 +22,7 @@
 // CHECK_SPV_LINEAR_C-NOT: "SPV_KHR_compute_shader_derivatives"
 
 //TEST:SIMPLE(filecheck=CHECK_HLSL_C): -allow-glsl -stage compute -entry computeMain -target hlsl -DCOMPUTE
-// CHECK_HLSL_C: error[E41400]:
+// CHECK_HLSL_C: computeMain(
 
 //TEST:SIMPLE(filecheck=CHECK_GLSL_F): -allow-glsl -stage fragment -entry computeMain -target glsl 
 // CHECK_GLSL_F-NOT: GL_NV_compute_shader_derivatives

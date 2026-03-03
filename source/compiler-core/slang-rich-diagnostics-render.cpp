@@ -98,11 +98,9 @@ private:
         // to mark filenames at the beginning of a diagnostic
         const char* arrow;
         const char* noteDash;
-        // A south-east corner to close the gutter at the end (curves from down to left)
-        const char* gutterCorner;
     };
-    constexpr static Glyphs s_unicodeGlyphs = {"━", "┯", "─", "┬", "│", "╰ ", " ╭╼", " ╭╼", "╯"};
-    constexpr static Glyphs s_asciiGlyphs = {"^", "^", "-", "-", "|", "`", "-->", "---", "´"};
+    constexpr static Glyphs s_unicodeGlyphs = {"━", "┯", "─", "┬", "│", "╰ ", " ╭╼", " ╭╼"};
+    constexpr static Glyphs s_asciiGlyphs = {"^", "^", "-", "-", "|", "`", "-->", "---"};
     const Glyphs& m_glyphs;
 
     // A single highlight on a line, with an optional label to be connected
@@ -637,13 +635,6 @@ private:
                 ss << repeat(' ', layout.primarySection.maxGutterWidth + 1)
                    << color(TerminalColor::Cyan, m_glyphs.vertical) << "\n";
                 renderSectionBody(ss, layout.primarySection);
-                ss << color(
-                          TerminalColor::Cyan,
-                          repeat(
-                              m_glyphs.secondaryUnderline,
-                              layout.primarySection.maxGutterWidth + 1) +
-                              m_glyphs.gutterCorner)
-                   << "\n";
             }
         }
         for (const auto& note : layout.notes)
@@ -655,11 +646,6 @@ private:
                 ss << repeat(' ', note.section.maxGutterWidth + 1)
                    << color(TerminalColor::Cyan, m_glyphs.vertical) << "\n";
                 renderSectionBody(ss, note.section);
-                ss << color(
-                          TerminalColor::Cyan,
-                          repeat(m_glyphs.secondaryUnderline, note.section.maxGutterWidth + 1) +
-                              m_glyphs.gutterCorner)
-                   << "\n";
             }
         }
         return ss.produceString();

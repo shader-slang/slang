@@ -3,8 +3,7 @@
 uniform StructuredBuffer<uint32_t> in;
 uniform RWStructuredBuffer<uint64_t> out;
 
-//CHECK: error[E41202]: bit_cast size mismatch
-//CHECK: '4' casted into {{.*}} '8'
+//CHECK: error 41202{{.*}}4{{.*}}8
 
 [numthreads(4, 1, 1)]
 [shader("compute")]

@@ -1,0 +1,8 @@
+result code = -1
+standard error = {
+tests/diagnostics/continue-outside-loop.slang(4): error 30004: 'continue' must appear inside loop constructs.
+void foo() { continue; }
+             ^~~~~~~~
+}
+standard output = {
+}

@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=diag):
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
 interface IThing
 {
     void thing();
@@ -12,8 +12,6 @@ void f<T, U>(T t, U u)
     if (U is IThing)
     {
         // U being IThing doesn't justify using T as such!
-        t.thing();
-//diag:   ^^^^^ the constraint providing 'thing' is optional and must be checked with an 'is' statement before usage
-//diag:   ^^^^^ the constraint providing 'thing' is optional and must be checked with an 'is' statement before usage
+        t.thing(); // CHECK: error 30403
     }
 }

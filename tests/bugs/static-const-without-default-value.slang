@@ -1,10 +1,11 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -stage compute -entry computeMain -emit-spirv-directly
+// TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry computeMain -emit-spirv-directly
 
 // Test cases for static const variables without initializers producing an error
 
+// CHECK: ([[# @LINE+1]]): error 31225
 static const int globalVar;
-//CHECK:         ^^^^^^^^^ missing initializer for static const
-//CHECK:         ^^^^^^^^^ static const variable 'globalVar' must have an initializer
+
+// CHECK-NOT: error 31225
 
 // This should NOT cause an error - extern static const
 extern static const int externVar;

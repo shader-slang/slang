@@ -34,7 +34,7 @@ float f(uint id, float x)
         obj = B();
 
     return obj.calc(x);
-    // REPORT: note[E50102]: generated dynamic dispatch code
+    // REPORT: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
 }
 
 

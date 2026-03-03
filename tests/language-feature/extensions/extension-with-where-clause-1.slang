@@ -34,8 +34,8 @@ RWStructuredBuffer<float4> outBuffer;
 
 void computeMain()
 {
-//CHECK_FAIL-DAG: 'setVal' is not a member of 'Foo<int, float>'.
-//CHECK_FAIL-DAG: could not specialize generic for arguments of type
+//CHECK_FAIL-DAG: error 30027:{{.*}}'setVal'{{.*}}'Foo<int, float>'.
+//CHECK_FAIL-DAG: error 39999: could not specialize generic for arguments of type
 //CHECK_PASS: OpEntryPoint
 //CHECK: 3
 #ifdef FAIL

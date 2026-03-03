@@ -36,7 +36,7 @@ float f(uint id, float x)
 {
     IInterface obj = factory(id, x);
     return obj.calc(x);
-    // REPORT: note[E50102]: generated dynamic dispatch code
+    // REPORT: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
 }
 
 [numthreads(1, 1, 1)]

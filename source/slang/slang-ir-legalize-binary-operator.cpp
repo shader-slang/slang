@@ -2,7 +2,6 @@
 
 #include "compiler-core/slang-diagnostic-sink.h"
 #include "slang-ir-insts.h"
-#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -97,7 +96,7 @@ void legalizeBinaryOp(IRInst* inst, DiagnosticSink* sink, TargetProgram* targetP
     // Division by matrix is not supported on Metal and WGSL.
     if (isDivisionByMatrix(inst))
     {
-        sink->diagnose(Diagnostics::DivisionByMatrixNotSupported{.location = inst->sourceLoc});
+        sink->diagnose(inst, Diagnostics::divisionByMatrixNotSupported);
         return;
     }
 

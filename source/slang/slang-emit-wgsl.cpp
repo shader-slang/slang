@@ -2,7 +2,6 @@
 
 #include "slang-ir-layout.h"
 #include "slang-ir-util.h"
-#include "slang-rich-diagnostics.h"
 
 // A note on row/column "terminology reversal".
 //
@@ -442,10 +441,12 @@ const char* WGSLSourceEmitter::getWgslImageFormat(IRTextureTypeBase* type)
         return "rgba32float";
     default:
         const auto imageFormatInfo = getImageFormatInfo(imageFormat);
-        getSink()->diagnose(Diagnostics::ImageFormatUnsupportedByBackend{
-            .format = imageFormatInfo.name,
-            .backend = "WGSL",
-            .replacement = "rgba32float"});
+        getSink()->diagnose(
+            SourceLoc(),
+            Diagnostics::imageFormatUnsupportedByBackend,
+            imageFormatInfo.name,
+            "WGSL",
+            "rgba32float");
         return "rgba32float";
     }
 }
@@ -521,10 +522,10 @@ void WGSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             return;
         }
     case kIROp_Int16Type:
-        diagnoseOnce(Diagnostics::Int16NotSupportedInWgsl{.typeName = "int16_t"});
+        diagnoseOnce(SourceLoc(), Diagnostics::int16NotSupportedInWGSL, "int16_t");
         return;
     case kIROp_UInt16Type:
-        diagnoseOnce(Diagnostics::Int16NotSupportedInWgsl{.typeName = "uint16_t"});
+        diagnoseOnce(SourceLoc(), Diagnostics::int16NotSupportedInWGSL, "uint16_t");
         return;
     case kIROp_Int64Type:
     case kIROp_IntPtrType:
@@ -985,12 +986,12 @@ void WGSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                     }
                 case BaseType::Int16:
                     {
-                        diagnoseOnce(Diagnostics::Int16NotSupportedInWgsl{.typeName = "int16_t"});
+                        diagnoseOnce(SourceLoc(), Diagnostics::int16NotSupportedInWGSL, "int16_t");
                         break;
                     }
                 case BaseType::UInt16:
                     {
-                        diagnoseOnce(Diagnostics::Int16NotSupportedInWgsl{.typeName = "uint16_t"});
+                        diagnoseOnce(SourceLoc(), Diagnostics::int16NotSupportedInWGSL, "uint16_t");
                         break;
                     }
                 case BaseType::Int:

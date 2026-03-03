@@ -70,8 +70,7 @@ float testRead(int id)
     let obj = makeContainer(id);
     obj.Element x = obj.get();  // Read via associated type
     return obj.toFloat();
-    // REPORT-DAG: note[E50102]: generated {{.*}} dispatch code{{.*}} 2 possible types:
-    // REPORT-DAG: {{.*}}:[[# @LINE-2]]:
+    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
 }
 
 // Test passing associated type value to non-mutating method
@@ -80,8 +79,7 @@ float testProcess(int id)
     let obj = makeContainer(id);
     obj.Element x = obj.get();     // Read via associated type
     return obj.process(x);         // Pass associated type value to non-mutating method
-    // REPORT-DAG: note[E50102]: generated {{.*}} dispatch code{{.*}} 2 possible types:
-    // REPORT-DAG: {{.*}}:[[# @LINE-2]]:
+    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
 }
 
 [shader("compute")]

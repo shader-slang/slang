@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target cpp -stage compute -entry computeMain -obfuscate -line-directive-mode none
+//TEST:SIMPLE:-target cpp -stage compute -entry computeMain -obfuscate -line-directive-mode none
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -16,10 +16,6 @@ int silly(int a)
     int t = 0;
     [ForceUnroll(10)]
     while ( a > 0)
-/*CHECK:
-    ^ loop unrolling failed
-    ^ loop does not terminate
-*/
     {
         t = t + t + a;
     }
@@ -30,11 +26,11 @@ int silly(int a)
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     int x = int(dispatchThreadID.x);
-
+    
     //String v = getString();
     int v = silly(x);
-
+    
     outputBuffer[x] = v;
-
+    
 }
 

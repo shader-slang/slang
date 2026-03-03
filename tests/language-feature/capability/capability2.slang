@@ -1,5 +1,6 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -emit-spirv-directly -entry main -stage compute
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK_IGNORE_CAPS): -target spirv -emit-spirv-directly -entry main -stage compute -ignore-capabilities
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly -entry main -stage compute
+//TEST:SIMPLE(filecheck=CHECK_IGNORE_CAPS): -target spirv -emit-spirv-directly -entry main -stage compute -ignore-capabilities
+// CHECK_IGNORE_CAPS-NOT: error 36104
 module test;
 
 [require(spvAtomicFloat16AddEXT)]
@@ -7,10 +8,8 @@ interface IFoo
 {
     [require(spvRayQueryKHR)]
     void method1();
-//CHECK: ^^^^^^^ see declaration of 'method1'
 
     void method2();
-//CHECK: ^^^^^^^ see declaration of 'method2'
 }
 
 interface IFoo2
@@ -48,9 +47,8 @@ struct Impl1 : IFoo
 struct Impl2 : IFoo, IFoo2
 {
     // error here because explicit requirement is on `method1`
+    // CHECK: error 36104:{{.*}}spvGroupNonUniformArithmetic
     void method1()
-//CHECK: ^^^^^^^ capability incompatible with interface
-//CHECK: ^^^^^^^ 'method1' uses capability 'spvGroupNonUniformArithmetic' that is incompatable with the interface requirement
     {
         useRayQueryKHR();
         useNonUniformArithmetic();
@@ -58,16 +56,16 @@ struct Impl2 : IFoo, IFoo2
 
     // error here because capabilities are explicitly tagged on
     // the requirement parent `IFoo`
+    // CHECK: error 36104: {{.*}}spvGroupNonUniformArithmetic
     void method2()
-//CHECK: ^^^^^^^ capability incompatible with interface
-//CHECK: ^^^^^^^ 'method2' uses capability 'spvGroupNonUniformArithmetic' that is incompatable with the interface requirement
     {
         useAtomicFloat16();
         useNonUniformArithmetic();
     }
 
-    // do not error here because capabilities are not explicitly tagged
+    // do not error here because capabilities are not explicitly tagged 
     // on the requirement parent `IFoo2` or requirment method
+    // CHECK-NOT: error
     void method3()
     {
         useAtomicFloat16();

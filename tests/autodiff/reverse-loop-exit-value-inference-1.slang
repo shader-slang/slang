@@ -17,7 +17,7 @@ typedef float.Differential dfloat;
 // be absolutely no context stored for any of these tests.
 //
 
-// CHK_REPORT: note: no checkpoint contexts to report
+// CHK_REPORT: (0): note: no checkpoint contexts to report
 
 [Differentiable]
 float test_simple(float y)

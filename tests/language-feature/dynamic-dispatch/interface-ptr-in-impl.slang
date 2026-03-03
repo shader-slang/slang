@@ -80,8 +80,7 @@ float callThroughInterface(uint typeId, float inputValue)
     
     // TRUE dynamic dispatch - compiler must emit switch on type tag
     return obj.foo();
-    // DISPATCH-DAG: note[E50102]: generated {{.*}} dispatch code{{.*}} 2 possible types:
-    // DISPATCH-DAG: {{.*}}:[[# @LINE-2]]:
+    // DISPATCH: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
 }
 
 [numthreads(1, 1, 1)]

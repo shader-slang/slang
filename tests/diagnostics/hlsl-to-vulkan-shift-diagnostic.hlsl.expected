@@ -1,0 +1,14 @@
+result code = -1
+standard error = {
+tests/diagnostics/hlsl-to-vulkan-shift-diagnostic.hlsl(11): warning 39029: shader parameter 'c' has a 'register' specified for D3D, but no '[[vk::binding(...)]]` specified for Vulkan, nor is `-fvk-b-shift` used.
+ConstantBuffer<Data> c : register(b2);
+                         ^~~~~~~~
+tests/diagnostics/hlsl-to-vulkan-shift-diagnostic.hlsl(15): warning 39029: shader parameter 'u' has a 'register' specified for D3D, but no '[[vk::binding(...)]]` specified for Vulkan, nor is `-fvk-u-shift` used.
+RWStructuredBuffer<Data> u : register(u11);
+                             ^~~~~~~~
+tests/diagnostics/hlsl-to-vulkan-shift-diagnostic.hlsl(15): error 39025: conflicting vulkan inferred binding for parameter 'c' overlap is 0 and 0
+RWStructuredBuffer<Data> u : register(u11);
+                         ^
+}
+standard output = {
+}

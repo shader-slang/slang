@@ -5,8 +5,8 @@
 Buffer<float> InputTyped;
 RWBuffer<float> OutputTyped;
 
-//CHECK: error[E36107]
-//CHECK_IGNORE_CAPS-NOT: E36107
+//CHECK: ([[# @LINE+3]]): error 36107
+//CHECK_IGNORE_CAPS-NOT: error 36107
 [numthreads(64, 1, 1)]
 void Main(uint3 DTid : SV_DispatchThreadID)
 {

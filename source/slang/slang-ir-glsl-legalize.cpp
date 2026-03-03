@@ -9,7 +9,6 @@
 #include "slang-ir-specialize-function-call.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
-#include "slang-rich-diagnostics.h"
 
 #include <functional>
 #include <spirv/unified1/spirv.h>
@@ -983,10 +982,10 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
         return inStorage;
     }
 
-    context->getSink()->diagnose(Diagnostics::UnknownSystemValueSemantic{
-        .semanticName = semanticNameSpelling,
-        .location = varLayout->sourceLoc,
-    });
+    context->getSink()->diagnose(
+        varLayout->sourceLoc,
+        Diagnostics::unknownSystemValueSemantic,
+        semanticNameSpelling);
     return nullptr;
 }
 
@@ -1227,9 +1226,10 @@ void invokePathConstantFuncInHullShader(
         {
             if (!outputPatchArg)
             {
-                context->getSink()->diagnose(Diagnostics::UnknownPatchConstantParameter{
-                    .param = param,
-                    .location = param->sourceLoc});
+                context->getSink()->diagnose(
+                    param->sourceLoc,
+                    Diagnostics::unknownPatchConstantParameter,
+                    param);
                 return;
             }
             param->setFullType(outputPatchArg->getDataType());
@@ -1239,9 +1239,10 @@ void invokePathConstantFuncInHullShader(
         {
             if (!inputPatchArg)
             {
-                context->getSink()->diagnose(Diagnostics::UnknownPatchConstantParameter{
-                    .param = param,
-                    .location = param->sourceLoc});
+                context->getSink()->diagnose(
+                    param->sourceLoc,
+                    Diagnostics::unknownPatchConstantParameter,
+                    param);
                 return;
             }
             auto arrayType = builder.getArrayType(
@@ -1255,17 +1256,19 @@ void invokePathConstantFuncInHullShader(
             auto layout = findVarLayout(param);
             if (!layout)
             {
-                context->getSink()->diagnose(Diagnostics::UnknownPatchConstantParameter{
-                    .param = param,
-                    .location = param->sourceLoc});
+                context->getSink()->diagnose(
+                    param->sourceLoc,
+                    Diagnostics::unknownPatchConstantParameter,
+                    param);
                 return;
             }
             auto sysAttr = layout->findSystemValueSemanticAttr();
             if (!sysAttr)
             {
-                context->getSink()->diagnose(Diagnostics::UnknownPatchConstantParameter{
-                    .param = param,
-                    .location = param->sourceLoc});
+                context->getSink()->diagnose(
+                    param->sourceLoc,
+                    Diagnostics::unknownPatchConstantParameter,
+                    param);
                 return;
             }
             if (sysAttr->getName().caseInsensitiveEquals(toSlice("SV_OutputControlPointID")))
@@ -1280,9 +1283,10 @@ void invokePathConstantFuncInHullShader(
             }
             else
             {
-                context->getSink()->diagnose(Diagnostics::UnknownPatchConstantParameter{
-                    .param = param,
-                    .location = param->sourceLoc});
+                context->getSink()->diagnose(
+                    param->sourceLoc,
+                    Diagnostics::unknownPatchConstantParameter,
+                    param);
                 return;
             }
         }
@@ -1930,10 +1934,10 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
                     if (toSize < fromSize)
                     {
                         context->getSink()->diagnose(
-                            Diagnostics::CannotConvertArrayOfSmallerToLargerSize{
-                                .sourceSize = fromSize,
-                                .targetSize = toSize,
-                                .location = userDeclaredParamVarLayout->sourceLoc});
+                            userDeclaredParamVarLayout,
+                            Diagnostics::cannotConvertArrayOfSmallerToLargerSize,
+                            fromSize,
+                            toSize);
                     }
                 }
             }
@@ -5320,9 +5324,10 @@ void legalizeDynamicResourcesForGLSL(IRModule* module, CodeGenContext* context)
         }
         else
         {
-            context->getSink()->diagnose(Diagnostics::AmbiguousReferenceIr{
-                .inst = param,
-                .location = param->firstUse->getUser()->sourceLoc});
+            context->getSink()->diagnose(
+                param->firstUse->getUser(),
+                Diagnostics::ambiguousReference,
+                param);
         }
     }
 }

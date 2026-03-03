@@ -6,8 +6,8 @@
 //TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry computeMain -stage compute -profile sm_6_1
 //TEST:SIMPLE(filecheck=CHECK_WARN): -target hlsl -entry computeMain -stage compute -capability sm_4_0 
 
-//CHECK-NOT: warning[E41012]
-//CHECK_WARN: warning[E41012]
+//CHECK-NOT: warning 41012
+//CHECK_WARN: warning 41012
 //CHECK: computeMain
 
 //TEST_INPUT:ubuffer(data=[1], stride=4):out,name outputBuffer

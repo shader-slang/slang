@@ -1,0 +1,8 @@
+result code = -1
+standard error = {
+tests/diagnostics/x-macro-line-continuation.slang(11): error 15501: wrong number of arguments to macro (expected 1, got 2)
+    M(4, 4) \
+     ^
+}
+standard output = {
+}

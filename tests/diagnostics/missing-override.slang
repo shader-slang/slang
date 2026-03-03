@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
 
 interface IFoo
 {
@@ -8,15 +8,13 @@ interface IFoo
 struct Impl : IFoo
 {
     // Missing override for getVal, which should trigger a diagnostic.
+    // CHECK: ([[# @LINE+1]]): error 30853
     int getVal() { return 1; }
-//CHECK:^^^^^^ missing 'override' keyword for methods that overrides the default implementation in the interface
-//CHECK:^^^^^^ missing 'override' keyword for methods that overrides the default implementation in the interface
 }
 
 struct Impl2 : IFoo
 {
     // Overriding getVal with a different signature should also trigger a diagnostic.
+    // CHECK: ([[# @LINE+1]]): error 30854
     override int getVal(int x) { return x; }
-//CHECK:         ^^^^^^ 'getVal' marked as 'override' is not overriding any base declarations
-//CHECK:         ^^^^^^ 'getVal' marked as 'override' is not overriding any base declarations
 }

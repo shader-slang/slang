@@ -5,7 +5,6 @@
 #include "slang-compiler.h"
 #include "slang-ir-insts.h"
 #include "slang-ir.h"
-#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -35,15 +34,15 @@ static void diagnoseMissingReturnForTarget(
     {
         if (diagnoseWarning)
         {
-            sink->diagnose(Diagnostics::MissingReturn{.location = missingReturn->sourceLoc});
+            sink->diagnose(missingReturn, Diagnostics::missingReturn);
         }
     }
     else
     {
-        sink->diagnose(Diagnostics::MissingReturnError{
-            .targetName = TypeTextUtil::getCompileTargetName(SlangCompileTarget(target)),
-            .location = missingReturn->sourceLoc,
-        });
+        sink->diagnose(
+            missingReturn,
+            Diagnostics::missingReturnError,
+            TypeTextUtil::getCompileTargetName(SlangCompileTarget(target)));
     }
 }
 

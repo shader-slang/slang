@@ -249,40 +249,6 @@ bool maybeDiagnoseWarningOrError(
     }
 }
 
-// Overload of maybeDiagnose for new struct-based diagnostics
-template<typename DiagnosticStruct>
-bool maybeDiagnose(
-    DiagnosticSink* sink,
-    CompilerOptionSet& optionSet,
-    DiagnosticCategory errorType,
-    DiagnosticStruct const& diag)
-{
-    if ((int)errorType & (int)DiagnosticCategory::Capability &&
-        optionSet.getBoolOption(CompilerOptionName::IgnoreCapabilities))
-        return false;
-    return sink->diagnose(diag);
-}
-
-// Overload of maybeDiagnoseWarningOrError for new struct-based diagnostics
-template<typename WarningStruct, typename ErrorStruct>
-bool maybeDiagnoseWarningOrError(
-    DiagnosticSink* sink,
-    CompilerOptionSet& optionSet,
-    DiagnosticCategory errorType,
-    WarningStruct const& warningDiag,
-    ErrorStruct const& errorDiag)
-{
-    if ((int)errorType & (int)DiagnosticCategory::Capability &&
-        optionSet.getBoolOption(CompilerOptionName::RestrictiveCapabilityCheck))
-    {
-        return maybeDiagnose(sink, optionSet, errorType, errorDiag);
-    }
-    else
-    {
-        return maybeDiagnose(sink, optionSet, errorType, warningDiag);
-    }
-}
-
 bool isValidSlangLanguageVersion(int version);
 bool isValidGLSLVersion(int version);
 

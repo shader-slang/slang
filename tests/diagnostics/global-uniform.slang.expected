@@ -1,0 +1,8 @@
+result code = 0
+standard error = {
+tests/diagnostics/global-uniform.slang(13): warning 39019: 'c' is implicitly a global shader parameter, not a global variable. If a global variable is intended, add the 'static' modifier. If a uniform shader parameter is intended, add the 'uniform' modifier to silence this warning.
+C c;
+  ^
+}
+standard output = {
+}

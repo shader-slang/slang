@@ -1,5 +1,6 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -entry computeMain -stage compute -o no-type-conformance.hlsl
+//TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry computeMain -stage compute -o no-type-conformance.hlsl
 
+//CHECK: error 50101: Cannot dynamically dispatch on potentially uninitialized interface object 'IFoo'
 interface IFoo
 {
 	float get();
@@ -9,10 +10,6 @@ void foo()
 {
 	IFoo obj;
 	obj.get();
-//CHECK:^ cannot dispatch on uninitialized interface
-//CHECK:^ Cannot dynamically dispatch on potentially uninitialized interface object 'IFoo'.
-//CHECK:^ cannot dispatch on uninitialized interface
-//CHECK:^ Cannot dynamically dispatch on potentially uninitialized interface object 'IFoo'.
 }
 
 [numthreads(1, 1, 1)]

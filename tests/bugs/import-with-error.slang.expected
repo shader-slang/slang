@@ -1,0 +1,12 @@
+result code = -1
+standard error = {
+tests/bugs/import-with-error-extra.slang(10): error 30015: undefined identifier 'b'.
+    int a = b;
+            ^
+tests/bugs/import-with-error.slang(6): error 39999: import of module 'import_with_error_extra' failed because of a compilation error
+import import_with_error_extra;
+       ^~~~~~~~~~~~~~~~~~~~~~~
+(0): fatal error 39999: compilation ceased
+}
+standard output = {
+}

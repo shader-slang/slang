@@ -1,7 +1,6 @@
 // slang-check-modifier.cpp
 #include "../core/slang-char-util.h"
 #include "slang-check-impl.h"
-#include "slang-rich-diagnostics.h"
 
 // This file implements semantic checking behavior for
 // modifiers.
@@ -40,7 +39,7 @@ ConstantIntVal* SemanticsVisitor::checkConstantIntVal(Expr* expr)
     auto constIntVal = as<ConstantIntVal>(intVal);
     if (!constIntVal)
     {
-        getSink()->diagnose(Diagnostics::ExpectedIntegerConstantNotLiteral{.location = expr->loc});
+        getSink()->diagnose(expr->loc, Diagnostics::expectedIntegerConstantNotLiteral);
         return nullptr;
     }
     return constIntVal;
@@ -58,7 +57,7 @@ ConstantIntVal* SemanticsVisitor::checkConstantEnumVal(Expr* expr)
     auto constIntVal = as<ConstantIntVal>(intVal);
     if (!constIntVal)
     {
-        getSink()->diagnose(Diagnostics::ExpectedIntegerConstantNotLiteral{.location = expr->loc});
+        getSink()->diagnose(expr->loc, Diagnostics::expectedIntegerConstantNotLiteral);
         return nullptr;
     }
     return constIntVal;
@@ -81,7 +80,7 @@ bool SemanticsVisitor::checkLiteralStringVal(Expr* expr, String* outVal)
         return true;
     }
 
-    getSink()->diagnose(Diagnostics::ExpectedAStringLiteral{.expr = expr});
+    getSink()->diagnose(expr, Diagnostics::expectedAStringLiteral);
 
     return false;
 }
@@ -101,14 +100,12 @@ bool SemanticsVisitor::checkCapabilityName(Expr* expr, CapabilityName& outCapabi
         outCapabilityName = findCapabilityName(varExpr->name->text.getUnownedSlice());
         if (outCapabilityName == CapabilityName::Invalid)
         {
-            getSink()->diagnose(Diagnostics::UnknownCapability{
-                .capability = getText(varExpr->name),
-                .location = expr->loc});
+            getSink()->diagnose(expr, Diagnostics::unknownCapability, varExpr->name);
             return false;
         }
         return true;
     }
-    getSink()->diagnose(Diagnostics::ExpectCapability{.location = expr->loc});
+    getSink()->diagnose(expr, Diagnostics::expectCapability);
     return false;
 }
 
@@ -421,9 +418,10 @@ Modifier* SemanticsVisitor::validateAttribute(
                 {
                     if (constIntVal->getValue() < 1)
                     {
-                        getSink()->diagnose(Diagnostics::NonPositiveNumThreads{
-                            .value = constIntVal->getValue(),
-                            .attr = attr});
+                        getSink()->diagnose(
+                            attr,
+                            Diagnostics::nonPositiveNumThreads,
+                            constIntVal->getValue());
                         return nullptr;
                     }
                     if (intValue->getType() != m_astBuilder->getIntType())
@@ -473,9 +471,10 @@ Modifier* SemanticsVisitor::validateAttribute(
                 }
                 if (!isValidWaveSize)
                 {
-                    getSink()->diagnose(Diagnostics::InvalidWaveSize{
-                        .value = constIntVal->getValue(),
-                        .attr = attr});
+                    getSink()->diagnose(
+                        attr,
+                        Diagnostics::invalidWaveSize,
+                        constIntVal->getValue());
                     return nullptr;
                 }
             }
@@ -507,9 +506,10 @@ Modifier* SemanticsVisitor::validateAttribute(
         const IRIntegerValue kMaxAnyValueSize = 0x7FFF;
         if (value->getValue() > kMaxAnyValueSize)
         {
-            getSink()->diagnose(Diagnostics::AnyValueSizeExceedsLimit{
-                .maxSize = (int64_t)kMaxAnyValueSize,
-                .location = anyValueSizeAttr->loc});
+            getSink()->diagnose(
+                anyValueSizeAttr->loc,
+                Diagnostics::anyValueSizeExceedsLimit,
+                kMaxAnyValueSize);
             return nullptr;
         }
 
@@ -665,10 +665,10 @@ Modifier* SemanticsVisitor::validateAttribute(
                     getSink(),
                     this->getOptionSet(),
                     DiagnosticCategory::Capability,
-                    Diagnostics::UsingInternalCapabilityName{
-                        .decl = capNameString,
-                        .capability = capabilityNameToString((CapabilityName)capName),
-                        .location = attr->loc});
+                    attr,
+                    Diagnostics::usingInternalCapabilityName,
+                    attr,
+                    capName);
 
             // Ensure this capability only defines 1 stage per target, else diagnose an error.
             // This is a fatal error, do not allow toggling this error off.
@@ -691,18 +691,18 @@ Modifier* SemanticsVisitor::validateAttribute(
                 atomsToPrint.reserve(stageToBeUsed.getCount());
                 for (auto i : stageToBeUsed)
                     atomsToPrint.add(i);
-                getSink()->diagnose(Diagnostics::CapabilityHasMultipleStages{
-                    .capability = capNameString,
-                    .stages = atomsToPrint,
-                    .location = attr->loc});
+                getSink()->diagnose(
+                    attr,
+                    Diagnostics::capabilityHasMultipleStages,
+                    capNameString,
+                    atomsToPrint);
             }
             return entryPointAttr;
         }
         else
         {
             // always diagnose this error since nothing can compile with an invalid capability
-            getSink()->diagnose(
-                Diagnostics::UnknownCapability{.capability = capNameString, .location = attr->loc});
+            getSink()->diagnose(attr, Diagnostics::unknownCapability, capNameString);
             return nullptr;
         }
     }
@@ -713,8 +713,7 @@ Modifier* SemanticsVisitor::validateAttribute(
         // Let it go thru iff single string attribute
         if (!hasStringArgs(attr, 1))
         {
-            getSink()->diagnose(
-                Diagnostics::ExpectedSingleStringArg{.attrName = attr->keywordName, .attr = attr});
+            getSink()->diagnose(attr, Diagnostics::expectedSingleStringArg, attr->keywordName);
         }
     }
     else if (auto opAttr = as<SPIRVInstructionOpAttribute>(attr))
@@ -723,33 +722,27 @@ Modifier* SemanticsVisitor::validateAttribute(
         const auto argsCount = opAttr->args.getCount();
         if (argsCount < 1 || argsCount > 2)
         {
-            sink->diagnose(Diagnostics::AttributeArgumentCountMismatch{
-                .attrName = attr->keywordName,
-                .expected = "1...2",
-                .provided = (int64_t)argsCount,
-                .attr = attr});
+            sink->diagnose(
+                attr,
+                Diagnostics::attributeArgumentCountMismatch,
+                attr->keywordName,
+                "1...2",
+                argsCount);
         }
         else if (!as<IntegerLiteralExpr>(opAttr->args[0]))
         {
-            sink->diagnose(Diagnostics::AttributeExpectedIntArg{
-                .attrName = attr->keywordName,
-                .argIndex = 0,
-                .attr = attr});
+            sink->diagnose(attr, Diagnostics::attributeExpectedIntArg, attr->keywordName, 0);
         }
         else if (argsCount > 1 && !as<StringLiteralExpr>(opAttr->args[1]))
         {
-            sink->diagnose(Diagnostics::AttributeExpectedStringArg{
-                .attrName = attr->keywordName,
-                .argIndex = 1,
-                .attr = attr});
+            sink->diagnose(attr, Diagnostics::attributeExpectedStringArg, attr->keywordName, 1);
         }
     }
     else if (as<MaxTessFactorAttribute>(attr))
     {
         if (!hasFloatArgs(attr, 1))
         {
-            getSink()->diagnose(
-                Diagnostics::ExpectedSingleFloatArg{.attrName = attr->keywordName, .attr = attr});
+            getSink()->diagnose(attr, Diagnostics::expectedSingleFloatArg, attr->keywordName);
         }
     }
     else if (as<OutputControlPointsAttribute>(attr))
@@ -757,8 +750,7 @@ Modifier* SemanticsVisitor::validateAttribute(
         // Let it go thru iff single integral attribute
         if (!hasIntArgs(attr, 1))
         {
-            getSink()->diagnose(
-                Diagnostics::ExpectedSingleIntArg{.attrName = attr->keywordName, .attr = attr});
+            getSink()->diagnose(attr, Diagnostics::expectedSingleIntArg, attr->keywordName);
         }
     }
     else if (auto attrUsageAttr = as<AttributeUsageAttribute>(attr))
@@ -768,13 +760,17 @@ Modifier* SemanticsVisitor::validateAttribute(
         if (!structDecl)
         {
             getSink()->diagnose(
-                Diagnostics::AttributeUsageAttributeMustBeOnNonGenericStruct{.attr = attr});
+                attr,
+                Diagnostics::attributeUsageAttributeMustBeOnNonGenericStruct,
+                attr->keywordName);
             return nullptr;
         }
         if (findNextOuterGeneric(structDecl) != nullptr)
         {
             getSink()->diagnose(
-                Diagnostics::AttributeUsageAttributeMustBeOnNonGenericStruct{.attr = attr});
+                attr,
+                Diagnostics::attributeUsageAttributeMustBeOnNonGenericStruct,
+                attr->keywordName);
             return nullptr;
         }
         if (attr->args.getCount() == 1)
@@ -786,14 +782,13 @@ Modifier* SemanticsVisitor::validateAttribute(
             }
             else
             {
-                getSink()->diagnose(
-                    Diagnostics::ExpectedSingleIntArg{.attrName = attr->keywordName, .attr = attr});
+                getSink()->diagnose(attr, Diagnostics::expectedSingleIntArg, attr->keywordName);
                 return nullptr;
             }
         }
         if (!getAttributeTargetSyntaxClasses(attrUsageAttr->targetSyntaxClass, targetClassId))
         {
-            getSink()->diagnose(Diagnostics::InvalidAttributeTarget{.attr = attr});
+            getSink()->diagnose(attr, Diagnostics::invalidAttributeTarget);
             return nullptr;
         }
 
@@ -825,10 +820,7 @@ Modifier* SemanticsVisitor::validateAttribute(
     {
         if (forceUnrollAttr->args.getCount() < 1)
         {
-            getSink()->diagnose(Diagnostics::NotEnoughArguments{
-                .got = attr->args.getCount(),
-                .expected = 1,
-                .location = attr->loc});
+            getSink()->diagnose(attr, Diagnostics::notEnoughArguments, attr->args.getCount(), 1);
         }
         auto cint = checkConstantIntVal(attr->args[0]);
         if (cint)
@@ -838,10 +830,7 @@ Modifier* SemanticsVisitor::validateAttribute(
     {
         if (attr->args.getCount() < 1)
         {
-            getSink()->diagnose(Diagnostics::NotEnoughArguments{
-                .got = attr->args.getCount(),
-                .expected = 1,
-                .location = attr->loc});
+            getSink()->diagnose(attr, Diagnostics::notEnoughArguments, attr->args.getCount(), 1);
         }
         else
         {
@@ -881,17 +870,19 @@ Modifier* SemanticsVisitor::validateAttribute(
         }
         if (params.getCount() < attr->args.getCount())
         {
-            getSink()->diagnose(Diagnostics::TooManyArguments{
-                .got = attr->args.getCount(),
-                .expected = params.getCount(),
-                .location = attr->loc});
+            getSink()->diagnose(
+                attr,
+                Diagnostics::tooManyArguments,
+                attr->args.getCount(),
+                params.getCount());
         }
         else if (params.getCount() > attr->args.getCount())
         {
-            getSink()->diagnose(Diagnostics::NotEnoughArguments{
-                .got = attr->args.getCount(),
-                .expected = params.getCount(),
-                .location = attr->loc});
+            getSink()->diagnose(
+                attr,
+                Diagnostics::notEnoughArguments,
+                attr->args.getCount(),
+                params.getCount());
         }
     }
     else if (auto diffAttr = as<BackwardDifferentiableAttribute>(attr))
@@ -917,18 +908,14 @@ Modifier* SemanticsVisitor::validateAttribute(
         {
             if (!findImageFormatByName(formatName.getUnownedSlice(), &format))
             {
-                getSink()->diagnose(Diagnostics::UnknownImageFormatName{
-                    .formatName = formatName,
-                    .location = attr->args[0]});
+                getSink()->diagnose(attr->args[0], Diagnostics::unknownImageFormatName, formatName);
             }
         }
         else
         {
             if (!findVkImageFormatByName(formatName.getUnownedSlice(), &format))
             {
-                getSink()->diagnose(Diagnostics::UnknownImageFormatName{
-                    .formatName = formatName,
-                    .location = attr->args[0]});
+                getSink()->diagnose(attr->args[0], Diagnostics::unknownImageFormatName, formatName);
             }
         }
 
@@ -947,9 +934,7 @@ Modifier* SemanticsVisitor::validateAttribute(
         auto diagnosticInfo = findDiagnosticByName(diagnosticName.getUnownedSlice());
         if (!diagnosticInfo)
         {
-            getSink()->diagnose(Diagnostics::UnknownDiagnosticName{
-                .diagnosticName = diagnosticName,
-                .location = attr->args[0]->loc});
+            getSink()->diagnose(attr->args[0], Diagnostics::unknownDiagnosticName, diagnosticName);
         }
 
         allowAttr->diagnostic = diagnosticInfo;
@@ -1079,14 +1064,14 @@ Modifier* SemanticsVisitor::validateAttribute(
             }
             else
             {
-                getSink()->diagnose(Diagnostics::InvalidGuid{.guid = guid, .attr = attr});
+                getSink()->diagnose(attr, Diagnostics::invalidGUID, guid);
                 return nullptr;
             }
         }
         comInterfaceAttr->guid = resultGUID.toString();
         if (comInterfaceAttr->guid.getLength() != 32)
         {
-            getSink()->diagnose(Diagnostics::InvalidGuid{.guid = guid, .attr = attr});
+            getSink()->diagnose(attr, Diagnostics::invalidGUID, guid);
             return nullptr;
         }
     }
@@ -1095,9 +1080,7 @@ Modifier* SemanticsVisitor::validateAttribute(
         auto varDecl = as<VarDeclBase>(attrTarget);
         if (!varDecl)
         {
-            getSink()->diagnose(Diagnostics::AttributeNotApplicable{
-                .attrName = attr->getKeywordName(),
-                .attr = attr});
+            getSink()->diagnose(attr, Diagnostics::attributeNotApplicable, attr->getKeywordName());
             return nullptr;
         }
     }
@@ -1148,22 +1131,14 @@ Modifier* SemanticsVisitor::validateAttribute(
             {
                 capabilityNames.add(capName);
                 if (isInternalCapabilityName(capName))
-                {
-                    // Get the original text from the argument expression
-                    String argText;
-                    if (auto varExpr = as<VarExpr>(arg))
-                        argText = getText(varExpr->name);
-                    else
-                        argText = capabilityNameToString((CapabilityName)capName);
                     maybeDiagnose(
                         getSink(),
                         this->getOptionSet(),
                         DiagnosticCategory::Capability,
-                        Diagnostics::UsingInternalCapabilityName{
-                            .decl = argText,
-                            .capability = capabilityNameToString((CapabilityName)capName),
-                            .location = attr->loc});
-                }
+                        attr,
+                        Diagnostics::usingInternalCapabilityName,
+                        attr,
+                        capName);
             }
         }
         requireCapAttr->capabilitySet = CapabilitySet(capabilityNames).freeze(getASTBuilder());
@@ -1172,27 +1147,21 @@ Modifier* SemanticsVisitor::validateAttribute(
                 getSink(),
                 this->getOptionSet(),
                 DiagnosticCategory::Capability,
-                Diagnostics::UnexpectedCapability{
-                    .decl = attr->keywordName->text,
-                    .capability = capabilityNameToString(CapabilityName::Invalid),
-                    .location = attr->loc});
+                attr,
+                Diagnostics::unexpectedCapability,
+                attr,
+                CapabilityName::Invalid);
     }
     else if (auto requirePreludeAttr = as<RequirePreludeAttribute>(attr))
     {
         if (attr->args.getCount() > 2)
         {
-            getSink()->diagnose(Diagnostics::TooManyArguments{
-                .got = attr->args.getCount(),
-                .expected = 0,
-                .location = attr->loc});
+            getSink()->diagnose(attr, Diagnostics::tooManyArguments, attr->args.getCount(), 0);
             return nullptr;
         }
         else if (attr->args.getCount() < 2)
         {
-            getSink()->diagnose(Diagnostics::NotEnoughArguments{
-                .got = attr->args.getCount(),
-                .expected = 2,
-                .location = attr->loc});
+            getSink()->diagnose(attr, Diagnostics::notEnoughArguments, attr->args.getCount(), 2);
             return nullptr;
         }
         CapabilityName capName;
@@ -1207,7 +1176,7 @@ Modifier* SemanticsVisitor::validateAttribute(
         }
         else
         {
-            getSink()->diagnose(Diagnostics::ExpectedAStringLiteral{.expr = attr->args[1]});
+            getSink()->diagnose(attr->args[1], Diagnostics::expectedAStringLiteral);
             return nullptr;
         }
         return attr;
@@ -1223,10 +1192,7 @@ Modifier* SemanticsVisitor::validateAttribute(
         {
             // We should be special-casing the checking of any attribute
             // with a non-zero number of arguments.
-            getSink()->diagnose(Diagnostics::TooManyArguments{
-                .got = attr->args.getCount(),
-                .expected = 0,
-                .location = attr->loc});
+            getSink()->diagnose(attr, Diagnostics::tooManyArguments, attr->args.getCount(), 0);
             return nullptr;
         }
     }
@@ -1243,8 +1209,7 @@ AttributeBase* SemanticsVisitor::checkAttribute(
 
     if (!attrDecl)
     {
-        getSink()->diagnose(
-            Diagnostics::UnknownAttributeName{.attrName = attrName, .attr = uncheckedAttr});
+        getSink()->diagnose(uncheckedAttr, Diagnostics::unknownAttributeName, attrName);
         return uncheckedAttr;
     }
 
@@ -1319,11 +1284,12 @@ AttributeBase* SemanticsVisitor::checkAttribute(
 
     if (mismatch)
     {
-        getSink()->diagnose(Diagnostics::AttributeArgumentCountMismatch{
-            .attrName = attrName,
-            .expected = String(paramCount),
-            .provided = (int64_t)argCount,
-            .attr = attr});
+        getSink()->diagnose(
+            attr,
+            Diagnostics::attributeArgumentCountMismatch,
+            attrName,
+            paramCount,
+            argCount);
         return uncheckedAttr;
     }
 
@@ -1357,8 +1323,7 @@ AttributeBase* SemanticsVisitor::checkAttribute(
 
     if (!validTarget)
     {
-        getSink()->diagnose(
-            Diagnostics::AttributeNotApplicable{.attrName = attrName, .attr = attr});
+        getSink()->diagnose(attr, Diagnostics::attributeNotApplicable, attrName);
         return uncheckedAttr;
     }
 
@@ -1692,7 +1657,7 @@ AttributeBase* SemanticsVisitor::checkGLSLLayoutAttribute(
     CASE(UncheckedGLSLCallablePayloadInAttribute, VulkanCallablePayloadInAttribute)
     else
     {
-        getSink()->diagnose(Diagnostics::UnrecognizedGlslLayoutQualifier{.attr = uncheckedAttr});
+        getSink()->diagnose(uncheckedAttr, Diagnostics::unrecognizedGLSLLayoutQualifier);
     }
 #undef CASE
 
@@ -1748,7 +1713,7 @@ Modifier* SemanticsVisitor::checkModifier(
         {
             if (!ignoreUnallowedModifier)
             {
-                getSink()->diagnose(Diagnostics::ModifierNotAllowed{.modifier = m});
+                getSink()->diagnose(m, Diagnostics::modifierNotAllowed, m);
                 return nullptr;
             }
             return m;
@@ -1762,8 +1727,7 @@ Modifier* SemanticsVisitor::checkModifier(
             if (as<PointerTypeExpr>(varDeclBase->type.exp))
             {
                 // Disallow `const T*` syntax.
-                getSink()->diagnose(
-                    Diagnostics::ConstNotAllowedOnCStylePtrDecl{.location = m->loc});
+                getSink()->diagnose(m, Diagnostics::constNotAllowedOnCStylePtrDecl);
                 return nullptr;
             }
         }
@@ -1851,12 +1815,16 @@ Modifier* SemanticsVisitor::checkModifier(
                 else if (filteredResult.isOverloaded())
                 {
                     getSink()->diagnose(
-                        Diagnostics::AmbiguousOriginalDefintionOfExternDecl{.decl = varDecl});
+                        varDecl,
+                        Diagnostics::ambiguousOriginalDefintionOfExternDecl,
+                        varDecl);
                 }
                 else
                 {
                     getSink()->diagnose(
-                        Diagnostics::MissingOriginalDefintionOfExternDecl{.decl = varDecl});
+                        varDecl,
+                        Diagnostics::missingOriginalDefintionOfExternDecl,
+                        varDecl);
                 }
             }
             // The next part of the check is to make sure the type defined here is consistent with
@@ -1870,9 +1838,10 @@ Modifier* SemanticsVisitor::checkModifier(
     {
         if (!packOffsetModifier->registerName.getContent().startsWith("c"))
         {
-            getSink()->diagnose(Diagnostics::UnknownRegisterClass{
-                .className = packOffsetModifier->registerName.getContent(),
-                .location = packOffsetModifier->loc});
+            getSink()->diagnose(
+                packOffsetModifier,
+                Diagnostics::unknownRegisterClass,
+                packOffsetModifier->registerName);
             return m;
         }
         auto uniformOffset =
@@ -1894,9 +1863,10 @@ Modifier* SemanticsVisitor::checkModifier(
                 uniformOffset += 12;
                 break;
             default:
-                getSink()->diagnose(Diagnostics::InvalidComponentMask{
-                    .mask = packOffsetModifier->componentMask.getContent(),
-                    .location = packOffsetModifier->loc});
+                getSink()->diagnose(
+                    packOffsetModifier,
+                    Diagnostics::invalidComponentMask,
+                    packOffsetModifier->componentMask);
                 break;
             }
         }
@@ -1918,15 +1888,17 @@ Modifier* SemanticsVisitor::checkModifier(
                     genDecl->ownedScope);
                 if (!scrutineeResults.isValid())
                 {
-                    getSink()->diagnose(Diagnostics::UndefinedIdentifier{
-                        .name = targetIntrinsic->scrutinee.name,
-                        .location = targetIntrinsic->scrutinee.loc});
+                    getSink()->diagnose(
+                        targetIntrinsic->scrutinee.loc,
+                        Diagnostics::undefinedIdentifier2,
+                        targetIntrinsic->scrutinee.name);
                 }
                 if (scrutineeResults.isOverloaded())
                 {
-                    getSink()->diagnose(Diagnostics::AmbiguousReference{
-                        .name = getText(targetIntrinsic->scrutinee.name),
-                        .location = targetIntrinsic->scrutinee.loc});
+                    getSink()->diagnose(
+                        targetIntrinsic->scrutinee.loc,
+                        Diagnostics::ambiguousReference,
+                        targetIntrinsic->scrutinee.name);
                 }
                 targetIntrinsic->scrutineeDeclRef = scrutineeResults.item.declRef;
             }
@@ -1939,17 +1911,19 @@ Modifier* SemanticsVisitor::checkModifier(
         {
             if (isGlobalDecl(decl))
             {
-                getSink()->diagnose(Diagnostics::InvalidUseOfPrivateVisibility{
-                    .decl = as<Decl>(syntaxNode),
-                    .location = m->loc});
+                getSink()->diagnose(
+                    m,
+                    Diagnostics::invalidUseOfPrivateVisibility,
+                    as<Decl>(syntaxNode));
                 return m;
             }
         }
         if (as<NamespaceDeclBase>(syntaxNode))
         {
-            getSink()->diagnose(Diagnostics::InvalidVisibilityModifierOnTypeOfDecl{
-                .astNodeType = syntaxNode->astNodeType,
-                .location = m->loc});
+            getSink()->diagnose(
+                m,
+                Diagnostics::invalidVisibilityModifierOnTypeOfDecl,
+                syntaxNode->astNodeType);
             return m;
         }
         else if (auto decl = as<Decl>(syntaxNode))
@@ -1957,9 +1931,10 @@ Modifier* SemanticsVisitor::checkModifier(
             // Interface requirements can't be private.
             if (isInterfaceRequirement(decl))
             {
-                getSink()->diagnose(Diagnostics::InvalidUseOfPrivateVisibility{
-                    .decl = as<Decl>(syntaxNode),
-                    .location = m->loc});
+                getSink()->diagnose(
+                    m,
+                    Diagnostics::invalidUseOfPrivateVisibility,
+                    as<Decl>(syntaxNode));
             }
         }
     }
@@ -1967,9 +1942,10 @@ Modifier* SemanticsVisitor::checkModifier(
     {
         if (as<NamespaceDeclBase>(syntaxNode))
         {
-            getSink()->diagnose(Diagnostics::InvalidVisibilityModifierOnTypeOfDecl{
-                .astNodeType = syntaxNode->astNodeType,
-                .location = m->loc});
+            getSink()->diagnose(
+                m,
+                Diagnostics::invalidVisibilityModifierOnTypeOfDecl,
+                syntaxNode->astNodeType);
             return m;
         }
     }
@@ -2043,9 +2019,10 @@ Modifier* SemanticsVisitor::checkModifier(
                     }
                     else if (cintVal->getValue() < 1)
                     {
-                        getSink()->diagnose(Diagnostics::NonPositiveNumThreads{
-                            .value = cintVal->getValue(),
-                            .attr = attr});
+                        getSink()->diagnose(
+                            attr,
+                            Diagnostics::nonPositiveNumThreads,
+                            cintVal->getValue());
                         return nullptr;
                     }
                 }
@@ -2115,7 +2092,7 @@ void SemanticsVisitor::checkVisibility(Decl* decl)
         DeclVisibility typeVisibility = getTypeVisibility(type);
         if (typeVisibility < thisVisibility)
         {
-            getSink()->diagnose(Diagnostics::UseOfLessVisibleType{.type = type, .decl = decl});
+            getSink()->diagnose(decl, Diagnostics::useOfLessVisibleType, decl, type);
             break;
         }
     }
@@ -2132,8 +2109,7 @@ void SemanticsVisitor::checkVisibility(Decl* decl)
     auto parentVisibility = getDeclVisibility(parentDecl);
     if (thisVisibility > parentVisibility)
     {
-        getSink()->diagnose(
-            Diagnostics::DeclCannotHaveHigherVisibility{.parent = parentDecl, .decl = decl});
+        getSink()->diagnose(decl, Diagnostics::declCannotHaveHigherVisibility, decl, parentDecl);
     }
 }
 
@@ -2209,9 +2185,11 @@ void SemanticsVisitor::checkModifiers(ModifiableSyntaxNode* syntaxNode)
         {
             if (mapExclusiveGroupToModifier.tryGetValue(conflictGroup, existingModifier))
             {
-                getSink()->diagnose(Diagnostics::DuplicateModifier{
-                    .existingModifier = existingModifier,
-                    .modifier = modifier});
+                getSink()->diagnose(
+                    modifier->loc,
+                    Diagnostics::duplicateModifier,
+                    modifier,
+                    existingModifier);
             }
             mapExclusiveGroupToModifier[conflictGroup] = modifier;
         }
@@ -2282,8 +2260,7 @@ void SemanticsVisitor::checkModifiers(ModifiableSyntaxNode* syntaxNode)
         }
         else
         {
-            getSink()->diagnose(
-                Diagnostics::MissingLayoutBindingModifier{.location = glslOffsetAttribute->loc});
+            getSink()->diagnose(glslOffsetAttribute, Diagnostics::missingLayoutBindingModifier);
         }
     }
 
@@ -2313,7 +2290,9 @@ void SemanticsVisitor::checkRayPayloadStructFields(StructDecl* structDecl)
         {
             // Emit the diagnostic error
             getSink()->diagnose(
-                Diagnostics::RayPayloadFieldMissingAccessQualifiers{.field = fieldVarDecl});
+                fieldVarDecl,
+                Diagnostics::rayPayloadFieldMissingAccessQualifiers,
+                fieldVarDecl->getName());
         }
 
         // Check stage names in read qualifier
@@ -2324,9 +2303,10 @@ void SemanticsVisitor::checkRayPayloadStructFields(StructDecl* structDecl)
                 String stageName = stageToken.getContent();
                 if (!validStages.contains(stageName))
                 {
-                    getSink()->diagnose(Diagnostics::RayPayloadInvalidStageInAccessQualifier{
-                        .stageName = stageName,
-                        .location = stageToken.loc});
+                    getSink()->diagnose(
+                        stageToken,
+                        Diagnostics::rayPayloadInvalidStageInAccessQualifier,
+                        stageName);
                 }
             }
         }
@@ -2339,9 +2319,10 @@ void SemanticsVisitor::checkRayPayloadStructFields(StructDecl* structDecl)
                 String stageName = stageToken.getContent();
                 if (!validStages.contains(stageName))
                 {
-                    getSink()->diagnose(Diagnostics::RayPayloadInvalidStageInAccessQualifier{
-                        .stageName = stageName,
-                        .location = stageToken.loc});
+                    getSink()->diagnose(
+                        stageToken,
+                        Diagnostics::rayPayloadInvalidStageInAccessQualifier,
+                        stageName);
                 }
             }
         }

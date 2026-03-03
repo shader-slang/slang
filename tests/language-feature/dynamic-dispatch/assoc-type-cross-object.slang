@@ -62,6 +62,6 @@ void computeMain(uint3 threadId: SV_DispatchThreadID)
     obj1.Data d = obj1.make();
 
     // Cannot pass obj1.Data to obj2.process(), even though both are the same type
-    // CHECK: error[E30019]
+    // CHECK: ([[# @LINE+1]]): error 30019
     outputBuffer[0] = obj2.process(d);
 }

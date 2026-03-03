@@ -4,7 +4,6 @@
 #include "slang-ir-inst-pass-base.h"
 #include "slang-ir-insts.h"
 #include "slang-ir.h"
-#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -53,10 +52,7 @@ struct OutOfBoundAccessChecker : public InstPassBase
         // Check bounds: index should be >= 0 and < arraySize
         if (indexValue < 0 || indexValue >= arraySizeValue)
         {
-            sink->diagnose(Diagnostics::ArrayIndexOutOfBounds{
-                .index = String(indexValue),
-                .size = String(arraySizeValue),
-                .location = inst->sourceLoc});
+            sink->diagnose(inst, Diagnostics::arrayIndexOutOfBounds, indexValue, arraySizeValue);
         }
     }
 

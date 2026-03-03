@@ -1,14 +1,13 @@
 // Test that unbounded arrays are NonAddressable and cannot be used in arrays
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target spirv -allow-glsl -stage compute -entry computeMain
-// Using non-exhaustive due to multiple duplicate cascading errors
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -allow-glsl -stage compute -entry computeMain
 
 // Unbounded array itself is fine
 int unboundedArray[];
 
 // Array of unbounded arrays - should error (unbounded arrays are NonAddressable)
+//CHECK: ([[# @LINE+1]]): error 30027
 int arrayOfUnbounded[3][];
-//CHECK: arrays of non-addressable type not allowed
 
 // Struct containing unbounded array (must be last member)
 struct StructWithUnbounded
@@ -18,28 +17,27 @@ struct StructWithUnbounded
 }
 
 // Array of struct containing unbounded array - should error (struct is NonAddressable)
+//CHECK: ([[# @LINE+1]]): error 30027
 StructWithUnbounded myArray[2];
-//CHECK: arrays of non-addressable type not allowed
 
 // StructuredBuffer of struct with unbounded array - should error
+//CHECK: ([[# @LINE+1]]): error 30028
 StructuredBuffer<StructWithUnbounded> myBuffer;
-//CHECK: non-addressable type cannot be used in StructuredBuffer
 
 // Nested case
 struct NestedUnbounded
-//CHECK: function parameter cannot be unsized
 {
     int id;
     StructWithUnbounded nested;  // Struct with unbounded array member
 }
 
 // Array of nested struct - should error
+//CHECK: ([[# @LINE+1]]): error 30027
 NestedUnbounded nestedArray[5];
-//CHECK: arrays of non-addressable type not allowed
 
 // StructuredBuffer of nested struct - should error
+//CHECK: ([[# @LINE+1]]): error 30028
 StructuredBuffer<NestedUnbounded> nestedBuffer;
-//CHECK: non-addressable type cannot be used in StructuredBuffer
 
 [numthreads(1, 1, 1)]
 void computeMain()

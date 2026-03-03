@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHK): -target spirv -entry computeMain
+//TEST:SIMPLE(filecheck=CHK): -target spirv -entry computeMain
 
 // Both out and inout parameters
 // should have this treated as writes
@@ -25,13 +25,11 @@ void undefined_function_use()
     int x;
     int tmp = 1;
 
+    //CHK-DAG: warning 41016: use of uninitialized variable 'x'
     out_test(x, tmp);
-//CHK:      ^ use of uninitialized variable
-//CHK:      ^ use of uninitialized variable 'x'
-
+    
+    //CHK-DAG: warning 41016: use of uninitialized variable 'x'
     inout_test(tmp, x);
-//CHK:        ^ use of uninitialized variable
-//CHK:        ^ use of uninitialized variable 'x'
 }
 
 void out_function_use()
@@ -92,9 +90,8 @@ void undefined_generic_use()
 {
     int x;
 
+    //CHK-DAG: warning 41016: use of uninitialized variable 'x'
     ordinary_generic(x);
-//CHK:              ^ use of uninitialized variable
-//CHK:              ^ use of uninitialized variable 'x'
 }
 
 void ok_generic_use()
@@ -113,8 +110,11 @@ void f()
     out_test(1, dim.x);
 }
 
+//CHK-NOT: warning 41016
+
 [Shader("compute")]
 [NumThreads(4, 1, 1)]
 void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
 {
 }
+

@@ -1,6 +1,5 @@
 // slang-check-inheritance.cpp
 #include "slang-check-impl.h"
-#include "slang-rich-diagnostics.h"
 
 // This file implements the semantic checking logic
 // related to computing linearized inheritance
@@ -67,7 +66,7 @@ bool SharedSemanticsContext::_checkForCircularityInExtensionTargetType(
     {
         if (decl == info->decl)
         {
-            getSink()->diagnose(Diagnostics::CircularityInExtension{.decl = decl});
+            getSink()->diagnose(decl, Diagnostics::circularityInExtension, decl);
             return true;
         }
     }
@@ -788,7 +787,7 @@ void SharedSemanticsContext::_mergeFacetLists(
             if (!bases.isEmpty())
             {
                 auto baseDecl = (*bases.begin())->facetImpl.origin.declRef.getDecl();
-                getSink()->diagnose(Diagnostics::CyclicReferenceInInheritance{.decl = baseDecl});
+                getSink()->diagnose(baseDecl, Diagnostics::cyclicReferenceInInheritance, baseDecl);
             }
             return;
         }

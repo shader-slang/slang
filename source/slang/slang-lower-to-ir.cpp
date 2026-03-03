@@ -38,7 +38,6 @@
 #include "slang-ir-validate.h"
 #include "slang-ir.h"
 #include "slang-mangle.h"
-#include "slang-rich-diagnostics.h"
 #include "slang-type-layout.h"
 #include "slang-visitor.h"
 #include "slang.h"
@@ -4362,10 +4361,10 @@ struct ExprLoweringContext
                      ->findDecoration<IRGlobalInputDecoration>())
             {
                 this->context->getSink()->diagnose(
-                    Diagnostics::RequireInputDecoratedVarForParameter{
-                        .func = decl,
-                        .paramNumber = glslRequireShaderInputParameter->parameterNumber,
-                        .expr = expr});
+                    expr,
+                    Diagnostics::requireInputDecoratedVarForParameter,
+                    decl,
+                    glslRequireShaderInputParameter->parameterNumber);
             }
             return;
         }
@@ -4962,8 +4961,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                             i = addr.val;
                         else
                         {
-                            context->getSink()->diagnose(
-                                Diagnostics::NoSuchAddress{.location = operand.expr->loc});
+                            context->getSink()->diagnose(operand.expr, Diagnostics::noSuchAddress);
                             return nullptr;
                         }
                     }
@@ -5503,8 +5501,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             {
                 if (auto interfaceDeclRef = declRefType->getDeclRef().as<InterfaceDecl>())
                 {
-                    context->getSink()->diagnose(
-                        Diagnostics::InterfaceDefaultInitializer{.expr = expr});
+                    context->getSink()->diagnose(expr, Diagnostics::interfaceDefaultInitializer);
                 }
             }
 
@@ -6726,7 +6723,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // for unreachable code based on IR analysis instead,
         // at which point we'd probably disable this check.
         //
-        context->getSink()->diagnose(Diagnostics::UnreachableCode{.stmt = stmt});
+        context->getSink()->diagnose(stmt, Diagnostics::unreachableCode);
 
         startBlock();
     }
@@ -6950,9 +6947,9 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
                     if (inferredMaxIters->value < constIntVal->getValue())
                     {
                         context->getSink()->diagnose(
-                            Diagnostics::ForLoopTerminatesInFewerIterationsThanMaxIters{
-                                .iterations = (int64_t)inferredMaxIters->value,
-                                .attr = maxIters});
+                            maxIters,
+                            Diagnostics::forLoopTerminatesInFewerIterationsThanMaxIters,
+                            inferredMaxIters->value);
                     }
                 }
             }
@@ -8295,8 +8292,7 @@ IRInst* getAddress(IRGenContext* context, LoweredValInfo const& inVal, SourceLoc
         return val.val;
     }
 
-    context->getSink()->diagnose(
-        Diagnostics::InvalidLValueForRefParameter{.location = diagnosticLocation});
+    context->getSink()->diagnose(diagnosticLocation, Diagnostics::invalidLValueForRefParameter);
     return nullptr;
 }
 
@@ -10269,9 +10265,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
         else
         {
-            getSink()->diagnose(Diagnostics::Unimplemented{
-                .feature = "lower unknown AggType to IR",
-                .location = decl->loc});
+            getSink()->diagnose(
+                decl->loc,
+                Diagnostics::unimplemented,
+                "lower unknown AggType to IR");
             return LoweredValInfo::simple(subBuilder->getVoidType());
         }
 
