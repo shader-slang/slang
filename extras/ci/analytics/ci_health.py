@@ -23,7 +23,7 @@ from datetime import datetime, timezone, timedelta
 
 # Import the page template from ci_visualization
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from ci_visualization import page_template
+from ci_visualization import page_template, chart_section, DOWNLOAD_JS
 
 
 DEFAULT_REPO = "shader-slang/slang"
@@ -224,8 +224,8 @@ def build_history_chart(snapshots):
     timestamps = [_round_time(s["timestamp"][11:16]) for s in snapshots]
 
     # Only show GCP VM groups (Linux GPU and Windows GPU), exclude scaler host and test runners
-    gcp_vm_groups = ["Linux GPU (GCP)", "Windows GPU (GCP)"]
-    palette = {"Linux GPU (GCP)": "#0d6efd", "Windows GPU (GCP)": "#28a745"}
+    gcp_vm_groups = ["Linux GPU (GCP)", "Windows Build (GCP)", "Windows GPU (GCP)"]
+    palette = {"Linux GPU (GCP)": "#0d6efd", "Windows Build (GCP)": "#fd7e14", "Windows GPU (GCP)": "#28a745"}
 
     # Queue depth over time
     queued_data = [s.get("jobs_queued", 0) for s in snapshots]
@@ -240,8 +240,17 @@ def build_history_chart(snapshots):
     for g in gcp_vm_groups:
         group_series[g] = [s.get("runner_groups", {}).get(g, {}).get("total", 0) for s in snapshots]
 
+    charts_html = (
+        chart_section("runnerHistory", "GCP Runner VMs",
+            "Number of GCP-provisioned runner VMs online per group, sampled every 15 minutes.")
+        + chart_section("workflowHistory", "Active CI Workflows",
+            "CI workflow runs currently in progress or queued.")
+        + chart_section("queueHistory", "Job Queue Depth",
+            "Individual jobs waiting in queue vs. actively running on runners.")
+    )
+
     return f"""
-<div style="margin-bottom:15px">
+<div class="chart-section">
   <label>Time window: </label>
   <select id="historyRange" onchange="updateHistoryRange()">
     <option value="4">Last 4 hours</option>
@@ -249,17 +258,10 @@ def build_history_chart(snapshots):
     <option value="24" selected>Last 24 hours</option>
   </select>
 </div>
-<div style="position:relative;width:100%;max-width:1200px;margin:20px 0">
-  <canvas id="runnerHistory"></canvas>
-</div>
-<div style="position:relative;width:100%;max-width:1200px;margin:20px 0">
-  <canvas id="workflowHistory"></canvas>
-</div>
-<div style="position:relative;width:100%;max-width:1200px;margin:20px 0">
-  <canvas id="queueHistory"></canvas>
-</div>
+{charts_html}
 <script src="{CHARTJS_CDN}"></script>
 <script>
+{DOWNLOAD_JS}
 // All snapshot data
 const allTimestamps = {json.dumps(timestamps)};
 const allRunnerData = {json.dumps({g: group_series[g] for g in gcp_vm_groups})};
@@ -301,18 +303,17 @@ function buildCharts(hours) {{
       tension: 0.3,
     }});
   }}
-  charts.runner = new Chart(document.getElementById('runnerHistory').getContext('2d'), {{
+  charts.runner = new Chart(document.getElementById('runnerHistory_canvas').getContext('2d'), {{
     type: 'line',
     data: {{ labels: displayLabels, datasets: runnerDatasets }},
     options: {{
       responsive: true,
-      scales: {{ y: {{ min: 0, stacked: true, title: {{ display: true, text: 'GCP VMs Online' }} }} }},
-      plugins: {{ title: {{ display: true, text: 'GCP Runner VMs' }} }}
+      scales: {{ y: {{ min: 0, stacked: true, title: {{ display: true, text: 'GCP VMs Online' }} }} }}
     }}
   }});
 
   // Workflow runs
-  charts.workflow = new Chart(document.getElementById('workflowHistory').getContext('2d'), {{
+  charts.workflow = new Chart(document.getElementById('workflowHistory_canvas').getContext('2d'), {{
     type: 'line',
     data: {{
       labels: displayLabels,
@@ -323,13 +324,12 @@ function buildCharts(hours) {{
     }},
     options: {{
       responsive: true,
-      scales: {{ y: {{ min: 0, title: {{ display: true, text: 'Workflow Runs' }} }} }},
-      plugins: {{ title: {{ display: true, text: 'Active CI Workflows' }} }}
+      scales: {{ y: {{ min: 0, title: {{ display: true, text: 'Workflow Runs' }} }} }}
     }}
   }});
 
   // Job queue
-  charts.queue = new Chart(document.getElementById('queueHistory').getContext('2d'), {{
+  charts.queue = new Chart(document.getElementById('queueHistory_canvas').getContext('2d'), {{
     type: 'line',
     data: {{
       labels: displayLabels,
@@ -340,8 +340,7 @@ function buildCharts(hours) {{
     }},
     options: {{
       responsive: true,
-      scales: {{ y: {{ min: 0, title: {{ display: true, text: 'Jobs' }} }} }},
-      plugins: {{ title: {{ display: true, text: 'Job Queue Depth' }} }}
+      scales: {{ y: {{ min: 0, title: {{ display: true, text: 'Jobs' }} }} }}
     }}
   }});
 }}
@@ -364,7 +363,7 @@ def generate_health_html(queue_data, failures, output_dir):
     fetched_at = now.strftime(f"%Y-%m-%d {rounded_time} UTC")
 
     # Runner status section — only online GCP GPU runners
-    GCP_GPU_GROUPS = {"Linux GPU (GCP)", "Windows GPU (GCP)"}
+    GCP_GPU_GROUPS = {"Linux GPU (GCP)", "Windows Build (GCP)", "Windows GPU (GCP)"}
     runners_html = ""
     if queue_data and queue_data.get("self_hosted_runners"):
         runners = queue_data["self_hosted_runners"]
@@ -519,7 +518,7 @@ def generate_health_html(queue_data, failures, output_dir):
 <h2>Queue Status</h2>
 {queue_html}
 
-<h2>24h Load History</h2>
+<h2>Load History</h2>
 {history_html}
 
 <h2>Self-Hosted Runner Status</h2>
