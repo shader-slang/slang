@@ -46,11 +46,19 @@ public:
 
             if (arg == UnownedTerminatedStringSlice("-i"))
             {
-                inputPathPrefix = expectArg(argCursor, argEnd);
+                auto val = expectArg(argCursor, argEnd);
+                if (!val)
+                    sink.diagnose(SourceLoc(), Diagnostics::unknownOption, arg);
+                else
+                    inputPathPrefix = val;
             }
             else if (arg == UnownedTerminatedStringSlice("-o"))
             {
-                outputPathPrefix = expectArg(argCursor, argEnd);
+                auto val = expectArg(argCursor, argEnd);
+                if (!val)
+                    sink.diagnose(SourceLoc(), Diagnostics::unknownOption, arg);
+                else
+                    outputPathPrefix = val;
             }
             else if (arg == UnownedTerminatedStringSlice("-m"))
             {

@@ -344,7 +344,16 @@ public:
         fiddle::setTestGenMode(true);
         fiddle::setTestGenOutputDir(options.outputPathPrefix);
 
-        String inputPath = options.inputPaths[0];
+        for (auto inputPath : options.inputPaths)
+        {
+            processTestGenInputFile(inputPath);
+            if (sink.getErrorCount())
+                return;
+        }
+    }
+
+    void processTestGenInputFile(String const& inputPath)
+    {
         String inputText;
         if (SLANG_FAILED(File::readAllText(inputPath, inputText)))
         {
@@ -352,24 +361,18 @@ public:
             return;
         }
 
-        // Register the source file
         PathInfo inputPathInfo = PathInfo::makeFromString(inputPath);
         SourceFile* inputSourceFile =
             sourceManager.createSourceFileWithString(inputPathInfo, inputText);
         SourceView* inputSourceView =
             sourceManager.createSourceView(inputSourceFile, nullptr, SourceLoc());
 
-        // Parse templates from the file (normal FIDDLE processing)
         RefPtr<TextTemplateFile> textTemplateFile = parseTextTemplate(inputSourceView);
         if (!textTemplateFile || sink.getErrorCount())
             return;
 
-        // Execute the templates (which will call emit_test_file())
-        // The output from RAW/SPLICE goes to _testGenTemplateBuffer instead of _builder
         StringBuilder dummyBuilder;
         generateTextTemplateOutputs(inputPath, textTemplateFile, dummyBuilder, &sink);
-        if (sink.getErrorCount())
-            return;
     }
 
     void execute(int argc, char const* const* argv)

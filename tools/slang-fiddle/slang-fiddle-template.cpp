@@ -204,14 +204,20 @@ public:
                         _cursor++;
                     auto spliceExprEnd = _cursor;
 
-                    // Check if splice is followed by a newline and consume it
                     bool hasTrailingNewline = false;
-                    if (*_cursor == '\r' || *_cursor == '\n')
+                    if (!atEnd() && (*_cursor == '\r' || *_cursor == '\n'))
                     {
                         hasTrailingNewline = true;
-                        if (*_cursor == '\r' && *(_cursor + 1) == '\n')
-                            _cursor++; // Skip \r in \r\n
-                        _cursor++;     // Skip the newline
+                        if (*_cursor == '\r')
+                        {
+                            _cursor++;
+                            if (!atEnd() && *_cursor == '\n')
+                                _cursor++;
+                        }
+                        else
+                        {
+                            _cursor++;
+                        }
                         isAtStartOfLine = true;
                         currentLineBegin = _cursor;
                     }

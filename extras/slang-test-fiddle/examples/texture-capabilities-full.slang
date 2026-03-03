@@ -124,8 +124,8 @@
 %    local needsComparisonSampler = (testOp >= 40 and testOp <= 49)
 %    local bugIssue = test.bug or test.disableCompute
 // THIS IS A GENERATED FILE. DO NOT EDIT!
-// Instead, edit generate-types-tests.py and then regenerate this test
-// by running: ./generate-types-tests.py
+// Instead, edit texture-capabilities-full.slang and regenerate via:
+//   slang-fiddle -m test-gen -o <output-dir> texture-capabilities-full.slang
 //
 // Texture types capability test: metal / $textureType
 // - Type supported since target version:  $minVersion
