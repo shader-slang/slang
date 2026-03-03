@@ -52,7 +52,7 @@ public:
             {
                 outputPathPrefix = expectArg(argCursor, argEnd);
             }
-            else if (arg == UnownedTerminatedStringSlice("--mode"))
+            else if (arg == UnownedTerminatedStringSlice("-m"))
             {
                 auto modeStr = expectArg(argCursor, argEnd);
                 if (!modeStr)
@@ -72,16 +72,8 @@ public:
                     sink.diagnose(
                         SourceLoc(),
                         Diagnostics::unknownOption,
-                        String("--mode ") + modeStr);
+                        String("-m ") + modeStr);
                 }
-            }
-            else if (arg == UnownedTerminatedStringSlice("--output-dir"))
-            {
-                testGenOutputDir = expectArg(argCursor, argEnd);
-            }
-            else if (arg == UnownedTerminatedStringSlice("--input"))
-            {
-                testGenInputFile = expectArg(argCursor, argEnd);
             }
             else
             {
@@ -95,9 +87,6 @@ public:
     String outputPathPrefix = "";
     List<String> inputPaths;
 
-    // Test generation mode options
     FiddleMode fiddleMode = FiddleMode::Default;
-    String testGenOutputDir = "";
-    String testGenInputFile = "";
 };
 } // namespace fiddle

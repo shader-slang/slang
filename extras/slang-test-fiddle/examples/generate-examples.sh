@@ -48,7 +48,7 @@ for template in "$SCRIPT_DIR"/*.slang; do
     echo "Processing: $template_name"
 
     # Run slang-fiddle in test-gen mode
-    output=$("$SLANG_FIDDLE" --mode test-gen --input "$template" --output-dir "$OUTPUT_DIR" 2>&1)
+    output=$("$SLANG_FIDDLE" -m test-gen -o "$OUTPUT_DIR" "$template" 2>&1)
 
     # Count generated files
     count=$(echo "$output" | grep -c "^Generated:" || true)

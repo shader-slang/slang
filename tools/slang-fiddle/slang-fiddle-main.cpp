@@ -335,16 +335,16 @@ public:
 
     void executeTestGenMode()
     {
-        // For test generation mode, use FIDDLE's normal template processing
-        // RAW() and SPLICE() accumulate in _testGenTemplateBuffer
-        // emit_test_file() writes the buffer and clears it
+        if (options.inputPaths.getCount() == 0)
+        {
+            sink.diagnose(SourceLoc(), fiddle::Diagnostics::couldNotReadInputFile, "");
+            return;
+        }
 
-        // Set test-gen mode in script system
         fiddle::setTestGenMode(true);
-        fiddle::setTestGenOutputDir(options.testGenOutputDir);
+        fiddle::setTestGenOutputDir(options.outputPathPrefix);
 
-        // Read the input template file
-        String inputPath = options.testGenInputFile;
+        String inputPath = options.inputPaths[0];
         String inputText;
         if (SLANG_FAILED(File::readAllText(inputPath, inputText)))
         {

@@ -9,9 +9,7 @@ The `slang-fiddle` tool has been extended with a test generation mode that proce
 ## Command Line Usage
 
 ```bash
-slang-fiddle --mode test-gen \
-  --input <template.slang> \
-  --output-dir <output-directory>
+slang-fiddle -m test-gen -o <output-directory> <template.slang>
 ```
 
 ## Template Syntax
@@ -184,7 +182,7 @@ The following files in `tools/slang-fiddle/` were modified to add test generatio
 
 ### Test Generation Mode
 
-When invoked with `--mode test-gen`:
+When invoked with `-m test-gen`:
 
 1. The template file is parsed using standard FIDDLE parsing
 2. RAW() and SPLICE() functions accumulate content into a buffer instead of generating `.fiddle` files
@@ -209,9 +207,9 @@ A fix was added to preserve newlines after `$identifier` splices at line endings
 ```bash
 # Generate tests from template
 ./build/generators/Release/bin/slang-fiddle \
-  --mode test-gen \
-  --input extras/slang-test-fiddle/examples/simple-numeric-test.slang \
-  --output-dir tests/fiddle
+  -m test-gen \
+  -o tests/fiddle \
+  extras/slang-test-fiddle/examples/simple-numeric-test.slang
 
 # Run generated tests
 ./build/Release/bin/slang-test tests/fiddle/numeric-ops/
