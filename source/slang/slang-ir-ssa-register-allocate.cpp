@@ -95,6 +95,19 @@ struct RegisterAllocateContext
             inst2->getOp() == kIROp_Param)
             return false;
 
+        // If two insts are coming from two separate user defined names, don't coalesce them into
+        // the same register.
+        auto name1 = inst1->findDecoration<IRNameHintDecoration>();
+        auto name2 = inst2->findDecoration<IRNameHintDecoration>();
+
+        if (name1 && !name2 || !name1 && name2)
+            return true;
+
+        if (!name1 || !name2)
+            return true;
+        if (name1->getName() != name2->getName())
+            return false;
+
         return true;
     }
 
