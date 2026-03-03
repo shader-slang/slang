@@ -303,9 +303,18 @@ public:
         }
     }
 
-    /// Set whether to enable unicode in rich diagnostics
-    void setEnableUnicode(bool enable) { m_enableUnicode = enable; }
+    /// Set whether to enable unicode in rich diagnostics.
+    /// When not explicitly set, unicode is auto-detected based on whether
+    /// output goes to a console (matching the behavior of color auto-detection).
+    void setEnableUnicode(bool enable) { m_enableUnicode = enable; m_unicodeExplicitlySet = true; }
     bool getEnableUnicode() const { return m_enableUnicode; }
+
+    bool shouldEnableUnicode() const
+    {
+        if (m_unicodeExplicitlySet)
+            return m_enableUnicode;
+        return shouldEnableTerminalColors();
+    }
 
     /// The parent sink is another sink that will receive diagnostics from this sink.
     void setParentSink(DiagnosticSink* parentSink) { m_parentSink = parentSink; }
@@ -400,7 +409,8 @@ protected:
 
     // Rich diagnostics rendering options
     SlangDiagnosticColor m_diagnosticColorMode = SLANG_DIAGNOSTIC_COLOR_AUTO;
-    bool m_enableUnicode = true; // Enable unicode unconditionally
+    bool m_enableUnicode = false;
+    bool m_unicodeExplicitlySet = false;
 };
 
 /// An `ISlangWriter` that writes directly to a diagnostic sink.
