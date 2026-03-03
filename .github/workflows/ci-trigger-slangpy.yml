@@ -1,0 +1,32 @@
+name: Trigger SlangPy CI
+
+# Use pull_request_target so this workflow has access to repository secrets
+# even for PRs from forks. This is safe because the workflow only dispatches
+# metadata (PR number, SHA) and never checks out or executes PR code.
+on:
+  pull_request_target:
+    branches: [master]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  trigger-slangpy-tests:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft != true
+
+    steps:
+      - name: Trigger SlangPy CI
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.SLANGPY_DISPATCH_TOKEN }}
+          repository: shader-slang/slangpy
+          event-type: slang-pr-test
+          client-payload: |
+            {
+              "slang_pr_number": "${{ github.event.pull_request.number }}",
+              "slang_commit_sha": "${{ github.event.pull_request.head.sha }}",
+              "slang_ref": "${{ github.event.pull_request.head.sha }}"
+            }

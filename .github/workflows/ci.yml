@@ -149,7 +149,6 @@ jobs:
     needs: [filter, build-linux-debug-gcc-x86_64]
     if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-test-container.yml
-    secrets: inherit
     with:
       config: debug
       server-count: 4
@@ -158,7 +157,6 @@ jobs:
     needs: [filter, build-linux-release-gcc-x86_64]
     if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-test-container.yml
-    secrets: inherit
     with:
       config: release
       server-count: 4
@@ -168,7 +166,6 @@ jobs:
     needs: [filter, build-macos-debug-clang-aarch64]
     if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-test.yml
-    secrets: inherit
     with:
       os: macos
       compiler: clang
@@ -183,7 +180,6 @@ jobs:
     needs: [filter, build-macos-release-clang-aarch64]
     if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-test.yml
-    secrets: inherit
     with:
       os: macos
       compiler: clang
@@ -199,7 +195,6 @@ jobs:
     needs: [filter, build-linux-debug-gcc-aarch64]
     if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-test.yml
-    secrets: inherit
     with:
       os: linux
       compiler: gcc
@@ -213,7 +208,6 @@ jobs:
     needs: [filter, build-linux-release-gcc-aarch64]
     if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-test.yml
-    secrets: inherit
     with:
       os: linux
       compiler: gcc
@@ -228,7 +222,6 @@ jobs:
     needs: [filter, build-windows-debug-cl-x86_64-gpu]
     if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-test.yml
-    secrets: inherit
     with:
       os: windows
       compiler: cl
@@ -242,7 +235,6 @@ jobs:
     needs: [filter, build-windows-release-cl-x86_64-gpu]
     if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-test.yml
-    secrets: inherit
     with:
       os: windows
       compiler: cl
