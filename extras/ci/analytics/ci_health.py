@@ -364,7 +364,7 @@ def generate_health_html(queue_data, failures, output_dir):
     # Runner status section — only online GCP GPU runners
     GCP_GPU_GROUPS = {"Linux GPU (GCP)", "Windows Build (GCP)", "Windows GPU (GCP)"}
     runners_html = ""
-    if queue_data and queue_data.get("self_hosted_runners"):
+    if queue_data and "self_hosted_runners" in queue_data:
         runners = queue_data["self_hosted_runners"]
         from collections import defaultdict
         groups = defaultdict(list)

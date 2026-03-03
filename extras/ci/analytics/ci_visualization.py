@@ -1243,9 +1243,9 @@ def generate_month_page(month, month_jobs, config, output_dir, generated_at=""):
         for b in sorted(branches) if b
     )
 
+    updated_html = f'\n<p style="color:#6c757d">Last updated: {generated_at}.</p>' if generated_at else ""
     body = f"""
-<h1>Timeline: {month}</h1>
-<p style="color:#6c757d">Last updated: {generated_at}.</p>
+<h1>Timeline: {month}</h1>{updated_html}
 <div style="margin-bottom:15px">
   <label>Workflow: </label>
   <select id="wfFilter" onchange="filterJobs()">
