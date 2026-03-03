@@ -2292,16 +2292,21 @@ ScalarizedVal extractField(
         return ScalarizedVal();
 
     case ScalarizedVal::Flavor::value:
-        return ScalarizedVal::value(builder->emitFieldExtract(
-            getFieldType(val.irValue->getDataType(), fieldKey),
-            val.irValue,
-            fieldKey));
+        {
+            auto fieldType = getFieldType(val.irValue->getDataType(), fieldKey);
+            if (!fieldType)
+                return ScalarizedVal();
+            return ScalarizedVal::value(
+                builder->emitFieldExtract(fieldType, val.irValue, fieldKey));
+        }
 
     case ScalarizedVal::Flavor::address:
         {
             auto ptrType = as<IRPtrTypeBase>(val.irValue->getDataType());
             auto valType = ptrType->getValueType();
             auto fieldType = getFieldType(valType, fieldKey);
+            if (!fieldType)
+                return ScalarizedVal();
             auto fieldPtrType = builder->getPtrType(
                 ptrType->getOp(),
                 fieldType,
