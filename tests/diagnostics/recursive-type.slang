@@ -1,10 +1,8 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):-target spirv
+
+// CHECK: error 41001:
 
 struct Outer {
-/*CHECK:
-       ^^^^^ type contains cyclic reference
-       ^^^^^ type 'Outer' contains cyclic reference to itself.
-*/
     Outer next; // non-pointer
     int y;
 };

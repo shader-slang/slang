@@ -1,5 +1,5 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=diag): -stage compute -entry computeMain -allow-glsl -target glsl
-//DIAGNOSTIC_TEST:SIMPLE(diag=diag): -stage compute -entry computeMain -allow-glsl -target spirv -emit-spirv-directly
+//TEST:SIMPLE(filecheck=CHECK): -stage compute -entry computeMain -allow-glsl -target glsl
+//TEST:SIMPLE(filecheck=CHECK): -stage compute -entry computeMain -allow-glsl -target spirv -emit-spirv-directly
 
 readonly writeonly buffer MyBlockName3
 {
@@ -20,13 +20,10 @@ buffer dontOptimizeOutBlock
 layout(local_size_x = 1) in;
 void computeMain()
 {
+//CHECK: error 30101
     optimizeBlock.data1 = inputBuffer1.data1;
-//diag:                                ^^^^^ cannot read from writeonly
-//diag:                                ^^^^^ cannot read from writeonly, check modifiers.
+//CHECK: error 30101
     optimizeBlock.data2 = inputBuffer2.data1;
-//diag:                                ^^^^^ cannot read from writeonly
-//diag:                                ^^^^^ cannot read from writeonly, check modifiers.
+//CHECK: error 30101
     int a = inputBuffer2.data1;
-//diag:                  ^^^^^ cannot read from writeonly
-//diag:                  ^^^^^ cannot read from writeonly, check modifiers.
 }

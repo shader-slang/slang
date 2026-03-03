@@ -54,37 +54,36 @@ extension MyType<T>
 [numthreads(1,1,1)]
 void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
-    // CHK-DAG: TEST_specialize T_is_int
-    // CHK-DAG: TEST_specialize<float>
+    // CHK-DAG: error {{.*}} TEST_specialize T_is_int
+    // CHK-DAG:{{.*}} TEST_specialize<float>
     TEST_specialize<float>();
 
-    // CHK-DAG: TEST_specialize T_is_float
-    // CHK-DAG: TEST_specialize<int>
+    // CHK-DAG: error {{.*}} TEST_specialize T_is_float
+    // CHK-DAG:{{.*}} TEST_specialize<int>
     TEST_specialize<int>();
 
-    //HLSL: TEST_target_switch all
-    //HLSL: TEST_target_switch hlsl
-    //HLSL-NOT: TEST_target_switch glsl
-    //HLSL-NOT: TEST_target_switch default
+    //HLSL: error {{.*}} TEST_target_switch all
+    //HLSL: error {{.*}} TEST_target_switch hlsl
+    //HLSL-NOT: error {{.*}} TEST_target_switch glsl
+    //HLSL-NOT: error {{.*}} TEST_target_switch default
     //
-    //GLSL: TEST_target_switch all
-    //GLSL-NOT: TEST_target_switch hlsl
-    //GLSL: TEST_target_switch glsl
-    //GLSL-NOT: TEST_target_switch default
+    //GLSL: error {{.*}} TEST_target_switch all
+    //GLSL-NOT: error {{.*}} TEST_target_switch hlsl
+    //GLSL: error {{.*}} TEST_target_switch glsl
+    //GLSL-NOT: error {{.*}} TEST_target_switch default
     //
-    //SPV: TEST_target_switch all
-    //SPV-NOT: TEST_target_switch hlsl
-    //SPV-NOT: TEST_target_switch glsl
-    //SPV: TEST_target_switch default
+    //SPV: error {{.*}} TEST_target_switch all
+    //SPV-NOT: error {{.*}} TEST_target_switch hlsl
+    //SPV-NOT: error {{.*}} TEST_target_switch glsl
+    //SPV: error {{.*}} TEST_target_switch default
     //
     TEST_target_switch();
 
-    //CHK-NOT: MyType init true
-    //CHK: MyType init false
+    //CHK-NOT: error {{.*}} MyType init true
+    //CHK: error {{.*}} MyType init false
     MyType<float> obj;
 
-    //CHK: error[E41402]
-    //CHK: static_assert.slang:[[#@LINE+1]]
+    //CHK: ([[#@LINE+1]]): error
     static_assert(dispatchThreadID.x == 0, "not constant");
 }
 

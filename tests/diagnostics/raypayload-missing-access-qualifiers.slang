@@ -1,15 +1,14 @@
 // raypayload-missing-access-qualifiers.slang
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE:
 
 // Test error for field in ray payload struct missing read/write access qualifiers
 
 struct [raypayload] RayPayload
 {
     float4 color : read(caller, anyhit) : write(caller);
-    float4 colorMissingQualifiers;
-//CHECK:   ^^^^^^^^^^^^^^^^^^^^^^ ray payload field missing access qualifiers
-//CHECK:   ^^^^^^^^^^^^^^^^^^^^^^ field 'colorMissingQualifiers' in ray payload struct must have either 'read' OR 'write' access qualifiers
+    float4 colorMissingQualifiers; // Error expected here
+
 };
 
 uniform RWTexture2D<float4> resultTexture;

@@ -4,7 +4,6 @@
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
-#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -278,8 +277,8 @@ struct GlobalVarTranslationContext
                     kIROp_VoidType)
                 {
                     context->getSink()->diagnose(
-                        Diagnostics::EntryPointMustReturnVoidWhenGlobalOutputPresent{
-                            .location = entryPointFunc->sourceLoc});
+                        entryPointFunc,
+                        Diagnostics::entryPointMustReturnVoidWhenGlobalOutputPresent);
                     continue;
                 }
                 builder.setInsertBefore(entryPointFunc);

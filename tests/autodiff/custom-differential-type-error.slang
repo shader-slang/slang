@@ -1,5 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target spirv
-// Using non-exhaustive because this triggers many cascading errors (E30027 at line 0) from IDifferentiable synthesis.
+//TEST:SIMPLE(filecheck=CHECK):-target spirv
 
 interface IFoo : IDifferentiable
 {
@@ -15,12 +14,8 @@ struct Foo :  IFoo
 {
     typealias Differential = Bar;
 
+    // CHECK: ([[# @LINE+1]]): error 30027: 'x' is not a member of 'typeof(Foo.Differential)'.
     [DerivativeMember(Differential.x)]
-/*CHECK:
-                                   ^ 'x' is not a member of
-                                   ^ expected an expression of type 'float', got 'error'
-     ^^^^^^^^^^^^^^^^ [DerivativeMember] must reference to a member in the associated differential type 'Bar'.
-*/
     float x;
 
     [BackwardDifferentiable]

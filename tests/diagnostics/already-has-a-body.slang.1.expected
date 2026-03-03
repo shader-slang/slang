@@ -5,14 +5,12 @@ error[E30201]: function 'foo' already has a body
   │
 8 │ int foo(){ /* redefinition */ }
   │     ━━━ redeclared here
-──╯
 
 note: see previous definition of 'foo'
   ╭╼ tests/diagnostics/already-has-a-body.slang:7:5
   │
 7 │ int foo(){ /* original */ }
   │     ───
-──╯
 }
 standard output = {
 }

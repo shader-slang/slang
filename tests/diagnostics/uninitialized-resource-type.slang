@@ -1,7 +1,5 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK1,non-exhaustive): -target hlsl -DTEST_1
-// non-exhaustive due to extra short error message on first test
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK2,non-exhaustive): -target hlsl -DTEST_2
-// non-exhaustive due to pre-existing internal error (99999) triggered after diagnostic
+//DIAGNOSTIC_TEST:SIMPLE: -target hlsl -DTEST_1
+//DIAGNOSTIC_TEST:SIMPLE: -target hlsl -DTEST_2
 
 SamplerState sampler;
 
@@ -10,7 +8,6 @@ struct Foo
     bool sample_bar = false;
 #ifdef TEST_1
     Texture2D<float4> bar = {};
-//CHECK1:                   ^ cannot use initializer list
 #elif defined(TEST_2)
     Texture2D<float4> bar[2];
 #endif
@@ -41,8 +38,5 @@ Result process(in Foo foo)
 float4 cs_main(uint3 thread_id : SV_DispatchThreadID) {
     Foo foo;
     const let result = process(foo);
-//CHECK2:                     ^ use of uninitialized variable
-//CHECK2:                     ^ use of uninitialized variable 'foo'
-//CHECK2:                     ^ use of uninitialized opaque handle 'array<Texture2D,2>'.
     return result.color;
 }

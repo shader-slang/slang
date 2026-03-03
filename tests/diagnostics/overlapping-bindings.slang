@@ -1,19 +1,12 @@
 // overlapping-bindings.slang
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl
-// CHECK: warning[E39001]
-// CHECK: note:
+//DIAGNOSTIC_TEST:SIMPLE:-target hlsl
 
 // Two parameters with the same `register:
 
 Texture2D a : register(t0);
-//CHECK:  ^ see declaration of 'a'
 
 Texture2D b : register(t0);
-/*CHECK:
-          ^ explicit binding overlap
-          ^ explicit binding for parameter 'b' overlaps with parameter 'a'
-*/
 
 // Parameters marked to ignore overlap:
 

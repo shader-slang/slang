@@ -2,7 +2,6 @@
 #include "slang-translation-unit.h"
 
 #include "slang-compiler.h"
-#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -200,7 +199,7 @@ SlangResult TranslationUnitRequest::requireSourceFiles()
             if (SLANG_FAILED(res))
             {
                 // Report couldn't load
-                sink->diagnose(Diagnostics::CannotOpenFile{.path = pathInfo.getName()});
+                sink->diagnose(SourceLoc(), Diagnostics::cannotOpenFile, pathInfo.getName());
                 return res;
             }
         }

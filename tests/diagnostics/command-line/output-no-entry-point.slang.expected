@@ -1,0 +1,6 @@
+result code = 1
+standard error = {
+(0): error 70: the output path 'something.dxbc' is not associated with any entry point; a '-o' option for a compiled kernel must follow the '-entry' option for its corresponding entry point
+}
+standard output = {
+}

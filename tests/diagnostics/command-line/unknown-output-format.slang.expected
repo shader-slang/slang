@@ -1,0 +1,6 @@
+result code = 1
+standard error = {
+(0): error 60: cannot infer an output format from the output path 'cookies.jar'
+}
+standard output = {
+}

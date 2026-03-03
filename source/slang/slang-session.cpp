@@ -10,7 +10,6 @@
 #include "slang-options.h"
 #include "slang-parser.h"
 #include "slang-preprocessor.h"
-#include "slang-rich-diagnostics.h"
 #include "slang-serialize-ast.h"
 #include "slang-serialize-container.h"
 #include "slang-serialize-ir.h"
@@ -168,9 +167,7 @@ Linkage::loadModule(const char* moduleName, slang::IBlob** outDiagnostics)
 
     if (isInLanguageServer())
     {
-        sink.setFlags(
-            DiagnosticSink::Flag::HumaneLoc | DiagnosticSink::Flag::LanguageServer |
-            DiagnosticSink::Flag::MachineReadableDiagnostics);
+        sink.setFlags(DiagnosticSink::Flag::HumaneLoc | DiagnosticSink::Flag::LanguageServer);
     }
 
     try
@@ -213,9 +210,7 @@ slang::IModule* Linkage::loadModuleFromBlob(
 
     if (isInLanguageServer())
     {
-        sink.setFlags(
-            DiagnosticSink::Flag::HumaneLoc | DiagnosticSink::Flag::LanguageServer |
-            DiagnosticSink::Flag::MachineReadableDiagnostics);
+        sink.setFlags(DiagnosticSink::Flag::HumaneLoc | DiagnosticSink::Flag::LanguageServer);
     }
 
 
@@ -366,7 +361,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createCompositeComponentType(
         auto componentType = componentTypes[0];
         if (componentType == nullptr)
         {
-            sink.diagnose(Diagnostics::NullComponentType{.index = 0});
+            sink.diagnose(SourceLoc{}, Diagnostics::nullComponentType, 0);
             sink.getBlobIfNeeded(outDiagnostics);
             return SLANG_E_INVALID_ARG;
         }
@@ -380,7 +375,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createCompositeComponentType(
     {
         if (componentTypes[cc] == nullptr)
         {
-            sink.diagnose(Diagnostics::NullComponentType{.index = int(cc)});
+            sink.diagnose(SourceLoc{}, Diagnostics::nullComponentType, cc);
             sink.getBlobIfNeeded(outDiagnostics);
             return SLANG_E_INVALID_ARG;
         }
@@ -1236,13 +1231,11 @@ void Linkage::_diagnoseErrorInImportedModule(DiagnosticSink* sink)
 {
     for (auto info = m_modulesBeingImported; info; info = info->next)
     {
-        sink->diagnose(Diagnostics::ErrorInImportedModule{
-            .module = info->name->text,
-            .location = info->importLoc});
+        sink->diagnose(info->importLoc, Diagnostics::errorInImportedModule, info->name);
     }
     if (!isInLanguageServer())
     {
-        sink->diagnose(Diagnostics::CompilationCeased{});
+        sink->diagnose(SourceLoc(), Diagnostics::compilationCeased);
     }
 }
 
@@ -1441,9 +1434,7 @@ RefPtr<Module> Linkage::findOrImportModule(
         if (isBeingImported(previouslyLoadedModule))
         {
             // We seem to be in the middle of loading this module
-            sink->diagnose(Diagnostics::RecursiveModuleImport{
-                .module = moduleName,
-                .location = requestingLoc});
+            sink->diagnose(requestingLoc, Diagnostics::recursiveModuleImport, moduleName);
             return nullptr;
         }
 
@@ -1486,7 +1477,7 @@ RefPtr<Module> Linkage::findOrImportModule(
             // Should built-in modules shadow user modules, even when the
             // built-in module fails to load, for some reason?
             //
-            sink->diagnose(Diagnostics::GlslModuleNotAvailable{.location = requestingLoc});
+            sink->diagnose(requestingLoc, Diagnostics::glslModuleNotAvailable, moduleName);
         }
         return glslModule;
     }
@@ -1683,9 +1674,10 @@ RefPtr<Module> Linkage::findOrImportModule(
                                 ->findDecoration<IRExperimentalModuleDecoration>() &&
                             !m_optionSet.getBoolOption(CompilerOptionName::ExperimentalFeature))
                         {
-                            sink->diagnose(Diagnostics::NeedToEnableExperimentFeature{
-                                .module = getText(moduleName),
-                                .loc = requestingLoc});
+                            sink->diagnose(
+                                requestingLoc,
+                                Diagnostics::needToEnableExperimentFeature,
+                                moduleName);
                         }
                     }
                     return module;
@@ -1710,8 +1702,7 @@ RefPtr<Module> Linkage::findOrImportModule(
     // list of the file names that were tried, if
     // nothing was even found via the include system).
     //
-    sink->diagnose(
-        Diagnostics::CannotOpenFile{.path = defaultSourceFileName, .location = requestingLoc});
+    sink->diagnose(requestingLoc, Diagnostics::cannotOpenFile, defaultSourceFileName);
 
     // If the attempt to import the module failed, then
     // we will stick a null pointer into the map of loaded
@@ -1847,7 +1838,7 @@ Linkage::IncludeResult Linkage::findAndIncludeFile(
     auto sourceFile = findFile(name, loc, includeSystem);
     if (!sourceFile)
     {
-        sink->diagnose(Diagnostics::CannotOpenFile{.path = getText(name), .location = loc});
+        sink->diagnose(loc, Diagnostics::cannotOpenFile, getText(name));
         return result;
     }
 
@@ -1911,8 +1902,9 @@ Linkage::IncludeResult Linkage::findAndIncludeFile(
 
     if (slangLanguageVersion != module->getModuleDecl()->languageVersion)
     {
-        sink->diagnose(Diagnostics::LanguageVersionDiffersFromIncludingModule{
-            .location = tokens.begin()->getLoc()});
+        sink->diagnose(
+            tokens.begin()->getLoc(),
+            Diagnostics::languageVersionDiffersFromIncludingModule);
     }
 
     auto outerScope = module->getModuleDecl()->ownedScope;

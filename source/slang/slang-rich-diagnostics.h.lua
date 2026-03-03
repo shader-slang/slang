@@ -11,35 +11,18 @@ local diagnostics_module = dofile("source/slang/slang-diagnostics.lua")
 
 local M = {}
 
--- Helper function to convert kebab-case name to PascalCase
+-- Helper function to convert space-separated name to PascalCase
 function M.toPascalCase(name)
 	local result = ""
-	for word in name:gmatch("[^-]+") do
+	for word in name:gmatch("%S+") do
 		result = result .. word:sub(1, 1):upper() .. word:sub(2):lower()
 	end
 	return result
 end
 
--- Helper function to convert kebab-case name to lowerCamelCase
--- This matches the naming convention used by DiagnosticInfo::name in C++
--- which is what the -Wno-xxx flag lookup converts from kebab-case to
-function M.toLowerCamelCase(name)
-	local result = ""
-	local first = true
-	for word in name:gmatch("[^-]+") do
-		if first then
-			result = result .. word:lower()
-			first = false
-		else
-			result = result .. word:sub(1, 1):upper() .. word:sub(2):lower()
-		end
-	end
-	return result
-end
-
--- Helper function to convert kebab-case name to snake_case
+-- Helper function to convert space-separated name to snake_case
 function M.toSnakeCase(name)
-	return name:gsub("-", "_"):lower()
+	return name:gsub("%s+", "_"):lower()
 end
 
 -- Helper function to convert Lua type names to C++ types
@@ -47,18 +30,12 @@ local cpp_type_map = {
 	string = "String",
 	type = "Type*",
 	qualtype = "QualType",
-	int = "int64_t",
+	int = "int",
 	name = "Name*",
 	decl = "Decl*",
 	expr = "Expr*",
 	stmt = "Stmt*",
 	val = "Val*",
-	modifier = "Modifier*",
-	irinst = "IRInst*",
-	parampassingmode = "ParamPassingMode",
-	capabilityatomlist = "List<CapabilityAtom>",
-	astnodetype = "ASTNodeType",
-	codegentarget = "CodeGenTarget",
 }
 function M.getCppType(lua_type)
 	local mapped = cpp_type_map[lua_type]
@@ -177,12 +154,6 @@ local member_access_map = {
 		text = { expr = function(base) return base .. "->text" end, type = "string" },
 		loc = { expr = function(base) return base .. "->loc" end, type = "sourceloc" },
 	},
-	modifier = {
-		loc = { expr = function(base) return base .. "->loc" end, type = "sourceloc" },
-	},
-	irinst = {
-		sourceLoc = { expr = function(base) return base .. "->sourceLoc" end, type = "sourceloc" },
-	},
 }
 
 -- Helper function to resolve member access (single level only, no chaining)
@@ -213,8 +184,8 @@ local severity_map = {
 	["note"] = "Severity::Note",
 	["warning"] = "Severity::Warning",
 	["error"] = "Severity::Error",
-	["fatal"] = "Severity::Fatal",
-	["internal"] = "Severity::Internal",
+	["fatal error"] = "Severity::Fatal",
+	["internal error"] = "Severity::Internal",
 }
 
 function M.getSeverityEnum(severity_name)

@@ -1,7 +1,6 @@
 // Test that arrays and StructuredBuffers of nested structs with unbounded arrays are not allowed
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target spirv -allow-glsl -stage compute -entry computeMain
-// Using non-exhaustive because there are many cascading duplicate errors
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -allow-glsl -stage compute -entry computeMain
 
 // Struct containing unbounded array (must be last member)
 struct StructWithUnbounded
@@ -12,19 +11,18 @@ struct StructWithUnbounded
 
 // Nested case
 struct NestedUnbounded
-//CHECK: function parameter cannot be unsized
 {
     int id;
     StructWithUnbounded nested;  // Struct with unbounded array member
 }
 
 // Array of nested struct - should error
+//CHECK: ([[# @LINE+1]]): error 30027
 NestedUnbounded nestedArray[5];
-//CHECK: arrays of non-addressable type not allowed
 
 // StructuredBuffer of nested struct - should error
+//CHECK: ([[# @LINE+1]]): error 30028
 StructuredBuffer<NestedUnbounded> nestedBuffer;
-//CHECK: non-addressable type cannot be used in StructuredBuffer
 
 [numthreads(1, 1, 1)]
 void computeMain()

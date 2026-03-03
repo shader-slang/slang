@@ -1,0 +1,14 @@
+result code = -1
+standard error = {
+tests/diagnostics/register-bindings.slang(7): error 39008: expected a register index after 't'
+TextureCube b : register(t);
+                         ^
+tests/diagnostics/register-bindings.slang(10): error 39009: expected 'space', got 's'
+SamplerState c : register(s0, s1);
+                              ^~
+tests/diagnostics/register-bindings.slang(13): error 39010: expected a register space index after 'space'
+SamplerState d : register(s2, space);
+                              ^~~~~
+}
+standard output = {
+}

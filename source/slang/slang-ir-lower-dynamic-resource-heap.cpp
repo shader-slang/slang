@@ -3,7 +3,6 @@
 #include "compiler-core/slang-artifact-associated-impl.h"
 #include "slang-capability.h"
 #include "slang-ir-util.h"
-#include "slang-rich-diagnostics.h"
 #include "slang-target-program.h"
 #include "slang-type-layout.h"
 
@@ -66,7 +65,7 @@ void lowerDynamicResourceHeap(IRModule* module, TargetProgram* targetProgram, Di
         if (targetCaps.atLeastOneSetImpliedInOther(CapabilitySet(
                 CapabilityName::descriptor_handle)) != CapabilitySet::ImpliesReturnFlags::Implied)
         {
-            sink->diagnose(Diagnostics::TargetDoesNotSupportDescriptorHandle{});
+            sink->diagnose(SourceLoc(), Diagnostics::targetDoesNotSupportDescriptorHandle);
             return;
         }
     }

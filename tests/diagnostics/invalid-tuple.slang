@@ -1,10 +1,7 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=diag):
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
 
+// CHECK: ([[# @LINE+1]]): error 30400: generic type 'Tuple' used without argument
 Tuple t0;
-/*diag:
-^^^^^ generic type 'Tuple' used without argument
-^^^^^ generic type 'Tuple' used without argument
-*/
 
 // This should be OK, compiling down to a zero-sized type
 Tuple<> t1;

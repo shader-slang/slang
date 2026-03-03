@@ -1,7 +1,6 @@
 #include "slang-ir-check-shader-parameter-type.h"
 
 #include "slang-ir-util.h"
-#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -77,8 +76,9 @@ void checkForInvalidShaderParameterTypeForMetal(IRModule* module, DiagnosticSink
                 if (user->sourceLoc.isValid())
                 {
                     sink->diagnose(
-                        Diagnostics::ResourceTypesInConstantBufferInParameterBlockNotAllowedOnMetal{
-                            .location = user->sourceLoc});
+                        user,
+                        Diagnostics::
+                            resourceTypesInConstantBufferInParameterBlockNotAllowedOnMetal);
                     foundUseSite = true;
                     break;
                 }
@@ -86,8 +86,8 @@ void checkForInvalidShaderParameterTypeForMetal(IRModule* module, DiagnosticSink
 
             if (!foundUseSite)
                 sink->diagnose(
-                    Diagnostics::ResourceTypesInConstantBufferInParameterBlockNotAllowedOnMetal{
-                        .location = inst->sourceLoc});
+                    inst,
+                    Diagnostics::resourceTypesInConstantBufferInParameterBlockNotAllowedOnMetal);
         }
     }
 }

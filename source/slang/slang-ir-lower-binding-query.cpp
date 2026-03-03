@@ -3,7 +3,6 @@
 #include "slang-ir-insts.h"
 #include "slang-ir-lower-tuple-types.h"
 #include "slang-ir.h"
-#include "slang-rich-diagnostics.h"
 
 // The pass in this file lowers the `getRegisterIndex()` and
 // `getSpaceIndex()` intrinsics, by replacing them with literal
@@ -199,8 +198,7 @@ struct BindingQueryLoweringContext : public WorkListPass
             // binding query intrinsics don't admit any reasonable
             // runtime implementation.
             //
-            sink->diagnose(
-                Diagnostics::OpaqueReferenceMustResolveToGlobal{.location = inst->sourceLoc});
+            sink->diagnose(inst, Diagnostics::opaqueReferenceMustResolveToGlobal);
             return;
         }
 

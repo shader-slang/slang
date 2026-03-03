@@ -1,10 +1,8 @@
 // sizeof.slang
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE:
 
 int func()
 {
     return sizeof(func);
-//CHECK:   ^^^^^^ invalid sizeof argument
-//CHECK:   ^^^^^^ argument to sizeof is invalid
 }

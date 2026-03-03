@@ -3,7 +3,6 @@
 
 #include "slang-ir-insts.h"
 #include "slang-ir.h"
-#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -265,8 +264,7 @@ static RefPtr<Region> generateRegionsForIRBlocks(
             if (block != registeredBlock[(int)ll->op])
             {
                 if (ctx->getSink())
-                    ctx->getSink()->diagnose(
-                        Diagnostics::MultiLevelBreakUnsupported{.location = block->sourceLoc});
+                    ctx->getSink()->diagnose(block, Diagnostics::multiLevelBreakUnsupported);
             }
 
             // Now we need to create a structured `break` or `continue` operation
@@ -685,9 +683,9 @@ static RefPtr<Region> generateRegionsForIRBlocks(
                                 breakLabel,
                                 visited))
                         {
-                            ctx->getSink()->diagnose(Diagnostics::SwitchFallthroughRestructured{
-                                .location = switchInst->sourceLoc,
-                            });
+                            ctx->getSink()->diagnose(
+                                switchInst,
+                                Diagnostics::switchFallthroughRestructured);
                             warnedAboutFallthrough = true;
                         }
                     }

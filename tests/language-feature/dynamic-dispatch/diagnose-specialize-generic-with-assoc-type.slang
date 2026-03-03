@@ -54,6 +54,6 @@ RWStructuredBuffer<float> outputBuffer;
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     let obj = factory(dispatchThreadID.x);
-    // CHECK: error[E33180]
+    // CHECK: ([[# @LINE+1]]): error 33180
     outputBuffer[0] = processCalc(obj, 3.0);
 }

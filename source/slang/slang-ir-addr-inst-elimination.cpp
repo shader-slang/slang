@@ -2,7 +2,6 @@
 
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
-#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -181,9 +180,9 @@ struct AddressInstEliminationContext
                 case kIROp_GetOffsetPtr:
                     break;
                 default:
-                    sink->diagnose(Diagnostics::UnsupportedUseOfLValueForAutoDiff{
-                        .location = use->getUser()->sourceLoc,
-                    });
+                    sink->diagnose(
+                        use->getUser()->sourceLoc,
+                        Diagnostics::unsupportedUseOfLValueForAutoDiff);
                     break;
                 }
                 use = nextUse;

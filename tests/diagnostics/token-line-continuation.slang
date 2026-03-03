@@ -1,8 +1,6 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=diag):
+//DIAGNOSTIC_TEST:SIMPLE:
 
 // Check the diagnostic output if a token uses \ line split
 
 void foo() { br\
-//diag:      ^^ undefined identifier
-//diag:      ^^ undefined identifier 'br'.
 eak; }

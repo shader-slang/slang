@@ -9,7 +9,7 @@ void f()
 {
 	int i;
 #pragma warning (SPECIFIER : IDs)
-	// CHECK: error[E30081]
+	// CHECK: ([[# @LINE+1]]): error 30081:
 	i = GetValue();
 }
 

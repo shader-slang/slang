@@ -1,0 +1,6 @@
+result code = 1
+standard error = {
+(0): error 61: no specified '-target' option matches the output path 'bad.hlsl', which implies the 'hlsl' format
+}
+standard output = {
+}

@@ -1,0 +1,8 @@
+result code = -1
+standard error = {
+tests/diagnostics/entry-point-no-stage.slang(9): error 38007: no stage specified for entry point 'main'; use either a '[shader("name")]' function attribute or the '-stage <name>' command-line option to specify a stage
+void main()
+     ^~~~
+}
+standard output = {
+}

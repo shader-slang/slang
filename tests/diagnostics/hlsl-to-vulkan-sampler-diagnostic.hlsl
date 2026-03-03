@@ -1,6 +1,5 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target glsl -profile ps_4_0 -entry main -fvk-t-shift 5 all -fvk-t-shift 7 2  -fvk-s-shift -3 0 -fvk-u-shift 1 2 -no-codegen
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target glsl -profile ps_4_0 -entry main -no-codegen
-// CHECK: warning[E39013]
+//DIAGNOSTIC_TEST:SIMPLE:-target glsl -profile ps_4_0 -entry main -fvk-t-shift 5 all -fvk-t-shift 7 2  -fvk-s-shift -3 0 -fvk-u-shift 1 2 -no-codegen
+//DIAGNOSTIC_TEST:SIMPLE:-target glsl -profile ps_4_0 -entry main -no-codegen
 
 // This tests that combined texture sampler objects which have D3D style register assignments, but no vk::binding,
 // show an appropriate warning.
@@ -26,10 +25,6 @@ Sampler2D 		cs2 : register(s0): register(t0);
 
 // Only register, should warn without recommending vk-xxx-shift, since that would not help map 2 d3d registers to one vk binding.
 Sampler2D 		cs3 : register(s1): register(t1);
-/*CHECK:
-                  ^^^^^^^^ D3D register without Vulkan binding
-                  ^^^^^^^^ shader parameter 'cs3' has a 'register' specified for D3D
-*/
 
 float4 main() : SV_TARGET
 {

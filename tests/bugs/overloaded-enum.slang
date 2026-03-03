@@ -1,20 +1,10 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=diag):
+//TEST:SIMPLE(filecheck=CHECK):
 
 enum E
 {
     A,
-/*diag:
-    ^ see previous declaration of 'A'
-    ^ candidate: E E.A
-*/
     A
-/*diag:
-    ^ conflicting declaration
-    ^ declaration of 'A' conflicts with existing declaration
-    ^ candidate: E E.A
-*/
+    // CHECK: overloaded-enum.slang([[#@LINE-1]]): error 30200: declaration of 'A' conflicts with existing declaration
 }
 
 E e = E::A;
-//diag:  ^ ambiguous reference to 'A'
-//diag:  ^ ambiguous reference to 'A'

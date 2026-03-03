@@ -1,0 +1,15 @@
+result code = -1
+standard error = {
+tests/bugs/glsl-layout-define.hlsl(4): error 30015: undefined identifier 'UNDEFINED_VK_BINDING'.
+    binding = UNDEFINED_VK_BINDING,
+              ^~~~~~~~~~~~~~~~~~~~
+tests/bugs/glsl-layout-define.hlsl(5): error 30015: undefined identifier 'UNDEFINED_VK_SET'.
+    set = UNDEFINED_VK_SET)
+          ^~~~~~~~~~~~~~~~
+(0): error 30015: undefined identifier 'main'.
+tests/bugs/glsl-layout-define.hlsl(3): error 38000: no function found matching entry point name 'main'
+layout(
+^~~~~~
+}
+standard output = {
+}

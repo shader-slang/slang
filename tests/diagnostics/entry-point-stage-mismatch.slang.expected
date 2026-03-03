@@ -1,0 +1,8 @@
+result code = 0
+standard error = {
+tests/diagnostics/entry-point-stage-mismatch.slang(9): warning 38006: entry point 'main' being compiled for the 'vertex' stage has a '[shader(...)]' attribute that specifies the 'compute' stage
+void main()
+     ^~~~
+}
+standard output = {
+}

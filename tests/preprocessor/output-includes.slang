@@ -1,4 +1,4 @@
-//TEST:SIMPLE:-output-includes
+//DIAGNOSTIC_TEST:SIMPLE:-output-includes
 
 int foo() { return 0; }
 

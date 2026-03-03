@@ -62,7 +62,7 @@ void computeMain(uint3 threadId: SV_DispatchThreadID)
     }
 
     // Broken: explicit IContainer annotation
-    // CHECK: error[E30019]
+    // CHECK: error 30019
     {
         IContainer obj = makeContainer(0);
         obj.Element x = obj.get();

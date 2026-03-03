@@ -1,5 +1,5 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target hlsl
+//TEST:SIMPLE(filecheck=CHECK): -target spirv
+//TEST:SIMPLE(filecheck=CHECK): -target hlsl
 
 // __ref and __constref parameters with interface types are not supported
 // in dynamic dispatch contexts. This test checks that the compiler
@@ -24,17 +24,15 @@ struct ImplB : IFoo
 }
 
 // Scenario 1: Direct __ref interface parameter
+// CHECK: ([[# @LINE+1]]): error 52010: '__ref' parameter of type 'IFoo' cannot be used in a dynamic dispatch context.
 float processRef(__ref IFoo obj)
-//CHECK:                    ^^^ ref parameter incompatible with dynamic dispatch
-//CHECK:                    ^^^ '__ref' parameter of type 'IFoo' cannot be used in a dynamic dispatch context.
 {
     return obj.getValue();
 }
 
 // Scenario 2: Direct __constref interface parameter
+// CHECK: ([[# @LINE+1]]): error 52010: '__constref' parameter of type 'IFoo' cannot be used in a dynamic dispatch context.
 float processConstref(__constref IFoo obj)
-//CHECK:                              ^^^ ref parameter incompatible with dynamic dispatch
-//CHECK:                              ^^^ '__constref' parameter of type 'IFoo' cannot be used in a dynamic dispatch context.
 {
     return obj.getValue();
 }

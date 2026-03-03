@@ -17,7 +17,7 @@ struct InnerData
     INode node;  // Contains the interface
 }
 
-// CHECK: error[E{{[0-9]+}}]
+// CHECK: error {{[0-9]+}}
 struct OuterNode : INode
 {
     InnerData inner;  // Cycle via nested struct: OuterNode -> InnerData -> INode

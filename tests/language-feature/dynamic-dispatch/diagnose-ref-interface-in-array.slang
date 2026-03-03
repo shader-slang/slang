@@ -1,5 +1,5 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target hlsl
+//TEST:SIMPLE(filecheck=CHECK): -target spirv
+//TEST:SIMPLE(filecheck=CHECK): -target hlsl
 
 // The diagnostic for __ref/__constref with interface types in dynamic
 // dispatch is applied recursively: if a struct contains an array whose
@@ -31,16 +31,14 @@ struct ArrayContainer
     IFoo items[4];
 }
 
+// CHECK: ([[# @LINE+1]]): error 52010: '__ref' parameter of type 'ArrayContainer' cannot be used in a dynamic dispatch context.
 float processArrayRef(__ref ArrayContainer c)
-//CHECK:                                   ^ ref parameter incompatible with dynamic dispatch
-//CHECK:                                   ^ '__ref' parameter of type 'ArrayContainer' cannot be used in a dynamic dispatch context.
 {
     return c.items[0].getValue();
 }
 
+// CHECK: ([[# @LINE+1]]): error 52010: '__constref' parameter of type 'ArrayContainer' cannot be used in a dynamic dispatch context.
 float processArrayConstref(__constref ArrayContainer c)
-//CHECK:                                             ^ ref parameter incompatible with dynamic dispatch
-//CHECK:                                             ^ '__constref' parameter of type 'ArrayContainer' cannot be used in a dynamic dispatch context.
 {
     return c.items[1].getValue();
 }
@@ -51,9 +49,8 @@ struct MultiDimContainer
     IFoo grid[2][3];
 }
 
+// CHECK: ([[# @LINE+1]]): error 52010: '__ref' parameter of type 'MultiDimContainer' cannot be used in a dynamic dispatch context.
 float processMultiDim(__ref MultiDimContainer c)
-//CHECK:                                      ^ ref parameter incompatible with dynamic dispatch
-//CHECK:                                      ^ '__ref' parameter of type 'MultiDimContainer' cannot be used in a dynamic dispatch context.
 {
     return c.grid[0][1].getValue();
 }
@@ -67,9 +64,8 @@ struct MultipleArrays
     IFoo second[3];
 }
 
+// CHECK: ([[# @LINE+1]]): error 52010: '__constref' parameter of type 'MultipleArrays' cannot be used in a dynamic dispatch context.
 float processMultipleArrays(__constref MultipleArrays c)
-//CHECK:                                              ^ ref parameter incompatible with dynamic dispatch
-//CHECK:                                              ^ '__constref' parameter of type 'MultipleArrays' cannot be used in a dynamic dispatch context.
 {
     return c.first[0].getValue() + c.second[0].getValue();
 }
@@ -87,9 +83,8 @@ struct OuterWithInner
     InnerWithArray inner;
 }
 
+// CHECK: ([[# @LINE+1]]): error 52010: '__ref' parameter of type 'OuterWithInner' cannot be used in a dynamic dispatch context.
 float processOuter(__ref OuterWithInner o)
-//CHECK:                                ^ ref parameter incompatible with dynamic dispatch
-//CHECK:                                ^ '__ref' parameter of type 'OuterWithInner' cannot be used in a dynamic dispatch context.
 {
     return o.inner.items[0].getValue();
 }

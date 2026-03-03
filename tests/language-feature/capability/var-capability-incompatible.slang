@@ -3,7 +3,7 @@
 struct MyType
 {}
 
-//CHECK: error[E36107]
+//CHECK: ([[# @LINE+2]]): error 36107
 [numthreads(1,1,1)]
 void f1()
 {
@@ -11,7 +11,7 @@ void f1()
 }
 
 ConstantBuffer<MyType> t2;
-//CHECK: error[E36107]
+//CHECK: ([[# @LINE+2]]): error 36107
 [numthreads(1,1,1)]
 void f2()  // compile to spirv should result error here.
 {

@@ -55,24 +55,21 @@ float testInt(int id)
 {
     ILookup obj = makeObj(id);
     return obj[int(0)];   // T=int
-    // REPORT-DAG: :[[# @LINE-1]]:{{.*}}
-    // REPORT-DAG: note{{.*}}: generated {{.*}} dispatch code{{.*}} 2 possible types:
+    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
 }
 
 float testFloat(int id)
 {
     ILookup obj = makeObj(id);
     return obj[float(0.5)]; // T=float — separate dispatch function from T=int
-    // REPORT-DAG: :[[# @LINE-1]]:{{.*}}
-    // REPORT-DAG: note{{.*}}: generated {{.*}} dispatch code{{.*}} 2 possible types:
+    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
 }
 
 float testUint(int id)
 {
     ILookup obj = makeObj(id);
     return obj[uint(2)];  // T=uint — another separate dispatch function
-    // REPORT-DAG: :[[# @LINE-1]]:{{.*}}
-    // REPORT-DAG: note{{.*}}: generated {{.*}} dispatch code{{.*}} 2 possible types:
+    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
 }
 
 [numthreads(1, 1, 1)]

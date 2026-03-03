@@ -1,9 +1,7 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE:
 // expected one token, but got another
 
 int foo()
 {
 	int a = 3 ]
-//CHECK:   ^ unexpected token
-//CHECK:   ^ unexpected ']', expected ';'
 }

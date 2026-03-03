@@ -6,7 +6,6 @@
 #include "slang-ir-layout.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
-#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -261,15 +260,13 @@ struct BitCastLoweringContext
         if (fromBasicType && toBasicType)
         {
             if (fromTypeSize.size != toTypeSize.size)
-            {
-                sink->diagnose(Diagnostics::NotEqualBitCastSize{
-                    .fromType = fromType,
-                    .fromSize = fromTypeSize.size,
-                    .toType = toType,
-                    .toSize = toTypeSize.size,
-                    .location = inst->sourceLoc,
-                });
-            }
+                sink->diagnose(
+                    inst->sourceLoc,
+                    Diagnostics::notEqualBitCastSize,
+                    fromType,
+                    fromTypeSize.size,
+                    toType,
+                    toTypeSize.size);
             // Both fromType and toType are basic types, no processing needed.
             return;
         }
@@ -376,15 +373,13 @@ struct BitCastLoweringContext
         }
 
         if (fromTypeSize.size != toTypeSize.size)
-        {
-            sink->diagnose(Diagnostics::NotEqualBitCastSize{
-                .fromType = fromType,
-                .fromSize = fromTypeSize.size,
-                .toType = toType,
-                .toSize = toTypeSize.size,
-                .location = inst->sourceLoc,
-            });
-        }
+            sink->diagnose(
+                inst->sourceLoc,
+                Diagnostics::notEqualBitCastSize,
+                fromType,
+                fromTypeSize.size,
+                toType,
+                toTypeSize.size);
 
         // Enumerate all fields in to-type and obtain its value from operand object.
         IRBuilder builder(module);

@@ -5,7 +5,6 @@
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
-#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -451,11 +450,11 @@ bool propagateConstExprBackward(PropagateConstExprContext* context, IRGlobalValu
                                 // that. This is not expected.
                                 if (!isConstExpr(arg))
                                 {
-                                    context->getSink()->diagnose(Diagnostics::ArgIsNotConstexpr{
-                                        .argIndex = static_cast<int64_t>(pp + 1),
-                                        .funcName = calleeFunc,
-                                        .location = callInst->sourceLoc,
-                                    });
+                                    context->getSink()->diagnose(
+                                        callInst->sourceLoc,
+                                        Diagnostics::argIsNotConstexpr,
+                                        pp + 1,
+                                        calleeFunc);
                                     return false;
                                 }
                             }
@@ -552,7 +551,8 @@ void validateConstExpr(PropagateConstExprContext* context, IRGlobalValueWithCode
                         // Diagnose the failure.
 
                         context->getSink()->diagnose(
-                            Diagnostics::NeedCompileTimeConstant{.location = ii->sourceLoc});
+                            ii->sourceLoc,
+                            Diagnostics::needCompileTimeConstant);
 
                         break;
                     }

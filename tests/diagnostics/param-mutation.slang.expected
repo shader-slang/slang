@@ -1,0 +1,11 @@
+result code = -1
+standard error = {
+tests/diagnostics/param-mutation.slang(17): warning 30068: mutating method 'setValue' called on `in` parameter 's'; changes will not be visible to caller. copy the parameter into a local variable if this behavior is intended
+    s.setValue(v + 1);
+              ^
+tests/diagnostics/param-mutation.slang(36): error 30067: mutating method 'setValue' called on `in` parameter 's'; changes will not be visible to caller. copy the parameter into a local variable if this behavior is intended
+    s.setValue(v + 1);
+              ^
+}
+standard output = {
+}

@@ -8,7 +8,7 @@ int64_t GetValue();
 void f()
 {
 	int i;
-	// CHECK: error[E30081]
+	// CHECK: ([[# @LINE+1]]): error 30081:
 	i = GetValue();
 }
 

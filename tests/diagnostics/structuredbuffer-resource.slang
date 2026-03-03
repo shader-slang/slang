@@ -1,22 +1,18 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -target spirv
 
 // Direct resource types as StructuredBuffer elements
 
+//CHECK-DAG: ([[# @LINE+1]]): error 38204
 StructuredBuffer<Texture2D<float>> textureBuffer;
-//CHECK:                           ^^^^^^^^^^^^^ resource type in StructuredBuffer
-//CHECK:                           ^^^^^^^^^^^^^ StructuredBuffer element type 'Texture2D' cannot contain resource or opaque handle types
 
+//CHECK-DAG: ([[# @LINE+1]]): error 38204
 StructuredBuffer<SamplerState> samplerBuffer;
-//CHECK:                       ^^^^^^^^^^^^^ resource type in StructuredBuffer
-//CHECK:                       ^^^^^^^^^^^^^ StructuredBuffer element type 'SamplerState' cannot contain resource or opaque handle types
 
+//CHECK-DAG: ([[# @LINE+1]]): error 38204
 StructuredBuffer<StructuredBuffer<float>> nestedBuffer;
-//CHECK:                                  ^^^^^^^^^^^^ resource type in StructuredBuffer
-//CHECK:                                  ^^^^^^^^^^^^ StructuredBuffer element type 'StructuredBuffer<float>' cannot contain resource or opaque handle types
 
+//CHECK-DAG: ([[# @LINE+1]]): error 38204
 RWStructuredBuffer<Texture2D<float>> rwTextureBuffer;
-//CHECK:                             ^^^^^^^^^^^^^^^ resource type in StructuredBuffer
-//CHECK:                             ^^^^^^^^^^^^^^^ StructuredBuffer element type 'Texture2D' cannot contain resource or opaque handle types
 
 RWStructuredBuffer<float> output;
 

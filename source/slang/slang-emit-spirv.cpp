@@ -13,7 +13,6 @@
 #include "slang-ir-util.h"
 #include "slang-ir.h"
 #include "slang-lookup-spirv.h"
-#include "slang-rich-diagnostics.h"
 #include "spirv/unified1/spirv.h"
 
 #include <type_traits>
@@ -2769,10 +2768,12 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             return SpvImageFormatR64i;
         default:
             const auto imageFormatInfo = getImageFormatInfo(imageFormat);
-            m_sink->diagnose(Diagnostics::ImageFormatUnsupportedByBackend{
-                .format = imageFormatInfo.name,
-                .backend = "SPIRV",
-                .replacement = "unknown"});
+            m_sink->diagnose(
+                SourceLoc(),
+                Diagnostics::imageFormatUnsupportedByBackend,
+                imageFormatInfo.name,
+                "SPIRV",
+                "unknown");
             return SpvImageFormatUnknown;
         }
     }
@@ -3714,8 +3715,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     SpvInst* emitFuncDefinition(IRFunc* irFunc)
     {
         if (!irFunc->getFirstBlock())
-            m_sink->diagnose(
-                Diagnostics::NoBlocksOrIntrinsic{.target = "spirv", .location = irFunc->sourceLoc});
+            m_sink->diagnose(irFunc, Diagnostics::noBlocksOrIntrinsic, "spirv");
 
         // [2.4: Logical Layout of a Module]
         //
@@ -5682,9 +5682,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                             else if (arg.caseInsensitiveEquals(toSlice("fractional_odd")))
                                 mode = SpvExecutionModeSpacingFractionalOdd;
                             else
-                                m_sink->diagnose(Diagnostics::UnknownTessPartitioning{
-                                    .partitioning = arg,
-                                    .location = partitioningDecor->sourceLoc});
+                                m_sink->diagnose(
+                                    partitioningDecor,
+                                    Diagnostics::unknownTessPartitioning,
+                                    arg);
                         }
                         requireSPIRVExecutionMode(nullptr, getIRInstSpvID(entryPoint), mode);
                     }
@@ -8446,12 +8447,12 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         // wrong, so it can help the user or developers to locate the issue easier.
         if (!isFloatOrPackedFloatType(fromType))
         {
-            m_sink->diagnose(Diagnostics::InternalCompilerError{.location = inst->sourceLoc});
+            m_sink->diagnose(inst, Diagnostics::internalCompilerError);
         }
 
         if (!isFloatOrPackedFloatType(toType))
         {
-            m_sink->diagnose(Diagnostics::InternalCompilerError{.location = inst->sourceLoc});
+            m_sink->diagnose(inst, Diagnostics::internalCompilerError);
         }
 
         if (isTypeEqual(fromType, toType))
@@ -10275,8 +10276,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     const auto fromVector = cast<IRVectorType>(unwrapAttributedType(fromType));
                     const auto fromVectorSize = getIntVal(fromVector->getElementCount());
                     if (toVectorSize > fromVectorSize)
-                        m_sink->diagnose(
-                            Diagnostics::SpirvInvalidTruncate{.location = inst->sourceLoc});
+                        m_sink->diagnose(inst, Diagnostics::spirvInvalidTruncate);
                     last = emitInstCustomOperandFunc(
                         parent,
                         isLast ? as<IRInst>(inst) : spvInst,
@@ -10724,8 +10724,7 @@ SlangResult emitSPIRVFromIR(
 
     if (!symbolsEmitted)
     {
-        sink->diagnose(
-            Diagnostics::OutputSpvIsEmpty{.location = irModule->getModuleInst()->sourceLoc});
+        sink->diagnose(irModule->getModuleInst(), Diagnostics::outputSpvIsEmpty);
         return SLANG_FAIL;
     }
 

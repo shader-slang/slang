@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHK): -target spirv -entry computeMain
+//TEST:SIMPLE(filecheck=CHK): -target spirv -entry computeMain
 
 float f(float) { return 1; }
 
@@ -25,9 +25,8 @@ float3 unconditional(int mode)
 int conditional()
 {
     int k;
+    //CHK-DAG: warning 41016: use of uninitialized variable 'k'
     return (k > 0);
-//CHK:        ^ use of uninitialized variable
-//CHK:        ^ use of uninitialized variable 'k'
 }
 
 // Using unitialized values
@@ -35,8 +34,7 @@ int use_undefined_value(int k)
 {
     int x;
     x += k;
-//CHK:^^ use of uninitialized variable
-//CHK:^^ use of uninitialized variable 'x'
+    //CHK-DAG: warning 41016: use of uninitialized variable 'x'
     return x;
 }
 
@@ -46,6 +44,7 @@ __generic<T>
 T generic_undefined_return()
 {
     T y;
+    //CHK-NOT: warning 41016: use of uninitialized variable 'y'
     return y;
 }
 
@@ -53,11 +52,8 @@ T generic_undefined_return()
 float undefined_array()
 {
     float array[2];
+    //CHK-DAG: warning 41016: use of uninitialized variable 'array'
     return array[0];
-/*CHK:
-    ^^^^^^ use of uninitialized variable
-    ^^^^^^ use of uninitialized variable 'array'
-*/
 }
 
 float filled_array(int mode)
@@ -141,17 +137,14 @@ float structs()
 
     float result = inputData.value;
 
+    //CHK-DAG: warning 41016: use of uninitialized variable 'undefVar'
     result += undefVar;
-//CHK:     ^^ use of uninitialized variable
-//CHK:     ^^ use of uninitialized variable 'undefVar'
 
+    //CHK-DAG: warning 41016: use of uninitialized variable 'undefData'
     result += undefData.value;
-//CHK:     ^^ use of uninitialized variable
-//CHK:     ^^ use of uninitialized variable 'undefData'
 
+    //CHK-DAG: warning 41016: use of uninitialized variable 'nestedData'
     result += nestedData.data.value;
-//CHK:     ^^ use of uninitialized variable
-//CHK:     ^^ use of uninitialized variable 'nestedData'
 
     return result;
 }
@@ -162,31 +155,31 @@ float nested_scopes(int x, inout float p)
     if (x == 0)
     {
         float y;
+        //CHK-DAG: warning 41016: use of uninitialized variable 'y'
         return y;
-//CHK:  ^^^^^^ use of uninitialized variable
-//CHK:  ^^^^^^ use of uninitialized variable 'y'
     }
     else if (x == 1)
     {
         float y;
+        //CHK-DAG: warning 41016: use of uninitialized variable 'y'
         p = y + 1;
-//CHK:        ^ use of uninitialized variable
-//CHK:        ^ use of uninitialized variable 'y'
 
         if (x == 2)
         {
             float z;
+            //CHK-DAG: warning 41016: use of uninitialized variable 'z'
             p += z;
-//CHK:        ^^ use of uninitialized variable
-//CHK:        ^^ use of uninitialized variable 'z'
         }
     }
 
     return 1.0;
 }
 
+//CHK-NOT: warning 41016
+
 [Shader("compute")]
 [NumThreads(4, 1, 1)]
 void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
 {
 }
+

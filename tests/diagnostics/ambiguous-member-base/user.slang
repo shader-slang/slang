@@ -1,15 +1,14 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
-// Using non-exhaustive because there are many "candidate: static X x" notes
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
 import lib;
 
 static X x;
 
 void test()
 {
+    // CHECK: ([[# @LINE+1]]):{{.*}}ambiguous reference to 'x'
     x.m = 2;
-//CHECK: ambiguous reference to 'x'
+    // CHECK: ([[# @LINE+1]]):{{.*}}ambiguous reference to 'x'
     x[3] = 2;
-//CHECK: ambiguous reference to 'x'
+    // CHECK: ([[# @LINE+1]]):{{.*}}ambiguous reference to 'x'
     x();
-//CHECK: ambiguous reference to 'x'
 }

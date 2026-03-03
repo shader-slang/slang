@@ -6,7 +6,6 @@
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
-#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -60,10 +59,7 @@ void validate(IRValidateContext* context, bool condition, IRInst* inst, char con
     {
         if (context)
         {
-            context->getSink()->diagnose(Diagnostics::IrValidationFailed{
-                .message = message,
-                .location = inst->sourceLoc,
-            });
+            context->getSink()->diagnose(inst, Diagnostics::irValidationFailed, message);
         }
         else
         {
@@ -536,9 +532,7 @@ void validateAtomicOperations(bool skipFuncParamValidation, DiagnosticSink* sink
         {
             IRInst* destinationPtr = inst->getOperand(0);
             if (!isValidAtomicDest(skipFuncParamValidation, destinationPtr))
-                sink->diagnose(Diagnostics::InvalidAtomicDestinationPointer{
-                    .location = inst->sourceLoc,
-                });
+                sink->diagnose(inst->sourceLoc, Diagnostics::invalidAtomicDestinationPointer);
         }
         break;
 
@@ -557,15 +551,9 @@ static void validateVectorOrMatrixElementType(
     SourceLoc sourceLoc,
     IRType* elementType,
     uint32_t allowedWidths,
+    const DiagnosticInfo& disallowedElementTypeEncountered,
     TargetRequest* targetRequest)
 {
-    auto emitDisallowedTypeError = [&]()
-    {
-        sink->diagnose(Diagnostics::VectorWithDisallowedElementTypeEncountered{
-            .type = elementType,
-            .location = sourceLoc});
-    };
-
     if (!isFloatingType(elementType) && !isPackedFloatType(elementType))
     {
         if (isIntegralType(elementType))
@@ -573,7 +561,7 @@ static void validateVectorOrMatrixElementType(
             IntInfo info = getIntTypeInfo(targetRequest, elementType);
             if (allowedWidths == 0U)
             {
-                emitDisallowedTypeError();
+                sink->diagnose(sourceLoc, disallowedElementTypeEncountered, elementType);
             }
             else
             {
@@ -588,13 +576,13 @@ static void validateVectorOrMatrixElementType(
                 }
                 if (!widthAllowed)
                 {
-                    emitDisallowedTypeError();
+                    sink->diagnose(sourceLoc, disallowedElementTypeEncountered, elementType);
                 }
             }
         }
         else if (!as<IRBoolType>(elementType))
         {
-            emitDisallowedTypeError();
+            sink->diagnose(sourceLoc, disallowedElementTypeEncountered, elementType);
         }
     }
 }
@@ -610,11 +598,12 @@ static void validateVectorElementCount(DiagnosticSink* sink, IRVectorType* vecto
     const IRIntegerValue maxCount = 4;
     if ((elementCount < minCount) || (elementCount > maxCount))
     {
-        sink->diagnose(Diagnostics::VectorWithInvalidElementCountEncountered{
-            .count = String(elementCount),
-            .min = "1",
-            .max = String(maxCount),
-            .location = vectorType->sourceLoc});
+        sink->diagnose(
+            vectorType->sourceLoc,
+            Diagnostics::vectorWithInvalidElementCountEncountered,
+            elementCount,
+            "1",
+            maxCount);
     }
 }
 
@@ -637,8 +626,7 @@ void validateVectorsAndMatrices(
                 if ((rowCount && (rowCount->getValue() == 1)) ||
                     (colCount && (colCount->getValue() == 1)))
                 {
-                    sink->diagnose(Diagnostics::MatrixColumnOrRowCountIsOne{
-                        .location = matrixType->sourceLoc});
+                    sink->diagnose(matrixType->sourceLoc, Diagnostics::matrixColumnOrRowCountIsOne);
                 }
             }
 
@@ -661,6 +649,7 @@ void validateVectorsAndMatrices(
                 vectorType->sourceLoc,
                 elementType,
                 allowedWidths,
+                Diagnostics::vectorWithDisallowedElementTypeEncountered,
                 targetRequest);
 
             validateVectorElementCount(sink, vectorType);
@@ -745,9 +734,10 @@ void StructuredBufferValidationContext::validateStructuredBufferVariable(IRInst*
     // Check if the element type contains any resource/opaque handle types
     if (containsOpaqueHandleTypeCached(elementType))
     {
-        m_sink->diagnose(Diagnostics::CannotUseResourceTypeInStructuredBuffer{
-            .type = elementType,
-            .location = inst->sourceLoc});
+        m_sink->diagnose(
+            inst->sourceLoc,
+            Diagnostics::cannotUseResourceTypeInStructuredBuffer,
+            elementType);
         m_hasErrors = true;
     }
 }

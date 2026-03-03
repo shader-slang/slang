@@ -1,5 +1,5 @@
 //TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry main -allow-glsl -profile sm_5_0
-// CHECK: error[E36116]
+// CHECK: error 36116
 struct RayPayload
 {
     uint data;

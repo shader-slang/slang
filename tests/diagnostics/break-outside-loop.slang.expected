@@ -1,0 +1,8 @@
+result code = -1
+standard error = {
+tests/diagnostics/break-outside-loop.slang(6): error 30003: 'break' must appear inside loop or switch constructs.
+void foo() { break; }
+             ^~~~~
+}
+standard output = {
+}

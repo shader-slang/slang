@@ -6,26 +6,26 @@
 
 // `experimental-dynamic-dispatch` and `-lang 2025` have fewer restrictions
 //
-// CHECK_2025_OR_EXP-NOT: E33072
-// CHECK_2025_OR_EXP-NOT: E33073
-// CHECK_2025_OR_EXP-NOT: E33074
-// CHECK_2025_OR_EXP-NOT: E33075
-// CHECK_2025_OR_EXP-NOT: E33076
-// CHECK_2025_OR_EXP-NOT: E33077
-// CHECK_2025_OR_EXP-NOT: E33078
-// CHECK_2025_OR_EXP-NOT: E33082
+// CHECK_2025_OR_EXP-NOT: error 33072
+// CHECK_2025_OR_EXP-NOT: error 33073
+// CHECK_2025_OR_EXP-NOT: error 33074
+// CHECK_2025_OR_EXP-NOT: error 33075
+// CHECK_2025_OR_EXP-NOT: error 33076
+// CHECK_2025_OR_EXP-NOT: error 33077
+// CHECK_2025_OR_EXP-NOT: error 33078
+// CHECK_2025_OR_EXP-NOT: error 33082
 
 /////////////////////////////////////////////////////
 
 // `dyn` interfaces are not allowed to be generics
-// CHECK_2026-DAG: error[E33072]
+// CHECK_2026-DAG: error 33072
 dyn interface interface1<T>
 {
 	static const int member;
 };
 
 // `dyn` interfaces must not define any associated types.
-// CHECK_2026-DAG: error[E33073]
+// CHECK_2026-DAG: error 33073
 interface IBase1
 {
 };
@@ -35,7 +35,7 @@ dyn interface interface2
 };
 
 // `dyn` interfaces must not define any generic methods.
-// CHECK_2026-DAG: error[E33074]
+// CHECK_2026-DAG: error 33074
 dyn interface interface3
 {
 	T genericFunc<T : IArithmetic>(T val)
@@ -45,7 +45,7 @@ dyn interface interface3
 };
 
 // `dyn` interfaces must not define any mutating methods
-// CHECK_2026-DAG: error[E33075]
+// CHECK_2026-DAG: error 33075
 dyn interface interface4
 {
 	[mutating]
@@ -53,7 +53,7 @@ dyn interface interface4
 };
 
 // `dyn` interfaces cannot inherit from any interfaces that are not dyn.
-// CHECK_2026-DAG: error[E33077]
+// CHECK_2026-DAG: error 33077
 
 interface IBase2
 {
@@ -80,7 +80,7 @@ dyn interface interface6 : IBase3
 };
 
 // `dyn` interfaces cannot contain any function requirements that are marked as [Differentiable].
-// CHECK_2026-DAG: error[E33076]
+// CHECK_2026-DAG: error 33076
 dyn interface interface7
 {
 	[Differentiable]
@@ -91,8 +91,8 @@ dyn interface interface7
 };
 
 // The type which is conforming to a dyn (myType in interface myType : IBase) cannot be generic.
-// CHECK_2026-DAG: error[E33082]
-// CHECK_2026-DAG: error[E33082]
+// CHECK_2026-DAG: error 33082
+// CHECK_2026-DAG: error 33082
 dyn interface IBase4
 {
 	int doMath(int val);
@@ -116,7 +116,7 @@ interface genericInterface1<T : IArithmetic> : IBase4
 };
 
 // Extensions that make a type conform/inherit to dyn interfaces are not allowed.
-// CHECK_2026-DAG: error[E33078]
+// CHECK_2026-DAG: error 33078
 dyn interface IBase5
 {
 };
@@ -133,14 +133,14 @@ extension<T:interface9> T : IBase5
 };
 
 // Type conforming to `dyn` interface must be an ordinary data type, meaning that it cannot contain any fields that are opaque or non-copyable or unsized.
-// CHECK_2026-DAG: error[E33079]
-// CHECK_2026-DAG: error[E33080]
-// CHECK_2026-DAG: error[E33081]
-// CHECK_2026-DAG: error[E33081]
+// CHECK_2026-DAG: error 33079
+// CHECK_2026-DAG: error 33080
+// CHECK_2026-DAG: error 33081
+// CHECK_2026-DAG: error 33081
 
-// CHECK_2025_OR_EXP-DAG: error[E33079]
-// CHECK_2025_OR_EXP-DAG: error[E33080]
-// CHECK_2025_OR_EXP-DAG: error[E33081]
+// CHECK_2025_OR_EXP-DAG: error 33079
+// CHECK_2025_OR_EXP-DAG: error 33080
+// CHECK_2025_OR_EXP-DAG: error 33081
 
 struct structWithUnsized : IBase6
 {

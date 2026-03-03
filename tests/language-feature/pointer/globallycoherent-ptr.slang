@@ -4,13 +4,13 @@
 
 cbuffer Globals
 {
-    // CHECK: error[E30078]
+    // CHECK: ([[# @LINE+1]]): error 30078
     globallycoherent Ptr<int> ptr1;
-    // CHECK: error[E30078]
+    // CHECK: ([[# @LINE+1]]): error 30078
     globallycoherent int* ptr2;
-    // CHECK: error[E30078]
+    // CHECK: ([[# @LINE+1]]): error 30078
     coherent Ptr<int> ptr3;
-    // CHECK: error[E30078]
+    // CHECK: ([[# @LINE+1]]): error 30078
     coherent int* ptr4;
 }
 

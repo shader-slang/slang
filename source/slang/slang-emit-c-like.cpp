@@ -21,7 +21,6 @@
 #include "slang-lower-to-ir.h"
 #include "slang-mangle.h"
 #include "slang-mangled-lexer.h"
-#include "slang-rich-diagnostics.h"
 #include "slang-syntax.h"
 #include "slang-type-layout.h"
 #include "slang-visitor.h"
@@ -304,8 +303,7 @@ IRNumThreadsDecoration* CLikeSourceEmitter::getComputeThreadGroupSize(
     {
         if (id >= 0)
         {
-            getSink()->diagnose(Diagnostics::UnsupportedSpecializationConstantForNumThreads{
-                .location = decor->sourceLoc});
+            getSink()->diagnose(decor, Diagnostics::unsupportedSpecializationConstantForNumThreads);
             break;
         }
     }
@@ -1129,7 +1127,7 @@ inline String CLikeSourceEmitter::maybeMakeEntryPointNameValid(String name, Diag
         if (name == "main")
         {
             String newName = _generateUniqueName(name.getUnownedSlice());
-            sink->diagnose(Diagnostics::MainEntryPointRenamed{.oldName = name, .newName = newName});
+            sink->diagnose(SourceLoc(), Diagnostics::mainEntryPointRenamed, name, newName);
             return newName;
         }
     }
@@ -2340,9 +2338,7 @@ void CLikeSourceEmitter::emitInstStmt(IRInst* inst)
 
 void CLikeSourceEmitter::diagnoseUnhandledInst(IRInst* inst)
 {
-    getSink()->diagnose(Diagnostics::Unimplemented{
-        .feature = "unexpected IR opcode during code emit",
-        .location = inst->sourceLoc});
+    getSink()->diagnose(inst, Diagnostics::unimplemented, "unexpected IR opcode during code emit");
 }
 
 bool CLikeSourceEmitter::hasExplicitConstantBufferOffset(IRInst* cbufferType)
@@ -2797,10 +2793,11 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
     case kIROp_ImageSubscript:
         // We should have legalized ImageSubscript before emit for metal targets
         if (isMetalTarget(this->getTargetReq()))
-            getSink()->diagnose(Diagnostics::Unimplemented{
-                .feature = "kIROp_ImageSubscript is unimplemented for Metal, expected legalization "
-                           "beforehand",
-                .location = inst->sourceLoc});
+            getSink()->diagnose(
+                inst,
+                Diagnostics::unimplemented,
+                "kIROp_ImageSubscript is unimplemented for Metal, expected legalization "
+                "beforehand");
         [[fallthrough]];
     case kIROp_GetElement:
     case kIROp_MeshOutputRef:

@@ -725,7 +725,7 @@ static bool checkAnnotations(
 
             // Suggest using non-exhaustive mode as an alternative
             sb << "\n  Or add 'non-exhaustive' to skip checking unannotated diagnostics:\n";
-            sb << "  //DIAGNOSTIC_TEST:SIMPLE(diag=" << prefix << "):\n";
+            sb << "  //DIAGNOSTIC_TEST:SIMPLE(diag=" << prefix << ",non-exhaustive):\n";
 
             outMissingAnnotations.add(sb.produceString());
         }

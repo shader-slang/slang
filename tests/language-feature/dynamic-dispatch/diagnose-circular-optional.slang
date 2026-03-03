@@ -23,7 +23,7 @@ struct LeafNode : INode
     float getValue() { return value; }
 }
 
-// CHECK: error[E41014]: type cannot be packed for dynamic dispatch
+// CHECK: error 41014
 struct LinkedNode : INode
 {
     float value;

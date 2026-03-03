@@ -7,9 +7,9 @@ void f()
 {
 	int i;
 #pragma warning (once : 30081)
-	// CHECK: warning[E30081]
+	// CHECK: ([[# @LINE+1]]): warning 30081:
 	i = GetValue();
-	// CHECK-NOT: warning[E30081]
+	// CHECK-NOT: ([[# @LINE+1]]): warning 30081:
 	i = GetValue();
 }
 

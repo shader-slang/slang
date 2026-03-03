@@ -70,7 +70,7 @@ void computeMain(int id : SV_DispatchThreadID)
     IFullFeatured obj = makeObj(id);
 
     // Property setter through dynamic dispatch — emits error 99999: unimplemented type packing
-    // CHECK: error[E99999]
+    // CHECK: error 99999
     obj.value = 5.0;
 
     // Subscript setter through dynamic dispatch — same limitation

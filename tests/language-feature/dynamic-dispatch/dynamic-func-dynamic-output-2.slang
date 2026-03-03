@@ -53,7 +53,7 @@ IFactory getFactory(uint id, float x)
 float calc(IFoo obj, float y)
 {
     return obj.calc(y);
-    // REPORT: note[E50102]: generated dynamic dispatch code
+    // REPORT: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
 }
 
 float f(uint id, float x)

@@ -1,0 +1,14 @@
+result code = -1
+standard error = {
+tests/diagnostics/generic-constraint-forward-reference.slang(9): error 30117: generic constraint for parameter 'Foo' references type parameter 'T' before it is declared
+void test1<Foo : IFoo<T>, T : IFloat>() {}
+                 ^~~~
+tests/diagnostics/generic-constraint-forward-reference.slang(12): error 30117: generic constraint for parameter 'A' references type parameter 'B' before it is declared
+void test2<A : IBar<B, C>, B : IFloat, C : IFloat>() {}
+               ^~~~
+tests/diagnostics/generic-constraint-forward-reference.slang(12): error 30117: generic constraint for parameter 'A' references type parameter 'C' before it is declared
+void test2<A : IBar<B, C>, B : IFloat, C : IFloat>() {}
+               ^~~~
+}
+standard output = {
+}

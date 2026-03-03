@@ -45,7 +45,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     IFoo obj = makeInterface(dispatchThreadID.x);
 
     // Attempting to specialize generic function with interface type
-    // CHECK: error[E33180]
+    // CHECK: ([[# @LINE+1]]): error 33180
     float result = genericFunc(obj, 3.0);
 
     outputBuffer[0] = result;

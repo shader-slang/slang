@@ -1,0 +1,6 @@
+result code = 1
+standard error = {
+(0): error 80: multiple output paths have been specified entry point 'main' on target 'dxbc'
+}
+standard output = {
+}

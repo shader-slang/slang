@@ -1,16 +1,16 @@
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -stage compute -entry main -target spirv -emit-spirv-directly
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -stage compute -entry main -target spirv -emit-spirv-directly
 
 void main()
 {
     spirv_asm
     {
+        // CHECK: ([[#@LINE+1]]): error
         unknownOpCode
-//CHECK:^^^^^^^^^^^^^ unrecognized SPIR-V opcode
-//CHECK:^^^^^^^^^^^^^ unrecognized spirv opcode: unknownOpCode
     };
     spirv_asm
     {
+        // CHECK-NOT: ([[#@LINE+1]]): error
         5
     };
 }

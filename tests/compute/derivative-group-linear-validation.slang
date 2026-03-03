@@ -24,5 +24,4 @@ void main() {
     g_ssbo[0] = texture_color;
 }
 
-// CHECK: error[E31211]
-// CHECK: compute derivative group linear requires total thread dispatch count to be at a multiple of 4
+// CHECK: error 31211: compute derivative group linear requires total thread dispatch count to be at a multiple of 4

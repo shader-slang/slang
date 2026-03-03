@@ -1,13 +1,11 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
+//DIAGNOSTIC_TEST(windows):SIMPLE:
 
-// Test that use of empty statement after an `if` leads to a warning.
+// Test that use of empty statement after an `if` leads to an warning.
 
 struct S {}
 
 void test()
 {
 	if (1+1==2);
-//CHECK:    ^ potentially unintended empty statement
-//CHECK:    ^ potentially unintended empty statement at this location; use {} instead.
 		return;
 }

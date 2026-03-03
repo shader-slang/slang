@@ -378,19 +378,23 @@ bool addTypeCoercionWitnessToArgs(
             if (shouldEmitError)
             {
                 visitor->getSink()->diagnose(
-                    Diagnostics::ImplicitTypeCoerceConstraintWithNonImplicitConversion{
-                        .fromType = fromType,
-                        .toType = toType,
-                        .location = maybeContext->loc});
+                    maybeContext->loc,
+                    Diagnostics::ImplicitTypeCoerceConstraintWithNonImplicitConversion,
+                    fromType,
+                    toType);
 
                 if (auto declRefTypeCoercionWitness =
                         as<DeclRefTypeCoercionWitness>(typeCoercionWitness))
                 {
-                    visitor->getSink()->diagnose(Diagnostics::SeeDefinitionOfConversionFunction{
-                        .decl = declRefTypeCoercionWitness->getDeclRef().getDecl()});
+                    visitor->getSink()->diagnose(
+                        declRefTypeCoercionWitness->getDeclRef(),
+                        Diagnostics::seeDefinitionOf,
+                        "the non implicit conversion function");
                 }
                 visitor->getSink()->diagnose(
-                    Diagnostics::SeeDefinitionOfConstraint{.decl = constraintDecl});
+                    constraintDecl,
+                    Diagnostics::seeDefinitionOf,
+                    "the unsatisfied constraint");
             }
             return false;
         }
@@ -401,12 +405,15 @@ bool addTypeCoercionWitnessToArgs(
     {
         if (shouldEmitError)
         {
-            visitor->getSink()->diagnose(Diagnostics::TypeCoerceConstraintMissingConversion{
-                .fromType = fromType,
-                .toType = toType,
-                .location = maybeContext->loc});
             visitor->getSink()->diagnose(
-                Diagnostics::SeeDefinitionOf{.decl = genericDeclRef.getDecl()->inner});
+                maybeContext->loc,
+                Diagnostics::TypeCoerceConstraintMissingConversion,
+                fromType,
+                toType);
+            visitor->getSink()->diagnose(
+                constraintDecl,
+                Diagnostics::seeDefinitionOf,
+                genericDeclRef.getDecl()->inner);
         }
         return false;
     }

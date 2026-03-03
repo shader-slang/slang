@@ -49,7 +49,7 @@ void computeMain(int id : SV_DispatchThreadID)
     IFoo df = createDynamicObject<IFoo>(id, 0);
     // this creates a `specialize(lookupwitness(w, "eval"))`
     // and we need to make sure we can also diagnose properly.
-    // CHECK: error[E33180]:
+    // CHECK: ([[@LINE+1]]): error 33180:
     int result = b.eval(df);
     outputBuffer[0] = result;
 }

@@ -12,7 +12,7 @@ interface INode
     float get();
 }
 
-// CHECK: error[E{{[0-9]+}}]
+// CHECK: error {{[0-9]+}}
 struct TreeNode : INode
 {
     INode children[2];  // Array embeds values - does not break the cycle

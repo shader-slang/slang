@@ -12,10 +12,10 @@ struct HsOut
 
 struct HscOut
 {
-    //CHK: error[E30024]: array size mismatch prevents conversion
+    //CHK: error 30024: Cannot convert array of size 5 to array of size 4 as this would truncate data
     float EdgeTessFactor[5] : SV_TessFactor;
 
-    //CHK: error[E30024]: array size mismatch prevents conversion
+    //CHK: error 30024: Cannot convert array of size 3 to array of size 2 as this would truncate data
     float InsideTessFactor[3] : SV_InsideTessFactor;
 };
 

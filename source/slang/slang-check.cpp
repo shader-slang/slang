@@ -7,7 +7,6 @@
 
 #include "../core/slang-type-text-util.h"
 #include "slang-check-impl.h"
-#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -30,11 +29,11 @@ public:
             String filename = Path::getFileNameWithoutExt(path);
             if (filename == "dxil")
             {
-                m_sink->diagnose(Diagnostics::DxilNotFound{});
+                m_sink->diagnose(SourceLoc(), Diagnostics::dxilNotFound);
             }
             else
             {
-                m_sink->diagnose(Diagnostics::NoteFailedToLoadDynamicLibrary{.path = path});
+                m_sink->diagnose(SourceLoc(), Diagnostics::noteFailedToLoadDynamicLibrary, path);
             }
         }
         return res;
@@ -142,8 +141,7 @@ IDownstreamCompiler* Session::getOrLoadDownstreamCompiler(
             //
             if (sink)
             {
-                sink->diagnose(Diagnostics::FailedToLoadDownstreamCompiler{
-                    .compiler = TypeTextUtil::getPassThroughAsHumanText(SlangPassThrough(type))});
+                sink->diagnose(SourceLoc(), Diagnostics::failedToLoadDownstreamCompiler, type);
             }
             SinkSharedLibraryLoader loader(m_sharedLibraryLoader, sink);
             locator(m_downstreamCompilerPaths[int(type)], &loader, m_downstreamCompilerSet);

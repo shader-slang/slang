@@ -1,4 +1,7 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv -emit-spirv-directly
+
+//TEST:SIMPLE(filecheck=CHECK):-target spirv -emit-spirv-directly
+
+// CHECK: error 41001:
 
 struct TA
 {
@@ -6,10 +9,6 @@ struct TA
 }
 
 struct TB
-/*CHECK:
-       ^^ type contains cyclic reference
-       ^^ type 'array<TA,2>' contains cyclic reference to itself.
-*/
 {
     TA ta[2];
 }

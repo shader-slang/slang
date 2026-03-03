@@ -35,13 +35,13 @@ struct C : IInterface
 T transfer<T : IInterface>(T obj)
 {
     return obj.withOffset(2.5f);
-    // REPORT-DAG: note[E50102]: generated dynamic dispatch code
+    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
 }
 
 float calc<T : IInterface>(T obj, float y)
 {
     return transfer(obj).calc(y);
-    // REPORT-DAG: note[E50102]: generated dynamic dispatch code
+    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
 }
 
 float f(uint id, float x)

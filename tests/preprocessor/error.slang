@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=diag):
+//TEST:SIMPLE:
 
 // #error support
 
@@ -9,9 +9,5 @@
 #else
 
 #error This isn't valid!
-/*diag:
- ^^^^^ preprocessor error
- ^^^^^ #error: This isn't valid!
-*/
 
 #endif

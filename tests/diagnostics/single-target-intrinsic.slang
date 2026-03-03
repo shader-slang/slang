@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
+//DIAGNOSTIC_TEST(windows):SIMPLE:
 
 
 T doThing<T>(T in)
@@ -8,16 +8,9 @@ T doThing<T>(T in)
 
 __target_intrinsic(hlsl, "doSomethingIntrinsically($0)")
 T doThing<T>(T in);
-/*CHECK:
-  ^^^^^^^ see previous definition of 'doThing'
-*/
 
 __target_intrinsic(hlsl, "letsRedefineIt($0)")
 T doThing<T>(T in);
-/*CHECK:
-  ^^^^^^^ function 'doThing' already has a body
-  ^^^^^^^ redeclared here
-*/
 
 void test()
 {

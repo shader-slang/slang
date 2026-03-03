@@ -11,11 +11,9 @@ func test(f: functype(int, int)->float) -> float
 void computeMain()
 {
     int c = 2;
-    // CHECK: error[E30019]:
-    // CHECK: coerce-failure.slang:[[# @LINE+1]]:
+    // CHECK: ([[# @LINE+1]]): error 30019
     let result = test((int x, int y)=> x + y + c);
 
-    // CHECK: error[E30019]:
-    // CHECK: coerce-failure.slang:[[# @LINE+1]]:
+    // CHECK: ([[# @LINE+1]]): error 30019
     let result1 = test((int x, float y) => x + y);
 }

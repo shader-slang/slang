@@ -1637,7 +1637,7 @@ void printDiagnosticArg(StringBuilder& sb, CapabilityName name)
     sb << capabilityNameToStringWithoutPrefix(name);
 }
 
-void printDiagnosticArg(StringBuilder& sb, const List<CapabilityAtom>& list)
+void printDiagnosticArg(StringBuilder& sb, List<CapabilityAtom>& list)
 {
     CapabilityAtomSet set;
     for (auto i : list)

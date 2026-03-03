@@ -1,0 +1,8 @@
+result code = 0
+standard error = {
+tests/diagnostics/bool-to-float.slang(11): warning 30081: implicit conversion from 'bool' to 'float' is not recommended
+        float f = true;
+                  ^~~~
+}
+standard output = {
+}

@@ -1,11 +1,10 @@
 // Test that StructuredBuffer of ParameterBlock (NonAddressable type) is not allowed
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -allow-glsl -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -allow-glsl -stage compute -entry computeMain
 
 // Direct ParameterBlock in StructuredBuffer - should error
+//CHECK: ([[# @LINE+1]]): error 30028
 StructuredBuffer<ParameterBlock<Texture2D>> myBuffer1;
-//CHECK:                                    ^^^^^^^^^ non-addressable type cannot be used in StructuredBuffer
-//CHECK:                                    ^^^^^^^^^ 'ParameterBlock<Texture2D<vector<float,4>>>' is non-addressable and cannot be used in StructuredBuffer
 
 // Struct containing ParameterBlock in StructuredBuffer - should error  
 struct StructWithParameterBlock
@@ -14,9 +13,8 @@ struct StructWithParameterBlock
     int value;
 }
 
+//CHECK: ([[# @LINE+1]]): error 30028
 StructuredBuffer<StructWithParameterBlock> myBuffer2;
-//CHECK:                                   ^^^^^^^^^ non-addressable type cannot be used in StructuredBuffer
-//CHECK:                                   ^^^^^^^^^ 'StructWithParameterBlock' is non-addressable and cannot be used in StructuredBuffer
 
 // Nested struct containing ParameterBlock - should error
 struct NestedStruct
@@ -25,24 +23,18 @@ struct NestedStruct
     float data;
 }
 
+//CHECK: ([[# @LINE+1]]): error 30028
 StructuredBuffer<NestedStruct> myBuffer3;
-//CHECK:                       ^^^^^^^^^ non-addressable type cannot be used in StructuredBuffer
-//CHECK:                       ^^^^^^^^^ 'NestedStruct' is non-addressable and cannot be used in StructuredBuffer
 
 // Struct containing array of ParameterBlock - should error
 struct StructWithParameterBlockArray
 {
     ParameterBlock<Texture2D> blocks[2];
-//CHECK:                      ^^^^^^ arrays of non-addressable type not allowed
-//CHECK:                      ^^^^^^ Arrays of non-addressable type 'ParameterBlock<Texture2D<vector<float,4>>>' are not allowed
-//CHECK:                      ^^^^^^ arrays of non-addressable type not allowed
-//CHECK:                      ^^^^^^ Arrays of non-addressable type 'ParameterBlock<Texture2D<vector<float,4>>>' are not allowed
     int value;
 }
 
+//CHECK: ([[# @LINE+1]]): error 30028
 StructuredBuffer<StructWithParameterBlockArray> myBuffer4;
-//CHECK:                                        ^^^^^^^^^ non-addressable type cannot be used in StructuredBuffer
-//CHECK:                                        ^^^^^^^^^ 'StructWithParameterBlockArray' is non-addressable and cannot be used in StructuredBuffer
 
 [numthreads(1, 1, 1)]
 void computeMain()
