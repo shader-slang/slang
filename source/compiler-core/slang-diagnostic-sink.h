@@ -306,7 +306,11 @@ public:
     /// Set whether to enable unicode in rich diagnostics.
     /// When not explicitly set, unicode is auto-detected based on whether
     /// output goes to a console (matching the behavior of color auto-detection).
-    void setEnableUnicode(bool enable) { m_enableUnicode = enable; m_unicodeExplicitlySet = true; }
+    void setEnableUnicode(bool enable)
+    {
+        m_enableUnicode = enable;
+        m_unicodeExplicitlySet = true;
+    }
     bool getEnableUnicode() const { return m_enableUnicode; }
 
     bool shouldEnableUnicode() const
