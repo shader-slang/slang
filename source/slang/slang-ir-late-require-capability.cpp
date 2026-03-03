@@ -20,7 +20,6 @@ struct ProcessLateRequireCapabilityInstsContext
     const CodeGenTarget m_target;
     CompilerOptionSet& m_optionSet;
     DiagnosticSink* const m_sink;
-    SlangResult m_status = SLANG_OK;
 
     Dictionary<IRInst*, HashSet<IRFunc*>> m_mapInstToReferencingEntryPoints;
 
@@ -138,10 +137,6 @@ struct ProcessLateRequireCapabilityInstsContext
                 .location = irInst->sourceLoc
             });
         diagnoseCallStack(irInst, m_sink);
-
-        // we'll fail only if restrictive capability check was requested
-        if (m_optionSet.getBoolOption(CompilerOptionName::RestrictiveCapabilityCheck))
-            m_status = SLANG_FAIL;
     }
 
     void processFunc(IRFunc* func)
@@ -202,7 +197,7 @@ struct ProcessLateRequireCapabilityInstsContext
     }
 };
 
-SlangResult processLateRequireCapabilityInsts(
+void processLateRequireCapabilityInsts(
     IRModule* module,
     CodeGenContext* codeGenContext,
     DiagnosticSink* sink)
@@ -215,7 +210,6 @@ SlangResult processLateRequireCapabilityInsts(
         sink);
 
     context.processModule();
-    return context.m_status;
 }
 
 } // namespace Slang

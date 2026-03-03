@@ -19,7 +19,6 @@
 #include "slang-ir-inline.h"
 #include "slang-ir-insert-debug-value-store.h"
 #include "slang-ir-insts.h"
-#include "slang-ir-late-require-capability.h"
 #include "slang-ir-link.h"
 #include "slang-ir-loop-inversion.h"
 #include "slang-ir-lower-defer.h"
