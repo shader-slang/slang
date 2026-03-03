@@ -173,8 +173,7 @@ int _emitTestFile(lua_State* L)
     String outputDir = Path::getParentDirectory(outputPath);
     if (outputDir.getLength() > 0)
     {
-        SlangResult dirResult = Path::createDirectory(outputDir);
-        if (SLANG_FAILED(dirResult))
+        if (!Path::createDirectoryRecursive(outputDir))
         {
             return luaL_error(
                 L,
