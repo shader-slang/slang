@@ -1,0 +1,10 @@
+prefix=@CMAKE_INSTALL_PREFIX@
+exec_prefix=${prefix}
+libdir=${prefix}/@CMAKE_INSTALL_LIBDIR@
+includedir=${prefix}/@CMAKE_INSTALL_INCLUDEDIR@
+
+Name: slang-compiler
+Description: Slang shading language compiler library
+Version: @SLANG_VERSION_NUMERIC@
+Libs: -L${libdir} -lslang-compiler
+Cflags: -I${includedir}
