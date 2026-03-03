@@ -3,16 +3,15 @@
 // Test that a ternary/select on a specialization constant used as a groupshared
 // array size compiles successfully to SPIR-V using OpSpecConstantOp Select.
 
-// CHECK: %[[FOO:[0-9A-Za-z_]+]] = OpSpecConstant %uint 4
-// CHECK: %[[CMP:[0-9A-Za-z_]+]] = OpSpecConstantOp %bool UGreaterThan %[[FOO]] %{{[0-9A-Za-z_]+}}
-// CHECK: %[[SIZE:[0-9A-Za-z_]+]] = OpSpecConstantOp %uint Select %[[CMP]] %[[FOO]] %{{[0-9A-Za-z_]+}}
-// CHECK: %[[SIZE_INT:[0-9A-Za-z_]+]] = OpSpecConstantOp %int UConvert %[[SIZE]]
-// CHECK: %[[ARR_TYPE:[0-9A-Za-z_]+]] = OpTypeArray %float %[[SIZE_INT]]
+// CHECK: %[[FOO:[0-9A-Za-z_]+]] = OpSpecConstant %int 4
+// CHECK: %[[CMP:[0-9A-Za-z_]+]] = OpSpecConstantOp %bool SGreaterThan %[[FOO]] %{{[0-9A-Za-z_]+}}
+// CHECK: %[[SIZE:[0-9A-Za-z_]+]] = OpSpecConstantOp %int Select %[[CMP]] %[[FOO]] %{{[0-9A-Za-z_]+}}
+// CHECK: %[[ARR_TYPE:[0-9A-Za-z_]+]] = OpTypeArray %float %[[SIZE]]
 // CHECK: %[[PT_TYPE:[0-9A-Za-z_]+]] = OpTypePointer Workgroup %[[ARR_TYPE]]
 // CHECK: OpVariable %[[PT_TYPE]] Workgroup
 
 [vk::specialization_constant]
-const uint FOO = 4;
+const int FOO = 4;
 
 groupshared float arr[FOO > 0 ? FOO : 1];
 
