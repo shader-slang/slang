@@ -219,7 +219,10 @@ public:
     template<typename D>
     bool diagnose(D const& d)
     {
-        return diagnoseRichImpl(d.toGenericDiagnostic(), D::getInfo());
+        const DiagnosticInfo* info = D::getInfo();
+        if (info && getEffectiveMessageSeverity(*info, SourceLoc()) == Severity::Disable)
+            return false;
+        return diagnoseRichImpl(d.toGenericDiagnostic(), info);
     }
 
     // Useful for notes on existing diagnostics, where it would be redundant to display the same
