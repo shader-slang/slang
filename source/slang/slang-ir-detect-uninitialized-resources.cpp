@@ -13,6 +13,7 @@
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -174,37 +175,38 @@ struct UninitializedResourceDetectionContext
 
                             // Main error
                             sink->diagnose(
-                                sourceLoc,
-                                Diagnostics::cannotDefaultInitializeStructWithUninitializedResource,
-                                structName,
-                                resourceName);
+                                Diagnostics::CannotDefaultInitializeStructWithUninitializedResource{
+                                    .structName = structName,
+                                    .resourceName = resourceName,
+                                    .location = sourceLoc,
+                                });
 
                             // Note pointing to struct definition
                             if (structType->sourceLoc.isValid())
                             {
-                                sink->diagnose(
-                                    structType->sourceLoc,
-                                    Diagnostics::seeDefinitionOfStruct,
-                                    structName);
+                                sink->diagnose(Diagnostics::SeeDefinitionOfStruct{
+                                    .name = structName,
+                                    .location = structType->sourceLoc});
                             }
                         }
                         else
                         {
                             // Struct contains nested resources
                             sink->diagnose(
-                                sourceLoc,
-                                Diagnostics::cannotDefaultInitializeStructContainingResources,
-                                structName);
+                                Diagnostics::CannotDefaultInitializeStructContainingResources{
+                                    .structName = structName,
+                                    .location = sourceLoc,
+                                });
                         }
                     }
                     else
                     {
                         // Direct resource initialization
                         String resourceName = getResourceTypeName(uninitializedType);
-                        sink->diagnose(
-                            sourceLoc,
-                            Diagnostics::cannotDefaultInitializeResource,
-                            resourceName);
+                        sink->diagnose(Diagnostics::CannotDefaultInitializeResource{
+                            .resourceName = resourceName,
+                            .location = sourceLoc,
+                        });
                     }
                 }
             }

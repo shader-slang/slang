@@ -1,4 +1,4 @@
-//TEST:SIMPLE:
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHK):
 
 // It used to be the case that coercions of already-coerced initializer lists
 // didn't take into account the more specific type. One way of triggering this
@@ -13,5 +13,7 @@ void main()
 {
     // Should generate a type error.
     T t = (S)0;
+//CHK:    ^ type mismatch in expression
+//CHK:    ^ expected an expression of type 'T', got 'S'
 }
 

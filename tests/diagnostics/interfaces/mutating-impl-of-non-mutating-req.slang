@@ -1,17 +1,19 @@
 // mutating-impl-of-non-mutating-req.slang
 
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):-target hlsl -entry main
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -entry main
 interface IThing
 {
     int processValue(int inValue);
+//CHECK:^^^^^^^^^^^^ see interface requirement declaration of 'processValue'
 }
 
 struct Counter : IThing
 {
     int state;
-    
-    // CHECK: ([[# @LINE+1]]): error 38105:
+
     [mutating] int processValue(int inValue)
+//CHECK:           ^^^^^^^^^^^^ interface requirement mismatch
+//CHECK:           ^^^^^^^^^^^^ member 'processValue' does not match interface requirement.
     {
         int result = state;
         state += inValue;

@@ -9,6 +9,7 @@
 #include "slang-ir-simplify-cfg.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -555,7 +556,7 @@ bool unrollLoopsInFunc(
         if (!_unrollLoop(targetProgram, module, loop, blocks))
         {
             if (sink)
-                sink->diagnose(loopLoc, Diagnostics::cannotUnrollLoop);
+                sink->diagnose(Diagnostics::CannotUnrollLoop{.location = loopLoc});
             return false;
         }
 

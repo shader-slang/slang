@@ -10,6 +10,7 @@
 #include "../core/slang-text-io.h"
 #include "../core/slang-type-text-util.h"
 #include "slang-options.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -1213,7 +1214,7 @@ struct LoadContext
         auto result = StreamUtil::readAll(stream, streamData);
         if (SLANG_FAILED(result))
         {
-            sink->diagnose(SourceLoc(), Diagnostics::unableToReadRiff);
+            sink->diagnose(Diagnostics::UnableToReadRiff{});
             return result;
         }
     }
@@ -1230,19 +1231,19 @@ struct LoadContext
     auto rootChunk = RIFF::RootChunk::getFromBlob(data, dataSize);
     if (!rootChunk)
     {
-        sink->diagnose(SourceLoc(), Diagnostics::unableToReadRiff);
+        sink->diagnose(Diagnostics::UnableToReadRiff{});
         return SLANG_FAIL;
     }
     if (rootChunk->getType() != kSlangStateFileFourCC)
     {
-        sink->diagnose(SourceLoc(), Diagnostics::expectingSlangRiffContainer);
+        sink->diagnose(Diagnostics::ExpectingSlangRiffContainer{});
         return SLANG_FAIL;
     }
 
     auto dataChunk = rootChunk->findDataChunk(kSlangStateDataFourCC);
     if (!dataChunk)
     {
-        sink->diagnose(SourceLoc(), Diagnostics::expectingSlangRiffContainer);
+        sink->diagnose(Diagnostics::ExpectingSlangRiffContainer{});
         return SLANG_FAIL;
     }
 
@@ -1253,7 +1254,7 @@ struct LoadContext
         auto result = reader.read(header);
         if (SLANG_FAILED(result))
         {
-            sink->diagnose(SourceLoc(), Diagnostics::expectingSlangRiffContainer);
+            sink->diagnose(Diagnostics::ExpectingSlangRiffContainer{});
             return result;
         }
     }
@@ -1264,17 +1265,15 @@ struct LoadContext
         header.m_semanticVersion.append(headerBuf);
         g_semanticVersion.append(currentBuf);
 
-        sink->diagnose(
-            SourceLoc(),
-            Diagnostics::incompatibleRiffSemanticVersion,
-            headerBuf,
-            currentBuf);
+        sink->diagnose(Diagnostics::IncompatibleRiffSemanticVersion{
+            .actualVersion = headerBuf,
+            .expectedVersion = currentBuf});
         return SLANG_FAIL;
     }
 
     if (header.m_typeHash != _getTypeHash())
     {
-        sink->diagnose(SourceLoc(), Diagnostics::riffHashMismatch);
+        sink->diagnose(Diagnostics::RiffHashMismatch{});
         return SLANG_FAIL;
     }
 
@@ -1285,7 +1284,7 @@ struct LoadContext
         auto result = reader.read(&outBuffer[0], remainingSize);
         if (SLANG_FAILED(result))
         {
-            sink->diagnose(SourceLoc(), Diagnostics::expectingSlangRiffContainer);
+            sink->diagnose(Diagnostics::ExpectingSlangRiffContainer{});
             return result;
         }
     }
@@ -1338,7 +1337,7 @@ struct LoadContext
 
     if (!Path::createDirectory(dirPath))
     {
-        sink->diagnose(SourceLoc(), Diagnostics::unableToCreateDirectory, dirPath);
+        sink->diagnose(Diagnostics::UnableToCreateDirectory{.path = dirPath});
         return SLANG_FAIL;
     }
 

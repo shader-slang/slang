@@ -115,7 +115,7 @@
 //     }
 //
 // Use non-exhaustive mode to only check that annotations match:
-//     //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
+//     //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 //     void test() {
 //         if (1);
 //     //CHECK:  ^ empty statement

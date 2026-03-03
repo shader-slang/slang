@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE:
+//DIAGNOSTIC_TEST:SIMPLE(diag=diag):
 
 float nonDiff(float x)
 {
@@ -13,6 +13,8 @@ float f(float x)
         val = x + 1;
     else
         val = nonDiff(x * 2.0f);
+//diag:              ^ derivative cannot be propagated through non-differentiable call
+//diag:              ^ derivative cannot be propagated through call to non-forward-differentiable function `nonDiff`, use 'no_diff' to clarify intention.
     // Not all path propagates derivatives through.
     return val;
 }
@@ -26,6 +28,10 @@ void g(float x)
         val = x + 1;
 
     for (int i = 0; i < 5; i++) // Not ok, we can't infer the loop iterations because the body modifies induction var.
+/*diag:
+    ^^^ loop in differentiable function needs attributes
+    ^^^ loops inside a differentiable function need to provide either '[MaxIters(n)]' or '[ForceUnroll]' attribute.
+*/
     {
         i = (int)x;
         no_diff debugBreak();

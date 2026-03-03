@@ -1,6 +1,7 @@
 // slang-check-conversion.cpp
 #include "slang-ast-synthesis.h"
 #include "slang-check-impl.h"
+#include "slang-rich-diagnostics.h"
 
 // This file contains semantic-checking logic for dealing
 // with conversion (both implicit and explicit) of expressions
@@ -464,10 +465,9 @@ bool SemanticsVisitor::createInvokeExprForSynthesizedCtor(
         bool isArrayType = as<ArrayExpressionType>(toType) != nullptr;
         if (!isCStyle && !isArrayType)
         {
-            diagnoseOnce(
-                fromInitializerListExpr->loc,
-                Diagnostics::cannotUseInitializerListForType,
-                toType);
+            diagnoseOnce(Diagnostics::CannotUseInitializerListForType{
+                .type = toType,
+                .initList = fromInitializerListExpr});
         }
 
         return false;
@@ -598,10 +598,9 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
             //
             if (outToExpr)
             {
-                getSink()->diagnose(
-                    fromInitializerListExpr,
-                    Diagnostics::cannotUseInitializerListForVectorOfUnknownSize,
-                    toElementCount);
+                getSink()->diagnose(Diagnostics::CannotUseInitializerListForVectorOfUnknownSize{
+                    .elementCount = toElementCount,
+                    .initList = fromInitializerListExpr});
             }
             return false;
         }
@@ -642,10 +641,9 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
             //
             if (outToExpr)
             {
-                getSink()->diagnose(
-                    fromInitializerListExpr,
-                    Diagnostics::cannotUseInitializerListForCoopVectorOfUnknownSize,
-                    toElementCount);
+                getSink()->diagnose(Diagnostics::CannotUseInitializerListForCoopVectorOfUnknownSize{
+                    .elementCount = toElementCount,
+                    .initList = fromInitializerListExpr});
             }
             return false;
         }
@@ -794,10 +792,9 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
             //
             if (outToExpr)
             {
-                getSink()->diagnose(
-                    fromInitializerListExpr,
-                    Diagnostics::cannotUseInitializerListForMatrixOfUnknownSize,
-                    toMatrixType->getRowCount());
+                getSink()->diagnose(Diagnostics::CannotUseInitializerListForMatrixOfUnknownSize{
+                    .rowCount = toMatrixType->getRowCount(),
+                    .initList = fromInitializerListExpr});
             }
             return false;
         }
@@ -908,10 +905,9 @@ bool SemanticsVisitor::_readAggregateValueFromInitializerList(
         //
         if (outToExpr)
         {
-            getSink()->diagnose(
-                fromInitializerListExpr,
-                Diagnostics::cannotUseInitializerListForType,
-                inToType);
+            getSink()->diagnose(Diagnostics::CannotUseInitializerListForType{
+                .type = inToType,
+                .initList = fromInitializerListExpr});
         }
         return false;
     }
@@ -1000,11 +996,10 @@ bool SemanticsVisitor::_coerceInitializerList(
     {
         if (outToExpr)
         {
-            getSink()->diagnose(
-                fromInitializerListExpr,
-                Diagnostics::tooManyInitializers,
-                argIndex,
-                argCount);
+            getSink()->diagnose(Diagnostics::TooManyInitializers{
+                .expected = (int64_t)argIndex,
+                .got = (int64_t)argCount,
+                .initList = fromInitializerListExpr});
         }
     }
     if (outToExpr)
@@ -1034,7 +1029,10 @@ bool SemanticsVisitor::_failedCoercion(
         {
             if (sink)
             {
-                sink->diagnose(fromExpr->loc, Diagnostics::typeMismatch, toType, fromExpr->type);
+                sink->diagnose(Diagnostics::TypeMismatch{
+                    .expectedType = toType,
+                    .actualType = fromExpr->type,
+                    .expr = fromExpr});
             }
         }
     }
@@ -1262,14 +1260,13 @@ bool SemanticsVisitor::_coerce(
                                       : nullptr;
             if (auto declCandidate = as<DeclRefExpr>(firstCandidate))
             {
-                sink->diagnose(
-                    fromExpr->loc,
-                    Diagnostics::ambiguousReference,
-                    declCandidate->declRef);
+                sink->diagnose(Diagnostics::AmbiguousReference{
+                    .name = getText(declCandidate->declRef.getName()),
+                    .location = fromExpr->loc});
             }
             else
             {
-                sink->diagnose(fromExpr->loc, Diagnostics::ambiguousExpression);
+                sink->diagnose(Diagnostics::AmbiguousExpression{.expr = fromExpr});
             }
         }
         return false;
@@ -1964,13 +1961,14 @@ bool SemanticsVisitor::_coerce(
         {
             if (sink)
             {
-                sink->diagnose(fromExpr, Diagnostics::ambiguousConversion, fromType, toType);
+                sink->diagnose(Diagnostics::AmbiguousConversion{
+                    .fromType = fromType.type,
+                    .toType = toType,
+                    .expr = fromExpr});
                 for (auto candidate : overloadContext.bestCandidates)
                 {
                     sink->diagnose(
-                        candidate.item.declRef,
-                        Diagnostics::seeDeclarationOf,
-                        candidate.item.declRef);
+                        Diagnostics::SeeDeclarationOf{.decl = candidate.item.declRef.getDecl()});
                 }
             }
 
@@ -2033,12 +2031,14 @@ bool SemanticsVisitor::_coerce(
             {
                 if (sink)
                 {
-                    sink->diagnose(fromExpr, Diagnostics::typeMismatch, toType, fromType);
-                    sink->diagnoseWithoutSourceView(
-                        fromExpr,
-                        Diagnostics::noteExplicitConversionPossible,
-                        fromType,
-                        toType);
+                    sink->diagnose(Diagnostics::TypeMismatch{
+                        .expectedType = toType,
+                        .actualType = fromType,
+                        .expr = fromExpr});
+                    sink->diagnose(Diagnostics::NoteExplicitConversionPossible{
+                        .fromType = fromType.type,
+                        .toType = toType,
+                        .location = fromExpr->loc});
                 }
             }
             else if (cost >= kConversionCost_Default)
@@ -2065,11 +2065,10 @@ bool SemanticsVisitor::_coerce(
                 }
                 if (shouldEmitGeneralWarning && sink)
                 {
-                    sink->diagnose(
-                        fromExpr,
-                        Diagnostics::unrecommendedImplicitConversion,
-                        fromType,
-                        toType);
+                    sink->diagnose(Diagnostics::UnrecommendedImplicitConversion{
+                        .fromType = fromType.type,
+                        .toType = toType,
+                        .expr = fromExpr});
                 }
             }
 
@@ -2080,7 +2079,7 @@ bool SemanticsVisitor::_coerce(
                 if (builtinConversionKind == kBuiltinConversion_FloatToDouble)
                 {
                     if (!as<FloatingPointLiteralExpr>(fromExpr))
-                        sink->diagnose(fromExpr, Diagnostics::implicitConversionToDouble);
+                        sink->diagnose(Diagnostics::ImplicitConversionToDouble{.expr = fromExpr});
                 }
             }
         }
