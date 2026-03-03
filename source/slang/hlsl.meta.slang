@@ -24103,7 +24103,7 @@ struct HitObject
     // "void hitObjectRecordMissEXT(hitObjectEXT, uint rayFlags, uint, vec3, float, vec3, float);"
     __glsl_extension(GL_EXT_shader_invocation_reorder)
     __glsl_extension(GL_EXT_ray_tracing)
-    __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+    __glsl_extension(GL_EXT_buffer_reference_uvec2)
     [require(glsl, ser_raygen_closesthit_miss)]
     static void __glslMakeMissEXT(
         out HitObject hitObj,
@@ -24146,7 +24146,7 @@ struct HitObject
     // "void hitObjectRecordMissMotionEXT(hitObjectEXT hitObject, uint rayFlags, uint sbtRecordIndex, vec3 origin, float Tmin, vec3 direction, float TMax, float currentTime)"
     __glsl_extension(GL_EXT_shader_invocation_reorder_motion)
     __glsl_extension(GL_EXT_ray_tracing)
-    __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+    __glsl_extension(GL_EXT_buffer_reference_uvec2)
     [require(glsl, ser_raygen_closesthit_miss)]
     static void __glslMakeMissMotionEXT(
         out HitObject hitObj,
@@ -24213,7 +24213,7 @@ struct HitObject
 
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_EXT_shader_invocation_reorder)
-    __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+    __glsl_extension(GL_EXT_buffer_reference_uvec2)
     [require(glsl, ser_raygen_closesthit_miss)]
     float3 __glslGetRayWorldDirectionEXT()
     {
@@ -24240,7 +24240,7 @@ struct HitObject
 
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_EXT_shader_invocation_reorder)
-    __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+    __glsl_extension(GL_EXT_buffer_reference_uvec2)
     [require(glsl, ser_raygen_closesthit_miss)]
     float3 __glslGetRayWorldOriginEXT()
     {
@@ -24267,7 +24267,7 @@ struct HitObject
 
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_EXT_shader_invocation_reorder)
-    __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+    __glsl_extension(GL_EXT_buffer_reference_uvec2)
     [require(glsl, ser_raygen_closesthit_miss)]
     float __glslGetTMaxEXT()
     {
@@ -24294,7 +24294,7 @@ struct HitObject
 
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_EXT_shader_invocation_reorder)
-    __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+    __glsl_extension(GL_EXT_buffer_reference_uvec2)
     [require(glsl, ser_raygen_closesthit_miss)]
     float __glslGetTMinEXT()
     {
@@ -24424,7 +24424,7 @@ struct HitObject
 
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_EXT_shader_invocation_reorder)
-    __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+    __glsl_extension(GL_EXT_buffer_reference_uvec2)
     [require(glsl, ser_raygen_closesthit_miss)]
     void __glslGetAttributesEXT(int attributeLocation)
     {
@@ -24437,7 +24437,7 @@ struct HitObject
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
     __glsl_extension(GL_EXT_shader_invocation_reorder)
-    __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+    __glsl_extension(GL_EXT_buffer_reference_uvec2)
     [require(glsl, ser_raygen_closesthit_miss)]
     static void __glslTraceRay(
         out HitObject hitObject,
@@ -24465,7 +24465,7 @@ struct HitObject
 
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_EXT_shader_invocation_reorder)
-    __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+    __glsl_extension(GL_EXT_buffer_reference_uvec2)
     [require(glsl, ser_raygen_closesthit_miss)]
     static void __glslTraceRayEXT(
         out HitObject hitObject,
@@ -24957,7 +24957,7 @@ struct HitObject
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_shader_invocation_reorder)
     __glsl_extension(GL_EXT_shader_invocation_reorder)
-    __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+    __glsl_extension(GL_EXT_buffer_reference_uvec2)
     __glsl_extension(GL_NV_ray_tracing_motion_blur)
     [require(glsl, ser_motion_raygen_closesthit_miss)]
     static void __glslTraceMotionRay(
@@ -24987,7 +24987,7 @@ struct HitObject
 
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_EXT_shader_invocation_reorder)
-    __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+    __glsl_extension(GL_EXT_buffer_reference_uvec2)
     __glsl_extension(GL_NV_ray_tracing_motion_blur)
     [require(glsl, ser_motion_raygen_closesthit_miss)]
     static void __glslTraceMotionRayEXT(
@@ -25030,7 +25030,7 @@ struct HitObject
 
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_EXT_shader_invocation_reorder)
-    __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+    __glsl_extension(GL_EXT_buffer_reference_uvec2)
     [require(glsl, ser_raygen_closesthit_miss)]
     static void __glslInvokeEXT(
         HitObject hitObj,
