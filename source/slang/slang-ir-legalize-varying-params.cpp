@@ -2470,7 +2470,7 @@ protected:
                     {var,
                      varType,
                      String(semanticDecoration->getSemanticName()).toLower(),
-                     (UInt)semanticDecoration->getSemanticIndex()}};
+                     (UInt)semanticDecoration->getEffectiveSemanticIndex()}};
             }
         }
 
@@ -2996,7 +2996,7 @@ private:
             {
                 if (semanticDecor->getSemanticName().startsWithCaseInsensitive(toSlice("sv_")))
                 {
-                    auto indexAsString = String(UInt(semanticDecor->getSemanticIndex()));
+                    auto indexAsString = String(UInt(semanticDecor->getEffectiveSemanticIndex()));
                     auto sysValInfo =
                         getSystemValueInfo(semanticDecor->getSemanticName(), &indexAsString, field);
                     if (sysValInfo.isUnsupported)
@@ -3564,8 +3564,9 @@ private:
 
                 auto loweredName = String(outName).toLower();
                 auto loweredNameSlice = getUserSemanticNameSlice(loweredName, isUserSemantic);
-                auto semanticIndex =
-                    hasStringIndex ? stringToInt(outIndex) : semanticDecoration->getSemanticIndex();
+                auto semanticIndex = hasStringIndex
+                                         ? stringToInt(outIndex)
+                                         : semanticDecoration->getEffectiveSemanticIndex();
                 auto newDecoration =
                     builder.addSemanticDecoration(key, loweredNameSlice, semanticIndex);
 
