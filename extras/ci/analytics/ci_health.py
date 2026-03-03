@@ -359,8 +359,7 @@ buildCharts(24);
 def generate_health_html(queue_data, failures, output_dir):
     """Generate health.html from live data."""
     now = datetime.now(timezone.utc)
-    rounded_time = _round_time(now.strftime("%H:%M"))
-    fetched_at = now.strftime(f"%Y-%m-%d {rounded_time} UTC")
+    fetched_at = now.strftime("%Y-%m-%d %H:%M UTC")
 
     # Runner status section — only online GCP GPU runners
     GCP_GPU_GROUPS = {"Linux GPU (GCP)", "Windows Build (GCP)", "Windows GPU (GCP)"}
