@@ -2,9 +2,13 @@
 // Verifies that y = Activation(W*x) works correctly without bias,
 // and that autodiff computes correct weight and input gradients.
 //
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly -xslang -DTEST_POINTER=0
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTEST_POINTER=0
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTEST_POINTER=1
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly -xslang -DTEST_POINTER=0 -xslang -DTEST_TENSORVIEW=0
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTEST_POINTER=0 -xslang -DTEST_TENSORVIEW=0
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTEST_POINTER=1 -xslang -DTEST_TENSORVIEW=0
+//
+// Compile-only test for TorchTensorViewAddress (CUDA target):
+//TEST:SIMPLE(filecheck=CHECK): -target ptx -stage compute -entry computeMain -capability cuda_sm_7_0 -DTEST_TENSORVIEW=1 -DTEST_POINTER=0 -experimental-feature
+// CHECK: computeMain
 
 import neural;
 
@@ -14,7 +18,11 @@ import neural;
 // Gradient buffer for weight gradients
 //TEST_INPUT: set gradParams = ubuffer(data=[0.0 0.0 0.0 0.0], stride=4)
 
-#if TEST_POINTER
+#if TEST_TENSORVIEW
+    uniform TensorView<float> params;
+    uniform TensorView<float> gradParams;
+    typealias Address = TorchTensorViewAddress<float>;
+#elif TEST_POINTER
     uniform float* params;
     uniform float* gradParams;
     typealias Address = PointerAddress<float>;
