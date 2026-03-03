@@ -131,11 +131,9 @@ struct ProcessLateRequireCapabilityInstsContext
                 .location = entry->sourceLoc,
             });
 
-        m_sink->diagnose(
-            Diagnostics::SeeCallOfFunc{
-                .name = "__requireCapability",
-                .location = irInst->sourceLoc
-            });
+        m_sink->diagnose(Diagnostics::SeeCallOfFunc{
+            .name = "__requireCapability",
+            .location = irInst->sourceLoc});
         diagnoseCallStack(irInst, m_sink);
     }
 
