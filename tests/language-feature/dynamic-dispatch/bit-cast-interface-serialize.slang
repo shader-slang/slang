@@ -6,7 +6,7 @@
 //   #10222 — specialization lowers existential to compact tagged-union
 // See parent issue #9920.
 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl -stage compute -entry computeMain -conformance "FooA:IFoo=0" -conformance "FooB:IFoo=1"
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -stage compute -entry computeMain -conformance "FooA:IFoo=0" -conformance "FooB:IFoo=1"
 
 [anyValueSize(16)]
 interface IFoo
@@ -35,8 +35,9 @@ struct RawExistential
 
 void serialize(IFoo foo, RWStructuredBuffer<uint> buf, int baseSlot)
 {
-    // CHECK: error 41202
     RawExistential raw = bit_cast<RawExistential>(foo);
+//CHECK:                                         ^ bit_cast size mismatch
+//CHECK:                                         ^ invalid to bit_cast differently sized types
     for (int i = 0; i < kRawUints; i++)
         buf[baseSlot + i] = raw.data[i];
 }

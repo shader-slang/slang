@@ -6,12 +6,12 @@
 // existential tuple in a struct field would bypass the pack/unpack
 // marshalling required for dynamic dispatch.
 
-//TEST:SIMPLE(filecheck=CHECK): -target spirv
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry computeMain
-//TEST:SIMPLE(filecheck=CHECK): -target cuda -stage compute -entry computeMain
-//TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry computeMain
-//TEST:SIMPLE(filecheck=CHECK): -target wgsl -stage compute -entry computeMain
-//TEST:SIMPLE(filecheck=CHECK): -target cpp -stage compute -entry computeMain
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target hlsl -stage compute -entry computeMain
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target cuda -stage compute -entry computeMain
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target metal -stage compute -entry computeMain
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target wgsl -stage compute -entry computeMain
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target cpp -stage compute -entry computeMain
 
 [anyValueSize(16)]
 interface IFoo
@@ -28,45 +28,66 @@ struct ImplA : IFoo
 // Direct __ref to interface type on struct field.
 struct RefFieldDirect
 {
-    // CHECK: ([[# @LINE+1]]): error 31201
     __ref IFoo field;
+/*CHECK:
+    ^^^^^ modifier not allowed
+    ^^^^^ modifier '__ref' is not allowed here.
+*/
 }
 
 // Direct __constref to interface type on struct field.
 struct ConstrefFieldDirect
 {
-    // CHECK: ([[# @LINE+1]]): error 31201
     __constref IFoo field;
+/*CHECK:
+    ^^^^^^^^^^ modifier not allowed
+    ^^^^^^^^^^ modifier '__constref' is not allowed here.
+*/
 }
 
 // __ref on a concrete type struct field (same restriction applies).
 struct RefFieldConcrete
 {
-    // CHECK: ([[# @LINE+1]]): error 31201
     __ref float field;
+/*CHECK:
+    ^^^^^ modifier not allowed
+    ^^^^^ modifier '__ref' is not allowed here.
+*/
 }
 
 // __constref on a concrete type struct field.
 struct ConstrefFieldConcrete
 {
-    // CHECK: ([[# @LINE+1]]): error 31201
     __constref float field;
+/*CHECK:
+    ^^^^^^^^^^ modifier not allowed
+    ^^^^^^^^^^ modifier '__constref' is not allowed here.
+*/
 }
 
 // Both __ref and __constref on fields in the same struct.
 struct MixedRefFields
 {
-    // CHECK: ([[# @LINE+1]]): error 31201
     __ref IFoo refField;
-    // CHECK: ([[# @LINE+1]]): error 31201
+/*CHECK:
+    ^^^^^ modifier not allowed
+    ^^^^^ modifier '__ref' is not allowed here.
+*/
     __constref IFoo constrefField;
+/*CHECK:
+    ^^^^^^^^^^ modifier not allowed
+    ^^^^^^^^^^ modifier '__constref' is not allowed here.
+*/
 }
 
 // Nested struct: inner struct tries to use __ref on interface field.
 struct Inner
 {
-    // CHECK: ([[# @LINE+1]]): error 31201
     __ref IFoo iface;
+/*CHECK:
+    ^^^^^ modifier not allowed
+    ^^^^^ modifier '__ref' is not allowed here.
+*/
 }
 
 struct Outer

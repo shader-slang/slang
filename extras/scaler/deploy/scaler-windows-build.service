@@ -1,0 +1,42 @@
+[Unit]
+Description=GCP Runner Scaler (Windows builds, no GPU)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=scaler
+Group=scaler
+
+ExecReload=/bin/kill -USR1 $MAINPID
+ExecStart=/opt/scaler/scaler \
+    --url=https://github.com/shader-slang/slang \
+    --name=windows-build-runners \
+    --labels=Windows,self-hosted,build \
+    --platform=windows \
+    --max-runners=8 \
+    --min-runners=0 \
+    --gcp-project=slang-runners \
+    --gcp-zones=us-east1-c,us-east1-d,us-central1-a,us-west1-a,us-west1-b \
+    --gcp-instance-template=windows-build-runner \
+    --gcp-gpu-type=none \
+    --vm-prefix=win-build
+
+EnvironmentFile=/opt/scaler/scaler.env
+
+Restart=always
+RestartSec=10
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=scaler-windows-build
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadOnlyPaths=/opt/scaler
+
+[Install]
+WantedBy=multi-user.target

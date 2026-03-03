@@ -2,7 +2,7 @@
 
 // Confirm that we diagnose a `void` function that returns a value.
 
-//DIAGNOSTIC_TEST:SIMPLE:-stage compute -entry main -target dxbc
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHK):-stage compute -entry main -target dxbc
 
 void good()
 {
@@ -14,6 +14,9 @@ void bad()
 {
 	// Implicit cast to `void` is not allowed.
 	return 1;
+//CHK:  ^ type mismatch in expression
+//CHK:  ^ expected an expression of type 'void', got 'int'
+//CHK:  ^ explicit conversion from 'int' to 'void' is possible
 }
 
 [numthreads(1, 1, 1)]
