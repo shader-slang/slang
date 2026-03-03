@@ -714,6 +714,14 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                 .returnType = returnType,
                 .location = entryPointFuncDecl->loc});
         }
+
+        if (as<ArrayExpressionType>(returnType))
+        {
+            sink->diagnose(Diagnostics::EntryPointCannotReturnArrayType{
+                .entryPoint = entryPointName,
+                .returnType = returnType,
+                .location = entryPointFuncDecl->loc});
+        }
     }
 
     // Every entry point needs to have a stage specified either via
