@@ -374,32 +374,33 @@ def generate_health_html(queue_data, failures, output_dir):
             if g in GCP_GPU_GROUPS and r.get("status") == "online":
                 groups[g].append(r)
 
-        if groups:
-            for group_name in sorted(groups):
-                group_runners = groups[group_name]
-                busy = sum(1 for r in group_runners if r.get("busy"))
-                total = len(group_runners)
+        # Show all GCP groups, including ones with 0 online runners (auto-scaling)
+        for group_name in sorted(GCP_GPU_GROUPS):
+            group_runners = groups.get(group_name, [])
+            busy = sum(1 for r in group_runners if r.get("busy"))
+            total = len(group_runners)
 
-                runners_html += f'<h3>{_esc(group_name)} ({busy}/{total} busy)</h3>\n'
-                runners_html += '<table><tr><th>Runner</th><th>Status</th><th>Current Job</th></tr>\n'
-                for r in sorted(group_runners, key=lambda x: x.get("name", "")):
-                    name = _esc(r.get("name", ""))
-                    busy_flag = r.get("busy", False)
-                    state = '<span style="color:#0d6efd">BUSY</span>' if busy_flag else '<span style="color:#28a745">IDLE</span>'
+            runners_html += f'<h3>{_esc(group_name)} ({busy}/{total} busy)</h3>\n'
+            if not group_runners:
+                runners_html += '<p style="color:#6c757d">No runners online (auto-scaling group scales to zero when idle).</p>\n'
+                continue
+            runners_html += '<table><tr><th>Runner</th><th>Status</th><th>Current Job</th></tr>\n'
+            for r in sorted(group_runners, key=lambda x: x.get("name", "")):
+                name = _esc(r.get("name", ""))
+                busy_flag = r.get("busy", False)
+                state = '<span style="color:#0d6efd">BUSY</span>' if busy_flag else '<span style="color:#28a745">IDLE</span>'
 
-                    job_info = ""
-                    job = r.get("job")
-                    if job:
-                        job_name = job.get("name", "")
-                        job_branch = job.get("branch", "")
-                        job_url = job.get("html_url", "")
-                        label = f"{job_name} ({job_branch})" if job_branch else job_name
-                        job_info = _link(job_url, label)
+                job_info = ""
+                job = r.get("job")
+                if job:
+                    job_name = job.get("name", "")
+                    job_branch = job.get("branch", "")
+                    job_url = job.get("html_url", "")
+                    label = f"{job_name} ({job_branch})" if job_branch else job_name
+                    job_info = _link(job_url, label)
 
-                    runners_html += f"<tr><td>{name}</td><td>{state}</td><td>{job_info}</td></tr>\n"
-                runners_html += "</table>\n"
-        else:
-            runners_html = "<p>No GCP GPU runners online (other online runners may be listed below).</p>"
+                runners_html += f"<tr><td>{name}</td><td>{state}</td><td>{job_info}</td></tr>\n"
+            runners_html += "</table>\n"
 
         # Other runners (non-GCP GPU, online only)
         other_runners = [

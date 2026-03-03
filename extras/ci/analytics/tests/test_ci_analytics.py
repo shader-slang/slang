@@ -126,6 +126,28 @@ class TestRunnerTypeCoverage(unittest.TestCase):
         self.assertIn("Windows Build (GCP)", html)
         self.assertIn("Windows GPU (GCP)", html)
 
+    def test_generate_health_html_shows_empty_groups_with_message(self):
+        """GCP groups with no online runners should still appear with a message."""
+        queue_data = {
+            "summary": {"jobs_queued": 0, "jobs_running": 0, "runs_queued": 0, "runs_in_progress": 0},
+            "self_hosted_runners": [
+                {"name": "linux-runner-1", "group": "Linux GPU (GCP)", "status": "online", "busy": False},
+            ],
+            "queue_by_group": [],
+            "longest_waiting_jobs": [],
+        }
+
+        with tempfile.TemporaryDirectory() as tmp:
+            ci_health.generate_health_html(queue_data, [], tmp)
+            with open(os.path.join(tmp, "health.html"), encoding="utf-8") as f:
+                html = f.read()
+
+        # All three groups should appear even when no runners are online
+        self.assertIn("Linux GPU (GCP)", html)
+        self.assertIn("Windows Build (GCP)", html)
+        self.assertIn("Windows GPU (GCP)", html)
+        self.assertIn("scales to zero when idle", html)
+
 
 class TestStatisticsRunnerNamePrefixes(unittest.TestCase):
     def test_statistics_parallel_chart_includes_runner_name_prefix_groups(self):
