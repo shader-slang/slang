@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):-target metal -entry meshMain
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target metal -entry meshMain
 
 struct VsOutput {
   float4 pos : SV_Position;
@@ -13,8 +13,9 @@ void meshMain(out vertices VsOutput verts[3], out indices uint3 tris[1])
 
   // Output vertices
   for (uint i = 0; i < 3; i++) {
-//CHECK: ([[# @LINE+1]]): error 56104
     verts[i].pos = float4(0.0);
+//CHECK:         ^ mesh output must be assigned as whole struct
+//CHECK:         ^ whole struct must be assiged to mesh output at once for Metal target.
   }
 
   // Output indices

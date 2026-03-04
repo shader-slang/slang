@@ -98,9 +98,24 @@ private:
         // to mark filenames at the beginning of a diagnostic
         const char* arrow;
         const char* noteDash;
+        // A south-east corner to close the gutter at the end (curves from down to left)
+        const char* gutterCorner;
     };
-    constexpr static Glyphs s_unicodeGlyphs = {"━", "┯", "─", "┬", "│", "╰ ", " ╭╼", " ╭╼"};
-    constexpr static Glyphs s_asciiGlyphs = {"^", "^", "-", "-", "|", "`", "-->", "---"};
+    // Unicode box-drawing glyphs as raw UTF-8 bytes to avoid source encoding assumptions:
+    //   ━ U+2501  ┯ U+252F  ─ U+2500  ┬ U+252C  │ U+2502
+    //   ╰ U+2570  ╭ U+256D  ╼ U+257C  ╯ U+256F
+    constexpr static Glyphs s_unicodeGlyphs = {
+        "\xe2\x94\x81",
+        "\xe2\x94\xaf",
+        "\xe2\x94\x80",
+        "\xe2\x94\xac",
+        "\xe2\x94\x82",
+        "\xe2\x95\xb0 ",
+        " \xe2\x95\xad\xe2\x95\xbc",
+        " \xe2\x95\xad\xe2\x95\xbc",
+        "\xe2\x95\xaf",
+    };
+    constexpr static Glyphs s_asciiGlyphs = {"^", "^", "-", "-", "|", "`", "-->", "---", "'"};
     const Glyphs& m_glyphs;
 
     // A single highlight on a line, with an optional label to be connected
@@ -635,6 +650,13 @@ private:
                 ss << repeat(' ', layout.primarySection.maxGutterWidth + 1)
                    << color(TerminalColor::Cyan, m_glyphs.vertical) << "\n";
                 renderSectionBody(ss, layout.primarySection);
+                ss << color(
+                          TerminalColor::Cyan,
+                          repeat(
+                              m_glyphs.secondaryUnderline,
+                              layout.primarySection.maxGutterWidth + 1) +
+                              m_glyphs.gutterCorner)
+                   << "\n";
             }
         }
         for (const auto& note : layout.notes)
@@ -646,6 +668,11 @@ private:
                 ss << repeat(' ', note.section.maxGutterWidth + 1)
                    << color(TerminalColor::Cyan, m_glyphs.vertical) << "\n";
                 renderSectionBody(ss, note.section);
+                ss << color(
+                          TerminalColor::Cyan,
+                          repeat(m_glyphs.secondaryUnderline, note.section.maxGutterWidth + 1) +
+                              m_glyphs.gutterCorner)
+                   << "\n";
             }
         }
         return ss.produceString();

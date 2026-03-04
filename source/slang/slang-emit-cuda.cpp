@@ -4,6 +4,7 @@
 #include "../core/slang-writer.h"
 #include "slang-emit-source-writer.h"
 #include "slang-mangled-lexer.h"
+#include "slang-rich-diagnostics.h"
 
 #include <assert.h>
 
@@ -1316,12 +1317,9 @@ SlangResult CUDASourceEmitter::emitWMMAFragmentType(
     // we can provide better diagnostic messages here.
     if (!typeCheck(elementType->getOp(), matrixUse))
     {
-        StringBuilder msg;
-        getSink()->diagnose(
-            SourceLoc(),
-            Diagnostics::cooperativeMatrixUnsupportedElementType,
-            typeName,
-            matrixUse == 0 ? "A" : (matrixUse == 1 ? "B" : "C"));
+        getSink()->diagnose(Diagnostics::CooperativeMatrixUnsupportedElementType{
+            .elementType = typeName,
+            .matrixUse = matrixUse == 0 ? "A" : (matrixUse == 1 ? "B" : "C")});
         SLANG_RELEASE_ASSERT(false);
         return SLANG_FAIL;
     }
@@ -1331,12 +1329,10 @@ SlangResult CUDASourceEmitter::emitWMMAFragmentType(
     FragmentShape shape = computeShapeCombination(matrixUse, rowCount, colCount);
     if (!shape.isValid())
     {
-        getSink()->diagnose(
-            SourceLoc(),
-            Diagnostics::cooperativeMatrixInvalidShape,
-            rowCount,
-            colCount,
-            matrixUse == 0 ? "A" : (matrixUse == 1 ? "B" : "C"));
+        getSink()->diagnose(Diagnostics::CooperativeMatrixInvalidShape{
+            .rowCount = String(rowCount),
+            .colCount = String(colCount),
+            .matrixUse = matrixUse == 0 ? "A" : (matrixUse == 1 ? "B" : "C")});
         SLANG_RELEASE_ASSERT(false);
         return SLANG_FAIL;
     }

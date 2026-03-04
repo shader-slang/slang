@@ -5,7 +5,9 @@
 glob_append(neural_shader_sources "*.slang")
 
 # Set output directories for build tree
-set(neural_output_dir "${CMAKE_BINARY_DIR}/$<CONFIG>/${slang_library_dir}/${SLANG_STANDARD_MODULE_DIR_NAME}")
+# Files go under a "slang/" subdirectory so that `import slang.neural;` resolves
+# to <standard-module-dir>/slang/neural.slang-module at runtime.
+set(neural_output_dir "${CMAKE_BINARY_DIR}/$<CONFIG>/${slang_library_dir}/${SLANG_STANDARD_MODULE_DIR_NAME}/slang")
 set(neural_module_file "${neural_output_dir}/${SLANG_NEURAL_MODULE_FILE_NAME}")
 
 # Copy neural shader files to output directory
@@ -69,9 +71,10 @@ add_custom_target(
 set_target_properties(slang-neural-module PROPERTIES FOLDER generated)
 
 # Install the neural directory to the configured location in the release package
+# Installs into <install-dir>/slang/ to match the `import slang.neural;` convention.
 install(
     DIRECTORY ${neural_output_dir}/
-    DESTINATION ${SLANG_STANDARD_MODULE_INSTALL_DIR}
+    DESTINATION ${SLANG_STANDARD_MODULE_INSTALL_DIR}/slang
     FILES_MATCHING
     PATTERN "*.slang"
     PATTERN "*.slang-module"

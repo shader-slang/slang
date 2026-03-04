@@ -9,6 +9,7 @@
 #include "slang-lookup.h"
 #include "slang-parameter-binding.h"
 #include "slang-profile.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -145,9 +146,7 @@ static void validateSystemValueSemanticForType(
         diagnoseCapabilityErrors(
             sink,
             visitor->getOptionSet(),
-            loc,
-            Diagnostics::unknownSystemValueSemantic,
-            baseName);
+            Diagnostics::UnknownSystemValueSemantic{.semanticName = baseName, .location = loc});
         return;
     }
 
@@ -255,11 +254,11 @@ static void validateSystemValueSemanticForType(
         diagnoseCapabilityErrors(
             sink,
             visitor->getOptionSet(),
-            loc,
-            Diagnostics::systemValueSemanticInvalidDirection,
-            baseName,
-            directionStr,
-            stageStr);
+            Diagnostics::SystemValueSemanticInvalidDirection{
+                .semantic = baseName,
+                .direction = directionStr,
+                .stage = stageStr,
+                .location = loc});
     }
     else if (!foundMatchingAccessor)
     {
@@ -275,11 +274,11 @@ static void validateSystemValueSemanticForType(
         diagnoseCapabilityErrors(
             sink,
             visitor->getOptionSet(),
-            loc,
-            Diagnostics::systemValueSemanticInvalidType,
-            unwrapConditionalType(type),
-            baseName,
-            validTypesStr);
+            Diagnostics::SystemValueSemanticInvalidType{
+                .type = unwrapConditionalType(type),
+                .semantic = baseName,
+                .expectedTypes = validTypesStr,
+                .location = loc});
     }
 }
 
@@ -578,7 +577,9 @@ DeclRef<FuncDecl> findFunctionDeclByName(Module* translationUnit, Name* name, Di
     if (!entryPointFuncDeclRef)
     {
         auto translationUnitSyntax = translationUnit->getModuleDecl();
-        sink->diagnose(translationUnitSyntax, Diagnostics::entryPointFunctionNotFound, name);
+        sink->diagnose(Diagnostics::EntryPointFunctionNotFound{
+            .name = name->text,
+            .location = translationUnitSyntax->loc});
     }
     return entryPointFuncDeclRef;
 }
@@ -708,11 +709,18 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
 
         if (hasResourceOrUnsizedTypes)
         {
-            sink->diagnose(
-                entryPointFuncDecl,
-                Diagnostics::entryPointCannotReturnResourceType,
-                entryPointName,
-                returnType);
+            sink->diagnose(Diagnostics::EntryPointCannotReturnResourceType{
+                .entryPoint = entryPointName,
+                .returnType = returnType,
+                .location = entryPointFuncDecl->loc});
+        }
+
+        if (as<ArrayExpressionType>(returnType))
+        {
+            sink->diagnose(Diagnostics::EntryPointCannotReturnArrayType{
+                .entryPoint = entryPointName,
+                .returnType = returnType,
+                .location = entryPointFuncDecl->loc});
         }
     }
 
@@ -721,7 +729,9 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     //
     if (stage == Stage::Unknown)
     {
-        sink->diagnose(entryPointFuncDecl, Diagnostics::entryPointHasNoStage, entryPointName);
+        sink->diagnose(Diagnostics::EntryPointHasNoStage{
+            .entryPoint = entryPointName->text,
+            .location = entryPointFuncDecl->loc});
     }
 
     if (stage == Stage::Hull)
@@ -735,7 +745,9 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         {
             if (attr->args.getCount() != 1)
             {
-                sink->diagnose(attr, Diagnostics::badlyDefinedPatchConstantFunc, entryPointName);
+                sink->diagnose(Diagnostics::BadlyDefinedPatchConstantFunc{
+                    .entryPointName = entryPointName,
+                    .location = attr});
                 return;
             }
 
@@ -744,7 +756,9 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
 
             if (!stringLit)
             {
-                sink->diagnose(expr, Diagnostics::badlyDefinedPatchConstantFunc, entryPointName);
+                sink->diagnose(Diagnostics::BadlyDefinedPatchConstantFunc{
+                    .entryPointName = entryPointName,
+                    .location = attr});
                 return;
             }
 
@@ -765,11 +779,10 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
             DeclRef<FuncDecl> patchConstantFuncDeclRef = findFunctionDeclByName(module, name, sink);
             if (!patchConstantFuncDeclRef)
             {
-                sink->diagnose(
-                    expr,
-                    Diagnostics::attributeFunctionNotFound,
-                    name,
-                    "patchconstantfunc");
+                sink->diagnose(Diagnostics::AttributeFunctionNotFound{
+                    .funcName = name,
+                    .attrName = "patchconstantfunc",
+                    .location = expr});
                 return;
             }
 
@@ -792,11 +805,9 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
 
                     if (!isValidThreadDispatchIDType(paramType))
                     {
-                        String typeString = paramType->toString();
-                        sink->diagnose(
-                            param->loc,
-                            Diagnostics::invalidDispatchThreadIDType,
-                            typeString);
+                        sink->diagnose(Diagnostics::InvalidDispatchThreadIdType{
+                            .type = paramType->toString(),
+                            .location = param->loc});
                         return;
                     }
                 }
@@ -985,9 +996,7 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
         if (shouldWarnOnNonUniformParam)
         {
             sink->diagnose(
-                param,
-                Diagnostics::nonUniformEntryPointParameterTreatedAsUniform,
-                param->getName());
+                Diagnostics::NonUniformEntryPointParameterTreatedAsUniform{.param = param});
         }
     }
 
@@ -1003,35 +1012,31 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
     {
         if (param->findModifier<GLSLBindingAttribute>())
         {
-            sink->diagnose(
-                param,
-                Diagnostics::unhandledModOnEntryPointParameter,
-                "attribute '[[vk::binding(...)]]'",
-                param->getName());
+            sink->diagnose(Diagnostics::UnhandledModOnEntryPointParameter{
+                .modifier = "attribute '[[vk::binding(...)]]'",
+                .param = param->getName(),
+                .location = param->loc});
         }
         if (param->findModifier<PushConstantAttribute>())
         {
-            sink->diagnose(
-                param,
-                Diagnostics::unhandledModOnEntryPointParameter,
-                "attribute '[[vk::push_constant]]'",
-                param->getName());
+            sink->diagnose(Diagnostics::UnhandledModOnEntryPointParameter{
+                .modifier = "attribute '[[vk::push_constant]]'",
+                .param = param->getName(),
+                .location = param->loc});
         }
         if (param->findModifier<HLSLRegisterSemantic>())
         {
-            sink->diagnose(
-                param,
-                Diagnostics::unhandledModOnEntryPointParameter,
-                "keyword 'register'",
-                param->getName());
+            sink->diagnose(Diagnostics::UnhandledModOnEntryPointParameter{
+                .modifier = "keyword 'register'",
+                .param = param->getName(),
+                .location = param->loc});
         }
         if (param->findModifier<HLSLPackOffsetSemantic>())
         {
-            sink->diagnose(
-                param,
-                Diagnostics::unhandledModOnEntryPointParameter,
-                "keyword 'packoffset'",
-                param->getName());
+            sink->diagnose(Diagnostics::UnhandledModOnEntryPointParameter{
+                .modifier = "keyword 'packoffset'",
+                .param = param->getName(),
+                .location = param->loc});
         }
     }
 
@@ -1052,11 +1057,10 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                 sink,
                 linkage->m_optionSet,
                 DiagnosticCategory::Capability,
-                entryPointFuncDecl,
-                Diagnostics::entryPointUsesUnavailableCapability,
-                entryPointFuncDecl,
-                compileTarget,
-                stageTarget);
+                Diagnostics::EntryPointUsesUnavailableCapability{
+                    .stage = capabilityNameToString((CapabilityName)stageTarget),
+                    .target = capabilityNameToString((CapabilityName)compileTarget),
+                    .decl = entryPointFuncDecl});
 
             // Find out what is incompatible (ancestor missing a super set of 'target+stage')
             CapabilitySet failedSet({(CapabilityName)compileTarget, (CapabilityName)stageTarget});
@@ -1120,16 +1124,27 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                             (*targetCapSet));
                     }
                 }
+                StringBuilder entryPointNameSb;
+                printDiagnosticArg(entryPointNameSb, entryPointFuncDecl);
+                auto atoms = addedAtoms.getElements<CapabilityAtom>();
+                StringBuilder capsSb;
+                printDiagnosticArg(capsSb, atoms);
                 maybeDiagnoseWarningOrError(
                     sink,
                     target->getOptionSet(),
                     DiagnosticCategory::Capability,
-                    entryPointFuncDecl->loc,
-                    Diagnostics::profileImplicitlyUpgraded,
-                    Diagnostics::profileImplicitlyUpgradedRestrictive,
-                    entryPointFuncDecl,
-                    target->getOptionSet().getProfile().getName(),
-                    addedAtoms.getElements<CapabilityAtom>());
+                    Diagnostics::ProfileImplicitlyUpgraded{
+                        .entryPoint = entryPointNameSb.produceString(),
+                        .profile = target->getOptionSet().getProfile().getName(),
+                        .capabilities = capsSb.produceString(),
+                        .location = entryPointFuncDecl->loc,
+                    },
+                    Diagnostics::ProfileImplicitlyUpgradedRestrictive{
+                        .entryPoint = entryPointNameSb.produceString(),
+                        .profile = target->getOptionSet().getProfile().getName(),
+                        .capabilities = capsSb.produceString(),
+                        .location = entryPointFuncDecl->loc,
+                    });
             }
         }
     }
@@ -1160,11 +1175,11 @@ bool resolveStageOfProfileWithEntryPoint(
                     sink,
                     optionSet,
                     DiagnosticCategory::Capability,
-                    entryPointAttr,
-                    Diagnostics::entryPointAndProfileAreIncompatible,
-                    entryPointFuncDecl,
-                    entryPointStage,
-                    targetProfile.getName());
+                    Diagnostics::EntryPointAndProfileAreIncompatible{
+                        .decl = entryPointFuncDecl,
+                        .stage = getStageName(entryPointStage),
+                        .profile = targetProfile.getName(),
+                        .location = entryPointAttr->loc});
         }
         if (entryPointProfileStage == Stage::Unknown)
             entryPointProfile = Profile(entryPointStage);
@@ -1174,11 +1189,11 @@ bool resolveStageOfProfileWithEntryPoint(
                 sink,
                 optionSet,
                 DiagnosticCategory::Capability,
-                entryPointFuncDecl,
-                Diagnostics::specifiedStageDoesntMatchAttribute,
-                entryPointFuncDecl->getName(),
-                entryPointProfileStage,
-                entryPointStage);
+                Diagnostics::SpecifiedStageDoesntMatchAttribute{
+                    .entryPoint = entryPointFuncDecl->getName()->text,
+                    .compiledStage = getStageName(entryPointProfileStage),
+                    .attributeStage = getStageName(entryPointStage),
+                    .location = entryPointFuncDecl->loc});
         entryPointProfile.additionalCapabilities.add(CapabilitySet{entryPointAttr->capabilitySet});
         return true;
     }
@@ -1580,9 +1595,7 @@ RefPtr<ComponentType> createUnspecializedGlobalComponentType(FrontEndCompileRequ
         if (!parseTypeConformanceArgString(stringValue, typeName, interfaceName, sequentialId))
         {
             compileRequest->getSink()->diagnose(
-                SourceLoc(),
-                Diagnostics::invalidTypeConformanceOptionString,
-                stringValue);
+                Diagnostics::InvalidTypeConformanceOptionString{.option = stringValue});
             continue;
         }
         auto concreteType = globalComponentType->getTypeFromString(
@@ -1590,11 +1603,9 @@ RefPtr<ComponentType> createUnspecializedGlobalComponentType(FrontEndCompileRequ
             compileRequest->getSink());
         if (!concreteType)
         {
-            compileRequest->getSink()->diagnose(
-                SourceLoc(),
-                Diagnostics::invalidTypeConformanceOptionNoType,
-                stringValue,
-                typeName);
+            compileRequest->getSink()->diagnose(Diagnostics::InvalidTypeConformanceOptionNoType{
+                .option = stringValue,
+                .typeName = typeName});
             continue;
         }
         auto interfaceType = globalComponentType->getTypeFromString(
@@ -1602,11 +1613,9 @@ RefPtr<ComponentType> createUnspecializedGlobalComponentType(FrontEndCompileRequ
             compileRequest->getSink());
         if (!interfaceType)
         {
-            compileRequest->getSink()->diagnose(
-                SourceLoc(),
-                Diagnostics::invalidTypeConformanceOptionNoType,
-                stringValue,
-                interfaceName);
+            compileRequest->getSink()->diagnose(Diagnostics::InvalidTypeConformanceOptionNoType{
+                .option = stringValue,
+                .typeName = interfaceName});
             continue;
         }
         ComPtr<slang::ITypeConformance> conformanceComponent;
@@ -1623,9 +1632,7 @@ RefPtr<ComponentType> createUnspecializedGlobalComponentType(FrontEndCompileRequ
             // we should report the diagnostics that were generated.
             //
             compileRequest->getSink()->diagnose(
-                SourceLoc(),
-                Diagnostics::cannotCreateTypeConformance,
-                stringValue);
+                Diagnostics::CannotCreateTypeConformance{.conformance = stringValue});
             if (diagnostics)
             {
                 compileRequest->getSink()->diagnoseRaw(
@@ -1791,11 +1798,9 @@ RefPtr<ComponentType::SpecializationInfo> Module::_validateSpecializationArgsImp
 {
     if (argCount < getSpecializationParamCount())
     {
-        sink->diagnose(
-            SourceLoc(),
-            Diagnostics::mismatchSpecializationArguments,
-            getSpecializationParamCount(),
-            argCount);
+        sink->diagnose(Diagnostics::MismatchSpecializationArguments{
+            .expected = (int64_t)getSpecializationParamCount(),
+            .provided = (int64_t)argCount});
         return nullptr;
     }
     outConsumedArgCount = getSpecializationParamCount();
@@ -1822,10 +1827,9 @@ RefPtr<ComponentType::SpecializationInfo> Module::_validateSpecializationArgsImp
                 Type* argType = as<Type>(arg.val);
                 if (!argType)
                 {
-                    sink->diagnose(
-                        param.loc,
-                        Diagnostics::expectedTypeForSpecializationArg,
-                        genericTypeParamDecl);
+                    sink->diagnose(Diagnostics::ExpectedTypeForSpecializationArg{
+                        .param = genericTypeParamDecl->getName()->text,
+                        .location = param.loc});
                     argType = getLinkage()->getASTBuilder()->getErrorType();
                 }
 
@@ -1858,10 +1862,9 @@ RefPtr<ComponentType::SpecializationInfo> Module::_validateSpecializationArgsImp
                         if (argGenericParamDeclRef.getDecl() == genericTypeParamDecl)
                         {
                             // We are trying to specialize a generic parameter using itself.
-                            sink->diagnose(
-                                genericTypeParamDecl,
-                                Diagnostics::cannotSpecializeGlobalGenericToItself,
-                                genericTypeParamDecl->getName());
+                            sink->diagnose(Diagnostics::CannotSpecializeGlobalGenericToItself{
+                                .param = genericTypeParamDecl->getName(),
+                                .location = genericTypeParamDecl->loc});
                             continue;
                         }
                         else
@@ -1869,10 +1872,10 @@ RefPtr<ComponentType::SpecializationInfo> Module::_validateSpecializationArgsImp
                             // We are trying to specialize a generic parameter using a *different*
                             // global generic type parameter.
                             sink->diagnose(
-                                genericTypeParamDecl,
-                                Diagnostics::cannotSpecializeGlobalGenericToAnotherGenericParam,
-                                genericTypeParamDecl->getName(),
-                                argGenericParamDeclRef.getName());
+                                Diagnostics::CannotSpecializeGlobalGenericToAnotherGenericParam{
+                                    .param = genericTypeParamDecl->getName(),
+                                    .otherParam = argGenericParamDeclRef.getName(),
+                                    .location = genericTypeParamDecl->loc});
                             continue;
                         }
                     }
@@ -1902,11 +1905,11 @@ RefPtr<ComponentType::SpecializationInfo> Module::_validateSpecializationArgsImp
                         // If no witness was found, then we will be unable to satisfy
                         // the conformances required.
                         sink->diagnose(
-                            genericTypeParamDecl,
-                            Diagnostics::typeArgumentForGenericParameterDoesNotConformToInterface,
-                            argType,
-                            genericTypeParamDecl->nameAndLoc.name,
-                            interfaceType);
+                            Diagnostics::TypeArgumentForGenericParameterDoesNotConformToInterface{
+                                .typeArg = argType,
+                                .param = genericTypeParamDecl->nameAndLoc.name,
+                                .interface = interfaceType,
+                                .location = genericTypeParamDecl->loc});
                     }
 
                     ModuleSpecializationInfo::GenericArgInfo constraintArgInfo;
@@ -1925,10 +1928,9 @@ RefPtr<ComponentType::SpecializationInfo> Module::_validateSpecializationArgsImp
                 Type* argType = as<Type>(arg.val);
                 if (!argType)
                 {
-                    sink->diagnose(
-                        param.loc,
-                        Diagnostics::expectedTypeForSpecializationArg,
-                        interfaceType);
+                    sink->diagnose(Diagnostics::ExpectedTypeForSpecializationArg{
+                        .param = interfaceType ? interfaceType->toString() : "<unknown type>",
+                        .location = param.loc});
                     argType = getLinkage()->getASTBuilder()->getErrorType();
                 }
 
@@ -1937,11 +1939,9 @@ RefPtr<ComponentType::SpecializationInfo> Module::_validateSpecializationArgsImp
                 {
                     // If no witness was found, then we will be unable to satisfy
                     // the conformances required.
-                    sink->diagnose(
-                        SourceLoc(),
-                        Diagnostics::typeArgumentDoesNotConformToInterface,
-                        argType,
-                        interfaceType);
+                    sink->diagnose(Diagnostics::TypeArgumentDoesNotConformToInterface{
+                        .typeArg = argType,
+                        .interface = interfaceType});
                 }
 
                 ExpandedSpecializationArg expandedArg;
@@ -1963,11 +1963,10 @@ RefPtr<ComponentType::SpecializationInfo> Module::_validateSpecializationArgsImp
                 IntVal* intVal = as<IntVal>(arg.val);
                 if (!intVal)
                 {
-                    sink->diagnose(
-                        param.loc,
-                        Diagnostics::expectedValueOfTypeForSpecializationArg,
-                        paramDecl->getType(),
-                        paramDecl);
+                    sink->diagnose(Diagnostics::ExpectedValueOfTypeForSpecializationArg{
+                        .type = paramDecl->getType(),
+                        .param = paramDecl->getName()->text,
+                        .location = param.loc});
                     intVal =
                         getLinkage()->getASTBuilder()->getIntVal(m_astBuilder->getIntType(), 0);
                 }
@@ -2054,11 +2053,10 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
 
         if (genericArgCount < 0)
         {
-            sink->diagnose(
-                SourceLoc(),
-                Diagnostics::mismatchSpecializationArguments,
-                genericSpecializationParamCount + existentialSpecializationParamCount,
-                argCount);
+            sink->diagnose(Diagnostics::MismatchSpecializationArguments{
+                .expected = (int64_t)(genericSpecializationParamCount +
+                                      existentialSpecializationParamCount),
+                .provided = (int64_t)argCount});
             return nullptr;
         }
 
@@ -2098,7 +2096,7 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
             }
             else
             {
-                sink->diagnose(SourceLoc(), Diagnostics::invalidFormOfSpecializationArg, ii + 1);
+                sink->diagnose(Diagnostics::InvalidFormOfSpecializationArg{.index = ii + 1});
             }
         }
         auto genAppExpr = astBuilder->create<GenericAppExpr>();
@@ -2146,11 +2144,10 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
 
     if (argCount < existentialSpecializationParamCount)
     {
-        sink->diagnose(
-            SourceLoc(),
-            Diagnostics::mismatchSpecializationArguments,
-            genericSpecializationParamCount + existentialSpecializationParamCount,
-            argCount);
+        sink->diagnose(Diagnostics::MismatchSpecializationArguments{
+            .expected =
+                (int64_t)(genericSpecializationParamCount + existentialSpecializationParamCount),
+            .provided = (int64_t)argCount});
         return nullptr;
     }
 
@@ -2169,11 +2166,9 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
         {
             // If no witness was found, then we will be unable to satisfy
             // the conformances required.
-            sink->diagnose(
-                SourceLoc(),
-                Diagnostics::typeArgumentDoesNotConformToInterface,
-                argType,
-                paramType);
+            sink->diagnose(Diagnostics::TypeArgumentDoesNotConformToInterface{
+                .typeArg = argType,
+                .interface = paramType});
             continue;
         }
 
@@ -2289,10 +2284,7 @@ void parseSpecializationArgStrings(
 
         if (!argExpr)
         {
-            sink->diagnose(
-                SourceLoc(),
-                Diagnostics::internalCompilerError,
-                "couldn't parse specialization argument");
+            sink->diagnose(Diagnostics::InternalCompilerError{});
             return;
         }
 
@@ -2365,11 +2357,9 @@ static RefPtr<ComponentType> _createSpecializedProgramImpl(
     auto specializationParamCount = unspecializedProgram->getSpecializationParamCount();
     if (specializationArgCount != specializationParamCount)
     {
-        sink->diagnose(
-            SourceLoc(),
-            Diagnostics::mismatchSpecializationArguments,
-            specializationParamCount,
-            specializationArgCount);
+        sink->diagnose(Diagnostics::MismatchSpecializationArguments{
+            .expected = (int64_t)specializationParamCount,
+            .provided = (int64_t)specializationArgCount});
         return nullptr;
     }
 

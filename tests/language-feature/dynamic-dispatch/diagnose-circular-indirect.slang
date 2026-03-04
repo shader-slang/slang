@@ -25,7 +25,7 @@ struct BarImpl : IBar
     void process() {}
 }
 
-// CHECK: error {{[0-9]+}}
+// CHECK: error[E{{[0-9]+}}]
 struct FooImpl : IFoo
 {
     IBar bar;  // Cycle: FooImpl -> IBar -> BarImpl -> IFoo -> FooImpl

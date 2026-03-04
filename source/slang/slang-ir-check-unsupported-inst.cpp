@@ -2,6 +2,7 @@
 
 #include "slang-ir-util.h"
 #include "slang-ir.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -16,7 +17,8 @@ void checkUnsupportedInst(TargetRequest* target, IRFunc* func, DiagnosticSink* s
             switch (inst->getOp())
             {
             case kIROp_GetArrayLength:
-                sink->diagnose(inst, Diagnostics::attemptToQuerySizeOfUnsizedArray);
+                sink->diagnose(
+                    Diagnostics::AttemptToQuerySizeOfUnsizedArray{.location = inst->sourceLoc});
                 break;
             }
         }
@@ -35,10 +37,9 @@ void checkUnsupportedInst(IRModule* module, TargetRequest* target, DiagnosticSin
                 if (!as<IRBasicType>(globalInst->getOperand(0)) &&
                     !as<IRPackedFloatType>(globalInst->getOperand(0)))
                 {
-                    sink->diagnose(
-                        findFirstUseLoc(globalInst),
-                        Diagnostics::unsupportedBuiltinType,
-                        globalInst);
+                    sink->diagnose(Diagnostics::UnsupportedBuiltinType{
+                        .type = globalInst,
+                        .location = findFirstUseLoc(globalInst)});
                 }
                 break;
             }

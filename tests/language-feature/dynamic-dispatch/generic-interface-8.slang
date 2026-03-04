@@ -4,10 +4,10 @@
 //   2. Open type parameter:     createDynamicObject<ICalculator<T>>
 //   3. Interface type argument:  createDynamicObject<ICalculator<IFoo>>
 
-//TEST:SIMPLE(filecheck=CHECK): -target spirv
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry computeMain
-//TEST:SIMPLE(filecheck=CHECK): -target glsl -stage compute -entry computeMain
-//TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry computeMain
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target spirv
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target hlsl -stage compute -entry computeMain
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target glsl -stage compute -entry computeMain
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target metal -stage compute -entry computeMain
 
 RWStructuredBuffer<float> outputBuffer;
 
@@ -38,8 +38,8 @@ struct Multiplier : ICalculator<float>
 // See https://github.com/shader-slang/slang/issues/10063
 ICalculator<float> createCalcFloat(uint id)
 {
-    // CHECK: ([[# @LINE+1]]): error 39999
     return createDynamicObject<ICalculator<float>>(id);
+//CHECK: could not specialize generic for arguments of type (uint)
 }
 
 // Case 2: Open type parameter.
@@ -49,8 +49,8 @@ ICalculator<float> createCalcFloat(uint id)
 // See https://github.com/shader-slang/slang/issues/10063
 ICalculator<T> createCalcGeneric<T>(uint id)
 {
-    // CHECK: ([[# @LINE+1]]): error 39999
     return createDynamicObject<ICalculator<T>>(id);
+//CHECK: could not specialize generic for arguments of type (uint)
 }
 
 // Case 3: Interface type as type argument.
@@ -59,8 +59,8 @@ ICalculator<T> createCalcGeneric<T>(uint id)
 // See https://github.com/shader-slang/slang/issues/10063
 ICalculator<IFoo> createCalcInterface(uint id)
 {
-    // CHECK: ([[# @LINE+1]]): error 39999
     return createDynamicObject<ICalculator<IFoo>>(id);
+//CHECK: could not specialize generic for arguments of type (uint)
 }
 
 [numthreads(1, 1, 1)]
