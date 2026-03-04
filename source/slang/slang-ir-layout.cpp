@@ -240,8 +240,11 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
         {
             auto vecType = cast<IRVectorType>(type);
             IRSizeAndAlignment elementTypeLayout;
-            SLANG_RETURN_ON_FAIL(
-                getSizeAndAlignment(targetReq, this, vecType->getElementType(), &elementTypeLayout));
+            SLANG_RETURN_ON_FAIL(getSizeAndAlignment(
+                targetReq,
+                this,
+                vecType->getElementType(),
+                &elementTypeLayout));
             *outSizeAndAlignment = getVectorSizeAndAlignment(
                 elementTypeLayout,
                 getIntegerValueFromInst(vecType->getElementCount()));
