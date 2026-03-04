@@ -276,6 +276,12 @@ public struct TorchTensorViewAddress<T> : IPointerLikeAddress<T>
     }
 
     [ForceInline]
+    internal T *getPointer(uint offset)
+    {
+        return inner.getPointer(offset);
+    }
+
+    [ForceInline]
     [require(cuda_glsl_hlsl_metal_spirv, sm_6_6)]
     public void atomicAdd(uint index, T value)
     {
