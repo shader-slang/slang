@@ -2,9 +2,10 @@
 
 import os
 import sys
+from pathlib import Path
 
 # Directory for generated files relative to slang top
-genTargetDirectory = "tests/capabilities/texture/"
+genTargetDirectory = "tests/generated/capabilities/texture/types/"
 
 # Table of test input types with the appropriate Slang texture types
 #
@@ -558,6 +559,8 @@ def main():
 
     slangTopDirectory = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     genTestDirectory = os.path.join(slangTopDirectory, genTargetDirectory)
+
+    Path(genTestDirectory).mkdir(parents=True, exist_ok=True)
     os.chdir(genTestDirectory)
 
     generateTests(getWgslTests())
