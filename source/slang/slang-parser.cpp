@@ -6833,7 +6833,6 @@ ParamDecl* Parser::ParseParameter()
 ///
 static Expr* _parseAtomicTypeExpr(Parser* parser, bool allowDecl)
 {
-    StringBuilder sb;
     auto typeSpec = _parseTypeSpec(parser);
     if (typeSpec.decl)
     {
