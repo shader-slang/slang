@@ -724,7 +724,7 @@ Val* ExtractExistentialSubtypeWitness::_substituteImplOverride(
     return substValue;
 }
 
-void TypeCoercionWitness::_toTextOverride(StringBuilder& out)
+void BuiltinTypeCoercionWitness::_toTextOverride(StringBuilder& out)
 {
     out << "BuiltinTypeCoercionWitness(";
     if (getFromType())
@@ -1609,10 +1609,7 @@ Val* FuncCallIntVal::tryFoldImpl(
     }                                       \
     else
 
-#define TERMINATING_CASE(MATCH) \
-    {                           \
-        MATCH                   \
-    }
+#define TERMINATING_CASE(MATCH) {MATCH}
 
         // Handle the cases using the macros
         BINARY_OPERATOR_CASE(>=)

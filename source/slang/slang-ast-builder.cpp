@@ -1099,9 +1099,14 @@ top:
     return transitiveWitness;
 }
 
-TypeCoercionWitness* ASTBuilder::getTypeCoercionWitness(
-    Type* subType,
-    Type* superType,
+BuiltinTypeCoercionWitness* ASTBuilder::getBuiltinTypeCoercionWitness(Type* fromType, Type* toType)
+{
+    return getOrCreate<BuiltinTypeCoercionWitness>(fromType, toType);
+}
+
+DeclRefTypeCoercionWitness* ASTBuilder::getDeclRefTypeCoercionWitness(
+    Type* fromType,
+    Type* toType,
     DeclRef<Decl> declRef)
 {
     return getOrCreate<DeclRefTypeCoercionWitness>(fromType, toType, declRef);

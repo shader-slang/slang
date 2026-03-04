@@ -683,9 +683,11 @@ public:
         SubtypeWitness* aIsSubtypeOfBWitness,
         SubtypeWitness* bIsSubtypeOfCWitness);
 
-    TypeCoercionWitness* getTypeCoercionWitness(
-        Type* fromType,
-        Type* toType,
+    BuiltinTypeCoercionWitness* getBuiltinTypeCoercionWitness(Type* subType, Type* superType);
+
+    DeclRefTypeCoercionWitness* getDeclRefTypeCoercionWitness(
+        Type* subType,
+        Type* superType,
         DeclRef<Decl> declRef);
 
     /// Helpers to get type info from the SharedASTBuilder
