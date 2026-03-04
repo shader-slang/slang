@@ -1,0 +1,42 @@
+name: Trigger SlangPy CI
+
+permissions:
+  contents: read
+
+# Manual-only trigger for now. Cross-repo dispatch to SlangPy is functional
+# but needs performance tuning before being enabled on every PR.
+# To test a PR against SlangPy, run this workflow manually and provide the
+# PR number.
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "Slang PR number to test against SlangPy"
+        required: true
+        type: string
+
+jobs:
+  trigger-slangpy-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Get PR info
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PR_SHA=$(gh api repos/${{ github.repository }}/pulls/${{ inputs.pr_number }} --jq '.head.sha')
+          echo "sha=$PR_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Trigger SlangPy CI
+        uses: peter-evans/repository-dispatch@ff45666b9427631e3450c54a1bcbee4d9ff4d7c0 # v3
+        with:
+          token: ${{ secrets.SLANGPY_DISPATCH_TOKEN }}
+          repository: shader-slang/slangpy
+          event-type: slang-pr-test
+          client-payload: |
+            {
+              "slang_pr_number": "${{ inputs.pr_number }}",
+              "slang_commit_sha": "${{ steps.pr.outputs.sha }}",
+              "slang_ref": "${{ steps.pr.outputs.sha }}"
+            }

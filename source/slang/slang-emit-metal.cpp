@@ -1431,7 +1431,7 @@ bool MetalSourceEmitter::_emitUserSemantic(
     {
         m_writer->emit(" [[user(");
         m_writer->emit(String(semanticName).toUpper());
-        if (semanticIndex != 0)
+        if (semanticIndex > 0)
         {
             m_writer->emit("_");
             m_writer->emit(semanticIndex);

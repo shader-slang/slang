@@ -16,7 +16,7 @@
 // TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTEST_HALF=1 -xslang -DTEST_SIZE=64
 
 #pragma warning(disable: 41017)
-import neural;
+import slang.neural;
 import common;
 
 // TEST_INPUT: ubuffer(data=[0], stride=4, count=1):out, name=resultBuffer
