@@ -198,6 +198,85 @@ public struct PointerAddress<T> : IPointerLikeAddress<T>
     }
 }
 
+/**
+TensorView address type with pointer-like semantics for slangtorch integration.
+Wraps a TensorView by extracting its data pointer into a PointerAddress, delegating
+all IPointerLikeAddress operations to it.
+@param T The element type.
+@remarks CUDA-only, since TensorView is a CUDA-specific type.
+@category neural
+*/
+
+public struct TorchTensorViewAddress<T> : IPointerLikeAddress<T>
+    where T : __BuiltinFloatingPointType
+    where T.Differential == T
+{
+    public typealias Differential = TorchTensorViewAddress<T.Differential>;
+
+    internal PointerAddress<T> inner;
+
+    [require(cuda)]
+    public __init(TensorView<T> tensor, uint baseAddress = 0U)
+    {
+        this.inner = PointerAddress<T>(tensor.data_ptr() + baseAddress);
+    }
+
+    [require(cuda)]
+    public __subscript(uint index)->T
+    {
+        [nonmutating] get { return inner[index]; }
+        [mutating] set { inner[index] = newValue; }
+    }
+
+    [require(cuda)]
+    public This getOffset(int elements)
+    {
+        This result;
+        result.inner = inner.getOffset(elements);
+        return result;
+    }
+
+    [ForceInline]
+    [require(cuda_glsl_hlsl_metal_spirv, sm_6_6)]
+    public void atomicAdd(uint index, T value)
+    {
+        __target_switch
+        {
+        case cuda:
+            inner.atomicAdd(index, value);
+        default:
+            static_assert(false, "atomicAdd is not supported on this target");
+        }
+    }
+
+    [ForceInline]
+    public void atomicAdd(uint index, vector<T, 2> value) {
+        __target_switch
+        {
+        case cuda:
+            inner.atomicAdd(index, value);
+        default:
+            static_assert(false, "atomicAdd is not supported on this target");
+        }
+    }
+
+    [ForceInline]
+    internal uint4 readUint4<DstType, bool IsAligned, uint ActualBoundary>(int offsetIndex)
+        where DstType : __BuiltinFloatingPointType
+        where DstType.Differential == DstType
+    {
+        return inner.readUint4<DstType, IsAligned, ActualBoundary>(offsetIndex);
+    }
+
+    [ForceInline]
+    internal void writeUint4Atomic<SrcType, bool IsAligned, uint ActualBoundary>(int offsetIndex, uint4 value)
+        where SrcType : __BuiltinFloatingPointType
+        where SrcType.Differential == SrcType
+    {
+        inner.writeUint4Atomic<SrcType, IsAligned, ActualBoundary>(offsetIndex, value);
+    }
+}
+
 // We currently don't support UserPointer as an `IDifferentiablePtrType`, the issue is tracked in
 // https://github.com/shader-slang/slang/issues/8834.
 // So we define an internal extension for now, once we can resolve the issue, we can make it public.

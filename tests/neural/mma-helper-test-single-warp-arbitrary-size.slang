@@ -10,7 +10,7 @@
 
 #pragma warning(disable: 41017)
 
-import neural;
+import slang.neural;
 import common;
 
 #if TEST_HALF
