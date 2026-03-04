@@ -1,4 +1,4 @@
-name: Populate Fork PR Cache
+name: Populate sccache
 
 on:
   schedule:
@@ -6,7 +6,7 @@ on:
   workflow_dispatch: # Allow manual trigger
 
 concurrency:
-  group: populate-fork-cache
+  group: populate-sccache
   cancel-in-progress: false
 
 permissions:
@@ -33,7 +33,7 @@ jobs:
           echo "last-commit=$CURRENT_COMMIT" >> $GITHUB_OUTPUT
 
           # Check if we already have a cache marker for this commit
-          MARKER_KEY="fork-cache-marker-${CURRENT_COMMIT}"
+          MARKER_KEY="sccache-marker-${CURRENT_COMMIT}"
 
           echo "Checking for existing cache marker: ${MARKER_KEY}"
 
@@ -366,10 +366,10 @@ jobs:
       - name: Create cache marker file
         run: |
           mkdir -p .cache-markers
-          echo "fork-cache-marker for commit ${{ needs.check-changes.outputs.last-commit }}" > .cache-markers/fork-cache-marker.txt
+          echo "sccache-marker for commit ${{ needs.check-changes.outputs.last-commit }}" > .cache-markers/sccache-marker.txt
 
       - name: Save cache marker
         uses: actions/cache/save@v4
         with:
-          path: .cache-markers/fork-cache-marker.txt
-          key: fork-cache-marker-${{ needs.check-changes.outputs.last-commit }}
+          path: .cache-markers/sccache-marker.txt
+          key: sccache-marker-${{ needs.check-changes.outputs.last-commit }}
