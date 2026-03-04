@@ -71,8 +71,10 @@ SlangResult CommandLineDownstreamCompiler::compile(
         // Not possible to compile with this version of the interface.
         // TODO: Fix other `IDownstreamCompiler::compile` implementations not always writing to
         // `outArtifact` when returning early.
-        const auto targetDesc = ArtifactDescUtil::makeDescForCompileTarget(SLANG_TARGET_UNKNOWN);
+        const auto targetDesc = ArtifactDescUtil::makeDescForCompileTarget(inOptions.targetType);
         auto artifact = ArtifactUtil::createArtifact(targetDesc);
+        auto diagnostics = ArtifactDiagnostics::create();
+        ArtifactUtil::addAssociated(artifact, diagnostics);
         *outArtifact = artifact.detach();
         return SLANG_E_NOT_IMPLEMENTED;
     }
