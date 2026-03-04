@@ -181,7 +181,7 @@ struct GlobalVarTranslationContext
                 {
                     varLayoutBuilder.setSystemValueSemantic(
                         semanticDecor->getSemanticName(),
-                        semanticDecor->getSemanticIndex());
+                        semanticDecor->getEffectiveSemanticIndex());
                 }
                 else
                 {
@@ -317,7 +317,7 @@ struct GlobalVarTranslationContext
                     {
                         varLayoutBuilder.setSystemValueSemantic(
                             semanticDecor->getSemanticName(),
-                            semanticDecor->getSemanticIndex());
+                            semanticDecor->getEffectiveSemanticIndex());
                     }
                     else
                     {
