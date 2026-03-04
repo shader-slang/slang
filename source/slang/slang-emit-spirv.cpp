@@ -2455,7 +2455,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     else if (inst->getOp() == kIROp_UnsizedArrayType)
                     {
                         IRSizeAndAlignment sizeAndAlignment;
-                        getNaturalSizeAndAlignment(m_targetRequest, elementType, &sizeAndAlignment);
+                        SLANG_ASSERT(SLANG_SUCCEEDED(
+                            getNaturalSizeAndAlignment(m_targetRequest, elementType, &sizeAndAlignment)));
                         stride = (int)sizeAndAlignment.getStride();
                     }
 
@@ -4249,7 +4250,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             return nullptr;
 
         IRSizeAndAlignment sizeAlignment;
-        getNaturalSizeAndAlignment(this->m_targetRequest, varType, &sizeAlignment);
+        SLANG_ASSERT(SLANG_SUCCEEDED(
+            getNaturalSizeAndAlignment(this->m_targetRequest, varType, &sizeAlignment)));
         if (sizeAlignment.size != IRSizeAndAlignment::kIndeterminateSize)
         {
             requireVariableBufferCapabilityIfNeeded(varType);
@@ -6334,7 +6336,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             }
             else
             {
-                getOffset(m_targetRequest, IRTypeLayoutRules::get(layoutRuleName), field, &offset);
+                SLANG_ASSERT(SLANG_SUCCEEDED(
+                    getOffset(m_targetRequest, IRTypeLayoutRules::get(layoutRuleName), field, &offset)));
             }
             emitOpMemberDecorateOffset(
                 getSection(SpvLogicalSectionID::Annotations),
@@ -7921,10 +7924,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 if (alignedAttr)
                     sizeAndAlignment.alignment = (int)getIntVal(alignedAttr->getAlignment());
                 else
-                    getNaturalSizeAndAlignment(
+                    SLANG_ASSERT(SLANG_SUCCEEDED(getNaturalSizeAndAlignment(
                         m_targetRequest,
                         ptrType->getValueType(),
-                        &sizeAndAlignment);
+                        &sizeAndAlignment)));
 
                 alignmentOut = sizeAndAlignment.alignment;
                 if (alignmentOut != -1)
@@ -8038,7 +8041,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         if (addressSpaceToStorageClass(addrSpace) == SpvStorageClassPhysicalStorageBuffer)
         {
             IRSizeAndAlignment sizeAndAlignment;
-            getNaturalSizeAndAlignment(m_targetRequest, sourceElementType, &sizeAndAlignment);
+            SLANG_ASSERT(SLANG_SUCCEEDED(
+                getNaturalSizeAndAlignment(m_targetRequest, sourceElementType, &sizeAndAlignment)));
             alignment = sizeAndAlignment.alignment;
             if (alignment != -1)
                 memoryAccessMask |= SpvMemoryAccessAlignedMask;
@@ -9631,17 +9635,20 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     (String("unnamed_type_") + String(uid)).getUnownedSlice());
             }
             IRSizeAndAlignment structSizeAlignment;
-            getNaturalSizeAndAlignment(m_targetRequest, type, &structSizeAlignment);
+            SLANG_ASSERT(SLANG_SUCCEEDED(
+                getNaturalSizeAndAlignment(m_targetRequest, type, &structSizeAlignment)));
 
             List<SpvInst*> members;
             for (auto field : structType->getFields())
             {
                 IRIntegerValue offset = 0;
                 IRSizeAndAlignment sizeAlignment;
-                getNaturalOffset(m_targetRequest, field, &offset);
+                SLANG_ASSERT(SLANG_SUCCEEDED(
+                    getNaturalOffset(m_targetRequest, field, &offset)));
 
                 auto fieldType = field->getFieldType();
-                getNaturalSizeAndAlignment(m_targetRequest, fieldType, &sizeAlignment);
+                SLANG_ASSERT(SLANG_SUCCEEDED(
+                    getNaturalSizeAndAlignment(m_targetRequest, fieldType, &sizeAlignment)));
 
                 SpvInst* forwardRef = nullptr;
                 SpvInst* spvFieldType = nullptr;
@@ -9817,7 +9824,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             }
 
             IRSizeAndAlignment sizeAlignment;
-            getNaturalSizeAndAlignment(m_targetRequest, type, &sizeAlignment);
+            SLANG_ASSERT(SLANG_SUCCEEDED(
+                getNaturalSizeAndAlignment(m_targetRequest, type, &sizeAlignment)));
             int spvEncoding = 0;
             StringBuilder sbName;
             getTypeNameHint(sbName, type);
@@ -9957,7 +9965,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     (String("unnamed_forward_type_") + String(uid)).getUnownedSlice());
             }
             IRSizeAndAlignment structSizeAlignment;
-            getNaturalSizeAndAlignment(m_targetRequest, type, &structSizeAlignment);
+            SLANG_ASSERT(SLANG_SUCCEEDED(
+                getNaturalSizeAndAlignment(m_targetRequest, type, &structSizeAlignment)));
 
             ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_relaxed_extended_instruction"));
             return emitOpDebugForwardRefsComposite(

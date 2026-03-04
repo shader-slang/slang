@@ -383,7 +383,8 @@ IRIntegerValue get16ByteAlignedVectorElementCount(
     IRIntegerValue minCount)
 {
     IRSizeAndAlignment sizeAlignment;
-    getNaturalSizeAndAlignment(target->getTargetReq(), elementType, &sizeAlignment);
+    SLANG_ASSERT(
+        SLANG_SUCCEEDED(getNaturalSizeAndAlignment(target->getTargetReq(), elementType, &sizeAlignment)));
     if (sizeAlignment.size)
         return align(sizeAlignment.size * minCount, 16) / sizeAlignment.size;
     return 4;
