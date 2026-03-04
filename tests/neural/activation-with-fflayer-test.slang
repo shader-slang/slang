@@ -5,7 +5,7 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-mtl -compute -shaderobj -output-using-type -xslang -experimental-feature
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -xslang -experimental-feature
 
-import neural;
+import slang.neural;
 
 // Simple weights for testing: identity-like transform
 // For 2x2 -> 2: W = [[1,0],[0,1]], b = [0,0]
