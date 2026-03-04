@@ -107,7 +107,6 @@ VISIBILITY_LEVEL struct TiledMMAHelper<T, int InputSize, int OutputSize, int Sub
         static const uint TotalUint4 = TileSizeInUint4 * NTileRows;
         static const uint NumLoadsPerThread = TotalUint4 / N;
 
-        [ForceUnroll]
         for (uint i = 0; i < NumLoadsPerThread; i++)
         {
             uint idx = laneId + i * N;
@@ -173,7 +172,6 @@ VISIBILITY_LEVEL struct TiledMMAHelper<T, int InputSize, int OutputSize, int Sub
         static const int TileSizeInUint4C = TileSizeInElements / CMShape.ElementCountPerVectorMatC;
         static const uint NumStoresPerThread = TileSizeInUint4C / N;
 
-        [ForceUnroll]
         for (uint i = 0; i < NumStoresPerThread; i++)
         {
             uint idx = laneId + i * N;
@@ -217,7 +215,6 @@ VISIBILITY_LEVEL struct TiledMMAHelper<T, int InputSize, int OutputSize, int Sub
         const uint subgroupIndex = getWaveId();
 
         MatC matC[TileInfoT.NCoopMat];
-        [ForceUnroll]
         for (int i = 0; i < TileInfoT.NCoopMat; i++)
         {
             matC[i].fill(T(0.0f));
@@ -226,7 +223,6 @@ VISIBILITY_LEVEL struct TiledMMAHelper<T, int InputSize, int OutputSize, int Sub
         OutArrayType outputVector;
         if (Bias)
         {
-            [ForceUnroll]
             for (int i = 0; i < M; i++)
             {
                 U bias = biasAddress.value[i];
@@ -248,7 +244,6 @@ VISIBILITY_LEVEL struct TiledMMAHelper<T, int InputSize, int OutputSize, int Sub
                 // Only a warp-level sync is needed (for shared memory B visibility).
 
                 // Phase 1: Load weight tiles into CoopMat A.
-                [ForceUnroll]
                 for (uint i = 0; i < TileInfoT.NCoopMatRow; i++)
                 {
                     matA[i] = loadTileDirect<U, Address>(i, tileCol, weightAddress);
@@ -275,7 +270,6 @@ VISIBILITY_LEVEL struct TiledMMAHelper<T, int InputSize, int OutputSize, int Sub
                 BaseMMA.loadVectorToShB(sharedMemoryBOffset, tileCol, subgroupIndex, inputVector);
                 GroupMemoryBarrierWithGroupSync();
 
-                [ForceUnroll]
                 for (uint i = 0; i < TileInfoT.NCoopMatRow; i++)
                 {
                     uint ptrTileOffset = sharedMemoryAOffset + i * TileSizeInUint4;
@@ -285,7 +279,6 @@ VISIBILITY_LEVEL struct TiledMMAHelper<T, int InputSize, int OutputSize, int Sub
 
             // Phase 3: MMA.
             uint ptrPerWarpBOffset = sharedMemoryBOffset + subgroupIndex * ShMemInfo.SharedMemSizeInVectorMatB;
-            [ForceUnroll]
             for (uint j = 0; j < TileInfoT.NCoopMatColumn; j++)
             {
                 uint ptrMatBOffset = ptrPerWarpBOffset + j * CMShape.CoopMatBSizeInVector;
@@ -304,10 +297,8 @@ VISIBILITY_LEVEL struct TiledMMAHelper<T, int InputSize, int OutputSize, int Sub
         // Phase 4: Write result to output vector via shared memory C (same as MMAHelper.mma).
         uint ptrPerWarpCOffset = ptrCOffset + subgroupIndex * ShMemInfo.SharedMemSizeInVectorMatC;
 
-        [ForceUnroll]
         for (int i = 0; i < TileInfoT.NCoopMatRow; i++)
         {
-            [ForceUnroll]
             for (int j = 0; j < TileInfoT.NCoopMatColumn; j++)
             {
                 int index = i * TileInfoT.NCoopMatColumn + j;
