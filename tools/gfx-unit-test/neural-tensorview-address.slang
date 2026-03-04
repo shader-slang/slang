@@ -1,4 +1,4 @@
-import neural;
+import slang.neural;
 
 typealias Address = TorchTensorViewAddress<float>;
 typealias Vec4 = InlineVector<float, 4>;
