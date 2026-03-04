@@ -3132,8 +3132,9 @@ static DeclBase* ParseDeclaratorDecl(
         {
             StringBuilder sb;
             printDiagnosticArg(sb, typeSpec.decl->astNodeType);
-            parser->sink->diagnose(
-                Diagnostics::DeclNotAllowed{.declType = sb.produceString(), .location = typeSpec.decl->loc});
+            parser->sink->diagnose(Diagnostics::DeclNotAllowed{
+                .declType = sb.produceString(),
+                .location = typeSpec.decl->loc});
         }
 
         return parseTraditionalFuncDecl(parser, declaratorInfo);
@@ -6840,8 +6841,9 @@ static Expr* _parseAtomicTypeExpr(Parser* parser, bool allowDecl)
         {
             StringBuilder sb;
             printDiagnosticArg(sb, typeSpec.decl->astNodeType);
-            parser->sink->diagnose(
-                Diagnostics::DeclNotAllowed{.declType = sb.produceString(), .location = typeSpec.decl->loc});
+            parser->sink->diagnose(Diagnostics::DeclNotAllowed{
+                .declType = sb.produceString(),
+                .location = typeSpec.decl->loc});
         }
 
         AddMember(parser->currentScope, typeSpec.decl);
