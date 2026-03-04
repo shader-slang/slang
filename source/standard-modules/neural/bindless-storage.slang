@@ -267,9 +267,6 @@ public struct TorchTensorViewAddress<T> : IPointerLikeAddress<T>
     [ForceInline]
     internal uint getBaseIndex() { return inner.getBaseIndex(); }
 
-    [ForceInline]
-    internal T* getPointer(uint offset) { return inner.getPointer(offset); }
-
     [require(cuda)]
     public __init(TensorView<T> tensor, uint baseAddress = 0U)
     {
@@ -297,6 +294,12 @@ public struct TorchTensorViewAddress<T> : IPointerLikeAddress<T>
         return DifferentialPtrPair<This>(
             self.p.getOffset(elements),
             self.d.getOffset(elements));
+    }
+
+    [ForceInline]
+    internal T *getPointer(uint offset)
+    {
+        return inner.getPointer(offset);
     }
 
     [ForceInline]
