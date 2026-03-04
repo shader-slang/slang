@@ -2195,18 +2195,18 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         if (auto layout = valueType->findDecoration<IRSizeAndAlignmentDecoration>())
                         {
                             auto rule = IRTypeLayoutRules::get(layout->getLayoutName());
-                            getSizeAndAlignment(
+                            SLANG_ASSERT(SLANG_SUCCEEDED(getSizeAndAlignment(
                                 m_targetRequest,
                                 rule,
                                 valueType,
-                                &sizeAndAlignment);
+                                &sizeAndAlignment)));
                         }
                         else
                         {
-                            getNaturalSizeAndAlignment(
+                            SLANG_ASSERT(SLANG_SUCCEEDED(getNaturalSizeAndAlignment(
                                 m_targetRequest,
                                 valueType,
-                                &sizeAndAlignment);
+                                &sizeAndAlignment)));
                         }
                         uint64_t valueSize = sizeAndAlignment.size;
 
@@ -6359,11 +6359,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 IRIntegerValue matrixStride = 0;
                 auto rule = IRTypeLayoutRules::get(layoutRuleName);
                 IRSizeAndAlignment elementSizeAlignment;
-                getSizeAndAlignment(
+                SLANG_ASSERT(SLANG_SUCCEEDED(getSizeAndAlignment(
                     m_targetRequest,
                     rule,
                     matrixType->getElementType(),
-                    &elementSizeAlignment);
+                    &elementSizeAlignment)));
                 IRIntegerValue matrixMinorVectorCount = 0;
                 // Reminder: the meaning of row/column major layout
                 // in our semantics is the *opposite* of what GLSL/SPIRV

@@ -227,11 +227,11 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
     case kIROp_UnsizedArrayType:
         {
             auto unsizedArrayType = cast<IRUnsizedArrayType>(type);
-            getSizeAndAlignment(
+            SLANG_RETURN_ON_FAIL(getSizeAndAlignment(
                 targetReq,
                 this,
                 unsizedArrayType->getElementType(),
-                outSizeAndAlignment);
+                outSizeAndAlignment));
             outSizeAndAlignment->size = IRSizeAndAlignment::kIndeterminateSize;
             return SLANG_OK;
         }

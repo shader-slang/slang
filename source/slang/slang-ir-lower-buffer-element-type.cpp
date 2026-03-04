@@ -693,11 +693,11 @@ struct LoweredElementTypeContext
                 auto structKey = builder.createStructKey();
                 builder.addNameHintDecoration(structKey, UnownedStringSlice("data"));
                 IRSizeAndAlignment elementSizeAlignment;
-                getSizeAndAlignment(
+                SLANG_ASSERT(SLANG_SUCCEEDED(getSizeAndAlignment(
                     target->getTargetReq(),
                     config.getLayoutRule(),
                     loweredInnerTypeInfo.loweredType,
-                    &elementSizeAlignment);
+                    &elementSizeAlignment)));
                 elementSizeAlignment =
                     config.getLayoutRule()->alignCompositeElement(elementSizeAlignment);
                 auto innerArrayType = builder.getArrayType(
@@ -718,11 +718,11 @@ struct LoweredElementTypeContext
             else
             {
                 IRSizeAndAlignment elementSizeAlignment;
-                getSizeAndAlignment(
+                SLANG_ASSERT(SLANG_SUCCEEDED(getSizeAndAlignment(
                     target->getTargetReq(),
                     config.getLayoutRule(),
                     loweredInnerTypeInfo.loweredType,
-                    &elementSizeAlignment);
+                    &elementSizeAlignment)));
                 elementSizeAlignment =
                     config.getLayoutRule()->alignCompositeElement(elementSizeAlignment);
                 auto innerArrayType = builder.getArrayTypeBase(
@@ -901,11 +901,11 @@ struct LoweredElementTypeContext
             return info;
         info = getLoweredTypeInfoImpl(type, config);
         IRSizeAndAlignment sizeAlignment;
-        getSizeAndAlignment(
+        SLANG_ASSERT(SLANG_SUCCEEDED(getSizeAndAlignment(
             target->getTargetReq(),
             config.getLayoutRule(),
             info.loweredType,
-            &sizeAlignment);
+            &sizeAlignment)));
         loweredTypeInfo.set(type, info);
         mapLoweredTypeToInfo.set(info.loweredType, info);
         conversionMethodMap[{info.originalType, info.loweredType}] = info.convertLoweredToOriginal;
@@ -1006,17 +1006,17 @@ struct LoweredElementTypeContext
             auto loweredInnerType = getLoweredTypeInfo(unsizedArrayType->getElementType(), config);
 
             IRSizeAndAlignment arrayElementSizeAlignment;
-            getSizeAndAlignment(
+            SLANG_ASSERT(SLANG_SUCCEEDED(getSizeAndAlignment(
                 target->getTargetReq(),
                 config.getLayoutRule(),
                 loweredInnerType.loweredType,
-                &arrayElementSizeAlignment);
+                &arrayElementSizeAlignment)));
             IRSizeAndAlignment baseSizeAlignment;
-            getSizeAndAlignment(
+            SLANG_ASSERT(SLANG_SUCCEEDED(getSizeAndAlignment(
                 target->getTargetReq(),
                 config.getLayoutRule(),
                 tryGetPointedToOrBufferElementType(&builder, fieldAddr->getBase()->getDataType()),
-                &baseSizeAlignment);
+                &baseSizeAlignment)));
 
             // Convert pointer to uint64 and adjust offset.
             IRIntegerValue offset = baseSizeAlignment.size;
@@ -1681,11 +1681,11 @@ struct LoweredElementTypeContext
                 // Create size and alignment decoration for potential use
                 // in`StructuredBufferGetDimensions`.
                 IRSizeAndAlignment sizeAlignment;
-                getSizeAndAlignment(
+                SLANG_ASSERT(SLANG_SUCCEEDED(getSizeAndAlignment(
                     target->getTargetReq(),
                     config.getLayoutRule(),
                     elementType,
-                    &sizeAlignment);
+                    &sizeAlignment)));
                 SLANG_UNUSED(sizeAlignment);
             }
             else if (auto constBuffer = as<IRUniformParameterGroupType>(globalInst))
@@ -2695,11 +2695,11 @@ struct DefaultBufferElementTypeLoweringPolicy : BufferElementTypeLoweringPolicy
 
             auto vectorType = builder.getVectorType(matrixType->getElementType(), vectorSize);
             IRSizeAndAlignment elementSizeAlignment;
-            getSizeAndAlignment(
+            SLANG_ASSERT(SLANG_SUCCEEDED(getSizeAndAlignment(
                 target->getTargetReq(),
                 config.getLayoutRule(),
                 vectorType,
-                &elementSizeAlignment);
+                &elementSizeAlignment)));
             elementSizeAlignment =
                 config.getLayoutRule()->alignCompositeElement(elementSizeAlignment);
 
