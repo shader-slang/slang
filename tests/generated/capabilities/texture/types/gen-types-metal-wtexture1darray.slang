@@ -8,9 +8,9 @@
 // - Target version for negative test:     None
 //
 
-//TEST:SIMPLE(filecheck=POSITIVE): -entry fragMain -stage fragment -target metal -profile metallib_2_3
+//TEST:SIMPLE(filecheck=POSITIVE): -restrictive-capability-check -entry fragMain -stage fragment -target metal -profile metallib_2_3
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=POSITIVE_RESULT): -mtl
-//DISABLE_TEST:SIMPLE(filecheck=NEGATIVE): -entry fragMain -stage fragment -target None
+//DISABLE_TEST:SIMPLE(filecheck=NEGATIVE): -restrictive-capability-check -entry fragMain -stage fragment -target None
 
 //TEST_INPUT: ubuffer(data=[0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
@@ -28,7 +28,7 @@ void fragMain()
 // POSITIVE-NOT: {{(error|warning).*}}:
 
 // Expect either a compilation error or warning 41012 for upgraded profile to support functionality
-// NEGATIVE: {{error [[:digit:]]+|warning 41012}}:
+// NEGATIVE: {{error[E[[:digit:]]+]}}:
 
     int ret = 0;
     texHandle.Store(int2(0, 0), float4(0, 0, 0, 0));
