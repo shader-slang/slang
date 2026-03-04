@@ -16,7 +16,7 @@ interface IBeta
 }
 
 // Equality constraint with a conjunction super-type should be an error.
-// CHECK: ([[# @LINE+2]]): error 30404
+// CHECK: error[E30404]
 void f<T>(T val)
     where T == IAlpha & IBeta
 {
