@@ -4,6 +4,7 @@
 #include "slang-ir-dce.h"
 #include "slang-ir-dominators.h"
 #include "slang-ir-insts.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -135,6 +136,9 @@ IROp getTypeStyle(IROp op)
     case kIROp_HalfType:
     case kIROp_FloatType:
     case kIROp_DoubleType:
+    case kIROp_FloatE4M3Type:
+    case kIROp_FloatE5M2Type:
+    case kIROp_BFloat16Type:
         {
             // All float like
             return kIROp_FloatType;
@@ -183,8 +187,29 @@ IRInst* specializeWithGeneric(
     {
         genArgs.add(param);
     }
+
+    // Default to type kind for now.
+    IRType* typeForSpecialization = builder.getTypeKind();
+
+    auto dataType = genericToSpecialize->getDataType();
+    if (dataType)
+    {
+        if (dataType->getOp() == kIROp_TypeKind || dataType->getOp() == kIROp_GenericKind)
+        {
+            typeForSpecialization = (genericToSpecialize)->getDataType();
+        }
+        else if (dataType->getOp() == kIROp_Generic)
+        {
+            typeForSpecialization = (IRType*)builder.emitSpecializeInst(
+                builder.getTypeKind(),
+                (genericToSpecialize)->getDataType(),
+                genArgs.getCount(),
+                genArgs.getBuffer());
+        }
+    }
+
     return builder.emitSpecializeInst(
-        builder.getTypeKind(),
+        typeForSpecialization,
         genericToSpecialize,
         (UInt)genArgs.getCount(),
         genArgs.getBuffer());
@@ -523,10 +548,23 @@ void getTypeNameHint(StringBuilder& sb, IRInst* type)
         break;
     case kIROp_SubpassInputType:
         {
-            auto textureType = as<IRSubpassInputType>(type);
+            auto subpassInputType = as<IRSubpassInputType>(type);
             sb << "SubpassInput";
-            if (textureType->isMultisample())
-                sb << "MS";
+            // Handle isMultisample individually - if constant, use pretty name; if generic, include
+            // it
+            auto isMS = subpassInputType->getIsMultisampleInst();
+            if (auto isMSLit = as<IRIntLit>(isMS))
+            {
+                if (isMSLit->getValue() != 0)
+                    sb << "MS";
+            }
+            else
+            {
+                // Generic parameter - include in output for uniqueness
+                sb << "<";
+                getTypeNameHint(sb, isMS);
+                sb << ">";
+            }
             break;
         }
     case kIROp_TextureType:
@@ -553,59 +591,103 @@ void getTypeNameHint(StringBuilder& sb, IRInst* type)
             case SLANG_RESOURCE_ACCESS_READ:
                 break;
             }
-            if (textureType->isCombined())
+
+            auto isCombinedInst = textureType->getIsCombinedInst();
+            auto isCombinedLit = as<IRIntLit>(isCombinedInst);
+            if (isCombinedLit)
             {
-                switch (textureType->GetBaseShape())
+                bool isCombined = (isCombinedLit->getValue() != 0);
+                if (isCombined)
                 {
-                case SLANG_TEXTURE_1D:
-                    sb << "Sampler1D";
-                    break;
-                case SLANG_TEXTURE_2D:
-                    sb << "Sampler2D";
-                    break;
-                case SLANG_TEXTURE_3D:
-                    sb << "Sampler3D";
-                    break;
-                case SLANG_TEXTURE_CUBE:
-                    sb << "SamplerCube";
-                    break;
-                case SLANG_TEXTURE_BUFFER:
-                    sb << "SamplerBuffer";
-                    break;
+                    switch (textureType->GetBaseShape())
+                    {
+                    case SLANG_TEXTURE_1D:
+                        sb << "Sampler1D";
+                        break;
+                    case SLANG_TEXTURE_2D:
+                        sb << "Sampler2D";
+                        break;
+                    case SLANG_TEXTURE_3D:
+                        sb << "Sampler3D";
+                        break;
+                    case SLANG_TEXTURE_CUBE:
+                        sb << "SamplerCube";
+                        break;
+                    case SLANG_TEXTURE_BUFFER:
+                        sb << "SamplerBuffer";
+                        break;
+                    }
+                }
+                else
+                {
+                    switch (textureType->GetBaseShape())
+                    {
+                    case SLANG_TEXTURE_1D:
+                        sb << "Texture1D";
+                        break;
+                    case SLANG_TEXTURE_2D:
+                        sb << "Texture2D";
+                        break;
+                    case SLANG_TEXTURE_3D:
+                        sb << "Texture3D";
+                        break;
+                    case SLANG_TEXTURE_CUBE:
+                        sb << "TextureCube";
+                        break;
+                    case SLANG_TEXTURE_BUFFER:
+                        sb << "Buffer";
+                        break;
+                    }
                 }
             }
-            else
+
+            // Handle each boolean flag individually
+            auto isMultisampleInst = textureType->getIsMultisampleInst();
+            if (auto lit = as<IRIntLit>(isMultisampleInst))
             {
-                switch (textureType->GetBaseShape())
+                if (lit->getValue() != 0)
+                    sb << "MS";
+            }
+
+            auto isArrayInst = textureType->getIsArrayInst();
+            if (auto lit = as<IRIntLit>(isArrayInst))
+            {
+                if (lit->getValue() != 0)
+                    sb << "Array";
+            }
+
+            auto isShadowInst = textureType->getIsShadowInst();
+            if (auto lit = as<IRIntLit>(isShadowInst))
+            {
+                if (lit->getValue() != 0)
+                    sb << "Shadow";
+            }
+
+            // If any parameters are generic (not constants), append them for uniqueness
+            bool hasGenericParams = !as<IRIntLit>(textureType->getAccessInst()) || !isCombinedLit ||
+                                    !as<IRIntLit>(isMultisampleInst) ||
+                                    !as<IRIntLit>(isArrayInst) || !as<IRIntLit>(isShadowInst);
+
+            if (hasGenericParams)
+            {
+                sb << "<";
+                bool first = true;
+                auto appendParam = [&](IRInst* inst)
                 {
-                case SLANG_TEXTURE_1D:
-                    sb << "Texture1D";
-                    break;
-                case SLANG_TEXTURE_2D:
-                    sb << "Texture2D";
-                    break;
-                case SLANG_TEXTURE_3D:
-                    sb << "Texture3D";
-                    break;
-                case SLANG_TEXTURE_CUBE:
-                    sb << "TextureCube";
-                    break;
-                case SLANG_TEXTURE_BUFFER:
-                    sb << "Buffer";
-                    break;
-                }
-            }
-            if (textureType->isMultisample())
-            {
-                sb << "MS";
-            }
-            if (textureType->isArray())
-            {
-                sb << "Array";
-            }
-            if (textureType->isShadow())
-            {
-                sb << "Shadow";
+                    if (!as<IRIntLit>(inst))
+                    {
+                        if (!first)
+                            sb << ",";
+                        getTypeNameHint(sb, inst);
+                        first = false;
+                    }
+                };
+                appendParam(textureType->getAccessInst());
+                appendParam(isCombinedInst);
+                appendParam(isMultisampleInst);
+                appendParam(isArrayInst);
+                appendParam(isShadowInst);
+                sb << ">";
             }
         }
         break;
@@ -750,6 +832,15 @@ void getTypeNameHint(StringBuilder& sb, IRInst* type)
             sb << "ptr_";
             sb << (UInt64)ptrLit->getValue();
         }
+        break;
+    case kIROp_FloatE4M3Type:
+        sb << "FloatE4M3";
+        break;
+    case kIROp_FloatE5M2Type:
+        sb << "FloatE5M2";
+        break;
+    case kIROp_BFloat16Type:
+        sb << "BFloat16";
         break;
     default:
         if (auto decor = type->findDecoration<IRNameHintDecoration>())
@@ -1247,7 +1338,7 @@ IRInst* emitLoopBlocks(
 
 void sortBlocksInFunc(IRGlobalValueWithCode* func)
 {
-    auto order = getReversePostorder(func);
+    auto order = getReverseMirroredPostorder(func);
     for (auto block : order)
         block->insertAtEnd(func);
 }
@@ -2316,7 +2407,8 @@ void verifyComputeDerivativeGroupModifiers(
 
     if (quadAttr && linearAttr)
     {
-        sink->diagnose(errorLoc, Diagnostics::onlyOneOfDerivativeGroupLinearOrQuadCanBeSet);
+        sink->diagnose(
+            Diagnostics::OnlyOneOfDerivativeGroupLinearOrQuadCanBeSet{.location = errorLoc});
     }
 
     IRIntegerValue x = 1;
@@ -2332,14 +2424,14 @@ void verifyComputeDerivativeGroupModifiers(
     if (quadAttr)
     {
         if (x % 2 != 0 || y % 2 != 0)
-            sink->diagnose(errorLoc, Diagnostics::derivativeGroupQuadMustBeMultiple2ForXYThreads);
+            sink->diagnose(
+                Diagnostics::DerivativeGroupQuadMustBeMultiple2ForXyThreads{.location = errorLoc});
     }
     else if (linearAttr)
     {
         if ((x * y * z) % 4 != 0)
-            sink->diagnose(
-                errorLoc,
-                Diagnostics::derivativeGroupLinearMustBeMultiple4ForTotalThreadCount);
+            sink->diagnose(Diagnostics::DerivativeGroupLinearMustBeMultiple4ForTotalThreadCount{
+                .location = errorLoc});
     }
 }
 
@@ -2433,8 +2525,89 @@ IRBlock* getLoopHeaderForConditionBlock(IRBlock* block)
     return nullptr;
 }
 
-void legalizeDefUse(IRGlobalValueWithCode* func)
+// Return true if `inst` is defined at the start of `block`.
+// That is, either `inst` is defined in a block that dominates `block`,
+// or `inst` is defined in a parent of `block`.
+bool isInstAvailableAtBlock(IRDominatorTree& dom, IRInst* inst, IRBlock* block)
 {
+    auto defBlock = as<IRBlock>(inst->getParent());
+    if (!defBlock)
+        return true;
+    if (dom.dominates(defBlock, block))
+        return true;
+    // If inst is a parent of block, it is available.
+    for (IRInst* curr = block; curr; curr = curr->getParent())
+    {
+        if (curr == defBlock)
+            return true;
+    }
+    return false;
+}
+
+
+bool doesTargetSupportUnrestrictedPointers(TargetRequest* req)
+{
+    return isCPUTarget(req) || isCUDATarget(req) || isCPUTargetViaLLVM(req);
+}
+
+bool canInstBeStored(IRInst* inst)
+{
+    // Cannot store insts whose value is a type or a witness table, or a function.
+    // These insts get lowered to target-specific logic, and cannot be
+    // stored into variables or context structs as normal values.
+    //
+    if (as<IRTypeType>(inst->getDataType()) || as<IRWitnessTableType>(inst->getDataType()) ||
+        as<IRTypeKind>(inst->getDataType()) || as<IRFuncType>(inst->getDataType()) ||
+        !inst->getDataType())
+        return false;
+
+    return true;
+}
+
+// Should `inst` be duplicated at use sites instead of being
+// stored to a temporary variable?
+// Some targets such as spirv don't support forming variables of pointer types,
+// so in those cases we will duplicate pointer access chains at use sites.
+//
+bool shouldDuplicateInstAtUseSite(IRInst* inst, TargetProgram* target)
+{
+    switch (inst->getOp())
+    {
+    case kIROp_CastDescriptorHandleToResource:
+    case kIROp_CastDynamicResource:
+        // These casts potentially produces non-storable types, so we will always duplicate them at
+        // use sites.
+        return true;
+    }
+
+    if (!canInstBeStored(inst))
+        return true;
+
+    // For targets that don't support forming variables of pointer types,
+    // we will duplicate pointer access chains at use sites.
+    if (isPtrLikeOrHandleType(inst->getDataType()))
+    {
+        if (doesTargetSupportUnrestrictedPointers(target->getTargetReq()))
+            return false;
+        if (auto ptrType = as<IRPtrTypeBase>(inst->getDataType()))
+        {
+            // A user-pointer type can be stored to a variable.
+            if (ptrType->getAddressSpace() == AddressSpace::UserPointer)
+                return false;
+        }
+        return true;
+    }
+    return false;
+}
+
+void legalizeDefUse(IRGlobalValueWithCode* func, TargetProgram* target)
+{
+    // After multi-level break lowering, we may create situations where an inst
+    // defined in an inner region is referenced from an outer region, which creates
+    // an invalid IR form where the def does not dominate its use. This function
+    // fixes up such situations by creating temporary variables in the common dominator block, and
+    // insert a store to the variable in the inner region, and replacing the uses with loads from
+    // the variable.
     auto dom = computeDominatorTree(func);
 
     // Make a map of loop condition blocks to their loop header.
@@ -2448,122 +2621,162 @@ void legalizeDefUse(IRGlobalValueWithCode* func)
         if (auto header = getLoopHeaderForConditionBlock(block))
             loopHeaderBlockMap.add(block, header);
     }
-
-    for (auto block : func->getBlocks())
+    bool needRerun = true;
+    while (needRerun)
     {
-        for (auto inst : block->getModifiableChildren())
+        needRerun = false;
+        for (auto block : func->getBlocks())
         {
-            // Inspect all uses of `inst` and find the common dominator of all use sites.
-            IRBlock* commonDominator = block;
-            for (auto use = inst->firstUse; use; use = use->nextUse)
+            for (auto inst : block->getModifiableChildren())
             {
-                auto userBlock = as<IRBlock>(use->getUser()->getParent());
-                if (!userBlock)
-                    continue;
-                while (commonDominator && !dom->dominates(commonDominator, userBlock))
+                // Inspect all uses of `inst` and find the common dominator of all use sites.
+                IRBlock* commonDominator = block;
+                for (auto use = inst->firstUse; use; use = use->nextUse)
                 {
-                    commonDominator = dom->getImmediateDominator(commonDominator);
-                }
-            }
-            SLANG_ASSERT(commonDominator);
-
-            // If commonDominator is 'block' and if the inst is not a Var in
-            // a loop condition block, we can skip the legalization.
-            //
-            if (commonDominator == block &&
-                !(as<IRVar>(inst) && loopHeaderBlockMap.containsKey(block)))
-                continue;
-
-            // Normally, if the common dominator is not `block`, we can simply move the
-            // definition to the common dominator. An exception is when the common dominator is
-            // the target block of a loop. Another exception is when a var in the loop condition
-            // block is accessed both inside and outside the loop. It is technically visible,
-            // but effects on the 'var' are not visible outside the loop, so we'll need to hoist
-            // it out of the loop.
-            //
-            // Note that after normalization, loops are in the form of:
-            // ```
-            // loop { if (condition) block; else break; }
-            // ```
-            // If we find ourselves needing to make the inst available right before
-            // the `if`, it means we are seeing uses of the inst outside the loop.
-            // In this case, we should insert a var/move the inst before the loop
-            // instead of before the `if`. This situation can occur in the IR if
-            // the original code is lowered from a `do-while` loop.
-            //
-            bool shouldInitializeVar = false;
-            if (loopHeaderBlockMap.containsKey(commonDominator))
-            {
-                bool shouldMoveToHeader = false;
-
-                // Check that the break-block dominates any of the uses are past the break
-                // block
-                for (auto _use = inst->firstUse; _use; _use = _use->nextUse)
-                {
-                    if (dom->dominates(
-                            as<IRLoop>(loopHeaderBlockMap[commonDominator]->getTerminator())
-                                ->getBreakBlock(),
-                            _use->getUser()->getParent()))
+                    auto userBlock = as<IRBlock>(use->getUser()->getParent());
+                    if (!userBlock)
+                        continue;
+                    while (commonDominator && !dom->dominates(commonDominator, userBlock))
                     {
-                        shouldMoveToHeader = true;
-                        break;
+                        commonDominator = dom->getImmediateDominator(commonDominator);
                     }
                 }
-                if (shouldMoveToHeader)
+                SLANG_ASSERT(commonDominator);
+
+                // If commonDominator is 'block' and if the inst is not a Var in
+                // a loop condition block, we can skip the legalization.
+                //
+                if (commonDominator == block &&
+                    !(as<IRVar>(inst) && loopHeaderBlockMap.containsKey(block)))
+                    continue;
+
+                // Normally, if the common dominator is not `block`, we can simply move the
+                // definition to the common dominator. An exception is when the common dominator is
+                // the target block of a loop. Another exception is when a var in the loop condition
+                // block is accessed both inside and outside the loop. It is technically visible,
+                // but effects on the 'var' are not visible outside the loop, so we'll need to hoist
+                // it out of the loop.
+                //
+                // Note that after normalization, loops are in the form of:
+                // ```
+                // loop { if (condition) block; else break; }
+                // ```
+                // If we find ourselves needing to make the inst available right before
+                // the `if`, it means we are seeing uses of the inst outside the loop.
+                // In this case, we should insert a var/move the inst before the loop
+                // instead of before the `if`. This situation can occur in the IR if
+                // the original code is lowered from a `do-while` loop.
+                //
+                bool shouldInitializeVar = false;
+                if (loopHeaderBlockMap.containsKey(commonDominator))
                 {
-                    commonDominator = loopHeaderBlockMap[commonDominator];
-                    shouldInitializeVar = true;
-                }
-            }
+                    bool shouldMoveToHeader = false;
 
-            // Now we can legalize uses based on the type of `inst`.
-            if (auto var = as<IRVar>(inst))
-            {
-                // If inst is an var, this is easy, we just move it to the
-                // common dominator.
-                if (var->getParent() != commonDominator)
-                    var->insertBefore(commonDominator->getTerminator());
-
-                if (shouldInitializeVar)
-                {
-                    IRBuilder builder(func);
-                    builder.setInsertAfter(var);
-                    builder.emitStore(
-                        var,
-                        builder.emitDefaultConstruct(
-                            as<IRPtrTypeBase>(var->getDataType())->getValueType()));
-                }
-            }
-            else
-            {
-                // For all other insts, we need to create a local var for it,
-                // and replace all uses with a load from the local var.
-                IRBuilder builder(func);
-                builder.setInsertBefore(commonDominator->getTerminator());
-                IRVar* tempVar = builder.emitVar(inst->getFullType());
-                auto defaultVal = builder.emitDefaultConstruct(inst->getFullType());
-                builder.emitStore(tempVar, defaultVal);
-
-                builder.setInsertAfter(inst);
-                builder.emitStore(tempVar, inst);
-
-                traverseUses(
-                    inst,
-                    [&](IRUse* use)
+                    // Check that the break-block dominates any of the uses are past the break
+                    // block
+                    for (auto _use = inst->firstUse; _use; _use = _use->nextUse)
                     {
-                        auto userBlock = as<IRBlock>(use->getUser()->getParent());
-                        if (!userBlock)
-                            return;
-                        // Only fix the use of the current definition of `inst` does not
-                        // dominate it.
-                        if (!dom->dominates(block, userBlock))
+                        if (dom->dominates(
+                                as<IRLoop>(loopHeaderBlockMap[commonDominator]->getTerminator())
+                                    ->getBreakBlock(),
+                                _use->getUser()->getParent()))
                         {
-                            // Replace the use with a load of tempVar.
-                            builder.setInsertBefore(use->getUser());
-                            auto load = builder.emitLoad(tempVar);
-                            builder.replaceOperand(use, load);
+                            shouldMoveToHeader = true;
+                            break;
                         }
-                    });
+                    }
+                    if (shouldMoveToHeader)
+                    {
+                        commonDominator = loopHeaderBlockMap[commonDominator];
+                        shouldInitializeVar = true;
+                    }
+                }
+
+                // Now we can legalize uses based on the type of `inst`.
+                if (auto var = as<IRVar>(inst))
+                {
+                    // If inst is an var, this is easy, we just move it to the
+                    // common dominator.
+                    if (var->getParent() != commonDominator)
+                        var->insertBefore(commonDominator->getTerminator());
+
+                    if (shouldInitializeVar)
+                    {
+                        IRBuilder builder(func);
+                        builder.setInsertAfter(var);
+                        builder.emitStore(
+                            var,
+                            builder.emitDefaultConstruct(
+                                as<IRPtrTypeBase>(var->getDataType())->getValueType()));
+                    }
+                }
+                else if (shouldDuplicateInstAtUseSite(inst, target))
+                {
+                    // If inst must be duplicated at use sites due to target restrictions,
+                    // we will make a copy of it at its use, and rerun the entire processing loop
+                    // to transitively duplicate referenced operands.
+                    traverseUses(
+                        inst,
+                        [&](IRUse* use)
+                        {
+                            auto userBlock = as<IRBlock>(use->getUser()->getParent());
+                            if (!userBlock)
+                                return;
+                            // Only fix the use of the current definition of `inst` does not
+                            // dominate it.
+                            if (!dom->dominates(block, userBlock))
+                            {
+                                IRBuilder builder(func);
+                                builder.setInsertBefore(use->getUser());
+                                IRCloneEnv env;
+                                auto clonedInst = Slang::cloneInst(&env, &builder, inst);
+                                builder.replaceOperand(use, clonedInst);
+
+                                // If any operands of the gep inst is not defined at the use site,
+                                // we need to rerun the legalization and make sure they are
+                                // also made available.
+                                for (UInt i = 0; i < inst->getOperandCount(); i++)
+                                {
+                                    auto operand = inst->getOperand(i);
+                                    if (!isInstAvailableAtBlock(*dom, operand, userBlock))
+                                    {
+                                        needRerun = true;
+                                        break;
+                                    }
+                                }
+                            }
+                        });
+                }
+                else
+                {
+                    // For all other insts, we need to create a local var for it,
+                    // and replace all uses with a load from the local var.
+                    IRBuilder builder(func);
+                    builder.setInsertBefore(commonDominator->getTerminator());
+                    IRVar* tempVar = builder.emitVar(inst->getFullType());
+                    auto defaultVal = builder.emitDefaultConstruct(inst->getFullType());
+                    builder.emitStore(tempVar, defaultVal);
+
+                    traverseUses(
+                        inst,
+                        [&](IRUse* use)
+                        {
+                            auto userBlock = as<IRBlock>(use->getUser()->getParent());
+                            if (!userBlock)
+                                return;
+                            // Only fix the use of the current definition of `inst` does not
+                            // dominate it.
+                            if (!dom->dominates(block, userBlock))
+                            {
+                                // Replace the use with a load of tempVar.
+                                builder.setInsertBefore(use->getUser());
+                                auto load = builder.emitLoad(tempVar);
+                                builder.replaceOperand(use, load);
+                            }
+                        });
+                    builder.setInsertAfter(inst);
+                    builder.emitStore(tempVar, inst);
+                }
             }
         }
     }
@@ -2638,6 +2851,8 @@ bool canOperationBeSpecConst(IROp op, IRType* resultType, IRInst* const* fixedAr
     case kIROp_Geq:
     case kIROp_Less:
     case kIROp_Greater:
+    case kIROp_And:
+    case kIROp_Or:
         {
             IRInst* operand1;
             IRInst* operand2;
@@ -2732,6 +2947,9 @@ bool isSignedType(IRType* type)
     {
     case kIROp_FloatType:
     case kIROp_DoubleType:
+    case kIROp_FloatE4M3Type:
+    case kIROp_FloatE5M2Type:
+    case kIROp_BFloat16Type:
         return true;
     case kIROp_IntType:
     case kIROp_Int16Type:
@@ -2828,6 +3046,55 @@ bool canRelaxInstOrderRule(IRInst* inst, IRInst* useOfInst)
 {
     bool isSameBlock = (inst->getParent() == useOfInst->getParent());
     return isSameBlock && isGenericParameter(useOfInst) && (useOfInst->getDataType() == inst);
+}
+
+IRIntegerValue getInterfaceAnyValueSize(IRInst* type, SourceLoc usageLoc)
+{
+    SLANG_UNUSED(usageLoc);
+
+    if (auto decor = type->findDecoration<IRAnyValueSizeDecoration>())
+    {
+        return decor->getSize();
+    }
+
+    // We could conceivably make it an error to have an interface
+    // without an `[anyValueSize(...)]` attribute, but then we risk
+    // producing error messages even when doing 100% static specialization.
+    //
+    // It is simpler to use a reasonable default size and treat any
+    // type without an explicit attribute as using that size.
+    //
+    return kDefaultAnyValueSize;
+}
+
+IRType* getTextureTypeFromCombinedTextureSampler(IRType* type)
+{
+    IRBuilder builder(type);
+    builder.setInsertBefore(type);
+    auto textureType = as<IRTextureTypeBase>(type);
+    return builder.getTextureType(
+        textureType->getElementType(),
+        textureType->getShapeInst(),
+        textureType->getIsArrayInst(),
+        textureType->getIsMultisampleInst(),
+        textureType->getSampleCountInst(),
+        textureType->getAccessInst(),
+        textureType->getIsShadowInst(),
+        builder.getIntValue(builder.getIntType(), 0),
+        textureType->getFormatInst());
+}
+
+IRType* getSamplerTypeFromCombinedTextureSampler(IRType* type)
+{
+    IRBuilder builder(type);
+    builder.setInsertBefore(type);
+
+    auto textureType = as<IRTextureTypeBase>(type);
+
+    if (getIntVal(textureType->getIsShadowInst()) != 0)
+        return builder.getType(kIROp_SamplerComparisonStateType);
+    else
+        return builder.getType(kIROp_SamplerStateType);
 }
 
 } // namespace Slang

@@ -1138,72 +1138,29 @@ void ShaderInputLayout::parse(RandomGenerator* rand, const char* source)
             }
             break;
         }
-    case ScalarType::UInt32:
-        {
-            auto ptr = (const uint32_t*)data;
-            const size_t size = sizeInBytes / sizeof(ptr[0]);
-            for (size_t i = 0; i < size; ++i)
-            {
-                uint32_t v = ptr[i];
-                writer.print("%u\n", v);
-            }
-            break;
+#define CASE(SLANG_TYPE, C_TYPE, FORMAT)                      \
+    case ScalarType::SLANG_TYPE:                              \
+        {                                                     \
+            auto ptr = (const C_TYPE*)data;                   \
+            const size_t size = sizeInBytes / sizeof(ptr[0]); \
+            for (size_t i = 0; i < size; ++i)                 \
+            {                                                 \
+                C_TYPE v = ptr[i];                            \
+                writer.print("%" FORMAT "\n", v);             \
+            }                                                 \
+            break;                                            \
         }
-    case ScalarType::Int32:
-        {
-            auto ptr = (const int32_t*)data;
-            const size_t size = sizeInBytes / sizeof(ptr[0]);
-            for (size_t i = 0; i < size; ++i)
-            {
-                int32_t v = ptr[i];
-                writer.print("%i\n", v);
-            }
-            break;
-        }
-    case ScalarType::Int64:
-        {
-            auto ptr = (const int64_t*)data;
-            const size_t size = sizeInBytes / sizeof(ptr[0]);
-            for (size_t i = 0; i < size; ++i)
-            {
-                int64_t v = ptr[i];
-                writer.print("%" PRId64 "\n", v);
-            }
-            break;
-        }
-    case ScalarType::UInt64:
-        {
-            auto ptr = (const uint64_t*)data;
-            const size_t size = sizeInBytes / sizeof(ptr[0]);
-            for (size_t i = 0; i < size; ++i)
-            {
-                uint64_t v = ptr[i];
-                writer.print("%" PRIu64 "\n", v);
-            }
-            break;
-        }
-    case ScalarType::Float32:
-        {
-            auto ptr = (const float*)data;
-            const size_t size = sizeInBytes / sizeof(ptr[0]);
-            for (size_t i = 0; i < size; ++i)
-            {
-                const float v = ptr[i];
-                writer.print("%f\n", v);
-            }
-            break;
-        }
-    case ScalarType::Float64:
-        {
-            auto ptr = (const double*)data;
-            const size_t size = sizeInBytes / sizeof(ptr[0]);
-            for (size_t i = 0; i < size; ++i)
-            {
-                const double v = ptr[i];
-                writer.print("%f\n", v);
-            }
-            break;
-        }
+        CASE(UInt8, uint8_t, PRIu8);
+        CASE(Int8, int8_t, PRId8);
+        CASE(UInt16, uint16_t, PRIu16);
+        CASE(Int16, int16_t, PRId16);
+        CASE(UInt32, uint32_t, PRIu32);
+        CASE(Int32, int32_t, PRId32);
+        CASE(UInt64, uint64_t, PRIu64);
+        CASE(Int64, int64_t, PRId64);
+        CASE(Float32, float, "f");
+        CASE(Float64, double, "f");
+#undef CASE
     }
 
     return SLANG_OK;
@@ -1593,5 +1550,76 @@ void generateTextureDataRGB8(TextureData& output, const InputTextureDesc& inputD
             slice++;
         }
     }
+}
+
+void collectUsedAttributes(
+    slang::VariableLayoutReflection* varLayout,
+    HashSet<unsigned>& usedAttributeSet)
+{
+    slang::TypeLayoutReflection* typeLayout = varLayout->getTypeLayout();
+
+    // If it's a struct, recursively check its fields
+    if (typeLayout->getKind() == slang::TypeReflection::Kind::Struct)
+    {
+        unsigned fieldCount = typeLayout->getFieldCount();
+        for (unsigned i = 0; i < fieldCount; i++)
+        {
+            collectUsedAttributes(typeLayout->getFieldByIndex(i), usedAttributeSet);
+        }
+    }
+    else
+    {
+        // Check if this parameter has the semantic "A" used by render-test
+        const char* semanticName = varLayout->getSemanticName();
+        if (semanticName && strcmp(semanticName, "A") == 0)
+        {
+            // Only mark as used if it has a valid binding (meaning it wasn't optimized out)
+            if (varLayout->getBindingIndex() != (unsigned)SLANG_UNKNOWN_SIZE)
+            {
+                unsigned index = varLayout->getSemanticIndex();
+                size_t size = typeLayout->getSize(slang::ParameterCategory::VaryingInput);
+                unsigned slotCount = (unsigned)size;
+                for (unsigned k = 0; (k < slotCount) && (index + k < 7); k++)
+                {
+                    usedAttributeSet.add(index + k);
+                }
+            }
+        }
+    }
+}
+
+List<InputElementDesc> filterInputElements(
+    const InputElementDesc* allInputElements,
+    int allInputElementsCount,
+    slang::ProgramLayout* programLayout)
+{
+    // Identify which attributes are actually used by the vertex shader
+    HashSet<unsigned> usedAttributeSet;
+    for (unsigned i = 0; i < programLayout->getEntryPointCount(); i++)
+    {
+        auto entryPoint = programLayout->getEntryPointByIndex(i);
+        if (entryPoint->getStage() == SLANG_STAGE_VERTEX)
+        {
+            unsigned paramCount = entryPoint->getParameterCount();
+            for (unsigned j = 0; j < paramCount; j++)
+            {
+                collectUsedAttributes(entryPoint->getParameterByIndex(j), usedAttributeSet);
+            }
+        }
+    }
+
+    // Build the filtered list of input elements
+    List<InputElementDesc> inputElements;
+    inputElements.reserve(allInputElementsCount);
+
+    for (int i = 0; i < allInputElementsCount; i++)
+    {
+        if (usedAttributeSet.contains(i))
+        {
+            inputElements.add(allInputElements[i]);
+        }
+    }
+
+    return inputElements;
 }
 } // namespace renderer_test

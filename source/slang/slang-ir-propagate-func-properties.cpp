@@ -82,6 +82,20 @@ public:
         return true;
     }
 
+    bool isDebugInst(IRInst* inst)
+    {
+        switch (inst->getOp())
+        {
+        case kIROp_DebugLine:
+        case kIROp_DebugScope:
+        case kIROp_DebugVar:
+        case kIROp_DebugValue:
+            return true;
+        default:
+            return false;
+        }
+    }
+
     virtual bool propagate(IRBuilder& builder, IRFunc* f) override
     {
         bool hasReadNoneCall = false;
@@ -137,7 +151,6 @@ public:
                         hasReadNoneCall = true;
                         break;
                     }
-                    break;
                 }
             }
             if (hasReadNoneCall)

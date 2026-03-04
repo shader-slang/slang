@@ -1,7 +1,7 @@
 //TEST(compute):COMPARE_COMPUTE:-dx11 -shaderobj
 //TEST(compute):COMPARE_COMPUTE:-vk -shaderobj
-//TEST(compute):COMPARE_COMPUTE:-cpu -xslang -disable-specialization -shaderobj
-//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -xslang -disable-specialization -shaderobj
+//TEST(compute):COMPARE_COMPUTE:-cpu -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj
 
 // Test dynamic dispatch code gen for non-static member functions.
 

@@ -11,14 +11,14 @@ void useStruct(SomeStruct s)
 [numthreads(1,1,1)]
 void computeMain(uint3 threadId : SV_DispatchThreadID)
 {
-    // CHECK: ([[# @LINE+1]]): error {{.*}} cannot default-initialize struct 'SomeStruct' with '{}' because it contains an uninitialized texture field
+    // CHECK: error{{.*}}E39999{{.*}}not enough arguments to call
     SomeStruct s = {};
 
     s.value = 10 + threadId.x;
     useStruct(s);
 }
 
-// CHECK: ([[# @LINE+1]]): note: see definition of struct 'SomeStruct'
+// CHECK: note{{.*}}E39999{{.*}}candidate: SomeStruct.init(int, Texture1D<float>)
 struct SomeStruct
 {
     int value;

@@ -13,6 +13,7 @@
 #include "slang-legalize-types.h"
 #include "slang-mangle.h"
 #include "slang-module-library.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -60,9 +61,13 @@ struct IRSharedSpecContext
 
     // The "global" specialization environment.
     IRSpecEnv globalEnv;
+
+    // Diagnostic sink for reporting errors during linking.
+    DiagnosticSink* sink = nullptr;
 };
 
 void insertGlobalValueSymbol(IRSharedSpecContext* sharedContext, IRInst* gv);
+static bool isFunctionDefinedOrImported(IRInst* inst);
 
 struct WitnessTableCloneInfo : RefObject
 {
@@ -302,6 +307,7 @@ IRInst* IRSpecContext::maybeCloneValue(IRInst* originalValue)
     case kIROp_GlobalGenericParam:
     case kIROp_WitnessTable:
     case kIROp_InterfaceType:
+    case kIROp_EnumType:
     case kIROp_SymbolAlias:
         return cloneGlobalValue(this, originalValue);
 
@@ -803,6 +809,18 @@ IRStructType* cloneStructTypeImpl(
     auto clonedStruct = builder->createStructType();
     cloneSimpleGlobalValueImpl(context, originalStruct, originalValues, clonedStruct);
     return clonedStruct;
+}
+
+IREnumType* cloneEnumTypeImpl(
+    IRSpecContextBase* context,
+    IRBuilder* builder,
+    IREnumType* originalEnum,
+    IROriginalValuesForClone const& originalValues)
+{
+    auto clonedEnum =
+        builder->createEnumType(cloneType(context, (IRType*)originalEnum->getOperand(0)));
+    cloneSimpleGlobalValueImpl(context, originalEnum, originalValues, clonedEnum);
+    return clonedEnum;
 }
 
 
@@ -1388,6 +1406,9 @@ IRInst* cloneInst(
             cast<IRStructType>(originalInst),
             originalValues);
 
+    case kIROp_EnumType:
+        return cloneEnumTypeImpl(context, builder, cast<IREnumType>(originalInst), originalValues);
+
     case kIROp_InterfaceType:
         return cloneInterfaceTypeImpl(
             context,
@@ -1537,6 +1558,27 @@ IRInst* cloneGlobalValueWithLinkage(
         return nullptr;
     }
 
+    // Check that the best value we found is valid: if it's a function,
+    // it should either have a body, be an intrinsic, or be imported.
+    // This catches cases like extension methods declared without a body,
+    // which are not valid (extensions cannot define new requirements).
+    if (!isFunctionDefinedOrImported(bestVal))
+    {
+        if (auto sink = context->shared->sink)
+        {
+            sink->diagnose(Diagnostics::UnresolvedSymbol{
+                .symbol = bestVal,
+                .location = bestVal->sourceLoc,
+            });
+
+            // Emit notes for all available declarations of this symbol
+            for (IRSpecSymbol* ss = sym; ss; ss = ss->nextWithSameName)
+            {
+                sink->diagnose(Diagnostics::SeeDeclarationOfIr{.inst = ss->irGlobalValue});
+            }
+        }
+    }
+
     // Check if we've already cloned this value, for the case where
     // we didn't have an original value (just a name), but we've
     // now found a representative value.
@@ -1681,6 +1723,64 @@ static bool doesFuncHaveDefinition(IRFunc* func)
     return false;
 }
 
+/// Check if a function (or generic containing a function) is properly defined or imported.
+/// Returns true if the value is not a function, or if it has a definition, is an intrinsic,
+/// or is marked as imported.
+static bool isFunctionDefinedOrImported(IRInst* inst)
+{
+    IRFunc* func = nullptr;
+
+    // Handle generic case - unwrap the generic to get the function
+    if (auto generic = as<IRGeneric>(inst))
+    {
+        func = as<IRFunc>(findGenericReturnVal(generic));
+    }
+    else
+    {
+        func = as<IRFunc>(inst);
+    }
+
+    // Not a function, no check needed
+    if (!func)
+        return true;
+
+    // Check if it has a function body
+    if (func->getFirstBlock() != nullptr)
+        return true;
+
+    // Check for decorations that indicate the function has an external/special implementation
+    for (auto decor : func->getDecorations())
+    {
+        switch (decor->getOp())
+        {
+        // Intrinsic decorations
+        case kIROp_IntrinsicOpDecoration:
+        case kIROp_TargetIntrinsicDecoration:
+        case kIROp_SPIRVOpDecoration:
+        // Autodiff decorations - the function's implementation is provided by the derivative
+        // function
+        case kIROp_ForwardDerivativeDecoration:
+        case kIROp_BackwardDerivativeDecoration:
+        case kIROp_UserDefinedBackwardDerivativeDecoration:
+        case kIROp_PrimalSubstituteDecoration:
+        // Explicitly external functions
+        case kIROp_ExternCDecoration:
+        case kIROp_ExternCppDecoration:
+        case kIROp_UserExternDecoration:
+            return true;
+        default:
+            continue;
+        }
+    }
+
+    // Check for import decorations on the original inst (for generics)
+    if (inst->findDecoration<IRImportDecoration>() || inst->findDecoration<IRDllImportDecoration>())
+        return true;
+
+
+    return false;
+}
+
 static bool doesWitnessTableHaveDefinition(IRWitnessTable* wt)
 {
     auto interfaceType = as<IRInterfaceType>(wt->getConformanceType());
@@ -1714,11 +1814,18 @@ static bool doesTargetAllowUnresolvedFuncSymbol(TargetRequest* req)
     case CodeGenTarget::ShaderSharedLibrary:
     case CodeGenTarget::HostHostCallable:
     case CodeGenTarget::CPPSource:
+    case CodeGenTarget::CPPHeader:
     case CodeGenTarget::CUDASource:
+    case CodeGenTarget::CUDAHeader:
     case CodeGenTarget::SPIRV:
         if (req->getOptionSet().getBoolOption(CompilerOptionName::IncompleteLibrary))
             return true;
         return false;
+    case CodeGenTarget::HostLLVMIR:
+    case CodeGenTarget::ShaderLLVMIR:
+    case CodeGenTarget::HostObjectCode:
+    case CodeGenTarget::ShaderObjectCode:
+        return true;
     default:
         return false;
     }
@@ -1735,10 +1842,12 @@ static void diagnoseUnresolvedSymbols(TargetRequest* req, DiagnosticSink* sink, 
                 if (auto constant = as<IRGlobalConstant>(globalSym))
                 {
                     if (constant->getOperandCount() == 0)
-                        sink->diagnose(
-                            globalSym->sourceLoc,
-                            Diagnostics::unresolvedSymbol,
-                            globalSym);
+                    {
+                        sink->diagnose(Diagnostics::UnresolvedSymbol{
+                            .symbol = globalSym,
+                            .location = globalSym->sourceLoc,
+                        });
+                    }
                 }
                 else if (auto genericSym = as<IRGeneric>(globalSym))
                 {
@@ -1749,24 +1858,25 @@ static void diagnoseUnresolvedSymbols(TargetRequest* req, DiagnosticSink* sink, 
                 {
                     if (!doesFuncHaveDefinition(funcSym) &&
                         !doesTargetAllowUnresolvedFuncSymbol(req))
-                        sink->diagnose(
-                            globalSym->sourceLoc,
-                            Diagnostics::unresolvedSymbol,
-                            globalSym);
+                    {
+                        sink->diagnose(Diagnostics::UnresolvedSymbol{
+                            .symbol = globalSym,
+                            .location = globalSym->sourceLoc,
+                        });
+                    }
                 }
                 else if (auto witnessSym = as<IRWitnessTable>(globalSym))
                 {
                     if (!doesWitnessTableHaveDefinition(witnessSym))
                     {
-                        sink->diagnose(
-                            globalSym->sourceLoc,
-                            Diagnostics::unresolvedSymbol,
-                            witnessSym);
+                        sink->diagnose(Diagnostics::UnresolvedSymbol{
+                            .symbol = witnessSym,
+                            .location = globalSym->sourceLoc,
+                        });
                         if (auto concreteType = witnessSym->getConcreteType())
-                            sink->diagnose(
-                                concreteType->sourceLoc,
-                                Diagnostics::seeDeclarationOf,
-                                concreteType);
+                        {
+                            sink->diagnose(Diagnostics::SeeDeclarationOfIr{.inst = concreteType});
+                        }
                     }
                 }
                 break;
@@ -1906,7 +2016,7 @@ void GLSLReplaceAtomicUint(IRSpecContext* context, TargetProgram* targetProgram,
                     // HLSL concept
                     auto layout = inst->findDecoration<IRLayoutDecoration>()->getLayout();
                     auto layoutVal = as<IRVarOffsetAttr>(layout->getOperand(1));
-                    assert(layoutVal != nullptr);
+                    SLANG_ASSERT(layoutVal != nullptr);
                     bindingToInstMapUnsorted
                         .getOrAddValue(uint32_t(layoutVal->getOffset()), List<IRInst*>())
                         .add(inst);
@@ -2047,6 +2157,7 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
 
     auto sharedContext = state->getSharedContext();
     initializeSharedSpecContext(sharedContext, session, nullptr, targetReq);
+    sharedContext->sink = codeGenContext->getSink();
 
     state->irModule = sharedContext->module;
 
@@ -2311,7 +2422,7 @@ struct IRPrelinkContext : IRSpecContext
         if (auto linkage = originalVal->findDecoration<IRLinkageDecoration>())
         {
             RefPtr<IRSpecSymbol> symbol;
-            if (shared->symbols.tryGetValue(linkage->getMangledName()), symbol)
+            if (shared->symbols.tryGetValue(linkage->getMangledName(), symbol))
             {
                 return symbol->irGlobalValue;
             }
@@ -2402,6 +2513,10 @@ struct IRPrelinkContext : IRSpecContext
             break;
         case kIROp_ClassType:
             clonedInst = builderForClone->createClassType();
+            break;
+        case kIROp_EnumType:
+            clonedInst = builderForClone->createEnumType(
+                cloneType(this, (IRType*)cast<IREnumType>(originalVal)->getOperand(0)));
             break;
         default:
             return completeClonedInst(IRSpecContext::maybeCloneValue(originalVal));

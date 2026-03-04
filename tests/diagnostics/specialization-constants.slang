@@ -1,16 +1,29 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -target spirv
+//DIAGNOSTIC_TEST:SIMPLE(diag=diag): -target spirv
 
 struct T { int x; int y; }
 
-// CHECK: ([[# @LINE+1]]): error 31218
 [vk::constant_id(1)]
+/*diag:
+     ^^^^^^^^^^^ specialization constant type error
+     ^^^^^^^^^^^ specialization constant must be a scalar.
+*/
 const T st;
 
 [vk::constant_id(1)]
-// CHECK: ([[# @LINE+1]]): error 31219
 static const int x = 2;
+/*diag:
+                 ^ push/specialization constant storage class error
+                 ^ push or specialization constants cannot be 'static'.
+*/
 
 [push_constant]
 [vk::constant_id(1)]
-// CHECK: ([[# @LINE+1]]): error 31220
+/*diag:
+     ^^^^^^^^^^^ specialization constant type error
+     ^^^^^^^^^^^ specialization constant must be a scalar.
+*/
 const int y;
+/*diag:
+          ^ conflicting constant qualifiers
+          ^ 'y' cannot be a push constant and a specialization constant at the same time
+*/

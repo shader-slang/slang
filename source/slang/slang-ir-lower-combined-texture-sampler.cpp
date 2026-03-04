@@ -59,22 +59,9 @@ struct LowerCombinedSamplerContext
             getIntVal(textureType->getAccessInst()) == kCoreModule_ResourceAccessReadOnly ? false
                                                                                           : true;
 
-        info.textureType = builder.getTextureType(
-            textureType->getElementType(),
-            textureType->getShapeInst(),
-            textureType->getIsArrayInst(),
-            textureType->getIsMultisampleInst(),
-            textureType->getSampleCountInst(),
-            textureType->getAccessInst(),
-            textureType->getIsShadowInst(),
-            builder.getIntValue(builder.getIntType(), 0),
-            textureType->getFormatInst());
+        info.textureType = getTextureTypeFromCombinedTextureSampler(textureType);
         builder.createStructField(structType, info.texture, info.textureType);
-
-        if (getIntVal(textureType->getIsShadowInst()) != 0)
-            info.samplerType = builder.getType(kIROp_SamplerComparisonStateType);
-        else
-            info.samplerType = builder.getType(kIROp_SamplerStateType);
+        info.samplerType = getSamplerTypeFromCombinedTextureSampler(textureType);
         builder.createStructField(structType, info.sampler, info.samplerType);
 
         // Type layout.
@@ -103,7 +90,7 @@ struct LowerCombinedSamplerContext
 
         IRVarLayout::Builder samplerVarLayoutBuilder(&builder, samplerTypeLayout);
         samplerVarLayoutBuilder.findOrAddResourceInfo(samplerResourceKind)->offset =
-            isWGSLTarget ? 1 : 0;
+            isWGSLTarget ? 1u : 0u;
         auto samplerVarLayout = samplerVarLayoutBuilder.build();
 
         IRStructTypeLayout::Builder layoutBuilder(&builder);
@@ -135,9 +122,7 @@ IRTypeLayout* maybeCreateArrayLayout(
         {
             arrayTypeLayoutBuilder.addResourceUsage(
                 sizeAttr->getResourceKind(),
-                sizeAttr->getSize().isFinite() && elementCount != -1
-                    ? sizeAttr->getSize().getFiniteValue() * elementCount
-                    : LayoutSize::infinite());
+                elementCount == -1 ? LayoutSize::infinite() : sizeAttr->getSize() * elementCount);
         }
         return arrayTypeLayoutBuilder.build();
     }
@@ -155,8 +140,8 @@ IRTextureTypeBase* isCombinedTextureSamplerType(IRInst* typeInst)
 }
 
 void lowerCombinedTextureSamplers(
-    CodeGenContext* codeGenContext,
     IRModule* module,
+    CodeGenContext* codeGenContext,
     DiagnosticSink* sink)
 {
     SLANG_UNUSED(sink);

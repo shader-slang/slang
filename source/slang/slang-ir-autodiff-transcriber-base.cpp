@@ -7,6 +7,7 @@
 #include "slang-ir-eliminate-phis.h"
 #include "slang-ir-inst-pass-base.h"
 #include "slang-ir-util.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -36,10 +37,7 @@ void AutoDiffTranscriberBase::mapPrimalInst(IRInst* origInst, IRInst* primalInst
     if (cloneEnv.mapOldValToNew.containsKey(origInst) &&
         cloneEnv.mapOldValToNew[origInst] != primalInst)
     {
-        getSink()->diagnose(
-            origInst->sourceLoc,
-            Diagnostics::internalCompilerError,
-            "inconsistent primal instruction for original");
+        getSink()->diagnose(Diagnostics::InternalCompilerError{.location = origInst->sourceLoc});
     }
     else
     {
@@ -814,10 +812,7 @@ IRInst* AutoDiffTranscriberBase::getDifferentialZeroOfType(IRBuilder* builder, I
             return builder->getIntValue(primalType, 0);
         }
 
-        getSink()->diagnose(
-            primalType->sourceLoc,
-            Diagnostics::internalCompilerError,
-            "could not generate zero value for given type");
+        getSink()->diagnose(Diagnostics::InternalCompilerError{.location = primalType->sourceLoc});
         return nullptr;
     }
 }
@@ -1034,6 +1029,15 @@ InstPair AutoDiffTranscriberBase::transcribeGeneric(IRBuilder* inBuilder, IRGene
     mapDifferentialInst(origGeneric->getFirstBlock(), bodyBlock);
     transcribeBlockImpl(&builder, origGeneric->getFirstBlock(), instsToSkip);
 
+    auto diffReturnVal = getGenericReturnVal(diffGeneric);
+    if (auto func = as<IRFunc>(diffReturnVal))
+    {
+        IRInst* outSpecializedValue = nullptr;
+        auto hoistedFuncType =
+            hoistValueFromGeneric(builder, func->getDataType(), outSpecializedValue);
+        diffGeneric->setFullType((IRType*)hoistedFuncType);
+    }
+
     return InstPair(primalGeneric, diffGeneric);
 }
 
@@ -1154,10 +1158,7 @@ IRInst* AutoDiffTranscriberBase::transcribe(IRBuilder* builder, IRInst* origInst
         }
         return pair.differential;
     }
-    getSink()->diagnose(
-        origInst->sourceLoc,
-        Diagnostics::internalCompilerError,
-        "failed to transcibe instruction");
+    getSink()->diagnose(Diagnostics::InternalCompilerError{.location = origInst->sourceLoc});
     return nullptr;
 }
 
@@ -1216,10 +1217,9 @@ InstPair AutoDiffTranscriberBase::transcribeInst(IRBuilder* builder, IRInst* ori
     if (result.primal == nullptr && result.differential == nullptr)
     {
         // If we reach this statement, the instruction type is likely unhandled.
-        getSink()->diagnose(
-            origInst->sourceLoc,
-            Diagnostics::unimplemented,
-            "this instruction cannot be differentiated");
+        getSink()->diagnose(Diagnostics::Unimplemented{
+            .feature = "this instruction cannot be differentiated",
+            .location = origInst->sourceLoc});
     }
 
     return result;

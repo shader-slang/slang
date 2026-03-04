@@ -348,6 +348,12 @@ public:
 void generateTextureDataRGB8(TextureData& output, const InputTextureDesc& desc);
 void generateTextureData(TextureData& output, const InputTextureDesc& desc);
 
+void collectUsedAttributes(slang::VariableLayoutReflection* varLayout, bool* usedAttributes);
+Slang::List<InputElementDesc> filterInputElements(
+    const InputElementDesc* allInputElements,
+    int allInputElementsCount,
+    slang::ProgramLayout* programLayout);
+
 
 } // namespace renderer_test
 

@@ -9,7 +9,7 @@ class TargetProgram;
 // Repalce all matrix types whose layout is not specified with the default layout
 // of the target request.
 //
-void specializeMatrixLayout(TargetProgram* target, IRModule* module);
+void specializeMatrixLayout(IRModule* module, TargetProgram* target);
 
 } // namespace Slang
 

@@ -25,6 +25,25 @@ struct Impl : IFoo
     }
 }
 
+struct Other
+{
+    int n;
+}
+
+extension Other: IFoo
+{
+    int getVal()
+    {
+        return n;
+    }
+
+    // Override should also work inside an extension
+    override int getGreaterVal<int x>()
+    {
+        return getVal() + x + 2;
+    }
+}
+
 int test<T:IFoo>(T v) { return v.getGreaterVal<1>(); }
 
 //TEST_INPUT: set resultBuffer = out ubuffer(data=[0 0 0 0], stride=4)
@@ -37,4 +56,8 @@ void computeMain()
     int result = test(impl);
     resultBuffer[0] = result;
     // CHECK: 44
+
+    Other other = {32};
+    resultBuffer[1] = test(other);
+    // CHECK-NEXT: 35
 }

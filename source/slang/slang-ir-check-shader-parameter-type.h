@@ -7,7 +7,7 @@ class DiagnosticSink;
 class TargetRequest;
 
 void checkForInvalidShaderParameterType(
-    TargetRequest* targetReq,
     IRModule* module,
+    TargetRequest* targetReq,
     DiagnosticSink* sink);
 } // namespace Slang

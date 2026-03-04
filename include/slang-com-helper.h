@@ -6,7 +6,9 @@
 
 #include "slang.h"
 
+#include <algorithm>
 #include <atomic>
+#include <iterator>
 
 /* !!!!!!!!!!!!!!!!!!!!! Macros to help checking SlangResult !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
 
@@ -98,19 +100,8 @@ typedef SlangUUID Guid;
 
 SLANG_FORCE_INLINE bool operator==(const Slang::Guid& aIn, const Slang::Guid& bIn)
 {
-    using namespace Slang;
-    // Use the largest type the honors the alignment of Guid
-    typedef uint32_t CmpType;
-    union GuidCompare
-    {
-        Guid guid;
-        CmpType data[sizeof(Guid) / sizeof(CmpType)];
-    };
-    // Type pun - so compiler can 'see' the pun and not break aliasing rules
-    const CmpType* a = reinterpret_cast<const GuidCompare&>(aIn).data;
-    const CmpType* b = reinterpret_cast<const GuidCompare&>(bIn).data;
-    // Make the guid comparison a single branch, by not using short circuit
-    return ((a[0] ^ b[0]) | (a[1] ^ b[1]) | (a[2] ^ b[2]) | (a[3] ^ b[3])) == 0;
+    return aIn.data1 == bIn.data1 && aIn.data2 == bIn.data2 && aIn.data3 == bIn.data3 &&
+           std::equal(aIn.data4, aIn.data4 + std::size(aIn.data4), bIn.data4);
 }
 
 SLANG_FORCE_INLINE bool operator!=(const Slang::Guid& a, const Slang::Guid& b)

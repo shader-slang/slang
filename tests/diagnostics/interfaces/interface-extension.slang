@@ -1,10 +1,10 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):-target cpp -stage compute -entry main -disable-specialization
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):-target cpp -stage compute -entry main
 
 interface IFoo{}
 
-
-// CHECK: ([[# @LINE+1]]): error 30852
 extension IFoo
+//CHECK:  ^^^^ cannot extend interface type 'IFoo'
+//CHECK:  ^^^^ cannot extend interface type 'IFoo'. consider using a generic extension: `extension<T:IFoo> T {...}`
 {
     int f() { return 0; }
 }

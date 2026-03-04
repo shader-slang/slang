@@ -13,6 +13,7 @@
 #include "slang-ir-ssa-simplification.h"
 #include "slang-ir-util.h"
 #include "slang-ir-validate.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -317,10 +318,9 @@ InstPair ForwardDiffTranscriber::transcribeBinaryArith(IRBuilder* builder, IRIns
                 }
             }
         default:
-            getSink()->diagnose(
-                origArith->sourceLoc,
-                Diagnostics::unimplemented,
-                "this arithmetic instruction cannot be differentiated");
+            getSink()->diagnose(Diagnostics::Unimplemented{
+                .feature = "this arithmetic instruction cannot be differentiated",
+                .location = origArith->sourceLoc});
         }
     }
 
@@ -691,10 +691,7 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
         // differentiate such calls safely.
         // TODO(sai): Should probably get checked in the front-end.
         //
-        getSink()->diagnose(
-            origCall->sourceLoc,
-            Diagnostics::internalCompilerError,
-            "attempting to differentiate unresolved callee");
+        getSink()->diagnose(Diagnostics::InternalCompilerError{.location = origCall->sourceLoc});
 
         return InstPair(nullptr, nullptr);
     }
@@ -1083,10 +1080,9 @@ InstPair ForwardDiffTranscriber::transcribeControlFlow(IRBuilder* builder, IRIns
         return InstPair(diffBranch, diffBranch);
     }
 
-    getSink()->diagnose(
-        origInst->sourceLoc,
-        Diagnostics::unimplemented,
-        "attempting to differentiate unhandled control flow");
+    getSink()->diagnose(Diagnostics::Unimplemented{
+        .feature = "attempting to differentiate unhandled control flow",
+        .location = origInst->sourceLoc});
 
     return InstPair(nullptr, nullptr);
 }
@@ -1102,10 +1098,9 @@ InstPair ForwardDiffTranscriber::transcribeConst(IRBuilder*, IRInst* origInst)
         return InstPair(origInst, origInst);
     }
 
-    getSink()->diagnose(
-        origInst->sourceLoc,
-        Diagnostics::unimplemented,
-        "attempting to differentiate unhandled const type");
+    getSink()->diagnose(Diagnostics::Unimplemented{
+        .feature = "attempting to differentiate unhandled const type",
+        .location = origInst->sourceLoc});
 
     return InstPair(nullptr, nullptr);
 }
@@ -1194,7 +1189,11 @@ InstPair ForwardDiffTranscriber::transcribeSpecialize(
         // the generic args to specialize the primal function. This is true for all of our core
         // module functions, but we may need to rely on more general substitution logic here.
         auto diffSpecialize = builder->emitSpecializeInst(
-            builder->getTypeKind(),
+            (IRType*)builder->emitSpecializeInst(
+                builder->getTypeKind(),
+                diffBaseSpecialize->getBase()->getDataType(),
+                args.getCount(),
+                args.getBuffer()),
             diffBaseSpecialize->getBase(),
             args.getCount(),
             args.getBuffer());
@@ -1209,7 +1208,11 @@ InstPair ForwardDiffTranscriber::transcribeSpecialize(
         }
         diffBase = findOrTranscribeDiffInst(builder, origSpecialize->getBase());
         auto diffSpecialize = builder->emitSpecializeInst(
-            builder->getTypeKind(),
+            (IRType*)builder->emitSpecializeInst(
+                builder->getTypeKind(),
+                diffBase->getDataType(),
+                args.getCount(),
+                args.getBuffer()),
             diffBase,
             args.getCount(),
             args.getBuffer());

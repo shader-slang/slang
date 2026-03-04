@@ -1,11 +1,11 @@
 #include "slang-ir-any-value-inference.h"
 
 #include "../core/slang-func-ptr.h"
-#include "slang-ir-generics-lowering-context.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -90,7 +90,10 @@ List<IRInterfaceType*> sortTopologically(
     return sortedInterfaceTypes;
 }
 
-void inferAnyValueSizeWhereNecessary(TargetProgram* targetProgram, IRModule* module)
+void inferAnyValueSizeWhereNecessary(
+    IRModule* module,
+    TargetProgram* targetProgram,
+    DiagnosticSink* sink)
 {
     // Go through the global insts and collect all interface types.
     // For each interface type, infer its any-value-size, by looking up
@@ -130,9 +133,10 @@ void inferAnyValueSizeWhereNecessary(TargetProgram* targetProgram, IRModule* mod
             if (interfaceType->findDecoration<IRBuiltinDecoration>())
                 continue;
 
-            // If the interface already has an explicit any-value-size, don't infer anything.
+            /* If the interface already has an explicit any-value-size, don't infer anything.
             if (interfaceType->findDecoration<IRAnyValueSizeDecoration>())
                 continue;
+            */
 
             // Skip interfaces that are not implemented by any type.
             if (!implementedInterfaces.contains(interfaceType))
@@ -189,23 +193,57 @@ void inferAnyValueSizeWhereNecessary(TargetProgram* targetProgram, IRModule* mod
     }
 
     Dictionary<IRInterfaceType*, HashSet<IRInterfaceType*>> interfaceDependencyMap;
+    // Track which implementations have self-referential dependencies on their own interface.
+    Dictionary<IRInterfaceType*, List<IRInst*>> selfReferentialImpls;
+    Dictionary<IRInterfaceType*, List<IRInst*>> nonSelfReferentialImpls;
 
-    // Collect dependencies for each interface.
+    // Collect dependencies for each interface, separating self-referential implementations.
     for (auto interfaceType : interfaceTypes)
     {
         HashSet<IRInterfaceType*> dependencySet;
+        List<IRInst*> selfRefList;
+        List<IRInst*> nonSelfRefList;
+
         for (auto impl : mapInterfaceToImplementations[interfaceType])
         {
             auto dependencies = findDependenciesOfTypeInSet((IRType*)impl, interfaceTypes);
+            bool hasSelfReference = false;
             for (auto dependency : dependencies)
-                dependencySet.add(dependency);
+            {
+                if (dependency == interfaceType)
+                {
+                    hasSelfReference = true;
+                }
+                else
+                {
+                    dependencySet.add(dependency);
+                }
+            }
+
+            if (hasSelfReference)
+                selfRefList.add(impl);
+            else
+                nonSelfRefList.add(impl);
         }
+
         interfaceDependencyMap.add(interfaceType, dependencySet);
+        selfReferentialImpls.add(interfaceType, selfRefList);
+        nonSelfReferentialImpls.add(interfaceType, nonSelfRefList);
+
+        // Check for issue #9835: If ALL implementations are self-referential,
+        // there's no base case and AnyValue size cannot be calculated.
+        if (nonSelfRefList.getCount() == 0 && selfRefList.getCount() > 0)
+        {
+            sink->diagnose(Diagnostics::CyclicInterfaceDependency{
+                .interfaceType = interfaceType,
+            });
+        }
     }
 
     // Sort the interface types in topological order.
     // This is necessary because we need to infer the any-value-size of an interface type
     // before we infer the any-value-size of an interface type that depends on it.
+    // Note: Self-references are excluded from dependencySet so they don't break the sort.
     //
     List<IRInterfaceType*> sortedInterfaceTypes = sortTopologically(
         interfaceTypes,
@@ -213,26 +251,95 @@ void inferAnyValueSizeWhereNecessary(TargetProgram* targetProgram, IRModule* mod
 
     for (auto interfaceType : sortedInterfaceTypes)
     {
+        IRIntegerValue existingMaxSize = (IRIntegerValue)kMaxInt; // Default to max int.
+        if (auto existingAnyValueDecor = interfaceType->findDecoration<IRAnyValueSizeDecoration>())
+        {
+            existingMaxSize = existingAnyValueDecor->getSize();
+        }
+
         IRIntegerValue maxAnyValueSize = -1;
-        for (auto implType : mapInterfaceToImplementations[interfaceType])
+
+        // First pass: Calculate size from non-self-referential implementations.
+        // This establishes the base AnyValue size for the interface.
+        for (auto implType : nonSelfReferentialImpls[interfaceType])
         {
             IRSizeAndAlignment sizeAndAlignment;
             getNaturalSizeAndAlignment(
-                targetProgram->getOptionSet(),
+                targetProgram->getTargetReq(),
                 (IRType*)implType,
                 &sizeAndAlignment);
 
             maxAnyValueSize = Math::Max(maxAnyValueSize, sizeAndAlignment.size);
+
+            if (existingMaxSize < sizeAndAlignment.size)
+            {
+                sink->diagnose(Diagnostics::TypeDoesNotFitAnyValueSize{
+                    .type = implType,
+                    .location = implType->sourceLoc,
+                });
+                sink->diagnose(Diagnostics::TypeAndLimit{
+                    .type = implType,
+                    .size = sizeAndAlignment.size,
+                    .limit = existingMaxSize,
+                    .location = implType->sourceLoc,
+                });
+            }
+        }
+
+        // Set the AnyValue size from non-self-referential impls first,
+        // so self-referential impls can use it.
+        if (maxAnyValueSize >= 0 && !interfaceType->findDecoration<IRAnyValueSizeDecoration>())
+        {
+            IRBuilder builder(module);
+            builder.addAnyValueSizeDecoration(interfaceType, maxAnyValueSize);
+        }
+
+        // Second pass: Calculate size from self-referential implementations.
+        // These can now use the AnyValue size set above.
+        for (auto implType : selfReferentialImpls[interfaceType])
+        {
+            IRSizeAndAlignment sizeAndAlignment;
+            getNaturalSizeAndAlignment(
+                targetProgram->getTargetReq(),
+                (IRType*)implType,
+                &sizeAndAlignment);
+
+            maxAnyValueSize = Math::Max(maxAnyValueSize, sizeAndAlignment.size);
+
+            if (existingMaxSize < sizeAndAlignment.size)
+            {
+                sink->diagnose(Diagnostics::TypeDoesNotFitAnyValueSize{
+                    .type = implType,
+                    .location = implType->sourceLoc,
+                });
+                sink->diagnose(Diagnostics::TypeAndLimit{
+                    .type = implType,
+                    .size = sizeAndAlignment.size,
+                    .limit = existingMaxSize,
+                    .location = implType->sourceLoc,
+                });
+            }
         }
 
         // Should not encounter interface types without any conforming implementations.
         SLANG_ASSERT(maxAnyValueSize >= 0);
 
-        // If we found a max size, add an any-value-size decoration to the interface type.
+        // Update the AnyValue size if self-referential impls require a larger size.
         if (maxAnyValueSize >= 0)
         {
             IRBuilder builder(module);
-            builder.addAnyValueSizeDecoration(interfaceType, maxAnyValueSize);
+            if (auto existingDecor = interfaceType->findDecoration<IRAnyValueSizeDecoration>())
+            {
+                if (existingDecor->getSize() < maxAnyValueSize)
+                {
+                    existingDecor->removeAndDeallocate();
+                    builder.addAnyValueSizeDecoration(interfaceType, maxAnyValueSize);
+                }
+            }
+            else
+            {
+                builder.addAnyValueSizeDecoration(interfaceType, maxAnyValueSize);
+            }
         }
     }
 }

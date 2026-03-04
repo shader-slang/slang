@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHK): -target spirv -entry computeMain
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHK): -target spirv -entry computeMain
 
 extern static const int flag;
 
@@ -20,9 +20,12 @@ struct Simple
     Simple *next;
 
     __init(int v, Simple* ptr)
+/*CHK:
+    ^^^^^^ exiting constructor without initializing field
+    ^^^^^^ exiting constructor without initializing field 'next'
+*/
     {
         value = v;
-        //CHK-DAG: warning 41020: exiting constructor without initializing field 'next'
     }
 }
 
@@ -35,8 +38,11 @@ struct Conditional
     {
         field = 0;
         if (flag == 0)
-            //CHK-DAG: warning 41020: exiting constructor without initializing field 'another_field'
             return;
+/*CHK:
+            ^^^^^^ exiting constructor without initializing field
+            ^^^^^^ exiting constructor without initializing field 'another_field'
+*/
 
         another_field = 0;
     }
@@ -86,12 +92,8 @@ struct Pass
     int y = 0;
 }
 
-//CHK-NOT: warning 41020
-//CHK-NOT: warning 41021
-
 [Shader("compute")]
 [NumThreads(4, 1, 1)]
 void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
 {
 }
-

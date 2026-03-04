@@ -82,6 +82,10 @@ struct ConstructSSAContext
     // to SSA values.
     List<IRVar*> promotableVars;
 
+    // Variables that should not be promoted due to switch fall-through.
+    // These are detected at the IR level by analyzing switch instructions.
+    HashSet<IRVar*> switchFallThroughVars;
+
     // Information about each basic block
     Dictionary<IRBlock*, RefPtr<SSABlockInfo>> blockInfos;
 
@@ -143,9 +147,341 @@ bool allUsesLeadToLoads(IRInst* inst)
     return true;
 }
 
-// Is the given variable one that we can promote to SSA form?
-bool isPromotableVar(ConstructSSAContext* /*context*/, IRVar* var, HashSet<IRBlock*>& knownBlocks)
+// ============================================================================
+// Switch Fall-Through Detection
+// ============================================================================
+//
+// These functions detect variables that cross switch fall-through boundaries.
+// Such variables must not be promoted to SSA form, because:
+// 1. SSA promotion would create phi nodes at merge points
+// 2. breakCriticalEdges inserts intermediate blocks for switch cases
+// 3. If a phi exists, the intermediate block must pass arguments (non-trivial)
+// 4. Non-trivial intermediate blocks can't be folded away by simplifyCFG
+// 5. This breaks the fall-through structure in the emitted code
+//
+// By keeping these variables as IRVar (memory), no phis are created,
+// intermediate blocks stay trivial, and they get folded away later,
+// preserving the fall-through structure.
+
+/// Collect all IRVar instructions that are stored to within a case region.
+/// The case region is defined as blocks reachable from caseLabel without
+/// going through breakLabel or nextCaseLabel.
+/// Uses iterative traversal with explicit worklist to avoid stack overflow.
+static void collectStoredVarsInCase(
+    IRBlock* startBlock,
+    IRBlock* breakLabel,
+    IRBlock* nextCaseLabel,
+    HashSet<IRVar*>& storedVars,
+    HashSet<IRBlock*>& visited)
 {
+    if (!startBlock)
+        return;
+
+    List<IRBlock*> worklist;
+    worklist.add(startBlock);
+
+    while (worklist.getCount() > 0)
+    {
+        auto block = worklist.getLast();
+        worklist.removeLast();
+
+        if (!block)
+            continue;
+
+        if (block == breakLabel || block == nextCaseLabel)
+            continue;
+
+        if (visited.contains(block))
+            continue;
+        visited.add(block);
+
+        // Scan instructions for stores to IRVar
+        for (auto inst = block->getFirstInst(); inst; inst = inst->getNextInst())
+        {
+            if (auto store = as<IRStore>(inst))
+            {
+                if (auto var = as<IRVar>(store->getPtr()))
+                {
+                    storedVars.add(var);
+                }
+            }
+        }
+
+        // Add successors to worklist
+        auto terminator = block->getTerminator();
+        if (!terminator)
+            continue;
+
+        for (auto succ : block->getSuccessors())
+        {
+            worklist.add(succ);
+        }
+    }
+}
+
+/// Collect all IRVar instructions that are loaded from within a case region.
+/// Uses iterative traversal with explicit worklist to avoid stack overflow.
+static void collectLoadedVarsInCase(
+    IRBlock* startBlock,
+    IRBlock* breakLabel,
+    HashSet<IRVar*>& loadedVars,
+    HashSet<IRBlock*>& visited)
+{
+    if (!startBlock)
+        return;
+
+    List<IRBlock*> worklist;
+    worklist.add(startBlock);
+
+    while (worklist.getCount() > 0)
+    {
+        auto block = worklist.getLast();
+        worklist.removeLast();
+
+        if (!block)
+            continue;
+
+        if (block == breakLabel)
+            continue;
+
+        if (visited.contains(block))
+            continue;
+        visited.add(block);
+
+        // Scan instructions for loads from IRVar
+        for (auto inst = block->getFirstInst(); inst; inst = inst->getNextInst())
+        {
+            if (auto load = as<IRLoad>(inst))
+            {
+                if (auto var = as<IRVar>(load->getPtr()))
+                {
+                    loadedVars.add(var);
+                }
+            }
+        }
+
+        // Add successors to worklist
+        auto terminator = block->getTerminator();
+        if (!terminator)
+            continue;
+
+        for (auto succ : block->getSuccessors())
+        {
+            worklist.add(succ);
+        }
+    }
+}
+
+/// Find the fall-through target for a case block, if any.
+/// Returns nullptr if the case doesn't fall through to another case.
+/// Uses iterative traversal with explicit worklist to avoid stack overflow.
+static IRBlock* findFallThroughTarget(
+    IRBlock* startBlock,
+    IRBlock* breakLabel,
+    const HashSet<IRBlock*>& allCaseLabels,
+    HashSet<IRBlock*>& visited)
+{
+    if (!startBlock)
+        return nullptr;
+
+    List<IRBlock*> worklist;
+    worklist.add(startBlock);
+
+    while (worklist.getCount() > 0)
+    {
+        auto block = worklist.getLast();
+        worklist.removeLast();
+
+        if (!block)
+            continue;
+
+        if (block == breakLabel)
+            continue;
+
+        if (visited.contains(block))
+            continue;
+        visited.add(block);
+
+        // If we reached another case label (not the starting block), that's the fall-through target
+        if (block != startBlock && allCaseLabels.contains(block))
+            return block;
+
+        auto terminator = block->getTerminator();
+        if (!terminator)
+            continue;
+
+        switch (terminator->getOp())
+        {
+        case kIROp_UnconditionalBranch:
+            {
+                auto branch = as<IRUnconditionalBranch>(terminator);
+                auto target = branch->getTargetBlock();
+                // Check if target is a case label - return immediately
+                if (allCaseLabels.contains(target))
+                    return target;
+                // Otherwise add to worklist
+                worklist.add(target);
+            }
+            break;
+        case kIROp_ConditionalBranch:
+        case kIROp_IfElse:
+            {
+                // For conditional branches, add both paths to worklist.
+                // The shared visited set is safe here because:
+                // 1. Both branches are added upfront, so both get explored
+                // 2. If a path leads to break, we continue (don't abort)
+                // 3. IR blocks have fixed terminators, so shared blocks
+                //    lead to the same destination regardless of entry path
+                auto branch = as<IRConditionalBranch>(terminator);
+                worklist.add(branch->getFalseBlock());
+                worklist.add(branch->getTrueBlock());
+            }
+            break;
+        case kIROp_Loop:
+            {
+                // For loops, follow the break block (where control goes after the loop)
+                auto loop = as<IRLoop>(terminator);
+                worklist.add(loop->getBreakBlock());
+            }
+            break;
+        case kIROp_Switch:
+            {
+                // For nested switches, follow the break label (where control goes after)
+                // This handles fall-through after a nested switch completes
+                auto nestedSwitch = as<IRSwitch>(terminator);
+                worklist.add(nestedSwitch->getBreakLabel());
+            }
+            break;
+        default:
+            // Return, throw, target switch, etc. - don't follow
+            break;
+        }
+    }
+
+    return nullptr;
+}
+
+/// Detect variables that cross switch fall-through boundaries.
+/// This must be called BEFORE breakCriticalEdges, while the original
+/// switch structure is still intact.
+static void detectSwitchFallThroughVars(ConstructSSAContext* context)
+{
+    auto globalVal = context->globalVal;
+
+    // Find all switch instructions
+    for (auto block : globalVal->getBlocks())
+    {
+        auto terminator = block->getTerminator();
+        auto switchInst = as<IRSwitch>(terminator);
+        if (!switchInst)
+            continue;
+
+        auto breakLabel = switchInst->getBreakLabel();
+        auto defaultLabel = switchInst->getDefaultLabel();
+        UInt caseCount = switchInst->getCaseCount();
+
+        // Build set of all case labels (including default) for quick lookup
+        HashSet<IRBlock*> allCaseLabels;
+        List<IRBlock*> caseLabels;
+        for (UInt i = 0; i < caseCount; i++)
+        {
+            auto label = switchInst->getCaseLabel(i);
+            if (!allCaseLabels.contains(label))
+            {
+                allCaseLabels.add(label);
+                caseLabels.add(label);
+            }
+        }
+        // Add default if it's not the break label
+        if (defaultLabel != breakLabel && !allCaseLabels.contains(defaultLabel))
+        {
+            allCaseLabels.add(defaultLabel);
+            caseLabels.add(defaultLabel);
+        }
+
+        // For each case, check if it falls through to any other case
+        // by following control flow (not by assuming any particular order)
+        for (auto caseLabel : caseLabels)
+        {
+            // Skip if this case label is the same as break (empty case)
+            if (caseLabel == breakLabel)
+                continue;
+
+            // Find where this case falls through to (if anywhere)
+            HashSet<IRBlock*> visitedForFallThrough;
+            auto fallThroughTarget =
+                findFallThroughTarget(caseLabel, breakLabel, allCaseLabels, visitedForFallThrough);
+
+            if (!fallThroughTarget)
+                continue; // This case doesn't fall through
+
+            // This case falls through! Collect stored vars in this case
+            HashSet<IRVar*> storedVars;
+            HashSet<IRBlock*> visitedForStore;
+            collectStoredVarsInCase(
+                caseLabel,
+                breakLabel,
+                fallThroughTarget,
+                storedVars,
+                visitedForStore);
+
+            if (storedVars.getCount() == 0)
+                continue; // No stores, nothing to protect
+
+            // Collect loaded vars in target case and any transitively reachable cases
+            HashSet<IRVar*> loadedVars;
+            HashSet<IRBlock*> processedTargets;
+            List<IRBlock*> targetsToProcess;
+            targetsToProcess.add(fallThroughTarget);
+
+            while (targetsToProcess.getCount() > 0)
+            {
+                auto targetLabel = targetsToProcess.getLast();
+                targetsToProcess.removeLast();
+
+                if (processedTargets.contains(targetLabel))
+                    continue;
+                processedTargets.add(targetLabel);
+
+                // Collect loads in this target
+                HashSet<IRBlock*> visitedForLoad;
+                collectLoadedVarsInCase(targetLabel, breakLabel, loadedVars, visitedForLoad);
+
+                // Check if this target also falls through
+                HashSet<IRBlock*> visitedForTargetFallThrough;
+                auto nextTarget = findFallThroughTarget(
+                    targetLabel,
+                    breakLabel,
+                    allCaseLabels,
+                    visitedForTargetFallThrough);
+                if (nextTarget && !processedTargets.contains(nextTarget))
+                {
+                    targetsToProcess.add(nextTarget);
+                }
+            }
+
+            // Variables that are stored in source AND loaded in target need protection
+            for (auto var : storedVars)
+            {
+                if (loadedVars.contains(var))
+                {
+                    context->switchFallThroughVars.add(var);
+                }
+            }
+        }
+    }
+}
+
+// ============================================================================
+
+// Is the given variable one that we can promote to SSA form?
+bool isPromotableVar(ConstructSSAContext* context, IRVar* var, HashSet<IRBlock*>& knownBlocks)
+{
+    // Check if the variable crosses a switch fall-through boundary.
+    // Such variables must stay as memory to preserve fall-through structure.
+    if (context->switchFallThroughVars.contains(var))
+        return false;
+
     // We want to identify variables such that we can always
     // determine what they will contain at a point in the
     // program by directly inspecting their uses.
@@ -926,14 +1262,13 @@ IRBlock* IREdge::getSuccessor() const
     return cast<IRBlock>(getUse()->get());
 }
 
-void IRBuilder::insertBlockAlongEdge(IRModule* module, IREdge const& edge)
+void IRBuilder::insertBlockAlongEdge(IRModule* module, IREdge const& edge, bool copyDebugLine)
 {
-    auto pred = edge.getPredecessor();
     auto succ = edge.getSuccessor();
     auto edgeUse = edge.getUse();
 
     IRBuilder builder(module);
-    builder.setInsertInto(pred);
+    builder.setInsertBefore(succ);
 
     // Create a new block that will sit "along" the edge
     IRBlock* edgeBlock = builder.createBlock();
@@ -947,6 +1282,22 @@ void IRBuilder::insertBlockAlongEdge(IRModule* module, IREdge const& edge)
     // The edge block should branch (unconditionally)
     // to the successor block.
     builder.setInsertInto(edgeBlock);
+
+    // The new block needs a DebugLine entry, so try to find
+    // one in the successor block and copy that.
+    if (copyDebugLine)
+    {
+        for (auto afterInst : succ->getChildren())
+        {
+            if (auto debugLine = as<IRDebugLine>(afterInst))
+            {
+                IRCloneEnv cloneEnv;
+                cloneInst(&cloneEnv, &builder, debugLine);
+                break;
+            }
+        }
+    }
+
     builder.emitBranch(succ);
 
     // Insert the new block into the block list
@@ -955,7 +1306,7 @@ void IRBuilder::insertBlockAlongEdge(IRModule* module, IREdge const& edge)
     // In principle, the order of this list shouldn't
     // affect the semantics of a program, but we
     // might want to be careful about ordering anyway.
-    edgeBlock->insertAfter(pred);
+    edgeBlock->insertBefore(succ);
 }
 
 bool IREdge::isCritical() const
@@ -1044,13 +1395,19 @@ static void breakCriticalEdges(ConstructSSAContext* context)
 
     for (auto edge : criticalEdges)
     {
-        IRBuilder::insertBlockAlongEdge(context->module, edge);
+        IRBuilder::insertBlockAlongEdge(context->module, edge, true);
     }
 }
 
 // Construct SSA form for a global value with code
 bool constructSSA(ConstructSSAContext* context)
 {
+    // Detect variables that cross switch fall-through boundaries.
+    // This must run BEFORE breakCriticalEdges, while we can still see
+    // the original switch structure (case blocks branching directly to
+    // next case labels).
+    detectSwitchFallThroughVars(context);
+
     // First, detect and and break any critical edges in the CFG,
     // because our representation of SSA form doesn't allow for them.
     breakCriticalEdges(context);

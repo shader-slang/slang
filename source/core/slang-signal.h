@@ -20,6 +20,9 @@ enum class SignalType
 // Note that message can be passed as nullptr for no message.
 [[noreturn]] void handleSignal(SignalType type, char const* message);
 
+// Special handler for assertions that can optionally return based on environment variable
+void handleAssert(char const* message);
+
 #define SLANG_UNEXPECTED(reason) ::Slang::handleSignal(::Slang::SignalType::Unexpected, reason)
 
 #define SLANG_UNIMPLEMENTED_X(what) ::Slang::handleSignal(::Slang::SignalType::Unimplemented, what)

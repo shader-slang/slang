@@ -16,6 +16,10 @@ namespace
     x(Void, void) \
     x(Bool, bool) \
     x(Float16, half) \
+    x(UInt8, uint8_t) \
+    x(Int8, int8_t) \
+    x(UInt16, uint16_t) \
+    x(Int16, int16_t) \
     x(UInt32, uint32_t) \
     x(Int32, int32_t) \
     x(Int64, int64_t) \
@@ -52,6 +56,7 @@ static const TypeTextUtil::CompileTargetInfo s_compileTargetInfos[] = {
     {SLANG_SPIRV_ASM, "spv-asm", "spirv-asm,spirv-assembly", "SPIR-V assembly"},
     {SLANG_C_SOURCE, "c", "c", "C source code"},
     {SLANG_CPP_SOURCE, "cpp,c++,cxx", "cpp,c++,cxx", "C++ source code"},
+    {SLANG_CPP_HEADER, "hpp", "hpp", "C++ source header"},
     {SLANG_CPP_PYTORCH_BINDING,
      "cpp,c++,cxx",
      "torch,torch-binding,torch-cpp,torch-cpp-binding",
@@ -70,10 +75,14 @@ static const TypeTextUtil::CompileTargetInfo s_compileTargetInfos[] = {
      "sharedlib,sharedlibrary,dll",
      "Shared library/Dll for host execution"},
     {SLANG_CUDA_SOURCE, "cu", "cuda,cu", "CUDA source code"},
+    {SLANG_CUDA_HEADER, "cuh", "cuh", "CUDA source header"},
     {SLANG_PTX, "ptx", "ptx", "PTX assembly"},
     {SLANG_CUDA_OBJECT_CODE, "obj,o", "cuobj,cubin", "CUDA binary"},
     {SLANG_SHADER_HOST_CALLABLE, "", "host-callable,callable", "Host callable"},
-    {SLANG_OBJECT_CODE, "obj,o", "object-code", "Object code"},
+    {SLANG_OBJECT_CODE,
+     "obj,o",
+     "object-code,shader-object-code",
+     "Object code for host execution (shader style)"},
     {SLANG_HOST_HOST_CALLABLE, "", "host-host-callable", "Host callable for host execution"},
     {SLANG_METAL, "metal", "metal", "Metal shader source"},
     {SLANG_METAL_LIB, "metallib", "metallib", "Metal Library Bytecode"},
@@ -85,6 +94,12 @@ static const TypeTextUtil::CompileTargetInfo s_compileTargetInfos[] = {
      "SPIR-V assembly via WebGPU shading language"},
     {SLANG_WGSL_SPIRV, "wgsl-spirv", "wgsl-spirv", "SPIR-V via WebGPU shading language"},
     {SLANG_HOST_VM, "slang-vm", "slangvm,slang-vm", "Slang VM byte code"},
+    {SLANG_HOST_OBJECT_CODE,
+     "obj,o",
+     "host-object-code",
+     "Object code for host execution (host style)"},
+    {SLANG_HOST_LLVM_IR, "ll", "llvm-host-ir,llvm-ir", "LLVM IR assembly (host style)"},
+    {SLANG_SHADER_LLVM_IR, "ll", "llvm-shader-ir", "LLVM IR assembly (shader style)"},
 };
 
 static const NamesDescriptionValue s_languageInfos[] = {

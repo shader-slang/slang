@@ -36,5 +36,5 @@ struct IRModule;
 /// Note how in the transformed code, there is no longer any attempt to load the rest
 /// of the contents of `gParams`.
 ///
-void specializeFuncsForBufferLoadArgs(CodeGenContext* codeGenContext, IRModule* module);
+void specializeFuncsForBufferLoadArgs(IRModule* module, CodeGenContext* codeGenContext);
 } // namespace Slang

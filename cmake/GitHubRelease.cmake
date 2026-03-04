@@ -2,6 +2,12 @@ function(check_assets_for_file json_content filename found_var)
     string(JSON asset_count LENGTH "${json_content}" "assets")
     set(found "FALSE")
 
+    # If there are no assets, return early to avoid JSON indexing errors
+    if(asset_count EQUAL 0)
+        set(${found_var} "${found}" PARENT_SCOPE)
+        return()
+    endif()
+
     # Never change, CMake...
     math(EXPR max_asset_index "${asset_count} - 1")
     foreach(i RANGE 0 ${max_asset_index})

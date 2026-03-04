@@ -9,6 +9,6 @@ struct CodeGenContext;
 
 /// Translate GLSL-flavored global in/out variables into
 /// entry point parameters with system value semantics.
-void translateGlobalVaryingVar(CodeGenContext* context, IRModule* module);
+void translateGlobalVaryingVar(IRModule* module, CodeGenContext* context);
 
 } // namespace Slang

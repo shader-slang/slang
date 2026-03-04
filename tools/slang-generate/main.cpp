@@ -333,16 +333,61 @@ Node* readBody(Reader& reader, NodeReadFlags flags, char openChar, int openCount
                 else if (peek(reader) == '{')
                 {
                     // This is the start of a block-structured escape, which will
-                    // end at a matching `}`.
+                    // end at a matching `$}`.
 
                     addTextSpan(link, spanBegin, lineBegin);
 
-                    Node* body = readBody<false>(reader, 0, '{', 0, '}');
+                    // Consume the opening '{'
+                    get(reader);
 
-                    addEscapeSpan(link, body);
+                    // Read until we find $}
+                    Node* nodes = nullptr;
+                    Node** bodyLink = &nodes;
 
-                    spanBegin = reader.cursor;
-                    atStartOfLine = false;
+                    char const* bodyBegin = reader.cursor;
+                    bool foundClosing = false;
+                    for (;;)
+                    {
+                        int c = get(reader);
+
+                        switch (c)
+                        {
+                        default:
+                            break;
+
+                        case EOF:
+                            {
+                                addTextSpan(bodyLink, bodyBegin, reader.cursor);
+                                addEscapeSpan(link, nodes);
+                                spanBegin = reader.cursor;
+                                atStartOfLine = false;
+                                foundClosing = true;
+                                break;
+                            }
+
+                        case '$':
+                            {
+                                if (peek(reader) == '}')
+                                {
+                                    // Found the closing $}
+                                    char const* bodyEnd = reader.cursor - 1;
+                                    addTextSpan(bodyLink, bodyBegin, bodyEnd);
+                                    get(reader); // consume the '}'
+
+                                    addEscapeSpan(link, nodes);
+
+                                    spanBegin = reader.cursor;
+                                    atStartOfLine = false;
+                                    foundClosing = true;
+                                    break;
+                                }
+                            }
+                            break;
+                        }
+
+                        if (foundClosing)
+                            break;
+                    }
                 }
                 else if (atStartOfLine && peek(reader) == ':')
                 {

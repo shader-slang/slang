@@ -1,0 +1,28 @@
+implementing neural;
+
+/**
+Layer interface (compile-time, GPU-friendly).
+This interface is intended to be used as a *generic constraint* (no existential storage),
+so it does not imply dynamic dispatch.
+
+@category neural
+*/
+public interface ILayer<T, InputVector, OutputVector, Layout, Activation>
+    where T : __BuiltinFloatingPointType
+    where T.Differential == T
+    where Layout : IStorageLayout
+    where InputVector : IVector<T>
+    where OutputVector : IVector<T>
+    where Activation : IActivation<T>
+{
+    /// Forward evaluation: y = f(x).
+    /// Address is passed as parameter to enable autodiff gradient routing.
+    /// @param input Input vector.
+    /// @param weightAddress Weight address (pointer-like).
+    /// @param biasAddress Bias address (pointer-like). Pass `none` if no bias.
+    /// @return Output vector.
+    [Differentiable]
+    public OutputVector eval<A>(InputVector input, A weightAddress, Optional<A> biasAddress = none)
+        where A : IPointerLikeAddress<T>
+        where A.Differential : IPointerLikeAddress<T.Differential>;
+}

@@ -4,6 +4,7 @@
 #include "../core/slang-performance-profiler.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -45,7 +46,8 @@ struct CacheOfDataToReplaceOps
         }
         else
         {
-            sink->diagnose(payloadVariable, Diagnostics::expectedIntegerConstantNotConstant);
+            sink->diagnose(Diagnostics::ExpectedIntegerConstantNotConstant{
+                .location = payloadVariable->sourceLoc});
         }
 
         IRInst* resultVariable;
@@ -54,10 +56,9 @@ struct CacheOfDataToReplaceOps
             // if somehow the location tied variable is missing and an error was not thrown by the
             // compiler
             resultVariable = builder.getIntValue(builder.getIntType(), 0);
-            sink->diagnose(
-                payloadVariable,
-                Diagnostics::expectedRayTracingPayloadObjectAtLocationButMissing,
-                intLitValue);
+            sink->diagnose(Diagnostics::ExpectedRayTracingPayloadObjectAtLocationButMissing{
+                .payloadLocation = intLitValue,
+                .location = payloadVariable->sourceLoc});
         }
         else
         {
@@ -171,8 +172,8 @@ void recurseAllOpsToReplace(CacheOfDataToReplaceOps* cache)
 }
 
 void replaceLocationIntrinsicsWithRaytracingObject(
-    TargetProgram* target,
     IRModule* module,
+    TargetProgram* target,
     DiagnosticSink* sink)
 {
     // currently only applies to GLSL syntax

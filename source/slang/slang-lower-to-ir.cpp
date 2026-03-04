@@ -38,6 +38,7 @@
 #include "slang-ir-validate.h"
 #include "slang-ir.h"
 #include "slang-mangle.h"
+#include "slang-rich-diagnostics.h"
 #include "slang-type-layout.h"
 #include "slang-visitor.h"
 #include "slang.h"
@@ -610,7 +611,7 @@ struct IRGenContext
     // that contains the Inst.
     FunctionDeclBase* funcDecl;
 
-    bool includeDebugInfo = false;
+    DebugInfoLevel debugInfoLevel = DebugInfoLevel::None;
 
     // The element index if we are inside an `expand` expression.
     IRInst* expandIndex = nullptr;
@@ -846,7 +847,7 @@ LoweredValInfo emitCallToVal(
                 auto callee = getSimpleVal(context, funcVal);
                 auto funcType = as<IRFuncType>(callee->getDataType());
                 auto throwAttr = funcType->findAttr<IRFuncThrowTypeAttr>();
-                assert(throwAttr);
+                SLANG_ASSERT(throwAttr);
 
                 auto handler = findErrorHandler(context, throwAttr->getErrorType());
                 auto succBlock = builder->createBlock();
@@ -921,15 +922,15 @@ LoweredValInfo emitCallToDeclRef(
             SLANG_RELEASE_ASSERT(argCount == 1);
             return LoweredValInfo::simple(args[0]);
         }
-        auto intrinsicOp = getIntrinsicOp(funcDecl, intrinsicOpModifier);
-        switch (IROp(intrinsicOp))
+        auto intrinsicOp = IROp(getIntrinsicOp(funcDecl, intrinsicOpModifier));
+        switch (intrinsicOp)
         {
         case kIROp_GetOffsetPtr:
             SLANG_ASSERT(argCount == 2);
             return LoweredValInfo::simple(builder->emitGetOffsetPtr(args[0], args[1]));
         default:
             return LoweredValInfo::simple(
-                builder->emitIntrinsicInst(type, IROp(intrinsicOp), argCount, args));
+                builder->emitIntrinsicInst(type, intrinsicOp, argCount, args));
         }
     }
 
@@ -1937,11 +1938,34 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             context->irBuilder->getTypeEqualityWitness(witnessType, subType, supType));
     }
 
-    LoweredValInfo visitTypeCoercionWitness(TypeCoercionWitness*)
+    LoweredValInfo visitBuiltinTypeCoercionWitness(BuiltinTypeCoercionWitness* witness)
     {
-        // When we fully support type coercion constraints, we should lower the witness into a
-        // function that does the conversion.
-        return LoweredValInfo();
+        auto irBuilder = getBuilder();
+        auto fromType = lowerType(context, witness->getFromType());
+        auto toType = lowerType(context, witness->getToType());
+        auto funcType = getBuilder()->getFuncType(1, &fromType, toType);
+        IRFunc* irFunc = irBuilder->createFunc();
+        irFunc->setFullType(funcType);
+        getBuilder()->addForceInlineDecoration(irFunc);
+
+        IRBuilderInsertLocScope insertScope(irBuilder);
+        irBuilder->setInsertInto(irFunc);
+        irBuilder->emitBlock();
+        auto param = irBuilder->emitParam(fromType);
+        auto cast = irBuilder->emitCast(toType, param);
+        irBuilder->emitReturn(cast);
+        return LoweredValInfo::simple(irFunc);
+    }
+
+    LoweredValInfo visitDeclRefTypeCoercionWitness(DeclRefTypeCoercionWitness* witness)
+    {
+        if (!witness->getDeclRef())
+            return LoweredValInfo();
+
+        auto fromType = lowerType(context, witness->getFromType());
+        auto toType = lowerType(context, witness->getToType());
+        auto funcType = getBuilder()->getFuncType(1, &fromType, toType);
+        return emitDeclRef(context, witness->getDeclRef(), funcType);
     }
 
     LoweredValInfo visitTransitiveSubtypeWitness(TransitiveSubtypeWitness* val)
@@ -2188,6 +2212,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         IRType* irValueType = lowerType(context, astValueType);
         IRInst* accessQualifier = nullptr;
         IRInst* addrSpace = nullptr;
+        IRType* dataLayout = nullptr;
 
         if (auto astAccessQualifier = type->getAccessQualifier())
         {
@@ -2207,7 +2232,13 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
                 (IRIntegerValue)AddressSpace::Generic);
         }
 
-        return getBuilder()->getPtrType(kIROp_PtrType, irValueType, accessQualifier, addrSpace);
+        if (auto dataLayoutType = type->getDataLayout())
+        {
+            dataLayout = lowerType(context, dataLayoutType);
+        }
+
+        return getBuilder()
+            ->getPtrType(kIROp_PtrType, irValueType, accessQualifier, addrSpace, dataLayout);
     }
 
     IRType* visitDeclRefType(DeclRefType* type)
@@ -3552,104 +3583,6 @@ void maybeAddReturnDestinationParam(ParameterLists* ioParameterLists, Type* resu
     }
 }
 
-/// Does the given `declRef` appear to be a declaration of an entry point?
-///
-/// This function does a best-effort job of detecting whether something is
-/// a shader entry point, but it cannot answer the question definitively,
-/// because the compilation model of Slang allows functions to be tagged
-/// as entry points separately from their declaration in the AST.
-///
-bool doesDeclAppearToBeAnEntryPoint(DeclRef<CallableDecl> const& declRef)
-{
-    auto decl = declRef.getDecl();
-    if (decl->hasModifier<EntryPointAttribute>())
-        return true;
-    if (decl->hasModifier<NumThreadsAttribute>())
-        return true;
-    return false;
-}
-
-/// Does a parameter appear to be a declaration of an entry-point varying input.
-///
-/// The `paramInfo` represents the parameter being inspected, and
-/// the `funcDeclRef` should represent the outer declaration that
-/// might or might not be an entry point.
-///
-/// This function is only able to do a best-effort check for what is an
-/// entry point (see `doesDeclAppearToBeAnEntryPoint()`), and cannot be
-/// fully robust in detection.
-///
-bool doesParamAppearToBeAnEntryPointVaryingInput(
-    IRLoweringParameterInfo const& paramInfo,
-    DeclRef<CallableDecl> const& funcDeclRef)
-{
-    // If the outer declaration doesn't appear to be an entry
-    // point, then it seems this isn't an entry point parameter
-    // at all, much less an input.
-    //
-    if (!doesDeclAppearToBeAnEntryPoint(funcDeclRef))
-        return false;
-
-    // We are only intereste in parameters that would otherwise
-    // be lowered to just use `in`.
-    //
-    if (paramInfo.actualParamPassingModeToUse != ParamPassingMode::In)
-        return false;
-
-    // We are only concerned with varying parameters, so `uniform`
-    // parameters aren't relevant.
-    //
-    if (paramInfo.decl->findModifier<HLSLUniformModifier>())
-        return false;
-
-    // Certain types conceptually represent uniform parameters even
-    // if they aren't declared with `uniform`, so we also want to
-    // ignore those.
-    //
-    // TODO: It would be best for logic like this to be factored into
-    // a shared subroutine somewhere, so that we don't have multiple
-    // places in the code doing ad hoc checks for a particular list
-    // of types, that might change over time.
-    //
-    if (as<HLSLPatchType>(paramInfo.type))
-        return false;
-
-    if (as<MeshOutputType>(paramInfo.type))
-        return false;
-
-    return true;
-}
-
-/// Modify the parameter passing mode for the given parameter, if it can
-/// be detected that it seems to be used as a varying input to an entry point.
-///
-/// If a varying `in` parameter is detected, its actual parameter-passing
-/// mode will be changed to `borrow in`.
-///
-/// This function is only able to do a best-effort check for what is an
-/// entry point (see `doesDeclAppearToBeAnEntryPoint()`), and cannot be
-/// fully robust in detection.
-///
-void maybeModifyParamPassingModeForDetectedEntryPointVaryingInput(
-    IRLoweringParameterInfo& ioParamInfo,
-    DeclRef<CallableDecl> const& funcDeclRef)
-{
-    // If we cannot detect that this seems to be a varying `in`
-    // parameter of an entry point, then we'll just skip it.
-    //
-    // There's no way for this code to be sure it isn't skipping
-    // over a function it shouldn't, but there's nothign we can
-    // do about it from here.
-    //
-    if (!doesParamAppearToBeAnEntryPointVaryingInput(ioParamInfo, funcDeclRef))
-        return;
-
-    // We basically just want to change the parameter from `in`
-    // to `borrow in`, so that it is an immutable by-reference parameter.
-    //
-    ioParamInfo.actualParamPassingModeToUse = ParamPassingMode::BorrowIn;
-}
-
 //
 // And here is our function that will do the recursive walk:
 void collectParameterLists(
@@ -3893,20 +3826,6 @@ void collectParameterLists(
     for (auto paramDeclRef : getParameters(context->astBuilder, callableDeclRef))
     {
         auto paramInfo = getParameterInfo(context, paramDeclRef);
-
-        // One unfortunate wrinkle that arises is that all the downstream
-        // logic in the Slang IR *really* wants the varying input parameters
-        // to a shader entry point to use `ParamPassingMode::BorrowIn`,
-        // so that they don't force copying, but syntactically such parameters
-        // are conventionally declared using `in` (meaning `ParamPassingMode::In`).
-        //
-        // We include logic here to switch up the parameter-passing mode
-        // in the case where we can statically detect that something is
-        // being compiled as an entry point. Note, however, that this logic
-        // is inherently fragile, since not every entry point that a user specifies
-        // is guaranteed to have had a `[shader(...)]` attribute on it.
-        //
-        maybeModifyParamPassingModeForDetectedEntryPointVaryingInput(paramInfo, callableDeclRef);
 
         ioParameterLists->params.add(paramInfo);
     }
@@ -4443,10 +4362,10 @@ struct ExprLoweringContext
                      ->findDecoration<IRGlobalInputDecoration>())
             {
                 this->context->getSink()->diagnose(
-                    expr,
-                    Diagnostics::requireInputDecoratedVarForParameter,
-                    decl,
-                    glslRequireShaderInputParameter->parameterNumber);
+                    Diagnostics::RequireInputDecoratedVarForParameter{
+                        .func = decl,
+                        .paramNumber = glslRequireShaderInputParameter->parameterNumber,
+                        .expr = expr});
             }
             return;
         }
@@ -4911,6 +4830,14 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         return LoweredValInfo::simple(getBuilder()->getIntValue(resultType, value));
     }
 
+    LoweredValInfo visitFloatBitCastExpr(FloatBitCastExpr* /*expr*/)
+    {
+        // __floatAsInt should always be constant-folded during semantic checking.
+        // If we reach here, something went wrong.
+        SLANG_UNEXPECTED("__floatAsInt should be constant-folded during type checking");
+        UNREACHABLE_RETURN(LoweredValInfo());
+    }
+
     LoweredValInfo visitOverloadedExpr(OverloadedExpr* /*expr*/)
     {
         SLANG_UNEXPECTED("overloaded expressions should not occur in checked AST");
@@ -5035,7 +4962,8 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                             i = addr.val;
                         else
                         {
-                            context->getSink()->diagnose(operand.expr, Diagnostics::noSuchAddress);
+                            context->getSink()->diagnose(
+                                Diagnostics::NoSuchAddress{.location = operand.expr->loc});
                             return nullptr;
                         }
                     }
@@ -5473,6 +5401,14 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             return LoweredValInfo::simple(
                 getBuilder()->emitMakeTuple(irType, args.getCount(), args.getBuffer()));
         }
+        else if (auto resourceType = as<ResourceType>(type))
+        {
+            // A resource type does not have a default value, so we defensively assign poison value.
+            // In practice, we should never get here. If the value remains unassigned after all of
+            // the subsequent IR steps and is used, it should be detected by
+            // detectUninitializedResources.
+            return LoweredValInfo::simple(getBuilder()->emitPoison(irType));
+        }
         else if (auto declRefType = as<DeclRefType>(type))
         {
             DeclRef<Decl> declRef = declRefType->getDeclRef();
@@ -5556,10 +5492,22 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
 
         // If the initializer list was empty, then the user was
         // asking for default initialization, which should apply
-        // to (almost) any type.
+        // to almost any type...
         //
         if (argCount == 0)
         {
+            // ... However, that "almost" does not count interface
+            // types. Interfaces should not be default-initialized to avoid
+            // unspecified behavior, so we'll warn about it here.
+            if (auto declRefType = as<DeclRefType>(type))
+            {
+                if (auto interfaceDeclRef = declRefType->getDeclRef().as<InterfaceDecl>())
+                {
+                    context->getSink()->diagnose(
+                        Diagnostics::InterfaceDefaultInitializer{.expr = expr});
+                }
+            }
+
             return getDefaultVal(type.type);
         }
 
@@ -5775,8 +5723,9 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         else
         {
             auto optType = lowerType(context, expr->type);
-            auto defaultVal = getDefaultVal(as<OptionalType>(expr->type)->getValueType());
-            auto irVal = context->irBuilder->emitMakeOptionalNone(optType, defaultVal.val);
+            // `none` for Optional<T> no longer requires a payload value from the front-end.
+            // The Optional-type lowering pass will synthesize a default-constructed placeholder.
+            auto irVal = context->irBuilder->emitMakeOptionalNone(optType);
             return LoweredValInfo::simple(irVal);
         }
     }
@@ -5841,6 +5790,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         // true-block: nonconditionalBranch(%after-block, true) for ||
         builder->insertBlock(thenBlock);
         builder->setInsertInto(thenBlock);
+        maybeEmitDebugLine(context, nullptr, nullptr, irCond->sourceLoc, true);
         auto trueVal = expr->flavor == LogicOperatorShortCircuitExpr::Flavor::And
                            ? getSimpleVal(context, lowerRValueExpr(context, expr->arguments[1]))
                            : LoweredValInfo::simple(context->irBuilder->getBoolValue(true)).val;
@@ -5851,6 +5801,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         // false-block: nonconditionalBranch(%after-block, <second param>: Bool) for ||
         builder->insertBlock(elseBlock);
         builder->setInsertInto(elseBlock);
+        maybeEmitDebugLine(context, nullptr, nullptr, irCond->sourceLoc, true);
         auto falseVal = expr->flavor == LogicOperatorShortCircuitExpr::Flavor::And
                             ? LoweredValInfo::simple(context->irBuilder->getBoolValue(false)).val
                             : getSimpleVal(context, lowerRValueExpr(context, expr->arguments[1]));
@@ -5860,6 +5811,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         // after-block: return input parameter
         builder->insertBlock(afterBlock);
         builder->setInsertInto(afterBlock);
+        maybeEmitDebugLine(context, nullptr, nullptr, irCond->sourceLoc, true);
         auto paramType = lowerType(context, expr->type.type);
         auto result = builder->emitParam(paramType);
 
@@ -5885,7 +5837,7 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
     LoweredValInfo visitTryExpr(TryExpr* expr)
     {
         auto invokeExpr = as<InvokeExpr>(expr->base);
-        assert(invokeExpr);
+        SLANG_ASSERT(invokeExpr);
         TryClauseEnvironment tryEnv;
         tryEnv.clauseType = expr->tryClauseType;
         return sharedLoweringContext.visitInvokeExprImpl(invokeExpr, LoweredValInfo(), tryEnv);
@@ -6050,8 +6002,8 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         builder->emitStore(var, optionalVal);
         builder->emitBranch(afterBlock);
         builder->setInsertInto(falseBlock);
-        auto defaultVal = getDefaultVal(as<OptionalType>(expr->type)->getValueType());
-        auto noneVal = builder->emitMakeOptionalNone(optType, defaultVal.val);
+        // See `visitMakeOptionalExpr`: no longer need to pass a defaultVal.
+        auto noneVal = builder->emitMakeOptionalNone(optType);
         builder->emitStore(var, noneVal);
         builder->emitBranch(afterBlock);
         builder->setInsertInto(afterBlock);
@@ -6587,7 +6539,7 @@ struct DestinationDrivenRValueExprLoweringVisitor
     void visitTryExpr(TryExpr* expr)
     {
         auto invokeExpr = as<InvokeExpr>(expr->base);
-        assert(invokeExpr);
+        SLANG_ASSERT(invokeExpr);
         TryClauseEnvironment tryEnv;
         tryEnv.clauseType = expr->tryClauseType;
         auto rValue = sharedLoweringContext.visitInvokeExprImpl(invokeExpr, destination, tryEnv);
@@ -6774,7 +6726,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         // for unreachable code based on IR analysis instead,
         // at which point we'd probably disable this check.
         //
-        context->getSink()->diagnose(stmt, Diagnostics::unreachableCode);
+        context->getSink()->diagnose(Diagnostics::UnreachableCode{.stmt = stmt});
 
         startBlock();
     }
@@ -6853,7 +6805,6 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             IRBlock* prevScopeEndBlock = pushScopeBlock(afterBlock);
             lowerStmt(context, thenStmt);
             emitBranchIfNeeded(afterBlock);
-
             insertBlock(elseBlock);
             lowerStmt(context, elseStmt);
             popScopeBlock(prevScopeEndBlock, true);
@@ -6875,6 +6826,8 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
 
             insertBlock(afterBlock);
         }
+
+        maybeEmitDebugLine(context, this, stmt, stmt->afterLoc);
 
         if (stmt->findModifier<FlattenAttribute>())
         {
@@ -6997,9 +6950,9 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
                     if (inferredMaxIters->value < constIntVal->getValue())
                     {
                         context->getSink()->diagnose(
-                            maxIters,
-                            Diagnostics::forLoopTerminatesInFewerIterationsThanMaxIters,
-                            inferredMaxIters->value);
+                            Diagnostics::ForLoopTerminatesInFewerIterationsThanMaxIters{
+                                .iterations = (int64_t)inferredMaxIters->value,
+                                .attr = maxIters});
                     }
                 }
             }
@@ -7948,6 +7901,7 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         SwitchStmtInfo info;
         info.initialBlock = initialBlock;
         info.defaultLabel = nullptr;
+
         lowerSwitchCases(stmt->body, &info);
 
         // TODO: once we've discovered the cases, we should
@@ -8002,26 +7956,70 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
     }
 };
 
-IRInst* getOrEmitDebugSource(IRGenContext* context, PathInfo path)
+IRInst* getOrEmitDebugSource(IRGenContext* context, SourceLoc loc)
 {
-    if (auto result = context->shared->mapSourcePathToDebugSourceInst.tryGetValue(path.foundPath))
-        return *result;
+    auto sourceManager = context->getLinkage()->getSourceManager();
+    auto sourceView = sourceManager->findSourceView(loc);
+    if (!sourceView)
+        return nullptr;
 
-    ComPtr<ISlangBlob> outBlob;
-    if (path.hasFileFoundPath())
+    IRInst* debugSourceInst = nullptr;
+
+    // Do a best-effort attempt to retrieve the nominal source file.
+    auto pathInfo = sourceView->getPathInfo(loc, SourceLocType::Emit);
+    String sourcePath = pathInfo.getName();
+
+    // If the source file path corresponds to an existing SourceFile in the source manager, use it.
+    auto source = sourceManager->findSourceFileByPathRecursively(sourcePath);
+    if (!source)
     {
-        context->getLinkage()->getFileSystemExt()->loadFile(
-            path.foundPath.getBuffer(),
-            outBlob.writeRef());
+        sourcePath = pathInfo.getMostUniqueIdentity();
+        source = sourceManager->findSourceFile(sourcePath);
     }
+    if (source &&
+        context->shared->mapSourceFileToDebugSourceInst.tryGetValue(source, debugSourceInst))
+    {
+        return debugSourceInst;
+    }
+
+    if (sourcePath.getLength() == 0)
+    {
+        return nullptr;
+    }
+
+    if (context->shared->mapSourcePathToDebugSourceInst.tryGetValue(sourcePath, debugSourceInst))
+    {
+        return debugSourceInst;
+    }
+
+    // If the source manager does not have an entry for the corresponding file name, make sure we
+    // still emit a source file entry in the spirv module.
+    ComPtr<ISlangBlob> outBlob;
     UnownedStringSlice content;
-    if (outBlob)
-        content = UnownedStringSlice((char*)outBlob->getBufferPointer(), outBlob->getBufferSize());
+
+    // Only embed source content for Standard and Maximal debug level
+    if (context->debugInfoLevel >= DebugInfoLevel::Standard)
+    {
+        if (pathInfo.hasFileFoundPath())
+        {
+            context->getLinkage()->getFileSystemExt()->loadFile(
+                pathInfo.foundPath.getBuffer(),
+                outBlob.writeRef());
+        }
+        if (outBlob)
+            content =
+                UnownedStringSlice((char*)outBlob->getBufferPointer(), outBlob->getBufferSize());
+    }
+
     IRBuilder builder(*context->irBuilder);
     builder.setInsertInto(context->irBuilder->getModule());
-    auto debugSrcInst = builder.emitDebugSource(path.foundPath.getUnownedSlice(), content, false);
-    context->shared->mapSourcePathToDebugSourceInst[path.foundPath] = debugSrcInst;
-    return debugSrcInst;
+    debugSourceInst = builder.emitDebugSource(sourcePath.getUnownedSlice(), content, false);
+    context->shared->mapSourcePathToDebugSourceInst[sourcePath] = debugSourceInst;
+    if (source)
+    {
+        context->shared->mapSourceFileToDebugSourceInst.add(source, debugSourceInst);
+    }
+    return debugSourceInst;
 }
 
 void maybeEmitDebugLine(
@@ -8031,7 +8029,8 @@ void maybeEmitDebugLine(
     SourceLoc loc,
     bool allowNullStmt)
 {
-    if (!context->includeDebugInfo)
+    // Only emit debug line info if debug level is at least Minimal
+    if (context->debugInfoLevel == DebugInfoLevel::None)
         return;
 
     if (!allowNullStmt)
@@ -8042,31 +8041,13 @@ void maybeEmitDebugLine(
             loc = stmt->loc;
     }
 
-    auto sourceManager = context->getLinkage()->getSourceManager();
-    auto sourceView = sourceManager->findSourceView(loc);
-    if (!sourceView)
+    IRInst* debugSourceInst = getOrEmitDebugSource(context, loc);
+    if (!debugSourceInst)
         return;
 
-    IRInst* debugSourceInst = nullptr;
+    auto sourceManager = context->getLinkage()->getSourceManager();
     auto humaneLoc = sourceManager->getHumaneLoc(loc, SourceLocType::Emit);
 
-    // Do a best-effort attempt to retrieve the nominal source file.
-    auto pathInfo = sourceView->getPathInfo(loc, SourceLocType::Emit);
-
-    // If the source file path correspond to an existing SourceFile in the source manager, use it.
-    auto source = sourceManager->findSourceFileByPathRecursively(pathInfo.foundPath);
-    if (!source)
-        source = sourceManager->findSourceFile(pathInfo.getMostUniqueIdentity());
-    if (source)
-    {
-        context->shared->mapSourceFileToDebugSourceInst.tryGetValue(source, debugSourceInst);
-    }
-    // If the source manager does not have an entry for the corresponding file name, make sure we
-    // still emit an source file entry in the spirv module.
-    if (!debugSourceInst)
-    {
-        debugSourceInst = getOrEmitDebugSource(context, pathInfo);
-    }
     if (visitor)
         visitor->startBlockIfNeeded(stmt);
     context->irBuilder->emitDebugLine(
@@ -8079,21 +8060,19 @@ void maybeEmitDebugLine(
 
 void maybeAddDebugLocationDecoration(IRGenContext* context, IRInst* inst)
 {
-    if (!context->includeDebugInfo)
+    // Only emit debug location info if debug level is at least Minimal
+    if (context->debugInfoLevel == DebugInfoLevel::None)
         return;
-    auto sourceView = context->getLinkage()->getSourceManager()->findSourceView(inst->sourceLoc);
-    if (!sourceView)
+
+    IRInst* debugSourceInst = getOrEmitDebugSource(context, inst->sourceLoc);
+    if (!debugSourceInst)
         return;
-    auto source = sourceView->getSourceFile();
-    IRInst* debugSourceInst = nullptr;
-    if (context->shared->mapSourceFileToDebugSourceInst.tryGetValue(source, debugSourceInst))
-    {
-        auto humaneLoc = context->getLinkage()->getSourceManager()->getHumaneLoc(
-            inst->sourceLoc,
-            SourceLocType::Emit);
-        context->irBuilder
-            ->addDebugLocationDecoration(inst, debugSourceInst, humaneLoc.line, humaneLoc.column);
-    }
+
+    auto sourceManager = context->getLinkage()->getSourceManager();
+    auto humaneLoc = sourceManager->getHumaneLoc(inst->sourceLoc, SourceLocType::Emit);
+
+    context->irBuilder
+        ->addDebugLocationDecoration(inst, debugSourceInst, humaneLoc.line, humaneLoc.column);
 }
 
 void lowerStmt(IRGenContext* context, Stmt* stmt)
@@ -8316,7 +8295,8 @@ IRInst* getAddress(IRGenContext* context, LoweredValInfo const& inVal, SourceLoc
         return val.val;
     }
 
-    context->getSink()->diagnose(diagnosticLocation, Diagnostics::invalidLValueForRefParameter);
+    context->getSink()->diagnose(
+        Diagnostics::InvalidLValueForRefParameter{.location = diagnosticLocation});
     return nullptr;
 }
 
@@ -8773,6 +8753,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     IGNORED_CASE(ModuleDeclarationDecl)
     IGNORED_CASE(FileDecl)
     IGNORED_CASE(RequireCapabilityDecl)
+    IGNORED_CASE(SemanticDecl)
 
 #undef IGNORED_CASE
 
@@ -9776,7 +9757,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
                 // For debug builds, still create debug information for let variables
                 // even though we're not creating an actual variable
-                if (context->includeDebugInfo && decl->loc.isValid() &&
+                // Requires Standard level or higher for variable debug info
+                if (context->debugInfoLevel >= DebugInfoLevel::Standard && decl->loc.isValid() &&
                     context->shared->debugValueContext.isDebuggableType(initVal.val->getDataType()))
                 {
                     // Create a debug variable for this let declaration
@@ -9786,29 +9768,21 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                         SourceLocType::Emit);
 
                     // Find the debug source for this file
-                    auto sourceView =
-                        context->getLinkage()->getSourceManager()->findSourceView(decl->loc);
-                    if (sourceView)
+                    IRInst* debugSourceInst = getOrEmitDebugSource(context, decl->loc);
+                    if (debugSourceInst)
                     {
-                        auto source = sourceView->getSourceFile();
-                        IRInst* debugSourceInst = nullptr;
-                        if (context->shared->mapSourceFileToDebugSourceInst.tryGetValue(
-                                source,
-                                debugSourceInst))
-                        {
-                            auto debugVar = builder->emitDebugVar(
-                                varType,
-                                debugSourceInst,
-                                builder->getIntValue(builder->getUIntType(), humaneLoc.line),
-                                builder->getIntValue(builder->getUIntType(), humaneLoc.column),
-                                nullptr);
+                        auto debugVar = builder->emitDebugVar(
+                            varType,
+                            debugSourceInst,
+                            builder->getIntValue(builder->getUIntType(), humaneLoc.line),
+                            builder->getIntValue(builder->getUIntType(), humaneLoc.column),
+                            nullptr);
 
-                            // Copy name hint from the declaration
-                            addNameHint(context, debugVar, decl);
+                        // Copy name hint from the declaration
+                        addNameHint(context, debugVar, decl);
 
-                            // Emit debug value to associate the constant with the debug variable
-                            builder->emitDebugValue(debugVar, initVal.val);
-                        }
+                        // Emit debug value to associate the constant with the debug variable
+                        builder->emitDebugValue(debugVar, initVal.val);
                     }
                 }
 
@@ -10295,10 +10269,9 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
         else
         {
-            getSink()->diagnose(
-                decl->loc,
-                Diagnostics::unimplemented,
-                "lower unknown AggType to IR");
+            getSink()->diagnose(Diagnostics::Unimplemented{
+                .feature = "lower unknown AggType to IR",
+                .location = decl->loc});
             return LoweredValInfo::simple(subBuilder->getVoidType());
         }
 
@@ -10902,10 +10875,22 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                     for (auto param : paramCloneInfos)
                     {
                         typeBuilder.setInsertInto(param.clonedParam);
-                        param.clonedParam->setFullType((IRType*)cloneInst(
-                            &cloneEnv,
-                            &typeBuilder,
-                            param.originalParam->getFullType()));
+
+                        // If the type is present in the generic (i.e. not in module scope),
+                        // then we need to make a clone since it is likely to be dependent on the
+                        // new parameters we just emitted and we want to obtain the effective type
+                        // in the current context.
+                        //
+                        // If it's in the global scope, we're good if we use the same type.
+                        //
+                        if (!as<IRModuleInst>(param.originalParam->getFullType()->getParent()))
+                            param.clonedParam->setFullType((IRType*)cloneInst(
+                                &cloneEnv,
+                                &typeBuilder,
+                                param.originalParam->getFullType()));
+                        else
+                            param.clonedParam->setFullType(param.originalParam->getFullType());
+
                         cloneInstDecorationsAndChildren(
                             &cloneEnv,
                             typeBuilder.getModule(),
@@ -11097,7 +11082,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         {
             getBuilder()->addRequireGLSLVersionDecoration(
                 inst,
-                Int(getIntegerLiteralValue(versionMod->versionNumberToken)));
+                Int(getIntegerLiteralValue(versionMod->versionNumberToken, getSink())));
         }
         for (auto versionMod : decl->getModifiersOfType<RequiredSPIRVVersionModifier>())
         {
@@ -11471,6 +11456,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         // or attributes.
         IRFunc* irFunc = subBuilder->createFunc();
         context->setGlobalValue(decl, LoweredValInfo::simple(findOuterMostGeneric(irFunc)));
+        irFunc->sourceLoc = decl->loc;
 
         FuncDeclBaseTypeInfo info;
         _lowerFuncDeclBaseTypeInfo(
@@ -11764,7 +11750,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 {
                     // We need to lower the function
                     FuncDecl* patchConstantFunc = attr->patchConstantFuncDecl;
-                    assert(patchConstantFunc);
+                    SLANG_ASSERT(patchConstantFunc);
 
                     // Convert the patch constant function into IRInst
                     IRInst* irPatchConstantFunc =
@@ -11942,33 +11928,34 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             else if (auto numThreadsAttr = as<NumThreadsAttribute>(modifier))
             {
                 LoweredValInfo extents[3];
-
+                subContext->irBuilder->setInsertBefore(irFunc);
                 for (int i = 0; i < 3; ++i)
                 {
                     extents[i] = numThreadsAttr->specConstExtents[i]
                                      ? emitDeclRef(
-                                           context,
+                                           subContext,
                                            numThreadsAttr->specConstExtents[i],
                                            lowerType(
-                                               context,
+                                               subContext,
                                                getType(
-                                                   context->astBuilder,
+                                                   subContext->astBuilder,
                                                    numThreadsAttr->specConstExtents[i])))
-                                     : lowerVal(context, numThreadsAttr->extents[i]);
+                                     : lowerVal(subContext, numThreadsAttr->extents[i]);
                 }
 
                 numThreadsDecor = as<IRNumThreadsDecoration>(getBuilder()->addNumThreadsDecoration(
                     irFunc,
-                    getSimpleVal(context, extents[0]),
-                    getSimpleVal(context, extents[1]),
-                    getSimpleVal(context, extents[2])));
+                    getSimpleVal(subContext, extents[0]),
+                    getSimpleVal(subContext, extents[1]),
+                    getSimpleVal(subContext, extents[2])));
                 numThreadsDecor->sourceLoc = numThreadsAttr->loc;
             }
             else if (auto waveSizeAttr = as<WaveSizeAttribute>(modifier))
             {
+                subContext->irBuilder->setInsertBefore(irFunc);
                 getBuilder()->addWaveSizeDecoration(
                     irFunc,
-                    getSimpleVal(context, lowerVal(context, waveSizeAttr->numLanes)));
+                    getSimpleVal(subContext, lowerVal(subContext, waveSizeAttr->numLanes)));
             }
             else if (as<ReadNoneAttribute>(modifier))
             {
@@ -12133,7 +12120,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             else if (auto versionMod = as<RequiredGLSLVersionModifier>(modifier))
                 getBuilder()->addRequireGLSLVersionDecoration(
                     irFunc,
-                    Int(getIntegerLiteralValue(versionMod->versionNumberToken)));
+                    Int(getIntegerLiteralValue(versionMod->versionNumberToken, getSink())));
             else if (auto spvVersion = as<RequiredSPIRVVersionModifier>(modifier))
                 getBuilder()->addRequireSPIRVVersionDecoration(irFunc, spvVersion->version);
             else if (auto wgslExtensionMod = as<RequiredWGSLExtensionModifier>(modifier))
@@ -12617,6 +12604,8 @@ LoweredValInfo emitDeclRef(IRGenContext* context, Decl* decl, DeclRefBase* subst
         // Once we have both the generic and its arguments,
         // we can emit a `specialize` instruction and use
         // its value as the result.
+        if (genericVal.flavor == LoweredValInfo::Flavor::Ptr)
+            type = context->irBuilder->getPtrType(type);
         auto irSpecializedVal = context->irBuilder->emitSpecializeInst(
             type,
             irGenericVal,
@@ -12904,8 +12893,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     IRBuilder* builder = &builderStorage;
 
     context->irBuilder = builder;
-    context->includeDebugInfo =
-        compileRequest->getLinkage()->m_optionSet.getDebugInfoLevel() != DebugInfoLevel::None;
+    context->debugInfoLevel = compileRequest->getLinkage()->m_optionSet.getDebugInfoLevel();
 
     if (translationUnit->getModuleDecl()->findModifier<ExperimentalModuleAttribute>())
     {
@@ -12915,14 +12903,17 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     // in the translation unit.
     //
     // If debug info is enabled, we emit the DebugSource insts for each source file into IR.
-    if (context->includeDebugInfo)
+    // This is needed for Minimal level and above (for line number correlation)
+    if (context->debugInfoLevel != DebugInfoLevel::None)
     {
         builder->setInsertInto(module->getModuleInst());
         for (auto source : translationUnit->getSourceFiles())
         {
+            // For Standard and Maximal level, include the source content, otherwise just the path
             auto debugSource = builder->emitDebugSource(
                 source->getPathInfo().getMostUniqueIdentity().getUnownedSlice(),
-                source->getContent(),
+                (context->debugInfoLevel >= DebugInfoLevel::Standard) ? source->getContent()
+                                                                      : UnownedStringSlice(),
                 source->isIncludedFile());
             context->shared->mapSourceFileToDebugSourceInst.add(source, debugSource);
         }
@@ -13032,8 +13023,9 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     lowerExpandType(module);
 
     // Generate DebugValue insts to store values into debug variables,
-    // if debug symbols are enabled.
-    if (context->includeDebugInfo)
+    // if debug symbols are enabled at Standard level or higher.
+    // This allows debugging of local variable values.
+    if (context->debugInfoLevel >= DebugInfoLevel::Standard)
     {
         insertDebugValueStore(context->shared->debugValueContext, module);
     }
@@ -13043,7 +13035,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     // temporaries and do basic simplifications.
     //
     constructSSA(module);
-    applySparseConditionalConstantPropagation(module, compileRequest->getSink());
+    applySparseConditionalConstantPropagation(module, nullptr, compileRequest->getSink());
 
     bool minimumOptimizations =
         linkage->m_optionSet.getBoolOption(CompilerOptionName::MinimumSlangOptimization);
@@ -13112,8 +13104,10 @@ RefPtr<IRModule> generateIRForTranslationUnit(
                 {
                     auto codeInst = as<IRGlobalValueWithCode>(func);
                     changed |= constructSSA(func);
-                    changed |=
-                        applySparseConditionalConstantPropagation(func, compileRequest->getSink());
+                    changed |= applySparseConditionalConstantPropagation(
+                        func,
+                        nullptr,
+                        compileRequest->getSink());
                     changed |= peepholeOptimize(nullptr, func);
                     changed |= simplifyCFG(codeInst, CFGSimplificationOptions::getFast());
                     eliminateDeadCode(func, dceOptions);
@@ -13146,15 +13140,13 @@ RefPtr<IRModule> generateIRForTranslationUnit(
         // Check for invalid differentiable function body.
         checkAutoDiffUsages(module, compileRequest->getSink());
 
-        checkForOperatorShiftOverflow(module, linkage->m_optionSet, compileRequest->getSink());
+        checkForOperatorShiftOverflow(module, compileRequest->getSink());
 
         if (translationUnit->getModuleDecl()->languageVersion >=
             SlangLanguageVersion::SLANG_LANGUAGE_VERSION_2025)
         {
             // We do not allow specializing a generic function with an existential type.
-            checkForIllegalGenericSpecializationWithExistentialType(
-                module,
-                compileRequest->getSink());
+            addDecorationsForGenericsSpecializedWithExistentials(module, compileRequest->getSink());
         }
     }
 
@@ -13729,6 +13721,28 @@ IREntryPointLayout* lowerEntryPointLayout(
     return context->irBuilder->getEntryPointLayout(irParamsLayout, irResultLayout);
 }
 
+bool isUnspecializedGenericDeclRef(DeclRef<Decl> declRef)
+{
+    auto genericDeclRef = as<GenericAppDeclRef>(declRef.declRefBase);
+    if (!genericDeclRef)
+        return false;
+    if (genericDeclRef->getArgCount() == 0)
+        return false;
+    DeclRef<Decl> argDeclRef;
+    if (auto intVal = as<DeclRefIntVal>(genericDeclRef->getArg(0)))
+    {
+        argDeclRef = intVal->getDeclRef();
+    }
+    else if (auto type = as<DeclRefType>(genericDeclRef->getArg(0)))
+    {
+        argDeclRef = type->getDeclRef();
+    }
+    if (argDeclRef.getDecl() &&
+        argDeclRef.getDecl()->parentDecl == genericDeclRef->getGenericDecl())
+        return true;
+    return false;
+}
+
 RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
 {
     if (m_irModuleForLayout)
@@ -13839,6 +13853,11 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
         // and thus don't have AST-level information for us to work with.
         //
         if (!funcDeclRef)
+            continue;
+
+        // Skip unspecialized functions because we cannot produce IR layouts to
+        // them yet.
+        if (isUnspecializedGenericDeclRef(funcDeclRef))
             continue;
 
         auto irFuncType = lowerType(context, getFuncType(astBuilder, funcDeclRef));

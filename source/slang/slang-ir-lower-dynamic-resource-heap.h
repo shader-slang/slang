@@ -8,6 +8,6 @@ class TargetProgram;
 class DiagnosticSink;
 
 /// Replace `GetDynamicResourceHeap` insts with an actual array of resources.
-void lowerDynamicResourceHeap(TargetProgram* targetProgram, IRModule* module, DiagnosticSink* sink);
+void lowerDynamicResourceHeap(IRModule* module, TargetProgram* targetProgram, DiagnosticSink* sink);
 
 } // namespace Slang

@@ -89,10 +89,10 @@ FindLeafValueResult findLeafValueAtOffset(
                 IRIntegerValue fieldOffset = 0;
                 IRSizeAndAlignment fieldLayout;
                 CHECK(getNaturalSizeAndAlignment(
-                    targetProgram->getOptionSet(),
+                    targetProgram->getTargetReq(),
                     field->getFieldType(),
                     &fieldLayout));
-                CHECK(getNaturalOffset(targetProgram->getOptionSet(), field, &fieldOffset));
+                CHECK(getNaturalOffset(targetProgram->getTargetReq(), field, &fieldOffset));
                 if (fieldOffset + fieldLayout.size > offset)
                 {
                     if (fieldOffset > offset)
@@ -131,7 +131,7 @@ FindLeafValueResult findLeafValueAtOffset(
             auto elementType = arrayType->getElementType();
             IRSizeAndAlignment elementLayout;
             CHECK(getNaturalSizeAndAlignment(
-                targetProgram->getOptionSet(),
+                targetProgram->getTargetReq(),
                 elementType,
                 &elementLayout));
             if (elementLayout.getStride() == 0)
@@ -161,7 +161,7 @@ FindLeafValueResult findLeafValueAtOffset(
             auto elementType = vectorType->getElementType();
             IRSizeAndAlignment elementLayout;
             CHECK(getNaturalSizeAndAlignment(
-                targetProgram->getOptionSet(),
+                targetProgram->getTargetReq(),
                 elementType,
                 &elementLayout));
             uint32_t index =
@@ -188,7 +188,7 @@ FindLeafValueResult findLeafValueAtOffset(
             auto columnCount = as<IRIntLit>(matrixType->getColumnCount())->value.intVal;
             auto rowType = builder.getVectorType(elementType, matrixType->getColumnCount());
             IRSizeAndAlignment rowLayout;
-            CHECK(getNaturalSizeAndAlignment(targetProgram->getOptionSet(), rowType, &rowLayout));
+            CHECK(getNaturalSizeAndAlignment(targetProgram->getTargetReq(), rowType, &rowLayout));
             uint32_t rowIndex = rowLayout.getStride() == 0
                                     ? 0
                                     : (uint32_t)(offset / (columnCount * rowLayout.getStride()));
@@ -362,7 +362,7 @@ IRInst* extractValueAtOffset(
     auto dataType = src->getDataType();
     IRSizeAndAlignment typeLayout;
     SLANG_RETURN_NULL_ON_FAIL(
-        getNaturalSizeAndAlignment(targetProgram->getOptionSet(), dataType, &typeLayout));
+        getNaturalSizeAndAlignment(targetProgram->getTargetReq(), dataType, &typeLayout));
     if (offset + size > typeLayout.size)
     {
         return builder.getIntValue(builder.getIntType(), 0);

@@ -4,6 +4,7 @@
 #include "slang-ir-reachability.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -19,6 +20,7 @@ static bool isMetaOp(IRInst* inst)
     case kIROp_IsSignedInt:
     case kIROp_IsHalf:
     case kIROp_IsFloat:
+    case kIROp_IsCoopFloat:
     case kIROp_IsVector:
     case kIROp_GetNaturalStride:
     case kIROp_TypeEquals:
@@ -286,6 +288,15 @@ static InstructionUsageType getInstructionUsageType(IRInst* user, IRInst* inst)
         // TODO: Ignore branches for now
         return None;
 
+    // Debug info instructions should be ignored - they don't constitute
+    // actual loads or stores of data, they're just metadata.
+    case kIROp_DebugValue:
+    case kIROp_DebugVar:
+    case kIROp_DebugLine:
+    case kIROp_DebugScope:
+    case kIROp_DebugInlinedAt:
+        return None;
+
     case kIROp_Call:
         // Function calls can be either
         // stores or loads depending on
@@ -540,17 +551,24 @@ static void checkConstructor(IRFunc* func, ReachabilityContext& reachability, Di
     {
         for (auto field : fields)
         {
+            StringBuilder typeNameSb;
+            printDiagnosticArg(typeNameSb, stype);
+            StringBuilder fieldNameSb;
+            printDiagnosticArg(fieldNameSb, field->getKey());
             if (synthesized)
             {
-                sink->diagnose(
-                    field->getKey(),
-                    Diagnostics::fieldNotDefaultInitialized,
-                    stype,
-                    field->getKey());
+                sink->diagnose(Diagnostics::FieldNotDefaultInitialized{
+                    .typeName = typeNameSb.produceString(),
+                    .fieldName = fieldNameSb.produceString(),
+                    .location = field->getKey()->sourceLoc,
+                });
             }
             else
             {
-                sink->diagnose(ret, Diagnostics::constructorUninitializedField, field->getKey());
+                sink->diagnose(Diagnostics::ConstructorUninitializedField{
+                    .fieldName = fieldNameSb.produceString(),
+                    .location = ret->sourceLoc,
+                });
             }
         }
     };
@@ -579,11 +597,22 @@ static void checkParameterAsOut(
     auto loads = getUnresolvedParamLoads(reachability, func, param);
     for (auto load : loads)
     {
-        sink->diagnose(
-            load,
-            as<IRTerminatorInst>(load) ? Diagnostics::returningWithUninitializedOut
-                                       : Diagnostics::usingUninitializedOut,
-            param);
+        StringBuilder paramNameSb;
+        printDiagnosticArg(paramNameSb, param);
+        if (as<IRTerminatorInst>(load))
+        {
+            sink->diagnose(Diagnostics::ReturningWithUninitializedOut{
+                .paramName = paramNameSb.produceString(),
+                .location = load->sourceLoc,
+            });
+        }
+        else
+        {
+            sink->diagnose(Diagnostics::UsingUninitializedOut{
+                .paramName = paramNameSb.produceString(),
+                .location = load->sourceLoc,
+            });
+        }
     }
 }
 
@@ -640,7 +669,29 @@ static void checkUninitializedValues(IRFunc* func, DiagnosticSink* sink)
             auto loads = getUnresolvedVariableLoads(reachability, inst);
             for (auto load : loads)
             {
-                sink->diagnose(load, Diagnostics::usingUninitializedVariable, inst);
+                // Check if we have a meaningful name for the variable
+                bool hasName = inst->findDecoration<IRNameHintDecoration>() != nullptr ||
+                               inst->findDecoration<IRLinkageDecoration>() != nullptr;
+
+                if (hasName)
+                {
+                    StringBuilder varNameSb;
+                    printDiagnosticArg(varNameSb, inst);
+                    sink->diagnose(Diagnostics::UsingUninitializedVariable{
+                        .varName = varNameSb.produceString(),
+                        .location = load->sourceLoc,
+                    });
+                }
+                else
+                {
+                    // For poison ops and other unnamed instructions, show type instead
+                    StringBuilder typeNameSb;
+                    printDiagnosticArg(typeNameSb, type);
+                    sink->diagnose(Diagnostics::UsingUninitializedValue{
+                        .typeName = typeNameSb.produceString(),
+                        .location = load->sourceLoc,
+                    });
+                }
             }
         }
     }
@@ -691,7 +742,12 @@ static void checkUninitializedGlobals(IRGlobalVar* variable, DiagnosticSink* sin
 
     for (auto load : loads)
     {
-        sink->diagnose(load, Diagnostics::usingUninitializedGlobalVariable, variable);
+        StringBuilder varNameSb;
+        printDiagnosticArg(varNameSb, variable);
+        sink->diagnose(Diagnostics::UsingUninitializedGlobalVariable{
+            .varName = varNameSb.produceString(),
+            .location = load->sourceLoc,
+        });
     }
 }
 

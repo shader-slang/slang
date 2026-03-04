@@ -21,6 +21,7 @@
 #include "slang-lower-to-ir.h"
 #include "slang-mangle.h"
 #include "slang-mangled-lexer.h"
+#include "slang-rich-diagnostics.h"
 #include "slang-syntax.h"
 #include "slang-type-layout.h"
 #include "slang-visitor.h"
@@ -79,12 +80,14 @@ struct CLikeSourceEmitter::ComputeEmitActionsContext
             return SourceLanguage::C;
         }
     case CodeGenTarget::CPPSource:
+    case CodeGenTarget::CPPHeader:
     case CodeGenTarget::HostCPPSource:
     case CodeGenTarget::PyTorchCppBinding:
         {
             return SourceLanguage::CPP;
         }
     case CodeGenTarget::CUDASource:
+    case CodeGenTarget::CUDAHeader:
         {
             return SourceLanguage::CUDA;
         }
@@ -111,7 +114,6 @@ CLikeSourceEmitter::CLikeSourceEmitter(const Desc& desc)
     m_effectiveProfile = desc.effectiveProfile;
 
     auto targetCaps = getTargetReq()->getTargetCaps();
-    isCoopvecPoc = targetCaps.implies(CapabilityAtom::hlsl_coopvec_poc);
     isOptixCoopVec = targetCaps.implies(CapabilityAtom::optix_coopvec);
 }
 
@@ -123,6 +125,10 @@ SlangResult CLikeSourceEmitter::init()
 void CLikeSourceEmitter::emitFrontMatterImpl(TargetRequest* targetReq)
 {
     SLANG_UNUSED(targetReq);
+    if (shouldEmitOnlyHeader())
+    {
+        m_writer->emit("#pragma once\n\n");
+    }
 }
 
 void CLikeSourceEmitter::emitPreModuleImpl()
@@ -298,7 +304,8 @@ IRNumThreadsDecoration* CLikeSourceEmitter::getComputeThreadGroupSize(
     {
         if (id >= 0)
         {
-            getSink()->diagnose(decor, Diagnostics::unsupportedSpecializationConstantForNumThreads);
+            getSink()->diagnose(Diagnostics::UnsupportedSpecializationConstantForNumThreads{
+                .location = decor->sourceLoc});
             break;
         }
     }
@@ -1122,7 +1129,7 @@ inline String CLikeSourceEmitter::maybeMakeEntryPointNameValid(String name, Diag
         if (name == "main")
         {
             String newName = _generateUniqueName(name.getUnownedSlice());
-            sink->diagnose(SourceLoc(), Diagnostics::mainEntryPointRenamed, name, newName);
+            sink->diagnose(Diagnostics::MainEntryPointRenamed{.oldName = name, .newName = newName});
             return newName;
         }
     }
@@ -1373,27 +1380,33 @@ void CLikeSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                     }
                 case BaseType::IntPtr:
                     {
-#if SLANG_PTR_IS_64
-                        m_writer->emit("int64_t(");
-                        m_writer->emitInt64(int64_t(litInst->value.intVal));
-                        m_writer->emit(")");
-#else
-                        m_writer->emit("int(");
-                        m_writer->emit(int(litInst->value.intVal));
-                        m_writer->emit(")");
-#endif
+                        if (getPointerSize(getTargetReq()) == sizeof(uint64_t))
+                        {
+                            m_writer->emit("int64_t(");
+                            m_writer->emitInt64(int64_t(litInst->value.intVal));
+                            m_writer->emit(")");
+                        }
+                        else
+                        {
+                            m_writer->emit("int(");
+                            m_writer->emit(int(litInst->value.intVal));
+                            m_writer->emit(")");
+                        }
                         break;
                     }
                 case BaseType::UIntPtr:
                     {
-#if SLANG_PTR_IS_64
-                        m_writer->emit("uint64_t(");
-                        m_writer->emitUInt64(uint64_t(litInst->value.intVal));
-                        m_writer->emit(")");
-#else
-                        m_writer->emit(UInt(uint32_t(litInst->value.intVal)));
-                        m_writer->emit("U");
-#endif
+                        if (getPointerSize(getTargetReq()) == sizeof(uint64_t))
+                        {
+                            m_writer->emit("uint64_t(");
+                            m_writer->emitUInt64(uint64_t(litInst->value.intVal));
+                            m_writer->emit(")");
+                        }
+                        else
+                        {
+                            m_writer->emit(UInt(uint32_t(litInst->value.intVal)));
+                            m_writer->emit("U");
+                        }
                         break;
                     }
                 }
@@ -1449,6 +1462,8 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     case kIROp_UpdateElement:
     case kIROp_DefaultConstruct:
     case kIROp_MetalCastToDepthTexture:
+    case kIROp_LoadResourceDescriptorFromHeap:
+    case kIROp_LoadSamplerDescriptorFromHeap:
         return false;
 
     // Always fold these in, because they are trivial
@@ -2325,7 +2340,9 @@ void CLikeSourceEmitter::emitInstStmt(IRInst* inst)
 
 void CLikeSourceEmitter::diagnoseUnhandledInst(IRInst* inst)
 {
-    getSink()->diagnose(inst, Diagnostics::unimplemented, "unexpected IR opcode during code emit");
+    getSink()->diagnose(Diagnostics::Unimplemented{
+        .feature = "unexpected IR opcode during code emit",
+        .location = inst->sourceLoc});
 }
 
 bool CLikeSourceEmitter::hasExplicitConstantBufferOffset(IRInst* cbufferType)
@@ -2780,11 +2797,10 @@ void CLikeSourceEmitter::defaultEmitInstExpr(IRInst* inst, const EmitOpInfo& inO
     case kIROp_ImageSubscript:
         // We should have legalized ImageSubscript before emit for metal targets
         if (isMetalTarget(this->getTargetReq()))
-            getSink()->diagnose(
-                inst,
-                Diagnostics::unimplemented,
-                "kIROp_ImageSubscript is unimplemented for Metal, expected legalization "
-                "beforehand");
+            getSink()->diagnose(Diagnostics::Unimplemented{
+                .feature = "kIROp_ImageSubscript is unimplemented for Metal, expected legalization "
+                           "beforehand",
+                .location = inst->sourceLoc});
         [[fallthrough]];
     case kIROp_GetElement:
     case kIROp_MeshOutputRef:
@@ -3146,33 +3162,18 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
         case kIROp_MakeCoopVector:
             {
                 emitType(coopVecType, getName(inst));
-                m_writer->emit(isCoopvecPoc ? ";\n" : " = { ");
+                m_writer->emit(" = { ");
 
                 auto elemCount = as<IRIntLit>(coopVecType->getOperand(1));
                 IRIntegerValue elemCountValue = elemCount->getValue();
-                if (isCoopvecPoc)
+                IRIntegerValue i = 0;
+                for (; i < elemCountValue - 1; ++i)
                 {
-                    for (IRIntegerValue i = 0; i < elemCountValue; ++i)
-                    {
-                        m_writer->emit(getName(inst));
-                        m_writer->emit(".WriteToIndex(");
-                        m_writer->emit(i);
-                        m_writer->emit(", ");
-                        emitDereferenceOperand(inst->getOperand(i), getInfo(EmitOp::General));
-                        m_writer->emit(");\n");
-                    }
-                }
-                else
-                {
-                    IRIntegerValue i = 0;
-                    for (; i < elemCountValue - 1; ++i)
-                    {
-                        emitDereferenceOperand(inst->getOperand(i), getInfo(EmitOp::General));
-                        m_writer->emit(", ");
-                    }
                     emitDereferenceOperand(inst->getOperand(i), getInfo(EmitOp::General));
-                    m_writer->emit("};\n");
+                    m_writer->emit(", ");
                 }
+                emitDereferenceOperand(inst->getOperand(i), getInfo(EmitOp::General));
+                m_writer->emit("};\n");
                 return;
             }
         case kIROp_Call:
@@ -3180,7 +3181,7 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
             m_writer->emit(";\n");
 
             m_writer->emit(getName(inst));
-            m_writer->emit(isCoopvecPoc ? ".CopyFrom(" : " = (");
+            m_writer->emit(" = (");
             emitCallExpr((IRCall*)inst, getInfo(EmitOp::General));
             m_writer->emit(");\n");
             return;
@@ -3189,7 +3190,7 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
             m_writer->emit(";\n");
 
             m_writer->emit(getName(inst));
-            m_writer->emit(isCoopvecPoc ? ".CopyFrom(" : " = (");
+            m_writer->emit(" = (");
             emitDereferenceOperand(inst->getOperand(0), getInfo(EmitOp::General));
             m_writer->emit(");\n");
             return;
@@ -3239,6 +3240,7 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
     case kIROp_StructuredBufferGetDimensions:
     case kIROp_MetalAtomicCast:
     case kIROp_MetalCastToDepthTexture:
+    case kIROp_SetOptiXPayloadRegister:
         emitInstStmt(inst);
         break;
 
@@ -3453,21 +3455,11 @@ void CLikeSourceEmitter::_emitStoreImpl(IRStore* store)
     auto dstPtr = store->getPtr();
     if (isPointerOfType(dstPtr->getDataType(), kIROp_CoopVectorType))
     {
-        if (isCoopvecPoc)
-        {
-            emitDereferenceOperand(dstPtr, getInfo(EmitOp::General));
-            m_writer->emit(".CopyFrom(");
-            emitDereferenceOperand(srcVal, getInfo(EmitOp::General));
-            m_writer->emit(");\n");
-        }
-        else
-        {
-            auto prec = getInfo(EmitOp::Assign);
-            emitDereferenceOperand(dstPtr, leftSide(getInfo(EmitOp::General), prec));
-            m_writer->emit(" = ");
-            emitOperand(srcVal, rightSide(prec, getInfo(EmitOp::General)));
-            m_writer->emit(";\n");
-        }
+        auto prec = getInfo(EmitOp::Assign);
+        emitDereferenceOperand(dstPtr, leftSide(getInfo(EmitOp::General), prec));
+        m_writer->emit(" = ");
+        emitOperand(srcVal, rightSide(prec, getInfo(EmitOp::General)));
+        m_writer->emit(";\n");
     }
     else
     {
@@ -3771,7 +3763,12 @@ void CLikeSourceEmitter::emitFunctionBody(IRGlobalValueWithCode* code)
     // Compute a structured region tree that can represent
     // the control flow of our function.
     //
-    RefPtr<RegionTree> regionTree = generateRegionTreeForFunc(code, getSink());
+    // Pass whether this target supports fall-through in switch statements.
+    // Targets like HLSL/WGSL don't support fall-through, so the restructure
+    // pass will use legacy behavior that doesn't preserve fall-through.
+    //
+    RefPtr<RegionTree> regionTree =
+        generateRegionTreeForFunc(code, getSink(), supportsSwitchFallThrough());
 
     // Now that we've computed the region tree, we have
     // an opportunity to perform some last-minute transformations
@@ -3936,6 +3933,8 @@ void CLikeSourceEmitter::emitFuncDecl(IRFunc* func, const String& name)
 
     auto funcType = func->getDataType();
     auto resultType = func->getResultType();
+
+    emitFunctionPreambleImpl(func);
 
     emitFuncDecorations(func);
     emitType(resultType, name);
@@ -4150,6 +4149,13 @@ String CLikeSourceEmitter::_emitLiteralOneWithType(int bitWidth)
             one = "u32(1)";
             return one;
         }
+    }
+
+    // uint32_t is only available in HLSL 2018+ (-HV 2018), so we use uint
+    // which is valid in all HLSL versions and maps to the same DXIL type.
+    if (getTarget() == CodeGenTarget::HLSL && bitWidth == 32)
+    {
+        return "uint(1)";
     }
 
     String one;
@@ -4760,7 +4766,7 @@ void CLikeSourceEmitter::emitVar(IRVar* varDecl)
             {
                 m_writer->emit(";\n");
                 m_writer->emit(getName(varDecl));
-                m_writer->emit(isCoopvecPoc ? ".CopyFrom(" : " = (");
+                m_writer->emit(" = (");
                 emitDereferenceOperand(store->getVal()->getOperand(0), getInfo(EmitOp::General));
                 m_writer->emit(")");
             }
@@ -4768,7 +4774,7 @@ void CLikeSourceEmitter::emitVar(IRVar* varDecl)
             {
                 m_writer->emit(";\n");
                 m_writer->emit(getName(varDecl));
-                m_writer->emit(isCoopvecPoc ? ".CopyFrom(" : " = (");
+                m_writer->emit(" = (");
                 emitCallExpr((IRCall*)store->getVal(), getInfo(EmitOp::General));
                 m_writer->emit(")");
             }
@@ -4781,14 +4787,12 @@ void CLikeSourceEmitter::emitVar(IRVar* varDecl)
                 {
                     m_writer->emit(";\n");
                     m_writer->emit(getName(varDecl));
-                    m_writer->emit(isCoopvecPoc ? ".WriteToIndex(" : "[");
+                    m_writer->emit("[");
                     m_writer->emit(i);
-                    m_writer->emit(isCoopvecPoc ? ", " : "] = ");
+                    m_writer->emit("] = ");
                     emitDereferenceOperand(
                         store->getVal()->getOperand(i),
                         getInfo(EmitOp::General));
-                    if (isCoopvecPoc)
-                        m_writer->emit(")");
                 }
             }
             else
@@ -5294,6 +5298,24 @@ void CLikeSourceEmitter::computeEmitActions(IRModule* module, List<EmitAction>& 
     ctx.actions = &ioActions;
     ctx.openInsts = InstHashSet(module);
 
+    if (shouldEmitOnlyHeader())
+    {
+        // remove body from all functions when emitting a header
+        for (auto inst : module->getGlobalInsts())
+        {
+            if (as<IRFunc>(inst))
+            {
+                for (auto child : inst->getModifiableChildren())
+                {
+                    if (as<IRBlock>(child))
+                    {
+                        child->removeAndDeallocate();
+                    }
+                }
+            }
+        }
+    }
+
     for (auto inst : module->getGlobalInsts())
     {
         // Emit all resource-typed objects first. This is to avoid an odd scenario in HLSL
@@ -5329,6 +5351,13 @@ void CLikeSourceEmitter::computeEmitActions(IRModule* module, List<EmitAction>& 
     }
     for (auto inst : module->getGlobalInsts())
     {
+        if (shouldEmitOnlyHeader())
+        {
+            // Don't emit types without ExternCppDecoration in a header
+            if (!inst->findDecoration<IRExternCppDecoration>())
+                continue;
+        }
+
         if (as<IRType>(inst))
         {
             // Don't emit a type unless it is actually used or is marked exported.

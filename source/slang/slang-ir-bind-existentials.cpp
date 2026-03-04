@@ -3,6 +3,7 @@
 
 #include "slang-ir-insts.h"
 #include "slang-ir.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -216,7 +217,7 @@ struct BindExistentialSlots
         UInt slotCount = 0;
         if (auto typeResInfo =
                 varLayout->getTypeLayout()->findSizeAttr(LayoutResourceKind::ExistentialTypeParam))
-            slotCount = UInt(typeResInfo->getFiniteSize());
+            slotCount = typeResInfo->getFiniteSize();
 
         // At this point we know that the parameter consumes
         // some number of slots, so it would be an error
@@ -228,7 +229,8 @@ struct BindExistentialSlots
             // we should be detecting and diagnosing this problem before
             // we make it to back-end code generation.
             //
-            sink->diagnose(param->sourceLoc, Diagnostics::missingExistentialBindingsForParameter);
+            sink->diagnose(
+                Diagnostics::MissingExistentialBindingsForParameter{.location = param->sourceLoc});
             return;
         }
 
@@ -243,7 +245,8 @@ struct BindExistentialSlots
         UInt slotOperandCount = 2 * slotCount;
         if ((ioSlotOperandOffset + slotOperandCount) > bindOperandCount)
         {
-            sink->diagnose(param->sourceLoc, Diagnostics::missingExistentialBindingsForParameter);
+            sink->diagnose(
+                Diagnostics::MissingExistentialBindingsForParameter{.location = param->sourceLoc});
             return;
         }
         //

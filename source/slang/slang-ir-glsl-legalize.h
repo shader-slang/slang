@@ -15,8 +15,8 @@ struct IRFunc;
 struct IRModule;
 
 void legalizeEntryPointsForGLSL(
-    Session* session,
     IRModule* module,
+    Session* session,
     const List<IRFunc*>& func,
     CodeGenContext* context,
     ShaderExtensionTracker* glslExtensionTracker);
@@ -25,5 +25,5 @@ void legalizeConstantBufferLoadForGLSL(IRModule* module);
 
 void legalizeDispatchMeshPayloadForGLSL(IRModule* module);
 
-void legalizeDynamicResourcesForGLSL(CodeGenContext* context, IRModule* module);
+void legalizeDynamicResourcesForGLSL(IRModule* module, CodeGenContext* context);
 } // namespace Slang

@@ -9,11 +9,9 @@ static IRInst* shl(IRBuilder& builder, IRInst* inst, const IRIntegerValue value)
 {
     if (value == 0)
         return inst;
-    const auto [width, isSigned] = getIntTypeInfo(inst->getDataType());
-    if (value >= width)
+    auto width = maybeGetIntTypeWidth(inst->getDataType());
+    if (width && value >= width.value())
         return builder.getIntValue(inst->getDataType(), 0);
-    if (value == 0)
-        return inst;
     return builder.emitShl(
         inst->getDataType(),
         inst,
@@ -24,20 +22,19 @@ static IRInst* shr(IRBuilder& builder, IRInst* inst, const IRIntegerValue value)
 {
     if (value == 0)
         return inst;
-    const auto [width, isSigned] = getIntTypeInfo(inst->getDataType());
+    auto width = maybeGetIntTypeWidth(inst->getDataType());
+    auto isSigned = getIntTypeSigned(inst->getDataType());
     // If it's not signed, then we just shift all the set bits away
-    if (value >= width && !isSigned)
+    if (width && value >= width.value() && !isSigned)
         return builder.getIntValue(inst->getDataType(), 0);
     // Since on many platforms bit shifting by the number of bits in the number
     // is undefined, correct this here assuming that the Slang IR has the same
     // restriction
-    if (value >= width && isSigned)
+    if (width && value >= width.value() && isSigned)
         return builder.emitShr(
             inst->getDataType(),
             inst,
-            builder.getIntValue(builder.getIntType(), width - 1));
-    if (value == 0)
-        return inst;
+            builder.getIntValue(builder.getIntType(), width.value() - 1));
     return builder.emitShr(
         inst->getDataType(),
         inst,
@@ -59,7 +56,6 @@ static void synthesizeBitFieldGetter(IRFunc* func, IRBitFieldAccessorDecoration*
 
     IRBuilder builder{func};
 
-    const auto isSigned = getIntTypeInfo(func->getResultType()).isSigned;
     builder.setInsertInto(func);
     builder.emitBlock();
     const auto s = builder.emitParam(structParamType);
@@ -69,16 +65,42 @@ static void synthesizeBitFieldGetter(IRFunc* func, IRBitFieldAccessorDecoration*
     // extension behaviour on the right shift
     // return (int(_backing) << (backingWidth-topOfFoo)) >> (backingWidth-fooWidth);
 
-    const auto backingWidth = getIntTypeInfo(backingType).width;
+    const auto backingWidth = maybeGetIntTypeWidth(backingType);
     const auto fieldWidth = dec->getFieldWidth();
     const auto topOfField = dec->getFieldOffset() + fieldWidth;
-    const auto leftShiftAmount = backingWidth - topOfField;
-    const auto rightShiftAmount = backingWidth - fieldWidth;
+
+    auto castBackingType = backingType;
+    if (getIntTypeSigned(backingType) != getIntTypeSigned(func->getResultType()))
+        castBackingType = builder.getType(getOppositeSignIntTypeOp(backingType->getOp()));
+
     const auto backingValue = builder.emitFieldExtract(backingType, s, dec->getBackingMemberKey());
-    const auto castBackingType = builder.getType(getIntTypeOpFromInfo({backingWidth, isSigned}));
     const auto castedBacking = builder.emitCast(castBackingType, backingValue);
-    const auto leftShifted = shl(builder, castedBacking, leftShiftAmount);
-    const auto rightShifted = shr(builder, leftShifted, rightShiftAmount);
+
+    IRInst* rightShifted;
+    if (backingWidth)
+    {
+        // Backing width is target-independent and known already.
+        const auto leftShiftAmount = backingWidth.value() - topOfField;
+        const auto rightShiftAmount = backingWidth.value() - fieldWidth;
+        const auto leftShifted = shl(builder, castedBacking, leftShiftAmount);
+        rightShifted = shr(builder, leftShifted, rightShiftAmount);
+    }
+    else
+    {
+        // Backing width is not yet know, so we need to express width with
+        // sizeof(backingType)*8 and let peephole optimization deal with this
+        // later on.
+        const auto backingWidthSizeOf = builder.emitSizeOf(backingType);
+        const auto intType = builder.getIntType();
+        const auto backingBitWidth =
+            builder.emitMul(intType, builder.getIntValue(intType, 8), backingWidthSizeOf);
+        const auto leftShiftAmount =
+            builder.emitSub(intType, backingBitWidth, builder.getIntValue(intType, topOfField));
+        const auto rightShiftAmount =
+            builder.emitSub(intType, backingBitWidth, builder.getIntValue(intType, fieldWidth));
+        const auto leftShifted = builder.emitShl(backingType, castedBacking, leftShiftAmount);
+        rightShifted = builder.emitShr(backingType, leftShifted, rightShiftAmount);
+    }
     const auto castedToBitFieldType = builder.emitCast(bitFieldType, rightShifted);
     builder.emitReturn(castedToBitFieldType);
 

@@ -8,6 +8,7 @@
 #include "slang-check-impl.h"
 #include "slang-diagnostics.h"
 #include "slang-mangle.h"
+#include "slang-rich-diagnostics.h"
 #include "slang-syntax.h"
 
 #include <assert.h>
@@ -845,17 +846,74 @@ void ExtractFromConjunctionSubtypeWitness::_toTextOverride(StringBuilder& out)
     out << ")";
 }
 
-void TypeCoercionWitness::_toTextOverride(StringBuilder& out)
+void BuiltinTypeCoercionWitness::_toTextOverride(StringBuilder& out)
 {
-    out << "TypeCoercionWitness(";
+    out << "BuiltinTypeCoercionWitness(";
     if (getFromType())
         out << getFromType();
+    else
+        out << "<null>";
+    out << ",";
     if (getToType())
         out << getToType();
+    else
+        out << "<null>";
     out << ")";
 }
 
-Val* TypeCoercionWitness::_substituteImplOverride(
+Val* BuiltinTypeCoercionWitness::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    int diff = 0;
+
+    auto substFrom = as<Type>(getFromType()->substituteImpl(astBuilder, subst, &diff));
+    auto substTo = as<Type>(getToType()->substituteImpl(astBuilder, subst, &diff));
+
+    if (!diff)
+        return this;
+
+    (*ioDiff)++;
+
+    BuiltinTypeCoercionWitness* substValue =
+        astBuilder->getBuiltinTypeCoercionWitness(substFrom, substTo);
+    return substValue;
+}
+
+Val* BuiltinTypeCoercionWitness::_resolveImplOverride()
+{
+    auto newFrom = as<Type>(getFromType()->resolve());
+    auto newTo = as<Type>(getToType()->resolve());
+
+    if (newFrom != getFromType() || newTo != getToType())
+    {
+        return getCurrentASTBuilder()->getBuiltinTypeCoercionWitness(newFrom, newTo);
+    }
+    return this;
+}
+
+void DeclRefTypeCoercionWitness::_toTextOverride(StringBuilder& out)
+{
+    out << "DeclRefTypeCoercionWitness(";
+    if (getFromType())
+        out << getFromType();
+    else
+        out << "<null>";
+    out << ",";
+    if (getToType())
+        out << getToType();
+    else
+        out << "<null>";
+    out << ",";
+    if (getDeclRef())
+        out << getDeclRef();
+    else
+        out << "<null>";
+    out << ")";
+}
+
+Val* DeclRefTypeCoercionWitness::_substituteImplOverride(
     ASTBuilder* astBuilder,
     SubstitutionSet subst,
     int* ioDiff)
@@ -871,12 +929,12 @@ Val* TypeCoercionWitness::_substituteImplOverride(
 
     (*ioDiff)++;
 
-    TypeCoercionWitness* substValue =
-        astBuilder->getTypeCoercionWitness(substFrom, substTo, substDeclRef);
+    DeclRefTypeCoercionWitness* substValue =
+        astBuilder->getDeclRefTypeCoercionWitness(substFrom, substTo, substDeclRef);
     return substValue;
 }
 
-Val* TypeCoercionWitness::_resolveImplOverride()
+Val* DeclRefTypeCoercionWitness::_resolveImplOverride()
 {
     Val* resolvedDeclRef = nullptr;
     if (getDeclRef())
@@ -892,7 +950,7 @@ Val* TypeCoercionWitness::_resolveImplOverride()
         newDeclRef = getDeclRef().declRefBase;
     if (newFrom != getFromType() || newTo != getToType() || newDeclRef != getDeclRef())
     {
-        return getCurrentASTBuilder()->getTypeCoercionWitness(newFrom, newTo, newDeclRef);
+        return getCurrentASTBuilder()->getDeclRefTypeCoercionWitness(newFrom, newTo, newDeclRef);
     }
     return this;
 }
@@ -1201,7 +1259,9 @@ Val* PolynomialIntVal::_substituteImplOverride(
 
             if (auto constantVal = as<ConstantIntVal>(substResult))
             {
-                evaluatedTermConstFactor *= constantVal->getValue();
+                auto power = factor->getPower();
+                for (IntegerLiteralValue i = 0; i < power; i++)
+                    evaluatedTermConstFactor *= constantVal->getValue();
             }
             else if (auto intResult = as<IntVal>(substResult))
             {
@@ -1642,17 +1702,17 @@ Val* FuncCallIntVal::tryFoldImpl(
     }                                                                       \
     else
 
-#define DIV_OPERATOR_CASE(op)                                                    \
-    if (opNameSlice == toSlice(#op))                                             \
-    {                                                                            \
-        if (constArgs[1]->getValue() == 0)                                       \
-        {                                                                        \
-            if (sink)                                                            \
-                sink->diagnose(newFuncDecl.getLoc(), Diagnostics::divideByZero); \
-            return nullptr;                                                      \
-        }                                                                        \
-        resultValue = constArgs[0]->getValue() op constArgs[1]->getValue();      \
-    }                                                                            \
+#define DIV_OPERATOR_CASE(op)                                                                \
+    if (opNameSlice == toSlice(#op))                                                         \
+    {                                                                                        \
+        if (constArgs[1]->getValue() == 0)                                                   \
+        {                                                                                    \
+            if (sink)                                                                        \
+                sink->diagnose(Diagnostics::DivideByZero{.location = newFuncDecl.getLoc()}); \
+            return nullptr;                                                                  \
+        }                                                                                    \
+        resultValue = constArgs[0]->getValue() op constArgs[1]->getValue();                  \
+    }                                                                                        \
     else
 
 #define LOGICAL_OPERATOR_CASE(op)                                                          \
@@ -1690,7 +1750,7 @@ Val* FuncCallIntVal::tryFoldImpl(
         LOGICAL_OPERATOR_CASE(&&)
         LOGICAL_OPERATOR_CASE(||)
         // Special cases need their "operator" names quoted.
-        SPECIAL_OPERATOR_CASE("!", resultValue = ((constArgs[0]->getValue() != 0) ? 1 : 0);)
+        SPECIAL_OPERATOR_CASE("!", resultValue = ((constArgs[0]->getValue() == 0) ? 1 : 0);)
         SPECIAL_OPERATOR_CASE("~", resultValue = ~constArgs[0]->getValue();)
         SPECIAL_OPERATOR_CASE("?:",
                               resultValue = constArgs[0]->getValue() != 0
@@ -2139,6 +2199,7 @@ void UIntSet::unionWith(const UIntSetVal& set)
     // UIntSetVal has getBitmask accessor that returns Elements
     const Index setCount = set.getBitmaskCount();
     const Index minCount = Math::Min(setCount, m_buffer.getCount());
+    m_buffer.reserve(setCount);
 
     for (Index i = 0; i < minCount; ++i)
     {

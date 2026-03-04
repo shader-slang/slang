@@ -6,6 +6,7 @@
 #include "slang-compiler.h"
 #include "slang-lookup-spirv.h"
 #include "slang-lookup.h"
+#include "slang-rich-diagnostics.h"
 #include "slang-visitor.h"
 
 #include <assert.h>
@@ -242,6 +243,18 @@ public:
             lastErrorLoc = loc;
         }
     }
+
+    // Rich diagnostic overload - filters out duplicate errors for the same location
+    template<typename T>
+    void diagnose(T const& diagnostic)
+    {
+        auto loc = diagnostic.location;
+        if (loc != lastErrorLoc)
+        {
+            sink->diagnose(diagnostic);
+            lastErrorLoc = loc;
+        }
+    }
 };
 
 // Forward Declarations
@@ -285,10 +298,9 @@ static void Unexpected(Parser* parser)
     // Don't emit "unexpected token" errors if we are in recovering mode
     if (!parser->isRecovering)
     {
-        parser->diagnose(
-            parser->tokenReader.peekLoc(),
-            Diagnostics::unexpectedToken,
-            parser->tokenReader.peekTokenType());
+        parser->diagnose(Diagnostics::UnexpectedToken{
+            .tokenType = TokenTypeToString(parser->tokenReader.peekTokenType()),
+            .location = parser->tokenReader.peekLoc()});
 
         // Switch into recovery mode, to suppress additional errors
         parser->isRecovering = true;
@@ -300,11 +312,10 @@ static void Unexpected(Parser* parser, char const* expected)
     // Don't emit "unexpected token" errors if we are in recovering mode
     if (!parser->isRecovering)
     {
-        parser->sink->diagnose(
-            parser->tokenReader.peekLoc(),
-            Diagnostics::unexpectedTokenExpectedTokenName,
-            parser->tokenReader.peekTokenType(),
-            expected);
+        parser->sink->diagnose(Diagnostics::UnexpectedTokenExpectedTokenName{
+            .actualToken = TokenTypeToString(parser->tokenReader.peekTokenType()),
+            .expectedTokenName = expected,
+            .location = parser->tokenReader.peekLoc()});
 
         // Switch into recovery mode, to suppress additional errors
         parser->isRecovering = true;
@@ -318,11 +329,10 @@ static void Unexpected(Parser* parser, TokenType expected)
     {
         if (parser->lastErrorLoc != parser->tokenReader.peekLoc())
         {
-            parser->sink->diagnose(
-                parser->tokenReader.peekLoc(),
-                Diagnostics::unexpectedTokenExpectedTokenType,
-                parser->tokenReader.peekTokenType(),
-                expected);
+            parser->sink->diagnose(Diagnostics::UnexpectedTokenExpectedTokenType{
+                .actualToken = TokenTypeToString(parser->tokenReader.peekTokenType()),
+                .expectedToken = TokenTypeToString(expected),
+                .location = parser->tokenReader.peekLoc()});
             parser->lastErrorLoc = parser->tokenReader.peekLoc();
         }
         // Switch into recovery mode, to suppress additional errors
@@ -1428,7 +1438,9 @@ static NameLoc ParseDeclName(Parser* parser)
                 break;
             }; // fall-thru
         default:
-            parser->sink->diagnose(nameToken.loc, Diagnostics::invalidOperator, nameToken);
+            parser->sink->diagnose(Diagnostics::InvalidOperator{
+                .op = nameToken.getContent(),
+                .location = nameToken.loc});
             break;
         }
 
@@ -1517,6 +1529,7 @@ static Decl* ParseGenericParamDecl(Parser* parser, GenericDecl* genericDecl)
     {
         // default case is a type parameter
         auto paramDecl = parser->astBuilder->create<GenericValueParamDecl>();
+        parser->FillPosition(paramDecl);
         paramDecl->nameAndLoc = NameLoc(parser->ReadToken(TokenType::Identifier));
         if (AdvanceIf(parser, TokenType::Colon))
         {
@@ -1824,6 +1837,11 @@ public:
         if (expr->value)
             dispatch(expr->value);
     }
+    void visitFloatBitCastExpr(FloatBitCastExpr* expr)
+    {
+        if (expr->value)
+            dispatch(expr->value);
+    }
     void visitExpr(Expr* /*expr*/) {}
 };
 
@@ -1838,7 +1856,8 @@ static Stmt* parseOptBody(Parser* parser)
         // have the `;`, so we will provide a better diagnostic for it.
         if (peekTokenType(parser) == TokenType::LBrace)
         {
-            parser->sink->diagnose(semiColonToken.loc, Diagnostics::unexpectedBodyAfterSemicolon);
+            parser->sink->diagnose(
+                Diagnostics::UnexpectedBodyAfterSemicolon{.location = semiColonToken.loc});
 
             // Fall through to parse the block stmt.
         }
@@ -2376,10 +2395,9 @@ static Expr* parseGenericApp(Parser* parser, Expr* base)
     else if (parser->LookAheadToken(TokenType::OpGreater))
         parser->ReadToken(TokenType::OpGreater);
     else
-        parser->sink->diagnose(
-            parser->tokenReader.peekToken(),
-            Diagnostics::tokenTypeExpected,
-            "'>'");
+        parser->sink->diagnose(Diagnostics::TokenTypeExpected{
+            .tokenType = "'>'",
+            .location = parser->tokenReader.peekToken().loc});
     return genericApp;
 }
 
@@ -3025,7 +3043,8 @@ static DeclBase* ParseDeclaratorDecl(
         auto result = declGroupBuilder.getResult();
         if (!result)
         {
-            parser->sink->diagnose(startPosition, Diagnostics::declarationDidntDeclareAnything);
+            parser->sink->diagnose(
+                Diagnostics::DeclarationDidntDeclareAnything{.location = startPosition});
         }
         return result;
     }
@@ -3311,7 +3330,7 @@ static Modifier* ParseSemantic(Parser* parser)
         BitFieldModifier* bitWidthMod = parser->astBuilder->create<BitFieldModifier>();
         parser->FillPosition(bitWidthMod);
         const auto token = parser->tokenReader.advanceToken();
-        bitWidthMod->width = getIntegerLiteralValue(token);
+        bitWidthMod->width = getIntegerLiteralValue(token, parser->sink);
         return bitWidthMod;
     }
     else if (parser->LookAheadToken(TokenType::CompletionRequest))
@@ -3967,10 +3986,9 @@ static NodeBase* parseRequireCapabilityDecl(Parser* parser, void*)
         if (capName != CapabilityName::Invalid)
             capNames.add(capName);
         else
-            parser->sink->diagnose(
-                capNameToken,
-                Diagnostics::unknownCapability,
-                capNameToken.getContent());
+            parser->sink->diagnose(Diagnostics::UnknownCapability{
+                .capability = capNameToken.getContent(),
+                .location = capNameToken.getLoc()});
         if (AdvanceIf(parser, "+") || AdvanceIf(parser, ","))
             continue;
         break;
@@ -4136,7 +4154,7 @@ static NodeBase* parseSubscriptDecl(Parser* parser, void* /*userData*/)
             }
             else
             {
-                parser->diagnose(decl->loc, Diagnostics::subscriptMustHaveReturnType);
+                parser->diagnose(Diagnostics::SubscriptMustHaveReturnType{.location = decl->loc});
                 decl->returnType.exp = parser->astBuilder->create<IncompleteExpr>();
             }
 
@@ -4230,6 +4248,85 @@ static NodeBase* parsePropertyDecl(Parser* parser, void* /*userData*/)
     }
 
     parseStorageDeclBody(parser, decl);
+
+    parser->PopScope();
+    return decl;
+}
+
+// Parse a typed accessor for a semantic declaration:
+// "[modifiers] get : <type>;" or "[modifiers] set : <type>;"
+static Decl* parseSemanticAccessorDecl(Parser* parser)
+{
+    Modifiers modifiers = ParseModifiers(parser);
+
+    Decl* decl = nullptr;
+    auto loc = peekToken(parser).loc;
+    auto name = peekToken(parser).getName();
+
+    if (AdvanceIf(parser, "get"))
+    {
+        auto getter = parser->astBuilder->create<SemanticGetterDecl>();
+        expect(parser, TokenType::Colon);
+        getter->type = parser->ParseTypeExp();
+        decl = getter;
+    }
+    else if (AdvanceIf(parser, "set"))
+    {
+        auto setter = parser->astBuilder->create<SemanticSetterDecl>();
+        expect(parser, TokenType::Colon);
+        setter->type = parser->ParseTypeExp();
+        decl = setter;
+    }
+    else
+    {
+        Unexpected(parser);
+        return nullptr;
+    }
+
+    decl->loc = loc;
+    decl->nameAndLoc.name = name;
+    decl->nameAndLoc.loc = loc;
+
+    _addModifiers(decl, modifiers);
+
+    parser->ReadToken(TokenType::Semicolon);
+
+    return decl;
+}
+
+// Parse the body of a semantic declaration: { [accessor]* }
+static void parseSemanticDeclBody(Parser* parser, SemanticDecl* decl)
+{
+    if (AdvanceIf(parser, TokenType::LBrace))
+    {
+        Token closingToken;
+        while (!AdvanceIfMatch(parser, MatchedTokenType::CurlyBraces, &closingToken))
+        {
+            auto accessor = parseSemanticAccessorDecl(parser);
+            if (accessor)
+                AddMember(decl, accessor);
+        }
+        decl->closingSourceLoc = closingToken.loc;
+    }
+    else
+    {
+        parser->sink->diagnose(Diagnostics::UnexpectedToken{
+            .tokenType = TokenTypeToString(peekToken(parser).type),
+            .location = parser->tokenReader.peekLoc()});
+    }
+}
+
+// Parse a semantic declaration: "semantic <name> { [accessor]* }"
+static NodeBase* parseSemanticDecl(Parser* parser, void* /*userData*/)
+{
+    SemanticDecl* decl = parser->astBuilder->create<SemanticDecl>();
+    parser->FillPosition(decl);
+    parser->PushScope(decl);
+
+    // Expect an identifier for the semantic name
+    decl->nameAndLoc = expectIdentifier(parser);
+
+    parseSemanticDeclBody(parser, decl);
 
     parser->PopScope();
     return decl;
@@ -4798,7 +4895,7 @@ static NodeBase* parseAttributeSyntaxDecl(Parser* parser, void* /*userData*/)
         auto classNameAndLoc = expectIdentifier(parser);
         syntaxClass = parser->astBuilder->findSyntaxClass(classNameAndLoc.name);
 
-        assert(syntaxClass);
+        SLANG_ASSERT(syntaxClass);
     }
     else
     {
@@ -4890,7 +4987,8 @@ static void CompleteDecl(
     Parser* parser,
     Decl* decl,
     ContainerDecl* containerDecl,
-    Modifiers modifiers)
+    Modifiers modifiers,
+    Scope* modifierScope)
 {
     // Add any modifiers we parsed before the declaration to the list
     // of modifiers on the declaration itself.
@@ -4900,7 +4998,18 @@ static void CompleteDecl(
     //
     Decl* declToModify = decl;
     if (auto genericDecl = as<GenericDecl>(decl))
+    {
+        // If `decl` is a generic decl, hookup modifierScope to be nested inside
+        // the generic decl's scope, so that generic parameters can be accessible
+        // from the modifiers.
+        if (modifierScope)
+        {
+            modifierScope->containerDecl = genericDecl;
+            if (genericDecl->ownedScope)
+                modifierScope->parent = genericDecl->ownedScope->parent;
+        }
         declToModify = genericDecl->inner;
+    }
 
     if (as<ModuleDeclarationDecl>(decl))
     {
@@ -4928,7 +5037,10 @@ static void CompleteDecl(
                 containerDecl->astNodeType,
                 decl->astNodeType))
         {
-            parser->sink->diagnose(decl->loc, Diagnostics::declNotAllowed, decl->astNodeType);
+            StringBuilder sb;
+            printDiagnosticArg(sb, decl->astNodeType);
+            parser->sink->diagnose(
+                Diagnostics::DeclNotAllowed{.declType = sb.produceString(), .location = decl->loc});
         }
         else
         {
@@ -4941,10 +5053,11 @@ static void CompleteDecl(
                         containerDecl->astNodeType,
                         declToModify->astNodeType))
                 {
-                    parser->sink->diagnose(
-                        decl->loc,
-                        Diagnostics::declNotAllowed,
-                        declToModify->astNodeType);
+                    StringBuilder sb;
+                    printDiagnosticArg(sb, declToModify->astNodeType);
+                    parser->sink->diagnose(Diagnostics::DeclNotAllowed{
+                        .declType = sb.produceString(),
+                        .location = decl->loc});
                 }
             }
         }
@@ -5007,7 +5120,8 @@ static void CompleteDecl(
 static DeclBase* ParseDeclWithModifiers(
     Parser* parser,
     ContainerDecl* containerDecl,
-    Modifiers modifiers)
+    Modifiers modifiers,
+    Scope* modifierScope)
 {
     DeclBase* decl = nullptr;
 
@@ -5123,10 +5237,9 @@ static DeclBase* ParseDeclWithModifiers(
             // skip the whole `{}` block and return an empty decl.
             if (!parser->isRecovering)
             {
-                parser->sink->diagnose(
-                    loc,
-                    Diagnostics::unexpectedToken,
-                    parser->tokenReader.peekToken());
+                parser->sink->diagnose(Diagnostics::UnexpectedToken{
+                    .tokenType = TokenTypeToString(parser->tokenReader.peekToken().type),
+                    .location = loc});
             }
             SkipBalancedToken(&parser->tokenReader);
             decl = parser->astBuilder->create<EmptyDecl>();
@@ -5157,7 +5270,7 @@ static DeclBase* ParseDeclWithModifiers(
     {
         if (auto dd = as<Decl>(decl))
         {
-            CompleteDecl(parser, dd, containerDecl, modifiers);
+            CompleteDecl(parser, dd, containerDecl, modifiers, modifierScope);
         }
         else if (auto declGroup = as<DeclGroup>(decl))
         {
@@ -5171,7 +5284,7 @@ static DeclBase* ParseDeclWithModifiers(
 
             for (auto subDecl : declGroup->decls)
             {
-                CompleteDecl(parser, subDecl, containerDecl, modifiers);
+                CompleteDecl(parser, subDecl, containerDecl, modifiers, nullptr);
             }
         }
     }
@@ -5180,8 +5293,22 @@ static DeclBase* ParseDeclWithModifiers(
 
 static DeclBase* ParseDecl(Parser* parser, ContainerDecl* containerDecl)
 {
+    // If the decl to be parsed is a generic decl (e.g. a `func<T>(...)`), we need to
+    // to make sure any exprs in the modifiers will have the correct scope so that the
+    // generic parameters can be referenced.
+    // However at this point, we don't even know if the decl is generic or not.
+    // So we will create a temporary scope for the modifiers, and then hookup the temp
+    // scope with the generic decl's scope once it is parsed.
+    Scope* modifierScope = parser->astBuilder->create<Scope>();
+    modifierScope->parent = parser->currentScope;
+    ScopeDecl* scopeDecl = parser->astBuilder->create<ScopeDecl>();
+    modifierScope->containerDecl = scopeDecl;
+    scopeDecl->ownedScope = modifierScope;
+    auto oldScope = parser->currentScope;
+    parser->currentScope = modifierScope;
     Modifiers modifiers = ParseModifiers(parser);
-    return ParseDeclWithModifiers(parser, containerDecl, modifiers);
+    parser->currentScope = oldScope;
+    return ParseDeclWithModifiers(parser, containerDecl, modifiers, modifierScope);
 }
 
 static Decl* ParseSingleDecl(Parser* parser, ContainerDecl* containerDecl)
@@ -5201,10 +5328,9 @@ static Decl* ParseSingleDecl(Parser* parser, ContainerDecl* containerDecl)
         }
     }
 
-    parser->sink->diagnose(
-        declBase->loc,
-        Diagnostics::unimplemented,
-        "didn't expect multiple declarations here");
+    parser->sink->diagnose(Diagnostics::Unimplemented{
+        .feature = "didn't expect multiple declarations here",
+        .location = declBase->loc});
     return nullptr;
 }
 
@@ -5410,10 +5536,9 @@ void Parser::parseSourceFile(ContainerDecl* program)
     {
         if (!isValidSlangLanguageVersion(currentModule->languageVersion))
         {
-            sink->diagnose(
-                program->loc,
-                Diagnostics::unknownLanguageVersion,
-                currentModule->languageVersion);
+            sink->diagnose(Diagnostics::UnknownLanguageVersion{
+                .version = String(currentModule->languageVersion),
+                .location = program->loc});
         }
     }
 
@@ -5509,10 +5634,10 @@ Decl* Parser::ParseStruct()
                 PopScope();
                 if (!LookAheadToken(TokenType::Semicolon))
                 {
-                    this->diagnose(
-                        this->tokenReader.peekToken().loc,
-                        Diagnostics::unexpectedTokenExpectedTokenType,
-                        "';'");
+                    this->diagnose(Diagnostics::UnexpectedTokenExpectedTokenType{
+                        .actualToken = TokenTypeToString(this->tokenReader.peekToken().type),
+                        .expectedToken = "';'",
+                        .location = this->tokenReader.peekToken().loc});
                 }
                 return rs;
             }
@@ -5709,11 +5834,10 @@ static Stmt* parseTargetSwitchStmtImpl(Parser* parser, TargetSwitchStmt* stmt)
         }
         if (caseNames.getCount() == 0)
         {
-            parser->sink->diagnose(
-                parser->tokenReader.peekLoc(),
-                Diagnostics::unexpectedTokenExpectedTokenType,
-                parser->tokenReader.peekToken(),
-                "'case' or 'default'");
+            parser->sink->diagnose(Diagnostics::UnexpectedTokenExpectedTokenType{
+                .actualToken = TokenTypeToString(parser->tokenReader.peekToken().type),
+                .expectedToken = "'case' or 'default'",
+                .location = parser->tokenReader.peekLoc()});
             parser->isRecovering = true;
             goto recover;
         }
@@ -5754,10 +5878,9 @@ static Stmt* parseTargetSwitchStmtImpl(Parser* parser, TargetSwitchStmt* stmt)
                 auto cap = findCapabilityName(caseName.getContent());
                 if (caseName.getContent().getLength() && cap == CapabilityName::Invalid)
                 {
-                    parser->sink->diagnose(
-                        caseName.loc,
-                        Diagnostics::unknownTargetName,
-                        caseName.getContent());
+                    parser->sink->diagnose(Diagnostics::UnknownTargetName{
+                        .name = caseName.getContent(),
+                        .location = caseName.loc});
                 }
                 targetCase->capability = (int32_t)cap;
                 targetCase->capabilityToken = caseName;
@@ -6152,7 +6275,8 @@ Stmt* Parser::ParseStatement(Stmt* parentStmt)
             // An empty statement after an `if` is probably a mistake,
             // so we will diagnose it as such.
             //
-            sink->diagnose(tokenReader.peekLoc(), Diagnostics::unintendedEmptyStatement);
+            sink->diagnose(
+                Diagnostics::UnintendedEmptyStatement{.location = tokenReader.peekLoc()});
         }
         statement = astBuilder->create<EmptyStmt>();
         FillPosition(statement);
@@ -6310,7 +6434,7 @@ DeclStmt* Parser::parseVarDeclrStatement(Modifiers modifiers)
     DeclStmt* varDeclrStatement = astBuilder->create<DeclStmt>();
 
     FillPosition(varDeclrStatement);
-    auto decl = ParseDeclWithModifiers(this, currentScope->containerDecl, modifiers);
+    auto decl = ParseDeclWithModifiers(this, currentScope->containerDecl, modifiers, nullptr);
     varDeclrStatement->decl = decl;
 
     if (as<VarDeclBase>(decl))
@@ -6330,7 +6454,10 @@ DeclStmt* Parser::parseVarDeclrStatement(Modifiers modifiers)
     }
     else
     {
-        sink->diagnose(decl->loc, Diagnostics::declNotAllowed, decl->astNodeType);
+        StringBuilder sb;
+        printDiagnosticArg(sb, decl->astNodeType);
+        sink->diagnose(
+            Diagnostics::DeclNotAllowed{.declType = sb.produceString(), .location = decl->loc});
     }
     return varDeclrStatement;
 }
@@ -6369,6 +6496,7 @@ Stmt* Parser::parseIfLetStatement()
     auto tempVarDecl = astBuilder->create<LetDecl>();
     tempVarDecl->nameAndLoc = NameLoc(getName(this, "$OptVar"), identifierToken.loc);
     tempVarDecl->initExpr = initExpr;
+    tempVarDecl->checkState = DeclCheckState::ReadyForParserLookup;
     AddMember(currentScope->containerDecl, tempVarDecl);
 
     DeclStmt* tmpVarDeclStmt = astBuilder->create<DeclStmt>();
@@ -6385,10 +6513,25 @@ Stmt* Parser::parseIfLetStatement()
 
     ReadToken(TokenType::RParent);
 
-    // Create a new scope surrounding the positive statement, will be used for
-    // the variable declared in the if_let syntax
+    // Create scope for the positive statement containing the unwrapped variable.
+    // The variable must be added to scope BEFORE parsing the body, because during
+    // deferred parsing tryParseGenericApp may call CheckTerm which needs to find
+    // the variable.
     ScopeDecl* positiveScopeDecl = astBuilder->create<ScopeDecl>();
     pushScopeAndSetParent(positiveScopeDecl);
+
+    // Create 'let <user_var> = $OptVar.value'
+    MemberExpr* memberExpr = astBuilder->create<MemberExpr>();
+    memberExpr->baseExpression = tempVarExpr;
+    memberExpr->name = getName(this, "value");
+
+    auto varDecl = astBuilder->create<LetDecl>();
+    varDecl->nameAndLoc = NameLoc(identifierToken.getName(), identifierToken.loc);
+    varDecl->initExpr = memberExpr;
+    varDecl->checkState = DeclCheckState::ReadyForParserLookup;
+    AddMember(positiveScopeDecl, varDecl);
+
+    // Now parse the body with the variable in scope
     ifStatement->positiveStatement = ParseStatement(ifStatement);
     PopScope();
 
@@ -6406,20 +6549,8 @@ Stmt* Parser::parseIfLetStatement()
             seqPositiveStmt = astBuilder->create<SeqStmt>();
         }
 
-        MemberExpr* memberExpr = astBuilder->create<MemberExpr>();
-        memberExpr->baseExpression = tempVarExpr;
-        memberExpr->name = getName(this, "value");
-
-        auto varDecl = astBuilder->create<LetDecl>();
-        varDecl->nameAndLoc = NameLoc(identifierToken.getName(), identifierToken.loc);
-        varDecl->initExpr = memberExpr;
-
         DeclStmt* varDeclrStatement = astBuilder->create<DeclStmt>();
         varDeclrStatement->decl = varDecl;
-
-        // Add scope to the variable declared in the if_let syntax such
-        // that this variable cannot be used outside the positive statement
-        AddMember(positiveScopeDecl, varDecl);
 
         seqPositiveStmt->stmts.add(varDeclrStatement);
         seqPositiveStmt->stmts.add(ifStatement->positiveStatement);
@@ -6446,6 +6577,8 @@ IfStmt* Parser::parseIfStatement()
         ReadToken("else");
         ifStatement->negativeStatement = ParseStatement(ifStatement);
     }
+    ifStatement->afterLoc = tokenReader.peekLoc();
+
     return ifStatement;
 }
 
@@ -6490,10 +6623,10 @@ ForStmt* Parser::ParseForStatement()
         }
         else
         {
-            sink->diagnose(
-                stmt->initialStatement->loc,
-                Diagnostics::unexpectedTokenExpectedTokenType,
-                "expression");
+            sink->diagnose(Diagnostics::UnexpectedTokenExpectedTokenType{
+                .actualToken = "statement",
+                .expectedToken = "expression",
+                .location = stmt->initialStatement->loc});
         }
     }
     else
@@ -7062,6 +7195,21 @@ static NodeBase* parseCountOfExpr(Parser* parser, void* /*userData*/)
     return countOfExpr;
 }
 
+static NodeBase* parseFloatAsIntExpr(Parser* parser, void* /*userData*/)
+{
+    FloatBitCastExpr* expr = parser->astBuilder->create<FloatBitCastExpr>();
+
+    parser->ReadMatchingToken(TokenType::LParent);
+
+    // Parse the argument expression
+    // The result type will be determined during semantic checking based on the input type
+    expr->value = parser->ParseExpression();
+
+    parser->ReadMatchingToken(TokenType::RParent);
+
+    return expr;
+}
+
 static NodeBase* parseAddressOfExpr(Parser* parser, void* /*userData*/)
 {
     // We could have a type or a variable or an expression
@@ -7258,12 +7406,11 @@ static IntegerLiteralValue _fixIntegerLiteral(
         if ((!(maskedValue == 0 || maskedValue == mask)) && sink && token)
         {
             // Output a warning that number has been altered
-            sink->diagnose(
-                *token,
-                Diagnostics::integerLiteralTruncated,
-                token->getContent(),
-                BaseTypeInfo::asText(baseType),
-                truncatedValue);
+            sink->diagnose(Diagnostics::IntegerLiteralTruncated{
+                .literal = String(token->getContent()),
+                .type = String(BaseTypeInfo::asText(baseType)),
+                .truncatedValue = String(truncatedValue),
+                .location = token->loc});
         }
 
         value = truncatedValue;
@@ -7323,7 +7470,7 @@ static BaseType _determineNonSuffixedIntegerLiteralType(
 
         // Decimal integer is too large to be represented as signed.
         // Output warning that it is represented as unsigned instead.
-        sink->diagnose(*token, Diagnostics::integerLiteralTooLarge);
+        sink->diagnose(Diagnostics::IntegerLiteralTooLarge{.location = token->loc});
     }
 
     return baseType;
@@ -7531,7 +7678,7 @@ static Expr* parseAtomicExpr(Parser* parser)
     {
     default:
         // TODO: should this return an error expression instead of NULL?
-        parser->diagnose(parser->tokenReader.peekLoc(), Diagnostics::syntaxError);
+        parser->diagnose(Diagnostics::SyntaxError{.location = parser->tokenReader.peekLoc()});
         return parser->astBuilder->create<IncompleteExpr>();
 
     // Either:
@@ -7598,7 +7745,8 @@ static Expr* parseAtomicExpr(Parser* parser)
                     {
                         // We don't support empty parentheses `()` as a valid expression prior to
                         // Slang 2026.
-                        parser->diagnose(openParen, Diagnostics::invalidEmptyParenthesisExpr);
+                        parser->diagnose(
+                            Diagnostics::InvalidEmptyParenthesisExpr{.location = openParen.loc});
                         base = parser->astBuilder->create<IncompleteExpr>();
                         base->type = parser->astBuilder->getErrorType();
                     }
@@ -7725,7 +7873,13 @@ static Expr* parseAtomicExpr(Parser* parser)
 
             UnownedStringSlice suffix;
             bool isDecimalBase;
-            IntegerLiteralValue value = getIntegerLiteralValue(token, &suffix, &isDecimalBase);
+            bool hasOverflowed;
+            IntegerLiteralValue value = getIntegerLiteralValue(
+                token,
+                parser->sink,
+                &suffix,
+                &isDecimalBase,
+                &hasOverflowed);
 
             // Look at any suffix on the value
             char const* suffixCursor = suffix.begin();
@@ -7767,7 +7921,9 @@ static Expr* parseAtomicExpr(Parser* parser)
 
                 if (unknownCount)
                 {
-                    parser->sink->diagnose(token, Diagnostics::invalidIntegerLiteralSuffix, suffix);
+                    parser->sink->diagnose(Diagnostics::InvalidIntegerLiteralSuffix{
+                        .suffix = String(suffix),
+                        .location = token.loc});
                     suffixBaseType = BaseType::Int;
                 }
                 // `u` or `ul` suffix -> `uint`
@@ -7801,17 +7957,23 @@ static Expr* parseAtomicExpr(Parser* parser)
                 // TODO: do we need suffixes for smaller integer types?
                 else
                 {
-                    parser->sink->diagnose(token, Diagnostics::invalidIntegerLiteralSuffix, suffix);
+                    parser->sink->diagnose(Diagnostics::InvalidIntegerLiteralSuffix{
+                        .suffix = String(suffix),
+                        .location = token.loc});
                     suffixBaseType = BaseType::Int;
                 }
             }
-            else
+            else if (!hasOverflowed)
             {
                 suffixBaseType = _determineNonSuffixedIntegerLiteralType(
                     value,
                     isDecimalBase,
                     &token,
                     parser->sink);
+            }
+            else
+            {
+                suffixBaseType = BaseType::UInt64;
             }
 
             value = _fixIntegerLiteral(suffixBaseType, value, &token, parser->sink);
@@ -7875,10 +8037,9 @@ static Expr* parseAtomicExpr(Parser* parser)
 
                 if (unknownCount)
                 {
-                    parser->sink->diagnose(
-                        token,
-                        Diagnostics::invalidFloatingPointLiteralSuffix,
-                        suffix);
+                    parser->sink->diagnose(Diagnostics::InvalidFloatingPointLiteralSuffix{
+                        .suffix = String(suffix),
+                        .location = token.loc});
                     suffixBaseType = BaseType::Float;
                 }
                 // `f` suffix -> `float`
@@ -7899,10 +8060,9 @@ static Expr* parseAtomicExpr(Parser* parser)
                 // TODO: are there other suffixes we need to handle?
                 else
                 {
-                    parser->sink->diagnose(
-                        token,
-                        Diagnostics::invalidFloatingPointLiteralSuffix,
-                        suffix);
+                    parser->sink->diagnose(Diagnostics::InvalidFloatingPointLiteralSuffix{
+                        .suffix = String(suffix),
+                        .location = token.loc});
                     suffixBaseType = BaseType::Float;
                 }
             }
@@ -7929,22 +8089,20 @@ static Expr* parseAtomicExpr(Parser* parser)
                 }
             case FloatFixKind::Zeroed:
                 {
-                    parser->sink->diagnose(
-                        token,
-                        Diagnostics::floatLiteralTooSmall,
-                        BaseTypeInfo::asText(suffixBaseType),
-                        token.getContent(),
-                        fixedValue);
+                    parser->sink->diagnose(Diagnostics::FloatLiteralTooSmall{
+                        .literal = String(token.getContent()),
+                        .type = String(BaseTypeInfo::asText(suffixBaseType)),
+                        .convertedValue = String(fixedValue),
+                        .location = token.loc});
                     break;
                 }
             case FloatFixKind::Unrepresentable:
                 {
-                    parser->sink->diagnose(
-                        token,
-                        Diagnostics::floatLiteralUnrepresentable,
-                        BaseTypeInfo::asText(suffixBaseType),
-                        token.getContent(),
-                        fixedValue);
+                    parser->sink->diagnose(Diagnostics::FloatLiteralUnrepresentable{
+                        .type = String(BaseTypeInfo::asText(suffixBaseType)),
+                        .literal = String(token.getContent()),
+                        .convertedValue = String(fixedValue),
+                        .location = token.loc});
                     break;
                 }
             }
@@ -8218,7 +8376,7 @@ static Expr* parsePostfixExpr(Parser* parser)
     }
 }
 
-static IRIntegerValue _foldIntegerPrefixOp(TokenType tokenType, IRIntegerValue value)
+static IntegerLiteralValue _foldIntegerPrefixOp(TokenType tokenType, IntegerLiteralValue value)
 {
     switch (tokenType)
     {
@@ -8227,7 +8385,15 @@ static IRIntegerValue _foldIntegerPrefixOp(TokenType tokenType, IRIntegerValue v
     case TokenType::OpAdd:
         return value;
     case TokenType::OpSub:
-        return -value;
+#if SLANG_VC
+// Disable MSVC warning: "unary minus operator applied to unsigned type, result still unsigned"
+#pragma warning(push)
+#pragma warning(disable : 4146)
+#endif
+        return -(uint64_t)value;
+#if SLANG_VC
+#pragma warning(pop)
+#endif
     default:
         {
             SLANG_ASSERT(!"Unexpected op");
@@ -8368,9 +8534,9 @@ static std::optional<SPIRVAsmOperand> parseSPIRVAsmOperand(Parser* parser)
     else if (parser->LookAheadToken(TokenType::IntegerLiteral))
     {
         const auto tok = parser->ReadToken();
-        const auto v = getIntegerLiteralValue(tok);
+        const auto v = getIntegerLiteralValue(tok, parser->sink);
         if (v < 0 || v > 0xffffffff)
-            parser->diagnose(tok, Diagnostics::spirvOperandRange);
+            parser->diagnose(Diagnostics::SpirvOperandRange{.location = tok.loc});
         return SPIRVAsmOperand{SPIRVAsmOperand::Literal, tok, nullptr, {}, SpvWord(v)};
     }
     // A literal string
@@ -8455,16 +8621,15 @@ static std::optional<SPIRVAsmInst> parseSPIRVAsmInst(Parser* parser)
 
     const auto& opcodeWord = spirvInfo->opcodes.lookup(ret.opcode.token.getContent());
     const auto& opInfo = opcodeWord ? spirvInfo->opInfos.lookup(*opcodeWord) : std::nullopt;
-    ret.opcode.knownValue = opcodeWord.value_or(SpvOp(0xffffffff));
+    ret.opcode.knownValue = opcodeWord.value_or(SpvOpMax);
 
     // If we couldn't find any info, but used this assignment syntax, raise
     // an error
     if (!opInfo && resultOperand)
     {
-        parser->diagnose(
-            resultOperand->token,
-            Diagnostics::unrecognizedSPIRVOpcode,
-            ret.opcode.token);
+        parser->diagnose(Diagnostics::UnrecognizedSpirvOpcode{
+            .opcode = ret.opcode.token.getContent(),
+            .location = resultOperand->token.loc});
         return std::nullopt;
     }
 
@@ -8472,20 +8637,18 @@ static std::optional<SPIRVAsmInst> parseSPIRVAsmInst(Parser* parser)
     // OpFoo` instruction) then diagnose if we don't know where to put it
     if (resultOperand && opInfo && opInfo->resultIdIndex == -1)
     {
-        parser->diagnose(
-            resultOperand->token,
-            Diagnostics::spirvInstructionWithoutResultId,
-            ret.opcode.token);
+        parser->diagnose(Diagnostics::SpirvInstructionWithoutResultId{
+            .opcode = ret.opcode.token.getContent(),
+            .location = resultOperand->token.loc});
         return std::nullopt;
     }
 
     // Likewise for the type
     if (resultTypeOperand && opInfo && opInfo->resultTypeIndex == -1)
     {
-        parser->diagnose(
-            resultTypeOperand->token,
-            Diagnostics::spirvInstructionWithoutResultTypeId,
-            ret.opcode.token);
+        parser->diagnose(Diagnostics::SpirvInstructionWithoutResultTypeId{
+            .opcode = ret.opcode.token.getContent(),
+            .location = resultTypeOperand->token.loc});
     }
 
     //
@@ -8525,11 +8688,10 @@ static std::optional<SPIRVAsmInst> parseSPIRVAsmInst(Parser* parser)
                 token.type == TokenType::OpMod && (parser->LookAheadToken(TokenType::OpAssign, 2) ||
                                                    parser->LookAheadToken(TokenType::Colon, 2)))
             {
-                parser->diagnose(
-                    parser->tokenReader.peekLoc(),
-                    Diagnostics::spirvInstructionWithTooManyOperands,
-                    ret.opcode.token,
-                    opInfo->maxOperandCount);
+                parser->diagnose(Diagnostics::SpirvInstructionWithTooManyOperands{
+                    .opcode = ret.opcode.token.getContent(),
+                    .maxOperands = opInfo->maxOperandCount,
+                    .location = parser->tokenReader.peekLoc()});
             }
         }
 
@@ -8551,7 +8713,7 @@ static std::optional<SPIRVAsmInst> parseSPIRVAsmInst(Parser* parser)
     }
 
     if (ret.opcode.flavor == SPIRVAsmOperand::Flavor::NamedValue &&
-        ret.opcode.knownValue == (SpvWord)(SpvOp(0xffffffff)))
+        ret.opcode.knownValue == (SpvWord)SpvOpMax)
     {
         if (ret.opcode.token.type == TokenType::IntegerLiteral)
         {
@@ -8561,10 +8723,9 @@ static std::optional<SPIRVAsmInst> parseSPIRVAsmInst(Parser* parser)
         }
         else
         {
-            parser->diagnose(
-                ret.opcode.token,
-                Diagnostics::unrecognizedSPIRVOpcode,
-                ret.opcode.token);
+            parser->diagnose(Diagnostics::UnrecognizedSpirvOpcode{
+                .opcode = ret.opcode.token.getContent(),
+                .location = ret.opcode.token.loc});
             return std::nullopt;
         }
     }
@@ -8668,7 +8829,7 @@ static Expr* parsePrefixExpr(Parser* parser)
                 }
                 else
                 {
-                    parser->diagnose(newExpr->loc, Diagnostics::syntaxError);
+                    parser->diagnose(Diagnostics::SyntaxError{.location = newExpr->loc});
                     newExpr->functionExpr = parser->astBuilder->create<IncompleteExpr>();
                 }
                 return newExpr;
@@ -8721,7 +8882,7 @@ static Expr* parsePrefixExpr(Parser* parser)
                 IntegerLiteralExpr* newLiteral =
                     parser->astBuilder->create<IntegerLiteralExpr>(*intLit);
 
-                IRIntegerValue value = _foldIntegerPrefixOp(tokenType, newLiteral->value);
+                IntegerLiteralValue value = _foldIntegerPrefixOp(tokenType, newLiteral->value);
 
                 // Need to get the basic type, so we can fit to underlying type
                 if (auto basicExprType = as<BasicExpressionType>(intLit->type.type))
@@ -8936,7 +9097,9 @@ static IROp parseIROp(Parser* parser, Token& outToken)
 
         if (op == kIROp_Invalid)
         {
-            parser->sink->diagnose(outToken, Diagnostics::unimplemented, "unknown intrinsic op");
+            parser->sink->diagnose(Diagnostics::Unimplemented{
+                .feature = "unknown intrinsic op",
+                .location = outToken.loc});
         }
         return op;
     }
@@ -9101,7 +9264,7 @@ static NodeBase* parseSPIRVVersionModifier(Parser* parser, void* /*userData*/)
         modifier->version = version;
         return modifier;
     }
-    parser->sink->diagnose(token, Diagnostics::invalidSPIRVVersion);
+    parser->sink->diagnose(Diagnostics::InvalidSpirvVersion{.location = token.loc});
     return nullptr;
 }
 
@@ -9115,7 +9278,7 @@ static NodeBase* parseCUDASMVersionModifier(Parser* parser, void* /*userData*/)
         modifier->version = version;
         return modifier;
     }
-    parser->sink->diagnose(token, Diagnostics::invalidCUDASMVersion);
+    parser->sink->diagnose(Diagnostics::InvalidCudaSmVersion{.location = token.loc});
     return nullptr;
 }
 
@@ -9309,9 +9472,8 @@ static NodeBase* parseLayoutModifier(Parser* parser, void* /*userData*/)
 
             if (as<GLSLUnparsedLayoutModifier>(modifier))
             {
-                parser->diagnose(
-                    modifier,
-                    Diagnostics::unrecognizedGLSLLayoutQualifierOrRequiresAssignment);
+                parser->diagnose(Diagnostics::UnrecognizedGlslLayoutQualifierOrRequiresAssignment{
+                    .location = modifier->loc});
             }
 
             listBuilder.add(modifier);
@@ -9552,6 +9714,7 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseDecl("__init", parseConstructorDecl),
     _makeParseDecl("__subscript", parseSubscriptDecl),
     _makeParseDecl("property", parsePropertyDecl),
+    _makeParseDecl("semantic", parseSemanticDecl),
     _makeParseDecl("interface", parseInterfaceDecl),
     _makeParseDecl("syntax", parseSyntaxDecl),
     _makeParseDecl("attribute_syntax", parseAttributeSyntaxDecl),
@@ -9689,6 +9852,7 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseExpr("alignof", parseAlignOfExpr),
     _makeParseExpr("countof", parseCountOfExpr),
     _makeParseExpr("__getAddress", parseAddressOfExpr),
+    _makeParseExpr("__floatAsInt", parseFloatAsIntExpr),
 };
 
 ConstArrayView<SyntaxParseInfo> getSyntaxParseInfos()

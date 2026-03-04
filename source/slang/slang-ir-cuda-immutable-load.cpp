@@ -107,7 +107,7 @@ struct ImmutableBufferLoadLoweringContext : InstPassBase
                 auto elementCount = getIntVal(vectorType->getElementCount());
                 IRSizeAndAlignment elementSize;
                 getNaturalSizeAndAlignment(
-                    targetProgram->getOptionSet(),
+                    targetProgram->getTargetReq(),
                     elementType,
                     &elementSize);
                 if (elementCount <= 2)
@@ -365,7 +365,7 @@ struct ImmutableBufferLoadLoweringContext : InstPassBase
     }
 };
 
-void lowerImmutableBufferLoadForCUDA(TargetProgram* targetProgram, IRModule* module)
+void lowerImmutableBufferLoadForCUDA(IRModule* module, TargetProgram* targetProgram)
 {
     ImmutableBufferLoadLoweringContext context(module);
     context.targetProgram = targetProgram;

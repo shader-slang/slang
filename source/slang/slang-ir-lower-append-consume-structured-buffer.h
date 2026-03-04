@@ -13,8 +13,8 @@ class TargetProgram;
 /// that contains two RWStructuredBuffer typed fields, one to store the elements, and one
 /// for the atomic buffer.
 void lowerAppendConsumeStructuredBuffers(
-    TargetProgram* target,
     IRModule* module,
+    TargetProgram* target,
     DiagnosticSink* sink);
 
 } // namespace Slang

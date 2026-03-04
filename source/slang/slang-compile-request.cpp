@@ -10,6 +10,7 @@
 #include "slang-emit-source-writer.h"
 #include "slang-lower-to-ir.h"
 #include "slang-parser.h"
+#include "slang-rich-diagnostics.h"
 #include "slang-serialize-container.h"
 
 namespace Slang
@@ -155,7 +156,7 @@ static void _outputInclude(SourceFile* sourceFile, Index depth, DiagnosticSink* 
     // Perhaps I output in two sections, one the hierarchy and the other the locations of the
     // includes?
 
-    sink->diagnose(SourceLoc(), Diagnostics::includeOutput, buf);
+    sink->diagnose(Diagnostics::IncludeOutput{.content = buf.toString()});
 }
 
 static void _outputIncludesRec(
@@ -307,6 +308,14 @@ void FrontEndCompileRequest::parseTranslationUnit(TranslationUnitRequest* transl
     {
         module->getIncludedSourceFileMap().addIfNotExists(sourceFile, nullptr);
     }
+
+    // For a new translation unit, we need to reset the WarningStateTracker
+    // to avoid pragma state pollution from previously parsed modules.
+    // This is only done for the first file of the translation unit.
+    // Subsequent files (if any) in the same translation unit, as well as
+    // files included via __include during semantic checking, will reuse
+    // the tracker to preserve pragma states within the module.
+    getSink()->setSourceWarningStateTracker(nullptr);
 
     for (auto sourceFile : translationUnit->getSourceFiles())
     {
@@ -470,9 +479,8 @@ void FrontEndCompileRequest::generateIR()
             if (SLANG_FAILED(
                     SerialContainerUtil::verifyIRSerialize(irModule, getSession(), options)))
             {
-                getSink()->diagnose(
-                    irModule->getModuleInst()->sourceLoc,
-                    Diagnostics::serialDebugVerificationFailed);
+                getSink()->diagnose(Diagnostics::SerialDebugVerificationFailed{
+                    .location = irModule->getModuleInst()->sourceLoc});
             }
         }
 
@@ -655,7 +663,7 @@ void FrontEndCompileRequest::addTranslationUnitSourceFile(
     if (SLANG_FAILED(existsRes))
     {
         // Emit a diagnostic!
-        getSink()->diagnose(SourceLoc(), Diagnostics::cannotOpenFile, path);
+        getSink()->diagnose(Diagnostics::CannotOpenFile{.path = path});
         return;
     }
 

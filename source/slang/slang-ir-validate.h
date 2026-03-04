@@ -80,6 +80,9 @@ private:
 // lead back to in/inout parameters that we can't validate.
 void validateAtomicOperations(bool skipFuncParamValidation, DiagnosticSink* sink, IRInst* inst);
 
+// Overload that takes IRModule* first for use with SLANG_PASS macro
+void validateAtomicOperations(IRModule* module, bool skipFuncParamValidation, DiagnosticSink* sink);
+
 void validateVectorsAndMatrices(
     IRModule* module,
     DiagnosticSink* sink,

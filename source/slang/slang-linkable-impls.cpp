@@ -561,11 +561,13 @@ SpecializedComponentType::SpecializedComponentType(
 
 void SpecializedComponentType::buildHash(DigestBuilder<SHA1>& builder)
 {
+    SLANG_AST_BUILDER_RAII(getLinkage()->getASTBuilder());
+
     auto specializationArgCount = getSpecializationArgCount();
     for (Index i = 0; i < specializationArgCount; ++i)
     {
         auto specializationArg = getSpecializationArg(i);
-        auto argString = specializationArg.val->toString();
+        auto argString = specializationArg.toString();
         builder.append(argString);
     }
 

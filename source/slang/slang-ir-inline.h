@@ -33,7 +33,7 @@ bool performPreAutoDiffForceInlining(IRModule* module);
 
 /// Inline calls to functions that returns a resource/sampler via either return value or output
 /// parameter.
-void performGLSLResourceReturnFunctionInlining(TargetProgram* targetProgram, IRModule* module);
+void performGLSLResourceReturnFunctionInlining(IRModule* module, TargetProgram* targetProgram);
 
 /// Inline simple intrinsic functions whose definition is a single asm block.
 void performIntrinsicFunctionInlining(IRModule* module);

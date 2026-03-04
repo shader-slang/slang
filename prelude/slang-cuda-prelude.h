@@ -1,3 +1,6 @@
+#ifndef SLANG_CUDA_PRELUDE_H
+#define SLANG_CUDA_PRELUDE_H
+
 #define SLANG_PRELUDE_EXPORT
 
 #ifdef __CUDACC_RTC__
@@ -27,6 +30,14 @@
 // the other half2 operators.
 #define __CUDA_NO_HALF2_OPERATORS__
 #include <cuda_fp16.h>
+#endif
+
+#ifdef SLANG_CUDA_ENABLE_FP8
+#include <cuda_fp8.h>
+#endif
+
+#ifdef SLANG_CUDA_ENABLE_BF16
+#include <cuda_bf16.h>
 #endif
 
 #ifdef SLANG_CUDA_ENABLE_OPTIX
@@ -281,14 +292,26 @@ typedef unsigned int uint32_t;
 typedef unsigned long long uint64_t;
 typedef size_t uintptr_t;
 
-#endif
-
 typedef long long longlong;
 typedef unsigned long long ulonglong;
+
+#else
+
+// When not using NVRTC, match the platform's int64_t definition for signed type
+// On Linux: int64_t is 'long', on Windows: int64_t is 'long long'
+typedef int64_t longlong;
+// ulonglong must remain 'unsigned long long' to match CUDA's atomic operations
+typedef unsigned long long ulonglong;
+
+#endif
 
 typedef unsigned char uchar;
 typedef unsigned short ushort;
 typedef unsigned int uint;
+
+#if SLANG_CUDA_ENABLE_HALF
+typedef __half half;
+#endif
 
 union Union32
 {
@@ -333,6 +356,60 @@ struct __align__(4) __half3
 struct __align__(4) __half4
 {
     __half x, y, z, w;
+};
+#endif
+
+#if SLANG_CUDA_ENABLE_BF16
+
+// Add the other vector bfloat16 types
+struct __nv_bfloat161
+{
+    __nv_bfloat16 x;
+};
+struct __nv_bfloat163
+{
+    __nv_bfloat16 x, y, z;
+};
+struct __nv_bfloat164
+{
+    __nv_bfloat16 x, y, z, w;
+};
+#endif
+
+#if SLANG_CUDA_ENABLE_FP8
+
+// Add the other vector fp8 types
+struct __nv_fp8_e4m31
+{
+    __nv_fp8_e4m3 x;
+};
+struct __nv_fp8_e4m32
+{
+    __nv_fp8_e4m3 x, y;
+};
+struct __nv_fp8_e4m33
+{
+    __nv_fp8_e4m3 x, y, z;
+};
+struct __nv_fp8_e4m34
+{
+    __nv_fp8_e4m3 x, y, z, w;
+};
+struct __nv_fp8_e5m21
+{
+    __nv_fp8_e5m2 x;
+};
+struct __nv_fp8_e5m22
+{
+    __nv_fp8_e5m2 x, y;
+};
+struct __nv_fp8_e5m23
+{
+    __nv_fp8_e5m2 x, y, z;
+};
+struct __nv_fp8_e5m24
+{
+    __nv_fp8_e5m2 x, y, z, w;
 };
 #endif
 
@@ -397,6 +474,49 @@ SLANG_VECTOR_GET_ELEMENT_PTR(double)
 #if SLANG_CUDA_ENABLE_HALF
 SLANG_VECTOR_GET_ELEMENT(__half)
 SLANG_VECTOR_GET_ELEMENT_PTR(__half)
+#endif
+
+#if SLANG_CUDA_ENABLE_BF16
+SLANG_VECTOR_GET_ELEMENT(__nv_bfloat16)
+SLANG_VECTOR_GET_ELEMENT_PTR(__nv_bfloat16)
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __nv_bfloat16
+_slang_vector_dot(__nv_bfloat162 v0, __nv_bfloat162 v1)
+{
+    __nv_bfloat16 result = __nv_bfloat16(0.0f);
+    for (int i = 0; i < 2; i++)
+    {
+        result += _slang_vector_get_element(v0, i) * _slang_vector_get_element(v1, i);
+    }
+    return result;
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __nv_bfloat16
+_slang_vector_dot(__nv_bfloat163 v0, __nv_bfloat163 v1)
+{
+    __nv_bfloat16 result = __nv_bfloat16(0.0f);
+    for (int i = 0; i < 3; i++)
+    {
+        result += _slang_vector_get_element(v0, i) * _slang_vector_get_element(v1, i);
+    }
+    return result;
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __nv_bfloat16
+_slang_vector_dot(__nv_bfloat164 v0, __nv_bfloat164 v1)
+{
+    __nv_bfloat16 result = __nv_bfloat16(0.0f);
+    for (int i = 0; i < 4; i++)
+    {
+        result += _slang_vector_get_element(v0, i) * _slang_vector_get_element(v1, i);
+    }
+    return result;
+}
+#endif
+
+#if SLANG_CUDA_ENABLE_FP8
+SLANG_VECTOR_GET_ELEMENT(__nv_fp8_e4m3)
+SLANG_VECTOR_GET_ELEMENT_PTR(__nv_fp8_e4m3)
+SLANG_VECTOR_GET_ELEMENT(__nv_fp8_e5m2)
+SLANG_VECTOR_GET_ELEMENT_PTR(__nv_fp8_e5m2)
 #endif
 
 #define SLANG_CUDA_VECTOR_BINARY_OP(T, n, op)                                                 \
@@ -539,6 +659,15 @@ SLANG_MAKE_VECTOR(ulonglong)
 SLANG_MAKE_VECTOR(__half)
 #endif
 
+#if SLANG_CUDA_ENABLE_BF16
+SLANG_MAKE_VECTOR(__nv_bfloat16)
+#endif
+
+#if SLANG_CUDA_ENABLE_FP8
+SLANG_MAKE_VECTOR(__nv_fp8_e4m3)
+SLANG_MAKE_VECTOR(__nv_fp8_e5m2)
+#endif
+
 SLANG_FORCE_INLINE SLANG_CUDA_CALL bool1 make_bool1(bool x)
 {
     return bool1{x};
@@ -620,6 +749,30 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL __half1 make___half1(__half x)
 }
 #endif
 #endif
+#if SLANG_CUDA_ENABLE_BF16
+SLANG_MAKE_VECTOR_FROM_SCALAR(__nv_bfloat16)
+#if !SLANG_CUDA_RTC
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __nv_bfloat16 make___nv_bfloat161(__nv_bfloat16 x)
+{
+    return __nv_bfloat16{x};
+}
+#endif
+#endif
+
+#if SLANG_CUDA_ENABLE_FP8
+SLANG_MAKE_VECTOR_FROM_SCALAR(__nv_fp8_e4m3)
+SLANG_MAKE_VECTOR_FROM_SCALAR(__nv_fp8_e5m2)
+#if !SLANG_CUDA_RTC
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __nv_fp8_e4m3 make___nv_fp8_e4m31(__nv_fp8_e4m3 x)
+{
+    return __nv_fp8_e4m3{x};
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __nv_fp8_e5m2 make___nv_fp8_e5m21(__nv_fp8_e5m2 x)
+{
+    return __nv_fp8_e5m2{x};
+}
+#endif
+#endif
 
 #define SLANG_CUDA_VECTOR_ATOMIC_BINARY_IMPL(Fn, T, N)                                            \
     SLANG_FORCE_INLINE SLANG_CUDA_CALL T##N Fn(T##N* address, T##N val)                           \
@@ -634,6 +787,10 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL __half1 make___half1(__half x)
 #if defined(__CUDA_ARCH__) && __CUDA_ARCH__ < 900
 SLANG_CUDA_VECTOR_ATOMIC_BINARY_IMPL(atomicAdd, float, 2)
 SLANG_CUDA_VECTOR_ATOMIC_BINARY_IMPL(atomicAdd, float, 4)
+#endif
+#if defined(SLANG_CUDA_ENABLE_HALF) && defined(__CUDA_ARCH__) && (__CUDA_ARCH__ >= 700)
+SLANG_CUDA_VECTOR_ATOMIC_BINARY_IMPL(atomicAdd, __half, 3)
+SLANG_CUDA_VECTOR_ATOMIC_BINARY_IMPL(atomicAdd, __half, 4)
 #endif
 SLANG_CUDA_VECTOR_ATOMIC_BINARY_IMPL(atomicAdd, float, 3)
 SLANG_CUDA_VECTOR_ATOMIC_BINARY_IMPL(atomicAdd, int, 2)
@@ -681,6 +838,14 @@ GET_VECTOR_TYPE_IMPL_N(double)
 #if SLANG_CUDA_ENABLE_HALF
 GET_VECTOR_TYPE_IMPL_N(__half)
 #endif
+#if SLANG_CUDA_ENABLE_BF16
+GET_VECTOR_TYPE_IMPL_N(__nv_bfloat16)
+#endif
+#if SLANG_CUDA_ENABLE_FP8
+GET_VECTOR_TYPE_IMPL_N(__nv_fp8_e4m3)
+GET_VECTOR_TYPE_IMPL_N(__nv_fp8_e5m2)
+#endif
+
 template<typename T, int n>
 using Vector = typename GetVectorTypeImpl<T, n>::type;
 
@@ -1576,6 +1741,195 @@ SLANG_SURF3DWRITE_CONVERT_IMPL(float, "f")
 SLANG_SURF3DWRITE_CONVERT_IMPL(uint, "r")
 SLANG_SURF3DWRITE_CONVERT_IMPL(int, "r")
 
+// ----------------------------- F16 -----------------------------------------
+#if SLANG_CUDA_ENABLE_HALF
+// Unary
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_ceil(__half f)
+{
+    return ::hceil(f);
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_floor(__half f)
+{
+    return ::hfloor(f);
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_round(__half f)
+{
+    return ::hrint(f);
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_sin(__half f)
+{
+    return ::hsin(f);
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_cos(__half f)
+{
+    return ::hcos(f);
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL void F16_sincos(__half f, __half* s, __half* c)
+{
+    *s = ::hsin(f);
+    *c = ::hcos(f);
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_tan(__half f)
+{
+    return __float2half(::tanf(__half2float(f)));
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_asin(__half f)
+{
+    return __float2half(::asinf(__half2float(f)));
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_acos(__half f)
+{
+    return __float2half(::acosf(__half2float(f)));
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_atan(__half f)
+{
+    return __float2half(::atanf(__half2float(f)));
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_sinh(__half f)
+{
+    return __float2half(::sinhf(__half2float(f)));
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_cosh(__half f)
+{
+    return __float2half(::coshf(__half2float(f)));
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_tanh(__half f)
+{
+    return __float2half(::tanhf(__half2float(f)));
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_asinh(__half f)
+{
+    return __float2half(::asinhf(__half2float(f)));
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_acosh(__half f)
+{
+    return __float2half(::acoshf(__half2float(f)));
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_atanh(__half f)
+{
+    return __float2half(::atanhf(__half2float(f)));
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_log2(__half f)
+{
+    return ::hlog2(f);
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_log(__half f)
+{
+    return ::hlog(f);
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_log10(__half f)
+{
+    return ::hlog10(f);
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_exp2(__half f)
+{
+    return ::hexp2(f);
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_exp(__half f)
+{
+    return ::hexp(f);
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_abs(__half f)
+{
+    return __habs(f);
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_trunc(__half f)
+{
+    return ::htrunc(f);
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_sqrt(__half f)
+{
+    return ::hsqrt(f);
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_rsqrt(__half f)
+{
+    return ::hrsqrt(f);
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL int F16_sign(__half f)
+{
+    return (f == __half(0.0f)) ? 0 : ((f < __half(0.0f)) ? -1 : 1);
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_frac(__half f)
+{
+    return f - F16_floor(f);
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL bool F16_isnan(__half f)
+{
+    return __hisnan(f);
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL bool F16_isfinite(__half f)
+{
+    return !__hisinf(f) && !__hisnan(f);
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL bool F16_isinf(__half f)
+{
+    return __hisinf(f);
+}
+
+// Binary
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_min(__half a, __half b)
+{
+    return __hmin(a, b);
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_max(__half a, __half b)
+{
+    return __hmax(a, b);
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_pow(__half a, __half b)
+{
+    return __float2half(::powf(__half2float(a), __half2float(b)));
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_fmod(__half a, __half b)
+{
+    return __float2half(::fmodf(__half2float(a), __half2float(b)));
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_remainder(__half a, __half b)
+{
+    return __float2half(::remainderf(__half2float(a), __half2float(b)));
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_atan2(__half a, __half b)
+{
+    return __float2half(::atan2(__half2float(a), __half2float(b)));
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_frexp(__half x, int* e)
+{
+    return __float2half(frexpf(__half2float(x), e));
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_modf(__half x, __half* ip)
+{
+    float ipf;
+    float res = ::modff(__half2float(x), &ipf);
+    *ip = __float2half(ipf);
+    return __float2half(res);
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uint16_t F16_asuint(__half h)
+{
+    return __half_as_ushort(h);
+}
+SLANG_FORCE_INLINE SLANG_CUDA_CALL int16_t F16_asint(__half h)
+{
+    return __half_as_short(h);
+}
+
+// Ternary
+SLANG_FORCE_INLINE SLANG_CUDA_CALL __half F16_fma(__half a, __half b, __half c)
+{
+    return __hfma(a, b, c);
+}
+
+#endif
+
 // ----------------------------- F32 -----------------------------------------
 
 // Unary
@@ -1679,9 +2033,9 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_rsqrt(float f)
 {
     return ::rsqrtf(f);
 }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_sign(float f)
+SLANG_FORCE_INLINE SLANG_CUDA_CALL int F32_sign(float f)
 {
-    return (f == 0.0f) ? f : ((f < 0.0f) ? -1.0f : 1.0f);
+    return (f == 0.0f) ? 0 : ((f < 0.0f) ? -1 : 1);
 }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL float F32_frac(float f)
 {
@@ -1848,9 +2202,9 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL double F64_rsqrt(double f)
 {
     return ::rsqrt(f);
 }
-SLANG_FORCE_INLINE SLANG_CUDA_CALL double F64_sign(double f)
+SLANG_FORCE_INLINE SLANG_CUDA_CALL int F64_sign(double f)
 {
-    return (f == 0.0) ? f : ((f < 0.0) ? -1.0 : 1.0);
+    return (f == 0.0) ? 0 : ((f < 0.0) ? -1 : 1);
 }
 SLANG_FORCE_INLINE SLANG_CUDA_CALL double F64_frac(double f)
 {
@@ -2016,6 +2370,11 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t U32_firstbithigh(uint32_t v)
     return 31 - __clz(v);
 }
 
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t U32_reversebits(uint32_t v)
+{
+    return __brev(v);
+}
+
 // ----------------------------- I32 -----------------------------------------
 
 // Unary
@@ -2066,6 +2425,11 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t I32_firstbithigh(int32_t v)
     return U32_firstbithigh(uint32_t(v));
 }
 
+SLANG_FORCE_INLINE SLANG_CUDA_CALL int32_t I32_reversebits(int32_t v)
+{
+    return int32_t(U32_reversebits(uint32_t(v)));
+}
+
 // ----------------------------- U64 -----------------------------------------
 
 SLANG_FORCE_INLINE SLANG_CUDA_CALL int64_t U64_abs(uint64_t f)
@@ -2087,6 +2451,25 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t U64_countbits(uint64_t v)
     return __popcll(v);
 }
 
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t U64_firstbitlow(uint64_t v)
+{
+    // __ffs returns 1-based bit position or 0 if no bits set
+    // firstbitlow should return 0-based bit position or ~0u if no bits set
+    return v == 0 ? ~uint32_t(0) : (__ffsll(v) - 1u);
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t U64_firstbithigh(uint64_t v)
+{
+    if (v == 0)
+        return ~uint32_t(0);
+    return 63 - __clzll(v);
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uint64_t U64_reversebits(uint64_t v)
+{
+    return __brevll(v);
+}
+
 // ----------------------------- I64 -----------------------------------------
 
 SLANG_FORCE_INLINE SLANG_CUDA_CALL int64_t I64_abs(int64_t f)
@@ -2106,6 +2489,23 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL int64_t I64_max(int64_t a, int64_t b)
 SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t I64_countbits(int64_t v)
 {
     return U64_countbits(uint64_t(v));
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t I64_firstbitlow(int64_t v)
+{
+    return U64_firstbitlow(uint64_t(v));
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL uint32_t I64_firstbithigh(int64_t v)
+{
+    if (v < 0)
+        v = ~v;
+    return U64_firstbithigh(uint64_t(v));
+}
+
+SLANG_FORCE_INLINE SLANG_CUDA_CALL int64_t I64_reversebits(int64_t v)
+{
+    return int64_t(U64_reversebits(uint64_t(v)));
 }
 
 // ----------------------------- IPTR -----------------------------------------
@@ -2245,17 +2645,23 @@ struct ByteAddressBuffer
 
 // Signed 64-bit atomic wrappers
 // CUDA only supports unsigned long long atomics, so we cast signed to unsigned
-__device__ __forceinline__ long long atomicExch(long long* address, long long val)
+// Use longlong type with explicit unsigned long long casts for platform portability
+__device__ __forceinline__ longlong atomicExch(longlong* address, longlong val)
 {
-    return (long long)atomicExch((unsigned long long*)address, (unsigned long long)val);
+    return (longlong)atomicExch((unsigned long long*)address, (unsigned long long)val);
 }
 
-__device__ __forceinline__ long long atomicCAS(long long* address, long long compare, long long val)
+__device__ __forceinline__ longlong atomicCAS(longlong* address, longlong compare, longlong val)
 {
-    return (long long)atomicCAS(
+    return (longlong)atomicCAS(
         (unsigned long long*)address,
         (unsigned long long)compare,
         (unsigned long long)val);
+}
+
+__device__ __forceinline__ longlong atomicAdd(longlong* address, longlong val)
+{
+    return (longlong)atomicAdd((unsigned long long*)address, (unsigned long long)val);
 }
 
 // Float bitwise atomic compare-and-swap
@@ -2266,6 +2672,240 @@ __device__ __forceinline__ float atomicCAS(float* address, float compare, float 
     int old = atomicCAS(addr_as_int, __float_as_int(compare), __float_as_int(val));
     return __int_as_float(old);
 }
+
+// =====================================================================
+// Atomic Reduction Operations (PTX `red` instruction)
+// These are in-place atomic operations that don't return the old value.
+// They are faster than the corresponding atomic operations that return values
+// because they use the PTX `red` instruction with relaxed memory ordering.
+//
+// Supported operations based on PTX ISA:
+// - add: .s32, .u32, .u64, .s64, .f16, .f16x2, .bf16, .bf16x2, .f32, .f64
+// - min/max: .s32, .u32, .s64, .u64, .f32, .f64, .f16, .f16x2
+// - and/or/xor: .b32, .b64
+// - inc/dec: .u32
+// =====================================================================
+
+// Atomic reduction ADD operations
+__device__ __forceinline__ void __slang_atomic_reduce_add(int32_t* addr, int32_t val, int order)
+{
+    asm volatile("red.relaxed.gpu.global.add.s32 [%0], %1;" : : "l"(addr), "r"(val) : "memory");
+}
+
+__device__ __forceinline__ void __slang_atomic_reduce_add(uint32_t* addr, uint32_t val, int order)
+{
+    asm volatile("red.relaxed.gpu.global.add.u32 [%0], %1;" : : "l"(addr), "r"(val) : "memory");
+}
+
+__device__ __forceinline__ void __slang_atomic_reduce_add(int64_t* addr, int64_t val, int order)
+{
+    asm volatile("red.relaxed.gpu.global.add.s64 [%0], %1;" : : "l"(addr), "l"(val) : "memory");
+}
+
+__device__ __forceinline__ void __slang_atomic_reduce_add(uint64_t* addr, uint64_t val, int order)
+{
+    asm volatile("red.relaxed.gpu.global.add.u64 [%0], %1;" : : "l"(addr), "l"(val) : "memory");
+}
+
+__device__ __forceinline__ void __slang_atomic_reduce_add(float* addr, float val, int order)
+{
+    asm volatile("red.relaxed.gpu.global.add.f32 [%0], %1;" : : "l"(addr), "f"(val) : "memory");
+}
+
+__device__ __forceinline__ void __slang_atomic_reduce_add(double* addr, double val, int order)
+{
+    asm volatile("red.relaxed.gpu.global.add.f64 [%0], %1;" : : "l"(addr), "d"(val) : "memory");
+}
+
+#if SLANG_CUDA_ENABLE_HALF
+__device__ __forceinline__ void __slang_atomic_reduce_add(__half* addr, __half val, int order)
+{
+    unsigned short val_as_ushort = *reinterpret_cast<unsigned short*>(&val);
+    asm volatile("red.relaxed.gpu.global.add.noftz.f16 [%0], %1;"
+                 :
+                 : "l"(addr), "h"(val_as_ushort)
+                 : "memory");
+}
+
+__device__ __forceinline__ void __slang_atomic_reduce_add(__half2* addr, __half2 val, int order)
+{
+    unsigned int val_as_uint = *reinterpret_cast<unsigned int*>(&val);
+    asm volatile("red.relaxed.gpu.global.add.noftz.f16x2 [%0], %1;"
+                 :
+                 : "l"(addr), "r"(val_as_uint)
+                 : "memory");
+}
+#endif
+
+#if SLANG_CUDA_ENABLE_BF16
+__device__ __forceinline__ void __slang_atomic_reduce_add(
+    __nv_bfloat16* addr,
+    __nv_bfloat16 val,
+    int order)
+{
+    unsigned short val_as_ushort = *reinterpret_cast<unsigned short*>(&val);
+    asm volatile("red.relaxed.gpu.global.add.noftz.bf16 [%0], %1;"
+                 :
+                 : "l"(addr), "h"(val_as_ushort)
+                 : "memory");
+}
+
+__device__ __forceinline__ void __slang_atomic_reduce_add(
+    __nv_bfloat162* addr,
+    __nv_bfloat162 val,
+    int order)
+{
+    unsigned int val_as_uint = *reinterpret_cast<unsigned int*>(&val);
+    asm volatile("red.relaxed.gpu.global.add.noftz.bf16x2 [%0], %1;"
+                 :
+                 : "l"(addr), "r"(val_as_uint)
+                 : "memory");
+}
+#endif
+
+// Atomic reduction MIN operations
+__device__ __forceinline__ void __slang_atomic_reduce_min(int32_t* addr, int32_t val, int order)
+{
+    asm volatile("red.relaxed.gpu.global.min.s32 [%0], %1;" : : "l"(addr), "r"(val) : "memory");
+}
+
+__device__ __forceinline__ void __slang_atomic_reduce_min(uint32_t* addr, uint32_t val, int order)
+{
+    asm volatile("red.relaxed.gpu.global.min.u32 [%0], %1;" : : "l"(addr), "r"(val) : "memory");
+}
+
+__device__ __forceinline__ void __slang_atomic_reduce_min(int64_t* addr, int64_t val, int order)
+{
+    asm volatile("red.relaxed.gpu.global.min.s64 [%0], %1;" : : "l"(addr), "l"(val) : "memory");
+}
+
+__device__ __forceinline__ void __slang_atomic_reduce_min(uint64_t* addr, uint64_t val, int order)
+{
+    asm volatile("red.relaxed.gpu.global.min.u64 [%0], %1;" : : "l"(addr), "l"(val) : "memory");
+}
+
+// NOTE: PTX `red` instruction does NOT support min/max for floating-point types.
+// Only integer types (.u32, .u64, .s32, .s64) are supported for min/max.
+// For floating-point min/max atomics, use the regular `atom` instruction via
+// __atomic_min/__atomic_max.
+
+// Atomic reduction MAX operations
+__device__ __forceinline__ void __slang_atomic_reduce_max(int32_t* addr, int32_t val, int order)
+{
+    asm volatile("red.relaxed.gpu.global.max.s32 [%0], %1;" : : "l"(addr), "r"(val) : "memory");
+}
+
+__device__ __forceinline__ void __slang_atomic_reduce_max(uint32_t* addr, uint32_t val, int order)
+{
+    asm volatile("red.relaxed.gpu.global.max.u32 [%0], %1;" : : "l"(addr), "r"(val) : "memory");
+}
+
+__device__ __forceinline__ void __slang_atomic_reduce_max(int64_t* addr, int64_t val, int order)
+{
+    asm volatile("red.relaxed.gpu.global.max.s64 [%0], %1;" : : "l"(addr), "l"(val) : "memory");
+}
+
+__device__ __forceinline__ void __slang_atomic_reduce_max(uint64_t* addr, uint64_t val, int order)
+{
+    asm volatile("red.relaxed.gpu.global.max.u64 [%0], %1;" : : "l"(addr), "l"(val) : "memory");
+}
+
+// NOTE: PTX `red` instruction does NOT support min/max for floating-point types.
+// Only integer types (.u32, .u64, .s32, .s64) are supported for min/max.
+// For floating-point min/max atomics, use the regular `atom` instruction via
+// __atomic_min/__atomic_max.
+
+// Atomic reduction AND operations (bitwise, integers only)
+__device__ __forceinline__ void __slang_atomic_reduce_and(int32_t* addr, int32_t val, int order)
+{
+    asm volatile("red.relaxed.gpu.global.and.b32 [%0], %1;" : : "l"(addr), "r"(val) : "memory");
+}
+
+__device__ __forceinline__ void __slang_atomic_reduce_and(uint32_t* addr, uint32_t val, int order)
+{
+    asm volatile("red.relaxed.gpu.global.and.b32 [%0], %1;" : : "l"(addr), "r"(val) : "memory");
+}
+
+__device__ __forceinline__ void __slang_atomic_reduce_and(int64_t* addr, int64_t val, int order)
+{
+    asm volatile("red.relaxed.gpu.global.and.b64 [%0], %1;" : : "l"(addr), "l"(val) : "memory");
+}
+
+__device__ __forceinline__ void __slang_atomic_reduce_and(uint64_t* addr, uint64_t val, int order)
+{
+    asm volatile("red.relaxed.gpu.global.and.b64 [%0], %1;" : : "l"(addr), "l"(val) : "memory");
+}
+
+// Atomic reduction OR operations (bitwise, integers only)
+__device__ __forceinline__ void __slang_atomic_reduce_or(int32_t* addr, int32_t val, int order)
+{
+    asm volatile("red.relaxed.gpu.global.or.b32 [%0], %1;" : : "l"(addr), "r"(val) : "memory");
+}
+
+__device__ __forceinline__ void __slang_atomic_reduce_or(uint32_t* addr, uint32_t val, int order)
+{
+    asm volatile("red.relaxed.gpu.global.or.b32 [%0], %1;" : : "l"(addr), "r"(val) : "memory");
+}
+
+__device__ __forceinline__ void __slang_atomic_reduce_or(int64_t* addr, int64_t val, int order)
+{
+    asm volatile("red.relaxed.gpu.global.or.b64 [%0], %1;" : : "l"(addr), "l"(val) : "memory");
+}
+
+__device__ __forceinline__ void __slang_atomic_reduce_or(uint64_t* addr, uint64_t val, int order)
+{
+    asm volatile("red.relaxed.gpu.global.or.b64 [%0], %1;" : : "l"(addr), "l"(val) : "memory");
+}
+
+// Atomic reduction XOR operations (bitwise, integers only)
+__device__ __forceinline__ void __slang_atomic_reduce_xor(int32_t* addr, int32_t val, int order)
+{
+    asm volatile("red.relaxed.gpu.global.xor.b32 [%0], %1;" : : "l"(addr), "r"(val) : "memory");
+}
+
+__device__ __forceinline__ void __slang_atomic_reduce_xor(uint32_t* addr, uint32_t val, int order)
+{
+    asm volatile("red.relaxed.gpu.global.xor.b32 [%0], %1;" : : "l"(addr), "r"(val) : "memory");
+}
+
+__device__ __forceinline__ void __slang_atomic_reduce_xor(int64_t* addr, int64_t val, int order)
+{
+    asm volatile("red.relaxed.gpu.global.xor.b64 [%0], %1;" : : "l"(addr), "l"(val) : "memory");
+}
+
+__device__ __forceinline__ void __slang_atomic_reduce_xor(uint64_t* addr, uint64_t val, int order)
+{
+    asm volatile("red.relaxed.gpu.global.xor.b64 [%0], %1;" : : "l"(addr), "l"(val) : "memory");
+}
+
+// Atomic reduction INC/DEC operations (unsigned 32-bit only in PTX)
+// Note: PTX inc/dec have specific semantics:
+//   inc: d = (old >= b) ? 0 : old + 1
+//   dec: d = ((old == 0) || (old > b)) ? b : old - 1
+// For simple increment by 1, we use add instead
+__device__ __forceinline__ void __slang_atomic_reduce_inc(uint32_t* addr, int order)
+{
+    asm volatile("red.relaxed.gpu.global.add.u32 [%0], 1;" : : "l"(addr) : "memory");
+}
+
+__device__ __forceinline__ void __slang_atomic_reduce_inc(int32_t* addr, int order)
+{
+    asm volatile("red.relaxed.gpu.global.add.s32 [%0], 1;" : : "l"(addr) : "memory");
+}
+
+__device__ __forceinline__ void __slang_atomic_reduce_dec(uint32_t* addr, int order)
+{
+    asm volatile("red.relaxed.gpu.global.add.u32 [%0], -1;" : : "l"(addr) : "memory");
+}
+
+__device__ __forceinline__ void __slang_atomic_reduce_dec(int32_t* addr, int order)
+{
+    asm volatile("red.relaxed.gpu.global.add.s32 [%0], -1;" : : "l"(addr) : "memory");
+}
+
+// =====================================================================
+// End of Atomic Reduction Operations
+// =====================================================================
 
 // Missing support for Load with status
 struct RWByteAddressBuffer
@@ -3607,12 +4247,12 @@ __inline__ __device__ uint4 _waveMatchMultiple(WarpMask mask, const T& inVal)
     return make_uint4(matchBits, 0, 0, 0);
 }
 
-__device__ uint getAt(dim3 a, int b)
+__inline__ __device__ uint getAt(dim3 a, int b)
 {
     SLANG_PRELUDE_ASSERT(b >= 0 && b < 3);
     return (&a.x)[b];
 }
-__device__ uint3 operator*(uint3 a, dim3 b)
+__inline__ __device__ uint3 operator*(uint3 a, dim3 b)
 {
     uint3 r;
     r.x = a.x * b.x;
@@ -3672,8 +4312,290 @@ static __forceinline__ __device__ void* getOptiXRayPayloadPtr()
     return unpackOptiXRayPayloadPointer(u0, u1);
 }
 
+// Maximum number of 32-bit registers for OptiX payload (32 registers = 128 bytes)
+static constexpr size_t kMaxOptiXPayloadRegisters = 32;
+
+// Helper to pack/unpack payload to/from registers for small payloads (<= 128 bytes)
+template<typename T, size_t N = (sizeof(T) + 3) / 4>
+struct PayloadRegisters
+{
+    uint32_t regs[N > 0 ? N : 1];
+
+    __forceinline__ __device__ void pack(const T& payload) { memcpy(regs, &payload, sizeof(T)); }
+
+    __forceinline__ __device__ void unpack(T& payload) { memcpy(&payload, regs, sizeof(T)); }
+};
+
+// Internal helper to call optixTrace with the right number of register arguments
+template<typename T, size_t N = (sizeof(T) + 3) / 4>
+__forceinline__ __device__ void optixTraceWithRegs(
+    OptixTraversableHandle AccelerationStructure,
+    float3 Origin,
+    float3 Direction,
+    float TMin,
+    float TMax,
+    float Time,
+    uint32_t InstanceInclusionMask,
+    uint32_t RayFlags,
+    uint32_t RayContributionToHitGroupIndex,
+    uint32_t MultiplierForGeometryContributionToHitGroupIndex,
+    uint32_t MissShaderIndex,
+    PayloadRegisters<T, N>& pr)
+{
+    // Call optixTrace with the appropriate number of payload registers
+    if constexpr (N == 0)
+    {
+        optixTrace(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex);
+    }
+    else if constexpr (N == 1)
+    {
+        optixTrace(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0]);
+    }
+    else if constexpr (N == 2)
+    {
+        optixTrace(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1]);
+    }
+    else if constexpr (N == 3)
+    {
+        optixTrace(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2]);
+    }
+    else if constexpr (N == 4)
+    {
+        optixTrace(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3]);
+    }
+    else if constexpr (N == 5)
+    {
+        optixTrace(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3],
+            pr.regs[4]);
+    }
+    else if constexpr (N == 6)
+    {
+        optixTrace(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3],
+            pr.regs[4],
+            pr.regs[5]);
+    }
+    else if constexpr (N == 7)
+    {
+        optixTrace(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3],
+            pr.regs[4],
+            pr.regs[5],
+            pr.regs[6]);
+    }
+    else if constexpr (N == 8)
+    {
+        optixTrace(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3],
+            pr.regs[4],
+            pr.regs[5],
+            pr.regs[6],
+            pr.regs[7]);
+    }
+    else if constexpr (N <= 16)
+    {
+        optixTrace(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3],
+            pr.regs[4],
+            pr.regs[5],
+            pr.regs[6],
+            pr.regs[7],
+            pr.regs[8],
+            pr.regs[9],
+            pr.regs[10],
+            pr.regs[11],
+            pr.regs[12],
+            pr.regs[13],
+            pr.regs[14],
+            pr.regs[15]);
+    }
+    else if constexpr (N <= kMaxOptiXPayloadRegisters)
+    {
+        optixTrace(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3],
+            pr.regs[4],
+            pr.regs[5],
+            pr.regs[6],
+            pr.regs[7],
+            pr.regs[8],
+            pr.regs[9],
+            pr.regs[10],
+            pr.regs[11],
+            pr.regs[12],
+            pr.regs[13],
+            pr.regs[14],
+            pr.regs[15],
+            pr.regs[16],
+            pr.regs[17],
+            pr.regs[18],
+            pr.regs[19],
+            pr.regs[20],
+            pr.regs[21],
+            pr.regs[22],
+            pr.regs[23],
+            pr.regs[24],
+            pr.regs[25],
+            pr.regs[26],
+            pr.regs[27],
+            pr.regs[28],
+            pr.regs[29],
+            pr.regs[30],
+            pr.regs[31]);
+    }
+}
+
 template<typename T>
-__forceinline__ __device__ void* optixTrace(
+__forceinline__ __device__ void optixTrace(
     OptixTraversableHandle AccelerationStructure,
     uint32_t RayFlags,
     uint32_t InstanceInclusionMask,
@@ -3683,22 +4605,78 @@ __forceinline__ __device__ void* optixTrace(
     RayDesc Ray,
     T* Payload)
 {
-    uint32_t r0, r1;
-    packOptiXRayPayloadPointer((void*)Payload, r0, r1);
+    constexpr size_t numRegs = (sizeof(T) + 3) / 4;
+
+    if constexpr (numRegs <= kMaxOptiXPayloadRegisters)
+    {
+        // Register-based approach for small payloads
+        PayloadRegisters<T> pr;
+        pr.pack(*Payload);
+
+        optixTraceWithRegs<T>(
+            AccelerationStructure,
+            Ray.Origin,
+            Ray.Direction,
+            Ray.TMin,
+            Ray.TMax,
+            0.f, /* Time for motion blur */
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr);
+
+        // Read back updated payload registers
+        // Native optixTrace updates regs in place
+        pr.unpack(*Payload);
+    }
+    else
+    {
+        // Pointer-based fallback for large payloads
+        uint32_t r0, r1;
+        packOptiXRayPayloadPointer((void*)Payload, r0, r1);
+        optixTrace(
+            AccelerationStructure,
+            Ray.Origin,
+            Ray.Direction,
+            Ray.TMin,
+            Ray.TMax,
+            0.f,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            r0,
+            r1);
+    }
+}
+
+// Non-template overload for empty payload case.
+// When Slang's type legalization eliminates an empty payload struct,
+// the generated code calls optixTrace without a payload argument.
+__forceinline__ __device__ void optixTrace(
+    OptixTraversableHandle AccelerationStructure,
+    uint32_t RayFlags,
+    uint32_t InstanceInclusionMask,
+    uint32_t RayContributionToHitGroupIndex,
+    uint32_t MultiplierForGeometryContributionToHitGroupIndex,
+    uint32_t MissShaderIndex,
+    RayDesc Ray)
+{
     optixTrace(
         AccelerationStructure,
         Ray.Origin,
         Ray.Direction,
         Ray.TMin,
         Ray.TMax,
-        0.f, /* Time for motion blur, currently unsupported in slang */
+        0.f,
         InstanceInclusionMask,
         RayFlags,
         RayContributionToHitGroupIndex,
         MultiplierForGeometryContributionToHitGroupIndex,
-        MissShaderIndex,
-        r0,
-        r1);
+        MissShaderIndex);
 }
 
 #if (OPTIX_VERSION >= 90000)
@@ -3767,8 +4745,276 @@ __forceinline__ __device__ bool optixHitObjectIsLSSHit(OptixTraversableHandle* O
 }
 #endif
 
+// Internal helper to call optixTraverse with the right number of register arguments
+template<typename T, size_t N = (sizeof(T) + 3) / 4>
+__forceinline__ __device__ void optixTraverseWithRegs(
+    OptixTraversableHandle AccelerationStructure,
+    float3 Origin,
+    float3 Direction,
+    float TMin,
+    float TMax,
+    float Time,
+    uint32_t InstanceInclusionMask,
+    uint32_t RayFlags,
+    uint32_t RayContributionToHitGroupIndex,
+    uint32_t MultiplierForGeometryContributionToHitGroupIndex,
+    uint32_t MissShaderIndex,
+    PayloadRegisters<T, N>& pr)
+{
+    // Call optixTraverse with the appropriate number of payload registers
+    if constexpr (N == 0)
+    {
+        optixTraverse(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex);
+    }
+    else if constexpr (N == 1)
+    {
+        optixTraverse(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0]);
+    }
+    else if constexpr (N == 2)
+    {
+        optixTraverse(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1]);
+    }
+    else if constexpr (N == 3)
+    {
+        optixTraverse(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2]);
+    }
+    else if constexpr (N == 4)
+    {
+        optixTraverse(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3]);
+    }
+    else if constexpr (N == 5)
+    {
+        optixTraverse(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3],
+            pr.regs[4]);
+    }
+    else if constexpr (N == 6)
+    {
+        optixTraverse(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3],
+            pr.regs[4],
+            pr.regs[5]);
+    }
+    else if constexpr (N == 7)
+    {
+        optixTraverse(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3],
+            pr.regs[4],
+            pr.regs[5],
+            pr.regs[6]);
+    }
+    else if constexpr (N == 8)
+    {
+        optixTraverse(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3],
+            pr.regs[4],
+            pr.regs[5],
+            pr.regs[6],
+            pr.regs[7]);
+    }
+    else if constexpr (N <= 16)
+    {
+        optixTraverse(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3],
+            pr.regs[4],
+            pr.regs[5],
+            pr.regs[6],
+            pr.regs[7],
+            pr.regs[8],
+            pr.regs[9],
+            pr.regs[10],
+            pr.regs[11],
+            pr.regs[12],
+            pr.regs[13],
+            pr.regs[14],
+            pr.regs[15]);
+    }
+    else if constexpr (N <= kMaxOptiXPayloadRegisters)
+    {
+        optixTraverse(
+            AccelerationStructure,
+            Origin,
+            Direction,
+            TMin,
+            TMax,
+            Time,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3],
+            pr.regs[4],
+            pr.regs[5],
+            pr.regs[6],
+            pr.regs[7],
+            pr.regs[8],
+            pr.regs[9],
+            pr.regs[10],
+            pr.regs[11],
+            pr.regs[12],
+            pr.regs[13],
+            pr.regs[14],
+            pr.regs[15],
+            pr.regs[16],
+            pr.regs[17],
+            pr.regs[18],
+            pr.regs[19],
+            pr.regs[20],
+            pr.regs[21],
+            pr.regs[22],
+            pr.regs[23],
+            pr.regs[24],
+            pr.regs[25],
+            pr.regs[26],
+            pr.regs[27],
+            pr.regs[28],
+            pr.regs[29],
+            pr.regs[30],
+            pr.regs[31]);
+    }
+}
+
 template<typename T>
-__forceinline__ __device__ void* optixTraverse(
+__forceinline__ __device__ void optixTraverse(
     OptixTraversableHandle AccelerationStructure,
     uint32_t RayFlags,
     uint32_t InstanceInclusionMask,
@@ -3779,26 +5025,56 @@ __forceinline__ __device__ void* optixTraverse(
     T* Payload,
     OptixTraversableHandle* hitObj)
 {
-    uint32_t r0, r1;
-    packOptiXRayPayloadPointer((void*)Payload, r0, r1);
-    optixTraverse(
-        AccelerationStructure,
-        Ray.Origin,
-        Ray.Direction,
-        Ray.TMin,
-        Ray.TMax,
-        0.f, /* Time for motion blur, currently unsupported in slang */
-        InstanceInclusionMask,
-        RayFlags,
-        RayContributionToHitGroupIndex,
-        MultiplierForGeometryContributionToHitGroupIndex,
-        MissShaderIndex,
-        r0,
-        r1);
+    constexpr size_t numRegs = (sizeof(T) + 3) / 4;
+
+    if constexpr (numRegs <= kMaxOptiXPayloadRegisters)
+    {
+        // Register-based approach for small payloads
+        PayloadRegisters<T> pr;
+        pr.pack(*Payload);
+
+        optixTraverseWithRegs<T>(
+            AccelerationStructure,
+            Ray.Origin,
+            Ray.Direction,
+            Ray.TMin,
+            Ray.TMax,
+            0.f, /* Time for motion blur */
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr);
+
+        // Read back updated payload registers
+        // Native optixTrace updates regs in place
+        pr.unpack(*Payload);
+    }
+    else
+    {
+        // Pointer-based fallback for large payloads
+        uint32_t r0, r1;
+        packOptiXRayPayloadPointer((void*)Payload, r0, r1);
+        optixTraverse(
+            AccelerationStructure,
+            Ray.Origin,
+            Ray.Direction,
+            Ray.TMin,
+            Ray.TMax,
+            0.f,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            r0,
+            r1);
+    }
 }
 
 template<typename T>
-__forceinline__ __device__ void* optixTraverse(
+__forceinline__ __device__ void optixTraverse(
     OptixTraversableHandle AccelerationStructure,
     uint32_t RayFlags,
     uint32_t InstanceInclusionMask,
@@ -3810,22 +5086,79 @@ __forceinline__ __device__ void* optixTraverse(
     T* Payload,
     OptixTraversableHandle* hitObj)
 {
-    uint32_t r0, r1;
-    packOptiXRayPayloadPointer((void*)Payload, r0, r1);
+    constexpr size_t numRegs = (sizeof(T) + 3) / 4;
+
+    if constexpr (numRegs <= kMaxOptiXPayloadRegisters)
+    {
+        // Register-based approach for small payloads
+        PayloadRegisters<T> pr;
+        pr.pack(*Payload);
+
+        optixTraverseWithRegs<T>(
+            AccelerationStructure,
+            Ray.Origin,
+            Ray.Direction,
+            Ray.TMin,
+            Ray.TMax,
+            RayTime,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            pr);
+
+        // Read back updated payload registers
+        // Native optixTrace updates regs in place
+        pr.unpack(*Payload);
+    }
+    else
+    {
+        // Pointer-based fallback for large payloads
+        uint32_t r0, r1;
+        packOptiXRayPayloadPointer((void*)Payload, r0, r1);
+        optixTraverse(
+            AccelerationStructure,
+            Ray.Origin,
+            Ray.Direction,
+            Ray.TMin,
+            Ray.TMax,
+            RayTime,
+            InstanceInclusionMask,
+            RayFlags,
+            RayContributionToHitGroupIndex,
+            MultiplierForGeometryContributionToHitGroupIndex,
+            MissShaderIndex,
+            r0,
+            r1);
+    }
+}
+
+// Non-template overload for empty payload case.
+// When Slang's type legalization eliminates an empty payload struct,
+// the generated code calls optixTraverse without a payload argument.
+__forceinline__ __device__ void optixTraverse(
+    OptixTraversableHandle AccelerationStructure,
+    uint32_t RayFlags,
+    uint32_t InstanceInclusionMask,
+    uint32_t RayContributionToHitGroupIndex,
+    uint32_t MultiplierForGeometryContributionToHitGroupIndex,
+    uint32_t MissShaderIndex,
+    RayDesc Ray,
+    OptixTraversableHandle* hitObj)
+{
     optixTraverse(
         AccelerationStructure,
         Ray.Origin,
         Ray.Direction,
         Ray.TMin,
         Ray.TMax,
-        RayTime,
+        0.f,
         InstanceInclusionMask,
         RayFlags,
         RayContributionToHitGroupIndex,
         MultiplierForGeometryContributionToHitGroupIndex,
-        MissShaderIndex,
-        r0,
-        r1);
+        MissShaderIndex);
 }
 
 #if (OPTIX_VERSION >= 80100)
@@ -4154,15 +5487,152 @@ static __forceinline__ __device__ void slangOptixMakeNopHitObject(OptixTraversab
 #endif
 
 #if (OPTIX_VERSION >= 80100)
+// Internal helper to call optixInvoke with the right number of register arguments
+template<typename T, size_t N = (sizeof(T) + 3) / 4>
+__forceinline__ __device__ void optixInvokeWithRegs(PayloadRegisters<T, N>& pr)
+{
+    if constexpr (N == 0)
+    {
+        optixInvoke();
+    }
+    else if constexpr (N == 1)
+    {
+        optixInvoke(pr.regs[0]);
+    }
+    else if constexpr (N == 2)
+    {
+        optixInvoke(pr.regs[0], pr.regs[1]);
+    }
+    else if constexpr (N == 3)
+    {
+        optixInvoke(pr.regs[0], pr.regs[1], pr.regs[2]);
+    }
+    else if constexpr (N == 4)
+    {
+        optixInvoke(pr.regs[0], pr.regs[1], pr.regs[2], pr.regs[3]);
+    }
+    else if constexpr (N == 5)
+    {
+        optixInvoke(pr.regs[0], pr.regs[1], pr.regs[2], pr.regs[3], pr.regs[4]);
+    }
+    else if constexpr (N == 6)
+    {
+        optixInvoke(pr.regs[0], pr.regs[1], pr.regs[2], pr.regs[3], pr.regs[4], pr.regs[5]);
+    }
+    else if constexpr (N == 7)
+    {
+        optixInvoke(
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3],
+            pr.regs[4],
+            pr.regs[5],
+            pr.regs[6]);
+    }
+    else if constexpr (N == 8)
+    {
+        optixInvoke(
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3],
+            pr.regs[4],
+            pr.regs[5],
+            pr.regs[6],
+            pr.regs[7]);
+    }
+    else if constexpr (N <= 16)
+    {
+        optixInvoke(
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3],
+            pr.regs[4],
+            pr.regs[5],
+            pr.regs[6],
+            pr.regs[7],
+            pr.regs[8],
+            pr.regs[9],
+            pr.regs[10],
+            pr.regs[11],
+            pr.regs[12],
+            pr.regs[13],
+            pr.regs[14],
+            pr.regs[15]);
+    }
+    else if constexpr (N <= kMaxOptiXPayloadRegisters)
+    {
+        optixInvoke(
+            pr.regs[0],
+            pr.regs[1],
+            pr.regs[2],
+            pr.regs[3],
+            pr.regs[4],
+            pr.regs[5],
+            pr.regs[6],
+            pr.regs[7],
+            pr.regs[8],
+            pr.regs[9],
+            pr.regs[10],
+            pr.regs[11],
+            pr.regs[12],
+            pr.regs[13],
+            pr.regs[14],
+            pr.regs[15],
+            pr.regs[16],
+            pr.regs[17],
+            pr.regs[18],
+            pr.regs[19],
+            pr.regs[20],
+            pr.regs[21],
+            pr.regs[22],
+            pr.regs[23],
+            pr.regs[24],
+            pr.regs[25],
+            pr.regs[26],
+            pr.regs[27],
+            pr.regs[28],
+            pr.regs[29],
+            pr.regs[30],
+            pr.regs[31]);
+    }
+}
+
 template<typename T>
 static __forceinline__ __device__ void optixInvoke(
     OptixTraversableHandle AccelerationStructure,
     OptixTraversableHandle* HitOrMiss,
-    T Payload)
+    T* Payload)
 {
-    uint32_t r0, r1;
-    packOptiXRayPayloadPointer((void*)Payload, r0, r1);
-    optixInvoke(r0, r1);
+    constexpr size_t numRegs = (sizeof(T) + 3) / 4;
+
+    if constexpr (numRegs <= kMaxOptiXPayloadRegisters)
+    {
+        // Register-based approach for small payloads
+        PayloadRegisters<T> pr;
+        pr.pack(*Payload);
+        optixInvokeWithRegs<T>(pr);
+        // Read back updated payload registers
+        pr.unpack(*Payload);
+    }
+    else
+    {
+        // Pointer-based fallback for large payloads
+        uint32_t r0, r1;
+        packOptiXRayPayloadPointer((void*)Payload, r0, r1);
+        optixInvoke(r0, r1);
+    }
+}
+
+// Overload for empty payloads (when payload is eliminated by type legalization)
+static __forceinline__ __device__ void optixInvoke(
+    OptixTraversableHandle AccelerationStructure,
+    OptixTraversableHandle* HitOrMiss)
+{
+    // Call OptiX invoke with no payload for empty payload case
+    optixInvoke();
 }
 #endif
 
@@ -4190,6 +5660,20 @@ slangOptixHitObjectGetInstanceIndex(OptixTraversableHandle* Obj)
 static __forceinline__ __device__ uint slangOptixHitObjectGetInstanceId(OptixTraversableHandle* Obj)
 {
     return optixHitObjectGetInstanceId();
+}
+#endif
+
+#if (OPTIX_VERSION >= 80000)
+static __forceinline__ __device__ float slangOptixHitObjectGetRayTime(OptixTraversableHandle* Obj)
+{
+    return optixHitObjectGetRayTime();
+}
+#endif
+
+#if (OPTIX_VERSION >= 80100)
+static __forceinline__ __device__ float slangOptixHitObjectGetRayTmax(OptixTraversableHandle* Obj)
+{
+    return optixHitObjectGetRayTmax();
 }
 #endif
 
@@ -4254,11 +5738,46 @@ slangOptixHitObjectGetSbtRecordIndex(OptixTraversableHandle* Obj)
 #endif
 
 #if (OPTIX_VERSION >= 90000)
-static __forceinline__ __device__ uint
-slangOptixHitObjectSetSbtRecordIndex(OptixTraversableHandle* Obj, uint sbtRecordIndex)
+static __forceinline__ __device__ void slangOptixHitObjectSetSbtRecordIndex(
+    OptixTraversableHandle* Obj,
+    uint sbtRecordIndex)
 {
-    optixHitObjectSetSbtRecordIndex(sbtRecordIndex); // returns void
-    return sbtRecordIndex;
+    optixHitObjectSetSbtRecordIndex(sbtRecordIndex);
+}
+#endif
+
+// HitObject transform matrix wrappers for SER (Shader Execution Reordering)
+// These wrappers convert OptiX's float[12] matrix format to Slang's Matrix type
+// Available in RG, CH, MS, CC, DC stages per OptiX documentation
+// Note: optixHitObjectGetWorldToObjectTransformMatrix/optixHitObjectGetObjectToWorldTransformMatrix
+// were added in OptiX 9.0 (not available in 8.0 or 8.1)
+#if (OPTIX_VERSION >= 90000)
+static __forceinline__ __device__ Matrix<float, 4, 3> slangOptixHitObjectGetWorldToObject(
+    OptixTraversableHandle* hitObj)
+{
+    float m[12];
+    optixHitObjectGetWorldToObjectTransformMatrix(m);
+    // OptiX stores matrix as 3 rows of float4, we need to transpose to 4 rows of float3
+    return makeMatrix<float, 4, 3>(
+        make_float3(m[0], m[4], m[8]),
+        make_float3(m[1], m[5], m[9]),
+        make_float3(m[2], m[6], m[10]),
+        make_float3(m[3], m[7], m[11]));
+}
+#endif
+
+#if (OPTIX_VERSION >= 90000)
+static __forceinline__ __device__ Matrix<float, 4, 3> slangOptixHitObjectGetObjectToWorld(
+    OptixTraversableHandle* hitObj)
+{
+    float m[12];
+    optixHitObjectGetObjectToWorldTransformMatrix(m);
+    // OptiX stores matrix as 3 rows of float4, we need to transpose to 4 rows of float3
+    return makeMatrix<float, 4, 3>(
+        make_float3(m[0], m[4], m[8]),
+        make_float3(m[1], m[5], m[9]),
+        make_float3(m[2], m[6], m[10]),
+        make_float3(m[3], m[7], m[11]));
 }
 #endif
 
@@ -4336,6 +5855,8 @@ typedef unsigned long long OptixTraversableHandle;
 static const int kSlangTorchTensorMaxDim = 5;
 
 // TensorView
+// NOTE: If you change this struct's layout, also update the hard-coded size/alignment
+// in _createTypeLayout() in slang-type-layout.cpp.
 struct TensorView
 {
     uint8_t* data;
@@ -4526,7 +6047,7 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL T tex1Dfetch_int(CUtexObject texObj, int x, i
     SLANG_FORCE_INLINE SLANG_CUDA_CALL T tex1Dfetch_int(CUtexObject texObj, int x, int mip)    \
     {                                                                                          \
         T result;                                                                              \
-        T stub;                                                                                \
+        [[maybe_unused]] T stub;                                                               \
         asm("tex.level.1d.v4." dtype ".s32 {%0, %1, %2, %3}, [%4, {%5}], %6;"                  \
             : c(result), c(stub), c(stub), c(stub)                                             \
             : "l"(texObj), "r"(x), "r"(mip));                                                  \
@@ -4536,7 +6057,7 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL T tex1Dfetch_int(CUtexObject texObj, int x, i
     SLANG_FORCE_INLINE SLANG_CUDA_CALL T##2 tex1Dfetch_int(CUtexObject texObj, int x, int mip) \
     {                                                                                          \
         T result_x, result_y;                                                                  \
-        T stub;                                                                                \
+        [[maybe_unused]] T stub;                                                               \
         asm("tex.level.1d.v4." dtype ".s32 {%0, %1, %2, %3}, [%4, {%5}], %6;"                  \
             : c(result_x), c(result_y), c(stub), c(stub)                                       \
             : "l"(texObj), "r"(x), "r"(mip));                                                  \
@@ -4565,7 +6086,7 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL T tex2Dfetch_int(CUtexObject texObj, int x, i
     SLANG_FORCE_INLINE SLANG_CUDA_CALL T tex2Dfetch_int(CUtexObject texObj, int x, int y, int mip) \
     {                                                                                              \
         T result;                                                                                  \
-        T stub;                                                                                    \
+        [[maybe_unused]] T stub;                                                                   \
         asm("tex.level.2d.v4." dtype ".s32 {%0, %1, %2, %3}, [%4, {%5, %6}], %7;"                  \
             : c(result), c(stub), c(stub), c(stub)                                                 \
             : "l"(texObj), "r"(x), "r"(y), "r"(mip));                                              \
@@ -4576,7 +6097,7 @@ SLANG_FORCE_INLINE SLANG_CUDA_CALL T tex2Dfetch_int(CUtexObject texObj, int x, i
         T##2 tex2Dfetch_int(CUtexObject texObj, int x, int y, int mip)                             \
     {                                                                                              \
         T result_x, result_y;                                                                      \
-        T stub;                                                                                    \
+        [[maybe_unused]] T stub;                                                                   \
         asm("tex.level.2d.v4." dtype ".s32 {%0, %1, %2, %3}, [%4, {%5, %6}], %7;"                  \
             : c(result_x), c(result_y), c(stub), c(stub)                                           \
             : "l"(texObj), "r"(x), "r"(y), "r"(mip));                                              \
@@ -4608,7 +6129,7 @@ tex3Dfetch_int(CUtexObject texObj, int x, int y, int z, int mip);
     tex3Dfetch_int(CUtexObject texObj, int x, int y, int z, int mip)                      \
     {                                                                                     \
         T result;                                                                         \
-        T stub;                                                                           \
+        [[maybe_unused]] T stub;                                                          \
         asm("tex.level.3d.v4." dtype ".s32 {%0, %1, %2, %3}, [%4, {%5, %6, %7, %8}], %9;" \
             : c(result), c(stub), c(stub), c(stub)                                        \
             : "l"(texObj), "r"(x), "r"(y), "r"(z), "r"(z) /* ignored */, "r"(mip));       \
@@ -4619,7 +6140,7 @@ tex3Dfetch_int(CUtexObject texObj, int x, int y, int z, int mip);
         T##2 tex3Dfetch_int(CUtexObject texObj, int x, int y, int z, int mip)             \
     {                                                                                     \
         T result_x, result_y;                                                             \
-        T stub;                                                                           \
+        [[maybe_unused]] T stub;                                                          \
         asm("tex.level.3d.v4." dtype ".s32 {%0, %1, %2, %3}, [%4, {%5, %6, %7, %8}], %9;" \
             : c(result_x), c(result_y), c(stub), c(stub)                                  \
             : "l"(texObj), "r"(x), "r"(y), "r"(z), "r"(z) /* ignored */, "r"(mip));       \
@@ -4650,7 +6171,7 @@ tex1DArrayfetch_int(CUtexObject texObj, int x, int layer, int mip);
     tex1DArrayfetch_int(CUtexObject texObj, int x, int layer, int mip)             \
     {                                                                              \
         T result;                                                                  \
-        T stub;                                                                    \
+        [[maybe_unused]] T stub;                                                   \
         asm("tex.level.a1d.v4." dtype ".s32 {%0, %1, %2, %3}, [%4, {%5, %6}], %7;" \
             : c(result), c(stub), c(stub), c(stub)                                 \
             : "l"(texObj), "r"(layer), "r"(x), "r"(mip));                          \
@@ -4661,7 +6182,7 @@ tex1DArrayfetch_int(CUtexObject texObj, int x, int layer, int mip);
         T##2 tex1DArrayfetch_int(CUtexObject texObj, int x, int layer, int mip)    \
     {                                                                              \
         T result_x, result_y;                                                      \
-        T stub;                                                                    \
+        [[maybe_unused]] T stub;                                                   \
         asm("tex.level.a1d.v4." dtype ".s32 {%0, %1, %2, %3}, [%4, {%5, %6}], %7;" \
             : c(result_x), c(result_y), c(stub), c(stub)                           \
             : "l"(texObj), "r"(layer), "r"(x), "r"(mip));                          \
@@ -4692,7 +6213,7 @@ tex2DArrayfetch_int(CUtexObject texObj, int x, int y, int layer, int mip);
     tex2DArrayfetch_int(CUtexObject texObj, int x, int y, int layer, int mip)               \
     {                                                                                       \
         T result;                                                                           \
-        T stub;                                                                             \
+        [[maybe_unused]] T stub;                                                            \
         asm("tex.level.a2d.v4." dtype ".s32 {%0, %1, %2, %3}, [%4, {%5, %6, %7, %8}], %9;"  \
             : c(result), c(stub), c(stub), c(stub)                                          \
             : "l"(texObj), "r"(layer), "r"(x), "r"(y), "r"(layer) /* ignored */, "r"(mip)); \
@@ -4703,7 +6224,7 @@ tex2DArrayfetch_int(CUtexObject texObj, int x, int y, int layer, int mip);
         T##2 tex2DArrayfetch_int(CUtexObject texObj, int x, int y, int layer, int mip)      \
     {                                                                                       \
         T result_x, result_y;                                                               \
-        T stub;                                                                             \
+        [[maybe_unused]] T stub;                                                            \
         asm("tex.level.a2d.v4." dtype ".s32 {%0, %1, %2, %3}, [%4, {%5, %6, %7, %8}], %9;"  \
             : c(result_x), c(result_y), c(stub), c(stub)                                    \
             : "l"(texObj), "r"(layer), "r"(x), "r"(y), "r"(layer) /* ignored */, "r"(mip)); \
@@ -5121,7 +6642,8 @@ __forceinline__ __device__ VecTOut slangOptixCoopVecMatMul(
 
 
 // This implementation can only be enabled on CUDA Toolkit 12.5+
-#if (((__CUDACC_VER_MAJOR__ >= 12) && (__CUDACC_VER_MINOR__ >= 5)) || (CUDA_VERSION >= 12050))
+#if ((__CUDACC_VER_MAJOR__ > 12) || (__CUDACC_VER_MAJOR__ == 12 && __CUDACC_VER_MINOR__ >= 5)) || \
+    (CUDA_VERSION >= 12050)
 // The reason we have to implement our own wmma operation on CUDA is the interface
 // design of cooperative_matrix on Vulkan is quite different from CUDA WMMA API, where
 // SPIRV spec doesn't require the matrix layout during declaration of the cooperative_matrix,
@@ -5228,6 +6750,27 @@ struct PtxTypeName<half>
 };
 #endif // #if SLANG_CUDA_ENABLE_HALF
 
+#if SLANG_CUDA_ENABLE_FP8
+template<>
+struct PtxTypeName<__nv_fp8_e4m3>
+{
+    static constexpr const char name[] = "f8e4m3";
+};
+template<>
+struct PtxTypeName<__nv_fp8_e5m2>
+{
+    static constexpr const char name[] = "f8e5m2";
+};
+#endif // #if SLANG_CUDA_ENABLE_FP8
+
+#if SLANG_CUDA_ENABLE_BF16
+template<>
+struct PtxTypeName<__nv_bfloat16>
+{
+    static constexpr const char name[] = "bf16";
+};
+#endif
+
 template<>
 struct PtxTypeName<float>
 {
@@ -5278,6 +6821,30 @@ struct RegisterCount<half, M, N, K, MatrixUse::MatrixD>
     static constexpr int value = 4;
 };
 #endif // #if SLANG_CUDA_ENABLE_HALF
+
+#if SLANG_CUDA_ENABLE_BF16
+// bfloat16 - 8 regs for A/B, 4 regs for C/D
+template<int M, int N, int K>
+struct RegisterCount<__nv_bfloat16, M, N, K, MatrixUse::MatrixA>
+{
+    static constexpr int value = 8;
+};
+template<int M, int N, int K>
+struct RegisterCount<__nv_bfloat16, M, N, K, MatrixUse::MatrixB>
+{
+    static constexpr int value = 8;
+};
+template<int M, int N, int K>
+struct RegisterCount<__nv_bfloat16, M, N, K, MatrixUse::MatrixC>
+{
+    static constexpr int value = 4;
+};
+template<int M, int N, int K>
+struct RegisterCount<__nv_bfloat16, M, N, K, MatrixUse::MatrixD>
+{
+    static constexpr int value = 4;
+};
+#endif // #if SLANG_CUDA_ENABLE_BF16
 
 // Float (f32) - 8 regs for C/D only
 template<int M, int N, int K>
@@ -5367,6 +6934,71 @@ struct RegisterCount<char, 32, 8, 16, MatrixUse::MatrixB>
     static constexpr int value = 1;
 };
 
+#if SLANG_CUDA_ENABLE_FP8
+// fp8 - same as u8
+template<>
+struct RegisterCount<__nv_fp8_e4m3, 16, 16, 16, MatrixUse::MatrixA>
+{
+    static constexpr int value = 2;
+};
+template<>
+struct RegisterCount<__nv_fp8_e4m3, 16, 16, 16, MatrixUse::MatrixB>
+{
+    static constexpr int value = 2;
+};
+template<>
+struct RegisterCount<__nv_fp8_e4m3, 8, 32, 16, MatrixUse::MatrixA>
+{
+    static constexpr int value = 1;
+};
+template<>
+struct RegisterCount<__nv_fp8_e4m3, 8, 32, 16, MatrixUse::MatrixB>
+{
+    static constexpr int value = 4;
+};
+template<>
+struct RegisterCount<__nv_fp8_e4m3, 32, 8, 16, MatrixUse::MatrixA>
+{
+    static constexpr int value = 4;
+};
+template<>
+struct RegisterCount<__nv_fp8_e4m3, 32, 8, 16, MatrixUse::MatrixB>
+{
+    static constexpr int value = 1;
+};
+
+template<>
+struct RegisterCount<__nv_fp8_e5m2, 16, 16, 16, MatrixUse::MatrixA>
+{
+    static constexpr int value = 2;
+};
+template<>
+struct RegisterCount<__nv_fp8_e5m2, 16, 16, 16, MatrixUse::MatrixB>
+{
+    static constexpr int value = 2;
+};
+template<>
+struct RegisterCount<__nv_fp8_e5m2, 8, 32, 16, MatrixUse::MatrixA>
+{
+    static constexpr int value = 1;
+};
+template<>
+struct RegisterCount<__nv_fp8_e5m2, 8, 32, 16, MatrixUse::MatrixB>
+{
+    static constexpr int value = 4;
+};
+template<>
+struct RegisterCount<__nv_fp8_e5m2, 32, 8, 16, MatrixUse::MatrixA>
+{
+    static constexpr int value = 4;
+};
+template<>
+struct RegisterCount<__nv_fp8_e5m2, 32, 8, 16, MatrixUse::MatrixB>
+{
+    static constexpr int value = 1;
+};
+#endif
+
 
 // ====================================================================================
 // Saturation at the output for integer MMA
@@ -5391,7 +7023,7 @@ struct IsSaturated<false>
 // ====================================================================================
 
 template<typename ElemT, int M, int N, int K, MatrixUse use, Layout layout>
-__device__ inline void wmmaLoad(uint32_t* regs, const ElemT* ptr, int stride)
+__device__ inline void wmmaLoad(uint32_t* regs, const void* ptr, int stride)
 {
     constexpr int nregs = RegisterCount<ElemT, M, N, K, use>::value;
 
@@ -5456,7 +7088,7 @@ __device__ inline void wmmaLoad(uint32_t* regs, const ElemT* ptr, int stride)
 // ====================================================================================
 
 template<typename ElemT, int M, int N, int K, Layout layout>
-__device__ inline void wmmaStore(ElemT* ptr, const uint32_t* regs, int stride)
+__device__ inline void wmmaStore(void* ptr, const uint32_t* regs, int stride)
 {
     constexpr int nregs = RegisterCount<ElemT, M, N, K, MatrixUse::MatrixD>::value;
 
@@ -5552,9 +7184,12 @@ inline unsigned __device__ Pack32Helper<unsigned char>(unsigned char value)
 
 // The dimensions of the fragment are specified by M, N, K which are totally determined during
 // compile time, so slang already did the pre-filter on the shape & type combination.
-template<typename T, int M, int N, int K, MatrixUse R, Layout MatrixLayout = RowMajor>
+template<typename T, int M, int N, int K, MatrixUse R>
 struct WmmaFragment
 {
+    __device__ WmmaFragment() {}
+    __device__ WmmaFragment(T scalarValue) { fill(scalarValue); }
+
     typedef WmmaFragment<T, M, N, K, R> This;
     template<Layout layout>
     void __device__ Store(RWStructuredBuffer<T> buffer, uint element, uint stride)
@@ -5573,25 +7208,19 @@ struct WmmaFragment
     void __device__ fill(T value)
     {
         unsigned packed = Pack32Helper(value);
-
-        // Manually assign to prevent register coalescing
-        regs[0] = packed;
-        regs[1] = packed;
-        regs[2] = packed;
-        regs[3] = packed;
-        regs[4] = packed;
-        regs[5] = packed;
-        regs[6] = packed;
-        regs[7] = packed;
+        constexpr int nregs = RegisterCount<T, M, N, K, R>::value;
+        for (int i = 0; i < nregs; i++)
+        {
+            regs[i] = packed;
+        }
     }
 
     __device__ This operator*(T b)
     {
-        constexpr int nregs = RegisterCount<T, M, N, K, R>::value;
         This result;
 
         // This loop will be unrolled by the compiler becuase nregs is constexpr
-        for (int i = 0; i < nregs; i++)
+        for (int i = 0; i < GetLength(); i++)
         {
             result.set(i, get(i) * b);
         }
@@ -5600,11 +7229,10 @@ struct WmmaFragment
 
     __device__ This operator*(const This& b)
     {
-        constexpr int nregs = RegisterCount<T, M, N, K, R>::value;
         This result;
 
         // This loop will be unrolled by the compiler becuase nregs is constexpr
-        for (int i = 0; i < nregs; i++)
+        for (int i = 0; i < GetLength(); i++)
         {
             result.set(i, get(i) * b.get(i));
         }
@@ -5613,10 +7241,9 @@ struct WmmaFragment
 
     __device__ This operator/(const This& other)
     {
-        constexpr int nregs = RegisterCount<T, M, N, K, R>::value;
         This result;
 
-        for (int i = 0; i < nregs; i++)
+        for (int i = 0; i < GetLength(); i++)
         {
             result.set(i, get(i) / other.get(i));
         }
@@ -5625,10 +7252,9 @@ struct WmmaFragment
 
     __device__ This operator-(const This& other)
     {
-        constexpr int nregs = RegisterCount<T, M, N, K, R>::value;
         This result;
 
-        for (int i = 0; i < nregs; i++)
+        for (int i = 0; i < GetLength(); i++)
         {
             result.set(i, get(i) - other.get(i));
         }
@@ -5637,10 +7263,9 @@ struct WmmaFragment
 
     __device__ This operator-()
     {
-        constexpr int nregs = RegisterCount<T, M, N, K, R>::value;
         This result;
 
-        for (int i = 0; i < nregs; i++)
+        for (int i = 0; i < GetLength(); i++)
         {
             result.set(i, -get(i));
         }
@@ -5649,10 +7274,9 @@ struct WmmaFragment
 
     __device__ This operator+(const This& other)
     {
-        constexpr int nregs = RegisterCount<T, M, N, K, R>::value;
         This result;
 
-        for (int i = 0; i < nregs; i++)
+        for (int i = 0; i < GetLength(); i++)
         {
             result.set(i, get(i) + other.get(i));
         }
@@ -5661,10 +7285,9 @@ struct WmmaFragment
 
     __device__ This operator%(const This& other)
     {
-        constexpr int nregs = RegisterCount<T, M, N, K, R>::value;
         This result;
 
-        for (int i = 0; i < nregs; i++)
+        for (int i = 0; i < GetLength(); i++)
         {
             result.set(i, get(i) % other.get(i));
         }
@@ -5677,7 +7300,7 @@ struct WmmaFragment
         // If the data type is different, we need to copy element by element.
         // Since the shape of two matrices are the same, they have the same
         // number of elements.
-        for (int i = 0; i < elements_per_thread; i++)
+        for (int i = 0; i < GetLength(); i++)
         {
             set(i, static_cast<T>(other.get(i)));
         }
@@ -5689,13 +7312,14 @@ struct WmmaFragment
     //   - index 1: bits [8:15]  of regs[0]
     //   - index 2: bits [16:23] of regs[0]
     //   - index 3: bits [24:31] of regs[0]
-    //   - index 4: bits [0:7]   of regs[1], etc.
     __device__ T get(int index) const
     {
         if constexpr (sizeof(T) == 4)
         {
             // T is 32-bit (float or int32): 1 element per register
-            return *reinterpret_cast<const T*>(&regs[index]);
+            T v;
+            memcpy(&v, &regs[index], 4);
+            return v;
         }
         else if constexpr (sizeof(T) == 2)
         {
@@ -5706,7 +7330,9 @@ struct WmmaFragment
             int bitOffset = elementOffset * 16;
             uint32_t extracted = (regs[regIndex] >> bitOffset) & 0xFFFF;
             uint16_t value16 = static_cast<uint16_t>(extracted);
-            return *reinterpret_cast<const T*>(&value16);
+            T v;
+            memcpy(&v, &value16, 2);
+            return v;
         }
         else if constexpr (sizeof(T) == 1)
         {
@@ -5727,7 +7353,7 @@ struct WmmaFragment
         if constexpr (sizeof(T) == 4)
         {
             // T is 32-bit (float or int32): 1 element per register
-            regs[index] = *reinterpret_cast<const uint32_t*>(&value);
+            memcpy(&regs[index], &value, 4);
         }
         else if constexpr (sizeof(T) == 2)
         {
@@ -5736,7 +7362,8 @@ struct WmmaFragment
             int elementOffset = index % 2;
             int bitOffset = elementOffset * 16;
             uint32_t mask = 0xFFFF;
-            uint16_t value16 = *reinterpret_cast<const uint16_t*>(&value);
+            uint16_t value16;
+            memcpy(&value16, &value, 2);
 
             // Clear the bits at the target position
             regs[regIndex] &= ~(mask << bitOffset);
@@ -5769,40 +7396,52 @@ struct WmmaFragment
         wmmaStore<T, M, N, K, layout>(buffer + element, regs, stride);
     }
 
+    template<Layout layout, typename U>
+    void __device__ Store(U* buffer, uint stride)
+    {
+        // Force compile-time check, so we know the template parameter comibination is valid.
+        (void)RegisterCount<T, M, N, K, R>::value;
+        wmmaStore<T, M, N, K, layout>(buffer, regs, stride * sizeof(U) / sizeof(T));
+    }
+
     template<Layout layout>
     static This __device__ Load(T* buffer, uint element, uint stride)
     {
-        WmmaFragment<T, M, N, K, R, layout> fragment;
+        WmmaFragment<T, M, N, K, R> fragment;
 
         // Force compile-time check, so we know the template parameter comibination is valid.
         (void)RegisterCount<T, M, N, K, R>::value;
         wmmaLoad<T, M, N, K, R, layout>(fragment.regs, buffer + element, stride);
-
+        fragment.m_layout = layout;
         return fragment;
     }
 
-    static __device__ uint32_t GetLength() { return This::elements_per_thread; }
+    template<Layout layout, typename U>
+    static This __device__ Load(U* buffer, uint stride)
+    {
+        WmmaFragment<T, M, N, K, R> fragment;
+
+        // Force compile-time check, so we know the template parameter comibination is valid.
+        (void)RegisterCount<T, M, N, K, R>::value;
+        wmmaLoad<T, M, N, K, R, layout>(fragment.regs, buffer, stride * sizeof(U) / sizeof(T));
+        fragment.m_layout = layout;
+        return fragment;
+    }
+
+    static constexpr __device__ uint32_t GetLength() { return This::elements_per_thread; }
 
     // For referencing those template parameters outside the struct
     using ElementType = T;
     static constexpr int m_M = M;
     static constexpr int m_N = N;
     static constexpr int m_K = K;
-    static constexpr Layout m_layout = MatrixLayout;
+    Layout m_layout = Layout::RowMajor;
 
-    // Maximum registers needed across all fragment types and data types
-    static constexpr int MAX_REGS = 8;
-    unsigned regs[MAX_REGS] = {};
+    // Register Count requirement
+    static constexpr int RegsCount = RegisterCount<T, M, N, K, R>::value;
+    unsigned regs[RegsCount] = {};
 
-    static constexpr uint32_t elements_per_warp = (R == MatrixUse::MatrixA)   ? (M * K)
-                                                  : (R == MatrixUse::MatrixB) ? (K * N)
-                                                                              : (M * N);
-
-    static_assert(elements_per_warp % 32 == 0, "Total elements per warp must be divisible by 32");
-
-    static constexpr uint32_t elements_per_thread = elements_per_warp / 32;
-    static constexpr uint32_t bytes_per_thread = elements_per_thread * sizeof(T);
-    static constexpr uint32_t registers_per_thread = (bytes_per_thread + 3) / 4;
+    static constexpr uint32_t elements_per_thread = RegsCount * (4 / sizeof(T));
 };
 
 // ====================================================================================
@@ -6271,12 +7910,10 @@ template<
     int M,
     int N,
     int K,
-    Layout layoutA,
-    Layout layoutB,
     bool saturatingAccumulation>
 WmmaFragment<DType, M, N, K, MatrixC> __device__ coopMatMulAdd(
-    WmmaFragment<AType, M, N, K, MatrixUse::MatrixA, layoutA> matA,
-    WmmaFragment<BType, M, N, K, MatrixUse::MatrixB, layoutB> matB,
+    WmmaFragment<AType, M, N, K, MatrixUse::MatrixA> matA,
+    WmmaFragment<BType, M, N, K, MatrixUse::MatrixB> matB,
     WmmaFragment<CType, M, N, K, MatrixUse::MatrixC> matC)
 {
     constexpr ShapeCombination shape = (M == 16 && N == 16 && K == 16) ? ShapeCombination::m16n16k16
@@ -6285,14 +7922,65 @@ WmmaFragment<DType, M, N, K, MatrixC> __device__ coopMatMulAdd(
                                            : ShapeCombination::m32n8k16;
 
     WmmaFragment<DType, M, N, K, MatrixC> matD;
-    MMAHelper<AType, BType, CType, DType, shape, layoutA, layoutB, saturatingAccumulation>::eval(
-        matD,
-        matA,
-        matB,
-        matC);
+    uint32_t encodedLayout = (matA.m_layout == Layout::RowMajor ? 1 : 0) << 1 |
+                             (matB.m_layout == Layout::RowMajor ? 1 : 0);
+
+    switch (encodedLayout)
+    {
+    // 00011
+    case 0x3:
+        MMAHelper<
+            AType,
+            BType,
+            CType,
+            DType,
+            shape,
+            Layout::RowMajor,
+            Layout::RowMajor,
+            saturatingAccumulation>::eval(matD, matA, matB, matC);
+        break;
+    // 00010
+    case 0x2:
+        MMAHelper<
+            AType,
+            BType,
+            CType,
+            DType,
+            shape,
+            Layout::RowMajor,
+            Layout::ColMajor,
+            saturatingAccumulation>::eval(matD, matA, matB, matC);
+        break;
+    // 0001
+    case 0x01:
+        MMAHelper<
+            AType,
+            BType,
+            CType,
+            DType,
+            shape,
+            Layout::ColMajor,
+            Layout::RowMajor,
+            saturatingAccumulation>::eval(matD, matA, matB, matC);
+        break;
+    // 0000
+    case 0x00:
+        MMAHelper<
+            AType,
+            BType,
+            CType,
+            DType,
+            shape,
+            Layout::ColMajor,
+            Layout::ColMajor,
+            saturatingAccumulation>::eval(matD, matA, matB, matC);
+        break;
+    }
 
     return matD;
 }
 
 } // namespace Slang_CUDA_WMMA
 #endif // #if (((__CUDACC_VER_MAJOR__ >=12)&&(__CUDACC_VER_MINOR__>=5)) || (CUDA_VERSION >= 12050))
+
+#endif

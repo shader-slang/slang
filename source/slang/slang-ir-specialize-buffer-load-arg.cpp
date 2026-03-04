@@ -125,7 +125,7 @@ struct FuncBufferLoadSpecializationCondition : FunctionCallSpecializeCondition
     }
 };
 
-void specializeFuncsForBufferLoadArgs(CodeGenContext* codegenContext, IRModule* module)
+void specializeFuncsForBufferLoadArgs(IRModule* module, CodeGenContext* codegenContext)
 {
     FuncBufferLoadSpecializationCondition condition;
     condition.codegenContext = codegenContext;

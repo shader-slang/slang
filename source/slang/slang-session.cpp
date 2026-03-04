@@ -10,6 +10,7 @@
 #include "slang-options.h"
 #include "slang-parser.h"
 #include "slang-preprocessor.h"
+#include "slang-rich-diagnostics.h"
 #include "slang-serialize-ast.h"
 #include "slang-serialize-container.h"
 #include "slang-serialize-ir.h"
@@ -148,6 +149,7 @@ void Linkage::addTarget(slang::TargetDesc const& desc)
     optionSet.set(CompilerOptionName::FloatingPointMode, FloatingPointMode(desc.floatingPointMode));
     optionSet.addTargetFlags(desc.flags);
     optionSet.setProfile(Profile(desc.profile));
+
     optionSet.set(CompilerOptionName::LineDirectiveMode, LineDirectiveMode(desc.lineDirectiveMode));
     optionSet.set(CompilerOptionName::GLSLForceScalarLayout, desc.forceGLSLScalarBufferLayout);
 
@@ -166,7 +168,9 @@ Linkage::loadModule(const char* moduleName, slang::IBlob** outDiagnostics)
 
     if (isInLanguageServer())
     {
-        sink.setFlags(DiagnosticSink::Flag::HumaneLoc | DiagnosticSink::Flag::LanguageServer);
+        sink.setFlags(
+            DiagnosticSink::Flag::HumaneLoc | DiagnosticSink::Flag::LanguageServer |
+            DiagnosticSink::Flag::MachineReadableDiagnostics);
     }
 
     try
@@ -209,7 +213,9 @@ slang::IModule* Linkage::loadModuleFromBlob(
 
     if (isInLanguageServer())
     {
-        sink.setFlags(DiagnosticSink::Flag::HumaneLoc | DiagnosticSink::Flag::LanguageServer);
+        sink.setFlags(
+            DiagnosticSink::Flag::HumaneLoc | DiagnosticSink::Flag::LanguageServer |
+            DiagnosticSink::Flag::MachineReadableDiagnostics);
     }
 
 
@@ -349,23 +355,35 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createCompositeComponentType(
 
     SLANG_AST_BUILDER_RAII(getASTBuilder());
 
+    DiagnosticSink sink(getSourceManager(), Lexer::sourceLocationLexer);
+    applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
+
     // Attempting to create a "composite" of just one component type should
     // just return the component type itself, to avoid redundant work.
     //
     if (componentTypeCount == 1)
     {
         auto componentType = componentTypes[0];
+        if (componentType == nullptr)
+        {
+            sink.diagnose(Diagnostics::NullComponentType{.index = 0});
+            sink.getBlobIfNeeded(outDiagnostics);
+            return SLANG_E_INVALID_ARG;
+        }
         componentType->addRef();
         *outCompositeComponentType = componentType;
         return SLANG_OK;
     }
 
-    DiagnosticSink sink(getSourceManager(), Lexer::sourceLocationLexer);
-    applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
-
     List<RefPtr<ComponentType>> childComponents;
     for (Int cc = 0; cc < componentTypeCount; ++cc)
     {
+        if (componentTypes[cc] == nullptr)
+        {
+            sink.diagnose(Diagnostics::NullComponentType{.index = int(cc)});
+            sink.getBlobIfNeeded(outDiagnostics);
+            return SLANG_E_INVALID_ARG;
+        }
         childComponents.add(asInternal(componentTypes[cc]));
     }
 
@@ -526,9 +544,13 @@ DeclRef<Decl> Linkage::specializeWithArgTypes(
     invokeExpr->functionExpr = funcExpr;
     invokeExpr->arguments = argExprs;
 
-    auto checkedInvokeExpr = visitor.CheckInvokeExprWithCheckedOperands(invokeExpr);
-
-    return as<DeclRefExpr>(as<InvokeExpr>(checkedInvokeExpr)->functionExpr)->declRef;
+    auto checkedInvokeExpr = as<InvokeExpr>(visitor.CheckInvokeExprWithCheckedOperands(invokeExpr));
+    if (!checkedInvokeExpr)
+        return DeclRef<Decl>();
+    auto funcDeclRefExpr = as<DeclRefExpr>(checkedInvokeExpr->functionExpr);
+    if (!funcDeclRefExpr)
+        return DeclRef<Decl>();
+    return funcDeclRefExpr->declRef;
 }
 
 
@@ -1214,11 +1236,13 @@ void Linkage::_diagnoseErrorInImportedModule(DiagnosticSink* sink)
 {
     for (auto info = m_modulesBeingImported; info; info = info->next)
     {
-        sink->diagnose(info->importLoc, Diagnostics::errorInImportedModule, info->name);
+        sink->diagnose(Diagnostics::ErrorInImportedModule{
+            .module = info->name->text,
+            .location = info->importLoc});
     }
     if (!isInLanguageServer())
     {
-        sink->diagnose(SourceLoc(), Diagnostics::compilationCeased);
+        sink->diagnose(Diagnostics::CompilationCeased{});
     }
 }
 
@@ -1417,7 +1441,9 @@ RefPtr<Module> Linkage::findOrImportModule(
         if (isBeingImported(previouslyLoadedModule))
         {
             // We seem to be in the middle of loading this module
-            sink->diagnose(requestingLoc, Diagnostics::recursiveModuleImport, moduleName);
+            sink->diagnose(Diagnostics::RecursiveModuleImport{
+                .module = moduleName,
+                .location = requestingLoc});
             return nullptr;
         }
 
@@ -1460,7 +1486,7 @@ RefPtr<Module> Linkage::findOrImportModule(
             // Should built-in modules shadow user modules, even when the
             // built-in module fails to load, for some reason?
             //
-            sink->diagnose(requestingLoc, Diagnostics::glslModuleNotAvailable, moduleName);
+            sink->diagnose(Diagnostics::GlslModuleNotAvailable{.location = requestingLoc});
         }
         return glslModule;
     }
@@ -1657,10 +1683,9 @@ RefPtr<Module> Linkage::findOrImportModule(
                                 ->findDecoration<IRExperimentalModuleDecoration>() &&
                             !m_optionSet.getBoolOption(CompilerOptionName::ExperimentalFeature))
                         {
-                            sink->diagnose(
-                                requestingLoc,
-                                Diagnostics::needToEnableExperimentFeature,
-                                moduleName);
+                            sink->diagnose(Diagnostics::NeedToEnableExperimentFeature{
+                                .module = getText(moduleName),
+                                .loc = requestingLoc});
                         }
                     }
                     return module;
@@ -1685,7 +1710,8 @@ RefPtr<Module> Linkage::findOrImportModule(
     // list of the file names that were tried, if
     // nothing was even found via the include system).
     //
-    sink->diagnose(requestingLoc, Diagnostics::cannotOpenFile, defaultSourceFileName);
+    sink->diagnose(
+        Diagnostics::CannotOpenFile{.path = defaultSourceFileName, .location = requestingLoc});
 
     // If the attempt to import the module failed, then
     // we will stick a null pointer into the map of loaded
@@ -1821,7 +1847,7 @@ Linkage::IncludeResult Linkage::findAndIncludeFile(
     auto sourceFile = findFile(name, loc, includeSystem);
     if (!sourceFile)
     {
-        sink->diagnose(loc, Diagnostics::cannotOpenFile, getText(name));
+        sink->diagnose(Diagnostics::CannotOpenFile{.path = getText(name), .location = loc});
         return result;
     }
 
@@ -1885,9 +1911,8 @@ Linkage::IncludeResult Linkage::findAndIncludeFile(
 
     if (slangLanguageVersion != module->getModuleDecl()->languageVersion)
     {
-        sink->diagnose(
-            tokens.begin()->getLoc(),
-            Diagnostics::languageVersionDiffersFromIncludingModule);
+        sink->diagnose(Diagnostics::LanguageVersionDiffersFromIncludingModule{
+            .location = tokens.begin()->getLoc()});
     }
 
     auto outerScope = module->getModuleDecl()->ownedScope;
@@ -1901,6 +1926,11 @@ Linkage::IncludeResult Linkage::findAndIncludeFile(
         fileDecl);
 
     module->getModuleDecl()->addMember(fileDecl);
+
+    // Add the included source file to the translation unit so that it appears in
+    // getSourceFiles() and gets a DebugSource during IR lowering (needed for
+    // IRDebugLocationDecoration / IRDebugFuncDecoration on declarations from __include'd files).
+    translationUnit->addIncludedSourceFileIfNotExist(sourceFile);
 
     result.fileDecl = fileDecl;
     result.isNew = true;
@@ -2039,13 +2069,19 @@ SlangResult Linkage::loadSerializedModuleContents(
     //
     SourceLoc serializedModuleLoc;
     {
-        auto sourceFile =
-            sourceManager->findSourceFileByPathRecursively(moduleFilePathInfo.foundPath);
-        if (!sourceFile)
-        {
-            sourceFile = sourceManager->createSourceFileWithString(moduleFilePathInfo, String());
-            sourceManager->addSourceFile(moduleFilePathInfo.getMostUniqueIdentity(), sourceFile);
-        }
+        // For the purposes of diagnostics, we create a source file to represent
+        // the binary module file. We intentionally create this with empty content
+        // to avoid displaying binary data in error messages.
+        //
+        // Note: We do NOT reuse any existing source file for this path, because
+        // an earlier code path (e.g., IncludeSystem::loadFile) may have loaded
+        // the binary module content into a source file, and we don't want to
+        // display that binary data when showing diagnostic source lines.
+        //
+        auto sourceFile = sourceManager->createSourceFileWithString(moduleFilePathInfo, String());
+        sourceManager->addSourceFileIfNotExist(
+            moduleFilePathInfo.getMostUniqueIdentity(),
+            sourceFile);
         auto sourceView =
             sourceManager->createSourceView(sourceFile, &moduleFilePathInfo, SourceLoc());
         serializedModuleLoc = sourceView->getRange().begin;

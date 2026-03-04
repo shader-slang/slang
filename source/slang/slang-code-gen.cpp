@@ -7,6 +7,7 @@
 #include "slang-compiler.h"
 #include "slang-emit-cuda.h"         // for `CUDAExtensionTracker`
 #include "slang-extension-tracker.h" // for `ShaderExtensionTracker`
+#include "slang-rich-diagnostics.h"
 
 // TODO: The "artifact" system is a scourge.
 #include "../compiler-core/slang-artifact-desc-util.h"
@@ -225,6 +226,7 @@ static RefPtr<ExtensionTracker> _newExtensionTracker(CodeGenTarget target)
     {
     case CodeGenTarget::PTX:
     case CodeGenTarget::CUDASource:
+    case CodeGenTarget::CUDAHeader:
         {
             return new CUDAExtensionTracker;
         }
@@ -383,11 +385,9 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
             auto sourceName = TypeTextUtil::getCompileTargetName(SlangCompileTarget(sourceTarget));
             auto targetName = TypeTextUtil::getCompileTargetName(SlangCompileTarget(target));
 
-            sink->diagnose(
-                SourceLoc(),
-                Diagnostics::compilerNotDefinedForTransition,
-                sourceName,
-                targetName);
+            sink->diagnose(Diagnostics::CompilerNotDefinedForTransition{
+                .sourceTarget = sourceName,
+                .destTarget = targetName});
             return SLANG_FAIL;
         }
     }
@@ -399,7 +399,7 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
     if (!compiler)
     {
         auto compilerName = TypeTextUtil::getPassThroughAsHumanText((SlangPassThrough)compilerType);
-        sink->diagnose(SourceLoc(), Diagnostics::passThroughCompilerNotFound, compilerName);
+        sink->diagnose(Diagnostics::PassThroughCompilerNotFound{.compiler = compilerName});
         return SLANG_FAIL;
     }
 
@@ -580,6 +580,14 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
             {
                 options.flags |= CompileOptions::Flag::EnableFloat16;
             }
+            if (cudaTracker->isBfloat16Required())
+            {
+                options.flags |= CompileOptions::Flag::EnableBfloat16;
+            }
+            if (cudaTracker->isFp8Required())
+            {
+                options.flags |= CompileOptions::Flag::EnableFloat8;
+            }
         }
         else if (ShaderExtensionTracker* glslTracker = as<ShaderExtensionTracker>(extensionTracker))
         {
@@ -672,10 +680,8 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
                 auto downstreamCompilerName =
                     TypeTextUtil::getPassThroughName((SlangPassThrough)compilerType);
 
-                sink->diagnose(
-                    SourceLoc(),
-                    Diagnostics::downstreamCompilerDoesntSupportWholeProgramCompilation,
-                    downstreamCompilerName);
+                sink->diagnose(Diagnostics::DownstreamCompilerDoesntSupportWholeProgramCompilation{
+                    .compiler = downstreamCompilerName});
                 return SLANG_FAIL;
             }
         }
@@ -1043,6 +1049,8 @@ SlangResult emitSPIRVForEntryPointsDirectly(
 
 SlangResult emitHostVMCode(CodeGenContext* codeGenContext, ComPtr<IArtifact>& outArtifact);
 
+SlangResult emitLLVMForEntryPoints(CodeGenContext* codeGenContext, ComPtr<IArtifact>& outArtifact);
+
 static CodeGenTarget _getIntermediateTarget(CodeGenTarget target)
 {
     switch (target)
@@ -1147,13 +1155,26 @@ SlangResult CodeGenContext::_emitEntryPoints(ComPtr<IArtifact>& outArtifact)
     case CodeGenTarget::DXBytecode:
     case CodeGenTarget::MetalLib:
     case CodeGenTarget::PTX:
-    case CodeGenTarget::ShaderHostCallable:
-    case CodeGenTarget::ShaderSharedLibrary:
-    case CodeGenTarget::HostExecutable:
-    case CodeGenTarget::HostHostCallable:
-    case CodeGenTarget::HostSharedLibrary:
     case CodeGenTarget::WGSLSPIRV:
         SLANG_RETURN_ON_FAIL(emitWithDownstreamForEntryPoints(outArtifact));
+        return SLANG_OK;
+    case CodeGenTarget::ShaderSharedLibrary:
+    case CodeGenTarget::HostExecutable:
+    case CodeGenTarget::HostSharedLibrary:
+    case CodeGenTarget::ShaderHostCallable:
+    case CodeGenTarget::HostHostCallable:
+    case CodeGenTarget::HostLLVMIR:
+    case CodeGenTarget::ShaderLLVMIR:
+    case CodeGenTarget::HostObjectCode:
+    case CodeGenTarget::ShaderObjectCode:
+        if (isCPUTargetViaLLVM(getTargetReq()))
+        {
+            SLANG_RETURN_ON_FAIL(emitLLVMForEntryPoints(this, outArtifact));
+        }
+        else
+        {
+            SLANG_RETURN_ON_FAIL(emitWithDownstreamForEntryPoints(outArtifact));
+        }
         return SLANG_OK;
     case CodeGenTarget::HostVM:
         SLANG_RETURN_ON_FAIL(emitHostVMCode(this, outArtifact));
@@ -1210,6 +1231,10 @@ SlangResult CodeGenContext::emitEntryPoints(ComPtr<IArtifact>& outArtifact)
     case CodeGenTarget::HostSharedLibrary:
     case CodeGenTarget::WGSLSPIRVAssembly:
     case CodeGenTarget::HostVM:
+    case CodeGenTarget::HostObjectCode:
+    case CodeGenTarget::ShaderObjectCode:
+    case CodeGenTarget::HostLLVMIR:
+    case CodeGenTarget::ShaderLLVMIR:
         {
             SLANG_RETURN_ON_FAIL(_emitEntryPoints(outArtifact));
 
@@ -1220,7 +1245,9 @@ SlangResult CodeGenContext::emitEntryPoints(ComPtr<IArtifact>& outArtifact)
     case CodeGenTarget::GLSL:
     case CodeGenTarget::HLSL:
     case CodeGenTarget::CUDASource:
+    case CodeGenTarget::CUDAHeader:
     case CodeGenTarget::CPPSource:
+    case CodeGenTarget::CPPHeader:
     case CodeGenTarget::HostCPPSource:
     case CodeGenTarget::PyTorchCppBinding:
     case CodeGenTarget::CSource:
@@ -1360,6 +1387,12 @@ bool CodeGenContext::shouldReportCheckpointIntermediates()
 {
     return getTargetProgram()->getOptionSet().getBoolOption(
         CompilerOptionName::ReportCheckpointIntermediates);
+}
+
+bool CodeGenContext::shouldReportDynamicDispatchSites()
+{
+    return getTargetProgram()->getOptionSet().getBoolOption(
+        CompilerOptionName::ReportDynamicDispatchSites);
 }
 
 bool CodeGenContext::shouldDumpIntermediates()

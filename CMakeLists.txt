@@ -20,7 +20,7 @@ set(PROJECT_VERSION "${SLANG_VERSION_FULL}")
 # Global CMake options
 #
 if(${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.24")
-    cmake_policy(SET CMP0135 OLD)
+    cmake_policy(SET CMP0135 NEW)
 endif()
 cmake_policy(SET CMP0077 NEW)
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
@@ -129,6 +129,17 @@ option(SLANG_ENABLE_FULL_IR_VALIDATION "Enable full IR validation (SLOW!)")
 option(SLANG_ENABLE_IR_BREAK_ALLOC "Enable _debugUID on IR allocation")
 option(SLANG_ENABLE_ASAN "Enable ASAN (address sanitizer)")
 option(SLANG_ENABLE_COVERAGE "Enable code coverage instrumentation")
+option(
+    SLANG_ENABLE_TIME_TRACE
+    "Enable Clang time trace profiling for build analysis"
+)
+option(SLANG_ENABLE_PCH "Enable precompiled headers for faster builds" ON)
+
+option(
+    SLANG_STANDARD_MODULE_DEVELOP_BUILD
+    "Enable development build for standard modules (enables UNIT_TEST macro). Disable for release builds."
+    ON
+)
 
 option(SLANG_ENABLE_PREBUILT_BINARIES "Enable using prebuilt binaries" ON)
 option(SLANG_ENABLE_GFX "Enable gfx targets" ON)
@@ -387,6 +398,52 @@ if(NOT SLANG_EXCLUDE_TINT)
 endif()
 
 #
+# sccache support
+#
+# Enable sccache as the compiler launcher for faster rebuilds. Can be activated
+# via -DSLANG_USE_SCCACHE=ON or by setting the SLANG_USE_SCCACHE environment
+# variable to a truthy value. When enabled, precompiled headers are automatically
+# disabled due to a known incompatibility that causes linker errors.
+#
+option(
+    SLANG_USE_SCCACHE
+    "Use sccache as compiler launcher for faster rebuilds"
+    OFF
+)
+if(NOT CMAKE_C_COMPILER_LAUNCHER AND NOT CMAKE_CXX_COMPILER_LAUNCHER)
+    if(
+        NOT SLANG_USE_SCCACHE
+        AND DEFINED ENV{SLANG_USE_SCCACHE}
+        AND "$ENV{SLANG_USE_SCCACHE}"
+    )
+        set(SLANG_USE_SCCACHE ON CACHE BOOL "" FORCE)
+    endif()
+    if(SLANG_USE_SCCACHE)
+        find_program(SCCACHE_PROGRAM sccache)
+        if(SCCACHE_PROGRAM)
+            message(STATUS "Using sccache: ${SCCACHE_PROGRAM}")
+            set(CMAKE_C_COMPILER_LAUNCHER "${SCCACHE_PROGRAM}")
+            set(CMAKE_CXX_COMPILER_LAUNCHER "${SCCACHE_PROGRAM}")
+            # Re-run the MSVC debug-info workaround now that the launcher is set
+            include(CCacheDebugInfoWorkaround)
+            # Disable PCH: sccache + PCH causes linker errors
+            if(SLANG_ENABLE_PCH)
+                message(
+                    STATUS
+                    "Disabling precompiled headers (incompatible with sccache)"
+                )
+                set(SLANG_ENABLE_PCH OFF CACHE BOOL "" FORCE)
+            endif()
+        else()
+            message(
+                WARNING
+                "SLANG_USE_SCCACHE is ON but sccache was not found in PATH"
+            )
+        endif()
+    endif()
+endif()
+
+#
 # Option validation
 #
 
@@ -437,12 +494,16 @@ endif()
 
 if(${SLANG_USE_SYSTEM_MINIZ})
     find_package(miniz REQUIRED)
-    add_library(miniz ALIAS miniz::miniz)
+    if(NOT TARGET miniz)
+        add_library(miniz ALIAS miniz::miniz)
+    endif()
 endif()
 
 if(${SLANG_USE_SYSTEM_LZ4})
     find_package(lz4 REQUIRED)
-    add_library(lz4_static ALIAS LZ4::lz4)
+    if(NOT TARGET lz4_static)
+        add_library(lz4_static ALIAS LZ4::lz4)
+    endif()
 endif()
 
 if(${SLANG_USE_SYSTEM_VULKAN_HEADERS})
@@ -455,7 +516,9 @@ endif()
 
 if(${SLANG_USE_SYSTEM_GLSLANG})
     find_package(glslang REQUIRED)
-    add_library(glslang ALIAS glslang::glslang)
+    if(NOT TARGET glslang)
+        add_library(glslang ALIAS glslang::glslang)
+    endif()
 endif()
 
 add_subdirectory(external)

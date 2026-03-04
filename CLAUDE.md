@@ -1,4 +1,4 @@
-+# CLAUDE.md
+# CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
@@ -8,15 +8,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Reference other instruction files as well:
 
-- @.github/copilot-instructions.md
+- @.github/copilot-instructions.md (shares formatting/testing/debugging info; this CLAUDE.md is the canonical source)
 
-User-specific instructions for Slang:
+User-specific instructions for Slang (optional, may not exist):
 
 - @~/.claude/slang-instructions.md
 
 ## Build System and Common Commands
-
-**IMPORTANT:** On Windows, always use `cmake.exe` (not `cmake`) to ensure proper GPU test execution. Using `cmake` without the `.exe` extension may invoke WSL's cmake, which cannot run GPU tests.
 
 ### Building the Project
 
@@ -32,15 +30,33 @@ cmake.exe --preset vs2022
 cmake --build --preset debug # Debug binary
 cmake --build --preset release # Release binary
 
+# Alternative: use workflow preset (configure + build in one step)
+cmake --workflow --preset debug
+
 # Build specific targets
 cmake --build --preset debug --target slangc
 cmake --build --preset debug --target slang-test
 ```
 
+When building with `cmake --build`, redirect all of outputs to null-device.
+When the build failed, then, re-run the same command without the redirections.
+It is to avoid wasting the token usage of LLM.
+
+Example,
+```
+# Print the build logs only when the initial attempt failed.
+cmake --build --preset debug >/dev/null 2>&1 || cmake --build --preset debug
+```
+
+### Formatting
+
+**Run `./extras/formatting.sh` before committing changes.** PRs must conform to the project's coding style. Use `./extras/formatting.sh --check-only` to verify without modifying files.
+
 ### PR Workflow
 
-1. **Label your PR**: Use "pr: non-breaking" (default) or "pr: breaking" (for ABI/language breaking changes)
-2. **Include tests**: Add regression tests as `.slang` files under `tests/`
+1. **Format your code**: Run `./extras/formatting.sh` before committing
+2. **Label your PR**: Use "pr: non-breaking" (default) or "pr: breaking" (for ABI/language breaking changes)
+3. **Include tests**: Add regression tests as `.slang` files under `tests/`
 
 ### Testing
 
@@ -105,13 +121,16 @@ slang-test must run from repository root
 - `source/compiler-core/`: Compiler infrastructure (diagnostics, downstream compilers)
 - `source/slang/`: Main compiler implementation (frontend, IR, backend)
 - `source/slangc/`: Command-line compiler tool
+- `source/slang-core-module/`, `source/slang-glsl-module/`, `source/standard-modules/`: Standard library modules
+- `source/slang-wasm/`: WebAssembly bindings
+- `source/slang-record-replay/`: API call record/replay
+- `source/slang-rt/`: Runtime library
 - `tools/`: Development and testing tools
-- `include/`: Public API headers (`slang.h`, `slang-gfx.h`)
-- `external/`: - Third-party dependencies and submodules
-- `prelude/`: - Built-in language definitions and standard library
-- `examples/`: - Sample programs demonstrating Slang usage
-- `tests/`: - Comprehensive test suite
-- `docs/`: - Project documentation
+- `include/`: Public API headers (`slang.h`)
+- `external/`: Third-party dependencies and submodules
+- `prelude/`: Built-in language definitions and standard library
+- `tests/`: Comprehensive test suite
+- `docs/`: Project documentation (user guide in `docs/user-guide/`)
 - `build/source/slang/fiddle/`: Generated code from FIDDLE macros (created during build)
 
 ### Compilation Model
@@ -151,57 +170,37 @@ slang-test must run from repository root
 
 ### Debugging tools
 
-#### slangc with `-dump-ir`
+#### IR Dump (`-dump-ir`)
 
-slangc with `-dump-ir` option is most efficient way to investigate problems that can be observed at IR level.
+```bash
+# Dump IR at every pass (use with -target and -o to avoid mixing output)
+slangc -dump-ir -target spirv-asm -o tmp.spv test.slang | python extras/split-ir-dump.py
 
-It will often require a use of `-target` and the most common combination is `-dump-ir -target spirv-asm`.
-When `-dump-ir` is used without `-target`, the compilation process may stop earlier than it should be.
+# Dump IR before/after a specific pass
+slangc -dump-ir-before lowerGenerics -dump-ir-after lowerGenerics -target spirv-asm -o tmp.spv test.slang > pass.dump
+```
 
-Since it dumps many lines, it will be good to store the result into a file for a further investigation.
-The dump prints multiple sections which of each is separated by `### ` header.
-Each section visualizes the IR state on multiple steps during the compilation.
-It is necessary to differentiate the information on one section from one section, because the issue might be observed at a specific section.
-
-You can also modify Slang code and insert a call to `dumpIRToString()` at any point of interest to dump any part of the IR
-to string. You can then write that string to a temp file with `File::writeAllText()` to analyze what is going on.
-
-When checking the IR dump, look for type consistency or logical errors in the IR to locate the potential transformation
-pass at fault. Focus on passes that makes significant and systematic changes to the IR, such as specialization, inlining,
-type legalization, and buffer lowering passes. You may iterate this process multiple times to narrow down the issue.
+- Always combine `-dump-ir` with `-target` (otherwise compilation stops early) and `-o <file>` (otherwise target code mixes with IR on stdout)
+- Use `extras/split-ir-dump.py` to split large dumps into per-pass files. See `extras/split-ir-dump.md` for details.
+- You can insert `dumpIRToString()` in C++ code and write to a file with `File::writeAllText()` for ad-hoc inspection.
+- When debugging, focus on root causes in IR passes (specialization, inlining, type legalization, buffer lowering) rather than band-aid fixes in emit logic. The compiler philosophy is to keep emission simple and do heavy transforms in IR passes.
 
 #### InstTrace
 
-Note that any issues in the generated target code could stem from IR passes or even the front-end type checking
-early in the pipeline, and you need to focus on tracking the root cause that breaks the consistency/invariants/assumptions
-of the IR instead of putting in band-aid fixes in the later passes or in the emit logic. The philosphy of the compiler is to
-keep the target code emission logic as simple and direct as possible, and most of the heavy lifting code transform is done
-in the IR passes.
-
-If you encounter a bug related to a problematic instruction, it is often useful to trace the location where the instruction is created.
-You can use the `extras/insttrace.py` script to do this. For example, during debugging you find that an instruction with `_debugUID=1234`
-is wrong, you can run the following command to trace the callstack where the instruction is created:
-
+Trace where a problematic IR instruction was created:
 ```bash
-# From workspace root:
-python3 ./extras/insttrace.py 1234 ./build/Debug/bin/slangc tests/my-test.slang -target spirv
+python3 ./extras/insttrace.py <debugUID> ./build/Debug/bin/slangc tests/my-test.slang -target spirv
 ```
 
-#### slangc with `-target spirv-asm`
+#### SPIRV Tools
 
-slangc with `-target spirv-asm` is the most common way to see how the given slang shader is compiled into spirv code.
+- `slangc -target spirv-asm` — compile to SPIRV assembly
+- Set `SLANG_RUN_SPIRV_VALIDATION=1` for static validation; use `-skip-spirv-validation` to see SPIRV output even when validation fails
+- `slangc -target spirv-asm -emit-spirv-via-glsl` — generate reference SPIRV via GLSL for comparison
 
-When an environment variable, `SLANG_RUN_SPIRV_VALIDATION=1`, is set, it will also run a static SPIRV valdiation.
+#### RTX Remix Testing
 
-You can skip the validation, if needed, with a command-line argument, `-skip-spirv-validation`.
-When SPIRV validation fails, the actual spirv code is not printed.
-You can skip the validation with the option and print the spirv code even when it fails the validation.
-
-#### slangc with `-target spirv-asm -emit-spirv-via-glsl`
-
-By default, slang uses `-emit-spirv-directly` and slang emits from slang shader to spirv directly.
-When `-emit-spirv-via-glsl` is used, slang will translate the input slang shader to glsl and let glslang to generate spirv code.
-This can be useful when we want to generate a reference spirv code for a comparison.
+Use the `/repro-remix` skill or see `extras/repro-remix.md`.
 
 ### IR System
 
@@ -232,77 +231,32 @@ This can be useful when we want to generate a reference spirv code for a compari
 
 - Don't mention Claude on the commit message
 
+### Debugging with slangpy
+
+Use the `/slangpy-debug` skill to build slangpy from source with your local Slang build for compatibility testing.
+
 ## Cross-Platform Considerations
 
-**Supported Platforms**: Windows (x64/ARM64), Linux (x64/ARM64), macOS (x64/ARM64), WebAssembly
+**Supported Platforms**:
+Windows (x64/ARM64), Linux (x64/ARM64), macOS (x64/ARM64), WebAssembly
 
-**Platform Abstractions**: Use utilities in `source/core/` for file system, process management, platform detection
+**Platform Abstractions**:
+Use utilities in `source/core/` for file system, process management, platform detection
 
-**Graphics APIs**: Code generation supports all major APIs but runtime testing requires appropriate drivers/SDKs
+**Graphics APIs**:
+Code generation supports all major APIs but runtime testing requires appropriate drivers/SDKs
 
-## Additional documents
+**WSL on Windows**:
+When running under WSL environment, try to append `.exe` to the executables to avoid using Linux binaries
+- Use `cmake.exe` instead of `cmake`,
+- Use `python.exe` instead of `python`,
+- Use `gh.exe` instead of `gh` and so on.
 
-The most important documents are the end-user facing user-guide documents.
-And it can be found under `docs/user-guide/`.
+## Additional Documents
 
-There is a dedicated repo, https://github.com/shader-slang/spec.git
-If needed, you should clone the repo under `external/` directory.
+- User-facing documentation: `docs/user-guide/`
+- Language specification: see below
 
-### Formal Specification (`external/spec/specification/`)
+### Formal Specification
 
-- `specification/index.bs` - Main specification document
-- `specification/types.md` - Type system specification
-- `specification/generics.md` - Generics and templates specification
-- `specification/interfaces.md` - Interface system specification
-- `specification/expressions.md` - Expression evaluation rules
-- `specification/declarations.md` - Declaration syntax and semantics
-- `specification/statements.md` - Statement execution semantics
-- `specification/checking.md` - Type checking rules
-- `specification/conversion.md` - Type conversion rules
-- `specification/overloading.md` - Overload resolution
-- `specification/lookup.md` - Name lookup rules
-- `specification/modules.md` - Module system
-- `specification/capabilities.md` - Capability system
-- `specification/autodiff.md` - Automatic differentiation
-- `specification/attributes.md` - Attribute system
-- `specification/lexical.md` - Lexical analysis
-- `specification/parsing.md` - Parsing rules
-- `specification/preprocessor.md` - Preprocessor behavior
-- `specification/execution.md` - Execution model
-- `specification/extensions.md` - Language extensions
-- `specification/subtyping.md` - Subtyping relationships
-- `specification/visibility.md` - Visibility and access control
-
-### Feature Proposals (`external/spec/proposals/`)
-
-**Template and Active Proposals:**
-
-- `000-template.md` - Template for new proposals
-- `001-where-clauses.md` - `where` clauses for generic constraints (Partially implemented)
-- `002-type-equality-constraints.md` - Type equality constraints in generics
-- `003-atomic-t.md` - Atomic operations and types
-- `004-initialization.md` - Initialization syntax improvements
-- `005-write-only-textures.md` - Write-only texture support
-- `007-variadic-generics.md` - Variadic generic types and functions (Implemented)
-- `008-tuples.md` - Tuple types built on variadic generics (Implemented)
-- `009-ifunc.md` - Function interface types for callbacks
-- `010-new-diff-type-system.md` - New automatic differentiation type system
-- `011-structured-binding.md` - Structured binding declarations
-- `012-language-version-directive.md` - Language version directives
-- `013-aligned-load-store.md` - Aligned memory load/store operations
-- `014-extended-length-vectors.md` - Extended vector length support
-- `015-descriptor-handle.md` - Descriptor handle types
-- `016-slangpy.md` - Python binding for Slang
-- `017-shader-record.md` - Shader record data structures
-- `018-packed-data-intrinsics.md` - Packed data manipulation intrinsics
-- `019-cooperative-vector.md` - Cooperative vector operations
-- `020-stage-switch.md` - Stage-specific code switching
-- `022-C++20-migration.md` - C++20 feature migration
-- `023-cooperative-matrix.md` - Cooperative matrix operations
-- `024-any-dyn-types.md` - Any and dynamic types
-- `025-lambda-1.md` - Lambda expressions with immutable capture (In Implementation)
-- `026-error-handling.md` - Error handling mechanisms
-- `027-tuple-syntax.md` - Tuple syntax improvements
-- `028-cooperative-matrix-2.md` - Extended cooperative matrix support
-- `029-conditional.md` - Conditional compilation features
-- `030-interface-method-default-impl.md` - Default interface method implementations (In Experiment)
+Clone `https://github.com/shader-slang/spec.git` under `external/` if needed. Specification files are in `external/spec/specification/`, feature proposals in `external/spec/proposals/`.

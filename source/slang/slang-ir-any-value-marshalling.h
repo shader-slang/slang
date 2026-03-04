@@ -6,15 +6,17 @@
 namespace Slang
 {
 struct IRType;
-struct SharedGenericsLoweringContext;
+struct IRModule;
+class TargetProgram;
+class TargetRequest;
 
 /// Generates functions that pack and unpack `AnyValue`s, and replaces
 /// all `IRPackAnyValue` and `IRUnpackAnyValue` instructions with calls
 /// to these packing/unpacking functions.
 /// This is a sub-pass of lower-generics.
-void generateAnyValueMarshallingFunctions(SharedGenericsLoweringContext* sharedContext);
+void generateAnyValueMarshallingFunctions(IRModule* module, TargetProgram* targetProgram);
 
 
 /// Get the AnyValue size required to hold a value of `type`.
-SlangInt getAnyValueSize(IRType* type);
+SlangInt getAnyValueSize(IRType* type, TargetRequest* targetReq);
 } // namespace Slang

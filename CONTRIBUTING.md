@@ -93,8 +93,9 @@ Download and install CMake from [CMake.org/download](https://cmake.org/download)
 Run CMake with the following command to generate a Visual Studio 2022 Solution:
 
 ```
-C:\git\slang> cmake.exe --preset vs2022 # For Visual Studio 2022
 C:\git\slang> cmake.exe --preset vs2019 # For Visual Studio 2019
+C:\git\slang> cmake.exe --preset vs2022 # For Visual Studio 2022
+C:\git\slang> cmake.exe --preset vs2026 # For Visual Studio 2026
 ```
 
 Open `build/slang.sln` with Visual Studio IDE and build it for "x64".
@@ -362,6 +363,15 @@ git add user-guide/toc.html
 Similar to the `/format` bot-command described in the previous section, you can also use `/regenerate-toc` instead.
 
 When the PR is limited to document changes, the build workflows may not start properly. This is because the building process is unnecessary when the PR is limited to document changes. This may lead to a case where some of the required build workflows are stuck waiting to start. When this happens, the committers will manually merge the PR as a workaround, and it will not give you a chance to rewrite the commit message.
+
+#### Documenting New Diagnostics
+
+When introducing new compiler warnings or errors, or changing the behavior of existing diagnostics, update the relevant documentation in the same PR. Documentation updates should reflect the new behavior and provide guidance on how users should respond to the diagnostic.
+
+Key documentation areas that may need updates:
+- `docs/language-reference/` - Language features and restrictions
+- `docs/user-guide/` - User-facing guidance and examples
+- `docs/design/` - Design rationale and implementation details
 
 ## Code Style
 

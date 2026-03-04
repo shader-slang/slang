@@ -44,12 +44,12 @@ HashCode UIntSet::getHashCode() const
     return rs;
 }
 
-void UIntSet::resizeAndClear(UInt val)
+void UIntSet::resizeAndUnsetAll(UInt val)
 {
     // TODO(JS): This could be faster in that if the resize is larger the additional area is cleared
     // twice
     resize(val);
-    clear();
+    unsetAll();
 }
 
 void UIntSet::setAll()
@@ -63,9 +63,10 @@ void UIntSet::resize(UInt size)
     resizeBackingBufferDirectly(newCount);
 }
 
-void UIntSet::clear()
+void UIntSet::unsetAll()
 {
-    ::memset(m_buffer.getBuffer(), 0, m_buffer.getCount() * sizeof(Element));
+    if (m_buffer.getCount() > 0)
+        ::memset(m_buffer.getBuffer(), 0, m_buffer.getCount() * sizeof(Element));
 }
 
 bool UIntSet::isEmpty() const
@@ -99,6 +100,9 @@ bool UIntSet::operator==(const UIntSet& set) const
 
     const Index bCount = set.m_buffer.getCount();
     const auto bElems = set.m_buffer.getBuffer();
+
+    if (aCount == 0 || bCount == 0)
+        return aCount == bCount;
 
     const Index minCount = Math::Min(aCount, bCount);
 
@@ -135,7 +139,7 @@ void UIntSet::subtractWith(const UIntSet& set)
 {
     outRs.resizeBackingBufferDirectly(
         Math::Max(set1.m_buffer.getCount(), set2.m_buffer.getCount()));
-    outRs.clear();
+    outRs.unsetAll();
     for (Index i = 0; i < set1.m_buffer.getCount(); i++)
         outRs.m_buffer[i] |= set1.m_buffer[i];
     for (Index i = 0; i < set2.m_buffer.getCount(); i++)

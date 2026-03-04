@@ -1,5 +1,4 @@
-//DIAGNOSTIC_TEST:COMMAND_LINE_SIMPLE:-target hlsl -entry computeMain -stage compute -o no-type-conformance.hlsl
-// no type conformance linked
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -entry computeMain -stage compute -o no-type-conformance.hlsl
 
 interface IFoo
 {
@@ -8,7 +7,9 @@ interface IFoo
 
 void foo()
 {
-	IFoo obj;
+	IFoo obj = createDynamicObject<IFoo>(0, 0);
+//CHECK:                             ^ no type conformances found
+//CHECK:                             ^ No type conformances are found for interface 'IFoo'. Code generation for current target requires at least one implementation type present in the linkage.
 	obj.get();
 }
 

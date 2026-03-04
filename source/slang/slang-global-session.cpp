@@ -11,6 +11,7 @@
 #include "slang-doc-markdown-writer.h"
 #include "slang-options.h"
 #include "slang-parser.h"
+#include "slang-rich-diagnostics.h"
 #include "slang-serialize-ast.h"
 #include "slang-serialize-container.h"
 #include "slang-serialize-ir.h"
@@ -172,7 +173,10 @@ void Session::_initCodeGenTransitionMap()
 
     // For C and C++ we default to use the 'genericCCpp' compiler
     {
-        const CodeGenTarget sources[] = {CodeGenTarget::CSource, CodeGenTarget::CPPSource};
+        const CodeGenTarget sources[] = {
+            CodeGenTarget::CSource,
+            CodeGenTarget::CPPSource,
+            CodeGenTarget::CPPHeader};
         for (auto source : sources)
         {
             // We *don't* add a default for host callable, as we will determine what is suitable
@@ -188,13 +192,17 @@ void Session::_initCodeGenTransitionMap()
                 CodeGenTarget::HostSharedLibrary,
                 PassThroughMode::GenericCCpp);
             map.addTransition(source, CodeGenTarget::HostExecutable, PassThroughMode::GenericCCpp);
-            map.addTransition(source, CodeGenTarget::ObjectCode, PassThroughMode::GenericCCpp);
+            map.addTransition(
+                source,
+                CodeGenTarget::ShaderObjectCode,
+                PassThroughMode::GenericCCpp);
         }
     }
 
 
     // Add all the straightforward transitions
     map.addTransition(CodeGenTarget::CUDASource, CodeGenTarget::PTX, PassThroughMode::NVRTC);
+    map.addTransition(CodeGenTarget::CUDAHeader, CodeGenTarget::PTX, PassThroughMode::NVRTC);
     map.addTransition(CodeGenTarget::HLSL, CodeGenTarget::DXBytecode, PassThroughMode::Fxc);
     map.addTransition(CodeGenTarget::HLSL, CodeGenTarget::DXIL, PassThroughMode::Dxc);
     map.addTransition(CodeGenTarget::GLSL, CodeGenTarget::SPIRV, PassThroughMode::Glslang);
@@ -846,7 +854,7 @@ Session::createSession(slang::SessionDesc const& inDesc, slang::ISession** outSe
                 artifact.writeRef());
             if (SLANG_FAILED(result))
             {
-                sink.diagnose(SourceLoc{}, Diagnostics::unableToReadFile, path.stringValue);
+                sink.diagnose(Diagnostics::UnableToReadFile{.path = path.stringValue});
                 return result;
             }
             linkage->m_libModules.add(artifact);
@@ -1014,7 +1022,8 @@ SlangPassThrough Session::getDownstreamCompilerForTransition(
 
     // Special case host-callable
     if ((desc.kind == ArtifactKind::HostCallable) &&
-        (source == CodeGenTarget::CSource || source == CodeGenTarget::CPPSource))
+        (source == CodeGenTarget::CSource || source == CodeGenTarget::CPPSource ||
+         source == CodeGenTarget::CPPHeader))
     {
         // We prefer LLVM if it's available
         if (const auto llvm = getOrLoadDownstreamCompiler(PassThroughMode::LLVM, nullptr))
@@ -1062,7 +1071,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Session::setSPIRVCoreGrammar(char const* 
         const auto readRes = File::readAllText(jsonPath, contents);
         if (SLANG_FAILED(readRes))
         {
-            sink.diagnose(SourceLoc{}, Diagnostics::unableToReadFile, jsonPath);
+            sink.diagnose(Diagnostics::UnableToReadFile{.path = jsonPath});
             return readRes;
         }
         const auto pathInfo = PathInfo::makeFromString(jsonPath);
@@ -1212,6 +1221,19 @@ void Session::addBuiltinSource(
     }
 
     outModule = module;
+}
+
+ISlangSharedLibrary* Session::getOrLoadSlangLLVM()
+{
+    if (m_slangLLVM.get())
+        return m_slangLLVM.get();
+
+    auto result = m_sharedLibraryLoader->loadSharedLibrary("slang-llvm", m_slangLLVM.writeRef());
+
+    if (result == SLANG_FAIL)
+        return nullptr;
+
+    return m_slangLLVM.get();
 }
 
 SlangResult checkExternalCompilerSupport(Session* session, PassThroughMode passThrough)

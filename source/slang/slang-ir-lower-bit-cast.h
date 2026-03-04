@@ -11,6 +11,6 @@ struct IRModule;
 class DiagnosticSink;
 class TargetProgram;
 
-void lowerBitCast(TargetProgram* targetReq, IRModule* module, DiagnosticSink* sink);
+void lowerBitCast(IRModule* module, TargetProgram* targetReq, DiagnosticSink* sink);
 
 } // namespace Slang

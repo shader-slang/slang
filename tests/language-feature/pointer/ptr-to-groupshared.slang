@@ -1,4 +1,9 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly -Xslang -g0
+
+// By default slang-test uses `-g` and it requires `VariablePointers`, which
+// doesn't produce the correct result due to the bug on the graphics driver.
+// Tracked by github issue #9061
+//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly
 
 // Tests if we handle passing groupshared address-space pointers correctly to a function
 // when that data-type needs legalization (Data -> Data_natural due to `lower-buffer-element-type`).

@@ -9,6 +9,7 @@
 #include "slang-ir-specialize-function-call.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
+#include "slang-rich-diagnostics.h"
 
 #include <functional>
 #include <spirv/unified1/spirv.h>
@@ -982,10 +983,10 @@ GLSLSystemValueInfo* getGLSLSystemValueInfo(
         return inStorage;
     }
 
-    context->getSink()->diagnose(
-        varLayout->sourceLoc,
-        Diagnostics::unknownSystemValueSemantic,
-        semanticNameSpelling);
+    context->getSink()->diagnose(Diagnostics::UnknownSystemValueSemantic{
+        .semanticName = semanticNameSpelling,
+        .location = varLayout->sourceLoc,
+    });
     return nullptr;
 }
 
@@ -1150,7 +1151,7 @@ IRTypeLayout* createPatchConstantFuncResultTypeLayout(
 
                 auto unusedBinding =
                     context->usedBindingIndex[LayoutResourceKind::VaryingOutput].getLSBZero();
-                varLayoutForKind->offset = unusedBinding;
+                varLayoutForKind->offset = (UInt)unusedBinding;
                 context->usedBindingIndex[LayoutResourceKind::VaryingOutput].add(unusedBinding);
             }
             builder.addField(field->getKey(), fieldVarLayoutBuilder.build());
@@ -1226,10 +1227,9 @@ void invokePathConstantFuncInHullShader(
         {
             if (!outputPatchArg)
             {
-                context->getSink()->diagnose(
-                    param->sourceLoc,
-                    Diagnostics::unknownPatchConstantParameter,
-                    param);
+                context->getSink()->diagnose(Diagnostics::UnknownPatchConstantParameter{
+                    .param = param,
+                    .location = param->sourceLoc});
                 return;
             }
             param->setFullType(outputPatchArg->getDataType());
@@ -1239,10 +1239,9 @@ void invokePathConstantFuncInHullShader(
         {
             if (!inputPatchArg)
             {
-                context->getSink()->diagnose(
-                    param->sourceLoc,
-                    Diagnostics::unknownPatchConstantParameter,
-                    param);
+                context->getSink()->diagnose(Diagnostics::UnknownPatchConstantParameter{
+                    .param = param,
+                    .location = param->sourceLoc});
                 return;
             }
             auto arrayType = builder.getArrayType(
@@ -1256,19 +1255,17 @@ void invokePathConstantFuncInHullShader(
             auto layout = findVarLayout(param);
             if (!layout)
             {
-                context->getSink()->diagnose(
-                    param->sourceLoc,
-                    Diagnostics::unknownPatchConstantParameter,
-                    param);
+                context->getSink()->diagnose(Diagnostics::UnknownPatchConstantParameter{
+                    .param = param,
+                    .location = param->sourceLoc});
                 return;
             }
             auto sysAttr = layout->findSystemValueSemanticAttr();
             if (!sysAttr)
             {
-                context->getSink()->diagnose(
-                    param->sourceLoc,
-                    Diagnostics::unknownPatchConstantParameter,
-                    param);
+                context->getSink()->diagnose(Diagnostics::UnknownPatchConstantParameter{
+                    .param = param,
+                    .location = param->sourceLoc});
                 return;
             }
             if (sysAttr->getName().caseInsensitiveEquals(toSlice("SV_OutputControlPointID")))
@@ -1283,10 +1280,9 @@ void invokePathConstantFuncInHullShader(
             }
             else
             {
-                context->getSink()->diagnose(
-                    param->sourceLoc,
-                    Diagnostics::unknownPatchConstantParameter,
-                    param);
+                context->getSink()->diagnose(Diagnostics::UnknownPatchConstantParameter{
+                    .param = param,
+                    .location = param->sourceLoc});
                 return;
             }
         }
@@ -1757,8 +1753,12 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
             auto accessQualifier = AccessQualifier::ReadWrite;
             if (kind == LayoutResourceKind::VaryingInput)
                 accessQualifier = AccessQualifier::Immutable;
-            IRType* paramType =
-                builder->getPtrType(ptrOpCode, arrayType, accessQualifier, addrSpace);
+            IRType* paramType = builder->getPtrType(
+                ptrOpCode,
+                arrayType,
+                accessQualifier,
+                addrSpace,
+                builder->getDefaultBufferLayoutType());
 
             auto globalParam = addGlobalParam(builder->getModule(), paramType);
             moveValueBefore(globalParam, builder->getFunc());
@@ -1826,8 +1826,11 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
         // all cases the new parameter will use a pointer type, into the
         // appropriate address space for a varying input/output.
         //
-        IRType* legalizedParamPtrType =
-            builder->getPtrType(ptrOpCode, legalizedParamType, addrSpace);
+        IRType* legalizedParamPtrType = builder->getPtrType(
+            ptrOpCode,
+            legalizedParamType,
+            addrSpace,
+            builder->getDefaultBufferLayoutType());
         auto legalizedParamPtr = addGlobalParam(builder->getModule(), legalizedParamPtrType);
         moveValueBefore(legalizedParamPtr, builder->getFunc());
 
@@ -1927,10 +1930,10 @@ ScalarizedVal createSimpleGLSLGlobalVarying(
                     if (toSize < fromSize)
                     {
                         context->getSink()->diagnose(
-                            userDeclaredParamVarLayout,
-                            Diagnostics::cannotConvertArrayOfSmallerToLargerSize,
-                            fromSize,
-                            toSize);
+                            Diagnostics::CannotConvertArrayOfSmallerToLargerSize{
+                                .sourceSize = fromSize,
+                                .targetSize = toSize,
+                                .location = userDeclaredParamVarLayout->sourceLoc});
                     }
                 }
             }
@@ -2186,14 +2189,13 @@ ScalarizedVal createGLSLGlobalVaryingsImpl(
                 &fieldParentInfo,
                 field,
                 nameHintSB);
-            if (fieldVal.flavor != ScalarizedVal::Flavor::none)
-            {
-                ScalarizedTupleValImpl::Element element;
-                element.val = fieldVal;
-                element.key = field->getKey();
 
-                tupleValImpl->elements.add(element);
-            }
+            ScalarizedTupleValImpl::Element element = {};
+            if (fieldVal.flavor != ScalarizedVal::Flavor::none)
+                element.val = fieldVal;
+            element.key = field->getKey();
+
+            tupleValImpl->elements.add(element);
         }
 
         return ScalarizedVal::tuple(tupleValImpl);
@@ -2286,18 +2288,31 @@ ScalarizedVal extractField(
 {
     switch (val.flavor)
     {
+    case ScalarizedVal::Flavor::none:
+        return ScalarizedVal();
+
     case ScalarizedVal::Flavor::value:
-        return ScalarizedVal::value(builder->emitFieldExtract(
-            getFieldType(val.irValue->getDataType(), fieldKey),
-            val.irValue,
-            fieldKey));
+        {
+            auto fieldType = getFieldType(val.irValue->getDataType(), fieldKey);
+            if (!fieldType)
+                return ScalarizedVal();
+            return ScalarizedVal::value(
+                builder->emitFieldExtract(fieldType, val.irValue, fieldKey));
+        }
 
     case ScalarizedVal::Flavor::address:
         {
             auto ptrType = as<IRPtrTypeBase>(val.irValue->getDataType());
             auto valType = ptrType->getValueType();
             auto fieldType = getFieldType(valType, fieldKey);
-            auto fieldPtrType = builder->getPtrType(ptrType->getOp(), fieldType);
+            if (!fieldType)
+                return ScalarizedVal();
+            auto fieldPtrType = builder->getPtrType(
+                ptrType->getOp(),
+                fieldType,
+                ptrType->getAccessQualifier(),
+                ptrType->getAddressSpace(),
+                ptrType->getDataLayout());
             return ScalarizedVal::address(
                 builder->emitFieldAddress(fieldPtrType, val.irValue, fieldKey));
         }
@@ -2427,6 +2442,9 @@ ScalarizedVal adaptType(
 {
     switch (val.flavor)
     {
+    case ScalarizedVal::Flavor::none:
+        return ScalarizedVal();
+
     case ScalarizedVal::Flavor::value:
         return adaptType(builder, val.irValue, toType, fromType);
         break;
@@ -2465,6 +2483,8 @@ void assign(
 {
     switch (left.flavor)
     {
+    case ScalarizedVal::Flavor::none:
+        return;
     case ScalarizedVal::Flavor::arrayIndex:
         {
             // Get the rhs value
@@ -2568,6 +2588,9 @@ ScalarizedVal getSubscriptVal(
 {
     switch (val.flavor)
     {
+    case ScalarizedVal::Flavor::none:
+        return ScalarizedVal();
+
     case ScalarizedVal::Flavor::value:
         return ScalarizedVal::value(
             builder->emitElementExtract(elementType, val.irValue, indexVal));
@@ -2713,6 +2736,9 @@ IRInst* materializeValue(IRBuilder* builder, ScalarizedVal const& val)
 {
     switch (val.flavor)
     {
+    case ScalarizedVal::Flavor::none:
+        return builder->getVoidValue();
+
     case ScalarizedVal::Flavor::value:
         return val.irValue;
 
@@ -2766,6 +2792,9 @@ ScalarizedVal getPtrToVal(IRBuilder* builder, ScalarizedVal val)
 
     switch (val.flavor)
     {
+    case ScalarizedVal::Flavor::none:
+        return ScalarizedVal();
+
         // The easy case is when the input `val` is using the
         // `ScalarizedVal::Flavor::address` case, since in that
         // case it holds an IR pointer that already *is* a pointer
@@ -2848,6 +2877,9 @@ ScalarizedVal dereferenceVal(IRBuilder* builder, ScalarizedVal ptr)
 
     switch (ptr.flavor)
     {
+    case ScalarizedVal::Flavor::none:
+        return ScalarizedVal();
+
         // One easy case is when the input pointer is directly
         // represented as an IR instruction, since we can then
         // use that same instruction to encode a `ScalarizedVal`
@@ -3464,6 +3496,7 @@ static void legalizeMeshOutputParam(
     case ScalarizedVal::Flavor::value:
     case ScalarizedVal::Flavor::address:
     case ScalarizedVal::Flavor::typeAdapter:
+    case ScalarizedVal::Flavor::none:
         break;
     }
 
@@ -3690,8 +3723,11 @@ IRInst* getOrCreatePerVertexInputArray(GLSLLegalizationContext* context, IRInst*
     auto arrayType = builder.getArrayType(
         tryGetPointedToType(&builder, inputVertexAttr->getDataType()),
         builder.getIntValue(builder.getIntType(), 3));
-    arrayInst = builder.createGlobalParam(
-        builder.getPtrType(arrayType, AccessQualifier::Immutable, AddressSpace::Input));
+    arrayInst = builder.createGlobalParam(builder.getPtrType(
+        arrayType,
+        AccessQualifier::Immutable,
+        AddressSpace::Input,
+        builder.getDefaultBufferLayoutType()));
     context->mapVertexInputToPerVertexArray[inputVertexAttr] = arrayInst;
     builder.addDecoration(arrayInst, kIROp_PerVertexDecoration);
 
@@ -5018,8 +5054,8 @@ void decorateModuleWithSPIRVVersion(IRModule* module, SemanticVersion spirvVersi
 }
 
 void legalizeEntryPointsForGLSL(
-    Session* session,
     IRModule* module,
+    Session* session,
     const List<IRFunc*>& funcs,
     CodeGenContext* context,
     ShaderExtensionTracker* glslExtensionTracker)
@@ -5145,7 +5181,8 @@ void legalizeDispatchMeshPayloadForGLSL(IRModule* module)
                         builder.getPtrType(
                             payloadPtrType->getOp(),
                             payloadPtrType->getValueType(),
-                            AddressSpace::TaskPayloadWorkgroup));
+                            AddressSpace::TaskPayloadWorkgroup,
+                            payloadPtrType->getDataLayout()));
                     payload->setFullType(payloadSharedPtrType);
                 }
                 else
@@ -5160,6 +5197,11 @@ void legalizeDispatchMeshPayloadForGLSL(IRModule* module)
                     v->setFullType(builder.getRateQualifiedType(
                         builder.getGroupSharedRate(),
                         v->getFullType()));
+
+                    // Add a name hint to the global variable for debuginfo.
+                    // Use a distinctive name to avoid confusion with the user's local variable.
+                    builder.addNameHintDecoration(v, toSlice("__EmitMeshTasks_Payload"));
+
                     builder.setInsertBefore(call);
                     builder.emitStore(v, builder.emitLoad(payload));
 
@@ -5173,7 +5215,7 @@ void legalizeDispatchMeshPayloadForGLSL(IRModule* module)
         });
 }
 
-void legalizeDynamicResourcesForGLSL(CodeGenContext* context, IRModule* module)
+void legalizeDynamicResourcesForGLSL(IRModule* module, CodeGenContext* context)
 {
     List<IRInst*> toRemove;
 
@@ -5283,10 +5325,9 @@ void legalizeDynamicResourcesForGLSL(CodeGenContext* context, IRModule* module)
         }
         else
         {
-            context->getSink()->diagnose(
-                param->firstUse->getUser(),
-                Diagnostics::ambiguousReference,
-                param);
+            context->getSink()->diagnose(Diagnostics::AmbiguousReferenceIr{
+                .inst = param,
+                .location = param->firstUse->getUser()->sourceLoc});
         }
     }
 }

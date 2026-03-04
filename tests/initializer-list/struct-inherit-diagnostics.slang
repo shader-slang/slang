@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):
 
 struct DefaultStruct_base
 {
@@ -22,18 +22,18 @@ struct DefaultStruct2 : DefaultStruct_base
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
 {
-    //CHECK: error 30504: cannot use initializer list for type 'DefaultStruct1'
     DefaultStruct1 s1 = {};
+//CHECK:                ^ cannot use initializer list
 
-    //CHECK: error 30504: cannot use initializer list for type 'DefaultStruct1'
     DefaultStruct1 s2 = {1};
+//CHECK:                ^ cannot use initializer list
 
-    //CHECK: error 30504: cannot use initializer list for type 'DefaultStruct1'
     DefaultStruct1 s3 = {1, 2};
+//CHECK:                ^ cannot use initializer list
 
-    //CHECK: error 30504: cannot use initializer list for type 'DefaultStruct2'
     DefaultStruct2 s4 = {};
+//CHECK:                ^ cannot use initializer list
 
-    //CHECK: error 30504: cannot use initializer list for type 'DefaultStruct2'
     DefaultStruct2 s5 = {1};
+//CHECK:                ^ cannot use initializer list
 }

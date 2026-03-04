@@ -865,6 +865,13 @@ struct IRSemanticDecoration : public IRDecoration
 
     UnownedStringSlice getSemanticName() { return getSemanticNameOperand()->getStringSlice(); }
     int getSemanticIndex() { return int(getIntVal(getSemanticIndexOperand())); }
+
+    /// Returns the semantic index, treating -1 (unspecified) as 0.
+    int getEffectiveSemanticIndex()
+    {
+        auto idx = getSemanticIndex();
+        return idx >= 0 ? idx : 0;
+    }
 };
 
 FIDDLE()
@@ -1027,7 +1034,11 @@ struct IRTypeSizeAttr : public IRLayoutResourceInfoAttr
     {
         return LayoutSize::fromRaw(LayoutSize::RawValue(getIntVal(getSizeInst())));
     }
-    size_t getFiniteSize() { return getSize().getFiniteValue(); }
+    UInt getFiniteSize()
+    {
+        SLANG_ASSERT(getSize().isFinite());
+        return getSize().getFiniteValue().getValidValue();
+    }
 };
 
 // Layout
@@ -1598,7 +1609,7 @@ struct IRVarLayout : IRLayout
         struct ResInfo
         {
             LayoutResourceKind kind = LayoutResourceKind::None;
-            UInt offset = 0;
+            LayoutOffset offset = 0;
             UInt space = 0;
         };
 
@@ -2610,6 +2621,11 @@ struct IRDebugVar : IRInst
     IRInst* getLine() { return getOperand(1); }
     IRInst* getCol() { return getOperand(2); }
     IRInst* getArgIndex() { return getOperandCount() >= 4 ? getOperand(3) : nullptr; }
+    void setArgIndex(IRInst* argIndex)
+    {
+        if (getOperandCount() >= 4)
+            setOperand(3, argIndex);
+    }
 };
 
 FIDDLE()
@@ -2817,6 +2833,124 @@ struct IREmbeddedDownstreamIR : IRInst
     CodeGenTarget getTarget() { return static_cast<CodeGenTarget>(getTargetOperand()->getValue()); }
 };
 
+FIDDLE()
+struct IRSetBase : IRInst
+{
+    FIDDLE(baseInst())
+    UInt getCount() { return getOperandCount(); }
+    IRInst* getElement(UInt idx) { return getOperand(idx); }
+    bool isEmpty() { return getOperandCount() == 0; }
+    bool isSingleton() { return (getOperandCount() == 1) && !isUnbounded(); }
+    bool isUnbounded()
+    {
+        // This is an unbounded set if any of its elements are unbounded.
+        for (UInt ii = 0; ii < getOperandCount(); ++ii)
+        {
+            switch (getElement(ii)->getOp())
+            {
+            case kIROp_UnboundedTypeElement:
+            case kIROp_UnboundedWitnessTableElement:
+            case kIROp_UnboundedFuncElement:
+            case kIROp_UnboundedGenericElement:
+                return true;
+            }
+        }
+        return false;
+    }
+
+    IRInst* tryGetUnboundedElement()
+    {
+        for (UInt ii = 0; ii < getOperandCount(); ++ii)
+        {
+            switch (getElement(ii)->getOp())
+            {
+            case kIROp_UnboundedTypeElement:
+            case kIROp_UnboundedWitnessTableElement:
+            case kIROp_UnboundedFuncElement:
+            case kIROp_UnboundedGenericElement:
+                return getElement(ii);
+            }
+        }
+        return nullptr;
+    }
+
+    bool containsUninitializedElement()
+    {
+        // This is a "potentially uninitialized" set if any of its elements are unbounded.
+        for (UInt ii = 0; ii < getOperandCount(); ++ii)
+        {
+            switch (getElement(ii)->getOp())
+            {
+            case kIROp_UninitializedTypeElement:
+            case kIROp_UninitializedWitnessTableElement:
+                return true;
+            }
+        }
+        return false;
+    }
+
+    IRInst* tryGetUninitializedElement()
+    {
+        for (UInt ii = 0; ii < getOperandCount(); ++ii)
+        {
+            switch (getElement(ii)->getOp())
+            {
+            case kIROp_UninitializedTypeElement:
+            case kIROp_UninitializedWitnessTableElement:
+                return getElement(ii);
+            }
+        }
+        return nullptr;
+    }
+};
+
+FIDDLE()
+struct IRWitnessTableSet : IRSetBase
+{
+    FIDDLE(leafInst())
+};
+
+
+FIDDLE()
+struct IRTypeSet : IRSetBase
+{
+    FIDDLE(leafInst())
+};
+
+FIDDLE()
+struct IRSetTagType : IRType
+{
+    FIDDLE(leafInst())
+    IRSetBase* getSet() { return as<IRSetBase>(getOperand(0)); }
+    bool isSingleton() { return getSet()->isSingleton(); }
+};
+
+FIDDLE()
+struct IRTaggedUnionType : IRType
+{
+    FIDDLE(leafInst())
+    IRWitnessTableSet* getWitnessTableSet() { return as<IRWitnessTableSet>(getOperand(0)); }
+    IRTypeSet* getTypeSet() { return as<IRTypeSet>(getOperand(1)); }
+    bool isSingleton()
+    {
+        return getTypeSet()->isSingleton() && getWitnessTableSet()->isSingleton();
+    }
+};
+
+FIDDLE()
+struct IRElementOfSetType : IRType
+{
+    FIDDLE(leafInst())
+    IRSetBase* getSet() { return as<IRSetBase>(getOperand(0)); }
+};
+
+FIDDLE()
+struct IRUntaggedUnionType : IRType
+{
+    FIDDLE(leafInst())
+    IRSetBase* getSet() { return as<IRSetBase>(getOperand(0)); }
+};
+
 // Generate struct definitions for all IR instructions not explicitly defined in this file
 #if 0 // FIDDLE TEMPLATE:
 % local lua_module = require("source/slang/slang-ir.h.lua")
@@ -2838,10 +2972,18 @@ struct IR$(inst.struct_name) : IR$(inst.parent_struct)
     }
 %   end
 %   for _, operand in ipairs(inst.operands) do
-%     if operand.has_type then
-    $(operand.type)* $(operand.getter_name)() { return ($(operand.type)*)getOperand($(operand.index)); }
+%     if operand.optional then
+%       if operand.has_type then
+    $(operand.type)* $(operand.getter_name)() { return getOperandCount() > $(operand.index) ? ($(operand.type)*)getOperand($(operand.index)) : nullptr; }
+%       else
+    IRInst* $(operand.getter_name)() { return getOperandCount() > $(operand.index) ? getOperand($(operand.index)) : nullptr; }
+%       end
 %     else
+%       if operand.has_type then
+    $(operand.type)* $(operand.getter_name)() { return ($(operand.type)*)getOperand($(operand.index)); }
+%       else
     IRInst* $(operand.getter_name)() { return getOperand($(operand.index)); }
+%       end
 %     end
 %   end
 };
@@ -3004,6 +3146,7 @@ public:
     IRPtrLit* getNullPtrValue(IRType* type);
     IRPtrLit* getNullVoidPtrValue() { return getNullPtrValue(getPtrType(getVoidType())); }
     IRVoidLit* getVoidValue();
+    IRVoidLit* getVoidValue(IRType* type);
     IRInst* getCapabilityValue(CapabilitySet const& caps);
 
     IRBasicType* getBasicType(BaseType baseType);
@@ -3182,26 +3325,37 @@ $(type_info.return_type) $(type_info.method_name)(
         IROp op,
         IRType* valueType,
         AccessQualifier accessQualifier,
-        AddressSpace addressSpace);
+        AddressSpace addressSpace,
+        IRType* dataLayoutType);
     IRPtrType* getPtrType(
         IROp op,
         IRType* valueType,
         IRInst* accessQualifier,
-        IRInst* addressSpace);
-    IRPtrType* getPtrType(IROp op, IRType* valueType, AddressSpace addressSpace)
+        IRInst* addressSpace,
+        IRType* dataLayoutType);
+    IRPtrType* getPtrType(
+        IROp op,
+        IRType* valueType,
+        AddressSpace addressSpace,
+        IRType* dataLayoutType)
     {
-        return getPtrType(op, valueType, AccessQualifier::ReadWrite, addressSpace);
+        return getPtrType(op, valueType, AccessQualifier::ReadWrite, addressSpace, dataLayoutType);
     }
     IRPtrType* getPtrType(
         IRType* valueType,
         AccessQualifier accessQualifier,
-        AddressSpace addressSpace)
+        AddressSpace addressSpace,
+        IRType* dataLayoutType)
     {
-        return getPtrType(kIROp_PtrType, valueType, accessQualifier, addressSpace);
+        return getPtrType(kIROp_PtrType, valueType, accessQualifier, addressSpace, dataLayoutType);
     }
     IRPtrType* getPtrType(IRType* valueType, AddressSpace addressSpace)
     {
-        return getPtrType(valueType, AccessQualifier::ReadWrite, addressSpace);
+        return getPtrType(
+            valueType,
+            AccessQualifier::ReadWrite,
+            addressSpace,
+            getDefaultBufferLayoutType());
     }
     // Copies the op-type of the oldPtrType, access-qualifier and address-space.
     // Does not reuse the same `inst` for access-qualifier and address-space.
@@ -3211,7 +3365,8 @@ $(type_info.return_type) $(type_info.method_name)(
             oldPtrType->getOp(),
             valueType,
             oldPtrType->getAccessQualifier(),
-            oldPtrType->getAddressSpace());
+            oldPtrType->getAddressSpace(),
+            oldPtrType->getDataLayout());
     }
 
     /// Get a GLSL output parameter group type
@@ -3511,6 +3666,16 @@ $(type_info.return_type) $(type_info.method_name)(
         return emitMakeTuple(SLANG_COUNT_OF(args), args);
     }
 
+    IRMakeTaggedUnion* emitMakeTaggedUnion(
+        IRType* type,
+        IRInst* typeTag,
+        IRInst* witnessTableTag,
+        IRInst* value)
+    {
+        IRInst* args[] = {typeTag, witnessTableTag, value};
+        return cast<IRMakeTaggedUnion>(emitIntrinsicInst(type, kIROp_MakeTaggedUnion, 3, args));
+    }
+
     IRInst* emitMakeValuePack(IRType* type, UInt count, IRInst* const* args);
     IRInst* emitMakeValuePack(UInt count, IRInst* const* args);
 
@@ -3548,7 +3713,7 @@ $(type_info.return_type) $(type_info.method_name)(
     IRInst* emitOptionalHasValue(IRInst* optValue);
     IRInst* emitGetOptionalValue(IRInst* optValue);
     IRInst* emitMakeOptionalValue(IRInst* optType, IRInst* value);
-    IRInst* emitMakeOptionalNone(IRInst* optType, IRInst* defaultValue);
+    IRInst* emitMakeOptionalNone(IRInst* optType);
 
     IRInst* emitDifferentialPairGetDifferential(IRType* diffType, IRInst* diffPair);
     IRInst* emitDifferentialValuePairGetDifferential(IRType* diffType, IRInst* diffPair);
@@ -3577,6 +3742,8 @@ $(type_info.return_type) $(type_info.method_name)(
     IRInst* emitMakeMatrix(IRType* type, UInt argCount, IRInst* const* args);
 
     IRInst* emitMakeMatrixFromScalar(IRType* type, IRInst* scalarValue);
+
+    IRInst* emitMakeCoopMatrixFromScalar(IRType* type, IRInst* scalarValue);
 
     IRInst* emitMakeCoopVector(IRType* type, UInt argCount, IRInst* const* args);
 
@@ -3645,6 +3812,19 @@ $(type_info.return_type) $(type_info.method_name)(
         IRInst* offset,
         IRInst* alignment,
         IRInst* value);
+
+    IRInst* emitLoadDescriptorFromHeap(IRType* type, IRInst* heap, IRInst* index);
+    IRInst* emitSPIRVLoadTexelPointerFromHeap(
+        IRType* type,
+        IRInst* heap,
+        IRInst* index,
+        IRInst* textureType,
+        IRInst* coord,
+        IRInst* sampleIndex);
+
+    IRInst* emitSPIRVResourceDescriptorHeap();
+    IRInst* emitSPIRVSamplerDescriptorHeap();
+    IRInst* emitMakeCombinedTextureSampler(IRType* type, IRInst* texture, IRInst* sampler);
 
     IRInst* emitEmbeddedDownstreamIR(CodeGenTarget target, ISlangBlob* blob);
 
@@ -3726,7 +3906,10 @@ $(type_info.return_type) $(type_info.method_name)(
     ///
     IRBlock* emitBlock();
 
-    static void insertBlockAlongEdge(IRModule* module, IREdge const& edge);
+    static void insertBlockAlongEdge(
+        IRModule* module,
+        IREdge const& edge,
+        bool copyDebugLine = false);
 
     IRParam* createParam(IRType* type);
     IRParam* emitParam(IRType* type);
@@ -4025,12 +4208,180 @@ $(type_info.return_type) $(type_info.method_name)(
     IRInst* emitGenericAsm(UnownedStringSlice asmText);
 
     IRInst* emitRWStructuredBufferGetElementPtr(IRInst* structuredBuffer, IRInst* index);
+    IRInst* emitRWStructuredBufferGetElementPtr(
+        IRType* pointerType,
+        IRInst* structuredBuffer,
+        IRInst* index);
 
     IRInst* emitNonUniformResourceIndexInst(IRInst* val);
 
     IRMetalSetVertex* emitMetalSetVertex(IRInst* index, IRInst* vertex);
     IRMetalSetPrimitive* emitMetalSetPrimitive(IRInst* index, IRInst* primitive);
     IRMetalSetIndices* emitMetalSetIndices(IRInst* index, IRInst* indices);
+
+    IRGetElementFromTag* emitGetElementFromTag(IRInst* tag)
+    {
+        auto tagType = cast<IRSetTagType>(tag->getDataType());
+        IRInst* set = tagType->getSet();
+        auto elementType =
+            cast<IRElementOfSetType>(emitIntrinsicInst(nullptr, kIROp_ElementOfSetType, 1, &set));
+        return cast<IRGetElementFromTag>(
+            emitIntrinsicInst(elementType, kIROp_GetElementFromTag, 1, &tag));
+    }
+
+    IRGetTagFromTaggedUnion* emitGetTagFromTaggedUnion(IRInst* tag)
+    {
+        auto taggedUnionType = cast<IRTaggedUnionType>(tag->getDataType());
+
+        IRInst* set = taggedUnionType->getWitnessTableSet();
+        auto tableTagType =
+            cast<IRSetTagType>(emitIntrinsicInst(nullptr, kIROp_SetTagType, 1, &set));
+
+        return cast<IRGetTagFromTaggedUnion>(
+            emitIntrinsicInst(tableTagType, kIROp_GetTagFromTaggedUnion, 1, &tag));
+    }
+
+    IRGetTypeTagFromTaggedUnion* emitGetTypeTagFromTaggedUnion(IRInst* tag)
+    {
+        auto taggedUnionType = cast<IRTaggedUnionType>(tag->getDataType());
+
+        IRInst* typeSet = taggedUnionType->getTypeSet();
+        auto typeTagType =
+            cast<IRSetTagType>(emitIntrinsicInst(nullptr, kIROp_SetTagType, 1, &typeSet));
+
+        return cast<IRGetTypeTagFromTaggedUnion>(
+            emitIntrinsicInst(typeTagType, kIROp_GetTypeTagFromTaggedUnion, 1, &tag));
+    }
+
+    IRGetValueFromTaggedUnion* emitGetValueFromTaggedUnion(IRInst* taggedUnion)
+    {
+        auto taggedUnionType = cast<IRTaggedUnionType>(taggedUnion->getDataType());
+
+        IRInst* typeSet = taggedUnionType->getTypeSet();
+        auto valueOfTypeSetType = cast<IRUntaggedUnionType>(
+            emitIntrinsicInst(nullptr, kIROp_UntaggedUnionType, 1, &typeSet));
+
+        return cast<IRGetValueFromTaggedUnion>(
+            emitIntrinsicInst(valueOfTypeSetType, kIROp_GetValueFromTaggedUnion, 1, &taggedUnion));
+    }
+
+    IRGetDispatcher* emitGetDispatcher(
+        IRFuncType* funcType,
+        IRWitnessTableSet* witnessTableSet,
+        IRStructKey* key)
+    {
+        IRInst* args[] = {witnessTableSet, key};
+        return cast<IRGetDispatcher>(emitIntrinsicInst(funcType, kIROp_GetDispatcher, 2, args));
+    }
+
+    IRGetSpecializedDispatcher* emitGetSpecializedDispatcher(
+        IRFuncType* funcType,
+        IRWitnessTableSet* witnessTableSet,
+        IRStructKey* key,
+        List<IRInst*> const& specArgs)
+    {
+        List<IRInst*> args;
+        args.add(witnessTableSet);
+        args.add(key);
+        for (auto specArg : specArgs)
+        {
+            args.add(specArg);
+        }
+        return cast<IRGetSpecializedDispatcher>(emitIntrinsicInst(
+            funcType,
+            kIROp_GetSpecializedDispatcher,
+            (UInt)args.getCount(),
+            args.getBuffer()));
+    }
+
+    IRUntaggedUnionType* getUntaggedUnionType(IRInst* operand)
+    {
+        return as<IRUntaggedUnionType>(
+            emitIntrinsicInst(nullptr, kIROp_UntaggedUnionType, 1, &operand));
+    }
+
+    IRElementOfSetType* getElementOfSetType(IRInst* operand)
+    {
+        return as<IRElementOfSetType>(
+            emitIntrinsicInst(nullptr, kIROp_ElementOfSetType, 1, &operand));
+    }
+
+    IRTaggedUnionType* getTaggedUnionType(IRWitnessTableSet* tables, IRTypeSet* types)
+    {
+        IRInst* operands[] = {tables, types};
+        return as<IRTaggedUnionType>(
+            emitIntrinsicInst(nullptr, kIROp_TaggedUnionType, 2, operands));
+    }
+
+    IRSetTagType* getSetTagType(IRSetBase* collection)
+    {
+        IRInst* operands[] = {collection};
+        return cast<IRSetTagType>(emitIntrinsicInst(nullptr, kIROp_SetTagType, 1, operands));
+    }
+
+    IRUnboundedTypeElement* getUnboundedTypeElement(IRInst* interfaceType)
+    {
+        return cast<IRUnboundedTypeElement>(
+            emitIntrinsicInst(nullptr, kIROp_UnboundedTypeElement, 1, &interfaceType));
+    }
+
+    IRUnboundedWitnessTableElement* getUnboundedWitnessTableElement(IRInst* interfaceType)
+    {
+        return cast<IRUnboundedWitnessTableElement>(
+            emitIntrinsicInst(nullptr, kIROp_UnboundedWitnessTableElement, 1, &interfaceType));
+    }
+
+    IRUnboundedFuncElement* getUnboundedFuncElement()
+    {
+        return cast<IRUnboundedFuncElement>(
+            emitIntrinsicInst(nullptr, kIROp_UnboundedFuncElement, 0, nullptr));
+    }
+
+    IRUnboundedGenericElement* getUnboundedGenericElement()
+    {
+        return cast<IRUnboundedGenericElement>(
+            emitIntrinsicInst(nullptr, kIROp_UnboundedGenericElement, 0, nullptr));
+    }
+
+    IRUninitializedTypeElement* getUninitializedTypeElement(IRInst* interfaceType)
+    {
+        return cast<IRUninitializedTypeElement>(
+            emitIntrinsicInst(nullptr, kIROp_UninitializedTypeElement, 1, &interfaceType));
+    }
+
+    IRUninitializedWitnessTableElement* getUninitializedWitnessTableElement(IRInst* interfaceType)
+    {
+        return cast<IRUninitializedWitnessTableElement>(
+            emitIntrinsicInst(nullptr, kIROp_UninitializedWitnessTableElement, 1, &interfaceType));
+    }
+
+    IRNoneTypeElement* getNoneTypeElement()
+    {
+        return cast<IRNoneTypeElement>(
+            emitIntrinsicInst(nullptr, kIROp_NoneTypeElement, 0, nullptr));
+    }
+
+    IRNoneWitnessTableElement* getNoneWitnessTableElement()
+    {
+        return cast<IRNoneWitnessTableElement>(
+            emitIntrinsicInst(nullptr, kIROp_NoneWitnessTableElement, 0, nullptr));
+    }
+
+    IRGetTagOfElementInSet* emitGetTagOfElementInSet(
+        IRType* tagType,
+        IRInst* element,
+        IRInst* collection)
+    {
+        SLANG_ASSERT(tagType->getOp() == kIROp_SetTagType);
+        IRInst* args[] = {element, collection};
+        return cast<IRGetTagOfElementInSet>(
+            emitIntrinsicInst(tagType, kIROp_GetTagOfElementInSet, 2, args));
+    }
+
+    IRSetTagType* getSetTagType(IRInst* collection)
+    {
+        return cast<IRSetTagType>(emitIntrinsicInst(nullptr, kIROp_SetTagType, 1, &collection));
+    }
 
     //
     // Decorations
@@ -4238,7 +4589,7 @@ $(type_info.return_type) $(type_info.method_name)(
     IRSemanticDecoration* addSemanticDecoration(
         IRInst* value,
         UnownedStringSlice const& text,
-        IRIntegerValue index = 0)
+        IRIntegerValue index = -1)
     {
         return as<IRSemanticDecoration>(addDecoration(
             value,
@@ -4807,6 +5158,12 @@ $(type_info.return_type) $(type_info.method_name)(
     }
 
     void addRayPayloadDecoration(IRType* inst) { addDecoration(inst, kIROp_RayPayloadDecoration); }
+
+    IRSetBase* getSet(IROp op, const HashSet<IRInst*>& elements);
+
+    IRSetBase* getSingletonSet(IROp op, IRInst* element);
+
+    UInt getUniqueID(IRInst* inst);
 };
 
 // Helper to establish the source location that will be used

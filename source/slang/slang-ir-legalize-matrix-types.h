@@ -8,6 +8,6 @@ class DiagnosticSink;
 class TargetProgram;
 
 // Lower int/uint/bool matrix types to arrays for SPIRV, WGSL, GLSL, and Metal targets
-void legalizeMatrixTypes(TargetProgram* targetProgram, IRModule* module, DiagnosticSink* sink);
+void legalizeMatrixTypes(IRModule* module, TargetProgram* targetProgram, DiagnosticSink* sink);
 
 } // namespace Slang

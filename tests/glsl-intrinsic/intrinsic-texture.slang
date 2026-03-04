@@ -696,6 +696,22 @@ bool textureFuncs( Sampler1D<T> gsampler1D
         // SPIR_NOGRADS:  OpImageSampleDrefExplicitLod{{.*}}[[LOAD]]{{.*}} Lod %
         && (float(0) == texture(uniform_samplerCubeShadow, vec4(coord), float(0)) || ignoreResultF32)
 
+        // GLSL_GRADS:    texture({{.*}}samplerCubeArrayShadow
+        // GLSL_NOGRADS:  texture({{.*}}samplerCubeArrayShadow
+        // SPIR_GRADS:    [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}samplerCubeArrayShadow
+        // SPIR_NOGRADS:  [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}samplerCubeArrayShadow
+        // SPIR_GRADS:    OpImageSampleDrefImplicitLod{{.*}}[[LOAD]]
+        // SPIR_NOGRADS:  OpImageSampleDrefExplicitLod{{.*}}[[LOAD]]{{.*}} Lod %
+        && (float(0) == texture(uniform_samplerCubeArrayShadow, vec4(coord), float(0)) || ignoreResultF32)
+
+        // GLSL_GRADS:    texture({{.*}}samplerCubeArrayShadow
+        // GLSL_NOGRADS:  texture({{.*}}samplerCubeArrayShadow
+        // SPIR_GRADS:    [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}samplerCubeArrayShadow
+        // SPIR_NOGRADS:  [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}samplerCubeArrayShadow
+        // SPIR_GRADS:    OpImageSampleDrefImplicitLod{{.*}}[[LOAD]]{{.*}} Bias %
+        // SPIR_NOGRADS:  OpImageSampleDrefExplicitLod{{.*}}[[LOAD]]{{.*}} Lod %
+        && (float(0) == texture(uniform_samplerCubeArrayShadow, vec4(coord), float(0), float(0)) || ignoreResultF32)
+
         // GLSL_GRADS:    texture({{.*}}sampler2DArray
         // GLSL_NOGRADS:  texture({{.*}}sampler2DArray
         // SPIR_GRADS:    [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DArray
@@ -961,6 +977,14 @@ bool textureFuncs( Sampler1D<T> gsampler1D
         // SPIR_NOGRADS:  OpImageSampleDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Lod %
         && (float(0) == textureLod(uniform_sampler2DShadow, vec3(coord), float(0)) || ignoreResultF32)
 
+        // GLSL_GRADS:    textureLod({{.*}}sampler2DArrayShadow
+        // GLSL_NOGRADS:  textureLod({{.*}}sampler2DArrayShadow
+        // SPIR_GRADS:    [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DArrayShadow
+        // SPIR_NOGRADS:  [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler2DArrayShadow
+        // SPIR_GRADS:    OpImageSampleDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Lod %
+        // SPIR_NOGRADS:  OpImageSampleDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Lod %
+        && (float(0) == textureLod(uniform_sampler2DArrayShadow, vec4(coord), float(0)) || ignoreResultF32)
+
         // GLSL_GRADS:    textureLod({{.*}}sampler1DShadow
         // GLSL_NOGRADS:  textureLod({{.*}}sampler1DShadow
         // SPIR_GRADS:    [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}sampler1DShadow
@@ -1008,6 +1032,22 @@ bool textureFuncs( Sampler1D<T> gsampler1D
         // SPIR_GRADS:    OpImageSampleImplicitLod {{.*}}[[LOAD]]{{.*}} Bias|ConstOffset %
         // SPIR_NOGRADS:  OpImageSampleExplicitLod {{.*}}[[LOAD]]{{.*}} Lod|ConstOffset %
         && gvec4(T.Element(0)) == textureOffset(gsampler1D, float(coord), int(1))
+
+        // GLSL_GRADS:    textureLod({{.*}}samplerCubeShadow
+        // GLSL_NOGRADS:  textureLod({{.*}}samplerCubeShadow
+        // SPIR_GRADS:    [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}samplerCubeShadow
+        // SPIR_NOGRADS:  [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}samplerCubeShadow
+        // SPIR_GRADS:    OpImageSampleDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Lod %
+        // SPIR_NOGRADS:  OpImageSampleDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Lod %
+        && (float(0) == textureLod(uniform_samplerCubeShadow, vec4(coord), float(0)) || ignoreResultF32)
+
+        // GLSL_GRADS:    textureLod({{.*}}samplerCubeArrayShadow
+        // GLSL_NOGRADS:  textureLod({{.*}}samplerCubeArrayShadow
+        // SPIR_GRADS:    [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}samplerCubeArrayShadow
+        // SPIR_NOGRADS:  [[LOAD:%[1-9][0-9]*]] = OpLoad{{.*}}samplerCubeArrayShadow
+        // SPIR_GRADS:    OpImageSampleDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Lod %
+        // SPIR_NOGRADS:  OpImageSampleDrefExplicitLod {{.*}}[[LOAD]]{{.*}} Lod %
+        && (float(0) == textureLod(uniform_samplerCubeArrayShadow, vec4(coord), float(0), float(0)) || ignoreResultF32)
 
         // GLSL_GRADS:    textureOffset({{.*}}sampler1D
         // GLSL_NOGRADS:  textureOffset({{.*}}sampler1D

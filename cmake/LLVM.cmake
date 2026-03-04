@@ -38,7 +38,6 @@ function(fetch_or_build_slang_llvm)
             endif()
         endif()
     elseif(SLANG_SLANG_LLVM_FLAVOR STREQUAL "USE_SYSTEM_LLVM")
-        find_package(LLVM 21.1 REQUIRED CONFIG)
         find_package(Clang REQUIRED CONFIG)
 
         if(LLVM_LINK_LLVM_DYLIB)
@@ -72,7 +71,7 @@ function(fetch_or_build_slang_llvm)
             EXPORT_SET_NAME SlangTargets
         )
 
-        llvm_config(slang-llvm ${LLVM_LINK_TYPE} filecheck native orcjit)
+        llvm_config(slang-llvm ${LLVM_LINK_TYPE} ${LLVM_TARGETS_TO_BUILD} core support filecheck orcjit codegen mc mcparser)
 
         # If we don't include this, then the symbols in the LLVM linked here may
         # conflict with those of other LLVMs linked at runtime, for instance in mesa.
@@ -88,7 +87,10 @@ function(fetch_or_build_slang_llvm)
 
         # The LLVM headers need a warning disabling, which somehow slips through \external
         if(MSVC)
-            target_compile_options(slang-llvm PRIVATE -wd4244 /Zc:preprocessor)
+            target_compile_options(
+                slang-llvm
+                PRIVATE -wd4244 -wd4267 /Zc:preprocessor
+            )
         endif()
 
         if(NOT LLVM_ENABLE_RTTI)

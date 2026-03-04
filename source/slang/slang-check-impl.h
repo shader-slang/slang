@@ -24,6 +24,17 @@ bool diagnoseCapabilityErrors(
     return sink->diagnose(pos, info, args...);
 }
 
+template<typename D>
+bool diagnoseCapabilityErrors(
+    DiagnosticSink* sink,
+    CompilerOptionSet& optionSet,
+    D const& diagnostic)
+{
+    if (optionSet.getBoolOption(CompilerOptionName::IgnoreCapabilities))
+        return false;
+    return sink->diagnose(diagnostic);
+}
+
 enum class IsSubTypeOptions
 {
     None = 0,
@@ -55,7 +66,15 @@ Type* getPointedToTypeIfCanImplicitDeref(Type* type);
 
 inline int getIntValueBitSize(IntegerLiteralValue val)
 {
-    uint64_t v = val > 0 ? (uint64_t)val : (uint64_t)-val;
+#if SLANG_VC
+// Disable MSVC warning: "unary minus operator applied to unsigned type, result still unsigned"
+#pragma warning(push)
+#pragma warning(disable : 4146)
+#endif
+    uint64_t v = val > 0 ? (uint64_t)val : -(uint64_t)val;
+#if SLANG_VC
+#pragma warning(pop)
+#endif
     int result = 1;
     while (v >>= 1)
     {
@@ -64,7 +83,10 @@ inline int getIntValueBitSize(IntegerLiteralValue val)
     return result;
 }
 
-int getTypeBitSize(Type* t);
+// This returns the number of bits that the type could be. The only exceptional
+// cases are IntPtr and UIntPtr, whose sizes are not known during checking, and
+// the maximum supported value of 64 is returned instead.
+int getMaximumTypeBitSize(Type* t);
 
 // A flat representation of basic types (scalars, vectors and matrices)
 // that can be used as lookup key in caches
@@ -701,6 +723,12 @@ struct SharedSemanticsContext : public RefObject
 
     Dictionary<Decl*, bool> m_typeContainsRecursionCache;
 
+    Dictionary<TypePair, ConversionCost> m_typeConversionCostCache;
+
+    // Track diagnostics that have already been reported to avoid duplicates.
+    // Key format: "diagnosticId|sourceLocRaw" or "diagnosticId|sourceLocRaw|extraInfo"
+    HashSet<String> m_reportedDiagnosticKeys;
+
 public:
     SharedSemanticsContext(
         Linkage* linkage,
@@ -1267,6 +1295,39 @@ struct SemanticsVisitor : public SemanticsContext
 
     CompilerOptionSet& getOptionSet() { return getShared()->getOptionSet(); }
 
+    /// Diagnose a diagnostic only once per unique key (diagnostic ID + location + parameters).
+    /// Useful for avoiding duplicate warnings in loops over aggregate elements.
+    template<typename... Args>
+    void diagnoseOnce(SourceLoc loc, DiagnosticInfo const& diagnostic, Args&&... args)
+    {
+        // Key = diagnostic ID + source location + all parameters
+        StringBuilder keyBuilder;
+        keyBuilder << diagnostic.id << "|" << loc.getRaw();
+        if constexpr (sizeof...(args) > 0)
+        {
+            ((keyBuilder << "|" << args), ...); // Fold expression to append all args
+        }
+        String key = keyBuilder.produceString();
+        if (!getShared()->m_reportedDiagnosticKeys.add(key))
+            return; // Already reported
+        getSink()->diagnose(loc, diagnostic, std::forward<Args>(args)...);
+    }
+
+    /// Diagnose a rich diagnostic only once per unique key (diagnostic ID + serialized content).
+    template<typename D>
+    void diagnoseOnce(D const& diagnostic)
+    {
+        auto genericDiag = diagnostic.toGenericDiagnostic();
+        StringBuilder keyBuilder;
+        keyBuilder << D::getInfo()->id;
+        keyBuilder << "|" << genericDiag.primarySpan.range.begin.getRaw();
+        keyBuilder << "|" << genericDiag.primarySpan.message;
+        String key = keyBuilder.produceString();
+        if (!getShared()->m_reportedDiagnosticKeys.add(key))
+            return; // Already reported
+        getSink()->diagnose(diagnostic);
+    }
+
 public:
     // Translate Types
 
@@ -1587,6 +1648,12 @@ public:
 
     Expr* _CheckTerm(Expr* term);
 
+    /// If inside a lambda body, check whether `exprIn` (or its base sub-expression chain)
+    /// references an outer-scope variable that needs to be captured into the lambda struct.
+    /// This handles the case where an expression was already checked by the parser's
+    /// two-phase generic disambiguation before the lambda capture context was established.
+    Expr* maybeRegisterLambdaCapture(Expr* exprIn);
+
     Expr* CreateErrorExpr(Expr* expr);
 
     bool IsErrorExpr(Expr* expr);
@@ -1757,6 +1824,17 @@ public:
     /// when a conversion is being done "for real" so that diagnostics
     /// should be emitted on failure.
     ///
+    /// If `outWitnessOfConversion` is non-null and zero valid conversions are found
+    /// `outWitnessOfConversion` will be set to a `nullptr`.
+    ///
+    /// If `outWitnessOfConversion` is non-null and a conversion is found,
+    /// `outWitnessOfConversion` will either be set to:
+    /// (1) `BuiltinTypeCoercionWitness*` to signify that Slang casts without
+    /// a user-definition.
+    /// (2) `DeclRefTypeCoercionWitness*` to signify that Slang will cast
+    /// via a user-definition.
+    /// (3) `nullptr` to signify that the case is unhandled and should be handled
+    ///
     bool _coerce(
         CoercionSite site,
         Type* toType,
@@ -1764,7 +1842,8 @@ public:
         QualType fromType,
         Expr* fromExpr,
         DiagnosticSink* sink,
-        ConversionCost* outCost);
+        ConversionCost* outCost,
+        TypeCoercionWitness** outWitnessOfConversion);
 
     /// Check whether implicit type coercion from `fromType` to `toType` is possible.
     ///
@@ -1829,6 +1908,9 @@ public:
     AttributeBase* checkAttribute(
         UncheckedAttribute* uncheckedAttr,
         ModifiableSyntaxNode* attrTarget);
+
+    AttributeDecl* findOrSynthesizeAttributeDeclFromUserDefinedAttributeStruct(
+        StructDecl* attributeTypeDecl);
 
     AttributeBase* checkGLSLLayoutAttribute(
         UncheckedGLSLLayoutAttribute* uncheckedAttr,
@@ -2393,6 +2475,11 @@ public:
         // Additional subtype witnesses available to the currentt constraint solving context.
         Type* subTypeForAdditionalWitnesses = nullptr;
         Dictionary<Type*, SubtypeWitness*>* additionalSubtypeWitnesses = nullptr;
+
+        // Accumulated conversion cost from type promotions during constraint solving.
+        // This tracks costs when a type parameter is promoted to satisfy an interface
+        // constraint (e.g., int -> float to satisfy __BuiltinFloatingPointType).
+        ConversionCost typePromotionCost = kConversionCost_None;
     };
 
     Type* TryJoinVectorAndScalarType(
@@ -3021,6 +3108,7 @@ public:
     }
 
     Expr* visitSizeOfLikeExpr(SizeOfLikeExpr* expr);
+    Expr* visitFloatBitCastExpr(FloatBitCastExpr* expr);
     Expr* visitAddressOfExpr(AddressOfExpr* expr);
     Expr* visitIncompleteExpr(IncompleteExpr* expr);
     Expr* visitBoolLiteralExpr(BoolLiteralExpr* expr);
@@ -3066,7 +3154,6 @@ public:
 
     void maybeCheckKnownBuiltinInvocation(Expr* invokeExpr);
 
-    Expr* maybeRegisterLambdaCapture(Expr* exprIn);
     //
     // Some syntax nodes should not occur in the concrete input syntax,
     // and will only appear *after* checking is complete. We need to
@@ -3299,5 +3386,25 @@ RefPtr<ComponentType> createSpecializedGlobalComponentType(EndToEndCompileReques
 RefPtr<ComponentType> createSpecializedGlobalAndEntryPointsComponentType(
     EndToEndCompileRequest* endToEndReq,
     List<RefPtr<ComponentType>>& outSpecializedEntryPoints);
+
+// Returns `false` if coerce fails.
+// * `constraintDecl` is the constraint we need to satisfy
+// * `genericDeclRef` is the generic decl we are operating on
+// * `maybeContext` is the contect for our current operation. This variable must be filled if
+// `shouldEmitError == true`.
+// * `maybeConstrainedGenericParams` contains set of constrained params relative to `genericDeclRef`
+// and current context.
+//   This param is optional. Coercion `toType` and `fromType` will be added to the set if function
+//   succeeds.
+// * `args` are the current arguments relative to `genericDeclRef`.
+bool addTypeCoercionWitnessToArgs(
+    ASTBuilder* astBuilder,
+    SemanticsVisitor* visitor,
+    TypeCoercionConstraintDecl* constraintDecl,
+    DeclRef<GenericDecl> genericDeclRef,
+    SemanticsVisitor::OverloadResolveContext* maybeContext,
+    HashSet<Decl*>* maybeConstrainedGenericParams,
+    ShortList<Val*>& args,
+    bool shouldEmitError);
 
 } // namespace Slang

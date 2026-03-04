@@ -44,6 +44,10 @@ public:
 
 protected:
     // Implement CLikeSourceEmitter interface
+    virtual bool shouldEmitOnlyHeader() SLANG_OVERRIDE
+    {
+        return m_target == CodeGenTarget::CPPHeader;
+    }
     virtual bool isResourceTypeBindless(IRType* type) SLANG_OVERRIDE
     {
         SLANG_UNUSED(type);
@@ -86,7 +90,7 @@ protected:
     virtual void emitGlobalInstImpl(IRInst* inst) SLANG_OVERRIDE;
     virtual bool shouldFoldInstIntoUseSites(IRInst* inst) SLANG_OVERRIDE;
 
-    const UnownedStringSlice* getVectorElementNames(BaseType elemType, Index elemCount);
+    const UnownedStringSlice* getVectorElementNames(Index elemCount);
 
     // Replaceable for classes derived from CPPSourceEmitter
     virtual SlangResult calcTypeName(IRType* type, CodeGenTarget target, StringBuilder& out);

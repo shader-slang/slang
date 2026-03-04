@@ -19,6 +19,7 @@ struct IRCFGNormalizationPass
 /// "after" block.
 ///
 void normalizeCFG(
+    TargetProgram* targetProgram,
     IRModule* module,
     IRGlobalValueWithCode* func,
     IRCFGNormalizationPass const& options = IRCFGNormalizationPass());

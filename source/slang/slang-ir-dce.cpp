@@ -587,17 +587,22 @@ bool shouldInstBeLiveIfParentIsLive(IRInst* inst, IRDeadCodeEliminationOptions o
                 break;
             }
         }
-        for (auto decor : innerInst->getDecorations())
+
+        if (innerInst)
         {
-            switch (decor->getOp())
+            for (auto decor : innerInst->getDecorations())
             {
-            case kIROp_ForwardDerivativeDecoration:
-            case kIROp_UserDefinedBackwardDerivativeDecoration:
-            case kIROp_PrimalSubstituteDecoration:
-                shouldKeptAliveIfImported = true;
-                break;
+                switch (decor->getOp())
+                {
+                case kIROp_ForwardDerivativeDecoration:
+                case kIROp_UserDefinedBackwardDerivativeDecoration:
+                case kIROp_PrimalSubstituteDecoration:
+                    shouldKeptAliveIfImported = true;
+                    break;
+                }
             }
         }
+
         if (isImported && shouldKeptAliveIfImported)
             return true;
     }
@@ -665,16 +670,17 @@ bool shouldInstBeLiveIfParentIsLive(IRInst* inst, IRDeadCodeEliminationOptions o
 
 bool isWeakReferenceOperand(IRInst* inst, UInt operandIndex)
 {
+    SLANG_UNUSED(operandIndex);
     // There are some type of operands that needs to be treated as
     // "weak" references -- they can never hold things alive, and
     // whenever we delete the referenced value, these operands needs
     // to be replaced with `undef`.
     switch (inst->getOp())
     {
-    case kIROp_BoundInterfaceType:
+    /*case kIROp_BoundInterfaceType:
         if (inst->getOperand(operandIndex)->getOp() == kIROp_WitnessTable)
             return true;
-        break;
+        break;*/
     case kIROp_SpecializationDictionaryItem:
         // Ignore all operands of SpecializationDictionaryItem.
         // This inst is used as a cache and shouldn't hold anything alive.

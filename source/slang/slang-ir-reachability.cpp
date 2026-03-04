@@ -18,7 +18,7 @@ ReachabilityContext::ReachabilityContext(IRGlobalValueWithCode* code)
 
     sourceBlocks.setCount(allBlocks.getCount());
     for (auto& srcBlock : sourceBlocks)
-        srcBlock.resizeAndClear(allBlocks.getCount());
+        srcBlock.resizeAndUnsetAll(allBlocks.getCount());
 
     if (allBlocks.getCount() == 0)
         return;

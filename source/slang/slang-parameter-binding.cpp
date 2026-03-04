@@ -6,6 +6,7 @@
 #include "slang-ir-string-hash.h"
 #include "slang-ir-util.h"
 #include "slang-lookup.h"
+#include "slang-rich-diagnostics.h"
 #include "slang-type-layout.h"
 #include "slang.h"
 
@@ -223,12 +224,12 @@ struct UsedRanges
         return Add(range);
     }
 
-    VarLayout* Add(VarLayout* param, UInt begin, LayoutSize end)
+    VarLayout* Add(VarLayout* param, LayoutOffset begin, LayoutSize end)
     {
         UsedRange range;
         range.parameter = param;
-        range.begin = begin;
-        range.end = end.isFinite() ? end.getFiniteValue() : UInt(-1);
+        range.begin = begin.getValidValueOr((UInt)-1);
+        range.end = end.getFiniteValueOr((UInt)-1);
         return Add(range);
     }
 
@@ -269,16 +270,7 @@ struct UsedRanges
 
     Index findRangeContaining(UInt index, LayoutSize size) const
     {
-        if (size.isFinite())
-        {
-            const auto count = size.getFiniteValue();
-            if (count > 0)
-            {
-                return (count == 1) ? findRangeContaining(index)
-                                    : findRangeContaining(index, count);
-            }
-        }
-        else
+        if (size.isInfinite())
         {
             // The size is infinite...
             const auto rangeCount = ranges.getCount();
@@ -291,14 +283,24 @@ struct UsedRanges
                 }
             }
         }
+        else if (size.compare(0) == std::partial_ordering::greater)
+        {
+            // We know that size is not infinite, and it's greater than 0 so it's not invalid
+            return size.compare(1) == std::partial_ordering::equivalent
+                       ? findRangeContaining(index)
+                       : findRangeContaining(index, size.getFiniteValue().getValidValue());
+        }
         return -1;
     }
 
     bool contains(UInt index) const { return findRangeContaining(index) >= 0; }
 
     // Try to find space for `count` entries
-    UInt Allocate(VarLayout* param, UInt count)
+    UInt Allocate(VarLayout* param, const LayoutOffset count)
     {
+        if (count.isInvalid())
+            return 0;
+
         UInt begin = 0;
 
         UInt rangeCount = ranges.getCount();
@@ -309,10 +311,10 @@ struct UsedRanges
             UInt end = ranges[rr].begin;
 
             // If there is enough space...
-            if (end >= begin + count)
+            if (end >= begin + count.getValidValue())
             {
                 // ... then claim it and be done
-                Add(param, begin, begin + count);
+                Add(param, begin, begin + count.getValidValue());
                 return begin;
             }
 
@@ -323,7 +325,7 @@ struct UsedRanges
 
         // We've run out of ranges to check, so we
         // can safely go after the last one!
-        Add(param, begin, begin + count);
+        Add(param, begin, begin + count.getValidValue());
         return begin;
     }
 };
@@ -569,7 +571,9 @@ LayoutSemanticInfo extractHLSLLayoutSemanticInfo(
     LayoutResourceKind kind = findRegisterClassFromName(registerClassName);
     if (kind == LayoutResourceKind::None)
     {
-        sink->diagnose(registerLoc, Diagnostics::unknownRegisterClass, registerClassName);
+        sink->diagnose(Diagnostics::UnknownRegisterClass{
+            .className = registerClassName,
+            .location = registerLoc});
         return info;
     }
 
@@ -577,7 +581,9 @@ LayoutSemanticInfo extractHLSLLayoutSemanticInfo(
     // how it works for varying input/output semantics).
     if (registerIndexDigits.getLength() == 0)
     {
-        sink->diagnose(registerLoc, Diagnostics::expectedARegisterIndex, registerClassName);
+        sink->diagnose(Diagnostics::ExpectedARegisterIndex{
+            .className = registerClassName,
+            .location = registerLoc});
     }
 
     UInt index = 0;
@@ -596,15 +602,17 @@ LayoutSemanticInfo extractHLSLLayoutSemanticInfo(
 
         if (kind == LayoutResourceKind::SubElementRegisterSpace)
         {
-            sink->diagnose(spaceLoc, Diagnostics::unexpectedSpecifierAfterSpace, spaceName);
+            sink->diagnose(Diagnostics::UnexpectedSpecifierAfterSpace{
+                .specifier = spaceName,
+                .location = spaceLoc});
         }
         else if (spaceSpelling != UnownedTerminatedStringSlice("space"))
         {
-            sink->diagnose(spaceLoc, Diagnostics::expectedSpace, spaceSpelling);
+            sink->diagnose(Diagnostics::ExpectedSpace{.got = spaceSpelling, .location = spaceLoc});
         }
         else if (spaceDigits.getLength() == 0)
         {
-            sink->diagnose(spaceLoc, Diagnostics::expectedSpaceIndex);
+            sink->diagnose(Diagnostics::ExpectedSpaceIndex{.location = spaceLoc});
         }
         else
         {
@@ -839,7 +847,7 @@ static VarLayout* markSpaceUsed(ParameterBindingContext* context, VarLayout* var
     return context->shared->usedSpaces.Add(varLayout, space, space + 1);
 }
 
-static UInt allocateUnusedSpaces(ParameterBindingContext* context, UInt count)
+static UInt allocateUnusedSpaces(ParameterBindingContext* context, const LayoutOffset count)
 {
     return context->shared->usedSpaces.Allocate(nullptr, count);
 }
@@ -871,18 +879,17 @@ static void addExplicitParameterBinding(
     auto kind = semanticInfo.kind;
 
     auto& bindingInfo = parameterInfo->bindingInfo[(int)kind];
-    if (bindingInfo.count != 0)
+    if (bindingInfo.count.compare(0) == std::partial_ordering::greater)
     {
         // We already have a binding here, so we want to
         // confirm that it matches the new one that is
         // incoming...
-        if (bindingInfo.count != count || bindingInfo.index != semanticInfo.index ||
-            bindingInfo.space != semanticInfo.space)
+        if (bindingInfo.count.compare(count) != std::partial_ordering::equivalent ||
+            bindingInfo.index != semanticInfo.index || bindingInfo.space != semanticInfo.space)
         {
-            getSink(context)->diagnose(
-                varDecl,
-                Diagnostics::conflictingExplicitBindingsForParameter,
-                getReflectionName(varDecl));
+            getSink(context)->diagnose(Diagnostics::ConflictingExplicitBindingsForParameter{
+                .paramName = getReflectionName(varDecl),
+                .decl = varDecl});
         }
 
         // TODO(tfoley): `register` semantics can technically be
@@ -935,7 +942,7 @@ static void addExplicitParameterBinding(
             auto paramA = parameterInfo->varLayout->getVariable();
             auto paramB = overlappedVarLayout->getVariable();
 
-            auto& diagnosticInfo = Diagnostics::parameterBindingsOverlap;
+            auto* diagnosticInfo = Diagnostics::ParameterBindingsOverlap::getInfo();
 
             // If *both* of the shader parameters declarations agree
             // that overlapping bindings should be allowed, then we
@@ -943,22 +950,14 @@ static void addExplicitParameterBinding(
             // the user because such overlapping bindings are likely
             // to indicate a programming error.
             //
-            if (shouldDisableDiagnostic(paramA, diagnosticInfo) &&
-                shouldDisableDiagnostic(paramB, diagnosticInfo))
+            if (shouldDisableDiagnostic(paramA, *diagnosticInfo) &&
+                shouldDisableDiagnostic(paramB, *diagnosticInfo))
             {
             }
             else
             {
-                bool written = getSink(context)->diagnose(
-                    paramA,
-                    diagnosticInfo,
-                    getReflectionName(paramA),
-                    getReflectionName(paramB));
-                if (written)
-                    getSink(context)->diagnose(
-                        paramB,
-                        Diagnostics::seeDeclarationOf,
-                        getReflectionName(paramB));
+                getSink(context)->diagnose(
+                    Diagnostics::ParameterBindingsOverlap{.paramA = paramA, .paramB = paramB});
             }
         }
     }
@@ -1089,10 +1088,9 @@ static bool _maybeDiagnoseMissingVulkanLayoutModifier(
             if (textureType->isCombined())
             {
                 // Recommend [[vk::binding]] but not '-fvk-xxx-shift` for combined texture samplers
-                getSink(context)->diagnose(
-                    registerModifier,
-                    Diagnostics::registerModifierButNoVulkanLayout,
-                    varDecl.getName());
+                getSink(context)->diagnose(Diagnostics::RegisterModifierButNoVulkanLayout{
+                    .paramName = varDecl.getName(),
+                    .location = registerModifier->loc});
                 return true;
             }
         }
@@ -1104,11 +1102,10 @@ static bool _maybeDiagnoseMissingVulkanLayoutModifier(
             registerClassName,
             registerIndexDigits);
 
-        getSink(context)->diagnose(
-            registerModifier,
-            Diagnostics::registerModifierButNoVkBindingNorShift,
-            varDecl.getName(),
-            registerClassName);
+        getSink(context)->diagnose(Diagnostics::RegisterModifierButNoVkBindingNorShift{
+            .paramName = varDecl.getName(),
+            .className = registerClassName,
+            .location = registerModifier->loc});
         return true;
     }
     return false;
@@ -1230,11 +1227,10 @@ static void addExplicitParameterBindings_GLSL(
                 info[kResInfo].resInfo = foundResInfo;
                 if (attr->binding != 0)
                 {
-                    getSink(context)->diagnose(
-                        attr,
-                        Diagnostics::wholeSpaceParameterRequiresZeroBinding,
-                        varDecl.getName(),
-                        attr->binding);
+                    getSink(context)->diagnose(Diagnostics::WholeSpaceParameterRequiresZeroBinding{
+                        .paramName = varDecl.getName(),
+                        .binding = (int64_t)attr->binding,
+                        .location = attr->loc});
                 }
                 info[kResInfo].semanticInfo.index = attr->set;
                 info[kResInfo].semanticInfo.space = 0;
@@ -1403,6 +1399,8 @@ static void completeBindingsForParameterImpl(
     RefPtr<VarLayout> firstVarLayout,
     ParameterBindingInfo bindingInfos[kLayoutResourceKindCount])
 {
+    // TODO: check bindingInfos for finite/validity
+
     // For any resource kind used by the parameter
     // we need to update its layout information
     // to include a binding for that resource kind.
@@ -1417,7 +1415,7 @@ static void completeBindingsForParameterImpl(
     // consumes, so that we can allocate a contiguous range of
     // spaces.
     //
-    UInt spacesToAllocateCount = 0;
+    LayoutOffset spacesToAllocateCount = 0;
     for (auto typeRes : firstTypeLayout->resourceInfos)
     {
         auto kind = typeRes.kind;
@@ -1427,7 +1425,7 @@ static void completeBindingsForParameterImpl(
         // go into our contiguously allocated range.
         //
         auto& bindingInfo = bindingInfos[(int)kind];
-        if (bindingInfo.count != 0)
+        if (bindingInfo.count.compare(0) != std::partial_ordering::equivalent)
         {
             continue;
         }
@@ -1442,22 +1440,22 @@ static void completeBindingsForParameterImpl(
             //
             if (typeRes.count.isInfinite())
             {
-                spacesToAllocateCount++;
+                spacesToAllocateCount += 1;
             }
             break;
 
         case LayoutResourceKind::SubElementRegisterSpace:
-            // If the parameter consumes any full spaces (e.g., it
-            // is a `struct` type with one or more unbounded arrays
-            // for fields), then we will include those spaces in
-            // our allocaiton.
-            //
-            // We assume/require here that we never end up needing
-            // an unbounded number of spaces.
-            // TODO: we should enforce that somewhere with an error.
-            //
-            spacesToAllocateCount += typeRes.count.getFiniteValue();
-            break;
+            {
+                // If the parameter consumes any full spaces (e.g., it
+                // is a `struct` type with one or more unbounded arrays
+                // for fields), then we will include those spaces in
+                // our allocaiton.
+                //
+                // This will be set to invalid() should we be handling an
+                // unbounded number of spaces;
+                spacesToAllocateCount += typeRes.count.getFiniteValue();
+                break;
+            }
 
         case LayoutResourceKind::Uniform:
             // We want to ignore uniform data for this calculation,
@@ -1478,7 +1476,7 @@ static void completeBindingsForParameterImpl(
     // contiguous spaces here.
     //
     UInt firstAllocatedSpace = 0;
-    if (spacesToAllocateCount)
+    if (spacesToAllocateCount.compare(0) == std::partial_ordering::greater)
     {
         firstAllocatedSpace = allocateUnusedSpaces(context, spacesToAllocateCount);
     }
@@ -1494,7 +1492,7 @@ static void completeBindingsForParameterImpl(
         // for this resource kind?
         auto kind = typeRes.kind;
         auto& bindingInfo = bindingInfos[(int)kind];
-        if (bindingInfo.count != 0)
+        if (bindingInfo.count.compare(0) != std::partial_ordering::equivalent)
         {
             // If things have already been bound, our work is done.
             //
@@ -1532,7 +1530,7 @@ static void completeBindingsForParameterImpl(
                 // the number of spaces consumed.
                 //
                 bindingInfo.index = currentAllocatedSpace;
-                currentAllocatedSpace += count.getFiniteValue();
+                currentAllocatedSpace += count.getFiniteValue().getValidValue();
 
                 // TODO: what should we store as the "space" for
                 // an allocation of register spaces? Either zero
@@ -1608,13 +1606,13 @@ static void applyBindingInfoToParameter(
         auto& bindingInfo = bindingInfos[k];
 
         // skip resources we aren't consuming
-        if (bindingInfo.count == 0)
+        if (bindingInfo.count.compare(0) == std::partial_ordering::equivalent)
             continue;
 
         // Add a record to the variable layout
         auto varRes = varLayout->AddResourceInfo(kind);
         varRes->space = (int)bindingInfo.space;
-        varRes->index = (int)bindingInfo.index;
+        varRes->index = bindingInfo.index;
     }
 }
 
@@ -1911,7 +1909,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameterDecl(
     //
     SimpleSemanticInfo semanticInfo;
     int semanticIndex = 0;
-    if (!state.optSemanticName)
+    if (decl && !state.optSemanticName)
     {
         if (auto semantic = decl->findModifier<HLSLSimpleSemantic>())
         {
@@ -1959,8 +1957,9 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameterDecl(
     // `location`s in declaration order coincidentally matches
     // the `SV_Target` order.
     //
-    if (isKhronosTarget(context->getTargetRequest()) ||
-        isMetalTarget(context->getTargetRequest()) || isWGPUTarget(context->getTargetRequest()))
+    if (decl &&
+        (isKhronosTarget(context->getTargetRequest()) ||
+         isMetalTarget(context->getTargetRequest()) || isWGPUTarget(context->getTargetRequest())))
     {
         if (auto locationAttr = decl->findModifier<GLSLLocationAttribute>())
         {
@@ -1988,7 +1987,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameterDecl(
                     continue;
 
                 auto varResInfo = varLayout->findOrAddResourceInfo(kind);
-                varResInfo->index = location;
+                varResInfo->index = (UInt)location;
 
                 // Note: OpenGL and Vulkan represent dual-source color blending
                 // differently from multiple render targets (MRT) at the source
@@ -2019,9 +2018,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameterDecl(
         else if (auto indexAttr = decl->findModifier<GLSLIndexAttribute>())
         {
             getSink(context)->diagnose(
-                indexAttr,
-                Diagnostics::vkIndexWithoutVkLocation,
-                decl->getName());
+                Diagnostics::VkIndexWithoutVkLocation{.location = indexAttr->loc});
         }
     }
 
@@ -2099,10 +2096,9 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
         case Stage::Intersection:
         case Stage::RayGeneration:
             // Don't expect this case to have any `in out` parameters.
-            getSink(context)->diagnose(
-                state.loc,
-                Diagnostics::dontExpectOutParametersForStage,
-                getStageName(state.stage));
+            getSink(context)->diagnose(Diagnostics::DontExpectOutParametersForStage{
+                .stage = getStageName(state.stage),
+                .location = state.loc});
             break;
 
         case Stage::AnyHit:
@@ -2140,10 +2136,9 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
             // an `in` parameter as indicating a payload that the
             // programmer doesn't intend to write to.
             //
-            getSink(context)->diagnose(
-                state.loc,
-                Diagnostics::dontExpectInParametersForStage,
-                getStageName(state.stage));
+            getSink(context)->diagnose(Diagnostics::DontExpectInParametersForStage{
+                .stage = getStageName(state.stage),
+                .location = state.loc});
             break;
 
         case Stage::AnyHit:
@@ -2206,6 +2201,14 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                 state,
                 varLayout,
                 (int)rowCount);
+        }
+        else if (auto descriptorHandleType = as<DescriptorHandleType>(type))
+        {
+            return processSimpleEntryPointParameter(
+                context,
+                descriptorHandleType,
+                state,
+                varLayout);
         }
         else if (auto arrayType = as<ArrayExpressionType>(type))
         {
@@ -2368,10 +2371,9 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
 
                 if (!fieldTypeLayout)
                 {
-                    getSink(context)->diagnose(
-                        varLayout->varDecl,
-                        Diagnostics::notValidVaryingParameter,
-                        fieldType);
+                    getSink(context)->diagnose(Diagnostics::NotValidVaryingParameter{
+                        .paramName = fieldDecl->getName(),
+                        .decl = varLayout->varDecl.getDecl()});
                     continue;
                 }
                 fieldVarLayout->typeLayout = fieldTypeLayout;
@@ -2446,10 +2448,9 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
 
                     if (!fieldTypeLayout)
                     {
-                        getSink(context)->diagnose(
-                            field,
-                            Diagnostics::notValidVaryingParameter,
-                            field);
+                        getSink(context)->diagnose(Diagnostics::NotValidVaryingParameter{
+                            .paramName = field.getName(),
+                            .decl = field.getDecl()});
                         continue;
                     }
                     fieldVarLayout->typeLayout = fieldTypeLayout;
@@ -2462,7 +2463,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                     {
                         // If the field is a Conditional<T, false> type, then it could have 0 size.
                         // We should skip this field if it has no use of layout units.
-                        if (fieldTypeResInfo.count == 0)
+                        if (fieldTypeResInfo.count.compare(0) == std::partial_ordering::equivalent)
                             continue;
 
                         auto kind = fieldTypeResInfo.kind;
@@ -2492,7 +2493,8 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                             // information, and we just need to update the computed
                             // size of the `struct` type to account for the field.
                             //
-                            auto fieldEndOffset = fieldResInfo->index + fieldTypeResInfo.count;
+                            auto fieldEndOffset =
+                                LayoutSize{fieldResInfo->index} + fieldTypeResInfo.count;
                             structTypeResInfo->count =
                                 maximum(structTypeResInfo->count, fieldEndOffset);
                         }
@@ -2501,10 +2503,10 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                 if (firstImplicit && firstExplicit)
                 {
                     getSink(context)->diagnose(
-                        firstImplicit,
-                        Diagnostics::mixingImplicitAndExplicitBindingForVaryingParams,
-                        firstImplicit->getName(),
-                        firstExplicit->getName());
+                        Diagnostics::MixingImplicitAndExplicitBindingForVaryingParams{
+                            .implicitName = firstImplicit->getName(),
+                            .explicitName = firstExplicit->getName(),
+                            .location = firstImplicit->loc});
                 }
 
                 return structLayout;
@@ -2699,12 +2701,14 @@ struct ScopeLayoutBuilder
     {
         // Does the parameter have any uniform data?
         auto layoutInfo = varLayout->typeLayout->FindResourceInfo(LayoutResourceKind::Uniform);
-        LayoutSize uniformSize = layoutInfo ? layoutInfo->count : 0;
-        if (uniformSize != 0)
+        LayoutSize uniformSize = layoutInfo ? layoutInfo->count : LayoutSize(0);
+        if (uniformSize.compare(0) == std::partial_ordering::greater)
         {
             // Make sure uniform fields get laid out properly...
 
-            UniformLayoutInfo fieldInfo(uniformSize, varLayout->typeLayout->uniformAlignment);
+            UniformLayoutInfo fieldInfo(
+                uniformSize,
+                LayoutOffset{varLayout->typeLayout->uniformAlignment});
 
             auto rules = m_layoutContext.rules;
             LayoutSize uniformOffset = rules->AddStructField(&m_structLayoutInfo, fieldInfo);
@@ -2819,7 +2823,7 @@ struct SimpleScopeLayoutBuilder : ScopeLayoutBuilder
                 // to add it to our set for tracking.
                 //
                 auto startOffset = paramResInfo->index;
-                auto endOffset = startOffset + paramTypeResInfo.count;
+                auto endOffset = LayoutSize{startOffset} + paramTypeResInfo.count;
                 usedRangeSet[int(kind)].Add(paramVarLayout, startOffset, endOffset);
             }
         }
@@ -2871,7 +2875,7 @@ struct SimpleScopeLayoutBuilder : ScopeLayoutBuilder
                     continue;
 
                 auto startOffset = paramResInfo->index;
-                auto endOffset = startOffset + paramTypeResInfo.count;
+                auto endOffset = LayoutSize{startOffset} + paramTypeResInfo.count;
 
                 auto scopeResInfo = m_structLayout->findOrAddResourceInfo(paramTypeResInfo.kind);
                 scopeResInfo->count = maximum(scopeResInfo->count, endOffset);
@@ -2932,16 +2936,18 @@ static ParameterBindingAndKindInfo _assignConstantBufferBinding(
                               context->layoutContext.objectLayoutOptions)
                           .getSimple();
 
-    const Index count = Index(layoutInfo.size.getFiniteValue());
+    const auto count = layoutInfo.size.getFiniteValue();
 
-    auto existingParam =
-        usedRangeSet->usedResourceRanges[(int)layoutInfo.kind].Add(varLayout, index, index + count);
+    auto existingParam = usedRangeSet->usedResourceRanges[(int)layoutInfo.kind].Add(
+        varLayout,
+        index,
+        LayoutSize{count + index});
     SLANG_UNUSED(existingParam);
     SLANG_ASSERT(existingParam == nullptr);
 
     ParameterBindingAndKindInfo info;
     info.kind = layoutInfo.kind;
-    info.count = count;
+    info.count = LayoutSize{count};
     info.index = index;
     info.space = space;
     return info;
@@ -3056,6 +3062,12 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
     // which is what the `ScopeLayoutBuilder` is designed to help with.
     //
     TypeLayoutContext layoutContext = context->layoutContext;
+
+    // Use entry point parameter layout rules for target-specific cases,
+    // such as CUDA, where cuLaunchKernel expects an unpadded entry point parameter buffer size
+    // so we do not add trailing padding to parameter structs
+    layoutContext =
+        layoutContext.with(layoutContext.getRulesFamily()->getEntryPointParameterRules());
 
     if (isKhronosTarget(context->getTargetRequest()))
     {
@@ -3485,8 +3497,7 @@ void diagnoseGlobalUniform(SharedParameterBindingContext* sharedContext, VarDecl
     // marked as uniform
     if (!varDecl->hasModifier<HLSLUniformModifier>())
     {
-        getSink(sharedContext)
-            ->diagnose(varDecl, Diagnostics::globalUniformNotExpected, varDecl->getName());
+        getSink(sharedContext)->diagnose(Diagnostics::GlobalUniformNotExpected{.decl = varDecl});
     }
 
     // Always check and warn about binding attributes being ignored, regardless of uniform
@@ -3494,9 +3505,7 @@ void diagnoseGlobalUniform(SharedParameterBindingContext* sharedContext, VarDecl
     if (varDecl->findModifier<GLSLBindingAttribute>())
     {
         sharedContext->m_sink->diagnose(
-            varDecl,
-            Diagnostics::bindingAttributeIgnoredOnUniform,
-            varDecl->getName());
+            Diagnostics::BindingAttributeIgnoredOnUniform{.decl = varDecl});
     }
 }
 
@@ -3528,6 +3537,7 @@ static bool _isPTXTarget(CodeGenTarget target)
     switch (target)
     {
     case CodeGenTarget::CUDASource:
+    case CodeGenTarget::CUDAHeader:
     case CodeGenTarget::PTX:
         {
             return true;
@@ -3725,7 +3735,8 @@ static bool _calcNeedsDefaultSpace(SharedParameterBindingContext& sharedContext)
             // the space from the explicit binding will be used, so
             // that a default space isn't needed.
             //
-            if (parameterInfo->bindingInfo[resInfo.kind].count != 0)
+            if (parameterInfo->bindingInfo[resInfo.kind].count.compare(0) ==
+                std::partial_ordering::greater)
                 continue;
 
             // We also want to exclude certain resource kinds from
@@ -3797,7 +3808,7 @@ static bool _calcNeedsDefaultSpace(SharedParameterBindingContext& sharedContext)
 
 static void _appendRange(Index start, LayoutSize size, StringBuilder& ioBuf)
 {
-    if (size == 1)
+    if (size.compare(1) == std::partial_ordering::equivalent)
     {
         // If it's in effect a single index, just append like that.
         ioBuf << start;
@@ -3805,13 +3816,17 @@ static void _appendRange(Index start, LayoutSize size, StringBuilder& ioBuf)
     else
     {
         ioBuf << "[ " << start << " ... ";
-        if (size.isFinite())
+        if (size.isInfinite())
         {
-            ioBuf << start + (Index)size.getFiniteValue() << ")";
+            ioBuf << "inf )";
+        }
+        else if (size.isInvalid())
+        {
+            ioBuf << start << "invalid )";
         }
         else
         {
-            ioBuf << "inf )";
+            ioBuf << start + (Index)size.getFiniteValue().getValidValue() << ")";
         }
     }
 }
@@ -3878,7 +3893,9 @@ static void _maybeApplyHLSLToVulkanShifts(
                     bindingInfo.index += shift;
 
                     // Presumably they should both match
-                    SLANG_ASSERT(bindingInfo.index == resourceInfo.index);
+                    SLANG_ASSERT(
+                        resourceInfo.index.compare(bindingInfo.index) ==
+                        std::partial_ordering::equivalent);
                     SLANG_ASSERT(bindingInfo.space == resourceInfo.space);
                 }
 
@@ -3930,12 +3947,11 @@ static void _maybeApplyHLSLToVulkanShifts(
                         _appendRange(clashRange.begin, LayoutSize(clashRange.end), clashRangeBuf);
 
                         // Report the clash.
-                        sink->diagnose(
-                            curVar,
-                            Diagnostics::conflictingVulkanInferredBindingForParameter,
-                            getReflectionName(clashingVarLayout->getVariable()),
-                            curRangeBuf,
-                            clashRangeBuf);
+                        sink->diagnose(Diagnostics::ConflictingVulkanInferredBindingForParameter{
+                            .paramName = getReflectionName(clashingVarLayout->getVariable()),
+                            .overlap1 = curRangeBuf.produceString(),
+                            .overlap2 = clashRangeBuf.produceString(),
+                            .decl = curVar});
                     }
                 }
             }
@@ -4171,10 +4187,9 @@ RefPtr<ProgramLayout> generateParameterBindings(TargetProgram* targetProgram, Di
                 needDefaultConstantBuffer = true;
                 if (varLayout->varDecl.getDecl()->hasModifier<GLSLBindingAttribute>() ||
                     varLayout->varDecl.getDecl()->hasModifier<GLSLLocationAttribute>())
-                    sink->diagnose(
-                        varLayout->varDecl,
-                        Diagnostics::explicitUniformLocation,
-                        as<VarDecl>(varLayout->varDecl).getDecl()->getType());
+                    sink->diagnose(Diagnostics::ExplicitUniformLocation{
+                        .type = as<VarDecl>(varLayout->varDecl).getDecl()->getType(),
+                        .var = varLayout->varDecl.getDecl()});
                 diagnoseGlobalUniform(
                     &sharedContext,
                     as<VarDeclBase>(varLayout->varDecl.getDecl()));
@@ -4269,7 +4284,7 @@ RefPtr<ProgramLayout> generateParameterBindings(TargetProgram* targetProgram, Di
 
     globalScopeVarLayout = globalScopeLayoutBuilder.endLayout(globalScopeVarLayout);
 
-    if (globalConstantBufferBinding.count != 0)
+    if (globalConstantBufferBinding.count.compare(0) != std::partial_ordering::equivalent)
     {
         auto cbInfo = globalScopeVarLayout->findOrAddResourceInfo(globalConstantBufferBinding.kind);
 
@@ -4286,10 +4301,40 @@ RefPtr<ProgramLayout> generateParameterBindings(TargetProgram* targetProgram, Di
         if (numShaderRecordRegs > 1)
         {
             sink->diagnose(
-                SourceLoc(),
-                Diagnostics::tooManyShaderRecordConstantBuffers,
-                numShaderRecordRegs);
+                Diagnostics::TooManyShaderRecordConstantBuffers{.count = numShaderRecordRegs});
         }
+    }
+
+    // Allocate a space for the bindless resource descriptor heap if the target
+    // is compatible with the `descriptor_handle` capability. This alias covers
+    // all targets that support DescriptorHandle types (glsl_spirv, sm_6_6, cpp,
+    // cuda, metal, wgsl).
+    auto targetCaps = targetReq->getTargetCaps();
+    if (targetCaps.atLeastOneSetImpliedInOther(CapabilitySet(CapabilityName::descriptor_handle)) ==
+        CapabilitySet::ImpliesReturnFlags::Implied)
+    {
+        // Check if user has specified a preferred bindless space index
+        int requestedIndex =
+            targetProgram->getOptionSet().getIntOption(CompilerOptionName::BindlessSpaceIndex);
+
+        // Try to use the requested index, or find the next available one
+        int availableIndex = requestedIndex;
+        while (sharedContext.usedSpaces.contains(availableIndex))
+        {
+            availableIndex++;
+        }
+
+        // Warn if we had to use a different index than requested
+        if (availableIndex != requestedIndex &&
+            targetProgram->getOptionSet().hasOption(CompilerOptionName::BindlessSpaceIndex))
+        {
+            sink->diagnose(Diagnostics::RequestedBindlessSpaceIndexUnavailable{
+                .requested = requestedIndex,
+                .available = availableIndex});
+        }
+
+        markSpaceUsed(&context, nullptr, availableIndex);
+        programLayout->bindlessSpaceIndex = availableIndex;
     }
 
     return programLayout;

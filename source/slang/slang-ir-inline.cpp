@@ -1258,7 +1258,7 @@ struct GLSLResourceReturnFunctionInliningPass : InliningPassBase
     }
 };
 
-void performGLSLResourceReturnFunctionInlining(TargetProgram* targetProgram, IRModule* module)
+void performGLSLResourceReturnFunctionInlining(IRModule* module, TargetProgram* targetProgram)
 {
     GLSLResourceReturnFunctionInliningPass pass(module);
     bool changed = true;
@@ -1266,7 +1266,7 @@ void performGLSLResourceReturnFunctionInlining(TargetProgram* targetProgram, IRM
     while (changed)
     {
         changed = pass.considerAllCallSites();
-        simplifyIR(nullptr, module, IRSimplificationOptions::getFast(targetProgram));
+        simplifyIR(module, nullptr, IRSimplificationOptions::getFast(targetProgram));
     }
 }
 

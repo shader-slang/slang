@@ -6,6 +6,11 @@
 //CHECK: gl_ClipDistance[0] =
 //CHECK: gl_ClipDistance[1] =
 
+//TEST:SIMPLE(filecheck=SPIRV): -profile sm_5_0 -stage vertex -entry mainVertex -target spirv-asm
+
+//SPIRV-DAG: OpCapability Shader
+//SPIRV-DAG: OpCapability ClipDistance
+
 struct VertexInput 
 {
     float3 position : POSITION; 

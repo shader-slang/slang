@@ -684,11 +684,11 @@ LegalType createLegalUniformBufferTypeForExistentials(
     IRInst* layoutOperand);
 
 
-void legalizeExistentialTypeLayout(TargetProgram* target, IRModule* module, DiagnosticSink* sink);
+void legalizeExistentialTypeLayout(IRModule* module, TargetProgram* target, DiagnosticSink* sink);
 
-void legalizeResourceTypes(TargetProgram* target, IRModule* module, DiagnosticSink* sink);
+void legalizeResourceTypes(IRModule* module, TargetProgram* target, DiagnosticSink* sink);
 
-void legalizeEmptyTypes(TargetProgram* target, IRModule* module, DiagnosticSink* sink);
+void legalizeEmptyTypes(IRModule* module, TargetProgram* target, DiagnosticSink* sink);
 
 bool isResourceType(IRType* type);
 

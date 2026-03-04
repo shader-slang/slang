@@ -306,20 +306,6 @@ bool areIndicesSubsetOf(List<IndexTrackingInfo>& indicesA, List<IndexTrackingInf
     return true;
 }
 
-bool canInstBeStored(IRInst* inst)
-{
-    // Cannot store insts whose value is a type or a witness table, or a function.
-    // These insts get lowered to target-specific logic, and cannot be
-    // stored into variables or context structs as normal values.
-    //
-    if (as<IRTypeType>(inst->getDataType()) || as<IRWitnessTableType>(inst->getDataType()) ||
-        as<IRTypeKind>(inst->getDataType()) || as<IRFuncType>(inst->getDataType()) ||
-        !inst->getDataType())
-        return false;
-
-    return true;
-}
-
 // This is a helper that converts insts in a loop condition block into two if necessary,
 // then replaces all uses 'outside' the loop region with the new insts. This is because
 // insts in loop condition blocks can be used in two distinct regions (the loop body, and

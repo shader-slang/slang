@@ -12,5 +12,5 @@ bool removeRedundancyInFunc(IRGlobalValueWithCode* func, bool hoistLoopInvariant
 
 bool eliminateRedundantLoadStore(IRGlobalValueWithCode* func);
 
-void removeAvailableInDownstreamModuleDecorations(CodeGenTarget target, IRModule* module);
+void removeAvailableInDownstreamModuleDecorations(IRModule* module, CodeGenTarget target);
 } // namespace Slang

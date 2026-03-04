@@ -24,7 +24,7 @@ struct CodeGenContext;
 struct IRInst;
 class TargetRequest;
 
-void deferBufferLoad(CodeGenContext* context, IRModule* module);
+void deferBufferLoad(IRModule* module, CodeGenContext* context);
 
 // Returns true if the type is suitable for defer-load optimization.
 // Generally, we want to defer loading large structs or composites that contain arrays.

@@ -79,7 +79,7 @@ static bool hasValue(const uint8_t* data, size_t size, uint8_t value)
         size -= firstSize;
         data += firstSize;
 
-        assert((size_t(data) & alignMask) == 0);
+        SLANG_ASSERT((size_t(data) & alignMask) == 0);
     }
 
     // Now do the middle

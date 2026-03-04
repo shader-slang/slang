@@ -30,6 +30,10 @@ public:
     virtual bool tryEmitInstStmtImpl(IRInst* inst) SLANG_OVERRIDE;
     virtual void emitSwitchCaseSelectorsImpl(const SwitchRegion::Case* currentCase, bool isDefault)
         SLANG_OVERRIDE;
+
+    // WGSL doesn't support fall-through in switch statements
+    virtual bool supportsSwitchFallThrough() SLANG_OVERRIDE { return false; }
+
     virtual void emitSimpleTypeAndDeclaratorImpl(IRType* type, DeclaratorInfo* declarator)
         SLANG_OVERRIDE;
     virtual void emitVarKeywordImpl(IRType* type, IRInst* varDecl) SLANG_OVERRIDE;

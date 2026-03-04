@@ -5,19 +5,22 @@
 #include "slang-ir-any-value-marshalling.h"
 #include "slang-ir-insts.h"
 #include "slang-ir.h"
+#include "slang-target-program.h"
 
 namespace Slang
 {
 struct ResultTypeLoweringContext
 {
+    TargetProgram* targetProgram;
     IRModule* module;
+    TargetProgram* program;
     DiagnosticSink* sink;
 
     InstWorkList workList;
     InstHashSet workListSet;
 
-    ResultTypeLoweringContext(IRModule* inModule)
-        : module(inModule), workList(inModule), workListSet(inModule)
+    ResultTypeLoweringContext(IRModule* inModule, TargetProgram* program)
+        : module(inModule), program(program), workList(inModule), workListSet(inModule)
     {
     }
 
@@ -72,14 +75,14 @@ struct ResultTypeLoweringContext
         auto valueType = resultType->getValueType();
         if (valueType->getOp() != kIROp_VoidType)
         {
-            anyValueSize = getAnyValueSize(valueType);
+            anyValueSize = getAnyValueSize(valueType, targetProgram->getTargetReq());
             info->valueType = valueType;
         }
 
         auto errorType = resultType->getErrorType();
         info->errorType = errorType;
 
-        auto errSize = getAnyValueSize(errorType);
+        auto errSize = getAnyValueSize(errorType, targetProgram->getTargetReq());
         if (errSize > anyValueSize)
             anyValueSize = errSize;
 
@@ -282,9 +285,10 @@ struct ResultTypeLoweringContext
     }
 };
 
-void lowerResultType(IRModule* module, DiagnosticSink* sink)
+void lowerResultType(IRModule* module, TargetProgram* targetProgram, DiagnosticSink* sink)
 {
-    ResultTypeLoweringContext context(module);
+    ResultTypeLoweringContext context(module, targetProgram);
+    context.targetProgram = targetProgram;
     context.sink = sink;
     context.processModule();
 }

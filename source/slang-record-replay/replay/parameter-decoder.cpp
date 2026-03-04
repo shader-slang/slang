@@ -218,6 +218,7 @@ size_t ParameterDecoder::decodeStruct(
     size_t readByte = 0;
     readByte = decodeEnumValue(buffer, bufferSize, value.getValue().kind);
     readByte += decodeInt32(buffer + readByte, bufferSize - readByte, value.getValue().intValue0);
+    readByte += decodeInt32(buffer + readByte, bufferSize - readByte, value.getValue().intValue1);
 
     PointerDecoder<char*> stringValue0;
     readByte += decodeString(buffer + readByte, bufferSize - readByte, stringValue0);
@@ -226,7 +227,7 @@ size_t ParameterDecoder::decodeStruct(
     PointerDecoder<char*> stringValue1;
     readByte += decodeString(buffer + readByte, bufferSize - readByte, stringValue1);
     value.getValue().stringValue1 = stringValue1.getPointer();
-    return 0;
+    return readByte;
 }
 
 size_t ParameterDecoder::decodeStruct(

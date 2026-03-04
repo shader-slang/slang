@@ -11,6 +11,8 @@ struct IRModule;
 class TargetProgram;
 class DiagnosticSink;
 
-void lowerReinterpret(TargetProgram* targetReq, IRModule* module, DiagnosticSink* sink);
+void lowerReinterpret(IRModule* module, TargetProgram* targetReq, DiagnosticSink* sink);
+
+void lowerReinterpretOptional(IRModule* module, TargetProgram* targetReq, DiagnosticSink* sink);
 
 } // namespace Slang

@@ -343,9 +343,9 @@ public:
             __builtin_unreachable(); \
     } while (0)
 #elif SLANG_CLANG
-#define SLANG_ASSUME(X) __builtin_assume(X)
+#define SLANG_ASSUME(X) __builtin_assume(static_cast<bool>(X))
 #elif SLANG_VC
-#define SLANG_ASSUME(X) __assume(X)
+#define SLANG_ASSUME(X) __assume(static_cast<bool>(X))
 #else
 [[noreturn]] inline void invokeUndefinedBehaviour() {}
 #define SLANG_ASSUME(X)                 \
@@ -361,11 +361,11 @@ public:
 // assumptions in release builds
 //
 #ifdef _DEBUG
-#define SLANG_ASSERT(VALUE)               \
-    do                                    \
-    {                                     \
-        if (!(VALUE)) [[unlikely]]        \
-            SLANG_ASSERT_FAILURE(#VALUE); \
+#define SLANG_ASSERT(VALUE)                \
+    do                                     \
+    {                                      \
+        if (!(VALUE)) [[unlikely]]         \
+            ::Slang::handleAssert(#VALUE); \
     } while (0)
 #else
 #define SLANG_ASSERT(VALUE) SLANG_ASSUME(VALUE)

@@ -23,7 +23,7 @@ public struct RenderBuffer2D<T : ITexelElement> {
     public uint16_t2 size;
 
     public __init() {
-        handle = {};
+        // handle remains uninitialized - cannot be default initialized
         offset = {};
         size = {};
     }
@@ -38,7 +38,7 @@ public struct RWRenderBuffer2D<T : ITexelElement> {
     public uint16_t2 size;
 
     public __init() {
-        handle = {};
+        // handle remains uninitialized - cannot be default initialized
         offset = {};
         size = {};
     }

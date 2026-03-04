@@ -337,6 +337,8 @@ BufferElementTypeLoweringPolicy* getBufferElementTypeLoweringPolicy(
 
 TypeLoweringConfig getTypeLoweringConfigForBuffer(TargetProgram* target, IRType* bufferType);
 
+IROp getOpFromTypeLayoutRules(IRTypeLayoutRuleName ruleName);
+
 IRInst* ConversionMethod::apply(IRBuilder& builder, IRType* resultType, IRInst* operandAddr)
 {
     if (!*this)
@@ -381,7 +383,7 @@ IRIntegerValue get16ByteAlignedVectorElementCount(
     IRIntegerValue minCount)
 {
     IRSizeAndAlignment sizeAlignment;
-    getNaturalSizeAndAlignment(target->getOptionSet(), elementType, &sizeAlignment);
+    getNaturalSizeAndAlignment(target->getTargetReq(), elementType, &sizeAlignment);
     if (sizeAlignment.size)
         return align(sizeAlignment.size * minCount, 16) / sizeAlignment.size;
     return 4;
@@ -692,7 +694,7 @@ struct LoweredElementTypeContext
                 builder.addNameHintDecoration(structKey, UnownedStringSlice("data"));
                 IRSizeAndAlignment elementSizeAlignment;
                 getSizeAndAlignment(
-                    target->getOptionSet(),
+                    target->getTargetReq(),
                     config.getLayoutRule(),
                     loweredInnerTypeInfo.loweredType,
                     &elementSizeAlignment);
@@ -717,7 +719,7 @@ struct LoweredElementTypeContext
             {
                 IRSizeAndAlignment elementSizeAlignment;
                 getSizeAndAlignment(
-                    target->getOptionSet(),
+                    target->getTargetReq(),
                     config.getLayoutRule(),
                     loweredInnerTypeInfo.loweredType,
                     &elementSizeAlignment);
@@ -900,7 +902,7 @@ struct LoweredElementTypeContext
         info = getLoweredTypeInfoImpl(type, config);
         IRSizeAndAlignment sizeAlignment;
         getSizeAndAlignment(
-            target->getOptionSet(),
+            target->getTargetReq(),
             config.getLayoutRule(),
             info.loweredType,
             &sizeAlignment);
@@ -966,9 +968,14 @@ struct LoweredElementTypeContext
         case kIROp_RWStructuredBufferLoad:
         case kIROp_RWStructuredBufferLoadStatus:
         case kIROp_RWStructuredBufferStore:
-            return builder.emitRWStructuredBufferGetElementPtr(
-                baseAddr,
-                loadStoreInst->getOperand(1));
+            {
+                auto elementType =
+                    tryGetPointedToOrBufferElementType(&builder, baseAddr->getDataType());
+                return builder.emitRWStructuredBufferGetElementPtr(
+                    getPointerTypeWithBufferLayout(builder, baseAddr->getDataType(), elementType),
+                    baseAddr,
+                    loadStoreInst->getOperand(1));
+            }
         default:
             return nullptr;
         }
@@ -1000,13 +1007,13 @@ struct LoweredElementTypeContext
 
             IRSizeAndAlignment arrayElementSizeAlignment;
             getSizeAndAlignment(
-                target->getOptionSet(),
+                target->getTargetReq(),
                 config.getLayoutRule(),
                 loweredInnerType.loweredType,
                 &arrayElementSizeAlignment);
             IRSizeAndAlignment baseSizeAlignment;
             getSizeAndAlignment(
-                target->getOptionSet(),
+                target->getTargetReq(),
                 config.getLayoutRule(),
                 tryGetPointedToOrBufferElementType(&builder, fieldAddr->getBase()->getDataType()),
                 &baseSizeAlignment);
@@ -1105,7 +1112,14 @@ struct LoweredElementTypeContext
             // For structured buffer loads, the new address can be obtained by
             // getting the element pointer from the new base pointer and the original
             // index operand.
-            return builder.emitRWStructuredBufferGetElementPtr(newBasePtr, loadInst->getOperand(1));
+            {
+                auto elementType =
+                    tryGetPointedToOrBufferElementType(&builder, newBasePtr->getDataType());
+                return builder.emitRWStructuredBufferGetElementPtr(
+                    getPointerTypeWithBufferLayout(builder, newBasePtr->getDataType(), elementType),
+                    newBasePtr,
+                    loadInst->getOperand(1));
+            }
         default:
             return nullptr;
         }
@@ -1186,6 +1200,7 @@ struct LoweredElementTypeContext
                                 auto logicalBaseType = castInst->getDataType();
                                 auto logicalType = user->getDataType();
                                 IRInst* storageBaseAddr = ptrVal;
+                                IRPtrTypeBase* ptrType = as<IRPtrTypeBase>(logicalType);
                                 auto originalBaseValueType =
                                     tryGetPointedToOrBufferElementType(&builder, logicalBaseType);
                                 if (user->getOp() == kIROp_GetElementPtr)
@@ -1205,7 +1220,8 @@ struct LoweredElementTypeContext
                                                 args.add(user->getOperand(i));
                                             storageBaseAddr = builder.emitFieldAddress(
                                                 builder.getPtrType(
-                                                    arrayLowerInfo.loweredInnerArrayType),
+                                                    arrayLowerInfo.loweredInnerArrayType,
+                                                    ptrType),
                                                 ptrVal,
                                                 arrayLowerInfo.loweredInnerStructKey);
                                         }
@@ -1221,7 +1237,6 @@ struct LoweredElementTypeContext
                                         break;
                                     }
                                 }
-
 
                                 builder.setInsertBefore(user);
                                 IRInst* storageGEP = nullptr;
@@ -1256,7 +1271,9 @@ struct LoweredElementTypeContext
                                         auto storageTypeInfo =
                                             getLoweredTypeInfo(logicalValueType, config);
                                         storageGEP = builder.emitIntrinsicInst(
-                                            builder.getPtrType(storageTypeInfo.loweredType),
+                                            builder.getPtrType(
+                                                storageTypeInfo.loweredType,
+                                                ptrType),
                                             user->getOp(),
                                             newArgs.getCount(),
                                             newArgs.getArrayView().getBuffer());
@@ -1628,6 +1645,11 @@ struct LoweredElementTypeContext
     void processModule(IRModule* module)
     {
         IRBuilder builder(module);
+
+        // Fix the pointer types of `RWStructuredBufferGetElementPtr` and
+        // `FieldAddress` to be layout-aware.
+        fixBufferAccessPointerTypes(module->getModuleInst());
+
         struct BufferTypeInfo
         {
             IRType* bufferType;
@@ -1660,7 +1682,7 @@ struct LoweredElementTypeContext
                 // in`StructuredBufferGetDimensions`.
                 IRSizeAndAlignment sizeAlignment;
                 getSizeAndAlignment(
-                    target->getOptionSet(),
+                    target->getTargetReq(),
                     config.getLayoutRule(),
                     elementType,
                     &sizeAlignment);
@@ -2025,6 +2047,74 @@ struct LoweredElementTypeContext
             materializeStorageToLogicalCastsImpl(inst);
     }
 
+    IRPtrType* getPointerTypeWithBufferLayout(
+        IRBuilder& builder,
+        IRType* bufferType,
+        IRType* elementType)
+    {
+        TypeLoweringConfig loweringConfig = getTypeLoweringConfigForBuffer(target, bufferType);
+        IRType* layoutType = getTypeLayoutTypeForBuffer(target, builder, bufferType);
+        return builder.getPtrType(
+            elementType,
+            AccessQualifier::ReadWrite,
+            loweringConfig.addressSpace,
+            layoutType);
+    }
+
+    IRPtrType* copyBufferLayoutToPointer(
+        IRBuilder& builder,
+        IRType* bufferType,
+        IRPtrTypeBase* pointerType)
+    {
+        IRType* layoutType = getTypeLayoutTypeForBuffer(target, builder, bufferType);
+
+        AccessQualifier access = pointerType->getAccessQualifier();
+        AddressSpace addressSpace = pointerType->getAddressSpace();
+
+        return builder.getPtrType(pointerType->getValueType(), access, addressSpace, layoutType);
+    }
+
+    void fixBufferAccessPointerTypes(IRInst* root)
+    {
+        IRBuilder builder(root);
+        OrderedHashSet<IRInst*> workList;
+        workList.add(root);
+
+        while (workList.getCount() != 0)
+        {
+            IRInst* inst = workList.getLast();
+
+            workList.removeLast();
+
+            if (IRPtrTypeBase* ptrType = as<IRPtrTypeBase>(inst->getDataType()))
+            {
+                if (auto sgep = as<IRRWStructuredBufferGetElementPtr>(inst))
+                {
+                    auto bufferType = sgep->getBase()->getDataType();
+                    ptrType = copyBufferLayoutToPointer(builder, bufferType, ptrType);
+                    builder.setDataType(inst, ptrType);
+                }
+                else if (auto fa = as<IRFieldAddress>(inst))
+                {
+                    auto bufferType = fa->getBase()->getDataType();
+                    ptrType = copyBufferLayoutToPointer(builder, bufferType, ptrType);
+                    builder.setDataType(inst, ptrType);
+                }
+                else if (auto gep = as<IRGetElementPtr>(inst))
+                {
+                    auto bufferType = gep->getBase()->getDataType();
+                    ptrType = copyBufferLayoutToPointer(builder, bufferType, ptrType);
+                    builder.setDataType(inst, ptrType);
+                }
+            }
+
+            for (auto child = inst->getLastChild(); child; child = child->getPrevInst())
+            {
+                workList.add(child);
+            }
+        }
+    }
+
     // Lower all getElementPtr insts of a lowered matrix out of existance.
     void lowerMatrixAddresses(IRModule* module, MatrixAddrWorkItem workItem)
     {
@@ -2035,7 +2125,7 @@ struct LoweredElementTypeContext
         auto baseCast = as<IRCastStorageToLogical>(majorGEP->getBase());
         SLANG_ASSERT(baseCast);
         auto storageBase = baseCast->getOperand(0);
-        auto loweredMatrixType = cast<IRPtrTypeBase>(storageBase->getFullType())->getValueType();
+        auto loweredMatrixType = tryGetPointedToType(&builder, storageBase->getFullType());
         auto matrixTypeInfo =
             getTypeLoweringMap(workItem.config).mapLoweredTypeToInfo.tryGetValue(loweredMatrixType);
         SLANG_ASSERT(matrixTypeInfo);
@@ -2152,8 +2242,8 @@ struct LoweredElementTypeContext
 };
 
 void lowerBufferElementTypeToStorageType(
-    TargetProgram* target,
     IRModule* module,
+    TargetProgram* target,
     BufferElementTypeLoweringOptions options)
 {
     LoweredElementTypeContext context(target, options);
@@ -2165,6 +2255,7 @@ IRTypeLayoutRuleName getTypeLayoutRulesFromOp(IROp layoutTypeOp, IRTypeLayoutRul
     switch (layoutTypeOp)
     {
     case kIROp_DefaultBufferLayoutType:
+    case kIROp_DefaultPushConstantBufferLayoutType:
         return defaultLayout;
     case kIROp_Std140BufferLayoutType:
         return IRTypeLayoutRuleName::Std140;
@@ -2174,8 +2265,41 @@ IRTypeLayoutRuleName getTypeLayoutRulesFromOp(IROp layoutTypeOp, IRTypeLayoutRul
         return IRTypeLayoutRuleName::Natural;
     case kIROp_CBufferLayoutType:
         return IRTypeLayoutRuleName::C;
+    case kIROp_D3DConstantBufferLayoutType:
+        return IRTypeLayoutRuleName::D3DConstantBuffer;
+    case kIROp_MetalParameterBlockLayoutType:
+        return IRTypeLayoutRuleName::MetalParameterBlock;
+    case kIROp_CUDABufferLayoutType:
+        return IRTypeLayoutRuleName::CUDA;
+    case kIROp_LLVMBufferLayoutType:
+        return IRTypeLayoutRuleName::LLVM;
     }
     return defaultLayout;
+}
+
+IROp getOpFromTypeLayoutRules(IRTypeLayoutRuleName ruleName)
+{
+    switch (ruleName)
+    {
+    case IRTypeLayoutRuleName::Std140:
+        return kIROp_Std140BufferLayoutType;
+    case IRTypeLayoutRuleName::Std430:
+        return kIROp_Std430BufferLayoutType;
+    case IRTypeLayoutRuleName::Natural:
+        return kIROp_ScalarBufferLayoutType;
+    case IRTypeLayoutRuleName::C:
+        return kIROp_CBufferLayoutType;
+    case IRTypeLayoutRuleName::D3DConstantBuffer:
+        return kIROp_D3DConstantBufferLayoutType;
+    case IRTypeLayoutRuleName::MetalParameterBlock:
+        return kIROp_MetalParameterBlockLayoutType;
+    case IRTypeLayoutRuleName::CUDA:
+        return kIROp_CUDABufferLayoutType;
+    case IRTypeLayoutRuleName::LLVM:
+        return kIROp_LLVMBufferLayoutType;
+    default:
+        return kIROp_DefaultBufferLayoutType;
+    }
 }
 
 IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRType* bufferType)
@@ -2184,14 +2308,41 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
     {
         return IRTypeLayoutRuleName::MetalParameterBlock;
     }
-    if (target->getTargetReq()->getTarget() != CodeGenTarget::WGSL)
+    auto targetReq = target->getTargetReq();
+    if (targetReq->getTarget() != CodeGenTarget::WGSL)
     {
-        if (!isKhronosTarget(target->getTargetReq()))
+        if (!isKhronosTarget(target->getTargetReq()) && !isCPUTargetViaLLVM(targetReq))
             return IRTypeLayoutRuleName::Natural;
 
         // If we are just emitting GLSL, we can just use the general layout rule.
-        if (!target->shouldEmitSPIRVDirectly())
+        if (!target->shouldEmitSPIRVDirectly() && !isCPUTargetViaLLVM(targetReq))
             return IRTypeLayoutRuleName::Natural;
+
+        // An explicit (non-default) layout annotation on the buffer takes precedence
+        // over global compiler options such as forceScalarLayout.
+        {
+            IROp layoutTypeOp = kIROp_DefaultBufferLayoutType;
+            if (auto paramGroupType = as<IRUniformParameterGroupType>(bufferType))
+            {
+                if (paramGroupType->getDataLayout())
+                    layoutTypeOp = paramGroupType->getDataLayout()->getOp();
+            }
+            else if (auto structBufferType = as<IRHLSLStructuredBufferTypeBase>(bufferType))
+            {
+                if (structBufferType->getDataLayout())
+                    layoutTypeOp = structBufferType->getDataLayout()->getOp();
+            }
+            else if (auto storageBufferType = as<IRGLSLShaderStorageBufferType>(bufferType))
+            {
+                if (storageBufferType->getDataLayout())
+                    layoutTypeOp = storageBufferType->getDataLayout()->getOp();
+            }
+            if (layoutTypeOp != kIROp_DefaultBufferLayoutType &&
+                layoutTypeOp != kIROp_DefaultPushConstantBufferLayoutType)
+            {
+                return getTypeLayoutRulesFromOp(layoutTypeOp, IRTypeLayoutRuleName::Natural);
+            }
+        }
 
         // If the user specified a C-compatible buffer layout, then do that.
         if (target->getOptionSet().shouldUseCLayout())
@@ -2235,7 +2386,17 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
             auto layoutTypeOp = parameterGroupType->getDataLayout()
                                     ? parameterGroupType->getDataLayout()->getOp()
                                     : kIROp_DefaultBufferLayoutType;
-            return getTypeLayoutRulesFromOp(layoutTypeOp, IRTypeLayoutRuleName::Std140);
+
+            // DefaultPushConstantBufferLayoutType defaults to Std430.
+            if (layoutTypeOp == kIROp_DefaultPushConstantBufferLayoutType)
+                return IRTypeLayoutRuleName::Std430;
+
+            // The CPU targets default to the C buffer layout for compatibility
+            // with C/C++.
+            auto defaultTypeOp =
+                isCPUTarget(targetReq) ? IRTypeLayoutRuleName::C : IRTypeLayoutRuleName::Std140;
+
+            return getTypeLayoutRulesFromOp(layoutTypeOp, defaultTypeOp);
         }
     case kIROp_GLSLShaderStorageBufferType:
         {
@@ -2245,8 +2406,17 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
                                     : kIROp_Std430BufferLayoutType;
             return getTypeLayoutRulesFromOp(layoutTypeOp, IRTypeLayoutRuleName::Std430);
         }
-    case kIROp_PtrType:
-        return IRTypeLayoutRuleName::Natural;
+    }
+    if (auto ptrType = as<IRPtrTypeBase>(bufferType))
+    {
+        auto layoutTypeOp = ptrType->getDataLayout() ? ptrType->getDataLayout()->getOp()
+                                                     : kIROp_DefaultBufferLayoutType;
+
+        IRTypeLayoutRuleName defaultRule = IRTypeLayoutRuleName::Natural;
+        if (isCPUTargetViaLLVM(targetReq))
+            defaultRule = IRTypeLayoutRuleName::LLVM;
+
+        return getTypeLayoutRulesFromOp(layoutTypeOp, defaultRule);
     }
     return IRTypeLayoutRuleName::Natural;
 }
@@ -2255,6 +2425,15 @@ IRTypeLayoutRules* getTypeLayoutRuleForBuffer(TargetProgram* target, IRType* buf
 {
     auto ruleName = getTypeLayoutRuleNameForBuffer(target, bufferType);
     return IRTypeLayoutRules::get(ruleName);
+}
+
+IRType* getTypeLayoutTypeForBuffer(TargetProgram* target, IRBuilder& builder, IRType* bufferType)
+{
+    TypeLoweringConfig loweringConfig = getTypeLoweringConfigForBuffer(target, bufferType);
+    IROp layoutOp = getOpFromTypeLayoutRules(loweringConfig.layoutRuleName);
+    IRType* layoutType =
+        as<IRType>(builder.createIntrinsicInst(nullptr, layoutOp, 0, nullptr, nullptr));
+    return layoutType;
 }
 
 TypeLoweringConfig getTypeLoweringConfigForBuffer(TargetProgram* target, IRType* bufferType)
@@ -2273,6 +2452,26 @@ TypeLoweringConfig getTypeLoweringConfigForBuffer(TargetProgram* target, IRType*
             break;
         }
     }
+    else
+    {
+        // Set address space for buffer types
+        switch (bufferType->getOp())
+        {
+        case kIROp_ParameterBlockType:
+        case kIROp_ConstantBufferType:
+            addrSpace = AddressSpace::Uniform;
+            break;
+        case kIROp_HLSLStructuredBufferType:
+        case kIROp_HLSLRWStructuredBufferType:
+        case kIROp_HLSLAppendStructuredBufferType:
+        case kIROp_HLSLConsumeStructuredBufferType:
+        case kIROp_HLSLRasterizerOrderedStructuredBufferType:
+        case kIROp_GLSLShaderStorageBufferType:
+            addrSpace = AddressSpace::StorageBuffer;
+            break;
+        }
+    }
+
     auto rules = getTypeLayoutRuleNameForBuffer(target, bufferType);
     return TypeLoweringConfig{addrSpace, rules};
 }
@@ -2497,7 +2696,7 @@ struct DefaultBufferElementTypeLoweringPolicy : BufferElementTypeLoweringPolicy
             auto vectorType = builder.getVectorType(matrixType->getElementType(), vectorSize);
             IRSizeAndAlignment elementSizeAlignment;
             getSizeAndAlignment(
-                target->getOptionSet(),
+                target->getTargetReq(),
                 config.getLayoutRule(),
                 vectorType,
                 &elementSizeAlignment);
@@ -2545,13 +2744,24 @@ struct KhronosTargetBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLo
 
     virtual bool shouldLowerMatrixType(IRMatrixType* matrixType, TypeLoweringConfig config) override
     {
-        // For spirv, we always want to lower all matrix types, because SPIRV does not support
+        // For spirv, we generally want to lower all matrix types, because SPIRV does not support
         // specifying matrix layout/stride if the matrix type is used in places other than
         // defining a struct field. This means that if a matrix is used to define a varying
         // parameter, we always want to wrap it in a struct.
-        //
+        // Matrices within uniform and storage buffers are already members in the overall buffer
+        // struct type, hence do not need to be lowered.
         if (target->shouldEmitSPIRVDirectly())
-            return true;
+        {
+            switch (config.addressSpace)
+            {
+            case AddressSpace::Uniform:
+            case AddressSpace::StorageBuffer:
+                return false;
+            default:
+                return true;
+            }
+        }
+
         return DefaultBufferElementTypeLoweringPolicy::shouldLowerMatrixType(matrixType, config);
     }
 
@@ -2593,7 +2803,7 @@ struct KhronosTargetBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLo
                         // Find an integer type of the correct size for the current layout rule.
                         IRSizeAndAlignment boolSizeAndAlignment;
                         if (getSizeAndAlignment(
-                                target->getOptionSet(),
+                                target->getTargetReq(),
                                 config.getLayoutRule(),
                                 scalarType,
                                 &boolSizeAndAlignment) == SLANG_OK)
@@ -2676,6 +2886,23 @@ struct WGSLBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLoweringPol
     }
 };
 
+struct LLVMBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLoweringPolicy
+{
+    LLVMBufferElementTypeLoweringPolicy(
+        TargetProgram* inTarget,
+        BufferElementTypeLoweringOptions inOptions)
+        : DefaultBufferElementTypeLoweringPolicy(inTarget, inOptions)
+    {
+    }
+
+    virtual bool shouldLowerMatrixType(IRMatrixType* matrixType, TypeLoweringConfig config) override
+    {
+        SLANG_UNUSED(matrixType);
+        SLANG_UNUSED(config);
+        return true;
+    }
+};
+
 BufferElementTypeLoweringPolicy* getBufferElementTypeLoweringPolicy(
     BufferElementTypeLoweringPolicyKind kind,
     TargetProgram* target,
@@ -2691,6 +2918,8 @@ BufferElementTypeLoweringPolicy* getBufferElementTypeLoweringPolicy(
         return new MetalParameterBlockElementTypeLoweringPolicy(target, options);
     case BufferElementTypeLoweringPolicyKind::WGSL:
         return new WGSLBufferElementTypeLoweringPolicy(target, options);
+    case BufferElementTypeLoweringPolicyKind::LLVM:
+        return new LLVMBufferElementTypeLoweringPolicy(target, options);
     }
     SLANG_UNREACHABLE("unknown buffer element type lowering policy");
 }

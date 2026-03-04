@@ -127,7 +127,7 @@ private:
         outOffset = 3;
         return CharEncodeType::UTF8;
     }
-    else if (bytesCount >= 2)
+    else if (bytesCount >= 2 && ((bytesCount % 2) == 0))
     {
         Char16 c;
         ::memcpy(&c, bytes, 2);
@@ -156,7 +156,7 @@ private:
 #endif
             if ((low == 0) ^ (high == 0))
             {
-                outOffset = 2;
+                outOffset = 0;
                 return (high == 0) ? CharEncodeType::UTF16 : CharEncodeType::UTF16Reversed;
             }
         }

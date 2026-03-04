@@ -1,61 +1,31 @@
 #include "slang-ir-lower-dynamic-resource-heap.h"
 
 #include "compiler-core/slang-artifact-associated-impl.h"
+#include "slang-capability.h"
 #include "slang-ir-util.h"
+#include "slang-rich-diagnostics.h"
+#include "slang-target-program.h"
+#include "slang-type-layout.h"
 
 namespace Slang
 {
-UInt findUnusedSpaceIndex(TargetProgram* targetProgram, IRModule* module)
+
+/// Get the bindless descriptor set/space index from the program layout.
+/// This index was allocated during layout generation (before DCE),
+/// ensuring consistency with reflection data.
+UInt getBindlessSpaceIndex(TargetProgram* targetProgram)
 {
-    HashSet<int> usedSpaces;
-    auto processVarLayout = [&](IRVarLayout* varLayout)
+    // Get the bindless space index from the program layout.
+    // This is always allocated during generateParameterBindings().
+    if (auto programLayout = targetProgram->getExistingLayout())
     {
-        UInt spaceOffset = 0;
-        if (auto spaceAttr = varLayout->findOffsetAttr(LayoutResourceKind::SubElementRegisterSpace))
-        {
-            spaceOffset = spaceAttr->getOffset();
-        }
-        for (auto sizeAttr : varLayout->getTypeLayout()->getSizeAttrs())
-        {
-            auto kind = sizeAttr->getResourceKind();
-            if (!ShaderBindingRange::isUsageTracked(kind))
-                continue;
-
-            if (auto offsetAttr = varLayout->findOffsetAttr(kind))
-            {
-                // Get the binding information from this attribute and insert it into the list
-                auto spaceIndex = spaceOffset + offsetAttr->getSpace();
-                usedSpaces.add((int)spaceIndex);
-            }
-        }
-    };
-
-    for (auto inst : module->getGlobalInsts())
-    {
-        if (as<IRGlobalParam>(inst))
-        {
-            auto varLayout = findVarLayout(inst);
-            if (!varLayout)
-                continue;
-            processVarLayout(varLayout);
-
-            auto paramGroupTypeLayout = as<IRParameterGroupTypeLayout>(varLayout->getTypeLayout());
-            if (!paramGroupTypeLayout)
-                continue;
-            auto containerVarLayout = paramGroupTypeLayout->getContainerVarLayout();
-            if (!containerVarLayout)
-                continue;
-            processVarLayout(containerVarLayout);
-        }
+        SLANG_ASSERT(programLayout->bindlessSpaceIndex >= 0);
+        return (UInt)programLayout->bindlessSpaceIndex;
     }
 
-    // Find next unused space index.
-    int index = targetProgram->getOptionSet().getIntOption(CompilerOptionName::BindlessSpaceIndex);
-    while (usedSpaces.contains(index))
-    {
-        index++;
-    }
-    return index;
+    // Fallback: if no layout exists yet, use the user-specified index or default to 0.
+    // This shouldn't normally happen since layout is generated before this pass runs.
+    return (UInt)targetProgram->getOptionSet().getIntOption(CompilerOptionName::BindlessSpaceIndex);
 }
 
 IRVarLayout* createResourceHeapVarLayoutWithSpaceAndBinding(
@@ -77,10 +47,8 @@ IRVarLayout* createResourceHeapVarLayoutWithSpaceAndBinding(
     return varLayoutBuilder.build();
 }
 
-void lowerDynamicResourceHeap(TargetProgram* targetProgram, IRModule* module, DiagnosticSink* sink)
+void lowerDynamicResourceHeap(IRModule* module, TargetProgram* targetProgram, DiagnosticSink* sink)
 {
-    SLANG_UNUSED(sink);
-    auto unusedSpaceIndex = findUnusedSpaceIndex(targetProgram, module);
     List<IRInst*> workList;
     for (auto globalInst : module->getGlobalInsts())
     {
@@ -89,6 +57,22 @@ void lowerDynamicResourceHeap(TargetProgram* targetProgram, IRModule* module, Di
             workList.add(globalInst);
         }
     }
+
+    // If there are GetDynamicResourceHeap instructions, verify that the target
+    // supports descriptor_handle capability.
+    if (workList.getCount() > 0)
+    {
+        auto targetCaps = targetProgram->getTargetReq()->getTargetCaps();
+        if (targetCaps.atLeastOneSetImpliedInOther(CapabilitySet(
+                CapabilityName::descriptor_handle)) != CapabilitySet::ImpliesReturnFlags::Implied)
+        {
+            sink->diagnose(Diagnostics::TargetDoesNotSupportDescriptorHandle{});
+            return;
+        }
+    }
+
+    auto bindlessSpaceIndex = getBindlessSpaceIndex(targetProgram);
+
     for (auto inst : workList)
     {
         auto arrayType = as<IRArrayTypeBase>(inst->getDataType());
@@ -101,7 +85,7 @@ void lowerDynamicResourceHeap(TargetProgram* targetProgram, IRModule* module, Di
         auto varLayout = createResourceHeapVarLayoutWithSpaceAndBinding(
             builder,
             param,
-            unusedSpaceIndex,
+            bindlessSpaceIndex,
             bindingIndex);
         builder.addLayoutDecoration(param, varLayout);
         builder.addNameHintDecoration(param, toSlice("__slang_resource_heap"));

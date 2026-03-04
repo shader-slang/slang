@@ -63,7 +63,7 @@ struct ArrayParameterSpecializationCondition : FunctionCallSpecializeCondition
     CodeGenContext* codeGenContext = nullptr;
 };
 
-void specializeArrayParameters(CodeGenContext* codeGenContext, IRModule* module)
+void specializeArrayParameters(IRModule* module, CodeGenContext* codeGenContext)
 {
     ArrayParameterSpecializationCondition condition;
     condition.codeGenContext = codeGenContext;

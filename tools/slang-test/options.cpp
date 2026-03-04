@@ -80,18 +80,24 @@ static bool _isSubCommand(const char* arg)
         "  -api <expr>                    Enable specific APIs (e.g., 'vk+dx12' or '+dx11')\n"
         "  -synthesizedTestApi <expr>     Set APIs for synthesized tests\n"
         "  -skip-api-detection            Skip API availability detection\n"
+        "  -only-api-detection            Only run API detection and print results, then exit\n"
         "  -server-count <n>              Set number of test servers (default: 1)\n"
         "  -show-adapter-info             Show detailed adapter information\n"
         "  -generate-hlsl-baselines       Generate HLSL test baselines\n"
         "  -skip-reference-image-generation Skip generating reference images for render tests\n"
         "  -emit-spirv-via-glsl           Emit SPIR-V through GLSL instead of directly\n"
         "  -expected-failure-list <file>  Specify file containing expected failures\n"
+        "  -skip-list <file>              Specify file containing tests to skip (path prefixes)\n"
         "  -use-shared-library            Run tests in-process using shared library\n"
         "  -use-test-server               Run tests using test server\n"
         "  -use-fully-isolated-test-server  Run each test in isolated server\n"
         "  -capability <name>             Compile with the given capability\n"
         "  -shuffle-tests                 Shuffle tests in directories\n"
         "  -shuffle-seed <seed>           Set shuffle seed (default: 1)\n"
+        "  -explicit-test-order           Run tests in the order specified on command line\n"
+        "                                 (alphabetical for prefixes matching multiple tests)\n"
+        "  -dry-run                       List tests that would be run without running them\n"
+        "  -disable-retries               Disable automatic retries of failed tests\n"
 
         // Recent Windows runtime versions started opening a dialog popup window when
         // `abort()` is called, which breaks the CI workflow and some scripts that
@@ -278,6 +284,18 @@ static bool _isSubCommand(const char* arg)
         {
             optionsOut->shuffleTests = true;
         }
+        else if (strcmp(arg, "-explicit-test-order") == 0)
+        {
+            optionsOut->explicitTestOrder = true;
+        }
+        else if (strcmp(arg, "-dry-run") == 0)
+        {
+            optionsOut->dryRun = true;
+        }
+        else if (strcmp(arg, "-disable-retries") == 0)
+        {
+            optionsOut->disableRetries = true;
+        }
         else if (strcmp(arg, "-shuffle-seed") == 0)
         {
             if (argCursor == argEnd)
@@ -444,7 +462,23 @@ static bool _isSubCommand(const char* arg)
         }
         else if (strcmp(arg, "-skip-api-detection") == 0)
         {
+            if (optionsOut->apiDetectionOnly)
+            {
+                stdError.print(
+                    "error: -only-api-detection and -skip-api-detection are mutually exclusive\n");
+                return SLANG_FAIL;
+            }
             optionsOut->skipApiDetection = true;
+        }
+        else if (strcmp(arg, "-only-api-detection") == 0)
+        {
+            if (optionsOut->skipApiDetection)
+            {
+                stdError.print(
+                    "error: -only-api-detection and -skip-api-detection are mutually exclusive\n");
+                return SLANG_FAIL;
+            }
+            optionsOut->apiDetectionOnly = true;
         }
         else if (strcmp(arg, "-emit-spirv-via-glsl") == 0)
         {
@@ -495,6 +529,39 @@ static bool _isSubCommand(const char* arg)
                 if (trimmedLine.getLength() > 0)
                 {
                     optionsOut->expectedFailureList.add(trimmedLine);
+                }
+            }
+        }
+        else if (strcmp(arg, "-skip-list") == 0)
+        {
+            if (argCursor == argEnd)
+            {
+                stdError.print("error: expected operand for '%s'\n", arg);
+                showHelp(stdError);
+                return SLANG_FAIL;
+            }
+            auto fileName = *argCursor++;
+            String text;
+            File::readAllText(fileName, text);
+            List<UnownedStringSlice> lines;
+            StringUtil::split(text.getUnownedSlice(), '\n', lines);
+            for (auto line : lines)
+            {
+                // Remove comments (everything after '#' character)
+                auto trimmedLine = line;
+                auto commentIndex = line.indexOf('#');
+                if (commentIndex != -1)
+                {
+                    trimmedLine = line.head(commentIndex);
+                }
+
+                // Trim whitespace and skip empty lines
+                trimmedLine = trimmedLine.trim();
+                if (trimmedLine.getLength() > 0)
+                {
+                    Slang::StringBuilder sb;
+                    Slang::Path::simplify(trimmedLine, Slang::Path::SimplifyStyle::NoRoot, sb);
+                    optionsOut->skipList.add(sb);
                 }
             }
         }
@@ -582,6 +649,12 @@ static bool _isSubCommand(const char* arg)
         optionsOut->synthesizedTestApis &= optionsOut->enabledApis;
     }
 
+    // Check for conflicting options
+    if (optionsOut->shuffleTests && optionsOut->explicitTestOrder)
+    {
+        stdError.print("error: -shuffle-tests and -explicit-test-order are mutually exclusive\n");
+        return SLANG_FAIL;
+    }
 
     // first positional argument is source shader path
     optionsOut->testPrefixes.clear();

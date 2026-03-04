@@ -6,6 +6,7 @@
 #include "slang-ir-layout.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -76,7 +77,7 @@ struct BitCastLoweringContext
                 {
                     IRIntegerValue fieldOffset = 0;
                     SLANG_RELEASE_ASSERT(
-                        getNaturalOffset(targetProgram->getOptionSet(), field, &fieldOffset) ==
+                        getNaturalOffset(targetProgram->getTargetReq(), field, &fieldOffset) ==
                         SLANG_OK);
                     auto fieldType = field->getFieldType();
                     auto fieldValue =
@@ -95,7 +96,7 @@ struct BitCastLoweringContext
                 IRSizeAndAlignment elementLayout;
                 SLANG_RELEASE_ASSERT(
                     getNaturalSizeAndAlignment(
-                        targetProgram->getOptionSet(),
+                        targetProgram->getTargetReq(),
                         arrayType->getElementType(),
                         &elementLayout) == SLANG_OK);
                 for (IRIntegerValue i = 0; i < arrayCount->value.intVal; i++)
@@ -121,7 +122,7 @@ struct BitCastLoweringContext
                 IRSizeAndAlignment elementLayout;
                 SLANG_RELEASE_ASSERT(
                     getNaturalSizeAndAlignment(
-                        targetProgram->getOptionSet(),
+                        targetProgram->getTargetReq(),
                         vectorType->getElementType(),
                         &elementLayout) == SLANG_OK);
                 for (IRIntegerValue i = 0; i < elementCount->value.intVal; i++)
@@ -151,7 +152,7 @@ struct BitCastLoweringContext
                 IRSizeAndAlignment elementLayout;
                 SLANG_RELEASE_ASSERT(
                     getNaturalSizeAndAlignment(
-                        targetProgram->getOptionSet(),
+                        targetProgram->getTargetReq(),
                         elementType,
                         &elementLayout) == SLANG_OK);
                 for (IRIntegerValue i = 0; i < elementCount->value.intVal; i++)
@@ -171,6 +172,7 @@ struct BitCastLoweringContext
         case kIROp_HalfType:
         case kIROp_Int16Type:
         case kIROp_UInt16Type:
+        case kIROp_BFloat16Type:
             {
                 auto object = extractValueAtOffset(builder, targetProgram, src, offset, 2);
                 object = builder.emitCast(builder.getUInt16Type(), object);
@@ -181,10 +183,6 @@ struct BitCastLoweringContext
         case kIROp_UIntType:
         case kIROp_FloatType:
         case kIROp_BoolType:
-#if SLANG_PTR_IS_32
-        case kIROp_IntPtrType:
-        case kIROp_UIntPtrType:
-#endif
             {
                 auto object = extractValueAtOffset(builder, targetProgram, src, offset, 4);
                 object = builder.emitCast(builder.getUIntType(), object);
@@ -194,21 +192,33 @@ struct BitCastLoweringContext
         case kIROp_DoubleType:
         case kIROp_Int64Type:
         case kIROp_UInt64Type:
-#if SLANG_PTR_IS_64
-        case kIROp_IntPtrType:
-        case kIROp_UIntPtrType:
-#endif
-        case kIROp_RawPointerType:
-        case kIROp_PtrType:
-        case kIROp_FuncType:
             {
                 auto object = extractValueAtOffset(builder, targetProgram, src, offset, 8);
                 object = builder.emitCast(builder.getUInt64Type(), object);
                 return builder.emitBitCast(type, object);
             }
             break;
+        case kIROp_IntPtrType:
+        case kIROp_UIntPtrType:
+        case kIROp_RawPointerType:
+        case kIROp_PtrType:
+        case kIROp_FuncType:
+            {
+                IRInst* object;
+                auto ptrSize = getPointerSize(targetProgram->getTargetReq());
+                object =
+                    extractValueAtOffset(builder, targetProgram, src, offset, uint32_t(ptrSize));
+                object = builder.emitCast(
+                    ptrSize == sizeof(uint64_t) ? (IRType*)builder.getUInt64Type()
+                                                : (IRType*)builder.getUIntType(),
+                    object);
+                return builder.emitBitCast(type, object);
+            }
+            break;
         case kIROp_UInt8Type:
         case kIROp_Int8Type:
+        case kIROp_FloatE4M3Type:
+        case kIROp_FloatE5M2Type:
             {
                 auto object = extractValueAtOffset(builder, targetProgram, src, offset, 1);
                 object = builder.emitCast(builder.getUInt8Type(), object);
@@ -230,9 +240,9 @@ struct BitCastLoweringContext
         auto toType = inst->getDataType();
 
         IRSizeAndAlignment toTypeSize;
-        getNaturalSizeAndAlignment(targetProgram->getOptionSet(), toType, &toTypeSize);
+        getNaturalSizeAndAlignment(targetProgram->getTargetReq(), toType, &toTypeSize);
         IRSizeAndAlignment fromTypeSize;
-        getNaturalSizeAndAlignment(targetProgram->getOptionSet(), fromType, &fromTypeSize);
+        getNaturalSizeAndAlignment(targetProgram->getTargetReq(), fromType, &fromTypeSize);
 
         // Check if the target is directly emitted SPIRV and if the target is SPIRV 1.5 or later
         bool isDirectSpirv = false;
@@ -251,13 +261,15 @@ struct BitCastLoweringContext
         if (fromBasicType && toBasicType)
         {
             if (fromTypeSize.size != toTypeSize.size)
-                sink->diagnose(
-                    inst->sourceLoc,
-                    Diagnostics::notEqualBitCastSize,
-                    fromType,
-                    fromTypeSize.size,
-                    toType,
-                    toTypeSize.size);
+            {
+                sink->diagnose(Diagnostics::NotEqualBitCastSize{
+                    .fromType = fromType,
+                    .fromSize = fromTypeSize.size,
+                    .toType = toType,
+                    .toSize = toTypeSize.size,
+                    .location = inst->sourceLoc,
+                });
+            }
             // Both fromType and toType are basic types, no processing needed.
             return;
         }
@@ -311,7 +323,7 @@ struct BitCastLoweringContext
                 auto elementType = toVectorType->getElementType();
                 if (isIntegralType(elementType))
                 {
-                    auto intInfo = getIntTypeInfo(elementType);
+                    auto intInfo = getIntTypeInfo(targetProgram->getTargetReq(), elementType);
                     if (intInfo.width == 32)
                         return;
                 }
@@ -324,7 +336,7 @@ struct BitCastLoweringContext
                 auto elementType = fromVectorType->getElementType();
                 if (isIntegralType(elementType))
                 {
-                    auto intInfo = getIntTypeInfo(elementType);
+                    auto intInfo = getIntTypeInfo(targetProgram->getTargetReq(), elementType);
                     if (intInfo.width == 32)
                         return;
                 }
@@ -357,15 +369,22 @@ struct BitCastLoweringContext
         {
             return;
         }
+        if (as<IRHLSLStructuredBufferTypeBase>(fromType) ||
+            as<IRHLSLStructuredBufferTypeBase>(toType))
+        {
+            return;
+        }
 
         if (fromTypeSize.size != toTypeSize.size)
-            sink->diagnose(
-                inst->sourceLoc,
-                Diagnostics::notEqualBitCastSize,
-                fromType,
-                fromTypeSize.size,
-                toType,
-                toTypeSize.size);
+        {
+            sink->diagnose(Diagnostics::NotEqualBitCastSize{
+                .fromType = fromType,
+                .fromSize = fromTypeSize.size,
+                .toType = toType,
+                .toSize = toTypeSize.size,
+                .location = inst->sourceLoc,
+            });
+        }
 
         // Enumerate all fields in to-type and obtain its value from operand object.
         IRBuilder builder(module);
@@ -376,7 +395,7 @@ struct BitCastLoweringContext
     }
 };
 
-void lowerBitCast(TargetProgram* targetProgram, IRModule* module, DiagnosticSink* sink)
+void lowerBitCast(IRModule* module, TargetProgram* targetProgram, DiagnosticSink* sink)
 {
     BitCastLoweringContext context;
     context.module = module;

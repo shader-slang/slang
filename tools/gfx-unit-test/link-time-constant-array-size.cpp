@@ -147,9 +147,9 @@ static void validateArraySizeInStruct(
 
                     // Check the array size
                     auto arraySize = structFieldTypeLayout->getElementCount();
-                    // 0 becuase we haven't resolved the constant
+                    // becuase we haven't resolved the constant
                     SLANG_CHECK_MSG(
-                        arraySize == 0,
+                        arraySize == SLANG_UNKNOWN_SIZE,
                         "Field 'xs' array size does not match expected size");
 
                     // 4 because we're resolving it

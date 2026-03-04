@@ -355,7 +355,7 @@ void TextureTypeInfo::writeGetDimensionFunctions()
                 break;
 
             default:
-                assert(!"unexpected");
+                SLANG_ASSERT(!"unexpected");
                 break;
             }
 
@@ -556,7 +556,7 @@ void TextureTypeInfo::writeGetDimensionFunctions()
                     break;
 
                 default:
-                    assert(!"unexpected");
+                    SLANG_ASSERT(!"unexpected");
                     break;
                 }
 

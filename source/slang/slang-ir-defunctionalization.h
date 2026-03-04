@@ -13,5 +13,5 @@ struct IRType;
 /// global functions with calls to specialized versions simply
 /// referencing the global.
 ///
-bool specializeHigherOrderParameters(CodeGenContext* codeGenContext, IRModule* module);
+bool specializeHigherOrderParameters(IRModule* module, CodeGenContext* codeGenContext);
 } // namespace Slang

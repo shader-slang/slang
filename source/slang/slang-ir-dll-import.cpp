@@ -101,7 +101,7 @@ struct DllImportContext
         {
             IRSizeAndAlignment sizeAndAlignment;
             getNaturalSizeAndAlignment(
-                targetProgram->getOptionSet(),
+                targetProgram->getTargetReq(),
                 param->getDataType(),
                 &sizeAndAlignment);
             result += (uint32_t)align(sizeAndAlignment.size, 4);
@@ -111,7 +111,7 @@ struct DllImportContext
 
     void processFunc(IRFunc* func, IRDllImportDecoration* dllImportDecoration)
     {
-        assert(func->getFirstBlock() == nullptr);
+        SLANG_ASSERT(func->getFirstBlock() == nullptr);
 
         IRBuilder builder(module);
         NativeCallMarshallingContext marshalContext;
@@ -205,7 +205,7 @@ struct DllImportContext
     }
 };
 
-void generateDllImportFuncs(TargetProgram* targetProgram, IRModule* module, DiagnosticSink* sink)
+void generateDllImportFuncs(IRModule* module, TargetProgram* targetProgram, DiagnosticSink* sink)
 {
     DllImportContext context;
     context.module = module;

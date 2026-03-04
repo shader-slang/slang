@@ -6,6 +6,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck=CHK):-slang -compute -profile cs_6_0 -dx12 -shaderobj -render-feature hardware-device
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck=CHK):-vk -compute -shaderobj -render-feature int64
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck=CHK):-cuda -compute -shaderobj
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck=CHK):-llvm -compute -shaderobj
 
 // The expected behavior is that the literal type is the first from the following list
 // in which the value can fit:
@@ -83,7 +84,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         {
             v = 0;
         }
-        //CHK: warning 39999: integer literal is too large to be represented in a signed integer type, interpreting as unsigned
+        //CHK: warning[E39999]: integer literal is too large to be represented in a signed integer type, interpreting as unsigned
     }
     else
     {

@@ -1,0 +1,11 @@
+result code = -1
+standard error = {
+tests/diagnostics/already-has-a-body.slang(5): error 30201: function 'foo' already has a body
+int foo(){ /* redefinition */ }
+    ^~~
+tests/diagnostics/already-has-a-body.slang(4): note: see previous definition of 'foo'
+int foo(){ /* original */ }
+    ^~~
+}
+standard output = {
+}

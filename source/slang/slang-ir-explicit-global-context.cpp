@@ -53,6 +53,7 @@ struct IntroduceExplicitGlobalContextPass
                 hoistGlobalVarOptions = HoistGlobalVarOptions::PlainGlobal;
                 break;
             case CodeGenTarget::CUDASource:
+            case CodeGenTarget::CUDAHeader:
                 hoistableGlobalObjectKind = GlobalObjectKind::GlobalVar;
 
                 // One important exception is that CUDA *does* support
@@ -221,19 +222,14 @@ struct IntroduceExplicitGlobalContextPass
                     // skip any global-scope parameters that are varying instead of
                     // uniform.
                     //
-                    switch (m_target)
+                    if (isCUDATarget(m_target) || isCPUTarget(m_target))
                     {
-                    case CodeGenTarget::CUDASource:
-                    case CodeGenTarget::CPPSource:
-                        {
-                            auto layoutDecor = globalParam->findDecoration<IRLayoutDecoration>();
-                            SLANG_ASSERT(layoutDecor);
-                            auto layout = as<IRVarLayout>(layoutDecor->getLayout());
-                            SLANG_ASSERT(layout);
-                            if (isVaryingParameter(layout))
-                                continue;
-                        }
-                        break;
+                        auto layoutDecor = globalParam->findDecoration<IRLayoutDecoration>();
+                        SLANG_ASSERT(layoutDecor);
+                        auto layout = as<IRVarLayout>(layoutDecor->getLayout());
+                        SLANG_ASSERT(layout);
+                        if (isVaryingParameter(layout))
+                            continue;
                     }
 
                     // Because of upstream passes, we expect there to be only a
@@ -246,7 +242,8 @@ struct IntroduceExplicitGlobalContextPass
                     // For CUDA output, we want to leave the global uniform
                     // parameter where it is, because it will translate to
                     // a global `__constant__` variable.
-                    if (m_target == CodeGenTarget::CUDASource)
+                    if (m_target == CodeGenTarget::CUDASource ||
+                        m_target == CodeGenTarget::CUDAHeader)
                         continue;
 
                     GlobalParamInfo globalParamInfo;
@@ -294,7 +291,7 @@ struct IntroduceExplicitGlobalContextPass
         // it is responsible for introducing the explicit entry-point
         // parameter that is used for passing in the global param(s).
         //
-        if (m_target != CodeGenTarget::CPPSource)
+        if (!isCPUTarget(m_target))
         {
             if (m_globalParams.getCount() == 0 && m_globalVars.getCount() == 0)
             {
@@ -309,6 +306,12 @@ struct IntroduceExplicitGlobalContextPass
         // type with a name hint of `KernelContext`.
         //
         m_contextStructType = builder.createStructType();
+        if (m_target == CodeGenTarget::CPPHeader)
+        {
+            builder.addExternCppDecoration(
+                m_contextStructType,
+                UnownedTerminatedStringSlice("KernelContext"));
+        }
         builder.addNameHintDecoration(
             m_contextStructType,
             UnownedTerminatedStringSlice("KernelContext"));
@@ -440,6 +443,12 @@ struct IntroduceExplicitGlobalContextPass
         // Clone all original decorations to the new struct key.
         IRCloneEnv cloneEnv;
         cloneInstDecorationsAndChildren(&cloneEnv, m_module, originalInst, key);
+        if (m_target == CodeGenTarget::CPPHeader)
+        {
+            builder.addExternCppDecoration(
+                key,
+                originalInst->findDecoration<IRNameHintDecoration>()->getName());
+        }
 
         // We end by making note of the key that was created
         // for the instruction, so that we can use the key
@@ -497,7 +506,7 @@ struct IntroduceExplicitGlobalContextPass
             globalParam.entryPointParam->insertBefore(firstOrdinary);
         }
 
-        if (m_target == CodeGenTarget::CPPSource && m_globalParams.getCount() == 0)
+        if (isCPUTarget(m_target) && m_globalParams.getCount() == 0)
         {
             // The nature of our current ABI for entry points on CPU
             // means that we need an explicit parameter to be *declared*
