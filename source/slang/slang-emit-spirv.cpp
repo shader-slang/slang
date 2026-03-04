@@ -804,6 +804,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             case kIROp_ConstexprFloatCast:
                 return SpvOpFConvert;
             case kIROp_Select:
+            case kIROp_ConstexprSelect:
                 return SpvOpSelect;
             default:
                 break;
