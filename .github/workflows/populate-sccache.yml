@@ -93,7 +93,6 @@ jobs:
           key: sccache-macos-clang-aarch64-release-${{ needs.check-changes.outputs.last-commit }}
           restore-keys: |
             sccache-macos-clang-aarch64-release-
-            sccache-macos-clang-aarch64-
 
       - name: Setup sccache (local backend)
         uses: ./.github/actions/setup-sccache
@@ -152,7 +151,6 @@ jobs:
           key: sccache-macos-clang-aarch64-debug-${{ needs.check-changes.outputs.last-commit }}
           restore-keys: |
             sccache-macos-clang-aarch64-debug-
-            sccache-macos-clang-aarch64-
 
       - name: Setup sccache (local backend)
         uses: ./.github/actions/setup-sccache
@@ -207,7 +205,6 @@ jobs:
           key: sccache-linux-gcc-aarch64-release-${{ needs.check-changes.outputs.last-commit }}
           restore-keys: |
             sccache-linux-gcc-aarch64-release-
-            sccache-linux-gcc-aarch64-
 
       - name: Setup sccache (local backend)
         uses: ./.github/actions/setup-sccache
@@ -262,7 +259,6 @@ jobs:
           key: sccache-linux-gcc-aarch64-debug-${{ needs.check-changes.outputs.last-commit }}
           restore-keys: |
             sccache-linux-gcc-aarch64-debug-
-            sccache-linux-gcc-aarch64-
 
       - name: Setup sccache (local backend)
         uses: ./.github/actions/setup-sccache
