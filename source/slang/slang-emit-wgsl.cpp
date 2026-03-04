@@ -282,7 +282,7 @@ void WGSLSourceEmitter::emitSemanticsPrefixImpl(IRInst* inst)
         if (auto semanticDecoration = inst->findDecoration<IRSemanticDecoration>())
         {
             m_writer->emit("@location(");
-            m_writer->emit(semanticDecoration->getSemanticIndex());
+            m_writer->emit(semanticDecoration->getEffectiveSemanticIndex());
             m_writer->emit(")");
             return;
         }
