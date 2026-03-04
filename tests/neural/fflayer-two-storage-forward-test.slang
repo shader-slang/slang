@@ -9,7 +9,7 @@
 //TEST:SIMPLE(filecheck=CHECK): -target ptx -stage compute -entry computeMain -capability cuda_sm_7_0 -DTEST_TENSORVIEW=1 -experimental-feature
 // CHECK: computeMain
 
-import neural;
+import slang.neural;
 
 //TEST_INPUT: ubuffer(data=[0], stride=4):out,name=testResult
 RWStructuredBuffer<uint> testResult;
