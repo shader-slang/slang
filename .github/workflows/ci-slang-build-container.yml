@@ -76,7 +76,6 @@ jobs:
           key: sccache-linux-gcc-x86_64-${{ inputs.config }}-${{ github.sha }}
           restore-keys: |
             sccache-linux-gcc-x86_64-${{ inputs.config }}-
-            sccache-linux-gcc-x86_64-
 
       # Authenticate to Google Cloud for LLVM downloads (skip for fork PRs)
       - name: Authenticate to Google Cloud

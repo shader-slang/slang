@@ -74,7 +74,6 @@ jobs:
           key: sccache-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ inputs.config }}-${{ github.sha }}
           restore-keys: |
             sccache-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ inputs.config }}-
-            sccache-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-
 
       # Authenticate to Google Cloud for LLVM downloads (skip for fork PRs)
       - name: Authenticate to Google Cloud
