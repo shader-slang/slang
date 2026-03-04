@@ -5,7 +5,7 @@
 //
 // The check is done at IR level during AnyValue size inference.
 
-// CHECK: error 41002: interface 'IFoo' has cyclic dependency on itself through its implementations.
+// CHECK: error[E41002]: interface has cyclic dependency on itself
 
 interface IFoo
 {

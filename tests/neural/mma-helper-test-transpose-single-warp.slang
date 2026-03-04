@@ -5,7 +5,7 @@
 // TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=1
 
 #pragma warning(disable: 41017)
-import neural;
+import slang.neural;
 import common;
 
 // This test verifies that the tiled MMA load operations work correctly.

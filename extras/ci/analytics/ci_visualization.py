@@ -165,21 +165,109 @@ def chart_section(chart_id, title, description="", canvas_style=""):
     """Generate HTML for a chart section with anchor link and download button."""
     desc_html = f'\n<p style="color:#6c757d;font-size:0.9em">{description}</p>' if description else ""
     style_attr = f' style="{canvas_style}"' if canvas_style else ""
+    title_attr = html_mod.escape(title, quote=True)
+    desc_attr = html_mod.escape(description, quote=True) if description else ""
     return f"""<div class="chart-section" id="{chart_id}">
   <h2>{title} <a class="anchor" href="#{chart_id}">#</a>
-  <button class="download-btn" onclick="downloadChart('{chart_id}_canvas')">PNG</button></h2>{desc_html}
-  <div class="chart-container"{style_attr}><canvas id="{chart_id}_canvas"></canvas></div>
+  <select class="download-btn" onchange="downloadChart('{chart_id}_canvas', this.value); this.selectedIndex=0">
+    <option value="" disabled selected>Download PNG</option>
+    <option value="transparent">Transparent</option>
+    <option value="white">White background</option>
+  </select>
+  <select class="download-btn" onchange="copyChart('{chart_id}_canvas', this.value); this.selectedIndex=0">
+    <option value="" disabled selected>Copy PNG</option>
+    <option value="transparent">Transparent</option>
+    <option value="white">White background</option>
+  </select></h2>{desc_html}
+  <div class="chart-container"{style_attr}><canvas id="{chart_id}_canvas" data-title="{title_attr}" data-desc="{desc_attr}"></canvas></div>
 </div>"""
 
 
 DOWNLOAD_JS = """
-function downloadChart(canvasId) {
+function wrapText(ctx, text, maxWidth) {
+  if (!text) return [];
+  var words = text.split(/\\s+/);
+  var lines = [];
+  var cur = '';
+  for (var i = 0; i < words.length; i++) {
+    var test = cur ? (cur + ' ' + words[i]) : words[i];
+    if (ctx.measureText(test).width > maxWidth && cur) {
+      lines.push(cur);
+      cur = words[i];
+    } else {
+      cur = test;
+    }
+  }
+  if (cur) lines.push(cur);
+  return lines;
+}
+function renderChartPng(canvasId, bg) {
   var canvas = document.getElementById(canvasId);
-  if (!canvas) return;
+  if (!canvas || !bg) return null;
+  var title = canvas.getAttribute('data-title') || '';
+  var desc = canvas.getAttribute('data-desc') || '';
+  var pad = 16;
+  var titleFont = 'bold 18px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+  var descFont = '12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+  var titleLineH = 22;
+  var descLineH = 16;
+  var maxTextW = canvas.width;
+  var probe = document.createElement('canvas').getContext('2d');
+  probe.font = titleFont;
+  var titleLines = wrapText(probe, title, maxTextW);
+  probe.font = descFont;
+  var descLines = wrapText(probe, desc, maxTextW);
+  var headerH = titleLines.length * titleLineH + descLines.length * descLineH;
+  if (headerH > 0) headerH += pad;
+  var tmp = document.createElement('canvas');
+  tmp.width = canvas.width + pad * 2;
+  tmp.height = canvas.height + headerH + pad;
+  var ctx = tmp.getContext('2d');
+  if (bg === 'white') {
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, tmp.width, tmp.height);
+  }
+  var y = pad;
+  if (titleLines.length) {
+    ctx.font = titleFont;
+    ctx.fillStyle = '#212529';
+    for (var i = 0; i < titleLines.length; i++) {
+      ctx.fillText(titleLines[i], pad, y + titleLineH - 6);
+      y += titleLineH;
+    }
+  }
+  if (descLines.length) {
+    ctx.font = descFont;
+    ctx.fillStyle = '#6c757d';
+    for (var j = 0; j < descLines.length; j++) {
+      ctx.fillText(descLines[j], pad, y + descLineH - 4);
+      y += descLineH;
+    }
+  }
+  ctx.drawImage(canvas, pad, headerH);
+  return tmp;
+}
+function downloadChart(canvasId, bg) {
+  var tmp = renderChartPng(canvasId, bg);
+  if (!tmp) return;
   var link = document.createElement('a');
   link.download = canvasId.replace('_canvas', '') + '.png';
-  link.href = canvas.toDataURL('image/png', 1.0);
+  link.href = tmp.toDataURL('image/png', 1.0);
   link.click();
+}
+function copyChart(canvasId, bg) {
+  var tmp = renderChartPng(canvasId, bg);
+  if (!tmp) return;
+  if (!window.isSecureContext || !navigator.clipboard || !window.ClipboardItem) {
+    console.error('Clipboard API not available (requires HTTPS or localhost)');
+    downloadChart(canvasId, bg);
+    return;
+  }
+  tmp.toBlob(function(blob) {
+    navigator.clipboard.write([new ClipboardItem({'image/png': blob})]).catch(function(err) {
+      console.error('Failed to copy chart to clipboard:', err);
+    });
+  }, 'image/png');
 }
 """
 
@@ -221,7 +309,7 @@ def page_template(title, body, active=""):
   .chart-section h2 a.anchor {{ color: #adb5bd; text-decoration: none; font-size: 0.7em; visibility: hidden; }}
   .chart-section:hover h2 a.anchor {{ visibility: visible; }}
   .chart-section h2 a.anchor:hover {{ color: #0d6efd; }}
-  .download-btn {{ font-size: 12px; color: #6c757d; cursor: pointer; border: 1px solid #dee2e6; background: white; padding: 2px 8px; border-radius: 4px; margin-left: 8px; }}
+  .download-btn {{ font-size: 12px; color: #6c757d; cursor: pointer; border: 1px solid #dee2e6; background: white; padding: 2px 8px; border-radius: 4px; margin-left: 8px; -webkit-appearance: none; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M0 0l4 5 4-5z' fill='%236c757d'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 6px center; padding-right: 20px; }}
   .download-btn:hover {{ background: #f8f9fa; color: #333; }}
   .stat-card {{ display: inline-block; background: #f8f9fa; border-radius: 8px; padding: 15px 25px; margin: 5px; text-align: center; }}
   .stat-card .value {{ font-size: 2em; font-weight: bold; color: #212529; }}
@@ -405,6 +493,10 @@ def process_jobs(jobs_data, config):
             file=sys.stderr,
         )
 
+    generated_at = datetime.datetime.now(datetime.timezone.utc).strftime(
+        "%Y-%m-%d %H:%M UTC"
+    )
+
     return {
         "all_jobs": jobs_data,
         "active_jobs": active_jobs,
@@ -417,6 +509,7 @@ def process_jobs(jobs_data, config):
         "test_wait_by_date": dict(test_wait_by_date),
         "dates": sorted(jobs_by_date.keys()),
         "months": sorted(jobs_by_month.keys()),
+        "generated_at": generated_at,
     }
 
 
@@ -529,7 +622,7 @@ def generate_index(data, output_dir):
 
     body = f"""
 <h1>Slang CI Analytics</h1>
-<p style="color:#6c757d">CI workflow only. Excludes skipped jobs. Data range: {dates[0] if dates else 'N/A'} to {dates[-1] if dates else 'N/A'}.</p>
+<p style="color:#6c757d">Last updated: {data['generated_at']}. CI workflow only. Excludes skipped jobs. Data range: {dates[0] if dates else 'N/A'} to {dates[-1] if dates else 'N/A'}.</p>
 <h2>Last 3 Days</h2>
 <div>
   <div class="stat-card"><div class="value">{ci_tat_3d:.0f}m{tat_delta}</div><div class="label">CI Turnaround (avg)</div></div>
@@ -700,6 +793,11 @@ def generate_statistics(data, config, output_dir):
             name = g["name"]
             if name not in sh_groups:
                 sh_groups[name] = g.get("runner_count", 0)
+    for p in config.get("runner_name_prefixes", []):
+        if p.get("self_hosted"):
+            name = p["name"]
+            if name not in sh_groups:
+                sh_groups[name] = p.get("runner_count", 0)
 
     group_parallel_per_day = defaultdict(list)
     cap_avg_queue = []
@@ -775,7 +873,7 @@ def generate_statistics(data, config, output_dir):
 
     body = f"""
 <h1>Statistics &amp; Trends</h1>
-<p style="color:#6c757d">CI workflow only. Excludes skipped jobs. Data range: {dates[0] if dates else 'N/A'} to {dates[-1] if dates else 'N/A'}.</p>
+<p style="color:#6c757d">Last updated: {data['generated_at']}. CI workflow only. Excludes skipped jobs. Data range: {dates[0] if dates else 'N/A'} to {dates[-1] if dates else 'N/A'}.</p>
 
 <div style="margin-bottom:15px">
   <label>Date range: </label>
@@ -996,7 +1094,7 @@ new Chart(document.getElementById('parallelRate_canvas').getContext('2d'), {{
     labels: {json.dumps(dates)},
     datasets: {json.dumps(parallel_datasets)}
   }},
-  options: {{responsive:true, scales:{{y:{{min:0,title:{{display:true,text:'Avg Concurrent Runners'}}}}}}}}
+  options: {{responsive:true, scales:{{y:{{stacked:true,min:0,title:{{display:true,text:'Avg Concurrent Runners'}}}}}}}}
 }});
 
 // Queue wait time percentiles
@@ -1022,7 +1120,7 @@ new Chart(document.getElementById('queueWait_canvas').getContext('2d'), {{
 # --- Monthly timeline pages ---
 
 
-def generate_month_page(month, month_jobs, config, output_dir):
+def generate_month_page(month, month_jobs, config, output_dir, generated_at=""):
     """Generate a monthly timeline page with daily Gantt views."""
     # Group by date, then by runner
     days = defaultdict(lambda: defaultdict(list))
@@ -1145,8 +1243,9 @@ def generate_month_page(month, month_jobs, config, output_dir):
         for b in sorted(branches) if b
     )
 
+    updated_html = f'\n<p style="color:#6c757d">Last updated: {generated_at}.</p>' if generated_at else ""
     body = f"""
-<h1>Timeline: {month}</h1>
+<h1>Timeline: {month}</h1>{updated_html}
 <div style="margin-bottom:15px">
   <label>Workflow: </label>
   <select id="wfFilter" onchange="filterJobs()">
@@ -1247,7 +1346,7 @@ def main():
 
     for month in data["months"]:
         print(f"Generating month_{month}.html...")
-        generate_month_page(month, data["jobs_by_month"][month], config, args.output)
+        generate_month_page(month, data["jobs_by_month"][month], config, args.output, data["generated_at"])
 
     print(f"\nDone! Output written to {args.output}/")
     print(f"Open {args.output}/index.html in a browser to view.")

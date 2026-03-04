@@ -13,6 +13,7 @@
 #include "slang-ir-util.h"
 #include "slang-ir.h"
 #include "slang-lookup-spirv.h"
+#include "slang-rich-diagnostics.h"
 #include "spirv/unified1/spirv.h"
 
 #include <type_traits>
@@ -800,6 +801,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 return SpvOpUConvert;
             case kIROp_FloatCast:
                 return SpvOpFConvert;
+            case kIROp_Select:
+                return SpvOpSelect;
             default:
                 break;
             }
@@ -2768,12 +2771,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             return SpvImageFormatR64i;
         default:
             const auto imageFormatInfo = getImageFormatInfo(imageFormat);
-            m_sink->diagnose(
-                SourceLoc(),
-                Diagnostics::imageFormatUnsupportedByBackend,
-                imageFormatInfo.name,
-                "SPIRV",
-                "unknown");
+            m_sink->diagnose(Diagnostics::ImageFormatUnsupportedByBackend{
+                .format = imageFormatInfo.name,
+                .backend = "SPIRV",
+                .replacement = "unknown"});
             return SpvImageFormatUnknown;
         }
     }
@@ -3715,7 +3716,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     SpvInst* emitFuncDefinition(IRFunc* irFunc)
     {
         if (!irFunc->getFirstBlock())
-            m_sink->diagnose(irFunc, Diagnostics::noBlocksOrIntrinsic, "spirv");
+            m_sink->diagnose(
+                Diagnostics::NoBlocksOrIntrinsic{.target = "spirv", .location = irFunc->sourceLoc});
 
         // [2.4: Logical Layout of a Module]
         //
@@ -5682,10 +5684,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                             else if (arg.caseInsensitiveEquals(toSlice("fractional_odd")))
                                 mode = SpvExecutionModeSpacingFractionalOdd;
                             else
-                                m_sink->diagnose(
-                                    partitioningDecor,
-                                    Diagnostics::unknownTessPartitioning,
-                                    arg);
+                                m_sink->diagnose(Diagnostics::UnknownTessPartitioning{
+                                    .partitioning = arg,
+                                    .location = partitioningDecor->sourceLoc});
                         }
                         requireSPIRVExecutionMode(nullptr, getIRInstSpvID(entryPoint), mode);
                     }
@@ -6645,8 +6646,45 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         if (auto found = m_descriptorHeapRuntimeArrayTypes.tryGetValue(descriptorElementType))
             return *found;
 
+        SpvInst* stride = nullptr;
+        int userDefinedStride = 0;
+        if (descriptorElementType->opcode == SpvOpTypeSampler)
+        {
+            userDefinedStride = m_targetProgram->getOptionSet().getIntOption(
+                CompilerOptionName::SPIRVSamplerHeapStride);
+        }
+        else
+        {
+            userDefinedStride = m_targetProgram->getOptionSet().getIntOption(
+                CompilerOptionName::SPIRVResourceHeapStride);
+        }
+        if (userDefinedStride == 0)
+        {
+            IRBuilder builder(m_irModule);
+            builder.setInsertInto(m_irModule->getModuleInst());
+
+            stride = emitOpConstantSizeOfEXT(nullptr, builder.getUIntType(), descriptorElementType);
+        }
+
         auto runtimeArrayType = emitOpTypeRuntimeArray(nullptr, descriptorElementType);
         m_descriptorHeapRuntimeArrayTypes[descriptorElementType] = runtimeArrayType;
+
+        if (stride)
+        {
+            emitOpDecorateArrayStrideIdEXT(
+                getSection(SpvLogicalSectionID::Annotations),
+                nullptr,
+                runtimeArrayType,
+                stride);
+        }
+        else
+        {
+            emitOpDecorateArrayStride(
+                getSection(SpvLogicalSectionID::Annotations),
+                nullptr,
+                runtimeArrayType,
+                SpvLiteralInteger::from32(userDefinedStride));
+        }
         return runtimeArrayType;
     }
 
@@ -8410,12 +8448,12 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         // wrong, so it can help the user or developers to locate the issue easier.
         if (!isFloatOrPackedFloatType(fromType))
         {
-            m_sink->diagnose(inst, Diagnostics::internalCompilerError);
+            m_sink->diagnose(Diagnostics::InternalCompilerError{.location = inst->sourceLoc});
         }
 
         if (!isFloatOrPackedFloatType(toType))
         {
-            m_sink->diagnose(inst, Diagnostics::internalCompilerError);
+            m_sink->diagnose(Diagnostics::InternalCompilerError{.location = inst->sourceLoc});
         }
 
         if (isTypeEqual(fromType, toType))
@@ -10239,7 +10277,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     const auto fromVector = cast<IRVectorType>(unwrapAttributedType(fromType));
                     const auto fromVectorSize = getIntVal(fromVector->getElementCount());
                     if (toVectorSize > fromVectorSize)
-                        m_sink->diagnose(inst, Diagnostics::spirvInvalidTruncate);
+                        m_sink->diagnose(
+                            Diagnostics::SpirvInvalidTruncate{.location = inst->sourceLoc});
                     last = emitInstCustomOperandFunc(
                         parent,
                         isLast ? as<IRInst>(inst) : spvInst,
@@ -10687,7 +10726,8 @@ SlangResult emitSPIRVFromIR(
 
     if (!symbolsEmitted)
     {
-        sink->diagnose(irModule->getModuleInst(), Diagnostics::outputSpvIsEmpty);
+        sink->diagnose(
+            Diagnostics::OutputSpvIsEmpty{.location = irModule->getModuleInst()->sourceLoc});
         return SLANG_FAIL;
     }
 

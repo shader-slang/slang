@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 // Test: Array of struct containing ParameterBlock - should error
 
@@ -17,5 +17,8 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     outputBuffer[dispatchThreadID.x] = arrayOfStructWithPB[dispatchThreadID.x % 3].pb;
 }
 
-//CHECK: ([[# @LINE+1]]): error 30027
 uniform StructWithParameterBlock arrayOfStructWithPB[3];
+//CHECK:                         ^^^^^^^^^^^^^^^^^^^ arrays of non-addressable type not allowed
+//CHECK:                         ^^^^^^^^^^^^^^^^^^^ Arrays of non-addressable type 'StructWithParameterBlock' are not allowed
+//CHECK:                         ^^^^^^^^^^^^^^^^^^^ arrays of non-addressable type not allowed
+//CHECK:                         ^^^^^^^^^^^^^^^^^^^ Arrays of non-addressable type 'StructWithParameterBlock' are not allowed
