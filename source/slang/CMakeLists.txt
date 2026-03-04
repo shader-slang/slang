@@ -54,13 +54,21 @@ target_include_directories(
 # Use /O1;/Os for MSVC, -Oz for Clang, -Os for GCC.
 # For MSVC, we must disable PCH for this file since changing optimization
 # level is incompatible with precompiled headers (warning C4653).
-# Skip optimization entirely in Debug builds to avoid /RTC1 conflicts.
+# Skip optimization in MSVC Debug builds to avoid /RTC1 conflicts.
+# GCC/Clang don't have this issue, so they get size optimization in all configs.
+string(CONCAT RICH_DIAG_SIZE_OPT_FLAGS
+    "$<$<NOT:"
+        "$<AND:$<CONFIG:Debug>,$<CXX_COMPILER_ID:MSVC>>"
+    ">:"
+        "$<IF:$<CXX_COMPILER_ID:MSVC>,/O1;/Os,"
+            "$<IF:$<CXX_COMPILER_ID:GNU>,-Os,-Oz>>"
+    ">"
+)
 set_source_files_properties(
     slang-rich-diagnostics.cpp
     PROPERTIES
         SKIP_PRECOMPILE_HEADERS ON
-        COMPILE_OPTIONS
-            "$<$<NOT:$<CONFIG:Debug>>:$<IF:$<CXX_COMPILER_ID:MSVC>,/O1;/Os,$<IF:$<CXX_COMPILER_ID:GNU>,-Os,-Oz>>>"
+        COMPILE_OPTIONS "${RICH_DIAG_SIZE_OPT_FLAGS}"
 )
 
 #
