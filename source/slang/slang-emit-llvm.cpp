@@ -624,7 +624,9 @@ public:
     {
         IRSizeAndAlignment sizeAlignment;
 
-        Slang::getSizeAndAlignment(targetReq, rules, legalizeResourceTypes(type), &sizeAlignment);
+        auto result =
+            Slang::getSizeAndAlignment(targetReq, rules, legalizeResourceTypes(type), &sizeAlignment);
+        SLANG_ASSERT(SLANG_SUCCEEDED(result));
 
         return sizeAlignment;
     }
@@ -647,7 +649,9 @@ public:
     {
         auto elemCount = getIntVal(vecType->getElementCount());
         IRSizeAndAlignment elementAlignment;
-        Slang::getSizeAndAlignment(targetReq, rules, vecType->getElementType(), &elementAlignment);
+        auto result =
+            Slang::getSizeAndAlignment(targetReq, rules, vecType->getElementType(), &elementAlignment);
+        SLANG_ASSERT(SLANG_SUCCEEDED(result));
         IRSizeAndAlignment vectorAlignment =
             rules->getVectorSizeAndAlignment(elementAlignment, elemCount);
 
