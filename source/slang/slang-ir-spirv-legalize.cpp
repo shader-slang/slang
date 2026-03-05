@@ -127,11 +127,10 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         builder.setInsertBefore(inst);
         auto elementType = inst->getElementType();
         IRSizeAndAlignment elementSize;
-        SLANG_ASSERT(SLANG_SUCCEEDED(getSizeAndAlignment(
-            m_sharedContext->m_targetRequest,
-            layoutRules,
-            elementType,
-            &elementSize)));
+        if (SLANG_FAILED(getSizeAndAlignment(
+                m_sharedContext->m_targetRequest, layoutRules, elementType, &elementSize)))
+            m_sharedContext->m_sink->diagnose(
+                Diagnostics::InternalCompilerError{.location = inst->sourceLoc});
         elementSize = layoutRules->alignCompositeElement(elementSize);
 
         const auto arrayType = builder.getUnsizedArrayType(
@@ -142,8 +141,10 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         const auto arrayKey = builder.createStructKey();
         builder.createStructField(structType, arrayKey, arrayType);
         IRSizeAndAlignment structSize;
-        SLANG_ASSERT(SLANG_SUCCEEDED(getSizeAndAlignment(
-            m_sharedContext->m_targetRequest, layoutRules, structType, &structSize)));
+        if (SLANG_FAILED(getSizeAndAlignment(
+                m_sharedContext->m_targetRequest, layoutRules, structType, &structSize)))
+            m_sharedContext->m_sink->diagnose(
+                Diagnostics::InternalCompilerError{.location = inst->sourceLoc});
 
         StringBuilder nameSb;
         switch (inst->getOp())
@@ -231,8 +232,10 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             m_sharedContext->m_targetProgram,
             cbParamInst->getDataType());
         IRSizeAndAlignment sizeAlignment;
-        SLANG_ASSERT(SLANG_SUCCEEDED(getSizeAndAlignment(
-            m_sharedContext->m_targetRequest, rules, structType, &sizeAlignment)));
+        if (SLANG_FAILED(getSizeAndAlignment(
+                m_sharedContext->m_targetRequest, rules, structType, &sizeAlignment)))
+            m_sharedContext->m_sink->diagnose(
+                Diagnostics::InternalCompilerError{.location = cbParamInst->sourceLoc});
         traverseUses(
             cbParamInst,
             [&](IRUse* use)

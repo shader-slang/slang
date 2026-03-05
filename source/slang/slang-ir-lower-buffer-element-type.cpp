@@ -383,8 +383,8 @@ IRIntegerValue get16ByteAlignedVectorElementCount(
     IRIntegerValue minCount)
 {
     IRSizeAndAlignment sizeAlignment;
-    SLANG_ASSERT(
-        SLANG_SUCCEEDED(getNaturalSizeAndAlignment(target->getTargetReq(), elementType, &sizeAlignment)));
+    auto result = getNaturalSizeAndAlignment(target->getTargetReq(), elementType, &sizeAlignment);
+    SLANG_ASSERT(SLANG_SUCCEEDED(result));
     if (sizeAlignment.size)
         return align(sizeAlignment.size * minCount, 16) / sizeAlignment.size;
     return 4;
@@ -694,11 +694,12 @@ struct LoweredElementTypeContext
                 auto structKey = builder.createStructKey();
                 builder.addNameHintDecoration(structKey, UnownedStringSlice("data"));
                 IRSizeAndAlignment elementSizeAlignment;
-                SLANG_ASSERT(SLANG_SUCCEEDED(getSizeAndAlignment(
+                auto elementSizeResult = getSizeAndAlignment(
                     target->getTargetReq(),
                     config.getLayoutRule(),
                     loweredInnerTypeInfo.loweredType,
-                    &elementSizeAlignment)));
+                    &elementSizeAlignment);
+                SLANG_ASSERT(SLANG_SUCCEEDED(elementSizeResult));
                 elementSizeAlignment =
                     config.getLayoutRule()->alignCompositeElement(elementSizeAlignment);
                 auto innerArrayType = builder.getArrayType(
@@ -719,11 +720,12 @@ struct LoweredElementTypeContext
             else
             {
                 IRSizeAndAlignment elementSizeAlignment;
-                SLANG_ASSERT(SLANG_SUCCEEDED(getSizeAndAlignment(
+                auto elementSizeResult = getSizeAndAlignment(
                     target->getTargetReq(),
                     config.getLayoutRule(),
                     loweredInnerTypeInfo.loweredType,
-                    &elementSizeAlignment)));
+                    &elementSizeAlignment);
+                SLANG_ASSERT(SLANG_SUCCEEDED(elementSizeResult));
                 elementSizeAlignment =
                     config.getLayoutRule()->alignCompositeElement(elementSizeAlignment);
                 auto innerArrayType = builder.getArrayTypeBase(
@@ -902,11 +904,12 @@ struct LoweredElementTypeContext
             return info;
         info = getLoweredTypeInfoImpl(type, config);
         IRSizeAndAlignment sizeAlignment;
-        SLANG_ASSERT(SLANG_SUCCEEDED(getSizeAndAlignment(
+        auto sizeAlignResult = getSizeAndAlignment(
             target->getTargetReq(),
             config.getLayoutRule(),
             info.loweredType,
-            &sizeAlignment)));
+            &sizeAlignment);
+        SLANG_ASSERT(SLANG_SUCCEEDED(sizeAlignResult));
         loweredTypeInfo.set(type, info);
         mapLoweredTypeToInfo.set(info.loweredType, info);
         conversionMethodMap[{info.originalType, info.loweredType}] = info.convertLoweredToOriginal;
@@ -1007,17 +1010,19 @@ struct LoweredElementTypeContext
             auto loweredInnerType = getLoweredTypeInfo(unsizedArrayType->getElementType(), config);
 
             IRSizeAndAlignment arrayElementSizeAlignment;
-            SLANG_ASSERT(SLANG_SUCCEEDED(getSizeAndAlignment(
+            auto arrayElemResult = getSizeAndAlignment(
                 target->getTargetReq(),
                 config.getLayoutRule(),
                 loweredInnerType.loweredType,
-                &arrayElementSizeAlignment)));
+                &arrayElementSizeAlignment);
+            SLANG_ASSERT(SLANG_SUCCEEDED(arrayElemResult));
             IRSizeAndAlignment baseSizeAlignment;
-            SLANG_ASSERT(SLANG_SUCCEEDED(getSizeAndAlignment(
+            auto baseResult = getSizeAndAlignment(
                 target->getTargetReq(),
                 config.getLayoutRule(),
                 tryGetPointedToOrBufferElementType(&builder, fieldAddr->getBase()->getDataType()),
-                &baseSizeAlignment)));
+                &baseSizeAlignment);
+            SLANG_ASSERT(SLANG_SUCCEEDED(baseResult));
 
             // Convert pointer to uint64 and adjust offset.
             IRIntegerValue offset = baseSizeAlignment.size;
@@ -1682,11 +1687,12 @@ struct LoweredElementTypeContext
                 // Create size and alignment decoration for potential use
                 // in`StructuredBufferGetDimensions`.
                 IRSizeAndAlignment sizeAlignment;
-                SLANG_ASSERT(SLANG_SUCCEEDED(getSizeAndAlignment(
+                auto sizeAlignResult = getSizeAndAlignment(
                     target->getTargetReq(),
                     config.getLayoutRule(),
                     elementType,
-                    &sizeAlignment)));
+                    &sizeAlignment);
+                SLANG_ASSERT(SLANG_SUCCEEDED(sizeAlignResult));
                 SLANG_UNUSED(sizeAlignment);
             }
             else if (auto constBuffer = as<IRUniformParameterGroupType>(globalInst))
@@ -2696,11 +2702,12 @@ struct DefaultBufferElementTypeLoweringPolicy : BufferElementTypeLoweringPolicy
 
             auto vectorType = builder.getVectorType(matrixType->getElementType(), vectorSize);
             IRSizeAndAlignment elementSizeAlignment;
-            SLANG_ASSERT(SLANG_SUCCEEDED(getSizeAndAlignment(
+            auto elementSizeResult = getSizeAndAlignment(
                 target->getTargetReq(),
                 config.getLayoutRule(),
                 vectorType,
-                &elementSizeAlignment)));
+                &elementSizeAlignment);
+            SLANG_ASSERT(SLANG_SUCCEEDED(elementSizeResult));
             elementSizeAlignment =
                 config.getLayoutRule()->alignCompositeElement(elementSizeAlignment);
 

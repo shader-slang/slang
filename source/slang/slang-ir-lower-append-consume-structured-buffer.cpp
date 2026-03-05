@@ -49,8 +49,9 @@ static void lowerStructuredBufferType(TargetProgram* target, IRHLSLStructuredBuf
 
     IRTypeLayout::Builder elementTypeLayoutBuilder(&builder);
     IRSizeAndAlignment elementSize;
-    SLANG_ASSERT(SLANG_SUCCEEDED(
-        getSizeAndAlignment(target->getTargetReq(), layoutRules, elementType, &elementSize)));
+    auto elementSizeResult =
+        getSizeAndAlignment(target->getTargetReq(), layoutRules, elementType, &elementSize);
+    SLANG_ASSERT(SLANG_SUCCEEDED(elementSizeResult));
     elementTypeLayoutBuilder.addResourceUsage(
         LayoutResourceKind::Uniform,
         LayoutSize((LayoutSize::RawValue)elementSize.getStride()));

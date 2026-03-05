@@ -461,8 +461,9 @@ struct ByteAddressBufferLegalizationContext
                 auto rowCount = (Index)getIntVal(matType->getRowCount());
                 auto colVectorType = m_builder.getVectorType(matType->getElementType(), rowCount);
                 IRSizeAndAlignment colVectorSizeAlignment;
-                SLANG_ASSERT(SLANG_SUCCEEDED(
-                    getSizeAndAlignment(m_targetProgram, colVectorType, &colVectorSizeAlignment)));
+                if (SLANG_FAILED(
+                        getSizeAndAlignment(m_targetProgram, colVectorType, &colVectorSizeAlignment)))
+                    m_sink->diagnose(Diagnostics::InternalCompilerError{});
                 for (Index c = 0; c < colCount; c++)
                 {
                     auto colVector = emitLegalLoad(
@@ -1347,8 +1348,9 @@ struct ByteAddressBufferLegalizationContext
                         m_builder.getVectorType(matType->getElementType(), rowCount);
                     auto colVector = m_builder.emitMakeVector(colVectorType, colVectorArgs);
                     IRSizeAndAlignment colVectorSizeAlignment;
-                    SLANG_ASSERT(SLANG_SUCCEEDED(
-                        getSizeAndAlignment(m_targetProgram, colVectorType, &colVectorSizeAlignment)));
+                    if (SLANG_FAILED(getSizeAndAlignment(
+                            m_targetProgram, colVectorType, &colVectorSizeAlignment)))
+                        m_sink->diagnose(Diagnostics::InternalCompilerError{});
                     emitLegalStore(
                         colVectorType,
                         buffer,
