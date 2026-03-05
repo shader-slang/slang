@@ -6,11 +6,11 @@
 //
 // Patterns tested:
 //   1. Single Container (IFoo field) through IProcessor dispatch
-//   2. ArrayContainer (IFoo[4]) through IProcessor dispatch
-//   3. Two Containers through IProcessor dispatch (multiple nested existentials)
-//   4. Container with two different interface fields (IFoo + IBar) through dispatch
-//   5. Chained processors: output of one dispatched call feeds another
-//   6. IProcessor taking Container + additional IBar parameter (triple dispatch)
+//   2. ArrayContainer (IFoo[4]) through IArrayProcessor dispatch
+//   3. Two Containers through IDualProcessor dispatch (multiple nested existentials)
+//   4. MixedContainer (IFoo + IBar) through IMixedProcessor dispatch
+//   5. Container + additional IBar param through IWeightedProcessor (triple dispatch)
+//   6. Chained processors: output of one IProcessor feeds another IProcessor
 
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-dx12 -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type
@@ -86,7 +86,8 @@ struct ScaleProcessor : IProcessor
     float process(Container c)
     {
         return c.item.eval() * factor + float(c.metadata);
-        // REPORT-DAG: note{{.*}}: generated {{.*}} dispatch code{{.*}} 2 possible types:
+        // REPORT-DAG: note[E50102]: generated {{.*}} dispatch code{{.*}} 2 possible types:
+        // REPORT-DAG: {{.*}}:[[# @LINE-2]]:
     }
 }
 
@@ -96,7 +97,8 @@ struct OffsetProcessor : IProcessor
     float process(Container c)
     {
         return c.item.eval() + offset + float(c.metadata);
-        // REPORT-DAG: note{{.*}}: generated {{.*}} dispatch code{{.*}} 2 possible types:
+        // REPORT-DAG: note[E50102]: generated {{.*}} dispatch code{{.*}} 2 possible types:
+        // REPORT-DAG: {{.*}}:[[# @LINE-2]]:
     }
 }
 
@@ -115,7 +117,8 @@ struct ArraySumProcessor : IArrayProcessor
         for (int i = 0; i < 4; i++)
             sum += ac.items[i].eval();
         return sum;
-        // REPORT-DAG: note{{.*}}: generated {{.*}} dispatch code{{.*}} 2 possible types:
+        // REPORT-DAG: note[E50102]: generated {{.*}} dispatch code{{.*}} 2 possible types:
+        // REPORT-DAG: {{.*}}:[[# @LINE-3]]:
     }
 }
 
@@ -131,8 +134,10 @@ struct ArrayMaxProcessor : IArrayProcessor
             if (v > m) m = v;
         }
         return m;
-        // REPORT-DAG: note{{.*}}: generated {{.*}} dispatch code{{.*}} 2 possible types:
-        // REPORT-DAG: note{{.*}}: generated {{.*}} dispatch code{{.*}} 2 possible types:
+        // REPORT-DAG: note[E50102]: generated {{.*}} dispatch code{{.*}} 2 possible types:
+        // REPORT-DAG: {{.*}}:[[# @LINE-5]]:
+        // REPORT-DAG: note[E50102]: generated {{.*}} dispatch code{{.*}} 2 possible types:
+        // REPORT-DAG: {{.*}}:[[# @LINE-10]]:
     }
 }
 
@@ -148,8 +153,10 @@ struct DualScaleProcessor : IDualProcessor
     float processDual(Container a, Container b)
     {
         return a.item.eval() * b.item.eval();
-        // REPORT-DAG: note{{.*}}: generated {{.*}} dispatch code{{.*}} 2 possible types:
-        // REPORT-DAG: note{{.*}}: generated {{.*}} dispatch code{{.*}} 2 possible types:
+        // REPORT-DAG: note[E50102]: generated {{.*}} dispatch code{{.*}} 2 possible types:
+        // REPORT-DAG: {{.*}}:[[# @LINE-2]]:
+        // REPORT-DAG: note[E50102]: generated {{.*}} dispatch code{{.*}} 2 possible types:
+        // REPORT-DAG: {{.*}}:[[# @LINE-4]]:
     }
 }
 
@@ -159,8 +166,10 @@ struct DualAddProcessor : IDualProcessor
     float processDual(Container a, Container b)
     {
         return a.item.eval() + b.item.eval();
-        // REPORT-DAG: note{{.*}}: generated {{.*}} dispatch code{{.*}} 2 possible types:
-        // REPORT-DAG: note{{.*}}: generated {{.*}} dispatch code{{.*}} 2 possible types:
+        // REPORT-DAG: note[E50102]: generated {{.*}} dispatch code{{.*}} 2 possible types:
+        // REPORT-DAG: {{.*}}:[[# @LINE-2]]:
+        // REPORT-DAG: note[E50102]: generated {{.*}} dispatch code{{.*}} 2 possible types:
+        // REPORT-DAG: {{.*}}:[[# @LINE-4]]:
     }
 }
 
@@ -176,8 +185,10 @@ struct MixedScaleProcessor : IMixedProcessor
     float processMixed(MixedContainer mc)
     {
         return mc.foo.eval() * mc.bar.weight();
-        // REPORT-DAG: note{{.*}}: generated {{.*}} dispatch code{{.*}} 2 possible types:
-        // REPORT-DAG: note{{.*}}: generated {{.*}} dispatch code{{.*}} 2 possible types:
+        // REPORT-DAG: note[E50102]: generated {{.*}} dispatch code{{.*}} 2 possible types:
+        // REPORT-DAG: {{.*}}:[[# @LINE-2]]:
+        // REPORT-DAG: note[E50102]: generated {{.*}} dispatch code{{.*}} 2 possible types:
+        // REPORT-DAG: {{.*}}:[[# @LINE-4]]:
     }
 }
 
@@ -187,8 +198,10 @@ struct MixedSumProcessor : IMixedProcessor
     float processMixed(MixedContainer mc)
     {
         return mc.foo.eval() + mc.bar.weight();
-        // REPORT-DAG: note{{.*}}: generated {{.*}} dispatch code{{.*}} 2 possible types:
-        // REPORT-DAG: note{{.*}}: generated {{.*}} dispatch code{{.*}} 2 possible types:
+        // REPORT-DAG: note[E50102]: generated {{.*}} dispatch code{{.*}} 2 possible types:
+        // REPORT-DAG: {{.*}}:[[# @LINE-2]]:
+        // REPORT-DAG: note[E50102]: generated {{.*}} dispatch code{{.*}} 2 possible types:
+        // REPORT-DAG: {{.*}}:[[# @LINE-4]]:
     }
 }
 
@@ -205,8 +218,10 @@ struct WeightedProcessor : IWeightedProcessor
     float processWeighted(Container c, IBar w)
     {
         return c.item.eval() * w.weight();
-        // REPORT-DAG: note{{.*}}: generated {{.*}} dispatch code{{.*}} 2 possible types:
-        // REPORT-DAG: note{{.*}}: generated {{.*}} dispatch code{{.*}} 2 possible types:
+        // REPORT-DAG: note[E50102]: generated {{.*}} dispatch code{{.*}} 2 possible types:
+        // REPORT-DAG: {{.*}}:[[# @LINE-2]]:
+        // REPORT-DAG: note[E50102]: generated {{.*}} dispatch code{{.*}} 2 possible types:
+        // REPORT-DAG: {{.*}}:[[# @LINE-4]]:
     }
 }
 
@@ -216,8 +231,10 @@ struct BiasedProcessor : IWeightedProcessor
     float processWeighted(Container c, IBar w)
     {
         return c.item.eval() + w.weight() + 1.0;
-        // REPORT-DAG: note{{.*}}: generated {{.*}} dispatch code{{.*}} 2 possible types:
-        // REPORT-DAG: note{{.*}}: generated {{.*}} dispatch code{{.*}} 2 possible types:
+        // REPORT-DAG: note[E50102]: generated {{.*}} dispatch code{{.*}} 2 possible types:
+        // REPORT-DAG: {{.*}}:[[# @LINE-2]]:
+        // REPORT-DAG: note[E50102]: generated {{.*}} dispatch code{{.*}} 2 possible types:
+        // REPORT-DAG: {{.*}}:[[# @LINE-4]]:
     }
 }
 
@@ -253,31 +270,36 @@ IWeightedProcessor createWeightedProcessor(uint id, float data) { return createD
 float runProcessor(IProcessor proc, Container c)
 {
     return proc.process(c);
-    // REPORT-DAG: note{{.*}}: generated {{.*}} dispatch code{{.*}} 2 possible types:
+    // REPORT-DAG: note[E50102]: generated {{.*}} dispatch code{{.*}} 2 possible types:
+    // REPORT-DAG: {{.*}}:[[# @LINE-2]]:
 }
 
 float runArrayProcessor(IArrayProcessor proc, ArrayContainer ac)
 {
     return proc.processArray(ac);
-    // REPORT-DAG: note{{.*}}: generated {{.*}} dispatch code{{.*}} 2 possible types:
+    // REPORT-DAG: note[E50102]: generated {{.*}} dispatch code{{.*}} 2 possible types:
+    // REPORT-DAG: {{.*}}:[[# @LINE-2]]:
 }
 
 float runDualProcessor(IDualProcessor proc, Container a, Container b)
 {
     return proc.processDual(a, b);
-    // REPORT-DAG: note{{.*}}: generated {{.*}} dispatch code{{.*}} 2 possible types:
+    // REPORT-DAG: note[E50102]: generated {{.*}} dispatch code{{.*}} 2 possible types:
+    // REPORT-DAG: {{.*}}:[[# @LINE-2]]:
 }
 
 float runMixedProcessor(IMixedProcessor proc, MixedContainer mc)
 {
     return proc.processMixed(mc);
-    // REPORT-DAG: note{{.*}}: generated {{.*}} dispatch code{{.*}} 2 possible types:
+    // REPORT-DAG: note[E50102]: generated {{.*}} dispatch code{{.*}} 2 possible types:
+    // REPORT-DAG: {{.*}}:[[# @LINE-2]]:
 }
 
 float runWeightedProcessor(IWeightedProcessor proc, Container c, IBar w)
 {
     return proc.processWeighted(c, w);
-    // REPORT-DAG: note{{.*}}: generated {{.*}} dispatch code{{.*}} 2 possible types:
+    // REPORT-DAG: note[E50102]: generated {{.*}} dispatch code{{.*}} 2 possible types:
+    // REPORT-DAG: {{.*}}:[[# @LINE-2]]:
 }
 
 // ============================================================
