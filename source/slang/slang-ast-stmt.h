@@ -318,4 +318,11 @@ class ExpressionStmt : public Stmt
     FIDDLE() Expr* expression = nullptr;
 };
 
+FIDDLE()
+class RequireCapabilityStmt : public Stmt
+{
+    FIDDLE(...)
+    FIDDLE() List<Token> requiredCaps;
+};
+
 } // namespace Slang

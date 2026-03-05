@@ -2984,6 +2984,13 @@ local insts = {
 		--
 		hoistable = true
 	} },
+	{ LateRequireCapability = {
+		-- A capability requirement that is checked after linking, specialization, and IR-level dead
+		-- code elimination passes.
+		--
+		-- Parameters: IRCapabilitySet
+		operands = { { "capabilitySet", "IRCapabilitySet" } },
+	} }
 }
 
 -- A function to calculate some useful properties and put it in the table,
