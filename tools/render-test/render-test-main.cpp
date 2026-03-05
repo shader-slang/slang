@@ -18,11 +18,10 @@
 #if defined(_WIN32)
 #include <d3d12.h>
 #include <windows.h>
+#endif
 
 #if defined(_MSC_VER)
 #pragma comment(lib, "advapi32")
-#endif
-
 #endif
 
 #include <slang-rhi.h>
