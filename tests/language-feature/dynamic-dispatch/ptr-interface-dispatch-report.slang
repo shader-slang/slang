@@ -1,6 +1,6 @@
 // Verify that -report-dynamic-dispatch-sites correctly reports dispatch sites
-// for implementations containing pointer fields. The pointer fields participate
-// in AnyValue packing but the dispatch report itself should function normally.
+// when multiple implementations conform to the same interface. The report
+// should list the generated dispatch code regardless of implementation details.
 
 //TEST:SIMPLE(filecheck=REPORT):-target hlsl -stage compute -entry computeMain -report-dynamic-dispatch-sites
 
