@@ -8,6 +8,11 @@
 //TEST:SIMPLE(filecheck=CHECK): -target glsl -entry vertexMain -stage vertex
 //TEST:SIMPLE(filecheck=CHECK): -target metal -entry vertexMain -stage vertex
 //TEST:SIMPLE(filecheck=CHECK): -target wgsl -entry vertexMain -stage vertex
+//TEST:SIMPLE(filecheck=FRAG): -target spirv -entry fragmentMain -stage fragment
+//TEST:SIMPLE(filecheck=FRAG): -target hlsl -entry fragmentMain -stage fragment
+//TEST:SIMPLE(filecheck=FRAG): -target glsl -entry fragmentMain -stage fragment
+//TEST:SIMPLE(filecheck=FRAG): -target metal -entry fragmentMain -stage fragment
+//TEST:SIMPLE(filecheck=FRAG): -target wgsl -entry fragmentMain -stage fragment
 
 interface IFoo
 {
@@ -36,6 +41,7 @@ VertexOutput vertexMain(float3 position : POSITION)
     return output;
 }
 
+// FRAG: fragmentMain
 [shader("fragment")]
 float4 fragmentMain(VertexOutput input) : SV_Target
 {

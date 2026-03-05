@@ -2269,6 +2269,9 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                 state,
                 varLayout);
 
+            if (!elementTypeLayout)
+                return nullptr;
+
             RefPtr<ArrayTypeLayout> arrayTypeLayout = new ArrayTypeLayout();
             arrayTypeLayout->elementTypeLayout = elementTypeLayout;
             arrayTypeLayout->type = arrayType;
