@@ -2119,7 +2119,9 @@ void GLSLSourceEmitter::emitBufferPointerTypeDefinition(IRInst* type)
     auto ptrTypeName = getName(ptrType);
     IRSizeAndAlignment sizeAlignment;
     if (SLANG_FAILED(getNaturalSizeAndAlignment(
-            m_codeGenContext->getTargetReq(), ptrType->getValueType(), &sizeAlignment)))
+            m_codeGenContext->getTargetReq(),
+            ptrType->getValueType(),
+            &sizeAlignment)))
         getSink()->diagnose(Diagnostics::Unexpected{
             .message = "failed to compute type layout for buffer reference pointer",
             .location = type->sourceLoc});

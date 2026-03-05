@@ -128,7 +128,10 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         auto elementType = inst->getElementType();
         IRSizeAndAlignment elementSize;
         if (SLANG_FAILED(getSizeAndAlignment(
-                m_sharedContext->m_targetRequest, layoutRules, elementType, &elementSize)))
+                m_sharedContext->m_targetRequest,
+                layoutRules,
+                elementType,
+                &elementSize)))
             m_sharedContext->m_sink->diagnose(Diagnostics::Unexpected{
                 .message = "failed to compute element type layout for SPIR-V structured buffer",
                 .location = inst->sourceLoc});
@@ -145,7 +148,10 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         // so downstream SPIR-V emission can query its layout.
         IRSizeAndAlignment structSize;
         if (SLANG_FAILED(getSizeAndAlignment(
-                m_sharedContext->m_targetRequest, layoutRules, structType, &structSize)))
+                m_sharedContext->m_targetRequest,
+                layoutRules,
+                structType,
+                &structSize)))
             m_sharedContext->m_sink->diagnose(Diagnostics::Unexpected{
                 .message = "failed to compute struct type layout for SPIR-V structured buffer",
                 .location = inst->sourceLoc});
@@ -239,7 +245,10 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         // so downstream SPIR-V emission can query its layout.
         IRSizeAndAlignment sizeAlignment;
         if (SLANG_FAILED(getSizeAndAlignment(
-                m_sharedContext->m_targetRequest, rules, structType, &sizeAlignment)))
+                m_sharedContext->m_targetRequest,
+                rules,
+                structType,
+                &sizeAlignment)))
             m_sharedContext->m_sink->diagnose(Diagnostics::Unexpected{
                 .message = "failed to compute type layout for SPIR-V constant buffer wrapper",
                 .location = cbParamInst->sourceLoc});
