@@ -3,6 +3,7 @@
 #include "slang-ir-call-graph.h"
 #include "slang-ir-layout.h"
 #include "slang-ir-util.h"
+#include "slang-rich-diagnostics.h"
 
 using namespace slang;
 
@@ -101,10 +102,10 @@ public:
             return operand;
 
         IRSizeAndAlignment sizeAlignment = {};
-        getNaturalSizeAndAlignment(
-            codeGenContext->getTargetReq(),
-            inst->getDataType(),
-            &sizeAlignment);
+        if (SLANG_FAILED(getNaturalSizeAndAlignment(
+                codeGenContext->getTargetReq(), inst->getDataType(), &sizeAlignment)))
+            codeGenContext->getSink()->diagnose(
+                Diagnostics::InternalCompilerError{.location = inst->sourceLoc});
         operand = allocReg(funcBuilder, sizeAlignment.size, sizeAlignment.alignment);
         mapInstToOperand[inst] = operand;
         return operand;
@@ -173,10 +174,10 @@ public:
 
         // Align constantSection.
         IRSizeAndAlignment sizeAlignment;
-        getNaturalSizeAndAlignment(
-            codeGenContext->getTargetReq(),
-            inst->getDataType(),
-            &sizeAlignment);
+        if (SLANG_FAILED(getNaturalSizeAndAlignment(
+                codeGenContext->getTargetReq(), inst->getDataType(), &sizeAlignment)))
+            codeGenContext->getSink()->diagnose(
+                Diagnostics::InternalCompilerError{.location = inst->sourceLoc});
         alignConstSection(sizeAlignment.alignment);
 
         operand.offset = (uint32_t)byteCodeBuilder.constantSection.getCount();
@@ -508,10 +509,10 @@ public:
                 {
                     funcBuilder.parameterOffsets.add(operand.offset);
                     IRSizeAndAlignment sizeAlignment = {};
-                    getNaturalSizeAndAlignment(
-                        codeGenContext->getTargetReq(),
-                        inst->getDataType(),
-                        &sizeAlignment);
+                    if (SLANG_FAILED(getNaturalSizeAndAlignment(
+                            codeGenContext->getTargetReq(), inst->getDataType(), &sizeAlignment)))
+                        codeGenContext->getSink()->diagnose(
+                            Diagnostics::InternalCompilerError{.location = inst->sourceLoc});
                     funcBuilder.parameterSize =
                         operand.offset + (uint32_t)sizeAlignment.getStride();
                 }
@@ -522,7 +523,10 @@ public:
                 IRBuilder builder(inst);
                 auto type = tryGetPointedToType(&builder, inst->getDataType());
                 IRSizeAndAlignment sizeAlignment = {};
-                getNaturalSizeAndAlignment(codeGenContext->getTargetReq(), type, &sizeAlignment);
+                if (SLANG_FAILED(getNaturalSizeAndAlignment(
+                        codeGenContext->getTargetReq(), type, &sizeAlignment)))
+                    codeGenContext->getSink()->diagnose(
+                        Diagnostics::InternalCompilerError{.location = inst->sourceLoc});
                 auto varStorage = allocReg(
                     funcBuilder,
                     (size_t)sizeAlignment.size,
@@ -537,10 +541,10 @@ public:
         case kIROp_Load:
             {
                 IRSizeAndAlignment sizeAlignment = {};
-                getNaturalSizeAndAlignment(
-                    codeGenContext->getTargetReq(),
-                    inst->getDataType(),
-                    &sizeAlignment);
+                if (SLANG_FAILED(getNaturalSizeAndAlignment(
+                        codeGenContext->getTargetReq(), inst->getDataType(), &sizeAlignment)))
+                    codeGenContext->getSink()->diagnose(
+                        Diagnostics::InternalCompilerError{.location = inst->sourceLoc});
                 writeInst(
                     funcBuilder,
                     VMOp::Load,
@@ -552,10 +556,12 @@ public:
         case kIROp_Store:
             {
                 IRSizeAndAlignment sizeAlignment = {};
-                getNaturalSizeAndAlignment(
-                    codeGenContext->getTargetReq(),
-                    inst->getOperand(1)->getDataType(),
-                    &sizeAlignment);
+                if (SLANG_FAILED(getNaturalSizeAndAlignment(
+                        codeGenContext->getTargetReq(),
+                        inst->getOperand(1)->getDataType(),
+                        &sizeAlignment)))
+                    codeGenContext->getSink()->diagnose(
+                        Diagnostics::InternalCompilerError{.location = inst->sourceLoc});
                 writeInst(
                     funcBuilder,
                     VMOp::Store,
@@ -586,10 +592,10 @@ public:
             {
                 auto opInfo = translateArithmeticOp(inst);
                 IRSizeAndAlignment sizeAlignment = {};
-                getNaturalSizeAndAlignment(
-                    codeGenContext->getTargetReq(),
-                    inst->getDataType(),
-                    &sizeAlignment);
+                if (SLANG_FAILED(getNaturalSizeAndAlignment(
+                        codeGenContext->getTargetReq(), inst->getDataType(), &sizeAlignment)))
+                    codeGenContext->getSink()->diagnose(
+                        Diagnostics::InternalCompilerError{.location = inst->sourceLoc});
                 writeInst(
                     funcBuilder,
                     opInfo.opcode,
@@ -605,10 +611,10 @@ public:
             {
                 auto opInfo = translateArithmeticOp(inst);
                 IRSizeAndAlignment sizeAlignment = {};
-                getNaturalSizeAndAlignment(
-                    codeGenContext->getTargetReq(),
-                    inst->getDataType(),
-                    &sizeAlignment);
+                if (SLANG_FAILED(getNaturalSizeAndAlignment(
+                        codeGenContext->getTargetReq(), inst->getDataType(), &sizeAlignment)))
+                    codeGenContext->getSink()->diagnose(
+                        Diagnostics::InternalCompilerError{.location = inst->sourceLoc});
                 writeInst(
                     funcBuilder,
                     opInfo.opcode,
@@ -638,10 +644,10 @@ public:
                     auto param = paramList[i];
                     auto paramReg = ensureWorkingsetMemory(funcBuilder, param);
                     IRSizeAndAlignment sizeAlignment = {};
-                    getNaturalSizeAndAlignment(
-                        codeGenContext->getTargetReq(),
-                        param->getDataType(),
-                        &sizeAlignment);
+                    if (SLANG_FAILED(getNaturalSizeAndAlignment(
+                            codeGenContext->getTargetReq(), param->getDataType(), &sizeAlignment)))
+                        codeGenContext->getSink()->diagnose(
+                            Diagnostics::InternalCompilerError{.location = param->sourceLoc});
                     writeInst(
                         funcBuilder,
                         VMOp::Copy,
@@ -715,10 +721,10 @@ public:
                     operands.add(ensureInst(callInst->getArg(i)));
                 }
                 IRSizeAndAlignment sizeAlignment = {};
-                getNaturalSizeAndAlignment(
-                    codeGenContext->getTargetReq(),
-                    inst->getDataType(),
-                    &sizeAlignment);
+                if (SLANG_FAILED(getNaturalSizeAndAlignment(
+                        codeGenContext->getTargetReq(), inst->getDataType(), &sizeAlignment)))
+                    codeGenContext->getSink()->diagnose(
+                        Diagnostics::InternalCompilerError{.location = inst->sourceLoc});
                 writeInst(
                     funcBuilder,
                     VMOp::Call,
@@ -733,10 +739,12 @@ public:
                 if (returnInst && returnInst->getVal()->getOp() != kIROp_VoidLit)
                 {
                     IRSizeAndAlignment sizeAlignment = {};
-                    getNaturalSizeAndAlignment(
-                        codeGenContext->getTargetReq(),
-                        returnInst->getVal()->getDataType(),
-                        &sizeAlignment);
+                    if (SLANG_FAILED(getNaturalSizeAndAlignment(
+                            codeGenContext->getTargetReq(),
+                            returnInst->getVal()->getDataType(),
+                            &sizeAlignment)))
+                        codeGenContext->getSink()->diagnose(
+                            Diagnostics::InternalCompilerError{.location = inst->sourceLoc});
                     writeInst(
                         funcBuilder,
                         VMOp::Ret,
@@ -757,10 +765,10 @@ public:
                 IRBuilder builder(inst);
                 auto elementType = tryGetPointedToType(&builder, getElemInst->getDataType());
                 IRSizeAndAlignment sizeAlignment = {};
-                getNaturalSizeAndAlignment(
-                    codeGenContext->getTargetReq(),
-                    elementType,
-                    &sizeAlignment);
+                if (SLANG_FAILED(getNaturalSizeAndAlignment(
+                        codeGenContext->getTargetReq(), elementType, &sizeAlignment)))
+                    codeGenContext->getSink()->diagnose(
+                        Diagnostics::InternalCompilerError{.location = inst->sourceLoc});
                 auto stride = sizeAlignment.getStride();
                 auto baseOperand = ensureInst(base);
                 auto indexOperand = ensureInst(index);
@@ -784,7 +792,10 @@ public:
                     as<IRStructType>(tryGetPointedToType(&builder, base->getDataType()));
                 IRIntegerValue offset = 0;
                 auto field = findStructField(structType, fieldKey);
-                getNaturalOffset(codeGenContext->getTargetReq(), field, &offset);
+                if (SLANG_FAILED(
+                        getNaturalOffset(codeGenContext->getTargetReq(), field, &offset)))
+                    codeGenContext->getSink()->diagnose(
+                        Diagnostics::InternalCompilerError{.location = inst->sourceLoc});
 
                 writeInst(
                     funcBuilder,
@@ -803,10 +814,10 @@ public:
                 IRSizeAndAlignment sizeAlignment = {};
                 IRBuilder builder(inst);
                 auto elementType = tryGetPointedToType(&builder, getOffsetPtrInst->getDataType());
-                getNaturalSizeAndAlignment(
-                    codeGenContext->getTargetReq(),
-                    elementType,
-                    &sizeAlignment);
+                if (SLANG_FAILED(getNaturalSizeAndAlignment(
+                        codeGenContext->getTargetReq(), elementType, &sizeAlignment)))
+                    codeGenContext->getSink()->diagnose(
+                        Diagnostics::InternalCompilerError{.location = inst->sourceLoc});
                 writeInst(
                     funcBuilder,
                     VMOp::OffsetPtr,
@@ -825,7 +836,10 @@ public:
                 auto structType = as<IRStructType>(base->getDataType());
                 IRIntegerValue offset = 0;
                 auto field = findStructField(structType, fieldKey);
-                getNaturalOffset(codeGenContext->getTargetReq(), field, &offset);
+                if (SLANG_FAILED(
+                        getNaturalOffset(codeGenContext->getTargetReq(), field, &offset)))
+                    codeGenContext->getSink()->diagnose(
+                        Diagnostics::InternalCompilerError{.location = inst->sourceLoc});
 
                 auto baseOperand = ensureInst(base);
                 baseOperand.offset += (uint32_t)offset;
@@ -839,10 +853,10 @@ public:
                 auto index = getElemInst->getIndex();
                 auto elementType = getElemInst->getDataType();
                 IRSizeAndAlignment sizeAlignment = {};
-                getNaturalSizeAndAlignment(
-                    codeGenContext->getTargetReq(),
-                    elementType,
-                    &sizeAlignment);
+                if (SLANG_FAILED(getNaturalSizeAndAlignment(
+                        codeGenContext->getTargetReq(), elementType, &sizeAlignment)))
+                    codeGenContext->getSink()->diagnose(
+                        Diagnostics::InternalCompilerError{.location = inst->sourceLoc});
                 auto stride = sizeAlignment.getStride();
                 auto baseOperand = ensureInst(base);
                 if (as<IRIntLit>(index))
@@ -904,10 +918,10 @@ public:
                 auto arrayType = as<IRArrayTypeBase>(inst->getDataType());
                 auto elementType = arrayType->getElementType();
                 IRSizeAndAlignment sizeAlignment = {};
-                getNaturalSizeAndAlignment(
-                    codeGenContext->getTargetReq(),
-                    elementType,
-                    &sizeAlignment);
+                if (SLANG_FAILED(getNaturalSizeAndAlignment(
+                        codeGenContext->getTargetReq(), elementType, &sizeAlignment)))
+                    codeGenContext->getSink()->diagnose(
+                        Diagnostics::InternalCompilerError{.location = inst->sourceLoc});
                 auto stride = (uint32_t)sizeAlignment.getStride();
                 for (UInt i = 0; i < inst->getOperandCount(); ++i)
                 {
@@ -928,10 +942,10 @@ public:
                 auto arrayType = as<IRArrayTypeBase>(inst->getDataType());
                 auto elementType = arrayType->getElementType();
                 IRSizeAndAlignment sizeAlignment = {};
-                getNaturalSizeAndAlignment(
-                    codeGenContext->getTargetReq(),
-                    elementType,
-                    &sizeAlignment);
+                if (SLANG_FAILED(getNaturalSizeAndAlignment(
+                        codeGenContext->getTargetReq(), elementType, &sizeAlignment)))
+                    codeGenContext->getSink()->diagnose(
+                        Diagnostics::InternalCompilerError{.location = inst->sourceLoc});
                 auto stride = (uint32_t)sizeAlignment.getStride();
                 for (Index i = 0; i < getIntVal(arrayType->getElementCount()); ++i)
                 {
@@ -959,12 +973,17 @@ public:
                 {
                     auto field = fields[i];
                     IRIntegerValue offset = 0;
-                    getNaturalOffset(codeGenContext->getTargetReq(), field, &offset);
+                    if (SLANG_FAILED(
+                            getNaturalOffset(codeGenContext->getTargetReq(), field, &offset)))
+                        codeGenContext->getSink()->diagnose(
+                            Diagnostics::InternalCompilerError{.location = field->sourceLoc});
                     IRSizeAndAlignment sizeAlignment = {};
-                    getNaturalSizeAndAlignment(
-                        codeGenContext->getTargetReq(),
-                        field->getFieldType(),
-                        &sizeAlignment);
+                    if (SLANG_FAILED(getNaturalSizeAndAlignment(
+                            codeGenContext->getTargetReq(),
+                            field->getFieldType(),
+                            &sizeAlignment)))
+                        codeGenContext->getSink()->diagnose(
+                            Diagnostics::InternalCompilerError{.location = field->sourceLoc});
                     VMOperand elementOperand = result;
                     elementOperand.offset += (uint32_t)offset;
                     writeInst(
@@ -984,10 +1003,12 @@ public:
                 {
                     VMOperand elementOperand = result;
                     IRSizeAndAlignment sizeAlignment = {};
-                    getNaturalSizeAndAlignment(
-                        codeGenContext->getTargetReq(),
-                        inst->getOperand(i)->getDataType(),
-                        &sizeAlignment);
+                    if (SLANG_FAILED(getNaturalSizeAndAlignment(
+                            codeGenContext->getTargetReq(),
+                            inst->getOperand(i)->getDataType(),
+                            &sizeAlignment)))
+                        codeGenContext->getSink()->diagnose(
+                            Diagnostics::InternalCompilerError{.location = inst->sourceLoc});
                     writeInst(
                         funcBuilder,
                         VMOp::Copy,
@@ -1003,10 +1024,12 @@ public:
                 auto result = ensureWorkingsetMemory(funcBuilder, inst);
                 auto vectorType = as<IRVectorType>(inst->getDataType());
                 IRSizeAndAlignment sizeAlignment = {};
-                getNaturalSizeAndAlignment(
-                    codeGenContext->getTargetReq(),
-                    vectorType->getElementType(),
-                    &sizeAlignment);
+                if (SLANG_FAILED(getNaturalSizeAndAlignment(
+                        codeGenContext->getTargetReq(),
+                        vectorType->getElementType(),
+                        &sizeAlignment)))
+                    codeGenContext->getSink()->diagnose(
+                        Diagnostics::InternalCompilerError{.location = inst->sourceLoc});
                 auto stride = (uint32_t)sizeAlignment.getStride();
                 for (Index i = 0; i < getIntVal(vectorType->getElementCount()); ++i)
                 {
@@ -1026,10 +1049,12 @@ public:
                 auto result = ensureWorkingsetMemory(funcBuilder, inst);
                 auto matrixType = as<IRMatrixType>(inst->getDataType());
                 IRSizeAndAlignment sizeAlignment = {};
-                getNaturalSizeAndAlignment(
-                    codeGenContext->getTargetReq(),
-                    matrixType->getElementType(),
-                    &sizeAlignment);
+                if (SLANG_FAILED(getNaturalSizeAndAlignment(
+                        codeGenContext->getTargetReq(),
+                        matrixType->getElementType(),
+                        &sizeAlignment)))
+                    codeGenContext->getSink()->diagnose(
+                        Diagnostics::InternalCompilerError{.location = inst->sourceLoc});
                 auto stride = (uint32_t)sizeAlignment.getStride();
                 for (Index i = 0; i < getIntVal(matrixType->getRowCount()); ++i)
                 {
@@ -1082,10 +1107,10 @@ public:
         funcBuilder.name = addStringLiteral(getName(func).getUnownedSlice());
 
         IRSizeAndAlignment sizeAlignment = {};
-        getNaturalSizeAndAlignment(
-            codeGenContext->getTargetReq(),
-            func->getResultType(),
-            &sizeAlignment);
+        if (SLANG_FAILED(getNaturalSizeAndAlignment(
+                codeGenContext->getTargetReq(), func->getResultType(), &sizeAlignment)))
+            codeGenContext->getSink()->diagnose(
+                Diagnostics::InternalCompilerError{.location = func->sourceLoc});
         funcBuilder.resultSize = (uint32_t)sizeAlignment.getStride();
 
         Dictionary<IRBlock*, Index> mapBlockToByteOffset;

@@ -264,10 +264,10 @@ void inferAnyValueSizeWhereNecessary(
         for (auto implType : nonSelfReferentialImpls[interfaceType])
         {
             IRSizeAndAlignment sizeAndAlignment;
-            getNaturalSizeAndAlignment(
-                targetProgram->getTargetReq(),
-                (IRType*)implType,
-                &sizeAndAlignment);
+            if (SLANG_FAILED(getNaturalSizeAndAlignment(
+                    targetProgram->getTargetReq(), (IRType*)implType, &sizeAndAlignment)))
+                sink->diagnose(
+                    Diagnostics::InternalCompilerError{.location = implType->sourceLoc});
 
             maxAnyValueSize = Math::Max(maxAnyValueSize, sizeAndAlignment.size);
 
@@ -299,10 +299,10 @@ void inferAnyValueSizeWhereNecessary(
         for (auto implType : selfReferentialImpls[interfaceType])
         {
             IRSizeAndAlignment sizeAndAlignment;
-            getNaturalSizeAndAlignment(
-                targetProgram->getTargetReq(),
-                (IRType*)implType,
-                &sizeAndAlignment);
+            if (SLANG_FAILED(getNaturalSizeAndAlignment(
+                    targetProgram->getTargetReq(), (IRType*)implType, &sizeAndAlignment)))
+                sink->diagnose(
+                    Diagnostics::InternalCompilerError{.location = implType->sourceLoc});
 
             maxAnyValueSize = Math::Max(maxAnyValueSize, sizeAndAlignment.size);
 

@@ -240,9 +240,13 @@ struct BitCastLoweringContext
         auto toType = inst->getDataType();
 
         IRSizeAndAlignment toTypeSize;
-        getNaturalSizeAndAlignment(targetProgram->getTargetReq(), toType, &toTypeSize);
+        if (SLANG_FAILED(
+                getNaturalSizeAndAlignment(targetProgram->getTargetReq(), toType, &toTypeSize)))
+            sink->diagnose(Diagnostics::InternalCompilerError{.location = inst->sourceLoc});
         IRSizeAndAlignment fromTypeSize;
-        getNaturalSizeAndAlignment(targetProgram->getTargetReq(), fromType, &fromTypeSize);
+        if (SLANG_FAILED(
+                getNaturalSizeAndAlignment(targetProgram->getTargetReq(), fromType, &fromTypeSize)))
+            sink->diagnose(Diagnostics::InternalCompilerError{.location = inst->sourceLoc});
 
         // Check if the target is directly emitted SPIRV and if the target is SPIRV 1.5 or later
         bool isDirectSpirv = false;

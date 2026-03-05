@@ -106,10 +106,11 @@ struct ImmutableBufferLoadLoweringContext : InstPassBase
                 auto elementType = vectorType->getElementType();
                 auto elementCount = getIntVal(vectorType->getElementCount());
                 IRSizeAndAlignment elementSize;
-                getNaturalSizeAndAlignment(
+                auto elementSizeResult = getNaturalSizeAndAlignment(
                     targetProgram->getTargetReq(),
                     elementType,
                     &elementSize);
+                SLANG_ASSERT(SLANG_SUCCEEDED(elementSizeResult));
                 if (elementCount <= 2)
                     return kIROp_CUDALDG;
                 else if (elementCount == 4)

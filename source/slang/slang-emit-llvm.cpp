@@ -162,6 +162,7 @@ class LLVMTypeTranslator
 private:
     ILLVMBuilder* builder;
     TargetRequest* targetReq;
+    DiagnosticSink* m_sink;
     const Dictionary<IRInst*, LLVMDebugNode*>* instToDebugLLVM;
 
     Dictionary<IRType*, LLVMType*> valueTypeMap;
@@ -172,8 +173,9 @@ public:
     LLVMTypeTranslator(
         ILLVMBuilder* builder,
         TargetRequest* targetReq,
+        DiagnosticSink* sink,
         const Dictionary<IRInst*, LLVMDebugNode*>& instToDebugLLVM)
-        : builder(builder), targetReq(targetReq), instToDebugLLVM(&instToDebugLLVM)
+        : builder(builder), targetReq(targetReq), m_sink(sink), instToDebugLLVM(&instToDebugLLVM)
     {
     }
 
@@ -624,9 +626,9 @@ public:
     {
         IRSizeAndAlignment sizeAlignment;
 
-        auto result =
-            Slang::getSizeAndAlignment(targetReq, rules, legalizeResourceTypes(type), &sizeAlignment);
-        SLANG_ASSERT(SLANG_SUCCEEDED(result));
+        if (SLANG_FAILED(
+                Slang::getSizeAndAlignment(targetReq, rules, legalizeResourceTypes(type), &sizeAlignment)))
+            m_sink->diagnose(Diagnostics::InternalCompilerError{});
 
         return sizeAlignment;
     }
@@ -649,9 +651,9 @@ public:
     {
         auto elemCount = getIntVal(vecType->getElementCount());
         IRSizeAndAlignment elementAlignment;
-        auto result =
-            Slang::getSizeAndAlignment(targetReq, rules, vecType->getElementType(), &elementAlignment);
-        SLANG_ASSERT(SLANG_SUCCEEDED(result));
+        if (SLANG_FAILED(
+                Slang::getSizeAndAlignment(targetReq, rules, vecType->getElementType(), &elementAlignment)))
+            m_sink->diagnose(Diagnostics::InternalCompilerError{});
         IRSizeAndAlignment vectorAlignment =
             rules->getVectorSizeAndAlignment(elementAlignment, elemCount);
 
@@ -856,8 +858,8 @@ struct LLVMEmitter
 
         debug = getOptions().getDebugInfoLevel() != DebugInfoLevel::None;
 
-        types.reset(
-            new LLVMTypeTranslator(builder, codeGenContext->getTargetReq(), instToDebugLLVM));
+        types.reset(new LLVMTypeTranslator(
+            builder, codeGenContext->getTargetReq(), codeGenContext->getSink(), instToDebugLLVM));
 
         int32Type = builder->getIntType(32);
         int64Type = builder->getIntType(64);
