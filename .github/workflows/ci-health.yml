@@ -11,7 +11,7 @@ jobs:
     permissions:
       contents: read
       actions: read
-      id-token: write
+      id-token: write # Required for Workload Identity
 
     steps:
       - uses: actions/checkout@v4
