@@ -16,8 +16,6 @@ struct Foo : IFoo
     int getVal() { return val; }
 }
 
-//TEST_INPUT: type_conformance Foo:IFoo = 1;
-
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(1, 1, 1)]

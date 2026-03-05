@@ -16,8 +16,6 @@ struct Alpha : IFoo
     int getVal() { return x + 1; }
 }
 
-//TEST_INPUT: type_conformance Alpha:IFoo = 1;
-
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(1, 1, 1)]

@@ -77,9 +77,10 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     // CHECK: 999
     outputBuffer[1] = dispatchRead(reader2);
 
-    // Modify the source value and verify IndirectReader sees the change
+    // Modify the source value and re-dispatch through the original reader.
+    // The pointer stored in the already-packed existential must still
+    // reference the original memory and reflect the updated value.
     val = 90;
-    var reader3 = makeReader(0, &val);
     // CHECK: 100
-    outputBuffer[2] = dispatchRead(reader3);
+    outputBuffer[2] = dispatchRead(reader);
 }
