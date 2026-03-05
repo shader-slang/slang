@@ -55,8 +55,8 @@ void computeMain()
     outputBuffer[2] = gParams.values[0].getValue() + gParams.values[1].getValue();
     // CHECK: 13
 
-    // Index via runtime variable to force dynamic element access
-    int idx = 1;
+    // Index derived from runtime dispatch result to prevent constant folding
+    int idx = gParams.values[0].getValue() - 2;
     outputBuffer[3] = gParams.values[idx].getValue();
     // CHECK: 10
 }

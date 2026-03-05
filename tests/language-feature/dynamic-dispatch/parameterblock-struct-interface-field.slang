@@ -45,6 +45,7 @@ ParameterBlock<ArrayParams> gArray;
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
+// One globalExistentialType per ParameterBlock global (gSingle, gArray)
 //TEST_INPUT: globalExistentialType __Dynamic
 //TEST_INPUT: globalExistentialType __Dynamic
 
