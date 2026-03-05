@@ -96,7 +96,8 @@ while IFS= read -r report_path; do
 
         SLANGC_JSON_FIELDS=""
         if [[ -n "$sl_line_cov" ]]; then
-          SLANGC_JSON_FIELDS=$(cat <<SLANGC_EOF
+          SLANGC_JSON_FIELDS=$(
+            cat <<SLANGC_EOF
     "slangc_line_coverage": ${sl_line_cov},
     "slangc_lines_hit": ${sl_lines_hit},
     "slangc_lines_found": ${sl_lines_found},
