@@ -382,12 +382,13 @@ IRIntegerValue get16ByteAlignedVectorElementCount(
     IRType* elementType,
     IRIntegerValue minCount)
 {
-    // Layout may fail for resource/opaque types; fall back to 4 elements.
     IRSizeAndAlignment sizeAlignment;
-    getNaturalSizeAndAlignment(target->getTargetReq(), elementType, &sizeAlignment);
-    if (sizeAlignment.size)
+    auto result = getNaturalSizeAndAlignment(target->getTargetReq(), elementType, &sizeAlignment);
+
+    if (SLANG_SUCCEEDED(result) && sizeAlignment.size)
         return align(sizeAlignment.size * minCount, 16) / sizeAlignment.size;
-    return 4;
+    else
+        return 4;
 }
 
 const char* getLayoutName(IRTypeLayoutRuleName name)
