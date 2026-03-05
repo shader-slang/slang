@@ -1,6 +1,8 @@
 // THIS IS A GENERATED FILE. DO NOT EDIT!
-// Instead, edit generate-types-tests.py and then regenerate this test
-// by running: ./generate-types-tests.py
+// Instead, edit extras/generate-tests-capabilities-texture-types.py, and
+// regenerate this test by running:
+//
+//     extras/generate-tests-capabilities-texture-types.py
 //
 // Texture types capability test: glsl-vk / DepthTextureCubeArray
 // - Type supported since target version:  400

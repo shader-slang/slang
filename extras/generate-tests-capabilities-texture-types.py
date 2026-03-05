@@ -88,7 +88,7 @@ testInputForTestType = {
 #  43  - sample with 3-dimensional coord
 #  44  - sample with 4-dimensional coord
 #
-# Function getTestOp() returns the respective code to access a texture with the specified op.
+# Function getStatementsForTestOp() returns the respective code to access a texture with the specified op.
 
 # Test info for Target/Texture type combo
 class TestInfo:
@@ -342,56 +342,41 @@ def getPositiveNegativeBackendTargets(backend, minSupportedVersion):
     sys.exit(1)
 
 
-def getTestOp(testOp):
-    ret = ""
-    if testOp == 1:
-        ret += ("ret = int((texHandle.SampleLevel(samplerState, float(0), float(0))).x);")
-    elif testOp == 2:
-        ret += ("ret = int((texHandle.SampleLevel(samplerState, float2(0, 0), float(0))).x);")
-    elif testOp == 3:
-        ret += ("ret = int((texHandle.SampleLevel(samplerState, float3(0, 0, 0), float(0))).x);")
-    elif testOp == 4:
-        ret += ("ret = int((texHandle.SampleLevel(samplerState, float4(0, 0, 0, 0), float(0))).x);")
-    elif testOp == 11:
-        ret += ("ret = int((texHandle.Load(int(0))).x);")
-    elif testOp == 12:
-        ret += ("ret = int((texHandle.Load(int2(0, 0))).x);")
-    elif testOp == 13:
-        ret += ("ret = int((texHandle.Load(int3(0, 0, 0))).x);")
-    elif testOp == 14:
-        ret += ("ret = int((texHandle.Load(int4(0, 0, 0, 0))).x);")
-    elif testOp == 15:
-        ret += ("ret = int((texHandle.Load(int2(0, 0), 0)).x);")
-    elif testOp == 16:
-        ret += ("ret = int((texHandle.Load(int3(0, 0, 0), 0)).x);")
-    elif testOp == 21:
-        ret += ("texHandle.Store(int(0), float4(0, 0, 0, 0));\n")
-        ret += ("    ret = 0;")
-    elif testOp == 22:
-        ret += ("texHandle.Store(int2(0, 0), float4(0, 0, 0, 0));\n")
-        ret += ("    ret = 0;")
-    elif testOp == 23:
-        ret += ("texHandle.Store(int3(0, 0, 0), float4(0, 0, 0, 0));\n")
-        ret += ("    ret = 0;")
-    elif testOp == 32:
-        ret += ("texHandle.WriteSamplerFeedbackLevel(feedbackSamplerInput2D, samplerState, float2(0, 0), float(0));\n")
-        ret += ("    ret = 0;")
-    elif testOp == 33:
-        ret += ("texHandle.WriteSamplerFeedbackLevel(feedbackSamplerInput2DArray, samplerState, float3(0, 0, 0), float(0));\n")
-        ret += ("    ret = 0;")
-    elif testOp == 41:
-        ret += ("ret = int((texHandle.SampleCmpLevelZero(samplerComparisonState, float(0), float(0))).x);")
-    elif testOp == 42:
-        ret += ("ret = int((texHandle.SampleCmpLevelZero(samplerComparisonState, float2(0, 0), float(0))).x);")
-    elif testOp == 43:
-        ret += ("ret = int((texHandle.SampleCmpLevelZero(samplerComparisonState, float3(0, 0, 0), float(0))).x);")
-    elif testOp == 44:
-        ret += ("ret = int((texHandle.SampleCmpLevelZero(samplerComparisonState, float4(0, 0, 0, 0), float(0))).x);")
-    else:
-        print(f"Undefined test op code: {testOp}")
-        sys.exit(1)
+# Returns a statement or statements to exercise the texture type. The return type is a string,
+# every statement in their own line.
+def getStatementsForTestOp(testOp):
 
-    return ret
+    opToStatements = {
+        1 : "ret = int((texHandle.SampleLevel(samplerState, float(0), float(0))).x);",
+        2 : "ret = int((texHandle.SampleLevel(samplerState, float2(0, 0), float(0))).x);",
+        3 : "ret = int((texHandle.SampleLevel(samplerState, float3(0, 0, 0), float(0))).x);",
+        4 : "ret = int((texHandle.SampleLevel(samplerState, float4(0, 0, 0, 0), float(0))).x);",
+        11 : "ret = int((texHandle.Load(int(0))).x);",
+        12 : "ret = int((texHandle.Load(int2(0, 0))).x);",
+        13 : "ret = int((texHandle.Load(int3(0, 0, 0))).x);",
+        14 : "ret = int((texHandle.Load(int4(0, 0, 0, 0))).x);",
+        15 : "ret = int((texHandle.Load(int2(0, 0), 0)).x);",
+        16 : "ret = int((texHandle.Load(int3(0, 0, 0), 0)).x);",
+        21 : [ "texHandle.Store(int(0), float4(0, 0, 0, 0));", "ret = 0;" ],
+        22 : [ "texHandle.Store(int2(0, 0), float4(0, 0, 0, 0));", "ret = 0;"],
+        23 : [ "texHandle.Store(int3(0, 0, 0), float4(0, 0, 0, 0));", "ret = 0;"],
+        32 : [ "texHandle.WriteSamplerFeedbackLevel(feedbackSamplerInput2D, samplerState, float2(0, 0), float(0));", "ret = 0;"],
+        33 : [ "texHandle.WriteSamplerFeedbackLevel(feedbackSamplerInput2DArray, samplerState, float3(0, 0, 0), float(0));", "ret = 0;"],
+        41 : "ret = int((texHandle.SampleCmpLevelZero(samplerComparisonState, float(0), float(0))).x);",
+        42 : "ret = int((texHandle.SampleCmpLevelZero(samplerComparisonState, float2(0, 0), float(0))).x);",
+        43 : "ret = int((texHandle.SampleCmpLevelZero(samplerComparisonState, float3(0, 0, 0), float(0))).x);",
+        44 : "ret = int((texHandle.SampleCmpLevelZero(samplerComparisonState, float4(0, 0, 0, 0), float(0))).x);",
+    }
+
+    statements = opToStatements[testOp]
+
+    if isinstance(statements, str):
+        return statements;
+    elif isinstance(statements, list):
+        return "\n    ".join(statements)
+    else:
+        print(f"Undefined test spec type for op code: {testOp}")
+        sys.exit(1)
 
 
 def generateSingleTest(filepath, backend, testType, testInfo):
@@ -483,8 +468,10 @@ Texture2DArray<float4> feedbackSamplerInput2DArray;
             testDisabledComment += f"\n// Negative test disabled, see https://github.com/shader-slang/slang/issues/{testInfo.disableNegativeTestForIssue}"
 
     testStr = f"""// THIS IS A GENERATED FILE. DO NOT EDIT!
-// Instead, edit generate-types-tests.py and then regenerate this test
-// by running: ./generate-types-tests.py
+// Instead, edit extras/generate-tests-capabilities-texture-types.py, and
+// regenerate this test by running:
+//
+//     extras/generate-tests-capabilities-texture-types.py
 //
 // Texture types capability test: {backend['name']} / {testType}
 // - Type supported since target version:  {testInfo.minVersion}
@@ -515,7 +502,7 @@ void fragMain()
 // NEGATIVE: {{{{error[E[[:digit:]]+]}}}}:
 
     int ret = 0;
-    {getTestOp(testInfo.testOp)}
+    {getStatementsForTestOp(testInfo.testOp)}
     outputBuffer[0] = 0x12345 + ret;
 }}
 
@@ -523,7 +510,7 @@ void fragMain()
 void computeMain()
 {{
     int ret = 0;
-    {getTestOp(testInfo.testOp)}
+    {getStatementsForTestOp(testInfo.testOp)}
     outputBuffer[0] = 0x12345 + ret;
 }}
 // POSITIVE_RESULT: 12345
