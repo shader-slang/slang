@@ -616,7 +616,9 @@ public:
                 }
             }
         }
-        Slang::getOffset(targetReq, rules, legalField, &offset);
+        if (SLANG_FAILED(Slang::getOffset(targetReq, rules, legalField, &offset)))
+            m_sink->diagnose(Diagnostics::Unexpected{
+                .message = "failed to compute field offset for LLVM type translation"});
         return offset;
     }
 
