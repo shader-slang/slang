@@ -92,15 +92,6 @@ jobs:
           export SLANG_RUN_SPIRV_VALIDATION=1
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
 
-          # Start background VRAM monitor (log every 10 seconds)
-          (while true; do
-            echo "[VRAM $(date -u +%H:%M:%S)] $(nvidia-smi --query-gpu=memory.used,memory.total,memory.free --format=csv,noheader,nounits | awk -F', ' '{printf "used=%sMiB total=%sMiB free=%sMiB", $1, $2, $3}')"
-            sleep 10
-          done) &
-          VRAM_MONITOR_PID=$!
-          # shellcheck disable=SC2064 -- intentional early expansion of PID
-          trap "kill $VRAM_MONITOR_PID 2>/dev/null" EXIT
-
           slang_test_args=(
             "-category" "full"
             "-expected-failure-list" "tests/expected-failure-github.txt"
