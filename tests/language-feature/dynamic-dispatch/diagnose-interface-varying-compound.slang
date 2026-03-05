@@ -5,11 +5,12 @@
 // Currently triggers an ICE ("unhandled type kind") in parameter binding
 // instead of a clean diagnostic. Disabled until #10403 is fixed.
 
-//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target spirv
-//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target hlsl
-//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target glsl
-//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target metal
-//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target wgsl
+//DISABLE_TEST:SIMPLE(filecheck=CHK1): -target spirv -entry vertexStructMain -stage vertex
+//DISABLE_TEST:SIMPLE(filecheck=CHK1): -target hlsl -entry vertexStructMain -stage vertex
+//DISABLE_TEST:SIMPLE(filecheck=CHK2): -target spirv -entry vertexArrayMain -stage vertex
+//DISABLE_TEST:SIMPLE(filecheck=CHK2): -target hlsl -entry vertexArrayMain -stage vertex
+//DISABLE_TEST:SIMPLE(filecheck=CHK3): -target spirv -entry vertexOptionalMain -stage vertex
+//DISABLE_TEST:SIMPLE(filecheck=CHK3): -target hlsl -entry vertexOptionalMain -stage vertex
 
 interface IFoo
 {
@@ -32,8 +33,8 @@ struct VaryingData
 struct VertexOutputStruct
 {
     VaryingData data : TEXCOORD0;
-    // CHECK: error[E39028]
-    // CHECK: parameter 'material' is not a valid varying parameter
+    // CHK1: error[E39028]
+    // CHK1: parameter 'material' is not a valid varying parameter
     float4 pos : SV_Position;
 }
 
@@ -53,8 +54,8 @@ VertexOutputStruct vertexStructMain(float3 position : POSITION)
 struct VertexOutputArray
 {
     IFoo foos[2] : TEXCOORD0;
-    // CHECK: error[E39028]
-    // CHECK: parameter 'foos' is not a valid varying parameter
+    // CHK2: error[E39028]
+    // CHK2: parameter 'foos' is not a valid varying parameter
     float4 pos : SV_Position;
 }
 
@@ -75,8 +76,8 @@ VertexOutputArray vertexArrayMain(float3 position : POSITION)
 struct VertexOutputOptional
 {
     Optional<IFoo> foo : TEXCOORD0;
-    // CHECK: error[E39028]
-    // CHECK: parameter 'foo' is not a valid varying parameter
+    // CHK3: error[E39028]
+    // CHK3: parameter 'foo' is not a valid varying parameter
     float4 pos : SV_Position;
 }
 

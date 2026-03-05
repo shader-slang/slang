@@ -5,11 +5,10 @@
 // Currently triggers an ICE ("unhandled type kind") in parameter binding
 // instead of a clean diagnostic. Disabled until #10403 is fixed.
 
-//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target spirv
-//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target hlsl
-//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target glsl
-//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target metal
-//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target wgsl
+//DISABLE_TEST:SIMPLE(filecheck=CHK1): -target spirv -entry vertexMain -stage vertex
+//DISABLE_TEST:SIMPLE(filecheck=CHK1): -target hlsl -entry vertexMain -stage vertex
+//DISABLE_TEST:SIMPLE(filecheck=CHK2): -target spirv -entry fragmentReturnMain -stage fragment
+//DISABLE_TEST:SIMPLE(filecheck=CHK2): -target hlsl -entry fragmentReturnMain -stage fragment
 
 interface IFoo
 {
@@ -26,8 +25,8 @@ struct ImplA : IFoo
 struct VertexOutput
 {
     IFoo foo : TEXCOORD0;
-    // CHECK: error[E39028]
-    // CHECK: parameter 'foo' is not a valid varying parameter
+    // CHK1: error[E39028]
+    // CHK1: parameter 'foo' is not a valid varying parameter
     float4 pos : SV_Position;
 }
 
@@ -45,8 +44,8 @@ VertexOutput vertexMain(float3 position : POSITION)
 // Scenario 2: Interface type as entry point return value.
 [shader("fragment")]
 IFoo fragmentReturnMain() : SV_Target
-// CHECK: error[E39028]
-// CHECK: parameter 'fragmentReturnMain' is not a valid varying parameter
+// CHK2: error[E39028]
+// CHK2: parameter 'fragmentReturnMain' is not a valid varying parameter
 {
     ImplA a;
     a.x = 42.0;

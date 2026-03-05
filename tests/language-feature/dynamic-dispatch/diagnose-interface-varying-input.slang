@@ -5,11 +5,10 @@
 // Currently triggers an ICE ("unhandled type kind") in parameter binding
 // instead of a clean diagnostic. Disabled until #10403 is fixed.
 
-//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target spirv
-//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target hlsl
-//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target glsl
-//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target metal
-//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target wgsl
+//DISABLE_TEST:SIMPLE(filecheck=CHK1): -target spirv -entry fragmentMain -stage fragment
+//DISABLE_TEST:SIMPLE(filecheck=CHK1): -target hlsl -entry fragmentMain -stage fragment
+//DISABLE_TEST:SIMPLE(filecheck=CHK2): -target spirv -entry fragmentDirectParam -stage fragment
+//DISABLE_TEST:SIMPLE(filecheck=CHK2): -target hlsl -entry fragmentDirectParam -stage fragment
 
 interface IFoo
 {
@@ -20,8 +19,8 @@ interface IFoo
 struct FragmentInput
 {
     IFoo foo : TEXCOORD0;
-    // CHECK: error[E39028]
-    // CHECK: parameter 'foo' is not a valid varying parameter
+    // CHK1: error[E39028]
+    // CHK1: parameter 'foo' is not a valid varying parameter
     float4 pos : SV_Position;
 }
 
@@ -34,8 +33,8 @@ float4 fragmentMain(FragmentInput input) : SV_Target
 // Scenario 2: Interface type as direct entry point varying parameter.
 [shader("fragment")]
 float4 fragmentDirectParam(IFoo foo : TEXCOORD0) : SV_Target
-// CHECK: error[E39028]
-// CHECK: parameter 'foo' is not a valid varying parameter
+// CHK2: error[E39028]
+// CHK2: parameter 'foo' is not a valid varying parameter
 {
     return float4(foo.getValue(), 0, 0, 1);
 }
