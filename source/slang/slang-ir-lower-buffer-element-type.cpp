@@ -472,9 +472,7 @@ struct LoweredElementTypeContext
     // Specialized functions that takes storage-typed pointers instead of logical-typed pointers.
     Dictionary<SpecializationKey, IRFunc*> specializedFuncs;
 
-    LoweredElementTypeContext(
-        TargetProgram* target,
-        BufferElementTypeLoweringOptions inOptions)
+    LoweredElementTypeContext(TargetProgram* target, BufferElementTypeLoweringOptions inOptions)
         : target(target), options(inOptions)
     {
         leafTypeLoweringPolicy =
@@ -708,11 +706,10 @@ struct LoweredElementTypeContext
                 auto innerArrayType = builder.getArrayType(
                     loweredInnerTypeInfo.loweredType,
                     arrayType->getElementCount(),
-                    (needExplicitLayout && hasLayout)
-                        ? builder.getIntValue(
-                              builder.getIntType(),
-                              elementSizeAlignment.getStride())
-                        : nullptr);
+                    (needExplicitLayout && hasLayout) ? builder.getIntValue(
+                                                            builder.getIntType(),
+                                                            elementSizeAlignment.getStride())
+                                                      : nullptr);
                 builder.createStructField(loweredType, structKey, innerArrayType);
                 info.loweredInnerArrayType = innerArrayType;
                 info.loweredInnerStructKey = structKey;
@@ -736,11 +733,10 @@ struct LoweredElementTypeContext
                     arrayTypeBase->getOp(),
                     loweredInnerTypeInfo.loweredType,
                     nullptr,
-                    (needExplicitLayout && hasLayout)
-                        ? builder.getIntValue(
-                              builder.getIntType(),
-                              elementSizeAlignment.getStride())
-                        : nullptr);
+                    (needExplicitLayout && hasLayout) ? builder.getIntValue(
+                                                            builder.getIntType(),
+                                                            elementSizeAlignment.getStride())
+                                                      : nullptr);
                 maybeAddPhysicalTypeDecoration(builder, innerArrayType, config);
                 info.loweredType = innerArrayType;
             }
@@ -912,10 +908,7 @@ struct LoweredElementTypeContext
         // so downstream emitters can query its layout without recomputation.
         // Failure is expected for types whose layout is not computable (e.g.
         // ConstantBuffer, resource types on some targets).
-        ensureSizeAndAlignment(
-            target->getTargetReq(),
-            config.getLayoutRule(),
-            info.loweredType);
+        ensureSizeAndAlignment(target->getTargetReq(), config.getLayoutRule(), info.loweredType);
         loweredTypeInfo.set(type, info);
         mapLoweredTypeToInfo.set(info.loweredType, info);
         conversionMethodMap[{info.originalType, info.loweredType}] = info.convertLoweredToOriginal;
@@ -1027,9 +1020,7 @@ struct LoweredElementTypeContext
             getSizeAndAlignment(
                 target->getTargetReq(),
                 config.getLayoutRule(),
-                tryGetPointedToOrBufferElementType(
-                    &builder,
-                    fieldAddr->getBase()->getDataType()),
+                tryGetPointedToOrBufferElementType(&builder, fieldAddr->getBase()->getDataType()),
                 &baseSizeAlignment);
 
             // Convert pointer to uint64 and adjust offset.
@@ -1695,10 +1686,7 @@ struct LoweredElementTypeContext
                 // Best-effort: attach an IRSizeAndAlignmentDecoration to the element type
                 // for use by StructuredBufferGetDimensions emission (e.g. GLSL, WGSL).
                 // Failure is expected for types whose layout is not computable.
-                ensureSizeAndAlignment(
-                    target->getTargetReq(),
-                    config.getLayoutRule(),
-                    elementType);
+                ensureSizeAndAlignment(target->getTargetReq(), config.getLayoutRule(), elementType);
             }
             else if (auto constBuffer = as<IRUniformParameterGroupType>(globalInst))
                 elementType = constBuffer->getElementType();

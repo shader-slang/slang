@@ -108,10 +108,7 @@ Result getSizeAndAlignment(
 /// on the type. Unlike getSizeAndAlignment, failure is silently ignored —
 /// use this when the call is purely for decoration caching and the caller
 /// does not need the computed values or a success/failure indication.
-void ensureSizeAndAlignment(
-    TargetRequest* targetReq,
-    IRTypeLayoutRules* rules,
-    IRType* type);
+void ensureSizeAndAlignment(TargetRequest* targetReq, IRTypeLayoutRules* rules, IRType* type);
 
 /// Compute (if necessary) and return the natural size and alignment of `type`.
 ///

@@ -524,10 +524,7 @@ Result getSizeAndAlignment(
     return SLANG_OK;
 }
 
-void ensureSizeAndAlignment(
-    TargetRequest* targetReq,
-    IRTypeLayoutRules* rules,
-    IRType* type)
+void ensureSizeAndAlignment(TargetRequest* targetReq, IRTypeLayoutRules* rules, IRType* type)
 {
     IRSizeAndAlignment sizeAndAlignment;
     getSizeAndAlignment(targetReq, rules, type, &sizeAndAlignment);
