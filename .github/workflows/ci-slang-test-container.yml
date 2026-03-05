@@ -46,6 +46,13 @@ jobs:
         shell: bash
 
     steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/actions/gpu-health-check
+          sparse-checkout-cone-mode: false
+
+      - uses: ./.github/actions/gpu-health-check
+
       - name: Configure Git safe directory
         run: git config --global --add safe.directory '*'
 
@@ -161,6 +168,13 @@ jobs:
         shell: bash
 
     steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/actions/gpu-health-check
+          sparse-checkout-cone-mode: false
+
+      - uses: ./.github/actions/gpu-health-check
+
       - name: Configure Git safe directory
         run: git config --global --add safe.directory '*'
 
@@ -235,6 +249,13 @@ jobs:
         shell: bash
 
     steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/actions/gpu-health-check
+          sparse-checkout-cone-mode: false
+
+      - uses: ./.github/actions/gpu-health-check
+
       - name: Configure Git safe directory
         run: git config --global --add safe.directory '*'
 

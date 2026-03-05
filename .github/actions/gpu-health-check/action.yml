@@ -1,0 +1,20 @@
+name: GPU Health Check
+description: >-
+  Verify that the GPU and NVIDIA driver are functional before running GPU tests.
+  Fails fast on faulty VM instances (e.g. broken NVML) so the job can be re-run
+  on a healthy VM without wasting time on checkout/artifact download.
+  Works on both Linux and Windows with NVIDIA GPUs.
+
+runs:
+  using: "composite"
+  steps:
+    - name: GPU health check
+      shell: bash
+      run: |
+        echo "Checking GPU availability..."
+        if ! nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv,noheader 2>/dev/null; then
+          echo "::error::GPU health check failed: nvidia-smi cannot communicate with the GPU driver."
+          echo "::error::This VM instance likely has a faulty GPU setup. Re-run this job to get a new VM."
+          exit 1
+        fi
+        echo "GPU is healthy."
