@@ -1,0 +1,21 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: Slang Playground
+Source: https://github.com/shader-slang/slang-playground
+
+Files: *
+Copyright: 2024, NVIDIA Corporation
+           2024 The Khronos Group, Inc.
+License: Apache-2.0 WITH LLVM-exception
+
+Files: json-tree/*
+Copyright: Bunoon
+           2024 William Troup
+License: MIT
+
+Files: demos/ocean.slang
+Copyright: ShaderToys by afl_ext
+License: MIT
+
+Files: CODE_OF_CONDUCT.md CONTRIBUTING.md README.md
+Copyright: 2024 The Khronos Group, Inc.
+License: CC-BY-4.0
