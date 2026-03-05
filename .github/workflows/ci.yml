@@ -267,33 +267,25 @@ jobs:
     if: always() && (needs.test-linux-release-gcc-x86_64.result == 'failure' || needs.test-linux-debug-gcc-x86_64.result == 'failure')
     permissions:
       actions: write
+    outputs:
+      rerun-triggered: ${{ steps.check.outputs.rerun-triggered }}
     steps:
       - name: Check for GPU health check failures and rerun
+        id: check
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gpu_failure=false
+          # Use jq to find failed jobs where the "GPU health check" step failed
+          gpu_failures=$(gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs?per_page=100" \
+            --jq '[.jobs[] | select(.conclusion == "failure") | select(.steps[]? | select(.name == "GPU health check" and .conclusion == "failure"))] | length')
 
-          # Check all failed jobs in this run for GPU health check step failures
-          gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs?per_page=100" \
-            --jq '.jobs[] | select(.conclusion == "failure") | {name: .name, steps: [.steps[] | select(.name == "GPU health check") | {name: .name, conclusion: .conclusion}]}' \
-          | while IFS= read -r line; do
-              if echo "$line" | grep -q '"conclusion":"failure"'; then
-                echo "Found GPU health check failure in: $(echo "$line" | grep -o '"name":"[^"]*"' | head -1)"
-                echo "true" > /tmp/gpu_failure
-              fi
-            done
-
-          if [ -f /tmp/gpu_failure ]; then
-            gpu_failure=true
-          fi
-
-          if [ "$gpu_failure" = true ]; then
-            echo "GPU health check failure detected — re-running failed jobs to get a new VM..."
+          if [ "$gpu_failures" -gt 0 ]; then
+            echo "Found $gpu_failures job(s) with GPU health check failures — re-running failed jobs..."
             gh run rerun ${{ github.run_id }} --failed --repo "${{ github.repository }}"
-            echo "Re-run triggered successfully."
+            echo "rerun-triggered=true" >> "$GITHUB_OUTPUT"
           else
-            echo "No GPU health check failures found — failures are from actual test issues."
+            echo "No GPU health check failures — test failures are genuine."
+            echo "rerun-triggered=false" >> "$GITHUB_OUTPUT"
           fi
 
   check-ci:
@@ -326,12 +318,14 @@ jobs:
           echo "Linux Debug ARM64: ${{ needs.test-linux-debug-gcc-aarch64.result }}"
           echo "MaterialX Windows: ${{ needs.test-materialx-windows-release.result }}"
           echo "GPU failure rerun: ${{ needs.rerun-on-gpu-failure.result }}"
+          echo "Rerun triggered: ${{ needs.rerun-on-gpu-failure.outputs.rerun-triggered }}"
 
-          # If GPU failure rerun was triggered, don't fail check-ci — the rerun will
-          # create a new check-ci that evaluates the retried results.
-          if [[ "${{ needs.rerun-on-gpu-failure.result }}" == "success" ]]; then
-            echo "GPU failure rerun was triggered — waiting for retried jobs to complete."
-            echo "This check-ci run will show as successful; the rerun will be evaluated separately."
+          # If a GPU failure rerun was triggered, the failed jobs will be retried.
+          # The rerun replaces the failed jobs in this same run, so check-ci will
+          # be re-evaluated with the new results. Exit successfully here to avoid
+          # blocking the merge queue while the rerun is in progress.
+          if [[ "${{ needs.rerun-on-gpu-failure.outputs.rerun-triggered }}" == "true" ]]; then
+            echo "GPU failure rerun was triggered — this run will be re-evaluated after retry."
             exit 0
           fi
 
