@@ -221,33 +221,28 @@ function(set_default_compile_options target)
             target_compile_options(
                 ${target}
                 PRIVATE
-                -fsanitize=address
-                -shared-libsan
-                -fsanitize=undefined
-                -fno-sanitize-recover=undefined
+                    -fsanitize=address
+                    -shared-libsan
+                    -fsanitize=undefined
+                    -fno-sanitize-recover=undefined
             )
             target_link_options(
                 ${target}
                 BEFORE
-                PUBLIC
-                -fsanitize=address
-                -shared-libsan
-                -fsanitize=undefined
+                PUBLIC -fsanitize=address -shared-libsan -fsanitize=undefined
             )
         elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
             target_compile_options(
                 ${target}
                 PRIVATE
-                -fsanitize=address
-                -fsanitize=undefined
-                -fno-sanitize-recover=undefined
+                    -fsanitize=address
+                    -fsanitize=undefined
+                    -fno-sanitize-recover=undefined
             )
             target_link_options(
                 ${target}
                 BEFORE
-                PUBLIC
-                -fsanitize=address
-                -fsanitize=undefined
+                PUBLIC -fsanitize=address -fsanitize=undefined
             )
         elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
             target_compile_options(${target} PRIVATE /fsanitize=address)
