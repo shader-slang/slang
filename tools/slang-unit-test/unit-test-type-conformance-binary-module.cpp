@@ -472,6 +472,14 @@ SLANG_UNIT_TEST(typeConformanceBinaryModuleTransitiveNonExported)
         auto aModule = session->loadModule("a", diagnostics.writeRef());
         SLANG_CHECK(aModule != nullptr);
 
+        ComPtr<slang::IEntryPoint> entryPoint;
+        aModule->findAndCheckEntryPoint(
+            "computeMain",
+            SLANG_STAGE_COMPUTE,
+            entryPoint.writeRef(),
+            diagnostics.writeRef());
+        SLANG_CHECK(entryPoint != nullptr);
+
         auto layout = aModule->getLayout();
         SLANG_CHECK(layout != nullptr);
 
@@ -481,5 +489,39 @@ SLANG_UNIT_TEST(typeConformanceBinaryModuleTransitiveNonExported)
         SLANG_CHECK(ifoo != nullptr);
         SLANG_CHECK(foo1 != nullptr);
         SLANG_CHECK(foo2 != nullptr);
+
+        ComPtr<slang::ITypeConformance> foo1IFoo;
+        ComPtr<slang::ITypeConformance> foo2IFoo;
+        SLANG_CHECK(
+            session->createTypeConformanceComponentType(
+                foo1,
+                ifoo,
+                foo1IFoo.writeRef(),
+                0,
+                diagnostics.writeRef()) == SLANG_OK);
+        SLANG_CHECK(
+            session->createTypeConformanceComponentType(
+                foo2,
+                ifoo,
+                foo2IFoo.writeRef(),
+                1,
+                diagnostics.writeRef()) == SLANG_OK);
+
+        slang::IComponentType* componentTypes[] = {aModule, entryPoint.get(), foo1IFoo, foo2IFoo};
+        ComPtr<slang::IComponentType> composedProgram;
+        SLANG_CHECK(
+            session->createCompositeComponentType(
+                componentTypes,
+                SLANG_COUNT_OF(componentTypes),
+                composedProgram.writeRef(),
+                diagnostics.writeRef()) == SLANG_OK);
+
+        ComPtr<slang::IComponentType> linkedProgram;
+        SLANG_CHECK(
+            composedProgram->link(linkedProgram.writeRef(), diagnostics.writeRef()) == SLANG_OK);
+
+        ComPtr<slang::IBlob> code;
+        linkedProgram->getTargetCode(0, code.writeRef(), diagnostics.writeRef());
+        SLANG_CHECK(code != nullptr);
     }
 }
