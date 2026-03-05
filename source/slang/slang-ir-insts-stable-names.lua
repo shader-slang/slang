@@ -736,7 +736,6 @@ return {
 	["SPIRVSamplerHeap"] = 734,
 	["SPIRVLoadDescriptorFromHeap"] = 735,
 	["SPIRVLoadTexelPointerFromHeap"] = 736,
-<<<<<<< HEAD
 	["constexprAdd"] = 737,
 	["constexprSub"] = 738,
 	["constexprMul"] = 739,
