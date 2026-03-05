@@ -269,6 +269,7 @@ jobs:
       ]
     runs-on: ubuntu-latest
     if: >-
+      github.run_attempt < 3 &&
       always() && (
         needs.test-linux-release-gcc-x86_64.result == 'failure' ||
         needs.test-linux-debug-gcc-x86_64.result == 'failure' ||
@@ -333,12 +334,11 @@ jobs:
           # If a GPU failure rerun was triggered, the failed jobs will be retried.
           # `gh run rerun --failed` replaces the failed jobs in this same workflow
           # run, and check-ci will be re-evaluated with the new results.
-          # Note: there is a brief window where this check-ci shows success before
-          # the rerun completes. Since check-ci is required for merging, GitHub's
-          # merge queue will wait for the final check-ci result from the rerun.
+          # Exit 1 here so there's no false-green window — the rerun will produce
+          # a new check-ci that evaluates the retried results.
           if [[ "${{ needs.rerun-on-gpu-failure.outputs.rerun-triggered }}" == "true" ]]; then
-            echo "GPU failure rerun was triggered — this run will be re-evaluated after retry."
-            exit 0
+            echo "GPU failure rerun was triggered — this check-ci will be re-evaluated after retry."
+            exit 1
           fi
 
           # Check if any required jobs failed (allow success or skipped)
