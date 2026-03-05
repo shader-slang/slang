@@ -5,6 +5,7 @@
 #include "slang-ir-layout.h"
 #include "slang-ir-marshal-native-call.h"
 #include "slang-ir.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -100,10 +101,13 @@ struct DllImportContext
         for (auto param : func->getParams())
         {
             IRSizeAndAlignment sizeAndAlignment;
-            getNaturalSizeAndAlignment(
-                targetProgram->getTargetReq(),
-                param->getDataType(),
-                &sizeAndAlignment);
+            if (SLANG_FAILED(getNaturalSizeAndAlignment(
+                    targetProgram->getTargetReq(),
+                    param->getDataType(),
+                    &sizeAndAlignment)))
+                diagnosticSink->diagnose(Diagnostics::Unexpected{
+                    .message = "failed to compute type layout for DLL import parameter",
+                    .location = param->sourceLoc});
             result += (uint32_t)align(sizeAndAlignment.size, 4);
         }
         return result;

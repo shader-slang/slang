@@ -60,7 +60,22 @@ static Result _calcArraySizeAndAlignment(
 {
     auto elementCountLit = as<IRIntLit>(elementCountInst);
     if (!elementCountLit)
-        return SLANG_FAIL;
+    {
+        // Only treat specialization-constant-sized arrays as having
+        // indeterminate size. Other non-literal counts (e.g. sizeOf/alignOf
+        // expressions that haven't been folded yet) must return failure so
+        // the result is not cached prematurely with a wrong size.
+        if (!isSpecConstRateType(elementCountInst->getFullType()))
+            return SLANG_FAIL;
+
+        IRSizeAndAlignment elementTypeLayout;
+        SLANG_RETURN_ON_FAIL(
+            getSizeAndAlignment(targetReq, rules, elementType, &elementTypeLayout));
+        elementTypeLayout = rules->alignCompositeElement(elementTypeLayout);
+        outSizeAndAlignment->alignment = elementTypeLayout.alignment;
+        outSizeAndAlignment->size = IRSizeAndAlignment::kIndeterminateSize;
+        return SLANG_OK;
+    }
     auto elementCount = elementCountLit->getValue();
 
     if (elementCount == 0)
@@ -218,7 +233,8 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
     case kIROp_AtomicType:
         {
             auto atomicType = cast<IRAtomicType>(type);
-            calcSizeAndAlignment(targetReq, atomicType->getElementType(), outSizeAndAlignment);
+            SLANG_RETURN_ON_FAIL(
+                calcSizeAndAlignment(targetReq, atomicType->getElementType(), outSizeAndAlignment));
             return SLANG_OK;
         }
         break;
@@ -226,11 +242,11 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
     case kIROp_UnsizedArrayType:
         {
             auto unsizedArrayType = cast<IRUnsizedArrayType>(type);
-            getSizeAndAlignment(
+            SLANG_RETURN_ON_FAIL(getSizeAndAlignment(
                 targetReq,
                 this,
                 unsizedArrayType->getElementType(),
-                outSizeAndAlignment);
+                outSizeAndAlignment));
             outSizeAndAlignment->size = IRSizeAndAlignment::kIndeterminateSize;
             return SLANG_OK;
         }
@@ -507,6 +523,13 @@ Result getSizeAndAlignment(
     *outSizeAndAlignment = sizeAndAlignment;
     return SLANG_OK;
 }
+
+void ensureSizeAndAlignment(TargetRequest* targetReq, IRTypeLayoutRules* rules, IRType* type)
+{
+    IRSizeAndAlignment sizeAndAlignment;
+    getSizeAndAlignment(targetReq, rules, type, &sizeAndAlignment);
+}
+
 IROffsetDecoration* findOffsetDecorationForLayout(
     IRStructField* field,
     IRTypeLayoutRuleName layoutName)
@@ -543,19 +566,17 @@ Result getOffset(
     if (!structType)
         return SLANG_FAIL;
 
-    IRSizeAndAlignment structTypeLayout;
-    SLANG_RETURN_ON_FAIL(getSizeAndAlignment(targetReq, rules, structType, &structTypeLayout));
-
+    // Trigger struct layout computation to cache IROffsetDecorations on
+    // fields. The overall computation may fail (e.g. a specialization-
+    // constant-sized array prevents computing the total struct size),
+    // but offsets for fields before the failure point are still cached.
+    ensureSizeAndAlignment(targetReq, rules, (IRType*)structType);
     if (auto decor = findOffsetDecorationForLayout(field, rules->ruleName))
     {
         *outOffset = decor->getOffset();
         return SLANG_OK;
     }
 
-    // If attempting to lay out the parent type didn't
-    // cause the field to get an offset, then we are
-    // in an unexpected case with no easy answer.
-    //
     return SLANG_FAIL;
 }
 

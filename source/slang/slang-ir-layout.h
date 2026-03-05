@@ -104,6 +104,12 @@ Result getSizeAndAlignment(
     IRType* type,
     IRSizeAndAlignment* outSizeAndAlignment);
 
+/// Best-effort layout computation that caches an IRSizeAndAlignmentDecoration
+/// on the type. Unlike getSizeAndAlignment, failure is silently ignored —
+/// use this when the call is purely for decoration caching and the caller
+/// does not need the computed values or a success/failure indication.
+void ensureSizeAndAlignment(TargetRequest* targetReq, IRTypeLayoutRules* rules, IRType* type);
+
 /// Compute (if necessary) and return the natural size and alignment of `type`.
 ///
 /// This operation may fail if `type` is not one that can be stored in

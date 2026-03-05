@@ -246,11 +246,13 @@ static void reportCheckpointIntermediates(
             continue;
 
         IRSizeAndAlignment structSize;
-        getNaturalSizeAndAlignment(targetReq, structType, &structSize);
+        if (SLANG_FAILED(getNaturalSizeAndAlignment(targetReq, structType, &structSize)))
+            sink->diagnose(Diagnostics::Unexpected{
+                .message = "failed to compute struct type layout",
+                .location = structType->sourceLoc});
 
-        // Reporting happens before empty structs are optimized out
-        // and we still want to keep the checkpointing decorations,
-        // so we end up needing to check for non-zero-ness
+        // Reporting happens before empty structs are optimized out and we still
+        // want to keep the checkpointing decorations, so skip zero-sized structs.
         if (structSize.size == 0)
             continue;
 
@@ -265,7 +267,10 @@ static void reportCheckpointIntermediates(
         {
             IRType* fieldType = field->getFieldType();
             IRSizeAndAlignment fieldSize;
-            getNaturalSizeAndAlignment(targetReq, fieldType, &fieldSize);
+            if (SLANG_FAILED(getNaturalSizeAndAlignment(targetReq, fieldType, &fieldSize)))
+                sink->diagnose(Diagnostics::Unexpected{
+                    .message = "failed to compute field type layout",
+                    .location = field->sourceLoc});
             if (fieldSize.size == 0)
                 continue;
 

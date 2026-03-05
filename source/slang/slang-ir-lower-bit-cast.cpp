@@ -239,10 +239,40 @@ struct BitCastLoweringContext
         auto fromType = operand->getDataType();
         auto toType = inst->getDataType();
 
+        // Skip types whose layout cannot be computed (resource/opaque types,
+        // parameter groups, samplers, structured buffers). These checks must
+        // precede the layout computation to avoid failing on types that will
+        // be returned from without any processing.
+        if (as<IRResourceTypeBase>(fromType) || as<IRResourceTypeBase>(toType))
+        {
+            return;
+        }
+        if (as<IRPointerLikeType>(fromType) || as<IRPointerLikeType>(toType))
+        {
+            return;
+        }
+        if (as<IRSamplerStateTypeBase>(fromType) || as<IRSamplerStateTypeBase>(toType))
+        {
+            return;
+        }
+        if (as<IRHLSLStructuredBufferTypeBase>(fromType) ||
+            as<IRHLSLStructuredBufferTypeBase>(toType))
+        {
+            return;
+        }
+
         IRSizeAndAlignment toTypeSize;
-        getNaturalSizeAndAlignment(targetProgram->getTargetReq(), toType, &toTypeSize);
+        if (SLANG_FAILED(
+                getNaturalSizeAndAlignment(targetProgram->getTargetReq(), toType, &toTypeSize)))
+            sink->diagnose(Diagnostics::Unexpected{
+                .message = "failed to compute type layout for bit_cast target type",
+                .location = inst->sourceLoc});
         IRSizeAndAlignment fromTypeSize;
-        getNaturalSizeAndAlignment(targetProgram->getTargetReq(), fromType, &fromTypeSize);
+        if (SLANG_FAILED(
+                getNaturalSizeAndAlignment(targetProgram->getTargetReq(), fromType, &fromTypeSize)))
+            sink->diagnose(Diagnostics::Unexpected{
+                .message = "failed to compute type layout for bit_cast source type",
+                .location = inst->sourceLoc});
 
         // Check if the target is directly emitted SPIRV and if the target is SPIRV 1.5 or later
         bool isDirectSpirv = false;
@@ -354,25 +384,6 @@ struct BitCastLoweringContext
                  toElementCount % fromElementCount == 0) &&
                 !isTypeEqual(fromType, toType))
                 return;
-        }
-
-        // Ignore cases we cannot handle yet.
-        if (as<IRResourceTypeBase>(fromType) || as<IRResourceTypeBase>(toType))
-        {
-            return;
-        }
-        if (as<IRPointerLikeType>(fromType) || as<IRPointerLikeType>(toType))
-        {
-            return;
-        }
-        if (as<IRSamplerStateTypeBase>(fromType) || as<IRSamplerStateTypeBase>(toType))
-        {
-            return;
-        }
-        if (as<IRHLSLStructuredBufferTypeBase>(fromType) ||
-            as<IRHLSLStructuredBufferTypeBase>(toType))
-        {
-            return;
         }
 
         if (fromTypeSize.size != toTypeSize.size)

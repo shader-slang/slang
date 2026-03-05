@@ -264,10 +264,16 @@ void inferAnyValueSizeWhereNecessary(
         for (auto implType : nonSelfReferentialImpls[interfaceType])
         {
             IRSizeAndAlignment sizeAndAlignment;
-            getNaturalSizeAndAlignment(
-                targetProgram->getTargetReq(),
-                (IRType*)implType,
-                &sizeAndAlignment);
+            // Types whose layout can't be computed (e.g. containing resource
+            // handles or interface fields) can't be packed into an AnyValue.
+            // Skip them; if no implementation has a computable layout, the
+            // decoration is simply not emitted. Downstream consumers must
+            // handle a missing decoration gracefully.
+            if (SLANG_FAILED(getNaturalSizeAndAlignment(
+                    targetProgram->getTargetReq(),
+                    (IRType*)implType,
+                    &sizeAndAlignment)))
+                continue;
 
             maxAnyValueSize = Math::Max(maxAnyValueSize, sizeAndAlignment.size);
 
@@ -299,10 +305,11 @@ void inferAnyValueSizeWhereNecessary(
         for (auto implType : selfReferentialImpls[interfaceType])
         {
             IRSizeAndAlignment sizeAndAlignment;
-            getNaturalSizeAndAlignment(
-                targetProgram->getTargetReq(),
-                (IRType*)implType,
-                &sizeAndAlignment);
+            if (SLANG_FAILED(getNaturalSizeAndAlignment(
+                    targetProgram->getTargetReq(),
+                    (IRType*)implType,
+                    &sizeAndAlignment)))
+                continue;
 
             maxAnyValueSize = Math::Max(maxAnyValueSize, sizeAndAlignment.size);
 
@@ -321,8 +328,10 @@ void inferAnyValueSizeWhereNecessary(
             }
         }
 
-        // Should not encounter interface types without any conforming implementations.
-        SLANG_ASSERT(maxAnyValueSize >= 0);
+        // maxAnyValueSize may be -1 if all implementations had non-computable
+        // layouts (e.g. types containing TaggedUnion or resource handles).
+        // In that case, no decoration is emitted. Downstream consumers must
+        // handle a missing decoration gracefully and diagnose if needed.
 
         // Update the AnyValue size if self-referential impls require a larger size.
         if (maxAnyValueSize >= 0)

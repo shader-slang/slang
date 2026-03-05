@@ -127,11 +127,14 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         builder.setInsertBefore(inst);
         auto elementType = inst->getElementType();
         IRSizeAndAlignment elementSize;
-        getSizeAndAlignment(
-            m_sharedContext->m_targetRequest,
-            layoutRules,
-            elementType,
-            &elementSize);
+        if (SLANG_FAILED(getSizeAndAlignment(
+                m_sharedContext->m_targetRequest,
+                layoutRules,
+                elementType,
+                &elementSize)))
+            m_sharedContext->m_sink->diagnose(Diagnostics::Unexpected{
+                .message = "failed to compute element type layout for SPIR-V structured buffer",
+                .location = inst->sourceLoc});
         elementSize = layoutRules->alignCompositeElement(elementSize);
 
         const auto arrayType = builder.getUnsizedArrayType(
@@ -141,8 +144,19 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         builder.addPhysicalTypeDecoration(structType);
         const auto arrayKey = builder.createStructKey();
         builder.createStructField(structType, arrayKey, arrayType);
+        // Attach an IRSizeAndAlignmentDecoration to the struct type so downstream
+        // SPIR-V emission can query its layout. This struct wraps a single array
+        // field whose element layout was already computed successfully above, so
+        // the struct layout should always be computable.
         IRSizeAndAlignment structSize;
-        getSizeAndAlignment(m_sharedContext->m_targetRequest, layoutRules, structType, &structSize);
+        if (SLANG_FAILED(getSizeAndAlignment(
+                m_sharedContext->m_targetRequest,
+                layoutRules,
+                structType,
+                &structSize)))
+            m_sharedContext->m_sink->diagnose(Diagnostics::Unexpected{
+                .message = "failed to compute struct type layout for SPIR-V structured buffer",
+                .location = inst->sourceLoc});
 
         StringBuilder nameSb;
         switch (inst->getOp())
@@ -229,8 +243,19 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         auto rules = getTypeLayoutRuleForBuffer(
             m_sharedContext->m_targetProgram,
             cbParamInst->getDataType());
+        // Attach an IRSizeAndAlignmentDecoration to the wrapper struct so
+        // downstream SPIR-V emission can query its layout. This struct wraps
+        // a single field of the original constant buffer's inner type, so its
+        // layout should always be computable from that inner type.
         IRSizeAndAlignment sizeAlignment;
-        getSizeAndAlignment(m_sharedContext->m_targetRequest, rules, structType, &sizeAlignment);
+        if (SLANG_FAILED(getSizeAndAlignment(
+                m_sharedContext->m_targetRequest,
+                rules,
+                structType,
+                &sizeAlignment)))
+            m_sharedContext->m_sink->diagnose(Diagnostics::Unexpected{
+                .message = "failed to compute type layout for SPIR-V constant buffer wrapper",
+                .location = cbParamInst->sourceLoc});
         traverseUses(
             cbParamInst,
             [&](IRUse* use)

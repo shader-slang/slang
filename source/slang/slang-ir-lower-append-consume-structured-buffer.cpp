@@ -5,10 +5,14 @@
 #include "slang-ir-lower-buffer-element-type.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
-static void lowerStructuredBufferType(TargetProgram* target, IRHLSLStructuredBufferTypeBase* type)
+static void lowerStructuredBufferType(
+    TargetProgram* target,
+    IRHLSLStructuredBufferTypeBase* type,
+    DiagnosticSink* sink)
 {
     IRBuilder builder(type);
     builder.setInsertBefore(type);
@@ -49,7 +53,11 @@ static void lowerStructuredBufferType(TargetProgram* target, IRHLSLStructuredBuf
 
     IRTypeLayout::Builder elementTypeLayoutBuilder(&builder);
     IRSizeAndAlignment elementSize;
-    getSizeAndAlignment(target->getTargetReq(), layoutRules, elementType, &elementSize);
+    if (SLANG_FAILED(
+            getSizeAndAlignment(target->getTargetReq(), layoutRules, elementType, &elementSize)))
+        sink->diagnose(Diagnostics::Unexpected{
+            .message = "failed to compute element type layout for structured buffer",
+            .location = type->sourceLoc});
     elementTypeLayoutBuilder.addResourceUsage(
         LayoutResourceKind::Uniform,
         LayoutSize((LayoutSize::RawValue)elementSize.getStride()));
@@ -318,14 +326,13 @@ void lowerAppendConsumeStructuredBuffers(
     TargetProgram* target,
     DiagnosticSink* sink)
 {
-    SLANG_UNUSED(sink);
     for (auto globalInst : module->getGlobalInsts())
     {
         switch (globalInst->getOp())
         {
         case kIROp_HLSLAppendStructuredBufferType:
         case kIROp_HLSLConsumeStructuredBufferType:
-            lowerStructuredBufferType(target, as<IRHLSLStructuredBufferTypeBase>(globalInst));
+            lowerStructuredBufferType(target, as<IRHLSLStructuredBufferTypeBase>(globalInst), sink);
             break;
         }
     }

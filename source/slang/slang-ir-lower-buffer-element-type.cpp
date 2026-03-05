@@ -383,10 +383,12 @@ IRIntegerValue get16ByteAlignedVectorElementCount(
     IRIntegerValue minCount)
 {
     IRSizeAndAlignment sizeAlignment;
-    getNaturalSizeAndAlignment(target->getTargetReq(), elementType, &sizeAlignment);
-    if (sizeAlignment.size)
+    auto result = getNaturalSizeAndAlignment(target->getTargetReq(), elementType, &sizeAlignment);
+
+    if (SLANG_SUCCEEDED(result) && sizeAlignment.size)
         return align(sizeAlignment.size * minCount, 16) / sizeAlignment.size;
-    return 4;
+    else
+        return 4;
 }
 
 const char* getLayoutName(IRTypeLayoutRuleName name)
@@ -693,20 +695,21 @@ struct LoweredElementTypeContext
                 auto structKey = builder.createStructKey();
                 builder.addNameHintDecoration(structKey, UnownedStringSlice("data"));
                 IRSizeAndAlignment elementSizeAlignment;
-                getSizeAndAlignment(
+                bool hasLayout = SLANG_SUCCEEDED(getSizeAndAlignment(
                     target->getTargetReq(),
                     config.getLayoutRule(),
                     loweredInnerTypeInfo.loweredType,
-                    &elementSizeAlignment);
-                elementSizeAlignment =
-                    config.getLayoutRule()->alignCompositeElement(elementSizeAlignment);
+                    &elementSizeAlignment));
+                if (hasLayout)
+                    elementSizeAlignment =
+                        config.getLayoutRule()->alignCompositeElement(elementSizeAlignment);
                 auto innerArrayType = builder.getArrayType(
                     loweredInnerTypeInfo.loweredType,
                     arrayType->getElementCount(),
-                    needExplicitLayout ? builder.getIntValue(
-                                             builder.getIntType(),
-                                             elementSizeAlignment.getStride())
-                                       : nullptr);
+                    (needExplicitLayout && hasLayout) ? builder.getIntValue(
+                                                            builder.getIntType(),
+                                                            elementSizeAlignment.getStride())
+                                                      : nullptr);
                 builder.createStructField(loweredType, structKey, innerArrayType);
                 info.loweredInnerArrayType = innerArrayType;
                 info.loweredInnerStructKey = structKey;
@@ -718,21 +721,22 @@ struct LoweredElementTypeContext
             else
             {
                 IRSizeAndAlignment elementSizeAlignment;
-                getSizeAndAlignment(
+                bool hasLayout = SLANG_SUCCEEDED(getSizeAndAlignment(
                     target->getTargetReq(),
                     config.getLayoutRule(),
                     loweredInnerTypeInfo.loweredType,
-                    &elementSizeAlignment);
-                elementSizeAlignment =
-                    config.getLayoutRule()->alignCompositeElement(elementSizeAlignment);
+                    &elementSizeAlignment));
+                if (hasLayout)
+                    elementSizeAlignment =
+                        config.getLayoutRule()->alignCompositeElement(elementSizeAlignment);
                 auto innerArrayType = builder.getArrayTypeBase(
                     arrayTypeBase->getOp(),
                     loweredInnerTypeInfo.loweredType,
                     nullptr,
-                    needExplicitLayout ? builder.getIntValue(
-                                             builder.getIntType(),
-                                             elementSizeAlignment.getStride())
-                                       : nullptr);
+                    (needExplicitLayout && hasLayout) ? builder.getIntValue(
+                                                            builder.getIntType(),
+                                                            elementSizeAlignment.getStride())
+                                                      : nullptr);
                 maybeAddPhysicalTypeDecoration(builder, innerArrayType, config);
                 info.loweredType = innerArrayType;
             }
@@ -900,12 +904,11 @@ struct LoweredElementTypeContext
         if (loweredTypeInfo.tryGetValue(type, info))
             return info;
         info = getLoweredTypeInfoImpl(type, config);
-        IRSizeAndAlignment sizeAlignment;
-        getSizeAndAlignment(
-            target->getTargetReq(),
-            config.getLayoutRule(),
-            info.loweredType,
-            &sizeAlignment);
+        // Best-effort: attach an IRSizeAndAlignmentDecoration to the lowered type
+        // so downstream emitters can query its layout without recomputation.
+        // Failure is expected for types whose layout is not computable (e.g.
+        // ConstantBuffer, resource types on some targets).
+        ensureSizeAndAlignment(target->getTargetReq(), config.getLayoutRule(), info.loweredType);
         loweredTypeInfo.set(type, info);
         mapLoweredTypeToInfo.set(info.loweredType, info);
         conversionMethodMap[{info.originalType, info.loweredType}] = info.convertLoweredToOriginal;
@@ -1005,6 +1008,8 @@ struct LoweredElementTypeContext
             auto newArrayPtrVal = fieldAddr->getBase();
             auto loweredInnerType = getLoweredTypeInfo(unsizedArrayType->getElementType(), config);
 
+            // Layout may fail for resource/opaque types; zero size and
+            // alignment are safe defaults (no pointer offset adjustment).
             IRSizeAndAlignment arrayElementSizeAlignment;
             getSizeAndAlignment(
                 target->getTargetReq(),
@@ -1678,15 +1683,10 @@ struct LoweredElementTypeContext
                 elementType = structBuffer->getElementType();
                 auto config = getTypeLoweringConfigForBuffer(target, structBuffer);
 
-                // Create size and alignment decoration for potential use
-                // in`StructuredBufferGetDimensions`.
-                IRSizeAndAlignment sizeAlignment;
-                getSizeAndAlignment(
-                    target->getTargetReq(),
-                    config.getLayoutRule(),
-                    elementType,
-                    &sizeAlignment);
-                SLANG_UNUSED(sizeAlignment);
+                // Best-effort: attach an IRSizeAndAlignmentDecoration to the element type
+                // for use by StructuredBufferGetDimensions emission (e.g. GLSL, WGSL).
+                // Failure is expected for types whose layout is not computable.
+                ensureSizeAndAlignment(target->getTargetReq(), config.getLayoutRule(), elementType);
             }
             else if (auto constBuffer = as<IRUniformParameterGroupType>(globalInst))
                 elementType = constBuffer->getElementType();
@@ -2695,18 +2695,19 @@ struct DefaultBufferElementTypeLoweringPolicy : BufferElementTypeLoweringPolicy
 
             auto vectorType = builder.getVectorType(matrixType->getElementType(), vectorSize);
             IRSizeAndAlignment elementSizeAlignment;
-            getSizeAndAlignment(
+            bool hasLayout = SLANG_SUCCEEDED(getSizeAndAlignment(
                 target->getTargetReq(),
                 config.getLayoutRule(),
                 vectorType,
-                &elementSizeAlignment);
-            elementSizeAlignment =
-                config.getLayoutRule()->alignCompositeElement(elementSizeAlignment);
+                &elementSizeAlignment));
+            if (hasLayout)
+                elementSizeAlignment =
+                    config.getLayoutRule()->alignCompositeElement(elementSizeAlignment);
 
             auto arrayType = builder.getArrayType(
                 vectorType,
                 isColMajor ? matrixType->getColumnCount() : matrixType->getRowCount(),
-                needExplicitLayout
+                (needExplicitLayout && hasLayout)
                     ? builder.getIntValue(builder.getIntType(), elementSizeAlignment.getStride())
                     : nullptr);
             builder.createStructField(loweredType, structKey, arrayType);

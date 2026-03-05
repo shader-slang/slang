@@ -3,11 +3,13 @@
 #include "slang-ir-call-graph.h"
 #include "slang-ir-layout.h"
 #include "slang-ir-util.h"
+#include "slang-rich-diagnostics.h"
 
 using namespace slang;
 
 namespace Slang
 {
+
 class ByteCodeEmitter
 {
 public:
@@ -31,10 +33,21 @@ public:
 
     VMByteCodeBuilder& byteCodeBuilder;
     CodeGenContext* codeGenContext;
+    bool m_hasErrors = false;
 
     ByteCodeEmitter(VMByteCodeBuilder& builder, CodeGenContext* codeGenContext)
         : byteCodeBuilder(builder), codeGenContext(codeGenContext)
     {
+    }
+
+    void reportLayoutError(const char* message, SourceLoc loc = SourceLoc{})
+    {
+        m_hasErrors = true;
+        // Diagnostics::Unexpected aborts compilation immediately. m_hasErrors
+        // is maintained so we can lower this to a non-aborting severity in the
+        // future if we want to accumulate multiple errors before failing.
+        codeGenContext->getSink()->diagnose(
+            Diagnostics::Unexpected{.message = message, .location = loc});
     }
 
     String getName(IRInst* inst)
@@ -101,10 +114,13 @@ public:
             return operand;
 
         IRSizeAndAlignment sizeAlignment = {};
-        getNaturalSizeAndAlignment(
-            codeGenContext->getTargetReq(),
-            inst->getDataType(),
-            &sizeAlignment);
+        if (SLANG_FAILED(getNaturalSizeAndAlignment(
+                codeGenContext->getTargetReq(),
+                inst->getDataType(),
+                &sizeAlignment)))
+            reportLayoutError(
+                "failed to compute type layout for VM bytecode emission",
+                inst->sourceLoc);
         operand = allocReg(funcBuilder, sizeAlignment.size, sizeAlignment.alignment);
         mapInstToOperand[inst] = operand;
         return operand;
@@ -168,15 +184,20 @@ public:
 
     VMOperand addConstantValue(IRConstant* inst)
     {
+        if (inst->getOp() == kIROp_StringLit)
+            return addStringLiteral(static_cast<IRStringLit*>(inst)->getStringSlice());
+
         VMOperand operand;
         operand.sectionId = kSlangByteCodeSectionConstants;
 
-        // Align constantSection.
         IRSizeAndAlignment sizeAlignment;
-        getNaturalSizeAndAlignment(
-            codeGenContext->getTargetReq(),
-            inst->getDataType(),
-            &sizeAlignment);
+        if (SLANG_FAILED(getNaturalSizeAndAlignment(
+                codeGenContext->getTargetReq(),
+                inst->getDataType(),
+                &sizeAlignment)))
+            reportLayoutError(
+                "failed to compute type layout for VM bytecode emission",
+                inst->sourceLoc);
         alignConstSection(sizeAlignment.alignment);
 
         operand.offset = (uint32_t)byteCodeBuilder.constantSection.getCount();
@@ -184,10 +205,6 @@ public:
 
         switch (inst->getOp())
         {
-        case kIROp_StringLit:
-            {
-                return addStringLiteral(static_cast<IRStringLit*>(inst)->getStringSlice());
-            }
         case kIROp_IntLit:
             {
                 int64_t value = static_cast<IRIntLit*>(inst)->getValue();
@@ -508,10 +525,13 @@ public:
                 {
                     funcBuilder.parameterOffsets.add(operand.offset);
                     IRSizeAndAlignment sizeAlignment = {};
-                    getNaturalSizeAndAlignment(
-                        codeGenContext->getTargetReq(),
-                        inst->getDataType(),
-                        &sizeAlignment);
+                    if (SLANG_FAILED(getNaturalSizeAndAlignment(
+                            codeGenContext->getTargetReq(),
+                            inst->getDataType(),
+                            &sizeAlignment)))
+                        reportLayoutError(
+                            "failed to compute type layout for VM bytecode emission",
+                            inst->sourceLoc);
                     funcBuilder.parameterSize =
                         operand.offset + (uint32_t)sizeAlignment.getStride();
                 }
@@ -522,7 +542,13 @@ public:
                 IRBuilder builder(inst);
                 auto type = tryGetPointedToType(&builder, inst->getDataType());
                 IRSizeAndAlignment sizeAlignment = {};
-                getNaturalSizeAndAlignment(codeGenContext->getTargetReq(), type, &sizeAlignment);
+                if (SLANG_FAILED(getNaturalSizeAndAlignment(
+                        codeGenContext->getTargetReq(),
+                        type,
+                        &sizeAlignment)))
+                    reportLayoutError(
+                        "failed to compute type layout for VM bytecode emission",
+                        inst->sourceLoc);
                 auto varStorage = allocReg(
                     funcBuilder,
                     (size_t)sizeAlignment.size,
@@ -537,10 +563,13 @@ public:
         case kIROp_Load:
             {
                 IRSizeAndAlignment sizeAlignment = {};
-                getNaturalSizeAndAlignment(
-                    codeGenContext->getTargetReq(),
-                    inst->getDataType(),
-                    &sizeAlignment);
+                if (SLANG_FAILED(getNaturalSizeAndAlignment(
+                        codeGenContext->getTargetReq(),
+                        inst->getDataType(),
+                        &sizeAlignment)))
+                    reportLayoutError(
+                        "failed to compute type layout for VM bytecode emission",
+                        inst->sourceLoc);
                 writeInst(
                     funcBuilder,
                     VMOp::Load,
@@ -552,10 +581,13 @@ public:
         case kIROp_Store:
             {
                 IRSizeAndAlignment sizeAlignment = {};
-                getNaturalSizeAndAlignment(
-                    codeGenContext->getTargetReq(),
-                    inst->getOperand(1)->getDataType(),
-                    &sizeAlignment);
+                if (SLANG_FAILED(getNaturalSizeAndAlignment(
+                        codeGenContext->getTargetReq(),
+                        inst->getOperand(1)->getDataType(),
+                        &sizeAlignment)))
+                    reportLayoutError(
+                        "failed to compute type layout for VM bytecode emission",
+                        inst->sourceLoc);
                 writeInst(
                     funcBuilder,
                     VMOp::Store,
@@ -586,10 +618,13 @@ public:
             {
                 auto opInfo = translateArithmeticOp(inst);
                 IRSizeAndAlignment sizeAlignment = {};
-                getNaturalSizeAndAlignment(
-                    codeGenContext->getTargetReq(),
-                    inst->getDataType(),
-                    &sizeAlignment);
+                if (SLANG_FAILED(getNaturalSizeAndAlignment(
+                        codeGenContext->getTargetReq(),
+                        inst->getDataType(),
+                        &sizeAlignment)))
+                    reportLayoutError(
+                        "failed to compute type layout for VM bytecode emission",
+                        inst->sourceLoc);
                 writeInst(
                     funcBuilder,
                     opInfo.opcode,
@@ -605,10 +640,13 @@ public:
             {
                 auto opInfo = translateArithmeticOp(inst);
                 IRSizeAndAlignment sizeAlignment = {};
-                getNaturalSizeAndAlignment(
-                    codeGenContext->getTargetReq(),
-                    inst->getDataType(),
-                    &sizeAlignment);
+                if (SLANG_FAILED(getNaturalSizeAndAlignment(
+                        codeGenContext->getTargetReq(),
+                        inst->getDataType(),
+                        &sizeAlignment)))
+                    reportLayoutError(
+                        "failed to compute type layout for VM bytecode emission",
+                        inst->sourceLoc);
                 writeInst(
                     funcBuilder,
                     opInfo.opcode,
@@ -638,10 +676,13 @@ public:
                     auto param = paramList[i];
                     auto paramReg = ensureWorkingsetMemory(funcBuilder, param);
                     IRSizeAndAlignment sizeAlignment = {};
-                    getNaturalSizeAndAlignment(
-                        codeGenContext->getTargetReq(),
-                        param->getDataType(),
-                        &sizeAlignment);
+                    if (SLANG_FAILED(getNaturalSizeAndAlignment(
+                            codeGenContext->getTargetReq(),
+                            param->getDataType(),
+                            &sizeAlignment)))
+                        reportLayoutError(
+                            "failed to compute type layout for VM bytecode emission",
+                            param->sourceLoc);
                     writeInst(
                         funcBuilder,
                         VMOp::Copy,
@@ -715,10 +756,13 @@ public:
                     operands.add(ensureInst(callInst->getArg(i)));
                 }
                 IRSizeAndAlignment sizeAlignment = {};
-                getNaturalSizeAndAlignment(
-                    codeGenContext->getTargetReq(),
-                    inst->getDataType(),
-                    &sizeAlignment);
+                if (SLANG_FAILED(getNaturalSizeAndAlignment(
+                        codeGenContext->getTargetReq(),
+                        inst->getDataType(),
+                        &sizeAlignment)))
+                    reportLayoutError(
+                        "failed to compute type layout for VM bytecode emission",
+                        inst->sourceLoc);
                 writeInst(
                     funcBuilder,
                     VMOp::Call,
@@ -733,10 +777,13 @@ public:
                 if (returnInst && returnInst->getVal()->getOp() != kIROp_VoidLit)
                 {
                     IRSizeAndAlignment sizeAlignment = {};
-                    getNaturalSizeAndAlignment(
-                        codeGenContext->getTargetReq(),
-                        returnInst->getVal()->getDataType(),
-                        &sizeAlignment);
+                    if (SLANG_FAILED(getNaturalSizeAndAlignment(
+                            codeGenContext->getTargetReq(),
+                            returnInst->getVal()->getDataType(),
+                            &sizeAlignment)))
+                        reportLayoutError(
+                            "failed to compute type layout for VM bytecode emission",
+                            inst->sourceLoc);
                     writeInst(
                         funcBuilder,
                         VMOp::Ret,
@@ -757,10 +804,13 @@ public:
                 IRBuilder builder(inst);
                 auto elementType = tryGetPointedToType(&builder, getElemInst->getDataType());
                 IRSizeAndAlignment sizeAlignment = {};
-                getNaturalSizeAndAlignment(
-                    codeGenContext->getTargetReq(),
-                    elementType,
-                    &sizeAlignment);
+                if (SLANG_FAILED(getNaturalSizeAndAlignment(
+                        codeGenContext->getTargetReq(),
+                        elementType,
+                        &sizeAlignment)))
+                    reportLayoutError(
+                        "failed to compute type layout for VM bytecode emission",
+                        inst->sourceLoc);
                 auto stride = sizeAlignment.getStride();
                 auto baseOperand = ensureInst(base);
                 auto indexOperand = ensureInst(index);
@@ -784,7 +834,10 @@ public:
                     as<IRStructType>(tryGetPointedToType(&builder, base->getDataType()));
                 IRIntegerValue offset = 0;
                 auto field = findStructField(structType, fieldKey);
-                getNaturalOffset(codeGenContext->getTargetReq(), field, &offset);
+                if (SLANG_FAILED(getNaturalOffset(codeGenContext->getTargetReq(), field, &offset)))
+                    reportLayoutError(
+                        "failed to compute field offset for VM bytecode emission",
+                        inst->sourceLoc);
 
                 writeInst(
                     funcBuilder,
@@ -803,10 +856,13 @@ public:
                 IRSizeAndAlignment sizeAlignment = {};
                 IRBuilder builder(inst);
                 auto elementType = tryGetPointedToType(&builder, getOffsetPtrInst->getDataType());
-                getNaturalSizeAndAlignment(
-                    codeGenContext->getTargetReq(),
-                    elementType,
-                    &sizeAlignment);
+                if (SLANG_FAILED(getNaturalSizeAndAlignment(
+                        codeGenContext->getTargetReq(),
+                        elementType,
+                        &sizeAlignment)))
+                    reportLayoutError(
+                        "failed to compute type layout for VM bytecode emission",
+                        inst->sourceLoc);
                 writeInst(
                     funcBuilder,
                     VMOp::OffsetPtr,
@@ -825,7 +881,10 @@ public:
                 auto structType = as<IRStructType>(base->getDataType());
                 IRIntegerValue offset = 0;
                 auto field = findStructField(structType, fieldKey);
-                getNaturalOffset(codeGenContext->getTargetReq(), field, &offset);
+                if (SLANG_FAILED(getNaturalOffset(codeGenContext->getTargetReq(), field, &offset)))
+                    reportLayoutError(
+                        "failed to compute field offset for VM bytecode emission",
+                        inst->sourceLoc);
 
                 auto baseOperand = ensureInst(base);
                 baseOperand.offset += (uint32_t)offset;
@@ -839,10 +898,13 @@ public:
                 auto index = getElemInst->getIndex();
                 auto elementType = getElemInst->getDataType();
                 IRSizeAndAlignment sizeAlignment = {};
-                getNaturalSizeAndAlignment(
-                    codeGenContext->getTargetReq(),
-                    elementType,
-                    &sizeAlignment);
+                if (SLANG_FAILED(getNaturalSizeAndAlignment(
+                        codeGenContext->getTargetReq(),
+                        elementType,
+                        &sizeAlignment)))
+                    reportLayoutError(
+                        "failed to compute type layout for VM bytecode emission",
+                        inst->sourceLoc);
                 auto stride = sizeAlignment.getStride();
                 auto baseOperand = ensureInst(base);
                 if (as<IRIntLit>(index))
@@ -904,10 +966,13 @@ public:
                 auto arrayType = as<IRArrayTypeBase>(inst->getDataType());
                 auto elementType = arrayType->getElementType();
                 IRSizeAndAlignment sizeAlignment = {};
-                getNaturalSizeAndAlignment(
-                    codeGenContext->getTargetReq(),
-                    elementType,
-                    &sizeAlignment);
+                if (SLANG_FAILED(getNaturalSizeAndAlignment(
+                        codeGenContext->getTargetReq(),
+                        elementType,
+                        &sizeAlignment)))
+                    reportLayoutError(
+                        "failed to compute type layout for VM bytecode emission",
+                        inst->sourceLoc);
                 auto stride = (uint32_t)sizeAlignment.getStride();
                 for (UInt i = 0; i < inst->getOperandCount(); ++i)
                 {
@@ -928,10 +993,13 @@ public:
                 auto arrayType = as<IRArrayTypeBase>(inst->getDataType());
                 auto elementType = arrayType->getElementType();
                 IRSizeAndAlignment sizeAlignment = {};
-                getNaturalSizeAndAlignment(
-                    codeGenContext->getTargetReq(),
-                    elementType,
-                    &sizeAlignment);
+                if (SLANG_FAILED(getNaturalSizeAndAlignment(
+                        codeGenContext->getTargetReq(),
+                        elementType,
+                        &sizeAlignment)))
+                    reportLayoutError(
+                        "failed to compute type layout for VM bytecode emission",
+                        inst->sourceLoc);
                 auto stride = (uint32_t)sizeAlignment.getStride();
                 for (Index i = 0; i < getIntVal(arrayType->getElementCount()); ++i)
                 {
@@ -959,12 +1027,19 @@ public:
                 {
                     auto field = fields[i];
                     IRIntegerValue offset = 0;
-                    getNaturalOffset(codeGenContext->getTargetReq(), field, &offset);
+                    if (SLANG_FAILED(
+                            getNaturalOffset(codeGenContext->getTargetReq(), field, &offset)))
+                        reportLayoutError(
+                            "failed to compute field offset for VM bytecode emission",
+                            field->sourceLoc);
                     IRSizeAndAlignment sizeAlignment = {};
-                    getNaturalSizeAndAlignment(
-                        codeGenContext->getTargetReq(),
-                        field->getFieldType(),
-                        &sizeAlignment);
+                    if (SLANG_FAILED(getNaturalSizeAndAlignment(
+                            codeGenContext->getTargetReq(),
+                            field->getFieldType(),
+                            &sizeAlignment)))
+                        reportLayoutError(
+                            "failed to compute type layout for VM bytecode emission",
+                            field->sourceLoc);
                     VMOperand elementOperand = result;
                     elementOperand.offset += (uint32_t)offset;
                     writeInst(
@@ -984,10 +1059,13 @@ public:
                 {
                     VMOperand elementOperand = result;
                     IRSizeAndAlignment sizeAlignment = {};
-                    getNaturalSizeAndAlignment(
-                        codeGenContext->getTargetReq(),
-                        inst->getOperand(i)->getDataType(),
-                        &sizeAlignment);
+                    if (SLANG_FAILED(getNaturalSizeAndAlignment(
+                            codeGenContext->getTargetReq(),
+                            inst->getOperand(i)->getDataType(),
+                            &sizeAlignment)))
+                        reportLayoutError(
+                            "failed to compute type layout for VM bytecode emission",
+                            inst->sourceLoc);
                     writeInst(
                         funcBuilder,
                         VMOp::Copy,
@@ -1003,10 +1081,13 @@ public:
                 auto result = ensureWorkingsetMemory(funcBuilder, inst);
                 auto vectorType = as<IRVectorType>(inst->getDataType());
                 IRSizeAndAlignment sizeAlignment = {};
-                getNaturalSizeAndAlignment(
-                    codeGenContext->getTargetReq(),
-                    vectorType->getElementType(),
-                    &sizeAlignment);
+                if (SLANG_FAILED(getNaturalSizeAndAlignment(
+                        codeGenContext->getTargetReq(),
+                        vectorType->getElementType(),
+                        &sizeAlignment)))
+                    reportLayoutError(
+                        "failed to compute type layout for VM bytecode emission",
+                        inst->sourceLoc);
                 auto stride = (uint32_t)sizeAlignment.getStride();
                 for (Index i = 0; i < getIntVal(vectorType->getElementCount()); ++i)
                 {
@@ -1026,10 +1107,13 @@ public:
                 auto result = ensureWorkingsetMemory(funcBuilder, inst);
                 auto matrixType = as<IRMatrixType>(inst->getDataType());
                 IRSizeAndAlignment sizeAlignment = {};
-                getNaturalSizeAndAlignment(
-                    codeGenContext->getTargetReq(),
-                    matrixType->getElementType(),
-                    &sizeAlignment);
+                if (SLANG_FAILED(getNaturalSizeAndAlignment(
+                        codeGenContext->getTargetReq(),
+                        matrixType->getElementType(),
+                        &sizeAlignment)))
+                    reportLayoutError(
+                        "failed to compute type layout for VM bytecode emission",
+                        inst->sourceLoc);
                 auto stride = (uint32_t)sizeAlignment.getStride();
                 for (Index i = 0; i < getIntVal(matrixType->getRowCount()); ++i)
                 {
@@ -1082,10 +1166,13 @@ public:
         funcBuilder.name = addStringLiteral(getName(func).getUnownedSlice());
 
         IRSizeAndAlignment sizeAlignment = {};
-        getNaturalSizeAndAlignment(
-            codeGenContext->getTargetReq(),
-            func->getResultType(),
-            &sizeAlignment);
+        if (SLANG_FAILED(getNaturalSizeAndAlignment(
+                codeGenContext->getTargetReq(),
+                func->getResultType(),
+                &sizeAlignment)))
+            reportLayoutError(
+                "failed to compute type layout for VM bytecode emission",
+                func->sourceLoc);
         funcBuilder.resultSize = (uint32_t)sizeAlignment.getStride();
 
         Dictionary<IRBlock*, Index> mapBlockToByteOffset;
@@ -1195,6 +1282,8 @@ SlangResult emitVMByteCodeForEntryPoints(
 {
     ByteCodeEmitter emitter(byteCode, codeGenContext);
     emitter.emitEntryPoints(linkedIR);
+    if (emitter.m_hasErrors)
+        return SLANG_FAIL;
     return SLANG_OK;
 }
 
