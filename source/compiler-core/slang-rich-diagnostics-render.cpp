@@ -518,15 +518,22 @@ private:
         return rows;
     }
 
-    // When source text is unavailable (e.g. built-in modules), emit any span
-    // labels that would otherwise be lost, as plain indented text.
-    void renderOrphanedLabels(StringBuilder& ss, const SectionLayout& section)
+    // When source text is unavailable (e.g. built-in modules), render span
+    // labels with a compact gutter structure (pipe + closing corner), using a
+    // minimal gutter width since there are no line numbers to display.
+    void renderOrphanedLabels(StringBuilder& ss, const SectionLayout& section, Int64 gutterWidth)
     {
+        String gutter =
+            repeat(' ', gutterWidth + 1) + color(TerminalColor::Cyan, m_glyphs.vertical);
         for (const auto& block : section.blocks)
             for (const auto& line : block.lines)
                 for (const auto& span : line.spans)
                     if (span.label.getLength() > 0)
-                        ss << "  = " << span.label << "\n";
+                        ss << gutter << " " << color(TerminalColor::BoldRed, span.label) << "\n";
+        ss << color(
+                  TerminalColor::Cyan,
+                  repeat(m_glyphs.secondaryUnderline, gutterWidth + 1) + m_glyphs.gutterCorner)
+           << "\n";
     }
 
     void renderSectionBody(StringBuilder& ss, const SectionLayout& section)
@@ -668,11 +675,11 @@ private:
             layout.primaryLoc.line > 0 || layout.primaryLoc.fileName.getLength() > 0;
         if (hasValidLocation)
         {
-            renderLocation(ss, layout.primaryLoc);
-
-            if (layout.primarySection.blocks.getCount() > 0)
+            bool primaryHasSource = sectionHasSourceAvailable(layout.primarySection);
+            if (primaryHasSource)
             {
-                if (sectionHasSourceAvailable(layout.primarySection))
+                renderLocation(ss, layout.primaryLoc);
+                if (layout.primarySection.blocks.getCount() > 0)
                 {
                     ss << repeat(' ', layout.primarySection.maxGutterWidth + 1)
                        << color(TerminalColor::Cyan, m_glyphs.vertical) << "\n";
@@ -685,19 +692,25 @@ private:
                                   m_glyphs.gutterCorner)
                        << "\n";
                 }
-                else
-                {
-                    renderOrphanedLabels(ss, layout.primarySection);
-                }
+            }
+            else
+            {
+                constexpr Int64 kOrphanGutterWidth = 0;
+                DiagnosticLayout::Location loc = layout.primaryLoc;
+                loc.gutterIndent = kOrphanGutterWidth;
+                renderLocation(ss, loc);
+                if (layout.primarySection.blocks.getCount() > 0)
+                    renderOrphanedLabels(ss, layout.primarySection, kOrphanGutterWidth);
             }
         }
         for (const auto& note : layout.notes)
         {
             ss << "\n" << color(TerminalColor::Cyan, "note") << ": " << note.message << "\n";
-            renderNoteLocation(ss, note.loc);
-            if (note.section.blocks.getCount() > 0)
+            bool noteHasSource = sectionHasSourceAvailable(note.section);
+            if (noteHasSource)
             {
-                if (sectionHasSourceAvailable(note.section))
+                renderNoteLocation(ss, note.loc);
+                if (note.section.blocks.getCount() > 0)
                 {
                     ss << repeat(' ', note.section.maxGutterWidth + 1)
                        << color(TerminalColor::Cyan, m_glyphs.vertical) << "\n";
@@ -708,10 +721,15 @@ private:
                                   m_glyphs.gutterCorner)
                        << "\n";
                 }
-                else
-                {
-                    renderOrphanedLabels(ss, note.section);
-                }
+            }
+            else
+            {
+                constexpr Int64 kOrphanGutterWidth = 0;
+                DiagnosticLayout::Location noteLoc = note.loc;
+                noteLoc.gutterIndent = kOrphanGutterWidth;
+                renderNoteLocation(ss, noteLoc);
+                if (note.section.blocks.getCount() > 0)
+                    renderOrphanedLabels(ss, note.section, kOrphanGutterWidth);
             }
         }
         return ss.produceString();
