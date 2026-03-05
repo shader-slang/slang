@@ -335,6 +335,7 @@ jobs:
           path: |
             coverage-summary.json
             coverage-html/
+            coverage-html-slangc/
             build/${{ inputs.config }}/coverage-data/slang-test.profdata
             build/${{ inputs.config }}/lib/libslang.*
           retention-days: 7
@@ -369,6 +370,12 @@ jobs:
           # Copy coverage HTML to historical location
           cp -r ../coverage-html/* "${REPORT_DIR}/"
 
+          # Copy slangc compiler-only HTML report if it exists
+          if [[ -d ../coverage-html-slangc ]]; then
+            mkdir -p "${REPORT_DIR}/slangc"
+            cp -r ../coverage-html-slangc/* "${REPORT_DIR}/slangc/"
+          fi
+
           # Copy coverage summary JSON if it exists
           if [[ -f ../coverage-summary.json ]]; then
             cp ../coverage-summary.json "${REPORT_DIR}/"
@@ -377,6 +384,12 @@ jobs:
           # Update latest (replace entire directory)
           rm -rf reports/latest/*
           cp -r ../coverage-html/* reports/latest/
+
+          # Copy slangc report to latest
+          if [[ -d ../coverage-html-slangc ]]; then
+            mkdir -p reports/latest/slangc
+            cp -r ../coverage-html-slangc/* reports/latest/slangc/
+          fi
 
           # Copy coverage summary to latest
           if [[ -f ../coverage-summary.json ]]; then

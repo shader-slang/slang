@@ -517,6 +517,7 @@ EOF
                         <th style="padding: 15px; text-align: center;">Regions</th>
                         <th style="padding: 15px; text-align: center;">Functions</th>
                         <th style="padding: 15px; text-align: center;">Branches</th>
+                        <th style="padding: 15px; text-align: center;">Report</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -535,6 +536,7 @@ EOF
                         <td style="padding: 15px; text-align: center;"><span class="${linux_sl_region_class}">${LINUX_SLANGC_REGION_COV}</span><br><small>${LINUX_SLANGC_REGIONS_HIT}/${LINUX_SLANGC_REGIONS_FOUND}</small></td>
                         <td style="padding: 15px; text-align: center;"><span class="${linux_sl_function_class}">${LINUX_SLANGC_FUNCTION_COV}</span><br><small>${LINUX_SLANGC_FUNCTIONS_HIT}/${LINUX_SLANGC_FUNCTIONS_FOUND}</small></td>
                         <td style="padding: 15px; text-align: center;"><span class="${linux_sl_branch_class}">${LINUX_SLANGC_BRANCH_COV}</span><br><small>${LINUX_SLANGC_BRANCHES_HIT}/${LINUX_SLANGC_BRANCHES_FOUND}</small></td>
+                        <td style="padding: 15px; text-align: center;"><a href="${LINK_PREFIX}latest/linux/slangc/index.html" style="color: #667eea;">View</a></td>
                     </tr>
 EOF
       fi
@@ -552,6 +554,7 @@ EOF
                         <td style="padding: 15px; text-align: center;"><span class="${macos_sl_region_class}">${MACOS_SLANGC_REGION_COV}</span><br><small>${MACOS_SLANGC_REGIONS_HIT}/${MACOS_SLANGC_REGIONS_FOUND}</small></td>
                         <td style="padding: 15px; text-align: center;"><span class="${macos_sl_function_class}">${MACOS_SLANGC_FUNCTION_COV}</span><br><small>${MACOS_SLANGC_FUNCTIONS_HIT}/${MACOS_SLANGC_FUNCTIONS_FOUND}</small></td>
                         <td style="padding: 15px; text-align: center;"><span class="${macos_sl_branch_class}">${MACOS_SLANGC_BRANCH_COV}</span><br><small>${MACOS_SLANGC_BRANCHES_HIT}/${MACOS_SLANGC_BRANCHES_FOUND}</small></td>
+                        <td style="padding: 15px; text-align: center;"><a href="${LINK_PREFIX}latest/macos/slangc/index.html" style="color: #667eea;">View</a></td>
                     </tr>
 EOF
       fi
