@@ -264,13 +264,15 @@ void inferAnyValueSizeWhereNecessary(
         for (auto implType : nonSelfReferentialImpls[interfaceType])
         {
             IRSizeAndAlignment sizeAndAlignment;
+            // Types whose layout can't be computed (e.g. containing resource
+            // handles or interface fields) can't be packed into an AnyValue.
+            // Skip them here; the dynamic dispatch lowering pass diagnoses
+            // packing failures via canTypeBeStored().
             if (SLANG_FAILED(getNaturalSizeAndAlignment(
                     targetProgram->getTargetReq(),
                     (IRType*)implType,
                     &sizeAndAlignment)))
-                sink->diagnose(Diagnostics::Unexpected{
-                    .message = "failed to compute type layout for AnyValue size inference",
-                    .location = implType->sourceLoc});
+                continue;
 
             maxAnyValueSize = Math::Max(maxAnyValueSize, sizeAndAlignment.size);
 
@@ -306,9 +308,7 @@ void inferAnyValueSizeWhereNecessary(
                     targetProgram->getTargetReq(),
                     (IRType*)implType,
                     &sizeAndAlignment)))
-                sink->diagnose(Diagnostics::Unexpected{
-                    .message = "failed to compute type layout for AnyValue size inference",
-                    .location = implType->sourceLoc});
+                continue;
 
             maxAnyValueSize = Math::Max(maxAnyValueSize, sizeAndAlignment.size);
 
@@ -327,8 +327,9 @@ void inferAnyValueSizeWhereNecessary(
             }
         }
 
-        // Should not encounter interface types without any conforming implementations.
-        SLANG_ASSERT(maxAnyValueSize >= 0);
+        // maxAnyValueSize may be -1 if all implementations had non-computable
+        // layouts (e.g. types containing TaggedUnion or resource handles).
+        // The downstream dynamic dispatch lowering pass will diagnose these.
 
         // Update the AnyValue size if self-referential impls require a larger size.
         if (maxAnyValueSize >= 0)
