@@ -6,9 +6,10 @@
 
 // CHECK-DAG: %[[FOO2:[0-9A-Za-z_]+]] = OpSpecConstant %uint 0
 // CHECK-DAG: %[[FOO1:[0-9A-Za-z_]+]] = OpSpecConstant %uint 0
-// CHECK-DAG: OpSpecConstantOp %bool IEqual %[[FOO2]]
-// CHECK-DAG: OpSpecConstantOp %uint UDiv %[[FOO1]] %[[FOO2]]
-// CHECK-DAG: OpSpecConstantOp %uint Select
+// CHECK-DAG: %[[ZERO:[0-9A-Za-z_]+]] = OpConstant %uint 0
+// CHECK-DAG: %[[CMP:[0-9A-Za-z_]+]] = OpSpecConstantOp %bool IEqual %[[FOO2]] %[[ZERO]]
+// CHECK-DAG: %[[DIV:[0-9A-Za-z_]+]] = OpSpecConstantOp %uint UDiv %[[FOO1]] %[[FOO2]]
+// CHECK-DAG: OpSpecConstantOp %uint Select %[[CMP]] %[[ZERO]] %[[DIV]]
 
 [vk::specialization_constant] const uint FOO1 = 0;
 [vk::specialization_constant] const uint FOO2 = 0;
