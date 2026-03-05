@@ -4,8 +4,8 @@
 //
 // Key differences from neural_mlp_gpu.slang (InlineVector version):
 //   - WaveTangledVector replaces InlineVector (cooperative matrix MMA)
-//   - [numthreads(32,1,1)] — 32 threads per warp cooperate on MMA
-//   - Each thread processes a DIFFERENT pixel; the warp cooperates on the MMA ops
+//   - Configurable workgroup size via -DWORKGROUP_SIZE=N from Python (default 32)
+//   - Each thread processes a DIFFERENT pixel; warps cooperate on the MMA ops
 //   - Loss scaling support for fp16 gradient underflow prevention
 //   - Manual MSE gradient computation + bwd_diff(mlp_forward_with_latent) for backward
 //     (WaveTangledVector.operator[] is not backward-differentiable, so we compute
@@ -20,8 +20,14 @@ static const int OUTPUT_DIM = 3;
 static const float ALPHA = 0.01f;
 static const int SUBGROUP_SIZE = 32;
 
+#ifndef WORKGROUP_SIZE
+#define WORKGROUP_SIZE 32
+#endif
+static const int WORKGROUP_SZ = WORKGROUP_SIZE;
+static const int SUBGROUP_COUNT = WORKGROUP_SZ / SUBGROUP_SIZE;
+
 typealias ShMemSize = SharedMemorySize<float, TargetEnum.CUDA, ExecutionMode.Training,
-                                       SUBGROUP_SIZE, 1>;
+                                       SUBGROUP_SIZE, SUBGROUP_COUNT>;
 typealias ShMemSizeLayer4 = ShMemSize.OfLayer4<INPUT_DIM, HIDDEN_DIM, HIDDEN_DIM,
                                                 HIDDEN_DIM, OUTPUT_DIM>;
 
@@ -151,11 +157,11 @@ int get_total_params() { return int(TOTAL_PARAMS); }
 int get_grid_params() { return 32 * 32 * INPUT_DIM; }
 
 // ============================================================================
-// Compute shader entry points — [numthreads(32,1,1)] for cooperative matrix
+// Compute shader entry points — workgroup size configurable via -DWORKGROUP_SIZE=N
 // ============================================================================
 
 [shader("compute")]
-[numthreads(32, 1, 1)]
+[numthreads(WORKGROUP_SIZE, 1, 1)]
 void compute_calculate_grads(
     uint3 gid : SV_GroupID,
     uint gtid : SV_GroupIndex,
@@ -171,7 +177,7 @@ void compute_calculate_grads(
     uniform int latent_width,
     uniform int latent_height)
 {
-    int sample_idx = int(gid.x) * SUBGROUP_SIZE + int(gtid);
+    int sample_idx = int(gid.x) * WORKGROUP_SZ + int(gtid);
     int batch_count = batch_size.x * batch_size.y;
     if (sample_idx >= batch_count) return;
 
@@ -214,7 +220,7 @@ void compute_calculate_grads(
 }
 
 [shader("compute")]
-[numthreads(32, 1, 1)]
+[numthreads(WORKGROUP_SIZE, 1, 1)]
 void compute_render(
     uint3 gid : SV_GroupID,
     uint gtid : SV_GroupIndex,
@@ -225,7 +231,7 @@ void compute_render(
     uniform int latent_width,
     uniform int latent_height)
 {
-    int pixel_idx = int(gid.x) * SUBGROUP_SIZE + int(gtid);
+    int pixel_idx = int(gid.x) * WORKGROUP_SZ + int(gtid);
     int total_pixels = img_resolution.x * img_resolution.y;
     if (pixel_idx >= total_pixels) return;
 
@@ -241,7 +247,7 @@ void compute_render(
 }
 
 [shader("compute")]
-[numthreads(32, 1, 1)]
+[numthreads(WORKGROUP_SIZE, 1, 1)]
 void compute_show_loss(
     uint3 gid : SV_GroupID,
     uint gtid : SV_GroupIndex,
@@ -253,7 +259,7 @@ void compute_show_loss(
     uniform int latent_width,
     uniform int latent_height)
 {
-    int pixel_idx = int(gid.x) * SUBGROUP_SIZE + int(gtid);
+    int pixel_idx = int(gid.x) * WORKGROUP_SZ + int(gtid);
     int total_pixels = img_resolution.x * img_resolution.y;
     if (pixel_idx >= total_pixels) return;
 
@@ -272,7 +278,7 @@ void compute_show_loss(
 
 // Element-wise Adam optimizer with loss-scale unscaling
 [shader("compute")]
-[numthreads(32, 1, 1)]
+[numthreads(WORKGROUP_SIZE, 1, 1)]
 void compute_optimizer_step(
     uint3 gid : SV_GroupID,
     uint gtid : SV_GroupIndex,
@@ -285,7 +291,7 @@ void compute_optimizer_step(
     uniform float loss_scale,
     uniform int param_count)
 {
-    int idx = int(gid.x) * SUBGROUP_SIZE + int(gtid);
+    int idx = int(gid.x) * WORKGROUP_SZ + int(gtid);
     if (idx >= param_count) return;
 
     const float BETA1 = 0.9f, BETA2 = 0.999f, EPSILON = 1e-8f;
