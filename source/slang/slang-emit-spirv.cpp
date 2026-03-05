@@ -8468,12 +8468,16 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         // wrong, so it can help the user or developers to locate the issue easier.
         if (!isFloatOrPackedFloatType(fromType))
         {
-            m_sink->diagnose(Diagnostics::InternalCompilerError{.location = inst->sourceLoc});
+            m_sink->diagnose(Diagnostics::Unexpected{
+                .message = "expected float type as source of float cast",
+                .location = inst->sourceLoc});
         }
 
         if (!isFloatOrPackedFloatType(toType))
         {
-            m_sink->diagnose(Diagnostics::InternalCompilerError{.location = inst->sourceLoc});
+            m_sink->diagnose(Diagnostics::Unexpected{
+                .message = "expected float type as target of float cast",
+                .location = inst->sourceLoc});
         }
 
         if (isTypeEqual(fromType, toType))
