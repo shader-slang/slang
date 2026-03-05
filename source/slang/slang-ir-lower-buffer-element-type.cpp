@@ -912,6 +912,8 @@ struct LoweredElementTypeContext
         if (loweredTypeInfo.tryGetValue(type, info))
             return info;
         info = getLoweredTypeInfoImpl(type, config);
+        // Ensure an IRSizeAndAlignmentDecoration is attached to the lowered type
+        // so downstream emitters can query its layout without recomputation.
         IRSizeAndAlignment sizeAlignment;
         if (SLANG_FAILED(getSizeAndAlignment(
                 target->getTargetReq(), config.getLayoutRule(), info.loweredType, &sizeAlignment)))
@@ -1691,8 +1693,8 @@ struct LoweredElementTypeContext
                 elementType = structBuffer->getElementType();
                 auto config = getTypeLoweringConfigForBuffer(target, structBuffer);
 
-                // Create size and alignment decoration for potential use
-                // in`StructuredBufferGetDimensions`.
+                // Ensure an IRSizeAndAlignmentDecoration is attached to the element type
+                // for use by StructuredBufferGetDimensions emission (e.g. GLSL, WGSL).
                 IRSizeAndAlignment sizeAlignment;
                 if (SLANG_FAILED(getSizeAndAlignment(
                         target->getTargetReq(),

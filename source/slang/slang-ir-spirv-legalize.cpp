@@ -140,6 +140,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         builder.addPhysicalTypeDecoration(structType);
         const auto arrayKey = builder.createStructKey();
         builder.createStructField(structType, arrayKey, arrayType);
+        // Ensure an IRSizeAndAlignmentDecoration is attached to the struct type
+        // so downstream SPIR-V emission can query its layout.
         IRSizeAndAlignment structSize;
         if (SLANG_FAILED(getSizeAndAlignment(
                 m_sharedContext->m_targetRequest, layoutRules, structType, &structSize)))
@@ -231,6 +233,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         auto rules = getTypeLayoutRuleForBuffer(
             m_sharedContext->m_targetProgram,
             cbParamInst->getDataType());
+        // Ensure an IRSizeAndAlignmentDecoration is attached to the wrapper struct
+        // so downstream SPIR-V emission can query its layout.
         IRSizeAndAlignment sizeAlignment;
         if (SLANG_FAILED(getSizeAndAlignment(
                 m_sharedContext->m_targetRequest, rules, structType, &sizeAlignment)))
