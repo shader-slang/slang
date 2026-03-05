@@ -25,6 +25,10 @@ Provides array-like access patterns for storage backends that support pointer ar
 @see `BindlessBufferStorage.BindlessAddress`
 @category neural
 */
+/// Sealed: implementations are provided by the neural module (PointerAddress,
+/// TorchTensorViewAddress, etc.). User code should use these existing types
+/// rather than implementing the interface directly.
+[sealed]
 public interface IPointerLikeAddress<T> : IDifferentiablePtrType
     where T : __BuiltinFloatingPointType
     where T.Differential == T
