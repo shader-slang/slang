@@ -2197,14 +2197,16 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                             auto rule = IRTypeLayoutRules::get(layout->getLayoutName());
                             if (SLANG_FAILED(getSizeAndAlignment(
                                     m_targetRequest, rule, valueType, &sizeAndAlignment)))
-                                m_sink->diagnose(Diagnostics::InternalCompilerError{
+                                m_sink->diagnose(Diagnostics::Unexpected{
+                                    .message = "failed to compute type layout for SPIR-V array stride",
                                     .location = inst->sourceLoc});
                         }
                         else
                         {
                             if (SLANG_FAILED(getNaturalSizeAndAlignment(
                                     m_targetRequest, valueType, &sizeAndAlignment)))
-                                m_sink->diagnose(Diagnostics::InternalCompilerError{
+                                m_sink->diagnose(Diagnostics::Unexpected{
+                                    .message = "failed to compute type layout for SPIR-V array stride",
                                     .location = inst->sourceLoc});
                         }
                         uint64_t valueSize = sizeAndAlignment.size;
@@ -2456,7 +2458,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         IRSizeAndAlignment sizeAndAlignment;
                         if (SLANG_FAILED(getNaturalSizeAndAlignment(
                                 m_targetRequest, elementType, &sizeAndAlignment)))
-                            m_sink->diagnose(Diagnostics::InternalCompilerError{
+                            m_sink->diagnose(Diagnostics::Unexpected{
+                                .message = "failed to compute element type layout for SPIR-V unsized array",
                                 .location = inst->sourceLoc});
                         stride = (int)sizeAndAlignment.getStride();
                     }

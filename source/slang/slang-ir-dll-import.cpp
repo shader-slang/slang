@@ -103,8 +103,9 @@ struct DllImportContext
             IRSizeAndAlignment sizeAndAlignment;
             if (SLANG_FAILED(getNaturalSizeAndAlignment(
                     targetProgram->getTargetReq(), param->getDataType(), &sizeAndAlignment)))
-                diagnosticSink->diagnose(
-                    Diagnostics::InternalCompilerError{.location = param->sourceLoc});
+                diagnosticSink->diagnose(Diagnostics::Unexpected{
+                    .message = "failed to compute type layout for DLL import parameter",
+                    .location = param->sourceLoc});
             result += (uint32_t)align(sizeAndAlignment.size, 4);
         }
         return result;

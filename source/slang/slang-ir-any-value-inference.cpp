@@ -266,8 +266,9 @@ void inferAnyValueSizeWhereNecessary(
             IRSizeAndAlignment sizeAndAlignment;
             if (SLANG_FAILED(getNaturalSizeAndAlignment(
                     targetProgram->getTargetReq(), (IRType*)implType, &sizeAndAlignment)))
-                sink->diagnose(
-                    Diagnostics::InternalCompilerError{.location = implType->sourceLoc});
+                sink->diagnose(Diagnostics::Unexpected{
+                    .message = "failed to compute type layout for AnyValue size inference",
+                    .location = implType->sourceLoc});
 
             maxAnyValueSize = Math::Max(maxAnyValueSize, sizeAndAlignment.size);
 
@@ -301,8 +302,9 @@ void inferAnyValueSizeWhereNecessary(
             IRSizeAndAlignment sizeAndAlignment;
             if (SLANG_FAILED(getNaturalSizeAndAlignment(
                     targetProgram->getTargetReq(), (IRType*)implType, &sizeAndAlignment)))
-                sink->diagnose(
-                    Diagnostics::InternalCompilerError{.location = implType->sourceLoc});
+                sink->diagnose(Diagnostics::Unexpected{
+                    .message = "failed to compute type layout for AnyValue size inference",
+                    .location = implType->sourceLoc});
 
             maxAnyValueSize = Math::Max(maxAnyValueSize, sizeAndAlignment.size);
 

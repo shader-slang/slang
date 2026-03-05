@@ -247,8 +247,9 @@ static void reportCheckpointIntermediates(
 
         IRSizeAndAlignment structSize;
         if (SLANG_FAILED(getNaturalSizeAndAlignment(targetReq, structType, &structSize)))
-            sink->diagnose(
-                Diagnostics::InternalCompilerError{.location = structType->sourceLoc});
+            sink->diagnose(Diagnostics::Unexpected{
+                .message = "failed to compute struct type layout",
+                .location = structType->sourceLoc});
 
         if (structSize.size == 0)
             continue;
@@ -265,8 +266,9 @@ static void reportCheckpointIntermediates(
             IRType* fieldType = field->getFieldType();
             IRSizeAndAlignment fieldSize;
             if (SLANG_FAILED(getNaturalSizeAndAlignment(targetReq, fieldType, &fieldSize)))
-                sink->diagnose(
-                    Diagnostics::InternalCompilerError{.location = field->sourceLoc});
+                sink->diagnose(Diagnostics::Unexpected{
+                    .message = "failed to compute field type layout",
+                    .location = field->sourceLoc});
             if (fieldSize.size == 0)
                 continue;
 

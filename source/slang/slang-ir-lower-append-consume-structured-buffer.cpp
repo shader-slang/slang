@@ -55,7 +55,9 @@ static void lowerStructuredBufferType(
     IRSizeAndAlignment elementSize;
     if (SLANG_FAILED(
             getSizeAndAlignment(target->getTargetReq(), layoutRules, elementType, &elementSize)))
-        sink->diagnose(Diagnostics::InternalCompilerError{.location = type->sourceLoc});
+        sink->diagnose(Diagnostics::Unexpected{
+            .message = "failed to compute element type layout for structured buffer",
+            .location = type->sourceLoc});
     elementTypeLayoutBuilder.addResourceUsage(
         LayoutResourceKind::Uniform,
         LayoutSize((LayoutSize::RawValue)elementSize.getStride()));

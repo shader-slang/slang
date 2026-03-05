@@ -242,11 +242,15 @@ struct BitCastLoweringContext
         IRSizeAndAlignment toTypeSize;
         if (SLANG_FAILED(
                 getNaturalSizeAndAlignment(targetProgram->getTargetReq(), toType, &toTypeSize)))
-            sink->diagnose(Diagnostics::InternalCompilerError{.location = inst->sourceLoc});
+            sink->diagnose(Diagnostics::Unexpected{
+                .message = "failed to compute type layout for bit_cast target type",
+                .location = inst->sourceLoc});
         IRSizeAndAlignment fromTypeSize;
         if (SLANG_FAILED(
                 getNaturalSizeAndAlignment(targetProgram->getTargetReq(), fromType, &fromTypeSize)))
-            sink->diagnose(Diagnostics::InternalCompilerError{.location = inst->sourceLoc});
+            sink->diagnose(Diagnostics::Unexpected{
+                .message = "failed to compute type layout for bit_cast source type",
+                .location = inst->sourceLoc});
 
         // Check if the target is directly emitted SPIRV and if the target is SPIRV 1.5 or later
         bool isDirectSpirv = false;

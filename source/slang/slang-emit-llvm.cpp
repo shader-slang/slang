@@ -628,7 +628,8 @@ public:
 
         if (SLANG_FAILED(
                 Slang::getSizeAndAlignment(targetReq, rules, legalizeResourceTypes(type), &sizeAlignment)))
-            m_sink->diagnose(Diagnostics::InternalCompilerError{});
+            m_sink->diagnose(Diagnostics::Unexpected{
+                .message = "failed to compute type layout for LLVM type translation"});
 
         return sizeAlignment;
     }
@@ -653,7 +654,8 @@ public:
         IRSizeAndAlignment elementAlignment;
         if (SLANG_FAILED(
                 Slang::getSizeAndAlignment(targetReq, rules, vecType->getElementType(), &elementAlignment)))
-            m_sink->diagnose(Diagnostics::InternalCompilerError{});
+            m_sink->diagnose(Diagnostics::Unexpected{
+                .message = "failed to compute element type layout for LLVM vector alignment"});
         IRSizeAndAlignment vectorAlignment =
             rules->getVectorSizeAndAlignment(elementAlignment, elemCount);
 

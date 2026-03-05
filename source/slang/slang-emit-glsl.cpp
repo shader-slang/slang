@@ -2120,7 +2120,8 @@ void GLSLSourceEmitter::emitBufferPointerTypeDefinition(IRInst* type)
     IRSizeAndAlignment sizeAlignment;
     if (SLANG_FAILED(getNaturalSizeAndAlignment(
             m_codeGenContext->getTargetReq(), ptrType->getValueType(), &sizeAlignment)))
-        getSink()->diagnose(Diagnostics::InternalCompilerError{});
+        getSink()->diagnose(Diagnostics::Unexpected{
+            .message = "failed to compute type layout for buffer reference pointer"});
     auto alignment = sizeAlignment.alignment;
     m_writer->emit("layout(buffer_reference, std430, buffer_reference_align = ");
     m_writer->emitInt64(alignment);
