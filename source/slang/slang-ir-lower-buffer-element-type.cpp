@@ -919,17 +919,16 @@ struct LoweredElementTypeContext
         if (loweredTypeInfo.tryGetValue(type, info))
             return info;
         info = getLoweredTypeInfoImpl(type, config);
-        // Ensure an IRSizeAndAlignmentDecoration is attached to the lowered type
+        // Best-effort: attach an IRSizeAndAlignmentDecoration to the lowered type
         // so downstream emitters can query its layout without recomputation.
+        // Failure is expected for types whose layout is not computable (e.g.
+        // ConstantBuffer, resource types on some targets), so we do not diagnose.
         IRSizeAndAlignment sizeAlignment;
-        if (SLANG_FAILED(getSizeAndAlignment(
-                target->getTargetReq(),
-                config.getLayoutRule(),
-                info.loweredType,
-                &sizeAlignment)))
-            m_sink->diagnose(Diagnostics::Unexpected{
-                .message = "failed to compute type layout for buffer element lowering",
-                .location = info.loweredType->sourceLoc});
+        getSizeAndAlignment(
+            target->getTargetReq(),
+            config.getLayoutRule(),
+            info.loweredType,
+            &sizeAlignment);
         loweredTypeInfo.set(type, info);
         mapLoweredTypeToInfo.set(info.loweredType, info);
         conversionMethodMap[{info.originalType, info.loweredType}] = info.convertLoweredToOriginal;
@@ -1710,17 +1709,16 @@ struct LoweredElementTypeContext
                 elementType = structBuffer->getElementType();
                 auto config = getTypeLoweringConfigForBuffer(target, structBuffer);
 
-                // Ensure an IRSizeAndAlignmentDecoration is attached to the element type
+                // Best-effort: attach an IRSizeAndAlignmentDecoration to the element type
                 // for use by StructuredBufferGetDimensions emission (e.g. GLSL, WGSL).
+                // Failure is expected for types whose layout is not computable, so
+                // we do not diagnose.
                 IRSizeAndAlignment sizeAlignment;
-                if (SLANG_FAILED(getSizeAndAlignment(
-                        target->getTargetReq(),
-                        config.getLayoutRule(),
-                        elementType,
-                        &sizeAlignment)))
-                    m_sink->diagnose(Diagnostics::Unexpected{
-                        .message = "failed to compute type layout for buffer element lowering",
-                        .location = elementType->sourceLoc});
+                getSizeAndAlignment(
+                    target->getTargetReq(),
+                    config.getLayoutRule(),
+                    elementType,
+                    &sizeAlignment);
                 SLANG_UNUSED(sizeAlignment);
             }
             else if (auto constBuffer = as<IRUniformParameterGroupType>(globalInst))

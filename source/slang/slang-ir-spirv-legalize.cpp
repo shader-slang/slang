@@ -144,8 +144,10 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         builder.addPhysicalTypeDecoration(structType);
         const auto arrayKey = builder.createStructKey();
         builder.createStructField(structType, arrayKey, arrayType);
-        // Ensure an IRSizeAndAlignmentDecoration is attached to the struct type
-        // so downstream SPIR-V emission can query its layout.
+        // Attach an IRSizeAndAlignmentDecoration to the struct type so downstream
+        // SPIR-V emission can query its layout. This struct wraps a single array
+        // field whose element layout was already computed successfully above, so
+        // the struct layout should always be computable.
         IRSizeAndAlignment structSize;
         if (SLANG_FAILED(getSizeAndAlignment(
                 m_sharedContext->m_targetRequest,
@@ -241,8 +243,10 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         auto rules = getTypeLayoutRuleForBuffer(
             m_sharedContext->m_targetProgram,
             cbParamInst->getDataType());
-        // Ensure an IRSizeAndAlignmentDecoration is attached to the wrapper struct
-        // so downstream SPIR-V emission can query its layout.
+        // Attach an IRSizeAndAlignmentDecoration to the wrapper struct so
+        // downstream SPIR-V emission can query its layout. This struct wraps
+        // a single field of the original constant buffer's inner type, so its
+        // layout should always be computable from that inner type.
         IRSizeAndAlignment sizeAlignment;
         if (SLANG_FAILED(getSizeAndAlignment(
                 m_sharedContext->m_targetRequest,
