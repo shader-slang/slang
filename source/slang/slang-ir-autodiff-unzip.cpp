@@ -3,6 +3,7 @@
 #include "slang-ir-autodiff-rev.h"
 #include "slang-ir-ssa-simplification.h"
 #include "slang-ir-util.h"
+#include "slang-target-program.h"
 
 namespace Slang
 {
@@ -747,9 +748,20 @@ struct ExtractPrimalFuncContext
     AutoDiffSharedContext* autodiffContext;
     DifferentiableTypeConformanceContext diffTypeContext;
 
+    // The original function being differentiated (for checkpoint reporting).
+    IRFunc* originalFunc = nullptr;
+
+    // Whether to emit ReportCheckpointStore instructions.
+    bool shouldReportCheckpoints = false;
+
     ExtractPrimalFuncContext(IRModule* inModule, AutoDiffSharedContext* autodiffContext)
         : module(inModule), autodiffContext(autodiffContext), diffTypeContext(autodiffContext)
     {
+        if (autodiffContext->targetProgram)
+        {
+            shouldReportCheckpoints = autodiffContext->targetProgram->getOptionSet().getBoolOption(
+                CompilerOptionName::ReportCheckpointIntermediates);
+        }
     }
 
     IRInst* cloneGenericHeader(IRBuilder& builder, IRCloneEnv& cloneEnv, IRGeneric* gen)
@@ -895,10 +907,18 @@ struct ExtractPrimalFuncContext
         if (auto nameHint = inst->findDecoration<IRNameHintDecoration>())
             cloneDecoration(nameHint, key);
         builder.addPrimalValueStructKeyDecoration(inst, key);
-        builder.emitStore(
-            builder
-                .emitFieldAddress(builder.getPtrType(inst->getFullType()), intermediateOutput, key),
-            inst);
+        auto fieldAddr = builder.emitFieldAddress(
+            builder.getPtrType(inst->getFullType()),
+            intermediateOutput,
+            key);
+        builder.emitStore(fieldAddr, inst);
+
+        if (shouldReportCheckpoints && originalFunc)
+        {
+            auto reportInst =
+                builder.emitReportCheckpointStore(inst->getDataType(), originalFunc, fieldAddr);
+            reportInst->sourceLoc = inst->sourceLoc;
+        }
     }
 
     void storeReturnValue(IRBuilder& builder, IRInst* inst, IRInst* intermediateOutput)
@@ -996,7 +1016,7 @@ struct ExtractPrimalFuncContext
 
     IRFunc* turnUnzippedFuncIntoPrimalFunc(
         IRFunc* unzippedFunc,
-        IRFunc* originalFunc,
+        IRFunc* inOriginalFunc,
         HoistedPrimalsInfo* primalsInfo,
         IRInst*& outIntermediateType,
         // TODO(sai): cleanup. temporary extra value
@@ -1004,9 +1024,12 @@ struct ExtractPrimalFuncContext
     {
         IRBuilder builder(module);
 
+        // Store the original function for checkpoint reporting.
+        originalFunc = inOriginalFunc;
+
         IRFunc* func = unzippedFunc;
         IRInst* intermediateType = nullptr;
-        auto newFuncType = generatePrimalFuncType(unzippedFunc, originalFunc, intermediateType);
+        auto newFuncType = generatePrimalFuncType(unzippedFunc, inOriginalFunc, intermediateType);
         outIntermediateType = intermediateType;
         func->setFullType((IRType*)newFuncType);
 
@@ -1049,6 +1072,15 @@ struct ExtractPrimalFuncContext
                                 field->getKey());
                             inst->replaceUsesWith(fieldAddr);
                             builder.addPrimalValueStructKeyDecoration(inst, field->getKey());
+
+                            if (shouldReportCheckpoints && originalFunc)
+                            {
+                                auto reportInst = builder.emitReportCheckpointStore(
+                                    cast<IRPtrTypeBase>(inst->getDataType())->getValueType(),
+                                    originalFunc,
+                                    fieldAddr);
+                                reportInst->sourceLoc = inst->sourceLoc;
+                            }
                         }
                     }
                     else
@@ -1176,7 +1208,8 @@ IRFunc* splitApplyAndPropFuncs(
     IRFunc* originalFunc,
     HoistedPrimalsInfo* primalsInfo,
     IRInst*& intermediateType,
-    IRFunc*& getValFunc)
+    IRFunc*& getValFunc,
+    UnownedStringSlice intermediateTypeName)
 {
     IRBuilder builder(autodiffContext->moduleInst);
     builder.setInsertBefore(func);
@@ -1334,6 +1367,74 @@ IRFunc* splitApplyAndPropFuncs(
 
     for (auto block : blocksToRemove)
         block->removeAndDeallocate();
+
+    // Replace the intermediate struct type with a tuple type.
+    // Tuples will be optimized more effectively by later passes.
+    //
+    if (auto structType = as<IRStructType>(intermediateType))
+    {
+        // Collect field types and build key->index mapping.
+        List<IRType*> fieldTypes;
+        Dictionary<IRInst*, UInt> keyToIndex;
+        for (auto field : structType->getFields())
+        {
+            keyToIndex[field->getKey()] = (UInt)fieldTypes.getCount();
+            fieldTypes.add(field->getFieldType());
+        }
+
+        // Create the tuple type.
+        // If a name was provided, inject a TupleNameType as the last operand
+        // so the tuple carries the name through to lowering.
+        if (intermediateTypeName.getLength() > 0)
+        {
+            auto tupleNameType =
+                builder.getTupleNameType(builder.getStringValue(intermediateTypeName));
+            builder.addDecoration(tupleNameType, kIROp_OptimizableTypeDecoration);
+            fieldTypes.add((IRType*)tupleNameType);
+        }
+        auto tupleType = builder.getTupleType(fieldTypes);
+
+        // Replace FieldAddress and FieldExtract instructions that use our keys
+        // with GetElementPtr and GetTupleElement respectively.
+        for (auto& [key, index] : keyToIndex)
+        {
+            List<IRUse*> usesToProcess;
+            for (auto use = key->firstUse; use; use = use->nextUse)
+                usesToProcess.add(use);
+
+            for (auto use : usesToProcess)
+            {
+                auto user = use->getUser();
+                if (auto fieldAddr = as<IRFieldAddress>(user))
+                {
+                    builder.setInsertBefore(fieldAddr);
+                    auto newInst = builder.emitGetElementPtr(
+                        fieldAddr->getFullType(),
+                        fieldAddr->getBase(),
+                        (IRIntegerValue)index);
+                    fieldAddr->replaceUsesWith(newInst);
+                    fieldAddr->removeAndDeallocate();
+                }
+                else if (auto fieldExtract = as<IRFieldExtract>(user))
+                {
+                    builder.setInsertBefore(fieldExtract);
+                    auto newInst = builder.emitGetTupleElement(
+                        fieldExtract->getFullType(),
+                        fieldExtract->getBase(),
+                        (UInt)index);
+                    fieldExtract->replaceUsesWith(newInst);
+                    fieldExtract->removeAndDeallocate();
+                }
+            }
+        }
+
+        // Replace all uses of the struct type with the tuple type.
+        structType->replaceUsesWith(tupleType);
+        intermediateType = tupleType;
+
+        // Remove the struct type and its fields.
+        structType->removeAndDeallocate();
+    }
 
     return primalFunc;
 }

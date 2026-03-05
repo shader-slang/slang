@@ -17,7 +17,11 @@ namespace Slang
 // This pass may generate more `Specialize` insts, so it should be run in a loop with
 // the standard specialization pass until a no more changes can be made.
 //
-bool specializeDynamicInsts(IRModule* module, TargetProgram* target, DiagnosticSink* sink);
+bool specializeDynamicInsts(
+    IRModule* module,
+    TargetProgram* target,
+    DiagnosticSink* sink,
+    bool shouldReportDynamicDispatchSites);
 
 bool isSetSpecializedGeneric(IRInst* callee);
 

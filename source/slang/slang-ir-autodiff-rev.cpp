@@ -229,13 +229,23 @@ struct BackwardDiffTranslationContext
         //
         IRInst* intermediateType = nullptr;
         IRFunc* getValFunc = nullptr;
+
+        // Compute the intermediate type name from the target function before splitting,
+        // since the name hint won't be on the struct type yet.
+        String intermediateTypeNameStorage;
+        if (auto nameHint = targetFunc->findDecoration<IRNameHintDecoration>())
+        {
+            intermediateTypeNameStorage = String("s_bwdCallableCtx_") + nameHint->getName();
+        }
+
         auto applyFunc = splitApplyAndPropFuncs(
             autoDiffSharedContext,
             propagateFunc,
             targetFunc,
             primalsInfo,
             intermediateType,
-            getValFunc);
+            getValFunc,
+            intermediateTypeNameStorage.getUnownedSlice());
 
         // At this point the unzipped func is just an empty shell
         // and we can simply remove it.
@@ -313,7 +323,7 @@ struct BackwardDiffTranslationContext
         generateName(builder, targetFunc, applyFunc, "s_apply_");
         generateName(builder, targetFunc, propagateFunc, "s_bwdProp_");
         generateName(builder, targetFunc, getValFunc, "s_getVal_");
-        generateName(builder, targetFunc, intermediateType, "s_bwdCallableCtx_");
+        // generateName(builder, targetFunc, intermediateType, "s_bwdCallableCtx_");
 
         copyDebugInfo(targetFunc, applyFunc);
         copyDebugInfo(targetFunc, propagateFunc);

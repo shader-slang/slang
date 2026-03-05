@@ -689,6 +689,12 @@ bool isWeakReferenceOperand(IRInst* inst, UInt operandIndex)
         return true;
     case kIROp_WeakUse:
         return true;
+    case kIROp_ReportCheckpointStore:
+        // operand 2 (storeRef) is a weak reference to the store address.
+        // If the store is optimized out, this operand becomes poison.
+        if (operandIndex == 2)
+            return true;
+        break;
     case kIROp_Annotation:
         if (operandIndex == 0)
             return true;

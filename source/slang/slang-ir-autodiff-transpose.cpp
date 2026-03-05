@@ -1571,9 +1571,9 @@ struct DiffTransposePass
         case kIROp_LookupWitnessMethod:
         case kIROp_ExtractExistentialType:
         case kIROp_ExtractExistentialWitnessTable:
+        case kIROp_MakeOptionalNone:
             {
-                // Ignore. transposeBlock() should take care of adding the
-                // appropriate branch instruction.
+                // Ignore these, they can't affect any gradients.
                 return TranspositionResult();
             }
 

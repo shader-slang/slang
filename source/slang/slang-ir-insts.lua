@@ -678,6 +678,15 @@ local insts = {
 					hoistable = true,
 				},
 			},
+			-- A sentinel type used as the last operand of a TupleType to provide a custom
+			-- name for the generated struct when the tuple is lowered.
+			{
+				TupleName = {
+					struct_name = "TupleNameType",
+					operands = { { "name", "IRStringLit" } },
+					hoistable = true,
+				},
+			},
 			{ ExpandTypeOrVal = { operands = { { "type" } }, hoistable = true } },
 			{
 				spirvLiteralType = {
@@ -1393,6 +1402,17 @@ local insts = {
 		},
 	},
 	{ loopExitValue = { min_operands = 1 } },
+	{
+		ReportCheckpointStore = {
+			-- Marker instruction that reports a checkpoint store to the user.
+			-- Operands: (storedType, originalFunc, storeRef)
+			-- storedType is the IRType of the value being checkpointed.
+			-- originalFunc is the function that the checkpoint is associated with.
+			-- storeRef is a weak reference to the store or address instruction.
+			--   If the store is optimized out, this operand will become poison.
+			operands = { { "storedType" }, { "originalFunc" }, { "storeRef" } },
+		},
+	},
 	{
 		getStringHash = {
 			operands = { { "stringLit", "IRStringLit" } },
@@ -2845,6 +2865,11 @@ local insts = {
 	},
 	{ CastInterfaceToTaggedUnionPtr = {
 		-- Cast an interface-typed pointer to a tagged-union pointer with a known set.
+		-- Operands: (ptr, witnessTableSet, typeSet)
+		-- The witness table set and type set are carried here so that information
+		-- from the original TaggedUnionType is available during lowering,
+		-- even after the TaggedUnionType itself has been replaced.
+		operands = { { "ptr" }, { "witnessTableSet" }, { "typeSet" } }
 	} }, 
 	{ GetTagForSuperSet = {
 		-- Translate a tag from a set to its equivalent in a super-set
@@ -3044,6 +3069,22 @@ local insts = {
 	} },
 	{ WeakUse = { hoistable = true } },
 	{ FuncTypeOf = { hoistable = true }},
+	{ FuncWithBindings = {
+		-- Represents a reference to a function with specific existential parameter bindings.
+		--
+		-- Used by the type-flow specialization pass to represent different
+		-- specialized versions of the same function, each with different
+		-- existential parameter type bindings.
+		--
+		-- Operands: (func, binding0, binding1, ...)
+		-- The first operand is the base function (IRFunc or IRSpecialize).
+		-- Subsequent operands are the parameter binding infos, one per
+		-- function parameter. A VoidLit binding means "any" (unconstrained).
+		-- A non-void binding is the type-flow info for that parameter.
+		--
+		hoistable = true,
+		operands = { {"func"} }
+	} },
 	{ CompilerDictionaryEntry = { hoistable = true, parent = true }},
 	{ CompilerDictionaryValue = { operands = { {"value"} } } },
 	{ CompilerDictionary = { parent = true } },

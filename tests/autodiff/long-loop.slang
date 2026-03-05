@@ -1,7 +1,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -profile cs_5_0 -entry computeMain -line-directive-mode none
+//TEST:SIMPLE(filecheck=REPORT): -target hlsl -profile cs_5_0 -entry computeMain -line-directive-mode none -report-checkpoint-intermediates
 
 //TEST_INPUT:ubuffer(data=[0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -22,9 +22,8 @@ float sin_series(float x, int iterations)
 
 // Check that the intermediate context of sin_series does not have an array for `i`.
 
-// CHECK: struct s_bwdCallableCtx_sin_series_{{[0-9]+}}
-// CHECK-NOT: int {{[A-Za-z0-9_]+}}[{{.*}}]
-// CHECK: }
+// REPORT: checkpointing context of {{[0-9]+}} bytes associated with function: 'sin_series'
+// REPORT-NOT: FixedArray<int
 
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)

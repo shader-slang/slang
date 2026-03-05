@@ -411,13 +411,15 @@ IRFunc* DifferentiableTypeConformanceContext::getOrCreateExistentialDAddMethod()
         concreteDiffTypeWitnessTable,
         sharedContext->addMethodStructKey);
 
+    auto aVal = builder.emitExtractExistentialValue(dAddFuncType->getParamType(0), aObj);
+    auto bVal = builder.emitExtractExistentialValue(dAddFuncType->getParamType(1), bObj);
+    auto aType = builder.emitExtractExistentialType(aObj);
+
     // Call
     auto dAddResult = builder.emitCallInst(
         dAddFuncType->getResultType(),
         dAddMethod,
-        List<IRInst*>(
-            {builder.emitExtractExistentialValue(dAddFuncType->getParamType(0), aObj),
-             builder.emitExtractExistentialValue(dAddFuncType->getParamType(1), bObj)}));
+        List<IRInst*>({aVal, builder.emitReinterpret(aType, bVal)}));
 
     // Wrap result in existential.
     auto existentialDiffType = builder.emitMakeExistential(

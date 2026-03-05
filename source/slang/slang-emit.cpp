@@ -220,7 +220,11 @@ static void reportCheckpointIntermediates(
     DiagnosticSink* sink,
     IRModule* irModule)
 {
-    // Report checkpointing information
+    // Report checkpointing information by consuming ReportCheckpointStore marker instructions.
+    // Each ReportCheckpointStore has 3 operands:
+    //   0: storedType - the IRType of the value being checkpointed
+    //   1: originalFunc - the function that the checkpoint is associated with
+    //   2: storeRef - weak reference to the store/address (becomes poison if optimized out)
     TargetRequest* targetReq = codeGenContext->getTargetReq();
     SourceManager* sourceManager = sink->getSourceManager();
 
@@ -232,76 +236,99 @@ static void reportCheckpointIntermediates(
 
     CPPSourceEmitter emitter(description);
 
-    int nonEmptyStructs = 0;
-    for (auto inst : irModule->getGlobalInsts())
+    // Collect all ReportCheckpointStore instructions, grouped by original function.
+    struct CheckpointEntry
     {
-        IRStructType* structType = as<IRStructType>(inst);
-        if (!structType)
-            continue;
+        IRType* storedType;
+        SourceLoc sourceLoc;
+    };
+    Dictionary<IRInst*, List<CheckpointEntry>> funcToEntries;
+    List<IRInst*> reportInstsToRemove;
 
-        auto checkpointDecoration =
-            structType->findDecoration<IRCheckpointIntermediateDecoration>();
-        if (!checkpointDecoration)
-            continue;
-
-        IRSizeAndAlignment structSize;
-        getNaturalSizeAndAlignment(targetReq, structType, &structSize);
-
-        for (auto field : structType->getFields())
+    for (auto globalInst : irModule->getGlobalInsts())
+    {
+        auto func = as<IRFunc>(globalInst);
+        if (!func)
         {
-            if (field->findDecoration<IRReturnValueContextFieldDecoration>())
+            if (auto generic = as<IRGeneric>(globalInst))
+                func = as<IRFunc>(findGenericReturnVal(generic));
+        }
+        if (!func)
+            continue;
+
+        for (auto block : func->getBlocks())
+        {
+            for (auto inst : block->getChildren())
             {
-                // Remove the size of the return value context field from the struct size
-                // TODO: Does this account for alignment & padding properly?
-                //
-                IRType* fieldType = field->getFieldType();
-                IRSizeAndAlignment fieldSize;
-                getNaturalSizeAndAlignment(targetReq, fieldType, &fieldSize);
-                structSize.size -= fieldSize.size;
-                break;
+                if (inst->getOp() == kIROp_ReportCheckpointStore)
+                {
+                    reportInstsToRemove.add(inst);
+
+                    // If the store was optimized out (storeRef became poison),
+                    // skip reporting this entry.
+                    auto storeRef = inst->getOperand(2);
+                    if (storeRef->getOp() == kIROp_Poison)
+                        continue;
+
+                    auto storedType = (IRType*)inst->getOperand(0);
+                    auto originalFunc = inst->getOperand(1);
+                    CheckpointEntry entry;
+                    entry.storedType = storedType;
+                    entry.sourceLoc = inst->sourceLoc;
+                    funcToEntries[originalFunc].add(entry);
+                }
+            }
+        }
+    }
+
+    int nonEmptyFuncs = 0;
+    for (auto& [originalFunc, entries] : funcToEntries)
+    {
+        IRSizeAndAlignment totalSize = {};
+        List<CheckpointEntry> nonZeroEntries;
+        for (auto& entry : entries)
+        {
+            IRSizeAndAlignment entrySize;
+            getNaturalSizeAndAlignment(targetReq, entry.storedType, &entrySize);
+            if (entrySize.size > 0)
+            {
+                totalSize.size += entrySize.size;
+                nonZeroEntries.add(entry);
             }
         }
 
-        // Reporting happens before empty structs are optimized out
-        // and we still want to keep the checkpointing decorations,
-        // so we end up needing to check for non-zero-ness
-        if (structSize.size == 0)
+        if (totalSize.size == 0)
             continue;
 
-        auto func = checkpointDecoration->getSourceFunction();
         sink->diagnose(
-            structType,
+            originalFunc,
             Diagnostics::reportCheckpointIntermediates,
-            func,
-            structSize.size);
-        nonEmptyStructs++;
+            originalFunc,
+            totalSize.size);
+        nonEmptyFuncs++;
 
-        for (auto field : structType->getFields())
+        for (auto& entry : nonZeroEntries)
         {
-            if (field->findDecoration<IRReturnValueContextFieldDecoration>())
-                continue;
-
-            IRType* fieldType = field->getFieldType();
-            IRSizeAndAlignment fieldSize;
-            getNaturalSizeAndAlignment(targetReq, fieldType, &fieldSize);
-            if (fieldSize.size == 0)
-                continue;
+            IRSizeAndAlignment entrySize;
+            getNaturalSizeAndAlignment(targetReq, entry.storedType, &entrySize);
 
             typeWriter.clearContent();
-            emitter.emitType(fieldType);
+            emitter.emitType(entry.storedType);
 
             sink->diagnose(
-                field->sourceLoc,
-                field->findDecoration<IRLoopCounterDecoration>()
-                    ? Diagnostics::reportCheckpointCounter
-                    : Diagnostics::reportCheckpointVariable,
-                fieldSize.size,
+                entry.sourceLoc,
+                Diagnostics::reportCheckpointVariable,
+                entrySize.size,
                 typeWriter.getContent());
         }
     }
 
-    if (nonEmptyStructs == 0)
+    if (nonEmptyFuncs == 0)
         sink->diagnose(SourceLoc(), Diagnostics::reportCheckpointNone);
+
+    // Remove all consumed ReportCheckpointStore instructions.
+    for (auto inst : reportInstsToRemove)
+        inst->removeAndDeallocate();
 }
 
 struct LinkingAndOptimizationOptions
@@ -1101,13 +1128,6 @@ Result linkAndOptimizeIR(
         SLANG_PASS(specializeHigherOrderParameters, codeGenContext);
     }
 
-    // Report checkpointing information
-    if (codeGenContext->shouldReportCheckpointIntermediates())
-    {
-        SLANG_PASS(simplifyIR, targetProgram, fastIRSimplificationOptions, sink);
-        reportCheckpointIntermediates(codeGenContext, sink, irModule);
-    }
-
     SLANG_PASS(finalizeAutoDiffPass, targetProgram);
     SLANG_PASS(eliminateDeadCode, deadCodeEliminationOptions);
 
@@ -1201,18 +1221,6 @@ Result linkAndOptimizeIR(
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
 
-    // If we have a target that is GPU like we use the string hashing mechanism
-    // but for that to work we need to inline such that calls (or returns) of strings
-    // boil down into getStringHash(stringLiteral)
-    if (!ArtifactDescUtil::isCpuLikeTarget(artifactDesc))
-    {
-        // We could fail because
-        // 1) It's not inlinable for some reason (for example if it's recursive)
-        SLANG_RETURN_ON_FAIL(SLANG_PASS(performTypeInlining, targetProgram, sink));
-    }
-
-    if (sink->getErrorCount() != 0)
-        return SLANG_FAIL;
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
@@ -1252,6 +1260,37 @@ Result linkAndOptimizeIR(
 
     SLANG_PASS(lowerExistentials, targetProgram, sink);
 
+    // get rid of weak-use insts and any dictionaries in the
+    // module inst.
+    //
+    // -- put into a pass --
+    List<IRInst*> weakUseInsts;
+    for (auto insts : irModule->getModuleInst()->getGlobalInsts())
+    {
+        if (insts->getOp() == kIROp_WeakUse)
+            weakUseInsts.add(insts);
+    }
+
+    for (auto weakUse : weakUseInsts)
+    {
+        weakUse->removeAndDeallocate();
+    }
+
+    clearTranslationDictionary(irModule);
+
+    if (sink->getErrorCount() != 0)
+        return SLANG_FAIL;
+
+    // If we have a target that is GPU like we use the string hashing mechanism
+    // but for that to work we need to inline such that calls (or returns) of strings
+    // boil down into getStringHash(stringLiteral)
+    if (!ArtifactDescUtil::isCpuLikeTarget(artifactDesc))
+    {
+        // We could fail because
+        // 1) It's not inlinable for some reason (for example if it's recursive)
+        SLANG_RETURN_ON_FAIL(SLANG_PASS(performTypeInlining, targetProgram, sink));
+    }
+
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
 
@@ -1272,24 +1311,6 @@ Result linkAndOptimizeIR(
     SLANG_PASS(generateAnyValueMarshallingFunctions, targetProgram);
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
-
-    // get rid of weak-use insts and any dictionaries in the
-    // module inst.
-    //
-    // -- put into a pass --
-    List<IRInst*> weakUseInsts;
-    for (auto insts : irModule->getModuleInst()->getGlobalInsts())
-    {
-        if (insts->getOp() == kIROp_WeakUse)
-            weakUseInsts.add(insts);
-    }
-
-    for (auto weakUse : weakUseInsts)
-    {
-        weakUse->removeAndDeallocate();
-    }
-
-    clearTranslationDictionary(irModule);
 
     // Don't need to run any further target-dependent passes if we are generating code
     // for host vm.
@@ -1349,6 +1370,12 @@ Result linkAndOptimizeIR(
     else
     {
         SLANG_PASS(simplifyIR, targetProgram, defaultIRSimplificationOptions, sink);
+    }
+
+    // Report checkpointing information.
+    if (codeGenContext->shouldReportCheckpointIntermediates())
+    {
+        reportCheckpointIntermediates(codeGenContext, sink, irModule);
     }
 
     validateIRModuleIfEnabled(codeGenContext, irModule);

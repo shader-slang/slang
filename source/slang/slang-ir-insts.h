@@ -4113,6 +4113,8 @@ $(type_info.return_type) $(type_info.method_name)(
     IRInst* emitCheckpointObject(IRInst* value);
     IRInst* emitLoopExitValue(IRInst* value);
 
+    IRInst* emitReportCheckpointStore(IRType* storedType, IRInst* originalFunc, IRInst* storeRef);
+
     IRInst* emitUnreachable();
     IRInst* emitMissingReturn();
 
@@ -4347,10 +4349,22 @@ $(type_info.return_type) $(type_info.method_name)(
     IRGetDispatcher* emitGetDispatcher(
         IRFuncType* funcType,
         IRWitnessTableSet* witnessTableSet,
-        IRStructKey* key)
+        IRStructKey* key,
+        List<IRInst*>& paramBindings)
     {
-        IRInst* args[] = {witnessTableSet, key};
-        return cast<IRGetDispatcher>(emitIntrinsicInst(funcType, kIROp_GetDispatcher, 2, args));
+        List<IRInst*> args;
+        args.add(witnessTableSet);
+        args.add(key);
+        for (auto& paramBinding : paramBindings)
+        {
+            args.add(paramBinding);
+        }
+
+        return cast<IRGetDispatcher>(emitIntrinsicInst(
+            funcType,
+            kIROp_GetDispatcher,
+            (UInt)args.getCount(),
+            args.getBuffer()));
     }
 
     IRGetSpecializedDispatcher* emitGetSpecializedDispatcher(

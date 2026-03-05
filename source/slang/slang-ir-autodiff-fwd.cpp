@@ -1899,24 +1899,28 @@ struct ForwardDiffTranslationContext
         IRInst* primalResult =
             builder->emitMakeExistential(primalType, primalBase, primalWitnessTable);
 
-        if (diffBase)
+        if (auto diffWrappedType = diffTypeContext.tryGetDifferentiableValueType(primalWrappedType))
         {
-            if (auto diffWrappedType =
-                    diffTypeContext.tryGetDifferentiableValueType(primalWrappedType))
+            if (!diffBase)
             {
-                // DiffType : IDifferentiable
-                auto diffTypeDiffWitness =
-                    as<IRDifferentialPairType>(diffTypeContext.tryGetAssociationOfKind(
-                                                   diffWrappedType,
-                                                   AnnotationKind::DifferentialPairType))
-                        ->getWitness();
-                return InstPair(
-                    primalResult,
-                    builder->emitMakeExistential(
-                        this->autoDiffSharedContext->differentiableInterfaceType,
-                        diffBase,
-                        diffTypeDiffWitness));
+                // If the wrapped value is differentiable but we don't have a diffBase, we need to
+                // create a zero differential for the wrapped value in order to create the
+                // differential existential.
+                diffBase = getDifferentialZeroOfType(builder, primalWrappedType);
             }
+
+            // DiffType : IDifferentiable
+            auto diffTypeDiffWitness =
+                as<IRDifferentialPairType>(diffTypeContext.tryGetAssociationOfKind(
+                                               diffWrappedType,
+                                               AnnotationKind::DifferentialPairType))
+                    ->getWitness();
+            return InstPair(
+                primalResult,
+                builder->emitMakeExistential(
+                    this->autoDiffSharedContext->differentiableInterfaceType,
+                    diffBase,
+                    diffTypeDiffWitness));
         }
 
         // If there's no diffBase, should we be creating a zero differential existential?
@@ -2204,6 +2208,33 @@ struct ForwardDiffTranslationContext
         propagatePropertiesForSingleFunc(inBuilder->getModule(), cast<IRFunc>(fwdDiffFunc));
     }
 
+
+    void removeEntryPointDecorations(IRFunc* func)
+    {
+        List<IRDecoration*> decorationsToRemove;
+        for (auto decoration : func->getDecorations())
+        {
+            switch (decoration->getOp())
+            {
+            case kIROp_PyExportDecoration:
+            case kIROp_EntryPointDecoration:
+            case kIROp_DllExportDecoration:
+            case kIROp_HLSLExportDecoration:
+            case kIROp_CudaDeviceExportDecoration:
+            case kIROp_CudaKernelDecoration:
+            case kIROp_ExternCDecoration:
+            case kIROp_ExternCppDecoration:
+                decorationsToRemove.add(decoration);
+                break;
+            default:
+                break;
+            }
+        }
+
+        for (auto decoration : decorationsToRemove)
+            decoration->removeAndDeallocate();
+    }
+
     // Translate a function definition.
     InstPair translateFunc(IRBuilder* inBuilder, IRFunc* primalFunc, IRFunc* diffFunc)
     {
@@ -2213,6 +2244,7 @@ struct ForwardDiffTranslationContext
         // Create a clone for original func and run additional transformations on the clone.
         IRCloneEnv env;
         auto primalFuncClone = as<IRFunc>(cloneInst(&env, &builder, primalFunc));
+        removeEntryPointDecorations(primalFuncClone);
         prepareFuncForForwardDiff(primalFuncClone);
 
         builder.setInsertInto(diffFunc);

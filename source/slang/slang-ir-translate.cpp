@@ -358,8 +358,14 @@ IRInst* _resolveInstRec(TranslationContext* ctx, IRInst* inst)
     //
     SLANG_ASSERT(as<IRModuleInst>(instWithCanonicalOperands->getParent()));
 
+    // TODO: Group these.
     if (as<IRTranslateBase>(instWithCanonicalOperands) ||
-        as<IRTranslatedTypeBase>(instWithCanonicalOperands))
+        as<IRTranslatedTypeBase>(instWithCanonicalOperands) ||
+        as<IRForwardDiffFuncType>(instWithCanonicalOperands) ||
+        as<IRBwdCallableFuncType>(instWithCanonicalOperands) ||
+        as<IRApplyForBwdFuncType>(instWithCanonicalOperands) ||
+        as<IRFuncResultType>(instWithCanonicalOperands) ||
+        as<IRBackwardDiffFuncType>(instWithCanonicalOperands))
     {
         auto translateInst = ctx->maybeTranslateInst(instWithCanonicalOperands);
         instWithCanonicalOperands->replaceUsesWith(translateInst);

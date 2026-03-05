@@ -779,5 +779,8 @@ return {
 	["constexprCastIntToEnum"] = 782,
 	["constexprCastEnumToInt"] = 783,
 	["constexprEnumCast"] = 784,
-	["constexprDiv"] = 785
+	["constexprDiv"] = 785,
+	["FuncWithBindings"] = 786,
+	["ReportCheckpointStore"] = 787,
+	["Type.TupleName"] = 788
 }

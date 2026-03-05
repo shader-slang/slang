@@ -427,6 +427,12 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
             auto tagType = enumType->getTagType();
             return calcSizeAndAlignment(targetReq, tagType, outSizeAndAlignment);
         }
+    case kIROp_TupleNameType:
+        {
+            // Acts like VoidType
+            *outSizeAndAlignment = IRSizeAndAlignment(0, 1);
+            return SLANG_OK;
+        }
         break;
     default:
         break;

@@ -493,28 +493,26 @@ Val* BwdCallableFuncType::_resolveImplOverride()
                 astBuilder,
                 thisParamValueType,
                 thisTypeDiffWitness);
-            if (diffThisType)
+            SLANG_ASSERT(diffThisType);
+            // Flip direction: In -> Out, BorrowInOut -> BorrowInOut
+            switch (thisParamDirection)
             {
-                // Flip direction: In -> Out, BorrowInOut -> BorrowInOut
-                switch (thisParamDirection)
-                {
-                case ParamPassingMode::In:
-                    newParamTypes.add(astBuilder->getOutParamType(diffThisType));
-                    break;
-                case ParamPassingMode::BorrowInOut:
-                    newParamTypes.add(astBuilder->getBorrowInOutParamType(diffThisType));
-                    break;
-                default:
-                    // For other modes, just add as-is or with out
-                    newParamTypes.add(astBuilder->getOutParamType(diffThisType));
-                    break;
-                }
+            case ParamPassingMode::In:
+                newParamTypes.add(astBuilder->getOutParamType(diffThisType));
+                break;
+            case ParamPassingMode::BorrowInOut:
+                newParamTypes.add(astBuilder->getBorrowInOutParamType(diffThisType));
+                break;
+            default:
+                // For other modes, just add as-is or with out
+                newParamTypes.add(astBuilder->getOutParamType(diffThisType));
+                break;
             }
-            else
-            {
-                // Non-differentiable this type
-                newParamTypes.add(astBuilder->getNoneType());
-            }
+        }
+        else if (thisParamType)
+        {
+            // Non-differentiable this type
+            newParamTypes.add(astBuilder->getNoneType());
         }
 
         // Then, go through and translate all types (parameter & result) to their

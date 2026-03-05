@@ -21,6 +21,7 @@ IRFunc* splitApplyAndPropFuncs(
     IRFunc* originalFunc,
     HoistedPrimalsInfo* primalsInfo,
     IRInst*& intermediateType,
-    IRFunc*& getValFunc);
+    IRFunc*& getValFunc,
+    UnownedStringSlice intermediateTypeName = UnownedStringSlice());
 
 } // namespace Slang

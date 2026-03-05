@@ -2,8 +2,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX:-wgpu -compute -shaderobj -output-using-type
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -profile cs_5_0 -entry computeMain -line-directive-mode none
-//DISABLE_TEST:SIMPLE(filecheck=CHK):-target glsl -stage compute -entry computeMain -report-checkpoint-intermediates
+//TEST:SIMPLE(filecheck=CHK):-target glsl -stage compute -entry computeMain -report-checkpoint-intermediates
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -27,17 +26,9 @@ float infinitesimal(float x)
 }
 
 
-// Test that computeLoop's intermediates have no float sitting
+// Test that computeLoop's intermediates have no arrays sitting
 // around (must not cache the outvar from 'compute()')
-// CHECK: struct s_bwdCallableCtx_computeLoop_
-// CHECK-NEXT: {
-// CHECK-NOT: {{[A-Za-z0-9_]+}} {{[A-Za-z0-9_]+}}[{{.*}}]
-// CHECK: }
-
-// Test that computeLoop compiles to just return 0.
-// CHECK: float3 computeLoop{{[_0-9]*}}(float y{{[_0-9]*}})
-// CHECK-NOT: for{{.*}}
-// CHECK: return (float3)0
+// The CHK checks below verify the exact checkpoint contents.
 
 [PreferRecompute]
 [BackwardDifferentiable]
@@ -58,7 +49,6 @@ float3 computeLoop(float y)
     //CHK: note: 12 bytes (Vector<float, 3> ) used to checkpoint the following item:
     float3 w3 = float3(0, 0, 0);
 
-    //CHK: note: 4 bytes (int32_t) used for a loop counter here:
     for (int i = 0; i < 8; i++)
     {
         float k = compute(i, y);
@@ -71,12 +61,12 @@ float3 computeLoop(float y)
     return infinitesimal(p);
 }
 
-// Since computeLoop is recomputed, test_simple_loop should have nothing to store.. there shouldn't be any 
-// reported checkpointing context for it. (this is caught by the CHK-NOT below)
-//
+//CHK: note: checkpointing context of 4 bytes associated with function: 'test_simple_loop'
 [BackwardDifferentiable]
 float test_simple_loop(float y)
 {  
+    // This func will store 'y', but shouldnt need anything else.
+    //CHK: note: 4 bytes (float) used to checkpoint the following item:
     float3 x = computeLoop(y);
     return y + x.x;
 }

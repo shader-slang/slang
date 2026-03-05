@@ -5937,6 +5937,17 @@ IRInst* IRBuilder::emitLoopExitValue(IRInst* value)
     return inst;
 }
 
+IRInst* IRBuilder::emitReportCheckpointStore(
+    IRType* storedType,
+    IRInst* originalFunc,
+    IRInst* storeRef)
+{
+    IRInst* operands[] = {storedType, originalFunc, storeRef};
+    auto inst = createInst<IRInst>(this, kIROp_ReportCheckpointStore, getVoidType(), 3, operands);
+    addInst(inst);
+    return inst;
+}
+
 IRInst* IRBuilder::emitBranch(IRBlock* pBlock)
 {
     auto inst = createInst<IRUnconditionalBranch>(this, kIROp_UnconditionalBranch, nullptr, pBlock);
@@ -9020,6 +9031,7 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_DetachDerivative:
     case kIROp_FuncTypeOf:
     case kIROp_MakeIDifferentiableWitness:
+    case kIROp_FuncWithBindings:
         return false;
 
     case kIROp_Div:

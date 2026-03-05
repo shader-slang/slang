@@ -2085,6 +2085,13 @@ static LegalVal legalizeInst(
         SLANG_ASSERT(type.flavor == LegalType::Flavor::none);
         return LegalVal();
     default:
+        if (type.flavor == LegalType::Flavor::none)
+        {
+            // If the result type of the instruction is `none`, then we can
+            // just legalize to `none` without worrying about the details of
+            // the instruction, since there will be no value to produce.
+            return LegalVal();
+        }
         // TODO: produce a user-visible diagnostic here
         SLANG_UNEXPECTED("non-simple operand(s)!");
         break;

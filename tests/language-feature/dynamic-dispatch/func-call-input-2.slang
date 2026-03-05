@@ -54,7 +54,8 @@ IInterface factoryCD(uint id, float x)
 float calc(IInterface obj, float y)
 {
     return obj.calc(y);
-    // REPORT: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 4 possible types:
+    // REPORT: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
+    // REPORT: ([[# @LINE-2]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
 }
 
 float f(uint id, float x)
