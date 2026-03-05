@@ -121,22 +121,47 @@ else
   $LLVM_PROFDATA merge -sparse "$COVERAGE_DIR"/slang-test-*.profraw -o "$COVERAGE_DIR"/slang-test.profdata
 fi
 
-# Generate summary report
+# Filename patterns to exclude for slangc compiler-only coverage.
+# These are files compiled into libslang but not part of the compiler pipeline:
+#   - Generated code (prelude, capability defs, FIDDLE, lookup tables, core module meta)
+#   - External/third-party code, public API headers
+#   - Core module embedding, GLSLANG bridge
+#   - Record-replay instrumentation
+#   - Language server, documentation generator, unmaintained debug features
+SLANGC_IGNORE_ARGS=(
+  -ignore-filename-regex='build/prelude/'
+  -ignore-filename-regex='build/source/slang/(capability|fiddle|slang-lookup-tables)/'
+  -ignore-filename-regex='build/source/slang-core-module/'
+  -ignore-filename-regex='external/'
+  -ignore-filename-regex='include/'
+  -ignore-filename-regex='source/slang-core-module/'
+  -ignore-filename-regex='source/slang-glslang/'
+  -ignore-filename-regex='source/slang-record-replay/'
+  -ignore-filename-regex='tools/'
+  -ignore-filename-regex='source/slang/slang-(language-server|doc-markdown-writer|doc-ast|ast-dump|repro)\.'
+)
+
+# Generate summary report (full library)
 echo
-echo "Coverage Summary:"
-echo "================"
+echo "Full Library Coverage Summary:"
+echo "=============================="
 $LLVM_COV report "$LIBSLANG" -instr-profile="$COVERAGE_DIR"/slang-test.profdata
+
+# Generate slangc compiler-only summary report
+echo
+echo "slangc Compiler Coverage (excludes generated/non-compiler code):"
+echo "================================================================"
+$LLVM_COV report "$LIBSLANG" -instr-profile="$COVERAGE_DIR"/slang-test.profdata "${SLANGC_IGNORE_ARGS[@]}"
 
 # Generate HTML report (optional)
 if [[ "$COVERAGE_HTML" = "1" ]]; then
   HTML_DIR="${COVERAGE_HTML_DIR:-$REPO_ROOT/coverage-html}"
   echo
-  echo "Generating HTML coverage report..."
+  echo "Generating HTML coverage report (full library)..."
   $LLVM_COV show "$LIBSLANG" \
     -instr-profile="$COVERAGE_DIR"/slang-test.profdata \
     -format=html \
     -output-dir="$HTML_DIR"
-  echo
   echo "HTML report generated in $HTML_DIR/index.html"
 
   # Try to open the report on macOS

@@ -217,33 +217,89 @@ jobs:
 
           LIBSLANG="$BUILD_DIR/$CONFIG/lib/libslang.$LIB_EXT"
 
-          # Generate machine-readable coverage report
+          # Filename patterns to exclude for slangc compiler-only coverage
+          SLANGC_IGNORE_ARGS=(
+            -ignore-filename-regex='build/prelude/'
+            -ignore-filename-regex='build/source/slang/(capability|fiddle|slang-lookup-tables)/'
+            -ignore-filename-regex='build/source/slang-core-module/'
+            -ignore-filename-regex='external/'
+            -ignore-filename-regex='include/'
+            -ignore-filename-regex='source/slang-core-module/'
+            -ignore-filename-regex='source/slang-glslang/'
+            -ignore-filename-regex='source/slang-record-replay/'
+            -ignore-filename-regex='tools/'
+            -ignore-filename-regex='source/slang/slang-(language-server|doc-markdown-writer|doc-ast|ast-dump|repro)\.'
+          )
+
+          # Generate full library coverage report
           REPORT_OUTPUT=$($LLVM_COV report "$LIBSLANG" -instr-profile="$COVERAGE_DIR/slang-test.profdata" 2>/dev/null || echo "")
 
+          # Generate slangc compiler-only coverage report
+          SLANGC_REPORT_OUTPUT=$($LLVM_COV report "$LIBSLANG" -instr-profile="$COVERAGE_DIR/slang-test.profdata" "${SLANGC_IGNORE_ARGS[@]}" 2>/dev/null || echo "")
+
           if [[ -n "$REPORT_OUTPUT" ]]; then
-            # Extract TOTALS line which contains all metrics
             TOTALS_LINE=$(echo "$REPORT_OUTPUT" | grep "^TOTAL" | head -1)
 
             if [[ -n "$TOTALS_LINE" ]]; then
-              # Parse the TOTALS line - format is typically:
-              # TOTAL  regions_hit regions_total region_pct  functions_hit functions_total function_pct  lines_hit lines_total line_pct  branches_hit branches_total branch_pct
               read -r _ regions_hit regions_total region_pct functions_hit functions_total function_pct lines_hit lines_total line_pct branches_hit branches_total branch_pct <<< "$TOTALS_LINE"
 
-              # Output for GitHub Actions
+              # Parse slangc-only metrics
+              slangc_line_pct=""
+              if [[ -n "$SLANGC_REPORT_OUTPUT" ]]; then
+                SLANGC_TOTALS=$(echo "$SLANGC_REPORT_OUTPUT" | grep "^TOTAL" | head -1)
+                if [[ -n "$SLANGC_TOTALS" ]]; then
+                  read -r _ slangc_regions_hit slangc_regions_total slangc_region_pct slangc_functions_hit slangc_functions_total slangc_function_pct slangc_lines_hit slangc_lines_total slangc_line_pct slangc_branches_hit slangc_branches_total slangc_branch_pct <<< "$SLANGC_TOTALS"
+                fi
+              fi
+
               echo "coverage=$line_pct" >> $GITHUB_OUTPUT
 
               # Generate step summary
               cat >> $GITHUB_STEP_SUMMARY <<EOF
           # Coverage Report
+
+          ## Full Library
           - **Line Coverage:** ${line_pct}% (${lines_hit} / ${lines_total})
           - **Region Coverage:** ${region_pct}% (${regions_hit} / ${regions_total})
           - **Function Coverage:** ${function_pct}% (${functions_hit} / ${functions_total})
           - **Branch Coverage:** ${branch_pct}% (${branches_hit} / ${branches_total})
           EOF
 
+              if [[ -n "$slangc_line_pct" ]]; then
+                cat >> $GITHUB_STEP_SUMMARY <<EOF
+
+          ## slangc Compiler Pipeline
+          - **Line Coverage:** ${slangc_line_pct}% (${slangc_lines_hit} / ${slangc_lines_total})
+          - **Region Coverage:** ${slangc_region_pct}% (${slangc_regions_hit} / ${slangc_regions_total})
+          - **Function Coverage:** ${slangc_function_pct}% (${slangc_functions_hit} / ${slangc_functions_total})
+          - **Branch Coverage:** ${slangc_branch_pct}% (${slangc_branches_hit} / ${slangc_branches_total})
+          EOF
+              fi
+
               # Save coverage summary as JSON for historical tracking
               REPORT_DATE=$(date -u +"%Y-%m-%d")
               COMMIT_SHORT=$(git rev-parse --short HEAD)
+
+              # Build JSON with optional slangc fields
+              SLANGC_JSON=""
+              if [[ -n "$slangc_line_pct" ]]; then
+                SLANGC_JSON=$(cat <<SLANGC_EOF
+            "slangc_line_coverage": "${slangc_line_pct}",
+            "slangc_lines_hit": ${slangc_lines_hit},
+            "slangc_lines_found": ${slangc_lines_total},
+            "slangc_region_coverage": "${slangc_region_pct}",
+            "slangc_regions_hit": ${slangc_regions_hit},
+            "slangc_regions_found": ${slangc_regions_total},
+            "slangc_function_coverage": "${slangc_function_pct}",
+            "slangc_functions_hit": ${slangc_functions_hit},
+            "slangc_functions_found": ${slangc_functions_total},
+            "slangc_branch_coverage": "${slangc_branch_pct}",
+            "slangc_branches_hit": ${slangc_branches_hit},
+            "slangc_branches_found": ${slangc_branches_total},
+          SLANGC_EOF
+              )
+              fi
+
               cat > coverage-summary.json <<EOF
           {
             "date": "${REPORT_DATE}",
@@ -261,7 +317,9 @@ jobs:
             "functions_found": ${functions_total},
             "branch_coverage": "${branch_pct}",
             "branches_hit": ${branches_hit},
-            "branches_found": ${branches_total}
+            "branches_found": ${branches_total},
+            ${SLANGC_JSON}
+            "_version": 2
           }
           EOF
               echo "Saved coverage summary to coverage-summary.json"
