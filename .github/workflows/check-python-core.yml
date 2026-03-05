@@ -1,0 +1,70 @@
+name: Check Python Scripts (Core Python Only)
+
+on:
+  pull_request:
+    branches: [master]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "extras/**/*.py"
+      - ".github/workflows/check-python-core.yml"
+  merge_group:
+    types: [checks_requested]
+
+jobs:
+  check-python-core:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft != true
+    strategy:
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+    name: Parse Python with core Python (${{ matrix.os }})
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify using system Python (no setup-python)
+        run: |
+          echo "Python: $(python3 --version)"
+          echo "Path: $(which python3)"
+
+      - name: Compile-check all extras Python scripts
+        run: |
+          failed=0
+          for f in extras/*.py; do
+            if ! python3 -m py_compile "$f"; then
+              echo "FAIL: $f"
+              failed=1
+            fi
+          done
+          exit $failed
+
+      - name: Check for non-stdlib imports
+        run: |
+          python3 -c "
+          import ast, sys, os
+
+          stdlib = sys.stdlib_module_names
+
+          failed = False
+          for path in sorted(os.listdir('extras')):
+              if not path.endswith('.py'):
+                  continue
+              filepath = os.path.join('extras', path)
+              with open(filepath) as f:
+                  tree = ast.parse(f.read(), filepath)
+              for node in ast.walk(tree):
+                  if isinstance(node, ast.Import):
+                      for alias in node.names:
+                          top = alias.name.split('.')[0]
+                          if top not in stdlib:
+                              print(f'{filepath}: non-stdlib import: {alias.name}')
+                              failed = True
+                  elif isinstance(node, ast.ImportFrom):
+                      if node.module and node.level == 0:
+                          top = node.module.split('.')[0]
+                          if top not in stdlib:
+                              print(f'{filepath}: non-stdlib import: from {node.module}')
+                              failed = True
+          if failed:
+              sys.exit(1)
+          print('All imports are stdlib-only.')
+          "
