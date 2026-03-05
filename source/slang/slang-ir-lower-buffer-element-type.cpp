@@ -914,13 +914,11 @@ struct LoweredElementTypeContext
         // Best-effort: attach an IRSizeAndAlignmentDecoration to the lowered type
         // so downstream emitters can query its layout without recomputation.
         // Failure is expected for types whose layout is not computable (e.g.
-        // ConstantBuffer, resource types on some targets), so we do not diagnose.
-        IRSizeAndAlignment sizeAlignment;
-        getSizeAndAlignment(
+        // ConstantBuffer, resource types on some targets).
+        ensureSizeAndAlignment(
             target->getTargetReq(),
             config.getLayoutRule(),
-            info.loweredType,
-            &sizeAlignment);
+            info.loweredType);
         loweredTypeInfo.set(type, info);
         mapLoweredTypeToInfo.set(info.loweredType, info);
         conversionMethodMap[{info.originalType, info.loweredType}] = info.convertLoweredToOriginal;
@@ -1699,15 +1697,11 @@ struct LoweredElementTypeContext
 
                 // Best-effort: attach an IRSizeAndAlignmentDecoration to the element type
                 // for use by StructuredBufferGetDimensions emission (e.g. GLSL, WGSL).
-                // Failure is expected for types whose layout is not computable, so
-                // we do not diagnose.
-                IRSizeAndAlignment sizeAlignment;
-                getSizeAndAlignment(
+                // Failure is expected for types whose layout is not computable.
+                ensureSizeAndAlignment(
                     target->getTargetReq(),
                     config.getLayoutRule(),
-                    elementType,
-                    &sizeAlignment);
-                SLANG_UNUSED(sizeAlignment);
+                    elementType);
             }
             else if (auto constBuffer = as<IRUniformParameterGroupType>(globalInst))
                 elementType = constBuffer->getElementType();

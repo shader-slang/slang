@@ -60,7 +60,18 @@ static Result _calcArraySizeAndAlignment(
 {
     auto elementCountLit = as<IRIntLit>(elementCountInst);
     if (!elementCountLit)
-        return SLANG_FAIL;
+    {
+        // The element count is not a compile-time literal (e.g. a specialization
+        // constant). We can still compute the alignment from the element type,
+        // but the total size is indeterminate — same treatment as unsized arrays.
+        IRSizeAndAlignment elementTypeLayout;
+        SLANG_RETURN_ON_FAIL(
+            getSizeAndAlignment(targetReq, rules, elementType, &elementTypeLayout));
+        elementTypeLayout = rules->alignCompositeElement(elementTypeLayout);
+        outSizeAndAlignment->alignment = elementTypeLayout.alignment;
+        outSizeAndAlignment->size = IRSizeAndAlignment::kIndeterminateSize;
+        return SLANG_OK;
+    }
     auto elementCount = elementCountLit->getValue();
 
     if (elementCount == 0)
@@ -508,6 +519,16 @@ Result getSizeAndAlignment(
     *outSizeAndAlignment = sizeAndAlignment;
     return SLANG_OK;
 }
+
+void ensureSizeAndAlignment(
+    TargetRequest* targetReq,
+    IRTypeLayoutRules* rules,
+    IRType* type)
+{
+    IRSizeAndAlignment sizeAndAlignment;
+    getSizeAndAlignment(targetReq, rules, type, &sizeAndAlignment);
+}
+
 IROffsetDecoration* findOffsetDecorationForLayout(
     IRStructField* field,
     IRTypeLayoutRuleName layoutName)
@@ -544,19 +565,17 @@ Result getOffset(
     if (!structType)
         return SLANG_FAIL;
 
-    IRSizeAndAlignment structTypeLayout;
-    SLANG_RETURN_ON_FAIL(getSizeAndAlignment(targetReq, rules, structType, &structTypeLayout));
-
+    // Trigger struct layout computation to cache IROffsetDecorations on
+    // fields. The overall computation may fail (e.g. a specialization-
+    // constant-sized array prevents computing the total struct size),
+    // but offsets for fields before the failure point are still cached.
+    ensureSizeAndAlignment(targetReq, rules, (IRType*)structType);
     if (auto decor = findOffsetDecorationForLayout(field, rules->ruleName))
     {
         *outOffset = decor->getOffset();
         return SLANG_OK;
     }
 
-    // If attempting to lay out the parent type didn't
-    // cause the field to get an offset, then we are
-    // in an unexpected case with no easy answer.
-    //
     return SLANG_FAIL;
 }
 
