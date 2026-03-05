@@ -163,6 +163,7 @@ struct PeepholeContext : InstPassBase
         switch (inst->getOp())
         {
         case kIROp_Add:
+        case kIROp_ConstexprAdd:
             if (isZero(inst->getOperand(0)))
             {
                 return tryReplace(inst->getOperand(1));
@@ -173,6 +174,7 @@ struct PeepholeContext : InstPassBase
             }
             break;
         case kIROp_Sub:
+        case kIROp_ConstexprSub:
             if (isZero(inst->getOperand(1)))
             {
                 return tryReplace(inst->getOperand(0));
@@ -186,6 +188,7 @@ struct PeepholeContext : InstPassBase
             }
             break;
         case kIROp_Mul:
+        case kIROp_ConstexprMul:
             if (isOne(inst->getOperand(0)))
             {
                 return tryReplace(inst->getOperand(1));
@@ -204,6 +207,7 @@ struct PeepholeContext : InstPassBase
             }
             break;
         case kIROp_Div:
+        case kIROp_ConstexprDiv:
             if (allowUnsafeOptimizations && isZero(inst->getOperand(0)))
             {
                 return tryReplace(inst->getOperand(0));
@@ -214,6 +218,7 @@ struct PeepholeContext : InstPassBase
             }
             break;
         case kIROp_And:
+        case kIROp_ConstexprAnd:
             if (isZero(inst->getOperand(0)))
             {
                 return tryReplace(inst->getOperand(0));
@@ -232,6 +237,7 @@ struct PeepholeContext : InstPassBase
             }
             break;
         case kIROp_Or:
+        case kIROp_ConstexprOr:
             if (isZero(inst->getOperand(0)))
             {
                 return tryReplace(inst->getOperand(1));
@@ -1127,6 +1133,12 @@ struct PeepholeContext : InstPassBase
         case kIROp_Mul:
         case kIROp_Sub:
         case kIROp_Div:
+        case kIROp_ConstexprAdd:
+        case kIROp_ConstexprMul:
+        case kIROp_ConstexprSub:
+        case kIROp_ConstexprDiv:
+        case kIROp_ConstexprAnd:
+        case kIROp_ConstexprOr:
         case kIROp_And:
         case kIROp_Or:
             changed |= tryOptimizeArithmeticInst(inst);
@@ -1516,8 +1528,7 @@ bool peepholeOptimize(TargetProgram* target, IRModule* module, PeepholeOptimizat
     context.targetProgram = target;
     context.isPrelinking = options.isPrelinking;
     context.useFastAnalysis =
-        target ? target->getOptionSet().getBoolOption(CompilerOptionName::MinimumSlangOptimization)
-               : true;
+        target ? target->getOptionSet().shouldPerformMinimumOptimizations() : true;
     return context.processModule();
 }
 
@@ -1526,8 +1537,7 @@ bool peepholeOptimize(TargetProgram* target, IRInst* func)
     PeepholeContext context = PeepholeContext(func->getModule());
     context.targetProgram = target;
     context.useFastAnalysis =
-        target ? target->getOptionSet().getBoolOption(CompilerOptionName::MinimumSlangOptimization)
-               : true;
+        target ? target->getOptionSet().shouldPerformMinimumOptimizations() : true;
     return context.processFunc(func);
 }
 
