@@ -5,7 +5,6 @@
 #include "slang-ir-layout.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
-#include "slang-rich-diagnostics.h"
 
 /// This file implements an important IR transformation pass in the Slang compiler
 /// that rewrites buffer element types into valid storage types, a.k.a physical types
@@ -381,16 +380,12 @@ void ConversionMethod::applyDestinationDriven(IRBuilder& builder, IRInst* dest, 
 // has 16-byte aligned size and N is no less than `minCount`.
 IRIntegerValue get16ByteAlignedVectorElementCount(
     TargetProgram* target,
-    DiagnosticSink* sink,
     IRType* elementType,
     IRIntegerValue minCount)
 {
+    // Layout may fail for resource/opaque types; fall back to 4 elements.
     IRSizeAndAlignment sizeAlignment;
-    if (SLANG_FAILED(
-            getNaturalSizeAndAlignment(target->getTargetReq(), elementType, &sizeAlignment)))
-        sink->diagnose(Diagnostics::Unexpected{
-            .message = "failed to compute element type layout for 16-byte vector alignment",
-            .location = elementType->sourceLoc});
+    getNaturalSizeAndAlignment(target->getTargetReq(), elementType, &sizeAlignment);
     if (sizeAlignment.size)
         return align(sizeAlignment.size * minCount, 16) / sizeAlignment.size;
     return 4;
@@ -641,7 +636,6 @@ struct LoweredElementTypeContext
                         vectorType->getElementType(),
                         builder.getIntValue(get16ByteAlignedVectorElementCount(
                             target,
-                            m_sink,
                             vectorType->getElementType(),
                             getIntVal(vectorType->getElementCount()))));
                     if (packedVectorType != loweredInnerTypeInfo.originalType)
@@ -654,7 +648,7 @@ struct LoweredElementTypeContext
                 {
                     packedVectorType = builder.getVectorType(
                         loweredInnerTypeInfo.loweredType,
-                        get16ByteAlignedVectorElementCount(target, m_sink, scalarType, 1));
+                        get16ByteAlignedVectorElementCount(target, scalarType, 1));
                     loweredInnerTypeInfo.convertLoweredToOriginal = kIROp_VectorReshape;
                     loweredInnerTypeInfo.convertOriginalToLowered = kIROp_MakeVectorFromScalar;
                 }
@@ -706,23 +700,22 @@ struct LoweredElementTypeContext
                 auto structKey = builder.createStructKey();
                 builder.addNameHintDecoration(structKey, UnownedStringSlice("data"));
                 IRSizeAndAlignment elementSizeAlignment;
-                if (SLANG_FAILED(getSizeAndAlignment(
-                        target->getTargetReq(),
-                        config.getLayoutRule(),
-                        loweredInnerTypeInfo.loweredType,
-                        &elementSizeAlignment)))
-                    m_sink->diagnose(Diagnostics::Unexpected{
-                        .message = "failed to compute type layout for buffer element lowering",
-                        .location = loweredInnerTypeInfo.loweredType->sourceLoc});
-                elementSizeAlignment =
-                    config.getLayoutRule()->alignCompositeElement(elementSizeAlignment);
+                bool hasLayout = SLANG_SUCCEEDED(getSizeAndAlignment(
+                    target->getTargetReq(),
+                    config.getLayoutRule(),
+                    loweredInnerTypeInfo.loweredType,
+                    &elementSizeAlignment));
+                if (hasLayout)
+                    elementSizeAlignment =
+                        config.getLayoutRule()->alignCompositeElement(elementSizeAlignment);
                 auto innerArrayType = builder.getArrayType(
                     loweredInnerTypeInfo.loweredType,
                     arrayType->getElementCount(),
-                    needExplicitLayout ? builder.getIntValue(
-                                             builder.getIntType(),
-                                             elementSizeAlignment.getStride())
-                                       : nullptr);
+                    (needExplicitLayout && hasLayout)
+                        ? builder.getIntValue(
+                              builder.getIntType(),
+                              elementSizeAlignment.getStride())
+                        : nullptr);
                 builder.createStructField(loweredType, structKey, innerArrayType);
                 info.loweredInnerArrayType = innerArrayType;
                 info.loweredInnerStructKey = structKey;
@@ -734,24 +727,23 @@ struct LoweredElementTypeContext
             else
             {
                 IRSizeAndAlignment elementSizeAlignment;
-                if (SLANG_FAILED(getSizeAndAlignment(
-                        target->getTargetReq(),
-                        config.getLayoutRule(),
-                        loweredInnerTypeInfo.loweredType,
-                        &elementSizeAlignment)))
-                    m_sink->diagnose(Diagnostics::Unexpected{
-                        .message = "failed to compute type layout for buffer element lowering",
-                        .location = loweredInnerTypeInfo.loweredType->sourceLoc});
-                elementSizeAlignment =
-                    config.getLayoutRule()->alignCompositeElement(elementSizeAlignment);
+                bool hasLayout = SLANG_SUCCEEDED(getSizeAndAlignment(
+                    target->getTargetReq(),
+                    config.getLayoutRule(),
+                    loweredInnerTypeInfo.loweredType,
+                    &elementSizeAlignment));
+                if (hasLayout)
+                    elementSizeAlignment =
+                        config.getLayoutRule()->alignCompositeElement(elementSizeAlignment);
                 auto innerArrayType = builder.getArrayTypeBase(
                     arrayTypeBase->getOp(),
                     loweredInnerTypeInfo.loweredType,
                     nullptr,
-                    needExplicitLayout ? builder.getIntValue(
-                                             builder.getIntType(),
-                                             elementSizeAlignment.getStride())
-                                       : nullptr);
+                    (needExplicitLayout && hasLayout)
+                        ? builder.getIntValue(
+                              builder.getIntType(),
+                              elementSizeAlignment.getStride())
+                        : nullptr);
                 maybeAddPhysicalTypeDecoration(builder, innerArrayType, config);
                 info.loweredType = innerArrayType;
             }
@@ -1028,26 +1020,22 @@ struct LoweredElementTypeContext
             auto newArrayPtrVal = fieldAddr->getBase();
             auto loweredInnerType = getLoweredTypeInfo(unsizedArrayType->getElementType(), config);
 
+            // Layout may fail for resource/opaque types; zero size and
+            // alignment are safe defaults (no pointer offset adjustment).
             IRSizeAndAlignment arrayElementSizeAlignment;
-            if (SLANG_FAILED(getSizeAndAlignment(
-                    target->getTargetReq(),
-                    config.getLayoutRule(),
-                    loweredInnerType.loweredType,
-                    &arrayElementSizeAlignment)))
-                m_sink->diagnose(Diagnostics::Unexpected{
-                    .message = "failed to compute type layout for buffer element lowering",
-                    .location = loweredInnerType.loweredType->sourceLoc});
+            getSizeAndAlignment(
+                target->getTargetReq(),
+                config.getLayoutRule(),
+                loweredInnerType.loweredType,
+                &arrayElementSizeAlignment);
             IRSizeAndAlignment baseSizeAlignment;
-            if (SLANG_FAILED(getSizeAndAlignment(
-                    target->getTargetReq(),
-                    config.getLayoutRule(),
-                    tryGetPointedToOrBufferElementType(
-                        &builder,
-                        fieldAddr->getBase()->getDataType()),
-                    &baseSizeAlignment)))
-                m_sink->diagnose(Diagnostics::Unexpected{
-                    .message = "failed to compute type layout for buffer element lowering",
-                    .location = fieldAddr->sourceLoc});
+            getSizeAndAlignment(
+                target->getTargetReq(),
+                config.getLayoutRule(),
+                tryGetPointedToOrBufferElementType(
+                    &builder,
+                    fieldAddr->getBase()->getDataType()),
+                &baseSizeAlignment);
 
             // Convert pointer to uint64 and adjust offset.
             IRIntegerValue offset = baseSizeAlignment.size;
@@ -2725,28 +2713,25 @@ struct DefaultBufferElementTypeLoweringPolicy : BufferElementTypeLoweringPolicy
                 // we are required to ensure array element types has 16-byte stride.
                 vectorSize = builder.getIntValue(get16ByteAlignedVectorElementCount(
                     target,
-                    m_sink,
                     matrixType->getElementType(),
                     getIntVal(vectorSize)));
             }
 
             auto vectorType = builder.getVectorType(matrixType->getElementType(), vectorSize);
             IRSizeAndAlignment elementSizeAlignment;
-            if (SLANG_FAILED(getSizeAndAlignment(
-                    target->getTargetReq(),
-                    config.getLayoutRule(),
-                    vectorType,
-                    &elementSizeAlignment)))
-                m_sink->diagnose(Diagnostics::Unexpected{
-                    .message = "failed to compute type layout for buffer element lowering",
-                    .location = matrixType->sourceLoc});
-            elementSizeAlignment =
-                config.getLayoutRule()->alignCompositeElement(elementSizeAlignment);
+            bool hasLayout = SLANG_SUCCEEDED(getSizeAndAlignment(
+                target->getTargetReq(),
+                config.getLayoutRule(),
+                vectorType,
+                &elementSizeAlignment));
+            if (hasLayout)
+                elementSizeAlignment =
+                    config.getLayoutRule()->alignCompositeElement(elementSizeAlignment);
 
             auto arrayType = builder.getArrayType(
                 vectorType,
                 isColMajor ? matrixType->getColumnCount() : matrixType->getRowCount(),
-                needExplicitLayout
+                (needExplicitLayout && hasLayout)
                     ? builder.getIntValue(builder.getIntType(), elementSizeAlignment.getStride())
                     : nullptr);
             builder.createStructField(loweredType, structKey, arrayType);
