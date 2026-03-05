@@ -1336,7 +1336,6 @@ Result linkAndOptimizeIR(
             SLANG_PASS(
                 lowerBufferElementTypeToStorageType,
                 targetProgram,
-                sink,
                 bufferElementTypeLoweringOptions);
         }
 
@@ -1434,7 +1433,6 @@ Result linkAndOptimizeIR(
         SLANG_PASS(
             lowerBufferElementTypeToStorageType,
             targetProgram,
-            sink,
             bufferElementTypeLoweringOptions);
     }
 
@@ -1912,7 +1910,6 @@ Result linkAndOptimizeIR(
     SLANG_PASS(
         lowerBufferElementTypeToStorageType,
         targetProgram,
-        sink,
         bufferElementTypeLoweringOptions);
 
     // If we are generating code for glsl or metal, perform address space propagation now.

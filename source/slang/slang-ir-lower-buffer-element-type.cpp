@@ -333,7 +333,6 @@ struct BufferElementTypeLoweringPolicy : public RefObject
 BufferElementTypeLoweringPolicy* getBufferElementTypeLoweringPolicy(
     BufferElementTypeLoweringPolicyKind kind,
     TargetProgram* target,
-    DiagnosticSink* sink,
     BufferElementTypeLoweringOptions options);
 
 TypeLoweringConfig getTypeLoweringConfigForBuffer(TargetProgram* target, IRType* bufferType);
@@ -472,16 +471,13 @@ struct LoweredElementTypeContext
     // Specialized functions that takes storage-typed pointers instead of logical-typed pointers.
     Dictionary<SpecializationKey, IRFunc*> specializedFuncs;
 
-    DiagnosticSink* m_sink;
-
     LoweredElementTypeContext(
         TargetProgram* target,
-        DiagnosticSink* sink,
         BufferElementTypeLoweringOptions inOptions)
-        : target(target), m_sink(sink), options(inOptions)
+        : target(target), options(inOptions)
     {
         leafTypeLoweringPolicy =
-            getBufferElementTypeLoweringPolicy(options.loweringPolicyKind, target, sink, options);
+            getBufferElementTypeLoweringPolicy(options.loweringPolicyKind, target, options);
     }
 
     IRFunc* createArrayUnpackFunc(
@@ -2259,10 +2255,9 @@ struct LoweredElementTypeContext
 void lowerBufferElementTypeToStorageType(
     IRModule* module,
     TargetProgram* target,
-    DiagnosticSink* sink,
     BufferElementTypeLoweringOptions options)
 {
-    LoweredElementTypeContext context(target, sink, options);
+    LoweredElementTypeContext context(target, options);
     context.processModule(module);
 }
 
@@ -2495,15 +2490,13 @@ TypeLoweringConfig getTypeLoweringConfigForBuffer(TargetProgram* target, IRType*
 struct DefaultBufferElementTypeLoweringPolicy : BufferElementTypeLoweringPolicy
 {
     TargetProgram* target;
-    DiagnosticSink* m_sink;
     BufferElementTypeLoweringOptions options;
     SlangMatrixLayoutMode defaultMatrixLayout = SLANG_MATRIX_LAYOUT_ROW_MAJOR;
 
     DefaultBufferElementTypeLoweringPolicy(
         TargetProgram* inTarget,
-        DiagnosticSink* sink,
         BufferElementTypeLoweringOptions inOptions)
-        : target(inTarget), m_sink(sink), options(inOptions)
+        : target(inTarget), options(inOptions)
     {
         defaultMatrixLayout = (SlangMatrixLayoutMode)target->getOptionSet().getMatrixLayoutMode();
         if ((isCPUTarget(target->getTargetReq()) || isCUDATarget(target->getTargetReq()) ||
@@ -2749,9 +2742,8 @@ struct KhronosTargetBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLo
 {
     KhronosTargetBufferElementTypeLoweringPolicy(
         TargetProgram* inTarget,
-        DiagnosticSink* sink,
         BufferElementTypeLoweringOptions inOptions)
-        : DefaultBufferElementTypeLoweringPolicy(inTarget, sink, inOptions)
+        : DefaultBufferElementTypeLoweringPolicy(inTarget, inOptions)
     {
     }
 
@@ -2861,9 +2853,8 @@ struct MetalParameterBlockElementTypeLoweringPolicy : DefaultBufferElementTypeLo
 {
     MetalParameterBlockElementTypeLoweringPolicy(
         TargetProgram* inTarget,
-        DiagnosticSink* sink,
         BufferElementTypeLoweringOptions inOptions)
-        : DefaultBufferElementTypeLoweringPolicy(inTarget, sink, inOptions)
+        : DefaultBufferElementTypeLoweringPolicy(inTarget, inOptions)
     {
     }
 
@@ -2896,9 +2887,8 @@ struct WGSLBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLoweringPol
 {
     WGSLBufferElementTypeLoweringPolicy(
         TargetProgram* inTarget,
-        DiagnosticSink* sink,
         BufferElementTypeLoweringOptions inOptions)
-        : DefaultBufferElementTypeLoweringPolicy(inTarget, sink, inOptions)
+        : DefaultBufferElementTypeLoweringPolicy(inTarget, inOptions)
     {
     }
 
@@ -2912,9 +2902,8 @@ struct LLVMBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLoweringPol
 {
     LLVMBufferElementTypeLoweringPolicy(
         TargetProgram* inTarget,
-        DiagnosticSink* sink,
         BufferElementTypeLoweringOptions inOptions)
-        : DefaultBufferElementTypeLoweringPolicy(inTarget, sink, inOptions)
+        : DefaultBufferElementTypeLoweringPolicy(inTarget, inOptions)
     {
     }
 
@@ -2929,21 +2918,20 @@ struct LLVMBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLoweringPol
 BufferElementTypeLoweringPolicy* getBufferElementTypeLoweringPolicy(
     BufferElementTypeLoweringPolicyKind kind,
     TargetProgram* target,
-    DiagnosticSink* sink,
     BufferElementTypeLoweringOptions options)
 {
     switch (kind)
     {
     case BufferElementTypeLoweringPolicyKind::Default:
-        return new DefaultBufferElementTypeLoweringPolicy(target, sink, options);
+        return new DefaultBufferElementTypeLoweringPolicy(target, options);
     case BufferElementTypeLoweringPolicyKind::KhronosTarget:
-        return new KhronosTargetBufferElementTypeLoweringPolicy(target, sink, options);
+        return new KhronosTargetBufferElementTypeLoweringPolicy(target, options);
     case BufferElementTypeLoweringPolicyKind::MetalParameterBlock:
-        return new MetalParameterBlockElementTypeLoweringPolicy(target, sink, options);
+        return new MetalParameterBlockElementTypeLoweringPolicy(target, options);
     case BufferElementTypeLoweringPolicyKind::WGSL:
-        return new WGSLBufferElementTypeLoweringPolicy(target, sink, options);
+        return new WGSLBufferElementTypeLoweringPolicy(target, options);
     case BufferElementTypeLoweringPolicyKind::LLVM:
-        return new LLVMBufferElementTypeLoweringPolicy(target, sink, options);
+        return new LLVMBufferElementTypeLoweringPolicy(target, options);
     }
     SLANG_UNREACHABLE("unknown buffer element type lowering policy");
 }
