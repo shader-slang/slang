@@ -9,6 +9,7 @@ using namespace slang;
 
 namespace Slang
 {
+
 class ByteCodeEmitter
 {
 public:
@@ -32,10 +33,21 @@ public:
 
     VMByteCodeBuilder& byteCodeBuilder;
     CodeGenContext* codeGenContext;
+    bool m_hasErrors = false;
 
     ByteCodeEmitter(VMByteCodeBuilder& builder, CodeGenContext* codeGenContext)
         : byteCodeBuilder(builder), codeGenContext(codeGenContext)
     {
+    }
+
+    void reportLayoutError(const char* message, SourceLoc loc = SourceLoc{})
+    {
+        m_hasErrors = true;
+        // Diagnostics::Unexpected aborts compilation immediately. m_hasErrors
+        // is maintained so we can lower this to a non-aborting severity in the
+        // future if we want to accumulate multiple errors before failing.
+        codeGenContext->getSink()->diagnose(
+            Diagnostics::Unexpected{.message = message, .location = loc});
     }
 
     String getName(IRInst* inst)
@@ -106,9 +118,7 @@ public:
                 codeGenContext->getTargetReq(),
                 inst->getDataType(),
                 &sizeAlignment)))
-            codeGenContext->getSink()->diagnose(Diagnostics::Unexpected{
-                .message = "failed to compute type layout for VM bytecode emission",
-                .location = inst->sourceLoc});
+            reportLayoutError("failed to compute type layout for VM bytecode emission", inst->sourceLoc);
         operand = allocReg(funcBuilder, sizeAlignment.size, sizeAlignment.alignment);
         mapInstToOperand[inst] = operand;
         return operand;
@@ -172,18 +182,18 @@ public:
 
     VMOperand addConstantValue(IRConstant* inst)
     {
+        if (inst->getOp() == kIROp_StringLit)
+            return addStringLiteral(static_cast<IRStringLit*>(inst)->getStringSlice());
+
         VMOperand operand;
         operand.sectionId = kSlangByteCodeSectionConstants;
 
-        // Align constantSection.
         IRSizeAndAlignment sizeAlignment;
         if (SLANG_FAILED(getNaturalSizeAndAlignment(
                 codeGenContext->getTargetReq(),
                 inst->getDataType(),
                 &sizeAlignment)))
-            codeGenContext->getSink()->diagnose(Diagnostics::Unexpected{
-                .message = "failed to compute type layout for VM bytecode emission",
-                .location = inst->sourceLoc});
+            reportLayoutError("failed to compute type layout for VM bytecode emission", inst->sourceLoc);
         alignConstSection(sizeAlignment.alignment);
 
         operand.offset = (uint32_t)byteCodeBuilder.constantSection.getCount();
@@ -191,10 +201,6 @@ public:
 
         switch (inst->getOp())
         {
-        case kIROp_StringLit:
-            {
-                return addStringLiteral(static_cast<IRStringLit*>(inst)->getStringSlice());
-            }
         case kIROp_IntLit:
             {
                 int64_t value = static_cast<IRIntLit*>(inst)->getValue();
@@ -519,9 +525,7 @@ public:
                             codeGenContext->getTargetReq(),
                             inst->getDataType(),
                             &sizeAlignment)))
-                        codeGenContext->getSink()->diagnose(Diagnostics::Unexpected{
-                            .message = "failed to compute type layout for VM bytecode emission",
-                            .location = inst->sourceLoc});
+                        reportLayoutError("failed to compute type layout for VM bytecode emission", inst->sourceLoc);
                     funcBuilder.parameterSize =
                         operand.offset + (uint32_t)sizeAlignment.getStride();
                 }
@@ -536,9 +540,7 @@ public:
                         codeGenContext->getTargetReq(),
                         type,
                         &sizeAlignment)))
-                    codeGenContext->getSink()->diagnose(Diagnostics::Unexpected{
-                        .message = "failed to compute type layout for VM bytecode emission",
-                        .location = inst->sourceLoc});
+                    reportLayoutError("failed to compute type layout for VM bytecode emission", inst->sourceLoc);
                 auto varStorage = allocReg(
                     funcBuilder,
                     (size_t)sizeAlignment.size,
@@ -557,9 +559,7 @@ public:
                         codeGenContext->getTargetReq(),
                         inst->getDataType(),
                         &sizeAlignment)))
-                    codeGenContext->getSink()->diagnose(Diagnostics::Unexpected{
-                        .message = "failed to compute type layout for VM bytecode emission",
-                        .location = inst->sourceLoc});
+                    reportLayoutError("failed to compute type layout for VM bytecode emission", inst->sourceLoc);
                 writeInst(
                     funcBuilder,
                     VMOp::Load,
@@ -575,9 +575,7 @@ public:
                         codeGenContext->getTargetReq(),
                         inst->getOperand(1)->getDataType(),
                         &sizeAlignment)))
-                    codeGenContext->getSink()->diagnose(Diagnostics::Unexpected{
-                        .message = "failed to compute type layout for VM bytecode emission",
-                        .location = inst->sourceLoc});
+                    reportLayoutError("failed to compute type layout for VM bytecode emission", inst->sourceLoc);
                 writeInst(
                     funcBuilder,
                     VMOp::Store,
@@ -612,9 +610,7 @@ public:
                         codeGenContext->getTargetReq(),
                         inst->getDataType(),
                         &sizeAlignment)))
-                    codeGenContext->getSink()->diagnose(Diagnostics::Unexpected{
-                        .message = "failed to compute type layout for VM bytecode emission",
-                        .location = inst->sourceLoc});
+                    reportLayoutError("failed to compute type layout for VM bytecode emission", inst->sourceLoc);
                 writeInst(
                     funcBuilder,
                     opInfo.opcode,
@@ -634,9 +630,7 @@ public:
                         codeGenContext->getTargetReq(),
                         inst->getDataType(),
                         &sizeAlignment)))
-                    codeGenContext->getSink()->diagnose(Diagnostics::Unexpected{
-                        .message = "failed to compute type layout for VM bytecode emission",
-                        .location = inst->sourceLoc});
+                    reportLayoutError("failed to compute type layout for VM bytecode emission", inst->sourceLoc);
                 writeInst(
                     funcBuilder,
                     opInfo.opcode,
@@ -670,9 +664,7 @@ public:
                             codeGenContext->getTargetReq(),
                             param->getDataType(),
                             &sizeAlignment)))
-                        codeGenContext->getSink()->diagnose(Diagnostics::Unexpected{
-                            .message = "failed to compute type layout for VM bytecode emission",
-                            .location = param->sourceLoc});
+                        reportLayoutError("failed to compute type layout for VM bytecode emission", param->sourceLoc);
                     writeInst(
                         funcBuilder,
                         VMOp::Copy,
@@ -750,9 +742,7 @@ public:
                         codeGenContext->getTargetReq(),
                         inst->getDataType(),
                         &sizeAlignment)))
-                    codeGenContext->getSink()->diagnose(Diagnostics::Unexpected{
-                        .message = "failed to compute type layout for VM bytecode emission",
-                        .location = inst->sourceLoc});
+                    reportLayoutError("failed to compute type layout for VM bytecode emission", inst->sourceLoc);
                 writeInst(
                     funcBuilder,
                     VMOp::Call,
@@ -771,9 +761,7 @@ public:
                             codeGenContext->getTargetReq(),
                             returnInst->getVal()->getDataType(),
                             &sizeAlignment)))
-                        codeGenContext->getSink()->diagnose(Diagnostics::Unexpected{
-                            .message = "failed to compute type layout for VM bytecode emission",
-                            .location = inst->sourceLoc});
+                        reportLayoutError("failed to compute type layout for VM bytecode emission", inst->sourceLoc);
                     writeInst(
                         funcBuilder,
                         VMOp::Ret,
@@ -798,9 +786,7 @@ public:
                         codeGenContext->getTargetReq(),
                         elementType,
                         &sizeAlignment)))
-                    codeGenContext->getSink()->diagnose(Diagnostics::Unexpected{
-                        .message = "failed to compute type layout for VM bytecode emission",
-                        .location = inst->sourceLoc});
+                    reportLayoutError("failed to compute type layout for VM bytecode emission", inst->sourceLoc);
                 auto stride = sizeAlignment.getStride();
                 auto baseOperand = ensureInst(base);
                 auto indexOperand = ensureInst(index);
@@ -825,9 +811,7 @@ public:
                 IRIntegerValue offset = 0;
                 auto field = findStructField(structType, fieldKey);
                 if (SLANG_FAILED(getNaturalOffset(codeGenContext->getTargetReq(), field, &offset)))
-                    codeGenContext->getSink()->diagnose(Diagnostics::Unexpected{
-                        .message = "failed to compute field offset for VM bytecode emission",
-                        .location = inst->sourceLoc});
+                    reportLayoutError("failed to compute field offset for VM bytecode emission", inst->sourceLoc);
 
                 writeInst(
                     funcBuilder,
@@ -850,9 +834,7 @@ public:
                         codeGenContext->getTargetReq(),
                         elementType,
                         &sizeAlignment)))
-                    codeGenContext->getSink()->diagnose(Diagnostics::Unexpected{
-                        .message = "failed to compute type layout for VM bytecode emission",
-                        .location = inst->sourceLoc});
+                    reportLayoutError("failed to compute type layout for VM bytecode emission", inst->sourceLoc);
                 writeInst(
                     funcBuilder,
                     VMOp::OffsetPtr,
@@ -872,9 +854,7 @@ public:
                 IRIntegerValue offset = 0;
                 auto field = findStructField(structType, fieldKey);
                 if (SLANG_FAILED(getNaturalOffset(codeGenContext->getTargetReq(), field, &offset)))
-                    codeGenContext->getSink()->diagnose(Diagnostics::Unexpected{
-                        .message = "failed to compute field offset for VM bytecode emission",
-                        .location = inst->sourceLoc});
+                    reportLayoutError("failed to compute field offset for VM bytecode emission", inst->sourceLoc);
 
                 auto baseOperand = ensureInst(base);
                 baseOperand.offset += (uint32_t)offset;
@@ -892,9 +872,7 @@ public:
                         codeGenContext->getTargetReq(),
                         elementType,
                         &sizeAlignment)))
-                    codeGenContext->getSink()->diagnose(Diagnostics::Unexpected{
-                        .message = "failed to compute type layout for VM bytecode emission",
-                        .location = inst->sourceLoc});
+                    reportLayoutError("failed to compute type layout for VM bytecode emission", inst->sourceLoc);
                 auto stride = sizeAlignment.getStride();
                 auto baseOperand = ensureInst(base);
                 if (as<IRIntLit>(index))
@@ -960,9 +938,7 @@ public:
                         codeGenContext->getTargetReq(),
                         elementType,
                         &sizeAlignment)))
-                    codeGenContext->getSink()->diagnose(Diagnostics::Unexpected{
-                        .message = "failed to compute type layout for VM bytecode emission",
-                        .location = inst->sourceLoc});
+                    reportLayoutError("failed to compute type layout for VM bytecode emission", inst->sourceLoc);
                 auto stride = (uint32_t)sizeAlignment.getStride();
                 for (UInt i = 0; i < inst->getOperandCount(); ++i)
                 {
@@ -987,9 +963,7 @@ public:
                         codeGenContext->getTargetReq(),
                         elementType,
                         &sizeAlignment)))
-                    codeGenContext->getSink()->diagnose(Diagnostics::Unexpected{
-                        .message = "failed to compute type layout for VM bytecode emission",
-                        .location = inst->sourceLoc});
+                    reportLayoutError("failed to compute type layout for VM bytecode emission", inst->sourceLoc);
                 auto stride = (uint32_t)sizeAlignment.getStride();
                 for (Index i = 0; i < getIntVal(arrayType->getElementCount()); ++i)
                 {
@@ -1019,17 +993,13 @@ public:
                     IRIntegerValue offset = 0;
                     if (SLANG_FAILED(
                             getNaturalOffset(codeGenContext->getTargetReq(), field, &offset)))
-                        codeGenContext->getSink()->diagnose(Diagnostics::Unexpected{
-                            .message = "failed to compute field offset for VM bytecode emission",
-                            .location = field->sourceLoc});
+                        reportLayoutError("failed to compute field offset for VM bytecode emission", field->sourceLoc);
                     IRSizeAndAlignment sizeAlignment = {};
                     if (SLANG_FAILED(getNaturalSizeAndAlignment(
                             codeGenContext->getTargetReq(),
                             field->getFieldType(),
                             &sizeAlignment)))
-                        codeGenContext->getSink()->diagnose(Diagnostics::Unexpected{
-                            .message = "failed to compute type layout for VM bytecode emission",
-                            .location = field->sourceLoc});
+                        reportLayoutError("failed to compute type layout for VM bytecode emission", field->sourceLoc);
                     VMOperand elementOperand = result;
                     elementOperand.offset += (uint32_t)offset;
                     writeInst(
@@ -1053,9 +1023,7 @@ public:
                             codeGenContext->getTargetReq(),
                             inst->getOperand(i)->getDataType(),
                             &sizeAlignment)))
-                        codeGenContext->getSink()->diagnose(Diagnostics::Unexpected{
-                            .message = "failed to compute type layout for VM bytecode emission",
-                            .location = inst->sourceLoc});
+                        reportLayoutError("failed to compute type layout for VM bytecode emission", inst->sourceLoc);
                     writeInst(
                         funcBuilder,
                         VMOp::Copy,
@@ -1075,9 +1043,7 @@ public:
                         codeGenContext->getTargetReq(),
                         vectorType->getElementType(),
                         &sizeAlignment)))
-                    codeGenContext->getSink()->diagnose(Diagnostics::Unexpected{
-                        .message = "failed to compute type layout for VM bytecode emission",
-                        .location = inst->sourceLoc});
+                    reportLayoutError("failed to compute type layout for VM bytecode emission", inst->sourceLoc);
                 auto stride = (uint32_t)sizeAlignment.getStride();
                 for (Index i = 0; i < getIntVal(vectorType->getElementCount()); ++i)
                 {
@@ -1101,9 +1067,7 @@ public:
                         codeGenContext->getTargetReq(),
                         matrixType->getElementType(),
                         &sizeAlignment)))
-                    codeGenContext->getSink()->diagnose(Diagnostics::Unexpected{
-                        .message = "failed to compute type layout for VM bytecode emission",
-                        .location = inst->sourceLoc});
+                    reportLayoutError("failed to compute type layout for VM bytecode emission", inst->sourceLoc);
                 auto stride = (uint32_t)sizeAlignment.getStride();
                 for (Index i = 0; i < getIntVal(matrixType->getRowCount()); ++i)
                 {
@@ -1160,9 +1124,7 @@ public:
                 codeGenContext->getTargetReq(),
                 func->getResultType(),
                 &sizeAlignment)))
-            codeGenContext->getSink()->diagnose(Diagnostics::Unexpected{
-                .message = "failed to compute type layout for VM bytecode emission",
-                .location = func->sourceLoc});
+            reportLayoutError("failed to compute type layout for VM bytecode emission", func->sourceLoc);
         funcBuilder.resultSize = (uint32_t)sizeAlignment.getStride();
 
         Dictionary<IRBlock*, Index> mapBlockToByteOffset;
@@ -1272,6 +1234,8 @@ SlangResult emitVMByteCodeForEntryPoints(
 {
     ByteCodeEmitter emitter(byteCode, codeGenContext);
     emitter.emitEntryPoints(linkedIR);
+    if (emitter.m_hasErrors)
+        return SLANG_FAIL;
     return SLANG_OK;
 }
 
