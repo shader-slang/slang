@@ -332,8 +332,7 @@ void lowerAppendConsumeStructuredBuffers(
         {
         case kIROp_HLSLAppendStructuredBufferType:
         case kIROp_HLSLConsumeStructuredBufferType:
-            lowerStructuredBufferType(
-                target, as<IRHLSLStructuredBufferTypeBase>(globalInst), sink);
+            lowerStructuredBufferType(target, as<IRHLSLStructuredBufferTypeBase>(globalInst), sink);
             break;
         }
     }

@@ -386,7 +386,8 @@ IRIntegerValue get16ByteAlignedVectorElementCount(
     IRIntegerValue minCount)
 {
     IRSizeAndAlignment sizeAlignment;
-    if (SLANG_FAILED(getNaturalSizeAndAlignment(target->getTargetReq(), elementType, &sizeAlignment)))
+    if (SLANG_FAILED(
+            getNaturalSizeAndAlignment(target->getTargetReq(), elementType, &sizeAlignment)))
         sink->diagnose(Diagnostics::Unexpected{
             .message = "failed to compute element type layout for 16-byte vector alignment",
             .location = elementType->sourceLoc});
@@ -922,7 +923,10 @@ struct LoweredElementTypeContext
         // so downstream emitters can query its layout without recomputation.
         IRSizeAndAlignment sizeAlignment;
         if (SLANG_FAILED(getSizeAndAlignment(
-                target->getTargetReq(), config.getLayoutRule(), info.loweredType, &sizeAlignment)))
+                target->getTargetReq(),
+                config.getLayoutRule(),
+                info.loweredType,
+                &sizeAlignment)))
             m_sink->diagnose(Diagnostics::Unexpected{
                 .message = "failed to compute type layout for buffer element lowering",
                 .location = info.loweredType->sourceLoc});
@@ -1039,7 +1043,8 @@ struct LoweredElementTypeContext
                     target->getTargetReq(),
                     config.getLayoutRule(),
                     tryGetPointedToOrBufferElementType(
-                        &builder, fieldAddr->getBase()->getDataType()),
+                        &builder,
+                        fieldAddr->getBase()->getDataType()),
                     &baseSizeAlignment)))
                 m_sink->diagnose(Diagnostics::Unexpected{
                     .message = "failed to compute type layout for buffer element lowering",

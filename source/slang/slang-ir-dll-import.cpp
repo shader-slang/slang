@@ -102,7 +102,9 @@ struct DllImportContext
         {
             IRSizeAndAlignment sizeAndAlignment;
             if (SLANG_FAILED(getNaturalSizeAndAlignment(
-                    targetProgram->getTargetReq(), param->getDataType(), &sizeAndAlignment)))
+                    targetProgram->getTargetReq(),
+                    param->getDataType(),
+                    &sizeAndAlignment)))
                 diagnosticSink->diagnose(Diagnostics::Unexpected{
                     .message = "failed to compute type layout for DLL import parameter",
                     .location = param->sourceLoc});

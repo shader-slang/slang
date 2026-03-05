@@ -2196,17 +2196,24 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         {
                             auto rule = IRTypeLayoutRules::get(layout->getLayoutName());
                             if (SLANG_FAILED(getSizeAndAlignment(
-                                    m_targetRequest, rule, valueType, &sizeAndAlignment)))
+                                    m_targetRequest,
+                                    rule,
+                                    valueType,
+                                    &sizeAndAlignment)))
                                 m_sink->diagnose(Diagnostics::Unexpected{
-                                    .message = "failed to compute type layout for SPIR-V array stride",
+                                    .message =
+                                        "failed to compute type layout for SPIR-V array stride",
                                     .location = inst->sourceLoc});
                         }
                         else
                         {
                             if (SLANG_FAILED(getNaturalSizeAndAlignment(
-                                    m_targetRequest, valueType, &sizeAndAlignment)))
+                                    m_targetRequest,
+                                    valueType,
+                                    &sizeAndAlignment)))
                                 m_sink->diagnose(Diagnostics::Unexpected{
-                                    .message = "failed to compute type layout for SPIR-V array stride",
+                                    .message =
+                                        "failed to compute type layout for SPIR-V array stride",
                                     .location = inst->sourceLoc});
                         }
                         uint64_t valueSize = sizeAndAlignment.size;
@@ -2457,9 +2464,12 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     {
                         IRSizeAndAlignment sizeAndAlignment;
                         if (SLANG_FAILED(getNaturalSizeAndAlignment(
-                                m_targetRequest, elementType, &sizeAndAlignment)))
+                                m_targetRequest,
+                                elementType,
+                                &sizeAndAlignment)))
                             m_sink->diagnose(Diagnostics::Unexpected{
-                                .message = "failed to compute element type layout for SPIR-V unsized array",
+                                .message = "failed to compute element type layout for SPIR-V "
+                                           "unsized array",
                                 .location = inst->sourceLoc});
                         stride = (int)sizeAndAlignment.getStride();
                     }
@@ -6344,7 +6354,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             else
             {
                 if (SLANG_FAILED(getOffset(
-                        m_targetRequest, IRTypeLayoutRules::get(layoutRuleName), field, &offset)))
+                        m_targetRequest,
+                        IRTypeLayoutRules::get(layoutRuleName),
+                        field,
+                        &offset)))
                     m_sink->diagnose(Diagnostics::Unexpected{
                         .message = "failed to compute field offset for SPIR-V emission",
                         .location = field->sourceLoc});
@@ -6373,7 +6386,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 auto rule = IRTypeLayoutRules::get(layoutRuleName);
                 IRSizeAndAlignment elementSizeAlignment;
                 if (SLANG_FAILED(getSizeAndAlignment(
-                        m_targetRequest, rule, matrixType->getElementType(), &elementSizeAlignment)))
+                        m_targetRequest,
+                        rule,
+                        matrixType->getElementType(),
+                        &elementSizeAlignment)))
                     m_sink->diagnose(Diagnostics::Unexpected{
                         .message = "failed to compute type layout for SPIR-V member decoration",
                         .location = field->sourceLoc});
@@ -7936,7 +7952,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 else
                 {
                     if (SLANG_FAILED(getNaturalSizeAndAlignment(
-                            m_targetRequest, ptrType->getValueType(), &sizeAndAlignment)))
+                            m_targetRequest,
+                            ptrType->getValueType(),
+                            &sizeAndAlignment)))
                         m_sink->diagnose(Diagnostics::Unexpected{
                             .message = "failed to compute type layout for SPIR-V pointer alignment",
                             .location = inst->sourceLoc});
@@ -8055,7 +8073,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         {
             IRSizeAndAlignment sizeAndAlignment;
             if (SLANG_FAILED(getNaturalSizeAndAlignment(
-                    m_targetRequest, sourceElementType, &sizeAndAlignment)))
+                    m_targetRequest,
+                    sourceElementType,
+                    &sizeAndAlignment)))
                 m_sink->diagnose(Diagnostics::Unexpected{
                     .message = "failed to compute type layout for SPIR-V buffer stride",
                     .location = inst->sourceLoc});
@@ -9655,8 +9675,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     (String("unnamed_type_") + String(uid)).getUnownedSlice());
             }
             IRSizeAndAlignment structSizeAlignment;
-            if (SLANG_FAILED(getNaturalSizeAndAlignment(
-                    m_targetRequest, type, &structSizeAlignment)))
+            if (SLANG_FAILED(
+                    getNaturalSizeAndAlignment(m_targetRequest, type, &structSizeAlignment)))
                 m_sink->diagnose(Diagnostics::Unexpected{
                     .message = "failed to compute type layout for SPIR-V debug info",
                     .location = type->sourceLoc});
@@ -9672,8 +9692,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         .location = field->sourceLoc});
 
                 auto fieldType = field->getFieldType();
-                if (SLANG_FAILED(getNaturalSizeAndAlignment(
-                        m_targetRequest, fieldType, &sizeAlignment)))
+                if (SLANG_FAILED(
+                        getNaturalSizeAndAlignment(m_targetRequest, fieldType, &sizeAlignment)))
                     m_sink->diagnose(Diagnostics::Unexpected{
                         .message = "failed to compute type layout for SPIR-V debug info",
                         .location = field->sourceLoc});
@@ -9852,8 +9872,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             }
 
             IRSizeAndAlignment sizeAlignment;
-            if (SLANG_FAILED(
-                    getNaturalSizeAndAlignment(m_targetRequest, type, &sizeAlignment)))
+            if (SLANG_FAILED(getNaturalSizeAndAlignment(m_targetRequest, type, &sizeAlignment)))
                 m_sink->diagnose(Diagnostics::Unexpected{
                     .message = "failed to compute type layout for SPIR-V debug info",
                     .location = type->sourceLoc});
@@ -9996,8 +10015,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     (String("unnamed_forward_type_") + String(uid)).getUnownedSlice());
             }
             IRSizeAndAlignment structSizeAlignment;
-            if (SLANG_FAILED(getNaturalSizeAndAlignment(
-                    m_targetRequest, type, &structSizeAlignment)))
+            if (SLANG_FAILED(
+                    getNaturalSizeAndAlignment(m_targetRequest, type, &structSizeAlignment)))
                 m_sink->diagnose(Diagnostics::Unexpected{
                     .message = "failed to compute type layout for SPIR-V debug info",
                     .location = type->sourceLoc});

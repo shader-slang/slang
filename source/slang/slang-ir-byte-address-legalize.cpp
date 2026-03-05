@@ -461,8 +461,10 @@ struct ByteAddressBufferLegalizationContext
                 auto rowCount = (Index)getIntVal(matType->getRowCount());
                 auto colVectorType = m_builder.getVectorType(matType->getElementType(), rowCount);
                 IRSizeAndAlignment colVectorSizeAlignment;
-                if (SLANG_FAILED(
-                        getSizeAndAlignment(m_targetProgram, colVectorType, &colVectorSizeAlignment)))
+                if (SLANG_FAILED(getSizeAndAlignment(
+                        m_targetProgram,
+                        colVectorType,
+                        &colVectorSizeAlignment)))
                     m_sink->diagnose(Diagnostics::Unexpected{
                         .message = "failed to compute type layout for byte address legalization",
                         .location = matType->sourceLoc});
@@ -1351,9 +1353,12 @@ struct ByteAddressBufferLegalizationContext
                     auto colVector = m_builder.emitMakeVector(colVectorType, colVectorArgs);
                     IRSizeAndAlignment colVectorSizeAlignment;
                     if (SLANG_FAILED(getSizeAndAlignment(
-                            m_targetProgram, colVectorType, &colVectorSizeAlignment)))
+                            m_targetProgram,
+                            colVectorType,
+                            &colVectorSizeAlignment)))
                         m_sink->diagnose(Diagnostics::Unexpected{
-                            .message = "failed to compute type layout for byte address legalization",
+                            .message =
+                                "failed to compute type layout for byte address legalization",
                             .location = matType->sourceLoc});
                     emitLegalStore(
                         colVectorType,

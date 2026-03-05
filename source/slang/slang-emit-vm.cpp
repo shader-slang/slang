@@ -103,7 +103,9 @@ public:
 
         IRSizeAndAlignment sizeAlignment = {};
         if (SLANG_FAILED(getNaturalSizeAndAlignment(
-                codeGenContext->getTargetReq(), inst->getDataType(), &sizeAlignment)))
+                codeGenContext->getTargetReq(),
+                inst->getDataType(),
+                &sizeAlignment)))
             codeGenContext->getSink()->diagnose(Diagnostics::Unexpected{
                 .message = "failed to compute type layout for VM bytecode emission",
                 .location = inst->sourceLoc});
@@ -176,7 +178,9 @@ public:
         // Align constantSection.
         IRSizeAndAlignment sizeAlignment;
         if (SLANG_FAILED(getNaturalSizeAndAlignment(
-                codeGenContext->getTargetReq(), inst->getDataType(), &sizeAlignment)))
+                codeGenContext->getTargetReq(),
+                inst->getDataType(),
+                &sizeAlignment)))
             codeGenContext->getSink()->diagnose(Diagnostics::Unexpected{
                 .message = "failed to compute type layout for VM bytecode emission",
                 .location = inst->sourceLoc});
@@ -512,7 +516,9 @@ public:
                     funcBuilder.parameterOffsets.add(operand.offset);
                     IRSizeAndAlignment sizeAlignment = {};
                     if (SLANG_FAILED(getNaturalSizeAndAlignment(
-                            codeGenContext->getTargetReq(), inst->getDataType(), &sizeAlignment)))
+                            codeGenContext->getTargetReq(),
+                            inst->getDataType(),
+                            &sizeAlignment)))
                         codeGenContext->getSink()->diagnose(Diagnostics::Unexpected{
                             .message = "failed to compute type layout for VM bytecode emission",
                             .location = inst->sourceLoc});
@@ -527,7 +533,9 @@ public:
                 auto type = tryGetPointedToType(&builder, inst->getDataType());
                 IRSizeAndAlignment sizeAlignment = {};
                 if (SLANG_FAILED(getNaturalSizeAndAlignment(
-                        codeGenContext->getTargetReq(), type, &sizeAlignment)))
+                        codeGenContext->getTargetReq(),
+                        type,
+                        &sizeAlignment)))
                     codeGenContext->getSink()->diagnose(Diagnostics::Unexpected{
                         .message = "failed to compute type layout for VM bytecode emission",
                         .location = inst->sourceLoc});
@@ -546,7 +554,9 @@ public:
             {
                 IRSizeAndAlignment sizeAlignment = {};
                 if (SLANG_FAILED(getNaturalSizeAndAlignment(
-                        codeGenContext->getTargetReq(), inst->getDataType(), &sizeAlignment)))
+                        codeGenContext->getTargetReq(),
+                        inst->getDataType(),
+                        &sizeAlignment)))
                     codeGenContext->getSink()->diagnose(Diagnostics::Unexpected{
                         .message = "failed to compute type layout for VM bytecode emission",
                         .location = inst->sourceLoc});
@@ -599,7 +609,9 @@ public:
                 auto opInfo = translateArithmeticOp(inst);
                 IRSizeAndAlignment sizeAlignment = {};
                 if (SLANG_FAILED(getNaturalSizeAndAlignment(
-                        codeGenContext->getTargetReq(), inst->getDataType(), &sizeAlignment)))
+                        codeGenContext->getTargetReq(),
+                        inst->getDataType(),
+                        &sizeAlignment)))
                     codeGenContext->getSink()->diagnose(Diagnostics::Unexpected{
                         .message = "failed to compute type layout for VM bytecode emission",
                         .location = inst->sourceLoc});
@@ -619,7 +631,9 @@ public:
                 auto opInfo = translateArithmeticOp(inst);
                 IRSizeAndAlignment sizeAlignment = {};
                 if (SLANG_FAILED(getNaturalSizeAndAlignment(
-                        codeGenContext->getTargetReq(), inst->getDataType(), &sizeAlignment)))
+                        codeGenContext->getTargetReq(),
+                        inst->getDataType(),
+                        &sizeAlignment)))
                     codeGenContext->getSink()->diagnose(Diagnostics::Unexpected{
                         .message = "failed to compute type layout for VM bytecode emission",
                         .location = inst->sourceLoc});
@@ -653,7 +667,9 @@ public:
                     auto paramReg = ensureWorkingsetMemory(funcBuilder, param);
                     IRSizeAndAlignment sizeAlignment = {};
                     if (SLANG_FAILED(getNaturalSizeAndAlignment(
-                            codeGenContext->getTargetReq(), param->getDataType(), &sizeAlignment)))
+                            codeGenContext->getTargetReq(),
+                            param->getDataType(),
+                            &sizeAlignment)))
                         codeGenContext->getSink()->diagnose(Diagnostics::Unexpected{
                             .message = "failed to compute type layout for VM bytecode emission",
                             .location = param->sourceLoc});
@@ -731,7 +747,9 @@ public:
                 }
                 IRSizeAndAlignment sizeAlignment = {};
                 if (SLANG_FAILED(getNaturalSizeAndAlignment(
-                        codeGenContext->getTargetReq(), inst->getDataType(), &sizeAlignment)))
+                        codeGenContext->getTargetReq(),
+                        inst->getDataType(),
+                        &sizeAlignment)))
                     codeGenContext->getSink()->diagnose(Diagnostics::Unexpected{
                         .message = "failed to compute type layout for VM bytecode emission",
                         .location = inst->sourceLoc});
@@ -777,7 +795,9 @@ public:
                 auto elementType = tryGetPointedToType(&builder, getElemInst->getDataType());
                 IRSizeAndAlignment sizeAlignment = {};
                 if (SLANG_FAILED(getNaturalSizeAndAlignment(
-                        codeGenContext->getTargetReq(), elementType, &sizeAlignment)))
+                        codeGenContext->getTargetReq(),
+                        elementType,
+                        &sizeAlignment)))
                     codeGenContext->getSink()->diagnose(Diagnostics::Unexpected{
                         .message = "failed to compute type layout for VM bytecode emission",
                         .location = inst->sourceLoc});
@@ -804,8 +824,7 @@ public:
                     as<IRStructType>(tryGetPointedToType(&builder, base->getDataType()));
                 IRIntegerValue offset = 0;
                 auto field = findStructField(structType, fieldKey);
-                if (SLANG_FAILED(
-                        getNaturalOffset(codeGenContext->getTargetReq(), field, &offset)))
+                if (SLANG_FAILED(getNaturalOffset(codeGenContext->getTargetReq(), field, &offset)))
                     codeGenContext->getSink()->diagnose(Diagnostics::Unexpected{
                         .message = "failed to compute field offset for VM bytecode emission",
                         .location = inst->sourceLoc});
@@ -828,7 +847,9 @@ public:
                 IRBuilder builder(inst);
                 auto elementType = tryGetPointedToType(&builder, getOffsetPtrInst->getDataType());
                 if (SLANG_FAILED(getNaturalSizeAndAlignment(
-                        codeGenContext->getTargetReq(), elementType, &sizeAlignment)))
+                        codeGenContext->getTargetReq(),
+                        elementType,
+                        &sizeAlignment)))
                     codeGenContext->getSink()->diagnose(Diagnostics::Unexpected{
                         .message = "failed to compute type layout for VM bytecode emission",
                         .location = inst->sourceLoc});
@@ -850,8 +871,7 @@ public:
                 auto structType = as<IRStructType>(base->getDataType());
                 IRIntegerValue offset = 0;
                 auto field = findStructField(structType, fieldKey);
-                if (SLANG_FAILED(
-                        getNaturalOffset(codeGenContext->getTargetReq(), field, &offset)))
+                if (SLANG_FAILED(getNaturalOffset(codeGenContext->getTargetReq(), field, &offset)))
                     codeGenContext->getSink()->diagnose(Diagnostics::Unexpected{
                         .message = "failed to compute field offset for VM bytecode emission",
                         .location = inst->sourceLoc});
@@ -869,7 +889,9 @@ public:
                 auto elementType = getElemInst->getDataType();
                 IRSizeAndAlignment sizeAlignment = {};
                 if (SLANG_FAILED(getNaturalSizeAndAlignment(
-                        codeGenContext->getTargetReq(), elementType, &sizeAlignment)))
+                        codeGenContext->getTargetReq(),
+                        elementType,
+                        &sizeAlignment)))
                     codeGenContext->getSink()->diagnose(Diagnostics::Unexpected{
                         .message = "failed to compute type layout for VM bytecode emission",
                         .location = inst->sourceLoc});
@@ -935,7 +957,9 @@ public:
                 auto elementType = arrayType->getElementType();
                 IRSizeAndAlignment sizeAlignment = {};
                 if (SLANG_FAILED(getNaturalSizeAndAlignment(
-                        codeGenContext->getTargetReq(), elementType, &sizeAlignment)))
+                        codeGenContext->getTargetReq(),
+                        elementType,
+                        &sizeAlignment)))
                     codeGenContext->getSink()->diagnose(Diagnostics::Unexpected{
                         .message = "failed to compute type layout for VM bytecode emission",
                         .location = inst->sourceLoc});
@@ -960,7 +984,9 @@ public:
                 auto elementType = arrayType->getElementType();
                 IRSizeAndAlignment sizeAlignment = {};
                 if (SLANG_FAILED(getNaturalSizeAndAlignment(
-                        codeGenContext->getTargetReq(), elementType, &sizeAlignment)))
+                        codeGenContext->getTargetReq(),
+                        elementType,
+                        &sizeAlignment)))
                     codeGenContext->getSink()->diagnose(Diagnostics::Unexpected{
                         .message = "failed to compute type layout for VM bytecode emission",
                         .location = inst->sourceLoc});
@@ -1131,7 +1157,9 @@ public:
 
         IRSizeAndAlignment sizeAlignment = {};
         if (SLANG_FAILED(getNaturalSizeAndAlignment(
-                codeGenContext->getTargetReq(), func->getResultType(), &sizeAlignment)))
+                codeGenContext->getTargetReq(),
+                func->getResultType(),
+                &sizeAlignment)))
             codeGenContext->getSink()->diagnose(Diagnostics::Unexpected{
                 .message = "failed to compute type layout for VM bytecode emission",
                 .location = func->sourceLoc});

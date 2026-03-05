@@ -265,7 +265,9 @@ void inferAnyValueSizeWhereNecessary(
         {
             IRSizeAndAlignment sizeAndAlignment;
             if (SLANG_FAILED(getNaturalSizeAndAlignment(
-                    targetProgram->getTargetReq(), (IRType*)implType, &sizeAndAlignment)))
+                    targetProgram->getTargetReq(),
+                    (IRType*)implType,
+                    &sizeAndAlignment)))
                 sink->diagnose(Diagnostics::Unexpected{
                     .message = "failed to compute type layout for AnyValue size inference",
                     .location = implType->sourceLoc});
@@ -301,7 +303,9 @@ void inferAnyValueSizeWhereNecessary(
         {
             IRSizeAndAlignment sizeAndAlignment;
             if (SLANG_FAILED(getNaturalSizeAndAlignment(
-                    targetProgram->getTargetReq(), (IRType*)implType, &sizeAndAlignment)))
+                    targetProgram->getTargetReq(),
+                    (IRType*)implType,
+                    &sizeAndAlignment)))
                 sink->diagnose(Diagnostics::Unexpected{
                     .message = "failed to compute type layout for AnyValue size inference",
                     .location = implType->sourceLoc});

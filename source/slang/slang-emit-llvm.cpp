@@ -629,8 +629,11 @@ public:
     {
         IRSizeAndAlignment sizeAlignment;
 
-        if (SLANG_FAILED(
-                Slang::getSizeAndAlignment(targetReq, rules, legalizeResourceTypes(type), &sizeAlignment)))
+        if (SLANG_FAILED(Slang::getSizeAndAlignment(
+                targetReq,
+                rules,
+                legalizeResourceTypes(type),
+                &sizeAlignment)))
             m_sink->diagnose(Diagnostics::Unexpected{
                 .message = "failed to compute type layout for LLVM type translation",
                 .location = type->sourceLoc});
@@ -656,8 +659,11 @@ public:
     {
         auto elemCount = getIntVal(vecType->getElementCount());
         IRSizeAndAlignment elementAlignment;
-        if (SLANG_FAILED(
-                Slang::getSizeAndAlignment(targetReq, rules, vecType->getElementType(), &elementAlignment)))
+        if (SLANG_FAILED(Slang::getSizeAndAlignment(
+                targetReq,
+                rules,
+                vecType->getElementType(),
+                &elementAlignment)))
             m_sink->diagnose(Diagnostics::Unexpected{
                 .message = "failed to compute element type layout for LLVM vector alignment",
                 .location = vecType->sourceLoc});
@@ -866,7 +872,10 @@ struct LLVMEmitter
         debug = getOptions().getDebugInfoLevel() != DebugInfoLevel::None;
 
         types.reset(new LLVMTypeTranslator(
-            builder, codeGenContext->getTargetReq(), codeGenContext->getSink(), instToDebugLLVM));
+            builder,
+            codeGenContext->getTargetReq(),
+            codeGenContext->getSink(),
+            instToDebugLLVM));
 
         int32Type = builder->getIntType(32);
         int64Type = builder->getIntType(64);
