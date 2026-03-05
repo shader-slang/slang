@@ -266,8 +266,9 @@ void inferAnyValueSizeWhereNecessary(
             IRSizeAndAlignment sizeAndAlignment;
             // Types whose layout can't be computed (e.g. containing resource
             // handles or interface fields) can't be packed into an AnyValue.
-            // Skip them here; the dynamic dispatch lowering pass diagnoses
-            // packing failures via canTypeBeStored().
+            // Skip them; if no implementation has a computable layout, the
+            // decoration is simply not emitted. Downstream consumers must
+            // handle a missing decoration gracefully.
             if (SLANG_FAILED(getNaturalSizeAndAlignment(
                     targetProgram->getTargetReq(),
                     (IRType*)implType,
@@ -329,7 +330,8 @@ void inferAnyValueSizeWhereNecessary(
 
         // maxAnyValueSize may be -1 if all implementations had non-computable
         // layouts (e.g. types containing TaggedUnion or resource handles).
-        // The downstream dynamic dispatch lowering pass will diagnose these.
+        // In that case, no decoration is emitted. Downstream consumers must
+        // handle a missing decoration gracefully and diagnose if needed.
 
         // Update the AnyValue size if self-referential impls require a larger size.
         if (maxAnyValueSize >= 0)
