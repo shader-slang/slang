@@ -1423,7 +1423,12 @@ void ASTPrinter::addGenericParams(
                 sb << "let each ";
                 sb << getText(genericValuePackParam.getName());
                 sb << " : ";
-                addType(getType(m_astBuilder, genericValuePackParam));
+                auto type = getType(m_astBuilder, genericValuePackParam);
+                if (auto valuePackType = as<ValuePackType>(type))
+                {
+                    type = valuePackType->getElementType();
+                }
+                addType(type);
             }
         }
         else
