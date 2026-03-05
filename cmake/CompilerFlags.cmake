@@ -219,6 +219,8 @@ function(set_default_compile_options target)
             PRIVATE
             /fsanitize=address
             -fsanitize=address
+            -fsanitize=undefined
+            -fno-sanitize-recover=undefined
         )
         add_supported_cxx_linker_flags(
             ${target}
@@ -226,6 +228,7 @@ function(set_default_compile_options target)
             PUBLIC
             /INCREMENTAL:NO
             -fsanitize=address
+            -fsanitize=undefined
         )
     endif()
 
