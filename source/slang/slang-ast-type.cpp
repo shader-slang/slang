@@ -822,8 +822,7 @@ Val* ExpandType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet
     Index firstConcretePackSize = -1;
     for (Index i = 0; i < getCapturedPackCount(); i++)
     {
-        auto substCapturedPack =
-            getCapturedPack(i)->substituteImpl(astBuilder, subst, &diff);
+        auto substCapturedPack = getCapturedPack(i)->substituteImpl(astBuilder, subst, &diff);
 
         if (auto expandType = as<ExpandType>(substCapturedPack))
         {
@@ -941,8 +940,7 @@ void ValuePackType::_toTextOverride(StringBuilder& out)
 
 Type* ValuePackType::_createCanonicalTypeOverride()
 {
-    return getCurrentASTBuilder()->getOrCreate<ValuePackType>(
-        getElementType()->getCanonicalType());
+    return getCurrentASTBuilder()->getOrCreate<ValuePackType>(getElementType()->getCanonicalType());
 }
 
 Val* ValuePackType::_substituteImplOverride(
@@ -951,8 +949,7 @@ Val* ValuePackType::_substituteImplOverride(
     int* ioDiff)
 {
     int diff = 0;
-    auto newElementType =
-        as<Type>(getElementType()->substituteImpl(astBuilder, subst, &diff));
+    auto newElementType = as<Type>(getElementType()->substituteImpl(astBuilder, subst, &diff));
     if (!diff)
         return this;
     (*ioDiff)++;

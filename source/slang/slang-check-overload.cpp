@@ -663,10 +663,7 @@ bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
                 auto matchedArg = matchedArgs[aa++];
                 if (matchedArg.argExpr)
                 {
-                    val = tryConstantFoldExpr(
-                        matchedArg.argExpr,
-                        argFoldingKind,
-                        nullptr);
+                    val = tryConstantFoldExpr(matchedArg.argExpr, argFoldingKind, nullptr);
                     if (val && !isValuePack(val))
                     {
                         ShortList<IntVal*> singleValList;

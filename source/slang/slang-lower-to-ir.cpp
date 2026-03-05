@@ -4943,9 +4943,8 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
                 IRInst* countArg = sizedType;
                 if (as<IRValuePackType>(sizedType))
                 {
-                    countArg = getSimpleVal(
-                        context,
-                        lowerLValueExpr(context, sizeOfLikeExpr->value));
+                    countArg =
+                        getSimpleVal(context, lowerLValueExpr(context, sizeOfLikeExpr->value));
                 }
                 inst = builder->emitCountOf(resultType, countArg);
             }

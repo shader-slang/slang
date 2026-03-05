@@ -2106,10 +2106,7 @@ void EachIntVal::_toTextOverride(StringBuilder& out)
     getBasePack()->toText(out);
 }
 
-Val* EachIntVal::_substituteImplOverride(
-    ASTBuilder* astBuilder,
-    SubstitutionSet subst,
-    int* ioDiff)
+Val* EachIntVal::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
 {
     int diff = 0;
     auto substBase = getBasePack()->substituteImpl(astBuilder, subst, &diff);

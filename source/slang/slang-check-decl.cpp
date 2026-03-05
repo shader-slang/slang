@@ -3687,16 +3687,14 @@ void SemanticsDeclHeaderVisitor::visitGenericDecl(GenericDecl* genericDecl)
     for (Index i = 0; i < genericDecl->getDirectMemberDeclCount(); ++i)
     {
         Decl* m = genericDecl->getDirectMemberDecl(i);
-        bool isPack =
-            as<GenericTypePackParamDecl>(m) || as<GenericValuePackParamDecl>(m);
+        bool isPack = as<GenericTypePackParamDecl>(m) || as<GenericValuePackParamDecl>(m);
         if (isPack)
         {
             seenPack = true;
         }
         else if (seenPack && isGenericParam(m))
         {
-            getSink()->diagnose(
-                Diagnostics::PackParamMustBeLast{.param = m});
+            getSink()->diagnose(Diagnostics::PackParamMustBeLast{.param = m});
         }
     }
 }

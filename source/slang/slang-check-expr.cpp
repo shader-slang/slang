@@ -2343,8 +2343,7 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
             if (as<ValuePackType>(type))
             {
                 auto valExprFolded = tryConstantFoldExpr(
-                    SubstExpr<Expr>(
-                        countOfExpr.getExpr()->value, expr.getSubsts()),
+                    SubstExpr<Expr>(countOfExpr.getExpr()->value, expr.getSubsts()),
                     kind,
                     circularityInfo);
                 if (valExprFolded)
@@ -2368,9 +2367,8 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
                     if (auto packParamRef = baseDeclRef.as<GenericValuePackParamDecl>())
                     {
                         auto elementType = valPackType->getElementType();
-                        auto packRef = m_astBuilder->getOrCreate<DeclRefIntVal>(
-                            valPackType,
-                            packParamRef);
+                        auto packRef =
+                            m_astBuilder->getOrCreate<DeclRefIntVal>(valPackType, packParamRef);
                         Val* substPackRef = packRef->substitute(m_astBuilder, expr.getSubsts());
                         return m_astBuilder->getEachIntVal(elementType, substPackRef);
                     }
@@ -2385,10 +2383,8 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
         ShortList<IntVal*> elements;
         for (auto arg : packExpr.getExpr()->args)
         {
-            auto elementVal = tryConstantFoldExpr(
-                SubstExpr<Expr>(arg, expr.getSubsts()),
-                kind,
-                circularityInfo);
+            auto elementVal =
+                tryConstantFoldExpr(SubstExpr<Expr>(arg, expr.getSubsts()), kind, circularityInfo);
             if (!elementVal)
                 return nullptr;
             elements.add(elementVal);
@@ -3828,8 +3824,7 @@ Type* SemanticsVisitor::getDifferentialPairType(Type* primalType)
         else
         {
             Val* primalVal = primalType;
-            return m_astBuilder->getExpandType(
-                diffPairEachType, makeArrayViewSingle(primalVal));
+            return m_astBuilder->getExpandType(diffPairEachType, makeArrayViewSingle(primalVal));
         }
     }
 
@@ -5025,9 +5020,8 @@ Expr* SemanticsExprVisitor::visitEachExpr(EachExpr* expr)
             if (auto declRefExpr = as<DeclRefExpr>(expr->baseExpr))
             {
                 auto declRef = getDeclRef(m_astBuilder, declRefExpr);
-                m_capturedPacks->add(m_astBuilder->getOrCreate<DeclRefIntVal>(
-                    valPackType,
-                    declRef));
+                m_capturedPacks->add(
+                    m_astBuilder->getOrCreate<DeclRefIntVal>(valPackType, declRef));
             }
             expr->type = QualType(valPackType->getElementType());
             return expr;
