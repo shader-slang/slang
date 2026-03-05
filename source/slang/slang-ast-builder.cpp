@@ -944,7 +944,12 @@ ConcreteIntValPack* ASTBuilder::getIntValPack(ArrayView<IntVal*> vals)
     ShortList<IntVal*> flattenedVals;
     for (auto val : vals)
         flattenIntValList(flattenedVals, val);
-    return getOrCreate<ConcreteIntValPack>(flattenedVals.getArrayView().arrayView);
+    Type* elementType = getIntType();
+    if (flattenedVals.getCount() > 0 && flattenedVals[0]->getType())
+        elementType = flattenedVals[0]->getType();
+    auto packType = getOrCreate<ValuePackType>(elementType);
+    return getOrCreate<ConcreteIntValPack>(
+        packType, flattenedVals.getArrayView().arrayView);
 }
 
 IntVal* ASTBuilder::getEachIntVal(Type* elementType, Val* basePack)
@@ -952,7 +957,9 @@ IntVal* ASTBuilder::getEachIntVal(Type* elementType, Val* basePack)
     // each expand P ==> P (the pattern val)
     if (auto expandPack = as<ExpandIntValPack>(basePack))
     {
-        return as<IntVal>(expandPack->getPatternVal());
+        auto result = as<IntVal>(expandPack->getPatternVal());
+        SLANG_ASSERT(result);
+        return result;
     }
     return getOrCreate<EachIntVal>(elementType, basePack);
 }
@@ -967,7 +974,11 @@ Val* ASTBuilder::getExpandIntValPack(Val* patternVal, ArrayView<Val*> capturedPa
             return capturedPacks[0];
         }
     }
-    return getOrCreate<ExpandIntValPack>(patternVal, capturedPacks);
+    auto patternIntVal = as<IntVal>(patternVal);
+    Type* packType = patternIntVal && patternIntVal->getType()
+                         ? getOrCreate<ValuePackType>(patternIntVal->getType())
+                         : (Type*)getIntType();
+    return getOrCreate<ExpandIntValPack>(packType, patternVal, capturedPacks);
 }
 
 TypeEqualityWitness* ASTBuilder::getTypeEqualityWitness(Type* type)

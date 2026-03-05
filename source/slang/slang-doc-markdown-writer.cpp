@@ -2543,7 +2543,7 @@ DocumentPage* DocMarkdownWriter::findPageForToken(
                             outDecl = member;
                             if (as<GenericTypeParamDeclBase>(member))
                                 outSectionName = String("typeparam-") + token;
-                            else if (as<GenericValueParamDecl>(member))
+                            else if (isGenericValueParam(member))
                                 outSectionName = String("decl-") + token;
                             return currentPage;
                         }

@@ -93,6 +93,7 @@ bool GlobalInstInliningContextGeneric::isInlinableGlobalInst(IRInst* inst)
     case kIROp_GetOffsetPtr:
     case kIROp_UpdateElement:
     case kIROp_MakeTuple:
+    //case kIROp_MakeValuePack:
     case kIROp_GetTupleElement:
     case kIROp_MakeStruct:
     case kIROp_MakeArray:

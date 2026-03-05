@@ -301,7 +301,7 @@ void emitType(ManglingContext* context, Type* type)
     }
     else if (auto valuePackType = as<ValuePackType>(type))
     {
-        emitRaw(context, "Vp");
+        emitRaw(context, "TVp");
         emitType(context, valuePackType->getElementType());
     }
     else

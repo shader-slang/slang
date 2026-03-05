@@ -3536,7 +3536,13 @@ void SemanticsDeclHeaderVisitor::visitGenericTypeConstraintDecl(GenericTypeConst
                     if (auto subDeclRefType = as<DeclRefType>(decl->sub.type))
                     {
                         auto subDecl = subDeclRefType->getDeclRef().getDecl();
-                        if (as<GenericTypeParamDeclBase>(subDecl))
+                        if (as<GenericTypePackParamDecl>(subDecl))
+                        {
+                            getSink()->diagnose(Diagnostics::UseLetEachForGenericValuePackParam{
+                                .paramName = subDecl->getName(),
+                                .type = decl->sup.type});
+                        }
+                        else if (as<GenericTypeParamDecl>(subDecl))
                         {
                             getSink()->diagnose(Diagnostics::UseLetForGenericValueParam{
                                 .paramName = subDecl->getName(),
@@ -3642,6 +3648,14 @@ void SemanticsDeclHeaderVisitor::visitGenericValuePackParamDecl(GenericValuePack
 
     if (decl->type.type && !as<ValuePackType>(decl->type.type))
     {
+        if (!isValidCompileTimeConstantType(decl->type.type))
+        {
+            getSink()->diagnose(Diagnostics::GenericValueParameterTypeNotSupported{
+                .type = decl->type.type,
+                .decl = decl});
+            decl->type.type = m_astBuilder->getErrorType();
+            return;
+        }
         decl->type.type = m_astBuilder->getOrCreate<ValuePackType>(decl->type.type);
     }
 }

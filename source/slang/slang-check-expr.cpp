@@ -2395,7 +2395,7 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
     // `expand <expr>` where the expr involves value packs produces an ExpandIntValPack.
     if (auto expandExpr = expr.as<ExpandExpr>())
     {
-        if (auto expandType = as<ExpandType>(expandExpr.getExpr()->type.type))
+        if (auto expandType = as<ExpandType>(getType(m_astBuilder, expandExpr)))
         {
             auto patternVal = tryConstantFoldExpr(
                 SubstExpr<Expr>(expandExpr.getExpr()->baseExpr, expr.getSubsts()),

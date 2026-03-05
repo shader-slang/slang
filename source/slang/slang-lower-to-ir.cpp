@@ -1945,7 +1945,8 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     {
         auto irBuilder = getBuilder();
         auto baseVal = lowerSimpleVal(context, eachVal->getBasePack());
-        return LoweredValInfo::simple(irBuilder->emitEachInst(baseVal->getFullType(), baseVal));
+        auto elementType = lowerType(context, eachVal->getType());
+        return LoweredValInfo::simple(irBuilder->emitEachInst(elementType, baseVal));
     }
 
     LoweredValInfo visitEachType(EachType* eachType)

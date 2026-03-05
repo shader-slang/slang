@@ -324,13 +324,14 @@ FIDDLE()
 class ConcreteIntValPack : public IntVal
 {
     FIDDLE(...)
-    ConcreteIntValPack(ArrayView<IntVal*> vals)
+    ConcreteIntValPack(Type* inType, ArrayView<IntVal*> vals)
     {
+        m_operands.add(ValNodeOperand(inType));
         for (auto v : vals)
             m_operands.add(ValNodeOperand(v));
     }
-    Index getCount() { return getOperandCount(); }
-    IntVal* getElement(Index i) { return as<IntVal>(getOperand(i)); }
+    Index getCount() { return getOperandCount() - 1; }
+    IntVal* getElement(Index i) { return as<IntVal>(getOperand(i + 1)); }
     void _toTextOverride(StringBuilder& out);
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
     Val* _resolveImplOverride();
@@ -341,15 +342,16 @@ FIDDLE()
 class ExpandIntValPack : public IntVal
 {
     FIDDLE(...)
-    ExpandIntValPack(Val* patternVal, ArrayView<Val*> capturedPacks)
+    ExpandIntValPack(Type* inType, Val* patternVal, ArrayView<Val*> capturedPacks)
     {
+        m_operands.add(ValNodeOperand(inType));
         m_operands.add(ValNodeOperand(patternVal));
         for (auto p : capturedPacks)
             m_operands.add(ValNodeOperand(p));
     }
-    Val* getPatternVal() const { return getOperand(0); }
-    Index getCapturedPackCount() { return getOperandCount() - 1; }
-    Val* getCapturedPack(Index i) { return getOperand(i + 1); }
+    Val* getPatternVal() const { return getOperand(1); }
+    Index getCapturedPackCount() { return getOperandCount() - 2; }
+    Val* getCapturedPack(Index i) { return getOperand(i + 2); }
     void _toTextOverride(StringBuilder& out);
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
     Val* _resolveImplOverride();

@@ -2781,6 +2781,12 @@ standalone_note(
     "use 'let' keyword to declare a generic value parameter: 'let ~paramName:Name : ~type:Type'"
 )
 
+standalone_note(
+    "use-let-each-for-generic-value-pack-param",
+    30501,
+    "use 'let each' to declare a variadic generic value parameter: 'let each ~paramName:Name : ~type:Type'"
+)
+
 err(
     "pack-param-must-be-last",
     30500,
