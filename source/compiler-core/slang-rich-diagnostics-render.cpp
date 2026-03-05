@@ -134,6 +134,7 @@ private:
         Int64 number = 0;
         UnownedStringSlice content;
         List<LineHighlight> spans;
+        bool sourceAvailable = false;
     };
 
     // A collection of nearby HighlightedLines
@@ -303,12 +304,13 @@ private:
         {
             HighlightedLine& line = grouped[span.line];
             line.number = span.line;
-            if (line.content.getLength() == 0)
+            if (line.content.getLength() == 0 && !line.sourceAvailable)
             {
                 SourceView* view =
                     m_sourceManager ? m_sourceManager->findSourceView(span.startLoc) : nullptr;
                 if (view)
                 {
+                    line.sourceAvailable = true;
                     // Get the line content and trim end-of-line characters and trailing whitespace
                     UnownedStringSlice rawLine = StringUtil::trimEndOfLine(
                         view->getSourceFile()->getLineAtIndex(span.line - 1));
@@ -345,6 +347,18 @@ private:
         section.blocks.add(currentBlock);
         section.commonIndent = findCommonIndent(section.blocks);
         return section;
+    }
+
+    // Returns true if any line in the section has source text available.
+    // When source is unavailable (e.g. built-in modules), we skip rendering
+    // the section body to avoid showing empty source lines with underlines.
+    bool sectionHasSourceAvailable(const SectionLayout& section) const
+    {
+        for (const auto& block : section.blocks)
+            for (const auto& line : block.lines)
+                if (line.sourceAvailable)
+                    return true;
+        return false;
     }
 
     Int64 findCommonIndent(const List<LayoutBlock>& blocks)
@@ -504,6 +518,17 @@ private:
         return rows;
     }
 
+    // When source text is unavailable (e.g. built-in modules), emit any span
+    // labels that would otherwise be lost, as plain indented text.
+    void renderOrphanedLabels(StringBuilder& ss, const SectionLayout& section)
+    {
+        for (const auto& block : section.blocks)
+            for (const auto& line : block.lines)
+                for (const auto& span : line.spans)
+                    if (span.label.getLength() > 0)
+                        ss << "  = " << span.label << "\n";
+    }
+
     void renderSectionBody(StringBuilder& ss, const SectionLayout& section)
     {
         for (const auto& block : section.blocks)
@@ -647,16 +672,23 @@ private:
 
             if (layout.primarySection.blocks.getCount() > 0)
             {
-                ss << repeat(' ', layout.primarySection.maxGutterWidth + 1)
-                   << color(TerminalColor::Cyan, m_glyphs.vertical) << "\n";
-                renderSectionBody(ss, layout.primarySection);
-                ss << color(
-                          TerminalColor::Cyan,
-                          repeat(
-                              m_glyphs.secondaryUnderline,
-                              layout.primarySection.maxGutterWidth + 1) +
-                              m_glyphs.gutterCorner)
-                   << "\n";
+                if (sectionHasSourceAvailable(layout.primarySection))
+                {
+                    ss << repeat(' ', layout.primarySection.maxGutterWidth + 1)
+                       << color(TerminalColor::Cyan, m_glyphs.vertical) << "\n";
+                    renderSectionBody(ss, layout.primarySection);
+                    ss << color(
+                              TerminalColor::Cyan,
+                              repeat(
+                                  m_glyphs.secondaryUnderline,
+                                  layout.primarySection.maxGutterWidth + 1) +
+                                  m_glyphs.gutterCorner)
+                       << "\n";
+                }
+                else
+                {
+                    renderOrphanedLabels(ss, layout.primarySection);
+                }
             }
         }
         for (const auto& note : layout.notes)
@@ -665,14 +697,21 @@ private:
             renderNoteLocation(ss, note.loc);
             if (note.section.blocks.getCount() > 0)
             {
-                ss << repeat(' ', note.section.maxGutterWidth + 1)
-                   << color(TerminalColor::Cyan, m_glyphs.vertical) << "\n";
-                renderSectionBody(ss, note.section);
-                ss << color(
-                          TerminalColor::Cyan,
-                          repeat(m_glyphs.secondaryUnderline, note.section.maxGutterWidth + 1) +
-                              m_glyphs.gutterCorner)
-                   << "\n";
+                if (sectionHasSourceAvailable(note.section))
+                {
+                    ss << repeat(' ', note.section.maxGutterWidth + 1)
+                       << color(TerminalColor::Cyan, m_glyphs.vertical) << "\n";
+                    renderSectionBody(ss, note.section);
+                    ss << color(
+                              TerminalColor::Cyan,
+                              repeat(m_glyphs.secondaryUnderline, note.section.maxGutterWidth + 1) +
+                                  m_glyphs.gutterCorner)
+                       << "\n";
+                }
+                else
+                {
+                    renderOrphanedLabels(ss, note.section);
+                }
             }
         }
         return ss.produceString();
