@@ -509,7 +509,8 @@ runs:
               "GITHUB_EVENT_NAME": "${{ github.event_name }}",
               "GITHUB_ACTOR": "${{ github.actor }}",
               "DISABLE_TELEMETRY": "1",
-              "CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS": "1"
+              "CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS": "1",
+              "ENABLE_TOOL_SEARCH": "false"
             }
           }
 
@@ -554,7 +555,8 @@ runs:
               "GITHUB_REPOSITORY": "${{ github.repository }}",
               "GITHUB_EVENT_NAME": "${{ github.event_name }}",
               "GITHUB_ACTOR": "${{ github.actor }}",
-              "DISABLE_TELEMETRY": "1"
+              "DISABLE_TELEMETRY": "1",
+              "ENABLE_TOOL_SEARCH": "false"
             }
           }
 
