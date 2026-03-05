@@ -5,6 +5,7 @@
 #include "slang-ir-layout.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
+#include "slang-rich-diagnostics.h"
 
 /// This file implements an important IR transformation pass in the Slang compiler
 /// that rewrites buffer element types into valid storage types, a.k.a physical types
@@ -333,6 +334,7 @@ struct BufferElementTypeLoweringPolicy : public RefObject
 BufferElementTypeLoweringPolicy* getBufferElementTypeLoweringPolicy(
     BufferElementTypeLoweringPolicyKind kind,
     TargetProgram* target,
+    DiagnosticSink* sink,
     BufferElementTypeLoweringOptions options);
 
 TypeLoweringConfig getTypeLoweringConfigForBuffer(TargetProgram* target, IRType* bufferType);
@@ -379,12 +381,13 @@ void ConversionMethod::applyDestinationDriven(IRBuilder& builder, IRInst* dest, 
 // has 16-byte aligned size and N is no less than `minCount`.
 IRIntegerValue get16ByteAlignedVectorElementCount(
     TargetProgram* target,
+    DiagnosticSink* sink,
     IRType* elementType,
     IRIntegerValue minCount)
 {
     IRSizeAndAlignment sizeAlignment;
-    auto result = getNaturalSizeAndAlignment(target->getTargetReq(), elementType, &sizeAlignment);
-    SLANG_ASSERT(SLANG_SUCCEEDED(result));
+    if (SLANG_FAILED(getNaturalSizeAndAlignment(target->getTargetReq(), elementType, &sizeAlignment)))
+        sink->diagnose(Diagnostics::InternalCompilerError{});
     if (sizeAlignment.size)
         return align(sizeAlignment.size * minCount, 16) / sizeAlignment.size;
     return 4;
@@ -471,11 +474,16 @@ struct LoweredElementTypeContext
     // Specialized functions that takes storage-typed pointers instead of logical-typed pointers.
     Dictionary<SpecializationKey, IRFunc*> specializedFuncs;
 
-    LoweredElementTypeContext(TargetProgram* target, BufferElementTypeLoweringOptions inOptions)
-        : target(target), options(inOptions)
+    DiagnosticSink* m_sink;
+
+    LoweredElementTypeContext(
+        TargetProgram* target,
+        DiagnosticSink* sink,
+        BufferElementTypeLoweringOptions inOptions)
+        : target(target), m_sink(sink), options(inOptions)
     {
         leafTypeLoweringPolicy =
-            getBufferElementTypeLoweringPolicy(options.loweringPolicyKind, target, options);
+            getBufferElementTypeLoweringPolicy(options.loweringPolicyKind, target, sink, options);
     }
 
     IRFunc* createArrayUnpackFunc(
@@ -630,6 +638,7 @@ struct LoweredElementTypeContext
                         vectorType->getElementType(),
                         builder.getIntValue(get16ByteAlignedVectorElementCount(
                             target,
+                            m_sink,
                             vectorType->getElementType(),
                             getIntVal(vectorType->getElementCount()))));
                     if (packedVectorType != loweredInnerTypeInfo.originalType)
@@ -642,7 +651,7 @@ struct LoweredElementTypeContext
                 {
                     packedVectorType = builder.getVectorType(
                         loweredInnerTypeInfo.loweredType,
-                        get16ByteAlignedVectorElementCount(target, scalarType, 1));
+                        get16ByteAlignedVectorElementCount(target, m_sink, scalarType, 1));
                     loweredInnerTypeInfo.convertLoweredToOriginal = kIROp_VectorReshape;
                     loweredInnerTypeInfo.convertOriginalToLowered = kIROp_MakeVectorFromScalar;
                 }
@@ -694,12 +703,12 @@ struct LoweredElementTypeContext
                 auto structKey = builder.createStructKey();
                 builder.addNameHintDecoration(structKey, UnownedStringSlice("data"));
                 IRSizeAndAlignment elementSizeAlignment;
-                auto elementSizeResult = getSizeAndAlignment(
-                    target->getTargetReq(),
-                    config.getLayoutRule(),
-                    loweredInnerTypeInfo.loweredType,
-                    &elementSizeAlignment);
-                SLANG_ASSERT(SLANG_SUCCEEDED(elementSizeResult));
+                if (SLANG_FAILED(getSizeAndAlignment(
+                        target->getTargetReq(),
+                        config.getLayoutRule(),
+                        loweredInnerTypeInfo.loweredType,
+                        &elementSizeAlignment)))
+                    m_sink->diagnose(Diagnostics::InternalCompilerError{});
                 elementSizeAlignment =
                     config.getLayoutRule()->alignCompositeElement(elementSizeAlignment);
                 auto innerArrayType = builder.getArrayType(
@@ -720,12 +729,12 @@ struct LoweredElementTypeContext
             else
             {
                 IRSizeAndAlignment elementSizeAlignment;
-                auto elementSizeResult = getSizeAndAlignment(
-                    target->getTargetReq(),
-                    config.getLayoutRule(),
-                    loweredInnerTypeInfo.loweredType,
-                    &elementSizeAlignment);
-                SLANG_ASSERT(SLANG_SUCCEEDED(elementSizeResult));
+                if (SLANG_FAILED(getSizeAndAlignment(
+                        target->getTargetReq(),
+                        config.getLayoutRule(),
+                        loweredInnerTypeInfo.loweredType,
+                        &elementSizeAlignment)))
+                    m_sink->diagnose(Diagnostics::InternalCompilerError{});
                 elementSizeAlignment =
                     config.getLayoutRule()->alignCompositeElement(elementSizeAlignment);
                 auto innerArrayType = builder.getArrayTypeBase(
@@ -904,12 +913,9 @@ struct LoweredElementTypeContext
             return info;
         info = getLoweredTypeInfoImpl(type, config);
         IRSizeAndAlignment sizeAlignment;
-        auto sizeAlignResult = getSizeAndAlignment(
-            target->getTargetReq(),
-            config.getLayoutRule(),
-            info.loweredType,
-            &sizeAlignment);
-        SLANG_ASSERT(SLANG_SUCCEEDED(sizeAlignResult));
+        if (SLANG_FAILED(getSizeAndAlignment(
+                target->getTargetReq(), config.getLayoutRule(), info.loweredType, &sizeAlignment)))
+            m_sink->diagnose(Diagnostics::InternalCompilerError{});
         loweredTypeInfo.set(type, info);
         mapLoweredTypeToInfo.set(info.loweredType, info);
         conversionMethodMap[{info.originalType, info.loweredType}] = info.convertLoweredToOriginal;
@@ -1010,19 +1016,20 @@ struct LoweredElementTypeContext
             auto loweredInnerType = getLoweredTypeInfo(unsizedArrayType->getElementType(), config);
 
             IRSizeAndAlignment arrayElementSizeAlignment;
-            auto arrayElemResult = getSizeAndAlignment(
-                target->getTargetReq(),
-                config.getLayoutRule(),
-                loweredInnerType.loweredType,
-                &arrayElementSizeAlignment);
-            SLANG_ASSERT(SLANG_SUCCEEDED(arrayElemResult));
+            if (SLANG_FAILED(getSizeAndAlignment(
+                    target->getTargetReq(),
+                    config.getLayoutRule(),
+                    loweredInnerType.loweredType,
+                    &arrayElementSizeAlignment)))
+                m_sink->diagnose(Diagnostics::InternalCompilerError{});
             IRSizeAndAlignment baseSizeAlignment;
-            auto baseResult = getSizeAndAlignment(
-                target->getTargetReq(),
-                config.getLayoutRule(),
-                tryGetPointedToOrBufferElementType(&builder, fieldAddr->getBase()->getDataType()),
-                &baseSizeAlignment);
-            SLANG_ASSERT(SLANG_SUCCEEDED(baseResult));
+            if (SLANG_FAILED(getSizeAndAlignment(
+                    target->getTargetReq(),
+                    config.getLayoutRule(),
+                    tryGetPointedToOrBufferElementType(
+                        &builder, fieldAddr->getBase()->getDataType()),
+                    &baseSizeAlignment)))
+                m_sink->diagnose(Diagnostics::InternalCompilerError{});
 
             // Convert pointer to uint64 and adjust offset.
             IRIntegerValue offset = baseSizeAlignment.size;
@@ -1687,12 +1694,12 @@ struct LoweredElementTypeContext
                 // Create size and alignment decoration for potential use
                 // in`StructuredBufferGetDimensions`.
                 IRSizeAndAlignment sizeAlignment;
-                auto sizeAlignResult = getSizeAndAlignment(
-                    target->getTargetReq(),
-                    config.getLayoutRule(),
-                    elementType,
-                    &sizeAlignment);
-                SLANG_ASSERT(SLANG_SUCCEEDED(sizeAlignResult));
+                if (SLANG_FAILED(getSizeAndAlignment(
+                        target->getTargetReq(),
+                        config.getLayoutRule(),
+                        elementType,
+                        &sizeAlignment)))
+                    m_sink->diagnose(Diagnostics::InternalCompilerError{});
                 SLANG_UNUSED(sizeAlignment);
             }
             else if (auto constBuffer = as<IRUniformParameterGroupType>(globalInst))
@@ -2251,9 +2258,10 @@ struct LoweredElementTypeContext
 void lowerBufferElementTypeToStorageType(
     IRModule* module,
     TargetProgram* target,
+    DiagnosticSink* sink,
     BufferElementTypeLoweringOptions options)
 {
-    LoweredElementTypeContext context(target, options);
+    LoweredElementTypeContext context(target, sink, options);
     context.processModule(module);
 }
 
@@ -2486,13 +2494,15 @@ TypeLoweringConfig getTypeLoweringConfigForBuffer(TargetProgram* target, IRType*
 struct DefaultBufferElementTypeLoweringPolicy : BufferElementTypeLoweringPolicy
 {
     TargetProgram* target;
+    DiagnosticSink* m_sink;
     BufferElementTypeLoweringOptions options;
     SlangMatrixLayoutMode defaultMatrixLayout = SLANG_MATRIX_LAYOUT_ROW_MAJOR;
 
     DefaultBufferElementTypeLoweringPolicy(
         TargetProgram* inTarget,
+        DiagnosticSink* sink,
         BufferElementTypeLoweringOptions inOptions)
-        : target(inTarget), options(inOptions)
+        : target(inTarget), m_sink(sink), options(inOptions)
     {
         defaultMatrixLayout = (SlangMatrixLayoutMode)target->getOptionSet().getMatrixLayoutMode();
         if ((isCPUTarget(target->getTargetReq()) || isCUDATarget(target->getTargetReq()) ||
@@ -2696,18 +2706,19 @@ struct DefaultBufferElementTypeLoweringPolicy : BufferElementTypeLoweringPolicy
                 // we are required to ensure array element types has 16-byte stride.
                 vectorSize = builder.getIntValue(get16ByteAlignedVectorElementCount(
                     target,
+                    m_sink,
                     matrixType->getElementType(),
                     getIntVal(vectorSize)));
             }
 
             auto vectorType = builder.getVectorType(matrixType->getElementType(), vectorSize);
             IRSizeAndAlignment elementSizeAlignment;
-            auto elementSizeResult = getSizeAndAlignment(
-                target->getTargetReq(),
-                config.getLayoutRule(),
-                vectorType,
-                &elementSizeAlignment);
-            SLANG_ASSERT(SLANG_SUCCEEDED(elementSizeResult));
+            if (SLANG_FAILED(getSizeAndAlignment(
+                    target->getTargetReq(),
+                    config.getLayoutRule(),
+                    vectorType,
+                    &elementSizeAlignment)))
+                m_sink->diagnose(Diagnostics::InternalCompilerError{});
             elementSizeAlignment =
                 config.getLayoutRule()->alignCompositeElement(elementSizeAlignment);
 
@@ -2738,8 +2749,9 @@ struct KhronosTargetBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLo
 {
     KhronosTargetBufferElementTypeLoweringPolicy(
         TargetProgram* inTarget,
+        DiagnosticSink* sink,
         BufferElementTypeLoweringOptions inOptions)
-        : DefaultBufferElementTypeLoweringPolicy(inTarget, inOptions)
+        : DefaultBufferElementTypeLoweringPolicy(inTarget, sink, inOptions)
     {
     }
 
@@ -2849,8 +2861,9 @@ struct MetalParameterBlockElementTypeLoweringPolicy : DefaultBufferElementTypeLo
 {
     MetalParameterBlockElementTypeLoweringPolicy(
         TargetProgram* inTarget,
+        DiagnosticSink* sink,
         BufferElementTypeLoweringOptions inOptions)
-        : DefaultBufferElementTypeLoweringPolicy(inTarget, inOptions)
+        : DefaultBufferElementTypeLoweringPolicy(inTarget, sink, inOptions)
     {
     }
 
@@ -2883,8 +2896,9 @@ struct WGSLBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLoweringPol
 {
     WGSLBufferElementTypeLoweringPolicy(
         TargetProgram* inTarget,
+        DiagnosticSink* sink,
         BufferElementTypeLoweringOptions inOptions)
-        : DefaultBufferElementTypeLoweringPolicy(inTarget, inOptions)
+        : DefaultBufferElementTypeLoweringPolicy(inTarget, sink, inOptions)
     {
     }
 
@@ -2898,8 +2912,9 @@ struct LLVMBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLoweringPol
 {
     LLVMBufferElementTypeLoweringPolicy(
         TargetProgram* inTarget,
+        DiagnosticSink* sink,
         BufferElementTypeLoweringOptions inOptions)
-        : DefaultBufferElementTypeLoweringPolicy(inTarget, inOptions)
+        : DefaultBufferElementTypeLoweringPolicy(inTarget, sink, inOptions)
     {
     }
 
@@ -2914,20 +2929,21 @@ struct LLVMBufferElementTypeLoweringPolicy : DefaultBufferElementTypeLoweringPol
 BufferElementTypeLoweringPolicy* getBufferElementTypeLoweringPolicy(
     BufferElementTypeLoweringPolicyKind kind,
     TargetProgram* target,
+    DiagnosticSink* sink,
     BufferElementTypeLoweringOptions options)
 {
     switch (kind)
     {
     case BufferElementTypeLoweringPolicyKind::Default:
-        return new DefaultBufferElementTypeLoweringPolicy(target, options);
+        return new DefaultBufferElementTypeLoweringPolicy(target, sink, options);
     case BufferElementTypeLoweringPolicyKind::KhronosTarget:
-        return new KhronosTargetBufferElementTypeLoweringPolicy(target, options);
+        return new KhronosTargetBufferElementTypeLoweringPolicy(target, sink, options);
     case BufferElementTypeLoweringPolicyKind::MetalParameterBlock:
-        return new MetalParameterBlockElementTypeLoweringPolicy(target, options);
+        return new MetalParameterBlockElementTypeLoweringPolicy(target, sink, options);
     case BufferElementTypeLoweringPolicyKind::WGSL:
-        return new WGSLBufferElementTypeLoweringPolicy(target, options);
+        return new WGSLBufferElementTypeLoweringPolicy(target, sink, options);
     case BufferElementTypeLoweringPolicyKind::LLVM:
-        return new LLVMBufferElementTypeLoweringPolicy(target, options);
+        return new LLVMBufferElementTypeLoweringPolicy(target, sink, options);
     }
     SLANG_UNREACHABLE("unknown buffer element type lowering policy");
 }

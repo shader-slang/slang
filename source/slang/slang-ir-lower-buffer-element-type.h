@@ -35,9 +35,12 @@ struct BufferElementTypeLoweringOptions
 // after type legalization, and before array return type lowering because it may create functions
 // that returns array typed values.
 //
+class DiagnosticSink;
+
 void lowerBufferElementTypeToStorageType(
     IRModule* module,
     TargetProgram* target,
+    DiagnosticSink* sink,
     BufferElementTypeLoweringOptions options = BufferElementTypeLoweringOptions());
 
 // Returns the type layout rules should be used for a buffer resource type.

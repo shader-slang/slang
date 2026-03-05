@@ -2,7 +2,6 @@
 
 #include "slang-ir-inst-pass-base.h"
 #include "slang-ir-insts.h"
-#include "slang-ir-layout.h"
 #include "slang-ir-util.h"
 
 namespace Slang
@@ -105,12 +104,6 @@ struct ImmutableBufferLoadLoweringContext : InstPassBase
                 auto vectorType = as<IRVectorType>(type);
                 auto elementType = vectorType->getElementType();
                 auto elementCount = getIntVal(vectorType->getElementCount());
-                IRSizeAndAlignment elementSize;
-                auto elementSizeResult = getNaturalSizeAndAlignment(
-                    targetProgram->getTargetReq(),
-                    elementType,
-                    &elementSize);
-                SLANG_ASSERT(SLANG_SUCCEEDED(elementSizeResult));
                 if (elementCount <= 2)
                     return kIROp_CUDALDG;
                 else if (elementCount == 4)
