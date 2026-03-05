@@ -294,7 +294,6 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
         uint4 value;
         uint indexInWeight;
 
-        [ForceUnroll]
         for (uint i = 0; i < numLoadOrStorePerThread; i++)
         {
             if (coordInWeight.y >= TileInfo.HeightInElementsTileA)
@@ -391,16 +390,19 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
         // In store case, we actually store the MatC, whose data type could not be `half`.
         const uint elementPerVector = Op != AccessOp.READ ? CMShape.ElementCountPerVectorMatC : CMShape.ElementCountPerVector;
         const uint heightInVectorTile = Op != AccessOp.READ ? TileInfo.HeightInVectorTileC : TileInfo.HeightInVectorTileB;
-        const uint sharedMemSizeInVector = Op != AccessOp.READ ? ShMemInfo.SharedMemSizeInVectorMatC : ShMemInfo.SharedMemSizeInVectorMatB;
 
-        // In store case, we actually store the MatC. So the shared memory size could be different from MatB.
+        // Use SharedMemSizeInVectorMatC (not MatB) for per-warp stride even when
+        // loading MatB. This ensures each warp's B and C regions occupy the same
+        // slot, so the MatC writeback never overlaps an adjacent warp's MatB data.
+        // The shared memory pool is already sized for MatC-width per-warp regions.
+        const uint sharedMemSizeInVector = ShMemInfo.SharedMemSizeInVectorMatC;
+
         uint sharedMemoryBSubgroupOffset = sharedMemoryBOffset + subgroupIndex * sharedMemSizeInVector;
 
         // start index in vectorized tile for current thread: x * column_stride
         const uint indexInVectorizedTile = laneId * heightInVectorTile;
         const uint yOffset = (tileIndex * heightInVectorTile) * elementPerVector;
 
-        [ForceUnroll]
         for (uint yInTile = 0; yInTile < heightInVectorTile; yInTile++)
         {
             const int startIndex = yInTile * elementPerVector + yOffset;
@@ -532,7 +534,6 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
 
         uint index = (laneId % BatchSize) * TileStrideInVector;
 
-        [ForceUnroll]
         for (uint i = 0; i < TileStrideInVector; i++)
         {
             uint4 value;
@@ -562,11 +563,9 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
             // will use one shared memory. And left subgroup loads, right subgroup stores.
             uint subgroupOffset = (subgroupId / (k<<1)) * (CMShape.CoopMatCSizeInVector * COLUMN);
             uint ptrPerWarpOffset = sharedMemoryOffset + subgroupOffset;
-            [ForceUnroll]
             for (int i = 0; i < ROW; i++)
             {
                 // Store one row of cooperative matrix to the shared memory.
-                [ForceUnroll]
                 for (int j = 0; j < COLUMN; j++)
                 {
                     // This is the right node in the 2-way merge operation.
@@ -588,7 +587,6 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
                     // If the left node is the last subgroup, it means that there is no right node for it, so we don't need to do any addition for this subgroup.
                     if (subgroupId != (subgroupCount - 1))
                     {
-                        [ForceUnroll]
                         for (int j = 0; j < COLUMN; j++)
                         {
                             MatC rightMatC = MatC.Load<RowMajor, uint4>(ShMemPool.data, ptrPerWarpOffset + j * CMShape.CoopMatCSizeInVector,
@@ -819,7 +817,6 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
 
         // Phase 1: Warp-level reduction
         InArrayType localResult;
-        [ForceUnroll]
         for (int i = 0; i < M; i++)
         {
             localResult[i] = WaveActiveSum(dOut[i]);
@@ -836,7 +833,6 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
         // Phase 2: Lane 0 of each warp writes reduced result to shared memory
         if (laneId == 0)
         {
-            [ForceUnroll]
             for (int i = 0; i < M; i++)
             {
                 smemStore<U>(sharedMemoryOffset, subgroupId * MPadded + i, localResult[i]);
@@ -885,7 +881,6 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
         static const int StrideInVectorTileC = CoopMatCColumns * CMShape.COLUMN_C / CMShape.ElementCountPerVectorMatC;
 
         MatC matC[CoopMatCRows * CoopMatCColumns];
-        [ForceUnroll]
         for (int i = 0; i < CoopMatCRows * CoopMatCColumns; i++)
         {
             matC[i].fill(T(0.0f));
@@ -896,7 +891,6 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
 
         // Perform outer product for each warp.
         // The shared dimension is the Subgroup size N.
-        [ForceUnroll]
         for (uint k = 0; k < N; k += CMShape.COLUMN_A)
         {
             uint tileIndex = k / CMShape.COLUMN_A;
@@ -905,13 +899,11 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
             GroupMemoryBarrierWithWaveSync();
 
             MatA matA[CoopMatCRows];
-            [ForceUnroll]
             for (uint i = 0; i < CoopMatCRows; i++)
             {
                 matA[i] = MatA.Load<ColumnMajor, uint4>(ShMemPool.data, warpLocalPtrAOffset + i * CMShape.ROW_A / CMShape.ElementCountPerVector, StrideInVectorTileA);
             }
 
-            [ForceUnroll]
             for (uint j = 0; j < CoopMatCColumns; j++)
             {
                 // For matrix B, stride will be the width of the tile. This is different from the forward pass in A*B where the stride is height of tile B.
@@ -927,6 +919,10 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
             }
         }
 
+        // Ensure all warps have finished their outer-product MMA reads from
+        // shared memory before sumReduceTiles overwrites the same region.
+        GroupMemoryBarrierWithGroupSync();
+
         // sum reduce will accumulate the result cross all the warps into the cooperative matrix in the first subgroup.
         sumReduceTiles<CoopMatCRows, CoopMatCColumns>(matC, subgroupIndex, sharedMemoryBOffset);
 
@@ -935,10 +931,8 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
         if (subgroupIndex == 0)
         {
             // Store the result shared memory. We store one row of the cooperative matrix at a time.
-            [ForceUnroll]
             for (uint i = 0; i < CoopMatCRows; i++)
             {
-                [ForceUnroll]
                 for (uint j = 0; j < CoopMatCColumns; j++)
                 {
                     // Save the result to shared memory in row major, because this is cache friendly for global memory access.
@@ -1007,7 +1001,6 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
         // Iterate over the K dimension, T.COLUMN is column of Matrix A.
         uint bufferIndex = 0;
         MatC matC[TileInfo.NCoopMat];
-        [ForceUnroll]
         for (int i = 0; i < TileInfo.NCoopMat; i++)
         {
             matC[i].fill(T(0.0f));
@@ -1016,7 +1009,6 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
         OutArrayType outputVector;
         if (Bias)
         {
-            [ForceUnroll]
             for (int i = 0; i < M; i++)
             {
                 U bias = biasAddress.value[uint(i)];
@@ -1024,7 +1016,6 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
             }
         }
 
-        [ForceUnroll]
         for (int k = 0; k < TileInfo.SharedDimensionSize; k += CMShape.COLUMN_A)
         {
             uint tileIndex = k / CMShape.COLUMN_A;
@@ -1066,7 +1057,6 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
             // shB is shared only by each subgroup, and each subgroup will have its own offset on shB.
             // For matB, each warp could only have 1 or 2 Tiles to load according whether this warp is less (1 tile) or more than half warp (2 tiles).
             MatA matA[TileInfo.NCoopMatRow];
-            [ForceUnroll]
             for (uint i = 0; i < TileInfo.NCoopMatRow; i ++)
             {
                 if (TransposeA)
@@ -1081,11 +1071,11 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
                 }
             }
 
-            [ForceUnroll]
             for (uint j = 0; j < TileInfo.NCoopMatColumn; j ++)
             {
-                // NTilesColumn * HeightInVectorTileB is the size of the shared memory for matrix B in one warp measured in vector uint4.
-                uint ptrPerWarpOffset = ptrBOffset[bufferIndex] + subgroupIndex * ShMemInfo.SharedMemSizeInVectorMatB;
+                // Use SharedMemSizeInVectorMatC (not MatB) for per-warp stride to match
+                // the writeback layout, keeping each warp's B/C regions aligned.
+                uint ptrPerWarpOffset = ptrBOffset[bufferIndex] + subgroupIndex * ShMemInfo.SharedMemSizeInVectorMatC;
                 let matB = MatB.Load<ColumnMajor, uint4>(ShMemPool.data, ptrPerWarpOffset + j * CMShape.CoopMatBSizeInVector, TileInfo.HeightInVectorTileB);
 
                 for (uint i = 0; i < TileInfo.NCoopMatRow; i ++)
@@ -1104,10 +1094,8 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
         // Get start offset of the shared memory for current warp.
         uint ptrPerWarpOffset = ptrCOffset + subgroupIndex * ShMemInfo.SharedMemSizeInVectorMatC;
 
-        [ForceUnroll]
         for (int i = 0; i < TileInfo.NCoopMatRow; i ++)
         {
-            [ForceUnroll]
             for (int j = 0; j < TileInfo.NCoopMatColumn; j ++)
             {
                 int index = i * TileInfo.NCoopMatColumn + j;
@@ -1165,7 +1153,6 @@ public struct WaveTangledVector<T, ShMemSize : ISharedMemorySize, int N, int Sub
 
     public __init(T value)
     {
-        [ForceUnroll]
         for (int i = 0; i < N; i++)
         {
             this.data[i] = value;
@@ -1176,7 +1163,6 @@ public struct WaveTangledVector<T, ShMemSize : ISharedMemorySize, int N, int Sub
 
     public __init(T[Size] inData)
     {
-        [ForceUnroll]
         for (int i = 0; i < N; i++)
         {
             this.data[i] = inData[i];
@@ -1194,7 +1180,6 @@ public struct WaveTangledVector<T, ShMemSize : ISharedMemorySize, int N, int Sub
 
     public __init<InputArray : IArray<T>>(InputArray inData)
     {
-        [ForceUnroll]
         for (int i = 0; i < N; i++)
             this.data[i] = inData[i];
 
@@ -1208,7 +1193,6 @@ public struct WaveTangledVector<T, ShMemSize : ISharedMemorySize, int N, int Sub
         const int elementCountPerUint4 = sizeof(uint4) / sizeof(DTypeMatC);
         const int alignedSize = ((N + (elementCountPerUint4 - 1)) / elementCountPerUint4) * elementCountPerUint4;
 
-        [ForceUnroll]
         for (int i = N; i < alignedSize; i++)
         {
             this.data[i] = T(0.0f);
@@ -1232,7 +1216,7 @@ public struct WaveTangledVector<T, ShMemSize : ISharedMemorySize, int N, int Sub
         where Address.Differential : IPointerLikeAddress<T.Differential>
         where OutputVector : IVector<T>
     {
-        typealias MMA = MMAHelper<DTypeMatC, N, OutputVector.Size, SubgroupSize, Target, ShMemSize, false>;
+        typealias MMA = MMAHelper<T, N, OutputVector.Size, SubgroupSize, Target, ShMemSize, false>;
         uint shA = 0;
         uint shB = MMA.ShMemInfo.SharedMemSizeInVectorMatA;
         uint shC = shB;
@@ -1253,7 +1237,7 @@ public struct WaveTangledVector<T, ShMemSize : ISharedMemorySize, int N, int Sub
         where OutputVector : IVector<T>
         where OutputVector.Differential : IVector<T.Differential>
     {
-        typealias MMA = MMAHelper<DTypeMatC, N, OutputVector.Size, SubgroupSize, Target, ShMemSize, true>;
+        typealias MMA = MMAHelper<T, N, OutputVector.Size, SubgroupSize, Target, ShMemSize, true>;
 
         uint shA = 0;
         uint shB = MMA.ShMemInfo.SharedMemSizeInVectorMatA;
@@ -1310,6 +1294,9 @@ public struct WaveTangledVector<T, ShMemSize : ISharedMemorySize, int N, int Sub
 
         if (Bias)
         {
+            // Use shB (not shA) for bias reduction scratch space so it doesn't
+            // overlap with the tile-A region that the next layer's mma will load
+            // into. This avoids needing an extra block sync at the layer boundary.
             const int subgroupIndex = getWaveId();
             MMA.sumReduceRows<T.Differential, Address.Differential, OutputVector.Differential
                 >(shA, doutput, subgroupIndex, biasAddress.value.d);

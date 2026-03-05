@@ -375,19 +375,16 @@ static String _scrubName(const String& in)
         RequestState* dst = base[requestState];
 
         dst->compileFlags = 0;
-        dst->shouldDumpIntermediates =
-            linkage->m_optionSet.getBoolOption(CompilerOptionName::DumpIntermediates);
-        dst->debugInfoLevel = linkage->m_optionSet.getEnumOption<DebugInfoLevel>(
-            CompilerOptionName::DebugInformation);
-        dst->optimizationLevel =
-            linkage->m_optionSet.getEnumOption<OptimizationLevel>(CompilerOptionName::Optimization);
+        dst->shouldDumpIntermediates = linkage->m_optionSet.shouldDumpIntermediates();
+        dst->debugInfoLevel = linkage->m_optionSet.getDebugInfoLevel();
+        dst->optimizationLevel = linkage->m_optionSet.getOptimizationLevel();
         dst->containerFormat = request->m_containerFormat;
         dst->passThroughMode = request->m_passThrough;
 
         dst->useUnknownImageFormatAsDefault =
             linkage->m_optionSet.getBoolOption(CompilerOptionName::DefaultImageFormatUnknown);
         ;
-        dst->obfuscateCode = linkage->m_optionSet.getBoolOption(CompilerOptionName::Obfuscate);
+        dst->obfuscateCode = linkage->m_optionSet.shouldObfuscateCode();
 
         dst->defaultMatrixLayoutMode =
             (SlangMatrixLayoutMode)linkage->m_optionSet.getMatrixLayoutMode();
@@ -454,9 +451,7 @@ static String _scrubName(const String& in)
                 dst.target = srcTargetRequest->getTarget();
                 dst.profile = srcTargetRequest->getOptionSet().getProfile();
                 dst.targetFlags = srcTargetRequest->getOptionSet().getTargetFlags();
-                dst.floatingPointMode =
-                    srcTargetRequest->getOptionSet().getEnumOption<FloatingPointMode>(
-                        CompilerOptionName::FloatingPointMode);
+                dst.floatingPointMode = srcTargetRequest->getOptionSet().getFloatingPointMode();
             }
 
             // Copy the entry point/target output names
