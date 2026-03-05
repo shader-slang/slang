@@ -46,12 +46,12 @@ jobs:
         shell: bash
 
     steps:
-      - uses: actions/checkout@v4
-        with:
-          sparse-checkout: .github/actions/gpu-health-check
-          sparse-checkout-cone-mode: false
-
-      - uses: ./.github/actions/gpu-health-check
+      - name: GPU health check
+        run: |
+          if ! nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv,noheader 2>/dev/null; then
+            echo "::error::GPU health check failed — this VM has a faulty GPU. Re-run to get a new VM."
+            exit 1
+          fi
 
       - name: Configure Git safe directory
         run: git config --global --add safe.directory '*'
@@ -168,12 +168,12 @@ jobs:
         shell: bash
 
     steps:
-      - uses: actions/checkout@v4
-        with:
-          sparse-checkout: .github/actions/gpu-health-check
-          sparse-checkout-cone-mode: false
-
-      - uses: ./.github/actions/gpu-health-check
+      - name: GPU health check
+        run: |
+          if ! nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv,noheader 2>/dev/null; then
+            echo "::error::GPU health check failed — this VM has a faulty GPU. Re-run to get a new VM."
+            exit 1
+          fi
 
       - name: Configure Git safe directory
         run: git config --global --add safe.directory '*'
@@ -249,12 +249,12 @@ jobs:
         shell: bash
 
     steps:
-      - uses: actions/checkout@v4
-        with:
-          sparse-checkout: .github/actions/gpu-health-check
-          sparse-checkout-cone-mode: false
-
-      - uses: ./.github/actions/gpu-health-check
+      - name: GPU health check
+        run: |
+          if ! nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv,noheader 2>/dev/null; then
+            echo "::error::GPU health check failed — this VM has a faulty GPU. Re-run to get a new VM."
+            exit 1
+          fi
 
       - name: Configure Git safe directory
         run: git config --global --add safe.directory '*'
