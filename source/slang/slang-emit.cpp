@@ -1624,6 +1624,11 @@ Result linkAndOptimizeIR(
         SLANG_PASS(validateAtomicOperations, skipFuncParamValidation, sink);
     }
 
+    if (!isCPUTarget(targetRequest) && !isCUDATarget(targetRequest))
+    {
+        SLANG_PASS(validateGetAddressUsage, sink);
+    }
+
     // For CUDA targets only, we will need to turn operations
     // the implicitly reference the "active mask" into ones
     // that use (and pass around) an explicit mask instead.

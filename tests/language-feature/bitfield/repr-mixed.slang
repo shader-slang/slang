@@ -31,6 +31,6 @@ void computeMain()
     m.d = 0xEF;
 
     // With default packing, all fields are in one backing field
-    outputBuffer[0] = *((uint*)&m) & 0xFFFFFF; // Mask to 24 bits
+    outputBuffer[0] = *((uint*)__getAddress(m)) & 0xFFFFFF; // Mask to 24 bits
 }
 

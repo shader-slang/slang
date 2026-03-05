@@ -2378,6 +2378,9 @@ local insts = {
 			},
 			{
 				DisallowSpecializationWithExistentialsDecoration = { },
+			},
+			{
+				GetAddressDecoration = { },
 			}
 		},
 	},

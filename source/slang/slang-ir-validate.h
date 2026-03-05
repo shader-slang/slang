@@ -93,4 +93,9 @@ bool validateStructuredBufferResourceTypes(
     DiagnosticSink* sink,
     TargetRequest* targetRequest);
 
+// Validate that __getAddress is not used on function-local variables.
+// Finds IRVars decorated with GetAddressDecoration and checks if the stored
+// value originates from a function-local variable.
+void validateGetAddressUsage(IRModule* module, DiagnosticSink* sink);
+
 } // namespace Slang

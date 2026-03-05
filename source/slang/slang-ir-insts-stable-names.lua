@@ -736,4 +736,5 @@ return {
 	["SPIRVSamplerHeap"] = 734,
 	["SPIRVLoadDescriptorFromHeap"] = 735,
 	["SPIRVLoadTexelPointerFromHeap"] = 736,
+	["Decoration.GetAddressDecoration"] = 737,
 }

@@ -14080,7 +14080,7 @@ struct CapabilityDeclReferenceVisitor
         // __getAddress only works with certain targets
         handleProcessFunc(
             expr,
-            this->getASTBuilder()->getCapabilitySetVal(CapabilityName::cpp_cuda_metal_spirv),
+            this->getASTBuilder()->getCapabilitySetVal(CapabilityName::cpp_cuda_metal_spirv_llvm),
             expr->loc);
         this->dispatchIfNotNull(expr->arg);
     }
