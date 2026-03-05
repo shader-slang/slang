@@ -36,6 +36,10 @@ def parse_args():
         description="Generate CI analytics HTML from job data."
     )
     parser.add_argument("--input", default="ci_jobs.json", help="Input JSON file")
+    parser.add_argument(
+        "--pr-input", default="pr_merges.json",
+        help="Input JSON file with merged PR data (default: pr_merges.json)",
+    )
     parser.add_argument("--output", default="ci_analytics", help="Output directory")
     return parser.parse_args()
 
@@ -615,6 +619,31 @@ def generate_index(data, output_dir):
     prs_delta = _delta_str(prs_3d, prs_prev)
     fr_delta = _delta_str(failure_rate_3d, failure_rate_prev, "%", invert=True)
 
+    # PRs merged per day (from pr_collector data)
+    pr_merges = data.get("pr_merges", [])
+    prs_merged_by_date = defaultdict(int)
+    for pr in pr_merges:
+        merged_at = pr.get("merged_at")
+        if not merged_at:
+            continue
+        try:
+            dt = parse_dt(merged_at)
+            prs_merged_by_date[dt.strftime("%Y-%m-%d")] += 1
+        except (ValueError, TypeError):
+            continue
+
+    def _avg_merged(window_dates):
+        total = sum(prs_merged_by_date.get(d, 0) for d in window_dates)
+        return total / len(window_dates) if window_dates else 0
+
+    merged_3d = _avg_merged(recent_dates)
+    merged_prev = _avg_merged(prev_dates)
+    merged_delta = _delta_str(merged_3d, merged_prev)
+
+    merged_card_html = ""
+    if pr_merges:
+        merged_card_html = f'  <div class="stat-card"><div class="value">{merged_3d:.1f}{merged_delta}</div><div class="label">PRs Merged / day</div></div>'
+
     months_html = ""
     for month in reversed(data["months"]):
         count = len(data["jobs_by_month"][month])
@@ -628,6 +657,7 @@ def generate_index(data, output_dir):
   <div class="stat-card"><div class="value">{ci_tat_3d:.0f}m{tat_delta}</div><div class="label">CI Turnaround (avg)</div></div>
   <div class="stat-card"><div class="value">{prs_3d:.1f}{prs_delta}</div><div class="label">Active PRs / day</div></div>
   <div class="stat-card"><div class="value">{failure_rate_3d:.1f}%{fr_delta}</div><div class="label">Failure Rate</div></div>
+{merged_card_html}
 </div>
 
 <h2>Pages</h2>
@@ -871,6 +901,29 @@ def generate_statistics(data, config, output_dir):
         os_list, os_phase_avg_by_date, dates, "test"
     )
 
+    # PRs merged per day (from pr_collector data)
+    pr_merges = data.get("pr_merges", [])
+    prs_merged_by_date = defaultdict(int)
+    for pr in pr_merges:
+        merged_at = pr.get("merged_at")
+        if not merged_at:
+            continue
+        try:
+            dt = parse_dt(merged_at)
+            date_str = dt.strftime("%Y-%m-%d")
+            prs_merged_by_date[date_str] += 1
+        except (ValueError, TypeError):
+            continue
+    prs_merged_per_day = [prs_merged_by_date.get(d, 0) for d in dates]
+
+    if pr_merges:
+        pr_merged_chart_html = chart_section(
+            "prsMerged", "PRs Merged per Day",
+            "Number of pull requests merged each day."
+        )
+    else:
+        pr_merged_chart_html = ""
+
     body = f"""
 <h1>Statistics &amp; Trends</h1>
 <p style="color:#6c757d">Last updated: {data['generated_at']}. CI workflow only. Excludes skipped jobs. Data range: {dates[0] if dates else 'N/A'} to {dates[-1] if dates else 'N/A'}.</p>
@@ -891,6 +944,7 @@ def generate_statistics(data, config, output_dir):
 {chart_section("prsPerDay", "Active PRs per Day",
     "Unique PR branches with CI activity per day.")}
 
+{pr_merged_chart_html}
 {chart_section("buildTestWait", "Build and Test Wait Times (minutes)",
     "Build wait: run trigger to first build started. Test wait: last build completed to first test started (worst platform).")}
 
@@ -943,6 +997,7 @@ const allTurnP95 = {json.dumps(ci_p95_tat)};
 const allSoL = {json.dumps(ci_sol_avg)};
 const allBuildWait = {json.dumps(avg_build_wait)};
 const allTestWait = {json.dumps(avg_test_wait)};
+const allPRsMerged = {json.dumps(prs_merged_per_day)};
 
 let charts = [];
 
@@ -1037,6 +1092,17 @@ makeChart('prsPerDay_canvas', 'line', {{
   }},
   options: {{responsive:true}}
 }});
+
+// PRs merged per day
+if (document.getElementById('prsMerged_canvas')) {{
+  makeChart('prsMerged_canvas', 'bar', {{
+    data: {{
+      labels: sliceData(allLabels, 30),
+      datasets: [{{label:'PRs Merged', data:sliceData(allPRsMerged,30), _allData:allPRsMerged, backgroundColor:'#6f42c1'}}]
+    }},
+    options: {{responsive:true, scales:{{y:{{beginAtZero:true, title:{{display:true,text:'PRs'}}}}}}}}
+  }});
+}}
 
 // Runs per day
 makeChart('runsPerDay_canvas', 'line', {{
@@ -1326,8 +1392,21 @@ def main():
         sys.exit(2)
     print(f"Loaded {len(jobs_data)} jobs")
 
+    # Load PR merge data (optional)
+    pr_data = []
+    if os.path.exists(args.pr_input):
+        try:
+            with open(args.pr_input, encoding="utf-8") as f:
+                pr_data = json.load(f)
+            print(f"Loaded {len(pr_data)} merged PRs from {args.pr_input}")
+        except (json.JSONDecodeError, OSError) as e:
+            print(f"Warning: Could not load PR data: {e}", file=sys.stderr)
+    else:
+        print(f"No PR data at {args.pr_input} (skipping PRs merged chart)")
+
     # Process
     data = process_jobs(jobs_data, config)
+    data["pr_merges"] = pr_data
     print(f"Active jobs (excluding skipped): {len(data['active_jobs'])}")
     print(f"Date range: {data['dates'][0] if data['dates'] else 'N/A'} to {data['dates'][-1] if data['dates'] else 'N/A'}")
     print(f"Months: {len(data['months'])}")

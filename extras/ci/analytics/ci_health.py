@@ -28,6 +28,11 @@ from ci_visualization import page_template, chart_section, DOWNLOAD_JS
 
 DEFAULT_REPO = "shader-slang/slang"
 
+# GCP T4 GPU quota configuration
+GPU_QUOTA_PROJECT = "slang-runners"
+GPU_QUOTA_REGIONS = ["us-central1", "us-east1", "us-west1"]
+GPU_QUOTA_METRIC = "NVIDIA_T4_GPUS"
+
 
 def _esc(s):
     """HTML-escape a string."""
@@ -49,6 +54,49 @@ def _round_time(hhmm, interval=DISPLAY_INTERVAL_MIN):
     return f"{h:02d}:{m:02d}"
 SNAPSHOTS_FILE = "health_snapshots.jsonl"
 CHARTJS_CDN = "https://cdn.jsdelivr.net/npm/chart.js"
+
+
+def fetch_gpu_quota():
+    """Fetch T4 GPU usage and limits from GCP across all configured regions.
+
+    Returns a dict with 'usage', 'limit', and per-region breakdown,
+    or None if gcloud is unavailable.
+    """
+    total_usage = 0
+    total_limit = 0
+    regions = {}
+
+    for region in GPU_QUOTA_REGIONS:
+        cmd = [
+            "gcloud", "compute", "regions", "describe", region,
+            "--project", GPU_QUOTA_PROJECT,
+            "--format", "json(quotas)",
+        ]
+        try:
+            result = subprocess.run(
+                cmd, capture_output=True, text=True, timeout=30
+            )
+        except (subprocess.TimeoutExpired, FileNotFoundError):
+            return None
+        if result.returncode != 0:
+            return None
+        try:
+            data = json.loads(result.stdout)
+        except json.JSONDecodeError:
+            return None
+
+        for q in data.get("quotas", []):
+            if q.get("metric") == GPU_QUOTA_METRIC:
+                usage = int(q.get("usage", 0))
+                limit = int(q.get("limit", 0))
+                regions[region] = {"usage": usage, "limit": limit}
+                total_usage += usage
+                total_limit += limit
+                break
+
+    if not regions:
+        return None
+    return {"usage": total_usage, "limit": total_limit, "regions": regions}
 
 
 def parse_args():
@@ -118,41 +166,46 @@ def fetch_recent_failures(repo):
     return failures[:10]
 
 
-def record_snapshot(queue_data, output_dir):
+def record_snapshot(queue_data, output_dir, gpu_quota=None):
     """Append a runner status snapshot to the JSONL time-series file."""
-    if not queue_data:
+    if not queue_data and not gpu_quota:
         return
 
     now = datetime.now(timezone.utc)
     snapshot = {"timestamp": now.strftime("%Y-%m-%dT%H:%M:%SZ")}
 
-    # Aggregate runner counts by group
-    summary = queue_data.get("summary", {})
-    snapshot["jobs_queued"] = summary.get("jobs_queued", 0)
-    snapshot["jobs_running"] = summary.get("jobs_running", 0)
-    snapshot["runs_queued"] = summary.get("runs_queued", 0)
-    snapshot["runs_in_progress"] = summary.get("runs_in_progress", 0)
+    if queue_data:
+        # Aggregate runner counts by group
+        summary = queue_data.get("summary", {})
+        snapshot["jobs_queued"] = summary.get("jobs_queued", 0)
+        snapshot["jobs_running"] = summary.get("jobs_running", 0)
+        snapshot["runs_queued"] = summary.get("runs_queued", 0)
+        snapshot["runs_in_progress"] = summary.get("runs_in_progress", 0)
 
-    # Per-group busy/total from runner data
-    groups = {}
-    for r in queue_data.get("self_hosted_runners", []):
-        g = r.get("group", "Other")
-        if g not in groups:
-            groups[g] = {"busy": 0, "total": 0}
-        if r.get("status") == "online":
-            groups[g]["total"] += 1
-            if r.get("busy"):
-                groups[g]["busy"] += 1
-    snapshot["runner_groups"] = groups
+        # Per-group busy/total from runner data
+        groups = {}
+        for r in queue_data.get("self_hosted_runners", []):
+            g = r.get("group", "Other")
+            if g not in groups:
+                groups[g] = {"busy": 0, "total": 0}
+            if r.get("status") == "online":
+                groups[g]["total"] += 1
+                if r.get("busy"):
+                    groups[g]["busy"] += 1
+        snapshot["runner_groups"] = groups
 
-    # Per-group queue depth
-    queue_groups = {}
-    for g in queue_data.get("queue_by_group", []):
-        queue_groups[g["name"]] = {
-            "queued": g.get("queued", 0),
-            "running": g.get("running", 0),
-        }
-    snapshot["queue_by_group"] = queue_groups
+        # Per-group queue depth
+        queue_groups = {}
+        for g in queue_data.get("queue_by_group", []):
+            queue_groups[g["name"]] = {
+                "queued": g.get("queued", 0),
+                "running": g.get("running", 0),
+            }
+        snapshot["queue_by_group"] = queue_groups
+
+    # GPU quota per region
+    if gpu_quota:
+        snapshot["gpu_quota"] = gpu_quota.get("regions", {})
 
     # Append to JSONL file (kept indefinitely, ~55KB/day)
     os.makedirs(output_dir, exist_ok=True)
@@ -215,6 +268,14 @@ def _deduplicate_snapshots(snapshots):
     return [by_window[k] for k in sorted(by_window)]
 
 
+_REGION_COLORS = ["#0d6efd", "#fd7e14", "#28a745", "#dc3545", "#6f42c1", "#20c997"]
+
+
+def _region_palette(regions):
+    """Map region names to colors."""
+    return {r: _REGION_COLORS[i % len(_REGION_COLORS)] for i, r in enumerate(regions)}
+
+
 def build_history_chart(snapshots):
     """Build Chart.js HTML for 24h runner load history."""
     if not snapshots:
@@ -240,6 +301,27 @@ def build_history_chart(snapshots):
     for g in gcp_vm_groups:
         group_series[g] = [s.get("runner_groups", {}).get(g, {}).get("total", 0) for s in snapshots]
 
+    # GPU quota per region (discover regions dynamically from snapshot data)
+    gpu_regions = sorted({
+        region
+        for s in snapshots
+        for region in s.get("gpu_quota", {})
+    })
+    gpu_region_series = {}
+    for region in gpu_regions:
+        gpu_region_series[region] = [
+            s.get("gpu_quota", {}).get(region, {}).get("usage", 0)
+            for s in snapshots
+        ]
+    # Total quota limit (use latest snapshot that has quota data)
+    gpu_quota_limit = 0
+    for s in reversed(snapshots):
+        quota = s.get("gpu_quota", {})
+        if quota:
+            gpu_quota_limit = sum(r.get("limit", 0) for r in quota.values())
+            break
+    has_gpu_quota = bool(gpu_regions)
+
     charts_html = (
         chart_section("runnerHistory", "GCP Runner VMs",
             "Number of GCP-provisioned runner VMs online per group, sampled every 15 minutes.")
@@ -248,6 +330,9 @@ def build_history_chart(snapshots):
         + chart_section("queueHistory", "Job Queue Depth",
             "Individual jobs waiting in queue vs. actively running on runners.")
     )
+    if has_gpu_quota:
+        charts_html += chart_section("gpuQuota", "T4 GPU Usage vs. Quota",
+            "T4 GPUs in use per GCP region, stacked. Dashed line shows total quota limit.")
 
     return f"""
 <div class="chart-section">
@@ -269,6 +354,10 @@ const allRunsInProgress = {json.dumps(runs_in_progress)};
 const allRunsQueued = {json.dumps(runs_queued)};
 const allJobsQueued = {json.dumps(queued_data)};
 const allJobsRunning = {json.dumps(running_data)};
+
+const gpuRegionData = {json.dumps(gpu_region_series)};
+const gpuQuotaLimit = {gpu_quota_limit};
+const gpuRegionColors = {json.dumps(_region_palette(gpu_regions))};
 
 const runnerColors = {json.dumps(palette)};
 const pointsPerHour = 4; // 15-min intervals
@@ -343,6 +432,58 @@ function buildCharts(hours) {{
       scales: {{ y: {{ min: 0, title: {{ display: true, text: 'Jobs' }} }} }}
     }}
   }});
+
+  // GPU quota (stacked by region + limit line)
+  const gpuCanvas = document.getElementById('gpuQuota_canvas');
+  if (gpuCanvas && Object.keys(gpuRegionData).length > 0) {{
+    const gpuDatasets = [];
+    for (const [region, color] of Object.entries(gpuRegionColors)) {{
+      gpuDatasets.push({{
+        label: region,
+        data: sliceLast(gpuRegionData[region] || [], n),
+        borderColor: color,
+        backgroundColor: color + '55',
+        fill: 'stack',
+        stack: 'usage',
+        tension: 0.3,
+      }});
+    }}
+    // Quota limit as a dashed line (not stacked)
+    gpuDatasets.push({{
+      label: 'Quota Limit',
+      data: Array(labels.length).fill(gpuQuotaLimit),
+      borderColor: '#dc3545',
+      borderDash: [6, 3],
+      borderWidth: 2,
+      pointRadius: 0,
+      fill: false,
+    }});
+    charts.gpu = new Chart(gpuCanvas.getContext('2d'), {{
+      type: 'line',
+      data: {{ labels: displayLabels, datasets: gpuDatasets }},
+      options: {{
+        responsive: true,
+        scales: {{
+          y: {{ min: 0, title: {{ display: true, text: 'T4 GPUs' }} }}
+        }},
+        plugins: {{
+          tooltip: {{
+            callbacks: {{
+              afterBody: function(items) {{
+                const idx = items[0].dataIndex;
+                let total = 0;
+                for (const region of Object.keys(gpuRegionColors)) {{
+                  const ds = items[0].chart.data.datasets.find(d => d.label === region);
+                  if (ds) total += ds.data[idx] || 0;
+                }}
+                return 'Total: ' + total + ' / ' + gpuQuotaLimit;
+              }}
+            }}
+          }}
+        }}
+      }}
+    }});
+  }}
 }}
 
 function updateHistoryRange() {{
@@ -538,8 +679,15 @@ def main():
     print(f"Fetching queue status for {args.repo}...")
     queue_data = fetch_queue_status(args.repo)
 
+    print("Fetching GPU quota...")
+    gpu_quota = fetch_gpu_quota()
+    if gpu_quota:
+        print(f"  T4 GPUs: {gpu_quota['usage']}/{gpu_quota['limit']} in use")
+    else:
+        print("  GPU quota unavailable (gcloud not configured or not accessible)")
+
     print("Recording snapshot...")
-    record_snapshot(queue_data, args.output)
+    record_snapshot(queue_data, args.output, gpu_quota=gpu_quota)
 
     print("Fetching recent CI failures...")
     failures = fetch_recent_failures(args.repo)
