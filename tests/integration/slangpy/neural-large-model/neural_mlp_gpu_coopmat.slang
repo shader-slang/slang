@@ -5,6 +5,9 @@
 // Key differences from neural_mlp_gpu.slang (InlineVector version):
 //   - WaveTangledVector replaces InlineVector (cooperative matrix MMA)
 //   - Configurable workgroup size via -DWORKGROUP_SIZE=N from Python (default 32)
+//   - Configurable element type via -DUSE_HALF=1 from Python (default float)
+//     With USE_HALF=1: WaveTangledVector<half> exercises hybrid precision path
+//     (MatA/MatB in half, MatC in half), useful for detecting shared memory bugs
 //   - Each thread processes a DIFFERENT pixel; warps cooperate on the MMA ops
 //   - Loss scaling support for fp16 gradient underflow prevention
 //   - Manual MSE gradient computation + bwd_diff(mlp_forward_with_latent) for backward
@@ -21,25 +24,31 @@ static const float ALPHA = 0.01f;
 static const int SUBGROUP_SIZE = 32;
 
 #ifndef WORKGROUP_SIZE
-#define WORKGROUP_SIZE 32
+#define WORKGROUP_SIZE 64
 #endif
 static const int WORKGROUP_SZ = WORKGROUP_SIZE;
 static const int SUBGROUP_COUNT = WORKGROUP_SZ / SUBGROUP_SIZE;
 
-typealias ShMemSize = SharedMemorySize<float, TargetEnum.CUDA, ExecutionMode.Training,
+#ifdef USE_HALF
+typealias ElemType = half;
+#else
+typealias ElemType = float;
+#endif
+
+typealias ShMemSize = SharedMemorySize<ElemType, TargetEnum.CUDA, ExecutionMode.Training,
                                        SUBGROUP_SIZE, SUBGROUP_COUNT>;
 typealias ShMemSizeLayer4 = ShMemSize.OfLayer4<INPUT_DIM, HIDDEN_DIM, HIDDEN_DIM,
                                                 HIDDEN_DIM, OUTPUT_DIM>;
 
-typealias Address = PointerAddress<float>;
-typealias InputVec = WaveTangledVector<float, ShMemSizeLayer4, INPUT_DIM, SUBGROUP_SIZE>;
-typealias HiddenVec = WaveTangledVector<float, ShMemSizeLayer4, HIDDEN_DIM, SUBGROUP_SIZE>;
-typealias OutputVec = WaveTangledVector<float, ShMemSizeLayer4, OUTPUT_DIM, SUBGROUP_SIZE>;
+typealias Address = PointerAddress<ElemType>;
+typealias InputVec = WaveTangledVector<ElemType, ShMemSizeLayer4, INPUT_DIM, SUBGROUP_SIZE>;
+typealias HiddenVec = WaveTangledVector<ElemType, ShMemSizeLayer4, HIDDEN_DIM, SUBGROUP_SIZE>;
+typealias OutputVec = WaveTangledVector<ElemType, ShMemSizeLayer4, OUTPUT_DIM, SUBGROUP_SIZE>;
 
-typealias Layer0 = FFLayer<float, InputVec, HiddenVec, LinearLayout, LeakyReLU<float>, true>;
-typealias Layer1 = FFLayer<float, HiddenVec, HiddenVec, LinearLayout, LeakyReLU<float>, true>;
-typealias Layer2 = FFLayer<float, HiddenVec, HiddenVec, LinearLayout, LeakyReLU<float>, true>;
-typealias Layer3 = FFLayer<float, HiddenVec, OutputVec, LinearLayout, IdentityActivation<float>, true>;
+typealias Layer0 = FFLayer<ElemType, InputVec, HiddenVec, LinearLayout, LeakyReLU<ElemType>, true>;
+typealias Layer1 = FFLayer<ElemType, HiddenVec, HiddenVec, LinearLayout, LeakyReLU<ElemType>, true>;
+typealias Layer2 = FFLayer<ElemType, HiddenVec, HiddenVec, LinearLayout, LeakyReLU<ElemType>, true>;
+typealias Layer3 = FFLayer<ElemType, HiddenVec, OutputVec, LinearLayout, IdentityActivation<ElemType>, true>;
 
 static const uint TOTAL_PARAMS = Layer0.ParameterCount + Layer1.ParameterCount
                                 + Layer2.ParameterCount + Layer3.ParameterCount;
@@ -60,7 +69,7 @@ struct LCG
 // ============================================================================
 struct LayerAddr { Address w0, b0, w1, b1, w2, b2, w3, b3; };
 
-LayerAddr make_addr(float* ptr)
+LayerAddr make_addr(ElemType* ptr)
 {
     Address base = Address(ptr);
     LayerAddr a;
@@ -87,10 +96,9 @@ LayerAddr make_addr(float* ptr)
 OutputVec mlp_forward_with_latent(
     Address w0, Address b0, Address w1, Address b1,
     Address w2, Address b2, Address w3, Address b3,
-    // Latent address is no_diff because PointerAddress.operator[].get is not
-    // backward-differentiable. Latent grid gradients are not computed via autodiff
-    // in this CoopMat variant; only MLP weight gradients flow through bwd_diff.
-    no_diff Address latent_addr,
+    // Latent grid is always float (pixel data). Bilinear result cast to ElemType.
+    // Latent addr uses PointerAddress<float> since grid is always float.
+    no_diff PointerAddress<float> latent_addr,
     no_diff int latent_w, no_diff int latent_h,
     no_diff float2 uv)
 {
@@ -108,10 +116,10 @@ OutputVec mlp_forward_with_latent(
         float v10 = latent_addr[uint(c0.y * latent_w * INPUT_DIM + c1.x * INPUT_DIM + i)];
         float v01 = latent_addr[uint(c1.y * latent_w * INPUT_DIM + c0.x * INPUT_DIM + i)];
         float v11 = latent_addr[uint(c1.y * latent_w * INPUT_DIM + c1.x * INPUT_DIM + i)];
-        input[i] = lerp(lerp(v00, v10, f.x), lerp(v01, v11, f.x), f.y);
+        input[i] = ElemType(lerp(lerp(v00, v10, f.x), lerp(v01, v11, f.x), f.y));
     }
 
-    let act = LeakyReLU<float>(ALPHA);
+    let act = LeakyReLU<ElemType>(ALPHA);
     let h0 = Layer0(act).eval<Address>(input, w0, b0);
     let h1 = Layer1(act).eval<Address>(h0, w1, b1);
     let h2 = Layer2(act).eval<Address>(h1, w2, b2);
@@ -122,7 +130,7 @@ OutputVec mlp_forward_with_latent(
 // Standalone forward for inference/loss evaluation (no autodiff needed)
 // ============================================================================
 OutputVec forward_inference(
-    float* params, float* latent_data,
+    ElemType* params, float* latent_data,
     int latent_w, int latent_h, float2 uv)
 {
     int2 size = int2(latent_w, latent_h);
@@ -139,11 +147,11 @@ OutputVec forward_inference(
         float v10 = latent_data[c0.y * latent_w * INPUT_DIM + c1.x * INPUT_DIM + i];
         float v01 = latent_data[c1.y * latent_w * INPUT_DIM + c0.x * INPUT_DIM + i];
         float v11 = latent_data[c1.y * latent_w * INPUT_DIM + c1.x * INPUT_DIM + i];
-        input[i] = lerp(lerp(v00, v10, f.x), lerp(v01, v11, f.x), f.y);
+        input[i] = ElemType(lerp(lerp(v00, v10, f.x), lerp(v01, v11, f.x), f.y));
     }
 
     LayerAddr la = make_addr(params);
-    let act = LeakyReLU<float>(ALPHA);
+    let act = LeakyReLU<ElemType>(ALPHA);
     let h0 = Layer0(act).eval<Address>(input, la.w0, la.b0);
     let h1 = Layer1(act).eval<Address>(h0, la.w1, la.b1);
     let h2 = Layer2(act).eval<Address>(h1, la.w2, la.b2);
@@ -169,8 +177,8 @@ void compute_calculate_grads(
     uniform int2 batch_size,
     uniform int2 img_resolution,
     uniform float loss_scale,
-    uniform float* params,
-    uniform float* params_grad,
+    uniform ElemType* params,
+    uniform ElemType* params_grad,
     uniform float* latent_data,
     uniform float* latent_grad,
     uniform float* ref_image,
@@ -194,15 +202,14 @@ void compute_calculate_grads(
     float2 pixel_uv = (float2(pixel) + 0.5f) / float2(img_resolution);
 
     // Forward pass (non-differentiable) to get output for MSE gradient
-    Address latent_addr = Address(latent_data);
+    PointerAddress<float> latent_addr = PointerAddress<float>(latent_data);
     OutputVec out = forward_inference(params, latent_data, latent_width, latent_height, pixel_uv);
 
     // Manual MSE gradient: dL/d_out[i] = 2 * (out[i] - ref[i]) * loss_scale / 3
-    // The /3 is from MSE mean over 3 channels. loss_scale prevents fp16 underflow.
-    float dout_arr[OUTPUT_DIM];
-    dout_arr[0] = 2.0f * (out[0] - ref_color.x) * loss_scale / float(OUTPUT_DIM);
-    dout_arr[1] = 2.0f * (out[1] - ref_color.y) * loss_scale / float(OUTPUT_DIM);
-    dout_arr[2] = 2.0f * (out[2] - ref_color.z) * loss_scale / float(OUTPUT_DIM);
+    ElemType dout_arr[OUTPUT_DIM];
+    dout_arr[0] = ElemType(2.0f * (float(out[0]) - ref_color.x) * loss_scale / float(OUTPUT_DIM));
+    dout_arr[1] = ElemType(2.0f * (float(out[1]) - ref_color.y) * loss_scale / float(OUTPUT_DIM));
+    dout_arr[2] = ElemType(2.0f * (float(out[2]) - ref_color.z) * loss_scale / float(OUTPUT_DIM));
     OutputVec dOutput = OutputVec(dout_arr);
 
     LayerAddr la = make_addr(params);
@@ -225,7 +232,7 @@ void compute_render(
     uint3 gid : SV_GroupID,
     uint gtid : SV_GroupIndex,
     uniform int2 img_resolution,
-    uniform float* params,
+    uniform ElemType* params,
     uniform float* latent_data,
     uniform float* output_image,
     uniform int latent_width,
@@ -241,9 +248,9 @@ void compute_render(
     OutputVec out = forward_inference(params, latent_data, latent_width, latent_height, uv);
 
     int out_idx = pixel_idx * 3;
-    output_image[out_idx + 0] = out[0];
-    output_image[out_idx + 1] = out[1];
-    output_image[out_idx + 2] = out[2];
+    output_image[out_idx + 0] = float(out[0]);
+    output_image[out_idx + 1] = float(out[1]);
+    output_image[out_idx + 2] = float(out[2]);
 }
 
 [shader("compute")]
@@ -252,7 +259,7 @@ void compute_show_loss(
     uint3 gid : SV_GroupID,
     uint gtid : SV_GroupIndex,
     uniform int2 img_resolution,
-    uniform float* params,
+    uniform ElemType* params,
     uniform float* latent_data,
     uniform float* ref_image,
     uniform float* output_loss,
@@ -271,9 +278,10 @@ void compute_show_loss(
     int ref_idx = pixel_idx * 3;
     float3 ref_color = float3(ref_image[ref_idx], ref_image[ref_idx + 1], ref_image[ref_idx + 2]);
 
-    output_loss[ref_idx + 0] = (out[0] - ref_color.x) * (out[0] - ref_color.x);
-    output_loss[ref_idx + 1] = (out[1] - ref_color.y) * (out[1] - ref_color.y);
-    output_loss[ref_idx + 2] = (out[2] - ref_color.z) * (out[2] - ref_color.z);
+    float o0 = float(out[0]), o1 = float(out[1]), o2 = float(out[2]);
+    output_loss[ref_idx + 0] = (o0 - ref_color.x) * (o0 - ref_color.x);
+    output_loss[ref_idx + 1] = (o1 - ref_color.y) * (o1 - ref_color.y);
+    output_loss[ref_idx + 2] = (o2 - ref_color.z) * (o2 - ref_color.z);
 }
 
 // Element-wise Adam optimizer with loss-scale unscaling
@@ -282,10 +290,10 @@ void compute_show_loss(
 void compute_optimizer_step(
     uint3 gid : SV_GroupID,
     uint gtid : SV_GroupIndex,
-    uniform float* primal,
-    uniform float* grad,
-    uniform float* mean_buf,
-    uniform float* variance_buf,
+    uniform ElemType* primal,
+    uniform ElemType* grad,
+    uniform ElemType* mean_buf,
+    uniform ElemType* variance_buf,
     uniform float lr,
     uniform int iter,
     uniform float loss_scale,
@@ -295,13 +303,14 @@ void compute_optimizer_step(
     if (idx >= param_count) return;
 
     const float BETA1 = 0.9f, BETA2 = 0.999f, EPSILON = 1e-8f;
-    float g = grad[idx] / loss_scale;
-    float m = lerp(g, mean_buf[idx], BETA1);
-    float v = lerp(g * g, variance_buf[idx], BETA2);
+    float g = float(grad[idx]) / loss_scale;
+    float m = lerp(g, float(mean_buf[idx]), BETA1);
+    float v = lerp(g * g, float(variance_buf[idx]), BETA2);
     float m_hat = m / (1.0f - pow(BETA1, iter));
     float v_hat = v / (1.0f - pow(BETA2, iter));
-    primal[idx] -= lr * m_hat / (sqrt(v_hat) + EPSILON);
-    grad[idx] = 0.0f;
-    mean_buf[idx] = m;
-    variance_buf[idx] = v;
+    float p = float(primal[idx]) - lr * m_hat / (sqrt(v_hat) + EPSILON);
+    primal[idx] = ElemType(p);
+    grad[idx] = ElemType(0.0f);
+    mean_buf[idx] = ElemType(m);
+    variance_buf[idx] = ElemType(v);
 }
