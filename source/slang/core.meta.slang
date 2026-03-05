@@ -4718,12 +4718,34 @@ semantic sv_position
     [require(geometry)]
     get : float4;
 
+    [require(fragment)]
+    [require(geometry)]
+    get : float3;
+
+    [require(fragment)]
+    [require(geometry)]
+    get : float2;
+
     [require(vertex)]
     [require(geometry)]
     [require(hull)]
     [require(domain)]
     [require(mesh)]
     set : float4;
+
+    [require(vertex)]
+    [require(geometry)]
+    [require(hull)]
+    [require(domain)]
+    [require(mesh)]
+    set : float3;
+
+    [require(vertex)]
+    [require(geometry)]
+    [require(hull)]
+    [require(domain)]
+    [require(mesh)]
+    set : float2;
 }
 
 semantic sv_depth

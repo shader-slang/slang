@@ -105,12 +105,13 @@ SlangResult CommandLineDownstreamCompiler::compile(
     {
         // We could use the path to the source, or use the source name/paths as defined on the
         // artifact For now we just go with a lock file based on "slang-generated".
-        if (SLANG_FAILED(helper->createLockFile(
-                asCharSlice(toSlice("slang-generated")),
-                lockFile.writeRef())))
+        SlangResult lockRes =
+            helper->createLockFile(asCharSlice(toSlice("slang-generated")), lockFile.writeRef());
+        if (SLANG_FAILED(lockRes))
         {
+            diagnostics->setResult(lockRes);
             *outArtifact = resultArtifact.detach();
-            return SLANG_FAIL;
+            return lockRes;
         }
 
         auto lockArtifact = Artifact::create(
@@ -127,10 +128,12 @@ SlangResult CommandLineDownstreamCompiler::compile(
 
     // Append command line args to the end of cmdLine using the target specific function for the
     // specified options
-    if (SLANG_FAILED(calcArgs(options, cmdLine)))
+    SlangResult argsRes = calcArgs(options, cmdLine);
+    if (SLANG_FAILED(argsRes))
     {
+        diagnostics->setResult(argsRes);
         *outArtifact = resultArtifact.detach();
-        return SLANG_FAIL;
+        return argsRes;
     }
 
     // The 'productArtifact' is the main product produced from the compilation - the
@@ -138,11 +141,13 @@ SlangResult CommandLineDownstreamCompiler::compile(
     ComPtr<IArtifact> productArtifact;
     {
         List<ComPtr<IArtifact>> artifacts;
-        if (SLANG_FAILED(
-                calcCompileProducts(options, DownstreamProductFlag::All, lockFile, artifacts)))
+        SlangResult productsRes =
+            calcCompileProducts(options, DownstreamProductFlag::All, lockFile, artifacts);
+        if (SLANG_FAILED(productsRes))
         {
+            diagnostics->setResult(productsRes);
             *outArtifact = resultArtifact.detach();
-            return SLANG_FAIL;
+            return productsRes;
         }
 
         for (IArtifact* artifact : artifacts)
@@ -194,15 +199,6 @@ SlangResult CommandLineDownstreamCompiler::compile(
         return executeResult;
     }
 
-    // Parse output into diagnostics. We always parse even if the compiler returned
-    // non-zero, so diagnostics are available to the caller.
-    if (SLANG_FAILED(parseOutput(exeRes, diagnostics)))
-    {
-        diagnostics->setResult(SLANG_FAIL);
-        *outArtifact = resultArtifact.detach();
-        return SLANG_FAIL;
-    }
-
     // Go through the list of artifacts in the artifactList and check if they exist.
     //
     // This is useful because `calcCompileProducts` is conservative and may produce artifacts for
@@ -236,6 +232,16 @@ SlangResult CommandLineDownstreamCompiler::compile(
                 --i;
             }
         }
+    }
+
+    // Parse output into diagnostics after the cleanup loop so that non-existent file
+    // artifacts are disowned before any early return.
+    SlangResult parseRes = parseOutput(exeRes, diagnostics);
+    if (SLANG_FAILED(parseRes))
+    {
+        diagnostics->setResult(parseRes);
+        *outArtifact = resultArtifact.detach();
+        return parseRes;
     }
 
     // Add all of the source artifacts, that are temporary on the file system, such that they can

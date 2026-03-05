@@ -220,18 +220,38 @@ function(set_default_compile_options target)
             # instead (`-shared-libsan`).
             target_compile_options(
                 ${target}
-                PRIVATE -fsanitize=address -shared-libsan
+                PRIVATE
+                -fsanitize=address
+                -shared-libsan
+                -fsanitize=undefined
+                -fno-sanitize-recover=undefined
             )
             target_link_options(
                 ${target}
-                PUBLIC -fsanitize=address -shared-libsan
+                BEFORE
+                PUBLIC
+                -fsanitize=address
+                -shared-libsan
+                -fsanitize=undefined
             )
         elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
-            target_compile_options(${target} PRIVATE -fsanitize=address)
-            target_link_options(${target} PUBLIC -fsanitize=address)
+            target_compile_options(
+                ${target}
+                PRIVATE
+                -fsanitize=address
+                -fsanitize=undefined
+                -fno-sanitize-recover=undefined
+            )
+            target_link_options(
+                ${target}
+                BEFORE
+                PUBLIC
+                -fsanitize=address
+                -fsanitize=undefined
+            )
         elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
             target_compile_options(${target} PRIVATE /fsanitize=address)
-            target_link_options(${target} PRIVATE /INCREMENTAL:NO)
+            target_link_options(${target} BEFORE PUBLIC /INCREMENTAL:NO)
         else()
             message(FATAL_ERROR "SLANG_ENABLE_ASAN: unsupported C++ compiler")
         endif()
