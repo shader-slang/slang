@@ -219,7 +219,10 @@ private:
 
 // Convenience macro for timing a scope
 // Usage: SCOPED_TIMER(m_chronometer, "phase-name");
-#define SCOPED_TIMER(chrono, name) ::TestServer::ScopedTimer _scopedTimer##__LINE__(chrono, name)
+#define SCOPED_TIMER_CONCAT_(a, b) a##b
+#define SCOPED_TIMER_CONCAT(a, b) SCOPED_TIMER_CONCAT_(a, b)
+#define SCOPED_TIMER(chrono, name) \
+    ::TestServer::ScopedTimer SCOPED_TIMER_CONCAT(_scopedTimer, __LINE__)(chrono, name)
 
 } // namespace TestServer
 

@@ -5,38 +5,41 @@
 #ifndef SLANG_TEST_DIAGNOSTICS_H
 #define SLANG_TEST_DIAGNOSTICS_H
 
-#include <cstdlib>
-#include <cstring>
+#include "slang-platform.h"
+#include "slang-string.h"
 
 namespace Slang
 {
 
-// Check if a diagnostic category is enabled via SLANG_TEST_DIAGNOSTICS env var
+// Check if a diagnostic category is enabled via SLANG_TEST_DIAGNOSTICS env var.
 // Categories: timing, timing-phases, rpc, fd, pipe, all
+// Thread-safe: reads the env var once and caches the result.
 inline bool isDiagnosticEnabled(const char* category)
 {
-#ifdef _WIN32
-    static const char* diagnostics = []() -> const char*
+    // Cache the environment variable value. The static String is initialized once
+    // in a thread-safe manner (C++11 guarantees thread-safe static initialization).
+    static String diagnostics = []() -> String
     {
-        static char buffer[256];
-        char* buf = nullptr;
-        size_t len = 0;
-        if (_dupenv_s(&buf, &len, "SLANG_TEST_DIAGNOSTICS") == 0 && buf != nullptr)
+        StringBuilder envValue;
+        if (SLANG_SUCCEEDED(PlatformUtil::getEnvironmentVariable(
+                UnownedStringSlice("SLANG_TEST_DIAGNOSTICS"),
+                envValue)))
         {
-            strncpy_s(buffer, sizeof(buffer), buf, _TRUNCATE);
-            free(buf);
-            return buffer;
+            return envValue.toString();
         }
-        return nullptr;
+        return String();
     }();
-#else
-    static const char* diagnostics = getenv("SLANG_TEST_DIAGNOSTICS");
-#endif
-    if (!diagnostics)
+
+    if (diagnostics.getLength() == 0)
         return false;
-    if (strcmp(diagnostics, "all") == 0 || strcmp(diagnostics, "1") == 0)
+    UnownedStringSlice diagSlice = diagnostics.getUnownedSlice();
+    if (diagSlice.caseInsensitiveEquals(UnownedStringSlice("all")) ||
+        diagSlice.caseInsensitiveEquals(UnownedStringSlice("1")))
         return true;
-    return strstr(diagnostics, category) != nullptr;
+    // Case-insensitive substring search
+    String lowerDiag = diagnostics.toLower();
+    String lowerCat = String(category).toLower();
+    return lowerDiag.indexOf(lowerCat) != Index(-1);
 }
 
 } // namespace Slang
