@@ -30,9 +30,10 @@ RWStructuredBuffer<float> outputBuffer;
 void computeMain()
 {
     IFoo val = inputBuffer[0];
-    // REPORT: generated {{.*}} dispatch code{{.*}} 2 possible types
+    // REPORT-DAG: generated {{.*}} dispatch code{{.*}} 2 possible types
     outputBuffer[0] = val.getValue();
 
     IFoo rwVal = rwBuffer[0];
+    // REPORT-DAG: generated {{.*}} dispatch code{{.*}} 2 possible types
     outputBuffer[1] = rwVal.getValue();
 }

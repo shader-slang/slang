@@ -33,8 +33,8 @@ struct ImplB : IFoo
 // Each element layout: RTTI(uint2) + WitnessTableID(uint2) + AnyValue(8 bytes)
 //   = 24 bytes = 6 uint32s per element
 // Element 0: ImplA(v=10.0), WitnessTableID=1
-// Element 1: ImplB(v=5.0),  WitnessTableID=2
-//TEST_INPUT: set inputBuffer = ubuffer(data=[0 0 1 0 10.0f 0  0 0 2 0 5.0f 0], stride=4)
+// Element 1: ImplB(v=3.0),  WitnessTableID=2
+//TEST_INPUT: set inputBuffer = ubuffer(data=[0 0 1 0 10.0f 0  0 0 2 0 3.0f 0], stride=4)
 StructuredBuffer<IFoo> inputBuffer;
 
 //TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
@@ -46,7 +46,7 @@ void computeMain()
     // ImplA.getValue() returns v directly = 10.0
     outputBuffer[0] = inputBuffer[0].getValue();
 
-    // ImplB.getValue() returns v * 2.0 = 5.0 * 2.0 = 10.0
+    // ImplB.getValue() returns v * 2.0 = 3.0 * 2.0 = 6.0
     outputBuffer[1] = inputBuffer[1].getValue();
 
     // Read the same element twice to verify consistency
@@ -54,7 +54,7 @@ void computeMain()
     outputBuffer[3] = inputBuffer[1].getValue();
 
     // CHECK: 10.0
+    // CHECK: 6.0
     // CHECK: 10.0
-    // CHECK: 10.0
-    // CHECK: 10.0
+    // CHECK: 6.0
 }
