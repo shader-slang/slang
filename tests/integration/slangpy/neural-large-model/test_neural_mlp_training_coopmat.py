@@ -27,7 +27,7 @@ from conftest import get_slangpy_paths, REF_IMAGE_PATH
 
 TEST_DIR = Path(__file__).resolve().parent
 
-WORKGROUP_SIZE = 32
+WORKGROUP_SIZE = 64
 INPUT_DIM = 4
 HIDDEN_DIM = 128
 OUTPUT_DIM = 3
@@ -54,16 +54,19 @@ def _ceildiv(a, b):
     return (a + b - 1) // b
 
 
-def _create_device_and_kernels():
+def _create_device_and_kernels(extra_defines=None):
     """Create CUDA device, load module, link compute kernels."""
     include_paths = get_slangpy_paths()
+    defines = {"WORKGROUP_SIZE": str(WORKGROUP_SIZE)}
+    if extra_defines:
+        defines.update(extra_defines)
 
     try:
         device = spy.Device(
             type=spy.DeviceType.cuda,
             compiler_options=spy.SlangCompilerOptions({
                 "include_paths": include_paths,
-                "defines": {"WORKGROUP_SIZE": str(WORKGROUP_SIZE)},
+                "defines": defines,
             }),
         )
     except Exception as exc:
@@ -90,14 +93,14 @@ def _create_device_and_kernels():
     return device, kernels, high_level_module
 
 
-def _create_buffers(device):
-    """Create all GPU buffers for params, grads, Adam state, latent grid, etc."""
+def _create_buffers(device, mlp_dtype="float32"):
+    """Create all GPU buffers. mlp_dtype controls MLP param precision."""
     np.random.seed(42)
 
     mlp_params_np = kaiming_uniform_init(
         [(INPUT_DIM, HIDDEN_DIM), (HIDDEN_DIM, HIDDEN_DIM),
          (HIDDEN_DIM, HIDDEN_DIM), (HIDDEN_DIM, OUTPUT_DIM)]
-    )
+    ).astype(mlp_dtype)
     total_mlp = len(mlp_params_np)
 
     latent_np = np.random.uniform(0.0, 1.0, (LATENT_H, LATENT_W, INPUT_DIM)).astype("float32")
@@ -108,11 +111,11 @@ def _create_buffers(device):
     bufs = {}
     bufs["mlp_params"] = device.create_buffer(data=mlp_params_np, usage=usage_rw)
     bufs["mlp_grads"] = device.create_buffer(
-        data=np.zeros(total_mlp, dtype="float32"), usage=usage_rw)
+        data=np.zeros(total_mlp, dtype=mlp_dtype), usage=usage_rw)
     bufs["mlp_adam_m"] = device.create_buffer(
-        data=np.zeros(total_mlp, dtype="float32"), usage=usage_rw)
+        data=np.zeros(total_mlp, dtype=mlp_dtype), usage=usage_rw)
     bufs["mlp_adam_v"] = device.create_buffer(
-        data=np.zeros(total_mlp, dtype="float32"), usage=usage_rw)
+        data=np.zeros(total_mlp, dtype=mlp_dtype), usage=usage_rw)
 
     bufs["latent"] = device.create_buffer(data=latent_np.ravel(), usage=usage_rw)
     bufs["latent_grad"] = device.create_buffer(
@@ -341,6 +344,80 @@ def test_parameter_count_coopmat(device_type: spy.DeviceType) -> None:
               f"Total={total_mlp + grid_params}")
     finally:
         device.close()
+
+
+def _train_n_iters(defines, mlp_dtype, loss_scale, num_iters):
+    """Train for N iterations and return the loss curve. Used for cross-precision comparison."""
+    device, kernels, module = _create_device_and_kernels(extra_defines=defines)
+    try:
+        bufs = _create_buffers(device, mlp_dtype=mlp_dtype)
+        ref_buf, w, h, _ = _load_reference_image(device)
+        resolution = (w, h)
+        batch_size = (64, 64)
+        lr = 0.001
+        total_pixels = w * h
+        usage_rw = spy.BufferUsage.shader_resource | spy.BufferUsage.unordered_access
+        loss_buf = device.create_buffer(
+            data=np.zeros(total_pixels * 3, dtype="float32"), usage=usage_rw)
+
+        _dispatch_show_loss(kernels, bufs, ref_buf, resolution, loss_buf)
+        losses = [float(np.mean(loss_buf.to_numpy().view(np.float32)))]
+
+        for it in range(num_iters):
+            seed = int((it * 2654435761) & 0xFFFFFFFF)
+            _dispatch_grads(kernels, bufs, ref_buf, resolution, batch_size,
+                            seed, loss_scale)
+            _dispatch_optimizer(kernels, bufs, lr, it + 1, loss_scale)
+
+            if (it + 1) % 50 == 0:
+                _dispatch_show_loss(kernels, bufs, ref_buf, resolution, loss_buf)
+                losses.append(float(np.mean(loss_buf.to_numpy().view(np.float32))))
+
+        return losses
+    finally:
+        device.close()
+
+
+@pytest.mark.parametrize("device_type", [spy.DeviceType.cuda])
+def test_float_vs_half_coopmat(device_type: spy.DeviceType) -> None:
+    """Compare float and half WaveTangledVector training to detect CoopMat bugs.
+
+    Exercises the hybrid precision path (MatC size != MatB size) that triggered
+    the shared memory reuse bug fixed in PR #10384. If the half path produces
+    significantly worse results or NaN, it indicates a CoopMat correctness issue.
+    """
+    num_iters = 200
+
+    print("\n--- Float WaveTangledVector ---")
+    float_losses = _train_n_iters(
+        defines=None, mlp_dtype="float32", loss_scale=1.0, num_iters=num_iters)
+    print(f"  Initial: {float_losses[0]:.4f}  Final: {float_losses[-1]:.4f}")
+
+    print("--- Half WaveTangledVector ---")
+    half_losses = _train_n_iters(
+        defines={"USE_HALF": "1"}, mlp_dtype="float16", loss_scale=1.0,
+        num_iters=num_iters)
+    print(f"  Initial: {half_losses[0]:.4f}  Final: {half_losses[-1]:.4f}")
+
+    print("--- Comparison ---")
+    float_reduction = (1 - float_losses[-1] / float_losses[0]) * 100
+    half_reduction = (1 - half_losses[-1] / half_losses[0]) * 100
+    print(f"  Float: {float_reduction:.0f}% reduction")
+    print(f"  Half:  {half_reduction:.0f}% reduction")
+
+    assert np.isfinite(float_losses[-1]), "Float training produced NaN"
+    assert np.isfinite(half_losses[-1]), "Half training produced NaN"
+
+    assert float_losses[-1] < float_losses[0] * 0.5, \
+        f"Float didn't converge: {float_losses[-1]:.4f} >= 50% of {float_losses[0]:.4f}"
+    assert half_losses[-1] < half_losses[0] * 0.5, \
+        f"Half didn't converge: {half_losses[-1]:.4f} >= 50% of {half_losses[0]:.4f}"
+
+    ratio = half_losses[-1] / max(float_losses[-1], 1e-10)
+    print(f"  Half/Float loss ratio: {ratio:.2f}")
+    assert ratio < 5.0, \
+        f"Half loss too far from float: ratio {ratio:.2f} (half={half_losses[-1]:.4f}, float={float_losses[-1]:.4f})"
+    print("  PASS: both converge, half within 5x of float")
 
 
 if __name__ == "__main__":
