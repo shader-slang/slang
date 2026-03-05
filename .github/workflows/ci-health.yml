@@ -11,9 +11,19 @@ jobs:
     permissions:
       contents: read
       actions: read
+      id-token: write
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: "projects/125098404903/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider"
+          service_account: "github-ci@slang-runners.iam.gserviceaccount.com"
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
 
       - name: Checkout analytics repo
         uses: actions/checkout@v4
