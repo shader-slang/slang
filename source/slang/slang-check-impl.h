@@ -1020,11 +1020,11 @@ public:
         return result;
     }
 
-    SemanticsContext withParentExpandExpr(ExpandExpr* expr, OrderedHashSet<Type*>* capturedTypes)
+    SemanticsContext withParentExpandExpr(ExpandExpr* expr, OrderedHashSet<Val*>* capturedPacks)
     {
         SemanticsContext result(*this);
         result.m_parentExpandExpr = expr;
-        result.m_capturedTypePacks = capturedTypes;
+        result.m_capturedPacks = capturedPacks;
         return result;
     }
 
@@ -1184,7 +1184,7 @@ public:
 
     bool getExcludeTransparentMembersFromLookup() { return m_excludeTransparentMembersFromLookup; }
 
-    OrderedHashSet<Type*>* getCapturedTypePacks() { return m_capturedTypePacks; }
+    OrderedHashSet<Val*>* getCapturedPacks() { return m_capturedPacks; }
 
     GLSLBindingOffsetTracker* getGLSLBindingOffsetTracker()
     {
@@ -1242,7 +1242,7 @@ protected:
 
     ExpandExpr* m_parentExpandExpr = nullptr;
 
-    OrderedHashSet<Type*>* m_capturedTypePacks = nullptr;
+    OrderedHashSet<Val*>* m_capturedPacks = nullptr;
 
     // If we are checking inside a lambda expression, we need
     // to track the referenced variables that should be captured

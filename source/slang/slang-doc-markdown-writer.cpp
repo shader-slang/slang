@@ -838,6 +838,14 @@ void DocMarkdownWriter::writeExtensionConditions(
                             break;
                         }
                     }
+                    else if (auto valPackParamDecl = as<GenericValuePackParamDecl>(member))
+                    {
+                        if (valPackParamDecl->parameterIndex == parameterIndex)
+                        {
+                            originalParamDecl = valPackParamDecl;
+                            break;
+                        }
+                    }
                 }
             }
 
@@ -1643,7 +1651,7 @@ void DocMarkdownWriter::writeCallableOverridable(
                 {
                     for (Decl* decl : genericDecl->getDirectMemberDecls())
                     {
-                        if (as<GenericTypeParamDeclBase>(decl) || as<GenericValueParamDecl>(decl))
+                        if (isGenericParam(decl))
                         {
                             genericDecls.add(decl);
                         }
@@ -2357,7 +2365,7 @@ void DeclDocumentation::writeGenericParameters(
     List<Decl*> params;
     for (Decl* member : genericDecl->getDirectMemberDecls())
     {
-        if (as<GenericTypeParamDeclBase>(member) || as<GenericValueParamDecl>(member))
+        if (isGenericParam(member))
         {
             params.add(member);
         }

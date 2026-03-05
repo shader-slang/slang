@@ -1296,8 +1296,7 @@ void ASTPrinter::_addDeclPathRec(const DeclRef<Decl>& declRef, Index depth)
 
     // If the parent declaration is a generic, then we need to print out its
     // signature
-    if (parentGenericDeclRef && !declRef.as<GenericValueParamDecl>() &&
-        !declRef.as<GenericTypeParamDeclBase>())
+    if (parentGenericDeclRef && !isGenericParam(declRef))
     {
         auto substArgs =
             tryGetGenericArguments(SubstitutionSet(declRef), parentGenericDeclRef.getDecl());
@@ -1411,6 +1410,20 @@ void ASTPrinter::addGenericParams(
                 ScopePart scopePart(this, Part::Type::GenericParamType);
                 sb << "each ";
                 sb << getText(genericTypePackParam.getName());
+            }
+        }
+        else if (auto genericValuePackParam = paramDeclRef.as<GenericValuePackParamDecl>())
+        {
+            if (!first)
+                sb << ", ";
+            first = false;
+            ParamScope paramScope(&sb, outParamRanges);
+            {
+                ScopePart scopePart(this, Part::Type::GenericParamValue);
+                sb << "let each ";
+                sb << getText(genericValuePackParam.getName());
+                sb << " : ";
+                addType(getType(m_astBuilder, genericValuePackParam));
             }
         }
         else

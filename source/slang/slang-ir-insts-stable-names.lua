@@ -736,6 +736,7 @@ return {
 	["SPIRVSamplerHeap"] = 734,
 	["SPIRVLoadDescriptorFromHeap"] = 735,
 	["SPIRVLoadTexelPointerFromHeap"] = 736,
+<<<<<<< HEAD
 	["constexprAdd"] = 737,
 	["constexprSub"] = 738,
 	["constexprMul"] = 739,
@@ -765,4 +766,5 @@ return {
 	["constexprAnd"] = 763,
 	["constexprOr"] = 764,
 	["constexprSelect"] = 765,
+	["Type.ValuePackType"] = 766,
 }

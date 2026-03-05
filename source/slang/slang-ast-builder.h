@@ -329,7 +329,7 @@ public:
         if (!parent)
             return getDirectDeclRef(memberDecl);
         // A Generic value/type ParamDecl is always referred to directly.
-        if (as<GenericTypeParamDecl>(memberDecl) || as<GenericValueParamDecl>(memberDecl))
+        if (isGenericParam(memberDecl))
             return getDirectDeclRef(memberDecl);
         if (as<ThisTypeDecl>(memberDecl) && !as<InterfaceDecl>(memberDecl->parentDecl))
             return as<T>(parent);
@@ -651,9 +651,15 @@ public:
 
     Type* getEachType(Type* baseType);
 
-    Type* getExpandType(Type* pattern, ArrayView<Type*> capturedPacks);
+    Type* getExpandType(Type* pattern, ArrayView<Val*> capturedPacks);
 
     ConcreteTypePack* getTypePack(ArrayView<Type*> types);
+
+    ConcreteIntValPack* getIntValPack(ArrayView<IntVal*> vals);
+
+    IntVal* getEachIntVal(Type* elementType, Val* basePack);
+
+    Val* getExpandIntValPack(Val* patternVal, ArrayView<Val*> capturedPacks);
 
     /// Produce a witness that `T : T` for any type `T`
     TypeEqualityWitness* getTypeEqualityWitness(Type* type);

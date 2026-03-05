@@ -92,6 +92,10 @@ SemanticsVisitor::ParamCounts SemanticsVisitor::CountParameters(DeclRef<GenericD
                 counts.required++;
             }
         }
+        else if (as<GenericValuePackParamDecl>(m))
+        {
+            counts.allowed = -1;
+        }
         else if (as<GenericTypePackParamDecl>(m))
         {
             counts.allowed = -1;
@@ -363,6 +367,10 @@ bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
         {
             paramTypes.add(DeclRefType::create(m_astBuilder, typeParamRef));
         }
+        else if (auto valPackParam = memberRef.as<GenericValuePackParamDecl>())
+        {
+            paramTypes.add(getType(m_astBuilder, valPackParam));
+        }
         else if (auto valParamRef = memberRef.as<GenericValueParamDecl>())
         {
             paramTypes.add(getType(m_astBuilder, valParamRef));
@@ -629,6 +637,48 @@ bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
             {
                 maybeReportGeneralError();
                 return false;
+            }
+            checkedArgs.add(val);
+        }
+        else if (auto valPackParam = memberRef.as<GenericValuePackParamDecl>())
+        {
+            auto packType = as<ValuePackType>(getType(m_astBuilder, valPackParam));
+            SLANG_ASSERT(packType);
+
+            IntVal* val = nullptr;
+            if (aa >= matchedArgs.getCount())
+            {
+                if (allowPartialGenericApp)
+                {
+                    candidate.flags |= OverloadCandidate::Flag::IsPartiallyAppliedGeneric;
+                    break;
+                }
+                else
+                {
+                    val = m_astBuilder->getIntValPack(ArrayView<IntVal*>());
+                }
+            }
+            else
+            {
+                auto matchedArg = matchedArgs[aa++];
+                if (matchedArg.argExpr)
+                {
+                    val = tryConstantFoldExpr(
+                        matchedArg.argExpr,
+                        argFoldingKind,
+                        nullptr);
+                    if (val && !isValuePack(val))
+                    {
+                        ShortList<IntVal*> singleValList;
+                        singleValList.add(val);
+                        val = m_astBuilder->getIntValPack(singleValList.getArrayView().arrayView);
+                    }
+                }
+            }
+            if (val == nullptr)
+            {
+                val = m_astBuilder->getIntValPack(ArrayView<IntVal*>());
+                success = false;
             }
             checkedArgs.add(val);
         }
@@ -2251,11 +2301,11 @@ bool SemanticsVisitor::OverloadResolveContext::matchArgumentsToParams(
     ShortList<MatchedArg>& outMatchedArgs)
 {
     // We allow params to end with one or more variadic packs.
-    // We will first find out how many type packs there are.
+    // We will first find out how many packs there are (type packs and value packs).
     Index typePackCount = 0;
     for (Index i = params.getCount() - 1; i >= 0; --i)
     {
-        if (isTypePack(params[i].type))
+        if (isPackType(params[i].type))
             typePackCount++;
         else
             break;
@@ -2308,7 +2358,7 @@ bool SemanticsVisitor::OverloadResolveContext::matchArgumentsToParams(
             {
                 argType = typeType->getType();
             }
-            if (isTypePack(argType))
+            if (isPackType(argType))
             {
                 MatchedArg arg;
                 arg.argExpr = getArg(fixedParamCount + i);

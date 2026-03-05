@@ -1660,6 +1660,10 @@ void ASTSerialReadContext::_assignGenericParameterIndices(GenericDecl* genericDe
         {
             typeParam->parameterIndex = parameterCounter++;
         }
+        else if (auto valPackParam = as<GenericValuePackParamDecl>(m))
+        {
+            valPackParam->parameterIndex = parameterCounter++;
+        }
         else if (auto valParam = as<GenericValueParamDecl>(m))
         {
             valParam->parameterIndex = parameterCounter++;

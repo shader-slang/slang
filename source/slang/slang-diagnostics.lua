@@ -2775,6 +2775,19 @@ err(
     span { loc = "typeExp:Expr", message = "type '~type' cannot be used as a constraint" }
 )
 
+standalone_note(
+    "use-let-for-generic-value-param",
+    30499,
+    "use 'let' keyword to declare a generic value parameter: 'let ~paramName:Name : ~type:Type'"
+)
+
+err(
+    "pack-param-must-be-last",
+    30500,
+    "generic parameter after a variadic pack parameter is not allowed",
+    span { loc = "param:Decl", message = "generic parameter '~param' cannot appear after a variadic pack parameter" }
+)
+
 err(
     "invalid-constraint-sub-type",
     30402,

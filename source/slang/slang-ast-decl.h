@@ -965,6 +965,35 @@ class GenericValueParamDecl : public VarDeclBase
     int parameterIndex = 0;
 };
 
+FIDDLE()
+class GenericValuePackParamDecl : public VarDeclBase
+{
+    FIDDLE(...)
+    int parameterIndex = 0;
+};
+
+inline bool isGenericValueParam(Decl* decl)
+{
+    return as<GenericValueParamDecl>(decl) || as<GenericValuePackParamDecl>(decl);
+}
+
+template<typename T>
+inline bool isGenericValueParam(DeclRef<T> declRef)
+{
+    return isGenericValueParam(declRef.getDecl());
+}
+
+inline bool isGenericParam(Decl* decl)
+{
+    return as<GenericTypeParamDeclBase>(decl) || isGenericValueParam(decl);
+}
+
+template<typename T>
+inline bool isGenericParam(DeclRef<T> declRef)
+{
+    return isGenericParam(declRef.getDecl());
+}
+
 // An empty declaration (which might still have modifiers attached).
 //
 // An empty declaration is uncommon in HLSL, but
