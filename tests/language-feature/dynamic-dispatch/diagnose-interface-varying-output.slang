@@ -1,14 +1,11 @@
 // Interface types cannot be used in varying (inter-stage) outputs because
 // existential values carry runtime type information and witness tables that
 // cannot be interpolated between pipeline stages.
-//
-// Currently triggers an ICE ("unhandled type kind") in parameter binding
-// instead of a clean diagnostic. Disabled until #10403 is fixed.
 
-//DISABLE_TEST:SIMPLE(filecheck=CHK1): -target spirv -entry vertexMain -stage vertex
-//DISABLE_TEST:SIMPLE(filecheck=CHK1): -target hlsl -entry vertexMain -stage vertex
-//DISABLE_TEST:SIMPLE(filecheck=CHK2): -target spirv -entry fragmentReturnMain -stage fragment
-//DISABLE_TEST:SIMPLE(filecheck=CHK2): -target hlsl -entry fragmentReturnMain -stage fragment
+//TEST:SIMPLE(filecheck=CHK1): -target spirv -entry vertexMain -stage vertex
+//TEST:SIMPLE(filecheck=CHK1): -target hlsl -entry vertexMain -stage vertex
+//TEST:SIMPLE(filecheck=CHK2): -target spirv -entry fragmentReturnMain -stage fragment
+//TEST:SIMPLE(filecheck=CHK2): -target hlsl -entry fragmentReturnMain -stage fragment
 
 interface IFoo
 {
