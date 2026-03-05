@@ -2041,8 +2041,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             return true;
         }
 
-        // Literal constants are valid operands of OpSpecConstantOp.
-        if (as<IRConstant>(inst))
+        // Numeric/bool literals are valid operands of OpSpecConstantOp.
+        // IRConstant also covers IRStringLit and IRPtrLit which are not.
+        if (as<IRIntLit>(inst) || as<IRFloatLit>(inst) || as<IRBoolLit>(inst))
             return true;
 
         // A global param is only valid here if it is a specialization constant.
