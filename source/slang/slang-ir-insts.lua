@@ -657,7 +657,7 @@ local insts = {
 			},
 			-- Represents the type of a generic value pack parameter.
 			-- e.g. `let each D : int` lowers to a param of type ValuePackType(int).
-			{ ValuePackType = { operands = { { "elementType" }, { "IRType" } }, hoistable = true } },
+			{ ValuePackType = { operands = { { "elementType", "IRType" } }, hoistable = true } },
 			{ ExpandTypeOrVal = { operands = { { "type" } }, hoistable = true } },
 			{
 				spirvLiteralType = {
