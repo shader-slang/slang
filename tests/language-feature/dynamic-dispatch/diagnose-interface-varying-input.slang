@@ -2,14 +2,11 @@
 // existential values carry runtime type information and witness tables that
 // cannot be interpolated between pipeline stages.
 //
-// Currently triggers an ICE ("unhandled type kind") in parameter binding
-// instead of a clean diagnostic. Disabled until #10403 is fixed.
-
-//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target spirv
-//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target hlsl
-//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target glsl
-//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target metal
-//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target wgsl
+//TEST:SIMPLE(filecheck=CHECK): -target spirv
+//TEST:SIMPLE(filecheck=CHECK): -target hlsl
+//TEST:SIMPLE(filecheck=CHECK): -target glsl
+//TEST:SIMPLE(filecheck=CHECK): -target metal
+//TEST:SIMPLE(filecheck=CHECK): -target wgsl
 
 interface IFoo
 {
