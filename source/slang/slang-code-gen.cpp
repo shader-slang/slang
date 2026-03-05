@@ -671,9 +671,7 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
             if (compilerType == PassThroughMode::Dxc)
             {
                 // Can support no entry points on DXC because we can build libraries
-                profile =
-                    Profile(getTargetProgram()->getOptionSet().getEnumOption<Profile::RawEnum>(
-                        CompilerOptionName::Profile));
+                profile = getTargetProgram()->getOptionSet().getProfile();
             }
             else
             {
@@ -779,8 +777,7 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
     {
         auto linkage = getLinkage();
 
-        switch (getTargetProgram()->getOptionSet().getEnumOption<OptimizationLevel>(
-            CompilerOptionName::Optimization))
+        switch (getTargetProgram()->getOptionSet().getOptimizationLevel())
         {
         case OptimizationLevel::None:
             options.optimizationLevel = DownstreamCompileOptions::OptimizationLevel::None;
@@ -799,8 +796,7 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
             break;
         }
 
-        switch (getTargetProgram()->getOptionSet().getEnumOption<DebugInfoLevel>(
-            CompilerOptionName::DebugInformation))
+        switch (getTargetProgram()->getOptionSet().getDebugInfoLevel())
         {
         case DebugInfoLevel::None:
             options.debugInfoType = DownstreamCompileOptions::DebugInfoType::None;
@@ -820,8 +816,7 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
             break;
         }
 
-        switch (getTargetProgram()->getOptionSet().getEnumOption<FloatingPointMode>(
-            CompilerOptionName::FloatingPointMode))
+        switch (getTargetProgram()->getOptionSet().getFloatingPointMode())
         {
         case FloatingPointMode::Default:
             options.floatingPointMode = DownstreamCompileOptions::FloatingPointMode::Default;
@@ -838,8 +833,7 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
 
         if (getTargetProgram()->getOptionSet().hasOption(CompilerOptionName::DenormalModeFp16))
         {
-            switch (getTargetProgram()->getOptionSet().getEnumOption<FloatingPointDenormalMode>(
-                CompilerOptionName::DenormalModeFp16))
+            switch (getTargetProgram()->getOptionSet().getDenormalModeFp16())
             {
             case FloatingPointDenormalMode::Any:
                 options.denormalModeFp16 = DownstreamCompileOptions::FloatingPointDenormalMode::Any;
@@ -859,8 +853,7 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
 
         if (getTargetProgram()->getOptionSet().hasOption(CompilerOptionName::DenormalModeFp32))
         {
-            switch (getTargetProgram()->getOptionSet().getEnumOption<FloatingPointDenormalMode>(
-                CompilerOptionName::DenormalModeFp32))
+            switch (getTargetProgram()->getOptionSet().getDenormalModeFp32())
             {
             case FloatingPointDenormalMode::Any:
                 options.denormalModeFp32 = DownstreamCompileOptions::FloatingPointDenormalMode::Any;
@@ -880,8 +873,7 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
 
         if (getTargetProgram()->getOptionSet().hasOption(CompilerOptionName::DenormalModeFp64))
         {
-            switch (getTargetProgram()->getOptionSet().getEnumOption<FloatingPointDenormalMode>(
-                CompilerOptionName::DenormalModeFp64))
+            switch (getTargetProgram()->getOptionSet().getDenormalModeFp64())
             {
             case FloatingPointDenormalMode::Any:
                 options.denormalModeFp64 = DownstreamCompileOptions::FloatingPointDenormalMode::Any;
@@ -1374,7 +1366,7 @@ bool CodeGenContext::shouldSkipSPIRVValidation()
 
 bool CodeGenContext::shouldDumpIR()
 {
-    return getTargetProgram()->getOptionSet().getBoolOption(CompilerOptionName::DumpIr);
+    return getTargetProgram()->getOptionSet().shouldDumpIR();
 }
 
 bool CodeGenContext::shouldSkipDownstreamLinking()
@@ -1397,7 +1389,7 @@ bool CodeGenContext::shouldReportDynamicDispatchSites()
 
 bool CodeGenContext::shouldDumpIntermediates()
 {
-    return getTargetProgram()->getOptionSet().getBoolOption(CompilerOptionName::DumpIntermediates);
+    return getTargetProgram()->getOptionSet().shouldDumpIntermediates();
 }
 
 bool CodeGenContext::shouldTrackLiveness()
