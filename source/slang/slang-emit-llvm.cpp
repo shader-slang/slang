@@ -618,7 +618,8 @@ public:
         }
         if (SLANG_FAILED(Slang::getOffset(targetReq, rules, legalField, &offset)))
             m_sink->diagnose(Diagnostics::Unexpected{
-                .message = "failed to compute field offset for LLVM type translation"});
+                .message = "failed to compute field offset for LLVM type translation",
+                .location = field->sourceLoc});
         return offset;
     }
 
@@ -631,7 +632,8 @@ public:
         if (SLANG_FAILED(
                 Slang::getSizeAndAlignment(targetReq, rules, legalizeResourceTypes(type), &sizeAlignment)))
             m_sink->diagnose(Diagnostics::Unexpected{
-                .message = "failed to compute type layout for LLVM type translation"});
+                .message = "failed to compute type layout for LLVM type translation",
+                .location = type->sourceLoc});
 
         return sizeAlignment;
     }
@@ -657,7 +659,8 @@ public:
         if (SLANG_FAILED(
                 Slang::getSizeAndAlignment(targetReq, rules, vecType->getElementType(), &elementAlignment)))
             m_sink->diagnose(Diagnostics::Unexpected{
-                .message = "failed to compute element type layout for LLVM vector alignment"});
+                .message = "failed to compute element type layout for LLVM vector alignment",
+                .location = vecType->sourceLoc});
         IRSizeAndAlignment vectorAlignment =
             rules->getVectorSizeAndAlignment(elementAlignment, elemCount);
 

@@ -388,7 +388,8 @@ IRIntegerValue get16ByteAlignedVectorElementCount(
     IRSizeAndAlignment sizeAlignment;
     if (SLANG_FAILED(getNaturalSizeAndAlignment(target->getTargetReq(), elementType, &sizeAlignment)))
         sink->diagnose(Diagnostics::Unexpected{
-            .message = "failed to compute element type layout for 16-byte vector alignment"});
+            .message = "failed to compute element type layout for 16-byte vector alignment",
+            .location = elementType->sourceLoc});
     if (sizeAlignment.size)
         return align(sizeAlignment.size * minCount, 16) / sizeAlignment.size;
     return 4;
@@ -710,7 +711,8 @@ struct LoweredElementTypeContext
                         loweredInnerTypeInfo.loweredType,
                         &elementSizeAlignment)))
                     m_sink->diagnose(Diagnostics::Unexpected{
-                        .message = "failed to compute type layout for buffer element lowering"});
+                        .message = "failed to compute type layout for buffer element lowering",
+                        .location = loweredInnerTypeInfo.loweredType->sourceLoc});
                 elementSizeAlignment =
                     config.getLayoutRule()->alignCompositeElement(elementSizeAlignment);
                 auto innerArrayType = builder.getArrayType(
@@ -737,7 +739,8 @@ struct LoweredElementTypeContext
                         loweredInnerTypeInfo.loweredType,
                         &elementSizeAlignment)))
                     m_sink->diagnose(Diagnostics::Unexpected{
-                        .message = "failed to compute type layout for buffer element lowering"});
+                        .message = "failed to compute type layout for buffer element lowering",
+                        .location = loweredInnerTypeInfo.loweredType->sourceLoc});
                 elementSizeAlignment =
                     config.getLayoutRule()->alignCompositeElement(elementSizeAlignment);
                 auto innerArrayType = builder.getArrayTypeBase(
@@ -921,7 +924,8 @@ struct LoweredElementTypeContext
         if (SLANG_FAILED(getSizeAndAlignment(
                 target->getTargetReq(), config.getLayoutRule(), info.loweredType, &sizeAlignment)))
             m_sink->diagnose(Diagnostics::Unexpected{
-                .message = "failed to compute type layout for buffer element lowering"});
+                .message = "failed to compute type layout for buffer element lowering",
+                .location = info.loweredType->sourceLoc});
         loweredTypeInfo.set(type, info);
         mapLoweredTypeToInfo.set(info.loweredType, info);
         conversionMethodMap[{info.originalType, info.loweredType}] = info.convertLoweredToOriginal;
@@ -1028,7 +1032,8 @@ struct LoweredElementTypeContext
                     loweredInnerType.loweredType,
                     &arrayElementSizeAlignment)))
                 m_sink->diagnose(Diagnostics::Unexpected{
-                    .message = "failed to compute type layout for buffer element lowering"});
+                    .message = "failed to compute type layout for buffer element lowering",
+                    .location = loweredInnerType.loweredType->sourceLoc});
             IRSizeAndAlignment baseSizeAlignment;
             if (SLANG_FAILED(getSizeAndAlignment(
                     target->getTargetReq(),
@@ -1037,7 +1042,8 @@ struct LoweredElementTypeContext
                         &builder, fieldAddr->getBase()->getDataType()),
                     &baseSizeAlignment)))
                 m_sink->diagnose(Diagnostics::Unexpected{
-                    .message = "failed to compute type layout for buffer element lowering"});
+                    .message = "failed to compute type layout for buffer element lowering",
+                    .location = fieldAddr->sourceLoc});
 
             // Convert pointer to uint64 and adjust offset.
             IRIntegerValue offset = baseSizeAlignment.size;
@@ -1708,7 +1714,8 @@ struct LoweredElementTypeContext
                         elementType,
                         &sizeAlignment)))
                     m_sink->diagnose(Diagnostics::Unexpected{
-                        .message = "failed to compute type layout for buffer element lowering"});
+                        .message = "failed to compute type layout for buffer element lowering",
+                        .location = elementType->sourceLoc});
                 SLANG_UNUSED(sizeAlignment);
             }
             else if (auto constBuffer = as<IRUniformParameterGroupType>(globalInst))
@@ -2728,7 +2735,8 @@ struct DefaultBufferElementTypeLoweringPolicy : BufferElementTypeLoweringPolicy
                     vectorType,
                     &elementSizeAlignment)))
                 m_sink->diagnose(Diagnostics::Unexpected{
-                        .message = "failed to compute type layout for buffer element lowering"});
+                    .message = "failed to compute type layout for buffer element lowering",
+                    .location = matrixType->sourceLoc});
             elementSizeAlignment =
                 config.getLayoutRule()->alignCompositeElement(elementSizeAlignment);
 
