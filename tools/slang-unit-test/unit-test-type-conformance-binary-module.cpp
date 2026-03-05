@@ -1,6 +1,7 @@
 // unit-test-type-conformance-binary-module.cpp
 
-// Test that type conformances work when modules are loaded from precompiled binary blobs.
+// Tests that type conformances work when modules are loaded from precompiled binary blobs,
+// including the transitive import case (a imports b imports c).
 // This reproduces: https://github.com/shader-slang/slang/issues/10371
 
 #include "core/slang-memory-file-system.h"
@@ -176,5 +177,309 @@ SLANG_UNIT_TEST(typeConformanceBinaryModule)
         ComPtr<slang::IBlob> code;
         linkedProgram->getTargetCode(0, code.writeRef(), diagnostics.writeRef());
         SLANG_CHECK(code != nullptr);
+    }
+}
+
+// Verify that types from transitively imported modules are discoverable.
+// Module chain: a imports b, b imports c, c defines the interface and types.
+SLANG_UNIT_TEST(typeConformanceBinaryModuleTransitive)
+{
+    const char* cSource = R"(
+        module c;
+        public interface IFoo {
+            uint get();
+        }
+        public struct Foo1 : IFoo {
+            uint dummy;
+            uint get() { return 1; }
+        }
+        public struct Foo2 : IFoo {
+            uint dummy;
+            uint get() { return 2; }
+        }
+    )";
+
+    const char* bSource = R"(
+        module b;
+        __exported import c;
+    )";
+
+    const char* aSource = R"(
+        module a;
+        import b;
+        [shader("compute")]
+        [numthreads(1, 1, 1)]
+        void computeMain(uint3 tid: SV_DispatchThreadID, RWStructuredBuffer<uint> result)
+        {
+            uint i = tid.x;
+            uint type_id = tid.x;
+            uint dummy = 0;
+            IFoo f = createDynamicObject<IFoo>(type_id, dummy);
+            result[i] = f.get();
+        }
+    )";
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_SPIRV;
+    targetDesc.profile = globalSession->findProfile("spirv_1_5");
+    slang::CompilerOptionEntry optEntry;
+    optEntry.name = slang::CompilerOptionName::Optimization;
+    optEntry.value.kind = slang::CompilerOptionValueKind::Int;
+    optEntry.value.intValue0 = 0;
+    targetDesc.compilerOptionEntryCount = 1;
+    targetDesc.compilerOptionEntries = &optEntry;
+
+    // Phase 1: compile from source, serialize all modules to binary blobs.
+    ComPtr<ISlangBlob> aBlob;
+    ComPtr<ISlangBlob> bBlob;
+    ComPtr<ISlangBlob> cBlob;
+    {
+        ComPtr<ISlangFileSystemExt> fs = ComPtr<ISlangFileSystemExt>(new MemoryFileSystem());
+        auto& memFS = *static_cast<MemoryFileSystem*>(fs.get());
+        memFS.saveFile("c.slang", cSource, strlen(cSource));
+        memFS.saveFile("b.slang", bSource, strlen(bSource));
+        memFS.saveFile("a.slang", aSource, strlen(aSource));
+
+        slang::SessionDesc sessionDesc = {};
+        sessionDesc.targetCount = 1;
+        sessionDesc.targets = &targetDesc;
+        sessionDesc.fileSystem = fs;
+        const char* searchPaths[] = {"."};
+        sessionDesc.searchPathCount = 1;
+        sessionDesc.searchPaths = searchPaths;
+
+        ComPtr<slang::ISession> session;
+        SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+        ComPtr<ISlangBlob> diagnostics;
+        auto aModule = session->loadModule("a", diagnostics.writeRef());
+        SLANG_CHECK(aModule != nullptr);
+
+        for (int i = 0; i < session->getLoadedModuleCount(); i++)
+        {
+            auto mod = session->getLoadedModule(i);
+            ComPtr<ISlangBlob> serialized;
+            SLANG_CHECK(mod->serialize(serialized.writeRef()) == SLANG_OK);
+            String name = mod->getName();
+            if (name == "a")
+                aBlob = serialized;
+            else if (name == "b")
+                bBlob = serialized;
+            else if (name == "c")
+                cBlob = serialized;
+        }
+        SLANG_CHECK(aBlob != nullptr);
+        SLANG_CHECK(bBlob != nullptr);
+        SLANG_CHECK(cBlob != nullptr);
+    }
+
+    // Phase 2: load all modules from binary blobs in a new session.
+    // Verify that types from module c are transitively discoverable through module a.
+    {
+        ComPtr<ISlangFileSystemExt> fs = ComPtr<ISlangFileSystemExt>(new MemoryFileSystem());
+        auto& memFS = *static_cast<MemoryFileSystem*>(fs.get());
+        memFS.saveFileBlob("a.slang-module", aBlob);
+        memFS.saveFileBlob("b.slang-module", bBlob);
+        memFS.saveFileBlob("c.slang-module", cBlob);
+
+        slang::SessionDesc sessionDesc = {};
+        sessionDesc.targetCount = 1;
+        sessionDesc.targets = &targetDesc;
+        sessionDesc.fileSystem = fs;
+        const char* searchPaths[] = {"."};
+        sessionDesc.searchPathCount = 1;
+        sessionDesc.searchPaths = searchPaths;
+
+        ComPtr<slang::ISession> session;
+        SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+        ComPtr<ISlangBlob> diagnostics;
+        auto aModule = session->loadModule("a", diagnostics.writeRef());
+        SLANG_CHECK(aModule != nullptr);
+
+        ComPtr<slang::IEntryPoint> entryPoint;
+        aModule->findAndCheckEntryPoint(
+            "computeMain",
+            SLANG_STAGE_COMPUTE,
+            entryPoint.writeRef(),
+            diagnostics.writeRef());
+        SLANG_CHECK(entryPoint != nullptr);
+
+        auto layout = aModule->getLayout();
+        SLANG_CHECK(layout != nullptr);
+
+        auto ifoo = layout->findTypeByName("IFoo");
+        auto foo1 = layout->findTypeByName("Foo1");
+        auto foo2 = layout->findTypeByName("Foo2");
+        SLANG_CHECK(ifoo != nullptr);
+        SLANG_CHECK(foo1 != nullptr);
+        SLANG_CHECK(foo2 != nullptr);
+
+        ComPtr<slang::ITypeConformance> foo1IFoo;
+        ComPtr<slang::ITypeConformance> foo2IFoo;
+        SLANG_CHECK(
+            session->createTypeConformanceComponentType(
+                foo1,
+                ifoo,
+                foo1IFoo.writeRef(),
+                0,
+                diagnostics.writeRef()) == SLANG_OK);
+        SLANG_CHECK(
+            session->createTypeConformanceComponentType(
+                foo2,
+                ifoo,
+                foo2IFoo.writeRef(),
+                1,
+                diagnostics.writeRef()) == SLANG_OK);
+
+        slang::IComponentType* componentTypes[] = {aModule, entryPoint.get(), foo1IFoo, foo2IFoo};
+        ComPtr<slang::IComponentType> composedProgram;
+        SLANG_CHECK(
+            session->createCompositeComponentType(
+                componentTypes,
+                SLANG_COUNT_OF(componentTypes),
+                composedProgram.writeRef(),
+                diagnostics.writeRef()) == SLANG_OK);
+
+        ComPtr<slang::IComponentType> linkedProgram;
+        SLANG_CHECK(
+            composedProgram->link(linkedProgram.writeRef(), diagnostics.writeRef()) == SLANG_OK);
+
+        ComPtr<slang::IBlob> code;
+        linkedProgram->getTargetCode(0, code.writeRef(), diagnostics.writeRef());
+        SLANG_CHECK(code != nullptr);
+    }
+}
+
+// Same transitive chain but with plain `import c` (non-exported).
+// Module a's source doesn't reference IFoo, so source compilation succeeds.
+// After loading from binary, findTypeByName should still discover IFoo
+// transitively through the module dependency graph.
+SLANG_UNIT_TEST(typeConformanceBinaryModuleTransitiveNonExported)
+{
+    const char* cSource = R"(
+        module c;
+        public interface IFoo {
+            uint get();
+        }
+        public struct Foo1 : IFoo {
+            uint dummy;
+            uint get() { return 1; }
+        }
+        public struct Foo2 : IFoo {
+            uint dummy;
+            uint get() { return 2; }
+        }
+    )";
+
+    // b uses plain `import c` (not __exported), so c's symbols are not
+    // re-exported.  helper() gives module a a reason to import b.
+    const char* bSource = R"(
+        module b;
+        import c;
+        public uint helper() { return 42; }
+    )";
+
+    const char* aSource = R"(
+        module a;
+        import b;
+        [shader("compute")]
+        [numthreads(1, 1, 1)]
+        void computeMain(uint3 tid: SV_DispatchThreadID, RWStructuredBuffer<uint> result)
+        {
+            result[tid.x] = helper();
+        }
+    )";
+
+    ComPtr<slang::IGlobalSession> globalSession;
+    SLANG_CHECK(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+
+    slang::TargetDesc targetDesc = {};
+    targetDesc.format = SLANG_SPIRV;
+    targetDesc.profile = globalSession->findProfile("spirv_1_5");
+    slang::CompilerOptionEntry optEntry;
+    optEntry.name = slang::CompilerOptionName::Optimization;
+    optEntry.value.kind = slang::CompilerOptionValueKind::Int;
+    optEntry.value.intValue0 = 0;
+    targetDesc.compilerOptionEntryCount = 1;
+    targetDesc.compilerOptionEntries = &optEntry;
+
+    ComPtr<ISlangBlob> aBlob;
+    ComPtr<ISlangBlob> bBlob;
+    ComPtr<ISlangBlob> cBlob;
+    {
+        ComPtr<ISlangFileSystemExt> fs = ComPtr<ISlangFileSystemExt>(new MemoryFileSystem());
+        auto& memFS = *static_cast<MemoryFileSystem*>(fs.get());
+        memFS.saveFile("c.slang", cSource, strlen(cSource));
+        memFS.saveFile("b.slang", bSource, strlen(bSource));
+        memFS.saveFile("a.slang", aSource, strlen(aSource));
+
+        slang::SessionDesc sessionDesc = {};
+        sessionDesc.targetCount = 1;
+        sessionDesc.targets = &targetDesc;
+        sessionDesc.fileSystem = fs;
+        const char* searchPaths[] = {"."};
+        sessionDesc.searchPathCount = 1;
+        sessionDesc.searchPaths = searchPaths;
+
+        ComPtr<slang::ISession> session;
+        SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+        ComPtr<ISlangBlob> diagnostics;
+        auto aModule = session->loadModule("a", diagnostics.writeRef());
+        SLANG_CHECK(aModule != nullptr);
+
+        for (int i = 0; i < session->getLoadedModuleCount(); i++)
+        {
+            auto mod = session->getLoadedModule(i);
+            ComPtr<ISlangBlob> serialized;
+            SLANG_CHECK(mod->serialize(serialized.writeRef()) == SLANG_OK);
+            String name = mod->getName();
+            if (name == "a")
+                aBlob = serialized;
+            else if (name == "b")
+                bBlob = serialized;
+            else if (name == "c")
+                cBlob = serialized;
+        }
+        SLANG_CHECK(aBlob != nullptr);
+        SLANG_CHECK(bBlob != nullptr);
+        SLANG_CHECK(cBlob != nullptr);
+    }
+
+    {
+        ComPtr<ISlangFileSystemExt> fs = ComPtr<ISlangFileSystemExt>(new MemoryFileSystem());
+        auto& memFS = *static_cast<MemoryFileSystem*>(fs.get());
+        memFS.saveFileBlob("a.slang-module", aBlob);
+        memFS.saveFileBlob("b.slang-module", bBlob);
+        memFS.saveFileBlob("c.slang-module", cBlob);
+
+        slang::SessionDesc sessionDesc = {};
+        sessionDesc.targetCount = 1;
+        sessionDesc.targets = &targetDesc;
+        sessionDesc.fileSystem = fs;
+        const char* searchPaths[] = {"."};
+        sessionDesc.searchPathCount = 1;
+        sessionDesc.searchPaths = searchPaths;
+
+        ComPtr<slang::ISession> session;
+        SLANG_CHECK(globalSession->createSession(sessionDesc, session.writeRef()) == SLANG_OK);
+
+        ComPtr<ISlangBlob> diagnostics;
+        auto aModule = session->loadModule("a", diagnostics.writeRef());
+        SLANG_CHECK(aModule != nullptr);
+
+        auto layout = aModule->getLayout();
+        SLANG_CHECK(layout != nullptr);
+
+        auto ifoo = layout->findTypeByName("IFoo");
+        auto foo1 = layout->findTypeByName("Foo1");
+        auto foo2 = layout->findTypeByName("Foo2");
+        SLANG_CHECK(ifoo != nullptr);
+        SLANG_CHECK(foo1 != nullptr);
+        SLANG_CHECK(foo2 != nullptr);
     }
 }
