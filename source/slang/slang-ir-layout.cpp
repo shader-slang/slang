@@ -61,9 +61,13 @@ static Result _calcArraySizeAndAlignment(
     auto elementCountLit = as<IRIntLit>(elementCountInst);
     if (!elementCountLit)
     {
-        // The element count is not a compile-time literal (e.g. a specialization
-        // constant). We can still compute the alignment from the element type,
-        // but the total size is indeterminate — same treatment as unsized arrays.
+        // Only treat specialization-constant-sized arrays as having
+        // indeterminate size. Other non-literal counts (e.g. sizeOf/alignOf
+        // expressions that haven't been folded yet) must return failure so
+        // the result is not cached prematurely with a wrong size.
+        if (!isSpecConstRateType(elementCountInst->getFullType()))
+            return SLANG_FAIL;
+
         IRSizeAndAlignment elementTypeLayout;
         SLANG_RETURN_ON_FAIL(
             getSizeAndAlignment(targetReq, rules, elementType, &elementTypeLayout));
