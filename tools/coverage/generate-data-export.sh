@@ -73,17 +73,31 @@ while IFS= read -r report_path; do
 
         # slangc compiler-only metrics (may not exist in older reports)
         sl_line_cov=$(get_json_value "slangc_line_coverage" "$platform_summary")
-        sl_lines_hit=$(get_json_number "slangc_lines_hit" "$platform_summary")
-        sl_lines_found=$(get_json_number "slangc_lines_found" "$platform_summary")
-        sl_region_cov=$(get_json_value "slangc_region_coverage" "$platform_summary")
-        sl_regions_hit=$(get_json_number "slangc_regions_hit" "$platform_summary")
-        sl_regions_found=$(get_json_number "slangc_regions_found" "$platform_summary")
-        sl_function_cov=$(get_json_value "slangc_function_coverage" "$platform_summary")
-        sl_functions_hit=$(get_json_number "slangc_functions_hit" "$platform_summary")
-        sl_functions_found=$(get_json_number "slangc_functions_found" "$platform_summary")
-        sl_branch_cov=$(get_json_value "slangc_branch_coverage" "$platform_summary")
-        sl_branches_hit=$(get_json_number "slangc_branches_hit" "$platform_summary")
-        sl_branches_found=$(get_json_number "slangc_branches_found" "$platform_summary")
+        if [[ -n "$sl_line_cov" ]]; then
+          sl_lines_hit=$(get_json_number "slangc_lines_hit" "$platform_summary")
+          sl_lines_found=$(get_json_number "slangc_lines_found" "$platform_summary")
+          sl_region_cov=$(get_json_value "slangc_region_coverage" "$platform_summary")
+          sl_regions_hit=$(get_json_number "slangc_regions_hit" "$platform_summary")
+          sl_regions_found=$(get_json_number "slangc_regions_found" "$platform_summary")
+          sl_function_cov=$(get_json_value "slangc_function_coverage" "$platform_summary")
+          sl_functions_hit=$(get_json_number "slangc_functions_hit" "$platform_summary")
+          sl_functions_found=$(get_json_number "slangc_functions_found" "$platform_summary")
+          sl_branch_cov=$(get_json_value "slangc_branch_coverage" "$platform_summary")
+          sl_branches_hit=$(get_json_number "slangc_branches_hit" "$platform_summary")
+          sl_branches_found=$(get_json_number "slangc_branches_found" "$platform_summary")
+        else
+          sl_lines_hit=""
+          sl_lines_found=""
+          sl_region_cov=""
+          sl_regions_hit=""
+          sl_regions_found=""
+          sl_function_cov=""
+          sl_functions_hit=""
+          sl_functions_found=""
+          sl_branch_cov=""
+          sl_branches_hit=""
+          sl_branches_found=""
+        fi
 
         # Add to CSV
         echo "${date_part},${commit_part},${platform},${line_cov},${lines_hit},${lines_found},${region_cov},${regions_hit},${regions_found},${function_cov},${functions_hit},${functions_found},${branch_cov},${branches_hit},${branches_found},${sl_line_cov},${sl_lines_hit},${sl_lines_found},${sl_region_cov},${sl_regions_hit},${sl_regions_found},${sl_function_cov},${sl_functions_hit},${sl_functions_found},${sl_branch_cov},${sl_branches_hit},${sl_branches_found}" >>"$CSV_FILE"

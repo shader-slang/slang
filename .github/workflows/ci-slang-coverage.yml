@@ -217,19 +217,8 @@ jobs:
 
           LIBSLANG="$BUILD_DIR/$CONFIG/lib/libslang.$LIB_EXT"
 
-          # Filename patterns to exclude for slangc compiler-only coverage
-          SLANGC_IGNORE_ARGS=(
-            -ignore-filename-regex='build/prelude/'
-            -ignore-filename-regex='build/source/slang/(capability|fiddle|slang-lookup-tables)/'
-            -ignore-filename-regex='build/source/slang-core-module/'
-            -ignore-filename-regex='external/'
-            -ignore-filename-regex='include/'
-            -ignore-filename-regex='source/slang-core-module/'
-            -ignore-filename-regex='source/slang-glslang/'
-            -ignore-filename-regex='source/slang-record-replay/'
-            -ignore-filename-regex='tools/'
-            -ignore-filename-regex='source/slang/slang-(language-server|doc-markdown-writer|doc-ast|ast-dump|repro)\.'
-          )
+          # Load slangc compiler-only ignore patterns (shared definition)
+          source tools/coverage/slangc-ignore-patterns.sh
 
           # Generate full library coverage report
           REPORT_OUTPUT=$($LLVM_COV report "$LIBSLANG" -instr-profile="$COVERAGE_DIR/slang-test.profdata" 2>/dev/null || echo "")
