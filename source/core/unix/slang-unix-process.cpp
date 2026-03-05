@@ -359,7 +359,11 @@ SlangResult UnixPipeStream::read(void* buffer, size_t length, size_t& outReadByt
 
         outReadBytes = size_t(count);
 
-        // Log pipe read operation if debug enabled
+        // Log pipe read operation if debug enabled.
+        // Note: this writes to stderr directly, which is fine because:
+        // - In the test-server process, stderr is captured by slang-test via
+        //   drainTestServerStderr() and forwarded to the parent's stderr.
+        // - In the slang-test process itself, stderr goes directly to the console.
         if (isDiagnosticEnabled("pipe") && count > 0)
         {
             auto endTime = std::chrono::steady_clock::now();

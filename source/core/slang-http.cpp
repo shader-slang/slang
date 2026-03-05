@@ -480,7 +480,7 @@ SlangResult HTTPPacketConnection::write(const void* content, size_t sizeInBytes)
             stderr,
             "[RPC-WRITE] HTTPPacketConnection::write size=%zu duration=%lldus\n",
             sizeInBytes,
-            duration);
+            (long long)duration);
 #endif
 
         // Warn if write took more than 100ms

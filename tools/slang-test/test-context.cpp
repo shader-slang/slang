@@ -311,7 +311,10 @@ void TestContext::drainTestServerStderr()
     if (!stderrStream)
         return;
 
-    // Read any available data from the test-server's stderr and forward to our stderr
+    // Read any available data from the test-server's stderr and forward to our stderr.
+    // This is safe to call while the test-server is running: on Unix, the underlying
+    // UnixPipeStream::read uses poll() which returns immediately when no data is available.
+    // On Windows, the pipe read similarly returns when no data is buffered.
     List<uint8_t> buffer;
     buffer.setCount(4096);
 
