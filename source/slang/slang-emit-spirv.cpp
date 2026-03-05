@@ -2049,56 +2049,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     // Next, let's look at emitting some of the instructions
     // that can occur at global scope.
 
-    // Recursively checks whether `inst` is a valid OpSpecConstantOp tree:
-    // every leaf must be a literal constant or a specialization constant,
-    // and every interior node must be an op allowed by OpSpecConstantOp.
-    // `isSpecConstFound` is set when at least one leaf is a genuine
-    // specialization constant; the caller must check it to avoid emitting
-    // a pure-constant expression as OpSpecConstantOp, whose result would
-    // be spec-constant-typed and invalid where a true OpConstant is required.
-    bool isGlobalInstSpecConstDerived(IRInst* inst, bool& isSpecConstFound)
-    {
-        // Already tagged with the spec-const rate qualifier.
-        if (isSpecConstRateType(inst->getFullType()))
-        {
-            isSpecConstFound = true;
-            return true;
-        }
-
-        // Numeric/bool literals are valid operands of OpSpecConstantOp.
-        // IRConstant also covers IRStringLit and IRPtrLit which are not.
-        if (as<IRIntLit>(inst) || as<IRFloatLit>(inst) || as<IRBoolLit>(inst))
-            return true;
-
-        // A global param is only valid here if it is a specialization constant.
-        if (auto param = as<IRGlobalParam>(inst))
-        {
-            auto layout = getVarLayout(param);
-            if (layout && layout->findOffsetAttr(LayoutResourceKind::SpecializationConstant))
-            {
-                isSpecConstFound = true;
-                return true;
-            }
-            return false;
-        }
-
-        // Reject operations that SPIR-V cannot express as OpSpecConstantOp.
-        if (!canOperationBeSpecConst(
-                inst->getOp(),
-                inst->getDataType(),
-                nullptr,
-                inst->getOperands()))
-            return false;
-
-        // Recurse into operands; every one must itself be spec-const-derived.
-        for (UInt i = 0; i < inst->getOperandCount(); i++)
-        {
-            if (!isGlobalInstSpecConstDerived(inst->getOperand(i), isSpecConstFound))
-                return false;
-        }
-        return true;
-    }
-
     /// Emit an instruction that is expected to appear at the global scope of the SPIR-V module.
     ///
     /// Returns the corresponding SPIR-V instruction.
@@ -2740,9 +2690,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             return emitDescriptorHeapBuiltinVar(inst);
         default:
             {
-                bool isSpecConstFound = false;
-                if (isSpecConstRateType(inst->getFullType()) ||
-                    (isGlobalInstSpecConstDerived(inst, isSpecConstFound) && isSpecConstFound))
+                if (isSpecConstRateType(inst->getFullType()))
                     return emitSpecializationConstantOp(inst);
 
                 else if (as<IRSPIRVAsmOperand>(inst))
