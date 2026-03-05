@@ -1,6 +1,7 @@
 [submodule "external/glslang"]
 	path = external/glslang
-	url = https://github.com/KhronosGroup/glslang
+	url = https://github.com/jvepsalainen-nv/glslang
+	branch = fix-emscripten-pthread
 [submodule "external/tinyobjloader"]
 	path = external/tinyobjloader
 	url = https://github.com/syoyo/tinyobjloader
