@@ -58,7 +58,9 @@ jobs:
           cd ci_analytics_repo
           # Copy updated data files
           cp /tmp/ci_jobs.json ci_jobs.json
-          cp /tmp/pr_merges.json pr_merges.json
+          if [ -f /tmp/pr_merges.json ]; then
+            cp /tmp/pr_merges.json pr_merges.json
+          fi
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"

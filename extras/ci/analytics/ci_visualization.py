@@ -517,6 +517,24 @@ def process_jobs(jobs_data, config):
     }
 
 
+# --- Shared helpers ---
+
+
+def _count_pr_merges_by_date(pr_merges):
+    """Count PRs merged per date string from pr_collector data."""
+    counts = defaultdict(int)
+    for pr in pr_merges:
+        merged_at = pr.get("merged_at")
+        if not merged_at:
+            continue
+        try:
+            dt = parse_dt(merged_at)
+            counts[dt.strftime("%Y-%m-%d")] += 1
+        except (ValueError, TypeError):
+            continue
+    return counts
+
+
 # --- Index page ---
 
 
@@ -621,16 +639,7 @@ def generate_index(data, output_dir):
 
     # PRs merged per day (from pr_collector data)
     pr_merges = data.get("pr_merges", [])
-    prs_merged_by_date = defaultdict(int)
-    for pr in pr_merges:
-        merged_at = pr.get("merged_at")
-        if not merged_at:
-            continue
-        try:
-            dt = parse_dt(merged_at)
-            prs_merged_by_date[dt.strftime("%Y-%m-%d")] += 1
-        except (ValueError, TypeError):
-            continue
+    prs_merged_by_date = _count_pr_merges_by_date(pr_merges)
 
     def _avg_merged(window_dates):
         total = sum(prs_merged_by_date.get(d, 0) for d in window_dates)
@@ -903,17 +912,7 @@ def generate_statistics(data, config, output_dir):
 
     # PRs merged per day (from pr_collector data)
     pr_merges = data.get("pr_merges", [])
-    prs_merged_by_date = defaultdict(int)
-    for pr in pr_merges:
-        merged_at = pr.get("merged_at")
-        if not merged_at:
-            continue
-        try:
-            dt = parse_dt(merged_at)
-            date_str = dt.strftime("%Y-%m-%d")
-            prs_merged_by_date[date_str] += 1
-        except (ValueError, TypeError):
-            continue
+    prs_merged_by_date = _count_pr_merges_by_date(pr_merges)
     prs_merged_per_day = [prs_merged_by_date.get(d, 0) for d in dates]
 
     if pr_merges:
@@ -1398,6 +1397,14 @@ def main():
         try:
             with open(args.pr_input, encoding="utf-8") as f:
                 pr_data = json.load(f)
+            if not isinstance(pr_data, list):
+                print(
+                    f"Warning: PR data in {args.pr_input} is not a list; ignoring",
+                    file=sys.stderr,
+                )
+                pr_data = []
+            else:
+                pr_data = [p for p in pr_data if isinstance(p, dict)]
             print(f"Loaded {len(pr_data)} merged PRs from {args.pr_input}")
         except (json.JSONDecodeError, OSError) as e:
             print(f"Warning: Could not load PR data: {e}", file=sys.stderr)

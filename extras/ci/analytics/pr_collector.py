@@ -99,7 +99,7 @@ def get_start_date(days_str, existing_data, verbose=False):
     if days_str == "all":
         if verbose:
             print("Collecting all available PRs")
-        return datetime.datetime(2019, 1, 1, tzinfo=timezone.utc)
+        return datetime.datetime(1970, 1, 1, tzinfo=timezone.utc)
 
     try:
         days = int(days_str)
@@ -210,9 +210,15 @@ def main():
         print("No merged PRs found in the specified time range.")
         if existing_count > 0:
             print(f"Existing dataset contains {existing_count} PRs.")
+        save_data(existing, args.output)
+        print(f"Data saved to: {args.output}")
         return
 
-    existing_numbers = {pr["number"] for pr in existing}
+    existing_numbers = {
+        pr.get("number")
+        for pr in existing
+        if isinstance(pr, dict) and pr.get("number") is not None
+    }
     new_prs = []
     for pr in raw_prs:
         extracted = extract_pr_data(pr)

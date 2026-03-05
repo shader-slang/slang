@@ -76,14 +76,22 @@ def fetch_gpu_quota():
             result = subprocess.run(
                 cmd, capture_output=True, text=True, timeout=30
             )
-        except (subprocess.TimeoutExpired, FileNotFoundError):
+        except FileNotFoundError:
             return None
+        except subprocess.TimeoutExpired:
+            print(f"Warning: timeout fetching GPU quota for {region}", file=sys.stderr)
+            continue
         if result.returncode != 0:
-            return None
+            print(
+                f"Warning: gcloud failed for {region}: {result.stderr.strip()}",
+                file=sys.stderr,
+            )
+            continue
         try:
             data = json.loads(result.stdout)
         except json.JSONDecodeError:
-            return None
+            print(f"Warning: invalid GPU quota JSON for {region}", file=sys.stderr)
+            continue
 
         for q in data.get("quotas", []):
             if q.get("metric") == GPU_QUOTA_METRIC:
@@ -464,7 +472,7 @@ function buildCharts(hours) {{
       options: {{
         responsive: true,
         scales: {{
-          y: {{ min: 0, title: {{ display: true, text: 'T4 GPUs' }} }}
+          y: {{ min: 0, stacked: true, title: {{ display: true, text: 'T4 GPUs' }} }}
         }},
         plugins: {{
           tooltip: {{
