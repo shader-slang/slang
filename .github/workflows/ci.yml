@@ -62,10 +62,9 @@ jobs:
       config: release
       runs-on: '["ubuntu-22.04"]'
 
-  # NOTE: Remaining builds temporarily disabled for debugging Linux x86 test intermittency
   build-linux-release-gcc-wasm:
     needs: [filter]
-    if: false
+    if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-build.yml
     with:
       os: linux
@@ -77,7 +76,7 @@ jobs:
   # macOS builds
   build-macos-debug-clang-aarch64:
     needs: [filter]
-    if: false
+    if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-build.yml
     with:
       os: macos
@@ -88,7 +87,7 @@ jobs:
 
   build-macos-release-clang-aarch64:
     needs: [filter]
-    if: false
+    if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-build.yml
     with:
       os: macos
@@ -100,7 +99,7 @@ jobs:
   # Linux ARM64 builds (GitHub-hosted)
   build-linux-debug-gcc-aarch64:
     needs: [filter]
-    if: false
+    if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-build.yml
     with:
       os: linux
@@ -112,7 +111,7 @@ jobs:
 
   build-linux-release-gcc-aarch64:
     needs: [filter]
-    if: false
+    if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-build.yml
     with:
       os: linux
@@ -125,7 +124,7 @@ jobs:
   # Windows builds (self-hosted)
   build-windows-debug-cl-x86_64-gpu:
     needs: [filter]
-    if: false
+    if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-build.yml
     with:
       os: windows
@@ -136,7 +135,7 @@ jobs:
 
   build-windows-release-cl-x86_64-gpu:
     needs: [filter]
-    if: false
+    if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-build.yml
     with:
       os: windows
@@ -162,11 +161,10 @@ jobs:
       config: release
       server-count: 4
 
-  # NOTE: Non-Linux-x86 tests temporarily disabled for debugging test intermittency
   # macOS tests
   test-macos-debug-clang-aarch64:
     needs: [filter, build-macos-debug-clang-aarch64]
-    if: false
+    if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-test.yml
     with:
       os: macos
@@ -180,7 +178,7 @@ jobs:
 
   test-macos-release-clang-aarch64:
     needs: [filter, build-macos-release-clang-aarch64]
-    if: false
+    if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-test.yml
     with:
       os: macos
@@ -195,7 +193,7 @@ jobs:
   # Linux ARM64 tests (GitHub-hosted, CPU only)
   test-linux-debug-gcc-aarch64:
     needs: [filter, build-linux-debug-gcc-aarch64]
-    if: false
+    if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-test.yml
     with:
       os: linux
@@ -208,7 +206,7 @@ jobs:
 
   test-linux-release-gcc-aarch64:
     needs: [filter, build-linux-release-gcc-aarch64]
-    if: false
+    if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-test.yml
     with:
       os: linux
@@ -222,7 +220,7 @@ jobs:
   # Windows GPU tests (self-hosted)
   test-windows-debug-cl-x86_64-gpu:
     needs: [filter, build-windows-debug-cl-x86_64-gpu]
-    if: false
+    if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-test.yml
     with:
       os: windows
@@ -235,7 +233,7 @@ jobs:
 
   test-windows-release-cl-x86_64-gpu:
     needs: [filter, build-windows-release-cl-x86_64-gpu]
-    if: false
+    if: needs.filter.outputs.should-run == 'true'
     uses: ./.github/workflows/ci-slang-test.yml
     with:
       os: windows
@@ -249,7 +247,7 @@ jobs:
   # MaterialX Integration Tests (Windows only for initial validation)
   test-materialx-windows-release:
     needs: [filter, build-windows-release-cl-x86_64-gpu]
-    if: false
+    if: needs.filter.outputs.should-run == 'true' && github.event_name == 'pull_request'
     uses: ./.github/workflows/materialx-test.yml
     with:
       os: windows
@@ -262,9 +260,21 @@ jobs:
   # Checks whether any failed job's "GPU health check" step failed, and if so,
   # triggers a re-run of only the failed jobs to get a new (hopefully healthy) VM.
   rerun-on-gpu-failure:
-    needs: [test-linux-release-gcc-x86_64, test-linux-debug-gcc-x86_64]
+    needs:
+      [
+        test-linux-release-gcc-x86_64,
+        test-linux-debug-gcc-x86_64,
+        test-windows-release-cl-x86_64-gpu,
+        test-windows-debug-cl-x86_64-gpu,
+      ]
     runs-on: ubuntu-latest
-    if: always() && (needs.test-linux-release-gcc-x86_64.result == 'failure' || needs.test-linux-debug-gcc-x86_64.result == 'failure')
+    if: >-
+      always() && (
+        needs.test-linux-release-gcc-x86_64.result == 'failure' ||
+        needs.test-linux-debug-gcc-x86_64.result == 'failure' ||
+        needs.test-windows-release-cl-x86_64-gpu.result == 'failure' ||
+        needs.test-windows-debug-cl-x86_64-gpu.result == 'failure'
+      )
     permissions:
       actions: write
     outputs:
@@ -321,9 +331,11 @@ jobs:
           echo "Rerun triggered: ${{ needs.rerun-on-gpu-failure.outputs.rerun-triggered }}"
 
           # If a GPU failure rerun was triggered, the failed jobs will be retried.
-          # The rerun replaces the failed jobs in this same run, so check-ci will
-          # be re-evaluated with the new results. Exit successfully here to avoid
-          # blocking the merge queue while the rerun is in progress.
+          # `gh run rerun --failed` replaces the failed jobs in this same workflow
+          # run, and check-ci will be re-evaluated with the new results.
+          # Note: there is a brief window where this check-ci shows success before
+          # the rerun completes. Since check-ci is required for merging, GitHub's
+          # merge queue will wait for the final check-ci result from the rerun.
           if [[ "${{ needs.rerun-on-gpu-failure.outputs.rerun-triggered }}" == "true" ]]; then
             echo "GPU failure rerun was triggered — this run will be re-evaluated after retry."
             exit 0
