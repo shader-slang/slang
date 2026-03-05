@@ -469,6 +469,7 @@ struct LoweredElementTypeContext
     };
     // Specialized functions that takes storage-typed pointers instead of logical-typed pointers.
     Dictionary<SpecializationKey, IRFunc*> specializedFuncs;
+    Dictionary<IRFunc*, List<IRFunc*>> specializedFuncsByOriginal;
 
     LoweredElementTypeContext(TargetProgram* target, BufferElementTypeLoweringOptions inOptions)
         : target(target), options(inOptions)
@@ -1495,14 +1496,15 @@ struct LoweredElementTypeContext
             for (Index c = 0; c < callWorkList.getCount(); c++)
             {
                 auto call = callWorkList[c];
-                auto calleeFunc = as<IRGlobalValueWithParams>(call->getCallee());
+                auto calleeFunc = cast<IRFunc>(call->getCallee());
                 // We compute the func type for the specialized func based on the arguments
                 // provided, and check the specialization cache to reuse existing specialization
                 // when possible.
-                List<IRInst*> oldParams;
-                for (auto param : calleeFunc->getParams())
-                    oldParams.add(param);
-                SLANG_ASSERT(oldParams.getCount() == (Index)call->getArgCount());
+                List<IRType*> oldParamTypes;
+                for (auto paramType : calleeFunc->getDataType()->getParamTypes())
+                    oldParamTypes.add(paramType);
+
+                SLANG_ASSERT(oldParamTypes.getCount() == (Index)call->getArgCount());
 
                 ShortList<IRType*> paramTypes;
                 ShortList<IRInst*> newArgs;
@@ -1511,7 +1513,7 @@ struct LoweredElementTypeContext
                     auto arg = call->getArg(i);
                     if (auto castArg = as<IRCastStorageToLogical>(arg))
                     {
-                        auto oldParamPtrType = oldParams[i]->getDataType();
+                        auto oldParamPtrType = oldParamTypes[i];
                         auto storageValueType = tryGetPointedToOrBufferElementType(
                             &builder,
                             castArg->getOperand(0)->getDataType());
@@ -1536,11 +1538,12 @@ struct LoweredElementTypeContext
                         newArgs.add(arg);
                     }
                 }
+
                 auto specializedFuncType = builder.getFuncType(
                     (UInt)paramTypes.getCount(),
                     paramTypes.getArrayView().getBuffer(),
                     call->getDataType());
-                auto key = SpecializationKey{(IRFunc*)calleeFunc, specializedFuncType};
+                auto key = SpecializationKey{calleeFunc, specializedFuncType};
                 IRFunc* specializedFunc = nullptr;
                 if (!specializedFuncs.tryGetValue(key, specializedFunc))
                 {
@@ -1627,7 +1630,9 @@ struct LoweredElementTypeContext
                 builder.replaceOperand(use, castedParam);
         }
         clonedFunc->setFullType(specializedFuncType);
-        removeLinkageDecorations(clonedFunc);
+        // Keep track of the specialized functions. This is used to remove
+        // clashing linkage decorations if we need to retain the original too.
+        specializedFuncsByOriginal[(IRFunc*)call->getCallee()].add(clonedFunc);
 
         // Add all `CastStorageToLogical` insts in the cloned func to the worklist
         // for further processing.
@@ -1700,7 +1705,6 @@ struct LoweredElementTypeContext
                 continue;
             bufferTypeInsts.add(BufferTypeInfo{(IRType*)globalInst, elementType});
         }
-
 
         List<IRCastStorageToLogicalBase*> castInstWorkList;
 
@@ -1795,6 +1799,23 @@ struct LoweredElementTypeContext
                 continue;
             bufferTypeInst.bufferType->replaceUsesWith(bufferTypeInst.loweredBufferType);
             bufferTypeInst.bufferType->removeAndDeallocate();
+        }
+
+        // Remove linkage decorations from specialized functions if they don't
+        // cleanly replace the original.
+        for (auto& [original, specializations] : specializedFuncsByOriginal)
+        {
+            if (original->hasUses() || specializations.getCount() > 1)
+            {
+                for (auto specialization : specializations)
+                    removeLinkageDecorations(specialization);
+            }
+            else
+            {
+                // Remove original, because the specialized function replaced
+                // it. If we don't remove it, the linkage decorations clash.
+                original->removeAndDeallocate();
+            }
         }
     }
 
