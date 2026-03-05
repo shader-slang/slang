@@ -1516,8 +1516,7 @@ bool peepholeOptimize(TargetProgram* target, IRModule* module, PeepholeOptimizat
     context.targetProgram = target;
     context.isPrelinking = options.isPrelinking;
     context.useFastAnalysis =
-        target ? target->getOptionSet().getBoolOption(CompilerOptionName::MinimumSlangOptimization)
-               : true;
+        target ? target->getOptionSet().shouldPerformMinimumOptimizations() : true;
     return context.processModule();
 }
 
@@ -1526,8 +1525,7 @@ bool peepholeOptimize(TargetProgram* target, IRInst* func)
     PeepholeContext context = PeepholeContext(func->getModule());
     context.targetProgram = target;
     context.useFastAnalysis =
-        target ? target->getOptionSet().getBoolOption(CompilerOptionName::MinimumSlangOptimization)
-               : true;
+        target ? target->getOptionSet().shouldPerformMinimumOptimizations() : true;
     return context.processFunc(func);
 }
 
