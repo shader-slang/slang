@@ -251,6 +251,8 @@ static void reportCheckpointIntermediates(
                 .message = "failed to compute struct type layout",
                 .location = structType->sourceLoc});
 
+        // Reporting happens before empty structs are optimized out and we still
+        // want to keep the checkpointing decorations, so skip zero-sized structs.
         if (structSize.size == 0)
             continue;
 
