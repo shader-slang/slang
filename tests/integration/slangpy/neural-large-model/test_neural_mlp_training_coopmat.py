@@ -27,7 +27,7 @@ from conftest import get_slangpy_paths, REF_IMAGE_PATH
 
 TEST_DIR = Path(__file__).resolve().parent
 
-SUBGROUP_SIZE = 32
+WORKGROUP_SIZE = 32
 INPUT_DIM = 4
 HIDDEN_DIM = 128
 OUTPUT_DIM = 3
@@ -63,6 +63,7 @@ def _create_device_and_kernels():
             type=spy.DeviceType.cuda,
             compiler_options=spy.SlangCompilerOptions({
                 "include_paths": include_paths,
+                "defines": {"WORKGROUP_SIZE": str(WORKGROUP_SIZE)},
             }),
         )
     except Exception as exc:
@@ -141,9 +142,9 @@ def _load_reference_image(device):
 def _dispatch_grads(kernels, bufs, ref_buf, resolution, batch_size, seed, loss_scale):
     """Dispatch one training step: compute gradients via CoopMat backward pass."""
     batch_count = batch_size[0] * batch_size[1]
-    num_groups = _ceildiv(batch_count, SUBGROUP_SIZE)
+    num_groups = _ceildiv(batch_count, WORKGROUP_SIZE)
     kernels["calculate_grads"].dispatch(
-        thread_count=[num_groups * SUBGROUP_SIZE, 1, 1],
+        thread_count=[num_groups * WORKGROUP_SIZE, 1, 1],
         seed=seed,
         batch_size=[batch_size[0], batch_size[1]],
         img_resolution=[resolution[0], resolution[1]],
@@ -162,11 +163,11 @@ def _dispatch_optimizer(kernels, bufs, lr, iteration, loss_scale):
     """Dispatch Adam optimizer step for MLP params and latent grid."""
     for prefix, count_key in [("mlp", "total_mlp"), ("latent", "total_latent")]:
         param_count = bufs[count_key]
-        num_groups = _ceildiv(param_count, SUBGROUP_SIZE)
+        num_groups = _ceildiv(param_count, WORKGROUP_SIZE)
         p_key = prefix if prefix == "latent" else f"{prefix}_params"
         g_key = f"{prefix}_grad" if prefix == "latent" else f"{prefix}_grads"
         kernels["optimizer_step"].dispatch(
-            thread_count=[num_groups * SUBGROUP_SIZE, 1, 1],
+            thread_count=[num_groups * WORKGROUP_SIZE, 1, 1],
             primal=bufs[p_key],
             grad=bufs[g_key],
             mean_buf=bufs[f"{prefix}_adam_m"],
@@ -181,9 +182,9 @@ def _dispatch_optimizer(kernels, bufs, lr, iteration, loss_scale):
 def _dispatch_show_loss(kernels, bufs, ref_buf, resolution, loss_buf):
     """Dispatch loss evaluation over the full image."""
     total_pixels = resolution[0] * resolution[1]
-    num_groups = _ceildiv(total_pixels, SUBGROUP_SIZE)
+    num_groups = _ceildiv(total_pixels, WORKGROUP_SIZE)
     kernels["show_loss"].dispatch(
-        thread_count=[num_groups * SUBGROUP_SIZE, 1, 1],
+        thread_count=[num_groups * WORKGROUP_SIZE, 1, 1],
         img_resolution=[resolution[0], resolution[1]],
         params=bufs["mlp_params"],
         latent_data=bufs["latent"],
@@ -197,9 +198,9 @@ def _dispatch_show_loss(kernels, bufs, ref_buf, resolution, loss_buf):
 def _dispatch_render(kernels, bufs, resolution, output_buf):
     """Dispatch full-image render (inference)."""
     total_pixels = resolution[0] * resolution[1]
-    num_groups = _ceildiv(total_pixels, SUBGROUP_SIZE)
+    num_groups = _ceildiv(total_pixels, WORKGROUP_SIZE)
     kernels["render"].dispatch(
-        thread_count=[num_groups * SUBGROUP_SIZE, 1, 1],
+        thread_count=[num_groups * WORKGROUP_SIZE, 1, 1],
         img_resolution=[resolution[0], resolution[1]],
         params=bufs["mlp_params"],
         latent_data=bufs["latent"],
