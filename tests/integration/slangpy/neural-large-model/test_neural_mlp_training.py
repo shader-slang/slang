@@ -74,19 +74,19 @@ class Network(spy.InstanceList):
         self.latent_texture.optimize(module, lr, it)
 
 
-def _create_device_and_module():
+def _create_device_and_module(device_type=spy.DeviceType.cuda):
     """Create device and load the Slang module with neural.slang support."""
     include_paths = get_slangpy_paths()
 
     try:
         device = spy.Device(
-            type=spy.DeviceType.cuda,
+            type=device_type,
             compiler_options=spy.SlangCompilerOptions({
                 "include_paths": include_paths,
             }),
         )
     except Exception as exc:
-        pytest.skip(f"CUDA device not available: {exc}")
+        pytest.skip(f"Device not available ({device_type}): {exc}")
 
     module = spy.Module.load_from_file(device, str(TEST_DIR / "neural_mlp_gpu.slang"))
     return device, module
@@ -99,7 +99,7 @@ def _create_device_and_module():
 @pytest.mark.parametrize("device_type", [spy.DeviceType.cuda])
 def test_training_convergence(device_type: spy.DeviceType) -> None:
     """Train MLP on GPU for 5K iterations and verify loss convergence."""
-    device, module = _create_device_and_module()
+    device, module = _create_device_and_module(device_type)
     try:
         network = Network(module, device)
         total_p = int(module.get_total_params())
@@ -153,7 +153,7 @@ def test_training_convergence(device_type: spy.DeviceType) -> None:
 @pytest.mark.parametrize("device_type", [spy.DeviceType.cuda])
 def test_inference_quality(device_type: spy.DeviceType) -> None:
     """Train, then render full image and compare against reference."""
-    device, module = _create_device_and_module()
+    device, module = _create_device_and_module(device_type)
     try:
         network = Network(module, device)
         image = spy.Tensor.load_from_image(device, str(REF_IMAGE_PATH), linearize=True)
@@ -221,7 +221,7 @@ def test_inference_quality(device_type: spy.DeviceType) -> None:
 @pytest.mark.parametrize("device_type", [spy.DeviceType.cuda])
 def test_parameter_count(device_type: spy.DeviceType) -> None:
     """FFLayer.ParameterCount matches expected values."""
-    device, module = _create_device_and_module()
+    device, module = _create_device_and_module(device_type)
     try:
         total_mlp = int(module.get_total_params())
         grid_params = int(module.get_grid_params())
