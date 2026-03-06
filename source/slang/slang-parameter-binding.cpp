@@ -2231,6 +2231,9 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                 state,
                 varLayout);
 
+            if (!elementTypeLayout)
+                return nullptr;
+
             // We still walk over subsequent elements to make sure they consume resources
             // as needed
             for (UInt ii = 1; ii < elementCount; ++ii)
@@ -2265,6 +2268,9 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                 meshOutputType->getElementType(),
                 state,
                 varLayout);
+
+            if (!elementTypeLayout)
+                return nullptr;
 
             RefPtr<ArrayTypeLayout> arrayTypeLayout = new ArrayTypeLayout();
             arrayTypeLayout->elementTypeLayout = elementTypeLayout;
@@ -2568,6 +2574,10 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                 RefPtr<TypeLayout> assocTypeLayout = new TypeLayout();
                 assocTypeLayout->type = type;
                 return assocTypeLayout;
+            }
+            else if (declRef.as<InterfaceDecl>())
+            {
+                return nullptr;
             }
             else
             {
@@ -3160,14 +3170,13 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
             computeEntryPointParameterTypeLayout(context, paramDeclRef, paramVarLayout, state);
         paramVarLayout->typeLayout = paramTypeLayout;
 
-        // We expect to always be able to compute a layout for
-        // entry-point parameters, but to be defensive we will
-        // skip parameters that couldn't have a layout computed
-        // when assertions are disabled.
-        //
-        SLANG_ASSERT(paramTypeLayout);
         if (!paramTypeLayout)
+        {
+            getSink(context)->diagnose(Diagnostics::NotValidVaryingParameter{
+                .paramName = paramDeclRef.getName(),
+                .decl = paramDeclRef.getDecl()});
             continue;
+        }
 
         // Now that we've computed the layout to use for the parameter,
         // we need to add its resource usage to that of the entry
@@ -3212,9 +3221,15 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
                     entryPointRes->count.getFiniteValue();
                 entryPointRes->count += rr.count;
             }
-        }
 
-        entryPointLayout->resultLayout = resultLayout;
+            entryPointLayout->resultLayout = resultLayout;
+        }
+        else
+        {
+            getSink(context)->diagnose(Diagnostics::NotValidVaryingParameter{
+                .paramName = entryPointFuncDeclRef.getName(),
+                .decl = entryPointFuncDeclRef.getDecl()});
+        }
     }
 
     // We don't want certain kinds of resource usage within an entry
