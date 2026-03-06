@@ -3840,9 +3840,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
         // Similar to the case for entry points, if there is a single target,
         // then we allow some of its options to come from the "default"
         // target state.
-        auto defaultTargetFloatingPointMode =
-            m_defaultTarget.optionSet.getEnumOption<FloatingPointMode>(
-                CompilerOptionName::FloatingPointMode);
+        auto defaultTargetFloatingPointMode = m_defaultTarget.optionSet.getFloatingPointMode();
 
         if (m_rawTargets.getCount() == 1)
         {
@@ -3922,8 +3920,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
                 m_requestImpl->addTargetCapability(targetID, SlangCapabilityID(atom.intValue));
             }
 
-            auto floatingPointMode = rawTarget.optionSet.getEnumOption<FloatingPointMode>(
-                CompilerOptionName::FloatingPointMode);
+            auto floatingPointMode = rawTarget.optionSet.getFloatingPointMode();
             if (floatingPointMode != FloatingPointMode::Default)
             {
                 m_compileRequest->setTargetFloatingPointMode(
@@ -4193,7 +4190,7 @@ SlangResult OptionsParser::_parse(int argc, char const* const* argv)
     applySettingsToDiagnosticSink(m_requestImpl->getSink(), m_sink, linkage->m_optionSet);
 
     // Warn about separate debug info being used with unsupported targets
-    if (linkage->m_optionSet.getBoolOption(CompilerOptionName::EmitSeparateDebug))
+    if (linkage->m_optionSet.shouldEmitSeparateDebugInfo())
     {
         // Check all targets to see if any use separate debug info with an unsupported target
         for (const auto& rawTarget : m_rawTargets)
