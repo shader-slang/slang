@@ -13723,25 +13723,39 @@ IREntryPointLayout* lowerEntryPointLayout(
     return context->irBuilder->getEntryPointLayout(irParamsLayout, irResultLayout);
 }
 
-bool isUnspecializedGenericDeclRef(DeclRef<Decl> declRef)
+/// Check if a DeclRef<FuncDecl> refers to an unspecialized generic function,
+/// i.e. a FuncDecl inside a GenericDecl where the generic has not been
+/// concretely specialized. Returns false for non-FuncDecl refs.
+bool isUnspecializedGenericFuncDeclRef(DeclRef<Decl> declRef)
 {
-    auto genericDeclRef = as<GenericAppDeclRef>(declRef.declRefBase);
-    if (!genericDeclRef)
+    auto funcDecl = as<FuncDecl>(declRef.getDecl());
+    if (!funcDecl)
         return false;
-    if (genericDeclRef->getArgCount() == 0)
+
+    auto genericDecl = as<GenericDecl>(funcDecl->parentDecl);
+    if (!genericDecl)
         return false;
-    DeclRef<Decl> argDeclRef;
-    if (auto intVal = as<DeclRefIntVal>(genericDeclRef->getArg(0)))
-    {
-        argDeclRef = intVal->getDeclRef();
-    }
-    else if (auto type = as<DeclRefType>(genericDeclRef->getArg(0)))
-    {
-        argDeclRef = type->getDeclRef();
-    }
-    if (argDeclRef.getDecl() &&
-        argDeclRef.getDecl()->parentDecl == genericDeclRef->getGenericDecl())
+
+    // No GenericAppDeclRef means the generic was never applied
+    // (e.g. entry points from [shader(...)] created with makeDeclRef(funcDecl)).
+    auto genericAppDeclRef = as<GenericAppDeclRef>(declRef.declRefBase);
+    if (!genericAppDeclRef)
         return true;
+
+    // GenericAppDeclRef whose args still reference the generic's own parameters
+    // (applied but not yet substituted with concrete values).
+    // Currently only two states exist: fully specialized or not at all.
+    // If partial specialization is added, this logic will need updating.
+    for (Index i = 0; i < genericAppDeclRef->getArgCount(); i++)
+    {
+        DeclRef<Decl> argDeclRef;
+        if (auto intVal = as<DeclRefIntVal>(genericAppDeclRef->getArg(i)))
+            argDeclRef = intVal->getDeclRef();
+        else if (auto type = as<DeclRefType>(genericAppDeclRef->getArg(i)))
+            argDeclRef = type->getDeclRef();
+        if (argDeclRef.getDecl() && argDeclRef.getDecl()->parentDecl == genericDecl)
+            return true;
+    }
     return false;
 }
 
@@ -13859,7 +13873,7 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
 
         // Skip unspecialized functions because we cannot produce IR layouts to
         // them yet.
-        if (isUnspecializedGenericDeclRef(funcDeclRef))
+        if (isUnspecializedGenericFuncDeclRef(funcDeclRef))
             continue;
 
         auto irFuncType = lowerType(context, getFuncType(astBuilder, funcDeclRef));
