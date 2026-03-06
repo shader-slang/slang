@@ -24148,6 +24148,7 @@ struct HitObject
     {
         __target_switch
         {
+        case glsl: // fallback - outer MakeMiss routes glsl to __glslMakeMissEXT
         case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectRecordMissNV";
         }
     }
@@ -24388,6 +24389,7 @@ struct HitObject
     {
         __target_switch
         {
+        case glsl: // fallback - outer MakeHit routes glsl to EXT variant
         case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectRecordHitWithIndexNV";
         }
     }
@@ -24439,6 +24441,7 @@ struct HitObject
     {
         __target_switch
         {
+        case glsl: // fallback - outer MakeHit routes glsl to EXT variant
         case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectRecordHitNV";
         }
     }
@@ -24496,6 +24499,7 @@ struct HitObject
     {
         __target_switch
         {
+        case glsl:
         case _GL_EXT_shader_invocation_reorder: __intrinsic_asm "hitObjectGetAttributesEXT($0, $1)";
         }
     }
@@ -24549,6 +24553,7 @@ struct HitObject
     {
         __target_switch
         {
+        case glsl:
         case _GL_EXT_shader_invocation_reorder: __intrinsic_asm "hitObjectTraceRayEXT";
         }
     }
@@ -25106,6 +25111,7 @@ struct HitObject
     {
         __target_switch
         {
+        case glsl:
         case _GL_EXT_shader_invocation_reorder: __intrinsic_asm "hitObjectExecuteShaderEXT";
         }
     }
