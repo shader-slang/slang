@@ -19864,8 +19864,8 @@ float4x3 WorldToObject4x3()
 /// @return Time value between 0 and 1 for motion blur interpolation
 /// @remarks Available when motion blur extension is enabled
 /// @category raytracing
-__glsl_extension(GL_NV_ray_tracing_motion_blur)
 __glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_ray_tracing_motion_blur)
 [NonUniformReturn]
 [require(glsl_spirv, raytracing_motionblur_anyhit_closesthit_intersection_miss)]
 float RayCurrentTime()
@@ -21955,8 +21955,10 @@ int __hitObjectAttributesLocation(__ref Attributes attributes);
 /// or as a key in ReorderThread. Created by one of several methods described below. HitObject
 /// and its related functions are available in raytracing shader types only.
 /// @category raytracing Ray-tracing
-__glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_EXT_buffer_reference_uvec2)
+__glsl_extension(GL_EXT_shader_invocation_reorder)
+__glsl_extension(GL_NV_shader_invocation_reorder)
 [__NonCopyableType]
 __intrinsic_type($(kIROp_HitObjectType))
 struct HitObject
@@ -22857,11 +22859,8 @@ struct HitObject
         {
         case hlsl_nvapi:
             __intrinsic_asm "($0 = NvMakeNop())";
-        case _GL_NV_shader_invocation_reorder:
+        case glsl:
             __glslMakeNop(__return_val);
-        case glsl: // use GL_EXT until KHR is available.
-        case _GL_EXT_shader_invocation_reorder:
-            __intrinsic_asm "hitObjectRecordEmptyEXT(__return_val)";
         case cuda: __intrinsic_asm "slangOptixMakeNopHitObject";
         case spvShaderInvocationReorderNV:
             spirv_asm
@@ -23141,6 +23140,9 @@ struct HitObject
 
         /// Queries shader table index from HitObject. Valid if the hit object represents a hit or a miss.
     __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_buffer_reference_uvec2)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
+    __glsl_extension(GL_NV_shader_invocation_reorder)
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     uint GetShaderTableIndex()
@@ -23173,6 +23175,8 @@ struct HitObject
     }
 
     __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_buffer_reference_uvec2)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
     [ForceInline]
     [require(cuda_glsl_spirv, ser_raygen_closesthit_miss)]
     [require(hlsl, ser_dxr_raygen_closesthit_miss)]
@@ -23198,6 +23202,9 @@ struct HitObject
     }
         /// Returns the instance index of a hit. Valid if the hit object represents a hit.
     __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_buffer_reference_uvec2)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
+    __glsl_extension(GL_NV_shader_invocation_reorder)
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     uint GetInstanceIndex()
@@ -23231,6 +23238,9 @@ struct HitObject
 
         /// Returns the instance ID of a hit. Valid if the hit object represents a hit.
     __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_buffer_reference_uvec2)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
+    __glsl_extension(GL_NV_shader_invocation_reorder)
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     uint GetInstanceID()
@@ -23264,6 +23274,9 @@ struct HitObject
 
         /// Returns the geometry index of a hit. Valid if the hit object represents a hit.
     __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_buffer_reference_uvec2)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
+    __glsl_extension(GL_NV_shader_invocation_reorder)
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     uint GetGeometryIndex()
@@ -23297,6 +23310,9 @@ struct HitObject
 
         /// Returns the primitive index of a hit. Valid if the hit object represents a hit.
     __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_buffer_reference_uvec2)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
+    __glsl_extension(GL_NV_shader_invocation_reorder)
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     uint GetPrimitiveIndex()
@@ -23330,6 +23346,9 @@ struct HitObject
 
         /// Returns the hit kind. Valid if the hit object represents a hit.
     __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_buffer_reference_uvec2)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
+    __glsl_extension(GL_NV_shader_invocation_reorder)
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     uint GetHitKind()
@@ -23488,10 +23507,12 @@ struct HitObject
         /// Returns 4x3 world-to-object transform matrix. Valid if the hit object represents a hit.
         /// Note: NVAPI/SPIRV/GLSL extension. DXR 1.3 uses GetWorldToObject3x4() and GetWorldToObject4x3().
     __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_buffer_reference_uvec2)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
+    __glsl_extension(GL_NV_shader_invocation_reorder)
     [ForceInline]
-    [require(glsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_spirv, ser_raygen_closesthit_miss)]
     [require(nvapi, ser_raygen_closesthit_miss)]
-    [require(cuda, ser_raygen_closesthit_miss)]
     float4x3 GetWorldToObject()
     {
         __target_switch
@@ -23523,10 +23544,12 @@ struct HitObject
         /// Returns 4x3 object-to-world transform matrix. Valid if the hit object represents a hit.
         /// Note: NVAPI/SPIRV/GLSL extension. DXR 1.3 uses GetObjectToWorld3x4() and GetObjectToWorld4x3().
     __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_buffer_reference_uvec2)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
+    __glsl_extension(GL_NV_shader_invocation_reorder)
     [ForceInline]
-    [require(glsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_spirv, ser_raygen_closesthit_miss)]
     [require(nvapi, ser_raygen_closesthit_miss)]
-    [require(cuda, ser_raygen_closesthit_miss)]
     float4x3 GetObjectToWorld()
     {
         __target_switch
@@ -23555,6 +23578,11 @@ struct HitObject
         }
     }
 
+    __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_buffer_reference_uvec2)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
+    __glsl_extension(GL_NV_ray_tracing_motion_blur)
+    __glsl_extension(GL_NV_shader_invocation_reorder)
     [ForceInline]
     [require(cuda_glsl_spirv, ser_raygen_closesthit_miss)]
     float GetCurrentTime() {
@@ -23584,6 +23612,10 @@ struct HitObject
     }
 
         /// Returns object-space ray origin. Valid if the hit object represents a hit.
+    __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_buffer_reference_uvec2)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
+    __glsl_extension(GL_NV_shader_invocation_reorder)
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     float3 GetObjectRayOrigin() {
@@ -23615,6 +23647,10 @@ struct HitObject
     }
 
         /// Returns object-space ray direction. Valid if the hit object represents a hit.
+    __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_buffer_reference_uvec2)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
+    __glsl_extension(GL_NV_shader_invocation_reorder)
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     float3 GetObjectRayDirection() {
@@ -23645,6 +23681,10 @@ struct HitObject
         }
     }
 
+    __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_buffer_reference_uvec2)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
+    __glsl_extension(GL_NV_shader_invocation_reorder)
     [ForceInline]
     [require(glsl_spirv, ser_raygen_closesthit_miss)]
     uint2 GetShaderRecordBufferHandle() {
@@ -23673,9 +23713,12 @@ struct HitObject
     }
 
     /// Returns the attributes of a hit. Valid if the hit object represents a hit or a miss.
+    __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_buffer_reference_uvec2)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
+    __glsl_extension(GL_NV_shader_invocation_reorder)
     [ForceInline]
-    [require(cuda_hlsl_spirv, ser_raygen_closesthit_miss)]
-    [require(glsl, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     attr_t GetAttributes<attr_t>()
     {
         __target_switch
@@ -23755,10 +23798,12 @@ struct HitObject
 
         /// Returns the ray flags associated with the hit object. Valid if the hit object represents a hit or a miss.
         /// DXR 1.3 and GL_EXT_shader_invocation_reorder.
+    __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_buffer_reference_uvec2)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
     [ForceInline]
     [require(hlsl, ser_dxr_raygen_closesthit_miss)]
-    [require(spirv, ser_raygen_closesthit_miss)]
-    [require(glsl, ser_raygen_closesthit_miss)]
+    [require(glsl_spirv, ser_raygen_closesthit_miss)]
     uint GetRayFlags()
     {
         __target_switch
@@ -23780,10 +23825,12 @@ struct HitObject
 
         /// Returns the parametric starting point (TMin) of the ray. Valid if the hit object represents a hit or a miss.
         /// DXR 1.3 and GL_EXT_shader_invocation_reorder.
+    __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_buffer_reference_uvec2)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
     [ForceInline]
     [require(hlsl, ser_dxr_raygen_closesthit_miss)]
-    [require(spirv, ser_raygen_closesthit_miss)]
-    [require(glsl, ser_raygen_closesthit_miss)]
+    [require(glsl_spirv, ser_raygen_closesthit_miss)]
     float GetRayTMin()
     {
         __target_switch
@@ -23823,10 +23870,12 @@ struct HitObject
 
         /// Returns the world-space ray origin. Valid if the hit object represents a hit or a miss.
         /// DXR 1.3 and GL_EXT_shader_invocation_reorder.
+    __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_buffer_reference_uvec2)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
     [ForceInline]
     [require(hlsl, ser_dxr_raygen_closesthit_miss)]
-    [require(spirv, ser_raygen_closesthit_miss)]
-    [require(glsl, ser_raygen_closesthit_miss)]
+    [require(glsl_spirv, ser_raygen_closesthit_miss)]
     float3 GetWorldRayOrigin()
     {
         __target_switch
@@ -23852,10 +23901,12 @@ struct HitObject
 
         /// Returns the world-space ray direction. Valid if the hit object represents a hit or a miss.
         /// DXR 1.3 and GL_EXT_shader_invocation_reorder.
+    __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_buffer_reference_uvec2)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
     [ForceInline]
     [require(hlsl, ser_dxr_raygen_closesthit_miss)]
-    [require(spirv, ser_raygen_closesthit_miss)]
-    [require(glsl, ser_raygen_closesthit_miss)]
+    [require(glsl_spirv, ser_raygen_closesthit_miss)]
     float3 GetWorldRayDirection()
     {
         __target_switch
@@ -23929,10 +23980,12 @@ struct HitObject
 
         /// Creates a HitObject representing a miss with specified ray flags.
         /// DXR 1.3 and GL_EXT_shader_invocation_reorder - includes RayFlags parameter.
+    __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_buffer_reference_uvec2)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
     [ForceInline]
     [require(hlsl, ser_dxr_raygen_closesthit_miss)]
-    [require(spirv, ser_raygen_closesthit_miss)]
-    [require(glsl, ser_raygen_closesthit_miss)]
+    [require(glsl_spirv, ser_raygen_closesthit_miss)]
     static HitObject MakeMiss(
         uint RayFlags,
         uint MissShaderIndex,
@@ -24082,8 +24135,8 @@ struct HitObject
     /// !!!! Internal GLSL GL_NV_shader_invocation_reorder impl. Not part of interface! !!!!!!!!!!!!
     ///
 
-    __glsl_extension(GL_NV_shader_invocation_reorder)
     __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_NV_shader_invocation_reorder)
     [require(glsl, ser_raygen_closesthit_miss)]
     static void __glslMakeMissNV(
         out HitObject hitObj,
@@ -24101,9 +24154,9 @@ struct HitObject
 
     // EXT version with RayFlags parameter
     // "void hitObjectRecordMissEXT(hitObjectEXT, uint rayFlags, uint, vec3, float, vec3, float);"
-    __glsl_extension(GL_EXT_shader_invocation_reorder)
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_EXT_buffer_reference_uvec2)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
     [require(glsl, ser_raygen_closesthit_miss)]
     static void __glslMakeMissEXT(
         out HitObject hitObj,
@@ -24123,9 +24176,9 @@ struct HitObject
     }
 
     // "void hitObjectRecordMissMotionNV(hitObjectNV, uint, vec3, float, vec3, float, float);"
-    __glsl_extension(GL_NV_shader_invocation_reorder_motion)
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_ray_tracing_motion_blur)
+    __glsl_extension(GL_NV_shader_invocation_reorder_motion)
     [require(glsl, ser_motion_raygen_closesthit_miss)]
     static void __glslMakeMissMotionNV(
         out HitObject hitObj,
@@ -24144,10 +24197,9 @@ struct HitObject
 
     // EXT version with RayFlags parameter
     // "void hitObjectRecordMissMotionEXT(hitObjectEXT hitObject, uint rayFlags, uint sbtRecordIndex, vec3 origin, float Tmin, vec3 direction, float TMax, float currentTime)"
-    __glsl_extension(GL_EXT_shader_invocation_reorder_motion)
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_EXT_buffer_reference_uvec2)
-    [require(glsl, ser_raygen_closesthit_miss)]
+    [require(glsl, ser_motion_raygen_closesthit_miss)]
     static void __glslMakeMissMotionEXT(
         out HitObject hitObj,
         uint RayFlags,
@@ -24167,6 +24219,8 @@ struct HitObject
     }
 
     __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_buffer_reference_uvec2)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
     __glsl_extension(GL_NV_shader_invocation_reorder)
     [require(glsl, ser_raygen_closesthit_miss)]
     static void __glslMakeNop(out HitObject hitObj)
@@ -24182,6 +24236,8 @@ struct HitObject
     }
 
     __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_buffer_reference_uvec2)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
     __glsl_extension(GL_NV_shader_invocation_reorder)
     [require(glsl, ser_raygen_closesthit_miss)]
     float3 __glslGetRayDirection()
@@ -24197,6 +24253,8 @@ struct HitObject
     }
 
     __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_buffer_reference_uvec2)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
     __glsl_extension(GL_NV_shader_invocation_reorder)
     [require(glsl, ser_raygen_closesthit_miss)]
     float3 __glslGetRayWorldDirection()
@@ -24212,8 +24270,8 @@ struct HitObject
     }
 
     __glsl_extension(GL_EXT_ray_tracing)
-    __glsl_extension(GL_EXT_shader_invocation_reorder)
     __glsl_extension(GL_EXT_buffer_reference_uvec2)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
     [require(glsl, ser_raygen_closesthit_miss)]
     float3 __glslGetRayWorldDirectionEXT()
     {
@@ -24224,6 +24282,8 @@ struct HitObject
     }
 
     __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_buffer_reference_uvec2)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
     __glsl_extension(GL_NV_shader_invocation_reorder)
     [require(glsl, ser_raygen_closesthit_miss)]
     float3 __glslGetRayWorldOrigin()
@@ -24239,8 +24299,8 @@ struct HitObject
     }
 
     __glsl_extension(GL_EXT_ray_tracing)
-    __glsl_extension(GL_EXT_shader_invocation_reorder)
     __glsl_extension(GL_EXT_buffer_reference_uvec2)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
     [require(glsl, ser_raygen_closesthit_miss)]
     float3 __glslGetRayWorldOriginEXT()
     {
@@ -24251,6 +24311,8 @@ struct HitObject
     }
 
     __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_buffer_reference_uvec2)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
     __glsl_extension(GL_NV_shader_invocation_reorder)
     [require(glsl, ser_raygen_closesthit_miss)]
     float __glslGetTMax()
@@ -24266,8 +24328,8 @@ struct HitObject
     }
 
     __glsl_extension(GL_EXT_ray_tracing)
-    __glsl_extension(GL_EXT_shader_invocation_reorder)
     __glsl_extension(GL_EXT_buffer_reference_uvec2)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
     [require(glsl, ser_raygen_closesthit_miss)]
     float __glslGetTMaxEXT()
     {
@@ -24278,6 +24340,8 @@ struct HitObject
     }
 
     __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_buffer_reference_uvec2)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
     __glsl_extension(GL_NV_shader_invocation_reorder)
     [require(glsl, ser_raygen_closesthit_miss)]
     float __glslGetTMin()
@@ -24293,8 +24357,8 @@ struct HitObject
     }
 
     __glsl_extension(GL_EXT_ray_tracing)
-    __glsl_extension(GL_EXT_shader_invocation_reorder)
     __glsl_extension(GL_EXT_buffer_reference_uvec2)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
     [require(glsl, ser_raygen_closesthit_miss)]
     float __glslGetTMinEXT()
     {
@@ -24330,8 +24394,8 @@ struct HitObject
 
     //  "void hitObjectRecordHitWithIndexMotionNV(hitObjectNV, accelerationStructureEXT,int,int,int,uint,uint,vec3,float,vec3,float,float,int);"
     __glsl_extension(GL_EXT_ray_tracing)
-    __glsl_extension(GL_NV_shader_invocation_reorder)
     __glsl_extension(GL_NV_ray_tracing_motion_blur)
+    __glsl_extension(GL_NV_shader_invocation_reorder)
     [require(glsl, ser_motion_raygen_closesthit_miss)]
     static void __glslMakeMotionHitWithIndex(
         out HitObject hitObj,
@@ -24381,8 +24445,8 @@ struct HitObject
 
         // "void hitObjectRecordHitMotionNV(hitObjectNV,accelerationStructureEXT,int,int,int,uint,uint,uint,vec3,float,vec3,float,float,int);"
     __glsl_extension(GL_EXT_ray_tracing)
-    __glsl_extension(GL_NV_shader_invocation_reorder)
     __glsl_extension(GL_NV_ray_tracing_motion_blur)
+    __glsl_extension(GL_NV_shader_invocation_reorder)
     [require(glsl, ser_motion_raygen_closesthit_miss)]
     static void __glslMakeMotionHit(
         out HitObject hitObj,
@@ -24408,6 +24472,8 @@ struct HitObject
 
 
     __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_buffer_reference_uvec2)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
     __glsl_extension(GL_NV_shader_invocation_reorder)
     [require(glsl, ser_raygen_closesthit_miss)]
     void __glslGetAttributes(int attributeLocation)
@@ -24423,8 +24489,8 @@ struct HitObject
     }
 
     __glsl_extension(GL_EXT_ray_tracing)
-    __glsl_extension(GL_EXT_shader_invocation_reorder)
     __glsl_extension(GL_EXT_buffer_reference_uvec2)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
     [require(glsl, ser_raygen_closesthit_miss)]
     void __glslGetAttributesEXT(int attributeLocation)
     {
@@ -24435,9 +24501,9 @@ struct HitObject
     }
 
     __glsl_extension(GL_EXT_ray_tracing)
-    __glsl_extension(GL_NV_shader_invocation_reorder)
-    __glsl_extension(GL_EXT_shader_invocation_reorder)
     __glsl_extension(GL_EXT_buffer_reference_uvec2)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
+    __glsl_extension(GL_NV_shader_invocation_reorder)
     [require(glsl, ser_raygen_closesthit_miss)]
     static void __glslTraceRay(
         out HitObject hitObject,
@@ -24464,8 +24530,8 @@ struct HitObject
     }
 
     __glsl_extension(GL_EXT_ray_tracing)
-    __glsl_extension(GL_EXT_shader_invocation_reorder)
     __glsl_extension(GL_EXT_buffer_reference_uvec2)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
     [require(glsl, ser_raygen_closesthit_miss)]
     static void __glslTraceRayEXT(
         out HitObject hitObject,
@@ -24955,10 +25021,10 @@ struct HitObject
     }
 
     __glsl_extension(GL_EXT_ray_tracing)
-    __glsl_extension(GL_NV_shader_invocation_reorder)
-    __glsl_extension(GL_EXT_shader_invocation_reorder)
     __glsl_extension(GL_EXT_buffer_reference_uvec2)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
     __glsl_extension(GL_NV_ray_tracing_motion_blur)
+    __glsl_extension(GL_NV_shader_invocation_reorder)
     [require(glsl, ser_motion_raygen_closesthit_miss)]
     static void __glslTraceMotionRay(
         out HitObject hitObject,
@@ -24986,8 +25052,8 @@ struct HitObject
     }
 
     __glsl_extension(GL_EXT_ray_tracing)
-    __glsl_extension(GL_EXT_shader_invocation_reorder)
     __glsl_extension(GL_EXT_buffer_reference_uvec2)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
     __glsl_extension(GL_NV_ray_tracing_motion_blur)
     [require(glsl, ser_motion_raygen_closesthit_miss)]
     static void __glslTraceMotionRayEXT(
@@ -25012,6 +25078,8 @@ struct HitObject
     }
 
     __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_buffer_reference_uvec2)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
     __glsl_extension(GL_NV_shader_invocation_reorder)
     [require(glsl, ser_raygen_closesthit_miss)]
     static void __glslInvoke(
@@ -25029,8 +25097,8 @@ struct HitObject
     }
 
     __glsl_extension(GL_EXT_ray_tracing)
-    __glsl_extension(GL_EXT_shader_invocation_reorder)
     __glsl_extension(GL_EXT_buffer_reference_uvec2)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
     [require(glsl, ser_raygen_closesthit_miss)]
     static void __glslInvokeEXT(
         HitObject hitObj,
@@ -25051,8 +25119,9 @@ struct HitObject
     /// Where possible, reordering will also attempt to retain locality in the thread's launch indices
     /// (DispatchRaysIndex in DXR).
 __glsl_extension(GL_EXT_ray_tracing)
-__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GL_EXT_buffer_reference_uvec2)
 __glsl_extension(GL_EXT_shader_invocation_reorder)
+__glsl_extension(GL_NV_shader_invocation_reorder)
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, ser_raygen)]
 void ReorderThread( uint CoherenceHint, uint NumCoherenceHintBitsFromLSB )
@@ -25101,8 +25170,9 @@ void ReorderThread( uint CoherenceHint, uint NumCoherenceHintBitsFromLSB )
     /// of equal coherence hints, it will attempt to maximize locality in 3D space of the ray hit (if any).
 
 __glsl_extension(GL_EXT_ray_tracing)
-__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GL_EXT_buffer_reference_uvec2)
 __glsl_extension(GL_EXT_shader_invocation_reorder)
+__glsl_extension(GL_NV_shader_invocation_reorder)
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, ser_raygen)]
 void ReorderThread( HitObject HitOrMiss, uint CoherenceHint, uint NumCoherenceHintBitsFromLSB )
@@ -25141,8 +25211,9 @@ void ReorderThread( HitObject HitOrMiss, uint CoherenceHint, uint NumCoherenceHi
     // With CoherenceHint and NumCoherenceHintBitsFromLSB as 0, meaning they are ignored.
 
 __glsl_extension(GL_EXT_ray_tracing)
-__glsl_extension(GL_NV_shader_invocation_reorder)
+__glsl_extension(GL_EXT_buffer_reference_uvec2)
 __glsl_extension(GL_EXT_shader_invocation_reorder)
+__glsl_extension(GL_NV_shader_invocation_reorder)
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, ser_raygen)]
 void ReorderThread( HitObject HitOrMiss )
