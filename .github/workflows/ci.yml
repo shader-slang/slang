@@ -258,13 +258,14 @@ jobs:
 
   # Automatically re-run failed jobs if the failure was caused by a faulty GPU VM.
   # Only covers Linux container test jobs which have the "GPU health check" step.
-  # Skipped for fork PRs (GITHUB_TOKEN is read-only, rerun would fail).
+  # Only runs in merge queue where intermittent failures are most disruptive and
+  # the token always has full permissions (no fork token issues).
   rerun-on-gpu-failure:
     needs: [test-linux-release-gcc-x86_64, test-linux-debug-gcc-x86_64]
     runs-on: ubuntu-latest
     if: >-
+      github.event_name == 'merge_group' &&
       github.run_attempt < 3 &&
-      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) &&
       always() && (
         needs.test-linux-release-gcc-x86_64.result == 'failure' ||
         needs.test-linux-debug-gcc-x86_64.result == 'failure'
