@@ -16,6 +16,10 @@ interface IFoo
     int get();
 }
 
+// Positive cases must not be rejected (no 41014 for GoodImpl or GoodImplDevicePtr).
+// CHECK-NOT: type 'GoodImpl' contains fields that cannot be packed
+// CHECK-NOT: type 'GoodImplDevicePtr' contains fields that cannot be packed
+
 // CHECK-DAG: modifier 'groupshared' is not allowed here
 export struct ImplGroupsharedPtr : IFoo
 {
