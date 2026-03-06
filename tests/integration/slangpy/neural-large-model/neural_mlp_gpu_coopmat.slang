@@ -18,7 +18,10 @@
 import neural;
 
 static const int INPUT_DIM = 4;
-static const int HIDDEN_DIM = 128;
+#ifndef HIDDEN_DIM
+#define HIDDEN_DIM 128
+#endif
+static const int HIDDEN_SZ = HIDDEN_DIM;
 static const int OUTPUT_DIM = 3;
 static const float ALPHA = 0.01f;
 static const int SUBGROUP_SIZE = 32;
