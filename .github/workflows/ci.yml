@@ -257,24 +257,17 @@ jobs:
       runs-on: '["windows-latest"]'
 
   # Automatically re-run failed jobs if the failure was caused by a faulty GPU VM.
-  # Checks whether any failed job's "GPU health check" step failed, and if so,
-  # triggers a re-run of only the failed jobs to get a new (hopefully healthy) VM.
+  # Only covers Linux container test jobs which have the "GPU health check" step.
+  # Skipped for fork PRs (GITHUB_TOKEN is read-only, rerun would fail).
   rerun-on-gpu-failure:
-    needs:
-      [
-        test-linux-release-gcc-x86_64,
-        test-linux-debug-gcc-x86_64,
-        test-windows-release-cl-x86_64-gpu,
-        test-windows-debug-cl-x86_64-gpu,
-      ]
+    needs: [test-linux-release-gcc-x86_64, test-linux-debug-gcc-x86_64]
     runs-on: ubuntu-latest
     if: >-
       github.run_attempt < 3 &&
+      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) &&
       always() && (
         needs.test-linux-release-gcc-x86_64.result == 'failure' ||
-        needs.test-linux-debug-gcc-x86_64.result == 'failure' ||
-        needs.test-windows-release-cl-x86_64-gpu.result == 'failure' ||
-        needs.test-windows-debug-cl-x86_64-gpu.result == 'failure'
+        needs.test-linux-debug-gcc-x86_64.result == 'failure'
       )
     permissions:
       actions: write
@@ -286,13 +279,18 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # Use jq to find failed jobs where the "GPU health check" step failed
+          # Find failed jobs where the "GPU health check" step failed
           gpu_failures=$(gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs?per_page=100" \
-            --jq '[.jobs[] | select(.conclusion == "failure") | select(.steps[]? | select(.name == "GPU health check" and .conclusion == "failure"))] | length')
+            --jq '[.jobs[] | select(.conclusion == "failure") | select(.steps[]? | select(.name == "GPU health check" and .conclusion == "failure"))] | length' \
+            || echo "0")
+          gpu_failures=${gpu_failures:-0}
+          if ! [[ "$gpu_failures" =~ ^[0-9]+$ ]]; then
+            gpu_failures=0
+          fi
 
           if [ "$gpu_failures" -gt 0 ]; then
             echo "Found $gpu_failures job(s) with GPU health check failures — re-running failed jobs..."
-            gh run rerun ${{ github.run_id }} --failed --repo "${{ github.repository }}"
+            gh run rerun ${{ github.run_id }} --failed --repo "${{ github.repository }}" || echo "::warning::Rerun failed (may be unsupported for this run state)"
             echo "rerun-triggered=true" >> "$GITHUB_OUTPUT"
           else
             echo "No GPU health check failures — test failures are genuine."
