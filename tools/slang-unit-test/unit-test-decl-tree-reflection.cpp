@@ -138,6 +138,15 @@ SLANG_UNIT_TEST(declTreeReflection)
     SLANG_CHECK(firstDecl->getKind() == slang::DeclReflection::Kind::Struct);
     SLANG_CHECK(firstDecl->getChildrenCount() == 2);
 
+    // Verify getDeclSourceLocation on a struct declaration.
+    {
+        auto srcLoc = session->getDeclSourceLocation(firstDecl);
+        SLANG_CHECK(srcLoc.filePath != nullptr);
+        SLANG_CHECK(UnownedStringSlice(srcLoc.filePath) == "m.slang");
+        SLANG_CHECK(srcLoc.line == 3);
+        SLANG_CHECK(srcLoc.column == 16);
+    }
+
     {
         slang::TypeReflection* type = firstDecl->getType();
         SLANG_CHECK(getTypeFullName(type) == "MyFuncPropertyAttribute");
@@ -155,6 +164,15 @@ SLANG_UNIT_TEST(declTreeReflection)
     SLANG_CHECK(
         secondDecl->getChildrenCount() ==
         2); // Parameter declarations are children (return type is not)
+
+    // Verify getDeclSourceLocation on a function declaration.
+    {
+        auto srcLoc = session->getDeclSourceLocation(secondDecl);
+        SLANG_CHECK(srcLoc.filePath != nullptr);
+        SLANG_CHECK(UnownedStringSlice(srcLoc.filePath) == "m.slang");
+        SLANG_CHECK(srcLoc.line == 7);
+        SLANG_CHECK(srcLoc.column == 15);
+    }
 
     {
         auto funcReflection = secondDecl->asFunction();
