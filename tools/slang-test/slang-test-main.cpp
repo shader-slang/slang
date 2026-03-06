@@ -49,6 +49,10 @@
 #include <atomic>
 #include <thread>
 
+#if SLANG_UNIX_FAMILY
+#include <signal.h>
+#endif
+
 #if defined(_WIN32)
 #include <slang-rhi/agility-sdk.h>
 SLANG_RHI_EXPORT_AGILITY_SDK
@@ -5910,6 +5914,12 @@ SlangResult innerMain(int argc, char** argv)
 
 int main(int argc, char** argv)
 {
+#if SLANG_UNIX_FAMILY
+    // Ignore SIGPIPE so that writing to a broken pipe (e.g. a crashed test-server)
+    // returns EPIPE instead of killing this process (exit code 141).
+    signal(SIGPIPE, SIG_IGN);
+#endif
+
     // Fallback: run without cleanup if context initialization fails
     SlangResult res = innerMain(argc, argv);
     slang::shutdown();
