@@ -167,6 +167,7 @@ SlangResult CommandLineDownstreamCompiler::compile(
     // Somethings gone wrong if we don't find the main artifact
     if (!productArtifact)
     {
+        diagnostics->setResult(SLANG_FAIL);
         *outArtifact = resultArtifact.detach();
         return SLANG_FAIL;
     }
@@ -195,6 +196,7 @@ SlangResult CommandLineDownstreamCompiler::compile(
     // If execute completely failed (couldn't run the process), return failure
     if (SLANG_FAILED(executeResult))
     {
+        diagnostics->setResult(executeResult);
         *outArtifact = resultArtifact.detach();
         return executeResult;
     }

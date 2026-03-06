@@ -215,22 +215,26 @@ function(set_default_compile_options target)
 
     if(SLANG_ENABLE_ASAN)
         if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-            # Clang defaults to statically linking the sanitizer runtime (except on macOS/Darwin),
-            # which is not compatible with `-Wl,--no-undefined`, so we need to use dynamic linking
-            # instead (`-shared-libsan`).
             target_compile_options(
                 ${target}
                 PRIVATE
                     -fsanitize=address
-                    -shared-libsan
                     -fsanitize=undefined
                     -fno-sanitize-recover=undefined
             )
             target_link_options(
                 ${target}
                 BEFORE
-                PUBLIC -fsanitize=address -shared-libsan -fsanitize=undefined
+                PRIVATE -fsanitize=address -fsanitize=undefined
             )
+            if(NOT APPLE)
+                # Clang defaults to statically linking the sanitizer runtime,
+                # which is not compatible with `-Wl,--no-undefined`, so we need
+                # to use dynamic linking instead (`-shared-libsan`).
+                # On macOS/Darwin the sanitizer runtime is already dynamic.
+                target_compile_options(${target} PRIVATE -shared-libsan)
+                target_link_options(${target} BEFORE PRIVATE -shared-libsan)
+            endif()
         elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
             target_compile_options(
                 ${target}
@@ -242,11 +246,11 @@ function(set_default_compile_options target)
             target_link_options(
                 ${target}
                 BEFORE
-                PUBLIC -fsanitize=address -fsanitize=undefined
+                PRIVATE -fsanitize=address -fsanitize=undefined
             )
         elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
             target_compile_options(${target} PRIVATE /fsanitize=address)
-            target_link_options(${target} BEFORE PUBLIC /INCREMENTAL:NO)
+            target_link_options(${target} BEFORE PRIVATE /INCREMENTAL:NO)
         else()
             message(FATAL_ERROR "SLANG_ENABLE_ASAN: unsupported C++ compiler")
         endif()
