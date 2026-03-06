@@ -20,8 +20,16 @@ static String getTypeFullName(slang::TypeReflection* type)
 
 static void printRefl(slang::ISession* session, slang::DeclReflection* refl, unsigned int level = 0)
 {
-    // Mapping of kind ids to names
-    std::string names[] = {"Unsupported", "Struct", "Function", "Module", "Generic", "Variable"};
+    std::string names[] = {
+        "Unsupported",
+        "Struct",
+        "Function",
+        "Module",
+        "Generic",
+        "Variable",
+        "Namespace",
+        "Enum",
+    };
     for (unsigned int i = 0; i < level; i++)
     {
         std::cout << "  ";
@@ -29,7 +37,9 @@ static void printRefl(slang::ISession* session, slang::DeclReflection* refl, uns
     slang::SourceLocation sourceLocation;
     session->getDeclSourceLocation(refl, &sourceLocation);
     const char* filePath = sourceLocation.filePath ? sourceLocation.filePath : "<null>";
-    std::cout << "[" << names[(unsigned int)refl->getKind()] << "] (" << refl->getChildrenCount()
+    auto kindIndex = (unsigned int)refl->getKind();
+    auto kindName = kindIndex < SLANG_COUNT_OF(names) ? names[kindIndex] : std::string("Unknown");
+    std::cout << "[" << kindName << "] (" << refl->getChildrenCount()
               << ") " << filePath << ":" << sourceLocation.line << ":" << sourceLocation.column
               << std::endl;
 
