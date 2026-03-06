@@ -12,7 +12,17 @@ Perform a comprehensive code review of this PR for the Slang shader compiler usi
 - cross-backend-reviewer
 - documentation-accuracy-reviewer
 
-First, fetch the PR diff yourself with `gh pr diff <number>` and the changed files list. Then you MUST dispatch ALL subagents listed above in parallel, regardless of PR size. Do NOT skip any — even for small PRs, each agent catches different classes of issues. Pass the full diff content and changed file list in each subagent's prompt. Instruct each to read CLAUDE.md for project context. Subagents can read local files (base branch) for surrounding context but cannot run Bash — you must provide the diff to them. Each should report only noteworthy findings with confidence ≥80.
+First, fetch the PR diff yourself with `gh pr diff <number>` and the changed files list.
+
+Then dispatch EXACTLY 6 subagents — one for each reviewer listed above. This is mandatory. Make 6 separate Agent tool calls, one per reviewer. Do NOT combine reviewers. Do NOT skip any reviewer regardless of PR size. A review with fewer than 6 subagents is incomplete.
+
+For each Agent call:
+- Set `subagent_type` to the reviewer name (e.g., "code-quality-reviewer")
+- Include the full diff content and changed file list in the prompt
+- Instruct the subagent to read CLAUDE.md for project context
+- Subagents can read local files (base branch) for surrounding context but cannot run Bash
+
+Wait for ALL 6 subagents to complete before proceeding. Each should report only noteworthy findings with confidence ≥80.
 
 Once all subagents finish, review their combined feedback and apply a second editorial filter:
 - Drop any finding you judge to be a false positive or low-value
