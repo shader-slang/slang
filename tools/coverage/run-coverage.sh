@@ -121,28 +121,47 @@ else
   $LLVM_PROFDATA merge -sparse "$COVERAGE_DIR"/slang-test-*.profraw -o "$COVERAGE_DIR"/slang-test.profdata
 fi
 
-# Generate summary report
+# Load slangc compiler-only ignore patterns (shared with CI workflow)
+source "$(dirname "${BASH_SOURCE[0]}")/slangc-ignore-patterns.sh"
+
+# Generate summary report (full library)
 echo
-echo "Coverage Summary:"
-echo "================"
+echo "Full Library Coverage Summary:"
+echo "=============================="
 $LLVM_COV report "$LIBSLANG" -instr-profile="$COVERAGE_DIR"/slang-test.profdata
 
-# Generate HTML report (optional)
+# Generate slangc compiler-only summary report
+echo
+echo "slangc Compiler Coverage (excludes generated/non-compiler code):"
+echo "================================================================"
+$LLVM_COV report "$LIBSLANG" -instr-profile="$COVERAGE_DIR"/slang-test.profdata "${SLANGC_IGNORE_ARGS[@]}"
+
+# Generate HTML reports (optional)
 if [[ "$COVERAGE_HTML" = "1" ]]; then
   HTML_DIR="${COVERAGE_HTML_DIR:-$REPO_ROOT/coverage-html}"
+
   echo
-  echo "Generating HTML coverage report..."
+  echo "Generating HTML coverage report (full library)..."
   $LLVM_COV show "$LIBSLANG" \
     -instr-profile="$COVERAGE_DIR"/slang-test.profdata \
     -format=html \
     -output-dir="$HTML_DIR"
-  echo
   echo "HTML report generated in $HTML_DIR/index.html"
 
-  # Try to open the report on macOS
+  SLANGC_HTML_DIR="${HTML_DIR}-slangc"
+  echo
+  echo "Generating HTML coverage report (slangc compiler only)..."
+  $LLVM_COV show "$LIBSLANG" \
+    -instr-profile="$COVERAGE_DIR"/slang-test.profdata \
+    -format=html \
+    -output-dir="$SLANGC_HTML_DIR" \
+    "${SLANGC_IGNORE_ARGS[@]}"
+  echo "HTML report generated in $SLANGC_HTML_DIR/index.html"
+
   if [[ "$OSTYPE" == "darwin"* ]]; then
-    echo "Opening report in browser..."
+    echo "Opening reports in browser..."
     open "$HTML_DIR/index.html"
+    open "$SLANGC_HTML_DIR/index.html"
   fi
 fi
 
@@ -162,7 +181,8 @@ echo "Coverage data files:"
 echo "  - $COVERAGE_DIR/slang-test.profdata (merged profile data)"
 echo "  - $COVERAGE_DIR/*.profraw (raw profile data - can be deleted)"
 if [[ "$COVERAGE_HTML" = "1" ]]; then
-  echo "  - ${COVERAGE_HTML_DIR:-$REPO_ROOT/coverage-html}/ (HTML report)"
+  echo "  - ${COVERAGE_HTML_DIR:-$REPO_ROOT/coverage-html}/ (HTML report - full library)"
+  echo "  - ${COVERAGE_HTML_DIR:-$REPO_ROOT/coverage-html}-slangc/ (HTML report - slangc compiler only)"
 fi
 if [[ "$COVERAGE_LCOV" = "1" ]]; then
   echo "  - ${COVERAGE_LCOV_FILE:-$REPO_ROOT/coverage.lcov} (LCOV format for CI tools)"

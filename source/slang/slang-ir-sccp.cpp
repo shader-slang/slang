@@ -144,6 +144,35 @@ struct SCCPContext
         case kIROp_IntCast:
         case kIROp_FloatCast:
         case kIROp_Select:
+        case kIROp_ConstexprAdd:
+        case kIROp_ConstexprSub:
+        case kIROp_ConstexprMul:
+        case kIROp_ConstexprDiv:
+        case kIROp_ConstexprNeg:
+        case kIROp_ConstexprIRem:
+        case kIROp_ConstexprShl:
+        case kIROp_ConstexprShr:
+        case kIROp_ConstexprBitAnd:
+        case kIROp_ConstexprBitOr:
+        case kIROp_ConstexprBitXor:
+        case kIROp_ConstexprBitNot:
+        case kIROp_ConstexprNot:
+        case kIROp_ConstexprEql:
+        case kIROp_ConstexprNeq:
+        case kIROp_ConstexprGreater:
+        case kIROp_ConstexprLess:
+        case kIROp_ConstexprGeq:
+        case kIROp_ConstexprLeq:
+        case kIROp_ConstexprAnd:
+        case kIROp_ConstexprOr:
+        case kIROp_ConstexprSelect:
+        case kIROp_ConstexprIntCast:
+        case kIROp_ConstexprCastIntToFloat:
+        case kIROp_ConstexprCastFloatToInt:
+        case kIROp_ConstexprFloatCast:
+        case kIROp_ConstexprCastIntToEnum:
+        case kIROp_ConstexprCastEnumToInt:
+        case kIROp_ConstexprEnumCast:
             return true;
         default:
             return false;
@@ -945,9 +974,16 @@ struct SCCPContext
         switch (inst->getOp())
         {
         case kIROp_IntCast:
+        case kIROp_ConstexprIntCast:
         case kIROp_FloatCast:
+        case kIROp_ConstexprFloatCast:
         case kIROp_CastIntToFloat:
+        case kIROp_ConstexprCastIntToFloat:
         case kIROp_CastFloatToInt:
+        case kIROp_ConstexprCastFloatToInt:
+        case kIROp_ConstexprCastIntToEnum:
+        case kIROp_ConstexprCastEnumToInt:
+        case kIROp_ConstexprEnumCast:
             switch (inst->getOperandCount())
             {
             case 1:
@@ -959,21 +995,25 @@ struct SCCPContext
         case kIROp_DefaultConstruct:
             return evalDefaultConstruct(inst->getDataType());
         case kIROp_Add:
+        case kIROp_ConstexprAdd:
             return evalAdd(
                 inst->getDataType(),
                 getLatticeVal(inst->getOperand(0)),
                 getLatticeVal(inst->getOperand(1)));
         case kIROp_Sub:
+        case kIROp_ConstexprSub:
             return evalSub(
                 inst->getDataType(),
                 getLatticeVal(inst->getOperand(0)),
                 getLatticeVal(inst->getOperand(1)));
         case kIROp_Mul:
+        case kIROp_ConstexprMul:
             return evalMul(
                 inst->getDataType(),
                 getLatticeVal(inst->getOperand(0)),
                 getLatticeVal(inst->getOperand(1)));
         case kIROp_Div:
+        case kIROp_ConstexprDiv:
             {
                 // Detect divide by zero error.
                 auto divisor = getLatticeVal(inst->getOperand(1));
@@ -995,6 +1035,7 @@ struct SCCPContext
             }
         case kIROp_FRem:
         case kIROp_IRem:
+        case kIROp_ConstexprIRem:
             {
                 // Detect divide by zero error.
                 auto divisor = getLatticeVal(inst->getOperand(1));
@@ -1015,60 +1056,73 @@ struct SCCPContext
                 return evalRem(inst->getDataType(), getLatticeVal(inst->getOperand(0)), divisor);
             }
         case kIROp_Eql:
+        case kIROp_ConstexprEql:
             return evalEql(
                 inst->getDataType(),
                 getLatticeVal(inst->getOperand(0)),
                 getLatticeVal(inst->getOperand(1)));
         case kIROp_Neq:
+        case kIROp_ConstexprNeq:
             return evalNeq(
                 inst->getDataType(),
                 getLatticeVal(inst->getOperand(0)),
                 getLatticeVal(inst->getOperand(1)));
         case kIROp_Greater:
+        case kIROp_ConstexprGreater:
             return evalGreater(
                 inst->getDataType(),
                 getLatticeVal(inst->getOperand(0)),
                 getLatticeVal(inst->getOperand(1)));
         case kIROp_Less:
+        case kIROp_ConstexprLess:
             return evalLess(
                 inst->getDataType(),
                 getLatticeVal(inst->getOperand(0)),
                 getLatticeVal(inst->getOperand(1)));
         case kIROp_Leq:
+        case kIROp_ConstexprLeq:
             return evalLeq(
                 inst->getDataType(),
                 getLatticeVal(inst->getOperand(0)),
                 getLatticeVal(inst->getOperand(1)));
         case kIROp_Geq:
+        case kIROp_ConstexprGeq:
             return evalGeq(
                 inst->getDataType(),
                 getLatticeVal(inst->getOperand(0)),
                 getLatticeVal(inst->getOperand(1)));
         case kIROp_And:
+        case kIROp_ConstexprAnd:
             return evalAnd(
                 inst->getDataType(),
                 getLatticeVal(inst->getOperand(0)),
                 getLatticeVal(inst->getOperand(1)));
         case kIROp_Or:
+        case kIROp_ConstexprOr:
             return evalOr(
                 inst->getDataType(),
                 getLatticeVal(inst->getOperand(0)),
                 getLatticeVal(inst->getOperand(1)));
         case kIROp_Not:
+        case kIROp_ConstexprNot:
             return evalNot(inst->getDataType(), getLatticeVal(inst->getOperand(0)));
         case kIROp_BitAnd:
+        case kIROp_ConstexprBitAnd:
             return evalBitAnd(
                 inst->getDataType(),
                 getLatticeVal(inst->getOperand(0)),
                 getLatticeVal(inst->getOperand(1)));
         case kIROp_BitOr:
+        case kIROp_ConstexprBitOr:
             return evalBitOr(
                 inst->getDataType(),
                 getLatticeVal(inst->getOperand(0)),
                 getLatticeVal(inst->getOperand(1)));
         case kIROp_BitNot:
+        case kIROp_ConstexprBitNot:
             return evalBitNot(inst->getDataType(), getLatticeVal(inst->getOperand(0)));
         case kIROp_BitXor:
+        case kIROp_ConstexprBitXor:
             return evalBitXor(
                 inst->getDataType(),
                 getLatticeVal(inst->getOperand(0)),
@@ -1076,18 +1130,22 @@ struct SCCPContext
         case kIROp_BitCast:
             return evalBitCast(inst->getDataType(), getLatticeVal(inst->getOperand(0)));
         case kIROp_Neg:
+        case kIROp_ConstexprNeg:
             return evalNeg(inst->getDataType(), getLatticeVal(inst->getOperand(0)));
         case kIROp_Lsh:
+        case kIROp_ConstexprShl:
             return evalLsh(
                 inst->getDataType(),
                 getLatticeVal(inst->getOperand(0)),
                 getLatticeVal(inst->getOperand(1)));
         case kIROp_Rsh:
+        case kIROp_ConstexprShr:
             return evalRsh(
                 inst->getDataType(),
                 getLatticeVal(inst->getOperand(0)),
                 getLatticeVal(inst->getOperand(1)));
         case kIROp_Select:
+        case kIROp_ConstexprSelect:
             return evalSelect(
                 getLatticeVal(inst->getOperand(0)),
                 getLatticeVal(inst->getOperand(1)),
