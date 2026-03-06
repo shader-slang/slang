@@ -1,0 +1,183 @@
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+name: CI SlangPy Test Workflow (Containerized)
+
+on:
+  workflow_call:
+    inputs:
+      config:
+        required: true
+        type: string
+      server-count:
+        required: false
+        type: number
+        default: 4
+
+jobs:
+  test-slangpy:
+    runs-on: ["Linux", "self-hosted", "GPU"]
+    timeout-minutes: 60
+
+    permissions:
+      contents: read
+      packages: read
+
+    container:
+      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.3.0
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+      options: >-
+        --gpus all
+        --user root
+        --device /dev/nvidia-modeset:/dev/nvidia-modeset
+        --device /dev/dri:/dev/dri
+        -e NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics
+        -v /etc/vulkan/icd.d/nvidia_icd.json:/etc/vulkan/icd.d/nvidia_icd.json:ro
+        -v /usr/share/nvidia:/usr/share/nvidia:ro
+        -v /usr/share/glvnd/egl_vendor.d/10_nvidia.json:/usr/share/glvnd/egl_vendor.d/10_nvidia.json:ro
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Configure Git safe directory
+        run: git config --global --add safe.directory '*'
+
+      - uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
+          fetch-depth: "1"
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: slang-tests-linux-x86_64-gcc-${{ inputs.config }}
+          path: artifacts
+
+      - name: Setup test environment
+        run: |
+          if [[ "${{ inputs.config }}" == "release" ]]; then
+            cmake_config="Release"
+          else
+            cmake_config="Debug"
+          fi
+          echo "cmake_config=$cmake_config" >> $GITHUB_ENV
+
+          bin_dir="$PWD/artifacts/${cmake_config}/bin"
+          lib_dir="$PWD/artifacts/${cmake_config}/lib"
+          echo "bin_dir=$bin_dir" >> $GITHUB_ENV
+          echo "lib_dir=$lib_dir" >> $GITHUB_ENV
+
+          chmod +x "$bin_dir"/* 2>/dev/null || true
+          echo "LD_LIBRARY_PATH=$lib_dir:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+
+          # Display environment configuration
+          print-env-info
+
+      - name: Install and setup slangpy
+        run: |
+          python3 --version
+          echo "Cleaning up existing installations and installing slangpy..."
+
+          # Try to uninstall existing slangpy
+          python3 -m pip uninstall -y slangpy || echo "slangpy not found or already removed"
+
+          # Install slangpy
+          python3 -m pip install --verbose slangpy --user
+
+          # Get site packages directory
+          SITE_PACKAGES=$(python3 -c "import slangpy; import os; print(os.path.dirname(os.path.dirname(slangpy.__file__)))" | tail -n 1)
+          echo "Site packages directory: $SITE_PACKAGES"
+          echo "bin_dir location: $bin_dir"
+          echo "lib_dir location: $lib_dir"
+
+          #
+          # THIS IS A HUGE HACK, the latest slangpy release hardcoded this
+          # directory when looking for slangc. We should remove the offending
+          # code from slangpy and just put slangc into PATH here. The offending
+          # code is find_slangc() in
+          # slangpy/tests/device/test_precompiled_modules.py
+          #
+          # See https://github.com/shader-slang/slangpy/issues/696
+          #
+          SLANGC_TARGET_DIR="$SITE_PACKAGES/build/pip/_deps/slang-src/bin"
+          mkdir -p "$SLANGC_TARGET_DIR"
+          # Copy slangc binary to the expected location
+          cp -v "$bin_dir/slangc" "$SLANGC_TARGET_DIR/"
+          chmod +x "$SLANGC_TARGET_DIR/slangc"
+
+          # Remove old slang libraries and copy new ones
+          echo "Removing old slang libraries..."
+          rm -f "$SITE_PACKAGES/slangpy"/libslang*
+
+          echo "Copying new slang libraries..."
+          cp -v "$lib_dir"/libslang*.* "$SITE_PACKAGES/slangpy/" || { echo "Failed to copy library files"; exit 1; }
+
+          # Create symlink for the old library version that slangpy extension was linked against
+          echo "Creating symlink for slangpy compatibility..."
+          ln -sf libslang-compiler.so "$SITE_PACKAGES/slangpy/libslang-compiler.so.0.2025.24.3"
+
+          # Copy standard modules directory (contains neural module)
+          STD_MODULE_DIR=$(find "$lib_dir" -maxdepth 1 -type d -name "slang-standard-module-*" | head -1)
+          if [[ -n "$STD_MODULE_DIR" ]]; then
+            echo "Copying standard modules from: $STD_MODULE_DIR"
+            cp -r "$STD_MODULE_DIR" "$SITE_PACKAGES/slangpy/" || echo "Warning: Failed to copy standard modules"
+          fi
+
+          echo "Listing files in slangpy directory..."
+          ls -la "$SITE_PACKAGES/slangpy/"
+
+          # Export SITE_PACKAGES for use in subsequent steps
+          echo "SITE_PACKAGES=$SITE_PACKAGES" >> $GITHUB_ENV
+
+          echo "Installing python packages..."
+          curl -fsSL https://raw.githubusercontent.com/shader-slang/slangpy/main/requirements-dev.txt -o requirements-dev.txt
+          python3 -m pip install -r requirements-dev.txt --user
+          python3 -m pip install pytest-github-actions-annotate-failures --user
+          python3 -m pip install pytest-xdist --user
+
+      - name: Run slangpy tests
+        run: |
+          echo "Running pytest on slangpy tests..."
+          export PYTHONPATH="$SITE_PACKAGES"
+          export SLANG_RUN_SPIRV_VALIDATION=1
+
+          # First attempt: run with parallel execution
+          if python3 -m pytest "$SITE_PACKAGES/slangpy/tests" -ra -n auto --maxprocesses=3
+          then
+            echo "All tests passed on first attempt."
+          else
+            echo ""
+            echo "========================================"
+            echo "Some tests failed. Re-running failed tests sequentially..."
+            echo "========================================"
+            echo ""
+            # Re-run only the failed tests without parallelism (-n 0 disables xdist)
+            #   --lf, --last-failed   Rerun only the tests that failed at the last run
+            #   -n 0                  Rerun the tests sequentially
+            python3 -m pytest "$SITE_PACKAGES/slangpy/tests" -ra -n 0 --lf
+          fi
+
+      - name: Run slang neural integration tests
+        run: |
+          export PYTHONPATH="$SITE_PACKAGES"
+          export SLANG_RUN_SPIRV_VALIDATION=1
+
+          echo "Running neural module integration tests..."
+          # These tests live in the slang repo and test neural module functionality via slangpy
+          if python3 -m pytest tests/integration/slangpy/neural/ -ra -v
+          then
+            echo "All neural integration tests passed."
+          else
+            echo ""
+            echo "========================================"
+            echo "Some neural integration tests failed. Re-running failed tests..."
+            echo "========================================"
+            echo ""
+            python3 -m pytest tests/integration/slangpy/neural/ -ra -v --lf
+          fi
+
+      # NOTE: slangpy-samples tests are not run here to match the original
+      # ci-slang-test-container.yml behavior. The slangpy-samples tests have
+      # known issues with pickled test data that need to be fixed upstream.
