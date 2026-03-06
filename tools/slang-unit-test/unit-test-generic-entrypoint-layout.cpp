@@ -88,7 +88,7 @@ SLANG_UNIT_TEST(genericEntryPointLayout)
         SLANG_CHECK_ABORT(specializedEntryPoint != nullptr);
 
         auto layout = specializedEntryPoint->getLayout();
-        SLANG_CHECK(layout != nullptr);
+        SLANG_CHECK_ABORT(layout != nullptr);
 
         auto entryPointLayout = layout->getEntryPointByIndex(0);
         SLANG_CHECK(entryPointLayout != nullptr);
@@ -105,7 +105,7 @@ SLANG_UNIT_TEST(genericEntryPointLayout)
         SLANG_CHECK_ABORT(entryPoint != nullptr);
 
         auto layout = entryPoint->getLayout();
-        SLANG_CHECK(layout != nullptr);
+        SLANG_CHECK_ABORT(layout != nullptr);
 
         auto entryPointLayout = layout->getEntryPointByIndex(0);
         SLANG_CHECK(entryPointLayout != nullptr);
