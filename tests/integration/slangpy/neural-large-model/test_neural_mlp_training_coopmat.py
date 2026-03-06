@@ -93,13 +93,13 @@ def _create_device_and_kernels(extra_defines=None):
     return device, kernels, high_level_module
 
 
-def _create_buffers(device, mlp_dtype="float32"):
+def _create_buffers(device, mlp_dtype="float32", hidden_dim=HIDDEN_DIM):
     """Create all GPU buffers. mlp_dtype controls MLP param precision."""
     np.random.seed(42)
 
     mlp_params_np = kaiming_uniform_init(
-        [(INPUT_DIM, HIDDEN_DIM), (HIDDEN_DIM, HIDDEN_DIM),
-         (HIDDEN_DIM, HIDDEN_DIM), (HIDDEN_DIM, OUTPUT_DIM)]
+        [(INPUT_DIM, hidden_dim), (hidden_dim, hidden_dim),
+         (hidden_dim, hidden_dim), (hidden_dim, OUTPUT_DIM)]
     ).astype(mlp_dtype)
     total_mlp = len(mlp_params_np)
 
@@ -346,11 +346,11 @@ def test_parameter_count_coopmat(device_type: spy.DeviceType) -> None:
         device.close()
 
 
-def _train_n_iters(defines, mlp_dtype, loss_scale, num_iters):
+def _train_n_iters(defines, mlp_dtype, loss_scale, num_iters, hidden_dim=HIDDEN_DIM):
     """Train for N iterations and return the loss curve. Used for cross-precision comparison."""
     device, kernels, module = _create_device_and_kernels(extra_defines=defines)
     try:
-        bufs = _create_buffers(device, mlp_dtype=mlp_dtype)
+        bufs = _create_buffers(device, mlp_dtype=mlp_dtype, hidden_dim=hidden_dim)
         ref_buf, w, h, _ = _load_reference_image(device)
         resolution = (w, h)
         batch_size = (64, 64)
@@ -418,6 +418,80 @@ def test_float_vs_half_coopmat(device_type: spy.DeviceType) -> None:
     assert ratio < 5.0, \
         f"Half loss too far from float: ratio {ratio:.2f} (half={half_losses[-1]:.4f}, float={float_losses[-1]:.4f})"
     print("  PASS: both converge, half within 5x of float")
+
+
+@pytest.mark.parametrize("device_type", [spy.DeviceType.cuda])
+def test_small_network_stress_coopmat(device_type: spy.DeviceType) -> None:
+    """Stress test with small network (4->32->32->3) at large workgroup size (256).
+
+    8 warps per workgroup maximizes cross-warp contention for shared memory,
+    barrier synchronization, and outerProductAccumulate reductions.
+    Runs float and half variants, then repeats each to check determinism.
+    """
+    stress_hidden = 32
+    stress_wg = 256
+    num_iters = 200
+
+    base_defines = {"HIDDEN_DIM": str(stress_hidden), "WORKGROUP_SIZE": str(stress_wg)}
+
+    def run_variant(use_half, label):
+        defines = dict(base_defines)
+        dtype = "float32"
+        if use_half:
+            defines["USE_HALF"] = "1"
+            dtype = "float16"
+        return _train_n_iters(
+            defines=defines, mlp_dtype=dtype, loss_scale=1.0,
+            num_iters=num_iters, hidden_dim=stress_hidden)
+
+    print(f"\n=== Small-network stress: HIDDEN={stress_hidden}, WG={stress_wg} ===")
+
+    print("--- Float run 1 ---")
+    float_1 = run_variant(False, "float-1")
+    print(f"  Init: {float_1[0]:.4f}  Final: {float_1[-1]:.4f}")
+
+    print("--- Float run 2 (determinism) ---")
+    float_2 = run_variant(False, "float-2")
+    print(f"  Init: {float_2[0]:.4f}  Final: {float_2[-1]:.4f}")
+
+    print("--- Half run 1 ---")
+    half_1 = run_variant(True, "half-1")
+    print(f"  Init: {half_1[0]:.4f}  Final: {half_1[-1]:.4f}")
+
+    print("--- Half run 2 (determinism) ---")
+    half_2 = run_variant(True, "half-2")
+    print(f"  Init: {half_2[0]:.4f}  Final: {half_2[-1]:.4f}")
+
+    print("--- Results ---")
+
+    assert np.isfinite(float_1[-1]), "Float run 1 produced NaN"
+    assert np.isfinite(half_1[-1]), "Half run 1 produced NaN"
+
+    assert float_1[-1] < float_1[0] * 0.5, \
+        f"Float didn't converge: {float_1[-1]:.4f} >= 50% of {float_1[0]:.4f}"
+    assert half_1[-1] < half_1[0] * 0.5, \
+        f"Half didn't converge: {half_1[-1]:.4f} >= 50% of {half_1[0]:.4f}"
+
+    # Atomic float add ordering is non-deterministic, so allow small relative differences.
+    # A real race condition (gradient corruption) causes >10% divergence, not rounding noise.
+    det_rtol = 0.01
+    float_max_diff = max(abs(a - b) / max(abs(a), 1e-10) for a, b in zip(float_1, float_2))
+    half_max_diff = max(abs(a - b) / max(abs(a), 1e-10) for a, b in zip(half_1, half_2))
+    float_det = float_max_diff < det_rtol
+    half_det = half_max_diff < det_rtol
+    print(f"  Float determinism: {'PASS' if float_det else 'FAIL'} (max rel diff: {float_max_diff:.6f})")
+    print(f"  Half determinism:  {'PASS' if half_det else 'FAIL'} (max rel diff: {half_max_diff:.6f})")
+
+    ratio = half_1[-1] / max(float_1[-1], 1e-10)
+    print(f"  Float final: {float_1[-1]:.4f}")
+    print(f"  Half final:  {half_1[-1]:.4f}")
+    print(f"  Half/Float ratio: {ratio:.2f}")
+
+    assert float_det, "Float training is non-deterministic (possible race condition)"
+    assert half_det, "Half training is non-deterministic (possible race condition)"
+    assert ratio < 5.0, \
+        f"Half loss too far from float: ratio {ratio:.2f}"
+    print("  PASS: convergence OK, deterministic, half within tolerance")
 
 
 if __name__ == "__main__":
