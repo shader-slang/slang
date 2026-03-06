@@ -66,9 +66,6 @@ void printDiagnosticArg(StringBuilder& sb, CodeGenTarget val);
 
 class TargetRequest;
 
-/// Does target support expressing debug info stored in the Slang IR?
-bool canTargetUseDebugInfo(TargetRequest* targetReq);
-
 /// Are we generating code for a D3D API?
 bool isD3DTarget(TargetRequest* targetReq);
 

@@ -685,25 +685,6 @@ String getBuildIdentifierString(ComponentType* component)
     return sb.produceString();
 }
 
-bool canTargetUseDebugInfo(TargetRequest* targetReq)
-{
-    if (isCPUTargetViaLLVM(targetReq))
-        return true;
-
-    // For now, only allow debug info for CPU and SPIRV targets.
-    // Other textual targets does not allow us to attach raw debug info in any form.
-    switch (targetReq->getTarget())
-    {
-    case CodeGenTarget::HostLLVMIR:
-    case CodeGenTarget::ShaderLLVMIR:
-    case CodeGenTarget::SPIRV:
-    case CodeGenTarget::SPIRVAssembly:
-        return true;
-    default:
-        return false;
-    }
-}
-
 Result linkAndOptimizeIR(
     CodeGenContext* codeGenContext,
     LinkingAndOptimizationOptions const& options,
@@ -770,8 +751,7 @@ Result linkAndOptimizeIR(
     // Debug info is added by the front-end. If the target cannot express debug info, or if the user
     // specifies -g0, we need to stripped them out now to allow more optimization and cleanups.
     if (requiredLoweringPassSet.debugInfo &&
-        (targetCompilerOptions.getDebugInfoLevel() == DebugInfoLevel::None ||
-         !canTargetUseDebugInfo(targetRequest)))
+        (targetCompilerOptions.getDebugInfoLevel() == DebugInfoLevel::None))
         SLANG_PASS(stripDebugInfo);
 
     if (!isKhronosTarget(targetRequest) && requiredLoweringPassSet.glslSSBO)
