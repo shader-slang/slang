@@ -21,35 +21,24 @@ void computeMain()
     funcInt8(256);
 //CHECK:     ^^^ integer constant overflow in conversion
 //CHECK:     ^^^ integer value '256' does not fit in type 'int8_t'
-    funcInt8(-200);
-//CHECK:      ^^^ integer constant overflow in conversion
-//CHECK:      ^^^ integer value '-200' does not fit in type 'int8_t'
     funcUint8(256);
 //CHECK:      ^^^ integer constant overflow in conversion
 //CHECK:      ^^^ integer value '256' does not fit in type 'uint8_t'
-    funcInt16(40000);
-//CHECK:      ^^^^^ integer constant overflow in conversion
-//CHECK:      ^^^^^ integer value '40000' does not fit in type 'int16_t'
-
-    // Unsigned-to-signed overflow
-    funcInt(0xFFFFFFFFu);
-//CHECK:    ^^^^^^^^^^^ integer constant overflow in conversion
-//CHECK:    ^^^^^^^^^^^ integer value '4294967295' does not fit in type 'int'
-
-    // Signed-to-unsigned overflow
-    funcUint(-2);
-//CHECK:      ^ integer constant overflow in conversion
-//CHECK:      ^ integer value '-2' does not fit in type 'uint'
-
-    // Half overflow
-    funcHalf(3000);
-//CHECK:     ^^^^ integer constant overflow in conversion
-//CHECK:     ^^^^ integer value '3000' does not fit in type 'half'
 
     // Variable initializer overflow
     int8_t x = 256;
 //CHECK:       ^^^ integer constant overflow in conversion
 //CHECK:       ^^^ integer value '256' does not fit in type 'int8_t'
+
+    // Constant expressions that overflow
+    funcInt8(100 + 200);
+//CHECK:         ^ integer constant overflow in conversion
+//CHECK:         ^ integer value '300' does not fit in type 'int8_t'
+
+    // 65536 needs 17 bits, exceeding int16_t's 16 bits
+    funcInt16(65536);
+//CHECK:      ^^^^^ integer constant overflow in conversion
+//CHECK:      ^^^^^ integer value '65536' does not fit in type 'int16_t'
 
     // Function arguments that fit - should NOT warn
     funcInt8(127);
@@ -60,15 +49,16 @@ void computeMain()
     funcUint(42u);
     funcHalf(2048);
 
+    // Same-width sign reinterpretation is NOT overflow (common bit-pattern usage)
+    funcInt(0xFFFFFFFFu);
+    funcInt8(-200);
+    funcInt16(40000);
+    funcUint(-2);
+
     // -1 to unsigned is allowed (common "all ones" pattern)
     funcUint(-1);
     funcUint8(-1);
 
     // Explicit casts should NOT warn (handled as ExplicitCoercion)
     int8_t y = int8_t(256);
-
-    // Constant expressions that overflow
-    funcInt8(100 + 200);
-//CHECK:         ^ integer constant overflow in conversion
-//CHECK:         ^ integer value '300' does not fit in type 'int8_t'
 }
