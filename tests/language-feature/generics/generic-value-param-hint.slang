@@ -4,8 +4,8 @@
 // Should get the scalar hint.
 struct Foo1<D : int> {}
 /*CHECK:
-         ^^^ type 'int' cannot be used as a constraint
-             use 'let' keyword to declare a generic value parameter: 'let D : int'
+                ^^^ type 'int' cannot be used as a constraint
+                use 'let' keyword to declare a generic value parameter: 'let D : int'
 */
 
 // Case 2: `<each D : int>` — type pack param with int constraint.
