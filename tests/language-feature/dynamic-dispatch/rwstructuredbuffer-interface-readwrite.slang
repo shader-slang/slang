@@ -35,17 +35,18 @@ RWStructuredBuffer<IFoo> rwBuffer;
 //TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
+ImplA createImplA(float v) { ImplA a; a.v = v; return a; }
+ImplB createImplB(float v) { ImplB b; b.v = v; return b; }
+
+//TEST_INPUT: ubuffer(data=[9 4 5], stride=4):name=inputParams
+StructuredBuffer<uint> inputParams;
+
 [numthreads(1, 1, 1)]
 void computeMain()
 {
     // Write concrete types into the RW buffer as existentials
-    ImplA a;
-    a.v = 9.0;
-    rwBuffer[0] = a;
-
-    ImplB b;
-    b.v = 4.0;
-    rwBuffer[1] = b;
+    rwBuffer[0] = createImplA(float(inputParams[0]));
+    rwBuffer[1] = createImplB(float(inputParams[1]));
 
     // Read back and dispatch -- the buffer elements are now existentials
     // whose concrete types must be determined at runtime
@@ -54,9 +55,7 @@ void computeMain()
 
     // Overwrite element 0 with ImplB to verify the buffer correctly
     // tracks type changes
-    ImplB b2;
-    b2.v = 5.0;
-    rwBuffer[0] = b2;
+    rwBuffer[0] = createImplB(float(inputParams[2]));
     outputBuffer[2] = rwBuffer[0].getValue();  // ImplB: 5.0 * 3.0 = 15.0
 
     // Verify element 1 is still ImplB

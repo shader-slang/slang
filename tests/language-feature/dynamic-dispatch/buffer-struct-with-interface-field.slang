@@ -41,42 +41,43 @@ RWStructuredBuffer<SceneObject> objectBuffer;
 //TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
+Lambertian createLambertian(float albedo) { Lambertian l; l.albedo = albedo; return l; }
+Mirror createMirror(float reflectance) { Mirror m; m.reflectance = reflectance; return m; }
+
+SceneObject createSceneObject(float weight, IMaterial mat)
+{
+    SceneObject obj;
+    obj.weight = weight;
+    obj.material = mat;
+    return obj;
+}
+
+//TEST_INPUT: ubuffer(data=[2 3 4 5], stride=4):name=inputParams
+StructuredBuffer<uint> inputParams;
+
 [numthreads(1, 1, 1)]
 void computeMain()
 {
-    // Write a SceneObject with Lambertian material
-    SceneObject obj0;
-    obj0.weight = 0.5;
-    Lambertian lam;
-    lam.albedo = 0.8;
-    obj0.material = lam;
-    objectBuffer[0] = obj0;
-
-    // Write a SceneObject with Mirror material
-    SceneObject obj1;
-    obj1.weight = 1.0;
-    Mirror mir;
-    mir.reflectance = 0.9;
-    obj1.material = mir;
-    objectBuffer[1] = obj1;
+    objectBuffer[0] = createSceneObject(float(inputParams[0]), createLambertian(float(inputParams[1])));
+    objectBuffer[1] = createSceneObject(float(inputParams[2]), createMirror(float(inputParams[3])));
 
     // Read back and verify both concrete and interface fields
     SceneObject loaded0 = objectBuffer[0];
     SceneObject loaded1 = objectBuffer[1];
 
     // weight * material.evaluate(2.0)
-    // Lambertian: 0.5 * (0.8 * 2.0) = 0.5 * 1.6 = 0.8
+    // Lambertian: 2.0 * (3.0 * 2.0) = 2.0 * 6.0 = 12.0
     outputBuffer[0] = loaded0.weight * loaded0.material.evaluate(2.0);
 
-    // Mirror: 1.0 * (0.9 * 2.0 * 2.0) = 1.0 * 3.6 = 3.6
+    // Mirror: 4.0 * (5.0 * 2.0 * 2.0) = 4.0 * 20.0 = 80.0
     outputBuffer[1] = loaded1.weight * loaded1.material.evaluate(2.0);
 
     // Verify the concrete weight field independently
-    outputBuffer[2] = loaded0.weight;  // 0.5
-    outputBuffer[3] = loaded1.weight;  // 1.0
+    outputBuffer[2] = loaded0.weight;  // 2.0
+    outputBuffer[3] = loaded1.weight;  // 4.0
 
-    // CHECK: 0.8
-    // CHECK: 3.6
-    // CHECK: 0.5
-    // CHECK: 1.0
+    // CHECK: 12.0
+    // CHECK: 80.0
+    // CHECK: 2.0
+    // CHECK: 4.0
 }

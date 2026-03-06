@@ -34,6 +34,12 @@ struct CompoundObject
     IFoo elements[2];
 }
 
+ImplA createImplA(float v) { ImplA a; a.v = v; return a; }
+ImplB createImplB(float v) { ImplB b; b.v = v; return b; }
+
+//TEST_INPUT: ubuffer(data=[2 5 3], stride=4):name=inputParams
+StructuredBuffer<uint> inputParams;
+
 // CompoundObject layout:
 //   float scale (4 bytes, padded to alignment)
 //   IFoo elements[0] (24 bytes: RTTI + WitnessTableID + AnyValue)
@@ -48,15 +54,9 @@ RWStructuredBuffer<float> outputBuffer;
 void computeMain()
 {
     CompoundObject obj;
-    obj.scale = 2.0;
-
-    ImplA a;
-    a.v = 5.0;
-    obj.elements[0] = a;
-
-    ImplB b;
-    b.v = 3.0;
-    obj.elements[1] = b;
+    obj.scale = float(inputParams[0]);
+    obj.elements[0] = createImplA(float(inputParams[1]));
+    obj.elements[1] = createImplB(float(inputParams[2]));
 
     rwBuffer[0] = obj;
 
