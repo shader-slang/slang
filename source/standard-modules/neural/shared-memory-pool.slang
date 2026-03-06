@@ -14,6 +14,94 @@ public interface ISharedMemorySize
 public struct SharedMemoryPool<ShMemSize: ISharedMemorySize>
 {
     VISIBILITY_LEVEL static groupshared uint4 data[ShMemSize.Bytes / sizeof(uint4)];
+
+    // =========================================================================
+    // Pack/unpack helpers: store/load scalar U into/from uint4 array by index.
+    //
+    // Layout: element index `i` of type U is stored at:
+    //   uint4 slot:  i / ElementsPerUint4
+    //   uint  comp:  (i % ElementsPerUint4) / ElementsPerUint
+    //   sub-element: i % ElementsPerUint  (shift = subIdx * sizeof(U) * 8)
+    // =========================================================================
+
+    [ForceInline]
+    static void smemStore<U>(uint memOffset, int index, U value)
+        where U : __BuiltinArithmeticType
+    {
+        switch (sizeof(U))
+        {
+        case 2:
+            {
+                static const int elementsPerUint  = 4 / sizeof(U);
+                static const int elementsPerUint4 = 16 / sizeof(U);
+                static const int bitsPerElement   = sizeof(U) * 8;
+                const int slot = index / elementsPerUint4;
+                const int comp = (index % elementsPerUint4) / elementsPerUint;
+                const int sub  = index % elementsPerUint;
+                const uint shift = sub * bitsPerElement;
+                uint packed = data[memOffset + slot][comp];
+                packed = (packed & ~(uint(0xFFFF) << shift)) | (uint(bit_cast<uint16_t>(value)) << shift);
+                data[memOffset + slot][comp] = packed;
+            }
+            break;
+        case 4:
+            {
+                static const int elementsPerUint  = 4 / sizeof(U);
+                static const int elementsPerUint4 = 16 / sizeof(U);
+                const int slot = index / elementsPerUint4;
+                const int comp = (index % elementsPerUint4) / elementsPerUint;
+                data[memOffset + slot][comp] = bit_cast<uint>(value);
+            }
+            break;
+        case 8:
+            {
+                const int slot8 = index / 2;
+                const int comp8 = (index % 2) * 2;
+                vector<uint, 2> v = bit_cast<vector<uint, 2>>(value);
+                data[memOffset + slot8][comp8] = v[0];
+                data[memOffset + slot8][comp8 + 1] = v[1];
+            }
+            break;
+        }
+    }
+
+    [ForceInline]
+    static U smemLoad<U>(uint memOffset, int index)
+        where U : __BuiltinArithmeticType
+    {
+        switch (sizeof(U))
+        {
+        case 2:
+            {
+                static const int elementsPerUint  = 4 / sizeof(U);
+                static const int elementsPerUint4 = 16 / sizeof(U);
+                static const int bitsPerElement   = sizeof(U) * 8;
+                const int slot = index / elementsPerUint4;
+                const int comp = (index % elementsPerUint4) / elementsPerUint;
+                const int sub  = index % elementsPerUint;
+                const uint shift = sub * bitsPerElement;
+                return bit_cast<U>(uint16_t((data[memOffset + slot][comp] >> shift) & 0xFFFF));
+            }
+        case 4:
+            {
+                static const int elementsPerUint  = 4 / sizeof(U);
+                static const int elementsPerUint4 = 16 / sizeof(U);
+                const int slot = index / elementsPerUint4;
+                const int comp = (index % elementsPerUint4) / elementsPerUint;
+                return bit_cast<U>(data[memOffset + slot][comp]);
+            }
+        case 8:
+            {
+                const int slot8 = index / 2;
+                const int comp8 = (index % 2) * 2;
+                uint lo = data[memOffset + slot8][comp8];
+                uint hi = data[memOffset + slot8][comp8 + 1];
+                return bit_cast<U>(vector<uint, 2>(lo, hi));
+            }
+        default:
+            return U(0);
+        }
+    }
 }
 
 internal struct SharedMemoryUsage<T, TargetEnum Target, ExecutionMode ExeMode, int InputSize, int OutputSize, int SubgroupSize>

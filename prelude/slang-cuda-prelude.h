@@ -25,9 +25,8 @@
 // defined for the Slang compile are passed down.
 
 #ifdef SLANG_CUDA_ENABLE_HALF
-// We don't want half2 operators, because it will implement comparison operators that return a
-// bool(!). We want to generate those functions. Doing so means that we will have to define all
-// the other half2 operators.
+// We don't want half2 operators from cuda_fp16.h (comparison returns bool). Arithmetic for
+// __half2 is defined in the macro SLANG_CUDA_VECTOR_FLOAT_OP_HALF2 below (CUDA intrinsics).
 #define __CUDA_NO_HALF2_OPERATORS__
 #include <cuda_fp16.h>
 #endif
@@ -598,10 +597,40 @@ SLANG_CUDA_VECTOR_INT_OPS(ulonglong)
     SLANG_CUDA_VECTOR_BINARY_COMPARE_OP(T, n, ==) \
     SLANG_CUDA_VECTOR_BINARY_COMPARE_OP(T, n, !=) \
     SLANG_CUDA_VECTOR_UNARY_OP(T, n, -)
-#define SLANG_CUDA_VECTOR_FLOAT_OPS(T) \
-    SLANG_CUDA_VECTOR_FLOAT_OP(T, 2)   \
-    SLANG_CUDA_VECTOR_FLOAT_OP(T, 3)   \
-    SLANG_CUDA_VECTOR_FLOAT_OP(T, 4)
+/* Special case __half2: use CUDA intrinsics (__hadd2, __hsub2, etc.) so we get one add.f16x2
+   per op; generic macro would give two add.f16. Compare/logical stay element-wise for bool2. */
+#define SLANG_CUDA_VECTOR_FLOAT_OP_HALF2 \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 operator+(const __half2& lh, const __half2& rh) { return __hadd2(lh, rh); } \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 operator-(const __half2& lh, const __half2& rh) { return __hsub2(lh, rh); } \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 operator*(const __half2& lh, const __half2& rh) { return __hmul2(lh, rh); } \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 operator/(const __half2& lh, const __half2& rh) { return __h2div(lh, rh); } \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2 operator-(const __half2& h) { return __hneg2(h); } \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2& operator+=(__half2& lh, const __half2& rh) { lh = __hadd2(lh, rh); return lh; } \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2& operator-=(__half2& lh, const __half2& rh) { lh = __hsub2(lh, rh); return lh; } \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2& operator*=(__half2& lh, const __half2& rh) { lh = __hmul2(lh, rh); return lh; } \
+    SLANG_FORCE_INLINE SLANG_CUDA_CALL __half2& operator/=(__half2& lh, const __half2& rh) { lh = __h2div(lh, rh); return lh; } \
+    SLANG_CUDA_VECTOR_BINARY_OP(__half, 2, &&) \
+    SLANG_CUDA_VECTOR_BINARY_OP(__half, 2, ||) \
+    SLANG_CUDA_VECTOR_BINARY_COMPARE_OP(__half, 2, >) \
+    SLANG_CUDA_VECTOR_BINARY_COMPARE_OP(__half, 2, <) \
+    SLANG_CUDA_VECTOR_BINARY_COMPARE_OP(__half, 2, >=) \
+    SLANG_CUDA_VECTOR_BINARY_COMPARE_OP(__half, 2, <=) \
+    SLANG_CUDA_VECTOR_BINARY_COMPARE_OP(__half, 2, ==) \
+    SLANG_CUDA_VECTOR_BINARY_COMPARE_OP(__half, 2, !=)
+/* Explicit per-type expansion (no dispatch, no token-paste with __half) so NVRTC and all compilers behave. */
+#define SLANG_CUDA_VECTOR_FLOAT_OPS_float \
+    SLANG_CUDA_VECTOR_FLOAT_OP(float, 2) \
+    SLANG_CUDA_VECTOR_FLOAT_OP(float, 3) \
+    SLANG_CUDA_VECTOR_FLOAT_OP(float, 4)
+#define SLANG_CUDA_VECTOR_FLOAT_OPS_double \
+    SLANG_CUDA_VECTOR_FLOAT_OP(double, 2) \
+    SLANG_CUDA_VECTOR_FLOAT_OP(double, 3) \
+    SLANG_CUDA_VECTOR_FLOAT_OP(double, 4)
+#define SLANG_CUDA_VECTOR_FLOAT_OPS___half \
+    SLANG_CUDA_VECTOR_FLOAT_OP_HALF2 \
+    SLANG_CUDA_VECTOR_FLOAT_OP(__half, 3) \
+    SLANG_CUDA_VECTOR_FLOAT_OP(__half, 4)
+#define SLANG_CUDA_VECTOR_FLOAT_OPS(T) SLANG_CUDA_VECTOR_FLOAT_OPS_##T
 
 SLANG_CUDA_VECTOR_FLOAT_OPS(float)
 SLANG_CUDA_VECTOR_FLOAT_OPS(double)
@@ -3669,7 +3698,6 @@ __inline__ __device__ int _waveMax<int>(WarpMask mask, int val)
     return __reduce_max_sync(mask, val);
 }
 #endif
-
 
 // Multiple
 
