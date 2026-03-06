@@ -165,6 +165,7 @@ jobs:
           nv-inference-opus-model: ${{ vars.CLAUDE_NV_OPUS_MODEL }}
           nv-inference-sonnet-model: ${{ vars.CLAUDE_NV_SONNET_MODEL }}
           nv-inference-haiku-model: ${{ vars.CLAUDE_NV_HAIKU_MODEL }}
+          oidc-contents-permission: "write"
 
           # Build Slang so Claude can run slangc/slang-test to verify fixes
           setup-commands: |
@@ -285,4 +286,7 @@ jobs:
             mcp__github__create_pull_request,
             mcp__github__add_issue_comment,
             mcp__github__get_pull_request,
-            mcp__github__get_pull_request_files
+            mcp__github__get_pull_request_files,
+            mcp__github__get_file_contents,
+            mcp__github__create_branch,
+            mcp__github__create_or_update_file

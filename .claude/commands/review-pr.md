@@ -34,8 +34,6 @@ Use severity badges on each finding:
 - 🟡 **Gap** — missing backend/test/doc coverage, inconsistency
 - 🔵 **Question** — intent unclear, needs author clarification
 
-Include the confidence percentage in parentheses after the badge.
-
 **Template:**
 
 ```
@@ -48,8 +46,8 @@ Include the confidence percentage in parentheses after the badge.
 <details>
 <summary>Correctness & IR Invariants (N findings)</summary>
 
-- 🔴 **Bug** (95%) `file:line` — description
-- 🟡 **Gap** (82%) `file:line` — description
+- 🔴 **Bug** `file:line` — description
+- 🟡 **Gap** `file:line` — description
 
 </details>
 
@@ -84,7 +82,7 @@ Include the confidence percentage in parentheses after the badge.
 <details>
 <summary>Clarifications Needed</summary>
 
-- 🔵 (80%) `file:line` — question for the author
+- 🔵 `file:line` — question for the author
 
 </details>
 ```
