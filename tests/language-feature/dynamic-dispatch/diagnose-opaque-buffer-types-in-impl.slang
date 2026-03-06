@@ -50,6 +50,13 @@ export struct ImplStructuredBuffer : IFoo
     float get() { return 1.0; }
 }
 
+// CHECK-DAG: type 'ImplRWStructuredBuffer' contains fields that cannot be packed into ordinary bytes for dynamic dispatch
+export struct ImplRWStructuredBuffer : IFoo
+{
+    RWStructuredBuffer<float> b;
+    float get() { return 1.0; }
+}
+
 // CHECK-DAG: type 'ImplAppendStructuredBuffer' contains fields that cannot be packed into ordinary bytes for dynamic dispatch
 export struct ImplAppendStructuredBuffer : IFoo
 {

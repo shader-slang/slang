@@ -23,7 +23,7 @@ interface IFoo
     int get();
 }
 
-// CHECK: error
+// CHECK: type 'Impl' contains fields that cannot be packed into ordinary bytes for dynamic dispatch
 export struct Impl : IFoo
 {
     NonCopyData data;

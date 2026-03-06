@@ -36,6 +36,12 @@ export struct GoodImpl : IFoo
     int get() { return v; }
 }
 
+export struct GoodImplDevicePtr : IFoo
+{
+    int* p;
+    int get() { return *p; }
+}
+
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(1, 1, 1)]
