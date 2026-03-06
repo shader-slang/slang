@@ -101,6 +101,21 @@ static bool maybeGetName(CharSlice* linkageNameOut, CharSlice* prettyNameOut, IR
     return true;
 }
 
+// TODO: This should use some decoration instead. The LLVM emitter will
+// eventually be refactored to not know about buffer types anymore.
+static bool isPtrInvariant(IRInst* value)
+{
+    if (as<IRConstantBufferType>(value->getDataType()))
+        return true;
+    else if (auto gep = as<IRGetElementPtr>(value))
+        return isPtrInvariant(gep->getBase());
+    else if (auto off = as<IRGetOffsetPtr>(value))
+        return isPtrInvariant(off->getBase());
+    else if (auto fieldAddr = as<IRFieldAddress>(value))
+        return isPtrInvariant(fieldAddr->getBase());
+    return false;
+}
+
 static bool isPtrVolatile(IRInst* value)
 {
     if (auto memoryQualifier = value->findDecoration<IRMemoryQualifierSetDecoration>())
@@ -111,6 +126,21 @@ static bool isPtrVolatile(IRInst* value)
         }
     }
     return false;
+}
+
+static IRType* getPtrOrBufferElementType(IRType* ptrOrBuffer)
+{
+    if (auto ptrLikeType = as<IRPointerLikeType>(ptrOrBuffer))
+        return ptrLikeType->getElementType();
+    else if (auto ptrType = as<IRPtrTypeBase>(ptrOrBuffer))
+        return ptrType->getValueType();
+    else if (as<IRRawPointerTypeBase>(ptrOrBuffer))
+        return nullptr; // Unknown type
+    StringBuilder sb;
+    getTypeNameHint(sb, ptrOrBuffer);
+    String testmsg = "Unexpected type for getPtrOrBufferElementType()" + sb.produceString();
+    SLANG_ASSERT_FAILURE(testmsg.getBuffer());
+    return nullptr;
 }
 
 static bool isSigned(IRInst* value)
@@ -787,13 +817,13 @@ struct LLVMEmitter
             return SLANG_FAIL;
         }
 
-        using BuilderFuncV2 = SlangResult (*)(
+        using BuilderFuncV3 = SlangResult (*)(
             const SlangUUID& intfGuid,
             Slang::ILLVMBuilder** out,
             Slang::LLVMBuilderOptions options,
             Slang::IArtifact** outErrorArtifact);
 
-        auto builderFunc = (BuilderFuncV2)library->findFuncByName("createLLVMBuilder_V2");
+        auto builderFunc = (BuilderFuncV3)library->findFuncByName("createLLVMBuilder_V3");
         if (!builderFunc)
             return SLANG_FAIL;
 
@@ -803,6 +833,9 @@ struct LLVMEmitter
             getOptions().getStringOption(CompilerOptionName::LLVMCPU).getUnownedSlice();
         if (cpuOption.getLength() == 0)
             cpuOption = UnownedStringSlice("generic");
+        if (useJIT)
+            cpuOption = UnownedStringSlice("native");
+
         auto featOption =
             getOptions().getStringOption(CompilerOptionName::LLVMFeatures).getUnownedSlice();
 
@@ -1199,6 +1232,7 @@ struct LLVMEmitter
         LLVMInst* alloca = builder->emitAlloca(sizeAlignment.getStride(), sizeAlignment.alignment);
 
         builder->insertIntoBlock(currentBlock);
+        builder->setLifetimeStart(alloca);
         return alloca;
     }
 
@@ -1207,10 +1241,22 @@ struct LLVMEmitter
     LLVMInst* emitArrayGetElementPtr(
         LLVMInst* llvmPtr,
         LLVMInst* indexInst,
+        bool signedIndex,
         IRType* elemType,
         IRTypeLayoutRules* rules)
     {
         IRSizeAndAlignment sizeAndAlignment = types->getSizeAndAlignment(elemType, rules);
+        if (!signedIndex)
+        {
+            // If we have an unsigned index with less bits than a pointer, LLVM
+            // will sign-extend it while we need zero-extension. So we have to
+            // cast manually to avoid that. Note that emitCast just passes
+            // through if the type is already correct.
+            int pointerBits = builder->getPointerSizeInBits();
+            LLVMType* extendedType = builder->getIntType(pointerBits);
+            indexInst = builder->emitCast(indexInst, extendedType, false, false);
+        }
+
         return builder->emitGetElementPtr(llvmPtr, sizeAndAlignment.getStride(), indexInst);
     }
 
@@ -1257,11 +1303,13 @@ struct LLVMEmitter
                     auto dstElemPtr = emitArrayGetElementPtr(
                         dstPtr,
                         builder->getConstantInt(builder->getIntType(32), elem),
+                        false,
                         elemType,
                         dstLayout);
                     auto srcElemPtr = emitArrayGetElementPtr(
                         srcPtr,
                         builder->getConstantInt(builder->getIntType(32), elem),
+                        false,
                         elemType,
                         srcLayout);
                     last = crossLayoutMemCpy(
@@ -1368,7 +1416,8 @@ struct LLVMEmitter
         LLVMInst* llvmPtr,
         IRType* valType,
         IRTypeLayoutRules* rules,
-        bool isVolatile = false)
+        bool isVolatile = false,
+        bool isInvariant = false)
     {
         IRSizeAndAlignment sizeAlignment = types->getSizeAndAlignment(valType, rules);
 
@@ -1381,6 +1430,8 @@ struct LLVMEmitter
                 auto storageType = builder->getIntType(int(sizeAlignment.size * 8));
                 auto storageBool =
                     builder->emitLoad(storageType, llvmPtr, sizeAlignment.alignment, isVolatile);
+                if (isInvariant)
+                    builder->setLoadInvariant(storageBool);
                 return builder->emitIntResize(storageBool, llvmType);
             }
             break;
@@ -1416,7 +1467,10 @@ struct LLVMEmitter
         default:
             {
                 auto llvmType = types->getValueType(valType);
-                return builder->emitLoad(llvmType, llvmPtr, sizeAlignment.alignment, isVolatile);
+                auto load = builder->emitLoad(llvmType, llvmPtr, sizeAlignment.alignment, isVolatile);
+                if (isInvariant)
+                    builder->setLoadInvariant(load);
+                return load;
             }
         }
     }
@@ -1645,6 +1699,22 @@ struct LLVMEmitter
             {
                 auto branch = as<IRUnconditionalBranch>(inst);
                 llvmInst = builder->emitBranch(findValue(branch->getTargetBlock()));
+                // For loops, we can check decorations for interesting
+                // metadata that we could communicate to LLVM.
+                if (auto loopControlDecoration = branch->findDecoration<IRLoopControlDecoration>())
+                {
+                    switch (loopControlDecoration->getMode())
+                    {
+                    case IRLoopControl::kIRLoopControl_Unroll:
+                        builder->setLoopUnroll(llvmInst, true);
+                        break;
+                    case IRLoopControl::kIRLoopControl_Loop:
+                        builder->setLoopUnroll(llvmInst, false);
+                        break;
+                    default:
+                        break;
+                    }
+                }
             }
             break;
 
@@ -1721,7 +1791,16 @@ struct LLVMEmitter
                     findValue(ptr),
                     loadInst->getDataType(),
                     getBufferLayoutRules(ptr->getDataType()),
-                    isPtrVolatile(ptr));
+                    isPtrVolatile(ptr),
+                    isPtrInvariant(ptr));
+
+                if (auto constBuf = as<IRConstantBufferType>(loadInst->getDataType()))
+                {
+                    IRTypeLayoutRules* layout = getBufferLayoutRules(constBuf);
+                    IRSizeAndAlignment sizeAndAlignment =
+                        types->getSizeAndAlignment(constBuf->getElementType(), layout);
+                    builder->setPointerDereferenceable(llvmInst, sizeAndAlignment.size);
+                }
             }
             break;
 
@@ -1766,6 +1845,7 @@ struct LLVMEmitter
                 LLVMInst* ptr = emitArrayGetElementPtr(
                     llvmInst,
                     builder->getConstantInt(int32Type, aa),
+                    false,
                     op->getDataType(),
                     defaultPointerRules);
                 emitStore(ptr, findValue(op), op->getDataType(), defaultPointerRules);
@@ -1798,6 +1878,7 @@ struct LLVMEmitter
                     LLVMInst* ptr = emitArrayGetElementPtr(
                         llvmInst,
                         builder->getConstantInt(int32Type, i),
+                        false,
                         element->getDataType(),
                         defaultPointerRules);
                     emitStore(ptr, llvmElement, element->getDataType(), defaultPointerRules);
@@ -1930,6 +2011,7 @@ struct LLVMEmitter
                     auto llvmDstElement = emitArrayGetElementPtr(
                         llvmDst,
                         maybeEmitConstant(irElementIndex),
+                        isSigned(irElementIndex),
                         elementType,
                         rules);
                     auto llvmSrcElement =
@@ -1981,15 +2063,7 @@ struct LLVMEmitter
 
                 auto key = as<IRStructKey>(fieldAddressInst->getField());
 
-                IRStructType* baseStructType = nullptr;
-                if (auto ptrLikeType = as<IRPointerLikeType>(base->getDataType()))
-                {
-                    baseStructType = as<IRStructType>(ptrLikeType->getElementType());
-                }
-                else if (auto ptrType = as<IRPtrTypeBase>(base->getDataType()))
-                {
-                    baseStructType = as<IRStructType>(ptrType->getValueType());
-                }
+                IRStructType* baseStructType = as<IRStructType>(getPtrOrBufferElementType(base->getDataType()));
 
                 auto rules = getBufferLayoutRules(base->getDataType());
                 auto field = findStructField(baseStructType, key);
@@ -2016,7 +2090,7 @@ struct LLVMEmitter
                 auto field = findStructField(structType, key);
 
                 LLVMInst* ptr = emitStructGetElementPtr(llvmBase, field, defaultPointerRules);
-                llvmInst = emitLoad(ptr, field->getFieldType(), defaultPointerRules);
+                llvmInst = emitLoad(ptr, field->getFieldType(), defaultPointerRules, false, isPtrInvariant(base));
             }
             break;
 
@@ -2042,6 +2116,7 @@ struct LLVMEmitter
                 llvmInst = emitArrayGetElementPtr(
                     findValue(baseInst),
                     findValue(indexInst),
+                    isSigned(indexInst),
                     baseType,
                     getBufferLayoutRules(baseInst->getDataType()));
             }
@@ -2058,17 +2133,7 @@ struct LLVMEmitter
                     return nullptr;
                 }
 
-                IRType* baseType = nullptr;
-                if (auto ptrType = as<IRPtrTypeBase>(baseInst->getDataType()))
-                {
-                    baseType = ptrType->getValueType();
-                }
-                else if (auto ptrLikeType = as<IRPointerLikeType>(baseInst->getDataType()))
-                {
-                    baseType = as<IRType>(ptrLikeType->getOperand(0));
-                }
-                else
-                    SLANG_ASSERT_FAILURE("Unknown pointer type for GetElementPtr!");
+                IRType* baseType = getPtrOrBufferElementType(baseInst->getDataType());
 
                 // I _REALLY_ dislike that this helper function needs an
                 // IRBuilder :/
@@ -2078,6 +2143,7 @@ struct LLVMEmitter
                 llvmInst = emitArrayGetElementPtr(
                     findValue(baseInst),
                     findValue(indexInst),
+                    isSigned(indexInst),
                     elemType,
                     getBufferLayoutRules(baseInst->getDataType()));
             }
@@ -2107,12 +2173,9 @@ struct LLVMEmitter
                 {
                     // emitGEP + emitLoad.
                     auto elemType = arrayType->getElementType();
-                    LLVMInst* ptr = emitArrayGetElementPtr(
-                        llvmVal,
-                        findValue(indexInst),
-                        elemType,
-                        defaultPointerRules);
-                    llvmInst = emitLoad(ptr, elemType, defaultPointerRules);
+                    LLVMInst* ptr =
+                        emitArrayGetElementPtr(llvmVal, findValue(indexInst), isSigned(indexInst), elemType, defaultPointerRules);
+                    llvmInst = emitLoad(ptr, elemType, defaultPointerRules, false, isPtrInvariant(baseInst));
                 }
                 else
                     SLANG_ASSERT_FAILURE("Unknown data type for GetElement!");
@@ -2218,13 +2281,14 @@ struct LLVMEmitter
                 auto baseType =
                     cast<IRHLSLRWStructuredBufferType>(gepInst->getBase()->getDataType());
                 auto llvmBase = findValue(gepInst->getBase());
-                auto llvmIndex = findValue(gepInst->getIndex());
+                auto index = gepInst->getIndex();
+                auto llvmIndex = findValue(index);
 
                 auto llvmPtr = builder->emitGetBufferPtr(llvmBase);
 
                 IRTypeLayoutRules* rules = getBufferLayoutRules(baseType);
                 llvmInst =
-                    emitArrayGetElementPtr(llvmPtr, llvmIndex, baseType->getElementType(), rules);
+                    emitArrayGetElementPtr(llvmPtr, llvmIndex, isSigned(index), baseType->getElementType(), rules);
             }
             break;
 
@@ -2233,7 +2297,8 @@ struct LLVMEmitter
             {
                 auto base = inst->getOperand(0);
                 auto llvmBase = findValue(base);
-                auto llvmIndex = findValue(inst->getOperand(1));
+                auto index = inst->getOperand(1);
+                auto llvmIndex = findValue(index);
 
                 auto baseType = cast<IRHLSLStructuredBufferTypeBase>(base->getDataType());
 
@@ -2243,9 +2308,15 @@ struct LLVMEmitter
                 auto llvmPtr = emitArrayGetElementPtr(
                     llvmBasePtr,
                     llvmIndex,
+                    isSigned(index),
                     baseType->getElementType(),
                     rules);
-                llvmInst = emitLoad(llvmPtr, inst->getDataType(), rules);
+                llvmInst = emitLoad(
+                    llvmPtr,
+                    inst->getDataType(),
+                    rules,
+                    false,
+                    inst->getOp() == kIROp_StructuredBufferLoad);
             }
             break;
 
@@ -2253,7 +2324,8 @@ struct LLVMEmitter
             {
                 auto base = inst->getOperand(0);
                 auto llvmBase = findValue(base);
-                auto llvmIndex = findValue(inst->getOperand(1));
+                auto index = inst->getOperand(1);
+                auto llvmIndex = findValue(index);
                 auto val = inst->getOperand(2);
 
                 auto baseType = cast<IRHLSLStructuredBufferTypeBase>(base->getDataType());
@@ -2264,6 +2336,7 @@ struct LLVMEmitter
                 auto llvmPtr = emitArrayGetElementPtr(
                     llvmBasePtr,
                     llvmIndex,
+                    isSigned(index),
                     baseType->getElementType(),
                     rules);
                 llvmInst = emitStore(llvmPtr, findValue(val), val->getDataType(), rules);
@@ -2278,7 +2351,7 @@ struct LLVMEmitter
                 auto llvmBasePtr = builder->emitGetBufferPtr(llvmBase);
                 auto llvmPtr = builder->emitGetElementPtr(llvmBasePtr, 1, llvmIndex);
 
-                llvmInst = emitLoad(llvmPtr, inst->getDataType(), defaultPointerRules);
+                llvmInst = emitLoad(llvmPtr, inst->getDataType(), defaultPointerRules, false, false);
             }
             break;
 
@@ -2974,6 +3047,11 @@ struct LLVMEmitter
             auto groupName = String(entryPointDecor->getName()->getStringSlice());
             auto numThreadsDecor = func->findDecoration<IRNumThreadsDecoration>();
 
+            auto entryPointParamPtrType = func->getParamType(1);
+            auto entryPointParamType = getPtrOrBufferElementType(entryPointParamPtrType);
+            auto globalParamPtrType = func->getParamType(2);
+            auto globalParamType = getPtrOrBufferElementType(globalParamPtrType);
+
             LLVMInst* groupFunc = builder->emitComputeEntryPointWorkGroup(
                 llvmFunc,
                 getStringLitAsSlice(entryPointDecor->getName()),
@@ -2981,6 +3059,20 @@ struct LLVMEmitter
                 numThreadsDecor ? int(getIntVal(numThreadsDecor->getY())) : 1,
                 numThreadsDecor ? int(getIntVal(numThreadsDecor->getZ())) : 1,
                 32);
+
+            if (entryPointParamType)
+            {
+                size_t entryPointParamsSize = types->getSizeAndAlignment(entryPointParamType, getBufferLayoutRules(entryPointParamPtrType)).size;
+                builder->setPointerDereferenceable(builder->getFunctionArg(llvmFunc, 1), entryPointParamsSize);
+                builder->setPointerDereferenceable(builder->getFunctionArg(groupFunc, 1), entryPointParamsSize);
+            }
+
+            if (globalParamType)
+            {
+                size_t globalParamsSize = types->getSizeAndAlignment(globalParamType, getBufferLayoutRules(globalParamPtrType)).size;
+                builder->setPointerDereferenceable(builder->getFunctionArg(llvmFunc, 2), globalParamsSize);
+                builder->setPointerDereferenceable(builder->getFunctionArg(groupFunc, 2), globalParamsSize);
+            }
 
             auto entryPointName = entryPointDecor->getName();
             builder->emitComputeEntryPointDispatcher(

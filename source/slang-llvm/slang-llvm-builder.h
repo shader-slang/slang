@@ -367,6 +367,28 @@ public:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL generateAssembly(IArtifact** outArtifact) = 0;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL generateObjectCode(IArtifact** outArtifact) = 0;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL generateJITLibrary(IArtifact** outArtifact) = 0;
+
+    //==========================================================================
+    // Metadata
+    //==========================================================================
+
+    // This tells LLVM that a pointer dereference can be safely speculated as
+    // long as it refers to the first N bytes.
+    virtual SLANG_NO_THROW void SLANG_MCALL setPointerDereferenceable(LLVMInst* ptr, uint64_t bytes) = 0;
+
+    // If the load is invariant, it is expected that the resulting value can
+    // never change. This allows optimizing away loads to the same address.
+    virtual SLANG_NO_THROW void SLANG_MCALL setLoadInvariant(LLVMInst* load) = 0;
+
+    // This lets LLVM know that the value of an allocation is 'live' after this
+    // point.
+    virtual SLANG_NO_THROW void SLANG_MCALL setLifetimeStart(LLVMInst* alloca) = 0;
+
+    // This lets LLVM know that the value of an alloca is no longer live.
+    virtual SLANG_NO_THROW void SLANG_MCALL setLifetimeEnd(LLVMInst* alloca) = 0;
+
+    // Marks a loop to be unrolled or not unrolled.
+    virtual SLANG_NO_THROW void SLANG_MCALL setLoopUnroll(LLVMInst* loopBranch, bool unroll) = 0;
 };
 
 } // namespace Slang
