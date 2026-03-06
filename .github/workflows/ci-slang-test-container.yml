@@ -48,12 +48,9 @@ jobs:
     steps:
       - name: GPU health check
         run: |
-          if ! output=$(nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv,noheader 2>&1); then
-            echo "nvidia-smi output: $output"
-            echo "::error::GPU health check failed — this VM has a faulty GPU. Re-run to get a new VM."
-            exit 1
-          fi
-          echo "GPU: $output"
+          # TEMPORARY: Force failure to test rerun mechanism
+          echo "::error::GPU health check failed (forced for testing rerun mechanism)"
+          exit 1
 
       - name: Configure Git safe directory
         run: git config --global --add safe.directory '*'
