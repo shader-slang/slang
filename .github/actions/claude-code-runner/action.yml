@@ -426,7 +426,7 @@ runs:
           -X POST "$EXCHANGE_URL" \
           -H "Authorization: Bearer $OIDC_TOKEN" \
           -H "Content-Type: application/json" \
-          -d '{"permissions":{"contents":"read","pull_requests":"write","issues":"write","actions":"read"}}' \
+          -d '{"permissions":{"contents":"write","pull_requests":"write","issues":"write","actions":"read"}}' \
           2>/dev/null || echo "000")
 
         if [ "$HTTP_CODE" = "200" ] && [ -f "$EXCHANGE_RESPONSE" ]; then
