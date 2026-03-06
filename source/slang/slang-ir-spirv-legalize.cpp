@@ -1780,7 +1780,11 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
     {
         bool isLegalGlobalInstForTarget(IRInst* inst) override
         {
-            return as<IRSPIRVAsmOperand>(inst);
+            if (as<IRSPIRVAsmOperand>(inst))
+                return true;
+            if (isSpecConstRateType(inst->getFullType()))
+                return true;
+            return false;
         }
 
         bool isInlinableGlobalInstForTarget(IRInst* inst) override
