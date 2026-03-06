@@ -3491,6 +3491,19 @@ void SemanticsDeclHeaderVisitor::visitTypeCoercionConstraintDecl(TypeCoercionCon
         decl->toType = TranslateTypeNodeForced(decl->toType);
 }
 
+static void maybeFlattenConjunctionType(Type* type, List<Type*>& outTypes)
+{
+    if (auto andType = as<AndType>(type))
+    {
+        maybeFlattenConjunctionType(andType->getLeft(), outTypes);
+        maybeFlattenConjunctionType(andType->getRight(), outTypes);
+    }
+    else
+    {
+        outTypes.add(type);
+    }
+}
+
 void SemanticsDeclHeaderVisitor::visitGenericTypeConstraintDecl(GenericTypeConstraintDecl* decl)
 {
     CheckConstraintSubType(decl->sub);
@@ -3499,6 +3512,44 @@ void SemanticsDeclHeaderVisitor::visitGenericTypeConstraintDecl(GenericTypeConst
         decl->sub = TranslateTypeNodeForced(decl->sub);
     if (!decl->sup.type)
         decl->sup = TranslateTypeNodeForced(decl->sup);
+
+    // If the super-type is an AndType (e.g. `T : A & B`), flatten it and create
+    // individual GenericTypeConstraintDecls for each element in the conjunction.
+    if (decl->sup.type && !decl->isEqualityConstraint)
+    {
+        List<Type*> flattenedTypes;
+        maybeFlattenConjunctionType(decl->sup.type, flattenedTypes);
+        if (flattenedTypes.getCount() > 1)
+        {
+            auto parentDecl = as<ContainerDecl>(decl->parentDecl);
+            SLANG_ASSERT(parentDecl);
+
+            // Update the current decl's sup to the first type in the flattened list.
+            decl->sup = TypeExp(flattenedTypes[0]);
+
+            // Create new constraint decls for the remaining types.
+            List<GenericTypeConstraintDecl*> newConstraints;
+            for (Index i = 1; i < flattenedTypes.getCount(); i++)
+            {
+                auto newConstraint = m_astBuilder->create<GenericTypeConstraintDecl>();
+                newConstraint->sub = decl->sub;
+                newConstraint->sup = TypeExp(flattenedTypes[i]);
+                newConstraint->loc = decl->loc;
+                newConstraint->parentDecl = parentDecl;
+                parentDecl->addDirectMemberDecl(newConstraint);
+                newConstraints.add(newConstraint);
+            }
+
+            // Clear cached substitutions before proceeding with checking.
+            if (auto genericParentDecl = as<GenericDecl>(parentDecl))
+                genericParentDecl->_cachedArgsForDefaultSubstitution.clear();
+
+            for (auto newConstraint : newConstraints)
+            {
+                ensureDecl(newConstraint, DeclCheckState::SignatureChecked);
+            }
+        }
+    }
 
     if (getLinkage()->m_optionSet.shouldRunNonEssentialValidation())
     {
@@ -3661,6 +3712,33 @@ void SemanticsDeclBasesVisitor::visitInheritanceDecl(InheritanceDecl* inheritanc
     baseVistor.CheckConstraintSubType(base);
     base = baseVistor.TranslateTypeNode(base);
     inheritanceDecl->base = base;
+
+    // If the base type is an AndType (e.g. `struct Foo : IBar & IBaz`), flatten it
+    // into individual InheritanceDecls for each element in the conjunction.
+    if (base.type)
+    {
+        List<Type*> flattenedTypes;
+        maybeFlattenConjunctionType(base.type, flattenedTypes);
+        if (flattenedTypes.getCount() > 1)
+        {
+            auto parentDecl = as<ContainerDecl>(inheritanceDecl->parentDecl);
+            SLANG_ASSERT(parentDecl);
+
+            // Update the current decl's base to the first type in the flattened list.
+            inheritanceDecl->base = TypeExp(flattenedTypes[0]);
+
+            // Create new inheritance decls for the remaining types.
+            for (Index i = 1; i < flattenedTypes.getCount(); i++)
+            {
+                auto newInheritance = m_astBuilder->create<InheritanceDecl>();
+                newInheritance->base = TypeExp(flattenedTypes[i]);
+                newInheritance->loc = inheritanceDecl->loc;
+                newInheritance->parentDecl = parentDecl;
+                parentDecl->addDirectMemberDecl(newInheritance);
+                ensureDecl(newInheritance, DeclCheckState::ReadyForLookup);
+            }
+        }
+    }
 
     // Note: we do not check whether the type being inherited from
     // is valid to use for inheritance here, because there could
@@ -9104,12 +9182,22 @@ List<Val*> getDefaultSubstitutionArgs(
 
     bool shouldCache = true;
 
-    // create default substitution arguments for constraints
+    // check all constraints. It is possible that checking the constraint can split it
+    // into multiple constraints, so we will check all the constraints first, and then proceed with
+    // constructing the args list.
+    //
+    if (semantics)
+    {
+        for (auto genericTypeConstraintDecl :
+             genericDecl->getDirectMemberDeclsOfType<GenericTypeConstraintDecl>())
+        {
+            semantics->ensureDecl(genericTypeConstraintDecl, DeclCheckState::ReadyForReference);
+        }
+    }
+
     for (auto genericTypeConstraintDecl :
          genericDecl->getDirectMemberDeclsOfType<GenericTypeConstraintDecl>())
     {
-        if (semantics)
-            semantics->ensureDecl(genericTypeConstraintDecl, DeclCheckState::ReadyForReference);
         auto constraintDeclRef =
             astBuilder->getDirectDeclRef<GenericTypeConstraintDecl>(genericTypeConstraintDecl);
         auto supType = getSup(astBuilder, constraintDeclRef);

@@ -2131,65 +2131,6 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         return LoweredValInfo::simple(nullptr);
     }
 
-    LoweredValInfo visitConjunctionSubtypeWitness(ConjunctionSubtypeWitness* val)
-    {
-        // A witness `W = X & Y & ...` will lower as a tuple of the sub-witnesses
-        // `X`, `Y`, etc.
-        //
-        // The AST representation of a conjunction of witnesses matches this
-        // tuple-like encoding very closely, so we can simply lower each of
-        // the component witnesses to produce our result.
-        //
-        List<IRInst*> componentWitnesses;
-        auto componentCount = val->getComponentCount();
-        for (Index i = 0; i < componentCount; ++i)
-        {
-            auto componentWitness = lowerSimpleVal(context, val->getComponentWitness(i));
-            componentWitnesses.add(componentWitness);
-        }
-        return LoweredValInfo::simple(getBuilder()->emitMakeTuple(componentWitnesses));
-    }
-
-    LoweredValInfo visitExtractFromConjunctionSubtypeWitness(
-        ExtractFromConjunctionSubtypeWitness* val)
-    {
-        auto builder = getBuilder();
-
-        // We know from `visitConjunctionSubtypeWitness` that a witness for a relationship
-        // like `T : L & R` will be a tuple `(w_l, w_r)` where `w_l` is a witness
-        // for `T : L` and `w_r` will be a witness for `T : R`.
-        //
-        // An `ExtractFromConjunctionSubtypeWitness` represents the intention to
-        // extract one of those two sub-witnesses. It directly stores the original
-        // witness that `T : L & R`, so lower that first and expect it to be
-        // a value of tuple type.
-        //
-        auto conjunctionWitness = lowerSimpleVal(context, val->getConjunctionWitness());
-        auto conjunctionTupleType = as<IRTupleType>(conjunctionWitness->getDataType());
-        SLANG_ASSERT(conjunctionTupleType);
-
-        // The `ExtractFromConjunctionSubtypeWitness` also stores the index of
-        // the witness/supertype we want in the conjunction `L & R`.
-        //
-        auto indexInConjunction = val->getIndexInConjunction();
-
-        // We want to extract the appropriate element from the tuple based on
-        // the index, but to know the type of the result we need to look up
-        // the element type that corresponds to that index.
-        //
-        // TODO: `IRTupleType` should really have `getElementCount()` and
-        // `getElementType(index)` accessors.
-        //
-        auto elementType = (IRType*)conjunctionTupleType->getOperand(indexInConjunction);
-
-        // With the information we've extracted above, we now just need to
-        // extract the appropriate element from the `(w_l, w_r)` tuple of
-        // witnesses, and we will have our desired result.
-        //
-        return LoweredValInfo::simple(
-            builder->emitGetTupleElement(elementType, conjunctionWitness, indexInConjunction));
-    }
-
     LoweredValInfo visitNoneWitness(NoneWitness*)
     {
         auto builder = getBuilder();

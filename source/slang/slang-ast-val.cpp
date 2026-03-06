@@ -695,56 +695,6 @@ void TransitiveSubtypeWitness::_toTextOverride(StringBuilder& out)
         << toSlice(")");
 }
 
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ExtractFromConjunctionSubtypeWitness
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-Val* ExtractFromConjunctionSubtypeWitness::_substituteImplOverride(
-    ASTBuilder* astBuilder,
-    SubstitutionSet subst,
-    int* ioDiff)
-{
-    int diff = 0;
-
-    auto substSub = as<Type>(getSub()->substituteImpl(astBuilder, subst, &diff));
-    auto substSup = as<Type>(getSup()->substituteImpl(astBuilder, subst, &diff));
-    auto substWitness =
-        as<SubtypeWitness>(getConjunctionWitness()->substituteImpl(astBuilder, subst, &diff));
-
-    // If nothing changed, then we can bail out early.
-    if (!diff)
-        return this;
-
-    // Something changes, so let the caller know.
-    (*ioDiff)++;
-
-    // Substitution into the constituent pieces of this witness could
-    // have created opportunities for simplification. For example,
-    // the `substWitness` might be a `ConjunctionSubtypeWitness`,
-    // such that we could directly use one of its components in
-    // place of the extraction.
-    //
-    // We use the factory function on the AST builder to create
-    // the result witness, so that it can perform all of the
-    // simplification logic as needed.
-    //
-    return astBuilder->getExtractFromConjunctionSubtypeWitness(
-        substSub,
-        substSup,
-        substWitness,
-        getIndexInConjunction());
-}
-
-ConversionCost ExtractFromConjunctionSubtypeWitness::_getOverloadResolutionCostOverride()
-{
-    auto witness = as<ConjunctionSubtypeWitness>(getConjunctionWitness());
-    if (!witness)
-        return kConversionCost_None;
-    auto index = getIndexInConjunction();
-    if (index < witness->getComponentCount())
-        return witness->getComponentWitness(index)->getOverloadResolutionCost();
-    return kConversionCost_None;
-}
-
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ExtractExistentialSubtypeWitness
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -772,78 +722,6 @@ Val* ExtractExistentialSubtypeWitness::_substituteImplOverride(
     ExtractExistentialSubtypeWitness* substValue =
         astBuilder->getOrCreate<ExtractExistentialSubtypeWitness>(substSub, substSup, substDeclRef);
     return substValue;
-}
-
-void ConjunctionSubtypeWitness::_toTextOverride(StringBuilder& out)
-{
-    out << "ConjunctionSubtypeWitness(";
-    for (Index i = 0; i < kComponentCount; ++i)
-    {
-        if (i != 0)
-            out << ",";
-
-        auto w = getComponentWitness(i);
-        if (w)
-            out << w;
-    }
-    out << ")";
-}
-
-Val* ConjunctionSubtypeWitness::_substituteImplOverride(
-    ASTBuilder* astBuilder,
-    SubstitutionSet subst,
-    int* ioDiff)
-{
-    int diff = 0;
-    Val* substComponentWitnesses[kComponentCount];
-
-    auto substSub = as<Type>(getSub()->substituteImpl(astBuilder, subst, &diff));
-    auto substSup = as<Type>(getSup()->substituteImpl(astBuilder, subst, &diff));
-
-    for (Index i = 0; i < kComponentCount; ++i)
-    {
-        auto w = getComponentWitness(i);
-        substComponentWitnesses[i] = w ? w->substituteImpl(astBuilder, subst, &diff) : nullptr;
-    }
-
-    if (!diff)
-        return this;
-
-    *ioDiff += diff;
-
-    // We use the factory function on the AST builder rather than
-    // directly construct a new `ConjunctionSubtypeWitness`, because
-    // the substitution process might have created further opportunities
-    // for simplification.
-    //
-    auto result = astBuilder->getConjunctionSubtypeWitness(
-        substSub,
-        substSup,
-        as<SubtypeWitness>(substComponentWitnesses[0]),
-        as<SubtypeWitness>(substComponentWitnesses[1]));
-    return result;
-}
-
-ConversionCost ConjunctionSubtypeWitness::_getOverloadResolutionCostOverride()
-{
-    ConversionCost result = kConversionCost_None;
-    for (Index i = 0; i < getComponentCount(); i++)
-        result += getComponentWitness(i)->getOverloadResolutionCost();
-    return result;
-}
-
-void ExtractFromConjunctionSubtypeWitness::_toTextOverride(StringBuilder& out)
-{
-    out << "ExtractFromConjunctionSubtypeWitness(";
-    if (getConjunctionWitness())
-        out << getConjunctionWitness();
-    if (getSub())
-        out << getSub();
-    out << ",";
-    if (getSup())
-        out << getSup();
-    out << "," << getIndexInConjunction();
-    out << ")";
 }
 
 void BuiltinTypeCoercionWitness::_toTextOverride(StringBuilder& out)
