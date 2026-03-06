@@ -256,6 +256,49 @@ jobs:
       config: release
       runs-on: '["windows-latest"]'
 
+  # Automatically re-run failed jobs if the failure was caused by a faulty GPU VM.
+  # Checks whether any failed job's "GPU health check" step failed, and if so,
+  # triggers a re-run of only the failed jobs to get a new (hopefully healthy) VM.
+  rerun-on-gpu-failure:
+    needs:
+      [
+        test-linux-release-gcc-x86_64,
+        test-linux-debug-gcc-x86_64,
+        test-windows-release-cl-x86_64-gpu,
+        test-windows-debug-cl-x86_64-gpu,
+      ]
+    runs-on: ubuntu-latest
+    if: >-
+      github.run_attempt < 3 &&
+      always() && (
+        needs.test-linux-release-gcc-x86_64.result == 'failure' ||
+        needs.test-linux-debug-gcc-x86_64.result == 'failure' ||
+        needs.test-windows-release-cl-x86_64-gpu.result == 'failure' ||
+        needs.test-windows-debug-cl-x86_64-gpu.result == 'failure'
+      )
+    permissions:
+      actions: write
+    outputs:
+      rerun-triggered: ${{ steps.check.outputs.rerun-triggered }}
+    steps:
+      - name: Check for GPU health check failures and rerun
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Use jq to find failed jobs where the "GPU health check" step failed
+          gpu_failures=$(gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs?per_page=100" \
+            --jq '[.jobs[] | select(.conclusion == "failure") | select(.steps[]? | select(.name == "GPU health check" and .conclusion == "failure"))] | length')
+
+          if [ "$gpu_failures" -gt 0 ]; then
+            echo "Found $gpu_failures job(s) with GPU health check failures — re-running failed jobs..."
+            gh run rerun ${{ github.run_id }} --failed --repo "${{ github.repository }}"
+            echo "rerun-triggered=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No GPU health check failures — test failures are genuine."
+            echo "rerun-triggered=false" >> "$GITHUB_OUTPUT"
+          fi
+
   check-ci:
     needs:
       [
@@ -268,6 +311,7 @@ jobs:
         test-linux-release-gcc-aarch64,
         test-linux-debug-gcc-aarch64,
         test-materialx-windows-release,
+        rerun-on-gpu-failure,
       ]
     runs-on: ubuntu-latest
     if: always() && (github.event_name != 'pull_request' || github.event.pull_request.draft != true)
@@ -284,6 +328,18 @@ jobs:
           echo "Linux Release ARM64: ${{ needs.test-linux-release-gcc-aarch64.result }}"
           echo "Linux Debug ARM64: ${{ needs.test-linux-debug-gcc-aarch64.result }}"
           echo "MaterialX Windows: ${{ needs.test-materialx-windows-release.result }}"
+          echo "GPU failure rerun: ${{ needs.rerun-on-gpu-failure.result }}"
+          echo "Rerun triggered: ${{ needs.rerun-on-gpu-failure.outputs.rerun-triggered }}"
+
+          # If a GPU failure rerun was triggered, the failed jobs will be retried.
+          # `gh run rerun --failed` replaces the failed jobs in this same workflow
+          # run, and check-ci will be re-evaluated with the new results.
+          # Exit 1 here so there's no false-green window — the rerun will produce
+          # a new check-ci that evaluates the retried results.
+          if [[ "${{ needs.rerun-on-gpu-failure.outputs.rerun-triggered }}" == "true" ]]; then
+            echo "GPU failure rerun was triggered — this check-ci will be re-evaluated after retry."
+            exit 1
+          fi
 
           # Check if any required jobs failed (allow success or skipped)
           if [[ "${{ needs.test-windows-release-cl-x86_64-gpu.result }}" == "failure" ]] || \
