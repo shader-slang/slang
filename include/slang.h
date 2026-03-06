@@ -4435,8 +4435,8 @@ struct ISession : public ISlangUnknown
      *
      * The returned filePath pointer is valid for as long as the session.
      */
-    virtual SLANG_NO_THROW slang::SourceLocation SLANG_MCALL
-    getDeclSourceLocation(slang::DeclReflection* decl) = 0;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    getDeclSourceLocation(slang::DeclReflection* decl, slang::SourceLocation* outLocation) = 0;
 };
 
     #define SLANG_UUID_ISession ISession::getTypeGuid()

@@ -1795,30 +1795,28 @@ Linkage::isBinaryModuleUpToDate(const char* modulePath, slang::IBlob* binaryModu
     return isBinaryModuleUpToDate(modulePath, rootChunk);
 }
 
-SLANG_NO_THROW slang::SourceLocation SLANG_MCALL
-Linkage::getDeclSourceLocation(slang::DeclReflection* inDecl)
+SLANG_NO_THROW SlangResult SLANG_MCALL
+Linkage::getDeclSourceLocation(slang::DeclReflection* inDecl, slang::SourceLocation* outLocation)
 {
-    if (!inDecl)
-        return slang::SourceLocation();
+    if (!inDecl || !outLocation)
+        return SLANG_E_INVALID_ARG;
+
     Decl* decl = (Decl*)inDecl;
     SourceManager* sourceManager = getSourceManager();
     auto sourceView = sourceManager->findSourceViewRecursively(decl->getNameLoc());
-    if (sourceView)
+    if (!sourceView)
+        return SLANG_E_NOT_FOUND;
+
+    auto humaneLoc = sourceView->getHumaneLoc(decl->getNameLoc());
+    outLocation->filePath = nullptr;
+    if (humaneLoc.pathInfo.hasFoundPath())
     {
-        auto humaneLoc = sourceView->getHumaneLoc(decl->getNameLoc());
-        slang::SourceLocation loc;
-
-        if (humaneLoc.pathInfo.hasFoundPath())
-        {
-            auto pathSlice = m_stringSlicePool.addAndGetSlice(humaneLoc.pathInfo.foundPath);
-            loc.filePath = pathSlice.begin();
-        }
-
-        loc.line = humaneLoc.line;
-        loc.column = humaneLoc.column;
-        return loc;
+        auto pathSlice = m_stringSlicePool.addAndGetSlice(humaneLoc.pathInfo.foundPath);
+        outLocation->filePath = pathSlice.begin();
     }
-    return slang::SourceLocation();
+    outLocation->line = humaneLoc.line;
+    outLocation->column = humaneLoc.column;
+    return SLANG_OK;
 }
 
 SourceFile* Linkage::findFile(Name* name, SourceLoc loc, IncludeSystem& outIncludeSystem)

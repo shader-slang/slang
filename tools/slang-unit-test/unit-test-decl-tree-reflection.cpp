@@ -26,7 +26,8 @@ static void printRefl(slang::ISession* session, slang::DeclReflection* refl, uns
     {
         std::cout << "  ";
     }
-    auto sourceLocation = session->getDeclSourceLocation(refl);
+    slang::SourceLocation sourceLocation;
+    session->getDeclSourceLocation(refl, &sourceLocation);
     const char* filePath = sourceLocation.filePath ? sourceLocation.filePath : "<null>";
     std::cout << "[" << names[(unsigned int)refl->getKind()] << "] (" << refl->getChildrenCount()
               << ") " << filePath << ":" << sourceLocation.line << ":" << sourceLocation.column
@@ -140,7 +141,8 @@ SLANG_UNIT_TEST(declTreeReflection)
 
     // Verify getDeclSourceLocation on a struct declaration.
     {
-        auto srcLoc = session->getDeclSourceLocation(firstDecl);
+        slang::SourceLocation srcLoc;
+        SLANG_CHECK(session->getDeclSourceLocation(firstDecl, &srcLoc) == SLANG_OK);
         SLANG_CHECK(srcLoc.filePath != nullptr);
         SLANG_CHECK(UnownedStringSlice(srcLoc.filePath) == "m.slang");
         SLANG_CHECK(srcLoc.line == 3);
@@ -167,7 +169,8 @@ SLANG_UNIT_TEST(declTreeReflection)
 
     // Verify getDeclSourceLocation on a function declaration.
     {
-        auto srcLoc = session->getDeclSourceLocation(secondDecl);
+        slang::SourceLocation srcLoc;
+        SLANG_CHECK(session->getDeclSourceLocation(secondDecl, &srcLoc) == SLANG_OK);
         SLANG_CHECK(srcLoc.filePath != nullptr);
         SLANG_CHECK(UnownedStringSlice(srcLoc.filePath) == "m.slang");
         SLANG_CHECK(srcLoc.line == 7);
