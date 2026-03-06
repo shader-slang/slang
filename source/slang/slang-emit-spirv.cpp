@@ -9667,6 +9667,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
                 auto fieldType = field->getFieldType();
                 getNaturalSizeAndAlignment(m_targetRequest, fieldType, &sizeAlignment);
+                IRIntegerValue size = sizeAlignment.size;
+                SLANG_ASSERT(size == IRSizeAndAlignment::kIndeterminateSize || size >= 0);
+                if (size == IRSizeAndAlignment::kIndeterminateSize)
+                    size = 0;
 
                 SpvInst* forwardRef = nullptr;
                 SpvInst* spvFieldType = nullptr;
@@ -9727,7 +9731,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     fieldLine,
                     fieldCol,
                     builder.getIntValue(builder.getUIntType(), offset * 8),
-                    builder.getIntValue(builder.getUIntType(), sizeAlignment.size * 8),
+                    builder.getIntValue(builder.getUIntType(), size * 8),
                     builder.getIntValue(builder.getUIntType(), 0));
                 members.add(memberType);
             }
