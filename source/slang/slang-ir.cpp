@@ -4354,7 +4354,7 @@ IRInst* IRBuilder::emitGetTupleElement(IRType* type, IRInst* tuple, UInt element
             bool hasNestedPack = false;
             for (UInt i = 0; i < tuple->getOperandCount(); i++)
             {
-                if (as<IRMakeValuePack>(tuple->getOperand(i)))
+                if (as<IRMakeValuePack>(tuple->getOperand(i)) || as<IRExpand>(tuple->getOperand(i)))
                 {
                     hasNestedPack = true;
                     break;
