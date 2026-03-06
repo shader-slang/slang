@@ -843,6 +843,7 @@ private:
 };
 
 // Retrieves the ASTBuilder for the current compilation session.
+// Session destruction must occur in LIFO order relative to creation.
 ASTBuilder* getCurrentASTBuilder();
 
 // Sets the ASTBuilder for the current compilation session.
