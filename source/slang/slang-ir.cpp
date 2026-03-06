@@ -4351,7 +4351,17 @@ IRInst* IRBuilder::emitGetTupleElement(IRType* type, IRInst* tuple, UInt element
     case kIROp_TypePack:
         if (element < tuple->getOperandCount())
         {
-            return tuple->getOperand(element);
+            bool hasNestedPack = false;
+            for (UInt i = 0; i < tuple->getOperandCount(); i++)
+            {
+                if (as<IRMakeValuePack>(tuple->getOperand(i)))
+                {
+                    hasNestedPack = true;
+                    break;
+                }
+            }
+            if (!hasNestedPack)
+                return tuple->getOperand(element);
         }
         break;
     }

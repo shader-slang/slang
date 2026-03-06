@@ -806,13 +806,11 @@ struct SpecializationContext
         IRInst* newInst = nullptr;
         if (inst->getOp() == kIROp_MakeValuePack)
             newInst = builder.emitMakeValuePack(
-                inst->getFullType(),
-                flattendOperands.getCount(),
+                (UInt)flattendOperands.getCount(),
                 flattendOperands.getArrayView().getBuffer());
         else
             newInst = builder.emitMakeTuple(
-                inst->getFullType(),
-                flattendOperands.getCount(),
+                (UInt)flattendOperands.getCount(),
                 flattendOperands.getArrayView().getBuffer());
 
         inst->replaceUsesWith(newInst);
