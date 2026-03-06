@@ -227,8 +227,18 @@ public:
 
     Expr* ParseLeafExpression();
     ParamDecl* ParseParameter();
+
+    // Parse type expression, no declaration allowed
     Expr* ParseType();
+
+    // Parse type expression, declaration allowed as a side effect
+    Expr* ParseTypeAllowDecl();
+
+    // Parse type expression, no declaration allowed
     TypeExp ParseTypeExp();
+
+    // Parse type expression, declaration allowed as a side effect
+    TypeExp ParseTypeExpAllowDecl();
 
     Parser& operator=(const Parser&) = delete;
 
@@ -3115,6 +3125,18 @@ static DeclBase* ParseDeclaratorDecl(
         && !initDeclarator.initializer && !initDeclarator.semantics.first)
     {
         UnwrapDeclarator(parser->astBuilder, initDeclarator, &declaratorInfo);
+
+        // diagnose new type declaration, which is not allowed in function
+        // return type expression
+        if (typeSpec.decl)
+        {
+            StringBuilder sb;
+            printDiagnosticArg(sb, typeSpec.decl->astNodeType);
+            parser->sink->diagnose(Diagnostics::DeclNotAllowed{
+                .declType = sb.produceString(),
+                .location = typeSpec.decl->loc});
+        }
+
         return parseTraditionalFuncDecl(parser, declaratorInfo);
     }
 
@@ -4476,7 +4498,7 @@ NodeBase* parseTypeDef(Parser* parser, void* /*userData*/)
     TypeDefDecl* typeDefDecl = parser->astBuilder->create<TypeDefDecl>();
 
     // TODO(tfoley): parse an actual declarator
-    auto type = parser->ParseTypeExp();
+    auto type = parser->ParseTypeExpAllowDecl();
 
     auto nameToken = parser->ReadToken(TokenType::Identifier);
     typeDefDecl->loc = nameToken.loc;
@@ -6805,11 +6827,24 @@ ParamDecl* Parser::ParseParameter()
 /// An atomic type expression is a type specifier followed by an optional
 /// body in the case of a `struct`, `enum`, etc.
 ///
-static Expr* _parseAtomicTypeExpr(Parser* parser)
+/// In this function, we'll always parse the full atomic type declaration
+/// syntax, even when a declaration of a new type is not allowed. This gives
+/// better diagnostics.
+///
+static Expr* _parseAtomicTypeExpr(Parser* parser, bool allowDecl)
 {
     auto typeSpec = _parseTypeSpec(parser);
     if (typeSpec.decl)
     {
+        if (!allowDecl)
+        {
+            StringBuilder sb;
+            printDiagnosticArg(sb, typeSpec.decl->astNodeType);
+            parser->sink->diagnose(Diagnostics::DeclNotAllowed{
+                .declType = sb.produceString(),
+                .location = typeSpec.decl->loc});
+        }
+
         AddMember(parser->currentScope, typeSpec.decl);
     }
     return typeSpec.expr;
@@ -6818,17 +6853,17 @@ static Expr* _parseAtomicTypeExpr(Parser* parser)
 /// Parse a postfix type expression.
 ///
 /// A postfix type expression is an atomic type expression followed
-/// by zero or more postifx suffixes like array brackets.
+/// by zero or more postfix suffixes like array brackets.
 ///
-static Expr* _parsePostfixTypeExpr(Parser* parser)
+static Expr* _parsePostfixTypeExpr(Parser* parser, bool allowDecl)
 {
-    auto typeExpr = _parseAtomicTypeExpr(parser);
+    auto typeExpr = _parseAtomicTypeExpr(parser, allowDecl);
     return parsePostfixTypeSuffix(parser, typeExpr);
 }
 
-static Expr* _parseInfixTypeExpr(Parser* parser);
+static Expr* _parseInfixTypeExpr(Parser* parser, bool allowDecl);
 
-static Expr* _parseInfixTypeExprSuffix(Parser* parser, Expr* leftExpr)
+static Expr* _parseInfixTypeExprSuffix(Parser* parser, Expr* leftExpr, bool allowDecl)
 {
     for (;;)
     {
@@ -6839,7 +6874,7 @@ static Expr* _parseInfixTypeExprSuffix(Parser* parser, Expr* leftExpr)
         auto loc = peekToken(parser).loc;
         if (AdvanceIf(parser, TokenType::OpBitAnd))
         {
-            auto rightExpr = _parsePostfixTypeExpr(parser);
+            auto rightExpr = _parsePostfixTypeExpr(parser, allowDecl);
 
             auto andExpr = parser->astBuilder->create<AndTypeExpr>();
             andExpr->loc = loc;
@@ -6862,20 +6897,30 @@ static Expr* _parseInfixTypeExprSuffix(Parser* parser, Expr* leftExpr)
 /// operator for forming interface conjunctions and the `->` operator
 /// for functions.
 ///
-static Expr* _parseInfixTypeExpr(Parser* parser)
+static Expr* _parseInfixTypeExpr(Parser* parser, bool allowDecl)
 {
-    auto leftExpr = _parsePostfixTypeExpr(parser);
-    return _parseInfixTypeExprSuffix(parser, leftExpr);
+    auto leftExpr = _parsePostfixTypeExpr(parser, allowDecl);
+    return _parseInfixTypeExprSuffix(parser, leftExpr, allowDecl);
 }
 
 Expr* Parser::ParseType()
 {
-    return _parseInfixTypeExpr(this);
+    return _parseInfixTypeExpr(this, false);
+}
+
+Expr* Parser::ParseTypeAllowDecl()
+{
+    return _parseInfixTypeExpr(this, true);
 }
 
 TypeExp Parser::ParseTypeExp()
 {
     return TypeExp(ParseType());
+}
+
+TypeExp Parser::ParseTypeExpAllowDecl()
+{
+    return TypeExp(ParseTypeAllowDecl());
 }
 
 enum class Associativity
@@ -8947,7 +8992,7 @@ static Expr* _parseGenericArg(Parser* parser)
         auto typeExpr = typeSpec.expr;
 
         typeExpr = parsePostfixTypeSuffix(parser, typeExpr);
-        typeExpr = _parseInfixTypeExprSuffix(parser, typeExpr);
+        typeExpr = _parseInfixTypeExprSuffix(parser, typeExpr, false);
 
         return typeExpr;
     }

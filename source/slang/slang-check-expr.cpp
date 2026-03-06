@@ -2122,30 +2122,77 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
             resultValue = (constArgVals[0] != 0) || (constArgVals[1] != 0);
         }
 
-        // simple binary operators
-#define CASE(OP)                                          \
-    else if (opName == getName(#OP)) do                   \
-    {                                                     \
-        if (argCount != 2)                                \
-            return nullptr;                               \
-        resultValue = constArgVals[0] OP constArgVals[1]; \
-    }                                                     \
+        // Unsigned/bitwise operators (bit pattern preserved, uint64_t cast is correct)
+#define CASE_UINT(OP)                                                                         \
+    else if (opName == getName(#OP)) do                                                       \
+    {                                                                                         \
+        if (argCount != 2)                                                                    \
+            return nullptr;                                                                   \
+        resultValue =                                                                         \
+            static_cast<uint64_t>(constArgVals[0]) OP static_cast<uint64_t>(constArgVals[1]); \
+    }                                                                                         \
     while (0)
 
-        CASE(+); // TODO: this can also be unary...
-        CASE(*);
-        CASE(<<);
-        CASE(>>);
-        CASE(&);
-        CASE(|);
-        CASE(^);
-        CASE(!=);
-        CASE(==);
-        CASE(>=);
-        CASE(<=);
-        CASE(<);
-        CASE(>);
-#undef CASE
+        CASE_UINT(+); // TODO: this can also be unary...
+        CASE_UINT(*);
+        CASE_UINT(&);
+        CASE_UINT(|);
+        CASE_UINT(^);
+        CASE_UINT(!=);
+        CASE_UINT(==);
+#undef CASE_UINT
+
+        // Signed comparison operators (uint64_t cast would break e.g. (-1 < 0))
+        else if (opName == getName(">="))
+        {
+            if (argCount != 2)
+                return nullptr;
+            resultValue = constArgVals[0] >= constArgVals[1];
+        }
+        else if (opName == getName("<="))
+        {
+            if (argCount != 2)
+                return nullptr;
+            resultValue = constArgVals[0] <= constArgVals[1];
+        }
+        else if (opName == getName("<"))
+        {
+            if (argCount != 2)
+                return nullptr;
+            resultValue = constArgVals[0] < constArgVals[1];
+        }
+        else if (opName == getName(">"))
+        {
+            if (argCount != 2)
+                return nullptr;
+            resultValue = constArgVals[0] > constArgVals[1];
+        }
+
+        // Shift operators: guard negative count (UB), use modulo for width
+        else if (opName == getName("<<"))
+        {
+            if (argCount != 2)
+                return nullptr;
+            if (constArgVals[1] < 0)
+                return nullptr;
+            const auto shiftCount =
+                static_cast<std::make_unsigned_t<IRIntegerValue>>(constArgVals[1]) %
+                std::numeric_limits<std::make_unsigned_t<IRIntegerValue>>::digits;
+            resultValue = static_cast<IntegerLiteralValue>(
+                static_cast<std::make_unsigned_t<IntegerLiteralValue>>(constArgVals[0])
+                << shiftCount);
+        }
+        else if (opName == getName(">>"))
+        {
+            if (argCount != 2)
+                return nullptr;
+            if (constArgVals[1] < 0)
+                return nullptr;
+            const auto shiftCount =
+                static_cast<std::make_unsigned_t<IRIntegerValue>>(constArgVals[1]) %
+                std::numeric_limits<std::make_unsigned_t<IRIntegerValue>>::digits;
+            resultValue = constArgVals[0] >> shiftCount;
+        }
         // binary operators with chance of divide-by-zero
         // TODO: issue a suitable error in that case
 #define CASE(OP)                                          \
@@ -5770,14 +5817,7 @@ Expr* SemanticsVisitor::maybeInsertImplicitOpForMemberBase(
     CheckBaseContext checkBaseContext,
     bool& outNeedDeref)
 {
-    auto derefExpr = maybeDereference(baseExpr, checkBaseContext);
-
-    if (derefExpr != baseExpr)
-        outNeedDeref = true;
-
-    baseExpr = derefExpr;
-
-    // In case our base expressin is still overloaded, we can perform
+    // In case our base expression is still overloaded, we can perform
     // some more refinement.
     //
     // Handle the case of an overloaded base expression
@@ -5813,6 +5853,13 @@ Expr* SemanticsVisitor::maybeInsertImplicitOpForMemberBase(
             overloadedExpr);
         // TODO: handle other cases of OverloadedExpr that need filtering.
     }
+
+    // Dereference after resolving overloaded expressions, so that the
+    // concrete type is available for pointer-like dereferences.
+    auto derefExpr = maybeDereference(baseExpr, checkBaseContext);
+    if (derefExpr != baseExpr)
+        outNeedDeref = true;
+    baseExpr = derefExpr;
 
     // If the base of the member lookup has an interface type
     // *without* a suitable this-type substitution, then we are

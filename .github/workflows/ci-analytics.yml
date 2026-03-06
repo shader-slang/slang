@@ -35,17 +35,32 @@ jobs:
             --workflow CI \
             --verbose
 
+      - name: Collect merged PR data
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -f ci_analytics_repo/pr_merges.json ]; then
+            cp ci_analytics_repo/pr_merges.json /tmp/pr_merges.json
+          fi
+          python3 extras/ci/analytics/pr_collector.py \
+            --output /tmp/pr_merges.json \
+            --verbose
+
       - name: Generate visualizations
         run: |
           python3 extras/ci/analytics/ci_visualization.py \
             --input /tmp/ci_jobs.json \
+            --pr-input /tmp/pr_merges.json \
             --output ci_analytics_repo
 
       - name: Push to analytics repo
         run: |
           cd ci_analytics_repo
-          # Copy updated data file
+          # Copy updated data files
           cp /tmp/ci_jobs.json ci_jobs.json
+          if [ -f /tmp/pr_merges.json ]; then
+            cp /tmp/pr_merges.json pr_merges.json
+          fi
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"

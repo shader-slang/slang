@@ -106,6 +106,35 @@ struct SpecializationContext
         case kIROp_IntCast:
         case kIROp_FloatCast:
         case kIROp_Select:
+        case kIROp_ConstexprAdd:
+        case kIROp_ConstexprSub:
+        case kIROp_ConstexprMul:
+        case kIROp_ConstexprDiv:
+        case kIROp_ConstexprNeg:
+        case kIROp_ConstexprIRem:
+        case kIROp_ConstexprShl:
+        case kIROp_ConstexprShr:
+        case kIROp_ConstexprBitAnd:
+        case kIROp_ConstexprBitOr:
+        case kIROp_ConstexprBitXor:
+        case kIROp_ConstexprBitNot:
+        case kIROp_ConstexprNot:
+        case kIROp_ConstexprEql:
+        case kIROp_ConstexprNeq:
+        case kIROp_ConstexprGreater:
+        case kIROp_ConstexprLess:
+        case kIROp_ConstexprGeq:
+        case kIROp_ConstexprLeq:
+        case kIROp_ConstexprAnd:
+        case kIROp_ConstexprOr:
+        case kIROp_ConstexprSelect:
+        case kIROp_ConstexprIntCast:
+        case kIROp_ConstexprCastIntToFloat:
+        case kIROp_ConstexprCastFloatToInt:
+        case kIROp_ConstexprFloatCast:
+        case kIROp_ConstexprCastIntToEnum:
+        case kIROp_ConstexprCastEnumToInt:
+        case kIROp_ConstexprEnumCast:
             {
                 if (isSpecConstRateType(inst->getFullType()))
                 {

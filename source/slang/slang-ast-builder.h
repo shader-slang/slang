@@ -683,20 +683,6 @@ public:
         SubtypeWitness* aIsSubtypeOfBWitness,
         SubtypeWitness* bIsSubtypeOfCWitness);
 
-    /// Produce a witness that `T <: L` or `T <: R` given `T <: L&R`
-    SubtypeWitness* getExtractFromConjunctionSubtypeWitness(
-        Type* subType,
-        Type* superType,
-        SubtypeWitness* subIsSubtypeOfConjunction,
-        int indexOfSuperTypeInConjunction);
-
-    /// Produce a witnes that `S <: L&R` given witnesses that `S <: L` and `S <: R`
-    SubtypeWitness* getConjunctionSubtypeWitness(
-        Type* sub,
-        Type* lAndR,
-        SubtypeWitness* subIsLWitness,
-        SubtypeWitness* subIsRWitness);
-
     BuiltinTypeCoercionWitness* getBuiltinTypeCoercionWitness(Type* subType, Type* superType);
 
     DeclRefTypeCoercionWitness* getDeclRefTypeCoercionWitness(
@@ -843,6 +829,7 @@ private:
 };
 
 // Retrieves the ASTBuilder for the current compilation session.
+// Session destruction must occur in LIFO order relative to creation.
 ASTBuilder* getCurrentASTBuilder();
 
 // Sets the ASTBuilder for the current compilation session.
