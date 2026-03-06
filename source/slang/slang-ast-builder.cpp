@@ -948,8 +948,7 @@ ConcreteIntValPack* ASTBuilder::getIntValPack(ArrayView<IntVal*> vals)
     if (flattenedVals.getCount() > 0 && flattenedVals[0]->getType())
         elementType = flattenedVals[0]->getType();
     auto packType = getOrCreate<ValuePackType>(elementType);
-    return getOrCreate<ConcreteIntValPack>(
-        packType, flattenedVals.getArrayView().arrayView);
+    return getOrCreate<ConcreteIntValPack>(packType, flattenedVals.getArrayView().arrayView);
 }
 
 IntVal* ASTBuilder::getEachIntVal(Type* elementType, Val* basePack)
