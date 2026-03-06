@@ -9,7 +9,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-metal -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-wgsl -compute -shaderobj -output-using-type
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 interface IMesh
@@ -76,23 +76,31 @@ void computeMain(int id : SV_DispatchThreadID)
     outputBuffer[1] = n0.y;
     // CHECK: 0.0
 
-    float3 n2 = q.getNormal(2);
-    outputBuffer[2] = n2.z;
+    float3 n1 = q.getNormal(1);
+    outputBuffer[2] = n1.y;
     // CHECK: 1.0
 
-    outputBuffer[3] = q.averageY();
+    float3 n2 = q.getNormal(2);
+    outputBuffer[3] = n2.z;
+    // CHECK: 1.0
+
+    float3 n3 = q.getNormal(3);
+    outputBuffer[4] = n3.x;
+    // CHECK: 1.0
+
+    outputBuffer[5] = q.averageY();
     // CHECK: 0.5
 
     // LineMesh normals: (0,3,0), (0,5,0)
     var l = makeMesh(id + 1);
     float3 ln0 = l.getNormal(0);
-    outputBuffer[4] = ln0.y;
+    outputBuffer[6] = ln0.y;
     // CHECK: 3.0
 
     float3 ln1 = l.getNormal(1);
-    outputBuffer[5] = ln1.y;
+    outputBuffer[7] = ln1.y;
     // CHECK: 5.0
 
-    outputBuffer[6] = l.averageY();
+    outputBuffer[8] = l.averageY();
     // CHECK: 4.0
 }

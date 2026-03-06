@@ -9,7 +9,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-metal -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-wgsl -compute -shaderobj -output-using-type
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 struct Vertex
@@ -23,6 +23,8 @@ interface IShape
 {
     float area();
     float totalWeight();
+    float vertexX(int i);
+    float vertexY(int i);
 }
 
 struct Triangle : IShape
@@ -42,6 +44,9 @@ struct Triangle : IShape
     {
         return verts[0].weight + verts[1].weight + verts[2].weight;
     }
+
+    float vertexX(int i) { return verts[i].x; }
+    float vertexY(int i) { return verts[i].y; }
 }
 
 struct Segment : IShape
@@ -61,6 +66,9 @@ struct Segment : IShape
     {
         return endpoints[0].weight + endpoints[1].weight;
     }
+
+    float vertexX(int i) { return endpoints[i].x; }
+    float vertexY(int i) { return endpoints[i].y; }
 }
 
 IShape makeShape(int id)
@@ -93,10 +101,20 @@ void computeMain(int id : SV_DispatchThreadID)
     outputBuffer[1] = tri.totalWeight();
     // CHECK: 6.0
 
+    // Pin individual vertex fields to verify marshalling order
+    outputBuffer[2] = tri.vertexX(1);
+    // CHECK: 4.0
+    outputBuffer[3] = tri.vertexY(2);
+    // CHECK: 3.0
+
     // Segment: length = sqrt(9+16) = 5.0, area = 5.0 * 2.0 = 10.0
     var seg = makeShape(id + 1);
-    outputBuffer[2] = seg.area();
+    outputBuffer[4] = seg.area();
     // CHECK: 10.0
-    outputBuffer[3] = seg.totalWeight();
+    outputBuffer[5] = seg.totalWeight();
     // CHECK: 12.0
+    outputBuffer[6] = seg.vertexX(1);
+    // CHECK: 3.0
+    outputBuffer[7] = seg.vertexY(1);
+    // CHECK: 4.0
 }
