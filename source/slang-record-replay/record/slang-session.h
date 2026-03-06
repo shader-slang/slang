@@ -92,7 +92,7 @@ public:
     SLANG_NO_THROW bool SLANG_MCALL
     isBinaryModuleUpToDate(const char* modulePath, slang::IBlob* binaryModuleBlob) override;
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
-    getDeclSourceLocation(slang::DeclReflection* Decl, slang::SourceLocation* outLocation) override;
+    getDeclSourceLocation(slang::DeclReflection* decl, slang::SourceLocation* outLocation) override;
 
 private:
     SLANG_FORCE_INLINE slang::ISession* asExternal(SessionRecorder* session)
