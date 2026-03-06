@@ -147,10 +147,8 @@ bool isMemoryLocationUnmodifiedBetweenLoadAndUser(
             if (inst == userInst && !userIsOwnPredecessor)
                 break;
 
-            // No side effects, so can't write to memory. Terminator
-            // instructions count as having side-effects in Slang, but they
-            // don't write to memory.
-            if (!inst->mightHaveSideEffects() || inst == block->getTerminator())
+            // No side effects, so can't write to memory.
+            if (!inst->mightHaveSideEffects())
                 continue;
 
             // If we see any inst that has a side effect, check if it is a simple
@@ -165,6 +163,19 @@ bool isMemoryLocationUnmodifiedBetweenLoadAndUser(
                         return false;
                     continue;
                 }
+            case kIROp_UnconditionalBranch:
+            case kIROp_ConditionalBranch:
+            case kIROp_Switch:
+            case kIROp_TargetSwitch:
+            case kIROp_Return:
+            case kIROp_Yield:
+            case kIROp_Throw:
+            case kIROp_Defer:
+            case kIROp_Unreachable:
+            case kIROp_MissingReturn:
+                // These instructions don't have memory side effects, but do
+                // still count as having other side effects (control flow).
+                break;
             default:
                 // For any other case, conservatively assume the memory location may be modified.
                 return false;
