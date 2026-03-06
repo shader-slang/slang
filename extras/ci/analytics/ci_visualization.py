@@ -500,6 +500,10 @@ def process_jobs(jobs_data, config):
     # Merge queue statistics per date.
     # A merge queue "check" is a CI workflow run with event=merge_group.
     # We count success/failure/cancelled per run (not per job).
+    # Import shared helper for PR number extraction
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from gh_api import parse_merge_queue_pr_number
+
     mq_runs_by_date = defaultdict(lambda: {"success": 0, "failure": 0, "cancelled": 0, "total": 0})
     mq_tat_by_date = defaultdict(list)  # turnaround times for merge queue runs
     mq_recent_failures = []  # most recent merge queue failures (for table)
@@ -546,16 +550,8 @@ def process_jobs(jobs_data, config):
             mq_tat_by_date[date_str].append(tat)
 
         if conclusion == "failure":
-            # Extract PR number from branch name
             branch = run_jobs[0].get("head_branch", "")
-            pr_num = ""
-            if branch.startswith("gh-readonly-queue/"):
-                parts = branch.split("/")
-                if len(parts) >= 3:
-                    # Format: gh-readonly-queue/master/pr-NNNN-SHA
-                    pr_part = parts[2]
-                    if pr_part.startswith("pr-"):
-                        pr_num = pr_part.split("-", 2)[1] if "-" in pr_part[3:] else ""
+            pr_num = parse_merge_queue_pr_number(branch)
 
             # Find failing job names
             failing_jobs = [
@@ -564,6 +560,7 @@ def process_jobs(jobs_data, config):
             ]
             mq_recent_failures.append({
                 "date": date_str,
+                "created_at": earliest.isoformat(),
                 "run_id": run_id,
                 "branch": branch,
                 "pr_number": pr_num,
@@ -571,7 +568,7 @@ def process_jobs(jobs_data, config):
                 "failing_jobs": failing_jobs[:5],
             })
 
-    mq_recent_failures.sort(key=lambda x: x["date"], reverse=True)
+    mq_recent_failures.sort(key=lambda x: x["created_at"], reverse=True)
 
     generated_at = datetime.datetime.now(datetime.timezone.utc).strftime(
         "%Y-%m-%d %H:%M UTC"
@@ -1029,23 +1026,20 @@ def generate_statistics(data, config, output_dir):
     mq_failures_html = ""
     if mq_recent_failures:
         mq_failures_html = '\n<h3>Recent Merge Queue Failures</h3>\n'
-        mq_failures_html += '<table><tr><th>Date</th><th>PR</th><th>Failing Jobs</th></tr>\n'
+        mq_failures_html += '<table><tr><th>Date</th><th>PR</th><th>Run</th><th>Failing Jobs</th></tr>\n'
         for mf in mq_recent_failures[:20]:
             pr_num = mf.get("pr_number", "")
             url = mf.get("url", "")
-            if pr_num and url:
-                # Link to the run, but show PR number
-                run_url = url.rsplit("/", 1)[0] if "/jobs/" in url else url
-                pr_link = f'<a href="{html_mod.escape(run_url)}" target="_blank">#{html_mod.escape(pr_num)}</a>'
-            elif url:
-                run_url = url.rsplit("/", 1)[0] if "/jobs/" in url else url
-                pr_link = f'<a href="{html_mod.escape(run_url)}" target="_blank">link</a>'
+            run_url = url.split("/jobs/")[0] if "/jobs/" in url else url
+            if pr_num:
+                pr_link = f'<a href="https://github.com/shader-slang/slang/pull/{html_mod.escape(pr_num)}" target="_blank">#{html_mod.escape(pr_num)}</a>'
             else:
-                pr_link = pr_num or "?"
+                pr_link = "?"
+            run_link = f'<a href="{html_mod.escape(run_url)}" target="_blank">logs</a>' if run_url else ""
             failing = ", ".join(mf.get("failing_jobs", [])[:3])
             if len(mf.get("failing_jobs", [])) > 3:
                 failing += f" (+{len(mf['failing_jobs']) - 3} more)"
-            mq_failures_html += f"<tr><td>{html_mod.escape(mf.get('date', ''))}</td><td>{pr_link}</td><td>{html_mod.escape(failing)}</td></tr>\n"
+            mq_failures_html += f"<tr><td>{html_mod.escape(mf.get('date', ''))}</td><td>{pr_link}</td><td>{run_link}</td><td>{html_mod.escape(failing)}</td></tr>\n"
         mq_failures_html += "</table>\n"
 
     mq_chart_html = ""

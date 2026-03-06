@@ -176,28 +176,13 @@ def fetch_recent_failures(repo):
     return failures[:10]
 
 
-def _parse_mq_pr_number(branch):
-    """Extract PR number from merge queue branch name.
-
-    Format: gh-readonly-queue/master/pr-NNNN-SHA
-    """
-    if not branch or not branch.startswith("gh-readonly-queue/"):
-        return ""
-    parts = branch.split("/")
-    if len(parts) >= 3 and parts[2].startswith("pr-"):
-        segments = parts[2].split("-", 2)
-        if len(segments) >= 2:
-            return segments[1]
-    return ""
-
-
 def fetch_merge_queue_status(repo):
     """Fetch recent merge queue CI runs (last 24 hours).
 
     Returns a dict with 'recent' (list of runs), 'summary' counts.
     """
     sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
-    from gh_api import gh_api_list
+    from gh_api import gh_api_list, parse_merge_queue_pr_number
 
     runs, err = gh_api_list(
         f"repos/{repo}/actions/runs?event=merge_group&per_page=50",
@@ -221,10 +206,12 @@ def fetch_merge_queue_status(repo):
         elif run.get("status") in ("queued", "in_progress"):
             counts["in_progress"] += 1
 
+        pr_number = parse_merge_queue_pr_number(run.get("head_branch", ""))
         recent.append({
             "conclusion": conclusion or run.get("status", "in_progress"),
             "branch": run.get("head_branch", ""),
-            "pr_number": _parse_mq_pr_number(run.get("head_branch", "")),
+            "pr_number": pr_number,
+            "pr_url": f"https://github.com/{repo}/pull/{pr_number}" if pr_number else "",
             "url": run.get("html_url", ""),
             "created_at": event_time,
             "updated_at": run.get("updated_at", ""),
@@ -235,7 +222,7 @@ def fetch_merge_queue_status(repo):
 
 def record_snapshot(queue_data, output_dir, gpu_quota=None, mq_data=None):
     """Append a runner status snapshot to the JSONL time-series file."""
-    if not queue_data and not gpu_quota and not mq_data:
+    if not queue_data and not gpu_quota:
         return
 
     now = datetime.now(timezone.utc)
@@ -412,7 +399,7 @@ def build_history_chart(snapshots):
             "T4 GPUs in use per GCP region, stacked. Dashed line shows total quota limit.")
     if has_mq_snapshots:
         charts_html += chart_section("mqHistory", "Merge Queue Checks (24h rolling)",
-            "Cumulative merge queue CI check outcomes in the last 24 hours, sampled every 15 minutes.")
+            "Rolling 24-hour count of merge queue CI check outcomes, sampled every 15 minutes.")
 
     return f"""
 <div class="chart-section">
@@ -755,7 +742,6 @@ def generate_health_html(queue_data, failures, output_dir, mq_data=None):
     mq_html = ""
     if mq_data:
         summary = mq_data.get("summary", {})
-        total_checks = summary.get("success", 0) + summary.get("failure", 0) + summary.get("cancelled", 0) + summary.get("in_progress", 0)
         fail_rate = 0
         sf_total = summary.get("success", 0) + summary.get("failure", 0)
         if sf_total > 0:
@@ -774,17 +760,18 @@ def generate_health_html(queue_data, failures, output_dir, mq_data=None):
         recent_failures = [r for r in mq_data.get("recent", []) if r.get("conclusion") == "failure"]
         if recent_failures:
             mq_html += '\n<h3>Recent Merge Queue Failures</h3>\n'
-            mq_html += '<table><tr><th>PR</th><th>Time</th></tr>\n'
+            mq_html += '<table><tr><th>PR</th><th>Run</th><th>Time</th></tr>\n'
             for r in recent_failures[:10]:
                 pr_num = r.get("pr_number", "")
-                url = r.get("url", "")
+                pr_url = r.get("pr_url", "")
+                run_url = r.get("url", "")
                 created = r.get("created_at", "")[:16].replace("T", " ")
                 if pr_num:
-                    pr_text = f"#{pr_num}"
+                    pr_link = _link(pr_url, f"#{pr_num}")
                 else:
-                    pr_text = r.get("branch", "")[:50]
-                link = _link(url, pr_text)
-                mq_html += f"<tr><td>{link}</td><td>{created}</td></tr>\n"
+                    pr_link = _esc(r.get("branch", "")[:50])
+                run_link = _link(run_url, "logs") if run_url else ""
+                mq_html += f"<tr><td>{pr_link}</td><td>{run_link}</td><td>{created}</td></tr>\n"
             mq_html += "</table>\n"
         else:
             mq_html += "<p>No merge queue failures in the last 24 hours.</p>"
