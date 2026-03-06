@@ -80,6 +80,17 @@ slang-test must run from repository root
 - Use interpreter: `//TEST:INTERPRET(filecheck=CHECK):`
 - Example test structure in `tests/language-feature/lambda/lambda-0.slang`
 
+**Diagnostic Tests** (see `docs/diagnostics.md` for full details):
+
+Use `// DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):` as the test directive to verify that the compiler emits expected diagnostics. Annotations in comments match against compiler output by message text, severity, or error code. Carets align to columns on the preceding source line:
+
+```slang
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv
+int foo = undefined;
+//CHECK: E01234
+//CHECK:  ^^^^^^^^^ error
+```
+
 **SPIRV Validation**:
 
 - Set `SLANG_RUN_SPIRV_VALIDATION=1` when using `slangc -target spirv`
