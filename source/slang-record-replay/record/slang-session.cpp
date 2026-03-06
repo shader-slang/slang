@@ -563,8 +563,9 @@ SLANG_NO_THROW bool SessionRecorder::isBinaryModuleUpToDate(
     return result;
 }
 
-SLANG_NO_THROW SlangResult SLANG_MCALL
-SessionRecorder::getDeclSourceLocation(slang::DeclReflection* decl, slang::SourceLocation* outLocation)
+SLANG_NO_THROW SlangResult SLANG_MCALL SessionRecorder::getDeclSourceLocation(
+    slang::DeclReflection* decl,
+    slang::SourceLocation* outLocation)
 {
     return m_actualSession->getDeclSourceLocation(decl, outLocation);
 }
