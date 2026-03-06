@@ -54,8 +54,8 @@ def _ceildiv(a, b):
     return (a + b - 1) // b
 
 
-def _create_device_and_kernels(extra_defines=None):
-    """Create CUDA device, load module, link compute kernels."""
+def _create_device_and_kernels(extra_defines=None, device_type=spy.DeviceType.cuda):
+    """Create device, load module, link compute kernels."""
     include_paths = get_slangpy_paths()
     defines = {"WORKGROUP_SIZE": str(WORKGROUP_SIZE)}
     if extra_defines:
@@ -63,14 +63,14 @@ def _create_device_and_kernels(extra_defines=None):
 
     try:
         device = spy.Device(
-            type=spy.DeviceType.cuda,
+            type=device_type,
             compiler_options=spy.SlangCompilerOptions({
                 "include_paths": include_paths,
                 "defines": defines,
             }),
         )
     except Exception as exc:
-        pytest.skip(f"CUDA device not available: {exc}")
+        pytest.skip(f"Device not available ({device_type}): {exc}")
 
     raw_module = device.load_module(str(TEST_DIR / "neural_mlp_gpu_coopmat.slang"))
 
@@ -223,7 +223,7 @@ def _dispatch_render(kernels, bufs, resolution, output_buf):
 @pytest.mark.parametrize("device_type", [spy.DeviceType.cuda])
 def test_training_convergence_coopmat(device_type: spy.DeviceType) -> None:
     """Train MLP on GPU using WaveTangledVector for 5K iterations."""
-    device, kernels, module = _create_device_and_kernels()
+    device, kernels, module = _create_device_and_kernels(device_type=device_type)
     try:
         bufs = _create_buffers(device)
         ref_buf, w, h, _ = _load_reference_image(device)
@@ -272,7 +272,7 @@ def test_training_convergence_coopmat(device_type: spy.DeviceType) -> None:
 @pytest.mark.parametrize("device_type", [spy.DeviceType.cuda])
 def test_inference_quality_coopmat(device_type: spy.DeviceType) -> None:
     """Train with CoopMat, then render full image and compare against reference."""
-    device, kernels, _module = _create_device_and_kernels()
+    device, kernels, _module = _create_device_and_kernels(device_type=device_type)
     try:
         bufs = _create_buffers(device)
         ref_buf, w, h, ref_np = _load_reference_image(device)
@@ -333,7 +333,7 @@ def test_inference_quality_coopmat(device_type: spy.DeviceType) -> None:
 @pytest.mark.parametrize("device_type", [spy.DeviceType.cuda])
 def test_parameter_count_coopmat(device_type: spy.DeviceType) -> None:
     """FFLayer.ParameterCount must match expected values (same as InlineVector)."""
-    device, _kernels, module = _create_device_and_kernels()
+    device, _kernels, module = _create_device_and_kernels(device_type=device_type)
     try:
         total_mlp = int(module.get_total_params())
         grid_params = int(module.get_grid_params())
