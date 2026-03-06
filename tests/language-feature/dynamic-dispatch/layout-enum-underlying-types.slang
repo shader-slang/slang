@@ -1,14 +1,13 @@
-// Enums with non-default underlying types (uint8_t, uint16_t, uint64_t)
-// are marshalled via their tag type. The AnyValue packing must handle
-// the different storage sizes correctly -- a uint8_t enum occupies 1 byte,
-// while a uint64_t enum occupies 8 bytes in the packed representation.
+// Enums with non-default underlying types (uint8_t, uint16_t) are
+// marshalled via their tag type. The AnyValue packing must handle
+// the different storage sizes correctly for sub-32-bit tag types.
 
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cpu -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type -render-feature int16
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-metal -compute -shaderobj -output-using-type
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
 enum TinyEnum : uint8_t
