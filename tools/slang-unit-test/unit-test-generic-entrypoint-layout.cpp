@@ -79,12 +79,12 @@ SLANG_UNIT_TEST(genericEntryPointLayout)
 
         ComPtr<slang::IComponentType> specializedEntryPoint;
         slang::SpecializationArg args[] = {slang::SpecializationArg::fromExpr("4")};
-        SLANG_CHECK_ABORT(
-            entryPoint->specialize(
-                args,
-                1,
-                specializedEntryPoint.writeRef(),
-                diagnosticBlob.writeRef()) == SLANG_OK);
+        auto result = entryPoint->specialize(
+            args,
+            1,
+            specializedEntryPoint.writeRef(),
+            diagnosticBlob.writeRef());
+        SLANG_CHECK_ABORT(result == SLANG_OK);
         SLANG_CHECK_ABORT(specializedEntryPoint != nullptr);
 
         auto layout = specializedEntryPoint->getLayout();
