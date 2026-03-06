@@ -42,6 +42,7 @@ VISIBILITY_LEVEL struct TiledMMAHelper<T, int InputSize, int OutputSize, int Sub
     typealias BaseMMA = MMAHelper<T, InputSize, OutputSize, SubgroupSize, Target, ShMemSize, TransposeA>;
 
     VISIBILITY_LEVEL typealias TileInfoT = BaseMMA.TileInfo;
+    VISIBILITY_LEVEL typealias TileInfo = TileInfoT;
     typealias CMShape = BaseMMA.CMShape;
     typealias ShMemInfo = BaseMMA.ShMemInfo;
 
@@ -81,16 +82,20 @@ VISIBILITY_LEVEL struct TiledMMAHelper<T, int InputSize, int OutputSize, int Sub
     // Tile load helpers
     // =========================================================================
 
-    // Slow path: load a column of tiles (all NCoopMatRow tiles for a given tileCol)
-    // into shared memory. Needed when U != half, because CoopMat A only supports
-    // half and the data must be converted.
+    // Slow path: load NCoopMatRow tiles for a given shared-dimension index
+    // into shared memory. Needed when U != half, because CoopMat A only
+    // supports half and the data must be converted.
+    //
+    // TransposeA=false: loads a column of tiles (varying M, fixed K=tileIndex)
+    // TransposeA=true:  loads a row of tiles (fixed M=tileIndex, varying K)
+    //
     // Shared memory layout: tiles are stored contiguously, tile i at offset
-    // i * TileSizeInUint4, matching what MatA.Load expects with stride TileStrideInUint4.
+    // i * TileSizeInUint4.
     [ForceInline]
     [require(cooperative_matrix, subgroup_basic)]
     internal static void loadTileColumnViaSharedMemory<U, Address>(
         uint sharedMemoryOffset,
-        int tileCol,
+        int tileIndex,
         Address weightAddress)
             where U : __BuiltinFloatingPointType
             where U.Differential == U
@@ -98,21 +103,25 @@ VISIBILITY_LEVEL struct TiledMMAHelper<T, int InputSize, int OutputSize, int Sub
     {
         uint laneId = WaveGetLaneIndex();
 
-        // No bounds check needed: TotalUint4 is always a multiple of N (SubgroupSize).
-        // Proof: TileSizeInUint4 = ROW_A * COLUMN_A / ElementCountPerVector
-        //      = 16 * 16 / 8 = 32, and N = SubgroupSize = 32.
-        // So TotalUint4 = 32 * NTileRows, and NumLoadsPerThread = NTileRows exactly.
-        // The maximum idx = laneId + (NTileRows - 1) * 32 ≤ 31 + (NTileRows - 1) * 32
-        //                 = NTileRows * 32 - 1 = TotalUint4 - 1, always in bounds.
-        static const uint TotalUint4 = TileSizeInUint4 * NTileRows;
+        // NCoopMatRow tiles to load. Each tile is TileSizeInUint4 = 32 uint4.
+        // TotalUint4 = 32 * NCoopMatRow, always a multiple of N = 32.
+        static const uint NumTiles = TileInfoT.NCoopMatRow;
+        static const uint TotalUint4 = TileSizeInUint4 * NumTiles;
         static const uint NumLoadsPerThread = TotalUint4 / N;
 
         for (uint i = 0; i < NumLoadsPerThread; i++)
         {
             uint idx = laneId + i * N;
-            uint tileRow = idx / TileSizeInUint4;
+            uint localTileIdx = idx / TileSizeInUint4;
             uint idxInTile = idx % TileSizeInUint4;
-            int baseOffset = tileElementOffset(tileRow, tileCol);
+
+            // Map logical tile index to stored M×K coordinates.
+            // TransposeA=false: stored(localTileIdx, tileIndex) — localTileIdx is M, tileIndex is K
+            // TransposeA=true:  stored(tileIndex, localTileIdx) — tileIndex is M, localTileIdx is K
+            int storedRow = TransposeA ? tileIndex : int(localTileIdx);
+            int storedCol = TransposeA ? int(localTileIdx) : tileIndex;
+
+            int baseOffset = tileElementOffset(storedRow, storedCol);
             int elemOffset = baseOffset + idxInTile * CMShape.ElementCountPerVector;
             uint4 value = weightAddress.readUint4<half, true, CMShape.COLUMN_A>(elemOffset);
             ShMemPool.data[sharedMemoryOffset + idx] = value;
@@ -126,20 +135,37 @@ VISIBILITY_LEVEL struct TiledMMAHelper<T, int InputSize, int OutputSize, int Sub
     // Caller must ensure U is half before calling.
     [ForceInline]
     [require(cooperative_matrix, subgroup_basic)]
+    // Load a CoopMat A tile directly from global memory.
+    // tileRowIdx and tileColIdx are in the iteration's logical space
+    // (tileRowIdx = NCoopMatRow index, tileColIdx = shared dimension index).
+    // This function maps them to the stored M×K tile layout accounting for TransposeA.
     internal static MatA loadTileDirect<U, Address>(
-        int tileRow,
-        int tileCol,
+        int tileRowIdx,
+        int tileColIdx,
         Address weightAddress)
             where U : __BuiltinFloatingPointType
             where U.Differential == U
             where Address : IPointerLikeAddress<U>
     {
-        int offset = tileElementOffset(tileRow, tileCol);
-        // U is guaranteed to be half at the call site, so U* == half*.
+        // Map logical iteration indices to stored M×K tile coordinates.
+        // TransposeA=false: i indexes M (tileRow), tileIndex indexes K (tileCol)
+        // TransposeA=true:  i indexes K (tileCol), tileIndex indexes M (tileRow)
+        int storedRow = TransposeA ? tileColIdx : tileRowIdx;
+        int storedCol = TransposeA ? tileRowIdx : tileColIdx;
+
+        int offset = tileElementOffset(storedRow, storedCol);
         half* ptr = reinterpret<half*>(weightAddress.getPointer(uint(offset)));
-        // CoopMat.Load(T* buffer, uint element, uint stride) — element is 0
-        // because the pointer already points to the tile start.
-        return MatA.Load<RowMajor>(ptr, 0u, uint(CMShape.COLUMN_A));
+
+        if (TransposeA)
+        {
+            // Tile is stored row-major in M×K, but we need it column-major for W^T.
+            // ColumnMajor with stride ROW_A transposes the tile on load.
+            return MatA.Load<ColumnMajor>(ptr, 0u, uint(CMShape.ROW_A));
+        }
+        else
+        {
+            return MatA.Load<RowMajor>(ptr, 0u, uint(CMShape.COLUMN_A));
+        }
     }
 
     // =========================================================================
@@ -231,9 +257,9 @@ VISIBILITY_LEVEL struct TiledMMAHelper<T, int InputSize, int OutputSize, int Sub
         }
 
         [ForceUnroll]
-        for (int k = 0; k < K; k += CMShape.COLUMN_A)
+        for (int k = 0; k < TileInfoT.SharedDimensionSize; k += CMShape.COLUMN_A)
         {
-            uint tileCol = k / CMShape.COLUMN_A;
+            uint tileIndex = k / CMShape.COLUMN_A;
 
             MatA matA[TileInfoT.NCoopMatRow];
 
@@ -246,39 +272,43 @@ VISIBILITY_LEVEL struct TiledMMAHelper<T, int InputSize, int OutputSize, int Sub
                 // Phase 1: Load weight tiles into CoopMat A.
                 for (uint i = 0; i < TileInfoT.NCoopMatRow; i++)
                 {
-                    matA[i] = loadTileDirect<U, Address>(i, tileCol, weightAddress);
+                    matA[i] = loadTileDirect<U, Address>(i, tileIndex, weightAddress);
                 }
 
                 // Phase 2: Load input vector into shared memory B.
-                BaseMMA.loadVectorToShB(sharedMemoryBOffset, tileCol, subgroupIndex, inputVector);
+                BaseMMA.loadVectorToShB(sharedMemoryBOffset, tileIndex, subgroupIndex, inputVector);
                 GroupMemoryBarrierWithWaveSync();
             }
             else
             {
-                // Slow path: first warp loads the entire column of tiles to
-                // workgroup-shared memory for type conversion. All warps load
-                // their input vectors in parallel. A single GroupSync covers both.
-
-                // Phase 1: Load weight tiles into shared memory first, because we can't
-                // load them directly into CoopMat A.
+                // Slow path: first warp loads the tiles to workgroup-shared memory
+                // for type conversion. All warps load their input vectors in parallel.
                 if (subgroupIndex == 0)
                 {
-                    loadTileColumnViaSharedMemory<U, Address>(sharedMemoryAOffset, tileCol, weightAddress);
+                    loadTileColumnViaSharedMemory<U, Address>(sharedMemoryAOffset, tileIndex, weightAddress);
                 }
 
-                // Phase 2: Load input vector into shared memory B.
-                BaseMMA.loadVectorToShB(sharedMemoryBOffset, tileCol, subgroupIndex, inputVector);
+                BaseMMA.loadVectorToShB(sharedMemoryBOffset, tileIndex, subgroupIndex, inputVector);
                 GroupMemoryBarrierWithGroupSync();
 
                 for (uint i = 0; i < TileInfoT.NCoopMatRow; i++)
                 {
                     uint ptrTileOffset = sharedMemoryAOffset + i * TileSizeInUint4;
-                    matA[i] = MatA.Load<RowMajor, uint4>(ShMemPool.data, ptrTileOffset, TileStrideInUint4);
+                    if (TransposeA)
+                    {
+                        matA[i] = MatA.Load<ColumnMajor, uint4>(ShMemPool.data, ptrTileOffset, TileInfoT.HeightInVectorTileA);
+                    }
+                    else
+                    {
+                        matA[i] = MatA.Load<RowMajor, uint4>(ShMemPool.data, ptrTileOffset, TileStrideInUint4);
+                    }
                 }
             }
 
             // Phase 3: MMA.
-            uint ptrPerWarpBOffset = sharedMemoryBOffset + subgroupIndex * ShMemInfo.SharedMemSizeInVectorMatB;
+            // Use SharedMemSizeInVectorMatC (not MatB) for per-warp stride to match
+            // the writeback layout, keeping each warp's B/C regions aligned.
+            uint ptrPerWarpBOffset = sharedMemoryBOffset + subgroupIndex * ShMemInfo.SharedMemSizeInVectorMatC;
             for (uint j = 0; j < TileInfoT.NCoopMatColumn; j++)
             {
                 uint ptrMatBOffset = ptrPerWarpBOffset + j * CMShape.CoopMatBSizeInVector;
@@ -315,6 +345,23 @@ VISIBILITY_LEVEL struct TiledMMAHelper<T, int InputSize, int OutputSize, int Sub
         return outputVector;
     }
 
+    // Forward sumReduceRows to BaseMMA.
+    [ForceInline]
+    [require(cuda_spirv, subgroup_partitioned)]
+    [require(cuda_spirv, sm_6_6)]
+    VISIBILITY_LEVEL static void sumReduceRows<U, Address, InArrayType>(
+        uint sharedMemoryOffset,
+        in InArrayType dOut,
+        in int subgroupId,
+        Address biasAddress)
+        where U : __BuiltinFloatingPointType
+        where U.Differential == U
+        where Address : IPointerLikeAddress<U>
+        where InArrayType : IArrayAccessor<U>
+    {
+        BaseMMA.sumReduceRows<U, Address, InArrayType>(sharedMemoryOffset, dOut, subgroupId, biasAddress);
+    }
+
     // =========================================================================
     // Backward outer-product with tiled-layout store
     // =========================================================================
@@ -327,7 +374,7 @@ VISIBILITY_LEVEL struct TiledMMAHelper<T, int InputSize, int OutputSize, int Sub
     /// positions in global memory (no conversion back to linear layout).
     [ForceInline]
     [require(cooperative_matrix, subgroup_basic, cuda_spirv)]
-    VISIBILITY_LEVEL static void outerProductAccumulateTiledLayout<U, Address, TypeA, InArrayTypeA, TypeB, InArrayTypeB>(
+    VISIBILITY_LEVEL static void outerProductAccumulate<U, Address, TypeA, InArrayTypeA, TypeB, InArrayTypeB>(
         uint sharedMemoryAOffset,
         uint sharedMemoryBOffset,
         InArrayTypeA inputVectorA,
@@ -390,6 +437,12 @@ VISIBILITY_LEVEL struct TiledMMAHelper<T, int InputSize, int OutputSize, int Sub
                 }
             }
         }
+
+        // Group sync needed: unlike mma where we can widen the per-warp B stride
+        // to match C, the outer product's A+B regions already fill the shared
+        // memory pool. Widening B would overflow. So we sync to ensure all warps
+        // finish MMA reads before sumReduceTiles overwrites shared memory.
+        GroupMemoryBarrierWithGroupSync();
 
         // Cross-warp reduction (same as MMAHelper.outerProductAccumulate).
         BaseMMA.sumReduceTiles<CoopMatCRows, CoopMatCColumns>(matC, subgroupIndex, sharedMemoryBOffset);
