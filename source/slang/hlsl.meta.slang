@@ -24200,6 +24200,7 @@ struct HitObject
     // "void hitObjectRecordMissMotionEXT(hitObjectEXT hitObject, uint rayFlags, uint sbtRecordIndex, vec3 origin, float Tmin, vec3 direction, float TMax, float currentTime)"
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_EXT_buffer_reference_uvec2)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
     [require(glsl, ser_motion_raygen_closesthit_miss)]
     static void __glslMakeMissMotionEXT(
         out HitObject hitObj,
