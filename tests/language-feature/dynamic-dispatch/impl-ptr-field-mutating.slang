@@ -10,6 +10,9 @@
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
+//TEST_INPUT:ubuffer(data=[0 1], stride=4):name=typeSelector
+RWStructuredBuffer<uint> typeSelector;
+
 interface IAccumulator
 {
     int get();
@@ -48,18 +51,20 @@ struct LocalAccumulator : IAccumulator
     }
 }
 
-IAccumulator makePtrAccumulator(int* target)
+IAccumulator makeAccumulator(int id, int* target, int initial)
 {
-    PtrAccumulator a;
-    a.target = target;
-    return a;
-}
-
-IAccumulator makeLocalAccumulator(int initial)
-{
-    LocalAccumulator a;
-    a.value = initial;
-    return a;
+    if (id == 0)
+    {
+        PtrAccumulator a;
+        a.target = target;
+        return a;
+    }
+    else
+    {
+        LocalAccumulator a;
+        a.value = initial;
+        return a;
+    }
 }
 
 [numthreads(1, 1, 1)]
@@ -68,7 +73,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     int storage = 0;
 
     // PtrAccumulator: mutations go through the pointer to `storage`
-    var acc = makePtrAccumulator(&storage);
+    var acc = makeAccumulator(typeSelector[0], &storage, 0);
     acc.accumulate(10);
     acc.accumulate(20);
     // CHECK: 30
@@ -79,7 +84,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     outputBuffer[1] = storage;
 
     // LocalAccumulator: mutations are local to the existential value
-    var acc2 = makeLocalAccumulator(5);
+    var acc2 = makeAccumulator(typeSelector[1], nullptr, 5);
     acc2.accumulate(7);
     // CHECK: 12
     outputBuffer[2] = acc2.get();

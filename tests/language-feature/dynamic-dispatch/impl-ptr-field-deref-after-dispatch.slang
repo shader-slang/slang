@@ -11,6 +11,9 @@
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
+//TEST_INPUT:ubuffer(data=[0 1], stride=4):name=typeSelector
+RWStructuredBuffer<uint> typeSelector;
+
 interface IReader
 {
     int read();
@@ -68,12 +71,12 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     int val = 32;
 
     // IndirectReader: *source + offset = 32 + 10 = 42
-    var reader = makeReader(0, &val);
+    var reader = makeReader(typeSelector[0], &val);
     // CHECK: 42
     outputBuffer[0] = dispatchRead(reader);
 
     // DirectReader: value = 999
-    var reader2 = makeReader(1, nullptr);
+    var reader2 = makeReader(typeSelector[1], nullptr);
     // CHECK: 999
     outputBuffer[1] = dispatchRead(reader2);
 

@@ -5,9 +5,13 @@
 
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cpu -compute -shaderobj -output-using-type
 //DISABLE_TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type -emit-spirv-directly
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
+
+//TEST_INPUT:ubuffer(data=[0 1 0 1], stride=4):name=typeSelector
+RWStructuredBuffer<uint> typeSelector;
 
 // Auto-inferred anyValueSize: the compiler determines the size from the
 // largest conforming type's layout including pointer fields.
@@ -90,22 +94,22 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     int source = 39;
 
     // Auto-sized with pointer: 39 + 3 = 42
-    var a = makeAutoSized(0, &source);
+    var a = makeAutoSized(typeSelector[0], &source);
     // CHECK: 42
     outputBuffer[0] = a.get();
 
     // Auto-sized without pointer: 77
-    var b = makeAutoSized(1, nullptr);
+    var b = makeAutoSized(typeSelector[1], nullptr);
     // CHECK: 77
     outputBuffer[1] = b.get();
 
     // Explicit-sized with pointer: 39 + 3 = 42
-    var c = makeExplicitSized(0, &source);
+    var c = makeExplicitSized(typeSelector[2], &source);
     // CHECK: 42
     outputBuffer[2] = c.get();
 
     // Explicit-sized without pointer: 77
-    var d = makeExplicitSized(1, nullptr);
+    var d = makeExplicitSized(typeSelector[3], nullptr);
     // CHECK: 77
     outputBuffer[3] = d.get();
 }

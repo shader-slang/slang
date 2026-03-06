@@ -15,6 +15,9 @@
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
+//TEST_INPUT:ubuffer(data=[0 1 0], stride=4):name=typeSelector
+RWStructuredBuffer<uint> typeSelector;
+
 interface ICompute
 {
     int compute();
@@ -42,20 +45,22 @@ struct DirectImpl : ICompute
     }
 }
 
-ICompute makeArrayPtr(int* p0, int* p1)
+ICompute makeCompute(int id, int* p0, int* p1, int a, int b)
 {
-    ArrayPtrImpl impl;
-    impl.values[0] = p0;
-    impl.values[1] = p1;
-    return impl;
-}
-
-ICompute makeDirect(int a, int b)
-{
-    DirectImpl impl;
-    impl.a = a;
-    impl.b = b;
-    return impl;
+    if (id == 0)
+    {
+        ArrayPtrImpl impl;
+        impl.values[0] = p0;
+        impl.values[1] = p1;
+        return impl;
+    }
+    else
+    {
+        DirectImpl impl;
+        impl.a = a;
+        impl.b = b;
+        return impl;
+    }
 }
 
 [numthreads(1, 1, 1)]
@@ -65,19 +70,19 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     int y = 22;
 
     // ArrayPtrImpl: *values[0] + *values[1] = 20 + 22 = 42
-    var comp = makeArrayPtr(&x, &y);
+    var comp = makeCompute(typeSelector[0], &x, &y, 0, 0);
     // CHECK: 42
     outputBuffer[0] = comp.compute();
 
     // DirectImpl: a * b = 7 * 8 = 56
-    var comp2 = makeDirect(7, 8);
+    var comp2 = makeCompute(typeSelector[1], nullptr, nullptr, 7, 8);
     // CHECK: 56
     outputBuffer[1] = comp2.compute();
 
     // Modify pointed-to values.
     x = 100;
     y = -50;
-    var comp3 = makeArrayPtr(&x, &y);
+    var comp3 = makeCompute(typeSelector[2], &x, &y, 0, 0);
     // CHECK: 50
     outputBuffer[2] = comp3.compute();
 }

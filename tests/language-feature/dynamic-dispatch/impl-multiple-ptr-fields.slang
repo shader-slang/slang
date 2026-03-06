@@ -10,6 +10,9 @@
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
+//TEST_INPUT:ubuffer(data=[0 1 0], stride=4):name=typeSelector
+RWStructuredBuffer<uint> typeSelector;
+
 struct Vec2
 {
     int x;
@@ -75,12 +78,12 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     vec.y = 7;
 
     // MultiPtrImpl: 10 + 5 + 20 + 7 = 42
-    var comp = makeCompute(0, &ival, &fval, &vec);
+    var comp = makeCompute(typeSelector[0], &ival, &fval, &vec);
     // CHECK: 42
     outputBuffer[0] = comp.compute();
 
     // ValueImpl: 100 - 1 = 99
-    var comp2 = makeCompute(1, nullptr, nullptr, nullptr);
+    var comp2 = makeCompute(typeSelector[1], nullptr, nullptr, nullptr);
     // CHECK: 99
     outputBuffer[1] = comp2.compute();
 
@@ -89,7 +92,7 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     fval = 50.0;
     vec.x = 0;
     vec.y = 0;
-    var comp3 = makeCompute(0, &ival, &fval, &vec);
+    var comp3 = makeCompute(typeSelector[2], &ival, &fval, &vec);
     // CHECK: 150
     outputBuffer[2] = comp3.compute();
 }
