@@ -106,6 +106,10 @@ inputs:
     description: "Comma-separated list of usernames to allow without write permissions, or '*' to allow all users. Only works when github_token is provided."
     required: false
     default: ""
+  oidc-contents-permission:
+    description: "Contents permission level for OIDC token exchange ('read' or 'write'). Use 'write' only for workflows that need to push code (e.g., CI fixer). Default 'read' for safety."
+    required: false
+    default: "read"
 
   # AWS/Bedrock configuration (LLMGW path uses Bedrock with bearer token)
   aws-region:
@@ -426,7 +430,7 @@ runs:
           -X POST "$EXCHANGE_URL" \
           -H "Authorization: Bearer $OIDC_TOKEN" \
           -H "Content-Type: application/json" \
-          -d '{"permissions":{"contents":"write","pull_requests":"write","issues":"write","actions":"read"}}' \
+          -d '{"permissions":{"contents":"${{ inputs.oidc-contents-permission }}","pull_requests":"write","issues":"write","actions":"read"}}' \
           2>/dev/null || echo "000")
 
         if [ "$HTTP_CODE" = "200" ] && [ -f "$EXCHANGE_RESPONSE" ]; then
