@@ -1,5 +1,14 @@
-"""Sweep workgroup sizes for CoopMat MLP test. Run each size in a subprocess."""
-import subprocess, sys
+"""Sweep workgroup sizes for CoopMat MLP test. Run each size in a subprocess.
+
+Usage: run from the slang repo root:
+  ../slangpy/.venv/bin/python3 tests/integration/slangpy/neural-large-model/sweep_workgroup.py
+"""
+import os
+import subprocess
+import sys
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+REPO_ROOT = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", "..", ".."))
 
 for wg in [32, 64, 128, 256, 512, 1024]:
     print(f"\n===== WORKGROUP_SIZE={wg} =====", flush=True)
@@ -58,7 +67,7 @@ ok='OK' if np.isfinite(fl) and fl<il*0.5 else 'FAIL'
 print(f'  Final: {{fl:.4f}} ({{red:.0f}}% reduction) [{{ok}}]',flush=True)
 dev.close()
 """],
-        capture_output=False, cwd="/home/xiaoyongs/slangProject/slang",
+        capture_output=False, cwd=REPO_ROOT,
         timeout=600
     )
     if r.returncode != 0:

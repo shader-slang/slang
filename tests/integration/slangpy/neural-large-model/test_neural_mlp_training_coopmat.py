@@ -118,6 +118,9 @@ def _create_buffers(device, mlp_dtype="float32", hidden_dim=HIDDEN_DIM):
         data=np.zeros(total_mlp, dtype=mlp_dtype), usage=usage_rw)
 
     bufs["latent"] = device.create_buffer(data=latent_np.ravel(), usage=usage_rw)
+    # Latent grads are allocated but receive zero gradients in the CoopMat variant
+    # because PointerAddress.operator[] is not backward-differentiable (no_diff).
+    # The optimizer still runs on them (harmless no-op with zero grads).
     bufs["latent_grad"] = device.create_buffer(
         data=np.zeros(total_latent, dtype="float32"), usage=usage_rw)
     bufs["latent_adam_m"] = device.create_buffer(
