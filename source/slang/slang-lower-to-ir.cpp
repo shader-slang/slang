@@ -13744,14 +13744,19 @@ bool isUnspecializedGenericFuncDeclRef(DeclRef<Decl> declRef)
 
     // GenericAppDeclRef whose args still reference the generic's own parameters
     // (applied but not yet substituted with concrete values).
-    if (genericAppDeclRef->getArgCount() == 0)
-        return false;
-    DeclRef<Decl> argDeclRef;
-    if (auto intVal = as<DeclRefIntVal>(genericAppDeclRef->getArg(0)))
-        argDeclRef = intVal->getDeclRef();
-    else if (auto type = as<DeclRefType>(genericAppDeclRef->getArg(0)))
-        argDeclRef = type->getDeclRef();
-    return argDeclRef.getDecl() && argDeclRef.getDecl()->parentDecl == genericDecl;
+    // Currently only two states exist: fully specialized or not at all.
+    // If partial specialization is added, this logic will need updating.
+    for (Index i = 0; i < genericAppDeclRef->getArgCount(); i++)
+    {
+        DeclRef<Decl> argDeclRef;
+        if (auto intVal = as<DeclRefIntVal>(genericAppDeclRef->getArg(i)))
+            argDeclRef = intVal->getDeclRef();
+        else if (auto type = as<DeclRefType>(genericAppDeclRef->getArg(i)))
+            argDeclRef = type->getDeclRef();
+        if (argDeclRef.getDecl() && argDeclRef.getDecl()->parentDecl == genericDecl)
+            return true;
+    }
+    return false;
 }
 
 RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
