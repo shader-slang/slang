@@ -165,7 +165,7 @@ TensorView make_tensor_view(
     {
         res.sizes[i] = val.size(i);
         res.strides[i] = val.stride(i) * elementSize;
-        if (res.strides[i] == 0 && res.sizes[i] > 0)
+        if (!isEmpty && res.strides[i] == 0)
             throw std::runtime_error(
                 std::string(name)
                     .append(": tensors with broadcasted dimensions are not supported (use "
