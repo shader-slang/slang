@@ -39,9 +39,8 @@ static void printRefl(slang::ISession* session, slang::DeclReflection* refl, uns
     const char* filePath = sourceLocation.filePath ? sourceLocation.filePath : "<null>";
     auto kindIndex = (unsigned int)refl->getKind();
     auto kindName = kindIndex < SLANG_COUNT_OF(names) ? names[kindIndex] : std::string("Unknown");
-    std::cout << "[" << kindName << "] (" << refl->getChildrenCount()
-              << ") " << filePath << ":" << sourceLocation.line << ":" << sourceLocation.column
-              << std::endl;
+    std::cout << "[" << kindName << "] (" << refl->getChildrenCount() << ") " << filePath << ":"
+              << sourceLocation.line << ":" << sourceLocation.column << std::endl;
 
     for (auto* child : refl->getChildren())
     {
