@@ -332,7 +332,7 @@ List<Edit> formatSource(
                     return 1;
                 return 0;
             });
-        if (exclusionRangeId != -1)
+        if (exclusionRangeId >= 0)
             continue;
         pos += lengthStr.getLength();
         if (pos < line.getLength() && line[pos] == '\'')

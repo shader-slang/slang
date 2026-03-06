@@ -2068,7 +2068,7 @@ Result linkAndOptimizeIR(
         SLANG_PASS(unexportNonEmbeddableIR, target);
     }
 
-    SLANG_PASS(collectMetadata, *metadata);
+    SLANG_PASS(collectMetadata, *metadata, target);
 
     outLinkedIR.metadata = metadata;
 
