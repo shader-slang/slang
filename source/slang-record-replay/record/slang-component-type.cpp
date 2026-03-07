@@ -372,7 +372,7 @@ IComponentTypeRecorder::renameEntryPoint(const char* newName, IComponentType** o
 SLANG_NO_THROW SlangResult IComponentTypeRecorder::linkWithOptions(
     IComponentType** outLinkedComponentType,
     uint32_t compilerOptionEntryCount,
-    slang::CompilerOptionEntry* compilerOptionEntries,
+    slang::CompilerOptionEntry const* compilerOptionEntries,
     ISlangBlob** outDiagnostics)
 {
     slangRecordLog(LogLevel::Verbose, "%s\n", __PRETTY_FUNCTION__);

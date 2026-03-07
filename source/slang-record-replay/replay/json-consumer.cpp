@@ -507,7 +507,7 @@ void CommonInterfaceWriter::linkWithOptions(
     ObjectID objectId,
     ObjectID outLinkedComponentTypeId,
     uint32_t compilerOptionEntryCount,
-    slang::CompilerOptionEntry* compilerOptionEntries,
+    slang::CompilerOptionEntry const* compilerOptionEntries,
     ObjectID outDiagnosticsId)
 {
 
@@ -2787,7 +2787,7 @@ void JsonConsumer::IModule_linkWithOptions(
     ObjectID objectId,
     ObjectID outLinkedComponentTypeId,
     uint32_t compilerOptionEntryCount,
-    slang::CompilerOptionEntry* compilerOptionEntries,
+    slang::CompilerOptionEntry const* compilerOptionEntries,
     ObjectID outDiagnosticsId)
 {
     SANITY_CHECK();
@@ -2922,7 +2922,7 @@ void JsonConsumer::IEntryPoint_linkWithOptions(
     ObjectID objectId,
     ObjectID outLinkedComponentTypeId,
     uint32_t compilerOptionEntryCount,
-    slang::CompilerOptionEntry* compilerOptionEntries,
+    slang::CompilerOptionEntry const* compilerOptionEntries,
     ObjectID outDiagnosticsId)
 {
     SANITY_CHECK();
@@ -3062,7 +3062,7 @@ void JsonConsumer::ICompositeComponentType_linkWithOptions(
     ObjectID objectId,
     ObjectID outLinkedComponentTypeId,
     uint32_t compilerOptionEntryCount,
-    slang::CompilerOptionEntry* compilerOptionEntries,
+    slang::CompilerOptionEntry const* compilerOptionEntries,
     ObjectID outDiagnosticsId)
 {
     SANITY_CHECK();
@@ -3207,7 +3207,7 @@ void JsonConsumer::ITypeConformance_linkWithOptions(
     ObjectID objectId,
     ObjectID outLinkedComponentTypeId,
     uint32_t compilerOptionEntryCount,
-    slang::CompilerOptionEntry* compilerOptionEntries,
+    slang::CompilerOptionEntry const* compilerOptionEntries,
     ObjectID outDiagnosticsId)
 {
     SANITY_CHECK();
