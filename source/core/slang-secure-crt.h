@@ -18,7 +18,7 @@ inline void memcpy_s(void* dest, [[maybe_unused]] size_t destSize, const void* s
 }
 #endif // HAVE_MEMCPY_S
 
-// These are MSVC specific macros
+// Define MSVC specific macros to their POSIX equivalents
 #define _TRUNCATE ((size_t)-1)
 #define _stricmp strcasecmp
 

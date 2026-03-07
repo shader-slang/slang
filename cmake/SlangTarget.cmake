@@ -554,6 +554,17 @@ function(slang_add_target dir type)
     endif()
 
     #
+    # Secure CRT defines
+    #
+    if(SLANG_SECURE_CRT_DEFINES)
+        target_compile_definitions(
+            ${target}
+            PRIVATE ${SLANG_SECURE_CRT_DEFINES}
+        )
+    endif()
+
+
+    #
     # Precompiled headers (PCH)
     #
     if(SLANG_ENABLE_PCH AND ARG_PRECOMPILE_HEADERS)
