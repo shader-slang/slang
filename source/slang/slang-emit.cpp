@@ -748,8 +748,8 @@ Result linkAndOptimizeIR(
     requiredLoweringPassSet = {};
     calcRequiredLoweringPassSet(requiredLoweringPassSet, codeGenContext, irModule->getModuleInst());
 
-    // Debug info is added by the front-end, and therefore needs to be stripped out by targets
-    // that opt out of debug info.
+    // Debug info is added by the front-end. If the target cannot express debug info, or if the user
+    // specifies -g0, we need to stripped them out now to allow more optimization and cleanups.
     if (requiredLoweringPassSet.debugInfo &&
         (targetCompilerOptions.getDebugInfoLevel() == DebugInfoLevel::None))
         SLANG_PASS(stripDebugInfo);

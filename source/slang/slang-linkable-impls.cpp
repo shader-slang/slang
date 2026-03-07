@@ -661,16 +661,6 @@ void TypeConformance::addDepedencyFromWitness(SubtypeWitness* witness)
         addDepedencyFromWitness(transitiveWitness->getMidToSup());
         addDepedencyFromWitness(transitiveWitness->getSubToMid());
     }
-    else if (auto conjunctionWitness = as<ConjunctionSubtypeWitness>(witness))
-    {
-        auto componentCount = conjunctionWitness->getComponentCount();
-        for (Index i = 0; i < componentCount; ++i)
-        {
-            auto w = as<SubtypeWitness>(conjunctionWitness->getComponentWitness(i));
-            if (w)
-                addDepedencyFromWitness(w);
-        }
-    }
 }
 
 ISlangUnknown* TypeConformance::getInterface(const Guid& guid)
