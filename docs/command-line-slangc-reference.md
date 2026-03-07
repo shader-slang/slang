@@ -1138,7 +1138,7 @@ Help Style
 Optimization Level 
 
 * `0`, `none` : Disable all optimizations 
-* `1`, `default` : Enable a default level of optimization.This is the default if no [-o](#o) options are used. 
+* `1`, `default` : Enable a default level of optimization.This is the default if no [-O](#O-1) options are used. 
 * `2`, `high` : Enable aggressive optimizations for speed. 
 * `3`, `maximal` : Enable further optimizations, which might have a significant impact on compile time, or involve unwanted tradeoffs in terms of code size. 
 
