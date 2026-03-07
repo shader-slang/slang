@@ -4,12 +4,8 @@ include(CheckSourceCompiles)
 
 # Tests a symbol by attempting to call it with dummy arguments, which is necessary 
 # to detect inline functions that may not have an address.
-function(slang_probe_symbol_call macro call_expr)
-    set(includes "")
-    foreach(header IN LISTS ARGN)
-        string(APPEND includes "#include <${header}>\n")
-    endforeach()
-    set(test_source "${includes}\nint main() { ${call_expr}; return 0; }")
+function(slang_probe_symbol_call macro call_expr header)
+    set(test_source "#include <${header}>\nint main() { ${call_expr}; return 0; }")
     check_source_compiles(CXX "${test_source}" ${macro})
     if(${macro})
         add_compile_definitions(${macro})
