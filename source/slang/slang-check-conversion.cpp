@@ -2027,6 +2027,36 @@ bool SemanticsVisitor::_coerce(
         //
         if (outToExpr && site != CoercionSite::ExplicitCoercion)
         {
+            bool overflowWarningEmitted = false;
+            bool isCoreModule = false;
+            if (auto module = getShared()->getModule())
+                if (auto moduleDecl = module->getModuleDecl())
+                    isCoreModule = moduleDecl->hasModifier<FromCoreModuleModifier>();
+            int maxBitSize = getMaximumTypeBitSize(toType);
+            if (!isCoreModule && maxBitSize > 0)
+            {
+                if (auto intVal = tryFoldIntegerConstantExpression(
+                        fromExpr,
+                        ConstantFoldingKind::CompileTime,
+                        nullptr))
+                {
+                    if (auto val = as<ConstantIntVal>(intVal))
+                    {
+                        if (getIntValueBitSize(val->getValue()) > maxBitSize)
+                        {
+                            if (sink)
+                            {
+                                sink->diagnose(Diagnostics::IntegerConstantOverflow{
+                                    .value = String(val->getValue()),
+                                    .toType = toType,
+                                    .expr = fromExpr});
+                            }
+                            overflowWarningEmitted = true;
+                        }
+                    }
+                }
+            }
+
             if (cost >= kConversionCost_Explicit)
             {
                 if (sink)
@@ -2041,10 +2071,8 @@ bool SemanticsVisitor::_coerce(
                         .location = fromExpr->loc});
                 }
             }
-            else if (cost >= kConversionCost_Default)
+            else if (cost >= kConversionCost_Default && !overflowWarningEmitted)
             {
-                // For general types of implicit conversions, we issue a warning, unless `fromExpr`
-                // is a known constant and we know it won't cause a problem.
                 bool shouldEmitGeneralWarning = true;
                 if (isScalarIntegerType(toType) || isHalfType(toType))
                 {
@@ -2057,7 +2085,6 @@ bool SemanticsVisitor::_coerce(
                         {
                             if (isIntValueInRangeOfType(val->getValue(), toType))
                             {
-                                // OK.
                                 shouldEmitGeneralWarning = false;
                             }
                         }
