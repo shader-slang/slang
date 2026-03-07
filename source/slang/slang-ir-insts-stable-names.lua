@@ -765,4 +765,5 @@ return {
 	["constexprAnd"] = 763,
 	["constexprOr"] = 764,
 	["constexprSelect"] = 765,
+	["Type.ValuePackType"] = 766,
 }

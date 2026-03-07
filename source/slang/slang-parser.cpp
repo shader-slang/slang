@@ -1537,7 +1537,17 @@ static Decl* ParseGenericParamDecl(Parser* parser, GenericDecl* genericDecl)
     // simple syntax to introduce a value parameter
     if (AdvanceIf(parser, "let"))
     {
-        // default case is a type parameter
+        if (AdvanceIf(parser, "each"))
+        {
+            auto paramDecl = parser->astBuilder->create<GenericValuePackParamDecl>();
+            parser->FillPosition(paramDecl);
+            paramDecl->nameAndLoc = NameLoc(parser->ReadToken(TokenType::Identifier));
+            if (AdvanceIf(parser, TokenType::Colon))
+            {
+                paramDecl->type = parser->ParseTypeExp();
+            }
+            return paramDecl;
+        }
         auto paramDecl = parser->astBuilder->create<GenericValueParamDecl>();
         parser->FillPosition(paramDecl);
         paramDecl->nameAndLoc = NameLoc(parser->ReadToken(TokenType::Identifier));
@@ -1554,10 +1564,39 @@ static Decl* ParseGenericParamDecl(Parser* parser, GenericDecl* genericDecl)
     Decl* paramDecl = nullptr;
     if (AdvanceIf(parser, "each"))
     {
-        // A type pack parameter.
-        paramDecl = parser->astBuilder->create<GenericTypePackParamDecl>();
-        parser->FillPosition(paramDecl);
-        paramDecl->nameAndLoc = NameLoc(parser->ReadToken(TokenType::Identifier));
+        // Disambiguate between a type pack parameter (`each T`)
+        // and a value pack parameter in traditional syntax (`each int D`).
+        // If the next token is an identifier followed by a comma, '>', or ':',
+        // it's a type pack. Otherwise it's a value pack with type-first syntax.
+        bool isTypePack = parser->LookAheadToken(TokenType::Identifier);
+        if (isTypePack)
+        {
+            auto nextNextTokenType = peekTokenType(parser, 1);
+            switch (nextNextTokenType)
+            {
+            case TokenType::Colon:
+            case TokenType::Comma:
+            case TokenType::OpGreater:
+                break;
+            default:
+                isTypePack = false;
+                break;
+            }
+        }
+        if (isTypePack)
+        {
+            paramDecl = parser->astBuilder->create<GenericTypePackParamDecl>();
+            parser->FillPosition(paramDecl);
+            paramDecl->nameAndLoc = NameLoc(parser->ReadToken(TokenType::Identifier));
+        }
+        else
+        {
+            auto valuePackParamDecl = parser->astBuilder->create<GenericValuePackParamDecl>();
+            parser->FillPosition(valuePackParamDecl);
+            valuePackParamDecl->type = parser->ParseTypeExp();
+            valuePackParamDecl->nameAndLoc = NameLoc(parser->ReadToken(TokenType::Identifier));
+            return valuePackParamDecl;
+        }
     }
     else
     {
@@ -1815,6 +1854,43 @@ public:
         dispatch(expr->baseExpression);
         for (auto arg : expr->indexExprs)
             dispatch(arg);
+    }
+    void visitExpandExpr(ExpandExpr* expr) { dispatch(expr->baseExpr); }
+    void visitEachExpr(EachExpr* expr) { dispatch(expr->baseExpr); }
+    void visitParenExpr(ParenExpr* expr) { dispatch(expr->base); }
+    void visitTupleExpr(TupleExpr* expr)
+    {
+        for (auto elem : expr->elements)
+            dispatch(elem);
+    }
+    void visitSharedTypeExpr(SharedTypeExpr* expr)
+    {
+        if (expr->base.exp)
+            dispatch(expr->base.exp);
+    }
+    void visitModifiedTypeExpr(ModifiedTypeExpr* expr)
+    {
+        if (expr->base.exp)
+            dispatch(expr->base.exp);
+    }
+    void visitPointerTypeExpr(PointerTypeExpr* expr)
+    {
+        if (expr->base.exp)
+            dispatch(expr->base.exp);
+    }
+    void visitFuncTypeExpr(FuncTypeExpr* expr)
+    {
+        for (auto& param : expr->parameters)
+            if (param.exp)
+                dispatch(param.exp);
+        if (expr->result.exp)
+            dispatch(expr->result.exp);
+    }
+    void visitTupleTypeExpr(TupleTypeExpr* expr)
+    {
+        for (auto& member : expr->members)
+            if (member.exp)
+                dispatch(member.exp);
     }
     void visitMemberExpr(MemberExpr* expr)
     {
