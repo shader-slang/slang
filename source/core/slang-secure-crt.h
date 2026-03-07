@@ -1,4 +1,3 @@
-#ifndef _WIN32
 #ifndef SLANG_CORE_SECURE_CRT_H
 #define SLANG_CORE_SECURE_CRT_H
 #include <assert.h>
@@ -10,15 +9,23 @@
 #include <strings.h>
 #include <wchar.h>
 
+#ifndef HAVE_MEMCPY_S
 inline void memcpy_s(void* dest, [[maybe_unused]] size_t destSize, const void* src, size_t count)
 {
     assert(destSize >= count);
     memcpy(dest, src, count);
 }
+#endif
 
+#ifndef _TRUNCATE
 #define _TRUNCATE ((size_t)-1)
-#define _stricmp strcasecmp
+#endif
 
+#ifndef _stricmp
+#define _stricmp strcasecmp
+#endif
+
+#ifndef HAVE_FOPEN_S
 inline int fopen_s(FILE** f, const char* fileName, const char* mode)
 {
     if (f == nullptr || fileName == nullptr || mode == nullptr)
@@ -32,7 +39,9 @@ inline int fopen_s(FILE** f, const char* fileName, const char* mode)
     }
     return 0;
 }
+#endif
 
+#ifndef HAVE_FREAD_S
 inline size_t fread_s(
     void* buffer,
     [[maybe_unused]] size_t bufferSize,
@@ -43,12 +52,16 @@ inline size_t fread_s(
     assert(bufferSize >= elementSize * count);
     return fread(buffer, elementSize, count, stream);
 }
+#endif
 
+#ifndef HAVE_WCSNLEN_S
 inline size_t wcsnlen_s(const wchar_t* str, size_t /*numberofElements*/)
 {
     return wcslen(str);
 }
+#endif
 
+#ifndef HAVE_STRNLEN_S
 inline size_t strnlen_s(const char* str, size_t numberOfElements)
 {
 #if defined(__CYGWIN__)
@@ -64,7 +77,9 @@ inline size_t strnlen_s(const char* str, size_t numberOfElements)
     return strnlen(str, numberOfElements);
 #endif
 }
+#endif
 
+#ifndef HAVE_SPRINTF_S
 __attribute__((format(printf, 3, 4))) inline int sprintf_s(
     char* buffer,
     size_t sizeOfBuffer,
@@ -77,7 +92,9 @@ __attribute__((format(printf, 3, 4))) inline int sprintf_s(
     va_end(argptr);
     return rs;
 }
+#endif
 
+#ifndef HAVE_SWPRINTF_S
 // A patch was submitted to GCC wchar_t support in 2001, so I'm sure we can
 // enable this any day now...
 // __attribute__((format(wprintf, 3, 4)))
@@ -89,16 +106,22 @@ inline int swprintf_s(wchar_t* buffer, size_t sizeOfBuffer, const wchar_t* forma
     va_end(argptr);
     return rs;
 }
+#endif
 
+#ifndef HAVE_WCSCPY_S
 inline void wcscpy_s(wchar_t* strDestination, size_t /*numberOfElements*/, const wchar_t* strSource)
 {
     wcscpy(strDestination, strSource);
 }
+#endif
+#ifndef HAVE_STRCPY_S
 inline void strcpy_s(char* strDestination, size_t /*numberOfElements*/, const char* strSource)
 {
     strcpy(strDestination, strSource);
 }
+#endif
 
+#ifndef HAVE_WCSNCPY_S
 inline void wcsncpy_s(
     wchar_t* strDestination,
     size_t /*numberOfElements*/,
@@ -107,6 +130,8 @@ inline void wcsncpy_s(
 {
     wcsncpy(strDestination, strSource, count);
 }
+#endif
+#ifndef HAVE_STRNCPY_S
 inline void strncpy_s(
     char* strDestination,
     size_t /*numberOfElements*/,
