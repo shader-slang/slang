@@ -319,6 +319,28 @@ class CountOfIntVal : public SizeOfLikeIntVal
     static Val* tryFold(ASTBuilder* astBuilder, Type* intType, Val* newVal);
 };
 
+FIDDLE()
+class FirstIntVal : public IntVal
+{
+    FIDDLE(...)
+    FirstIntVal(Type* inType, Val* basePack) { setOperands(inType, basePack); }
+    Val* getBasePack() const { return getOperand(1); }
+    void _toTextOverride(StringBuilder& out);
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    Val* _resolveImplOverride();
+};
+
+FIDDLE()
+class LastIntVal : public IntVal
+{
+    FIDDLE(...)
+    LastIntVal(Type* inType, Val* basePack) { setOperands(inType, basePack); }
+    Val* getBasePack() const { return getOperand(1); }
+    void _toTextOverride(StringBuilder& out);
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    Val* _resolveImplOverride();
+};
+
 // A concrete pack of integer values, analogous to ConcreteTypePack for types.
 FIDDLE()
 class ConcreteIntValPack : public IntVal
@@ -332,6 +354,28 @@ class ConcreteIntValPack : public IntVal
     }
     Index getCount() { return getOperandCount() - 1; }
     IntVal* getElement(Index i) { return as<IntVal>(getOperand(i + 1)); }
+    void _toTextOverride(StringBuilder& out);
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    Val* _resolveImplOverride();
+};
+
+FIDDLE()
+class TrimHeadIntValPack : public IntVal
+{
+    FIDDLE(...)
+    TrimHeadIntValPack(Type* inType, Val* basePack) { setOperands(inType, basePack); }
+    Val* getBasePack() const { return getOperand(1); }
+    void _toTextOverride(StringBuilder& out);
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    Val* _resolveImplOverride();
+};
+
+FIDDLE()
+class TrimTailIntValPack : public IntVal
+{
+    FIDDLE(...)
+    TrimTailIntValPack(Type* inType, Val* basePack) { setOperands(inType, basePack); }
+    Val* getBasePack() const { return getOperand(1); }
     void _toTextOverride(StringBuilder& out);
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
     Val* _resolveImplOverride();
@@ -850,6 +894,15 @@ class DynamicSubtypeWitness : public SubtypeWitness
 /// A witness for the "none" value of optional constraints.
 FIDDLE()
 class NoneWitness : public Witness
+{
+    FIDDLE(...)
+
+    void _toTextOverride(StringBuilder& out);
+    Val* _resolveImplOverride();
+};
+
+FIDDLE()
+class NonEmptyPackWitness : public Witness
 {
     FIDDLE(...)
 

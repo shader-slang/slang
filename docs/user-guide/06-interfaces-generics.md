@@ -1183,6 +1183,36 @@ struct Dims<let each D : int>
 int typeCount<each T>() { return countof(T); }
 ```
 
+### Builtin Variadic Pack Operators
+
+Slang also supports simple pack queries:
+
+- `__first(P)` returns the first element of a type pack, value pack, or tuple-like pack source.
+- `__last(P)` returns the last element.
+- `__trimHead(P)` returns the pack with the first element removed.
+- `__trimTail(P)` returns the pack with the last element removed.
+
+For example:
+
+```csharp
+int firstValue<let each D : int>() where nonempty(D)
+{
+    return __first(D);
+}
+
+int restCount<let each D : int>()
+{
+    return countof(__trimHead(D));
+}
+
+__first(T) makeFirstType<each T>() where nonempty(T)
+{
+    return 0;
+}
+```
+
+`__first(...)` and `__last(...)` are only valid on packs that are known to be non-empty. For generic packs, use a `where nonempty(P)` constraint to make that guarantee explicit.
+
 Builtin Interfaces
 -----------------------------
 

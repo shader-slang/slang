@@ -301,6 +301,11 @@ static Expr* _parseGenericArg(Parser* parser);
 
 static Expr* parsePrefixExpr(Parser* parser);
 
+static NodeBase* parseFirstExpr(Parser* parser, void* userData);
+static NodeBase* parseLastExpr(Parser* parser, void* userData);
+static NodeBase* parseTrimHeadExpr(Parser* parser, void* userData);
+static NodeBase* parseTrimTailExpr(Parser* parser, void* userData);
+
 //
 
 static void Unexpected(Parser* parser)
@@ -1744,6 +1749,25 @@ static void maybeParseGenericConstraints(Parser* parser, ContainerDecl* genericP
     {
         bool optional = AdvanceIf(parser, "optional", &whereToken);
 
+        Token nonEmptyToken;
+        if (AdvanceIf(parser, "nonempty", &nonEmptyToken))
+        {
+            auto constraint = parser->astBuilder->create<NonEmptyPackConstraintDecl>();
+            constraint->whereTokenLoc = whereToken.loc;
+            constraint->loc = nonEmptyToken.loc;
+            parser->ReadMatchingToken(TokenType::LParent);
+            constraint->packExpr = parser->ParseExpression();
+            parser->ReadMatchingToken(TokenType::RParent);
+            if (optional)
+            {
+                addModifier(
+                    constraint,
+                    parser->astBuilder->create<OptionalConstraintModifier>());
+            }
+            AddMember(genericParent, constraint);
+            continue;
+        }
+
         auto subType = parser->ParseTypeExp();
         Token constraintToken;
         if (AdvanceIf(parser, TokenType::Colon, &constraintToken))
@@ -1857,6 +1881,10 @@ public:
     }
     void visitExpandExpr(ExpandExpr* expr) { dispatch(expr->baseExpr); }
     void visitEachExpr(EachExpr* expr) { dispatch(expr->baseExpr); }
+    void visitFirstExpr(FirstExpr* expr) { dispatch(expr->value); }
+    void visitLastExpr(LastExpr* expr) { dispatch(expr->value); }
+    void visitTrimHeadExpr(TrimHeadExpr* expr) { dispatch(expr->value); }
+    void visitTrimTailExpr(TrimTailExpr* expr) { dispatch(expr->value); }
     void visitParenExpr(ParenExpr* expr) { dispatch(expr->base); }
     void visitTupleExpr(TupleExpr* expr)
     {
@@ -2971,7 +2999,10 @@ static TypeSpec _parseSimpleTypeSpec(Parser* parser)
         typeSpec.expr = createDeclRefType(parser, decl);
         return typeSpec;
     }
-    else if (parser->LookAheadToken("expand") || parser->LookAheadToken("each"))
+    else if (
+        parser->LookAheadToken("expand") || parser->LookAheadToken("each") ||
+        parser->LookAheadToken("__first") || parser->LookAheadToken("__last") ||
+        parser->LookAheadToken("__trimHead") || parser->LookAheadToken("__trimTail"))
     {
         typeSpec.expr = parsePrefixExpr(parser);
         return typeSpec;
@@ -7316,6 +7347,36 @@ static NodeBase* parseCountOfExpr(Parser* parser, void* /*userData*/)
     return countOfExpr;
 }
 
+template<typename TExpr>
+static NodeBase* parsePackQueryExprImpl(Parser* parser)
+{
+    TExpr* expr = parser->astBuilder->create<TExpr>();
+    parser->ReadMatchingToken(TokenType::LParent);
+    expr->value = parser->ParseExpression();
+    parser->ReadMatchingToken(TokenType::RParent);
+    return expr;
+}
+
+static NodeBase* parseFirstExpr(Parser* parser, void* /*userData*/)
+{
+    return parsePackQueryExprImpl<FirstExpr>(parser);
+}
+
+static NodeBase* parseLastExpr(Parser* parser, void* /*userData*/)
+{
+    return parsePackQueryExprImpl<LastExpr>(parser);
+}
+
+static NodeBase* parseTrimHeadExpr(Parser* parser, void* /*userData*/)
+{
+    return parsePackQueryExprImpl<TrimHeadExpr>(parser);
+}
+
+static NodeBase* parseTrimTailExpr(Parser* parser, void* /*userData*/)
+{
+    return parsePackQueryExprImpl<TrimTailExpr>(parser);
+}
+
 static NodeBase* parseFloatAsIntExpr(Parser* parser, void* /*userData*/)
 {
     FloatBitCastExpr* expr = parser->astBuilder->create<FloatBitCastExpr>();
@@ -8967,6 +9028,34 @@ static Expr* parsePrefixExpr(Parser* parser)
             {
                 return parseEachExpr(parser, tokenLoc);
             }
+            else if (AdvanceIf(parser, "__first"))
+            {
+                auto expr = as<Expr>(parseFirstExpr(parser, nullptr));
+                if (expr && !expr->loc.isValid())
+                    expr->loc = tokenLoc;
+                return expr;
+            }
+            else if (AdvanceIf(parser, "__last"))
+            {
+                auto expr = as<Expr>(parseLastExpr(parser, nullptr));
+                if (expr && !expr->loc.isValid())
+                    expr->loc = tokenLoc;
+                return expr;
+            }
+            else if (AdvanceIf(parser, "__trimHead"))
+            {
+                auto expr = as<Expr>(parseTrimHeadExpr(parser, nullptr));
+                if (expr && !expr->loc.isValid())
+                    expr->loc = tokenLoc;
+                return expr;
+            }
+            else if (AdvanceIf(parser, "__trimTail"))
+            {
+                auto expr = as<Expr>(parseTrimTailExpr(parser, nullptr));
+                if (expr && !expr->loc.isValid())
+                    expr->loc = tokenLoc;
+                return expr;
+            }
             return parsePostfixExpr(parser);
         }
     default:
@@ -9972,6 +10061,10 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseExpr("sizeof", parseSizeOfExpr),
     _makeParseExpr("alignof", parseAlignOfExpr),
     _makeParseExpr("countof", parseCountOfExpr),
+    _makeParseExpr("__first", parseFirstExpr),
+    _makeParseExpr("__last", parseLastExpr),
+    _makeParseExpr("__trimHead", parseTrimHeadExpr),
+    _makeParseExpr("__trimTail", parseTrimTailExpr),
     _makeParseExpr("__getAddress", parseAddressOfExpr),
     _makeParseExpr("__floatAsInt", parseFloatAsIntExpr),
 };

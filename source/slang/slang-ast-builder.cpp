@@ -904,6 +904,72 @@ Type* ASTBuilder::getExpandType(Type* pattern, ArrayView<Val*> capturedPacks)
     return getOrCreate<ExpandType>(pattern, capturedPacks);
 }
 
+Type* ASTBuilder::getFirstElement(Type* basePack)
+{
+    if (auto tupleType = as<TupleType>(basePack))
+        return getFirstElement(tupleType->getTypePack());
+
+    if (auto typePack = as<ConcreteTypePack>(basePack))
+    {
+        if (typePack->getTypeCount() > 0)
+            return typePack->getElementType(0);
+    }
+
+    return getOrCreate<FirstPackElementType>(basePack);
+}
+
+Type* ASTBuilder::getLastElement(Type* basePack)
+{
+    if (auto tupleType = as<TupleType>(basePack))
+        return getLastElement(tupleType->getTypePack());
+
+    if (auto typePack = as<ConcreteTypePack>(basePack))
+    {
+        if (typePack->getTypeCount() > 0)
+            return typePack->getElementType(typePack->getTypeCount() - 1);
+    }
+
+    return getOrCreate<LastPackElementType>(basePack);
+}
+
+Type* ASTBuilder::getTrimHeadPack(Type* basePack)
+{
+    if (auto tupleType = as<TupleType>(basePack))
+    {
+        Type* trimmedPack = getTrimHeadPack(tupleType->getTypePack());
+        return getTupleType(makeArrayView(&trimmedPack, 1));
+    }
+
+    if (auto typePack = as<ConcreteTypePack>(basePack))
+    {
+        ShortList<Type*> trimmedTypes;
+        for (Index i = 1; i < typePack->getTypeCount(); i++)
+            trimmedTypes.add(typePack->getElementType(i));
+        return getTypePack(trimmedTypes.getArrayView().arrayView);
+    }
+
+    return getOrCreate<TrimHeadTypePack>(basePack);
+}
+
+Type* ASTBuilder::getTrimTailPack(Type* basePack)
+{
+    if (auto tupleType = as<TupleType>(basePack))
+    {
+        Type* trimmedPack = getTrimTailPack(tupleType->getTypePack());
+        return getTupleType(makeArrayView(&trimmedPack, 1));
+    }
+
+    if (auto typePack = as<ConcreteTypePack>(basePack))
+    {
+        ShortList<Type*> trimmedTypes;
+        for (Index i = 0; i + 1 < typePack->getTypeCount(); i++)
+            trimmedTypes.add(typePack->getElementType(i));
+        return getTypePack(trimmedTypes.getArrayView().arrayView);
+    }
+
+    return getOrCreate<TrimTailTypePack>(basePack);
+}
+
 void flattenTypeList(ShortList<Type*>& flattenedList, Type* type)
 {
     if (auto typePack = as<ConcreteTypePack>(type))
@@ -978,6 +1044,69 @@ Val* ASTBuilder::getExpandIntValPack(Val* patternVal, ArrayView<Val*> capturedPa
                          ? getOrCreate<ValuePackType>(patternIntVal->getType())
                          : (Type*)getIntType();
     return getOrCreate<ExpandIntValPack>(packType, patternVal, capturedPacks);
+}
+
+Val* ASTBuilder::getFirstElement(Val* basePack)
+{
+    if (auto valPack = as<ConcreteIntValPack>(basePack))
+    {
+        if (valPack->getCount() > 0)
+            return valPack->getElement(0);
+    }
+
+    auto baseIntVal = as<IntVal>(basePack);
+    auto packType = baseIntVal ? as<ValuePackType>(baseIntVal->getType()) : nullptr;
+    auto elementType = packType ? packType->getElementType() : getIntType();
+    return getOrCreate<FirstIntVal>(elementType, basePack);
+}
+
+Val* ASTBuilder::getLastElement(Val* basePack)
+{
+    if (auto valPack = as<ConcreteIntValPack>(basePack))
+    {
+        if (valPack->getCount() > 0)
+            return valPack->getElement(valPack->getCount() - 1);
+    }
+
+    auto baseIntVal = as<IntVal>(basePack);
+    auto packType = baseIntVal ? as<ValuePackType>(baseIntVal->getType()) : nullptr;
+    auto elementType = packType ? packType->getElementType() : getIntType();
+    return getOrCreate<LastIntVal>(elementType, basePack);
+}
+
+Val* ASTBuilder::getTrimHeadPack(Val* basePack)
+{
+    if (auto valPack = as<ConcreteIntValPack>(basePack))
+    {
+        ShortList<IntVal*> trimmedVals;
+        for (Index i = 1; i < valPack->getCount(); i++)
+            trimmedVals.add(valPack->getElement(i));
+        return getIntValPack(trimmedVals.getArrayView().arrayView);
+    }
+
+    auto baseIntVal = as<IntVal>(basePack);
+    auto packType = baseIntVal ? baseIntVal->getType() : getOrCreate<ValuePackType>(getIntType());
+    return getOrCreate<TrimHeadIntValPack>(packType, basePack);
+}
+
+Val* ASTBuilder::getTrimTailPack(Val* basePack)
+{
+    if (auto valPack = as<ConcreteIntValPack>(basePack))
+    {
+        ShortList<IntVal*> trimmedVals;
+        for (Index i = 0; i + 1 < valPack->getCount(); i++)
+            trimmedVals.add(valPack->getElement(i));
+        return getIntValPack(trimmedVals.getArrayView().arrayView);
+    }
+
+    auto baseIntVal = as<IntVal>(basePack);
+    auto packType = baseIntVal ? baseIntVal->getType() : getOrCreate<ValuePackType>(getIntType());
+    return getOrCreate<TrimTailIntValPack>(packType, basePack);
+}
+
+NonEmptyPackWitness* ASTBuilder::getNonEmptyPackWitness()
+{
+    return getOrCreate<NonEmptyPackWitness>();
 }
 
 TypeEqualityWitness* ASTBuilder::getTypeEqualityWitness(Type* type)

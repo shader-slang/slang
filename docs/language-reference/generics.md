@@ -240,6 +240,26 @@ expr  // every each-expr is substituted by pack element N-1
 In function parameter lists, expand/each constructs must come after all other parameters. There may be
 multiple declared expand/each parameters, in which case the type parameter packs must have equal lengths.
 
+### Pack queries
+
+Slang provides the following pack-query operations for type packs, value packs, and tuple-like pack sources:
+
+- `__first(P)`
+- `__last(P)`
+- `__trimHead(P)`
+- `__trimTail(P)`
+
+`__first(P)` and `__last(P)` are partial operations and require `P` to be known non-empty. For generic pack parameters, non-emptiness can be expressed with:
+
+```hlsl
+void foo<each T>() where nonempty(T)
+{
+    // `__first(T)` is well-formed here.
+}
+```
+
+`__trimHead(P)` and `__trimTail(P)` are total operations and yield an empty pack when applied to an empty pack.
+
 
 ## Type Checking
 

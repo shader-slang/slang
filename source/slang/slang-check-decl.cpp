@@ -364,6 +364,8 @@ struct SemanticsDeclHeaderVisitor : public SemanticsDeclVisitorBase,
 
     void visitTypeCoercionConstraintDecl(TypeCoercionConstraintDecl* decl);
 
+    void visitNonEmptyPackConstraintDecl(NonEmptyPackConstraintDecl* decl);
+
     bool validateGenericConstraintSubType(
         GenericTypeConstraintDecl* decl,
         TypeExp type,
@@ -3496,6 +3498,29 @@ void SemanticsDeclHeaderVisitor::visitTypeCoercionConstraintDecl(TypeCoercionCon
         decl->fromType = TranslateTypeNodeForced(decl->fromType);
     if (!decl->toType.type)
         decl->toType = TranslateTypeNodeForced(decl->toType);
+}
+
+void SemanticsDeclHeaderVisitor::visitNonEmptyPackConstraintDecl(NonEmptyPackConstraintDecl* decl)
+{
+    decl->packExpr = CheckTerm(decl->packExpr);
+    auto packExpr = decl->packExpr;
+    if (!packExpr)
+        return;
+
+    if (decl->hasModifier<OptionalConstraintModifier>())
+    {
+        getSink()->diagnose(
+            Diagnostics::OptionalNonEmptyPackConstraintIsInvalid{.expr = packExpr});
+    }
+
+    if (auto declRefExpr = as<DeclRefExpr>(packExpr))
+    {
+        auto declRef = getDeclRef(m_astBuilder, declRefExpr);
+        if (declRef.as<GenericTypePackParamDecl>() || declRef.as<GenericValuePackParamDecl>())
+            return;
+    }
+
+    getSink()->diagnose(Diagnostics::InvalidNonEmptyPackConstraintTarget{.expr = packExpr});
 }
 
 static void maybeFlattenConjunctionType(Type* type, List<Type*>& outTypes)
@@ -9309,38 +9334,50 @@ List<Val*> getDefaultSubstitutionArgs(
     //
     if (semantics)
     {
-        for (auto genericTypeConstraintDecl :
-             genericDecl->getDirectMemberDeclsOfType<GenericTypeConstraintDecl>())
+        for (auto member : genericDecl->getDirectMemberDecls())
         {
-            semantics->ensureDecl(genericTypeConstraintDecl, DeclCheckState::ReadyForReference);
+            if (auto genericTypeConstraintDecl = as<GenericTypeConstraintDecl>(member))
+            {
+                semantics->ensureDecl(genericTypeConstraintDecl, DeclCheckState::ReadyForReference);
+            }
+            else if (auto nonEmptyConstraintDecl = as<NonEmptyPackConstraintDecl>(member))
+            {
+                semantics->ensureDecl(nonEmptyConstraintDecl, DeclCheckState::ReadyForReference);
+            }
         }
     }
 
-    for (auto genericTypeConstraintDecl :
-         genericDecl->getDirectMemberDeclsOfType<GenericTypeConstraintDecl>())
+    for (auto member : genericDecl->getDirectMemberDecls())
     {
-        auto constraintDeclRef =
-            astBuilder->getDirectDeclRef<GenericTypeConstraintDecl>(genericTypeConstraintDecl);
-        auto supType = getSup(astBuilder, constraintDeclRef);
-        if (!supType)
+        if (auto genericTypeConstraintDecl = as<GenericTypeConstraintDecl>(member))
         {
-            args.add(astBuilder->getErrorType());
-            shouldCache = false;
-            continue;
+            auto constraintDeclRef =
+                astBuilder->getDirectDeclRef<GenericTypeConstraintDecl>(genericTypeConstraintDecl);
+            auto supType = getSup(astBuilder, constraintDeclRef);
+            if (!supType)
+            {
+                args.add(astBuilder->getErrorType());
+                shouldCache = false;
+                continue;
+            }
+            auto witness = astBuilder->getDeclaredSubtypeWitness(
+                getSub(astBuilder, constraintDeclRef),
+                getSup(astBuilder, constraintDeclRef),
+                constraintDeclRef);
+            // TODO: this is an ugly hack to prevent crashing.
+            // In early stages of compilation witness->sub and witness->sup may not be checked yet.
+            // When semanticVisitor is present we have used that to ensure the type is checked.
+            // However due to how the code is written we cannot guarantee semanticVisitor is always
+            // available here, and if we can't get the checked sup/sub type this subst is incomplete
+            // and should not be cached.
+            if (!witness->getSub())
+                shouldCache = false;
+            args.add(witness);
         }
-        auto witness = astBuilder->getDeclaredSubtypeWitness(
-            getSub(astBuilder, constraintDeclRef),
-            getSup(astBuilder, constraintDeclRef),
-            constraintDeclRef);
-        // TODO: this is an ugly hack to prevent crashing.
-        // In early stages of compilation witness->sub and witness->sup may not be checked yet.
-        // When semanticVisitor is present we have used that to ensure the type is checked.
-        // However due to how the code is written we cannot guarantee semanticVisitor is always
-        // available here, and if we can't get the checked sup/sub type this subst is incomplete
-        // and should not be cached.
-        if (!witness->getSub())
-            shouldCache = false;
-        args.add(witness);
+        else if (as<NonEmptyPackConstraintDecl>(member))
+        {
+            args.add(astBuilder->getNonEmptyPackWitness());
+        }
     }
 
     if (shouldCache)
