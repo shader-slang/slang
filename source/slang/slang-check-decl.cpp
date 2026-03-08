@@ -4774,7 +4774,8 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
                 return false;
         }
         else if (
-            auto requiredConstraintDeclRef = requiredMemberDeclRef.as<GenericTypeConstraintDecl>())
+            auto requiredTypeConstraintDeclRef =
+                requiredMemberDeclRef.as<GenericTypeConstraintDecl>())
         {
             if (auto satisfyingConstraintDeclRef =
                     satisfyingMemberDeclRef.as<GenericTypeConstraintDecl>())
@@ -4784,7 +4785,8 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
                 return false;
         }
         else if (
-            auto requiredConstraintDeclRef = requiredMemberDeclRef.as<TypeCoercionConstraintDecl>())
+            auto requiredTypeCoercionConstraintDeclRef =
+                requiredMemberDeclRef.as<TypeCoercionConstraintDecl>())
         {
             if (auto satisfyingConstraintDeclRef =
                     satisfyingMemberDeclRef.as<TypeCoercionConstraintDecl>())
@@ -4794,7 +4796,8 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
                 return false;
         }
         else if (
-            auto requiredConstraintDeclRef = requiredMemberDeclRef.as<NonEmptyPackConstraintDecl>())
+            auto requiredNonEmptyConstraintDeclRef =
+                requiredMemberDeclRef.as<NonEmptyPackConstraintDecl>())
         {
             if (auto satisfyingConstraintDeclRef =
                     satisfyingMemberDeclRef.as<NonEmptyPackConstraintDecl>())
@@ -4881,7 +4884,8 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
         auto requiredMemberDeclRef = requiredMemberDeclRefs[i];
         auto satisfyingMemberDeclRef = satisfyingMemberDeclRefs[i];
 
-        if (auto requiredConstraintDeclRef = requiredMemberDeclRef.as<GenericTypeConstraintDecl>())
+        if (auto requiredTypeConstraintDeclRef =
+                requiredMemberDeclRef.as<GenericTypeConstraintDecl>())
         {
             auto satisfyingConstraintDeclRef =
                 satisfyingMemberDeclRef.as<GenericTypeConstraintDecl>();
@@ -4895,7 +4899,8 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
             requiredSubstArgs.add(satisfyingWitness);
         }
         else if (
-            auto requiredConstraintDeclRef = requiredMemberDeclRef.as<TypeCoercionConstraintDecl>())
+            auto requiredTypeCoercionConstraintDeclRef =
+                requiredMemberDeclRef.as<TypeCoercionConstraintDecl>())
         {
             auto satisfyingConstraintDeclRef =
                 satisfyingMemberDeclRef.as<TypeCoercionConstraintDecl>();
@@ -4908,7 +4913,8 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
             requiredSubstArgs.add(satisfyingWitness);
         }
         else if (
-            auto requiredConstraintDeclRef = requiredMemberDeclRef.as<NonEmptyPackConstraintDecl>())
+            auto requiredNonEmptyConstraintDeclRef =
+                requiredMemberDeclRef.as<NonEmptyPackConstraintDecl>())
         {
             [[maybe_unused]] auto satisfyingConstraintDeclRef =
                 satisfyingMemberDeclRef.as<NonEmptyPackConstraintDecl>();
@@ -4968,7 +4974,8 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
                 return false;
         }
         else if (
-            auto requiredConstraintDeclRef = requiredMemberDeclRef.as<GenericTypeConstraintDecl>())
+            auto requiredTypeConstraintDeclRef =
+                requiredMemberDeclRef.as<GenericTypeConstraintDecl>())
         {
             auto satisfyingConstraintDeclRef =
                 satisfyingMemberDeclRef.as<GenericTypeConstraintDecl>();
@@ -4980,12 +4987,13 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
             // In current code the sub type will always be one of the generic type parameters,
             // and the super-type will always be an interface, but there should be no
             // need to make use of those additional details here.
-            auto specializedRequiredConstraintDeclRef = m_astBuilder
-                                                            ->getGenericAppDeclRef(
-                                                                requiredGenericDeclRef,
-                                                                requiredSubstArgs.getArrayView(),
-                                                                requiredConstraintDeclRef.getDecl())
-                                                            .as<GenericTypeConstraintDecl>();
+            auto specializedRequiredConstraintDeclRef =
+                m_astBuilder
+                    ->getGenericAppDeclRef(
+                        requiredGenericDeclRef,
+                        requiredSubstArgs.getArrayView(),
+                        requiredTypeConstraintDeclRef.getDecl())
+                    .as<GenericTypeConstraintDecl>();
             auto requiredSubType = getSub(m_astBuilder, specializedRequiredConstraintDeclRef);
             auto satisfyingSubType = getSub(m_astBuilder, satisfyingConstraintDeclRef);
             if (!satisfyingSubType->equals(requiredSubType))
@@ -4997,18 +5005,20 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
                 return false;
         }
         else if (
-            auto requiredConstraintDeclRef = requiredMemberDeclRef.as<TypeCoercionConstraintDecl>())
+            auto requiredTypeCoercionConstraintDeclRef =
+                requiredMemberDeclRef.as<TypeCoercionConstraintDecl>())
         {
             auto satisfyingConstraintDeclRef =
                 satisfyingMemberDeclRef.as<TypeCoercionConstraintDecl>();
             SLANG_ASSERT(satisfyingConstraintDeclRef);
 
-            auto specializedRequiredConstraintDeclRef = m_astBuilder
-                                                            ->getGenericAppDeclRef(
-                                                                requiredGenericDeclRef,
-                                                                requiredSubstArgs.getArrayView(),
-                                                                requiredConstraintDeclRef.getDecl())
-                                                            .as<TypeCoercionConstraintDecl>();
+            auto specializedRequiredConstraintDeclRef =
+                m_astBuilder
+                    ->getGenericAppDeclRef(
+                        requiredGenericDeclRef,
+                        requiredSubstArgs.getArrayView(),
+                        requiredTypeCoercionConstraintDeclRef.getDecl())
+                    .as<TypeCoercionConstraintDecl>();
             auto requiredFromType = getFromType(m_astBuilder, specializedRequiredConstraintDeclRef);
             auto satisfyingFromType = getFromType(m_astBuilder, satisfyingConstraintDeclRef);
             if (!satisfyingFromType->equals(requiredFromType))
@@ -5019,25 +5029,28 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
             if (!satisfyingToType->equals(requiredToType))
                 return false;
 
-            if (requiredConstraintDeclRef.getDecl()->hasModifier<ImplicitConversionModifier>() !=
+            if (requiredTypeCoercionConstraintDeclRef.getDecl()
+                    ->hasModifier<ImplicitConversionModifier>() !=
                 satisfyingConstraintDeclRef.getDecl()->hasModifier<ImplicitConversionModifier>())
             {
                 return false;
             }
         }
         else if (
-            auto requiredConstraintDeclRef = requiredMemberDeclRef.as<NonEmptyPackConstraintDecl>())
+            auto requiredNonEmptyConstraintDeclRef =
+                requiredMemberDeclRef.as<NonEmptyPackConstraintDecl>())
         {
             auto satisfyingConstraintDeclRef =
                 satisfyingMemberDeclRef.as<NonEmptyPackConstraintDecl>();
             SLANG_ASSERT(satisfyingConstraintDeclRef);
 
-            auto specializedRequiredConstraintDeclRef = m_astBuilder
-                                                            ->getGenericAppDeclRef(
-                                                                requiredGenericDeclRef,
-                                                                requiredSubstArgs.getArrayView(),
-                                                                requiredConstraintDeclRef.getDecl())
-                                                            .as<NonEmptyPackConstraintDecl>();
+            auto specializedRequiredConstraintDeclRef =
+                m_astBuilder
+                    ->getGenericAppDeclRef(
+                        requiredGenericDeclRef,
+                        requiredSubstArgs.getArrayView(),
+                        requiredNonEmptyConstraintDeclRef.getDecl())
+                    .as<NonEmptyPackConstraintDecl>();
             if (!specializedRequiredConstraintDeclRef)
                 return false;
 
@@ -9384,7 +9397,7 @@ bool SemanticsVisitor::doGenericSignaturesMatch(
         // constraint so that we can take the substitution
         // arguments into account.
         //
-        if (auto leftConstraint = as<GenericTypeConstraintDecl>(leftConstraints[cc]))
+        if (auto leftTypeConstraint = as<GenericTypeConstraintDecl>(leftConstraints[cc]))
         {
             auto unspecializedRightConstarintDeclRef = createDefaultSubstitutionsIfNeeded(
                 m_astBuilder,
@@ -9396,28 +9409,28 @@ bool SemanticsVisitor::doGenericSignaturesMatch(
             if (!rightConstraint)
                 return false;
 
-            if (leftConstraint->isEqualityConstraint !=
+            if (leftTypeConstraint->isEqualityConstraint !=
                 rightConstraint.getDecl()->isEqualityConstraint)
                 return false;
-            if (leftConstraint->hasModifier<OptionalConstraintModifier>() !=
+            if (leftTypeConstraint->hasModifier<OptionalConstraintModifier>() !=
                 rightConstraint.getDecl()->hasModifier<OptionalConstraintModifier>())
             {
                 return false;
             }
 
-            auto leftSub = leftConstraint->sub.type;
+            auto leftSub = leftTypeConstraint->sub.type;
             auto rightSub =
                 substInnerRightToLeft.substitute(m_astBuilder, rightConstraint.getDecl()->sub.type);
             if (!leftSub->equals(rightSub))
                 return false;
 
-            auto leftSup = leftConstraint->sup.type;
+            auto leftSup = leftTypeConstraint->sup.type;
             auto rightSup =
                 substInnerRightToLeft.substitute(m_astBuilder, rightConstraint.getDecl()->sup.type);
             if (!leftSup->equals(rightSup))
                 return false;
         }
-        else if (auto leftConstraint = as<NonEmptyPackConstraintDecl>(leftConstraints[cc]))
+        else if (auto leftNonEmptyConstraint = as<NonEmptyPackConstraintDecl>(leftConstraints[cc]))
         {
             auto unspecializedRightConstraintDeclRef = createDefaultSubstitutionsIfNeeded(
                 m_astBuilder,
@@ -9428,7 +9441,7 @@ bool SemanticsVisitor::doGenericSignaturesMatch(
                     .as<NonEmptyPackConstraintDecl>();
             if (!rightConstraint)
                 return false;
-            if (getNonEmptyConstraintTargetDecl(leftConstraint) !=
+            if (getNonEmptyConstraintTargetDecl(leftNonEmptyConstraint) !=
                 getNonEmptyConstraintTargetDecl(rightConstraint.getDecl()))
             {
                 return false;
