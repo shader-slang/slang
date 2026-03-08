@@ -173,6 +173,8 @@ bool isMemoryLocationUnmodifiedBetweenLoadAndUser(
             case kIROp_Defer:
             case kIROp_Unreachable:
             case kIROp_MissingReturn:
+            case kIROp_IfElse:
+            case kIROp_Loop:
                 // These instructions don't have memory side effects, but do
                 // still count as having other side effects (control flow).
                 break;
