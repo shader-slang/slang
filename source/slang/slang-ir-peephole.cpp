@@ -455,8 +455,9 @@ struct PeepholeContext : InstPassBase
                     base->getOp() == kIROp_MakeValuePack || base->getOp() == kIROp_MakeTuple;
                 bool isTypeLikePack =
                     base->getOp() == kIROp_TypePack || base->getOp() == kIROp_TupleType;
+                bool isWitnessLikePack = base->getOp() == kIROp_MakeWitnessPack;
 
-                if ((isValueLikePack || isTypeLikePack) &&
+                if ((isValueLikePack || isTypeLikePack || isWitnessLikePack) &&
                     !hasNestedFlattenablePackOperand(base) &&
                     base->getOperandCount() > 0)
                 {

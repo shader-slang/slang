@@ -1081,7 +1081,9 @@ Val* ASTBuilder::getTrimHeadPack(Val* basePack)
         ShortList<IntVal*> trimmedVals;
         for (Index i = 1; i < valPack->getCount(); i++)
             trimmedVals.add(valPack->getElement(i));
-        return getIntValPack(trimmedVals.getArrayView().arrayView);
+        return getOrCreate<ConcreteIntValPack>(
+            as<Type>(valPack->getType()),
+            trimmedVals.getArrayView().arrayView);
     }
 
     auto baseIntVal = as<IntVal>(basePack);
@@ -1096,7 +1098,9 @@ Val* ASTBuilder::getTrimTailPack(Val* basePack)
         ShortList<IntVal*> trimmedVals;
         for (Index i = 0; i + 1 < valPack->getCount(); i++)
             trimmedVals.add(valPack->getElement(i));
-        return getIntValPack(trimmedVals.getArrayView().arrayView);
+        return getOrCreate<ConcreteIntValPack>(
+            as<Type>(valPack->getType()),
+            trimmedVals.getArrayView().arrayView);
     }
 
     auto baseIntVal = as<IntVal>(basePack);
@@ -1140,6 +1144,32 @@ SubtypeWitness* ASTBuilder::getEachSubtypeWitness(
     if (auto expandWitness = as<ExpandSubtypeWitness>(patternWitness))
         return expandWitness->getPatternTypeWitness();
     return getOrCreate<EachSubtypeWitness>(subType, superType, patternWitness);
+}
+
+SubtypeWitness* ASTBuilder::getFirstSubtypeWitness(
+    Type* subType,
+    Type* superType,
+    SubtypeWitness* patternWitness)
+{
+    if (auto witnessPack = as<TypePackSubtypeWitness>(patternWitness))
+    {
+        if (witnessPack->getCount() > 0)
+            return witnessPack->getWitness(0);
+    }
+    return getOrCreate<FirstSubtypeWitness>(subType, superType, patternWitness);
+}
+
+SubtypeWitness* ASTBuilder::getLastSubtypeWitness(
+    Type* subType,
+    Type* superType,
+    SubtypeWitness* patternWitness)
+{
+    if (auto witnessPack = as<TypePackSubtypeWitness>(patternWitness))
+    {
+        if (witnessPack->getCount() > 0)
+            return witnessPack->getWitness(witnessPack->getCount() - 1);
+    }
+    return getOrCreate<LastSubtypeWitness>(subType, superType, patternWitness);
 }
 
 DeclaredSubtypeWitness* ASTBuilder::getDeclaredSubtypeWitness(

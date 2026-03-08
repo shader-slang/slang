@@ -1205,9 +1205,9 @@ int restCount<let each D : int>()
     return countof(__trimHead(D));
 }
 
-__first(T) makeFirstType<each T>() where nonempty(T)
+struct FirstTypeHolder<each T> where nonempty(T)
 {
-    return 0;
+    __first(T) value;
 }
 ```
 

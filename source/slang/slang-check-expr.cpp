@@ -4404,19 +4404,17 @@ static const char* _getPackQueryName(PackQueryExpr* expr)
 
 bool SemanticsVisitor::hasNonEmptyPackConstraint(Decl* decl)
 {
-    for (Decl* parent = m_outerScope ? m_outerScope->containerDecl : nullptr; parent;
-         parent = parent->parentDecl)
+    auto genericDecl = decl ? as<GenericDecl>(decl->parentDecl) : nullptr;
+    if (!genericDecl)
+        return false;
+
+    for (auto constraintDecl : genericDecl->getDirectMemberDeclsOfType<NonEmptyPackConstraintDecl>())
     {
-        if (auto genericDecl = as<GenericDecl>(parent))
+        if (auto packDeclRefExpr = as<DeclRefExpr>(constraintDecl->packExpr))
         {
-            for (auto constraintDecl :
-                 genericDecl->getDirectMemberDeclsOfType<NonEmptyPackConstraintDecl>())
+            if (getDeclRef(m_astBuilder, packDeclRefExpr).getDecl() == decl)
             {
-                if (auto packDeclRefExpr = as<DeclRefExpr>(constraintDecl->packExpr))
-                {
-                    if (getDeclRef(m_astBuilder, packDeclRefExpr).getDecl() == decl)
-                        return true;
-                }
+                return true;
             }
         }
     }
@@ -4468,9 +4466,8 @@ VariadicPackCardinality SemanticsVisitor::getPackCardinality(Val* packVal)
 
     if (auto concreteIntValPack = as<ConcreteIntValPack>(packVal))
     {
-        result =
-            concreteIntValPack->getCount() > 0 ? VariadicPackCardinality::NonEmpty
-                                               : VariadicPackCardinality::Empty;
+        result = concreteIntValPack->getCount() > 0 ? VariadicPackCardinality::NonEmpty
+                                                    : VariadicPackCardinality::Empty;
         getShared()->m_packCardinalityCache[packVal] = result;
         return result;
     }
@@ -4489,8 +4486,7 @@ VariadicPackCardinality SemanticsVisitor::getPackCardinality(Val* packVal)
         return result;
     }
 
-    if (
-        as<TrimHeadTypePack>(packVal) || as<TrimTailTypePack>(packVal) ||
+    if (as<TrimHeadTypePack>(packVal) || as<TrimTailTypePack>(packVal) ||
         as<TrimHeadIntValPack>(packVal) || as<TrimTailIntValPack>(packVal))
     {
         result = VariadicPackCardinality::Unknown;
@@ -4622,26 +4618,25 @@ Expr* SemanticsExprVisitor::visitPackQueryExpr(PackQueryExpr* packQueryExpr)
     if (!cardinalitySource && (isTypeExpr || isTypePack(operandType) || as<TupleType>(operandType)))
         cardinalitySource = operandType;
 
-    auto packCardinality =
-        cardinalitySource ? getPackCardinality(cardinalitySource)
-                          : VariadicPackCardinality::Unknown;
+    auto packCardinality = cardinalitySource ? getPackCardinality(cardinalitySource)
+                                             : VariadicPackCardinality::Unknown;
 
     if ((as<FirstExpr>(packQueryExpr) || as<LastExpr>(packQueryExpr)))
     {
         if (packCardinality == VariadicPackCardinality::Empty)
         {
-            getSink()->diagnose(
-                Diagnostics::EmptyPackQueryIsInvalid{.queryName = queryName, .expr = packQueryExpr});
+            getSink()->diagnose(Diagnostics::EmptyPackQueryIsInvalid{
+                .queryName = queryName,
+                .expr = packQueryExpr});
             packQueryExpr->type = m_astBuilder->getErrorType();
             return packQueryExpr;
         }
 
         if (packCardinality != VariadicPackCardinality::NonEmpty)
         {
-            getSink()->diagnose(
-                Diagnostics::PackQueryRequiresNonEmptyPack{
-                    .queryName = queryName,
-                    .expr = packQueryExpr});
+            getSink()->diagnose(Diagnostics::PackQueryRequiresNonEmptyPack{
+                .queryName = queryName,
+                .expr = packQueryExpr});
             packQueryExpr->type = m_astBuilder->getErrorType();
             return packQueryExpr;
         }
@@ -4673,6 +4668,10 @@ Expr* SemanticsExprVisitor::visitPackQueryExpr(PackQueryExpr* packQueryExpr)
 
     if (!isTypeExpr && !as<TupleType>(operandType))
     {
+        // This branch handles term-valued expressions whose checked type is an abstract type pack,
+        // e.g. `__first(expand Wrapper<each T>)`. Value packs are handled above, and tuple-valued
+        // queries are handled separately, so at this point we expect an abstract type-pack result.
+        SLANG_ASSERT(isTypePack(operandType));
         if (as<FirstExpr>(packQueryExpr) || as<LastExpr>(packQueryExpr))
             packQueryExpr->type = QualType(m_astBuilder->getEachType(operandType));
         else if (as<TrimHeadExpr>(packQueryExpr))

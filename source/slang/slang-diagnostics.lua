@@ -1694,6 +1694,13 @@ err(
     span { loc = "expr:Expr", message = "remove `optional` from this `nonempty(...)` constraint" }
 )
 
+err(
+    "non-empty-pack-constraint-target-must-be-from-current-generic",
+    30416,
+    "`nonempty(...)` target must be a generic pack parameter declared in the current generic",
+    span { loc = "expr:Expr", message = "this pack parameter is declared outside the current generic" }
+)
+
 -- Float bit cast diagnostics
 
 err(

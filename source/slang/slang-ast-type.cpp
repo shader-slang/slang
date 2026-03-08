@@ -899,7 +899,10 @@ Type* FirstPackElementType::_createCanonicalTypeOverride()
     return getCurrentASTBuilder()->getFirstElement(canonicalBasePack);
 }
 
-Val* FirstPackElementType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
+Val* FirstPackElementType::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
 {
     int diff = 0;
     auto substBasePack = as<Type>(getBasePack()->substituteImpl(astBuilder, subst, &diff));
@@ -925,7 +928,10 @@ Type* LastPackElementType::_createCanonicalTypeOverride()
     return getCurrentASTBuilder()->getLastElement(canonicalBasePack);
 }
 
-Val* LastPackElementType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
+Val* LastPackElementType::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
 {
     int diff = 0;
     auto substBasePack = as<Type>(getBasePack()->substituteImpl(astBuilder, subst, &diff));
@@ -951,7 +957,10 @@ Type* TrimHeadTypePack::_createCanonicalTypeOverride()
     return getCurrentASTBuilder()->getTrimHeadPack(canonicalBasePack);
 }
 
-Val* TrimHeadTypePack::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
+Val* TrimHeadTypePack::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
 {
     int diff = 0;
     auto substBasePack = as<Type>(getBasePack()->substituteImpl(astBuilder, subst, &diff));
@@ -977,7 +986,10 @@ Type* TrimTailTypePack::_createCanonicalTypeOverride()
     return getCurrentASTBuilder()->getTrimTailPack(canonicalBasePack);
 }
 
-Val* TrimTailTypePack::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
+Val* TrimTailTypePack::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
 {
     int diff = 0;
     auto substBasePack = as<Type>(getBasePack()->substituteImpl(astBuilder, subst, &diff));

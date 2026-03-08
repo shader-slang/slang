@@ -737,6 +737,38 @@ class EachSubtypeWitness : public SubtypeWitness
 };
 
 FIDDLE()
+class FirstSubtypeWitness : public SubtypeWitness
+{
+    FIDDLE(...)
+    FirstSubtypeWitness(Type* sub, Type* sup, SubtypeWitness* patternWitness)
+    {
+        setOperands(sub, sup, patternWitness);
+    }
+    Type* getSub() { return as<Type>(getOperand(0)); }
+    Type* getSup() { return as<Type>(getOperand(1)); }
+    SubtypeWitness* getPatternTypeWitness() { return as<SubtypeWitness>(getOperand(2)); }
+    void _toTextOverride(StringBuilder& out);
+    Val* _resolveImplOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
+FIDDLE()
+class LastSubtypeWitness : public SubtypeWitness
+{
+    FIDDLE(...)
+    LastSubtypeWitness(Type* sub, Type* sup, SubtypeWitness* patternWitness)
+    {
+        setOperands(sub, sup, patternWitness);
+    }
+    Type* getSub() { return as<Type>(getOperand(0)); }
+    Type* getSup() { return as<Type>(getOperand(1)); }
+    SubtypeWitness* getPatternTypeWitness() { return as<SubtypeWitness>(getOperand(2)); }
+    void _toTextOverride(StringBuilder& out);
+    Val* _resolveImplOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
+FIDDLE()
 class ExpandSubtypeWitness : public SubtypeWitness
 {
     FIDDLE(...)

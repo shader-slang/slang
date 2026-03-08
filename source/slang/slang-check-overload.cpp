@@ -1173,9 +1173,8 @@ bool SemanticsVisitor::TryCheckOverloadCandidateConstraints(
             {
                 if (context.mode != OverloadResolveContext::Mode::JustTrying)
                 {
-                    getSink()->diagnose(
-                        Diagnostics::EmptyPackDoesNotSatisfyNonEmptyConstraint{
-                            .location = context.loc});
+                    getSink()->diagnose(Diagnostics::EmptyPackDoesNotSatisfyNonEmptyConstraint{
+                        .location = context.loc});
                 }
                 return false;
             }

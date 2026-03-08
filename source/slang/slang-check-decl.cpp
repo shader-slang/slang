@@ -3509,15 +3509,28 @@ void SemanticsDeclHeaderVisitor::visitNonEmptyPackConstraintDecl(NonEmptyPackCon
 
     if (decl->hasModifier<OptionalConstraintModifier>())
     {
-        getSink()->diagnose(
-            Diagnostics::OptionalNonEmptyPackConstraintIsInvalid{.expr = packExpr});
+        getSink()->diagnose(Diagnostics::OptionalNonEmptyPackConstraintIsInvalid{.expr = packExpr});
     }
 
     if (auto declRefExpr = as<DeclRefExpr>(packExpr))
     {
         auto declRef = getDeclRef(m_astBuilder, declRefExpr);
-        if (declRef.as<GenericTypePackParamDecl>() || declRef.as<GenericValuePackParamDecl>())
+        if (auto typePackDeclRef = declRef.as<GenericTypePackParamDecl>())
+        {
+            if (typePackDeclRef.getDecl()->parentDecl == decl->parentDecl)
+                return;
+            getSink()->diagnose(
+                Diagnostics::NonEmptyPackConstraintTargetMustBeFromCurrentGeneric{.expr = packExpr});
             return;
+        }
+        if (auto valuePackDeclRef = declRef.as<GenericValuePackParamDecl>())
+        {
+            if (valuePackDeclRef.getDecl()->parentDecl == decl->parentDecl)
+                return;
+            getSink()->diagnose(
+                Diagnostics::NonEmptyPackConstraintTargetMustBeFromCurrentGeneric{.expr = packExpr});
+            return;
+        }
     }
 
     getSink()->diagnose(Diagnostics::InvalidNonEmptyPackConstraintTarget{.expr = packExpr});
@@ -3766,7 +3779,9 @@ void SemanticsDeclHeaderVisitor::visitGenericDecl(GenericDecl* genericDecl)
             ensureDecl(valParam, DeclCheckState::ReadyForReference);
             valParam->parameterIndex = parameterIndex++;
         }
-        else if (as<GenericTypeConstraintDecl>(m) || as<TypeCoercionConstraintDecl>(m))
+        else if (
+            as<GenericTypeConstraintDecl>(m) || as<TypeCoercionConstraintDecl>(m) ||
+            as<NonEmptyPackConstraintDecl>(m))
         {
             ensureDecl(m, DeclCheckState::ReadyForReference);
         }

@@ -494,6 +494,115 @@ void EachSubtypeWitness::_toTextOverride(StringBuilder& out)
     out << toSlice(")");
 }
 
+namespace
+{
+template<typename TWitness>
+Val* _substituteExtractPackSubtypeWitness(
+    TWitness* witness,
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff,
+    bool useLast)
+{
+    int diff = 0;
+    auto newPatternWitness =
+        as<SubtypeWitness>(witness->getPatternTypeWitness()->substituteImpl(astBuilder, subst, &diff));
+    if (auto witnessPack = as<TypePackSubtypeWitness>(newPatternWitness))
+    {
+        if (witnessPack->getCount() > 0)
+        {
+            auto index = useLast ? witnessPack->getCount() - 1 : 0;
+            (*ioDiff)++;
+            return witnessPack->getWitness(index);
+        }
+    }
+    auto newSub = as<Type>(witness->getSub()->substituteImpl(astBuilder, subst, &diff));
+    auto newSup = as<Type>(witness->getSup()->substituteImpl(astBuilder, subst, &diff));
+    if (!diff)
+        return witness;
+    (*ioDiff)++;
+    return useLast ? getCurrentASTBuilder()->getLastSubtypeWitness(newSub, newSup, newPatternWitness)
+                   : getCurrentASTBuilder()->getFirstSubtypeWitness(
+                         newSub,
+                         newSup,
+                         newPatternWitness);
+}
+
+template<typename TWitness>
+Val* _resolveExtractPackSubtypeWitness(TWitness* witness, bool useLast)
+{
+    int diff = 0;
+    auto newPatternWitness = as<SubtypeWitness>(witness->getPatternTypeWitness()->resolve());
+    if (newPatternWitness != witness->getPatternTypeWitness())
+        diff++;
+    if (auto witnessPack = as<TypePackSubtypeWitness>(newPatternWitness))
+    {
+        if (witnessPack->getCount() > 0)
+        {
+            auto index = useLast ? witnessPack->getCount() - 1 : 0;
+            return witnessPack->getWitness(index);
+        }
+    }
+    auto newSub = as<Type>(witness->getSub()->resolve());
+    if (newSub != witness->getSub())
+        diff++;
+    auto newSup = as<Type>(witness->getSup()->resolve());
+    if (newSup != witness->getSup())
+        diff++;
+    if (!diff)
+        return witness;
+    return useLast ? getCurrentASTBuilder()->getLastSubtypeWitness(newSub, newSup, newPatternWitness)
+                   : getCurrentASTBuilder()->getFirstSubtypeWitness(
+                         newSub,
+                         newSup,
+                         newPatternWitness);
+}
+} // namespace
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! FirstSubtypeWitness !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+Val* FirstSubtypeWitness::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    return _substituteExtractPackSubtypeWitness(this, astBuilder, subst, ioDiff, false);
+}
+
+Val* FirstSubtypeWitness::_resolveImplOverride()
+{
+    return _resolveExtractPackSubtypeWitness(this, false);
+}
+
+void FirstSubtypeWitness::_toTextOverride(StringBuilder& out)
+{
+    out << toSlice("FirstWitness(");
+    getPatternTypeWitness()->toText(out);
+    out << toSlice(")");
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! LastSubtypeWitness !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+Val* LastSubtypeWitness::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    return _substituteExtractPackSubtypeWitness(this, astBuilder, subst, ioDiff, true);
+}
+
+Val* LastSubtypeWitness::_resolveImplOverride()
+{
+    return _resolveExtractPackSubtypeWitness(this, true);
+}
+
+void LastSubtypeWitness::_toTextOverride(StringBuilder& out)
+{
+    out << toSlice("LastWitness(");
+    getPatternTypeWitness()->toText(out);
+    out << toSlice(")");
+}
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DeclaredSubtypeWitness !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 Val* DeclaredSubtypeWitness::_resolveImplOverride()
@@ -1891,7 +2000,10 @@ void FirstIntVal::_toTextOverride(StringBuilder& out)
     out << ")";
 }
 
-Val* FirstIntVal::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
+Val* FirstIntVal::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
 {
     int diff = 0;
     auto substBase = getBasePack()->substituteImpl(astBuilder, subst, &diff);

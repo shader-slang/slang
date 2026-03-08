@@ -1760,9 +1760,7 @@ static void maybeParseGenericConstraints(Parser* parser, ContainerDecl* genericP
             parser->ReadMatchingToken(TokenType::RParent);
             if (optional)
             {
-                addModifier(
-                    constraint,
-                    parser->astBuilder->create<OptionalConstraintModifier>());
+                addModifier(constraint, parser->astBuilder->create<OptionalConstraintModifier>());
             }
             AddMember(genericParent, constraint);
             continue;
@@ -2959,6 +2957,7 @@ static TypeSpec _applyModifiersToTypeSpec(Parser* parser, TypeSpec typeSpec, Mod
 static TypeSpec _parseSimpleTypeSpec(Parser* parser)
 {
     TypeSpec typeSpec;
+    Expr* typeExpr = nullptr;
 
     // We may see a `struct` (or `enum` or `class`) tag specified here, and need to act accordingly
     //
@@ -3004,8 +3003,7 @@ static TypeSpec _parseSimpleTypeSpec(Parser* parser)
         parser->LookAheadToken("__first") || parser->LookAheadToken("__last") ||
         parser->LookAheadToken("__trimHead") || parser->LookAheadToken("__trimTail"))
     {
-        typeSpec.expr = parsePrefixExpr(parser);
-        return typeSpec;
+        typeExpr = parsePrefixExpr(parser);
     }
     // Uncomment should we decide to enable (a,b,c) tuple types
     // else if(parser->LookAheadToken(TokenType::LParent))
@@ -3018,24 +3016,26 @@ static TypeSpec _parseSimpleTypeSpec(Parser* parser)
         typeSpec.expr = parseFuncTypeExpr(parser);
         return typeSpec;
     }
-
-    bool inGlobalScope = false;
-    if (AdvanceIf(parser, TokenType::Scope))
-    {
-        inGlobalScope = true;
-    }
-
-    Token typeName = parser->ReadToken(TokenType::Identifier);
-
-    auto basicType = parser->astBuilder->create<VarExpr>();
-    if (inGlobalScope)
-        basicType->scope = parser->currentModule->ownedScope;
     else
-        basicType->scope = parser->currentLookupScope;
-    basicType->loc = typeName.loc;
-    basicType->name = typeName.getNameOrNull();
+    {
+        bool inGlobalScope = false;
+        if (AdvanceIf(parser, TokenType::Scope))
+        {
+            inGlobalScope = true;
+        }
 
-    Expr* typeExpr = basicType;
+        Token typeName = parser->ReadToken(TokenType::Identifier);
+
+        auto basicType = parser->astBuilder->create<VarExpr>();
+        if (inGlobalScope)
+            basicType->scope = parser->currentModule->ownedScope;
+        else
+            basicType->scope = parser->currentLookupScope;
+        basicType->loc = typeName.loc;
+        basicType->name = typeName.getNameOrNull();
+
+        typeExpr = basicType;
+    }
 
     bool shouldLoop = true;
     while (shouldLoop)

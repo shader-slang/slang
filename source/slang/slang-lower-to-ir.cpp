@@ -2098,6 +2098,28 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             irBuilder->emitEachInst(witnessTableType, getSimpleVal(context, elementWitness)));
     }
 
+    LoweredValInfo visitFirstSubtypeWitness(FirstSubtypeWitness* witness)
+    {
+        auto patternWitness = lowerVal(context, witness->getPatternTypeWitness());
+        auto irBuilder = getBuilder();
+        auto supType = lowerType(context, witness->getSup());
+        auto witnessTableType = irBuilder->getWitnessTableType(supType);
+        auto basePack = getSimpleVal(context, patternWitness);
+        return LoweredValInfo::simple(
+            irBuilder->emitIntrinsicInst(witnessTableType, kIROp_ExtractFirstFromPack, 1, &basePack));
+    }
+
+    LoweredValInfo visitLastSubtypeWitness(LastSubtypeWitness* witness)
+    {
+        auto patternWitness = lowerVal(context, witness->getPatternTypeWitness());
+        auto irBuilder = getBuilder();
+        auto supType = lowerType(context, witness->getSup());
+        auto witnessTableType = irBuilder->getWitnessTableType(supType);
+        auto basePack = getSimpleVal(context, patternWitness);
+        return LoweredValInfo::simple(
+            irBuilder->emitIntrinsicInst(witnessTableType, kIROp_ExtractLastFromPack, 1, &basePack));
+    }
+
     LoweredValInfo visitDeclaredSubtypeWitness(DeclaredSubtypeWitness* val)
     {
         if (as<ThisTypeConstraintDecl>(val->getDeclRef()))
@@ -4485,10 +4507,24 @@ struct ExprLoweringContext
                     _lowerSubstitutionArg(subContext, genSubst, valParamDecl, argCounter++);
                 }
             }
-            for (auto constraintDecl :
-                 genDecl->getDirectMemberDeclsOfType<GenericTypeConstraintDecl>())
+            for (auto memberDecl : genDecl->getDirectMemberDecls())
             {
-                _lowerSubstitutionArg(subContext, genSubst, constraintDecl, argCounter++);
+                if (auto constraintDecl = as<GenericTypeConstraintDecl>(memberDecl))
+                {
+                    _lowerSubstitutionArg(subContext, genSubst, constraintDecl, argCounter++);
+                }
+                else if (auto typeCoercionConstraintDecl = as<TypeCoercionConstraintDecl>(memberDecl))
+                {
+                    _lowerSubstitutionArg(
+                        subContext,
+                        genSubst,
+                        typeCoercionConstraintDecl,
+                        argCounter++);
+                }
+                else if (auto nonEmptyConstraintDecl = as<NonEmptyPackConstraintDecl>(memberDecl))
+                {
+                    _lowerSubstitutionArg(subContext, genSubst, nonEmptyConstraintDecl, argCounter++);
+                }
             }
         }
         // TODO: also need to handle this-type substitution here?
