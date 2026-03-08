@@ -2457,6 +2457,24 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
         return m_astBuilder->getIntValPack(elements.getArrayView().arrayView);
     }
 
+    // A TupleExpr with integer elements also folds to a ConcreteIntValPack so
+    // tuple-backed pack queries can participate in integer-constant contexts.
+    if (auto tupleExpr = expr.as<TupleExpr>())
+    {
+        ShortList<IntVal*> elements;
+        for (auto elementExpr : tupleExpr.getExpr()->elements)
+        {
+            auto elementVal = tryConstantFoldExpr(
+                SubstExpr<Expr>(elementExpr, expr.getSubsts()),
+                kind,
+                circularityInfo);
+            if (!elementVal)
+                return nullptr;
+            elements.add(elementVal);
+        }
+        return m_astBuilder->getIntValPack(elements.getArrayView().arrayView);
+    }
+
     // `expand <expr>` where the expr involves value packs produces an ExpandIntValPack.
     if (auto expandExpr = expr.as<ExpandExpr>())
     {

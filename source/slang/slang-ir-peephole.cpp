@@ -485,7 +485,7 @@ struct PeepholeContext : InstPassBase
 
                     ShortList<IRInst*> slicedOperands;
                     UInt operandCount = packInst->getOperandCount();
-                    UInt start = trimTail ? 0 : UInt(operandCount > 0 ? 1 : 0);
+                    UInt start = trimTail ? 0u : (operandCount > 0 ? 1u : 0u);
                     UInt end = trimTail && operandCount > 0 ? operandCount - 1 : operandCount;
                     for (UInt i = start; i < end; ++i)
                         slicedOperands.add(packInst->getOperand(i));

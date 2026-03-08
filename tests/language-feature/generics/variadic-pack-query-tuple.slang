@@ -1,4 +1,10 @@
 //TEST:INTERPRET(filecheck=CHECK):
+#lang slang 2026
+
+struct IntConst<let N : int>
+{
+    static int get() { return N; }
+}
 
 void main()
 {
@@ -17,4 +23,12 @@ void main()
     let tail = __trimTail(tuple);
     printf("%d\n", tail._0 + tail._1);
     // CHECK: 30
+
+    // Tuple-expression syntax should also fold through `__first` / `__last`
+    // when the result is required in an integer-constant context.
+    printf("%d\n", IntConst<__first((40, 50))>.get());
+    // CHECK: 40
+
+    printf("%d\n", IntConst<__last((60, 70))>.get());
+    // CHECK: 70
 }

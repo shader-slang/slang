@@ -9130,14 +9130,31 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         UNREACHABLE_RETURN(LoweredValInfo());
     }
 
+    LoweredValInfo visitTypeCoercionConstraintDecl(TypeCoercionConstraintDecl* decl)
+    {
+        if (const auto globalGenericParamDecl = as<GlobalGenericParamDecl>(decl->parentDecl))
+        {
+            SLANG_UNUSED(globalGenericParamDecl);
+            auto builder = getBuilder();
+            auto fromType = lowerType(context, decl->fromType.Ptr());
+            auto toType = lowerType(context, decl->toType);
+            auto funcType = builder->getFuncType(1, &fromType, toType);
+            auto inst = builder->emitGlobalGenericParam(funcType);
+            addLinkageDecoration(context, inst, decl);
+            return LoweredValInfo::simple(inst);
+        }
+
+        SLANG_UNEXPECTED("type coercion constraint during lowering");
+        UNREACHABLE_RETURN(LoweredValInfo());
+    }
+
     LoweredValInfo visitNonEmptyPackConstraintDecl(NonEmptyPackConstraintDecl* decl)
     {
         if (const auto globalGenericParamDecl = as<GlobalGenericParamDecl>(decl->parentDecl))
         {
             SLANG_UNUSED(globalGenericParamDecl);
             auto witnessType = getBuilder()->getWitnessTableType(getBuilder()->getVoidType());
-            auto inst =
-                getBuilder()->emitIntrinsicInst(witnessType, kIROp_NonEmptyPackWitness, 0, nullptr);
+            auto inst = getBuilder()->emitGlobalGenericParam(witnessType);
             addLinkageDecoration(context, inst, decl);
             return LoweredValInfo::simple(inst);
         }
@@ -10851,6 +10868,19 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
 
     void emitGenericConstraintDecl(
         IRGenContext* subContext,
+        TypeCoercionConstraintDecl* constraintDecl)
+    {
+        auto subBuilder = subContext->irBuilder;
+        auto fromType = lowerType(subContext, constraintDecl->fromType.Ptr());
+        auto toType = lowerType(subContext, constraintDecl->toType);
+        auto funcType = subBuilder->getFuncType(1, &fromType, toType);
+        auto param = subBuilder->emitParam(funcType);
+        addNameHint(context, param, constraintDecl);
+        subContext->setValue(constraintDecl, LoweredValInfo::simple(param));
+    }
+
+    void emitGenericConstraintDecl(
+        IRGenContext* subContext,
         NonEmptyPackConstraintDecl* constraintDecl)
     {
         auto subBuilder = subContext->irBuilder;
@@ -10914,6 +10944,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             if (auto genericTypeConstraintDecl = as<GenericTypeConstraintDecl>(constraintDecl))
             {
                 emitGenericConstraintDecl(subContext, genericTypeConstraintDecl);
+            }
+            else if (auto typeCoercionConstraintDecl = as<TypeCoercionConstraintDecl>(constraintDecl))
+            {
+                emitGenericConstraintDecl(subContext, typeCoercionConstraintDecl);
             }
             else if (auto nonEmptyConstraintDecl = as<NonEmptyPackConstraintDecl>(constraintDecl))
             {

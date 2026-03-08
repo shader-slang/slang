@@ -614,6 +614,8 @@ static void _lookUpMembersInSuperTypeImpl(
     }
     else if (auto eachType = as<EachType>(superType))
     {
+        if (!request.semantics)
+            return;
         auto canEachType = eachType->getCanonicalType();
         InheritanceInfo inheritanceInfo =
             request.semantics->getShared()->getInheritanceInfo(canEachType);
@@ -628,6 +630,8 @@ static void _lookUpMembersInSuperTypeImpl(
     }
     else if (as<FirstPackElementType>(superType) || as<LastPackElementType>(superType))
     {
+        if (!request.semantics)
+            return;
         auto canQueryType = superType->getCanonicalType();
         InheritanceInfo inheritanceInfo =
             request.semantics->getShared()->getInheritanceInfo(canQueryType);

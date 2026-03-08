@@ -790,7 +790,7 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
 
     HashSet<Decl*> constrainedGenericParams;
 
-    for (auto constraintDecl : genericDeclRef.getDecl()->getMembers())
+    for (auto constraintDecl : genericDeclRef.getDecl()->getDirectMemberDecls())
     {
         if (auto genericTypeConstraintDecl = as<GenericTypeConstraintDecl>(constraintDecl))
         {
@@ -867,6 +867,21 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
                 return DeclRef<Decl>();
             }
         }
+        else if (auto typeCoercionConstraintDecl = as<TypeCoercionConstraintDecl>(constraintDecl))
+        {
+            if (!addTypeCoercionWitnessToArgs(
+                    getASTBuilder(),
+                    this,
+                    typeCoercionConstraintDecl,
+                    genericDeclRef,
+                    nullptr,
+                    &constrainedGenericParams,
+                    args,
+                    false))
+            {
+                return DeclRef<Decl>();
+            }
+        }
         else if (auto nonEmptyConstraintDecl = as<NonEmptyPackConstraintDecl>(constraintDecl))
         {
             Decl* constrainedPackDecl = nullptr;
@@ -902,22 +917,6 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
         {
             return DeclRef<Decl>();
         }
-    }
-
-    // Verify that all type coercion constraints can be satisfied.
-    for (auto constraintDecl :
-         genericDeclRef.getDecl()->getMembersOfType<TypeCoercionConstraintDecl>())
-    {
-        if (!addTypeCoercionWitnessToArgs(
-                getASTBuilder(),
-                this,
-                constraintDecl,
-                genericDeclRef,
-                nullptr,
-                &constrainedGenericParams,
-                args,
-                false))
-            return DeclRef<Decl>();
     }
 
     // Add a flat cost to all unconstrained generic params.
