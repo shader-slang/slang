@@ -685,6 +685,16 @@ private:
     Dictionary<int, int64_t> bindingToByteOffset;
 };
 
+/// Represents what the compiler can currently prove about a variadic pack's cardinality.
+/// This is intentionally coarse-grained: we only track whether a pack is known to be empty,
+/// known to be non-empty, or still unknown.
+enum class VariadicPackCardinality
+{
+    Unknown,
+    Empty,
+    NonEmpty,
+};
+
 /// Shared state for a semantics-checking session.
 struct SharedSemanticsContext : public RefObject
 {
@@ -724,6 +734,8 @@ struct SharedSemanticsContext : public RefObject
     Dictionary<Decl*, bool> m_typeContainsRecursionCache;
 
     Dictionary<TypePair, ConversionCost> m_typeConversionCostCache;
+
+    Dictionary<Val*, VariadicPackCardinality> m_packCardinalityCache;
 
     // Track diagnostics that have already been reported to avoid duplicates.
     // Key format: "diagnosticId|sourceLocRaw" or "diagnosticId|sourceLocRaw|extraInfo"
@@ -1513,6 +1525,10 @@ public:
     {
         return resolveOverloadedExpr(overloadedExpr, nullptr, mask);
     }
+
+    bool hasNonEmptyPackConstraint(Decl* decl);
+    VariadicPackCardinality getPackCardinality(Val* packVal);
+    bool isKnownNonEmptyPack(Val* packVal);
 
     /// Worker reoutine for `maybeResolveOverloadedExpr` and `resolveOverloadedExpr`.
     Expr* _resolveOverloadedExprImpl(
@@ -3205,6 +3221,8 @@ public:
     Expr* visitTreatAsDifferentiableExpr(TreatAsDifferentiableExpr* expr);
 
     Expr* visitGetArrayLengthExpr(GetArrayLengthExpr* expr);
+
+    Expr* visitPackQueryExpr(PackQueryExpr* expr);
 
     Expr* visitDefaultConstructExpr(DefaultConstructExpr* expr);
 

@@ -790,91 +790,123 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
 
     HashSet<Decl*> constrainedGenericParams;
 
-    for (auto constraintDecl :
-         genericDeclRef.getDecl()->getMembersOfType<GenericTypeConstraintDecl>())
+    for (auto constraintDecl : genericDeclRef.getDecl()->getDirectMemberDecls())
     {
-        DeclRef<GenericTypeConstraintDecl> constraintDeclRef =
-            m_astBuilder
-                ->getGenericAppDeclRef(
+        if (auto genericTypeConstraintDecl = as<GenericTypeConstraintDecl>(constraintDecl))
+        {
+            DeclRef<GenericTypeConstraintDecl> constraintDeclRef =
+                m_astBuilder
+                    ->getGenericAppDeclRef(
+                        genericDeclRef,
+                        args.getArrayView().arrayView,
+                        genericTypeConstraintDecl)
+                    .as<GenericTypeConstraintDecl>();
+
+            // Extract the (substituted) sub- and super-type from the constraint.
+            auto sub = getSub(m_astBuilder, constraintDeclRef);
+            auto sup = getSup(m_astBuilder, constraintDeclRef);
+
+            // Mark sub type as constrained.
+            if (auto subDeclRefType = as<DeclRefType>(constraintDeclRef.getDecl()->sub.type))
+                constrainedGenericParams.add(subDeclRefType->getDeclRef().getDecl());
+            else if (auto subEachType = as<EachType>(constraintDeclRef.getDecl()->sub.type))
+            {
+                if (auto elementDeclRefType = as<DeclRefType>(subEachType->getElementType()))
+                {
+                    constrainedGenericParams.add(elementDeclRefType->getDeclRef().getDecl());
+                }
+                else
+                {
+                    return DeclRef<Decl>();
+                }
+            }
+
+            if (sub->equals(sup) && isDeclRefTypeOf<InterfaceDecl>(sup))
+            {
+                return DeclRef<Decl>();
+            }
+
+            // Search for a witness that shows the constraint is satisfied.
+            SubtypeWitness* subTypeWitness = nullptr;
+            if (sub == system->subTypeForAdditionalWitnesses)
+            {
+                system->additionalSubtypeWitnesses->tryGetValue(sup, subTypeWitness);
+            }
+            else
+            {
+                subTypeWitness = isSubtype(
+                    sub,
+                    sup,
+                    system->additionalSubtypeWitnesses ? IsSubTypeOptions::NoCaching
+                                                       : IsSubTypeOptions::None);
+            }
+
+            if (genericTypeConstraintDecl->isEqualityConstraint)
+            {
+                if (!isTypeEqualityWitness(subTypeWitness))
+                    subTypeWitness = nullptr;
+            }
+
+            bool witnessIsOptional = isWitnessUncheckedOptional(subTypeWitness);
+            bool constraintIsOptional =
+                genericTypeConstraintDecl->hasModifier<OptionalConstraintModifier>();
+
+            if (subTypeWitness && (!witnessIsOptional || constraintIsOptional))
+            {
+                args.add(subTypeWitness);
+                outBaseCost += subTypeWitness->getOverloadResolutionCost();
+            }
+            else if (!subTypeWitness && constraintIsOptional)
+            {
+                auto noneWitness = m_astBuilder->getOrCreate<NoneWitness>();
+                args.add(noneWitness);
+                outBaseCost += kConversionCost_FailedOptionalConstraint;
+            }
+            else
+            {
+                return DeclRef<Decl>();
+            }
+        }
+        else if (auto typeCoercionConstraintDecl = as<TypeCoercionConstraintDecl>(constraintDecl))
+        {
+            if (!addTypeCoercionWitnessToArgs(
+                    getASTBuilder(),
+                    this,
+                    typeCoercionConstraintDecl,
                     genericDeclRef,
-                    args.getArrayView().arrayView,
-                    constraintDecl)
-                .as<GenericTypeConstraintDecl>();
-
-        // Extract the (substituted) sub- and super-type from the constraint.
-        auto sub = getSub(m_astBuilder, constraintDeclRef);
-        auto sup = getSup(m_astBuilder, constraintDeclRef);
-
-        // Mark sub type as constrained.
-        if (auto subDeclRefType = as<DeclRefType>(constraintDeclRef.getDecl()->sub.type))
-            constrainedGenericParams.add(subDeclRefType->getDeclRef().getDecl());
-        else if (auto subEachType = as<EachType>(constraintDeclRef.getDecl()->sub.type))
-            constrainedGenericParams.add(
-                as<DeclRefType>(subEachType->getElementType())->getDeclRef().getDecl());
-
-        if (sub->equals(sup) && isDeclRefTypeOf<InterfaceDecl>(sup))
-        {
-            // We are trying to use an interface type itself to conform to the
-            // type constraint. We can reach this case when the user code does
-            // not provide an explicit type parameter to specialize a generic
-            // and the type parameter cannot be inferred from any arguments.
-            // In this case, we should fail the constraint check.
-            return DeclRef<Decl>();
+                    nullptr,
+                    &constrainedGenericParams,
+                    args,
+                    false))
+            {
+                return DeclRef<Decl>();
+            }
         }
+        else if (auto nonEmptyConstraintDecl = as<NonEmptyPackConstraintDecl>(constraintDecl))
+        {
+            Decl* constrainedPackDecl = nullptr;
+            if (auto declRefExpr = as<DeclRefExpr>(nonEmptyConstraintDecl->packExpr))
+            {
+                constrainedPackDecl = getDeclRef(m_astBuilder, declRefExpr).getDecl();
+            }
 
-        // Search for a witness that shows the constraint is satisfied.
-        SubtypeWitness* subTypeWitness = nullptr;
-        if (sub == system->subTypeForAdditionalWitnesses)
-        {
-            // If we are trying to find the subtype info for a type whose inheritance info is
-            // being calculated, use what we have already known about the type.
-            system->additionalSubtypeWitnesses->tryGetValue(sup, subTypeWitness);
-        }
-        else
-        {
-            // The general case is to initiate a subtype query.
-            subTypeWitness = isSubtype(
-                sub,
-                sup,
-                system->additionalSubtypeWitnesses ? IsSubTypeOptions::NoCaching
-                                                   : IsSubTypeOptions::None);
-        }
+            Val* constrainedArg = nullptr;
+            if (auto typePackDecl = as<GenericTypePackParamDecl>(constrainedPackDecl))
+            {
+                if (typePackDecl->parameterIndex < args.getCount())
+                    constrainedArg = args[typePackDecl->parameterIndex];
+            }
+            else if (auto valuePackDecl = as<GenericValuePackParamDecl>(constrainedPackDecl))
+            {
+                if (valuePackDecl->parameterIndex < args.getCount())
+                    constrainedArg = args[valuePackDecl->parameterIndex];
+            }
 
-        if (constraintDecl->isEqualityConstraint)
-        {
-            // If constraint is an equality constraint, we need to make sure
-            // the witness is equality witness.
-            if (!isTypeEqualityWitness(subTypeWitness))
-                subTypeWitness = nullptr;
-        }
+            if (!constrainedArg || !isKnownNonEmptyPack(constrainedArg))
+                return DeclRef<Decl>();
 
-        bool witnessIsOptional = isWitnessUncheckedOptional(subTypeWitness);
-        bool constraintIsOptional = constraintDecl->hasModifier<OptionalConstraintModifier>();
-
-        if (subTypeWitness && (!witnessIsOptional || constraintIsOptional))
-        {
-            // We found a witness, so it will become an (implicit) argument.
-            args.add(subTypeWitness);
-            outBaseCost += subTypeWitness->getOverloadResolutionCost();
+            args.add(m_astBuilder->getNonEmptyPackWitness());
         }
-        else if (!subTypeWitness && constraintIsOptional)
-        {
-            // Optional witness failed to resolve; not an error.
-            auto noneWitness = m_astBuilder->getOrCreate<NoneWitness>();
-            args.add(noneWitness);
-            outBaseCost += kConversionCost_FailedOptionalConstraint;
-        }
-        else
-        {
-            // No witness was found, so the inference will now fail.
-            //
-            // TODO: Ideally we should print an error message in
-            // this case, to let the user know why things failed.
-            return DeclRef<Decl>();
-        }
-
-        // TODO: We may need to mark some constrains in our constraint
-        // system as being solved now, as a result of the witness we found.
     }
 
     // Make sure we haven't constructed any spurious constraints
@@ -885,22 +917,6 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
         {
             return DeclRef<Decl>();
         }
-    }
-
-    // Verify that all type coercion constraints can be satisfied.
-    for (auto constraintDecl :
-         genericDeclRef.getDecl()->getMembersOfType<TypeCoercionConstraintDecl>())
-    {
-        if (!addTypeCoercionWitnessToArgs(
-                getASTBuilder(),
-                this,
-                constraintDecl,
-                genericDeclRef,
-                nullptr,
-                &constrainedGenericParams,
-                args,
-                false))
-            return DeclRef<Decl>();
     }
 
     // Add a flat cost to all unconstrained generic params.

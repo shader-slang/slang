@@ -610,6 +610,21 @@ void ASTPrinter::addExpr(Expr* expr)
         }
         sb << ")";
     }
+    else if (const auto packQueryExpr = as<PackQueryExpr>(expr))
+    {
+        if (as<FirstExpr>(packQueryExpr))
+            sb << "__first(";
+        else if (as<LastExpr>(packQueryExpr))
+            sb << "__last(";
+        else if (as<TrimHeadExpr>(packQueryExpr))
+            sb << "__trimHead(";
+        else
+            sb << "__trimTail(";
+
+        if (packQueryExpr->value)
+            addExpr(packQueryExpr->value);
+        sb << ")";
+    }
     else if (const auto floatBitCastExpr = as<FloatBitCastExpr>(expr))
     {
         sb << "__floatAsInt(";
