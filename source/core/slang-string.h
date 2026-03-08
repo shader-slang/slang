@@ -467,7 +467,14 @@ class SLANG_RT_API String
     friend class StringBuilder;
 
 private:
-    char* getData() const { return m_buffer ? m_buffer->getData() : (char*)""; }
+    // Using `static char empty[]` instead of `(char*)""` to avoid ASan reporting
+    // a stack-use-after-scope error. This is an ASan runtime error (not a compiler
+    // warning), so it cannot be suppressed with pragmas.
+    char* getData() const
+    {
+        static char empty[] = "";
+        return m_buffer ? m_buffer->getData() : empty;
+    }
 
 
     void ensureUniqueStorageWithCapacity(Index capacity);
@@ -658,8 +665,19 @@ public:
 #endif
         }
     }
+#if SLANG_GCC && __GNUC__ == 11
+// GCC 11 emits many incorrect warnings about the `strcmp` calls below, e.g.:
+// ```
+// warning: `int strcmp(const char*, const char*)` of a string of length 2 and an array of size 1
+// evaluates to nonzero [-Wstring-compare]
+// ```
+// This is a false positive: GCC sees that getData() can return a static char[1]
+// and concludes that strcmp against longer strings is always nonzero, without
+// considering the dynamic m_buffer path.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstring-compare"
+#endif
     bool operator==(const char* strbuffer) const { return (strcmp(begin(), strbuffer) == 0); }
-
     bool operator==(const String& str) const { return (strcmp(begin(), str.begin()) == 0); }
     bool operator!=(const char* strbuffer) const { return (strcmp(begin(), strbuffer) != 0); }
     bool operator!=(const String& str) const { return (strcmp(begin(), str.begin()) != 0); }
@@ -667,6 +685,9 @@ public:
     bool operator<(const String& str) const { return (strcmp(begin(), str.begin()) < 0); }
     bool operator>=(const String& str) const { return (strcmp(begin(), str.begin()) >= 0); }
     bool operator<=(const String& str) const { return (strcmp(begin(), str.begin()) <= 0); }
+#if SLANG_GCC && __GNUC__ == 11
+#pragma GCC diagnostic pop
+#endif
 
     SLANG_FORCE_INLINE bool operator==(const UnownedStringSlice& slice) const
     {
