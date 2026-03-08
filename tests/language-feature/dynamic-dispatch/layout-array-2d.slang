@@ -9,7 +9,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-metal -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-wgsl -compute -shaderobj -output-using-type
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 interface IGrid
@@ -72,21 +72,29 @@ void computeMain(int id : SV_DispatchThreadID)
 {
     // Grid2x3: row 0 = {1,2,3}, row 1 = {4,5,6}
     var g1 = makeGrid(id);
-    outputBuffer[0] = g1.get(0, 2);
+    outputBuffer[0] = g1.get(0, 0);
+    // CHECK: 1.0
+    outputBuffer[1] = g1.get(0, 1);
+    // CHECK: 2.0
+    outputBuffer[2] = g1.get(0, 2);
     // CHECK: 3.0
-    outputBuffer[1] = g1.rowSum(0);
-    // CHECK: 6.0
-    outputBuffer[2] = g1.rowSum(1);
+    outputBuffer[3] = g1.get(1, 0);
+    // CHECK: 4.0
+    outputBuffer[4] = g1.rowSum(1);
     // CHECK: 15.0
 
     // Grid3x2: row 0 = {10,20}, row 1 = {30,40}, row 2 = {50,60}
     var g2 = makeGrid(id + 1);
-    outputBuffer[3] = g2.get(2, 1);
+    outputBuffer[5] = g2.get(0, 0);
+    // CHECK: 10.0
+    outputBuffer[6] = g2.get(1, 1);
+    // CHECK: 40.0
+    outputBuffer[7] = g2.get(2, 0);
+    // CHECK: 50.0
+    outputBuffer[8] = g2.get(2, 1);
     // CHECK: 60.0
-    outputBuffer[4] = g2.rowSum(0);
+    outputBuffer[9] = g2.rowSum(0);
     // CHECK: 30.0
-    outputBuffer[5] = g2.rowSum(1);
-    // CHECK: 70.0
-    outputBuffer[6] = g2.rowSum(2);
+    outputBuffer[10] = g2.rowSum(2);
     // CHECK: 110.0
 }

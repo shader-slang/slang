@@ -86,7 +86,7 @@ void computeMain(int id : SV_DispatchThreadID)
     outputBuffer[5] = b.element(1);
     // CHECK: 10.0
 
-    // Verify array field independence after assignment
+    // Verify the boxed value survives interface assignment/copy
     var c = makeData(id);
     var d = c;
     outputBuffer[6] = d.sum();
