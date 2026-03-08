@@ -123,13 +123,29 @@ bool isMemoryLocationUnmodifiedBetweenLoadAndUser(
         IRBlock* block = blockWorkList.getLast();
         blockWorkList.removeLast();
 
+        // If the userBlock is re-encountered, that means that it's its own
+        // predecessor and there's a loop. In that case, we'll need to consider
+        // the whole userBlock instead of just the instructions up to userInst.
         if (block == userBlock && searchBlocks.getCount() > 0)
             userIsOwnPredecessor = true;
 
+        // There's a bit of nuance here. Because 'userInst' must be a direct user
+        // of 'loadInst', 'loadInst' must dominate 'userInst'. It therefore
+        // follows that all blocks that can run between 'loadInst' and
+        // 'userInst' must also be dominated by 'loadInst'.
         if (!dom->dominates(rootBlock, block) || searchBlocks.contains(block))
             continue;
 
         searchBlocks.add(block);
+
+        // We do not care about the predecessors of the root block; they cannot
+        // possibly modify the value of the load, because they occur before the
+        // load. These can still be dominated by the rootBlock if we're in a
+        // loop (potentially referencing previous iteration's load), which is
+        // why we need to explicitly skip them here.
+        if (block == rootBlock)
+            continue;
+
         for (IRBlock* predecessor : block->getPredecessors())
             blockWorkList.add(predecessor);
     }
