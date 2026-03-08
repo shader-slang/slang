@@ -2301,10 +2301,7 @@ public:
 
     Stmt* maybeParseStmt(Stmt* stmt, const SemanticsContext& context);
 
-    void getGenericParams(
-        GenericDecl* decl,
-        List<Decl*>& outParams,
-        List<GenericTypeConstraintDecl*>& outConstraints);
+    void getGenericParams(GenericDecl* decl, List<Decl*>& outParams, List<Decl*>& outConstraints);
 
     /// Determine if `left` and `right` have matching generic signatures.
     /// If they do, then outputs a specialized declRef to `ioSubstRightToLeft` that

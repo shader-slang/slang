@@ -423,10 +423,11 @@ bool addTypeCoercionWitnessToArgs(
         }
     }
 
-    // Unhandled case in `_coerce`
+    // If `_coerce` accepted the conversion but didn't provide an explicit
+    // witness object, treat it as a builtin conversion witness so later
+    // lowering still has a concrete generic argument to pass through.
     if (!typeCoercionWitness)
-        typeCoercionWitness =
-            astBuilder->getDeclRefTypeCoercionWitness(fromType, toType, DeclRef<Decl>());
+        typeCoercionWitness = astBuilder->getBuiltinTypeCoercionWitness(fromType, toType);
 
     args.add(typeCoercionWitness);
     return true;

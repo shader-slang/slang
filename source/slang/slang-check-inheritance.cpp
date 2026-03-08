@@ -1124,7 +1124,7 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                 {
                     auto projectedFacet = new (arena) Facet::Impl(
                         astBuilder,
-                        Facet::Kind::Type,
+                        facet->kind,
                         Facet::Directness::Direct,
                         facet->origin.declRef,
                         facet->origin.type,

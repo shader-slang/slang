@@ -490,6 +490,7 @@ struct PeepholeContext : InstPassBase
                     for (UInt i = start; i < end; ++i)
                         slicedOperands.add(packInst->getOperand(i));
                     IRBuilder builder(module);
+                    IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
                     builder.setInsertBefore(inst);
                     if (asTuple)
                         return builder.emitMakeTuple(

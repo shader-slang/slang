@@ -10945,7 +10945,8 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             {
                 emitGenericConstraintDecl(subContext, genericTypeConstraintDecl);
             }
-            else if (auto typeCoercionConstraintDecl = as<TypeCoercionConstraintDecl>(constraintDecl))
+            else if (
+                auto typeCoercionConstraintDecl = as<TypeCoercionConstraintDecl>(constraintDecl))
             {
                 emitGenericConstraintDecl(subContext, typeCoercionConstraintDecl);
             }
