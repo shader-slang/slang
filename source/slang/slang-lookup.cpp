@@ -626,8 +626,7 @@ static void _lookUpMembersInSuperTypeImpl(
             ioResult,
             inBreadcrumbs);
     }
-    else if (
-        as<FirstPackElementType>(superType) || as<LastPackElementType>(superType))
+    else if (as<FirstPackElementType>(superType) || as<LastPackElementType>(superType))
     {
         auto canQueryType = superType->getCanonicalType();
         InheritanceInfo inheritanceInfo =

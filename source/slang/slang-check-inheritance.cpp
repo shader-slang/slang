@@ -1104,12 +1104,11 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
         // during visitGenericTypeConstraintDecl. If we get here, something is wrong.
         SLANG_UNEXPECTED("AndType should have been flattened before reaching getInheritanceInfo");
     }
-    else if (
-        as<EachType>(type) || as<FirstPackElementType>(type) || as<LastPackElementType>(type))
+    else if (as<EachType>(type) || as<FirstPackElementType>(type) || as<LastPackElementType>(type))
     {
         SemanticsVisitor visitor(this);
-        auto projectDirectBaseFacets = [&](InheritanceInfo elementInheritanceInfo,
-                                           auto makeProjectedWitness)
+        auto projectDirectBaseFacets =
+            [&](InheritanceInfo elementInheritanceInfo, auto makeProjectedWitness)
         {
             auto directFacet = new (arena) Facet::Impl(
                 astBuilder,
@@ -1145,8 +1144,7 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                 getInheritanceInfo(eachType->getElementType(), circularityInfo);
             return projectDirectBaseFacets(
                 elementInheritanceInfo,
-                [&](SubtypeWitness* patternWitness)
-                {
+                [&](SubtypeWitness* patternWitness) {
                     return astBuilder->getEachSubtypeWitness(
                         type,
                         patternWitness->getSup(),
@@ -1155,11 +1153,11 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
         }
         else if (auto firstType = as<FirstPackElementType>(type))
         {
-            auto packInheritanceInfo = getInheritanceInfo(firstType->getBasePack(), circularityInfo);
+            auto packInheritanceInfo =
+                getInheritanceInfo(firstType->getBasePack(), circularityInfo);
             return projectDirectBaseFacets(
                 packInheritanceInfo,
-                [&](SubtypeWitness* patternWitness)
-                {
+                [&](SubtypeWitness* patternWitness) {
                     return astBuilder->getFirstSubtypeWitness(
                         type,
                         patternWitness->getSup(),
@@ -1171,8 +1169,7 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
             auto packInheritanceInfo = getInheritanceInfo(lastType->getBasePack(), circularityInfo);
             return projectDirectBaseFacets(
                 packInheritanceInfo,
-                [&](SubtypeWitness* patternWitness)
-                {
+                [&](SubtypeWitness* patternWitness) {
                     return astBuilder->getLastSubtypeWitness(
                         type,
                         patternWitness->getSup(),

@@ -2105,8 +2105,11 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         auto supType = lowerType(context, witness->getSup());
         auto witnessTableType = irBuilder->getWitnessTableType(supType);
         auto basePack = getSimpleVal(context, patternWitness);
-        return LoweredValInfo::simple(
-            irBuilder->emitIntrinsicInst(witnessTableType, kIROp_ExtractFirstFromPack, 1, &basePack));
+        return LoweredValInfo::simple(irBuilder->emitIntrinsicInst(
+            witnessTableType,
+            kIROp_ExtractFirstFromPack,
+            1,
+            &basePack));
     }
 
     LoweredValInfo visitLastSubtypeWitness(LastSubtypeWitness* witness)
@@ -2116,8 +2119,11 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         auto supType = lowerType(context, witness->getSup());
         auto witnessTableType = irBuilder->getWitnessTableType(supType);
         auto basePack = getSimpleVal(context, patternWitness);
-        return LoweredValInfo::simple(
-            irBuilder->emitIntrinsicInst(witnessTableType, kIROp_ExtractLastFromPack, 1, &basePack));
+        return LoweredValInfo::simple(irBuilder->emitIntrinsicInst(
+            witnessTableType,
+            kIROp_ExtractLastFromPack,
+            1,
+            &basePack));
     }
 
     LoweredValInfo visitDeclaredSubtypeWitness(DeclaredSubtypeWitness* val)
@@ -4513,7 +4519,8 @@ struct ExprLoweringContext
                 {
                     _lowerSubstitutionArg(subContext, genSubst, constraintDecl, argCounter++);
                 }
-                else if (auto typeCoercionConstraintDecl = as<TypeCoercionConstraintDecl>(memberDecl))
+                else if (
+                    auto typeCoercionConstraintDecl = as<TypeCoercionConstraintDecl>(memberDecl))
                 {
                     _lowerSubstitutionArg(
                         subContext,
@@ -4523,7 +4530,11 @@ struct ExprLoweringContext
                 }
                 else if (auto nonEmptyConstraintDecl = as<NonEmptyPackConstraintDecl>(memberDecl))
                 {
-                    _lowerSubstitutionArg(subContext, genSubst, nonEmptyConstraintDecl, argCounter++);
+                    _lowerSubstitutionArg(
+                        subContext,
+                        genSubst,
+                        nonEmptyConstraintDecl,
+                        argCounter++);
                 }
             }
         }

@@ -4408,7 +4408,8 @@ bool SemanticsVisitor::hasNonEmptyPackConstraint(Decl* decl)
     if (!genericDecl)
         return false;
 
-    for (auto constraintDecl : genericDecl->getDirectMemberDeclsOfType<NonEmptyPackConstraintDecl>())
+    for (auto constraintDecl :
+         genericDecl->getDirectMemberDeclsOfType<NonEmptyPackConstraintDecl>())
     {
         if (auto packDeclRefExpr = as<DeclRefExpr>(constraintDecl->packExpr))
         {

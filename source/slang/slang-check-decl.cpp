@@ -3519,16 +3519,16 @@ void SemanticsDeclHeaderVisitor::visitNonEmptyPackConstraintDecl(NonEmptyPackCon
         {
             if (typePackDeclRef.getDecl()->parentDecl == decl->parentDecl)
                 return;
-            getSink()->diagnose(
-                Diagnostics::NonEmptyPackConstraintTargetMustBeFromCurrentGeneric{.expr = packExpr});
+            getSink()->diagnose(Diagnostics::NonEmptyPackConstraintTargetMustBeFromCurrentGeneric{
+                .expr = packExpr});
             return;
         }
         if (auto valuePackDeclRef = declRef.as<GenericValuePackParamDecl>())
         {
             if (valuePackDeclRef.getDecl()->parentDecl == decl->parentDecl)
                 return;
-            getSink()->diagnose(
-                Diagnostics::NonEmptyPackConstraintTargetMustBeFromCurrentGeneric{.expr = packExpr});
+            getSink()->diagnose(Diagnostics::NonEmptyPackConstraintTargetMustBeFromCurrentGeneric{
+                .expr = packExpr});
             return;
         }
     }

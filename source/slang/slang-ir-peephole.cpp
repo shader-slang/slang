@@ -458,8 +458,7 @@ struct PeepholeContext : InstPassBase
                 bool isWitnessLikePack = base->getOp() == kIROp_MakeWitnessPack;
 
                 if ((isValueLikePack || isTypeLikePack || isWitnessLikePack) &&
-                    !hasNestedFlattenablePackOperand(base) &&
-                    base->getOperandCount() > 0)
+                    !hasNestedFlattenablePackOperand(base) && base->getOperandCount() > 0)
                 {
                     auto index = useLast ? base->getOperandCount() - 1 : 0;
                     replacement = base->getOperand(index);

@@ -505,8 +505,8 @@ Val* _substituteExtractPackSubtypeWitness(
     bool useLast)
 {
     int diff = 0;
-    auto newPatternWitness =
-        as<SubtypeWitness>(witness->getPatternTypeWitness()->substituteImpl(astBuilder, subst, &diff));
+    auto newPatternWitness = as<SubtypeWitness>(
+        witness->getPatternTypeWitness()->substituteImpl(astBuilder, subst, &diff));
     if (auto witnessPack = as<TypePackSubtypeWitness>(newPatternWitness))
     {
         if (witnessPack->getCount() > 0)
@@ -521,11 +521,9 @@ Val* _substituteExtractPackSubtypeWitness(
     if (!diff)
         return witness;
     (*ioDiff)++;
-    return useLast ? getCurrentASTBuilder()->getLastSubtypeWitness(newSub, newSup, newPatternWitness)
-                   : getCurrentASTBuilder()->getFirstSubtypeWitness(
-                         newSub,
-                         newSup,
-                         newPatternWitness);
+    return useLast
+               ? getCurrentASTBuilder()->getLastSubtypeWitness(newSub, newSup, newPatternWitness)
+               : getCurrentASTBuilder()->getFirstSubtypeWitness(newSub, newSup, newPatternWitness);
 }
 
 template<typename TWitness>
@@ -551,11 +549,9 @@ Val* _resolveExtractPackSubtypeWitness(TWitness* witness, bool useLast)
         diff++;
     if (!diff)
         return witness;
-    return useLast ? getCurrentASTBuilder()->getLastSubtypeWitness(newSub, newSup, newPatternWitness)
-                   : getCurrentASTBuilder()->getFirstSubtypeWitness(
-                         newSub,
-                         newSup,
-                         newPatternWitness);
+    return useLast
+               ? getCurrentASTBuilder()->getLastSubtypeWitness(newSub, newSup, newPatternWitness)
+               : getCurrentASTBuilder()->getFirstSubtypeWitness(newSub, newSup, newPatternWitness);
 }
 } // namespace
 
