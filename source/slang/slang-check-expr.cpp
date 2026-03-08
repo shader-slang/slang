@@ -4691,8 +4691,10 @@ Expr* SemanticsExprVisitor::visitPackQueryExpr(PackQueryExpr* packQueryExpr)
         // e.g. `__first(expand Wrapper<each T>)`. Value packs are handled above, and tuple-valued
         // queries are handled separately, so at this point we expect an abstract type-pack result.
         SLANG_ASSERT(isTypePack(operandType));
-        if (as<FirstExpr>(packQueryExpr) || as<LastExpr>(packQueryExpr))
-            packQueryExpr->type = QualType(m_astBuilder->getEachType(operandType));
+        if (as<FirstExpr>(packQueryExpr))
+            packQueryExpr->type = QualType(m_astBuilder->getFirstElement(operandType));
+        else if (as<LastExpr>(packQueryExpr))
+            packQueryExpr->type = QualType(m_astBuilder->getLastElement(operandType));
         else if (as<TrimHeadExpr>(packQueryExpr))
             packQueryExpr->type = QualType(m_astBuilder->getTrimHeadPack(operandType));
         else
