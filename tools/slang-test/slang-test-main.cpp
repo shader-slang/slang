@@ -3122,17 +3122,15 @@ static TestResult runCPPCompilerSharedLibrary(TestContext* context, TestInput& i
     options.modulePath = SliceUtil::asTerminatedCharSlice(modulePath);
 
     ComPtr<IArtifact> artifact;
-    if (SLANG_FAILED(compiler->compile(options, artifact.writeRef())))
-    {
-        return TestResult::Fail;
-    }
+    const SlangResult compileRes = compiler->compile(options, artifact.writeRef());
 
-    auto diagnostics = findAssociatedRepresentation<IArtifactDiagnostics>(artifact);
+    auto diagnostics =
+        artifact ? findAssociatedRepresentation<IArtifactDiagnostics>(artifact) : nullptr;
 
-    if (diagnostics && SLANG_FAILED(diagnostics->getResult()))
+    if (SLANG_FAILED(compileRes) || (diagnostics && SLANG_FAILED(diagnostics->getResult())))
     {
         // Compilation failed
-        String actualOutput = _calcSummary(diagnostics);
+        String actualOutput = diagnostics ? _calcSummary(diagnostics) : String("Compile: Error\n");
 
         // Write the output
         Slang::File::writeAllText(actualOutputPath, actualOutput);
