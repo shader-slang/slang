@@ -1,9 +1,11 @@
 // Conditional<T, bool> as a field in a generic interface implementation,
-// with three specializations of different payload sizes dispatched
-// dynamically. Conditional lowers to vector<T, 0 or 1>, so each
-// specialization produces a different-sized AnyValue layout:
-//   Vertex<true, true>  -> position + normal + color  (largest)
-//   Vertex<true, false> -> position + normal          (medium)
+// with four specializations of different payload sizes dispatched
+// dynamically. Conditional<T, cond> lowers to a zero-size or T-sized
+// field depending on the bool, so each specialization produces a
+// different-sized AnyValue layout:
+//   Vertex<true, true>   -> position + normal + color  (largest)
+//   Vertex<true, false>  -> position + normal          (medium)
+//   Vertex<false, true>  -> position + color           (medium)
 //   Vertex<false, false> -> position only              (smallest)
 
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -shaderobj -output-using-type
@@ -14,7 +16,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-metal -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-wgsl -compute -shaderobj -output-using-type
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 interface IVertex
@@ -66,6 +68,13 @@ IVertex makeVertex(int id)
         v.normal = float3(0.0, 0.0, 1.0);
         return v;
     }
+    case 2:
+    {
+        Vertex<false, true> v;
+        v.position = float3(10.0, 11.0, 12.0);
+        v.color = float3(0.1, 0.3, 0.5);
+        return v;
+    }
     default:
     {
         Vertex<false, false> v;
@@ -100,14 +109,25 @@ void computeMain(int id : SV_DispatchThreadID)
     outputBuffer[7] = b.getPosition().z;
     // CHECK: 6.0
 
-    // Vertex<false, false>: no normal, no color (smallest payload)
+    // Vertex<false, true>: no normal, has color (0.1, 0.3, 0.5)
     var c = makeVertex(id + 2);
     outputBuffer[8] = c.getPosition().x;
-    // CHECK: 7.0
+    // CHECK: 10.0
     outputBuffer[9] = c.getNormalLength();
     // CHECK: -1.0
     outputBuffer[10] = c.getColorSum();
-    // CHECK: -1.0
+    // CHECK: 0.9
     outputBuffer[11] = c.getPosition().z;
+    // CHECK: 12.0
+
+    // Vertex<false, false>: no normal, no color (smallest payload)
+    var d = makeVertex(id + 3);
+    outputBuffer[12] = d.getPosition().x;
+    // CHECK: 7.0
+    outputBuffer[13] = d.getNormalLength();
+    // CHECK: -1.0
+    outputBuffer[14] = d.getColorSum();
+    // CHECK: -1.0
+    outputBuffer[15] = d.getPosition().z;
     // CHECK: 9.0
 }
