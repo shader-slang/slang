@@ -497,6 +497,79 @@ def process_jobs(jobs_data, config):
             file=sys.stderr,
         )
 
+    # Merge queue statistics per date.
+    # A merge queue "check" is a CI workflow run with event=merge_group.
+    # We count success/failure/cancelled per run (not per job).
+    # Import shared helper for PR number extraction
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from gh_api import parse_merge_queue_pr_number
+
+    mq_runs_by_date = defaultdict(lambda: {"success": 0, "failure": 0, "cancelled": 0, "total": 0})
+    mq_tat_by_date = defaultdict(list)  # turnaround times for merge queue runs
+    mq_recent_failures = []  # most recent merge queue failures (for table)
+    for run_id, run_jobs in runs.items():
+        if not run_jobs:
+            continue
+        if run_jobs[0].get("event") != "merge_group":
+            continue
+        if run_jobs[0].get("workflow_name") != "CI":
+            continue
+
+        # Determine run conclusion from jobs
+        conclusions = [j.get("conclusion") for j in run_jobs]
+        if "failure" in conclusions:
+            conclusion = "failure"
+        elif "cancelled" in conclusions and "success" not in conclusions:
+            conclusion = "cancelled"
+        elif all(c == "success" for c in conclusions if c):
+            conclusion = "success"
+        else:
+            conclusion = "cancelled"
+
+        # Date from earliest created_at
+        earliest = None
+        latest = None
+        for j in run_jobs:
+            c = parse_dt(j.get("created_at"))
+            d = parse_dt(j.get("completed_at"))
+            if c and (earliest is None or c < earliest):
+                earliest = c
+            if d and (latest is None or d > latest):
+                latest = d
+        if not earliest:
+            continue
+
+        date_str = earliest.strftime("%Y-%m-%d")
+        if date_str == today_str:
+            continue
+        mq_runs_by_date[date_str][conclusion] += 1
+        mq_runs_by_date[date_str]["total"] += 1
+
+        if earliest and latest and latest > earliest:
+            tat = (latest - earliest).total_seconds() / 60
+            mq_tat_by_date[date_str].append(tat)
+
+        if conclusion == "failure":
+            branch = run_jobs[0].get("head_branch", "")
+            pr_num = parse_merge_queue_pr_number(branch)
+
+            # Find failing job names
+            failing_jobs = [
+                j.get("name", "") for j in run_jobs
+                if j.get("conclusion") == "failure"
+            ]
+            mq_recent_failures.append({
+                "date": date_str,
+                "created_at": earliest.isoformat(),
+                "run_id": run_id,
+                "branch": branch,
+                "pr_number": pr_num,
+                "url": run_jobs[0].get("html_url", ""),
+                "failing_jobs": failing_jobs[:5],
+            })
+
+    mq_recent_failures.sort(key=lambda x: x["created_at"], reverse=True)
+
     generated_at = datetime.datetime.now(datetime.timezone.utc).strftime(
         "%Y-%m-%d %H:%M UTC"
     )
@@ -511,6 +584,9 @@ def process_jobs(jobs_data, config):
         "ci_sol_by_date": dict(ci_sol_by_date),
         "build_wait_by_date": dict(build_wait_by_date),
         "test_wait_by_date": dict(test_wait_by_date),
+        "mq_runs_by_date": dict(mq_runs_by_date),
+        "mq_tat_by_date": dict(mq_tat_by_date),
+        "mq_recent_failures": mq_recent_failures[:50],
         "dates": sorted(jobs_by_date.keys()),
         "months": sorted(jobs_by_month.keys()),
         "generated_at": generated_at,
@@ -923,6 +999,64 @@ def generate_statistics(data, config, output_dir):
     else:
         pr_merged_chart_html = ""
 
+    # Merge queue stats per day
+    mq_runs_by_date = data.get("mq_runs_by_date", {})
+    mq_tat_by_date = data.get("mq_tat_by_date", {})
+    mq_recent_failures = data.get("mq_recent_failures", [])
+    mq_success_per_day = []
+    mq_failure_per_day = []
+    mq_cancelled_per_day = []
+    mq_fail_rate_per_day = []
+    mq_avg_tat_per_day = []
+    has_mq_data = bool(mq_runs_by_date)
+    for date in dates:
+        mq = mq_runs_by_date.get(date, {})
+        s = mq.get("success", 0)
+        f = mq.get("failure", 0)
+        c = mq.get("cancelled", 0)
+        mq_success_per_day.append(s)
+        mq_failure_per_day.append(f)
+        mq_cancelled_per_day.append(c)
+        total_sf = s + f
+        mq_fail_rate_per_day.append(round(f / total_sf * 100, 1) if total_sf > 0 else 0)
+        tats = mq_tat_by_date.get(date, [])
+        mq_avg_tat_per_day.append(round(sum(tats) / len(tats), 1) if tats else 0)
+
+    # Build merge queue failure table HTML
+    mq_failures_html = ""
+    if mq_recent_failures:
+        mq_failures_html = '\n<h3>Recent Merge Queue Failures</h3>\n'
+        mq_failures_html += '<table><tr><th>Date</th><th>PR</th><th>Run</th><th>Failing Jobs</th></tr>\n'
+        for mf in mq_recent_failures[:20]:
+            pr_num = mf.get("pr_number", "")
+            url = mf.get("url", "")
+            run_url = url.split("/jobs/")[0] if "/jobs/" in url else url
+            if pr_num:
+                pr_link = f'<a href="https://github.com/shader-slang/slang/pull/{html_mod.escape(pr_num)}" target="_blank">#{html_mod.escape(pr_num)}</a>'
+            else:
+                pr_link = "?"
+            run_link = f'<a href="{html_mod.escape(run_url)}" target="_blank">logs</a>' if run_url else ""
+            failing = ", ".join(mf.get("failing_jobs", [])[:3])
+            if len(mf.get("failing_jobs", [])) > 3:
+                failing += f" (+{len(mf['failing_jobs']) - 3} more)"
+            mq_failures_html += f"<tr><td>{html_mod.escape(mf.get('date', ''))}</td><td>{pr_link}</td><td>{run_link}</td><td>{html_mod.escape(failing)}</td></tr>\n"
+        mq_failures_html += "</table>\n"
+
+    mq_chart_html = ""
+    if has_mq_data:
+        mq_chart_html = f"""
+{chart_section("mqChecks", "Merge Queue Checks per Day",
+    "Stacked by conclusion: success, failure, cancelled. Shows merge queue CI check runs triggered by GitHub merge queue.")}
+
+{chart_section("mqFailRate", "Merge Queue Failure Rate (%)",
+    "Percentage of merge queue CI checks that failed (excludes cancelled).")}
+
+{chart_section("mqTurnaround", "Merge Queue Turnaround Time (minutes)",
+    "Average time from merge queue CI check start to completion.")}
+
+{mq_failures_html}
+"""
+
     body = f"""
 <h1>Statistics &amp; Trends</h1>
 <p style="color:#6c757d">Last updated: {data['generated_at']}. CI workflow only. Excludes skipped jobs. Data range: {dates[0] if dates else 'N/A'} to {dates[-1] if dates else 'N/A'}.</p>
@@ -977,6 +1111,7 @@ def generate_statistics(data, config, output_dir):
 {chart_section("queueWait", "Queue Wait Time Percentiles (minutes)",
     "Time each job spent waiting in the CI queue for a runner before execution started. Shows average, median (p50), p90, and p95 per day.")}
 
+{mq_chart_html}
 
 <script src="{CHARTJS_CDN}"></script>
 <script>
@@ -997,6 +1132,12 @@ const allSoL = {json.dumps(ci_sol_avg)};
 const allBuildWait = {json.dumps(avg_build_wait)};
 const allTestWait = {json.dumps(avg_test_wait)};
 const allPRsMerged = {json.dumps(prs_merged_per_day)};
+const allMqSuccess = {json.dumps(mq_success_per_day)};
+const allMqFailure = {json.dumps(mq_failure_per_day)};
+const allMqCancelled = {json.dumps(mq_cancelled_per_day)};
+const allMqFailRate = {json.dumps(mq_fail_rate_per_day)};
+const allMqTat = {json.dumps(mq_avg_tat_per_day)};
+const hasMqData = {json.dumps(has_mq_data)};
 
 let charts = [];
 
@@ -1176,6 +1317,40 @@ new Chart(document.getElementById('queueWait_canvas').getContext('2d'), {{
   }},
   options: {{responsive:true, scales:{{y:{{title:{{display:true,text:'Minutes'}}}}}}}}
 }});
+
+// Merge queue charts (only if data exists)
+if (hasMqData) {{
+  // Merge queue checks per day (stacked bar)
+  makeChart('mqChecks_canvas', 'bar', {{
+    data: {{
+      labels: sliceData(allLabels, 30),
+      datasets: [
+        {{label:'Success', data:sliceData(allMqSuccess,30), _allData:allMqSuccess, backgroundColor:'{CONCLUSION_COLORS["success"]}'}},
+        {{label:'Failure', data:sliceData(allMqFailure,30), _allData:allMqFailure, backgroundColor:'{CONCLUSION_COLORS["failure"]}'}},
+        {{label:'Cancelled', data:sliceData(allMqCancelled,30), _allData:allMqCancelled, backgroundColor:'{CONCLUSION_COLORS["cancelled"]}'}},
+      ]
+    }},
+    options: {{responsive:true, scales:{{x:{{stacked:true}},y:{{stacked:true, title:{{display:true,text:'Merge Queue Checks'}}}}}}}}
+  }});
+
+  // Merge queue failure rate
+  makeChart('mqFailRate_canvas', 'line', {{
+    data: {{
+      labels: sliceData(allLabels, 30),
+      datasets: [{{label:'Failure Rate %', data:sliceData(allMqFailRate,30), _allData:allMqFailRate, borderColor:'#dc3545', fill:true, backgroundColor:'rgba(220,53,69,0.1)', tension:0.1}}]
+    }},
+    options: {{responsive:true, scales:{{y:{{min:0, max:100, title:{{display:true,text:'%'}}}}}}}}
+  }});
+
+  // Merge queue turnaround time
+  makeChart('mqTurnaround_canvas', 'line', {{
+    data: {{
+      labels: sliceData(allLabels, 30),
+      datasets: [{{label:'Avg Turnaround', data:sliceData(allMqTat,30), _allData:allMqTat, borderColor:'#0d6efd', fill:false, tension:0.1}}]
+    }},
+    options: {{responsive:true, scales:{{y:{{title:{{display:true,text:'Minutes'}}}}}}}}
+  }});
+}}
 </script>
 """
     with open(os.path.join(output_dir, "statistics.html"), "w") as f:
