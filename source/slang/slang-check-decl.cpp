@@ -9430,6 +9430,39 @@ bool SemanticsVisitor::doGenericSignaturesMatch(
             if (!leftSup->equals(rightSup))
                 return false;
         }
+        else if (
+            auto leftTypeCoercionConstraint =
+                as<TypeCoercionConstraintDecl>(leftConstraints[cc]))
+        {
+            auto unspecializedRightConstraintDeclRef = createDefaultSubstitutionsIfNeeded(
+                m_astBuilder,
+                this,
+                makeDeclRef(rightConstraints[cc]));
+            auto rightConstraint =
+                substInnerRightToLeft.substitute(m_astBuilder, unspecializedRightConstraintDeclRef)
+                    .as<TypeCoercionConstraintDecl>();
+            if (!rightConstraint)
+                return false;
+
+            auto leftFromType = leftTypeCoercionConstraint->fromType.type;
+            auto rightFromType = substInnerRightToLeft.substitute(
+                m_astBuilder,
+                rightConstraint.getDecl()->fromType.type);
+            if (!leftFromType->equals(rightFromType))
+                return false;
+
+            auto leftToType = leftTypeCoercionConstraint->toType.type;
+            auto rightToType =
+                substInnerRightToLeft.substitute(m_astBuilder, rightConstraint.getDecl()->toType.type);
+            if (!leftToType->equals(rightToType))
+                return false;
+
+            if (leftTypeCoercionConstraint->hasModifier<ImplicitConversionModifier>() !=
+                rightConstraint.getDecl()->hasModifier<ImplicitConversionModifier>())
+            {
+                return false;
+            }
+        }
         else if (auto leftNonEmptyConstraint = as<NonEmptyPackConstraintDecl>(leftConstraints[cc]))
         {
             auto unspecializedRightConstraintDeclRef = createDefaultSubstitutionsIfNeeded(

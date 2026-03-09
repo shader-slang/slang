@@ -663,6 +663,10 @@ Val* DeclaredSubtypeWitness::_substituteImplOverride(
                 }
                 index++;
             }
+            else if (as<TypeCoercionConstraintDecl>(member))
+            {
+                index++;
+            }
             else if (as<NonEmptyPackConstraintDecl>(member))
             {
                 index++;

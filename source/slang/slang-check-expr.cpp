@@ -4640,7 +4640,19 @@ Expr* SemanticsExprVisitor::visitPackQueryExpr(PackQueryExpr* packQueryExpr)
     auto packCardinality = cardinalitySource ? getPackCardinality(cardinalitySource)
                                              : VariadicPackCardinality::Unknown;
 
-    if ((as<FirstExpr>(packQueryExpr) || as<LastExpr>(packQueryExpr)))
+    auto isFirstOrLastQuery = [&]() { return as<FirstExpr>(packQueryExpr) || as<LastExpr>(packQueryExpr); };
+    auto applyPackQueryToType = [&](Type* type) -> Type*
+    {
+        if (as<FirstExpr>(packQueryExpr))
+            return m_astBuilder->getFirstElement(type);
+        if (as<LastExpr>(packQueryExpr))
+            return m_astBuilder->getLastElement(type);
+        if (as<TrimHeadExpr>(packQueryExpr))
+            return m_astBuilder->getTrimHeadPack(type);
+        return m_astBuilder->getTrimTailPack(type);
+    };
+
+    if (isFirstOrLastQuery())
     {
         if (packCardinality == VariadicPackCardinality::Empty)
         {
@@ -4663,22 +4675,14 @@ Expr* SemanticsExprVisitor::visitPackQueryExpr(PackQueryExpr* packQueryExpr)
 
     if (isTypeExpr)
     {
-        Type* resultType = nullptr;
-        if (as<FirstExpr>(packQueryExpr))
-            resultType = m_astBuilder->getFirstElement(operandType);
-        else if (as<LastExpr>(packQueryExpr))
-            resultType = m_astBuilder->getLastElement(operandType);
-        else if (as<TrimHeadExpr>(packQueryExpr))
-            resultType = m_astBuilder->getTrimHeadPack(operandType);
-        else
-            resultType = m_astBuilder->getTrimTailPack(operandType);
+        Type* resultType = applyPackQueryToType(operandType);
         packQueryExpr->type = m_astBuilder->getTypeType(resultType);
         return packQueryExpr;
     }
 
     if (auto valuePackType = as<ValuePackType>(operandType))
     {
-        if (as<FirstExpr>(packQueryExpr) || as<LastExpr>(packQueryExpr))
+        if (isFirstOrLastQuery())
             packQueryExpr->type = QualType(valuePackType->getElementType());
         else
             packQueryExpr->type = QualType(valuePackType);
@@ -4691,26 +4695,11 @@ Expr* SemanticsExprVisitor::visitPackQueryExpr(PackQueryExpr* packQueryExpr)
         // a `ValuePackType` or `TupleType`, e.g. `expand Wrapper<each T>`. Value-pack queries are
         // handled above, and tuple-valued queries are handled separately.
         SLANG_ASSERT(isTypePack(operandType));
-        if (as<FirstExpr>(packQueryExpr))
-            packQueryExpr->type = QualType(m_astBuilder->getFirstElement(operandType));
-        else if (as<LastExpr>(packQueryExpr))
-            packQueryExpr->type = QualType(m_astBuilder->getLastElement(operandType));
-        else if (as<TrimHeadExpr>(packQueryExpr))
-            packQueryExpr->type = QualType(m_astBuilder->getTrimHeadPack(operandType));
-        else
-            packQueryExpr->type = QualType(m_astBuilder->getTrimTailPack(operandType));
+        packQueryExpr->type = QualType(applyPackQueryToType(operandType));
         return packQueryExpr;
     }
 
-    Type* resultType = nullptr;
-    if (as<FirstExpr>(packQueryExpr))
-        resultType = m_astBuilder->getFirstElement(operandType);
-    else if (as<LastExpr>(packQueryExpr))
-        resultType = m_astBuilder->getLastElement(operandType);
-    else if (as<TrimHeadExpr>(packQueryExpr))
-        resultType = m_astBuilder->getTrimHeadPack(operandType);
-    else
-        resultType = m_astBuilder->getTrimTailPack(operandType);
+    Type* resultType = applyPackQueryToType(operandType);
     packQueryExpr->type = QualType(resultType);
     return packQueryExpr;
 }

@@ -8,3 +8,7 @@ void typePackOverload<each T>() where nonempty(T) {}
 
 void valuePackOverload<let each D : int>() {}
 void valuePackOverload<let each D : int>() where nonempty(D) {}
+
+// Coercion constraints must also participate in generic signature matching.
+void coercionOverload<T>(T x) where T(int) {}
+void coercionOverload<T>(T x) where T(float) {}
