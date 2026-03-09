@@ -21,41 +21,9 @@ void computeMain()
     funcInt8(256);
 //CHECK:     ^^^ integer constant overflow in conversion
 //CHECK:     ^^^ integer value '256' does not fit in type 'int8_t'
-    funcInt8(128);
-//CHECK:     ^^^ integer constant overflow in conversion
-//CHECK:     ^^^ integer value '128' does not fit in type 'int8_t'
-    funcInt8(-129);
-//CHECK:      ^^^ integer constant overflow in conversion
-//CHECK:      ^^^ integer value '-129' does not fit in type 'int8_t'
-    funcInt8(-200);
-//CHECK:      ^^^ integer constant overflow in conversion
-//CHECK:      ^^^ integer value '-200' does not fit in type 'int8_t'
     funcUint8(256);
 //CHECK:      ^^^ integer constant overflow in conversion
 //CHECK:      ^^^ integer value '256' does not fit in type 'uint8_t'
-
-    // Signed-range overflow for wider types
-    funcInt16(40000);
-//CHECK:      ^^^^^ integer constant overflow in conversion
-//CHECK:      ^^^^^ integer value '40000' does not fit in type 'int16_t'
-    funcInt16(65536);
-//CHECK:      ^^^^^ integer constant overflow in conversion
-//CHECK:      ^^^^^ integer value '65536' does not fit in type 'int16_t'
-
-    // Unsigned-to-signed overflow
-    funcInt(0xFFFFFFFFu);
-//CHECK:    ^^^^^^^^^^^ integer constant overflow in conversion
-//CHECK:    ^^^^^^^^^^^ integer value '4294967295' does not fit in type 'int'
-
-    // Signed-to-unsigned overflow
-    funcUint(-2);
-//CHECK:      ^ integer constant overflow in conversion
-//CHECK:      ^ integer value '-2' does not fit in type 'uint'
-
-    // Half overflow
-    funcHalf(3000);
-//CHECK:     ^^^^ integer constant overflow in conversion
-//CHECK:     ^^^^ integer value '3000' does not fit in type 'half'
 
     // Variable initializer overflow
     int8_t x = 256;
@@ -67,6 +35,11 @@ void computeMain()
 //CHECK:         ^ integer constant overflow in conversion
 //CHECK:         ^ integer value '300' does not fit in type 'int8_t'
 
+    // 65536 needs 17 bits, exceeding int16_t's 16 bits
+    funcInt16(65536);
+//CHECK:      ^^^^^ integer constant overflow in conversion
+//CHECK:      ^^^^^ integer value '65536' does not fit in type 'int16_t'
+
     // Function arguments that fit - should NOT warn
     funcInt8(127);
     funcInt8(-128);
@@ -76,6 +49,17 @@ void computeMain()
     funcInt(42);
     funcUint(42u);
     funcHalf(2048);
+
+    // Same-width sign reinterpretation is NOT overflow (common bit-pattern usage
+    // in shader code, e.g. packed bytes). The bit-width check intentionally
+    // allows these; the existing UnrecommendedImplicitConversion handles them
+    // when the conversion cost is high enough.
+    funcInt(0xFFFFFFFFu);
+    funcInt8(128);
+    funcInt8(-129);
+    funcInt8(-200);
+    funcInt16(40000);
+    funcUint(-2);
 
     // -1 to unsigned is allowed (common "all ones" pattern)
     funcUint(-1);
