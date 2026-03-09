@@ -1,4 +1,4 @@
-// bracketed-attribute-list-placemenet.slang
+// bracketed-attribute-list-placement.slang
 
 // Tests diagnostics for deprecated/removed bracket attribute list placement
 
@@ -9,7 +9,7 @@
 
 struct [__NonCopyableType] TestType
 //ERR: ^ invalid bracketed attribute placement. Bracketed attributes must be placed before 'struct'.
-//ERR: ^ invalid placement bracketed attributes list.
+//ERR: ^ invalid placement of bracketed attributes list.
 {
     int iParam;
 };

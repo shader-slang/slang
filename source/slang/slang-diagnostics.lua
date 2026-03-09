@@ -2433,7 +2433,7 @@ err(
     "invalid-bracket-attributes-placement",
     31205,
     "invalid bracketed attribute placement. Bracketed attributes must be placed before 'struct'.",
-    span { loc = "location", message = "invalid placement bracketed attributes list." }
+    span { loc = "location", message = "invalid placement of bracketed attributes list." }
 )
 
 err(
