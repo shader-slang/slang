@@ -2068,6 +2068,9 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
         auto elementTypeLayout =
             processEntryPointVaryingParameter(context, elementType, elementState, nullptr);
 
+        if (!elementTypeLayout)
+            return nullptr;
+
         RefPtr<StreamOutputTypeLayout> typeLayout = new StreamOutputTypeLayout();
         typeLayout->type = type;
         typeLayout->rules = elementTypeLayout->rules;
@@ -2302,6 +2305,9 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                 patchType->getElementType(),
                 state,
                 varLayout);
+
+            if (!elementTypeLayout)
+                return nullptr;
 
             RefPtr<ArrayTypeLayout> arrayTypeLayout = new ArrayTypeLayout();
             arrayTypeLayout->elementTypeLayout = elementTypeLayout;
