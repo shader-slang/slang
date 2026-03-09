@@ -143,7 +143,7 @@ void WGSLSourceEmitter::emitParameterGroupImpl(
         case LayoutResourceKind::SamplerState:
         case LayoutResourceKind::DescriptorTableSlot:
             {
-                auto kinds = LayoutResourceKindFlag::make(LayoutResourceKind::DescriptorTableSlot);
+                auto kinds = LayoutResourceKindFlag::make(kind);
                 m_writer->emit("@binding(");
                 auto index = getBindingOffsetForKinds(&containerChain, kinds);
                 m_writer->emit(index);
@@ -709,12 +709,11 @@ void WGSLSourceEmitter::emitLayoutQualifiersImpl(IRVarLayout* layout)
     {
         LayoutResourceKind kind = attr->getResourceKind();
 
-        // TODO:
-        // This is not correct. For the moment this is just here as a hack to make
-        // @binding and @group unique, so that we can pass WGSL compile tests.
-        // This will have to be revisited when we actually want to supply resources to
-        // shaders.
-        if (kind == LayoutResourceKind::DescriptorTableSlot)
+        if (kind == LayoutResourceKind::DescriptorTableSlot ||
+            kind == LayoutResourceKind::ShaderResource ||
+            kind == LayoutResourceKind::UnorderedAccess ||
+            kind == LayoutResourceKind::SamplerState ||
+            kind == LayoutResourceKind::ConstantBuffer)
         {
             m_writer->emit("@binding(");
             m_writer->emit(attr->getOffset());
