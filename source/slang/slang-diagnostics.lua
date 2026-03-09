@@ -3167,6 +3167,16 @@ err(
 )
 
 --
+-- 314xx: declaration nesting validation
+--
+err(
+    "decl-not-allowed-in-context",
+    31400,
+    "declaration not allowed in this context",
+    span { loc = "decl:Decl", message = "a ~childKind declaration is not allowed inside a ~parentKind." }
+)
+
+--
 -- 39999: waiting to be placed in the right range
 --
 err(

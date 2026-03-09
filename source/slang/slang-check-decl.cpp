@@ -26,6 +26,375 @@
 namespace Slang
 {
 
+// ============================================================================
+// Declaration nesting validation (disallowed-by-default)
+//
+// A data-driven table determines which declaration categories are legal inside
+// which container categories. Any combination not explicitly allowed is
+// rejected with a diagnostic.
+// ============================================================================
+
+/// Categories for child declarations (what is being declared).
+enum class DeclNestingCategory : uint32_t
+{
+    StructType,        // StructDecl, ClassDecl
+    InterfaceType,     // InterfaceDecl
+    EnumType,          // EnumDecl
+    AssocType,         // AssocTypeDecl
+    Extension,         // ExtensionDecl
+    Function,          // FuncDecl
+    Constructor,       // ConstructorDecl
+    Subscript,         // SubscriptDecl
+    Property,          // PropertyDecl
+    Accessor,          // GetterDecl, SetterDecl, RefAccessorDecl
+    InstanceVar,       // VarDecl/LetDecl without static modifier
+    StaticVar,         // VarDecl/LetDecl with HLSLStaticModifier
+    TypeAlias,         // TypeDefDecl, TypeAliasDecl
+    EnumCase,          // EnumCaseDecl
+    Inheritance,       // InheritanceDecl
+    Import,            // ImportDecl
+    Using,             // UsingDecl
+    Namespace,         // NamespaceDecl
+    Empty,             // EmptyDecl
+    ModuleDeclaration, // ModuleDeclarationDecl
+    Include,           // IncludeDecl, ImplementingDecl
+    Capability,        // RequireCapabilityDecl
+
+    Count,
+    Unknown = Count, // compiler-generated or unclassified (skip validation)
+};
+
+/// Categories for parent containers.
+enum class ContainerNestingCategory : uint32_t
+{
+    Module,        // ModuleDecl, FileDecl, NamespaceDeclBase
+    StructOrClass, // StructDecl, ClassDecl
+    Interface,     // InterfaceDecl
+    Enum,          // EnumDecl
+    Extension,     // ExtensionDecl
+    Subscript,     // SubscriptDecl
+    Property,      // PropertyDecl
+
+    Count,
+    Unknown = Count, // skip validation
+};
+
+/// Classify a declaration into a DeclNestingCategory.
+static DeclNestingCategory classifyDeclForNesting(Decl* decl)
+{
+    // Order matters for inheritance: check more-derived types first.
+    if (as<GetterDecl>(decl) || as<SetterDecl>(decl) || as<RefAccessorDecl>(decl))
+        return DeclNestingCategory::Accessor;
+    if (as<ConstructorDecl>(decl))
+        return DeclNestingCategory::Constructor;
+    if (as<FuncDecl>(decl))
+        return DeclNestingCategory::Function;
+    if (as<SubscriptDecl>(decl))
+        return DeclNestingCategory::Subscript;
+    if (as<PropertyDecl>(decl))
+        return DeclNestingCategory::Property;
+
+    if (as<InterfaceDecl>(decl))
+        return DeclNestingCategory::InterfaceType;
+    if (as<StructDecl>(decl) || as<ClassDecl>(decl))
+        return DeclNestingCategory::StructType;
+    if (as<EnumDecl>(decl))
+        return DeclNestingCategory::EnumType;
+    if (as<AssocTypeDecl>(decl))
+        return DeclNestingCategory::AssocType;
+    if (as<ExtensionDecl>(decl))
+        return DeclNestingCategory::Extension;
+
+    if (auto varDecl = as<VarDeclBase>(decl))
+    {
+        // ParamDecl / ModernParamDecl are structural, not user-chosen nesting.
+        if (as<ParamDecl>(decl) || as<ModernParamDecl>(decl))
+            return DeclNestingCategory::Unknown;
+        // GenericValueParamDecl and friends are inside GenericDecl, skip.
+        if (as<GenericValueParamDecl>(decl) || as<GenericValuePackParamDecl>(decl) ||
+            as<GlobalGenericValueParamDecl>(decl))
+            return DeclNestingCategory::Unknown;
+        // `extern` vars in extensions reference existing fields, not new declarations.
+        if (varDecl->hasModifier<ExternModifier>())
+            return DeclNestingCategory::Unknown;
+
+        if (varDecl->hasModifier<HLSLStaticModifier>())
+            return DeclNestingCategory::StaticVar;
+        return DeclNestingCategory::InstanceVar;
+    }
+
+    if (as<TypeDefDecl>(decl))
+        return DeclNestingCategory::TypeAlias;
+    if (as<EnumCaseDecl>(decl))
+        return DeclNestingCategory::EnumCase;
+    if (as<InheritanceDecl>(decl))
+        return DeclNestingCategory::Inheritance;
+    if (as<ImportDecl>(decl))
+        return DeclNestingCategory::Import;
+    if (as<UsingDecl>(decl))
+        return DeclNestingCategory::Using;
+    if (as<NamespaceDecl>(decl))
+        return DeclNestingCategory::Namespace;
+    if (as<EmptyDecl>(decl))
+        return DeclNestingCategory::Empty;
+    if (as<ModuleDeclarationDecl>(decl))
+        return DeclNestingCategory::ModuleDeclaration;
+    if (as<IncludeDecl>(decl) || as<ImplementingDecl>(decl))
+        return DeclNestingCategory::Include;
+    if (as<RequireCapabilityDecl>(decl))
+        return DeclNestingCategory::Capability;
+
+    // Everything else is compiler-generated or unclassified: skip validation.
+    return DeclNestingCategory::Unknown;
+}
+
+/// Classify a container declaration into a ContainerNestingCategory.
+static ContainerNestingCategory classifyContainerForNesting(ContainerDecl* container)
+{
+    if (as<ModuleDecl>(container) || as<FileDecl>(container) || as<NamespaceDecl>(container))
+        return ContainerNestingCategory::Module;
+    if (as<StructDecl>(container) || as<ClassDecl>(container))
+        return ContainerNestingCategory::StructOrClass;
+    if (as<InterfaceDecl>(container))
+        return ContainerNestingCategory::Interface;
+    if (as<EnumDecl>(container))
+        return ContainerNestingCategory::Enum;
+    if (as<ExtensionDecl>(container))
+        return ContainerNestingCategory::Extension;
+    if (as<SubscriptDecl>(container))
+        return ContainerNestingCategory::Subscript;
+    if (as<PropertyDecl>(container))
+        return ContainerNestingCategory::Property;
+
+    // GenericDecl, ScopeDecl, FunctionDeclBase, etc. — skip.
+    return ContainerNestingCategory::Unknown;
+}
+
+/// Helper to build a bitmask of allowed ContainerNestingCategory values.
+static constexpr uint32_t containerBit(ContainerNestingCategory c)
+{
+    return 1u << static_cast<uint32_t>(c);
+}
+
+/// The allowance table: for each DeclNestingCategory, a bitmask of allowed
+/// ContainerNestingCategory values.
+// clang-format off
+static const uint32_t kAllowedNestingContainers[static_cast<uint32_t>(DeclNestingCategory::Count)] = {
+    // StructType: Module, StructOrClass
+    containerBit(ContainerNestingCategory::Module) |
+    containerBit(ContainerNestingCategory::StructOrClass),
+
+    // InterfaceType: Module
+    containerBit(ContainerNestingCategory::Module),
+
+    // EnumType: Module, StructOrClass, Enum (nested enums)
+    containerBit(ContainerNestingCategory::Module) |
+    containerBit(ContainerNestingCategory::StructOrClass) |
+    containerBit(ContainerNestingCategory::Enum),
+
+    // AssocType: Interface
+    containerBit(ContainerNestingCategory::Interface),
+
+    // Extension: Module
+    containerBit(ContainerNestingCategory::Module),
+
+    // Function: Module, StructOrClass, Interface, Extension, Enum
+    containerBit(ContainerNestingCategory::Module) |
+    containerBit(ContainerNestingCategory::StructOrClass) |
+    containerBit(ContainerNestingCategory::Interface) |
+    containerBit(ContainerNestingCategory::Extension) |
+    containerBit(ContainerNestingCategory::Enum),
+
+    // Constructor: StructOrClass, Interface, Extension, Enum
+    containerBit(ContainerNestingCategory::StructOrClass) |
+    containerBit(ContainerNestingCategory::Interface) |
+    containerBit(ContainerNestingCategory::Extension) |
+    containerBit(ContainerNestingCategory::Enum),
+
+    // Subscript: StructOrClass, Interface, Extension, Enum
+    containerBit(ContainerNestingCategory::StructOrClass) |
+    containerBit(ContainerNestingCategory::Interface) |
+    containerBit(ContainerNestingCategory::Extension) |
+    containerBit(ContainerNestingCategory::Enum),
+
+    // Property: Module (GLSL built-ins), StructOrClass, Interface, Extension, Enum
+    containerBit(ContainerNestingCategory::Module) |
+    containerBit(ContainerNestingCategory::StructOrClass) |
+    containerBit(ContainerNestingCategory::Interface) |
+    containerBit(ContainerNestingCategory::Extension) |
+    containerBit(ContainerNestingCategory::Enum),
+
+    // Accessor: Subscript, Property
+    containerBit(ContainerNestingCategory::Subscript) |
+    containerBit(ContainerNestingCategory::Property),
+
+    // InstanceVar: Module (shader parameters), StructOrClass
+    containerBit(ContainerNestingCategory::Module) |
+    containerBit(ContainerNestingCategory::StructOrClass),
+
+    // StaticVar: Module, StructOrClass, Interface, Extension, Enum
+    containerBit(ContainerNestingCategory::Module) |
+    containerBit(ContainerNestingCategory::StructOrClass) |
+    containerBit(ContainerNestingCategory::Interface) |
+    containerBit(ContainerNestingCategory::Extension) |
+    containerBit(ContainerNestingCategory::Enum),
+
+    // TypeAlias: Module, StructOrClass, Interface, Extension, Enum
+    containerBit(ContainerNestingCategory::Module) |
+    containerBit(ContainerNestingCategory::StructOrClass) |
+    containerBit(ContainerNestingCategory::Interface) |
+    containerBit(ContainerNestingCategory::Extension) |
+    containerBit(ContainerNestingCategory::Enum),
+
+    // EnumCase: Enum
+    containerBit(ContainerNestingCategory::Enum),
+
+    // Inheritance: StructOrClass, Interface, Enum, Extension
+    containerBit(ContainerNestingCategory::StructOrClass) |
+    containerBit(ContainerNestingCategory::Interface) |
+    containerBit(ContainerNestingCategory::Enum) |
+    containerBit(ContainerNestingCategory::Extension),
+
+    // Import: Module
+    containerBit(ContainerNestingCategory::Module),
+
+    // Using: Module, StructOrClass, Interface, Extension
+    containerBit(ContainerNestingCategory::Module) |
+    containerBit(ContainerNestingCategory::StructOrClass) |
+    containerBit(ContainerNestingCategory::Interface) |
+    containerBit(ContainerNestingCategory::Extension),
+
+    // Namespace: Module
+    containerBit(ContainerNestingCategory::Module),
+
+    // Empty: everywhere
+    containerBit(ContainerNestingCategory::Module) |
+    containerBit(ContainerNestingCategory::StructOrClass) |
+    containerBit(ContainerNestingCategory::Interface) |
+    containerBit(ContainerNestingCategory::Enum) |
+    containerBit(ContainerNestingCategory::Extension) |
+    containerBit(ContainerNestingCategory::Subscript) |
+    containerBit(ContainerNestingCategory::Property),
+
+    // ModuleDeclaration: Module
+    containerBit(ContainerNestingCategory::Module),
+
+    // Include: Module
+    containerBit(ContainerNestingCategory::Module),
+
+    // Capability: Module
+    containerBit(ContainerNestingCategory::Module),
+};
+// clang-format on
+
+/// Return a human-readable name for a DeclNestingCategory.
+static const char* getDeclNestingCategoryName(DeclNestingCategory cat)
+{
+    switch (cat)
+    {
+    case DeclNestingCategory::StructType:
+        return "struct/class";
+    case DeclNestingCategory::InterfaceType:
+        return "interface";
+    case DeclNestingCategory::EnumType:
+        return "enum";
+    case DeclNestingCategory::AssocType:
+        return "associatedtype";
+    case DeclNestingCategory::Extension:
+        return "extension";
+    case DeclNestingCategory::Function:
+        return "function";
+    case DeclNestingCategory::Constructor:
+        return "constructor";
+    case DeclNestingCategory::Subscript:
+        return "subscript";
+    case DeclNestingCategory::Property:
+        return "property";
+    case DeclNestingCategory::Accessor:
+        return "accessor";
+    case DeclNestingCategory::InstanceVar:
+        return "non-static member variable";
+    case DeclNestingCategory::StaticVar:
+        return "static variable";
+    case DeclNestingCategory::TypeAlias:
+        return "typealias";
+    case DeclNestingCategory::EnumCase:
+        return "enum case";
+    case DeclNestingCategory::Inheritance:
+        return "inheritance";
+    case DeclNestingCategory::Import:
+        return "import";
+    case DeclNestingCategory::Using:
+        return "using";
+    case DeclNestingCategory::Namespace:
+        return "namespace";
+    case DeclNestingCategory::Empty:
+        return "empty";
+    case DeclNestingCategory::ModuleDeclaration:
+        return "module declaration";
+    case DeclNestingCategory::Include:
+        return "include";
+    case DeclNestingCategory::Capability:
+        return "require capability";
+    default:
+        return "unknown";
+    }
+}
+
+/// Return a human-readable name for a ContainerNestingCategory.
+static const char* getContainerNestingCategoryName(ContainerNestingCategory cat)
+{
+    switch (cat)
+    {
+    case ContainerNestingCategory::Module:
+        return "module/namespace";
+    case ContainerNestingCategory::StructOrClass:
+        return "struct/class";
+    case ContainerNestingCategory::Interface:
+        return "interface";
+    case ContainerNestingCategory::Enum:
+        return "enum";
+    case ContainerNestingCategory::Extension:
+        return "extension";
+    case ContainerNestingCategory::Subscript:
+        return "subscript";
+    case ContainerNestingCategory::Property:
+        return "property";
+    default:
+        return "unknown";
+    }
+}
+
+/// Validate that a declaration is allowed in its parent container.
+/// Returns true if a diagnostic was emitted (i.e. the nesting is invalid).
+static bool validateDeclNesting(SemanticsVisitor* visitor, Decl* decl)
+{
+    auto childCategory = classifyDeclForNesting(decl);
+    if (childCategory == DeclNestingCategory::Unknown)
+        return false;
+
+    // Unwrap GenericDecl to find the real parent.
+    auto parentContainer = getParentDecl(decl);
+    if (!parentContainer)
+        return false;
+
+    auto parentCategory = classifyContainerForNesting(parentContainer);
+    if (parentCategory == ContainerNestingCategory::Unknown)
+        return false;
+
+    uint32_t allowed = kAllowedNestingContainers[static_cast<uint32_t>(childCategory)];
+    if (allowed & (1u << static_cast<uint32_t>(parentCategory)))
+        return false; // allowed
+
+    visitor->getSink()->diagnose(Diagnostics::DeclNotAllowedInContext{
+        .childKind = getDeclNestingCategoryName(childCategory),
+        .parentKind = getContainerNestingCategoryName(parentCategory),
+        .decl = decl});
+    return true;
+}
+
+// ============================================================================
+
 static bool isAssociatedTypeDecl(Decl* decl)
 {
     auto d = decl;
@@ -248,7 +617,11 @@ struct SemanticsDeclModifiersVisitor : public SemanticsDeclVisitorBase,
         }
     }
 
-    void visitDecl(Decl* decl) { checkModifiers(decl); }
+    void visitDecl(Decl* decl)
+    {
+        validateDeclNesting(this, decl);
+        checkModifiers(decl);
+    }
 
     void visitStructDecl(StructDecl* structDecl);
 
