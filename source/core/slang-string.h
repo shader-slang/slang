@@ -473,7 +473,7 @@ private:
     // assumes that the buffer always exists.
     char* getMutableData()
     {
-        SLANG_ASSERT(m_buffer->getData());
+        SLANG_ASSERT(m_buffer);
         return m_buffer->getData();
     }
 
