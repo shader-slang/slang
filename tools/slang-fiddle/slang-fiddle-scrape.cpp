@@ -1019,32 +1019,22 @@ public:
 private:
     struct Scope
     {
-    public:
-        Scope(ContainerDecl* containerDecl, Scope* outer)
-            : containerDecl(containerDecl), outer(outer)
-        {
-        }
-
         ContainerDecl* containerDecl = nullptr;
-        Scope* outer = nullptr;
     };
-    Scope* currentScope = nullptr;
+    List<Scope> scopeStack;
 
-    struct WithScope : Scope
+    struct WithScope
     {
         WithScope(CheckContext* context, ContainerDecl* containerDecl)
-            : Scope(containerDecl, context->currentScope)
-            , _context(context)
-            , _saved(context->currentScope)
+            : _context(context)
         {
-            context->currentScope = this;
+            context->scopeStack.add(Scope{containerDecl});
         }
 
-        ~WithScope() { _context->currentScope = _saved; }
+        ~WithScope() { _context->scopeStack.removeLast(); }
 
     private:
         CheckContext* _context = nullptr;
-        Scope* _saved = nullptr;
     };
 
 
@@ -1123,9 +1113,9 @@ private:
 
     RefPtr<Expr> lookUp(UnownedStringSlice const& name)
     {
-        for (auto scope = currentScope; scope; scope = scope->outer)
+        for (Index i = scopeStack.getCount() - 1; i >= 0; i--)
         {
-            auto containerDecl = scope->containerDecl;
+            auto containerDecl = scopeStack[i].containerDecl;
             // TODO: accelerate lookup with a dictionary on the container...
             for (auto memberDecl : containerDecl->members)
             {
