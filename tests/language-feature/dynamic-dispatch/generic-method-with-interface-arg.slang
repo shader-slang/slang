@@ -31,7 +31,7 @@ struct Processor
     float apply<T : IFoo>(T obj, float x)
     {
         return obj.calc(x) * scale;
-        // REPORT-DAG: ([[# @LINE-1]]): {{.*}} dispatch code{{.*}} 2 possible types:
+        // REPORT-DAG: note[E50102]: generated {{.*}} dispatch code{{.*}} 2 possible types:
     }
 }
 

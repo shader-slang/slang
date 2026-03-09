@@ -42,7 +42,7 @@ float testWrapperStore(int id, float x)
     w.item = obj;
     IFoo retrieved = w.getItem();
     return retrieved.calc(x);
-    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} dispatch code{{.*}} 2 possible types:
+    // REPORT-DAG: note[E50102]: generated {{.*}} dispatch code{{.*}} 2 possible types:
 }
 
 float testWrapperDirect(int id, float x)
@@ -50,7 +50,7 @@ float testWrapperDirect(int id, float x)
     Wrapper<IFoo> w;
     w.item = makeObj(id);
     return w.item.calc(x);
-    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} dispatch code{{.*}} 2 possible types:
+    // REPORT-DAG: note[E50102]: generated {{.*}} dispatch code{{.*}} 2 possible types:
 }
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
