@@ -5691,6 +5691,25 @@ Decl* Parser::ParseStruct()
     ReadToken("struct");
     FillPosition(rs);
 
+    if (LookAheadToken(TokenType::LBracket))
+    {
+        if (currentModule->languageVersion >= SLANG_LANGUAGE_VERSION_2026)
+        {
+            sink->diagnose(Diagnostics::InvalidBracketAttributesPlacement{
+                    .location = tokenReader.peekLoc() });
+        }
+        else
+        {
+            sink->diagnose(Diagnostics::DeprecatedBracketAttributesPlacement{
+                    .location = tokenReader.peekLoc() });
+        }
+
+        Modifier** modifierLink = &rs->modifiers.first;
+        ParseSquareBracketAttributes(this, &modifierLink);
+
+        SourceLoc endLoc = tokenReader.peekLoc();
+    }
+
     // Skip completion request token to prevent producing a type named completion request.
     AdvanceIf(this, TokenType::CompletionRequest);
 

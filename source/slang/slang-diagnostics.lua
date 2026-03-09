@@ -2422,6 +2422,20 @@ err(
     span { loc = "decl:Decl", message = "cannot export incomplete type '~decl'" }
 )
 
+warning(
+    "deprecated-bracket-attributes-placement",
+    31204,
+    "deprecated bracketed attribute placement. Bracketed attributes should be placed before 'struct'.",
+    span { loc = "location", message = "deprecated placement of bracketed attributes list." }
+)
+
+err(
+    "invalid-bracket-attributes-placement",
+    31205,
+    "invalid bracketed attribute placement. Bracketed attributes must be placed before 'struct'.",
+    span { loc = "location", message = "invalid placement bracketed attributes list." }
+)
+
 err(
     "memory-qualifier-not-allowed-on-a-non-image-type-parameter",
     31206,
