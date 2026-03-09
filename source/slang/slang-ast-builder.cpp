@@ -904,10 +904,34 @@ Type* ASTBuilder::getExpandType(Type* pattern, ArrayView<Val*> capturedPacks)
     return getOrCreate<ExpandType>(pattern, capturedPacks);
 }
 
+static bool _containsEachType(Type* type)
+{
+    if (!type)
+        return false;
+    if (as<EachType>(type))
+        return true;
+    for (Index i = 0; i < type->getOperandCount(); ++i)
+    {
+        if (auto operandType = as<Type>(type->getOperand(i)))
+        {
+            if (_containsEachType(operandType))
+                return true;
+        }
+    }
+    return false;
+}
+
 Type* ASTBuilder::getFirstElement(Type* basePack)
 {
     if (auto tupleType = as<TupleType>(basePack))
         return getFirstElement(tupleType->getTypePack());
+
+    if (auto expandType = as<ExpandType>(basePack))
+    {
+        auto patternType = expandType->getPatternType();
+        if (!_containsEachType(patternType))
+            return patternType;
+    }
 
     if (auto typePack = as<ConcreteTypePack>(basePack))
     {
@@ -922,6 +946,13 @@ Type* ASTBuilder::getLastElement(Type* basePack)
 {
     if (auto tupleType = as<TupleType>(basePack))
         return getLastElement(tupleType->getTypePack());
+
+    if (auto expandType = as<ExpandType>(basePack))
+    {
+        auto patternType = expandType->getPatternType();
+        if (!_containsEachType(patternType))
+            return patternType;
+    }
 
     if (auto typePack = as<ConcreteTypePack>(basePack))
     {

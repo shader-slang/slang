@@ -4687,9 +4687,9 @@ Expr* SemanticsExprVisitor::visitPackQueryExpr(PackQueryExpr* packQueryExpr)
 
     if (!isTypeExpr && !as<TupleType>(operandType))
     {
-        // This branch handles term-valued expressions whose checked type is an abstract type pack,
-        // e.g. `__first(expand Wrapper<each T>)`. Value packs are handled above, and tuple-valued
-        // queries are handled separately, so at this point we expect an abstract type-pack result.
+        // This branch handles term-valued expressions whose checked type is a type pack rather than
+        // a `ValuePackType` or `TupleType`, e.g. `expand Wrapper<each T>`. Value-pack queries are
+        // handled above, and tuple-valued queries are handled separately.
         SLANG_ASSERT(isTypePack(operandType));
         if (as<FirstExpr>(packQueryExpr))
             packQueryExpr->type = QualType(m_astBuilder->getFirstElement(operandType));
