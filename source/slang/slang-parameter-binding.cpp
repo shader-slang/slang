@@ -1945,6 +1945,9 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameterDecl(
     //
     auto typeLayout = processEntryPointVaryingParameter(context, type, state, varLayout);
 
+    if (!typeLayout)
+        return nullptr;
+
     // For Khronos targets (OpenGL and Vulkan), we need to process
     // the `[[vk::location(...)]]` and `[[vk::index(...)]]` attributes,
     // if present.
@@ -2385,10 +2388,13 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
 
                 if (!fieldTypeLayout)
                 {
-                    getSink(context)->diagnose(Diagnostics::NotValidVaryingParameter{
-                        .paramName = fieldDecl->getName(),
-                        .decl = varLayout->varDecl.getDecl()});
-                    continue;
+                    if (fieldDecl)
+                    {
+                        getSink(context)->diagnose(Diagnostics::NotValidVaryingParameter{
+                            .paramName = fieldDecl->getName(),
+                            .decl = fieldDecl});
+                    }
+                    return nullptr;
                 }
                 fieldVarLayout->typeLayout = fieldTypeLayout;
 

@@ -6,6 +6,7 @@
 //TEST:SIMPLE(filecheck=CHK1): -target hlsl -entry fragmentMain -stage fragment
 //TEST:SIMPLE(filecheck=CHK2): -target spirv -entry fragmentDirectParam -stage fragment
 //TEST:SIMPLE(filecheck=CHK2): -target hlsl -entry fragmentDirectParam -stage fragment
+//TEST:SIMPLE(filecheck=CHK3): -target spirv -entry fragmentVkLocation -stage fragment
 
 interface IFoo
 {
@@ -34,4 +35,21 @@ float4 fragmentDirectParam(IFoo foo : TEXCOORD0) : SV_Target
 // CHK2: parameter 'foo' is not a valid varying parameter
 {
     return float4(foo.getValue(), 0, 0, 1);
+}
+
+// Scenario 3: Interface-typed field with [[vk::location]] attribute.
+// Before the fix, this would ICE because processEntryPointVaryingParameterDecl
+// tried to call typeLayout->FindResourceInfo() on a null typeLayout.
+struct FragmentInputVkLocation
+{
+    [[vk::location(0)]] IFoo foo;
+    // CHK3: error[E39028]
+    // CHK3: parameter 'foo' is not a valid varying parameter
+    float4 pos : SV_Position;
+}
+
+[shader("fragment")]
+float4 fragmentVkLocation(FragmentInputVkLocation input) : SV_Target
+{
+    return float4(input.foo.getValue(), 0, 0, 1);
 }

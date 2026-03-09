@@ -6,6 +6,8 @@
 //TEST:SIMPLE(filecheck=CHK1): -target hlsl -entry vertexMain -stage vertex
 //TEST:SIMPLE(filecheck=CHK2): -target spirv -entry fragmentReturnMain -stage fragment
 //TEST:SIMPLE(filecheck=CHK2): -target hlsl -entry fragmentReturnMain -stage fragment
+//TEST:SIMPLE(filecheck=CHK3): -target spirv -entry fragmentOptionalReturn -stage fragment
+//TEST:SIMPLE(filecheck=CHK3): -target hlsl -entry fragmentOptionalReturn -stage fragment
 
 interface IFoo
 {
@@ -47,4 +49,15 @@ IFoo fragmentReturnMain() : SV_Target
     ImplA a;
     a.x = 42.0;
     return a;
+}
+
+// Scenario 3: Optional<IFoo> as entry point return value.
+// The Optional decomposes into a tuple (IFoo, bool) internally.
+[shader("fragment")]
+Optional<IFoo> fragmentOptionalReturn() : SV_Target
+// CHK3: error[E39028]
+{
+    ImplA a;
+    a.x = 42.0;
+    return Optional<IFoo>(a);
 }
