@@ -2,12 +2,12 @@
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK_GLSL): -target glsl
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK_WGSL): -target wgsl
 
-// CHECK_SPIRV: warning 31105{{.*}}bgra8
-// CHECK_GLSL: warning 31105{{.*}}bgra8
+// CHECK_SPIRV: warning{{.*}}Image format 'bgra8' is not explicitly supported by the SPIRV backend
+// CHECK_GLSL: warning{{.*}}Image format 'bgra8' is not explicitly supported by the GLSL backend
 [format("bgra8")]
 RWTexture2D<float4> outputTexture;
 
-// CHECK_WGSL: warning 31105{{.*}}rg8
+// CHECK_WGSL: warning{{.*}}Image format 'rg8' is not explicitly supported by the WGSL backend
 [format("rg8")]
 RWTexture2D<float4> outputTexture2;
 

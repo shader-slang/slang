@@ -339,6 +339,99 @@ Type* SemanticsVisitor::TryJoinTypes(ConstraintSystem* constraints, QualType lef
     return nullptr;
 }
 
+bool addTypeCoercionWitnessToArgs(
+    ASTBuilder* astBuilder,
+    SemanticsVisitor* visitor,
+    TypeCoercionConstraintDecl* constraintDecl,
+    DeclRef<GenericDecl> genericDeclRef,
+    SemanticsVisitor::OverloadResolveContext* maybeContext,
+    HashSet<Decl*>* maybeConstrainedGenericParams,
+    ShortList<Val*>& args,
+    bool shouldEmitError)
+{
+    // To emit an error, `maybeContext` must be provided.
+    SLANG_ASSERT(!shouldEmitError || shouldEmitError && maybeContext);
+
+    DeclRef<TypeCoercionConstraintDecl> constraintDeclRef =
+        astBuilder
+            ->getGenericAppDeclRef(genericDeclRef, args.getArrayView().arrayView, constraintDecl)
+            .as<TypeCoercionConstraintDecl>();
+    auto fromType = getFromType(astBuilder, constraintDeclRef);
+    auto toType = getToType(astBuilder, constraintDeclRef);
+    TypeCoercionWitness* typeCoercionWitness = nullptr;
+    DeclRef<Decl> declRefUsedToConvert{};
+    ConversionCost conversionCost = kConversionCost_Impossible;
+    visitor->_coerce(
+        CoercionSite::General,
+        toType,
+        nullptr,
+        fromType,
+        nullptr,
+        visitor->getSink(),
+        &conversionCost,
+        &typeCoercionWitness);
+    if (constraintDecl->findModifier<ImplicitConversionModifier>())
+    {
+        // The viable conversion is not an implicit conversion, but implicit was requested, fail
+        if (conversionCost > kConversionCost_GeneralConversion)
+        {
+            if (shouldEmitError)
+            {
+                visitor->getSink()->diagnose(
+                    Diagnostics::ImplicitTypeCoerceConstraintWithNonImplicitConversion{
+                        .fromType = fromType,
+                        .toType = toType,
+                        .location = maybeContext->loc});
+
+                if (auto declRefTypeCoercionWitness =
+                        as<DeclRefTypeCoercionWitness>(typeCoercionWitness))
+                {
+                    visitor->getSink()->diagnose(Diagnostics::SeeDefinitionOfConversionFunction{
+                        .decl = declRefTypeCoercionWitness->getDeclRef().getDecl()});
+                }
+                visitor->getSink()->diagnose(
+                    Diagnostics::SeeDefinitionOfConstraint{.decl = constraintDecl});
+            }
+            return false;
+        }
+    }
+
+    // The type arguments are not convertible, return failure.
+    if (conversionCost == kConversionCost_Impossible)
+    {
+        if (shouldEmitError)
+        {
+            visitor->getSink()->diagnose(Diagnostics::TypeCoerceConstraintMissingConversion{
+                .fromType = fromType,
+                .toType = toType,
+                .location = maybeContext->loc});
+            visitor->getSink()->diagnose(
+                Diagnostics::SeeDefinitionOf{.decl = genericDeclRef.getDecl()->inner});
+        }
+        return false;
+    }
+
+    if (maybeConstrainedGenericParams)
+    {
+        if (auto fromDecl = isDeclRefTypeOf<Decl>(constraintDecl->fromType))
+        {
+            maybeConstrainedGenericParams->add(fromDecl.getDecl());
+        }
+        if (auto toDecl = isDeclRefTypeOf<Decl>(constraintDecl->toType))
+        {
+            maybeConstrainedGenericParams->add(toDecl.getDecl());
+        }
+    }
+
+    // Unhandled case in `_coerce`
+    if (!typeCoercionWitness)
+        typeCoercionWitness =
+            astBuilder->getDeclRefTypeCoercionWitness(fromType, toType, DeclRef<Decl>());
+
+    args.add(typeCoercionWitness);
+    return true;
+}
+
 DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
     ConstraintSystem* system,
     DeclRef<GenericDecl> genericDeclRef,
@@ -411,7 +504,7 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
     // The state of currently solved arguments.
     struct SolvedArg
     {
-        IntVal* val = nullptr;
+        Val* val = nullptr;
         bool isOptional = true;
         ShortList<QualType, 8> types;
     };
@@ -513,15 +606,32 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
 
             c.satisfied = true;
         }
+        else if (auto valPackParam = as<GenericValuePackParamDecl>(c.decl))
+        {
+            SLANG_ASSERT(valPackParam->parameterIndex != -1);
+
+            if (valPackParam->parameterIndex < knownGenericArgCount)
+            {
+                system->constraints[constraintIndex].satisfied = true;
+                continue;
+            }
+
+            if (solvedArgs.getCount() <= valPackParam->parameterIndex)
+                solvedArgs.setCount(valPackParam->parameterIndex + 1);
+            Val*& val = solvedArgs[valPackParam->parameterIndex].val;
+
+            auto cValPack = as<ConcreteIntValPack>(c.val);
+            if (cValPack)
+            {
+                if (!val)
+                    val = cValPack;
+            }
+            c.satisfied = true;
+        }
         else if (auto valParam = as<GenericValueParamDecl>(c.decl))
         {
             SLANG_ASSERT(valParam->parameterIndex != -1);
 
-            // If the parameter is one where we already know
-            // the argument value to use, we don't bother with
-            // trying to solve for it, and treat any constraints
-            // on such a parameter as implicitly solved-for.
-            //
             if (valParam->parameterIndex < knownGenericArgCount)
             {
                 system->constraints[constraintIndex].satisfied = true;
@@ -530,7 +640,7 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
 
             if (solvedArgs.getCount() <= valParam->parameterIndex)
                 solvedArgs.setCount(valParam->parameterIndex + 1);
-            IntVal*& val = solvedArgs[valParam->parameterIndex].val;
+            Val*& val = solvedArgs[valParam->parameterIndex].val;
             bool& valOptional = solvedArgs[valParam->parameterIndex].isOptional;
 
             auto cVal = as<IntVal>(c.val);
@@ -616,6 +726,30 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
                         m_astBuilder->getTypePack(typeList.getArrayView().arrayView),
                         isLVal));
                 }
+            }
+        }
+        else if (auto valPackParam = as<GenericValuePackParamDecl>(member))
+        {
+            SLANG_ASSERT(valPackParam->parameterIndex != -1);
+
+            if (valPackParam->parameterIndex < knownGenericArgCount)
+                continue;
+
+            if (valPackParam->parameterIndex >= solvedArgs.getCount())
+            {
+                // Empty pack.
+                args.add(m_astBuilder->getIntValPack(ArrayView<IntVal*>()));
+                continue;
+            }
+
+            auto val = solvedArgs[valPackParam->parameterIndex].val;
+            if (!val)
+            {
+                args.add(m_astBuilder->getIntValPack(ArrayView<IntVal*>()));
+            }
+            else
+            {
+                args.add(val);
             }
         }
         else if (auto valParam = as<GenericValueParamDecl>(member))
@@ -757,45 +891,16 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
     for (auto constraintDecl :
          genericDeclRef.getDecl()->getMembersOfType<TypeCoercionConstraintDecl>())
     {
-        DeclRef<TypeCoercionConstraintDecl> constraintDeclRef =
-            m_astBuilder
-                ->getGenericAppDeclRef(
-                    genericDeclRef,
-                    args.getArrayView().arrayView,
-                    constraintDecl)
-                .as<TypeCoercionConstraintDecl>();
-        auto fromType = constraintDeclRef.substitute(m_astBuilder, constraintDecl->fromType.Ptr());
-        auto toType = constraintDeclRef.substitute(m_astBuilder, constraintDecl->toType.Ptr());
-        auto conversionCost = getConversionCost(toType, fromType);
-        if (constraintDecl->findModifier<ImplicitConversionModifier>())
-        {
-            if (conversionCost > kConversionCost_GeneralConversion)
-            {
-                // The type arguments are not implicitly convertible, return failure.
-                return DeclRef<Decl>();
-            }
-        }
-        else
-        {
-            if (conversionCost == kConversionCost_Impossible)
-            {
-                // The type arguments are not convertible, return failure.
-                return DeclRef<Decl>();
-            }
-        }
-        if (auto fromDecl = isDeclRefTypeOf<Decl>(constraintDecl->fromType))
-        {
-            constrainedGenericParams.add(fromDecl.getDecl());
-        }
-        if (auto toDecl = isDeclRefTypeOf<Decl>(constraintDecl->toType))
-        {
-            constrainedGenericParams.add(toDecl.getDecl());
-        }
-        // If we are to expand the support of type coercion constraint beyond simple builtin core
-        // module functions, then the witness should be a reference to the conversion function. For
-        // now, this isn't required, and it is not easy to get it from the coercion logic, so we
-        // leave it empty.
-        args.add(m_astBuilder->getTypeCoercionWitness(fromType, toType, DeclRef<Decl>()));
+        if (!addTypeCoercionWitnessToArgs(
+                getASTBuilder(),
+                this,
+                constraintDecl,
+                genericDeclRef,
+                nullptr,
+                &constrainedGenericParams,
+                args,
+                false))
+            return DeclRef<Decl>();
     }
 
     // Add a flat cost to all unconstrained generic params.
@@ -1034,6 +1139,17 @@ bool SemanticsVisitor::TryUnifyIntParam(
     if (auto genericValueParamRef = varRef.as<GenericValueParamDecl>())
     {
         return TryUnifyIntParam(constraints, unifyCtx, genericValueParamRef.getDecl(), val);
+    }
+    else if (auto genericValuePackParamRef = varRef.as<GenericValuePackParamDecl>())
+    {
+        if (genericValuePackParamRef.getDecl()->parentDecl != constraints.genericDecl)
+            return false;
+        Constraint constraint;
+        constraint.decl = genericValuePackParamRef.getDecl();
+        constraint.val = val;
+        constraint.isOptional = unifyCtx.optionalConstraint;
+        constraints.constraints.add(constraint);
+        return true;
     }
     else
     {

@@ -18,6 +18,9 @@
 #if defined(_WIN32)
 #include <d3d12.h>
 #include <windows.h>
+#endif
+
+#if defined(_MSC_VER)
 #pragma comment(lib, "advapi32")
 #endif
 
@@ -1254,8 +1257,8 @@ Result RenderTestApp::writeBindingOutput(const String& fileName)
     // Wait until everything is complete
     m_queue->waitOnHost();
 
-    FILE* f = fopen(fileName.getBuffer(), "wb");
-    if (!f)
+    FILE* f = nullptr;
+    if (fopen_s(&f, fileName.getBuffer(), "wb") != 0 || !f)
     {
         return SLANG_FAIL;
     }

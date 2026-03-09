@@ -6,14 +6,10 @@ struct S {};
 
 void test()
 {
-    if (1);
-/*CHECK:
-        ^ implicit conversion
-          ^ empty statement
-*/
-    if (2);
-/*CHECK:
-        ^ implicit conversion
-          ^ empty statement
-*/
+    if (true);
+//CHECK:     ^ potentially unintended empty statement
+//CHECK:     ^ potentially unintended empty statement at this location; use {} instead.
+    if (true);
+//CHECK:     ^ potentially unintended empty statement
+//CHECK:     ^ potentially unintended empty statement at this location; use {} instead.
 }
