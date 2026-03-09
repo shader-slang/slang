@@ -5691,21 +5691,6 @@ Decl* Parser::ParseStruct()
     ReadToken("struct");
     FillPosition(rs);
 
-    // The `struct` keyword may optionally be followed by
-    // attributes that appertain to the struct declaration
-    // itself, and not to any variables declared using this
-    // type specifier.
-    //
-    // TODO: We don't yet correctly associate attributes with
-    // a variable decarlation vs. a struct type when a variable
-    // is declared with a struct type specified.
-    //
-    if (LookAheadToken(TokenType::LBracket))
-    {
-        Modifier** modifierLink = &rs->modifiers.first;
-        ParseSquareBracketAttributes(this, &modifierLink);
-    }
-
     // Skip completion request token to prevent producing a type named completion request.
     AdvanceIf(this, TokenType::CompletionRequest);
 
