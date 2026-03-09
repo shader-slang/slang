@@ -2025,6 +2025,8 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameterDecl(
     return typeLayout;
 }
 
+// Returns nullptr when `type` is not valid in a varying parameter position
+// (e.g. interface types, textures, samplers, constant buffers).
 static RefPtr<TypeLayout> processEntryPointVaryingParameter(
     ParameterBindingContext* context,
     Type* type,
