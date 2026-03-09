@@ -5695,13 +5695,13 @@ Decl* Parser::ParseStruct()
     {
         if (currentModule->languageVersion >= SLANG_LANGUAGE_VERSION_2026)
         {
-            sink->diagnose(Diagnostics::InvalidBracketAttributesPlacement{
-                    .location = tokenReader.peekLoc() });
+            sink->diagnose(
+                Diagnostics::InvalidBracketAttributesPlacement{.location = tokenReader.peekLoc()});
         }
         else
         {
             sink->diagnose(Diagnostics::DeprecatedBracketAttributesPlacement{
-                    .location = tokenReader.peekLoc() });
+                .location = tokenReader.peekLoc()});
         }
 
         Modifier** modifierLink = &rs->modifiers.first;
