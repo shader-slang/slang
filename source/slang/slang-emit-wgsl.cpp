@@ -709,6 +709,11 @@ void WGSLSourceEmitter::emitLayoutQualifiersImpl(IRVarLayout* layout)
     {
         LayoutResourceKind kind = attr->getResourceKind();
 
+        // TODO:
+        // This is not correct. For the moment this is just here as a hack to make
+        // @binding and @group unique, so that we can pass WGSL compile tests.
+        // This will have to be revisited when we actually want to supply resources to
+        // shaders.
         if (kind == LayoutResourceKind::DescriptorTableSlot ||
             kind == LayoutResourceKind::ShaderResource ||
             kind == LayoutResourceKind::UnorderedAccess ||
