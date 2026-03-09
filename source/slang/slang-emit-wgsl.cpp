@@ -714,32 +714,36 @@ void WGSLSourceEmitter::emitLayoutQualifiersImpl(IRVarLayout* layout)
         // @binding and @group unique, so that we can pass WGSL compile tests.
         // This will have to be revisited when we actually want to supply resources to
         // shaders.
-        if (kind == LayoutResourceKind::DescriptorTableSlot ||
-            kind == LayoutResourceKind::ShaderResource ||
-            kind == LayoutResourceKind::UnorderedAccess ||
-            kind == LayoutResourceKind::SamplerState ||
-            kind == LayoutResourceKind::ConstantBuffer)
+        switch (kind)
         {
-            m_writer->emit("@binding(");
-            m_writer->emit(attr->getOffset());
-            m_writer->emit(") ");
+        case LayoutResourceKind::DescriptorTableSlot:
+        case LayoutResourceKind::ShaderResource:
+        case LayoutResourceKind::UnorderedAccess:
+        case LayoutResourceKind::SamplerState:
+        case LayoutResourceKind::ConstantBuffer:
+            {
+                m_writer->emit("@binding(");
+                m_writer->emit(attr->getOffset());
+                m_writer->emit(") ");
 
-            EmitVarChain chain = {};
-            chain.varLayout = layout;
-            auto space = getBindingSpaceForKinds(&chain, LayoutResourceKindFlag::make(kind));
-            m_writer->emit("@group(");
-            m_writer->emit(space);
-            m_writer->emit(") ");
+                EmitVarChain chain = {};
+                chain.varLayout = layout;
+                auto space =
+                    getBindingSpaceForKinds(&chain, LayoutResourceKindFlag::make(kind));
+                m_writer->emit("@group(");
+                m_writer->emit(space);
+                m_writer->emit(") ");
 
-            return;
-        }
-        else if (kind == LayoutResourceKind::SpecializationConstant)
-        {
+                return;
+            }
+        case LayoutResourceKind::SpecializationConstant:
             m_writer->emit("@id(");
             m_writer->emit(attr->getOffset());
             m_writer->emit(") ");
 
             return;
+        default:
+            break;
         }
     }
 }
