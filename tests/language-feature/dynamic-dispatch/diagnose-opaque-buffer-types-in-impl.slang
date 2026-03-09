@@ -7,79 +7,89 @@
 // complementing diagnose-opaque-types-in-impl.slang which covers
 // textures, samplers, ray queries, and stream outputs.
 
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -conformance "ImplBuffer:IFoo=0" -conformance "ImplRWBuffer:IFoo=1" -conformance "ImplByteAddressBuffer:IFoo=2" -conformance "ImplRWByteAddressBuffer:IFoo=3" -conformance "ImplStructuredBuffer:IFoo=4" -conformance "ImplRWStructuredBuffer:IFoo=5" -conformance "ImplAppendStructuredBuffer:IFoo=6" -conformance "ImplConsumeStructuredBuffer:IFoo=7" -conformance "ImplRTAS:IFoo=8" -conformance "ImplSubpassInput:IFoo=9" -conformance "GoodImpl:IFoo=10"
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry computeMain -conformance "ImplBuffer:IFoo=0" -conformance "ImplRWBuffer:IFoo=1" -conformance "ImplByteAddressBuffer:IFoo=2" -conformance "ImplRWByteAddressBuffer:IFoo=3" -conformance "ImplStructuredBuffer:IFoo=4" -conformance "ImplRWStructuredBuffer:IFoo=5" -conformance "ImplAppendStructuredBuffer:IFoo=6" -conformance "ImplConsumeStructuredBuffer:IFoo=7" -conformance "ImplRTAS:IFoo=8" -conformance "ImplSubpassInput:IFoo=9" -conformance "GoodImpl:IFoo=10"
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -conformance "ImplBuffer:IFoo=0" -conformance "ImplRWBuffer:IFoo=1" -conformance "ImplByteAddressBuffer:IFoo=2" -conformance "ImplRWByteAddressBuffer:IFoo=3" -conformance "ImplStructuredBuffer:IFoo=4" -conformance "ImplRWStructuredBuffer:IFoo=5" -conformance "ImplAppendStructuredBuffer:IFoo=6" -conformance "ImplConsumeStructuredBuffer:IFoo=7" -conformance "ImplRTAS:IFoo=8" -conformance "ImplSubpassInput:IFoo=9" -conformance "GoodImpl:IFoo=10"
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target hlsl -stage compute -entry computeMain -conformance "ImplBuffer:IFoo=0" -conformance "ImplRWBuffer:IFoo=1" -conformance "ImplByteAddressBuffer:IFoo=2" -conformance "ImplRWByteAddressBuffer:IFoo=3" -conformance "ImplStructuredBuffer:IFoo=4" -conformance "ImplRWStructuredBuffer:IFoo=5" -conformance "ImplAppendStructuredBuffer:IFoo=6" -conformance "ImplConsumeStructuredBuffer:IFoo=7" -conformance "ImplRTAS:IFoo=8" -conformance "ImplSubpassInput:IFoo=9" -conformance "GoodImpl:IFoo=10"
 
 interface IFoo
 {
     float get();
 }
 
-// CHECK-DAG: type 'ImplBuffer' contains fields that cannot be packed into ordinary bytes for dynamic dispatch
 export struct ImplBuffer : IFoo
+//CHECK:      ^^^^^^^^^^ type cannot be packed for dynamic dispatch
+//CHECK:      ^^^^^^^^^^ type 'ImplBuffer' contains fields that cannot be packed into ordinary bytes for dynamic dispatch.
 {
     Buffer<float> b;
     float get() { return 1.0; }
 }
 
-// CHECK-DAG: type 'ImplRWBuffer' contains fields that cannot be packed into ordinary bytes for dynamic dispatch
 export struct ImplRWBuffer : IFoo
+//CHECK:      ^^^^^^^^^^^^ type cannot be packed for dynamic dispatch
+//CHECK:      ^^^^^^^^^^^^ type 'ImplRWBuffer' contains fields that cannot be packed into ordinary bytes for dynamic dispatch.
 {
     RWBuffer<float> b;
     float get() { return 1.0; }
 }
 
-// CHECK-DAG: type 'ImplByteAddressBuffer' contains fields that cannot be packed into ordinary bytes for dynamic dispatch
 export struct ImplByteAddressBuffer : IFoo
+//CHECK:      ^^^^^^^^^^^^^^^^^^^^^ type cannot be packed for dynamic dispatch
+//CHECK:      ^^^^^^^^^^^^^^^^^^^^^ type 'ImplByteAddressBuffer' contains fields that cannot be packed into ordinary bytes for dynamic dispatch.
 {
     ByteAddressBuffer b;
     float get() { return 1.0; }
 }
 
-// CHECK-DAG: type 'ImplRWByteAddressBuffer' contains fields that cannot be packed into ordinary bytes for dynamic dispatch
 export struct ImplRWByteAddressBuffer : IFoo
+//CHECK:      ^^^^^^^^^^^^^^^^^^^^^^^ type cannot be packed for dynamic dispatch
+//CHECK:      ^^^^^^^^^^^^^^^^^^^^^^^ type 'ImplRWByteAddressBuffer' contains fields that cannot be packed into ordinary bytes for dynamic dispatch.
 {
     RWByteAddressBuffer b;
     float get() { return 1.0; }
 }
 
-// CHECK-DAG: type 'ImplStructuredBuffer' contains fields that cannot be packed into ordinary bytes for dynamic dispatch
 export struct ImplStructuredBuffer : IFoo
+//CHECK:      ^^^^^^^^^^^^^^^^^^^^ type cannot be packed for dynamic dispatch
+//CHECK:      ^^^^^^^^^^^^^^^^^^^^ type 'ImplStructuredBuffer' contains fields that cannot be packed into ordinary bytes for dynamic dispatch.
 {
     StructuredBuffer<float> b;
     float get() { return 1.0; }
 }
 
-// CHECK-DAG: type 'ImplRWStructuredBuffer' contains fields that cannot be packed into ordinary bytes for dynamic dispatch
 export struct ImplRWStructuredBuffer : IFoo
+//CHECK:      ^^^^^^^^^^^^^^^^^^^^^^ type cannot be packed for dynamic dispatch
+//CHECK:      ^^^^^^^^^^^^^^^^^^^^^^ type 'ImplRWStructuredBuffer' contains fields that cannot be packed into ordinary bytes for dynamic dispatch.
 {
     RWStructuredBuffer<float> b;
     float get() { return 1.0; }
 }
 
-// CHECK-DAG: type 'ImplAppendStructuredBuffer' contains fields that cannot be packed into ordinary bytes for dynamic dispatch
 export struct ImplAppendStructuredBuffer : IFoo
+//CHECK:      ^^^^^^^^^^^^^^^^^^^^^^^^^^ type cannot be packed for dynamic dispatch
+//CHECK:      ^^^^^^^^^^^^^^^^^^^^^^^^^^ type 'ImplAppendStructuredBuffer' contains fields that cannot be packed into ordinary bytes for dynamic dispatch.
 {
     AppendStructuredBuffer<float> b;
     float get() { return 1.0; }
 }
 
-// CHECK-DAG: type 'ImplConsumeStructuredBuffer' contains fields that cannot be packed into ordinary bytes for dynamic dispatch
 export struct ImplConsumeStructuredBuffer : IFoo
+//CHECK:      ^^^^^^^^^^^^^^^^^^^^^^^^^^^ type cannot be packed for dynamic dispatch
+//CHECK:      ^^^^^^^^^^^^^^^^^^^^^^^^^^^ type 'ImplConsumeStructuredBuffer' contains fields that cannot be packed into ordinary bytes for dynamic dispatch.
 {
     ConsumeStructuredBuffer<float> b;
     float get() { return 1.0; }
 }
 
-// CHECK-DAG: type 'ImplRTAS' contains fields that cannot be packed into ordinary bytes for dynamic dispatch
 export struct ImplRTAS : IFoo
+//CHECK:      ^^^^^^^^ type cannot be packed for dynamic dispatch
+//CHECK:      ^^^^^^^^ type 'ImplRTAS' contains fields that cannot be packed into ordinary bytes for dynamic dispatch.
 {
     RaytracingAccelerationStructure accel;
     float get() { return 1.0; }
 }
 
-// CHECK-DAG: type 'ImplSubpassInput' contains fields that cannot be packed into ordinary bytes for dynamic dispatch
 export struct ImplSubpassInput : IFoo
+//CHECK:      ^^^^^^^^^^^^^^^^ type cannot be packed for dynamic dispatch
+//CHECK:      ^^^^^^^^^^^^^^^^ type 'ImplSubpassInput' contains fields that cannot be packed into ordinary bytes for dynamic dispatch.
 {
     SubpassInput si;
     float get() { return 1.0; }

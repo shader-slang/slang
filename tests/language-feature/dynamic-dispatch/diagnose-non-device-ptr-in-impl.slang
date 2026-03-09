@@ -8,29 +8,31 @@
 // Plain pointers (int*) default to device address space and are allowed
 // in interface implementations.
 
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -conformance "ImplGroupsharedPtr:IFoo=0" -conformance "ImplRefField:IFoo=1" -conformance "GoodImpl:IFoo=2" -conformance "GoodImplDevicePtr:IFoo=3"
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry computeMain -conformance "ImplGroupsharedPtr:IFoo=0" -conformance "ImplRefField:IFoo=1" -conformance "GoodImpl:IFoo=2" -conformance "GoodImplDevicePtr:IFoo=3"
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -conformance "ImplGroupsharedPtr:IFoo=0" -conformance "ImplRefField:IFoo=1" -conformance "GoodImpl:IFoo=2" -conformance "GoodImplDevicePtr:IFoo=3"
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target hlsl -stage compute -entry computeMain -conformance "ImplGroupsharedPtr:IFoo=0" -conformance "ImplRefField:IFoo=1" -conformance "GoodImpl:IFoo=2" -conformance "GoodImplDevicePtr:IFoo=3"
 
 interface IFoo
 {
     int get();
 }
 
-// Positive cases must not be rejected (no 41014 for GoodImpl or GoodImplDevicePtr).
-// CHECK-NOT: type 'GoodImpl' contains fields that cannot be packed
-// CHECK-NOT: type 'GoodImplDevicePtr' contains fields that cannot be packed
-
-// CHECK-DAG: modifier 'groupshared' is not allowed here
 export struct ImplGroupsharedPtr : IFoo
 {
     groupshared int* p;
+/*CHECK:
+    ^^^^^^^^^^^ modifier not allowed
+    ^^^^^^^^^^^ modifier 'groupshared' is not allowed here.
+*/
     int get() { return 1; }
 }
 
-// CHECK-DAG: modifier '__ref' is not allowed here
 export struct ImplRefField : IFoo
 {
     __ref int r;
+/*CHECK:
+    ^^^^^ modifier not allowed
+    ^^^^^ modifier '__ref' is not allowed here.
+*/
     int get() { return 1; }
 }
 

@@ -3,8 +3,8 @@
 // because their storage model is fundamentally different from ordinary
 // per-thread data.
 
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -conformance "Impl:IFoo=0" -conformance "GoodImpl:IFoo=1"
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry computeMain -conformance "Impl:IFoo=0" -conformance "GoodImpl:IFoo=1"
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -conformance "Impl:IFoo=0" -conformance "GoodImpl:IFoo=1"
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target hlsl -stage compute -entry computeMain -conformance "Impl:IFoo=0" -conformance "GoodImpl:IFoo=1"
 
 using namespace linalg;
 
@@ -13,8 +13,9 @@ interface IFoo
     int get();
 }
 
-// CHECK: type 'Impl' contains fields that cannot be packed into ordinary bytes for dynamic dispatch
 export struct Impl : IFoo
+//CHECK:      ^^^^ type cannot be packed for dynamic dispatch
+//CHECK:      ^^^^ type 'Impl' contains fields that cannot be packed into ordinary bytes for dynamic dispatch.
 {
     CoopMat<float, MemoryScope.Subgroup, 16, 16, CoopMatMatrixUse.MatrixAccumulator> m;
     int get() { return 1; }

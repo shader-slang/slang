@@ -9,8 +9,8 @@
 // intentional or a bug depends on whether non-copyable semantics should
 // be enforced at the marshalling level.
 
-//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target spirv -conformance "Impl:IFoo=0" -conformance "GoodImpl:IFoo=1"
-//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry computeMain -conformance "Impl:IFoo=0" -conformance "GoodImpl:IFoo=1"
+//DISABLE_TEST:SIMPLE(diag=CHECK): -target spirv -conformance "Impl:IFoo=0" -conformance "GoodImpl:IFoo=1"
+//DISABLE_TEST:SIMPLE(diag=CHECK): -target hlsl -stage compute -entry computeMain -conformance "Impl:IFoo=0" -conformance "GoodImpl:IFoo=1"
 
 [__NonCopyableType]
 struct NonCopyData
@@ -23,8 +23,9 @@ interface IFoo
     int get();
 }
 
-// CHECK: type 'Impl' contains fields that cannot be packed into ordinary bytes for dynamic dispatch
 export struct Impl : IFoo
+//CHECK:      ^^^^ type cannot be packed for dynamic dispatch
+//CHECK:      ^^^^ type 'Impl' contains fields that cannot be packed into ordinary bytes for dynamic dispatch.
 {
     NonCopyData data;
     int get() { return 1; }

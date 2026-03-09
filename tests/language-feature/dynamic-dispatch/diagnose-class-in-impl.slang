@@ -3,8 +3,8 @@
 // byte buffer used for dynamic dispatch because the reference would
 // become invalid after AnyValue round-tripping.
 
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -conformance "Impl:IFoo=0" -conformance "GoodImpl:IFoo=1"
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry computeMain -conformance "Impl:IFoo=0" -conformance "GoodImpl:IFoo=1"
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -conformance "Impl:IFoo=0" -conformance "GoodImpl:IFoo=1"
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target hlsl -stage compute -entry computeMain -conformance "Impl:IFoo=0" -conformance "GoodImpl:IFoo=1"
 
 class MyClass
 {
@@ -16,8 +16,9 @@ interface IFoo
     int get();
 }
 
-// CHECK: type 'Impl' contains fields that cannot be packed into ordinary bytes for dynamic dispatch
 export struct Impl : IFoo
+//CHECK:      ^^^^ type cannot be packed for dynamic dispatch
+//CHECK:      ^^^^ type 'Impl' contains fields that cannot be packed into ordinary bytes for dynamic dispatch.
 {
     MyClass obj;
     int get() { return 1; }

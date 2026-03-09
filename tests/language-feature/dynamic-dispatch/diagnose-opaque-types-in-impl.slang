@@ -7,8 +7,8 @@
 // The existing test in tests/diagnostics/resource-type-in-dynamic-dispatch.slang
 // covers Texture2D. This test extends coverage to other opaque resource types.
 
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -conformance "ImplSampler:IFoo=0" -conformance "ImplRWTexture:IFoo=1" -conformance "ImplTexture1D:IFoo=2" -conformance "ImplTexture3D:IFoo=3" -conformance "ImplTextureCube:IFoo=4" -conformance "ImplRayQuery:IFoo=5" -conformance "ImplTriangleStream:IFoo=6" -conformance "ImplMeshOutput:IFoo=7" -conformance "GoodImpl:IFoo=8"
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry computeMain -conformance "ImplSampler:IFoo=0" -conformance "ImplRWTexture:IFoo=1" -conformance "ImplTexture1D:IFoo=2" -conformance "ImplTexture3D:IFoo=3" -conformance "ImplTextureCube:IFoo=4" -conformance "ImplRayQuery:IFoo=5" -conformance "ImplTriangleStream:IFoo=6" -conformance "ImplMeshOutput:IFoo=7" -conformance "GoodImpl:IFoo=8"
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -conformance "ImplSampler:IFoo=0" -conformance "ImplRWTexture:IFoo=1" -conformance "ImplTexture1D:IFoo=2" -conformance "ImplTexture3D:IFoo=3" -conformance "ImplTextureCube:IFoo=4" -conformance "ImplRayQuery:IFoo=5" -conformance "ImplTriangleStream:IFoo=6" -conformance "ImplMeshOutput:IFoo=7" -conformance "GoodImpl:IFoo=8"
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target hlsl -stage compute -entry computeMain -conformance "ImplSampler:IFoo=0" -conformance "ImplRWTexture:IFoo=1" -conformance "ImplTexture1D:IFoo=2" -conformance "ImplTexture3D:IFoo=3" -conformance "ImplTextureCube:IFoo=4" -conformance "ImplRayQuery:IFoo=5" -conformance "ImplTriangleStream:IFoo=6" -conformance "ImplMeshOutput:IFoo=7" -conformance "GoodImpl:IFoo=8"
 
 struct MyVertex
 {
@@ -20,57 +20,65 @@ interface IFoo
     float get();
 }
 
-// CHECK-DAG: type 'ImplSampler' contains fields that cannot be packed into ordinary bytes for dynamic dispatch
 export struct ImplSampler : IFoo
+//CHECK:      ^^^^^^^^^^^ type cannot be packed for dynamic dispatch
+//CHECK:      ^^^^^^^^^^^ type 'ImplSampler' contains fields that cannot be packed into ordinary bytes for dynamic dispatch.
 {
     SamplerState s;
     float get() { return 1.0; }
 }
 
-// CHECK-DAG: type 'ImplRWTexture' contains fields that cannot be packed into ordinary bytes for dynamic dispatch
 export struct ImplRWTexture : IFoo
+//CHECK:      ^^^^^^^^^^^^^ type cannot be packed for dynamic dispatch
+//CHECK:      ^^^^^^^^^^^^^ type 'ImplRWTexture' contains fields that cannot be packed into ordinary bytes for dynamic dispatch.
 {
     RWTexture2D<float> t;
     float get() { return 1.0; }
 }
 
-// CHECK-DAG: type 'ImplTexture1D' contains fields that cannot be packed into ordinary bytes for dynamic dispatch
 export struct ImplTexture1D : IFoo
+//CHECK:      ^^^^^^^^^^^^^ type cannot be packed for dynamic dispatch
+//CHECK:      ^^^^^^^^^^^^^ type 'ImplTexture1D' contains fields that cannot be packed into ordinary bytes for dynamic dispatch.
 {
     Texture1D<float> t;
     float get() { return 1.0; }
 }
 
-// CHECK-DAG: type 'ImplTexture3D' contains fields that cannot be packed into ordinary bytes for dynamic dispatch
 export struct ImplTexture3D : IFoo
+//CHECK:      ^^^^^^^^^^^^^ type cannot be packed for dynamic dispatch
+//CHECK:      ^^^^^^^^^^^^^ type 'ImplTexture3D' contains fields that cannot be packed into ordinary bytes for dynamic dispatch.
 {
     Texture3D<float> t;
     float get() { return 1.0; }
 }
 
-// CHECK-DAG: type 'ImplTextureCube' contains fields that cannot be packed into ordinary bytes for dynamic dispatch
 export struct ImplTextureCube : IFoo
+//CHECK:      ^^^^^^^^^^^^^^^ type cannot be packed for dynamic dispatch
+//CHECK:      ^^^^^^^^^^^^^^^ type 'ImplTextureCube' contains fields that cannot be packed into ordinary bytes for dynamic dispatch.
 {
     TextureCube<float> t;
     float get() { return 1.0; }
 }
 
-// CHECK-DAG: type 'ImplRayQuery' contains fields that cannot be packed into ordinary bytes for dynamic dispatch
 export struct ImplRayQuery : IFoo
+//CHECK:      ^^^^^^^^^^^^ type cannot be packed for dynamic dispatch
+//CHECK:      ^^^^^^^^^^^^ type 'ImplRayQuery' contains fields that cannot be packed into ordinary bytes for dynamic dispatch.
 {
     RayQuery<RAY_FLAG_NONE> rq;
     float get() { return 1.0; }
 }
 
-// CHECK-DAG: type 'ImplTriangleStream' contains fields that cannot be packed into ordinary bytes for dynamic dispatch
 export struct ImplTriangleStream : IFoo
+//CHECK:      ^^^^^^^^^^^^^^^^^^ type cannot be packed for dynamic dispatch
+//CHECK:      ^^^^^^^^^^^^^^^^^^ type 'ImplTriangleStream' contains fields that cannot be packed into ordinary bytes for dynamic dispatch.
 {
     TriangleStream<MyVertex> stream;
     float get() { return 1.0; }
 }
 
-// CHECK-DAG: type 'ImplMeshOutput' contains fields that cannot be packed into ordinary bytes for dynamic dispatch
 export struct ImplMeshOutput : IFoo
+//CHECK:      ^^^^^^^^^^^^^^ type cannot be packed for dynamic dispatch
+//CHECK:      ^^^^^^^^^^^^^^ type 'ImplMeshOutput' contains fields that cannot be packed into ordinary bytes for dynamic dispatch.
 {
     OutputVertices<MyVertex, 3> verts;
     float get() { return 1.0; }
