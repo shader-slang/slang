@@ -2,6 +2,7 @@
 // Optional is lowered to a struct with hasValue + value before AnyValue
 // marshalling. Tests both Some and None values through dynamic dispatch.
 
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-dx12 -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type
@@ -9,7 +10,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-metal -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-wgsl -compute -shaderobj -output-using-type
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 interface IPoint
@@ -103,4 +104,11 @@ void computeMain(int id : SV_DispatchThreadID)
     // CHECK: 0.0
     outputBuffer[7] = b.getNormalY();
     // CHECK: 0.0
+
+    // SimplePoint: pos=(7,8,9), scale=2.0
+    var c = makePoint(id + 2);
+    outputBuffer[8] = c.getPosition().x;
+    // CHECK: 7.0
+    outputBuffer[9] = c.getWeight();
+    // CHECK: 2.0
 }
