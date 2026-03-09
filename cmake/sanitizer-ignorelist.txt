@@ -6,6 +6,8 @@
 # calls virtual methods on ILLVMBuilder (a COM interface returned by the
 # non-instrumented library).
 #
-# Skip vptr checks for types defined in slang-llvm sources.
+# Skip vptr checks for COM interfaces whose implementation lives in slang-llvm.
+# The type: pattern suppresses checks at all call sites regardless of which
+# source file the virtual call is in (e.g. slang-emit-llvm.cpp, slang-emit.cpp).
 [vptr]
-src:*slang-llvm*
+type:*ILLVMBuilder*

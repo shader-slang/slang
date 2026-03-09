@@ -221,7 +221,7 @@ function(set_default_compile_options target)
                     -fsanitize=address
                     -fsanitize=undefined
                     -fno-sanitize-recover=undefined
-                    -fsanitize-ignorelist=${CMAKE_SOURCE_DIR}/cmake/sanitizer-ignorelist.txt
+                    -fsanitize-ignorelist=${PROJECT_SOURCE_DIR}/cmake/sanitizer-ignorelist.txt
             )
             target_link_options(
                 ${target}
