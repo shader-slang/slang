@@ -6,7 +6,6 @@
 # Used by:
 # - .github/workflows/ci-slang-build-container.yml
 # - .github/workflows/ci-slang-test-container.yml
-# - .github/workflows/copilot-setup-steps.yml
 #
 # Build and push:
 #   docker build -f docker/linux-gpu-ci.Dockerfile -t ghcr.io/shader-slang/slang-linux-gpu-ci:v1.4.0 .
@@ -24,8 +23,8 @@
 
 FROM nvidia/cuda:13.0.1-devel-ubuntu22.04
 
-# Install essential tools required for GitHub Actions and Copilot
-# - curl: for downloading Copilot runtime and dependencies
+# Install essential tools required for GitHub Actions
+# - curl: for downloading dependencies
 # - wget: for downloading CMake and other tools
 # - git: for repository operations and submodules
 # - tar, gzip: for archive extraction
