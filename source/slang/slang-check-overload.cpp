@@ -1169,12 +1169,24 @@ bool SemanticsVisitor::TryCheckOverloadCandidateConstraints(
                     constrainedArg = newArgs[valuePackDecl->parameterIndex];
             }
 
-            if (!constrainedArg || !isKnownNonEmptyPack(constrainedArg))
+            auto packCardinality = constrainedArg ? getPackCardinality(constrainedArg)
+                                                  : VariadicPackCardinality::Unknown;
+            if (packCardinality != VariadicPackCardinality::NonEmpty)
             {
                 if (context.mode != OverloadResolveContext::Mode::JustTrying)
                 {
-                    getSink()->diagnose(Diagnostics::EmptyPackDoesNotSatisfyNonEmptyConstraint{
-                        .location = context.loc});
+                    if (packCardinality == VariadicPackCardinality::Empty)
+                    {
+                        getSink()->diagnose(Diagnostics::EmptyPackDoesNotSatisfyNonEmptyConstraint{
+                            .location = context.loc});
+                    }
+                    else
+                    {
+                        auto diagExpr = context.originalExpr ? context.originalExpr : context.baseExpr;
+                        getSink()->diagnose(Diagnostics::PackQueryRequiresNonEmptyPack{
+                            .queryName = "nonempty(...)",
+                            .expr = diagExpr});
+                    }
                 }
                 return false;
             }

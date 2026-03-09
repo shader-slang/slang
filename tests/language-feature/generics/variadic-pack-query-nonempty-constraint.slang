@@ -79,8 +79,8 @@ void badForward<let each D : int>()
 {
     consumeNonEmpty<D>();
 /*CHECK:
-    ^^^^^^^^^^^^^^^ empty pack does not satisfy `nonempty(...)` constraint
-    ^^^^^^^^^^^^^^^ pack argument here is empty
+    ^^^^^^^^^^^^^^^ cannot apply nonempty(...) to a pack that may be empty
+    ^^^^^^^^^^^^^^^ nonempty(...) requires a non-empty pack; add a `where nonempty(...)` constraint or use a structurally non-empty pack
 */
 }
 
@@ -88,8 +88,8 @@ void badTrimmedForward<let each D : int>() where nonempty(D)
 {
     consumeNonEmpty<__trimHead(D)>();
 /*CHECK:
-    ^^^^^^^^^^^^^^^ empty pack does not satisfy `nonempty(...)` constraint
-    ^^^^^^^^^^^^^^^ pack argument here is empty
+    ^^^^^^^^^^^^^^^ cannot apply nonempty(...) to a pack that may be empty
+    ^^^^^^^^^^^^^^^ nonempty(...) requires a non-empty pack; add a `where nonempty(...)` constraint or use a structurally non-empty pack
 */
 }
 
