@@ -13,17 +13,13 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <poll.h>
+#include <signal.h>
 #include <spawn.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
-#include <unistd.h>
-
-#if SLANG_OSX
-#include <signal.h>
-#endif
-
 #include <time.h>
+#include <unistd.h>
 
 extern char** environ;
 
@@ -438,6 +434,21 @@ SlangResult UnixPipeStream::write(const void* buffer, size_t length)
         }
         else
         {
+            //
+            // Reset signals to default for child processes.
+            // The parent may have set SIG_IGN on signals like SIGPIPE;
+            // children should get default signal behavior.
+            //
+            sigset_t sigdefault;
+            sigemptyset(&sigdefault);
+            sigaddset(&sigdefault, SIGPIPE);
+            posix_spawnattr_setsigdefault(&attr, &sigdefault);
+
+            short flags = 0;
+            posix_spawnattr_getflags(&attr, &flags);
+            flags |= POSIX_SPAWN_SETSIGDEF;
+            posix_spawnattr_setflags(&attr, flags);
+
             //
             // Stdio redirections
             //
