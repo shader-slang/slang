@@ -44,10 +44,13 @@ void computeMain()
 //CHECK:       ^^^^^ integer constant overflow in conversion
 //CHECK:       ^^^^^ integer value '65536' does not fit in type 'uint16_t'
 
-    // 4294967296 (2^32) needs 33 bits, exceeding int's 32
+    // 4294967296 (2^32) needs 33 bits, exceeding 32-bit types
     funcInt(4294967296);
 //CHECK:    ^^^^^^^^^^ integer constant overflow in conversion
 //CHECK:    ^^^^^^^^^^ integer value '4294967296' does not fit in type 'int'
+    funcUint(4294967296);
+//CHECK:     ^^^^^^^^^^ integer constant overflow in conversion
+//CHECK:     ^^^^^^^^^^ integer value '4294967296' does not fit in type 'uint'
 
     // Function arguments that fit - should NOT warn
     funcInt8(127);
@@ -60,18 +63,23 @@ void computeMain()
     funcUint(42u);
     funcHalf(2048);
 
-    // Same-width sign reinterpretation is NOT overflow. These values are
-    // outside the signed range but fit within the type's bit width, so
-    // no warning is emitted from either the bit-width overflow check or
-    // UnrecommendedImplicitConversion (whose cost is reduced by
-    // getImplicitConversionCostWithKnownArg). This is a deliberate choice
-    // for shader code where hex constants are commonly used as bit patterns
+    // Bit-width boundary: max values that fit exactly in the type's bit width
+    funcInt8(255);
+    funcUint(4294967295u);
+
+    // Values outside the signed range but within the type's bit width do
+    // NOT trigger the overflow warning. The check is conservative (bit-width
+    // only, not range-aware) to avoid false positives on common shader
+    // patterns where hex constants serve as bit patterns
     // (e.g. packed bytes: int x = 0xFF030206).
     funcInt(0xFFFFFFFFu);
     funcInt8(128);
     funcInt8(-129);
     funcInt8(-200);
     funcInt16(40000);
+
+    // -2 to unsigned: bit-width fits and getImplicitConversionCostWithKnownArg
+    // reduces cost below kConversionCost_Default, so no warning from either check.
     funcUint(-2);
 
     // -1 to unsigned is allowed (common "all ones" pattern)

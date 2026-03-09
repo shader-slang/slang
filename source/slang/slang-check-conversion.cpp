@@ -2027,7 +2027,7 @@ bool SemanticsVisitor::_coerce(
         //
         if (outToExpr && site != CoercionSite::ExplicitCoercion)
         {
-            bool overflowWarningEmitted = false;
+            bool overflowWarningDetected = false;
             bool isCoreModule = false;
             if (auto module = getShared()->getModule())
                 if (auto moduleDecl = module->getModuleDecl())
@@ -2057,13 +2057,13 @@ bool SemanticsVisitor::_coerce(
                 {
                     if (getIntValueBitSize(val->getValue()) > maxBitSize)
                     {
+                        overflowWarningDetected = true;
                         if (sink)
                         {
                             sink->diagnose(Diagnostics::IntegerConstantOverflow{
                                 .value = String(val->getValue()),
                                 .toType = toType,
                                 .expr = fromExpr});
-                            overflowWarningEmitted = true;
                         }
                     }
                 }
@@ -2084,9 +2084,9 @@ bool SemanticsVisitor::_coerce(
                 }
             }
             // For general implicit conversions with high cost, emit a warning
-            // unless the overflow check already covered this case or the
-            // value is a known constant within the target type's range.
-            else if (cost >= kConversionCost_Default && !overflowWarningEmitted)
+            // unless the value is a known constant within the target type's
+            // range. Skip if the overflow check already covered this case.
+            else if (cost >= kConversionCost_Default && !overflowWarningDetected)
             {
                 bool shouldEmitGeneralWarning = true;
                 if (isScalarIntegerType(toType) || isHalfType(toType))
