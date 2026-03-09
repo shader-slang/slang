@@ -2,6 +2,7 @@
 
 void funcInt8(int8_t x) {}
 void funcInt16(int16_t x) {}
+void funcUint16(uint16_t x) {}
 void funcInt(int x) {}
 void funcUint(uint x) {}
 void funcUint8(uint8_t x) {}
@@ -35,10 +36,18 @@ void computeMain()
 //CHECK:         ^ integer constant overflow in conversion
 //CHECK:         ^ integer value '300' does not fit in type 'int8_t'
 
-    // 65536 needs 17 bits, exceeding int16_t's 16 bits
+    // 65536 needs 17 bits, exceeding 16-bit types
     funcInt16(65536);
 //CHECK:      ^^^^^ integer constant overflow in conversion
 //CHECK:      ^^^^^ integer value '65536' does not fit in type 'int16_t'
+    funcUint16(65536);
+//CHECK:       ^^^^^ integer constant overflow in conversion
+//CHECK:       ^^^^^ integer value '65536' does not fit in type 'uint16_t'
+
+    // 4294967296 (2^32) needs 33 bits, exceeding int's 32
+    funcInt(4294967296);
+//CHECK:    ^^^^^^^^^^ integer constant overflow in conversion
+//CHECK:    ^^^^^^^^^^ integer value '4294967296' does not fit in type 'int'
 
     // Function arguments that fit - should NOT warn
     funcInt8(127);
@@ -46,14 +55,18 @@ void computeMain()
     funcUint8(255);
     funcInt16(32767);
     funcInt16(-32768);
+    funcUint16(65535);
     funcInt(42);
     funcUint(42u);
     funcHalf(2048);
 
-    // Same-width sign reinterpretation is NOT overflow (common bit-pattern usage
-    // in shader code, e.g. packed bytes). The bit-width check intentionally
-    // allows these; the existing UnrecommendedImplicitConversion handles them
-    // when the conversion cost is high enough.
+    // Same-width sign reinterpretation is NOT overflow. These values are
+    // outside the signed range but fit within the type's bit width, so
+    // no warning is emitted from either the bit-width overflow check or
+    // UnrecommendedImplicitConversion (whose cost is reduced by
+    // getImplicitConversionCostWithKnownArg). This is a deliberate choice
+    // for shader code where hex constants are commonly used as bit patterns
+    // (e.g. packed bytes: int x = 0xFF030206).
     funcInt(0xFFFFFFFFu);
     funcInt8(128);
     funcInt8(-129);

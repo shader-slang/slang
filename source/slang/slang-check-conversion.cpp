@@ -2032,25 +2032,37 @@ bool SemanticsVisitor::_coerce(
             if (auto module = getShared()->getModule())
                 if (auto moduleDecl = module->getModuleDecl())
                     isCoreModule = moduleDecl->hasModifier<FromCoreModuleModifier>();
+
+            // Cache the constant-fold result so both the overflow check and
+            // the UnrecommendedImplicitConversion check can reuse it.
+            Val* cachedFoldedVal = nullptr;
+            bool hasFolded = false;
+            auto getFoldedIntVal = [&]() -> ConstantIntVal*
+            {
+                if (!hasFolded)
+                {
+                    cachedFoldedVal = tryFoldIntegerConstantExpression(
+                        fromExpr,
+                        ConstantFoldingKind::CompileTime,
+                        nullptr);
+                    hasFolded = true;
+                }
+                return as<ConstantIntVal>(cachedFoldedVal);
+            };
+
             int maxBitSize = getMaximumTypeBitSize(toType);
             if (!isCoreModule && maxBitSize > 0 && cost < kConversionCost_Explicit)
             {
-                if (auto intVal = tryFoldIntegerConstantExpression(
-                        fromExpr,
-                        ConstantFoldingKind::CompileTime,
-                        nullptr))
+                if (auto val = getFoldedIntVal())
                 {
-                    if (auto val = as<ConstantIntVal>(intVal))
+                    if (getIntValueBitSize(val->getValue()) > maxBitSize)
                     {
-                        if (getIntValueBitSize(val->getValue()) > maxBitSize)
+                        if (sink)
                         {
-                            if (sink)
-                            {
-                                sink->diagnose(Diagnostics::IntegerConstantOverflow{
-                                    .value = String(val->getValue()),
-                                    .toType = toType,
-                                    .expr = fromExpr});
-                            }
+                            sink->diagnose(Diagnostics::IntegerConstantOverflow{
+                                .value = String(val->getValue()),
+                                .toType = toType,
+                                .expr = fromExpr});
                             overflowWarningEmitted = true;
                         }
                     }
@@ -2071,22 +2083,19 @@ bool SemanticsVisitor::_coerce(
                         .location = fromExpr->loc});
                 }
             }
+            // For general implicit conversions with high cost, emit a warning
+            // unless the overflow check already covered this case or the
+            // value is a known constant within the target type's range.
             else if (cost >= kConversionCost_Default && !overflowWarningEmitted)
             {
                 bool shouldEmitGeneralWarning = true;
                 if (isScalarIntegerType(toType) || isHalfType(toType))
                 {
-                    if (auto intVal = tryFoldIntegerConstantExpression(
-                            fromExpr,
-                            ConstantFoldingKind::CompileTime,
-                            nullptr))
+                    if (auto val = getFoldedIntVal())
                     {
-                        if (auto val = as<ConstantIntVal>(intVal))
+                        if (isIntValueInRangeOfType(val->getValue(), toType))
                         {
-                            if (isIntValueInRangeOfType(val->getValue(), toType))
-                            {
-                                shouldEmitGeneralWarning = false;
-                            }
+                            shouldEmitGeneralWarning = false;
                         }
                     }
                 }
