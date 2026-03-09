@@ -172,8 +172,21 @@ static void processInst(IRInst* inst, TargetProgram* targetProgram, DiagnosticSi
 
 struct GlobalInstInliningContext : public GlobalInstInliningContextGeneric
 {
-    bool isLegalGlobalInstForTarget(IRInst* /* inst */) override
+    bool isLegalGlobalInstForTarget(IRInst* inst) override
     {
+        switch (inst->getOp())
+        {
+        case kIROp_MakeStruct:
+        case kIROp_MakeArray:
+        case kIROp_MakeArrayFromElement:
+        case kIROp_MakeVector:
+        case kIROp_MakeMatrix:
+        case kIROp_MakeMatrixFromScalar:
+        case kIROp_MakeVectorFromScalar:
+            return true;
+        default:
+            break;
+        }
         // The global instructions that are generically considered legal are fine for
         // WGSL.
         return false;

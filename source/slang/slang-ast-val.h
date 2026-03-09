@@ -261,9 +261,9 @@ FIDDLE(abstract)
 class SizeOfLikeIntVal : public IntVal
 {
     FIDDLE(...)
-    SizeOfLikeIntVal(Type* inType, Type* typeArg) { setOperands(inType, typeArg); }
+    SizeOfLikeIntVal(Type* inType, Val* valArg) { setOperands(inType, valArg); }
 
-    Val* getTypeArg() { return getOperand(1); }
+    Val* getValArg() { return getOperand(1); }
 
     bool _isLinkTimeValOverride() { return false; }
 };
@@ -306,8 +306,8 @@ FIDDLE()
 class CountOfIntVal : public SizeOfLikeIntVal
 {
     FIDDLE(...)
-    CountOfIntVal(Type* inType, Type* typeArg)
-        : SizeOfLikeIntVal(inType, typeArg)
+    CountOfIntVal(Type* inType, Val* valArg)
+        : SizeOfLikeIntVal(inType, valArg)
     {
     }
 
@@ -315,8 +315,57 @@ class CountOfIntVal : public SizeOfLikeIntVal
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
     Val* _resolveImplOverride();
 
-    static Val* tryFoldOrNull(ASTBuilder* astBuilder, Type* intType, Type* newType);
-    static Val* tryFold(ASTBuilder* astBuilder, Type* intType, Type* newType);
+    static Val* tryFoldOrNull(ASTBuilder* astBuilder, Type* intType, Val* newVal);
+    static Val* tryFold(ASTBuilder* astBuilder, Type* intType, Val* newVal);
+};
+
+// A concrete pack of integer values, analogous to ConcreteTypePack for types.
+FIDDLE()
+class ConcreteIntValPack : public IntVal
+{
+    FIDDLE(...)
+    ConcreteIntValPack(Type* inType, ArrayView<IntVal*> vals)
+    {
+        m_operands.add(ValNodeOperand(inType));
+        for (auto v : vals)
+            m_operands.add(ValNodeOperand(v));
+    }
+    Index getCount() { return getOperandCount() - 1; }
+    IntVal* getElement(Index i) { return as<IntVal>(getOperand(i + 1)); }
+    void _toTextOverride(StringBuilder& out);
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    Val* _resolveImplOverride();
+};
+
+// Analogous to ExpandType: represents an unexpanded value pattern over captured value packs.
+FIDDLE()
+class ExpandIntValPack : public IntVal
+{
+    FIDDLE(...)
+    ExpandIntValPack(Type* inType, Val* patternVal, ArrayView<Val*> capturedPacks)
+    {
+        m_operands.add(ValNodeOperand(inType));
+        m_operands.add(ValNodeOperand(patternVal));
+        for (auto p : capturedPacks)
+            m_operands.add(ValNodeOperand(p));
+    }
+    Val* getPatternVal() const { return getOperand(1); }
+    Index getCapturedPackCount() { return getOperandCount() - 2; }
+    Val* getCapturedPack(Index i) { return getOperand(i + 2); }
+    void _toTextOverride(StringBuilder& out);
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    Val* _resolveImplOverride();
+};
+
+// Analogous to EachType: indexes into a value pack during substitution using packExpansionIndex.
+FIDDLE()
+class EachIntVal : public IntVal
+{
+    FIDDLE(...)
+    EachIntVal(Type* inType, Val* basePack) { setOperands(inType, basePack); }
+    Val* getBasePack() const { return getOperand(1); }
+    void _toTextOverride(StringBuilder& out);
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
 FIDDLE()
@@ -798,73 +847,6 @@ class DynamicSubtypeWitness : public SubtypeWitness
     DynamicSubtypeWitness(Type* inSub, Type* inSup) { setOperands(inSub, inSup); }
 };
 
-/// A witness that `T : L & R` because `T : L` and `T : R`
-FIDDLE()
-class ConjunctionSubtypeWitness : public SubtypeWitness
-{
-    FIDDLE(...)
-    // At the operational level, this class of witness is
-    // an operation that takes two witness tables `leftWitness`
-    // and `rightWitness`, and forms a pair/tuple of
-    // `(leftWitness, rightWitness)`.
-    static const int kComponentCount = 2;
-
-    ConjunctionSubtypeWitness(Type* inSub, Type* inSup, SubtypeWitness* left, SubtypeWitness* right)
-    {
-        setOperands(inSub, inSup, left, right);
-    }
-
-    SubtypeWitness* getLeftWitness() const { return as<SubtypeWitness>(getOperand(2)); }
-    SubtypeWitness* getRightWitness() const { return as<SubtypeWitness>(getOperand(3)); }
-
-    Count getComponentCount() const { return 2; }
-    SubtypeWitness* getComponentWitness(Index index) const
-    {
-        SLANG_ASSERT(index >= 0 && index < kComponentCount);
-        return as<SubtypeWitness>(getOperand(2 + index));
-    }
-
-    void _toTextOverride(StringBuilder& out);
-    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
-
-    ConversionCost _getOverloadResolutionCostOverride();
-};
-
-/// A witness that `T <: L` or `T <: R` because `T <: L&R`
-FIDDLE()
-class ExtractFromConjunctionSubtypeWitness : public SubtypeWitness
-{
-    FIDDLE(...)
-    // At the operational level, this class of witness is
-    // an operation that takes a pair/tuple of witness tables
-    // `(leftWtiness, rightWitness)` and extracts one of the
-    // elements of it.
-
-    /// Witness that `T < L & R`
-    SubtypeWitness* getConjunctionWitness() { return as<SubtypeWitness>(getOperand(2)); };
-
-    ExtractFromConjunctionSubtypeWitness(
-        Type* inSub,
-        Type* inSup,
-        SubtypeWitness* witness,
-        int index)
-    {
-        setOperands(inSub, inSup, witness, index);
-    }
-
-    /// The zero-based index of the super-type we care about in the conjunction
-    ///
-    /// If `conjunctionWitness` is `T < L & R` then this index should be zero if
-    /// we want to represent `T < L` and one if we want `T < R`.
-    ///
-    int getIndexInConjunction() { return (int)getIntConstOperand(3); };
-
-    void _toTextOverride(StringBuilder& out);
-    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
-
-    ConversionCost _getOverloadResolutionCostOverride();
-};
-
 /// A witness for the "none" value of optional constraints.
 FIDDLE()
 class NoneWitness : public Witness
@@ -1080,5 +1062,8 @@ inline bool isTypeEqualityWitness(Val* witness)
     }
     return false;
 }
+
+bool isValuePack(Val* val);
+bool isAbstractValuePack(Val* val);
 
 } // namespace Slang

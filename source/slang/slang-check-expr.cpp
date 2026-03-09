@@ -2122,30 +2122,77 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
             resultValue = (constArgVals[0] != 0) || (constArgVals[1] != 0);
         }
 
-        // simple binary operators
-#define CASE(OP)                                          \
-    else if (opName == getName(#OP)) do                   \
-    {                                                     \
-        if (argCount != 2)                                \
-            return nullptr;                               \
-        resultValue = constArgVals[0] OP constArgVals[1]; \
-    }                                                     \
+        // Unsigned/bitwise operators (bit pattern preserved, uint64_t cast is correct)
+#define CASE_UINT(OP)                                                                         \
+    else if (opName == getName(#OP)) do                                                       \
+    {                                                                                         \
+        if (argCount != 2)                                                                    \
+            return nullptr;                                                                   \
+        resultValue =                                                                         \
+            static_cast<uint64_t>(constArgVals[0]) OP static_cast<uint64_t>(constArgVals[1]); \
+    }                                                                                         \
     while (0)
 
-        CASE(+); // TODO: this can also be unary...
-        CASE(*);
-        CASE(<<);
-        CASE(>>);
-        CASE(&);
-        CASE(|);
-        CASE(^);
-        CASE(!=);
-        CASE(==);
-        CASE(>=);
-        CASE(<=);
-        CASE(<);
-        CASE(>);
-#undef CASE
+        CASE_UINT(+); // TODO: this can also be unary...
+        CASE_UINT(*);
+        CASE_UINT(&);
+        CASE_UINT(|);
+        CASE_UINT(^);
+        CASE_UINT(!=);
+        CASE_UINT(==);
+#undef CASE_UINT
+
+        // Signed comparison operators (uint64_t cast would break e.g. (-1 < 0))
+        else if (opName == getName(">="))
+        {
+            if (argCount != 2)
+                return nullptr;
+            resultValue = constArgVals[0] >= constArgVals[1];
+        }
+        else if (opName == getName("<="))
+        {
+            if (argCount != 2)
+                return nullptr;
+            resultValue = constArgVals[0] <= constArgVals[1];
+        }
+        else if (opName == getName("<"))
+        {
+            if (argCount != 2)
+                return nullptr;
+            resultValue = constArgVals[0] < constArgVals[1];
+        }
+        else if (opName == getName(">"))
+        {
+            if (argCount != 2)
+                return nullptr;
+            resultValue = constArgVals[0] > constArgVals[1];
+        }
+
+        // Shift operators: guard negative count (UB), use modulo for width
+        else if (opName == getName("<<"))
+        {
+            if (argCount != 2)
+                return nullptr;
+            if (constArgVals[1] < 0)
+                return nullptr;
+            const auto shiftCount =
+                static_cast<std::make_unsigned_t<IRIntegerValue>>(constArgVals[1]) %
+                std::numeric_limits<std::make_unsigned_t<IRIntegerValue>>::digits;
+            resultValue = static_cast<IntegerLiteralValue>(
+                static_cast<std::make_unsigned_t<IntegerLiteralValue>>(constArgVals[0])
+                << shiftCount);
+        }
+        else if (opName == getName(">>"))
+        {
+            if (argCount != 2)
+                return nullptr;
+            if (constArgVals[1] < 0)
+                return nullptr;
+            const auto shiftCount =
+                static_cast<std::make_unsigned_t<IRIntegerValue>>(constArgVals[1]) %
+                std::numeric_limits<std::make_unsigned_t<IRIntegerValue>>::digits;
+            resultValue = constArgVals[0] >> shiftCount;
+        }
         // binary operators with chance of divide-by-zero
         // TODO: issue a suitable error in that case
 #define CASE(OP)                                          \
@@ -2337,8 +2384,79 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
         }
         else if (auto countOfExpr = expr.as<CountOfExpr>())
         {
+            // For value packs, sizedType is ValuePackType. Try to fold
+            // the value expression to get the pack reference instead.
+            Val* countArg = type;
+            if (as<ValuePackType>(type))
+            {
+                auto valExprFolded = tryConstantFoldExpr(
+                    SubstExpr<Expr>(countOfExpr.getExpr()->value, expr.getSubsts()),
+                    kind,
+                    circularityInfo);
+                if (valExprFolded)
+                    countArg = valExprFolded;
+            }
             return as<IntVal>(
-                CountOfIntVal::tryFold(m_astBuilder, expr.getExpr()->type.type, type));
+                CountOfIntVal::tryFold(m_astBuilder, expr.getExpr()->type.type, countArg));
+        }
+    }
+
+    // `each D` where D is a value pack parameter produces an EachIntVal.
+    if (auto eachExpr = expr.as<EachExpr>())
+    {
+        if (auto baseExpr = eachExpr.getExpr()->baseExpr)
+        {
+            if (auto valPackType = as<ValuePackType>(baseExpr->type))
+            {
+                if (auto baseDeclRefExpr = as<DeclRefExpr>(baseExpr))
+                {
+                    auto baseDeclRef = getDeclRef(m_astBuilder, baseDeclRefExpr);
+                    if (auto packParamRef = baseDeclRef.as<GenericValuePackParamDecl>())
+                    {
+                        auto elementType = valPackType->getElementType();
+                        auto packRef =
+                            m_astBuilder->getOrCreate<DeclRefIntVal>(valPackType, packParamRef);
+                        Val* substPackRef = packRef->substitute(m_astBuilder, expr.getSubsts());
+                        return m_astBuilder->getEachIntVal(elementType, substPackRef);
+                    }
+                }
+            }
+        }
+    }
+
+    // A PackExpr with integer elements folds to a ConcreteIntValPack.
+    if (auto packExpr = expr.as<PackExpr>())
+    {
+        ShortList<IntVal*> elements;
+        for (auto arg : packExpr.getExpr()->args)
+        {
+            auto elementVal =
+                tryConstantFoldExpr(SubstExpr<Expr>(arg, expr.getSubsts()), kind, circularityInfo);
+            if (!elementVal)
+                return nullptr;
+            elements.add(elementVal);
+        }
+        return m_astBuilder->getIntValPack(elements.getArrayView().arrayView);
+    }
+
+    // `expand <expr>` where the expr involves value packs produces an ExpandIntValPack.
+    if (auto expandExpr = expr.as<ExpandExpr>())
+    {
+        if (auto expandType = as<ExpandType>(getType(m_astBuilder, expandExpr)))
+        {
+            auto patternVal = tryConstantFoldExpr(
+                SubstExpr<Expr>(expandExpr.getExpr()->baseExpr, expr.getSubsts()),
+                kind,
+                circularityInfo);
+            if (patternVal)
+            {
+                ShortList<Val*> capturedPacks;
+                for (Index i = 0; i < expandType->getCapturedPackCount(); i++)
+                    capturedPacks.add(expandType->getCapturedPack(i));
+                return as<IntVal>(m_astBuilder->getExpandIntValPack(
+                    patternVal,
+                    capturedPacks.getArrayView().arrayView));
+            }
         }
     }
 
@@ -2352,6 +2470,15 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
             Val* valResult = m_astBuilder->getOrCreate<DeclRefIntVal>(
                 declRef.substitute(m_astBuilder, genericValParamRef.getDecl()->getType()),
                 genericValParamRef);
+            valResult = valResult->substitute(m_astBuilder, expr.getSubsts());
+            return as<IntVal>(valResult);
+        }
+
+        if (auto genericValPackParamRef = declRef.as<GenericValuePackParamDecl>())
+        {
+            Val* valResult = m_astBuilder->getOrCreate<DeclRefIntVal>(
+                genericValPackParamRef.getDecl()->getType(),
+                genericValPackParamRef);
             valResult = valResult->substitute(m_astBuilder, expr.getSubsts());
             return as<IntVal>(valResult);
         }
@@ -3734,16 +3861,17 @@ Type* SemanticsVisitor::getDifferentialPairType(Type* primalType)
         auto diffPairEachType = getDifferentialPairType(eachType);
         if (auto expandType = as<ExpandType>(primalType))
         {
-            List<Type*> capturedTypePacks;
-            for (Index i = 0; i < expandType->getCapturedTypePackCount(); i++)
+            List<Val*> capturedPacks;
+            for (Index i = 0; i < expandType->getCapturedPackCount(); i++)
             {
-                capturedTypePacks.add(expandType->getCapturedTypePack(i));
+                capturedPacks.add(expandType->getCapturedPack(i));
             }
-            return m_astBuilder->getExpandType(diffPairEachType, capturedTypePacks.getArrayView());
+            return m_astBuilder->getExpandType(diffPairEachType, capturedPacks.getArrayView());
         }
         else
         {
-            return m_astBuilder->getExpandType(diffPairEachType, makeArrayViewSingle(primalType));
+            Val* primalVal = primalType;
+            return m_astBuilder->getExpandType(diffPairEachType, makeArrayViewSingle(primalVal));
         }
     }
 
@@ -4198,7 +4326,7 @@ static bool _isSizeOfType(Type* type)
     return false;
 }
 
-static bool _isCountOfType(Type* type)
+static bool _isTypeOrValValidForCountOf(Type* type)
 {
     if (!type)
     {
@@ -4220,12 +4348,18 @@ static bool _isCountOfType(Type* type)
         return true;
     }
 
+    if (as<ValuePackType>(type))
+    {
+        return true;
+    }
+
     return false;
 }
 
 Expr* SemanticsExprVisitor::visitSizeOfLikeExpr(SizeOfLikeExpr* sizeOfLikeExpr)
 {
     auto valueExpr = dispatch(sizeOfLikeExpr->value);
+    sizeOfLikeExpr->value = valueExpr;
     sizeOfLikeExpr->type = m_astBuilder->getIntType();
 
     Type* type = nullptr;
@@ -4250,7 +4384,7 @@ Expr* SemanticsExprVisitor::visitSizeOfLikeExpr(SizeOfLikeExpr* sizeOfLikeExpr)
 
     if (as<CountOfExpr>(sizeOfLikeExpr))
     {
-        if (!_isCountOfType(type))
+        if (!_isTypeOrValValidForCountOf(type))
         {
             getSink()->diagnose(Diagnostics::CountOfArgumentIsInvalid{.expr = sizeOfLikeExpr});
 
@@ -4859,8 +4993,8 @@ Expr* SemanticsExprVisitor::visitAsTypeExpr(AsTypeExpr* expr)
 
 Expr* SemanticsExprVisitor::visitExpandExpr(ExpandExpr* expr)
 {
-    OrderedHashSet<Type*> capturedTypePackSet;
-    auto subContext = this->withParentExpandExpr(expr, &capturedTypePackSet);
+    OrderedHashSet<Val*> capturedPackSet;
+    auto subContext = this->withParentExpandExpr(expr, &capturedPackSet);
     expr->baseExpr = dispatchExpr(expr->baseExpr, subContext);
 
     Type* patternType = nullptr;
@@ -4879,16 +5013,16 @@ Expr* SemanticsExprVisitor::visitExpandExpr(ExpandExpr* expr)
         expr->type = m_astBuilder->getErrorType();
         return expr;
     }
-    if (subContext.getCapturedTypePacks()->getCount() == 0)
+    if (subContext.getCapturedPacks()->getCount() == 0)
     {
         getSink()->diagnose(Diagnostics::ExpandTermCapturesNoTypePacks{.expr = expr});
     }
-    List<Type*> capturedTypePacks;
-    for (auto capturedType : capturedTypePackSet)
+    List<Val*> capturedPacks;
+    for (auto capturedVal : capturedPackSet)
     {
-        capturedTypePacks.add(capturedType);
+        capturedPacks.add(capturedVal);
     }
-    auto expandType = m_astBuilder->getExpandType(patternType, capturedTypePacks.getArrayView());
+    auto expandType = m_astBuilder->getExpandType(patternType, capturedPacks.getArrayView());
     if (isTypeExpr)
         expr->type = m_astBuilder->getTypeType(expandType);
     else
@@ -4922,6 +5056,25 @@ Expr* SemanticsExprVisitor::visitEachExpr(EachExpr* expr)
         expr->type = m_astBuilder->getErrorType();
         return expr;
     }
+
+    // Check if this is a value pack parameter reference (e.g. `each D` where D is
+    // `let each D : int`).
+    if (!isTypeNode)
+    {
+        if (auto valPackType = as<ValuePackType>(baseType))
+        {
+            SLANG_ASSERT(m_capturedPacks);
+            if (auto declRefExpr = as<DeclRefExpr>(expr->baseExpr))
+            {
+                auto declRef = getDeclRef(m_astBuilder, declRefExpr);
+                m_capturedPacks->add(
+                    m_astBuilder->getOrCreate<DeclRefIntVal>(valPackType, declRef));
+            }
+            expr->type = QualType(valPackType->getElementType());
+            return expr;
+        }
+    }
+
     if (isTypeNode)
     {
         auto declRefType = as<DeclRefType>(baseType);
@@ -4944,18 +5097,18 @@ Expr* SemanticsExprVisitor::visitEachExpr(EachExpr* expr)
         baseType = tupleType->getTypePack();
 
     {
-        SLANG_ASSERT(m_capturedTypePacks);
+        SLANG_ASSERT(m_capturedPacks);
         if (auto baseExpandType = as<ExpandType>(baseType))
         {
-            for (Index i = 0; i < baseExpandType->getCapturedTypePackCount(); i++)
+            for (Index i = 0; i < baseExpandType->getCapturedPackCount(); i++)
             {
-                auto capturedType = baseExpandType->getCapturedTypePack(i);
-                m_capturedTypePacks->add(capturedType);
+                auto capturedPack = baseExpandType->getCapturedPack(i);
+                m_capturedPacks->add(capturedPack);
             }
         }
         else
         {
-            m_capturedTypePacks->add(baseType);
+            m_capturedPacks->add(baseType);
         }
         auto eachType = m_astBuilder->getEachType(baseType);
         if (isTypeNode)
