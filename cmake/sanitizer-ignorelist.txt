@@ -1,0 +1,11 @@
+# UBSan ignorelist for prebuilt slang-llvm shared library.
+#
+# The prebuilt libslang-llvm is not compiled with sanitizers, so UBSan's
+# vptr checker cannot validate vtables from objects created inside it.
+# This causes false-positive "invalid vptr" aborts when sanitized code
+# calls virtual methods on ILLVMBuilder (a COM interface returned by the
+# non-instrumented library).
+#
+# Skip vptr checks for types defined in slang-llvm sources.
+[vptr]
+src:*slang-llvm*
