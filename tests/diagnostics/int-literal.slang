@@ -12,6 +12,8 @@ int doSomething(int a)
 
     // Should sign extend
     int c3 = 0x80000000;
+//CHECK:     ^^^^^^^^^^ integer constant overflow in conversion
+//CHECK:     ^^^^^^^^^^ integer value '2147483648' does not fit in type 'int'
 
     // No warning, hex literal will be interpreted as an unsigned 64 integer then signed with negative operator.
     int64_t c4 = -0xfffffffff;

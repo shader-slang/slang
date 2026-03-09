@@ -2032,8 +2032,8 @@ bool SemanticsVisitor::_coerce(
             if (auto module = getShared()->getModule())
                 if (auto moduleDecl = module->getModuleDecl())
                     isCoreModule = moduleDecl->hasModifier<FromCoreModuleModifier>();
-            int maxBitSize = getMaximumTypeBitSize(toType);
-            if (!isCoreModule && maxBitSize > 0)
+            if (!isCoreModule && cost < kConversionCost_Explicit &&
+                (isScalarIntegerType(toType) || isHalfType(toType)))
             {
                 if (auto intVal = tryFoldIntegerConstantExpression(
                         fromExpr,
@@ -2042,7 +2042,7 @@ bool SemanticsVisitor::_coerce(
                 {
                     if (auto val = as<ConstantIntVal>(intVal))
                     {
-                        if (getIntValueBitSize(val->getValue()) > maxBitSize)
+                        if (!isIntValueInRangeOfType(val->getValue(), toType))
                         {
                             if (sink)
                             {
