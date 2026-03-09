@@ -153,7 +153,7 @@ VISIBILITY_LEVEL struct TileInfo<T, int M, int N, int K, TargetEnum Target, bool
 //       we need the logic to be expand as much as possible during compile time. WaveGetLaneCount() is a runtime function,
 //       so if we use it directly in our mma function, some of branches won't be eliminated during compile time.
 [require(cooperative_matrix)]
-VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int SubgroupSize, TargetEnum Target, ShMemSize: ISharedMemorySize, bool TransposeA = false>
+VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int SubgroupSize, TargetEnum Target, ShMemSize: ISharedMemorySize, bool TransposeA, int SubgroupCount>
     where T : __BuiltinFloatingPointType
     where T.Differential == T
 {
@@ -552,20 +552,23 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
     [require(cooperative_matrix, subgroup_basic, cuda_spirv)]
     internal static void sumReduceTiles<int ROW, int COLUMN>(inout MatC matC[ROW*COLUMN], in int subgroupId, uint sharedMemoryOffset)
     {
-        const int subgroupCount = getWaveCount();
+        if (SubgroupCount <= 1)
+            return;
 
         // perform n/2 sum reduces, so each iteration will perform a 2-way reduce operation,
         // totally log2(n) steps, where n is the number of subgroups.
-        for (int k = 1; k < subgroupCount; k <<= 1)
+        for (int k = 1; k < SubgroupCount; k <<= 1)
         {
             // (subgroupId / k<< 1 ) calculate which cooperative matrix tile this warp will write to.
             // The whole shared memory is divided into subgroupCount/2 parts. So each two neighboring subgroups
             // will use one shared memory. And left subgroup loads, right subgroup stores.
             uint subgroupOffset = (subgroupId / (k<<1)) * (CMShape.CoopMatCSizeInVector * COLUMN);
             uint ptrPerWarpOffset = sharedMemoryOffset + subgroupOffset;
+            [ForceUnroll]
             for (int i = 0; i < ROW; i++)
             {
                 // Store one row of cooperative matrix to the shared memory.
+                [ForceUnroll]
                 for (int j = 0; j < COLUMN; j++)
                 {
                     // This is the right node in the 2-way merge operation.
@@ -585,8 +588,9 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
                 if (subgroupId % (k<<1) == 0)
                 {
                     // If the left node is the last subgroup, it means that there is no right node for it, so we don't need to do any addition for this subgroup.
-                    if (subgroupId != (subgroupCount - 1))
+                    if (subgroupId != (SubgroupCount - 1))
                     {
+                        [ForceUnroll]
                         for (int j = 0; j < COLUMN; j++)
                         {
                             MatC rightMatC = MatC.Load<RowMajor, uint4>(ShMemPool.data, ptrPerWarpOffset + j * CMShape.CoopMatCSizeInVector,
@@ -736,7 +740,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
         where InArrayType : IArrayAccessor<U>
     {
         const uint laneId = WaveGetLaneIndex();
-        const int subgroupCount = getWaveCount();
+        const int subgroupCount = SubgroupCount;
 
         // Pad M to even number for half2 alignment
         static const int MPadded = (M + 1) & ~1;  // Round up to even
@@ -1043,7 +1047,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
         // finish MMA reads before sumReduceTiles overwrites shared memory.
         GroupMemoryBarrierWithGroupSync();
 
-        // sum reduce will accumulate the result cross all the warps into the cooperative matrix in the first subgroup.
+        // Cross-warp reduction (skipped at compile time when SubgroupCount <= 1).
         sumReduceTiles<CoopMatCRows, CoopMatCColumns>(matC, subgroupIndex, sharedMemoryBOffset);
 
         // Only the first subgroup need to store the result to the global memory.
@@ -1067,7 +1071,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
                 // So we can use transposed version of LoadShA/StoreShA to store the result. Because in transpose version, the major-ness is along
                 // K dimension. Note that column major in transpose case is just the row major in non-transpose case.
 
-                typealias MMA = MMAHelper<T, InputSize, OutputSize, SubgroupSize, Target, ShMemSize, true>;
+                typealias MMA = MMAHelper<T, InputSize, OutputSize, SubgroupSize, Target, ShMemSize, true, SubgroupCount>;
                 MMA.storeShA<U, Address>(sharedMemoryBOffset, i, weightAddress);
 
                 // Wait until all threads in the warp finish reading the shared memory and storing to the global memory.
@@ -1248,11 +1252,11 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
 // WaveTangledVector is a vector type that emulates the Cooperative Vector type by using Cooperative Matrix feature which is
 // supported by CUDA and SPIR-V.
 [require(cooperative_matrix, subgroup_basic, cuda_spirv)]
-public struct WaveTangledVector<T, ShMemSize : ISharedMemorySize, int N, int SubgroupSize> : IVector<T>
+public struct WaveTangledVector<T, ShMemSize : ISharedMemorySize, int N, int SubgroupSize, int SubgroupCount> : IVector<T>
     where T : __BuiltinFloatingPointType
     where T.Differential == T
 {
-    public typealias Differential = WaveTangledVector<T, ShMemSize, N, SubgroupSize>;
+    public typealias Differential = WaveTangledVector<T, ShMemSize, N, SubgroupSize, SubgroupCount>;
 
     public static const int Size = N;
     public typealias ShMemPool = SharedMemoryPool<ShMemSize>;
@@ -1342,7 +1346,7 @@ public struct WaveTangledVector<T, ShMemSize : ISharedMemorySize, int N, int Sub
     {
         if (Layout.Layout == LayoutType.Optimal)
         {
-            typealias MMA = TiledMMAHelper<T, N, OutputVector.Size, SubgroupSize, Target, ShMemSize, false>;
+            typealias MMA = TiledMMAHelper<T, N, OutputVector.Size, SubgroupSize, Target, ShMemSize, false, SubgroupCount>;
             uint shA = 0;
             uint shB = MMA.ShMemInfo.SharedMemSizeInVectorMatA;
             uint shC = shB;
@@ -1353,7 +1357,7 @@ public struct WaveTangledVector<T, ShMemSize : ISharedMemorySize, int N, int Sub
         }
         else
         {
-            typealias MMA = MMAHelper<T, N, OutputVector.Size, SubgroupSize, Target, ShMemSize, false>;
+            typealias MMA = MMAHelper<T, N, OutputVector.Size, SubgroupSize, Target, ShMemSize, false, SubgroupCount>;
             uint shA = 0;
             uint shB = MMA.ShMemInfo.SharedMemSizeInVectorMatA;
             uint shC = shB;
@@ -1378,7 +1382,7 @@ public struct WaveTangledVector<T, ShMemSize : ISharedMemorySize, int N, int Sub
     {
         if (Layout.Layout == LayoutType.Optimal)
         {
-            typealias MMA = TiledMMAHelper<T, N, OutputVector.Size, SubgroupSize, Target, ShMemSize, true>;
+            typealias MMA = TiledMMAHelper<T, N, OutputVector.Size, SubgroupSize, Target, ShMemSize, true, SubgroupCount>;
 
             uint shA = 0;
             uint shB = MMA.ShMemInfo.SharedMemSizeInVectorMatA;
@@ -1392,11 +1396,11 @@ public struct WaveTangledVector<T, ShMemSize : ISharedMemorySize, int N, int Sub
             This.Differential dInput = This.Differential(outArray);
             dthis = DifferentialPair<This>(dthis.p, dInput);
 
-            GroupMemoryBarrierWithGroupSync();
+            // GroupMemoryBarrierWithGroupSync();
 
             static const int _outerRows = (MMA.M + MMA.CMShape.ROW_A - 1) / MMA.CMShape.ROW_A;
             static const int _outerPerWarpA = _outerRows * MMA.CMShape.ROW_A / MMA.CMShape.ElementCountPerVector * MMA.CMShape.COLUMN_A;
-            uint shB_outer = shA + uint(getWaveCount() * _outerPerWarpA);
+            uint shB_outer = shA + uint(SubgroupCount * _outerPerWarpA);
 
             // dW = dOut * input^T, stored in tiled layout
             MMA.outerProductAccumulate<T, Address.Differential,
@@ -1413,7 +1417,7 @@ public struct WaveTangledVector<T, ShMemSize : ISharedMemorySize, int N, int Sub
         }
         else
         {
-            typealias MMA = MMAHelper<T, N, OutputVector.Size, SubgroupSize, Target, ShMemSize, true>;
+            typealias MMA = MMAHelper<T, N, OutputVector.Size, SubgroupSize, Target, ShMemSize, true, SubgroupCount>;
 
             uint shA = 0;
             uint shB = MMA.ShMemInfo.SharedMemSizeInVectorMatA;
@@ -1431,7 +1435,7 @@ public struct WaveTangledVector<T, ShMemSize : ISharedMemorySize, int N, int Sub
 
             static const int _outerRows = (MMA.M + MMA.CMShape.ROW_A - 1) / MMA.CMShape.ROW_A;
             static const int _outerPerWarpA = _outerRows * MMA.CMShape.ROW_A / MMA.CMShape.ElementCountPerVector * MMA.CMShape.COLUMN_A;
-            uint shB_outer = shA + uint(getWaveCount() * _outerPerWarpA);
+            uint shB_outer = shA + uint(SubgroupCount * _outerPerWarpA);
 
             // dW = dOut * input^T, stored in linear layout
             MMA.outerProductAccumulate<T, Address.Differential,
