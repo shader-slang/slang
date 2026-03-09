@@ -101,11 +101,12 @@ export struct GoodImpl : IFoo
     float get() { return v; }
 }
 
+uniform int dynId;
 RWStructuredBuffer<float> outputBuffer;
 
 [numthreads(1, 1, 1)]
 void computeMain()
 {
-    IFoo f = createDynamicObject<IFoo>(10, 0);
+    IFoo f = createDynamicObject<IFoo>(dynId, 0);
     outputBuffer[0] = f.get();
 }
