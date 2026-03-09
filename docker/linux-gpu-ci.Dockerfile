@@ -9,8 +9,8 @@
 # - .github/workflows/copilot-setup-steps.yml
 #
 # Build and push:
-#   docker build -f docker/linux-gpu-ci.Dockerfile -t ghcr.io/shader-slang/slang-linux-gpu-ci:v1.3.0 .
-#   docker push ghcr.io/shader-slang/slang-linux-gpu-ci:v1.3.0
+#   docker build -f docker/linux-gpu-ci.Dockerfile -t ghcr.io/shader-slang/slang-linux-gpu-ci:v1.4.0 .
+#   docker push ghcr.io/shader-slang/slang-linux-gpu-ci:v1.4.0
 #
 # IMPORTANT: After pushing a new version, update all references in:
 #   - .github/workflows/ci-slang-build-container.yml
@@ -58,18 +58,18 @@ RUN apt-get update && apt-get install -y \
     glslang-tools \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Vulkan SDK 1.4.321.1 from tarball (apt packages discontinued after 1.4.313)
+# Install Vulkan SDK 1.4.341.1 from tarball (apt packages discontinued after 1.4.313)
 # Using tarball to get the fixed validation layers that resolve cooperative vector issues
-ENV VULKAN_SDK=/opt/vulkan-sdk/1.4.321.1/x86_64
+ENV VULKAN_SDK=/opt/vulkan-sdk/1.4.341.1/x86_64
 ENV PATH="${VULKAN_SDK}/bin:${PATH}"
 ENV LD_LIBRARY_PATH="${VULKAN_SDK}/lib:${LD_LIBRARY_PATH}"
 ENV VK_LAYER_PATH="${VULKAN_SDK}/share/vulkan/explicit_layer.d"
 
-RUN wget -q https://sdk.lunarg.com/sdk/download/1.4.321.1/linux/vulkansdk-linux-x86_64-1.4.321.1.tar.xz && \
-    tar -xf vulkansdk-linux-x86_64-1.4.321.1.tar.xz && \
+RUN wget -q https://sdk.lunarg.com/sdk/download/1.4.341.1/linux/vulkansdk-linux-x86_64-1.4.341.1.tar.xz && \
+    tar -xf vulkansdk-linux-x86_64-1.4.341.1.tar.xz && \
     mkdir -p /opt/vulkan-sdk && \
-    mv 1.4.321.1 /opt/vulkan-sdk/ && \
-    rm -rf vulkansdk-linux-x86_64-1.4.321.1.tar.xz
+    mv 1.4.341.1 /opt/vulkan-sdk/ && \
+    rm -rf vulkansdk-linux-x86_64-1.4.341.1.tar.xz
 
 # Install runtime libraries for test execution
 RUN apt-get update && apt-get install -y \
