@@ -4640,7 +4640,8 @@ Expr* SemanticsExprVisitor::visitPackQueryExpr(PackQueryExpr* packQueryExpr)
     auto packCardinality = cardinalitySource ? getPackCardinality(cardinalitySource)
                                              : VariadicPackCardinality::Unknown;
 
-    auto isFirstOrLastQuery = [&]() { return as<FirstExpr>(packQueryExpr) || as<LastExpr>(packQueryExpr); };
+    auto isFirstOrLastQuery = [&]()
+    { return as<FirstExpr>(packQueryExpr) || as<LastExpr>(packQueryExpr); };
     auto applyPackQueryToType = [&](Type* type) -> Type*
     {
         if (as<FirstExpr>(packQueryExpr))

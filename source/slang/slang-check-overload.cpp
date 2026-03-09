@@ -1182,7 +1182,8 @@ bool SemanticsVisitor::TryCheckOverloadCandidateConstraints(
                     }
                     else
                     {
-                        auto diagExpr = context.originalExpr ? context.originalExpr : context.baseExpr;
+                        auto diagExpr =
+                            context.originalExpr ? context.originalExpr : context.baseExpr;
                         getSink()->diagnose(Diagnostics::PackQueryRequiresNonEmptyPack{
                             .queryName = "nonempty(...)",
                             .expr = diagExpr});

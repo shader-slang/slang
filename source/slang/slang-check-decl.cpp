@@ -9431,8 +9431,7 @@ bool SemanticsVisitor::doGenericSignaturesMatch(
                 return false;
         }
         else if (
-            auto leftTypeCoercionConstraint =
-                as<TypeCoercionConstraintDecl>(leftConstraints[cc]))
+            auto leftTypeCoercionConstraint = as<TypeCoercionConstraintDecl>(leftConstraints[cc]))
         {
             auto unspecializedRightConstraintDeclRef = createDefaultSubstitutionsIfNeeded(
                 m_astBuilder,
@@ -9452,8 +9451,9 @@ bool SemanticsVisitor::doGenericSignaturesMatch(
                 return false;
 
             auto leftToType = leftTypeCoercionConstraint->toType.type;
-            auto rightToType =
-                substInnerRightToLeft.substitute(m_astBuilder, rightConstraint.getDecl()->toType.type);
+            auto rightToType = substInnerRightToLeft.substitute(
+                m_astBuilder,
+                rightConstraint.getDecl()->toType.type);
             if (!leftToType->equals(rightToType))
                 return false;
 
