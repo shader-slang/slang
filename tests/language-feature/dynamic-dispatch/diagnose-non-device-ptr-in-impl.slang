@@ -8,8 +8,8 @@
 // Plain pointers (int*) default to device address space and are allowed
 // in interface implementations.
 
-//TEST:SIMPLE(filecheck=CHECK): -target spirv
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -conformance "ImplGroupsharedPtr:IFoo=0" -conformance "ImplRefField:IFoo=1" -conformance "GoodImpl:IFoo=2" -conformance "GoodImplDevicePtr:IFoo=3"
+//TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry computeMain -conformance "ImplGroupsharedPtr:IFoo=0" -conformance "ImplRefField:IFoo=1" -conformance "GoodImpl:IFoo=2" -conformance "GoodImplDevicePtr:IFoo=3"
 
 interface IFoo
 {
@@ -51,6 +51,6 @@ RWStructuredBuffer<int> outputBuffer;
 [numthreads(1, 1, 1)]
 void computeMain()
 {
-    IFoo f = createDynamicObject<IFoo>(0, 0);
+    IFoo f = createDynamicObject<IFoo>(2, 0);
     outputBuffer[0] = f.get();
 }

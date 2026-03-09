@@ -3,8 +3,8 @@
 // byte buffer used for dynamic dispatch because the reference would
 // become invalid after AnyValue round-tripping.
 
-//TEST:SIMPLE(filecheck=CHECK): -target spirv
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -conformance "Impl:IFoo=0" -conformance "GoodImpl:IFoo=1"
+//TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry computeMain -conformance "Impl:IFoo=0" -conformance "GoodImpl:IFoo=1"
 
 class MyClass
 {
@@ -34,6 +34,6 @@ RWStructuredBuffer<int> outputBuffer;
 [numthreads(1, 1, 1)]
 void computeMain()
 {
-    IFoo f = createDynamicObject<IFoo>(0, 0);
+    IFoo f = createDynamicObject<IFoo>(1, 0);
     outputBuffer[0] = f.get();
 }

@@ -7,8 +7,8 @@
 // complementing diagnose-opaque-types-in-impl.slang which covers
 // textures, samplers, ray queries, and stream outputs.
 
-//TEST:SIMPLE(filecheck=CHECK): -target spirv
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -conformance "ImplBuffer:IFoo=0" -conformance "ImplRWBuffer:IFoo=1" -conformance "ImplByteAddressBuffer:IFoo=2" -conformance "ImplRWByteAddressBuffer:IFoo=3" -conformance "ImplStructuredBuffer:IFoo=4" -conformance "ImplRWStructuredBuffer:IFoo=5" -conformance "ImplAppendStructuredBuffer:IFoo=6" -conformance "ImplConsumeStructuredBuffer:IFoo=7" -conformance "ImplRTAS:IFoo=8" -conformance "ImplSubpassInput:IFoo=9" -conformance "GoodImpl:IFoo=10"
+//TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry computeMain -conformance "ImplBuffer:IFoo=0" -conformance "ImplRWBuffer:IFoo=1" -conformance "ImplByteAddressBuffer:IFoo=2" -conformance "ImplRWByteAddressBuffer:IFoo=3" -conformance "ImplStructuredBuffer:IFoo=4" -conformance "ImplRWStructuredBuffer:IFoo=5" -conformance "ImplAppendStructuredBuffer:IFoo=6" -conformance "ImplConsumeStructuredBuffer:IFoo=7" -conformance "ImplRTAS:IFoo=8" -conformance "ImplSubpassInput:IFoo=9" -conformance "GoodImpl:IFoo=10"
 
 interface IFoo
 {
@@ -96,6 +96,6 @@ RWStructuredBuffer<float> outputBuffer;
 [numthreads(1, 1, 1)]
 void computeMain()
 {
-    IFoo f = createDynamicObject<IFoo>(0, 5);
+    IFoo f = createDynamicObject<IFoo>(10, 0);
     outputBuffer[0] = f.get();
 }

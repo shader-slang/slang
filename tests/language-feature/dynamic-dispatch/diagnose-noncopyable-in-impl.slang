@@ -9,8 +9,8 @@
 // intentional or a bug depends on whether non-copyable semantics should
 // be enforced at the marshalling level.
 
-//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target spirv
-//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry computeMain
+//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target spirv -conformance "Impl:IFoo=0" -conformance "GoodImpl:IFoo=1"
+//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry computeMain -conformance "Impl:IFoo=0" -conformance "GoodImpl:IFoo=1"
 
 [__NonCopyableType]
 struct NonCopyData
@@ -41,6 +41,6 @@ RWStructuredBuffer<int> outputBuffer;
 [numthreads(1, 1, 1)]
 void computeMain()
 {
-    IFoo f = createDynamicObject<IFoo>(0, 0);
+    IFoo f = createDynamicObject<IFoo>(1, 0);
     outputBuffer[0] = f.get();
 }

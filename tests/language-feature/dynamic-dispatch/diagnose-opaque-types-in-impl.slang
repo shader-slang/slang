@@ -7,8 +7,8 @@
 // The existing test in tests/diagnostics/resource-type-in-dynamic-dispatch.slang
 // covers Texture2D. This test extends coverage to other opaque resource types.
 
-//TEST:SIMPLE(filecheck=CHECK): -target spirv
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -conformance "ImplSampler:IFoo=0" -conformance "ImplRWTexture:IFoo=1" -conformance "ImplTexture1D:IFoo=2" -conformance "ImplTexture3D:IFoo=3" -conformance "ImplTextureCube:IFoo=4" -conformance "ImplRayQuery:IFoo=5" -conformance "ImplTriangleStream:IFoo=6" -conformance "ImplMeshOutput:IFoo=7" -conformance "GoodImpl:IFoo=8"
+//TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry computeMain -conformance "ImplSampler:IFoo=0" -conformance "ImplRWTexture:IFoo=1" -conformance "ImplTexture1D:IFoo=2" -conformance "ImplTexture3D:IFoo=3" -conformance "ImplTextureCube:IFoo=4" -conformance "ImplRayQuery:IFoo=5" -conformance "ImplTriangleStream:IFoo=6" -conformance "ImplMeshOutput:IFoo=7" -conformance "GoodImpl:IFoo=8"
 
 struct MyVertex
 {
@@ -87,6 +87,6 @@ RWStructuredBuffer<float> outputBuffer;
 [numthreads(1, 1, 1)]
 void computeMain()
 {
-    IFoo f = createDynamicObject<IFoo>(0, 5);
+    IFoo f = createDynamicObject<IFoo>(8, 0);
     outputBuffer[0] = f.get();
 }
