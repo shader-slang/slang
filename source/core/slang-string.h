@@ -467,10 +467,7 @@ class SLANG_RT_API String
     friend class StringBuilder;
 
 private:
-    const char* getData() const
-    {
-        return m_buffer ? m_buffer->getData() : "";
-    }
+    const char* getData() const { return m_buffer ? m_buffer->getData() : ""; }
 
     // Note: This is not a non-const version of getData(), since this method
     // assumes that the buffer always exists.
