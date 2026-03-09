@@ -31,7 +31,7 @@ internal struct TileAlignedSize<int Size>
 ///   * Outer-product results are stored directly in tiled layout without
 ///     converting back to linear format.
 [require(cooperative_matrix)]
-VISIBILITY_LEVEL struct TiledMMAHelper<T, int InputSize, int OutputSize, int SubgroupSize, TargetEnum Target, ShMemSize: ISharedMemorySize, bool TransposeA = false>
+VISIBILITY_LEVEL struct TiledMMAHelper<T, int InputSize, int OutputSize, int SubgroupSize, TargetEnum Target, ShMemSize: ISharedMemorySize, bool TransposeA, int SubgroupCount>
     where T : __BuiltinFloatingPointType
     where T.Differential == T
 {
@@ -39,7 +39,7 @@ VISIBILITY_LEVEL struct TiledMMAHelper<T, int InputSize, int OutputSize, int Sub
 
     // Re-use the base MMA infrastructure for operations that don't change
     // (input-vector loading, output-vector store-back, cross-warp reduction).
-    typealias BaseMMA = MMAHelper<T, InputSize, OutputSize, SubgroupSize, Target, ShMemSize, TransposeA>;
+    typealias BaseMMA = MMAHelper<T, InputSize, OutputSize, SubgroupSize, Target, ShMemSize, TransposeA, SubgroupCount>;
 
     VISIBILITY_LEVEL typealias TileInfoT = BaseMMA.TileInfo;
     VISIBILITY_LEVEL typealias TileInfo = TileInfoT;
@@ -174,6 +174,8 @@ VISIBILITY_LEVEL struct TiledMMAHelper<T, int InputSize, int OutputSize, int Sub
 
     // Store a single tile from shared memory to its tiled-layout position in
     // global memory using atomic writes (for concurrent gradient accumulation).
+    // Uses explicit pack-path for float (same pattern as storeCoopMatTilesToGlobal_WriteUint4Atomic):
+    // half: one uint4 read → writeUint4Atomic<half, ...>; float: two uint4 read → pack → writeUint4Atomic<half, ...>.
     [ForceInline]
     [require(cooperative_matrix, subgroup_basic)]
     internal static void storeTileToGlobal<U, Address>(
@@ -188,22 +190,46 @@ VISIBILITY_LEVEL struct TiledMMAHelper<T, int InputSize, int OutputSize, int Sub
         uint laneId = WaveGetLaneIndex();
         int baseOffset = tileElementOffset(tileRow, tileCol);
 
-        // No bounds check needed: TileSizeInUint4C is always a multiple of N (SubgroupSize).
-        // Proof: TileSizeInUint4C = ROW_C * COLUMN_C / ElementCountPerVectorMatC
-        //      = 16 * 16 / (sizeof(uint4) / sizeof(T)).
-        //   half:  256 / 8 = 32  → 32 / 32 = 1 store per thread
-        //   float: 256 / 4 = 64  → 64 / 32 = 2 stores per thread
-        // The maximum idx = laneId + (NumStoresPerThread - 1) * 32
-        //                 = TileSizeInUint4C - 1, always in bounds.
-        static const int TileSizeInUint4C = TileSizeInElements / CMShape.ElementCountPerVectorMatC;
-        static const uint NumStoresPerThread = TileSizeInUint4C / N;
+        static const int TileSizeInUint4C_Half = TileSizeInElements / 8;   // 32 uint4 for half
+        static const int HalfsPerUint4 = 8;
 
-        for (uint i = 0; i < NumStoresPerThread; i++)
+        if (sizeof(U) == 2)
         {
-            uint idx = laneId + i * N;
-            uint4 value = ShMemPool.data[sharedMemoryOffset + idx];
-            int elemOffset = baseOffset + idx * CMShape.ElementCountPerVectorMatC;
-            weightAddress.writeUint4Atomic<T, true, CMShape.COLUMN_C>(elemOffset, value);
+            // Half: one uint4 per lane (or strided), write with explicit half atomic.
+            for (int v = (int)laneId; v < TileSizeInUint4C_Half; v += N)
+            {
+                uint4 value = ShMemPool.data[sharedMemoryOffset + v];
+                let globalAddr = weightAddress.getOffset(baseOffset + v * HalfsPerUint4);
+                globalAddr.writeUint4Atomic<half, true, CMShape.COLUMN_C>(0, value);
+            }
+        }
+        else if (sizeof(U) == 4)
+        {
+            // Float: pack two uint4 (8 floats) into one uint4 (4 half2), then write with half atomic (same as accelerate-vector-coopmat).
+            for (int v = (int)laneId; v < TileSizeInUint4C_Half; v += N)
+            {
+                int srcIdx = v * 2;
+                uint4 floatVec0 = ShMemPool.data[sharedMemoryOffset + srcIdx];
+                uint4 floatVec1 = ShMemPool.data[sharedMemoryOffset + srcIdx + 1];
+
+                uint4 packed;
+                half h0 = (half)bit_cast<float>(floatVec0[0]);
+                half h1 = (half)bit_cast<float>(floatVec0[1]);
+                half h2 = (half)bit_cast<float>(floatVec0[2]);
+                half h3 = (half)bit_cast<float>(floatVec0[3]);
+                half h4 = (half)bit_cast<float>(floatVec1[0]);
+                half h5 = (half)bit_cast<float>(floatVec1[1]);
+                half h6 = (half)bit_cast<float>(floatVec1[2]);
+                half h7 = (half)bit_cast<float>(floatVec1[3]);
+
+                packed[0] = uint(bit_cast<uint16_t>(h0)) | (uint(bit_cast<uint16_t>(h1)) << 16);
+                packed[1] = uint(bit_cast<uint16_t>(h2)) | (uint(bit_cast<uint16_t>(h3)) << 16);
+                packed[2] = uint(bit_cast<uint16_t>(h4)) | (uint(bit_cast<uint16_t>(h5)) << 16);
+                packed[3] = uint(bit_cast<uint16_t>(h6)) | (uint(bit_cast<uint16_t>(h7)) << 16);
+
+                let globalAddr = weightAddress.getOffset(baseOffset + v * HalfsPerUint4);
+                globalAddr.writeUint4Atomic<half, true, CMShape.COLUMN_C>(0, packed);
+            }
         }
     }
 
@@ -445,37 +471,60 @@ VISIBILITY_LEVEL struct TiledMMAHelper<T, int InputSize, int OutputSize, int Sub
         // finish MMA reads before sumReduceTiles overwrites shared memory.
         GroupMemoryBarrierWithGroupSync();
 
-        // Cross-warp reduction (same as MMAHelper.outerProductAccumulate).
+        // Cross-warp reduction (skipped at compile time when SubgroupCount <= 1).
         BaseMMA.sumReduceTiles<CoopMatCRows, CoopMatCColumns>(matC, subgroupIndex, sharedMemoryBOffset);
 
-        // Store result in tiled layout.  Only subgroup 0 writes to global memory.
-        // For each row of tiles: store all columns contiguously to shared memory,
-        // then write all tiles in that row to global memory in one pass.
+        // Store result in tiled layout. Row-at-a-time; write-back uses direct half2 atomicAdd (Tin2-style).
         if (subgroupIndex == 0)
         {
             static const uint SingleTileStrideInUint4 = CMShape.COLUMN_C / CMShape.ElementCountPerVectorMatC;
+            static const int Half2PerTile = TileSizeInElements / 2;   // 128 half2 per 16x16 tile
+            static const int TotalHalf2PerRow = CoopMatCColumns * Half2PerTile;
+            const uint laneId = WaveGetLaneIndex();
 
             [ForceUnroll]
             for (uint i = 0; i < CoopMatCRows; i++)
             {
-                // Store one row of CoopMat tiles contiguously into shared memory.
-                // Tile j at offset j * CoopMatCSizeInVector, each tile stored with
-                // its own row stride (SingleTileStrideInUint4).
-                [ForceUnroll]
+                // Phase 1: Store this row of tiles to shmem.
+                // [ForceUnroll]
                 for (uint j = 0; j < CoopMatCColumns; j++)
                 {
+                    uint tileOffset = j * CMShape.CoopMatCSizeInVector;
                     matC[i * CoopMatCColumns + j].Store<RowMajor, uint4>(
-                        ShMemPool.data, sharedMemoryBOffset + j * CMShape.CoopMatCSizeInVector, SingleTileStrideInUint4);
+                        ShMemPool.data, sharedMemoryBOffset + tileOffset, SingleTileStrideInUint4);
+                }
+                GroupMemoryBarrierWithWaveSync();
 
-                    GroupMemoryBarrierWithWaveSync();
+                // Phase 2: Flat loop at half2 granularity — one atomicAdd(half2) per slot (Tin2: _atomic_addh2).
+                // Loop over k (compile-time bound) so [ForceUnroll] can apply; h2Idx = laneId + k*N remains runtime.
+                static const int ItersPerLane = (TotalHalf2PerRow + N - 1) / N;
+                [ForceUnroll]
+                for (uint k = 0; k < ItersPerLane; k++)
+                {
+                    int h2Idx = (int)laneId + (int)k * N;
+                    int tileCol = h2Idx / Half2PerTile;
+                    int localH2 = h2Idx % Half2PerTile;
+                    int baseOffset = tileElementOffset((int)i, tileCol);
+                    int elemOffset = baseOffset + localH2 * 2;
 
-                    storeTileToGlobal<U, Address>(sharedMemoryBOffset, i, j, weightAddress);
-
-                    GroupMemoryBarrierWithWaveSync();
+                    if (sizeof(U) == 2)
+                    {
+                        uint packed = ShMemPool.smemLoad<uint>(sharedMemoryBOffset, h2Idx);
+                        vector<U, 2> h2 = bit_cast<vector<U, 2>>(packed);
+                        let addr = weightAddress.getOffset(elemOffset);
+                        addr.atomicAdd(0, h2);
+                    }
+                    else if (sizeof(U) == 4)
+                    {
+                        uint packed = ShMemPool.smemLoad<uint>(sharedMemoryBOffset, h2Idx);
+                        vector<half, 2> h2 = bit_cast<vector<half, 2>>(packed);
+                        let addr = weightAddress.getOffset(elemOffset);
+                        addr.atomicAdd(0, vector<U, 2>(U(h2[0]), U(h2[1])));
+                    }
                 }
             }
         }
 
-        AllMemoryBarrierWithGroupSync();
+        GroupMemoryBarrierWithGroupSync();
     }
 }
