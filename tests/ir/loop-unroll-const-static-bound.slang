@@ -26,6 +26,7 @@ void printMain()
     // CHECK-NOT: globalsbuffer
     // CHECK: results_0[int(0)] = results_0[int(0)] + test_value_0(tests_0[0U]);
     // CHECK: results_0[int(0)] = results_0[int(0)] + test_value_0(tests_0[1U]);
+    // CHECK-NOT: tests_0[2U]
     [ForceUnroll]
     for (uint nTestIndex = 0; nTestIndex < globalsbuffer[0].testcount; nTestIndex++)
     {

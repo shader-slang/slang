@@ -149,6 +149,7 @@ struct PeepholeContext : InstPassBase
         Index i = 0;
         for (auto sfield : structType->getFields())
         {
+            // Void-typed fields do not correspond to constructor arguments.
             if (as<IRVoidType>(sfield->getFieldType()))
                 continue;
 
