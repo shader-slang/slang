@@ -265,6 +265,7 @@ works for any given binary.
 | `SLANG_SLANG_LLVM_BINARY_URL`     | System dependent           | URL specifying the location of the slang-llvm prebuilt library                               |
 | `SLANG_USE_SCCACHE`               | `FALSE`                    | Use sccache as compiler launcher (auto-disables PCH)                                         |
 | `SLANG_GENERATORS_PATH`           | ``                         | Path to an installed `all-generators` target for cross compilation                           |
+| `SLANG_BOOTSTRAP_IGNORE_ABORT_MSG`| `FALSE`                    | Ignore the system modal assert dialog while running slang-bootstrap to help LLM workflow.
 
 The following options relate to optional dependencies for additional backends
 and running additional tests. Left unchanged they are auto detected, however
