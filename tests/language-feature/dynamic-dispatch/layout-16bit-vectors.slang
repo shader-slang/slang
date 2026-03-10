@@ -6,10 +6,10 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cpu -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type -render-feature int16,half
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -dx12 -profile sm_6_2 -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-compute -dx12 -profile sm_6_2 -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-metal -compute -shaderobj -output-using-type
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 //TEST_INPUT:ubuffer(data=[0 1 2], stride=4):name=kindBuffer
@@ -87,16 +87,18 @@ void computeMain()
     // -10 + 20 = 10
     // CHECK: 10.0
     outputBuffer[2] = i2.getSum();
+    // CHECK: -10.0
+    outputBuffer[3] = i2.getFirst();
 
     I16BitVec u3 = make16BitVec(kindBuffer[2]);
     // 100 + 200 + 300 = 600
     // CHECK: 600.0
-    outputBuffer[3] = u3.getSum();
+    outputBuffer[4] = u3.getSum();
     // CHECK: 100.0
-    outputBuffer[4] = u3.getFirst();
+    outputBuffer[5] = u3.getFirst();
 
     // Re-read half4 to verify no corruption
     I16BitVec h4b = make16BitVec(kindBuffer[0]);
     // CHECK: 12.0
-    outputBuffer[5] = h4b.getSum();
+    outputBuffer[6] = h4b.getSum();
 }

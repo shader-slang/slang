@@ -7,7 +7,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type -render-feature int16,half,double
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 //TEST_INPUT:ubuffer(data=[0 1], stride=4):name=kindBuffer
@@ -17,6 +17,7 @@ interface IMixed
 {
     float getSum();
     float getDoubleVal();
+    float getByteFields();
 }
 
 struct MixedImpl : IMixed
@@ -32,6 +33,7 @@ struct MixedImpl : IMixed
         return float(a) + float(b) + c + float(d) + float(e);
     }
     float getDoubleVal() { return float(d); }
+    float getByteFields() { return float(a) * 1000.0 + float(e); }
 }
 
 struct SimpleImpl : IMixed
@@ -40,6 +42,7 @@ struct SimpleImpl : IMixed
 
     float getSum() { return val; }
     float getDoubleVal() { return val; }
+    float getByteFields() { return val; }
 }
 
 IMixed makeMixed(int kind)
@@ -68,10 +71,13 @@ void computeMain()
     outputBuffer[0] = mixed.getSum();
     // CHECK: 4.0
     outputBuffer[1] = mixed.getDoubleVal();
+    // a=1, e=5: 1*1000 + 5 = 1005 (pins down byte-field placement)
+    // CHECK: 1005.0
+    outputBuffer[2] = mixed.getByteFields();
 
     IMixed simple = makeMixed(kindBuffer[1]);
     // CHECK: 77.0
-    outputBuffer[2] = simple.getSum();
+    outputBuffer[3] = simple.getSum();
     // CHECK: 77.0
-    outputBuffer[3] = simple.getDoubleVal();
+    outputBuffer[4] = simple.getDoubleVal();
 }

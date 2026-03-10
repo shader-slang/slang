@@ -8,7 +8,7 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type -render-feature int16
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-metal -compute -shaderobj -output-using-type
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
 //TEST_INPUT:ubuffer(data=[0 1 2], stride=4):name=kindBuffer
@@ -86,16 +86,18 @@ void computeMain()
     // 100 + 200 = 300
     // CHECK: 300
     outputBuffer[2] = v2.getSum();
+    // CHECK: 100
+    outputBuffer[3] = v2.getFirst();
 
     I8BitVec v3 = make8BitVec(kindBuffer[2]);
     // (-1) + (-2) + (-3) = -6
     // CHECK: -6
-    outputBuffer[3] = v3.getSum();
+    outputBuffer[4] = v3.getSum();
     // CHECK: -1
-    outputBuffer[4] = v3.getFirst();
+    outputBuffer[5] = v3.getFirst();
 
     // Re-read vec4 to verify no corruption from smaller vector impls
     I8BitVec v4b = make8BitVec(kindBuffer[0]);
     // CHECK: 100
-    outputBuffer[5] = v4b.getSum();
+    outputBuffer[6] = v4b.getSum();
 }
