@@ -26942,9 +26942,10 @@ namespace linalg
 
 enum CoopMatMatrixUse
 {
-    MatrixA = 0,
-    MatrixB = 1,
-    MatrixAccumulator = 2,
+    None = $(SLANG_COOPERATIVE_MATRIX_USE_NONE),
+    MatrixA = $(SLANG_COOPERATIVE_MATRIX_USE_A),
+    MatrixB = $(SLANG_COOPERATIVE_MATRIX_USE_B),
+    MatrixAccumulator = $(SLANG_COOPERATIVE_MATRIX_USE_ACCUMULATOR),
 };
 
 enum CoopMatMatrixLayout
@@ -28916,6 +28917,22 @@ CoopMat<T,S,M,N,R1> __float_to_int_cast<
 // Cooperative Matrix Multiply-Accumulate
 //
 
+__intrinsic_op($(kIROp_CoopMatMulAdd))
+internal CoopMat<T, S, M, N, CoopMatMatrixUse.MatrixAccumulator> __coopMatMulAdd<
+    T : ICoopElement,
+    U : ICoopElement,
+    V : ICoopElement,
+    W : ICoopElement,
+    let S : MemoryScope,
+    let M : int,
+    let K : int,
+    let N : int
+>(
+    CoopMat<U, S, M, K, CoopMatMatrixUse.MatrixA> matA,
+    CoopMat<V, S, K, N, CoopMatMatrixUse.MatrixB> matB,
+    CoopMat<W, S, M, N, CoopMatMatrixUse.MatrixAccumulator> matC,
+    bool saturatingAccumulation);
+
 /// Performs cooperative matrix multiply-accumulate operation: D = A * B + C
 /// This is the fundamental operation for hardware-accelerated matrix multiplication.
 /// All threads in the warp/subgroup cooperate to compute the result.
@@ -28948,61 +28965,7 @@ CoopMat<T, S, M, N, CoopMatMatrixUse.MatrixAccumulator> coopMatMulAdd<
     CoopMat<V, S, K, N, CoopMatMatrixUse.MatrixB> matB,
     CoopMat<W, S, M, N, CoopMatMatrixUse.MatrixAccumulator> matC)
 {
-    __target_switch
-    {
-    case spirv:
-        // https://github.com/KhronosGroup/SPIRV-Registry/blob/main/extensions/KHR/SPV_KHR_cooperative_matrix.asciidoc#3x-cooperative-matrix-operands
-        int operands = 0; // NoneKHR
-        if (__isSignedInt<U>())
-        {
-            operands |= 0x01; // MatrixASignedComponentsKHR
-        }
-        if (__isSignedInt<V>())
-        {
-            operands |= 0x02; // MatrixBSignedComponentsKHR
-        }
-        if (__isSignedInt<W>())
-        {
-            operands |= 0x04; // MatrixCSignedComponentsKHR
-        }
-        if (__isSignedInt<T>())
-        {
-            operands |= 0x08; // MatrixResultSignedComponentsKHR
-        }
-        if (saturatingAccumulation)
-        {
-            operands |= 0x10; // SaturatingAccumulationKHR
-        }
-
-        return spirv_asm
-        {
-            result:$$CoopMat<T, S, M, N, CoopMatMatrixUse.MatrixAccumulator> = OpCooperativeMatrixMulAddKHR $matA $matB $matC !operands;
-        };
-    case cuda:
-        if (saturatingAccumulation)
-            __intrinsic_asm R"(Slang_CUDA_WMMA::coopMatMulAdd<
-                                                         $T0::ElementType,
-                                                         $T1::ElementType,
-                                                         $T2::ElementType,
-                                                         $TR::ElementType,
-                                                         $T0::m_M,
-                                                         $T0::m_N,
-                                                         $T0::m_K,
-                                                         true
-                                                        >($0, $1, $2))";
-        else
-            __intrinsic_asm R"(Slang_CUDA_WMMA::coopMatMulAdd<
-                                                         $T0::ElementType,
-                                                         $T1::ElementType,
-                                                         $T2::ElementType,
-                                                         $TR::ElementType,
-                                                         $T0::m_M,
-                                                         $T0::m_N,
-                                                         $T0::m_K,
-                                                         false
-                                                        >($0, $1, $2))";
-
-    }
+    return __coopMatMulAdd<T, U, V, W, S, M, K, N>(matA, matB, matC, saturatingAccumulation);
 }
 
 extension<
@@ -30045,63 +30008,6 @@ static const struct {
 };
 for(auto buffer : kByteAddressBufferCases) {
 $}
-    [mutating]
-    [ForceInline]
-    [require(hlsl, byteaddressbuffer_rw)]
-    void __mutMatMul<U : __BuiltinArithmeticType, let K : int>(
-        CoopVec<U, K> input, uint inputInterpretationHLSL,
-        $(buffer.type) matrix, uint matrixOffset, uint matrixInterpretationHLSL,
-        uint m, uint k, uint memoryLayoutHLSL, bool transpose, uint matrixStride)
-    {
-        __target_switch
-        {
-        case hlsl:
-            if (__isFloat<T>() || __isSignedInt<T>())
-            {
-                if (__isFloat<U>() || __isSignedInt<U>())
-                    __intrinsic_asm "__builtin_MatVecMul($0, false,  $1, false, $2,  $3, $4, $5,  $6, $7, $8, $9, $10)";
-                else
-                    __intrinsic_asm "__builtin_MatVecMul($0, false,  $1,  true, $2,  $3, $4, $5,  $6, $7, $8, $9, $10)";
-            }
-            else
-            {
-                if (__isFloat<U>() || __isSignedInt<U>())
-                    __intrinsic_asm "__builtin_MatVecMul($0, true,  $1, false, $2,  $3, $4, $5,  $6, $7, $8, $9, $10)";
-                else
-                    __intrinsic_asm "__builtin_MatVecMul($0, true,  $1,  true, $2,  $3, $4, $5,  $6, $7, $8, $9, $10)";
-            }
-        }
-    }
-
-    [mutating]
-    [ForceInline]
-    [require(hlsl, byteaddressbuffer_rw)]
-    void __mutMatMulAdd<U : __BuiltinArithmeticType, let K : int>(
-        CoopVec<U, K> input, uint inputInterpretationHLSL,
-        $(buffer.type) matrix, uint matrixOffset, uint matrixInterpretationHLSL,
-        $(buffer.type) bias, uint biasOffset, uint biasInterpretationHLSL,
-        uint m, uint k, uint memoryLayoutHLSL, bool transpose, uint matrixStride)
-    {
-        __target_switch
-        {
-        case hlsl:
-            if (__isFloat<T>() || __isSignedInt<T>())
-            {
-                if (__isFloat<U>() || __isSignedInt<U>())
-                    __intrinsic_asm "__builtin_MatVecMulAdd($0, false,  $1, false, $2,  $3, $4, $5,  $9, $10, $11, $12, $13,  $6, $7, $8)";
-                else
-                    __intrinsic_asm "__builtin_MatVecMulAdd($0, false,  $1,  true, $2,  $3, $4, $5,  $9, $10, $11, $12, $13,  $6, $7, $8)";
-            }
-            else
-            {
-                if (__isFloat<U>() || __isSignedInt<U>())
-                    __intrinsic_asm "__builtin_MatVecMulAdd($0, true,  $1, false, $2,  $3, $4, $5,  $9, $10, $11, $12, $13,  $6, $7, $8)";
-                else
-                    __intrinsic_asm "__builtin_MatVecMulAdd($0, true,  $1,  true, $2,  $3, $4, $5,  $9, $10, $11, $12, $13,  $6, $7, $8)";
-            }
-        }
-    }
-
     /// Multiply the given input Cooperative vector with the given matrix and accumulate the result into this vector.
     /// @param input The input Cooperative vector to multiply with the matrix.
     /// @param inputInterpretation Specifies how to interpret the values in the input vector (e.g. as packed values).
@@ -30136,38 +30042,17 @@ $}
                     || k <= __inputInterpretationPackingFactor(inputInterpretation)*PackedK
                     , "for packed inputInterpretation values k must be less than or equal to the input vector length times the packing factor");
 
-        __target_switch
-        {
-        case hlsl:
-            let inputInterpretationHLSL = __getHLSLCoopVecComponentType(inputInterpretation);
-            let matrixInterpretationHLSL = __getHLSLCoopVecComponentType(matrixInterpretation);
-            let memoryLayoutHLSL = __getHLSLCoopVecMatrixLayout(memoryLayout);
-            This temp = this;
-            temp.__mutMatMul(
-                input,
-                inputInterpretationHLSL,
-                matrix,
-                matrixOffset,
-                matrixInterpretationHLSL,
-                N,
-                k,
-                memoryLayoutHLSL,
-                transpose,
-                matrixStride
-            );
-            this.__mutAdd(temp);
-        default: this = this + coopVecMatMulPacked<T, N, PackedK, U>(
-                input,
-                inputInterpretation,
-                k,
-                matrix,
-                matrixOffset,
-                matrixInterpretation,
-                memoryLayout,
-                transpose,
-                matrixStride
-            );
-        }
+        this = this + coopVecMatMulPacked<T, N, PackedK, U>(
+            input,
+            inputInterpretation,
+            k,
+            matrix,
+            matrixOffset,
+            matrixInterpretation,
+            memoryLayout,
+            transpose,
+            matrixStride
+        );
     }
 
     /// Accumulate the result from a matrix multiplication between an input Cooperative vector and a matrix.
@@ -30233,31 +30118,7 @@ $}
                     || k <= __inputInterpretationPackingFactor(inputInterpretation)*PackedK
                     , "for packed inputInterpretation values k must be less than or equal to the input vector length times the packing factor");
 
-        __target_switch
-        {
-        case hlsl:
-            let inputInterpretationHLSL = __getHLSLCoopVecComponentType(inputInterpretation);
-            let matrixInterpretationHLSL = __getHLSLCoopVecComponentType(matrixInterpretation);
-            let biasInterpretationHLSL = __getHLSLCoopVecComponentType(biasInterpretation);
-            let memoryLayoutHLSL = __getHLSLCoopVecMatrixLayout(memoryLayout);
-            This temp = this;
-            temp.__mutMatMulAdd(
-                input,
-                inputInterpretationHLSL,
-                matrix,
-                matrixOffset,
-                matrixInterpretationHLSL,
-                bias,
-                biasOffset,
-                biasInterpretationHLSL,
-                N,
-                k,
-                memoryLayoutHLSL,
-                transpose,
-                matrixStride
-            );
-            this.__mutAdd(temp);
-        default: this = this + coopVecMatMulAddPacked<T, N, PackedK, U>(
+        this = this + coopVecMatMulAddPacked<T, N, PackedK, U>(
             input,
             inputInterpretation,
             k,
@@ -30270,8 +30131,7 @@ $}
             memoryLayout,
             transpose,
             matrixStride
-            );
-        }
+        );
     }
 
     /// Performs matrix multiplication and accumulation with bias: this += input * matrix + bias
@@ -30323,25 +30183,6 @@ $}
             matrixStride
         );
     }
-
-    [ForceInline]
-    [require(hlsl, byteaddressbuffer_rw)]
-    void __OuterProductAccumulate<let K : int>(
-        CoopVec<T, K> b,
-        $(buffer.type) matrix,
-        int32_t matrixOffset,
-        uint matrixStride,
-        uint memoryLayout,
-        uint matrixInterpretation,
-    )
-    {
-        __target_switch
-        {
-        case hlsl:
-            __intrinsic_asm "__builtin_OuterProductAccumulate($0, $1, $2, $3, $6, $5, $4)";
-        }
-    }
-
 
 ${
 }
@@ -30877,10 +30718,10 @@ CoopVec<T, N> coopVecLoadGroupshared<let N : int, T : __BuiltinArithmeticType, l
 /// including standard row-major and column-major layouts as well as specialized layouts optimized for specific operations.
 enum CoopVecMatrixLayout
 {
-    RowMajor,
-    ColumnMajor,
-    InferencingOptimal,
-    TrainingOptimal
+    RowMajor = $(SLANG_COOPERATIVE_VECTOR_MATRIX_LAYOUT_ROW_MAJOR),
+    ColumnMajor = $(SLANG_COOPERATIVE_VECTOR_MATRIX_LAYOUT_COLUMN_MAJOR),
+    InferencingOptimal = $(SLANG_COOPERATIVE_VECTOR_MATRIX_LAYOUT_INFERENCING_OPTIMAL),
+    TrainingOptimal = $(SLANG_COOPERATIVE_VECTOR_MATRIX_LAYOUT_TRAINING_OPTIMAL)
 };
 
 /// Specifies how to interpret the values in a cooperative vector or matrix.
@@ -30888,21 +30729,22 @@ enum CoopVecMatrixLayout
 /// including packed formats where multiple values can be stored in a single element.
 enum CoopVecComponentType
 {
-    FloatE4M3,
-    FloatE5M2,
-    Float16,
-    Float32,
-    Float64,
-    SignedInt8,
-    SignedInt16,
-    SignedInt32,
-    SignedInt64,
-    SignedInt8Packed,
-    UnsignedInt8,
-    UnsignedInt16,
-    UnsignedInt32,
-    UnsignedInt64,
-    UnsignedInt8Packed
+    FloatE4M3 = $(SLANG_COOPERATIVE_COMPONENT_TYPE_FLOAT_E4M3),
+    FloatE5M2 = $(SLANG_COOPERATIVE_COMPONENT_TYPE_FLOAT_E5M2),
+    Float16 = $(SLANG_COOPERATIVE_COMPONENT_TYPE_FLOAT16),
+    Float32 = $(SLANG_COOPERATIVE_COMPONENT_TYPE_FLOAT32),
+    Float64 = $(SLANG_COOPERATIVE_COMPONENT_TYPE_FLOAT64),
+    SignedInt8 = $(SLANG_COOPERATIVE_COMPONENT_TYPE_INT8),
+    SignedInt16 = $(SLANG_COOPERATIVE_COMPONENT_TYPE_INT16),
+    SignedInt32 = $(SLANG_COOPERATIVE_COMPONENT_TYPE_INT32),
+    SignedInt64 = $(SLANG_COOPERATIVE_COMPONENT_TYPE_INT64),
+    SignedInt8Packed = $(SLANG_COOPERATIVE_COMPONENT_TYPE_INT8_PACKED),
+    UnsignedInt8 = $(SLANG_COOPERATIVE_COMPONENT_TYPE_UINT8),
+    UnsignedInt16 = $(SLANG_COOPERATIVE_COMPONENT_TYPE_UINT16),
+    UnsignedInt32 = $(SLANG_COOPERATIVE_COMPONENT_TYPE_UINT32),
+    UnsignedInt64 = $(SLANG_COOPERATIVE_COMPONENT_TYPE_UINT64),
+    UnsignedInt8Packed = $(SLANG_COOPERATIVE_COMPONENT_TYPE_UINT8_PACKED),
+    None = $(SLANG_COOPERATIVE_COMPONENT_TYPE_NONE),
 };
 
 [ForceInline]
@@ -30921,132 +30763,6 @@ int __inputInterpretationPackingFactor(CoopVecComponentType componentType)
 bool __isPackedInputInterpretation(CoopVecComponentType componentType)
 {
     return __inputInterpretationPackingFactor(componentType) != 1;
-}
-
-// TODO: We might consider some way of specifying these from our lookup tables
-[ForceInline]
-uint32_t __getSpvCoopVecMatrixLayout(CoopVecMatrixLayout layout)
-{
-    switch (layout)
-    {
-    case CoopVecMatrixLayout::RowMajor:
-        return 0;
-    case CoopVecMatrixLayout::ColumnMajor:
-        return 1;
-    case CoopVecMatrixLayout::InferencingOptimal:
-        return 2;
-    case CoopVecMatrixLayout::TrainingOptimal:
-        return 3;
-    default:
-        static_assert(false, "unsupported layout value");
-    }
-    return 0xffffffff;
-}
-
-[ForceInline]
-uint32_t __getHLSLCoopVecMatrixLayout(CoopVecMatrixLayout layout)
-{
-    switch (layout)
-    {
-    // TODO: Check these are the same
-    case CoopVecMatrixLayout::RowMajor:
-        return 0;
-    case CoopVecMatrixLayout::ColumnMajor:
-        return 1;
-    case CoopVecMatrixLayout::InferencingOptimal:
-        return 2;
-    case CoopVecMatrixLayout::TrainingOptimal:
-        return 3;
-    default:
-        static_assert(false, "unsupported layout value");
-    }
-    return 0xffffffff;
-}
-
-[ForceInline]
-uint32_t __getSpvCoopVecComponentType(CoopVecComponentType componentType)
-{
-    switch (componentType)
-    {
-    case CoopVecComponentType::Float16:
-        return 0;
-    case CoopVecComponentType::Float32:
-        return 1;
-    case CoopVecComponentType::Float64:
-        return 2;
-    case CoopVecComponentType::SignedInt8:
-        return 3;
-    case CoopVecComponentType::SignedInt16:
-        return 4;
-    case CoopVecComponentType::SignedInt32:
-        return 5;
-    case CoopVecComponentType::SignedInt8Packed:
-        return 1000491000;
-    case CoopVecComponentType::SignedInt64:
-        return 6;
-    case CoopVecComponentType::UnsignedInt8:
-        return 7;
-    case CoopVecComponentType::UnsignedInt16:
-        return 8;
-    case CoopVecComponentType::UnsignedInt32:
-        return 9;
-    case CoopVecComponentType::UnsignedInt8Packed:
-        return 1000491001;
-    case CoopVecComponentType::UnsignedInt64:
-        return 10;
-    case CoopVecComponentType::FloatE4M3:
-        return 1000491002;
-    case CoopVecComponentType::FloatE5M2:
-        return 1000491003;
-    default:
-        static_assert(false, "unsupported componentType value");
-    }
-    return 0xffffffff;
-}
-
-[ForceInline]
-uint32_t __getHLSLCoopVecComponentType(CoopVecComponentType componentType)
-{
-    __target_switch
-    {
-    case hlsl:
-        switch (componentType)
-        {
-        case CoopVecComponentType::SignedInt16:
-            return 2;
-        case CoopVecComponentType::UnsignedInt16:
-            return 3;
-        case CoopVecComponentType::SignedInt32:
-            return 4;
-        case CoopVecComponentType::UnsignedInt32:
-            return 5;
-        case CoopVecComponentType::SignedInt64:
-            return 6;
-        case CoopVecComponentType::UnsignedInt64:
-            return 7;
-        case CoopVecComponentType::Float16:
-            return 8;
-        case CoopVecComponentType::Float32:
-            return 9;
-        case CoopVecComponentType::Float64:
-            return 10;
-        case CoopVecComponentType::SignedInt8Packed:
-            return 17;
-        case CoopVecComponentType::UnsignedInt8Packed:
-            return 18;
-        case CoopVecComponentType::UnsignedInt8:
-            return 19;
-        case CoopVecComponentType::SignedInt8:
-            return 20;
-        case CoopVecComponentType::FloatE4M3:
-            return 21;
-        case CoopVecComponentType::FloatE5M2:
-            return 22;
-        default:
-            static_assert(false, "unsupported componentType value");
-        }
-        return 0; // ComponentType::Invalid
-    }
 }
 
 [ForceInline]
@@ -31098,12 +30814,105 @@ static const struct {
 for(auto buffer : kByteAddressBufferCases_) {
 $}
 
-// Internal implementation without static_assert; github issue 8620
+__intrinsic_op($(kIROp_CoopVecMatMul))
+internal __generic<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType>
+CoopVec<T, M> __coopVecMatMul(
+    CoopVec<U, PackedK> input,
+    CoopVecComponentType inputInterpretation,
+    Ptr<T[]> matrixPtr,
+    int32_t matrixOffset,
+    CoopVecComponentType matrixInterpretation,
+    int32_t k,
+    CoopVecMatrixLayout memoryLayout,
+    bool transpose,
+    uint matrixStride);
+
+__intrinsic_op($(kIROp_CoopVecMatMul))
+internal __generic<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType>
+CoopVec<T, M> __coopVecMatMul(
+    CoopVec<U, PackedK> input,
+    CoopVecComponentType inputInterpretation,
+    $(buffer.type) matrix,
+    int32_t matrixOffset,
+    CoopVecComponentType matrixInterpretation,
+    int32_t k,
+    CoopVecMatrixLayout memoryLayout,
+    bool transpose,
+    uint matrixStride);
+
+__intrinsic_op($(kIROp_CoopVecMatMulAdd))
+internal __generic<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType>
+CoopVec<T, M> __coopVecMatMulAdd(
+    CoopVec<U, PackedK> input,
+    CoopVecComponentType inputInterpretation,
+    Ptr<T[]> matrixPtr,
+    int32_t matrixOffset,
+    CoopVecComponentType matrixInterpretation,
+    Ptr<T[]> biasPtr,
+    int32_t biasOffset,
+    CoopVecComponentType biasInterpretation,
+    int32_t k,
+    CoopVecMatrixLayout memoryLayout,
+    bool transpose,
+    uint matrixStride);
+
+__intrinsic_op($(kIROp_CoopVecMatMulAdd))
+internal __generic<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType>
+CoopVec<T, M> __coopVecMatMulAdd(
+    CoopVec<U, PackedK> input,
+    CoopVecComponentType inputInterpretation,
+    $(buffer.type) matrix,
+    int32_t matrixOffset,
+    CoopVecComponentType matrixInterpretation,
+    $(buffer.type) bias,
+    int32_t biasOffset,
+    CoopVecComponentType biasInterpretation,
+    int32_t k,
+    CoopVecMatrixLayout memoryLayout,
+    bool transpose,
+    uint matrixStride);
+
+__intrinsic_op($(kIROp_CoopVecOuterProductAccumulate))
+internal __generic<T : __BuiltinArithmeticType, let M : int, let N : int>
+void __coopVecOuterProductAccumulate(
+    Ptr<T[]> matrixPtr,
+    int32_t matrixOffset,
+    CoopVec<T, M> a,
+    CoopVec<T, N> b,
+    CoopVecMatrixLayout memoryLayout,
+    CoopVecComponentType matrixInterpretation,
+    uint matrixStride);
+
+__intrinsic_op($(kIROp_CoopVecOuterProductAccumulate))
+internal __generic<T : __BuiltinArithmeticType, let M : int, let N : int>
+void __coopVecOuterProductAccumulate(
+    $(buffer.type) matrix,
+    int32_t matrixOffset,
+    CoopVec<T, M> a,
+    CoopVec<T, N> b,
+    CoopVecMatrixLayout memoryLayout,
+    CoopVecComponentType matrixInterpretation,
+    uint matrixStride);
+
+__intrinsic_op($(kIROp_CoopVecReduceSumAccumulate))
+internal __generic<T : __BuiltinArithmeticType, let N : int>
+void __coopVecReduceSumAccumulate(
+    Ptr<T[]> bufferPtr,
+    int32_t offset,
+    CoopVec<T, N> v);
+
+__intrinsic_op($(kIROp_CoopVecReduceSumAccumulate))
+internal __generic<T : __BuiltinArithmeticType, let N : int>
+void __coopVecReduceSumAccumulate(
+    $(buffer.type) buffer,
+    int32_t offset,
+    CoopVec<T, N> v);
+
 [ForceInline]
 [require(cooperative_vector)]
 [require(optix_coopvec)]
 __generic<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType>
-CoopVec<T, M> __coopVecMatMulPacked_impl(
+CoopVec<T, M> coopVecMatMulPacked(
     CoopVec<U, PackedK> input,
     constexpr CoopVecComponentType inputInterpretation,
     constexpr int k,
@@ -31115,54 +30924,39 @@ CoopVec<T, M> __coopVecMatMulPacked_impl(
     constexpr uint matrixStride
 )
 {
+    static_assert(__isPackedInputInterpretation(inputInterpretation) || k == PackedK
+                 , "for non-packed inputInterpretation values k must be equal to the input vector length");
+    static_assert(!__isPackedInputInterpretation(inputInterpretation)
+                || k <= __inputInterpretationPackingFactor(inputInterpretation)*PackedK
+                 , "for packed inputInterpretation values k must be less than or equal to the input vector length times the packing factor");
+
     __target_switch
     {
     case spirv:
-        let m : int32_t = M;
-        let matrixInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(matrixInterpretation);
-        let inputInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(inputInterpretation);
-        let memoryLayoutSpirv : int32_t = __getSpvCoopVecMatrixLayout(memoryLayout);
         let matrixBuf = __getEquivalentStructuredBuffer<uint32_t>(matrix);
-        let zero = 0;
-
-        int operands = 0;
-        if (__isSignedInt<U>())
-        {
-            operands |= 0x02;
-        }
-        if (__isSignedInt<T>())
-        {
-            operands |= 0x08;
-        }
-        return spirv_asm
-        {
-            %runtimeArrayType = OpTypeRuntimeArray $$uint32_t;
-            %storagePointerType = OpTypePointer StorageBuffer %runtimeArrayType;
-            %matrixPointer:%storagePointerType = OpAccessChain $matrixBuf $zero;
-            result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulNV $input $inputInterpretationSpirv %matrixPointer $matrixOffset $matrixInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride !operands;
-        };
+        return __coopVecMatMul<T, M, PackedK, U, uint32_t>(
+            input,
+            inputInterpretation,
+            matrixBuf,
+            matrixOffset,
+            matrixInterpretation,
+            k,
+            memoryLayout,
+            transpose,
+            matrixStride);
 
     case hlsl:
-        var ret = CoopVec<T, M>(0);
-        let inputInterpretationHLSL = __getHLSLCoopVecComponentType(inputInterpretation);
-        let matrixInterpretationHLSL = __getHLSLCoopVecComponentType(matrixInterpretation);
-        let memoryLayoutHLSL = __getHLSLCoopVecMatrixLayout(memoryLayout);
-        ret.__mutMatMul(
-             input,
-             inputInterpretationHLSL,
-             matrix,
-             matrixOffset,
-             matrixInterpretationHLSL,
-             M,
-             k,
-             memoryLayoutHLSL,
-             transpose,
-             matrixStride
-        );
-        return ret;
-
     case optix_coopvec:
-        __intrinsic_asm "slangOptixCoopVecMatMul<OptixCoopVec<$[0], $[1]>, OptixCoopVec<$[2], $[3]>, $1, $5, $6>($0, (CUdeviceptr)(&($3)), $4, $7, $8)", T, M, U, PackedK;
+        return __coopVecMatMul<T, M, PackedK, U>(
+            input,
+            inputInterpretation,
+            matrix,
+            matrixOffset,
+            matrixInterpretation,
+            k,
+            memoryLayout,
+            transpose,
+            matrixStride);
 
     default:
         var result = CoopVec<T, M>(0);
@@ -31260,42 +31054,6 @@ CoopVec<T, M> __coopVecMatMulPacked_impl(
 /// values to use from the packed input.
 // TODO: Can we ForceInline for just hlsl? the other platforms don't really
 // need it
-[ForceInline]
-[require(cooperative_vector)]
-[require(optix_coopvec)]
-__generic<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType>
-CoopVec<T, M> coopVecMatMulPacked(
-    CoopVec<U, PackedK> input,
-    constexpr CoopVecComponentType inputInterpretation,
-    constexpr int k,
-    $(buffer.type) matrix,
-    int32_t matrixOffset,
-    constexpr CoopVecComponentType matrixInterpretation,
-    constexpr CoopVecMatrixLayout memoryLayout,
-    constexpr bool transpose,
-    constexpr uint matrixStride
-)
-{
-    // Static assertions to validate parameters at compile time
-    // These can be evaluated because this wrapper function can be inlined (no GenericAsm)
-    static_assert(__isPackedInputInterpretation(inputInterpretation) || k == PackedK
-                 , "for non-packed inputInterpretation values k must be equal to the input vector length");
-    static_assert(!__isPackedInputInterpretation(inputInterpretation)
-                || k <= __inputInterpretationPackingFactor(inputInterpretation)*PackedK
-                 , "for packed inputInterpretation values k must be less than or equal to the input vector length times the packing factor");
-
-    // Delegate to implementation function (which contains GenericAsm for OptiX)
-    return __coopVecMatMulPacked_impl<T, M, PackedK, U>(
-        input,
-        inputInterpretation,
-        k,
-        matrix,
-        matrixOffset,
-        matrixInterpretation,
-        memoryLayout,
-        transpose,
-        matrixStride);
-}
 
 /// Multiply a matrix with a cooperative vector. Given a M-row by K-col `matrix`, and a K-element column vector `input`, computes `matrix * input`, and
 /// returns a M-element vector.
@@ -31345,11 +31103,10 @@ CoopVec<T, M> coopVecMatMul(
         matrixStride);
 }
 
-// Internal implementation without static_assert; github issue 8620
 [ForceInline]
 [require(cooperative_vector)]
 [require(optix_coopvec)]
-CoopVec<T, M> __coopVecMatMulAddPacked_impl<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType>(
+CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType>(
     CoopVec<U, PackedK> input,
     constexpr CoopVecComponentType inputInterpretation,
     constexpr int k,
@@ -31364,61 +31121,46 @@ CoopVec<T, M> __coopVecMatMulAddPacked_impl<T : __BuiltinArithmeticType, let M :
     constexpr uint matrixStride
 )
 {
+    static_assert(__isPackedInputInterpretation(inputInterpretation) || k == PackedK
+                 , "for non-packed inputInterpretation values k must be equal to the input vector length");
+    static_assert(!__isPackedInputInterpretation(inputInterpretation)
+                || k <= __inputInterpretationPackingFactor(inputInterpretation)*PackedK
+                 , "for packed inputInterpretation values k must be less than or equal to the input vector length times the packing factor");
+
     __target_switch
     {
     case spirv:
-        let m : int32_t = M;
-        let matrixInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(matrixInterpretation);
-        let biasInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(biasInterpretation);
-        let inputInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(inputInterpretation);
-        let memoryLayoutSpirv : int32_t = __getSpvCoopVecMatrixLayout(memoryLayout);
         let matrixBuf = __getEquivalentStructuredBuffer<uint32_t>(matrix);
         let biasBuf = __getEquivalentStructuredBuffer<uint32_t>(bias);
-        let zero = 0;
-
-        int operands = 0;
-        if (__isSignedInt<U>())
-        {
-            operands |= 0x02;
-        }
-        if (__isSignedInt<T>())
-        {
-            operands |= 0x08;
-        }
-        return spirv_asm
-        {
-            %runtimeArrayType = OpTypeRuntimeArray $$uint32_t;
-            %storagePointerType = OpTypePointer StorageBuffer %runtimeArrayType;
-            %matrixPointer:%storagePointerType = OpAccessChain $matrixBuf $zero;
-            %biasPointer:%storagePointerType = OpAccessChain $biasBuf $zero;
-            result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulAddNV $input $inputInterpretationSpirv %matrixPointer $matrixOffset $matrixInterpretationSpirv %biasPointer $biasOffset $biasInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride !operands;
-        };
+        return __coopVecMatMulAdd<T, M, PackedK, U, uint32_t>(
+            input,
+            inputInterpretation,
+            matrixBuf,
+            matrixOffset,
+            matrixInterpretation,
+            biasBuf,
+            biasOffset,
+            biasInterpretation,
+            k,
+            memoryLayout,
+            transpose,
+            matrixStride);
 
     case hlsl:
-        var ret = CoopVec<T, M>(0);
-        let inputInterpretationHLSL = __getHLSLCoopVecComponentType(inputInterpretation);
-        let matrixInterpretationHLSL = __getHLSLCoopVecComponentType(matrixInterpretation);
-        let biasInterpretationHLSL = __getHLSLCoopVecComponentType(biasInterpretation);
-        let memoryLayoutHLSL = __getHLSLCoopVecMatrixLayout(memoryLayout);
-        ret.__mutMatMulAdd(
-             input,
-             inputInterpretationHLSL,
-             matrix,
-             matrixOffset,
-             matrixInterpretationHLSL,
-             bias,
-             biasOffset,
-             biasInterpretationHLSL,
-             M,
-             k,
-             memoryLayoutHLSL,
-             transpose,
-             matrixStride
-        );
-        return ret;
-
     case optix_coopvec:
-        __intrinsic_asm "slangOptixCoopVecMatMul<OptixCoopVec<$[0], $[1]>, OptixCoopVec<$[2], $[3]>, $1, $5, $9, $8>($0, (CUdeviceptr)(&($3)), $4, (CUdeviceptr)(&($6)), $7, $11)", T, M, U, PackedK;
+        return __coopVecMatMulAdd<T, M, PackedK, U>(
+            input,
+            inputInterpretation,
+            matrix,
+            matrixOffset,
+            matrixInterpretation,
+            bias,
+            biasOffset,
+            biasInterpretation,
+            k,
+            memoryLayout,
+            transpose,
+            matrixStride);
 
     default:
         var result = coopVecMatMulPacked<T, M, PackedK, U>(
@@ -31510,31 +31252,6 @@ CoopVec<T, M> __coopVecMatMulAddPacked_impl<T : __BuiltinArithmeticType, let M :
 /// Transposing is not supported when `memoryLayout` is `RowMajor` or `ColumnMajor`, and `transpose` must be `false`.
 /// Not all component types support transposing.
 /// When `memoryLayout` is `InferencingOptimal` or `TrainingOptimal`, `matrixStride` is ignored.
-[ForceInline]
-[require(cooperative_vector)]
-[require(optix_coopvec)]
-CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType>(
-    CoopVec<U, PackedK> input,
-    constexpr CoopVecComponentType inputInterpretation,
-    constexpr int k,
-    $(buffer.type) matrix,
-    int32_t matrixOffset,
-    constexpr CoopVecComponentType matrixInterpretation,
-    $(buffer.type) bias,
-    int32_t biasOffset,
-    constexpr CoopVecComponentType biasInterpretation,
-    constexpr CoopVecMatrixLayout memoryLayout,
-    constexpr bool transpose,
-    constexpr uint matrixStride
-)
-{
-    static_assert(__isPackedInputInterpretation(inputInterpretation) || k == PackedK
-                 , "for non-packed inputInterpretation values k must be equal to the input vector length");
-    static_assert(!__isPackedInputInterpretation(inputInterpretation)
-                || k <= __inputInterpretationPackingFactor(inputInterpretation)*PackedK
-                 , "for packed inputInterpretation values k must be less than or equal to the input vector length times the packing factor");
-    return __coopVecMatMulAddPacked_impl<T, M, PackedK, U>(input, inputInterpretation, k, matrix, matrixOffset, matrixInterpretation, bias, biasOffset, biasInterpretation, memoryLayout, transpose, matrixStride);
-}
 
 /// Multiply a matrix with a cooperative vector and add a bias vector.
 /// Given a M-row by K-col `matrix`, a K-element column vector `input`, and a M-element vector `bias`, computes `matrix * input + bias`, and
@@ -31641,25 +31358,26 @@ void coopVecOuterProductAccumulate<T : __BuiltinArithmeticType, let M : int, let
 {
     __target_switch
     {
-    case hlsl:
-        uint matrixInterpretationHLSL = __getHLSLCoopVecComponentType(matrixInterpretation);
-        uint memoryLayoutHLSL = __getHLSLCoopVecMatrixLayout(memoryLayout);
-        return a.__OuterProductAccumulate(b, matrix, matrixOffset, matrixStride, memoryLayoutHLSL, matrixInterpretationHLSL);
     case spirv:
-        let matrixInterpretationSpirv : int = __getSpvCoopVecComponentType(matrixInterpretation);
-        let memoryLayoutSpirv : int = __getSpvCoopVecMatrixLayout(memoryLayout);
         let matrixBuf = __getEquivalentStructuredBuffer<uint32_t>(matrix);
-        let zero = 0;
-        spirv_asm
-        {
-            OpCapability CooperativeVectorTrainingNV;
-            %runtimeArrayType = OpTypeRuntimeArray $$uint32_t;
-            %storagePointerType = OpTypePointer StorageBuffer %runtimeArrayType;
-            %matrixPointer:%storagePointerType = OpAccessChain $matrixBuf $zero;
-            OpCooperativeVectorOuterProductAccumulateNV %matrixPointer $matrixOffset $a $b $memoryLayoutSpirv $matrixInterpretationSpirv $matrixStride;
-        };
+        __coopVecOuterProductAccumulate<T, M, N, uint32_t>(
+            matrixBuf,
+            matrixOffset,
+            a,
+            b,
+            memoryLayout,
+            matrixInterpretation,
+            matrixStride);
+    case hlsl:
     case optix_coopvec:
-        __intrinsic_asm "optixCoopVecOuterProductAccumulate($0, $1, (CUdeviceptr)(&$2), $3, $4)";
+        __coopVecOuterProductAccumulate<T, M, N>(
+            matrix,
+            matrixOffset,
+            a,
+            b,
+            memoryLayout,
+            matrixInterpretation,
+            matrixStride);
     default:
         for (int i = 0; i < M; ++i)
         {
@@ -31726,6 +31444,7 @@ void coopVecOuterProductAccumulate<T : __BuiltinArithmeticType, let M : int, let
 /// for (int i = 0; i < N; i++)
 ///     atomicAdd(dest[i], v[i]);
 /// ```
+[ForceInline]
 [require(cooperative_vector)]
 [require(optix_coopvec)]
 void coopVecReduceSumAccumulate<T : __BuiltinArithmeticType, let N : int>(
@@ -31736,21 +31455,12 @@ void coopVecReduceSumAccumulate<T : __BuiltinArithmeticType, let N : int>(
 {
     __target_switch
     {
-    case hlsl:
-        __intrinsic_asm "__builtin_VectorAccumulate($0, $1, $2)";
     case spirv:
         let bufBuf = __getEquivalentStructuredBuffer<uint32_t>(buffer);
-        let zero = 0;
-        spirv_asm
-        {
-            OpCapability CooperativeVectorTrainingNV;
-            %runtimeArrayType = OpTypeRuntimeArray $$uint32_t;
-            %storagePointerType = OpTypePointer StorageBuffer %runtimeArrayType;
-            %bufferPointer:%storagePointerType = OpAccessChain $bufBuf $zero;
-            OpCooperativeVectorReduceSumAccumulateNV %bufferPointer $offset $v;
-        };
+        __coopVecReduceSumAccumulate<T, N, uint32_t>(bufBuf, offset, v);
+    case hlsl:
     case optix_coopvec:
-        __intrinsic_asm "optixCoopVecReduceSumAccumulate($0, (CUdeviceptr)(&$1), $2)";
+        __coopVecReduceSumAccumulate<T, N>(buffer, offset, v);
     default:
         for (int i = 0; i < N; ++i)
         {
@@ -31779,53 +31489,52 @@ static const struct {
 for(auto buffer : kStructuredBufferCases_) {
 $}
 
-// Internal implementation without static_assert; github issue 8620
-[ForceInline]
-[require(spirv, cooperative_vector)]
-[require(optix_coopvec)]
-__generic<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType,IgnoredBufferElementType>
-CoopVec<T, M> __coopVecMatMulPacked_impl(
+__intrinsic_op($(kIROp_CoopVecMatMul))
+internal __generic<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType, IgnoredBufferElementType>
+CoopVec<T, M> __coopVecMatMul(
     CoopVec<U, PackedK> input,
-    constexpr CoopVecComponentType inputInterpretation,
-    constexpr int k,
+    CoopVecComponentType inputInterpretation,
     $(buffer.type) matrix,
     int32_t matrixOffset,
-    constexpr CoopVecComponentType matrixInterpretation,
-    constexpr CoopVecMatrixLayout memoryLayout,
-    constexpr bool transpose,
-    constexpr uint matrixStride
-)
-{
-    __target_switch
-    {
-    case spirv:
-        let m : int32_t = M;
-        let matrixInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(matrixInterpretation);
-        let inputInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(inputInterpretation);
-        let memoryLayoutSpirv : int32_t = __getSpvCoopVecMatrixLayout(memoryLayout);
-        let zero = 0;
+    CoopVecComponentType matrixInterpretation,
+    int32_t k,
+    CoopVecMatrixLayout memoryLayout,
+    bool transpose,
+    uint matrixStride);
 
-        // https://github.com/KhronosGroup/SPIRV-Registry/blob/main/extensions/KHR/SPV_KHR_cooperative_matrix.asciidoc#3x-cooperative-matrix-operands
-        int operands = 0; // NoneKHR
-        if (__isSignedInt<U>())
-        {
-            operands |= 0x02; // MatrixBSignedComponentsKHR
-        }
-        if (__isSignedInt<T>())
-        {
-            operands |= 0x08; // MatrixResultSignedComponentsKHR
-        }
-        return spirv_asm
-        {
-            %runtimeArrayType = OpTypeRuntimeArray $$IgnoredBufferElementType;
-            %storagePointerType = OpTypePointer StorageBuffer %runtimeArrayType;
-            %matrixPointer:%storagePointerType = OpAccessChain $matrix $zero;
-            result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulNV $input $inputInterpretationSpirv %matrixPointer $matrixOffset $matrixInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride !operands;
-        };
-    case optix_coopvec:
-        __intrinsic_asm "slangOptixCoopVecMatMul<$T0, $T0, $1, $5, $6>($0, (CUdeviceptr)(&($3)), $4, $8)";
-    }
-}
+__intrinsic_op($(kIROp_CoopVecMatMulAdd))
+internal __generic<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType, IgnoredBufferElementType>
+CoopVec<T, M> __coopVecMatMulAdd(
+    CoopVec<U, PackedK> input,
+    CoopVecComponentType inputInterpretation,
+    $(buffer.type) matrix,
+    int32_t matrixOffset,
+    CoopVecComponentType matrixInterpretation,
+    $(buffer.type) bias,
+    int32_t biasOffset,
+    CoopVecComponentType biasInterpretation,
+    int32_t k,
+    CoopVecMatrixLayout memoryLayout,
+    bool transpose,
+    uint matrixStride);
+
+__intrinsic_op($(kIROp_CoopVecOuterProductAccumulate))
+internal __generic<T : __BuiltinArithmeticType, let M : int, let N : int, IgnoredBufferElementType>
+void __coopVecOuterProductAccumulate(
+    $(buffer.type) matrix,
+    int32_t matrixOffset,
+    CoopVec<T, M> a,
+    CoopVec<T, N> b,
+    CoopVecMatrixLayout memoryLayout,
+    CoopVecComponentType matrixInterpretation,
+    uint matrixStride);
+
+__intrinsic_op($(kIROp_CoopVecReduceSumAccumulate))
+internal __generic<T : __BuiltinArithmeticType, let N : int, IgnoredBufferElementType>
+void __coopVecReduceSumAccumulate(
+    $(buffer.type) buffer,
+    int32_t offset,
+    CoopVec<T, N> v);
 
 [ForceInline]
 [require(spirv, cooperative_vector)]
@@ -31848,8 +31557,19 @@ CoopVec<T, M> coopVecMatMulPacked(
     static_assert(!__isPackedInputInterpretation(inputInterpretation)
                 || k <= __inputInterpretationPackingFactor(inputInterpretation)*PackedK
                  , "for packed inputInterpretation values k must be less than or equal to the input vector length times the packing factor");
-    return __coopVecMatMulPacked_impl<T, M, PackedK, U, IgnoredBufferElementType>(input, inputInterpretation, k, matrix, matrixOffset, matrixInterpretation, memoryLayout, transpose, matrixStride);
+
+    return __coopVecMatMul<T, M, PackedK, U, IgnoredBufferElementType>(
+        input,
+        inputInterpretation,
+        matrix,
+        matrixOffset,
+        matrixInterpretation,
+        k,
+        memoryLayout,
+        transpose,
+        matrixStride);
 }
+
 
 // specialized coopVecMatMul for non-packed inputs
 [require(spirv, cooperative_vector)]
@@ -31881,59 +31601,6 @@ CoopVec<T, M> coopVecMatMul(
         matrixStride);
 }
 
-// Internal implementation without static_assert; github issue 8620
-[ForceInline]
-[require(spirv, cooperative_vector)]
-[require(optix_coopvec)]
-CoopVec<T, M> __coopVecMatMulAddPacked_impl<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType, IgnoredBufferElementType>(
-    CoopVec<U, PackedK> input,
-    constexpr CoopVecComponentType inputInterpretation,
-    constexpr int k,
-    $(buffer.type) matrix,
-    int32_t matrixOffset,
-    constexpr CoopVecComponentType matrixInterpretation,
-    $(buffer.type) bias,
-    int32_t biasOffset,
-    constexpr CoopVecComponentType biasInterpretation,
-    constexpr CoopVecMatrixLayout memoryLayout,
-    constexpr bool transpose,
-    constexpr uint matrixStride
-)
-{
-    __target_switch
-    {
-    case spirv:
-        let m : int32_t = M;
-        let matrixInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(matrixInterpretation);
-        let biasInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(biasInterpretation);
-        let inputInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(inputInterpretation);
-        let memoryLayoutSpirv : int32_t = __getSpvCoopVecMatrixLayout(memoryLayout);
-        let zero = 0;
-
-        // https://github.com/KhronosGroup/SPIRV-Registry/blob/main/extensions/KHR/SPV_KHR_cooperative_matrix.asciidoc#3x-cooperative-matrix-operands
-        int operands = 0; // NoneKHR
-        if (__isSignedInt<U>())
-        {
-            operands |= 0x02; // MatrixBSignedComponentsKHR
-        }
-        if (__isSignedInt<T>())
-        {
-            operands |= 0x08; // MatrixResultSignedComponentsKHR
-        }
-
-        return spirv_asm
-        {
-            %runtimeArrayType = OpTypeRuntimeArray $$IgnoredBufferElementType;
-            %storagePointerType = OpTypePointer StorageBuffer %runtimeArrayType;
-            %matrixPointer:%storagePointerType = OpAccessChain $matrix $zero;
-            %biasPointer:%storagePointerType = OpAccessChain $bias $zero;
-            result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulAddNV $input $inputInterpretationSpirv %matrixPointer $matrixOffset $matrixInterpretationSpirv %biasPointer $biasOffset $biasInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride !operands;
-        };
-    case optix_coopvec:
-        __intrinsic_asm "slangOptixCoopVecMatMul<OptixCoopVec<$[0], $[1]>, OptixCoopVec<$[2], $[3]>, $1, $5, $9, $8>($0, (CUdeviceptr)(&($3)), $4, (CUdeviceptr)(&($6)), $7, $11)", T, M, U, PackedK;
-    }
-}
-
 [ForceInline]
 [require(spirv, cooperative_vector)]
 [require(optix_coopvec)]
@@ -31957,8 +31624,22 @@ CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, l
     static_assert(!__isPackedInputInterpretation(inputInterpretation)
                 || k <= __inputInterpretationPackingFactor(inputInterpretation)*PackedK
                  , "for packed inputInterpretation values k must be less than or equal to the input vector length times the packing factor");
-    return __coopVecMatMulAddPacked_impl<T, M, PackedK, U, IgnoredBufferElementType>(input, inputInterpretation, k, matrix, matrixOffset, matrixInterpretation, bias, biasOffset, biasInterpretation, memoryLayout, transpose, matrixStride);
+
+    return __coopVecMatMulAdd<T, M, PackedK, U, IgnoredBufferElementType>(
+        input,
+        inputInterpretation,
+        matrix,
+        matrixOffset,
+        matrixInterpretation,
+        bias,
+        biasOffset,
+        biasInterpretation,
+        k,
+        memoryLayout,
+        transpose,
+        matrixStride);
 }
+
 
 [require(spirv, cooperative_vector)]
 [require(optix_coopvec)]
@@ -32013,21 +31694,14 @@ void coopVecOuterProductAccumulate<T : __BuiltinArithmeticType, let M : int, let
     constexpr CoopVecComponentType matrixInterpretation,
 )
 {
-    __target_switch
-    {
-    case spirv:
-        let matrixInterpretationSpirv : int = __getSpvCoopVecComponentType(matrixInterpretation);
-        let memoryLayoutSpirv : int = __getSpvCoopVecMatrixLayout(memoryLayout);
-        let zero = 0;
-        spirv_asm
-        {
-            OpCapability CooperativeVectorTrainingNV;
-            %runtimeArrayType = OpTypeRuntimeArray $$IgnoredBufferElementType;
-            %storagePointerType = OpTypePointer StorageBuffer %runtimeArrayType;
-            %matrixPointer:%storagePointerType = OpAccessChain $matrix $zero;
-            OpCooperativeVectorOuterProductAccumulateNV %matrixPointer $matrixOffset $a $b $memoryLayoutSpirv $matrixInterpretationSpirv $matrixStride;
-        };
-    }
+    __coopVecOuterProductAccumulate<T, M, N, IgnoredBufferElementType>(
+        matrix,
+        matrixOffset,
+        a,
+        b,
+        memoryLayout,
+        matrixInterpretation,
+        matrixStride);
 }
 
 [require(spirv, cooperative_vector_training)]
@@ -32037,19 +31711,7 @@ void coopVecReduceSumAccumulate<T : __BuiltinArithmeticType, let N : int, Ignore
     int32_t offset
 )
 {
-    __target_switch
-    {
-    case spirv:
-        let zero = 0;
-        spirv_asm
-        {
-            OpCapability CooperativeVectorTrainingNV;
-            %runtimeArrayType = OpTypeRuntimeArray $$IgnoredBufferElementType;
-            %storagePointerType = OpTypePointer StorageBuffer %runtimeArrayType;
-            %bufferPointer:%storagePointerType = OpAccessChain $buffer $zero;
-            OpCooperativeVectorReduceSumAccumulateNV %bufferPointer $offset $v;
-        };
-    }
+    __coopVecReduceSumAccumulate<T, N, IgnoredBufferElementType>(buffer, offset, v);
 }
 
 ${
@@ -32057,6 +31719,38 @@ ${
 } // buffer type loop
 $}
 
+[ForceInline]
+[require(spirv, cooperative_vector_training)]
+__generic<T : __BuiltinArithmeticType, let M : int, let N : int>
+void __coopVecOuterProductAccumulateFromPointer(
+    void* matrixPtr,
+    int32_t matrixOffset,
+    CoopVec<T, M> a,
+    CoopVec<T, N> b,
+    CoopVecMatrixLayout memoryLayout,
+    CoopVecComponentType matrixInterpretation,
+    uint matrixStride)
+{
+    __coopVecOuterProductAccumulate<T, M, N>(
+        (Ptr<T[]>)matrixPtr,
+        matrixOffset,
+        a,
+        b,
+        memoryLayout,
+        matrixInterpretation,
+        matrixStride);
+}
+
+[ForceInline]
+[require(spirv, cooperative_vector_training)]
+__generic<T : __BuiltinArithmeticType, let N : int>
+void __coopVecReduceSumAccumulateFromPointer(
+    void* bufferPtr,
+    int32_t offset,
+    CoopVec<T, N> v)
+{
+    __coopVecReduceSumAccumulate<T, N>((Ptr<T[]>)bufferPtr, offset, v);
+}
 
 [require(spirv, cooperative_vector_training)]
 void coopVecOuterProductAccumulate<T : __BuiltinArithmeticType, let M : int, let N : int, U : __BuiltinArithmeticType, let IgnoredBufferSize : int>(
@@ -32069,17 +31763,15 @@ void coopVecOuterProductAccumulate<T : __BuiltinArithmeticType, let M : int, let
     constexpr CoopVecComponentType matrixInterpretation,
 )
 {
-    __target_switch
-    {
-    case spirv:
-        let matrixInterpretationSpirv : int = __getSpvCoopVecComponentType(matrixInterpretation);
-        let memoryLayoutSpirv : int = __getSpvCoopVecMatrixLayout(memoryLayout);
-        spirv_asm
-        {
-            OpCapability CooperativeVectorTrainingNV;
-            OpCooperativeVectorOuterProductAccumulateNV &matrix $matrixOffset $a $b $memoryLayoutSpirv $matrixInterpretationSpirv $matrixStride;
-        };
-    }
+    let matrixPtr0 = (void*)(&matrix);
+    __coopVecOuterProductAccumulateFromPointer<T, M, N>(
+        matrixPtr0,
+        matrixOffset,
+        a,
+        b,
+        memoryLayout,
+        matrixInterpretation,
+        matrixStride);
 }
 
 [require(spirv, cooperative_vector_training)]
@@ -32089,15 +31781,8 @@ void coopVecReduceSumAccumulate<T : __BuiltinArithmeticType, let N : int, U, let
     int32_t offset
 )
 {
-    __target_switch
-    {
-    case spirv:
-        spirv_asm
-        {
-            OpCapability CooperativeVectorTrainingNV;
-            OpCooperativeVectorReduceSumAccumulateNV &buffer $offset $v;
-        };
-    }
+    let bufferPtr0 = (void*)(&buffer);
+    __coopVecReduceSumAccumulateFromPointer<T, N>(bufferPtr0, offset, v);
 }
 
 // Pointer overloads for coopvector operations.
@@ -32120,29 +31805,18 @@ CoopVec<T, M> coopVecMatMulPacked(
     static_assert(!__isPackedInputInterpretation(inputInterpretation)
                 || k <= __inputInterpretationPackingFactor(inputInterpretation)*PackedK
                  , "for packed inputInterpretation values k must be less than or equal to the input vector length times the packing factor");
-    __target_switch
-    {
-    case spirv:
-        let m : int32_t = M;
-        let matrixInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(matrixInterpretation);
-        let inputInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(inputInterpretation);
-        let memoryLayoutSpirv : int32_t = __getSpvCoopVecMatrixLayout(memoryLayout);
-        int operands = 0; // NoneKHR
-        let zero = 0;
-        let cvtMatPtr = (Ptr<T[]>)matrixPtr;
-        if (__isSignedInt<U>())
-        {
-            operands |= 0x02; // MatrixBSignedComponentsKHR
-        }
-        if (__isSignedInt<T>())
-        {
-            operands |= 0x08; // MatrixResultSignedComponentsKHR
-        }
-        return spirv_asm
-        {
-            result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulNV $input $inputInterpretationSpirv $cvtMatPtr $zero $matrixInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride !operands;
-        };
-    }
+    let zero = 0;
+    let cvtMatPtr = (Ptr<T[]>)matrixPtr;
+    return __coopVecMatMul<T, M, PackedK, U>(
+        input,
+        inputInterpretation,
+        cvtMatPtr,
+        zero,
+        matrixInterpretation,
+        k,
+        memoryLayout,
+        transpose,
+        matrixStride);
 }
 
 // specialized coopVecMatMul for non-packed inputs
@@ -32192,31 +31866,22 @@ CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, l
                 || k <= __inputInterpretationPackingFactor(inputInterpretation)*PackedK
                  , "for packed inputInterpretation values k must be less than or equal to the input vector length times the packing factor");
 
-    __target_switch
-    {
-    case spirv:
-        let m : int32_t = M;
-        let matrixInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(matrixInterpretation);
-        let biasInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(biasInterpretation);
-        let inputInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(inputInterpretation);
-        let memoryLayoutSpirv : int32_t = __getSpvCoopVecMatrixLayout(memoryLayout);
-        let zero : int32_t = 0;
-        let cvtMatPtr = (Ptr<T[]>)matrixPtr;
-        let cvtBiasPtr = (Ptr<T[]>)biasPtr;
-        int operands = 0; // NoneKHR
-        if (__isSignedInt<U>())
-        {
-            operands |= 0x02; // MatrixBSignedComponentsKHR
-        }
-        if (__isSignedInt<T>())
-        {
-            operands |= 0x08; // MatrixResultSignedComponentsKHR
-        }
-        return spirv_asm
-        {
-            result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulAddNV $input $inputInterpretationSpirv $cvtMatPtr $zero $matrixInterpretationSpirv $cvtBiasPtr $zero $biasInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride !operands;
-        };
-    }
+    let zero : int32_t = 0;
+    let cvtMatPtr = (Ptr<T[]>)matrixPtr;
+    let cvtBiasPtr = (Ptr<T[]>)biasPtr;
+    return __coopVecMatMulAdd<T, M, PackedK, U>(
+        input,
+        inputInterpretation,
+        cvtMatPtr,
+        zero,
+        matrixInterpretation,
+        cvtBiasPtr,
+        zero,
+        biasInterpretation,
+        k,
+        memoryLayout,
+        transpose,
+        matrixStride);
 }
 
 [require(spirv, cooperative_vector)]
@@ -32259,18 +31924,14 @@ void coopVecOuterProductAccumulate<T : __BuiltinArithmeticType, let M : int, let
 )
 {
     let zero : int32_t = 0;
-    __target_switch
-    {
-    case spirv:
-        let matrixInterpretationSpirv : int = __getSpvCoopVecComponentType(matrixInterpretation);
-        let memoryLayoutSpirv : int = __getSpvCoopVecMatrixLayout(memoryLayout);
-        let cvtMatrixPtr = (Ptr<T[]>)matrixPtr;
-        spirv_asm
-        {
-            OpCapability CooperativeVectorTrainingNV;
-            OpCooperativeVectorOuterProductAccumulateNV $cvtMatrixPtr $zero $a $b $memoryLayoutSpirv $matrixInterpretationSpirv $matrixStride;
-        };
-    }
+    __coopVecOuterProductAccumulateFromPointer<T, M, N>(
+        matrixPtr,
+        zero,
+        a,
+        b,
+        memoryLayout,
+        matrixInterpretation,
+        matrixStride);
 }
 
 [require(spirv, cooperative_vector_training)]
@@ -32280,16 +31941,7 @@ void coopVecReduceSumAccumulate<T : __BuiltinArithmeticType, let N : int>(
 )
 {
     let zero : int32_t = 0;
-    let bufferPtr = (Ptr<T[]>)(buffer);
-    __target_switch
-    {
-    case spirv:
-        spirv_asm
-        {
-            OpCapability CooperativeVectorTrainingNV;
-            OpCooperativeVectorReduceSumAccumulateNV $bufferPtr $zero $v;
-        };
-    }
+    __coopVecReduceSumAccumulateFromPointer<T, N>(buffer, zero, v);
 }
 
 //@public:

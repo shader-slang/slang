@@ -88,6 +88,8 @@ void validateVectorsAndMatrices(
     DiagnosticSink* sink,
     TargetRequest* targetRequest);
 
+void validateCooperativeIR(IRModule* module, DiagnosticSink* sink);
+
 bool validateStructuredBufferResourceTypes(
     IRModule* module,
     DiagnosticSink* sink,

@@ -81,6 +81,8 @@ protected:
     virtual bool tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOuterPrec) SLANG_OVERRIDE;
     virtual bool tryEmitInstStmtImpl(IRInst* inst) SLANG_OVERRIDE;
     virtual void emitSimpleValueImpl(IRInst* inst) SLANG_OVERRIDE;
+
+    void emitMappedCoopVecComponentType(IRInst* operand);
     virtual void emitLoopControlDecorationImpl(IRLoopControlDecoration* decl) SLANG_OVERRIDE;
     virtual void emitFuncDecorationImpl(IRDecoration* decoration) SLANG_OVERRIDE;
     virtual void emitFuncDecorationsImpl(IRFunc* func) SLANG_OVERRIDE;

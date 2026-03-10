@@ -766,4 +766,9 @@ return {
 	["constexprOr"] = 764,
 	["constexprSelect"] = 765,
 	["Type.ValuePackType"] = 766,
+	["CoopMatMulAdd"] = 767,
+	["CoopVecMatMul"] = 768,
+	["CoopVecMatMulAdd"] = 769,
+	["CoopVecOuterProductAccumulate"] = 770,
+	["CoopVecReduceSumAccumulate"] = 771,
 }

@@ -1444,6 +1444,62 @@ local insts = {
 	{ TorchGetCudaStream = {} },
 	{ TorchTensorGetView = {} },
 	{ CoopMatMapElementIFunc = { min_operands = 2 } },
+	{ CoopMatMulAdd = { operands = { { "matA" }, { "matB" }, { "matC" }, { "saturatingAccumulation" } } } },
+	{
+		CoopVecMatMul = {
+			operands = {
+				{ "input" },
+				{ "inputInterpretation" },
+				{ "matrixPtr" },
+				{ "matrixOffset" },
+				{ "matrixInterpretation" },
+				{ "k" },
+				{ "memoryLayout" },
+				{ "transpose" },
+				{ "matrixStride" },
+			},
+		},
+	},
+	{
+		CoopVecMatMulAdd = {
+			operands = {
+				{ "input" },
+				{ "inputInterpretation" },
+				{ "matrixPtr" },
+				{ "matrixOffset" },
+				{ "matrixInterpretation" },
+				{ "biasPtr" },
+				{ "biasOffset" },
+				{ "biasInterpretation" },
+				{ "k" },
+				{ "memoryLayout" },
+				{ "transpose" },
+				{ "matrixStride" },
+			},
+		},
+	},
+	{
+		CoopVecOuterProductAccumulate = {
+			operands = {
+				{ "matrixPtr" },
+				{ "matrixOffset" },
+				{ "a" },
+				{ "b" },
+				{ "memoryLayout" },
+				{ "matrixInterpretation" },
+				{ "matrixStride" },
+			},
+		},
+	},
+	{
+		CoopVecReduceSumAccumulate = {
+			operands = {
+				{ "bufferPtr" },
+				{ "offset" },
+				{ "value" },
+			},
+		},
+	},
 	{ allocateOpaqueHandle = {} },
 	{
 		BindingQuery = {

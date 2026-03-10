@@ -668,6 +668,245 @@ void validateVectorsAndMatrices(
     }
 }
 
+static void diagnoseCooperativeIRValidationError(
+    DiagnosticSink* sink,
+    IRInst* inst,
+    const char* message)
+{
+    sink->diagnose(Diagnostics::IrValidationFailed{
+        .message = message,
+        .location = inst->sourceLoc,
+    });
+}
+
+static void validateCoopMatMulAdd(IRInst* inst, DiagnosticSink* sink)
+{
+    if (inst->getOperandCount() < 4)
+    {
+        diagnoseCooperativeIRValidationError(sink, inst, "Malformed CoopMatMulAdd operand list");
+        return;
+    }
+
+    auto coopMatMulAdd = as<IRCoopMatMulAdd>(inst);
+    SLANG_ASSERT(coopMatMulAdd);
+
+    auto aType = as<IRCoopMatrixType>(coopMatMulAdd->getMatA()->getDataType());
+    auto bType = as<IRCoopMatrixType>(coopMatMulAdd->getMatB()->getDataType());
+    auto cType = as<IRCoopMatrixType>(coopMatMulAdd->getMatC()->getDataType());
+    auto resultType = as<IRCoopMatrixType>(inst->getDataType());
+    if (!aType || !bType || !cType || !resultType)
+    {
+        diagnoseCooperativeIRValidationError(
+            sink,
+            inst,
+            "CoopMatMulAdd operands and result must all be cooperative matrix types");
+        return;
+    }
+
+    if (coopMatMulAdd->getSaturatingAccumulation()->getDataType()->getOp() != kIROp_BoolType)
+    {
+        diagnoseCooperativeIRValidationError(
+            sink,
+            inst,
+            "CoopMatMulAdd saturatingAccumulation operand must have bool type");
+        return;
+    }
+
+    auto aUse = as<IRIntLit>(aType->getMatrixUse());
+    auto bUse = as<IRIntLit>(bType->getMatrixUse());
+    auto cUse = as<IRIntLit>(cType->getMatrixUse());
+    auto resultUse = as<IRIntLit>(resultType->getMatrixUse());
+    if (aUse && bUse && cUse && resultUse)
+    {
+        if (aUse->getValue() != SLANG_COOPERATIVE_MATRIX_USE_A ||
+            bUse->getValue() != SLANG_COOPERATIVE_MATRIX_USE_B ||
+            cUse->getValue() != SLANG_COOPERATIVE_MATRIX_USE_ACCUMULATOR ||
+            resultUse->getValue() != SLANG_COOPERATIVE_MATRIX_USE_ACCUMULATOR)
+        {
+            diagnoseCooperativeIRValidationError(
+                sink,
+                inst,
+                "CoopMatMulAdd requires MatrixA, MatrixB, and accumulator matrix operands");
+        }
+    }
+
+    auto aScope = as<IRIntLit>(aType->getScope());
+    auto bScope = as<IRIntLit>(bType->getScope());
+    auto cScope = as<IRIntLit>(cType->getScope());
+    auto resultScope = as<IRIntLit>(resultType->getScope());
+    if (aScope && bScope && cScope && resultScope)
+    {
+        if (aScope->getValue() != bScope->getValue() || aScope->getValue() != cScope->getValue() ||
+            aScope->getValue() != resultScope->getValue())
+        {
+            diagnoseCooperativeIRValidationError(
+                sink,
+                inst,
+                "CoopMatMulAdd requires all cooperative matrix operands to use the same scope");
+        }
+    }
+
+    auto aRows = as<IRIntLit>(aType->getRowCount());
+    auto aCols = as<IRIntLit>(aType->getColumnCount());
+    auto bRows = as<IRIntLit>(bType->getRowCount());
+    auto bCols = as<IRIntLit>(bType->getColumnCount());
+    auto cRows = as<IRIntLit>(cType->getRowCount());
+    auto cCols = as<IRIntLit>(cType->getColumnCount());
+    auto resultRows = as<IRIntLit>(resultType->getRowCount());
+    auto resultCols = as<IRIntLit>(resultType->getColumnCount());
+    if (aRows && aCols && bRows && bCols && cRows && cCols && resultRows && resultCols)
+    {
+        if (aRows->getValue() != cRows->getValue() || aRows->getValue() != resultRows->getValue() ||
+            aCols->getValue() != bRows->getValue() || bCols->getValue() != cCols->getValue() ||
+            bCols->getValue() != resultCols->getValue())
+        {
+            diagnoseCooperativeIRValidationError(
+                sink,
+                inst,
+                "CoopMatMulAdd operand dimensions must satisfy A(MxK), B(KxN), and C/result(MxN)");
+        }
+    }
+}
+
+static void validateCoopVecMatMul(IRInst* inst, DiagnosticSink* sink)
+{
+    if (inst->getOperandCount() < 9)
+    {
+        diagnoseCooperativeIRValidationError(sink, inst, "Malformed CoopVecMatMul operand list");
+        return;
+    }
+
+    auto coopVecMatMul = as<IRCoopVecMatMul>(inst);
+    SLANG_ASSERT(coopVecMatMul);
+
+    auto resultType = as<IRCoopVectorType>(inst->getDataType());
+    auto inputType = as<IRCoopVectorType>(coopVecMatMul->getInput()->getDataType());
+    if (!resultType || !inputType)
+    {
+        diagnoseCooperativeIRValidationError(
+            sink,
+            inst,
+            "CoopVecMatMul requires cooperative vector input and result types");
+        return;
+    }
+}
+
+static void validateCoopVecMatMulAdd(IRInst* inst, DiagnosticSink* sink)
+{
+    if (inst->getOperandCount() < 12)
+    {
+        diagnoseCooperativeIRValidationError(sink, inst, "Malformed CoopVecMatMulAdd operand list");
+        return;
+    }
+
+    auto coopVecMatMulAdd = as<IRCoopVecMatMulAdd>(inst);
+    SLANG_ASSERT(coopVecMatMulAdd);
+
+    auto resultType = as<IRCoopVectorType>(inst->getDataType());
+    auto inputType = as<IRCoopVectorType>(coopVecMatMulAdd->getInput()->getDataType());
+    if (!resultType || !inputType)
+    {
+        diagnoseCooperativeIRValidationError(
+            sink,
+            inst,
+            "CoopVecMatMulAdd requires cooperative vector input and result types");
+        return;
+    }
+}
+
+static void validateCoopVecOuterProductAccumulate(IRInst* inst, DiagnosticSink* sink)
+{
+    if (inst->getOperandCount() < 7)
+    {
+        diagnoseCooperativeIRValidationError(
+            sink,
+            inst,
+            "Malformed CoopVecOuterProductAccumulate operand list");
+        return;
+    }
+
+    auto outerProduct = as<IRCoopVecOuterProductAccumulate>(inst);
+    SLANG_ASSERT(outerProduct);
+
+    auto aType = as<IRCoopVectorType>(outerProduct->getA()->getDataType());
+    auto bType = as<IRCoopVectorType>(outerProduct->getB()->getDataType());
+    if (!aType || !bType)
+    {
+        diagnoseCooperativeIRValidationError(
+            sink,
+            inst,
+            "CoopVecOuterProductAccumulate requires cooperative vector operands");
+    }
+
+    if (inst->getDataType()->getOp() != kIROp_VoidType)
+    {
+        diagnoseCooperativeIRValidationError(
+            sink,
+            inst,
+            "CoopVecOuterProductAccumulate must have void result type");
+    }
+}
+
+static void validateCoopVecReduceSumAccumulate(IRInst* inst, DiagnosticSink* sink)
+{
+    if (inst->getOperandCount() < 3)
+    {
+        diagnoseCooperativeIRValidationError(
+            sink,
+            inst,
+            "Malformed CoopVecReduceSumAccumulate operand list");
+        return;
+    }
+
+    auto reduceSum = as<IRCoopVecReduceSumAccumulate>(inst);
+    SLANG_ASSERT(reduceSum);
+
+    if (!as<IRCoopVectorType>(reduceSum->getValue()->getDataType()))
+    {
+        diagnoseCooperativeIRValidationError(
+            sink,
+            inst,
+            "CoopVecReduceSumAccumulate requires a cooperative vector value operand");
+    }
+
+    if (inst->getDataType()->getOp() != kIROp_VoidType)
+    {
+        diagnoseCooperativeIRValidationError(
+            sink,
+            inst,
+            "CoopVecReduceSumAccumulate must have void result type");
+    }
+}
+
+void validateCooperativeIR(IRModule* module, DiagnosticSink* sink)
+{
+    List<IRInst*> insts;
+    findAllInstsBreadthFirst(module->getModuleInst(), insts);
+    for (auto inst : insts)
+    {
+        switch (inst->getOp())
+        {
+        case kIROp_CoopMatMulAdd:
+            validateCoopMatMulAdd(inst, sink);
+            break;
+        case kIROp_CoopVecMatMul:
+            validateCoopVecMatMul(inst, sink);
+            break;
+        case kIROp_CoopVecMatMulAdd:
+            validateCoopVecMatMulAdd(inst, sink);
+            break;
+        case kIROp_CoopVecOuterProductAccumulate:
+            validateCoopVecOuterProductAccumulate(inst, sink);
+            break;
+        case kIROp_CoopVecReduceSumAccumulate:
+            validateCoopVecReduceSumAccumulate(inst, sink);
+            break;
+        default:
+            break;
+        }
+    }
+}
+
 //
 // Structure buffer resource types
 //
