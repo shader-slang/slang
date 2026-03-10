@@ -10,20 +10,30 @@
 #include <strings.h>
 #include <wchar.h>
 
+// Define MSVC specific macros
+#define _TRUNCATE ((size_t)-1)
+#define STRUNCATE 80
+#define _stricmp strcasecmp
+
 #ifndef HAVE_MEMCPY_S
-inline void memcpy_s(void* dest, [[maybe_unused]] size_t destSize, const void* src, size_t count)
+// https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/memcpy-s-wmemcpy-s
+inline int memcpy_s(void* dest, size_t destSize, const void* src, size_t count)
 {
-    assert(destSize >= count);
+    if (count == 0) return 0;
+    if (dest == nullptr) return EINVAL;
+    if (src == nullptr || destSize < count)
+    {
+        memset(dest, 0, destSize);
+        if (src == nullptr) return EINVAL;
+        return ERANGE;
+    }
     memcpy(dest, src, count);
+    return 0;
 }
 #endif // HAVE_MEMCPY_S
 
-// Define MSVC specific macros to their POSIX equivalents
-#define _TRUNCATE ((size_t)-1)
-#define _stricmp strcasecmp
-
-
 #ifndef HAVE_FOPEN_S
+// https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/fopen-s-wfopen-s
 inline int fopen_s(FILE** f, const char* fileName, const char* mode)
 {
     if (f == nullptr || fileName == nullptr || mode == nullptr)
@@ -40,50 +50,70 @@ inline int fopen_s(FILE** f, const char* fileName, const char* mode)
 #endif // HAVE_FOPEN_S
 
 #ifndef HAVE_FREAD_S
+// https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/fread-s
 inline size_t fread_s(
     void* buffer,
-    [[maybe_unused]] size_t bufferSize,
+    size_t bufferSize,
     size_t elementSize,
     size_t count,
     FILE* stream)
 {
-    assert(bufferSize >= elementSize * count);
+    if (elementSize == 0 || count == 0) return 0;
+    if (buffer == nullptr || stream == nullptr)
+    {
+        errno = EINVAL;
+        return 0;
+    }
+    if (bufferSize < elementSize * count)
+    {
+        errno = ERANGE;
+        return 0;
+    }
     return fread(buffer, elementSize, count, stream);
 }
 #endif // HAVE_FREAD_S
 
 #ifndef HAVE_WCSNLEN_S
-inline size_t wcsnlen_s(const wchar_t* str, size_t /*numberofElements*/)
+// https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/strnlen-strnlen-s
+inline size_t wcsnlen_s(const wchar_t* str, size_t numberOfElements)
 {
-    return wcslen(str);
+    if (str == nullptr)
+        return 0;
+    size_t count = 0;
+    while (count < numberOfElements && str[count] != L'\0')
+        count++;
+    return count;
 }
 #endif // HAVE_WCSNLEN_S
-
 #ifndef HAVE_STRNLEN_S
+// https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/strnlen-strnlen-s
 inline size_t strnlen_s(const char* str, size_t numberOfElements)
 {
-#if defined(__CYGWIN__)
-    const char* cur = str;
-    if (str)
-    {
-        const char* const end = str + numberOfElements;
-        while (*cur && cur < end)
-            cur++;
-    }
-    return size_t(cur - str);
-#else
-    return strnlen(str, numberOfElements);
-#endif
+    if (str == nullptr)
+        return 0;
+    size_t count = 0;
+    while (count < numberOfElements && str[count] != '\0')
+        count++;
+    return count;
 }
 #endif // HAVE_STRNLEN_S
 
 #ifndef HAVE_SPRINTF_S
-__attribute__((format(printf, 3, 4))) inline int sprintf_s(
+// https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/sprintf-s-sprintf-s-l-swprintf-s-swprintf-s-l
+#ifdef __GNUC__
+__attribute__((format(printf, 3, 4)))
+#endif
+inline int sprintf_s(
     char* buffer,
     size_t sizeOfBuffer,
     const char* format,
     ...)
 {
+    if (buffer == nullptr || format == nullptr)
+    {
+        errno = EINVAL;
+        return -1;
+    }
     va_list argptr;
     va_start(argptr, format);
     int rs = vsnprintf(buffer, sizeOfBuffer, format, argptr);
@@ -93,11 +123,18 @@ __attribute__((format(printf, 3, 4))) inline int sprintf_s(
 #endif // HAVE_SPRINTF_S
 
 #ifndef HAVE_SWPRINTF_S
+// https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/sprintf-s-sprintf-s-l-swprintf-s-swprintf-s-l
+
 // A patch was submitted to GCC wchar_t support in 2001, so I'm sure we can
 // enable this any day now...
 // __attribute__((format(wprintf, 3, 4)))
 inline int swprintf_s(wchar_t* buffer, size_t sizeOfBuffer, const wchar_t* format, ...)
 {
+    if (buffer == nullptr || format == nullptr)
+    {
+        errno = EINVAL;
+        return -1;
+    }
     va_list argptr;
     va_start(argptr, format);
     int rs = vswprintf(buffer, sizeOfBuffer, format, argptr);
@@ -107,36 +144,139 @@ inline int swprintf_s(wchar_t* buffer, size_t sizeOfBuffer, const wchar_t* forma
 #endif // HAVE_SWPRINTF_S
 
 #ifndef HAVE_WCSCPY_S
-inline void wcscpy_s(wchar_t* strDestination, size_t /*numberOfElements*/, const wchar_t* strSource)
+// https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/strcpy-s-wcscpy-s-mbscpy-s
+inline int wcscpy_s(wchar_t* dest, size_t dest_size, const wchar_t* src)
 {
-    wcscpy(strDestination, strSource);
+    if (dest == nullptr) 
+        return EINVAL;
+    if (src == nullptr) 
+    { 
+        dest[0] = L'\0'; 
+        errno = EINVAL; 
+        return EINVAL; 
+    }
+    if (dest_size == 0) { 
+        dest[0] = L'\0'; 
+        errno = ERANGE; 
+        return ERANGE; 
+    }
+    // Copy characters until we hit eof or run out of space
+    size_t i = 0;
+    while (i < dest_size - 1 && src[i] != L'\0')
+    {
+        dest[i] = src[i];
+        i++;
+    }
+
+    dest[i] = L'\0';
+    if (src[i] != L'\0') { 
+        dest[0] = L'\0'; 
+        errno = ERANGE; 
+        return ERANGE; 
+    }
+    return 0;
 }
 #endif // HAVE_WCSCPY_S
 #ifndef HAVE_STRCPY_S
-inline void strcpy_s(char* strDestination, size_t /*numberOfElements*/, const char* strSource)
+// https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/strcpy-s-wcscpy-s-mbscpy-s
+inline int strcpy_s(char* dest, size_t dest_size, const char* src)
 {
-    strcpy(strDestination, strSource);
+    if (dest == nullptr)
+        return EINVAL;
+    if (src == nullptr)
+    {
+        dest[0] = '\0';
+        errno = EINVAL;
+        return EINVAL;
+    }
+    if (dest_size == 0)
+    {
+        dest[0] = '\0';
+        errno = ERANGE;
+        return ERANGE;
+    }
+    size_t i = 0;
+    while (i < dest_size - 1 && src[i] != '\0')
+    {
+        dest[i] = src[i];
+        i++;
+    }
+    dest[i] = '\0';
+    if (src[i] != '\0')
+    {
+        dest[0] = '\0';
+        errno = ERANGE;
+        return ERANGE;
+    }
+    return 0;
 }
 #endif // HAVE_STRCPY_S
 
 #ifndef HAVE_WCSNCPY_S
-inline void wcsncpy_s(
-    wchar_t* strDestination,
-    size_t /*numberOfElements*/,
-    const wchar_t* strSource,
-    size_t count)
+// https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/strncpy-s-strncpy-s-l-wcsncpy-s-wcsncpy-s-l-mbsncpy-s-mbsncpy-s-l?view=msvc-170
+inline int wcsncpy_s(wchar_t* strDest, size_t numberOfElements, const wchar_t* strSource, size_t count)
 {
-    wcsncpy(strDestination, strSource, count);
+    if (strDest == nullptr || numberOfElements == 0)
+        return EINVAL;
+    if (strSource == nullptr)
+    {
+        strDest[0] = L'\0';
+        errno = EINVAL;
+        return EINVAL;
+    }
+
+    // D is less than count and the length of strSource
+    size_t D = (count == _TRUNCATE) ? numberOfElements - 1 :
+                   (count < numberOfElements - 1 ? count : numberOfElements - 1);
+    size_t i = 0;
+    while (i < D && strSource[i] != L'\0')
+    {
+        strDest[i] = strSource[i];
+        i++;
+    }
+    strDest[i] = L'\0';
+    if (count != _TRUNCATE && strSource[i] != L'\0' && i == numberOfElements - 1)
+    {
+        strDest[0] = L'\0';
+        errno = ERANGE;
+        return ERANGE;
+    }
+    if (count == _TRUNCATE && strSource[i] != L'\0')
+        return STRUNCATE;
+    return 0;
 }
 #endif // HAVE_WCSNCPY_S
 #ifndef HAVE_STRNCPY_S
-inline void strncpy_s(
-    char* strDestination,
-    size_t /*numberOfElements*/,
-    const char* strSource,
-    size_t count)
+// https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/strncpy-s-strncpy-s-l-wcsncpy-s-wcsncpy-s-l-mbsncpy-s-mbsncpy-s-l?view=msvc-170
+inline int strncpy_s(char* strDest, size_t numberOfElements, const char* strSource, size_t count)
 {
-    strncpy(strDestination, strSource, count);
+    if (strDest == nullptr || numberOfElements == 0)
+        return EINVAL;
+    if (strSource == nullptr)
+    {
+        strDest[0] = '\0';
+        errno = EINVAL;
+        return EINVAL;
+    }
+    // D is the lesser of count and the length of strSource
+    size_t D = (count == _TRUNCATE) ? numberOfElements - 1 :
+                   (count < numberOfElements - 1 ? count : numberOfElements - 1);
+    size_t i = 0;
+    while (i < D && strSource[i] != '\0')
+    {
+        strDest[i] = strSource[i];
+        i++;
+    }
+    strDest[i] = '\0';
+    if (count != _TRUNCATE && strSource[i] != '\0' && i == numberOfElements - 1)
+    {
+        strDest[0] = '\0';
+        errno = ERANGE;
+        return ERANGE;
+    }
+    if (count == _TRUNCATE && strSource[i] != '\0')
+        return STRUNCATE;
+    return 0;
 }
 #endif // HAVE_STRNCPY_S
 #endif // SLANG_CORE_SECURE_CRT_H
