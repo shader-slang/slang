@@ -789,7 +789,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         m_operandStack.setCount(operandsStartIndex);
     }
 
-    SpvOp _specConstantOpcodeConvert(IROp irOpCode, IRBasicType* basicType)
+    SpvOp _specConstantOpcodeConvert(
+        IROp irOpCode,
+        IRBasicType* basicType,
+        IRType* resultType = nullptr)
     {
         SpvOp opCode = SpvOpUndef;
         opCode = _arithmeticOpCodeConvert(irOpCode, basicType);
@@ -799,6 +802,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             {
             case kIROp_IntCast:
             case kIROp_ConstexprIntCast:
+                if (resultType && isSignedType(resultType))
+                    return SpvOpSConvert;
                 return SpvOpUConvert;
             case kIROp_FloatCast:
             case kIROp_ConstexprFloatCast:
@@ -3507,9 +3512,27 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             return emitLit(inst);
         }
 
+        // For integer casts in spec constant context, SPIRV's UConvert/SConvert
+        // require different bit widths between source and result. Same-width casts
+        // (e.g. uint->int) have no valid spec constant op encoding, so we pass
+        // through the operand directly since the bit representation is identical.
+        auto irOp = inst->getOp();
+        if (irOp == kIROp_IntCast || irOp == kIROp_ConstexprIntCast)
+        {
+            auto srcType = inst->getOperand(0)->getDataType();
+            auto dstType = inst->getDataType();
+            if (isIntegralType(srcType) && isIntegralType(dstType))
+            {
+                auto srcInfo = getIntTypeInfo(m_targetRequest, srcType);
+                auto dstInfo = getIntTypeInfo(m_targetRequest, dstType);
+                if (srcInfo.width == dstInfo.width)
+                    return emitSpecializationConstantOp(inst->getOperand(0));
+            }
+        }
+
         IRType* type = inst->getOperand(0)->getDataType();
         IRBasicType* basicType = as<IRBasicType>(type);
-        SpvOp opCode = _specConstantOpcodeConvert(inst->getOp(), basicType);
+        SpvOp opCode = _specConstantOpcodeConvert(inst->getOp(), basicType, inst->getDataType());
         if (opCode == SpvOpUndef)
         {
             String e = "Unhandled inst in spirv-emit:\n" +
