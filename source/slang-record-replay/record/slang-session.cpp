@@ -563,6 +563,16 @@ SLANG_NO_THROW bool SessionRecorder::isBinaryModuleUpToDate(
     return result;
 }
 
+SLANG_NO_THROW SlangResult SLANG_MCALL SessionRecorder::getDeclSourceLocation(
+    slang::DeclReflection* decl,
+    slang::SourceLocation* outLocation)
+{
+    // No need to record this function, it's a query function and doesn't impact slang internal
+    // state.
+    slangRecordLog(LogLevel::Verbose, "%s\n", __PRETTY_FUNCTION__);
+    return m_actualSession->getDeclSourceLocation(decl, outLocation);
+}
+
 IModuleRecorder* SessionRecorder::getModuleRecorder(slang::IModule* module)
 {
     IModuleRecorder* moduleRecord = nullptr;
