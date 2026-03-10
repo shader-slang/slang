@@ -33,7 +33,7 @@ NC='\033[0m'
 # Remove entries as the underlying issues are fixed.
 KNOWN_FAILURES=(
   # SV_PointSize cannot be used as input in fragment stage when
-  # vertex/fragment share a struct (https://github.com/shader-slang/slang/issues/XXXX)
+  # vertex/fragment share a struct (https://github.com/shader-slang/slang/issues/10473)
   "computenbody/particle.slang"
   "computeparticles/particle.slang"
   "particlesystem/particle.slang"
