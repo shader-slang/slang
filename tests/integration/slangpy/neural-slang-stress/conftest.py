@@ -4,19 +4,20 @@
 Pytest configuration for neural.slang large-model integration tests.
 
 These tests exercise neural.slang on the GPU via slangpy:
-- Training convergence (MLP + latent grid)
-- Inference correctness
-- Forward/backward stress across all activation functions
+- MLP-only integration coverage
+- Permuto encoder + MLP stress coverage
+- InlineVector and WaveTangledVector execution paths
 
 Requirements:
-- slangpy installed with slang >= 2026.1 (neural module support)
-- GPU with Vulkan support
+- slangpy installed with slang >= 2026.4 (neural module support)
+- CUDA-capable GPU
 """
 
 from __future__ import annotations
 
 import os
 from pathlib import Path
+import tempfile
 
 import pytest
 
@@ -24,13 +25,21 @@ import pytest
 TEST_DIR = Path(__file__).resolve().parent
 
 # Reference image used by training/inference tests
-REF_IMAGE_PATH = Path(__file__).resolve().parent.parent.parent.parent / "neural" / "neural-mlp-test-image.png"
+REF_IMAGE_PATH = TEST_DIR / "neural-mlp-test-image.png"
+
+# Optional output images from local runs go under the system temp dir so they
+# do not clutter the repo checkout.
+ARTIFACT_DIR = Path(tempfile.gettempdir()) / "slang-neural-large-model"
 
 
 def get_slangpy_paths():
     """Return include paths for slangpy's slang modules and neural standard module."""
     import slangpy as spy
-    pkg_dir = Path(spy.__file__).parent
+
+    if spy.__file__ is not None:
+        pkg_dir = Path(spy.__file__).parent
+    else:
+        pkg_dir = Path(spy.__path__[0]) / "slangpy"
 
     paths = [str(TEST_DIR)]
 
@@ -41,6 +50,9 @@ def get_slangpy_paths():
     for d in sorted(pkg_dir.iterdir()):
         if d.is_dir() and d.name.startswith("slang-standard-module-"):
             paths.append(str(d))
+            inner_slang = d / "slang"
+            if inner_slang.is_dir():
+                paths.append(str(inner_slang))
             break
 
     env_neural = os.environ.get("NEURAL_MODULE_PATH")
@@ -48,6 +60,12 @@ def get_slangpy_paths():
         paths.append(env_neural)
 
     return paths
+
+
+def get_artifact_path(filename: str) -> Path:
+    """Return a temp-dir path for optional locally saved test artifacts."""
+    ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
+    return ARTIFACT_DIR / filename
 
 
 def pytest_configure(config):
