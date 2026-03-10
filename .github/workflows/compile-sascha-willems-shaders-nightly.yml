@@ -111,9 +111,10 @@ jobs:
         env:
           BUILD_RESULT: ${{ job.status }}
 
+      # Slack notifications disabled - will be enabled in a follow-up PR
       - name: Success notification
         id: slack-notify-success
-        if: ${{ github.event_name == 'schedule' && success() }}
+        if: false # ${{ github.event_name == 'schedule' && success() }}
         uses: slackapi/slack-github-action@v1.26.0
         with:
           payload: |
@@ -125,7 +126,7 @@ jobs:
 
       - name: Failure notification
         id: slack-notify-failure
-        if: ${{ github.event_name == 'schedule' && !success() }}
+        if: false # ${{ github.event_name == 'schedule' && !success() }}
         uses: slackapi/slack-github-action@v1.26.0
         with:
           payload: |
