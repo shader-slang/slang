@@ -101,6 +101,16 @@ inputs:
     required: false
     default: "claude/"
 
+  # Permission configuration
+  allowed-non-write-users:
+    description: "Comma-separated list of usernames to allow without write permissions, or '*' to allow all users. Only works when github_token is provided."
+    required: false
+    default: ""
+  oidc-contents-permission:
+    description: "Contents permission level for OIDC token exchange ('read' or 'write'). Use 'write' only for workflows that need to push code (e.g., CI fixer). Default 'read' for safety."
+    required: false
+    default: "read"
+
   # AWS/Bedrock configuration (LLMGW path uses Bedrock with bearer token)
   aws-region:
     description: "AWS region"
@@ -420,7 +430,7 @@ runs:
           -X POST "$EXCHANGE_URL" \
           -H "Authorization: Bearer $OIDC_TOKEN" \
           -H "Content-Type: application/json" \
-          -d '{"permissions":{"contents":"read","pull_requests":"write","issues":"write","actions":"read"}}' \
+          -d '{"permissions":{"contents":"${{ inputs.oidc-contents-permission }}","pull_requests":"write","issues":"write","actions":"read"}}' \
           2>/dev/null || echo "000")
 
         if [ "$HTTP_CODE" = "200" ] && [ -f "$EXCHANGE_RESPONSE" ]; then
@@ -482,6 +492,7 @@ runs:
       with:
         anthropic_api_key: ${{ steps.auth-token.outputs.token }}
         github_token: ${{ steps.github-token.outputs.token }}
+        allowed_non_write_users: ${{ inputs.allowed-non-write-users }}
         trigger_phrase: ${{ inputs.trigger-phrase }}
         assignee_trigger: ${{ inputs.assignee-trigger }}
         label_trigger: ${{ inputs.label-trigger }}
@@ -509,7 +520,8 @@ runs:
               "GITHUB_EVENT_NAME": "${{ github.event_name }}",
               "GITHUB_ACTOR": "${{ github.actor }}",
               "DISABLE_TELEMETRY": "1",
-              "CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS": "1"
+              "CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS": "1",
+              "ENABLE_TOOL_SEARCH": "false"
             }
           }
 
@@ -529,6 +541,7 @@ runs:
       with:
         use_bedrock: "true"
         github_token: ${{ steps.github-token.outputs.token }}
+        allowed_non_write_users: ${{ inputs.allowed-non-write-users }}
         trigger_phrase: ${{ inputs.trigger-phrase }}
         assignee_trigger: ${{ inputs.assignee-trigger }}
         label_trigger: ${{ inputs.label-trigger }}
@@ -554,7 +567,8 @@ runs:
               "GITHUB_REPOSITORY": "${{ github.repository }}",
               "GITHUB_EVENT_NAME": "${{ github.event_name }}",
               "GITHUB_ACTOR": "${{ github.actor }}",
-              "DISABLE_TELEMETRY": "1"
+              "DISABLE_TELEMETRY": "1",
+              "ENABLE_TOOL_SEARCH": "false"
             }
           }
 

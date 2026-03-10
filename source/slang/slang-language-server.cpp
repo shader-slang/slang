@@ -291,6 +291,10 @@ String getDeclKindString(DeclRef<Decl> declRef)
     {
         return "(generic type pack parameter) ";
     }
+    else if (declRef.as<GenericValuePackParamDecl>())
+    {
+        return "(generic value pack parameter) ";
+    }
     else if (declRef.as<GenericValueParamDecl>())
     {
         return "(generic value parameter) ";
@@ -337,7 +341,19 @@ String getDeclSignatureString(DeclRef<Decl> declRef, WorkspaceVersion* version)
                 ASTPrinter::OptionFlag::SimplifiedBuiltinType |
                 ASTPrinter::OptionFlag::DefaultParamValues);
         printer.getStringBuilder() << getDeclKindString(declRef);
-        printer.addDeclSignature(declRef);
+        if (auto valPackParam = declRef.as<GenericValuePackParamDecl>())
+        {
+            auto& sb = printer.getStringBuilder();
+            sb << "let each " << getText(valPackParam.getName()) << " : ";
+            if (auto packType = as<ValuePackType>(valPackParam.getDecl()->getType()))
+                printer.addType(packType->getElementType());
+            else
+                printer.addType(valPackParam.getDecl()->getType());
+        }
+        else
+        {
+            printer.addDeclSignature(declRef);
+        }
         auto printInitExpr = [&](Module* module, Type* declType, Expr* initExpr)
         {
             auto& sb = printer.getStringBuilder();

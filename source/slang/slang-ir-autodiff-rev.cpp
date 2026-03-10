@@ -1321,7 +1321,7 @@ ParameterBlockTransposeInfo BackwardDiffTranscriberBase::splitAndTransposeParame
                     }
                     else
                     {
-                        refUse->set(diffRefReplacement);
+                        builder->replaceOperand(refUse, diffRefReplacement);
                     }
                     refUse = nextUse;
                 }

@@ -309,3 +309,33 @@ jobs:
           fi
 
           echo "All CI jobs completed successfully (passed or skipped)!"
+
+  # Automatically retry GPU health check failures by dispatching ci-retry.yml,
+  # which watches this run until it completes, then reruns only failed jobs.
+  # Capped at 2 automatic retries via run_attempt check.
+  retry-on-gpu-failure:
+    needs: [check-ci]
+    if: failure() && fromJSON(github.run_attempt) < 3
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Check for GPU health check failures and dispatch retry
+        env:
+          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gpu_failures=$(gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs?per_page=100" \
+            --jq '[.jobs[] | select(.conclusion == "failure") | select(.steps[]? | select(.name == "GPU health check" and .conclusion == "failure"))] | length' \
+            || echo "0")
+          gpu_failures=${gpu_failures:-0}
+          if ! [[ "$gpu_failures" =~ ^[0-9]+$ ]]; then
+            gpu_failures=0
+          fi
+
+          if [ "$gpu_failures" -gt 0 ]; then
+            echo "Found $gpu_failures GPU health check failure(s) — dispatching retry workflow..."
+            gh workflow run ci-retry.yml -F run_id=${{ github.run_id }}
+          else
+            echo "No GPU health check failures — not retrying."
+          fi

@@ -259,7 +259,7 @@ void GenericAppDeclRef::_toTextOverride(StringBuilder& out)
     auto genericDecl = as<GenericDecl>(getGenericDeclRef()->getDecl());
     Index paramCount = 0;
     for (auto member : genericDecl->getDirectMemberDecls())
-        if (as<GenericTypeParamDeclBase>(member) || as<GenericValueParamDecl>(member))
+        if (isGenericParam(member))
             paramCount++;
     getGenericDeclRef()->toText(out);
     out << "<";
@@ -328,7 +328,7 @@ void DeclRefBase::toText(StringBuilder& out)
         out << this->getDecl()->getName()->text;
         return;
     }
-    else if (as<GenericValueParamDecl>(this->getDecl()))
+    else if (isGenericValueParam(this->getDecl()))
     {
         SLANG_ASSERT(as<DirectDeclRef>(this));
         out << this->getDecl()->getName()->text;
@@ -385,8 +385,7 @@ void DeclRefBase::toText(StringBuilder& out)
                 {
                     Index paramCount = 0;
                     for (auto member : genericDecl->getDirectMemberDecls())
-                        if (as<GenericTypeParamDeclBase>(member) ||
-                            as<GenericValueParamDecl>(member))
+                        if (isGenericParam(member))
                             paramCount++;
                     out << "<";
                     auto args = genericAppDeclRef->getArgs();
@@ -567,9 +566,7 @@ DeclRef<Decl> createDefaultSubstitutionsIfNeeded(
     SemanticsVisitor* semantics,
     DeclRef<Decl> declRef)
 {
-    if (declRef.as<GenericTypeParamDeclBase>())
-        return declRef;
-    if (declRef.as<GenericValueParamDecl>())
+    if (isGenericParam(declRef))
         return declRef;
     if (declRef.as<GenericTypeConstraintDecl>())
         return declRef;

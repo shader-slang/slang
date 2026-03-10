@@ -1757,6 +1757,67 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             getBuilder(),
             specConstRateType,
             as<IRFuncType>(funcType)->getResultType());
+
+        // Check for operators and emit constexpr ops instead of calls.
+        // This ensures that compile-time integer expressions get hoistable,
+        // deduplicatable IR instructions.
+        auto funcName = val->getFuncDeclRef().getName();
+        if (funcName)
+        {
+            auto nameSlice = funcName->text.getUnownedSlice();
+            auto builder = getBuilder();
+
+            // Binary operators (2 args)
+#define CONSTEXPR_BINARY_OP(opStr, emitMethod)                                             \
+    if (nameSlice == toSlice(opStr) && args.getCount() == 2)                               \
+    {                                                                                      \
+        return LoweredValInfo::simple(builder->emitMethod(funcResType, args[0], args[1])); \
+    }                                                                                      \
+    else
+
+            // Arithmetic (+,*,- are handled by PolynomialIntVal)
+            CONSTEXPR_BINARY_OP("/", emitConstexprDiv)
+            CONSTEXPR_BINARY_OP("%", emitConstexprIRem)
+            // Shifts
+            CONSTEXPR_BINARY_OP("<<", emitConstexprShl)
+            CONSTEXPR_BINARY_OP(">>", emitConstexprShr)
+            // Bitwise
+            CONSTEXPR_BINARY_OP("&", emitConstexprBitAnd)
+            CONSTEXPR_BINARY_OP("|", emitConstexprBitOr)
+            CONSTEXPR_BINARY_OP("^", emitConstexprBitXor)
+            // Comparisons
+            CONSTEXPR_BINARY_OP("==", emitConstexprEql)
+            CONSTEXPR_BINARY_OP("!=", emitConstexprNeq)
+            CONSTEXPR_BINARY_OP(">", emitConstexprGreater)
+            CONSTEXPR_BINARY_OP("<", emitConstexprLess)
+            CONSTEXPR_BINARY_OP(">=", emitConstexprGeq)
+            CONSTEXPR_BINARY_OP("<=", emitConstexprLeq)
+            // Logical
+            CONSTEXPR_BINARY_OP("&&", emitConstexprAnd)
+            CONSTEXPR_BINARY_OP("||", emitConstexprOr)
+
+#undef CONSTEXPR_BINARY_OP
+
+            // Unary operators (1 arg)
+            if (nameSlice == toSlice("!") && args.getCount() == 1)
+            {
+                return LoweredValInfo::simple(builder->emitConstexprNot(funcResType, args[0]));
+            }
+            else if (nameSlice == toSlice("~") && args.getCount() == 1)
+            {
+                return LoweredValInfo::simple(builder->emitConstexprBitNot(funcResType, args[0]));
+            }
+            // Ternary select (?:) operator (3 args)
+            else if (nameSlice == toSlice("?:") && args.getCount() == 3)
+            {
+                return LoweredValInfo::simple(
+                    builder->emitConstexprSelect(funcResType, args[0], args[1], args[2]));
+            }
+        }
+
+        // TODO: Eventually, we might want to have a hoistable "Call" instruction to emit const-expr
+        // calls.
+        //
         auto resVal =
             emitCallToDeclRef(context, funcResType, val->getFuncDeclRef(), funcType, args, tryEnv);
         return resVal;
@@ -1769,7 +1830,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         SLANG_ASSERT(baseVal.flavor == LoweredValInfo::Flavor::Simple);
         auto type = lowerType(context, val->getType());
         type = maybeAddRateType(getBuilder(), baseVal.val->getFullType(), type);
-        auto resVal = LoweredValInfo::simple(getBuilder()->emitCast(type, baseVal.val));
+        auto resVal = LoweredValInfo::simple(getBuilder()->emitConstexprCast(type, baseVal.val));
         return resVal;
     }
 
@@ -1796,10 +1857,11 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
                 auto factorVal = lowerVal(context, factor->getParam()).val;
                 for (IntegerLiteralValue i = 0; i < factor->getPower(); i++)
                 {
-                    termVal = irBuilder->emitMul(factorVal->getFullType(), termVal, factorVal);
+                    termVal =
+                        irBuilder->emitConstexprMul(factorVal->getFullType(), termVal, factorVal);
                 }
             }
-            resultVal = irBuilder->emitAdd(termVal->getFullType(), resultVal, termVal);
+            resultVal = irBuilder->emitConstexprAdd(termVal->getFullType(), resultVal, termVal);
         }
         return LoweredValInfo::simple(resultVal);
     }
@@ -1807,7 +1869,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     LoweredValInfo visitSizeOfIntVal(SizeOfIntVal* val)
     {
         auto irBuilder = getBuilder();
-        auto typeArg = lowerType(context, as<Type>(val->getTypeArg()));
+        auto typeArg = lowerType(context, as<Type>(val->getValArg()));
         auto count = irBuilder->emitSizeOf(typeArg);
         return LoweredValInfo::simple(count);
     }
@@ -1815,7 +1877,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     LoweredValInfo visitAlignOfIntVal(AlignOfIntVal* val)
     {
         auto irBuilder = getBuilder();
-        auto typeArg = lowerType(context, as<Type>(val->getTypeArg()));
+        auto typeArg = lowerType(context, as<Type>(val->getValArg()));
         auto count = irBuilder->emitAlignOf(typeArg);
         return LoweredValInfo::simple(count);
     }
@@ -1824,8 +1886,13 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     {
         auto irBuilder = getBuilder();
         auto type = lowerType(context, val->getType());
-        auto typeArg = lowerType(context, as<Type>(val->getTypeArg()));
-        auto count = irBuilder->emitCountOf(type, typeArg);
+        auto valArg = val->getValArg();
+        IRInst* irArg = nullptr;
+        if (auto typeArg = as<Type>(valArg))
+            irArg = lowerType(context, typeArg);
+        else
+            irArg = lowerSimpleVal(context, valArg);
+        auto count = irBuilder->emitCountOf(type, irArg);
         return LoweredValInfo::simple(count);
     }
 
@@ -1843,6 +1910,45 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         return LoweredValInfo::simple(irTypePack);
     }
 
+    LoweredValInfo visitConcreteIntValPack(ConcreteIntValPack* valPack)
+    {
+        auto irBuilder = getBuilder();
+        ShortList<IRInst*> irVals;
+        for (Index i = 0; i < valPack->getCount(); i++)
+        {
+            auto loweredVal = lowerSimpleVal(context, valPack->getElement(i));
+            irVals.add(loweredVal);
+        }
+        auto irMakeValuePack = irBuilder->emitMakeValuePack(
+            (UInt)irVals.getCount(),
+            irVals.getArrayView().getBuffer());
+        return LoweredValInfo::simple(irMakeValuePack);
+    }
+
+    LoweredValInfo visitExpandIntValPack(ExpandIntValPack* expandVal)
+    {
+        auto irBuilder = getBuilder();
+        auto patternVal = lowerSimpleVal(context, expandVal->getPatternVal());
+        ShortList<IRInst*> capturedPacks;
+        for (Index i = 0; i < expandVal->getCapturedPackCount(); i++)
+        {
+            auto loweredPack = lowerSimpleVal(context, expandVal->getCapturedPack(i));
+            capturedPacks.add(loweredPack);
+        }
+        return LoweredValInfo::simple(irBuilder->getExpandTypeOrVal(
+            patternVal->getFullType(),
+            patternVal,
+            capturedPacks.getArrayView().arrayView));
+    }
+
+    LoweredValInfo visitEachIntVal(EachIntVal* eachVal)
+    {
+        auto irBuilder = getBuilder();
+        auto baseVal = lowerSimpleVal(context, eachVal->getBasePack());
+        auto elementType = lowerType(context, eachVal->getType());
+        return LoweredValInfo::simple(irBuilder->emitEachInst(elementType, baseVal));
+    }
+
     LoweredValInfo visitEachType(EachType* eachType)
     {
         auto type = lowerType(context, eachType->getElementType());
@@ -1854,16 +1960,19 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     {
         auto irBuilder = getBuilder();
         auto type = lowerType(context, expandType->getPatternType());
-        ShortList<IRInst*> capturedTypes;
-        for (Index i = 0; i < expandType->getCapturedTypePackCount(); i++)
+        ShortList<IRInst*> capturedPacks;
+        for (Index i = 0; i < expandType->getCapturedPackCount(); i++)
         {
-            auto loweredType = lowerType(context, expandType->getCapturedTypePack(i));
-            capturedTypes.add(loweredType);
+            auto pack = expandType->getCapturedPack(i);
+            if (auto packType = as<Type>(pack))
+                capturedPacks.add(lowerType(context, packType));
+            else
+                capturedPacks.add(lowerSimpleVal(context, pack));
         }
         return LoweredValInfo::simple(irBuilder->getExpandTypeOrVal(
             irBuilder->getTypeKind(),
             type,
-            capturedTypes.getArrayView().arrayView));
+            capturedPacks.getArrayView().arrayView));
     }
 
     LoweredValInfo visitTypePackSubtypeWitness(TypePackSubtypeWitness* witnessPack)
@@ -2069,65 +2178,6 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         return LoweredValInfo::simple(nullptr);
     }
 
-    LoweredValInfo visitConjunctionSubtypeWitness(ConjunctionSubtypeWitness* val)
-    {
-        // A witness `W = X & Y & ...` will lower as a tuple of the sub-witnesses
-        // `X`, `Y`, etc.
-        //
-        // The AST representation of a conjunction of witnesses matches this
-        // tuple-like encoding very closely, so we can simply lower each of
-        // the component witnesses to produce our result.
-        //
-        List<IRInst*> componentWitnesses;
-        auto componentCount = val->getComponentCount();
-        for (Index i = 0; i < componentCount; ++i)
-        {
-            auto componentWitness = lowerSimpleVal(context, val->getComponentWitness(i));
-            componentWitnesses.add(componentWitness);
-        }
-        return LoweredValInfo::simple(getBuilder()->emitMakeTuple(componentWitnesses));
-    }
-
-    LoweredValInfo visitExtractFromConjunctionSubtypeWitness(
-        ExtractFromConjunctionSubtypeWitness* val)
-    {
-        auto builder = getBuilder();
-
-        // We know from `visitConjunctionSubtypeWitness` that a witness for a relationship
-        // like `T : L & R` will be a tuple `(w_l, w_r)` where `w_l` is a witness
-        // for `T : L` and `w_r` will be a witness for `T : R`.
-        //
-        // An `ExtractFromConjunctionSubtypeWitness` represents the intention to
-        // extract one of those two sub-witnesses. It directly stores the original
-        // witness that `T : L & R`, so lower that first and expect it to be
-        // a value of tuple type.
-        //
-        auto conjunctionWitness = lowerSimpleVal(context, val->getConjunctionWitness());
-        auto conjunctionTupleType = as<IRTupleType>(conjunctionWitness->getDataType());
-        SLANG_ASSERT(conjunctionTupleType);
-
-        // The `ExtractFromConjunctionSubtypeWitness` also stores the index of
-        // the witness/supertype we want in the conjunction `L & R`.
-        //
-        auto indexInConjunction = val->getIndexInConjunction();
-
-        // We want to extract the appropriate element from the tuple based on
-        // the index, but to know the type of the result we need to look up
-        // the element type that corresponds to that index.
-        //
-        // TODO: `IRTupleType` should really have `getElementCount()` and
-        // `getElementType(index)` accessors.
-        //
-        auto elementType = (IRType*)conjunctionTupleType->getOperand(indexInConjunction);
-
-        // With the information we've extracted above, we now just need to
-        // extract the appropriate element from the `(w_l, w_r)` tuple of
-        // witnesses, and we will have our desired result.
-        //
-        return LoweredValInfo::simple(
-            builder->emitGetTupleElement(elementType, conjunctionWitness, indexInConjunction));
-    }
-
     LoweredValInfo visitNoneWitness(NoneWitness*)
     {
         auto builder = getBuilder();
@@ -2256,6 +2306,12 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         return (IRType*)getSimpleVal(
             context,
             emitDeclRef(context, declRef, context->irBuilder->getTypeKind()));
+    }
+
+    IRType* visitValuePackType(ValuePackType* type)
+    {
+        auto elementType = lowerType(context, type->getElementType());
+        return getBuilder()->getValuePackType(elementType);
     }
 
     IRType* visitTupleType(TupleType* type)
@@ -4336,6 +4392,14 @@ struct ExprLoweringContext
                 {
                     _lowerSubstitutionArg(subContext, genSubst, typeParamDecl, argCounter++);
                 }
+                else if (auto typePackParamDecl = as<GenericTypePackParamDecl>(memberDecl))
+                {
+                    _lowerSubstitutionArg(subContext, genSubst, typePackParamDecl, argCounter++);
+                }
+                else if (auto valPackParamDecl = as<GenericValuePackParamDecl>(memberDecl))
+                {
+                    _lowerSubstitutionArg(subContext, genSubst, valPackParamDecl, argCounter++);
+                }
                 else if (auto valParamDecl = as<GenericValueParamDecl>(memberDecl))
                 {
                     _lowerSubstitutionArg(subContext, genSubst, valParamDecl, argCounter++);
@@ -4818,8 +4882,13 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             }
             else
             {
-
-                inst = builder->emitCountOf(resultType, sizedType);
+                IRInst* countArg = sizedType;
+                if (as<IRValuePackType>(sizedType))
+                {
+                    countArg =
+                        getSimpleVal(context, lowerLValueExpr(context, sizeOfLikeExpr->value));
+                }
+                inst = builder->emitCountOf(resultType, countArg);
             }
 
             return LoweredValInfo::simple(inst);
@@ -5281,18 +5350,16 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         auto irBuilder = getBuilder();
         auto irType = lowerType(context, expr->type);
         List<IRInst*> irCapturedPacks;
-        if (auto expandType = as<IRExpandTypeOrVal>(irType))
+
+        if (auto expandTypeOrVal = as<IRExpandTypeOrVal>(irType))
         {
-            for (UInt i = 0; i < expandType->getCaptureCount(); i++)
+            for (UInt i = 0; i < expandTypeOrVal->getCaptureCount(); i++)
             {
-                irCapturedPacks.add(expandType->getCaptureType(i));
+                irCapturedPacks.add(expandTypeOrVal->getCaptureType(i));
             }
         }
         else
         {
-            // If the type of the expression is not an ExpandType, then it must be
-            // a DeclRefType to a generic type pack parameter.
-            // In this case, the captured type is just the DeclRefType itself.
             irCapturedPacks.add(irType);
         }
         auto expandInst = irBuilder->emitExpandInst(
@@ -9720,6 +9787,11 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return emitDeclRef(context, makeDeclRef(decl), lowerType(context, decl->type));
     }
 
+    LoweredValInfo visitGenericValuePackParamDecl(GenericValuePackParamDecl* decl)
+    {
+        return emitDeclRef(context, makeDeclRef(decl), lowerType(context, decl->type));
+    }
+
     LoweredValInfo visitVarDecl(VarDecl* decl)
     {
         // Detect global (or effectively global) variables
@@ -10648,6 +10720,13 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                 auto param = subBuilder->emitParam(typeKind);
                 addNameHint(context, param, typeParamDecl);
                 subContext->setValue(typeParamDecl, LoweredValInfo::simple(param));
+            }
+            else if (auto valPackDecl = as<GenericValuePackParamDecl>(member))
+            {
+                auto paramType = lowerType(subContext, valPackDecl->getType());
+                auto param = subBuilder->emitParam(paramType);
+                addNameHint(context, param, valPackDecl);
+                subContext->setValue(valPackDecl, LoweredValInfo::simple(param));
             }
             else if (auto valDecl = as<GenericValueParamDecl>(member))
             {
@@ -12375,7 +12454,7 @@ LoweredValInfo ensureDecl(IRGenContext* context, Decl* decl)
 
     // If we have a decl that's a generic value/type decl then something has gone seriously
     // wrong
-    if (as<GenericValueParamDecl>(decl) || as<GenericTypeParamDecl>(decl))
+    if (isGenericParam(decl))
     {
         SLANG_UNEXPECTED("Generic type/value shouldn't be handled here!");
     }
@@ -13037,8 +13116,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
     constructSSA(module);
     applySparseConditionalConstantPropagation(module, nullptr, compileRequest->getSink());
 
-    bool minimumOptimizations =
-        linkage->m_optionSet.getBoolOption(CompilerOptionName::MinimumSlangOptimization);
+    bool minimumOptimizations = linkage->m_optionSet.shouldPerformMinimumOptimizations();
     if (!minimumOptimizations)
     {
         simplifyCFG(module, CFGSimplificationOptions::getDefault());

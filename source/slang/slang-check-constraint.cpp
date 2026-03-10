@@ -504,7 +504,7 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
     // The state of currently solved arguments.
     struct SolvedArg
     {
-        IntVal* val = nullptr;
+        Val* val = nullptr;
         bool isOptional = true;
         ShortList<QualType, 8> types;
     };
@@ -606,15 +606,32 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
 
             c.satisfied = true;
         }
+        else if (auto valPackParam = as<GenericValuePackParamDecl>(c.decl))
+        {
+            SLANG_ASSERT(valPackParam->parameterIndex != -1);
+
+            if (valPackParam->parameterIndex < knownGenericArgCount)
+            {
+                system->constraints[constraintIndex].satisfied = true;
+                continue;
+            }
+
+            if (solvedArgs.getCount() <= valPackParam->parameterIndex)
+                solvedArgs.setCount(valPackParam->parameterIndex + 1);
+            Val*& val = solvedArgs[valPackParam->parameterIndex].val;
+
+            auto cValPack = as<ConcreteIntValPack>(c.val);
+            if (cValPack)
+            {
+                if (!val)
+                    val = cValPack;
+            }
+            c.satisfied = true;
+        }
         else if (auto valParam = as<GenericValueParamDecl>(c.decl))
         {
             SLANG_ASSERT(valParam->parameterIndex != -1);
 
-            // If the parameter is one where we already know
-            // the argument value to use, we don't bother with
-            // trying to solve for it, and treat any constraints
-            // on such a parameter as implicitly solved-for.
-            //
             if (valParam->parameterIndex < knownGenericArgCount)
             {
                 system->constraints[constraintIndex].satisfied = true;
@@ -623,7 +640,7 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
 
             if (solvedArgs.getCount() <= valParam->parameterIndex)
                 solvedArgs.setCount(valParam->parameterIndex + 1);
-            IntVal*& val = solvedArgs[valParam->parameterIndex].val;
+            Val*& val = solvedArgs[valParam->parameterIndex].val;
             bool& valOptional = solvedArgs[valParam->parameterIndex].isOptional;
 
             auto cVal = as<IntVal>(c.val);
@@ -709,6 +726,30 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
                         m_astBuilder->getTypePack(typeList.getArrayView().arrayView),
                         isLVal));
                 }
+            }
+        }
+        else if (auto valPackParam = as<GenericValuePackParamDecl>(member))
+        {
+            SLANG_ASSERT(valPackParam->parameterIndex != -1);
+
+            if (valPackParam->parameterIndex < knownGenericArgCount)
+                continue;
+
+            if (valPackParam->parameterIndex >= solvedArgs.getCount())
+            {
+                // Empty pack.
+                args.add(m_astBuilder->getIntValPack(ArrayView<IntVal*>()));
+                continue;
+            }
+
+            auto val = solvedArgs[valPackParam->parameterIndex].val;
+            if (!val)
+            {
+                args.add(m_astBuilder->getIntValPack(ArrayView<IntVal*>()));
+            }
+            else
+            {
+                args.add(val);
             }
         }
         else if (auto valParam = as<GenericValueParamDecl>(member))
@@ -1098,6 +1139,17 @@ bool SemanticsVisitor::TryUnifyIntParam(
     if (auto genericValueParamRef = varRef.as<GenericValueParamDecl>())
     {
         return TryUnifyIntParam(constraints, unifyCtx, genericValueParamRef.getDecl(), val);
+    }
+    else if (auto genericValuePackParamRef = varRef.as<GenericValuePackParamDecl>())
+    {
+        if (genericValuePackParamRef.getDecl()->parentDecl != constraints.genericDecl)
+            return false;
+        Constraint constraint;
+        constraint.decl = genericValuePackParamRef.getDecl();
+        constraint.val = val;
+        constraint.isOptional = unifyCtx.optionalConstraint;
+        constraints.constraints.add(constraint);
+        return true;
     }
     else
     {

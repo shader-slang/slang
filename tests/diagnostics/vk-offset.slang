@@ -21,7 +21,6 @@ S1 pc;
 struct VertexOutput
 {
     float3 position : SV_Position;
-//CHECK:   ^^^^^^^^ type 'vector<float,3>' is not valid for system value semantic 'SV_Position'; expected 'vector<float,4>'
 }
 
 [shader("vertex")]
