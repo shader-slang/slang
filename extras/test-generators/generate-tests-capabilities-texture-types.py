@@ -371,7 +371,7 @@ def getStatementsForTestOp(testOp):
     statements = opToStatements[testOp]
 
     if isinstance(statements, str):
-        return statements;
+        return statements
     elif isinstance(statements, list):
         return "\n    ".join(statements)
     else:
@@ -381,7 +381,7 @@ def getStatementsForTestOp(testOp):
 
 def generateSingleTest(filepath, backend, testType, testInfo):
 
-    global testInputForTestType;
+    global testInputForTestType
 
     # Determine the first supporting version and highest non-supporting version
     (positiveTestTarget, negativeTestTarget) = \
@@ -540,7 +540,7 @@ def main():
         sys.exit(1)
 
     # switch to target directory
-    global genTargetDirectory;
+    global genTargetDirectory
 
     slangTopDirectory = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
     genTestDirectory = os.path.join(slangTopDirectory, genTargetDirectory)
