@@ -17,7 +17,7 @@
 //TEST_INPUT: ubuffer(data=[0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
-//TEST_INPUT: Texture1D(size=4, content = zero, arrayLength=2):name texHandle
+//TEST_INPUT: Texture1D(size=4, content = one, arrayLength=2):name texHandle
 Texture1DArray<float4> texHandle;
 
 [shader("fragment")]
@@ -44,4 +44,4 @@ void computeMain()
     ret = int((texHandle.Load(int3(0, 0, 0))).x);
     outputBuffer[0] = 0x12345 + ret;
 }
-// POSITIVE_RESULT: 12345
+// POSITIVE_RESULT: 12346

@@ -17,7 +17,7 @@
 //TEST_INPUT: ubuffer(data=[0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
-//TEST_INPUT: Texture1D(format=D32Float, size=4, content = zero):name texHandle
+//TEST_INPUT: Texture1D(format=D32Float, size=4, content = one):name texHandle
 DepthTexture1D texHandle;
 
 //TEST_INPUT: Sampler(depthCompare):name samplerComparisonState
@@ -47,4 +47,4 @@ void computeMain()
     ret = int((texHandle.SampleCmpLevelZero(samplerComparisonState, float(0), float(0))).x);
     outputBuffer[0] = 0x12345 + ret;
 }
-// POSITIVE_RESULT: 12345
+// POSITIVE_RESULT: 12346

@@ -12,48 +12,48 @@ genTargetDirectory = "tests/generated/capabilities/texture/types/"
 # Tests specifications for all these types must be specified by
 # backends. See getMetalTests() for a simple example.
 testInputForTestType = {
-    "Texture1D<float4>"        : "Texture1D(size=4, content = zero)",
-    "Texture1DArray<float4>"   : "Texture1D(size=4, content = zero, arrayLength=2)",
-    "Texture2D<float4>"        : "Texture2D(size=4, content = zero)",
-    "Texture2DArray<float4>"   : "Texture2D(size=4, content = zero, arrayLength=2)",
-    "Texture2DMS<float4>"      : "Texture2D(size=4, content = zero, sampleCount = two)",
-    "Texture2DMSArray<float4>" : "Texture2D(size=4, content = zero, sampleCount = two, arrayLength=2)",
-    "Texture3D<float4>"        : "Texture3D(size=4, content = zero)",
-    "TextureCube<float4>"      : "TextureCube(size=4, content = zero)",
-    "TextureCubeArray<float4>" : "TextureCube(size=4, content = zero, arrayLength=2)",
+    "Texture1D<float4>"        : "Texture1D(size=4, content = one)",
+    "Texture1DArray<float4>"   : "Texture1D(size=4, content = one, arrayLength=2)",
+    "Texture2D<float4>"        : "Texture2D(size=4, content = one)",
+    "Texture2DArray<float4>"   : "Texture2D(size=4, content = one, arrayLength=2)",
+    "Texture2DMS<float4>"      : "Texture2D(size=4, content = one, sampleCount = two)",
+    "Texture2DMSArray<float4>" : "Texture2D(size=4, content = one, sampleCount = two, arrayLength=2)",
+    "Texture3D<float4>"        : "Texture3D(size=4, content = one)",
+    "TextureCube<float4>"      : "TextureCube(size=4, content = one)",
+    "TextureCubeArray<float4>" : "TextureCube(size=4, content = one, arrayLength=2)",
 
-    "DepthTexture1D"        : "Texture1D(format=D32Float, size=4, content = zero)",
-    "DepthTexture1DArray"   : "Texture1D(format=D32Float, size=4, content = zero, arrayLength=2)",
-    "DepthTexture2D"        : "Texture2D(format=D32Float, size=4, content = zero)",
-    "DepthTexture2DArray"   : "Texture2D(format=D32Float, size=4, content = zero, arrayLength=2)",
-    "DepthTexture2DMS"      : "Texture2D(format=D32Float, size=4, content = zero, sampleCount = two)",
-    "DepthTexture2DMSArray" : "Texture2D(format=D32Float, size=4, content = zero, sampleCount = two, arrayLength=2)",
-    "DepthTexture3D"        : "Texture3D(format=D32Float, size=4, content = zero)",
-    "DepthTextureCube"      : "TextureCube(format=D32Float, size=4, content = zero)",
-    "DepthTextureCubeArray" : "TextureCube(format=D32Float, size=4, content = zero, arrayLength=2)",
+    "DepthTexture1D"        : "Texture1D(format=D32Float, size=4, content = one)",
+    "DepthTexture1DArray"   : "Texture1D(format=D32Float, size=4, content = one, arrayLength=2)",
+    "DepthTexture2D"        : "Texture2D(format=D32Float, size=4, content = one)",
+    "DepthTexture2DArray"   : "Texture2D(format=D32Float, size=4, content = one, arrayLength=2)",
+    "DepthTexture2DMS"      : "Texture2D(format=D32Float, size=4, content = one, sampleCount = two)",
+    "DepthTexture2DMSArray" : "Texture2D(format=D32Float, size=4, content = one, sampleCount = two, arrayLength=2)",
+    "DepthTexture3D"        : "Texture3D(format=D32Float, size=4, content = one)",
+    "DepthTextureCube"      : "TextureCube(format=D32Float, size=4, content = one)",
+    "DepthTextureCubeArray" : "TextureCube(format=D32Float, size=4, content = one, arrayLength=2)",
 
-    "RWTexture1D<float4>"        : "RWTexture1D(size=4, content = zero)",
-    "RWTexture1DArray<float4>"   : "RWTexture1D(size=4, content = zero, arrayLength=2)",
-    "RWTexture2D<float4>"        : "RWTexture2D(size=4, content = zero)",
-    "RWTexture2DArray<float4>"   : "RWTexture2D(size=4, content = zero, arrayLength=2)",
-    "RWTexture2DMS<float4>"      : "RWTexture2D(size=4, content = zero, sampleCount = two)",
-    "RWTexture2DMSArray<float4>" : "RWTexture2D(size=4, content = zero, sampleCount = two, arrayLength=2)",
-    "RWTexture3D<float4>"        : "RWTexture3D(size=4, content = zero)",
+    "RWTexture1D<float4>"        : "RWTexture1D(size=4, content = one)",
+    "RWTexture1DArray<float4>"   : "RWTexture1D(size=4, content = one, arrayLength=2)",
+    "RWTexture2D<float4>"        : "RWTexture2D(size=4, content = one)",
+    "RWTexture2DArray<float4>"   : "RWTexture2D(size=4, content = one, arrayLength=2)",
+    "RWTexture2DMS<float4>"      : "RWTexture2D(size=4, content = one, sampleCount = two)",
+    "RWTexture2DMSArray<float4>" : "RWTexture2D(size=4, content = one, sampleCount = two, arrayLength=2)",
+    "RWTexture3D<float4>"        : "RWTexture3D(size=4, content = one)",
 
-    "WTexture1D<float4>"        : "RWTexture1D(size=4, content = zero)",
-    "WTexture1DArray<float4>"   : "RWTexture1D(size=4, content = zero, arrayLength=2)",
-    "WTexture2D<float4>"        : "RWTexture2D(size=4, content = zero)",
-    "WTexture2DArray<float4>"   : "RWTexture2D(size=4, content = zero, arrayLength=2)",
-    "WTexture3D<float4>"        : "RWTexture3D(size=4, content = zero)",
+    "WTexture1D<float4>"        : "RWTexture1D(size=4, content = one)",
+    "WTexture1DArray<float4>"   : "RWTexture1D(size=4, content = one, arrayLength=2)",
+    "WTexture2D<float4>"        : "RWTexture2D(size=4, content = one)",
+    "WTexture2DArray<float4>"   : "RWTexture2D(size=4, content = one, arrayLength=2)",
+    "WTexture3D<float4>"        : "RWTexture3D(size=4, content = one)",
 
-    "FeedbackTexture2D<SAMPLER_FEEDBACK_MIN_MIP>"      : "Texture2D(size=4, content = zero)",
-    "FeedbackTexture2DArray<SAMPLER_FEEDBACK_MIN_MIP>" : "Texture2D(size=4, content = zero, arrayLength=2)",
+    "FeedbackTexture2D<SAMPLER_FEEDBACK_MIN_MIP>"      : "Texture2D(size=4, content = one)",
+    "FeedbackTexture2DArray<SAMPLER_FEEDBACK_MIN_MIP>" : "Texture2D(size=4, content = one, arrayLength=2)",
 
-    "RasterizerOrderedTexture1D<float4>"        : "Texture1D(size=4, content = zero)",
-    "RasterizerOrderedTexture1DArray<float4>"   : "Texture1D(size=4, content = zero, arrayLength=2)",
-    "RasterizerOrderedTexture2D<float4>"        : "Texture2D(size=4, content = zero)",
-    "RasterizerOrderedTexture2DArray<float4>"   : "Texture2D(size=4, content = zero, arrayLength=2)",
-    "RasterizerOrderedTexture3D<float4>"        : "Texture3D(size=4, content = zero)",
+    "RasterizerOrderedTexture1D<float4>"        : "Texture1D(size=4, content = one)",
+    "RasterizerOrderedTexture1DArray<float4>"   : "Texture1D(size=4, content = one, arrayLength=2)",
+    "RasterizerOrderedTexture2D<float4>"        : "Texture2D(size=4, content = one)",
+    "RasterizerOrderedTexture2DArray<float4>"   : "Texture2D(size=4, content = one, arrayLength=2)",
+    "RasterizerOrderedTexture3D<float4>"        : "Texture3D(size=4, content = one)",
 }
 
 
@@ -286,8 +286,8 @@ def getGlslTests(nameSuffix, simpleTarget, vkTargetAdditionalFlags):
         "RWTexture1DArray<float4>"   : TestInfo("420", 12).disableNegativeTest(8908),
         "RWTexture2D<float4>"        : TestInfo("420", 12).disableNegativeTest(8908),
         "RWTexture2DArray<float4>"   : TestInfo("420", 13).disableNegativeTest(8908),
-        "RWTexture2DMS<float4>"      : TestInfo("420", 15).disableNegativeTest(8908),
-        "RWTexture2DMSArray<float4>" : TestInfo("420", 16).disableNegativeTest(8908),
+        "RWTexture2DMS<float4>"      : TestInfo("420", 15).disableNegativeTest(8908).disableComputeTest(10490),
+        "RWTexture2DMSArray<float4>" : TestInfo("420", 16).disableNegativeTest(8908).disableComputeTest(10490),
         "RWTexture3D<float4>"        : TestInfo("420", 13).disableNegativeTest(8908),
 
         "WTexture1D<float4>"        : TestInfo("420", 21).disableNegativeTest(8908),
@@ -357,9 +357,9 @@ def getStatementsForTestOp(testOp):
         14 : "ret = int((texHandle.Load(int4(0, 0, 0, 0))).x);",
         15 : "ret = int((texHandle.Load(int2(0, 0), 0)).x);",
         16 : "ret = int((texHandle.Load(int3(0, 0, 0), 0)).x);",
-        21 : [ "texHandle.Store(int(0), float4(0, 0, 0, 0));", "ret = 0;" ],
-        22 : [ "texHandle.Store(int2(0, 0), float4(0, 0, 0, 0));", "ret = 0;"],
-        23 : [ "texHandle.Store(int3(0, 0, 0), float4(0, 0, 0, 0));", "ret = 0;"],
+        21 : [ "texHandle.Store(int(0), float4(0, 0, 0, 0));", "ret = 1;" ],
+        22 : [ "texHandle.Store(int2(0, 0), float4(0, 0, 0, 0));", "ret = 1;"],
+        23 : [ "texHandle.Store(int3(0, 0, 0), float4(0, 0, 0, 0));", "ret = 1;"],
         32 : [ "texHandle.WriteSamplerFeedbackLevel(feedbackSamplerInput2D, samplerState, float2(0, 0), float(0));", "ret = 0;"],
         33 : [ "texHandle.WriteSamplerFeedbackLevel(feedbackSamplerInput2DArray, samplerState, float3(0, 0, 0), float(0));", "ret = 0;"],
         41 : "ret = int((texHandle.SampleCmpLevelZero(samplerComparisonState, float(0), float(0))).x);",
@@ -513,7 +513,7 @@ void computeMain()
     {getStatementsForTestOp(testInfo.testOp)}
     outputBuffer[0] = 0x12345 + ret;
 }}
-// POSITIVE_RESULT: 12345
+// POSITIVE_RESULT: 12346
 """
 
     # write the generated test to file

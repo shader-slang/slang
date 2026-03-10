@@ -17,7 +17,7 @@
 //TEST_INPUT: ubuffer(data=[0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
-//TEST_INPUT: Texture2D(size=4, content = zero):name texHandle
+//TEST_INPUT: Texture2D(size=4, content = one):name texHandle
 Texture2D<float4> texHandle;
 
 //TEST_INPUT: Sampler(filteringMode=point):name samplerState
@@ -47,4 +47,4 @@ void computeMain()
     ret = int((texHandle.SampleLevel(samplerState, float2(0, 0), float(0))).x);
     outputBuffer[0] = 0x12345 + ret;
 }
-// POSITIVE_RESULT: 12345
+// POSITIVE_RESULT: 12346

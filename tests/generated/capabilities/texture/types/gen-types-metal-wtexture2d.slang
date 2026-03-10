@@ -17,7 +17,7 @@
 //TEST_INPUT: ubuffer(data=[0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
-//TEST_INPUT: RWTexture2D(size=4, content = zero):name texHandle
+//TEST_INPUT: RWTexture2D(size=4, content = one):name texHandle
 WTexture2D<float4> texHandle;
 
 [shader("fragment")]
@@ -34,7 +34,7 @@ void fragMain()
 
     int ret = 0;
     texHandle.Store(int2(0, 0), float4(0, 0, 0, 0));
-    ret = 0;
+    ret = 1;
     outputBuffer[0] = 0x12345 + ret;
 }
 
@@ -43,7 +43,7 @@ void computeMain()
 {
     int ret = 0;
     texHandle.Store(int2(0, 0), float4(0, 0, 0, 0));
-    ret = 0;
+    ret = 1;
     outputBuffer[0] = 0x12345 + ret;
 }
-// POSITIVE_RESULT: 12345
+// POSITIVE_RESULT: 12346

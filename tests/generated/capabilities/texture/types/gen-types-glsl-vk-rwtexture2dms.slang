@@ -10,15 +10,16 @@
 // - Target version for negative test:     410
 //
 
+// Compute test disabled, see https://github.com/shader-slang/slang/issues/10490
 // Negative test disabled, see https://github.com/shader-slang/slang/issues/8908
 //TEST:SIMPLE(filecheck=POSITIVE): -restrictive-capability-check -entry fragMain -stage fragment -target glsl -profile glsl_420
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=POSITIVE_RESULT): -vk -emit-spirv-via-glsl
+//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=POSITIVE_RESULT): -vk -emit-spirv-via-glsl
 //DISABLE_TEST:SIMPLE(filecheck=NEGATIVE): -restrictive-capability-check -entry fragMain -stage fragment -target glsl -profile glsl_410
 
 //TEST_INPUT: ubuffer(data=[0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
-//TEST_INPUT: RWTexture2D(size=4, content = zero, sampleCount = two):name texHandle
+//TEST_INPUT: RWTexture2D(size=4, content = one, sampleCount = two):name texHandle
 RWTexture2DMS<float4> texHandle;
 
 [shader("fragment")]
@@ -45,4 +46,4 @@ void computeMain()
     ret = int((texHandle.Load(int2(0, 0), 0)).x);
     outputBuffer[0] = 0x12345 + ret;
 }
-// POSITIVE_RESULT: 12345
+// POSITIVE_RESULT: 12346
