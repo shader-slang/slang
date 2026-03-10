@@ -536,7 +536,7 @@ def generateTests(backendTestTuple):
 
 def main():
     if len(sys.argv) != 1:
-        print("Generates texture types cabilities tests for all backends")
+        print("Generates texture types capabilities tests for all backends")
         print("")
         print("The pattern for generated tests is: gen-types-<backend>-<texture-type>.slang")
         sys.exit(1)
