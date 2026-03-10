@@ -1,0 +1,139 @@
+name: Sascha Willems Vulkan Shaders (Nightly)
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Run daily at 4 AM UTC (after RTX Remix and coverage runs)
+    - cron: "0 4 * * *"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  sascha-willems-shader-test:
+    runs-on: windows-2022
+    timeout-minutes: 30
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout Slang repository
+        uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
+          fetch-depth: 0
+
+      - name: Fetch version tags
+        run: |
+          git fetch --tags --force
+          echo "Available tags:"
+          git tag -l "v20*" | head -10
+
+      - name: Add bash to PATH
+        shell: pwsh
+        run: |
+          Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\bin"
+
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Build Slang
+        run: |
+          echo "Building Slang..."
+          startTime=$(date +%s)
+
+          cmake --preset default --fresh \
+            -DSLANG_SLANG_LLVM_FLAVOR=DISABLE \
+            -DSLANG_ENABLE_EXAMPLES=OFF \
+            -DSLANG_ENABLE_REPLAYER=OFF \
+            -DSLANG_ENABLE_SLANGD=OFF \
+            -DSLANG_ENABLE_SLANGRT=OFF \
+            -DSLANG_ENABLE_SLANG_GLSLANG=ON \
+            -DSLANG_ENABLE_TESTS=OFF
+
+          cmake --build --preset release
+
+          endTime=$(date +%s)
+          duration=$(( (endTime - startTime) / 60 ))
+          echo "Slang build completed in $duration minutes"
+
+          slangcPath="build/Release/bin/slangc.exe"
+          if [ -f "$slangcPath" ]; then
+            echo "slangc built successfully at: $slangcPath"
+            "$slangcPath" -version
+          else
+            echo "Failed to build slangc"
+            exit 1
+          fi
+
+      - name: Clone SaschaWillems/Vulkan repository (sparse checkout)
+        run: |
+          echo "Cloning SaschaWillems/Vulkan (shaders/slang only)..."
+          git clone --depth 1 --filter=blob:none --sparse \
+            https://github.com/SaschaWillems/Vulkan.git SaschaWillems-Vulkan
+          cd SaschaWillems-Vulkan
+          git sparse-checkout set shaders/slang
+          commit=$(git rev-parse HEAD)
+          echo "Using SaschaWillems/Vulkan commit: $commit"
+
+          slangCount=$(find shaders/slang -name "*.slang" | wc -l | xargs)
+          echo "Found $slangCount .slang shader files"
+
+      - name: Compile Slang shaders
+        env:
+          SLANG_RUN_SPIRV_VALIDATION: 1
+        run: |
+          echo "Compiling Sascha Willems Vulkan Slang shaders..."
+          echo "SPIRV validation enabled via SLANG_RUN_SPIRV_VALIDATION=1"
+
+          ./extras/compile-sascha-willems-shaders.sh \
+            --slangc build/Release/bin/slangc.exe \
+            --repo SaschaWillems-Vulkan \
+            --spirv-val
+
+      - name: Report results
+        if: always()
+        run: |
+          echo ""
+          echo "================================================"
+          if [ "$BUILD_RESULT" = "success" ]; then
+            echo "Sascha Willems shader test PASSED"
+            echo "Slang compiler changes are compatible with Sascha Willems Vulkan shaders"
+          else
+            echo "Sascha Willems shader test FAILED"
+            echo "Slang compiler changes may have broken shader compilation"
+            echo "Review build logs for details"
+          fi
+          echo "================================================"
+        env:
+          BUILD_RESULT: ${{ job.status }}
+
+      - name: Success notification
+        id: slack-notify-success
+        if: ${{ github.event_name == 'schedule' && success() }}
+        uses: slackapi/slack-github-action@v1.26.0
+        with:
+          payload: |
+            {
+              "Sascha-Willems-Nightly": ":green-check-mark: Sascha Willems shader nightly status: ${{ job.status }}"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Failure notification
+        id: slack-notify-failure
+        if: ${{ github.event_name == 'schedule' && !success() }}
+        uses: slackapi/slack-github-action@v1.26.0
+        with:
+          payload: |
+            {
+              "Sascha-Willems-Nightly": ":alert: :alert: :alert: :alert: :alert: :alert:\nSascha Willems shader nightly status: ${{ job.status }}: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
