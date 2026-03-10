@@ -19,12 +19,15 @@
 // https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/memcpy-s-wmemcpy-s
 inline int memcpy_s(void* dest, size_t destSize, const void* src, size_t count)
 {
-    if (count == 0) return 0;
-    if (dest == nullptr) return EINVAL;
+    if (count == 0)
+        return 0;
+    if (dest == nullptr)
+        return EINVAL;
     if (src == nullptr || destSize < count)
     {
         memset(dest, 0, destSize);
-        if (src == nullptr) return EINVAL;
+        if (src == nullptr)
+            return EINVAL;
         return ERANGE;
     }
     memcpy(dest, src, count);
@@ -58,7 +61,8 @@ inline size_t fread_s(
     size_t count,
     FILE* stream)
 {
-    if (elementSize == 0 || count == 0) return 0;
+    if (elementSize == 0 || count == 0)
+        return 0;
     if (buffer == nullptr || stream == nullptr)
     {
         errno = EINVAL;
@@ -103,11 +107,7 @@ inline size_t strnlen_s(const char* str, size_t numberOfElements)
 #ifdef __GNUC__
 __attribute__((format(printf, 3, 4)))
 #endif
-inline int sprintf_s(
-    char* buffer,
-    size_t sizeOfBuffer,
-    const char* format,
-    ...)
+inline int sprintf_s(char* buffer, size_t sizeOfBuffer, const char* format, ...)
 {
     if (buffer == nullptr || format == nullptr)
     {
@@ -147,18 +147,18 @@ inline int swprintf_s(wchar_t* buffer, size_t sizeOfBuffer, const wchar_t* forma
 // https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/strcpy-s-wcscpy-s-mbscpy-s
 inline int wcscpy_s(wchar_t* dest, size_t dest_size, const wchar_t* src)
 {
-    if (dest == nullptr) 
+    if (dest == nullptr)
         return EINVAL;
-    if (src == nullptr) 
-    { 
-        dest[0] = L'\0'; 
-        errno = EINVAL; 
-        return EINVAL; 
+    if (dest_size == 0)
+    {
+        errno = ERANGE;
+        return ERANGE;
     }
-    if (dest_size == 0) { 
-        dest[0] = L'\0'; 
-        errno = ERANGE; 
-        return ERANGE; 
+    if (src == nullptr)
+    {
+        dest[0] = L'\0';
+        errno = EINVAL;
+        return EINVAL;
     }
     // Copy characters until we hit eof or run out of space
     size_t i = 0;
@@ -169,10 +169,11 @@ inline int wcscpy_s(wchar_t* dest, size_t dest_size, const wchar_t* src)
     }
 
     dest[i] = L'\0';
-    if (src[i] != L'\0') { 
-        dest[0] = L'\0'; 
-        errno = ERANGE; 
-        return ERANGE; 
+    if (src[i] != L'\0')
+    {
+        dest[0] = L'\0';
+        errno = ERANGE;
+        return ERANGE;
     }
     return 0;
 }
@@ -183,17 +184,16 @@ inline int strcpy_s(char* dest, size_t dest_size, const char* src)
 {
     if (dest == nullptr)
         return EINVAL;
+    if (dest_size == 0)
+    {
+        errno = ERANGE;
+        return ERANGE;
+    }
     if (src == nullptr)
     {
         dest[0] = '\0';
         errno = EINVAL;
         return EINVAL;
-    }
-    if (dest_size == 0)
-    {
-        dest[0] = '\0';
-        errno = ERANGE;
-        return ERANGE;
     }
     size_t i = 0;
     while (i < dest_size - 1 && src[i] != '\0')
@@ -214,7 +214,11 @@ inline int strcpy_s(char* dest, size_t dest_size, const char* src)
 
 #ifndef HAVE_WCSNCPY_S
 // https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/strncpy-s-strncpy-s-l-wcsncpy-s-wcsncpy-s-l-mbsncpy-s-mbsncpy-s-l?view=msvc-170
-inline int wcsncpy_s(wchar_t* strDest, size_t numberOfElements, const wchar_t* strSource, size_t count)
+inline int wcsncpy_s(
+    wchar_t* strDest,
+    size_t numberOfElements,
+    const wchar_t* strSource,
+    size_t count)
 {
     if (strDest == nullptr || numberOfElements == 0)
         return EINVAL;
@@ -225,11 +229,11 @@ inline int wcsncpy_s(wchar_t* strDest, size_t numberOfElements, const wchar_t* s
         return EINVAL;
     }
 
-    // D is less than count and the length of strSource
-    size_t D = (count == _TRUNCATE) ? numberOfElements - 1 :
-                   (count < numberOfElements - 1 ? count : numberOfElements - 1);
+    size_t limit = (count == _TRUNCATE)
+                       ? numberOfElements - 1
+                       : (count < numberOfElements - 1 ? count : numberOfElements - 1);
     size_t i = 0;
-    while (i < D && strSource[i] != L'\0')
+    while (i < limit && strSource[i] != L'\0')
     {
         strDest[i] = strSource[i];
         i++;
@@ -259,8 +263,8 @@ inline int strncpy_s(char* strDest, size_t numberOfElements, const char* strSour
         return EINVAL;
     }
     // D is the lesser of count and the length of strSource
-    size_t D = (count == _TRUNCATE) ? numberOfElements - 1 :
-                   (count < numberOfElements - 1 ? count : numberOfElements - 1);
+    size_t D = (count == _TRUNCATE) ? numberOfElements - 1
+                                    : (count < numberOfElements - 1 ? count : numberOfElements - 1);
     size_t i = 0;
     while (i < D && strSource[i] != '\0')
     {

@@ -563,7 +563,6 @@ function(slang_add_target dir type)
         )
     endif()
 
-
     #
     # Precompiled headers (PCH)
     #
