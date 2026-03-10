@@ -789,10 +789,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         m_operandStack.setCount(operandsStartIndex);
     }
 
-    SpvOp _specConstantOpcodeConvert(
-        IROp irOpCode,
-        IRBasicType* basicType,
-        IRType* resultType)
+    SpvOp _specConstantOpcodeConvert(IROp irOpCode, IRBasicType* basicType, IRType* resultType)
     {
         SpvOp opCode = SpvOpUndef;
         opCode = _arithmeticOpCodeConvert(irOpCode, basicType);
