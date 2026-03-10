@@ -894,7 +894,7 @@ Type* ASTBuilder::getEachType(Type* baseType)
     return getOrCreate<EachType>(baseType);
 }
 
-Type* ASTBuilder::getExpandType(Type* pattern, ArrayView<Type*> capturedPacks)
+Type* ASTBuilder::getExpandType(Type* pattern, ArrayView<Val*> capturedPacks)
 {
     // expand each T ==> T
     if (auto eachType = as<EachType>(pattern))
@@ -924,6 +924,60 @@ ConcreteTypePack* ASTBuilder::getTypePack(ArrayView<Type*> types)
     for (auto type : types)
         flattenTypeList(flattenedTypes, type);
     return getOrCreate<ConcreteTypePack>(flattenedTypes.getArrayView().arrayView);
+}
+
+static void flattenIntValList(ShortList<IntVal*>& flattenedList, IntVal* val)
+{
+    if (auto valPack = as<ConcreteIntValPack>(val))
+    {
+        for (Index i = 0; i < valPack->getCount(); i++)
+            flattenIntValList(flattenedList, valPack->getElement(i));
+    }
+    else
+    {
+        flattenedList.add(val);
+    }
+}
+
+ConcreteIntValPack* ASTBuilder::getIntValPack(ArrayView<IntVal*> vals)
+{
+    ShortList<IntVal*> flattenedVals;
+    for (auto val : vals)
+        flattenIntValList(flattenedVals, val);
+    Type* elementType = getIntType();
+    if (flattenedVals.getCount() > 0 && flattenedVals[0]->getType())
+        elementType = flattenedVals[0]->getType();
+    auto packType = getOrCreate<ValuePackType>(elementType);
+    return getOrCreate<ConcreteIntValPack>(packType, flattenedVals.getArrayView().arrayView);
+}
+
+IntVal* ASTBuilder::getEachIntVal(Type* elementType, Val* basePack)
+{
+    // each expand P ==> P (the pattern val)
+    if (auto expandPack = as<ExpandIntValPack>(basePack))
+    {
+        auto result = as<IntVal>(expandPack->getPatternVal());
+        SLANG_ASSERT(result);
+        return result;
+    }
+    return getOrCreate<EachIntVal>(elementType, basePack);
+}
+
+Val* ASTBuilder::getExpandIntValPack(Val* patternVal, ArrayView<Val*> capturedPacks)
+{
+    // expand each B ==> B (fold identity expansion)
+    if (auto eachVal = as<EachIntVal>(patternVal))
+    {
+        if (capturedPacks.getCount() == 1 && eachVal->getBasePack() == capturedPacks[0])
+        {
+            return capturedPacks[0];
+        }
+    }
+    auto patternIntVal = as<IntVal>(patternVal);
+    Type* packType = patternIntVal && patternIntVal->getType()
+                         ? getOrCreate<ValuePackType>(patternIntVal->getType())
+                         : (Type*)getIntType();
+    return getOrCreate<ExpandIntValPack>(packType, patternVal, capturedPacks);
 }
 
 TypeEqualityWitness* ASTBuilder::getTypeEqualityWitness(Type* type)

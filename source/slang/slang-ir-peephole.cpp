@@ -399,18 +399,84 @@ struct PeepholeContext : InstPassBase
             case kIROp_MakeWitnessPack:
             case kIROp_TypePack:
                 {
+                    auto base = inst->getOperand(0);
                     auto element = inst->getOperand(1);
+
+                    // Bail if any operand is a nested pack or expand —
+                    // the flattening peephole must run first.
+                    bool hasNestedPack = false;
+                    for (UInt i = 0; i < base->getOperandCount(); i++)
+                    {
+                        auto op = base->getOperand(i);
+                        if (as<IRMakeValuePack>(op) || as<IRExpand>(op))
+                        {
+                            hasNestedPack = true;
+                            break;
+                        }
+                    }
+                    if (hasNestedPack)
+                        break;
+
                     if (auto intLit = as<IRIntLit>(element))
                     {
-                        inst->replaceUsesWith(
-                            inst->getOperand(0)->getOperand((UInt)intLit->value.intVal));
-                        maybeRemoveOldInst(inst);
-                        changed = true;
+                        UInt index = (UInt)intLit->value.intVal;
+                        if (index < base->getOperandCount())
+                        {
+                            inst->replaceUsesWith(base->getOperand(index));
+                            maybeRemoveOldInst(inst);
+                            changed = true;
+                        }
                     }
                     break;
                 }
             default:
                 break;
+            }
+            break;
+        case kIROp_MakeTuple:
+        case kIROp_MakeValuePack:
+            {
+                // Flatten nested MakeValuePack operands.
+                bool hasNestedPack = false;
+                for (UInt i = 0; i < inst->getOperandCount(); i++)
+                {
+                    if (as<IRMakeValuePack>(inst->getOperand(i)))
+                    {
+                        hasNestedPack = true;
+                        break;
+                    }
+                }
+                if (hasNestedPack)
+                {
+                    IRBuilder builder(module);
+                    builder.setInsertBefore(inst);
+                    ShortList<IRInst*> flatOperands;
+                    for (UInt i = 0; i < inst->getOperandCount(); i++)
+                    {
+                        auto operand = inst->getOperand(i);
+                        if (auto nestedPack = as<IRMakeValuePack>(operand))
+                        {
+                            for (UInt j = 0; j < nestedPack->getOperandCount(); j++)
+                                flatOperands.add(nestedPack->getOperand(j));
+                        }
+                        else
+                        {
+                            flatOperands.add(operand);
+                        }
+                    }
+                    IRInst* newInst = nullptr;
+                    if (inst->getOp() == kIROp_MakeValuePack)
+                        newInst = builder.emitMakeValuePack(
+                            (UInt)flatOperands.getCount(),
+                            flatOperands.getArrayView().getBuffer());
+                    else
+                        newInst = builder.emitMakeTuple(
+                            (UInt)flatOperands.getCount(),
+                            flatOperands.getArrayView().getBuffer());
+                    inst->replaceUsesWith(newInst);
+                    maybeRemoveOldInst(inst);
+                    changed = true;
+                }
             }
             break;
         case kIROp_MakeCoopVectorFromValuePack:

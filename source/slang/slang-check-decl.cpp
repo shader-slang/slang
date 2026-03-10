@@ -356,6 +356,8 @@ struct SemanticsDeclHeaderVisitor : public SemanticsDeclVisitorBase,
 
     void visitGenericValueParamDecl(GenericValueParamDecl* decl);
 
+    void visitGenericValuePackParamDecl(GenericValuePackParamDecl* decl);
+
     void visitGenericTypeConstraintDecl(GenericTypeConstraintDecl* decl);
 
     void checkGenericTypeEqualityConstraintSubType(GenericTypeConstraintDecl* decl);
@@ -550,6 +552,11 @@ struct SemanticsDeclBodyVisitor : public SemanticsDeclVisitorBase,
     void visitGenericValueParamDecl(GenericValueParamDecl* genValDecl)
     {
         checkVarDeclCommon(genValDecl);
+    }
+
+    void visitGenericValuePackParamDecl(GenericValuePackParamDecl* genValPackDecl)
+    {
+        checkVarDeclCommon(genValPackDecl);
     }
 
     void visitGlobalGenericValueParamDecl(GlobalGenericValueParamDecl* decl)
@@ -1233,7 +1240,7 @@ QualType getTypeForDeclRef(
             isLValue = false;
 
         // Generic value parameters are always immutable
-        if (varDeclRef.is<GenericValueParamDecl>())
+        if (isGenericValueParam(varDeclRef))
             isLValue = false;
 
         // Function parameters declared in the "modern" style
@@ -2169,7 +2176,7 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         {
             if (!varDecl->type.type)
             {
-                if (as<GenericValueParamDecl>(varDecl))
+                if (isGenericValueParam(varDecl))
                 {
                     getSink()->diagnose(
                         Diagnostics::GenericValueParameterMustHaveType{.decl = varDecl});
@@ -3574,6 +3581,26 @@ void SemanticsDeclHeaderVisitor::visitGenericTypeConstraintDecl(GenericTypeConst
                 getSink()->diagnose(Diagnostics::InvalidTypeForConstraint{
                     .type = decl->sup.type,
                     .typeExp = decl->sup.exp});
+                if (isValidCompileTimeConstantType(decl->sup.type) &&
+                    !decl->whereTokenLoc.isValid())
+                {
+                    if (auto subDeclRefType = as<DeclRefType>(decl->sub.type))
+                    {
+                        auto subDecl = subDeclRefType->getDeclRef().getDecl();
+                        if (as<GenericTypePackParamDecl>(subDecl))
+                        {
+                            getSink()->diagnose(Diagnostics::UseLetEachForGenericValuePackParam{
+                                .paramName = subDecl->getName(),
+                                .type = decl->sup.type});
+                        }
+                        else if (as<GenericTypeParamDecl>(subDecl))
+                        {
+                            getSink()->diagnose(Diagnostics::UseLetForGenericValueParam{
+                                .paramName = subDecl->getName(),
+                                .type = decl->sup.type});
+                        }
+                    }
+                }
             }
         }
     }
@@ -3666,6 +3693,24 @@ void SemanticsDeclHeaderVisitor::visitGenericValueParamDecl(GenericValueParamDec
     }
 }
 
+void SemanticsDeclHeaderVisitor::visitGenericValuePackParamDecl(GenericValuePackParamDecl* decl)
+{
+    checkVarDeclCommon(decl);
+
+    if (decl->type.type && !as<ValuePackType>(decl->type.type))
+    {
+        if (!isValidCompileTimeConstantType(decl->type.type))
+        {
+            getSink()->diagnose(Diagnostics::GenericValueParameterTypeNotSupported{
+                .type = decl->type.type,
+                .decl = decl});
+            decl->type.type = m_astBuilder->getErrorType();
+            return;
+        }
+        decl->type.type = m_astBuilder->getOrCreate<ValuePackType>(decl->type.type);
+    }
+}
+
 void SemanticsDeclHeaderVisitor::visitGenericDecl(GenericDecl* genericDecl)
 {
     genericDecl->setCheckState(DeclCheckState::ReadyForLookup);
@@ -3686,6 +3731,11 @@ void SemanticsDeclHeaderVisitor::visitGenericDecl(GenericDecl* genericDecl)
             ensureDecl(typeParam, DeclCheckState::ReadyForReference);
             typeParam->parameterIndex = parameterIndex++;
         }
+        else if (auto valPackParam = as<GenericValuePackParamDecl>(m))
+        {
+            ensureDecl(valPackParam, DeclCheckState::ReadyForReference);
+            valPackParam->parameterIndex = parameterIndex++;
+        }
         else if (auto valParam = as<GenericValueParamDecl>(m))
         {
             ensureDecl(valParam, DeclCheckState::ReadyForReference);
@@ -3694,6 +3744,22 @@ void SemanticsDeclHeaderVisitor::visitGenericDecl(GenericDecl* genericDecl)
         else if (as<GenericTypeConstraintDecl>(m) || as<TypeCoercionConstraintDecl>(m))
         {
             ensureDecl(m, DeclCheckState::ReadyForReference);
+        }
+    }
+
+    // Validate that pack parameters only appear at the end of the parameter list.
+    bool seenPack = false;
+    for (Index i = 0; i < genericDecl->getDirectMemberDeclCount(); ++i)
+    {
+        Decl* m = genericDecl->getDirectMemberDecl(i);
+        bool isPack = as<GenericTypePackParamDecl>(m) || as<GenericValuePackParamDecl>(m);
+        if (isPack)
+        {
+            seenPack = true;
+        }
+        else if (seenPack && isGenericParam(m))
+        {
+            getSink()->diagnose(Diagnostics::PackParamMustBeLast{.param = m});
         }
     }
 }
@@ -4645,6 +4711,17 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
                 return false;
         }
         else if (
+            auto requiredValuePackParamDeclRef =
+                requiredMemberDeclRef.as<GenericValuePackParamDecl>())
+        {
+            if (auto satisfyingValuePackParamDeclRef =
+                    satisfyingMemberDeclRef.as<GenericValuePackParamDecl>())
+            {
+            }
+            else
+                return false;
+        }
+        else if (
             auto requiredConstraintDeclRef = requiredMemberDeclRef.as<GenericTypeConstraintDecl>())
         {
             if (auto satisfyingConstraintDeclRef =
@@ -4709,6 +4786,20 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
 
             requiredSubstArgs.add(satisfyingVal);
         }
+        else if (
+            auto requiredValuePackParamDeclRef =
+                requiredMemberDeclRef.as<GenericValuePackParamDecl>())
+        {
+            auto satisfyingValuePackParamDeclRef =
+                satisfyingMemberDeclRef.as<GenericValuePackParamDecl>();
+            SLANG_ASSERT(satisfyingValuePackParamDeclRef);
+
+            auto satisfyingVal = m_astBuilder->getOrCreate<DeclRefIntVal>(
+                requiredValuePackParamDeclRef.getDecl()->getType(),
+                satisfyingValuePackParamDeclRef);
+
+            requiredSubstArgs.add(satisfyingVal);
+        }
     }
     for (Index i = 0; i < memberCount; i++)
     {
@@ -4762,11 +4853,21 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
             auto satisfyingValueParamDeclRef = satisfyingMemberDeclRef.as<GenericValueParamDecl>();
             SLANG_ASSERT(satisfyingValueParamDeclRef);
 
-            // For a generic value parameter, we need to check that the required
-            // and satisfying declaration both agree on the type of the parameter.
-            //
             auto requiredParamType = getType(m_astBuilder, requiredValueParamDeclRef);
             auto satisfyingParamType = getType(m_astBuilder, satisfyingValueParamDeclRef);
+            if (!satisfyingParamType->equals(requiredParamType))
+                return false;
+        }
+        else if (
+            auto requiredValuePackParamDeclRef =
+                requiredMemberDeclRef.as<GenericValuePackParamDecl>())
+        {
+            auto satisfyingValuePackParamDeclRef =
+                satisfyingMemberDeclRef.as<GenericValuePackParamDecl>();
+            SLANG_ASSERT(satisfyingValuePackParamDeclRef);
+
+            auto requiredParamType = getType(m_astBuilder, requiredValuePackParamDeclRef);
+            auto satisfyingParamType = getType(m_astBuilder, satisfyingValuePackParamDeclRef);
             if (!satisfyingParamType->equals(requiredParamType))
                 return false;
         }
@@ -5124,16 +5225,8 @@ GenericDecl* SemanticsVisitor::synthesizeGenericSignatureForRequirementWitness(
             synValParamDecl->parameterIndex = valParamDecl->parameterIndex;
             synValParamDecl->type = valParamDecl->type;
 
-            // Note: we intentionally do not copy GenericValueParamDecl::initExpr here,
-            // because initType maybe dependent on the original type/value parameters,
-            // and if we copy we must also substitute all the original type parameters with the
-            // synthesized ones. It shouldn't be required for the implementing declaration to define
-            // initType anyways, so we'll just save ourselves from the trouble.
-            //
-
             mapOrigToSynTypeParams.add(valParamDecl, synGenericDecl);
 
-            // Construct a DeclRefExpr from the value parameter.
             auto synValParamDeclRef = makeDeclRef(synValParamDecl);
 
             auto synValParamDeclRefExpr = m_astBuilder->create<VarExpr>();
@@ -5141,6 +5234,24 @@ GenericDecl* SemanticsVisitor::synthesizeGenericSignatureForRequirementWitness(
             synValParamDeclRefExpr->type = synValParamDecl->type.type;
 
             synGenericArgs.add(synValParamDeclRefExpr);
+        }
+        else if (auto valPackParamDecl = as<GenericValuePackParamDecl>(member))
+        {
+            auto synValPackParamDecl = m_astBuilder->create<GenericValuePackParamDecl>();
+            synValPackParamDecl->nameAndLoc = valPackParamDecl->nameAndLoc;
+            synGenericDecl->addMember(synValPackParamDecl);
+            synValPackParamDecl->parameterIndex = valPackParamDecl->parameterIndex;
+            synValPackParamDecl->type = valPackParamDecl->type;
+
+            mapOrigToSynTypeParams.add(valPackParamDecl, synGenericDecl);
+
+            auto synValPackParamDeclRef = makeDeclRef(synValPackParamDecl);
+
+            auto synValPackParamDeclRefExpr = m_astBuilder->create<VarExpr>();
+            synValPackParamDeclRefExpr->declRef = synValPackParamDeclRef;
+            synValPackParamDeclRefExpr->type = synValPackParamDecl->type.type;
+
+            synGenericArgs.add(synValPackParamDeclRefExpr);
         }
     }
 
@@ -5692,6 +5803,14 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
                 synValParamDeclRefExpr->declRef = synValParamDeclRef;
                 synValParamDeclRefExpr->type = getType(m_astBuilder, synValParamDeclRef);
                 genericAppExpr->arguments.add(synValParamDeclRefExpr);
+            }
+            else if (auto valPackParamDecl = as<GenericValuePackParamDecl>(member))
+            {
+                auto synValPackParamDeclRef = makeDeclRef(valPackParamDecl);
+                auto synValPackParamDeclRefExpr = m_astBuilder->create<VarExpr>();
+                synValPackParamDeclRefExpr->declRef = synValPackParamDeclRef;
+                synValPackParamDeclRefExpr->type = getType(m_astBuilder, synValPackParamDeclRef);
+                genericAppExpr->arguments.add(synValPackParamDeclRefExpr);
             }
         }
         synBase = subVisitor.checkGenericAppWithCheckedArgs(genericAppExpr);
@@ -7693,13 +7812,13 @@ bool SemanticsVisitor::checkConformance(
             auto superTypeDecl = superDeclRefType->getDeclRef().getDecl();
             if (superTypeDecl->findModifier<ComInterfaceAttribute>())
             {
-                // A struct cannot implement a COM Interface.
-                if (auto classDecl = as<ClassDecl>(superTypeDecl))
+                auto subTypeDecl = declRef.getDecl();
+                if (auto classDecl = as<ClassDecl>(subTypeDecl))
                 {
-                    // OK.
+                    // Classes can implement COM interfaces.
                     SLANG_UNUSED(classDecl);
                 }
-                else if (auto subInterfaceDecl = as<InterfaceDecl>(superTypeDecl))
+                else if (auto subInterfaceDecl = as<InterfaceDecl>(subTypeDecl))
                 {
                     if (!subInterfaceDecl->findModifier<ComInterfaceAttribute>())
                     {
@@ -7707,7 +7826,7 @@ bool SemanticsVisitor::checkConformance(
                             Diagnostics::InterfaceInheritingComMustBeCom{.decl = inheritanceDecl});
                     }
                 }
-                else if (const auto structDecl = as<StructDecl>(superTypeDecl))
+                else if (const auto structDecl = as<StructDecl>(subTypeDecl))
                 {
                     getSink()->diagnose(
                         Diagnostics::StructCannotImplementComInterface{.decl = inheritanceDecl});
@@ -8129,6 +8248,15 @@ void SemanticsDeclBasesVisitor::visitInterfaceDecl(InterfaceDecl* decl)
         // a circular inheritance relationship.
 
         _validateCrossModuleInheritance(decl, inheritanceDecl);
+
+        if (baseInterfaceDeclRef.getDecl()->findModifier<ComInterfaceAttribute>())
+        {
+            if (!decl->findModifier<ComInterfaceAttribute>())
+            {
+                getSink()->diagnose(
+                    Diagnostics::InterfaceInheritingComMustBeCom{.decl = inheritanceDecl});
+            }
+        }
     }
 
     if (decl->findModifier<ComInterfaceAttribute>())
@@ -8860,6 +8988,8 @@ void SemanticsVisitor::getGenericParams(
             outParams.add(typeParamDecl);
         else if (auto valueParamDecl = as<GenericValueParamDecl>(dd))
             outParams.add(valueParamDecl);
+        else if (auto valuePackParamDecl = as<GenericValuePackParamDecl>(dd))
+            outParams.add(valuePackParamDecl);
         else if (auto constraintDecl = as<GenericTypeConstraintDecl>(dd))
             outConstraints.add(constraintDecl);
     }
@@ -8927,26 +9057,17 @@ bool SemanticsVisitor::doGenericSignaturesMatch(
         {
             if (auto rightValueParam = as<GenericValueParamDecl>(rightParam))
             {
-                // In this case we have two generic value parameters,
-                // and they should only be considered to match if
-                // they have the same type.
-                //
-                // Note: We are assuming here that the type of a value
-                // parameter cannot be dependent on any of the type
-                // parameters in the same signature. This is a reasonable
-                // assumption for now, but could get thorny down the road.
-                //
                 if (!leftValueParam->getType()->equals(rightValueParam->getType()))
-                {
-                    // If the value parameters have non-matching types,
-                    // then the full generic signatures do not match.
-                    //
                     return false;
-                }
-
-                // Generic value parameters with the same type are
-                // always considered to match.
-                //
+                continue;
+            }
+        }
+        else if (auto leftValuePackParam = as<GenericValuePackParamDecl>(leftParam))
+        {
+            if (auto rightValuePackParam = as<GenericValuePackParamDecl>(rightParam))
+            {
+                if (!leftValuePackParam->getType()->equals(rightValuePackParam->getType()))
+                    return false;
                 continue;
             }
         }
@@ -9168,6 +9289,15 @@ List<Val*> getDefaultSubstitutionArgs(
                 astBuilder,
                 astBuilder->getDirectDeclRef(genericTypePackParamDecl));
             args.add(packType);
+        }
+        else if (auto genericValuePackParamDecl = as<GenericValuePackParamDecl>(mm))
+        {
+            if (semantics)
+                semantics->ensureDecl(genericValuePackParamDecl, DeclCheckState::ReadyForLookup);
+
+            args.add(astBuilder->getOrCreate<DeclRefIntVal>(
+                genericValuePackParamDecl->getType(),
+                astBuilder->getDirectDeclRef(genericValuePackParamDecl)));
         }
         else if (auto genericValueParamDecl = as<GenericValueParamDecl>(mm))
         {
@@ -10650,7 +10780,7 @@ void SemanticsDeclBasesVisitor::_validateExtensionDeclGenericParams(ExtensionDec
         // Check each generic parameter directly
         for (auto member : genericDecl->getDirectMemberDecls())
         {
-            if (as<GenericTypeParamDeclBase>(member) || as<GenericValueParamDecl>(member))
+            if (isGenericParam(member))
             {
                 bool referencedByTargetType = genericParamsReferencedByTargetType.contains(member);
                 bool referencedByConstraint = genericParamsReferencedByConstraints.contains(member);
@@ -12685,8 +12815,7 @@ void checkDerivativeAttributeImpl(
         Index count = 0;
         for (auto member : genericDecl->getDirectMemberDecls())
         {
-            if (as<GenericTypeParamDecl>(member) || as<GenericValueParamDecl>(member) ||
-                as<GenericTypePackParamDecl>(member))
+            if (isGenericParam(member))
                 count++;
         }
 
@@ -14752,8 +14881,7 @@ void SemanticsDeclCapabilityVisitor::visitInheritanceDecl(InheritanceDecl* inher
 
 DeclVisibility getDeclVisibility(Decl* decl)
 {
-    if (as<GenericTypeParamDeclBase>(decl) || as<GenericValueParamDecl>(decl) ||
-        as<GenericTypeConstraintDecl>(decl))
+    if (isGenericParam(decl) || as<GenericTypeConstraintDecl>(decl))
     {
         auto genericDecl = as<GenericDecl>(decl->parentDecl);
         if (!genericDecl)
