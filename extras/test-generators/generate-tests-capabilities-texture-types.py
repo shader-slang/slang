@@ -468,10 +468,10 @@ Texture2DArray<float4> feedbackSamplerInput2DArray;
             testDisabledComment += f"\n// Negative test disabled, see https://github.com/shader-slang/slang/issues/{testInfo.disableNegativeTestForIssue}"
 
     testStr = f"""// THIS IS A GENERATED FILE. DO NOT EDIT!
-// Instead, edit extras/generate-tests-capabilities-texture-types.py, and
+// Instead, edit extras/test-generators/generate-tests-capabilities-texture-types.py, and
 // regenerate this test by running:
 //
-//     extras/generate-tests-capabilities-texture-types.py
+//     extras/test-generators/generate-tests-capabilities-texture-types.py
 //
 // Texture types capability test: {backend['name']} / {testType}
 // - Type supported since target version:  {testInfo.minVersion}
@@ -544,7 +544,7 @@ def main():
     # switch to target directory
     global genTargetDirectory;
 
-    slangTopDirectory = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    slangTopDirectory = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
     genTestDirectory = os.path.join(slangTopDirectory, genTargetDirectory)
 
     Path(genTestDirectory).mkdir(parents=True, exist_ok=True)

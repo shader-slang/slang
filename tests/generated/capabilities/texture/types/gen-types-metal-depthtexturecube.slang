@@ -1,8 +1,8 @@
 // THIS IS A GENERATED FILE. DO NOT EDIT!
-// Instead, edit extras/generate-tests-capabilities-texture-types.py, and
+// Instead, edit extras/test-generators/generate-tests-capabilities-texture-types.py, and
 // regenerate this test by running:
 //
-//     extras/generate-tests-capabilities-texture-types.py
+//     extras/test-generators/generate-tests-capabilities-texture-types.py
 //
 // Texture types capability test: metal / DepthTextureCube
 // - Type supported since target version:  1.0
