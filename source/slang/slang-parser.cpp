@@ -5705,9 +5705,10 @@ Decl* Parser::ParseStruct()
         }
 
         Modifier** modifierLink = &rs->modifiers.first;
-        ParseSquareBracketAttributes(this, &modifierLink);
 
-        SourceLoc endLoc = tokenReader.peekLoc();
+        // Even if this syntax is now removed in Slang 2026, we'll still parse
+        // this to keep the diagnostics output sane
+        ParseSquareBracketAttributes(this, &modifierLink);
     }
 
     // Skip completion request token to prevent producing a type named completion request.
