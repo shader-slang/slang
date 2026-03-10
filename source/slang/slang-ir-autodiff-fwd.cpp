@@ -976,6 +976,10 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
     {
         getSink()->diagnose(Diagnostics::CannotMixDifferentiableValueAndPtrOutputs{
             .location = origCall->sourceLoc});
+
+        // We'll continue transcribing instead of erroring out right away since we
+        // can still generate code (it just won't be correct). The diagnostic
+        // will still disallow any final code from being generated.
     }
 
     bool usePointerPairMode = hasDiffPtrOutput;
