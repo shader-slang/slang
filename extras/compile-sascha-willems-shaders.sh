@@ -47,10 +47,18 @@ REPO_DIR=""
 while [[ $# -gt 0 ]]; do
   case $1 in
   --slangc)
+    if [[ $# -lt 2 ]]; then
+      echo -e "${RED}Missing value for --slangc${NC}"
+      exit 1
+    fi
     SLANGC="$2"
     shift 2
     ;;
   --repo)
+    if [[ $# -lt 2 ]]; then
+      echo -e "${RED}Missing value for --repo${NC}"
+      exit 1
+    fi
     REPO_DIR="$2"
     shift 2
     ;;
@@ -81,7 +89,7 @@ log_error() { echo -e "${RED}[FAIL]${NC} $1"; }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SLANG_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-cd "$SLANG_ROOT"
+cd "$SLANG_ROOT" || exit 1
 
 if [ ! -f "CMakeLists.txt" ]; then
   log_error "Cannot find Slang repository root"
@@ -102,13 +110,16 @@ if [ -z "$SLANGC" ]; then
   done
 fi
 
-if [ -z "$SLANGC" ] || [ ! -f "$SLANGC" ]; then
-  log_error "slangc not found. Build Slang first or pass --slangc PATH"
+if [ -z "$SLANGC" ] || [ ! -x "$SLANGC" ]; then
+  log_error "slangc not found or not executable. Build Slang first or pass --slangc PATH"
   exit 1
 fi
 
 log_info "Using slangc: $SLANGC"
-"$SLANGC" -version
+if ! "$SLANGC" -version; then
+  log_error "Failed to execute slangc at $SLANGC"
+  exit 1
+fi
 
 # Clone or use existing repo
 if [ -z "$REPO_DIR" ]; then
@@ -122,7 +133,10 @@ fi
 
 if [ ! -d "$REPO_DIR" ]; then
   log_info "Cloning SaschaWillems/Vulkan (shallow)..."
-  git clone --depth 1 https://github.com/SaschaWillems/Vulkan.git "$REPO_DIR"
+  if ! git clone --depth 1 https://github.com/SaschaWillems/Vulkan.git "$REPO_DIR"; then
+    log_error "Failed to clone SaschaWillems/Vulkan into $REPO_DIR"
+    exit 1
+  fi
   log_success "Cloned to $REPO_DIR"
 else
   log_info "Using existing clone at $REPO_DIR"
@@ -269,8 +283,12 @@ if [ $skip_known -gt 0 ]; then
   echo ""
 fi
 
-if [ $success -eq 0 ] && [ $fail -gt 0 ]; then
-  log_error "All shader compilations failed!"
+if [ $success -eq 0 ]; then
+  if [ $total -eq 0 ]; then
+    log_error "No .slang files found under $SHADER_DIR"
+  else
+    log_error "No shaders compiled successfully"
+  fi
   exit 1
 fi
 
