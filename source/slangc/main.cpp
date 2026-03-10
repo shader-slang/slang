@@ -156,7 +156,7 @@ int wmain(int argc, wchar_t** argv)
         for (const auto& arg : args)
             argBuffers.add(arg.getBuffer());
 
-        result = MAIN(argBuffers.getCount(), (char**)&argBuffers[0]);
+        result = MAIN((int)argBuffers.getCount(), (char**)&argBuffers[0]);
     }
 
 #ifdef _MSC_VER
