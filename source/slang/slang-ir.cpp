@@ -6059,16 +6059,16 @@ IRInst* IRBuilder::emitExtractTaggedUnionPayload(IRType* type, IRInst* val, IRIn
 }
 
 
-IRInst* IRBuilder::emitSizeOf(IRInst* sizedType)
+IRInst* IRBuilder::emitSizeOf(IRInst* sizedType, IRType* dataLayoutType)
 {
-    auto inst = createInst<IRInst>(this, kIROp_SizeOf, getIntType(), sizedType);
+    auto inst = createInst<IRInst>(this, kIROp_SizeOf, getIntType(), sizedType, dataLayoutType);
     addInst(inst);
     return inst;
 }
 
-IRInst* IRBuilder::emitAlignOf(IRInst* sizedType)
+IRInst* IRBuilder::emitAlignOf(IRInst* sizedType, IRType* dataLayoutType)
 {
-    auto inst = createInst<IRInst>(this, kIROp_AlignOf, getIntType(), sizedType);
+    auto inst = createInst<IRInst>(this, kIROp_AlignOf, getIntType(), sizedType, dataLayoutType);
     addInst(inst);
     return inst;
 }

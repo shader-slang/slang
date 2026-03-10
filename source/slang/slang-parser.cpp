@@ -7276,7 +7276,13 @@ static NodeBase* parseSizeOfExpr(Parser* parser, void* /*userData*/)
     // The return type is always a Int
     sizeOfExpr->type = parser->astBuilder->getIntType();
 
-    sizeOfExpr->value = parser->ParseExpression();
+    sizeOfExpr->value = parser->ParseArgExpr();
+
+    if (AdvanceIf(parser, TokenType::Comma))
+    {
+        // If there is a comma, assume we also have an explicitly specified data layout.
+        sizeOfExpr->dataLayout = parser->ParseArgExpr();
+    }
 
     parser->ReadMatchingToken(TokenType::RParent);
 
@@ -7292,7 +7298,13 @@ static NodeBase* parseAlignOfExpr(Parser* parser, void* /*userData*/)
     // The return type is always a Int
     alignOfExpr->type = parser->astBuilder->getIntType();
 
-    alignOfExpr->value = parser->ParseExpression();
+    alignOfExpr->value = parser->ParseArgExpr();
+
+    if (AdvanceIf(parser, TokenType::Comma))
+    {
+        // If there is a comma, assume we also have an explicitly specified data layout.
+        alignOfExpr->dataLayout = parser->ParseArgExpr();
+    }
 
     parser->ReadMatchingToken(TokenType::RParent);
 

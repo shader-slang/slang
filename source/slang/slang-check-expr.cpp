@@ -2373,7 +2373,14 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
         auto type = as<Type>(
             sizeOfLikeExpr.getExpr()->sizedType->substitute(m_astBuilder, expr.getSubsts()));
 
-        if (auto sizeOfExpr = expr.as<SizeOfExpr>())
+        if (sizeOfLikeExpr.getExpr()->dataLayoutType &&
+            !as<ScalarDataLayoutType>(sizeOfLikeExpr.getExpr()->dataLayoutType))
+        {
+            // We can only constant-fold sizeof-like expressions when in natural
+            // data layout.
+            return nullptr;
+        }
+        else if (auto sizeOfExpr = expr.as<SizeOfExpr>())
         {
             return as<IntVal>(SizeOfIntVal::tryFold(m_astBuilder, expr.getExpr()->type.type, type));
         }
@@ -4401,6 +4408,33 @@ Expr* SemanticsExprVisitor::visitSizeOfLikeExpr(SizeOfLikeExpr* sizeOfLikeExpr)
             sizeOfLikeExpr->type = m_astBuilder->getErrorType();
             return sizeOfLikeExpr;
         }
+
+        DataLayoutType* dataLayoutType = nullptr;
+        if (sizeOfLikeExpr->dataLayout)
+        {
+            auto dataLayoutExpr = dispatch(sizeOfLikeExpr->dataLayout);
+            if (as<TypeType>(dataLayoutExpr->type))
+            {
+                TypeExp typeExp;
+                typeExp.exp = dataLayoutExpr;
+
+                auto properTypeExpr = CoerceToProperType(typeExp);
+
+                dataLayoutType = as<DataLayoutType>(properTypeExpr.type);
+            }
+        }
+        else
+        {
+            dataLayoutType = as<DataLayoutType>(m_astBuilder->getScalarLayoutType());
+        }
+
+        if (!dataLayoutType || !as<DataLayoutType>(dataLayoutType))
+        {
+            getSink()->diagnose(Diagnostics::SizeOfArgumentIsInvalid{.expr = sizeOfLikeExpr});
+            return sizeOfLikeExpr;
+        }
+
+        sizeOfLikeExpr->dataLayoutType = dataLayoutType;
 
         // Note: DescriptorHandle size is target-dependent (uint64_t for spvBindlessTextureNV,
         // uint2 otherwise). The size calculation is deferred to IR level where target

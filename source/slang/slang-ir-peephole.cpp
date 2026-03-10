@@ -283,6 +283,14 @@ struct PeepholeContext : InstPassBase
                 else
                     baseType = inst->getOperand(0)->getDataType();
 
+                IRTypeLayoutRules* layoutRules = IRTypeLayoutRules::getNatural();
+
+                if (inst->getOperandCount() >= 2)
+                {
+                    auto ruleName =getTypeLayoutRuleNameFromOp(inst->getOperand(1)->getOp(), IRTypeLayoutRuleName::Natural);
+                    layoutRules = IRTypeLayoutRules::get(ruleName);
+                }
+
                 // Special handling for DescriptorHandleType - its size/alignment is
                 // target-dependent
                 if (as<IRDescriptorHandleType>(baseType))
@@ -325,8 +333,9 @@ struct PeepholeContext : InstPassBase
                     break;
                 }
 
-                if (SLANG_FAILED(getNaturalSizeAndAlignment(
+                if (SLANG_FAILED(getSizeAndAlignment(
                         targetProgram->getTargetReq(),
+                        layoutRules,
                         baseType,
                         &sizeAlignment)))
                     break;

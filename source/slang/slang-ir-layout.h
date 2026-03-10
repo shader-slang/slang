@@ -142,4 +142,7 @@ Result getStd430SizeAndAlignment(
 ///
 Result getStd430Offset(TargetRequest* targetReq, IRStructField* field, IRIntegerValue* outOffset);
 
+IRTypeLayoutRuleName getTypeLayoutRuleNameFromOp(IROp layoutTypeOp, IRTypeLayoutRuleName defaultLayout);
+IROp getOpFromTypeLayoutRuleName(IRTypeLayoutRuleName ruleName);
+
 } // namespace Slang

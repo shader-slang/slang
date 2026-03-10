@@ -337,8 +337,6 @@ BufferElementTypeLoweringPolicy* getBufferElementTypeLoweringPolicy(
 
 TypeLoweringConfig getTypeLoweringConfigForBuffer(TargetProgram* target, IRType* bufferType);
 
-IROp getOpFromTypeLayoutRules(IRTypeLayoutRuleName ruleName);
-
 IRInst* ConversionMethod::apply(IRBuilder& builder, IRType* resultType, IRInst* operandAddr)
 {
     if (!*this)
@@ -2250,58 +2248,6 @@ void lowerBufferElementTypeToStorageType(
     context.processModule(module);
 }
 
-IRTypeLayoutRuleName getTypeLayoutRulesFromOp(IROp layoutTypeOp, IRTypeLayoutRuleName defaultLayout)
-{
-    switch (layoutTypeOp)
-    {
-    case kIROp_DefaultBufferLayoutType:
-    case kIROp_DefaultPushConstantBufferLayoutType:
-        return defaultLayout;
-    case kIROp_Std140BufferLayoutType:
-        return IRTypeLayoutRuleName::Std140;
-    case kIROp_Std430BufferLayoutType:
-        return IRTypeLayoutRuleName::Std430;
-    case kIROp_ScalarBufferLayoutType:
-        return IRTypeLayoutRuleName::Natural;
-    case kIROp_CBufferLayoutType:
-        return IRTypeLayoutRuleName::C;
-    case kIROp_D3DConstantBufferLayoutType:
-        return IRTypeLayoutRuleName::D3DConstantBuffer;
-    case kIROp_MetalParameterBlockLayoutType:
-        return IRTypeLayoutRuleName::MetalParameterBlock;
-    case kIROp_CUDABufferLayoutType:
-        return IRTypeLayoutRuleName::CUDA;
-    case kIROp_LLVMBufferLayoutType:
-        return IRTypeLayoutRuleName::LLVM;
-    }
-    return defaultLayout;
-}
-
-IROp getOpFromTypeLayoutRules(IRTypeLayoutRuleName ruleName)
-{
-    switch (ruleName)
-    {
-    case IRTypeLayoutRuleName::Std140:
-        return kIROp_Std140BufferLayoutType;
-    case IRTypeLayoutRuleName::Std430:
-        return kIROp_Std430BufferLayoutType;
-    case IRTypeLayoutRuleName::Natural:
-        return kIROp_ScalarBufferLayoutType;
-    case IRTypeLayoutRuleName::C:
-        return kIROp_CBufferLayoutType;
-    case IRTypeLayoutRuleName::D3DConstantBuffer:
-        return kIROp_D3DConstantBufferLayoutType;
-    case IRTypeLayoutRuleName::MetalParameterBlock:
-        return kIROp_MetalParameterBlockLayoutType;
-    case IRTypeLayoutRuleName::CUDA:
-        return kIROp_CUDABufferLayoutType;
-    case IRTypeLayoutRuleName::LLVM:
-        return kIROp_LLVMBufferLayoutType;
-    default:
-        return kIROp_DefaultBufferLayoutType;
-    }
-}
-
 IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRType* bufferType)
 {
     if (bufferType->getOp() == kIROp_ParameterBlockType && isMetalTarget(target->getTargetReq()))
@@ -2340,7 +2286,7 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
             if (layoutTypeOp != kIROp_DefaultBufferLayoutType &&
                 layoutTypeOp != kIROp_DefaultPushConstantBufferLayoutType)
             {
-                return getTypeLayoutRulesFromOp(layoutTypeOp, IRTypeLayoutRuleName::Natural);
+                return getTypeLayoutRuleNameFromOp(layoutTypeOp, IRTypeLayoutRuleName::Natural);
             }
         }
 
@@ -2376,7 +2322,7 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
             auto layoutTypeOp = structBufferType->getDataLayout()
                                     ? structBufferType->getDataLayout()->getOp()
                                     : kIROp_DefaultBufferLayoutType;
-            return getTypeLayoutRulesFromOp(layoutTypeOp, IRTypeLayoutRuleName::Std430);
+            return getTypeLayoutRuleNameFromOp(layoutTypeOp, IRTypeLayoutRuleName::Std430);
         }
     case kIROp_ParameterBlockType:
     case kIROp_ConstantBufferType:
@@ -2396,7 +2342,7 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
             auto defaultTypeOp =
                 isCPUTarget(targetReq) ? IRTypeLayoutRuleName::C : IRTypeLayoutRuleName::Std140;
 
-            return getTypeLayoutRulesFromOp(layoutTypeOp, defaultTypeOp);
+            return getTypeLayoutRuleNameFromOp(layoutTypeOp, defaultTypeOp);
         }
     case kIROp_GLSLShaderStorageBufferType:
         {
@@ -2404,7 +2350,7 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
             auto layoutTypeOp = storageBufferType->getDataLayout()
                                     ? storageBufferType->getDataLayout()->getOp()
                                     : kIROp_Std430BufferLayoutType;
-            return getTypeLayoutRulesFromOp(layoutTypeOp, IRTypeLayoutRuleName::Std430);
+            return getTypeLayoutRuleNameFromOp(layoutTypeOp, IRTypeLayoutRuleName::Std430);
         }
     }
     if (auto ptrType = as<IRPtrTypeBase>(bufferType))
@@ -2416,7 +2362,7 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
         if (isCPUTargetViaLLVM(targetReq))
             defaultRule = IRTypeLayoutRuleName::LLVM;
 
-        return getTypeLayoutRulesFromOp(layoutTypeOp, defaultRule);
+        return getTypeLayoutRuleNameFromOp(layoutTypeOp, defaultRule);
     }
     return IRTypeLayoutRuleName::Natural;
 }
@@ -2430,7 +2376,7 @@ IRTypeLayoutRules* getTypeLayoutRuleForBuffer(TargetProgram* target, IRType* buf
 IRType* getTypeLayoutTypeForBuffer(TargetProgram* target, IRBuilder& builder, IRType* bufferType)
 {
     TypeLoweringConfig loweringConfig = getTypeLoweringConfigForBuffer(target, bufferType);
-    IROp layoutOp = getOpFromTypeLayoutRules(loweringConfig.layoutRuleName);
+    IROp layoutOp = getOpFromTypeLayoutRuleName(loweringConfig.layoutRuleName);
     IRType* layoutType =
         as<IRType>(builder.createIntrinsicInst(nullptr, layoutOp, 0, nullptr, nullptr));
     return layoutType;

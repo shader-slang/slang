@@ -2460,8 +2460,8 @@ local insts = {
 	{ CastDescriptorHandleToResource = { operands = { { "handle" } } } },
 	{ CastResourceToDescriptorHandle = { operands = { { "resource" } } } },
 	{ TreatAsDynamicUniform = { operands = { { "value" } } } },
-	{ sizeOf = { operands = { { "type" } } } },
-	{ alignOf = { operands = { { "baseOp" } } } },
+	{ sizeOf = { operands = { { "type" }, { "dataLayout", "IRType" } } } },
+	{ alignOf = { operands = { { "baseOp" }, { "dataLayout", "IRType" } } } },
 	{ countOf = { operands = { { "type" } } } },
 	{ GetArrayLength = { operands = { { "array" } } } },
 	{
