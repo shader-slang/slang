@@ -179,20 +179,20 @@ fail_details=""
 
 get_output_ext() {
   case "$1" in
-    vertex) echo ".vert" ;;
-    fragment) echo ".frag" ;;
-    compute) echo ".comp" ;;
-    raygeneration) echo ".rgen" ;;
-    miss) echo ".rmiss" ;;
-    closesthit) echo ".rchit" ;;
-    callable) echo ".rcall" ;;
-    intersection) echo ".rint" ;;
-    anyhit) echo ".rahit" ;;
-    mesh) echo ".mesh" ;;
-    amplification) echo ".task" ;;
-    geometry) echo ".geom" ;;
-    hull) echo ".tesc" ;;
-    domain) echo ".tese" ;;
+  vertex) echo ".vert" ;;
+  fragment) echo ".frag" ;;
+  compute) echo ".comp" ;;
+  raygeneration) echo ".rgen" ;;
+  miss) echo ".rmiss" ;;
+  closesthit) echo ".rchit" ;;
+  callable) echo ".rcall" ;;
+  intersection) echo ".rint" ;;
+  anyhit) echo ".rahit" ;;
+  mesh) echo ".mesh" ;;
+  amplification) echo ".task" ;;
+  geometry) echo ".geom" ;;
+  hull) echo ".tesc" ;;
+  domain) echo ".tese" ;;
   esac
 }
 
