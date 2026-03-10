@@ -1,13 +1,23 @@
 from __future__ import annotations
 
+import importlib.util
+import sys
 from dataclasses import dataclass
+from pathlib import Path
 
 import numpy as np
 import pytest
 
 import slangpy as spy
 
-from conftest import REF_IMAGE_PATH, TEST_DIR, get_artifact_path, get_slangpy_paths
+_STRESS_DIR = Path(__file__).resolve().parent
+_spec = importlib.util.spec_from_file_location("stress_conftest", _STRESS_DIR / "conftest.py")
+_conftest = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_conftest)
+REF_IMAGE_PATH = _conftest.REF_IMAGE_PATH
+TEST_DIR = _conftest.TEST_DIR
+get_artifact_path = _conftest.get_artifact_path
+get_slangpy_include_paths = _conftest.get_slangpy_include_paths
 
 WORKGROUP_SIZE = 64
 KNUTH_HASH = 2654435761
@@ -25,7 +35,7 @@ class ImageMetrics:
 
 
 def create_device(device_type=spy.DeviceType.cuda, defines: dict[str, str] | None = None):
-    include_paths = get_slangpy_paths()
+    include_paths = get_slangpy_include_paths()
     all_defines = {"UNIT_TEST": "1"}
     if defines:
         all_defines.update(defines)

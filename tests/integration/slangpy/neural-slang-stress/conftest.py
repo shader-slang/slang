@@ -32,7 +32,7 @@ REF_IMAGE_PATH = TEST_DIR / "neural-mlp-test-image.png"
 ARTIFACT_DIR = Path(tempfile.gettempdir()) / "slang-neural-large-model"
 
 
-def get_slangpy_paths():
+def get_slangpy_include_paths():
     """Return include paths for slangpy's slang modules and neural standard module."""
     import slangpy as spy
 

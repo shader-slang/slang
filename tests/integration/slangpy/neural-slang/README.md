@@ -25,23 +25,23 @@ These tests verify that the experimental `neural` module works correctly when us
 
 ```bash
 cd /path/to/slang
-pytest tests/integration/slangpy/neural/ -v
+pytest tests/integration/slangpy/neural-slang/ -v
 ```
 
 ### Run specific test file:
 
 ```bash
-pytest tests/integration/slangpy/neural/test_neural_bindless.py -v
+pytest tests/integration/slangpy/neural-slang/test_neural_bindless.py -v
 ```
 
 ### Run with specific device type:
 
 ```bash
 # Vulkan only
-SLANGPY_DEVICE_TYPES=vulkan pytest tests/integration/slangpy/neural/ -v
+SLANGPY_DEVICE_TYPES=vulkan pytest tests/integration/slangpy/neural-slang/ -v
 
 # CUDA only
-SLANGPY_DEVICE_TYPES=cuda pytest tests/integration/slangpy/neural/ -v
+SLANGPY_DEVICE_TYPES=cuda pytest tests/integration/slangpy/neural-slang/ -v
 ```
 
 ## Test Files
@@ -63,10 +63,8 @@ SLANGPY_DEVICE_TYPES=cuda pytest tests/integration/slangpy/neural/ -v
 
 ## CI Integration
 
-These tests are designed to be run as part of slang's CI pipeline. They require:
+These tests are designed to be run as part of slangpy's CI pipeline via the `ci-latest-slang` workflow (PR #846). They require:
 
 1. slangpy to be installed (latest release from PyPI)
 2. The freshly built slang libraries to be copied over the slangpy bundled libraries
 3. A GPU with appropriate driver support
-
-See `.github/workflows/ci-slang-test.yml` for the CI integration pattern.

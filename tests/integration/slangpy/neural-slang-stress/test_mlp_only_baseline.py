@@ -207,8 +207,8 @@ def test_training_convergence_mlp_only(device_type: spy.DeviceType, vector_type:
         print(f"Final loss: {final_loss:.6f} (initial: {initial_loss:.6f})")
 
         assert np.isfinite(final_loss), "Final loss is not finite"
-        assert final_loss < initial_loss * 0.50, (
-            f"Training did not converge: {final_loss:.6f} >= 50% of initial {initial_loss:.6f}"
+        assert final_loss < initial_loss * 0.25, (
+            f"Training did not converge: {final_loss:.6f} >= 25% of initial {initial_loss:.6f}"
         )
     finally:
         runner.close()
@@ -254,7 +254,7 @@ def test_parameter_count_mlp_only(device_type: spy.DeviceType, vector_type: str)
     runner = _create_runner(vector_type, device_type)
     try:
         total_mlp = runner.get_total_params()
-        expected_mlp = 384 + 16512 + 16512 + 387  # = 33795
+        expected_mlp = sum(fi * fo + fo for fi, fo in MLP_LAYERS)  # 33795
         assert total_mlp == expected_mlp, f"MLP: {total_mlp} != {expected_mlp}"
         print(f"\nMLP-only [{vector_type}] params: {total_mlp}")
     finally:
