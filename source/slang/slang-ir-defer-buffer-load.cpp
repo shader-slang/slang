@@ -154,8 +154,7 @@ bool isMemoryLocationUnmodifiedBetweenLoadAndUser(
     {
         // If we're in the rootBlock, we don't care about instructions prior
         // to the load instruction.
-        IRInst* startInst = block == rootBlock ?
-            loadInst->getNextInst() : block->getFirstInst();
+        IRInst* startInst = block == rootBlock ? loadInst->getNextInst() : block->getFirstInst();
         for (IRInst* inst = startInst; inst; inst = inst->getNextInst())
         {
             // We found userInst, later instructions don't matter unless there's
@@ -175,7 +174,11 @@ bool isMemoryLocationUnmodifiedBetweenLoadAndUser(
             case kIROp_Store:
                 {
                     auto storedDest = inst->getOperand(0);
-                    if (canAddressesPotentiallyAlias(target, func, loadInst->getOperand(0), storedDest))
+                    if (canAddressesPotentiallyAlias(
+                            target,
+                            func,
+                            loadInst->getOperand(0),
+                            storedDest))
                         return false;
                     continue;
                 }
