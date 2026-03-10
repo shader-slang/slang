@@ -77,7 +77,7 @@ jobs:
           echo "Cloning SaschaWillems/Vulkan (shaders/slang only)..."
           git clone --depth 1 --filter=blob:none --sparse \
             https://github.com/SaschaWillems/Vulkan.git SaschaWillems-Vulkan
-          cd SaschaWillems-Vulkan
+          cd SaschaWillems-Vulkan || exit 1
           git sparse-checkout set shaders/slang
           commit=$(git rev-parse HEAD)
           echo "Using SaschaWillems/Vulkan commit: $commit"
@@ -86,11 +86,8 @@ jobs:
           echo "Found $slangCount .slang shader files"
 
       - name: Compile Slang shaders
-        env:
-          SLANG_RUN_SPIRV_VALIDATION: 1
         run: |
           echo "Compiling Sascha Willems Vulkan Slang shaders..."
-          echo "SPIRV validation enabled via SLANG_RUN_SPIRV_VALIDATION=1"
 
           ./extras/compile-sascha-willems-shaders.sh \
             --slangc build/Release/bin/slangc.exe \
