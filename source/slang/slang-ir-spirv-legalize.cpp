@@ -1780,11 +1780,23 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
     {
         bool isLegalGlobalInstForTarget(IRInst* inst) override
         {
-            if (as<IRSPIRVAsmOperand>(inst))
+            switch (inst->getOp())
+            {
+            case kIROp_MakeStruct:
+            case kIROp_MakeArray:
+            case kIROp_MakeArrayFromElement:
+            case kIROp_MakeVector:
+            case kIROp_MakeMatrix:
+            case kIROp_MakeMatrixFromScalar:
+            case kIROp_MakeVectorFromScalar:
                 return true;
-            if (isSpecConstRateType(inst->getFullType()))
-                return true;
-            return false;
+            default:
+                if (as<IRSPIRVAsmOperand>(inst))
+                    return true;
+                if (isSpecConstRateType(inst->getFullType()))
+                    return true;
+                return false;
+            };
         }
 
         bool isInlinableGlobalInstForTarget(IRInst* inst) override

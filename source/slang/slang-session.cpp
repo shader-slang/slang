@@ -1795,6 +1795,30 @@ Linkage::isBinaryModuleUpToDate(const char* modulePath, slang::IBlob* binaryModu
     return isBinaryModuleUpToDate(modulePath, rootChunk);
 }
 
+SLANG_NO_THROW SlangResult SLANG_MCALL
+Linkage::getDeclSourceLocation(slang::DeclReflection* inDecl, slang::SourceLocation* outLocation)
+{
+    if (!inDecl || !outLocation)
+        return SLANG_E_INVALID_ARG;
+
+    Decl* decl = (Decl*)inDecl;
+    SourceManager* sourceManager = getSourceManager();
+    auto sourceView = sourceManager->findSourceViewRecursively(decl->getNameLoc());
+    if (!sourceView)
+        return SLANG_E_NOT_FOUND;
+
+    auto humaneLoc = sourceView->getHumaneLoc(decl->getNameLoc());
+    outLocation->filePath = nullptr;
+    if (humaneLoc.pathInfo.hasFoundPath())
+    {
+        auto pathSlice = m_stringSlicePool.addAndGetSlice(humaneLoc.pathInfo.foundPath);
+        outLocation->filePath = pathSlice.begin();
+    }
+    outLocation->line = humaneLoc.line;
+    outLocation->column = humaneLoc.column;
+    return SLANG_OK;
+}
+
 SourceFile* Linkage::findFile(Name* name, SourceLoc loc, IncludeSystem& outIncludeSystem)
 {
     auto impl = [&](bool translateUnderScore) -> SourceFile*
@@ -2141,6 +2165,17 @@ SlangResult Linkage::loadSerializedModuleContents(
     module->setPathInfo(moduleFilePathInfo);
     module->setDigest(moduleChunk->getDigest());
     module->_collectShaderParams();
+
+    // When loading from a binary module, the semantic checker doesn't run, so
+    // imported modules are not registered in the module dependency list. We
+    // need to add them here so that name-based type lookup (findTypeByName)
+    // can find types from imported modules.
+    for (Index i = 0; i < module->getRequirementCount(); i++)
+    {
+        if (auto req = as<Module>(module->getRequirement(i)))
+            module->addModuleDependency(req);
+    }
+
     module->_discoverEntryPoints(sink, targets);
 
     // Hook up fileDecl's scope to module's scope.

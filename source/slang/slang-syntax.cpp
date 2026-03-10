@@ -674,19 +674,6 @@ RequirementWitness tryLookUpRequirementWitness(
             }
         }
     }
-    else if (
-        auto extractFromConjunctionTypeWitness =
-            as<ExtractFromConjunctionSubtypeWitness>(subtypeWitness))
-    {
-        if (auto conjunctionTypeWitness = as<ConjunctionSubtypeWitness>(
-                extractFromConjunctionTypeWitness->getConjunctionWitness()))
-        {
-            auto componentWitness = as<SubtypeWitness>(conjunctionTypeWitness->getComponentWitness(
-                extractFromConjunctionTypeWitness->getIndexInConjunction()));
-
-            return tryLookUpRequirementWitness(astBuilder, componentWitness, requirementKey);
-        }
-    }
 
     // If we are looking for `ThisType`, just return subtype.
     if (as<ThisTypeDecl>(requirementKey))

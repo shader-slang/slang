@@ -146,7 +146,7 @@ Session::~Session()
     //
     coreModules = decltype(coreModules)();
 
-    if (getCurrentASTBuilder() == m_rootASTBuilder)
+    if (getCurrentASTBuilder() == m_rootASTBuilder.get())
         setCurrentASTBuilder(nullptr);
 }
 

@@ -602,7 +602,12 @@ struct SCCPContext
             type,
             v0,
             v1,
-            [](IRIntegerValue c0, IRIntegerValue c1) { return c0 + c1; },
+            [](IRIntegerValue c0, IRIntegerValue c1)
+            {
+                return static_cast<IRIntegerValue>(
+                    static_cast<IRUnsignedIntegerValue>(c0) +
+                    static_cast<IRUnsignedIntegerValue>(c1));
+            },
             [](IRUnsignedIntegerValue c0, IRUnsignedIntegerValue c1) { return c0 + c1; },
             [](IRFloatingPointValue c0, IRFloatingPointValue c1) { return c0 + c1; });
     }
@@ -612,7 +617,12 @@ struct SCCPContext
             type,
             v0,
             v1,
-            [](IRIntegerValue c0, IRIntegerValue c1) { return c0 - c1; },
+            [](IRIntegerValue c0, IRIntegerValue c1)
+            {
+                return static_cast<IRIntegerValue>(
+                    static_cast<IRUnsignedIntegerValue>(c0) -
+                    static_cast<IRUnsignedIntegerValue>(c1));
+            },
             [](IRUnsignedIntegerValue c0, IRUnsignedIntegerValue c1) { return c0 - c1; },
             [](IRFloatingPointValue c0, IRFloatingPointValue c1) { return c0 - c1; });
     }
@@ -622,7 +632,12 @@ struct SCCPContext
             type,
             v0,
             v1,
-            [](IRIntegerValue c0, IRIntegerValue c1) { return c0 * c1; },
+            [](IRIntegerValue c0, IRIntegerValue c1)
+            {
+                return static_cast<IRIntegerValue>(
+                    static_cast<IRUnsignedIntegerValue>(c0) *
+                    static_cast<IRUnsignedIntegerValue>(c1));
+            },
             [](IRUnsignedIntegerValue c0, IRUnsignedIntegerValue c1) { return c0 * c1; },
             [](IRFloatingPointValue c0, IRFloatingPointValue c1) { return c0 * c1; });
     }
@@ -750,6 +765,10 @@ struct SCCPContext
     }
     LatticeVal evalLsh(IRType* type, LatticeVal v0, LatticeVal v1)
     {
+        const auto bitWidthOpt = maybeGetIntTypeWidth(type);
+        const IRUnsignedIntegerValue bitWidth =
+            bitWidthOpt ? static_cast<IRUnsignedIntegerValue>(*bitWidthOpt)
+                        : std::numeric_limits<IRUnsignedIntegerValue>::digits;
         bool isSigned = getIntTypeSigned(type);
         if (isSigned == false)
         {
@@ -757,16 +776,32 @@ struct SCCPContext
                 type,
                 v0,
                 v1,
-                [](IRUnsignedIntegerValue c0, IRUnsignedIntegerValue c1) { return c0 << c1; });
+                [bitWidth](IRUnsignedIntegerValue c0, IRUnsignedIntegerValue c1)
+                {
+                    if (c1 >= bitWidth)
+                        return IRUnsignedIntegerValue(0);
+                    return c0 << c1;
+                });
         }
         return evalBinaryIntImpl(
             type,
             v0,
             v1,
-            [](IRIntegerValue c0, IRIntegerValue c1) { return c0 << c1; });
+            [bitWidth](IRIntegerValue c0, IRIntegerValue c1)
+            {
+                if (static_cast<IRUnsignedIntegerValue>(c1) >= bitWidth)
+                    return IRIntegerValue(0);
+                return static_cast<IRIntegerValue>(
+                    static_cast<IRUnsignedIntegerValue>(c0)
+                    << static_cast<IRUnsignedIntegerValue>(c1));
+            });
     }
     LatticeVal evalRsh(IRType* type, LatticeVal v0, LatticeVal v1)
     {
+        const auto bitWidthOpt = maybeGetIntTypeWidth(type);
+        const IRUnsignedIntegerValue bitWidth =
+            bitWidthOpt ? static_cast<IRUnsignedIntegerValue>(*bitWidthOpt)
+                        : std::numeric_limits<IRUnsignedIntegerValue>::digits;
         bool isSigned = getIntTypeSigned(type);
         if (isSigned == false)
         {
@@ -774,13 +809,23 @@ struct SCCPContext
                 type,
                 v0,
                 v1,
-                [](IRUnsignedIntegerValue c0, IRUnsignedIntegerValue c1) { return c0 >> c1; });
+                [bitWidth](IRUnsignedIntegerValue c0, IRUnsignedIntegerValue c1)
+                {
+                    if (c1 >= bitWidth)
+                        return IRUnsignedIntegerValue(0);
+                    return c0 >> c1;
+                });
         }
         return evalBinaryIntImpl(
             type,
             v0,
             v1,
-            [](IRIntegerValue c0, IRIntegerValue c1) { return c0 >> c1; });
+            [bitWidth](IRIntegerValue c0, IRIntegerValue c1)
+            {
+                if (static_cast<IRUnsignedIntegerValue>(c1) >= bitWidth)
+                    return (c0 < 0) ? IRIntegerValue(-1) : IRIntegerValue(0);
+                return c0 >> static_cast<IRUnsignedIntegerValue>(c1);
+            });
     }
     LatticeVal evalNeg(IRType* type, LatticeVal v0)
     {
