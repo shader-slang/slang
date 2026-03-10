@@ -302,7 +302,7 @@ def test_parameter_count_permuto(device_type: spy.DeviceType, vector_type: str) 
     runner = _create_runner(vector_type, device_type)
     try:
         mlp_p, ft_p = runner.get_param_counts()
-        expected_mlp = (16 * 128 + 128) + (128 * 128 + 128) * 2 + (128 * 3 + 3)  # 35587
+        expected_mlp = sum(fi * fo + fo for fi, fo in MLP_LAYERS)  # 35587
         expected_ft = FEATURE_TABLE_SIZE  # 1,048,576
         assert mlp_p == expected_mlp, f"MLP: {mlp_p} != {expected_mlp}"
         assert ft_p == expected_ft, f"Feature table: {ft_p} != {expected_ft}"

@@ -55,11 +55,7 @@ struct LCG
 
 struct LayerAddr { Address w0, b0, w1, b1, w2, b2, w3, b3; };
 
-#ifdef USE_WAVE_TANGLED
 LayerAddr make_addr(float* ptr)
-#else
-LayerAddr make_addr(float* ptr)
-#endif
 {
     Address base = Address(ptr);
     LayerAddr a;
