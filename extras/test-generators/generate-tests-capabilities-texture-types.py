@@ -447,8 +447,6 @@ Texture2DArray<float4> feedbackSamplerInput2DArray;
 
     # determine if tests are disabled
     testDisabledComment = ""
-    computeTestDisabledComment = ""
-    negativeTestDisabledComment = ""
 
     if testInfo.disableForIssue is not None:
         # test completely disabled
