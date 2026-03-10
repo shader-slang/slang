@@ -5698,16 +5698,17 @@ Decl* Parser::ParseStruct()
             sink->diagnose(
                 Diagnostics::InvalidBracketAttributesPlacement{.location = tokenReader.peekLoc()});
         }
-        else
+        else if (currentModule->languageVersion >= SLANG_LANGUAGE_VERSION_2025)
         {
             sink->diagnose(Diagnostics::DeprecatedBracketAttributesPlacement{
                 .location = tokenReader.peekLoc()});
         }
+        // note: no diagnostics before Slang version 2025
 
         Modifier** modifierLink = &rs->modifiers.first;
 
         // Even if this syntax is now removed in Slang 2026, we'll still parse
-        // this to keep the diagnostics output sane
+        // it to keep the diagnostics output sane.
         ParseSquareBracketAttributes(this, &modifierLink);
     }
 
