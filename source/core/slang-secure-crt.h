@@ -1,4 +1,4 @@
-#ifndef _MSC_VER
+#if !defined(_WIN32) || defined(__MINGW32__) || defined(__CYGWIN__)
 #ifndef SLANG_CORE_SECURE_CRT_H
 #define SLANG_CORE_SECURE_CRT_H
 #include <assert.h>
@@ -301,4 +301,4 @@ inline int strncpy_s(char* strDest, size_t numberOfElements, const char* strSour
 }
 #endif // HAVE_STRNCPY_S
 #endif // SLANG_CORE_SECURE_CRT_H
-#endif // _MSC_VER
+#endif // !defined(_WIN32) || defined(__MINGW32__) || defined(__CYGWIN__)
