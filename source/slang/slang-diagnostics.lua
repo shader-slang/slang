@@ -1799,6 +1799,13 @@ err(
     span { loc = "expr:Expr", message = "generic constraint for parameter '~param:Type' references type parameter '~referenced:Decl' before it is declared" }
 )
 
+err(
+    "cannot-mix-differentiable-value-and-ptr-outputs",
+    30118,
+    "cannot mix differentiable value types with differentiable pointer outputs",
+    span { loc = "location", message = "function has both IDifferentiable value types and IDifferentiablePtrType outputs, which is not currently supported. Please split the function so that differentiable value parameters and pointer differentiable outputs are in separate functions." }
+)
+
 
 -- Load semantic checking diagnostics (part 3) - Include, Visibility, and Capability
 -- (inlined from slang-diagnostics-semantic-checking-3.lua)
