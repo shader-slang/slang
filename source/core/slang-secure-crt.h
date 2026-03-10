@@ -22,12 +22,19 @@ inline int memcpy_s(void* dest, size_t destSize, const void* src, size_t count)
     if (count == 0)
         return 0;
     if (dest == nullptr)
+    {
+        errno = EINVAL;
         return EINVAL;
+    }
     if (src == nullptr || destSize < count)
     {
         memset(dest, 0, destSize);
         if (src == nullptr)
+        {
+            errno = EINVAL;
             return EINVAL;
+        }
+        errno = ERANGE;
         return ERANGE;
     }
     memcpy(dest, src, count);
@@ -41,6 +48,7 @@ inline int fopen_s(FILE** f, const char* fileName, const char* mode)
 {
     if (f == nullptr || fileName == nullptr || mode == nullptr)
     {
+        errno = EINVAL;
         return EINVAL;
     }
     *f = fopen(fileName, mode);
@@ -228,7 +236,11 @@ inline int wcsncpy_s(
         errno = EINVAL;
         return EINVAL;
     }
-
+    if (count == 0)
+    {
+        strDest[0] = '\0';
+        return 0;
+    }
     size_t limit = (count == _TRUNCATE)
                        ? numberOfElements - 1
                        : (count < numberOfElements - 1 ? count : numberOfElements - 1);
@@ -262,11 +274,16 @@ inline int strncpy_s(char* strDest, size_t numberOfElements, const char* strSour
         errno = EINVAL;
         return EINVAL;
     }
-    // D is the lesser of count and the length of strSource
-    size_t D = (count == _TRUNCATE) ? numberOfElements - 1
-                                    : (count < numberOfElements - 1 ? count : numberOfElements - 1);
+    if (count == 0)
+    {
+        strDest[0] = '\0';
+        return 0;
+    }
+    size_t limit = (count == _TRUNCATE)
+                       ? numberOfElements - 1
+                       : (count < numberOfElements - 1 ? count : numberOfElements - 1);
     size_t i = 0;
-    while (i < D && strSource[i] != '\0')
+    while (i < limit && strSource[i] != '\0')
     {
         strDest[i] = strSource[i];
         i++;
