@@ -126,6 +126,47 @@ struct PeepholeContext : InstPassBase
         return false;
     }
 
+    IRInst* tryGetFieldValueFromSynthesizedConstructorCall(IRFieldExtract* fieldExtract)
+    {
+        auto call = as<IRCall>(fieldExtract->getOperand(0));
+        if (!call)
+            return nullptr;
+
+        auto callee = as<IRFunc>(call->getOperand(0));
+        if (!callee)
+            return nullptr;
+
+        auto constructorDecor = callee->findDecoration<IRConstructorDecoration>();
+        if (!constructorDecor || !constructorDecor->getSynthesizedStatus())
+            return nullptr;
+
+        auto structType = as<IRStructType>(call->getDataType());
+        if (!structType)
+            return nullptr;
+
+        auto field = fieldExtract->field.get();
+        Index fieldIndex = -1;
+        Index i = 0;
+        for (auto sfield : structType->getFields())
+        {
+            // Void-typed fields do not correspond to constructor arguments.
+            if (as<IRVoidType>(sfield->getFieldType()))
+                continue;
+
+            if (sfield->getKey() == field)
+            {
+                fieldIndex = i;
+                break;
+            }
+            i++;
+        }
+
+        if (fieldIndex < 0 || fieldIndex >= (Index)call->getArgCount())
+            return nullptr;
+
+        return call->getArg((UInt)fieldIndex);
+    }
+
     bool tryOptimizeArithmeticInst(IRInst* inst)
     {
         bool allowUnsafeOptimizations =
@@ -538,6 +579,14 @@ struct PeepholeContext : InstPassBase
                         changed = true;
                     }
                 }
+            }
+            else if (
+                auto replacement =
+                    tryGetFieldValueFromSynthesizedConstructorCall(as<IRFieldExtract>(inst)))
+            {
+                inst->replaceUsesWith(replacement);
+                maybeRemoveOldInst(inst);
+                changed = true;
             }
             else
             {
