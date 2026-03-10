@@ -792,7 +792,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     SpvOp _specConstantOpcodeConvert(
         IROp irOpCode,
         IRBasicType* basicType,
-        IRType* resultType = nullptr)
+        IRType* resultType)
     {
         SpvOp opCode = SpvOpUndef;
         opCode = _arithmeticOpCodeConvert(irOpCode, basicType);
@@ -802,7 +802,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             {
             case kIROp_IntCast:
             case kIROp_ConstexprIntCast:
-                if (resultType && isSignedType(resultType))
+                if (isSignedType(resultType))
                     return SpvOpSConvert;
                 return SpvOpUConvert;
             case kIROp_FloatCast:
