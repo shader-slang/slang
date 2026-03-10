@@ -371,12 +371,11 @@ public:
 #define SLANG_ASSERT(VALUE) SLANG_ASSUME(VALUE)
 #endif
 
-#define SLANG_RELEASE_ASSERT(VALUE) \
-    if (VALUE) [[likely]]           \
-    {                               \
-    }                               \
-    else                            \
-        SLANG_ASSERT_FAILURE(#VALUE)
+#define SLANG_RELEASE_ASSERT(VALUE)          \
+    if (!(VALUE)) [[unlikely]]              \
+    {                                       \
+        ::Slang::handleAssert(#VALUE, true); \
+    }
 
 template<typename T>
 void slang_use_obj(T&)

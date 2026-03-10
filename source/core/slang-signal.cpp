@@ -48,8 +48,7 @@ String _getMessage(SignalType type, char const* message)
     return buf.produceString();
 }
 
-// Special handler for assertions that can optionally return based on environment variable
-void handleAssert(char const* message)
+void handleAssert(char const* message, bool isReleaseAssert)
 {
 #if _WIN32 && defined(_MSC_VER)
     StringBuilder envValue;
@@ -63,7 +62,10 @@ void handleAssert(char const* message)
         {
             // Ignore the assert and continue execution.
             // This is to mimic the behavior of Release build with Debug build.
-            return;
+            if (!isReleaseAssert)
+            {
+                return;
+            }
         }
         else if (envSlice.caseInsensitiveEquals(UnownedStringSlice::fromLiteral("system")))
         {
