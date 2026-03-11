@@ -142,7 +142,7 @@ public struct PointerAddress<T> : IPointerLikeAddress<T>
     [ForwardDerivative(fwd_getOffset)]
     public This getOffset(int elements)
     {
-        return This(ptr + elements);
+        return no_diff(This(ptr + elements));
     }
 
     static DifferentialPtrPair<This> fwd_getOffset(DifferentialPtrPair<This> self, int elements)
@@ -331,7 +331,7 @@ internal extension<T> Ptr<T, Access.ReadWrite, AddressSpace.Device> : IPointerLi
     [ForwardDerivative(fwd_getOffset)]
     internal This getOffset(int elements)
     {
-        return This(this + elements);
+        return no_diff(This(this + elements));
     }
 
     static DifferentialPtrPair<This> fwd_getOffset(DifferentialPtrPair<This> self, int elements)
