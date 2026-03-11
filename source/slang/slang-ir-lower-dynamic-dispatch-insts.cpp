@@ -8,6 +8,7 @@
 #include "slang-ir-typeflow-set.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -599,11 +600,10 @@ public:
                     count++;
                 });
 
-            m_sink->diagnose(
-                use->getUser()->sourceLoc,
-                Diagnostics::dynamicDispatchCodeGeneratedHere,
-                count,
-                tableElementsStr.getUnownedSlice());
+            m_sink->diagnose(Diagnostics::DynamicDispatchCodeGeneratedHere{
+                .count = (int64_t)count,
+                .types = tableElementsStr.produceString(),
+                .location = use->getUser()->sourceLoc});
         }
     }
 
@@ -650,12 +650,11 @@ public:
                 printDiagnosticArg(specArgsStr, arg);
             }
 
-            m_sink->diagnose(
-                use->getUser()->sourceLoc,
-                Diagnostics::specializedDynamicDispatchCodeGeneratedHere,
-                count,
-                tableElementsStr.getUnownedSlice(),
-                specArgsStr.getUnownedSlice());
+            m_sink->diagnose(Diagnostics::SpecializedDynamicDispatchCodeGeneratedHere{
+                .count = (int64_t)count,
+                .types = tableElementsStr.produceString(),
+                .specArgs = specArgsStr.produceString(),
+                .location = use->getUser()->sourceLoc});
         }
     }
 
@@ -866,10 +865,10 @@ struct UntaggedUnionLoweringContext : public InstPassBase
             //
             if (sink && !canTypeBeStored(type))
             {
-                sink->diagnose(
-                    type->sourceLoc,
-                    Slang::Diagnostics::typeCannotBePackedIntoAnyValue,
-                    type);
+                sink->diagnose(Diagnostics::TypeCannotBePackedIntoAnyValue{
+                    .type = type,
+                    .location = type->sourceLoc,
+                });
             }
         }
 

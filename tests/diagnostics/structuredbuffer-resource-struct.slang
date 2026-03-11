@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -target spirv
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv
 
 struct WithTexture
 {
@@ -19,14 +19,17 @@ struct Nested
     float value;
 }
 
-//CHECK-DAG: ([[# @LINE+1]]): error 38204
 StructuredBuffer<WithTexture> bufferWithTexture;
+//CHECK:                      ^^^^^^^^^^^^^^^^^ resource type in StructuredBuffer
+//CHECK:                      ^^^^^^^^^^^^^^^^^ StructuredBuffer element type 'WithTexture' cannot contain resource or opaque handle types
 
-//CHECK-DAG: ([[# @LINE+1]]): error 38204
 StructuredBuffer<WithSampler> bufferWithSampler;
+//CHECK:                      ^^^^^^^^^^^^^^^^^ resource type in StructuredBuffer
+//CHECK:                      ^^^^^^^^^^^^^^^^^ StructuredBuffer element type 'WithSampler' cannot contain resource or opaque handle types
 
-//CHECK-DAG: ([[# @LINE+1]]): error 38204
 StructuredBuffer<Nested> bufferNested;
+//CHECK:                 ^^^^^^^^^^^^ resource type in StructuredBuffer
+//CHECK:                 ^^^^^^^^^^^^ StructuredBuffer element type 'Nested' cannot contain resource or opaque handle types
 
 RWStructuredBuffer<float4> output;
 

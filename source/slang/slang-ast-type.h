@@ -85,6 +85,7 @@ DeclRef<T> isDeclRefTypeOf(Val* type)
 
 bool isTypePack(Type* type);
 bool isAbstractTypePack(Type* type);
+bool isPackType(Type* type);
 
 // Base class for types that can be used in arithmetic expressions
 FIDDLE(abstract)
@@ -720,6 +721,7 @@ class PtrTypeBase : public BuiltinType
     Type* getValueType();
     Val* getAccessQualifier();
     Val* getAddressSpace();
+    Type* getDataLayout();
 
     std::optional<AccessQualifier> tryGetAccessQualifierValue();
 };
@@ -1007,9 +1009,9 @@ class ExpandType : public Type
 {
     FIDDLE(...)
     Type* getPatternType() const { return as<Type>(getOperand(0)); }
-    Index getCapturedTypePackCount() { return getOperandCount() - 1; }
-    Type* getCapturedTypePack(Index i) { return as<Type>(getOperand(i + 1)); }
-    ExpandType(Type* patternType, ArrayView<Type*> capturedPacks)
+    Index getCapturedPackCount() { return getOperandCount() - 1; }
+    Val* getCapturedPack(Index i) { return getOperand(i + 1); }
+    ExpandType(Type* patternType, ArrayView<Val*> capturedPacks)
     {
         m_operands.add(ValNodeOperand(patternType));
         for (auto t : capturedPacks)
@@ -1032,6 +1034,19 @@ class ConcreteTypePack : public Type
     }
     Index getTypeCount() { return getOperandCount(); }
     Type* getElementType(Index i) { return as<Type>(getOperand(i)); }
+    void _toTextOverride(StringBuilder& out);
+    Type* _createCanonicalTypeOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
+// Represents the type of a generic value pack parameter.
+// e.g. `let each D : int` has type `ValuePackType(int)`.
+FIDDLE()
+class ValuePackType : public Type
+{
+    FIDDLE(...)
+    ValuePackType(Type* elementType) { m_operands.add(ValNodeOperand(elementType)); }
+    Type* getElementType() const { return as<Type>(getOperand(0)); }
     void _toTextOverride(StringBuilder& out);
     Type* _createCanonicalTypeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);

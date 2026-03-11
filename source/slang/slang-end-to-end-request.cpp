@@ -11,6 +11,7 @@
 #include "slang-options.h"
 #include "slang-reflection-json.h"
 #include "slang-repro.h"
+#include "slang-rich-diagnostics.h"
 #include "slang-serialize-container.h"
 
 // TODO: The "artifact" system is a scourge.
@@ -76,7 +77,7 @@ EndToEndCompileRequest::queryInterface(SlangUUID const& uuid, void** outObject)
         return SLANG_OK;
     }
 
-    if (uuid == ISlangUnknown::getTypeGuid() && uuid == ICompileRequest::getTypeGuid())
+    if (uuid == ISlangUnknown::getTypeGuid() || uuid == ICompileRequest::getTypeGuid())
     {
         addReference();
         *outObject = static_cast<slang::ICompileRequest*>(this);
@@ -440,7 +441,7 @@ SlangResult EndToEndCompileRequest::_maybeWriteDebugArtifact(
     const String& path,
     IArtifact* artifact)
 {
-    if (targetProgram->getOptionSet().getBoolOption(CompilerOptionName::EmitSeparateDebug))
+    if (targetProgram->getOptionSet().shouldEmitSeparateDebugInfo())
     {
         const auto dbgArtifact = getSeparateDbgArtifact(artifact);
         // Check if a debug artifact was actually created (only for SPIR-V targets)
@@ -485,8 +486,7 @@ void EndToEndCompileRequest::generateOutput(TargetProgram* targetProgram)
 bool _shouldWriteSourceLocs(Linkage* linkage)
 {
     // If debug information or source manager are not avaiable we can't/shouldn't write out locs
-    if (linkage->m_optionSet.getEnumOption<DebugInfoLevel>(CompilerOptionName::DebugInformation) ==
-            DebugInfoLevel::None ||
+    if (linkage->m_optionSet.getDebugInfoLevel() == DebugInfoLevel::None ||
         linkage->getSourceManager() == nullptr)
     {
         return false;
@@ -571,7 +571,7 @@ SlangResult EndToEndCompileRequest::maybeCreateContainer()
         SlangResult res = writeContainerToStream(&stream);
         if (SLANG_FAILED(res))
         {
-            getSink()->diagnose(SourceLoc(), Diagnostics::unableToCreateModuleContainer);
+            getSink()->diagnose(Diagnostics::UnableToCreateModuleContainer{});
             return res;
         }
 
@@ -688,23 +688,20 @@ void EndToEndCompileRequest::generateOutput(ComponentType* program)
             auto specializationParam = program->getSpecializationParam(ii);
             if (auto decl = as<Decl>(specializationParam.object))
             {
-                sink->diagnose(
-                    specializationParam.loc,
-                    Diagnostics::specializationParameterOfNameNotSpecialized,
-                    decl);
+                sink->diagnose(Diagnostics::SpecializationParameterOfNameNotSpecialized{
+                    .param = decl->getName()->text,
+                    .location = specializationParam.loc});
             }
             else if (auto type = as<Type>(specializationParam.object))
             {
-                sink->diagnose(
-                    specializationParam.loc,
-                    Diagnostics::specializationParameterOfNameNotSpecialized,
-                    type);
+                sink->diagnose(Diagnostics::SpecializationParameterOfNameNotSpecialized{
+                    .param = type ? type->toString() : "<unknown type>",
+                    .location = specializationParam.loc});
             }
             else
             {
-                sink->diagnose(
-                    specializationParam.loc,
-                    Diagnostics::specializationParameterNotSpecialized);
+                sink->diagnose(Diagnostics::SpecializationParameterNotSpecialized{
+                    .location = specializationParam.loc});
             }
         }
 
@@ -730,6 +727,10 @@ void EndToEndCompileRequest::generateOutput()
 {
     SLANG_PROFILE;
     generateOutput(getSpecializedGlobalAndEntryPointsComponentType());
+
+    // Do not emit any artifacts if code generation produced errors.
+    if (getSink()->getErrorCount() != 0)
+        return;
 
     // If we are in command-line mode, we might be expected to actually
     // write output to one or more files here.
@@ -814,7 +815,7 @@ SlangCompileFlags EndToEndCompileRequest::getCompileFlags()
         result |= SLANG_COMPILE_FLAG_NO_MANGLING;
     if (getOptionSet().getBoolOption(CompilerOptionName::SkipCodeGen))
         result |= SLANG_COMPILE_FLAG_NO_CODEGEN;
-    if (getOptionSet().getBoolOption(CompilerOptionName::Obfuscate))
+    if (getOptionSet().shouldObfuscateCode())
         result |= SLANG_COMPILE_FLAG_OBFUSCATE;
     return result;
 }
@@ -1484,11 +1485,9 @@ SlangResult EndToEndCompileRequest::compile()
         {
             // If for some reason we didn't output any diagnostic, something is
             // going wrong, but we want to make sure we at least output something.
-            getSink()->diagnose(
-                SourceLoc(),
-                Diagnostics::compilationAbortedDueToException,
-                typeid(e).name(),
-                e.Message);
+            getSink()->diagnose(Diagnostics::CompilationAbortedDueToException{
+                .exceptionType = typeid(e).name(),
+                .exceptionMessage = e.Message});
         }
     }
     catch (const Exception& e)
@@ -1497,11 +1496,9 @@ SlangResult EndToEndCompileRequest::compile()
         // We will print out information on the exception to help out the user
         // in either filing a bug, or locating what in their code created
         // a problem.
-        getSink()->diagnose(
-            SourceLoc(),
-            Diagnostics::compilationAbortedDueToException,
-            typeid(e).name(),
-            e.Message);
+        getSink()->diagnose(Diagnostics::CompilationAbortedDueToException{
+            .exceptionType = typeid(e).name(),
+            .exceptionMessage = e.Message});
     }
     catch (...)
     {
@@ -1509,7 +1506,7 @@ SlangResult EndToEndCompileRequest::compile()
         // `Exception`, so something really fishy is going on. We want to
         // let the user know that we messed up, so they know to blame Slang
         // and not some other component in their system.
-        getSink()->diagnose(SourceLoc(), Diagnostics::compilationAborted);
+        getSink()->diagnose(Diagnostics::CompilationAborted{});
     }
     m_diagnosticOutput = getSink()->outputBuffer.produceString();
 
@@ -1528,7 +1525,7 @@ SlangResult EndToEndCompileRequest::compile()
         getSession()->getCompilerElapsedTime(&totalEndTime, &downstreamEndTime);
         double downstreamTime = downstreamEndTime - downstreamStartTime;
         String downstreamTimeStr = String(downstreamTime, "%.2f");
-        getSink()->diagnose(SourceLoc(), Diagnostics::downstreamCompileTime, downstreamTimeStr);
+        getSink()->diagnose(Diagnostics::DownstreamCompileTime{.time = downstreamTimeStr});
     }
     if (getOptionSet().getBoolOption(CompilerOptionName::ReportPerfBenchmark))
     {
@@ -1536,9 +1533,7 @@ SlangResult EndToEndCompileRequest::compile()
         PerformanceProfiler::getProfiler()->getResult(perfResult);
         perfResult << "\nType Dictionary Size: " << getSession()->m_typeDictionarySize << "\n";
         getSink()->diagnose(
-            SourceLoc(),
-            Diagnostics::performanceBenchmarkResult,
-            perfResult.produceString());
+            Diagnostics::PerformanceBenchmarkResult{.benchmarkOutput = perfResult.produceString()});
     }
 
     // Repro dump handling
@@ -1551,7 +1546,7 @@ SlangResult EndToEndCompileRequest::compile()
             SlangResult saveRes = ReproUtil::saveState(this, dumpRepro);
             if (SLANG_FAILED(saveRes))
             {
-                getSink()->diagnose(SourceLoc(), Diagnostics::unableToWriteReproFile, dumpRepro);
+                getSink()->diagnose(Diagnostics::UnableToWriteReproFile{.path = dumpRepro});
                 return saveRes;
             }
         }
@@ -1568,10 +1563,7 @@ SlangResult EndToEndCompileRequest::compile()
 
             if (SLANG_FAILED(saveRes))
             {
-                getSink()->diagnose(
-                    SourceLoc(),
-                    Diagnostics::unableToWriteReproFile,
-                    reproFileName);
+                getSink()->diagnose(Diagnostics::UnableToWriteReproFile{.path = reproFileName});
             }
         }
     }
@@ -1582,7 +1574,7 @@ SlangResult EndToEndCompileRequest::compile()
         auto reflection = this->getReflection();
         if (!reflection)
         {
-            getSink()->diagnose(SourceLoc(), Diagnostics::cannotEmitReflectionWithoutTarget);
+            getSink()->diagnose(Diagnostics::CannotEmitReflectionWithoutTarget{});
             return SLANG_FAIL;
         }
         auto bufferWriter = PrettyWriter();
@@ -1594,7 +1586,7 @@ SlangResult EndToEndCompileRequest::compile()
         }
         else if (SLANG_FAILED(File::writeAllText(reflectionPath, bufferWriter.getBuilder())))
         {
-            getSink()->diagnose(SourceLoc(), Diagnostics::unableToWriteFile, reflectionPath);
+            getSink()->diagnose(Diagnostics::UnableToWriteFile{.path = String(reflectionPath)});
         }
     }
 

@@ -1,8 +1,9 @@
 //TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry main -allow-glsl -profile sm_5_0
 //TEST:SIMPLE(filecheck=CHECK_IGNORE_CAPS): -target hlsl -entry main -allow-glsl -profile sm_5_0 -ignore-capabilities
 
-// CHECK: error 36107: entrypoint 'main' uses features that are not available in 'fragment' stage for 'hlsl'
-//CHECK_IGNORE_CAPS-NOT: error 36100
+// CHECK: error[E36107]
+// CHECK: entrypoint 'main' uses features that are not available
+//CHECK_IGNORE_CAPS-NOT: E36100
 [shader("fragment")]
 float4 main()
 {

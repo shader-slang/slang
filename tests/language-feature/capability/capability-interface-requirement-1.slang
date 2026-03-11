@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry computeMain -stage compute
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target hlsl -entry computeMain -stage compute
 
 // Test for requirment/implementation conformance given mismatch
 
@@ -7,30 +7,30 @@ public interface IAtomicAddable_Error1
     [require(sm_5_0, glsl)]
     [require(sm_5_0, hlsl)]
     public void atomicAdd(RWByteAddressBuffer buf, uint addr, int64_t value);
+//CHECK:        ^^^^^^^^^ see declaration of 'atomicAdd'
 }
 public struct AtomicAddable_Error1 : IAtomicAddable_Error1
 {
     [require(sm_5_0, glsl)]
-    // CHECK: ([[# @LINE+1]]): error 36119: {{.*}}hlsl
     public void atomicAdd(RWByteAddressBuffer buf, uint addr, int64_t value) { }
+//CHECK:        ^^^^^^^^^ requirement missing target/stage support
+//CHECK:        ^^^^^^^^^ requirement 'atomicAdd' must have the same target/stage support as the implementation; 'atomicAdd' is missing 'hlsl'
 }
-
-// ([[# @LINE-9]]): note: see declaration of 'atomicAdd'
 
 public interface IAtomicAddable_Error2
 {
     [require(sm_5_0, glsl)]
     public void atomicAdd(RWByteAddressBuffer buf, uint addr, int64_t value);
+//CHECK:        ^^^^^^^^^ see declaration of 'atomicAdd'
 }
 public struct AtomicAddable_Error2 : IAtomicAddable_Error2
 {
     [require(sm_5_0, glsl)]
     [require(sm_5_0, hlsl)]
-    // CHECK: ([[# @LINE+1]]): error 36108: {{.*}}hlsl
     public void atomicAdd(RWByteAddressBuffer buf, uint addr, int64_t value) { }
+//CHECK:        ^^^^^^^^^ dependencies not compatible on target
+//CHECK:        ^^^^^^^^^ 'atomicAdd' has dependencies that are not compatible on the required compilation target 'hlsl'.
 }
-
-// ([[# @LINE-9]]): note: see declaration of 'atomicAdd'
 
 // Test that we do not error (should be implicitly inferring capabilities)
 // CHECK-NOT: error
