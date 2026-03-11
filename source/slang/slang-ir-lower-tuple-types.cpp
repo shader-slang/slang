@@ -130,14 +130,14 @@ struct TupleLoweringContext
         auto base = inst->getOperand(0);
         bool trimTail = inst->getOp() == kIROp_TrimTailOfPack;
 
-        if (auto baseTupleType = as<IRTupleType>(base))
+        if (auto baseTupleInfo = getLoweredTupleType(&builder, base))
         {
             ShortList<IRType*> slicedTypes;
-            UInt operandCount = baseTupleType->getOperandCount();
+            UInt operandCount = (UInt)baseTupleInfo->fields.getCount();
             UInt start = trimTail ? 0u : (operandCount > 0 ? 1u : 0u);
             UInt end = trimTail && operandCount > 0 ? operandCount - 1 : operandCount;
             for (UInt i = start; i < end; ++i)
-                slicedTypes.add((IRType*)baseTupleType->getOperand(i));
+                slicedTypes.add(baseTupleInfo->fields[i]->getFieldType());
             auto replacement = builder.getTupleType(
                 slicedTypes.getCount(),
                 slicedTypes.getArrayView().getBuffer());
@@ -147,18 +147,24 @@ struct TupleLoweringContext
             return;
         }
 
-        auto baseTupleType = as<IRTupleType>(base->getDataType());
-        if (!baseTupleType)
+        auto baseTupleInfo = getLoweredTupleType(&builder, base->getDataType());
+        if (!baseTupleInfo)
             return;
 
         ShortList<IRInst*> elements;
-        UInt operandCount = baseTupleType->getOperandCount();
+        UInt operandCount = (UInt)baseTupleInfo->fields.getCount();
         UInt start = trimTail ? 0u : (operandCount > 0 ? 1u : 0u);
         UInt end = trimTail && operandCount > 0 ? operandCount - 1 : operandCount;
+        auto baseTupleType = as<IRTupleType>(base->getDataType());
         for (UInt i = start; i < end; ++i)
         {
             auto element =
-                builder.emitGetTupleElement((IRType*)baseTupleType->getOperand(i), base, i);
+                baseTupleType
+                    ? builder.emitGetTupleElement((IRType*)baseTupleType->getOperand(i), base, i)
+                    : builder.emitFieldExtract(
+                          baseTupleInfo->fields[i]->getFieldType(),
+                          base,
+                          baseTupleInfo->fields[i]->getKey());
             addToWorkList(element);
             elements.add(element);
         }
