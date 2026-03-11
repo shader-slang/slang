@@ -4409,7 +4409,7 @@ Expr* SemanticsExprVisitor::visitSizeOfLikeExpr(SizeOfLikeExpr* sizeOfLikeExpr)
             return sizeOfLikeExpr;
         }
 
-        DataLayoutType* dataLayoutType = nullptr;
+        Type* dataLayoutType = nullptr;
         if (sizeOfLikeExpr->dataLayout)
         {
             auto dataLayoutExpr = dispatch(sizeOfLikeExpr->dataLayout);
@@ -4420,15 +4420,17 @@ Expr* SemanticsExprVisitor::visitSizeOfLikeExpr(SizeOfLikeExpr* sizeOfLikeExpr)
 
                 auto properTypeExpr = CoerceToProperType(typeExp);
 
-                dataLayoutType = as<DataLayoutType>(properTypeExpr.type);
+                dataLayoutType = properTypeExpr.type;
             }
         }
         else
         {
-            dataLayoutType = as<DataLayoutType>(m_astBuilder->getScalarLayoutType());
+            dataLayoutType = m_astBuilder->getScalarLayoutType();
         }
 
-        if (!dataLayoutType || !as<DataLayoutType>(dataLayoutType))
+        auto witness = as<SubtypeWitness>(
+            tryGetInterfaceConformanceWitness(dataLayoutType, m_astBuilder->getSharedASTBuilder()->getIBufferDataLayoutType()));
+        if (!dataLayoutType || !witness)
         {
             getSink()->diagnose(Diagnostics::SizeOfArgumentIsInvalid{.expr = sizeOfLikeExpr});
             return sizeOfLikeExpr;

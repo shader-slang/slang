@@ -287,7 +287,17 @@ struct PeepholeContext : InstPassBase
 
                 if (inst->getOperandCount() >= 2)
                 {
-                    auto ruleName =getTypeLayoutRuleNameFromOp(inst->getOperand(1)->getOp(), IRTypeLayoutRuleName::Natural);
+                    auto layoutOp = inst->getOperand(1)->getOp();
+
+                    auto ruleName = getTypeLayoutRuleNameFromOp(layoutOp, IRTypeLayoutRuleName::_Count);
+
+                    if (ruleName == IRTypeLayoutRuleName::_Count)
+                    {
+                        // Can't resolve layout type yet, it could be a generic
+                        // param still.
+                        break;
+                    }
+
                     layoutRules = IRTypeLayoutRules::get(ruleName);
                 }
 

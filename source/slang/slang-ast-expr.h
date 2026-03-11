@@ -488,7 +488,7 @@ class SizeOfLikeExpr : public Expr
     FIDDLE() Type* sizedType = nullptr;
 
     // The type of `dataLayout`.
-    FIDDLE() DataLayoutType* dataLayoutType = nullptr;
+    FIDDLE() Type* dataLayoutType = nullptr;
 };
 
 FIDDLE()
