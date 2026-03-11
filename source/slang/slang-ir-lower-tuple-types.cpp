@@ -138,8 +138,9 @@ struct TupleLoweringContext
             UInt end = trimTail && operandCount > 0 ? operandCount - 1 : operandCount;
             for (UInt i = start; i < end; ++i)
                 slicedTypes.add((IRType*)baseTupleType->getOperand(i));
-            auto replacement =
-                builder.getTupleType(slicedTypes.getCount(), slicedTypes.getArrayView().getBuffer());
+            auto replacement = builder.getTupleType(
+                slicedTypes.getCount(),
+                slicedTypes.getArrayView().getBuffer());
             addToWorkList(replacement);
             inst->replaceUsesWith(replacement);
             inst->removeAndDeallocate();
@@ -162,8 +163,10 @@ struct TupleLoweringContext
             elements.add(element);
         }
 
-        auto replacement =
-            builder.emitMakeTuple((IRType*)inst->getDataType(), elements.getCount(), elements.getArrayView().getBuffer());
+        auto replacement = builder.emitMakeTuple(
+            (IRType*)inst->getDataType(),
+            elements.getCount(),
+            elements.getArrayView().getBuffer());
         addToWorkList(replacement);
         inst->replaceUsesWith(replacement);
         inst->removeAndDeallocate();
