@@ -10,7 +10,7 @@
 // CHECK: OpDecorate {{.*}} NonReadable
 // CHECK-NOT: OpCapability StorageImageReadWithoutFormat
 
-WTexture2D writeOnlyTexture;
+WTexture2D<float4> writeOnlyTexture;
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
