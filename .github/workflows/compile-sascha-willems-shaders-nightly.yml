@@ -12,6 +12,7 @@ concurrency:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   sascha-willems-shader-test:
@@ -25,52 +26,44 @@ jobs:
     steps:
       - name: Checkout Slang repository
         uses: actions/checkout@v4
-        with:
-          submodules: "recursive"
-          fetch-depth: 0
-
-      - name: Fetch version tags
-        run: |
-          git fetch --tags --force
-          echo "Available tags:"
-          git tag -l "v20*" | head -10
 
       - name: Add bash to PATH
         shell: pwsh
         run: |
           Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\bin"
 
-      - name: Setup MSVC
-        uses: ilammy/msvc-dev-cmd@v1
-
-      - name: Build Slang
+      - name: Download Slang build from latest successful merge queue
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          echo "Building Slang..."
-          startTime=$(date +%s)
+          echo "Finding latest successful merge queue CI run..."
+          RUN_INFO=$(gh run list --repo ${{ github.repository }} \
+            --workflow ci.yml --status success --event merge_group --limit 1 \
+            --json databaseId,headSha,createdAt)
 
-          cmake --preset default --fresh \
-            -DSLANG_SLANG_LLVM_FLAVOR=DISABLE \
-            -DSLANG_ENABLE_EXAMPLES=OFF \
-            -DSLANG_ENABLE_REPLAYER=OFF \
-            -DSLANG_ENABLE_SLANGD=OFF \
-            -DSLANG_ENABLE_SLANGRT=OFF \
-            -DSLANG_ENABLE_SLANG_GLSLANG=ON \
-            -DSLANG_ENABLE_TESTS=OFF
+          RUN_ID=$(echo "$RUN_INFO" | jq -r '.[0].databaseId')
+          COMMIT=$(echo "$RUN_INFO" | jq -r '.[0].headSha')
+          CREATED=$(echo "$RUN_INFO" | jq -r '.[0].createdAt')
 
-          cmake --build --preset release
-
-          endTime=$(date +%s)
-          duration=$(( (endTime - startTime) / 60 ))
-          echo "Slang build completed in $duration minutes"
-
-          slangcPath="build/Release/bin/slangc.exe"
-          if [ -f "$slangcPath" ]; then
-            echo "slangc built successfully at: $slangcPath"
-            "$slangcPath" -version
-          else
-            echo "Failed to build slangc"
+          if [ -z "$RUN_ID" ] || [ "$RUN_ID" = "null" ]; then
+            echo "No successful CI run found"
             exit 1
           fi
+
+          echo "Downloading from CI run $RUN_ID (commit: ${COMMIT:0:12}, created: $CREATED)"
+          gh run download "$RUN_ID" --repo ${{ github.repository }} \
+            --name slang-build-windows-x86_64-cl-release \
+            --dir slang-build/
+
+          slangcPath=$(find slang-build -name "slangc.exe" -type f | head -1)
+          if [ -z "$slangcPath" ]; then
+            echo "slangc.exe not found in artifact"
+            find slang-build -type f | head -30
+            exit 1
+          fi
+
+          echo "Found slangc at: $slangcPath"
+          "$slangcPath" -version
 
       - name: Clone SaschaWillems/Vulkan repository (sparse checkout)
         run: |
@@ -89,8 +82,9 @@ jobs:
         run: |
           echo "Compiling Sascha Willems Vulkan Slang shaders..."
 
+          slangcPath=$(find slang-build -name "slangc.exe" -type f | head -1)
           ./extras/compile-sascha-willems-shaders.sh \
-            --slangc build/Release/bin/slangc.exe \
+            --slangc "$slangcPath" \
             --repo SaschaWillems-Vulkan \
             --spirv-val
 
