@@ -208,6 +208,17 @@ SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
         // during visitGenericTypeConstraintDecl. If we get here, something is wrong.
         SLANG_UNEXPECTED("AndType should have been flattened before reaching isSubtype");
     }
+    else if (auto subTypePack = as<ConcreteTypePack>(subType))
+    {
+        // An empty type pack vacuously satisfies any element-wise subtype constraint.
+        if (subTypePack->getTypeCount() == 0)
+        {
+            return m_astBuilder->getSubtypeWitnessPack(
+                subType,
+                superType,
+                ArrayView<SubtypeWitness*>());
+        }
+    }
     // default is failure
     return failureWitness;
 }
