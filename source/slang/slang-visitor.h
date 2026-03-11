@@ -422,6 +422,7 @@ struct ModifyingExprVisitor : ExprVisitor<Derived, Expr*>
     Expr* visitSizeOfLikeExpr(SizeOfLikeExpr* e)
     {
         e->value = dispatchIfNotNull(e->value);
+        e->dataLayout = dispatchIfNotNull(e->dataLayout);
         return e;
     }
 

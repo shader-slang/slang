@@ -1922,6 +1922,8 @@ public:
     {
         if (expr->value)
             dispatch(expr->value);
+        if (expr->dataLayout)
+            dispatch(expr->dataLayout);
     }
     void visitFloatBitCastExpr(FloatBitCastExpr* expr)
     {
