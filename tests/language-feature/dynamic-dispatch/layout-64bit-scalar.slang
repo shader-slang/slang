@@ -25,7 +25,7 @@ struct DoubleImpl : IValue
     double val;
 
     float asFloat() { return float(val); }
-    int lowBits() { return int(int64_t(val) & 0xFFFF); }
+    int lowBits() { return int(int64_t(val) & 0xFFFFFFFF); }
     int highBits() { return int(int64_t(val) >> 32); }
 }
 
@@ -34,7 +34,7 @@ struct Int64Impl : IValue
     int64_t val;
 
     float asFloat() { return float(val); }
-    int lowBits() { return int(val & 0xFFFF); }
+    int lowBits() { return int(val & 0xFFFFFFFF); }
     int highBits() { return int(val >> 32); }
 }
 
@@ -43,7 +43,7 @@ struct Uint64Impl : IValue
     uint64_t val;
 
     float asFloat() { return float(val); }
-    int lowBits() { return int(val & 0xFFFF); }
+    int lowBits() { return int(val & 0xFFFFFFFF); }
     int highBits() { return int(val >> 32); }
 }
 
@@ -78,8 +78,8 @@ void computeMain()
     IValue i64 = makeValue(kindBuffer[1]);
     // CHECK: -42.0
     outputBuffer[2] = i64.asFloat();
-    // -42 & 0xFFFF = 65494
-    // CHECK: 65494
+    // -42 & 0xFFFFFFFF = -42 (lower 32 bits preserved)
+    // CHECK: -42
     outputBuffer[3] = i64.lowBits();
     // -42 >> 32 = -1 (sign extension)
     // CHECK: -1
