@@ -2174,6 +2174,14 @@ static bool _containsSizeOfLikeExpr(Expr* expr)
             if (_containsSizeOfLikeExpr(arg))
                 return true;
     }
+    if (auto indexExpr = as<IndexExpr>(expr))
+    {
+        if (_containsSizeOfLikeExpr(indexExpr->baseExpression))
+            return true;
+        for (auto idx : indexExpr->indexExprs)
+            if (_containsSizeOfLikeExpr(idx))
+                return true;
+    }
     return false;
 }
 
