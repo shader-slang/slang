@@ -2057,6 +2057,9 @@ bool SemanticsVisitor::_coerce(
                 {
                     if (getIntValueBitSize(val->getValue()) > maxBitSize)
                     {
+                        // Set even when sink is null (probe/costing calls) to
+                        // consistently suppress the UnrecommendedImplicitConversion
+                        // path below.
                         overflowWarningDetected = true;
                         if (sink)
                         {

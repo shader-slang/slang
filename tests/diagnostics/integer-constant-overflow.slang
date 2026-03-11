@@ -19,6 +19,8 @@ void computeMain()
 //CHECK:        ^^^ integer value '256' does not fit in type 'int8_t'
 
     // Function arguments that overflow - should warn
+    // (only the overflow warning fires; the general UnrecommendedImplicitConversion
+    // is suppressed when overflow is detected)
     funcInt8(256);
 //CHECK:     ^^^ integer constant overflow in conversion
 //CHECK:     ^^^ integer value '256' does not fit in type 'int8_t'
@@ -30,6 +32,11 @@ void computeMain()
     int8_t x = 256;
 //CHECK:       ^^^ integer constant overflow in conversion
 //CHECK:       ^^^ integer value '256' does not fit in type 'int8_t'
+
+    // Negative value that exceeds bit-width (getIntValueBitSize(-256) = 9 > 8)
+    funcInt8(-256);
+//CHECK:      ^^^ integer constant overflow in conversion
+//CHECK:      ^^^ integer value '-256' does not fit in type 'int8_t'
 
     // Constant expressions that overflow
     funcInt8(100 + 200);
