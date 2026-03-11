@@ -82,7 +82,7 @@ inline size_t fread_s(
         errno = EINVAL;
         return 0;
     }
-    if (elementSize != 0 && count > bufferSize / elementSize)
+    if (count > bufferSize / elementSize)
     {
         errno = ERANGE;
         return 0;
@@ -118,12 +118,16 @@ inline size_t strnlen_s(const char* str, size_t numberOfElements)
 
 #ifndef HAVE_SPRINTF_S
 // https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/sprintf-s-sprintf-s-l-swprintf-s-swprintf-s-l
+// Note: unlike MSVC's sprintf_s which invokes the invalid parameter handler
+// on overflow, this fallback uses vsnprintf which truncates on overflow and
+// null-terminates the buffer, returning the number of characters that would
+// have been written.
 #ifdef __GNUC__
 __attribute__((format(printf, 3, 4)))
 #endif
 inline int sprintf_s(char* buffer, size_t sizeOfBuffer, const char* format, ...)
 {
-    if (buffer == nullptr || format == nullptr)
+    if (buffer == nullptr || format == nullptr || sizeOfBuffer == 0)
     {
         errno = EINVAL;
         return -1;
