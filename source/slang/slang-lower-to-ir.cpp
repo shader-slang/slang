@@ -2131,9 +2131,11 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         auto patternWitness = lowerVal(context, witness->getPatternTypeWitness());
         auto irBuilder = getBuilder();
         auto basePack = getSimpleVal(context, patternWitness);
-        auto resultType = lowerType(context, witness->getSub());
+        IRInst* basePackType = basePack->getDataType();
+        auto resultType = as<IRType>(
+            irBuilder->emitIntrinsicInst(irBuilder->getTypeKind(), kIROp_TrimHeadOfPack, 1, &basePackType));
         return LoweredValInfo::simple(irBuilder->emitIntrinsicInst(
-            as<IRType>(resultType),
+            resultType,
             kIROp_TrimHeadOfPack,
             1,
             &basePack));
@@ -2144,9 +2146,11 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         auto patternWitness = lowerVal(context, witness->getPatternTypeWitness());
         auto irBuilder = getBuilder();
         auto basePack = getSimpleVal(context, patternWitness);
-        auto resultType = lowerType(context, witness->getSub());
+        IRInst* basePackType = basePack->getDataType();
+        auto resultType = as<IRType>(
+            irBuilder->emitIntrinsicInst(irBuilder->getTypeKind(), kIROp_TrimTailOfPack, 1, &basePackType));
         return LoweredValInfo::simple(irBuilder->emitIntrinsicInst(
-            as<IRType>(resultType),
+            resultType,
             kIROp_TrimTailOfPack,
             1,
             &basePack));
