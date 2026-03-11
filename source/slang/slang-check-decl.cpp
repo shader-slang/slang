@@ -2275,7 +2275,7 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
                 if (_containsSizeOfLikeExpr(varDecl->initExpr))
                 {
                     auto initExpr = CheckTerm(varDecl->initExpr);
-                    initExpr = 
+                    initExpr =
                         coerce(CoercionSite::Initializer, varDecl->type.Ptr(), initExpr, getSink());
                     varDecl->initExpr = initExpr;
                     varDecl->setCheckState(DeclCheckState::DefinitionChecked);
