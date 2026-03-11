@@ -2378,8 +2378,7 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
 
         if (auto sizeOfExpr = expr.as<SizeOfExpr>())
         {
-            return as<IntVal>(
-                SizeOfIntVal::tryFold(m_astBuilder, expr.getExpr()->type.type, type));
+            return as<IntVal>(SizeOfIntVal::tryFold(m_astBuilder, expr.getExpr()->type.type, type));
         }
         else if (auto alignOfExpr = expr.as<AlignOfExpr>())
         {
@@ -2400,7 +2399,8 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
                 if (valExprFolded)
                     countArg = valExprFolded;
             }
-            return as<IntVal>(CountOfIntVal::tryFold(m_astBuilder, expr.getExpr()->type.type, countArg));
+            return as<IntVal>(
+                CountOfIntVal::tryFold(m_astBuilder, expr.getExpr()->type.type, countArg));
         }
     }
 
