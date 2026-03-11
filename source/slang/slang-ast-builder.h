@@ -653,6 +653,14 @@ public:
 
     Type* getExpandType(Type* pattern, ArrayView<Val*> capturedPacks);
 
+    Type* getFirstElement(Type* basePack);
+
+    Type* getLastElement(Type* basePack);
+
+    Type* getTrimHeadPack(Type* basePack);
+
+    Type* getTrimTailPack(Type* basePack);
+
     ConcreteTypePack* getTypePack(ArrayView<Type*> types);
 
     ConcreteIntValPack* getIntValPack(ArrayView<IntVal*> vals);
@@ -660,6 +668,16 @@ public:
     IntVal* getEachIntVal(Type* elementType, Val* basePack);
 
     Val* getExpandIntValPack(Val* patternVal, ArrayView<Val*> capturedPacks);
+
+    Val* getFirstElement(Val* basePack);
+
+    Val* getLastElement(Val* basePack);
+
+    Val* getTrimHeadPack(Val* basePack);
+
+    Val* getTrimTailPack(Val* basePack);
+
+    NonEmptyPackWitness* getNonEmptyPackWitness();
 
     /// Produce a witness that `T : T` for any type `T`
     TypeEqualityWitness* getTypeEqualityWitness(Type* type);
@@ -680,6 +698,16 @@ public:
         SubtypeWitness* patternWitness);
 
     SubtypeWitness* getEachSubtypeWitness(
+        Type* subType,
+        Type* superType,
+        SubtypeWitness* patternWitness);
+
+    SubtypeWitness* getFirstSubtypeWitness(
+        Type* subType,
+        Type* superType,
+        SubtypeWitness* patternWitness);
+
+    SubtypeWitness* getLastSubtypeWitness(
         Type* subType,
         Type* superType,
         SubtypeWitness* patternWitness);
