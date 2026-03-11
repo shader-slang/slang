@@ -426,6 +426,13 @@ struct ModifyingExprVisitor : ExprVisitor<Derived, Expr*>
         return e;
     }
 
+    // --- Pack queries ---
+    Expr* visitPackQueryExpr(PackQueryExpr* e)
+    {
+        e->value = dispatchIfNotNull(e->value);
+        return e;
+    }
+
     // --- Detach ---
     Expr* visitDetachExpr(DetachExpr* e)
     {

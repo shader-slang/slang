@@ -924,10 +924,75 @@ InstPair ForwardDiffTranscriber::transcribeCall(IRBuilder* builder, IRCall* orig
         diffReturnType = primalReturnType;
     }
 
+    // Determine if this call should use "pointer pair method" mode.
+    // If any output (out/inout/ref parameter, or return value) is a differentiable pointer type
+    // (conforms to IDifferentiablePtrType), we should not mark the call as mixed-differential
+    // so that the transposition logic won't try to reverse it (doesn't make sense for
+    // differential pointers).
+    //
+    // If we detect a differentiable pointer output but there are also any differentiable
+    // value types (either inputs or outputs, i.e. conforming to IDifferentiable), we
+    // emit a diagnostic since we cannot transpose such mixed functions.
+    //
+    bool hasDiffPtrOutput = false;
+    bool hasDiffValueType = false;
+
+    // Check all parameters for differentiable value types (inputs and outputs)
+    // and output parameters for differentiable pointer types.
+    for (UIndex ii = 0; ii < calleeType->getParamCount(); ii++)
+    {
+        auto paramType = calleeType->getParamType(ii);
+        bool isOutput = as<IROutParamTypeBase>(paramType) || as<IRRefParamType>(paramType);
+
+        // For outputs (out/inout/ref), get the value type from the pointer.
+        // For inputs, use the param type directly.
+        IRType* valueType;
+        if (isOutput)
+            valueType = (IRType*)as<IRPtrTypeBase>(paramType)->getValueType();
+        else
+            valueType = paramType;
+
+        // Only outputs can contribute differentiable pointer types.
+        if (isOutput && differentiableTypeConformanceContext.isDifferentiablePtrType(valueType))
+            hasDiffPtrOutput = true;
+
+        // Any parameter (input or output) can contribute differentiable value types.
+        if (differentiableTypeConformanceContext.isDifferentiableValueType(valueType))
+            hasDiffValueType = true;
+    }
+
+    // Check return type.
+    if (auto retType = calleeType->getResultType())
+    {
+        if (differentiableTypeConformanceContext.isDifferentiablePtrType((IRType*)retType))
+            hasDiffPtrOutput = true;
+        if (differentiableTypeConformanceContext.isDifferentiableValueType((IRType*)retType))
+            hasDiffValueType = true;
+    }
+
+    // If there are pointer differentiable outputs AND any differentiable value types
+    // (inputs or outputs), emit a diagnostic.
+    if (hasDiffPtrOutput && hasDiffValueType)
+    {
+        getSink()->diagnose(Diagnostics::CannotMixDifferentiableValueAndPtrOutputs{
+            .location = origCall->sourceLoc});
+
+        // We'll continue transcribing instead of erroring out right away since we
+        // can still generate code (it just won't be correct). The diagnostic
+        // will still disallow any final code from being generated.
+    }
+
+    bool usePointerPairMode = hasDiffPtrOutput;
+
     auto callInst = argBuilder.emitCallInst(diffReturnType, diffCallee, args);
     placeholderCall->removeAndDeallocate();
 
-    argBuilder.markInstAsMixedDifferential(callInst, diffReturnType);
+    // In pointer pair mode, do not mark as mixed differential since
+    // the transposition logic should not try to reverse this call.
+    if (!usePointerPairMode)
+    {
+        argBuilder.markInstAsMixedDifferential(callInst, diffReturnType);
+    }
     argBuilder.addAutoDiffOriginalValueDecoration(callInst, primalCallee);
 
     *builder = afterBuilder;
