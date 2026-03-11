@@ -1,6 +1,7 @@
 // Mixed vector, matrix, and scalar fields in the same interface implementation.
 // This verifies that the AnyValue layout engine correctly composes different-sized
 // types within a single struct and preserves field ordering across pack/unpack.
+// Both matrices use non-diagonal entries to catch row/column ordering bugs.
 
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-dx12 -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type
@@ -83,7 +84,7 @@ IMixed makeMixed(int id)
         BasisScaled a;
         a.position = float3(1.0, 2.0, 3.0);
         a.basis = float3x3(
-            2.0, 0.0, 0.0,
+            2.0, 1.0, 0.0,
             0.0, 3.0, 0.0,
             0.0, 0.0, 4.0);
         a.scale = 0.5;
@@ -93,9 +94,9 @@ IMixed makeMixed(int id)
     {
         WorldOffset b;
         b.worldMatrix = float4x4(
-            1.0, 0.0, 0.0, 10.0,
+            1.0, 0.0, 2.0, 10.0,
             0.0, 1.0, 0.0, 20.0,
-            0.0, 0.0, 1.0, 30.0,
+            0.0, 3.0, 1.0, 30.0,
             0.0, 0.0, 0.0, 1.0);
         b.offset = float2(0.5, 0.5);
         return b;
@@ -105,10 +106,10 @@ IMixed makeMixed(int id)
 [numthreads(1, 1, 1)]
 void computeMain(int id : SV_DispatchThreadID)
 {
-    // BasisScaled: diag(2,3,4) * (1,2,3) * 0.5 = (1, 3, 6)
+    // BasisScaled: [[2,1,0],[0,3,0],[0,0,4]] * (1,2,3) * 0.5 = (4,6,12)*0.5 = (2,3,6)
     var a = makeMixed(id);
     outputBuffer[0] = a.resultX();
-    // CHECK: 1.0
+    // CHECK: 2.0
     outputBuffer[1] = a.resultY();
     // CHECK: 3.0
     outputBuffer[2] = a.resultZ();
@@ -116,14 +117,14 @@ void computeMain(int id : SV_DispatchThreadID)
     outputBuffer[3] = a.extraValue();
     // CHECK: 0.5
 
-    // WorldOffset: translate(10,20,30) * (1,2,3,1) + offset(0.5,0.5)
+    // WorldOffset: [[1,0,2,10],[0,1,0,20],[0,3,1,30],[0,0,0,1]] * (1,2,3,1) + offset
     var b = makeMixed(id + 1);
     outputBuffer[4] = b.resultX();
-    // CHECK: 11.5
+    // CHECK: 17.5
     outputBuffer[5] = b.resultY();
     // CHECK: 22.5
     outputBuffer[6] = b.resultZ();
-    // CHECK: 33.0
+    // CHECK: 39.0
     outputBuffer[7] = b.extraValue();
     // CHECK: 1.0
 }
