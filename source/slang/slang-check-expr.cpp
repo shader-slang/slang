@@ -4432,7 +4432,9 @@ Expr* SemanticsExprVisitor::visitSizeOfLikeExpr(SizeOfLikeExpr* sizeOfLikeExpr)
             tryGetInterfaceConformanceWitness(dataLayoutType, m_astBuilder->getSharedASTBuilder()->getIBufferDataLayoutType()));
         if (!dataLayoutType || !witness)
         {
-            getSink()->diagnose(Diagnostics::SizeOfArgumentIsInvalid{.expr = sizeOfLikeExpr});
+            getSink()->diagnose(Diagnostics::SizeOfDataLayoutIsInvalid{ .type = dataLayoutType, .expr = sizeOfLikeExpr->dataLayout});
+
+            sizeOfLikeExpr->type = m_astBuilder->getErrorType();
             return sizeOfLikeExpr;
         }
 

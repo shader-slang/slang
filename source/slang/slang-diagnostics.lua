@@ -1646,6 +1646,13 @@ err(
 )
 
 err(
+    "size-of-data-layout-is-invalid",
+    30086,
+    "invalid sizeof data layout",
+    span { loc = "expr:Expr", message = "'~type:Type' does not conform to IBufferDataLayout" }
+)
+
+err(
     "count-of-argument-is-invalid",
     30083,
     "invalid countof argument",
