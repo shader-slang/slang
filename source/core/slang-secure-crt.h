@@ -82,7 +82,7 @@ inline size_t fread_s(
         errno = EINVAL;
         return 0;
     }
-    if (bufferSize < elementSize * count)
+    if (elementSize != 0 && count > bufferSize / elementSize)
     {
         errno = ERANGE;
         return 0;
@@ -177,7 +177,7 @@ inline int wcscpy_s(wchar_t* dest, size_t dest_size, const wchar_t* src)
         errno = EINVAL;
         return EINVAL;
     }
-    // Copy characters until we hit eof or run out of space
+    // Copy characters until we hit null terminator or run out of space
     size_t i = 0;
     while (i < dest_size - 1 && src[i] != L'\0')
     {
@@ -266,14 +266,17 @@ inline int wcsncpy_s(
         i++;
     }
     strDest[i] = L'\0';
-    if (count != _TRUNCATE && strSource[i] != L'\0' && i == numberOfElements - 1)
+    if (strSource[i] != L'\0')
     {
-        strDest[0] = L'\0';
-        errno = ERANGE;
-        return ERANGE;
+        if (count == _TRUNCATE)
+            return STRUNCATE;
+        if (count >= numberOfElements)
+        {
+            strDest[0] = L'\0';
+            errno = ERANGE;
+            return ERANGE;
+        }
     }
-    if (count == _TRUNCATE && strSource[i] != L'\0')
-        return STRUNCATE;
     return 0;
 }
 #endif // HAVE_WCSNCPY_S
@@ -307,14 +310,17 @@ inline int strncpy_s(char* strDest, size_t numberOfElements, const char* strSour
         i++;
     }
     strDest[i] = '\0';
-    if (count != _TRUNCATE && strSource[i] != '\0' && i == numberOfElements - 1)
+    if (strSource[i] != '\0')
     {
-        strDest[0] = '\0';
-        errno = ERANGE;
-        return ERANGE;
+        if (count == _TRUNCATE)
+            return STRUNCATE;
+        if (count >= numberOfElements)
+        {
+            strDest[0] = '\0';
+            errno = ERANGE;
+            return ERANGE;
+        }
     }
-    if (count == _TRUNCATE && strSource[i] != '\0')
-        return STRUNCATE;
     return 0;
 }
 #endif // HAVE_STRNCPY_S
