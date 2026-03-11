@@ -310,14 +310,20 @@ struct PeepholeContext : InstPassBase
                 {
                     auto layoutOp = inst->getOperand(1)->getOp();
 
-                    if (layoutOp == kIROp_Param)
+                    IRTypeLayoutRuleName defaultLayout = IRTypeLayoutRuleName::Natural;
+                    if (isInGeneric)
                     {
-                        // Can't resolve layout type yet, it could be a generic
-                        // param still.
-                        break;
+                        // If we're in a generic context, it's possible that the
+                        // data layout still depends on a generic parameter.
+                        // _Count is used as a sentinel value to exit when this
+                        // happens.
+                        defaultLayout = IRTypeLayoutRuleName::_Count;
                     }
 
-                    auto ruleName = getTypeLayoutRuleNameFromOp(layoutOp, IRTypeLayoutRuleName::Natural);
+                    auto ruleName = getTypeLayoutRuleNameFromOp(layoutOp, defaultLayout);
+
+                    if (ruleName == IRTypeLayoutRuleName::_Count)
+                        break;
 
                     layoutRules = IRTypeLayoutRules::get(ruleName);
                 }
