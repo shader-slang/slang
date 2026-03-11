@@ -191,11 +191,11 @@ jobs:
             elif [ "${RUNNER_OS}" = "Windows" ]; then
               echo "Setting up Windows environment..."
               cmake.exe --preset vs2022 --fresh
-              cmake.exe --build --preset release >/dev/null 2>&1 || cmake.exe --build --preset release
+              cmake.exe --build --preset vs2022-debug >/dev/null 2>&1 || cmake.exe --build --preset vs2022-debug
             else
               echo "Setting up Linux environment..."
               cmake --preset default -DSLANG_SLANG_LLVM_BINARY_URL=https://github.com/shader-slang/slang/releases/download/v2025.6.1/slang-2026.1.2-linux-x86_64.zip --fresh
-              cmake --build --preset release >/dev/null 2>&1 || cmake --build --preset release
+              cmake --build --preset debug >/dev/null 2>&1 || cmake --build --preset debug
             fi
             echo "Environment setup completed"
 
