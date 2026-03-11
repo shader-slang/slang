@@ -1153,9 +1153,6 @@ IRInterfaceType* DifferentiableTypeConformanceContext::getConformanceTypeFromWit
     else if (as<IRTypePack>(witness->getDataType()) || as<IRTupleType>(witness->getDataType()))
     {
         auto witnessPackType = witness->getDataType();
-        SLANG_ASSERT(
-            witnessPackType && witnessPackType->getOp() == kIROp_TypePack ||
-            witnessPackType->getOp() == kIROp_TupleType);
         SLANG_ASSERT(witnessPackType->getOperandCount() >= 1);
         auto operand = witnessPackType->getOperand(0);
         auto innerWitnessTableType = cast<IRWitnessTableType>(operand);
