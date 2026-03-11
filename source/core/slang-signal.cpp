@@ -50,7 +50,6 @@ String _getMessage(SignalType type, char const* message)
 
 void handleAssert(char const* message, bool isReleaseAssert)
 {
-#if _WIN32 && defined(_MSC_VER)
     StringBuilder envValue;
     if (SLANG_SUCCEEDED(
             PlatformUtil::getEnvironmentVariable(UnownedStringSlice("SLANG_ASSERT"), envValue)))
@@ -71,6 +70,7 @@ void handleAssert(char const* message, bool isReleaseAssert)
         {
             assert(!"SLANG_ASSERT triggered");
         }
+#if _WIN32 && defined(_MSC_VER)
         else if (envSlice.caseInsensitiveEquals(UnownedStringSlice::fromLiteral("debugbreak")))
         {
             if (IsDebuggerPresent())
@@ -83,8 +83,8 @@ void handleAssert(char const* message, bool isReleaseAssert)
                 assert(!"SLANG_ASSERT triggered (no debugger attached)");
             }
         }
-    }
 #endif
+    }
 
     // Default behavior: delegate to handleSignal
     handleSignal(SignalType::AssertFailure, message);

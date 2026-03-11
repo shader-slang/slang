@@ -554,7 +554,7 @@ private:
         }
 
         SLANG_UNEXPECTED(
-            "Inconsistent find result returned. This is a bug in Dictionary implementation.");
+            "Inconsistent find result returned. This is a bug in OrderedDictionary implementation.");
     }
     void add(KeyValuePair<TKey, TValue>&& kvPair)
     {
@@ -577,7 +577,7 @@ private:
         }
 
         SLANG_UNEXPECTED(
-                "Inconsistent find result returned. This is a bug in Dictionary implementation.");
+            "Inconsistent find result returned. This is a bug in OrderedDictionary implementation.");
     }
 
 public:
@@ -681,7 +681,7 @@ public:
                 return dict->m_hashMap[pos.objectPosition]->value.value;
             }
 
-            SLANG_UNEXPECTED("The key does not exists in dictionary.");
+            SLANG_UNEXPECTED("The key does not exist in dictionary.");
         }
         inline TValue& operator()() const { return getValue(); }
         operator TValue&() const { return getValue(); }
