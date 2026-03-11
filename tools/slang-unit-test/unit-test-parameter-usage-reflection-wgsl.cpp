@@ -96,33 +96,17 @@ SLANG_UNIT_TEST(isParameterLocationUsedReflectionWGSL)
 
         // All three vertex inputs (POSITION=0, TEXCOORD=1, COLOR=2) are used.
         bool isUsed = false;
-        metadata->isParameterLocationUsed(
-            SLANG_PARAMETER_CATEGORY_VARYING_INPUT,
-            0,
-            0,
-            isUsed);
+        metadata->isParameterLocationUsed(SLANG_PARAMETER_CATEGORY_VARYING_INPUT, 0, 0, isUsed);
         SLANG_CHECK(isUsed);
 
-        metadata->isParameterLocationUsed(
-            SLANG_PARAMETER_CATEGORY_VARYING_INPUT,
-            0,
-            1,
-            isUsed);
+        metadata->isParameterLocationUsed(SLANG_PARAMETER_CATEGORY_VARYING_INPUT, 0, 1, isUsed);
         SLANG_CHECK(isUsed);
 
-        metadata->isParameterLocationUsed(
-            SLANG_PARAMETER_CATEGORY_VARYING_INPUT,
-            0,
-            2,
-            isUsed);
+        metadata->isParameterLocationUsed(SLANG_PARAMETER_CATEGORY_VARYING_INPUT, 0, 2, isUsed);
         SLANG_CHECK(isUsed);
 
         // Location 3 should not be used.
-        metadata->isParameterLocationUsed(
-            SLANG_PARAMETER_CATEGORY_VARYING_INPUT,
-            0,
-            3,
-            isUsed);
+        metadata->isParameterLocationUsed(SLANG_PARAMETER_CATEGORY_VARYING_INPUT, 0, 3, isUsed);
         SLANG_CHECK(!isUsed);
     }
 
@@ -154,33 +138,19 @@ SLANG_UNIT_TEST(isParameterLocationUsedReflectionWGSL)
         // Fragment varying inputs: TEXCOORD=0 and COLOR=1 are used,
         // SV_Position is a system value, not a user varying input.
         bool isUsed = false;
-        metadata->isParameterLocationUsed(
-            SLANG_PARAMETER_CATEGORY_VARYING_INPUT,
-            0,
-            0,
-            isUsed);
+        metadata->isParameterLocationUsed(SLANG_PARAMETER_CATEGORY_VARYING_INPUT, 0, 0, isUsed);
         SLANG_CHECK(isUsed);
 
-        metadata->isParameterLocationUsed(
-            SLANG_PARAMETER_CATEGORY_VARYING_INPUT,
-            0,
-            1,
-            isUsed);
+        metadata->isParameterLocationUsed(SLANG_PARAMETER_CATEGORY_VARYING_INPUT, 0, 1, isUsed);
         SLANG_CHECK(isUsed);
 
         // Descriptor table slots for the texture and sampler should also be used.
-        metadata->isParameterLocationUsed(
-            SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT,
-            0,
-            0,
-            isUsed);
+        metadata
+            ->isParameterLocationUsed(SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT, 0, 0, isUsed);
         SLANG_CHECK(isUsed);
 
-        metadata->isParameterLocationUsed(
-            SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT,
-            0,
-            1,
-            isUsed);
+        metadata
+            ->isParameterLocationUsed(SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT, 0, 1, isUsed);
         SLANG_CHECK(isUsed);
     }
 }
