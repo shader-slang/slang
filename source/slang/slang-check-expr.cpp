@@ -2370,38 +2370,38 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
 
     if (auto sizeOfLikeExpr = expr.as<SizeOfLikeExpr>())
     {
-        if (sizeOfLikeExpr.getExpr()->sizedType)
-        {
-            auto type = as<Type>(
-                sizeOfLikeExpr.getExpr()->sizedType->substitute(m_astBuilder, expr.getSubsts()));
+        if (!sizeOfLikeExpr.getExpr()->sizedType)
+            return nullptr;
+        
+        auto type = as<Type>(
+            sizeOfLikeExpr.getExpr()->sizedType->substitute(m_astBuilder, expr.getSubsts()));
 
-            if (auto sizeOfExpr = expr.as<SizeOfExpr>())
+        if (auto sizeOfExpr = expr.as<SizeOfExpr>())
+        {
+            return as<IntVal>(
+                SizeOfIntVal::tryFold(m_astBuilder, expr.getExpr()->type.type, type));
+        }
+        else if (auto alignOfExpr = expr.as<AlignOfExpr>())
+        {
+            return as<IntVal>(
+                AlignOfIntVal::tryFold(m_astBuilder, expr.getExpr()->type.type, type));
+        }
+        else if (auto countOfExpr = expr.as<CountOfExpr>())
+        {
+            // For value packs, sizedType is ValuePackType. Try to fold
+            // the value expression to get the pack reference instead.
+            Val* countArg = type;
+            if (as<ValuePackType>(type))
             {
-                return as<IntVal>(
-                    SizeOfIntVal::tryFold(m_astBuilder, expr.getExpr()->type.type, type));
+                auto valExprFolded = tryConstantFoldExpr(
+                    SubstExpr<Expr>(countOfExpr.getExpr()->value, expr.getSubsts()),
+                    kind,
+                    circularityInfo);
+                if (valExprFolded)
+                    countArg = valExprFolded;
             }
-            else if (auto alignOfExpr = expr.as<AlignOfExpr>())
-            {
-                return as<IntVal>(
-                    AlignOfIntVal::tryFold(m_astBuilder, expr.getExpr()->type.type, type));
-            }
-            else if (auto countOfExpr = expr.as<CountOfExpr>())
-            {
-                // For value packs, sizedType is ValuePackType. Try to fold
-                // the value expression to get the pack reference instead.
-                Val* countArg = type;
-                if (as<ValuePackType>(type))
-                {
-                    auto valExprFolded = tryConstantFoldExpr(
-                        SubstExpr<Expr>(countOfExpr.getExpr()->value, expr.getSubsts()),
-                        kind,
-                        circularityInfo);
-                    if (valExprFolded)
-                        countArg = valExprFolded;
-                }
-                return as<IntVal>(
-                    CountOfIntVal::tryFold(m_astBuilder, expr.getExpr()->type.type, countArg));
-            }
+            return as<IntVal>(
+                CountOfIntVal::tryFold(m_astBuilder, expr.getExpr()->type.type, countArg));
         }
     }
 
