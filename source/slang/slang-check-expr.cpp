@@ -2400,8 +2400,7 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
                 if (valExprFolded)
                     countArg = valExprFolded;
             }
-            return as<IntVal>(
-                CountOfIntVal::tryFold(m_astBuilder, expr.getExpr()->type.type, countArg));
+            return as<IntVal>(CountOfIntVal::tryFold(m_astBuilder, expr.getExpr()->type.type, countArg));
         }
     }
 
