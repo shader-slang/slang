@@ -122,6 +122,53 @@ struct TupleLoweringContext
         inst->removeAndDeallocate();
     }
 
+    void processTrimOfPack(IRInst* inst)
+    {
+        IRBuilder builder(module);
+        builder.setInsertBefore(inst);
+
+        auto base = inst->getOperand(0);
+        bool trimTail = inst->getOp() == kIROp_TrimTailOfPack;
+
+        if (auto baseTupleType = as<IRTupleType>(base))
+        {
+            ShortList<IRType*> slicedTypes;
+            UInt operandCount = baseTupleType->getOperandCount();
+            UInt start = trimTail ? 0u : (operandCount > 0 ? 1u : 0u);
+            UInt end = trimTail && operandCount > 0 ? operandCount - 1 : operandCount;
+            for (UInt i = start; i < end; ++i)
+                slicedTypes.add((IRType*)baseTupleType->getOperand(i));
+            auto replacement =
+                builder.getTupleType(slicedTypes.getCount(), slicedTypes.getArrayView().getBuffer());
+            addToWorkList(replacement);
+            inst->replaceUsesWith(replacement);
+            inst->removeAndDeallocate();
+            return;
+        }
+
+        auto baseTupleType = as<IRTupleType>(base->getDataType());
+        if (!baseTupleType)
+            return;
+
+        ShortList<IRInst*> elements;
+        UInt operandCount = baseTupleType->getOperandCount();
+        UInt start = trimTail ? 0u : (operandCount > 0 ? 1u : 0u);
+        UInt end = trimTail && operandCount > 0 ? operandCount - 1 : operandCount;
+        for (UInt i = start; i < end; ++i)
+        {
+            auto element =
+                builder.emitGetTupleElement((IRType*)baseTupleType->getOperand(i), base, i);
+            addToWorkList(element);
+            elements.add(element);
+        }
+
+        auto replacement =
+            builder.emitMakeTuple((IRType*)inst->getDataType(), elements.getCount(), elements.getArrayView().getBuffer());
+        addToWorkList(replacement);
+        inst->replaceUsesWith(replacement);
+        inst->removeAndDeallocate();
+    }
+
     void processGetElementPtr(IRGetElementPtr* inst)
     {
         IRBuilder builder(module);
@@ -366,6 +413,10 @@ struct TupleLoweringContext
             break;
         case kIROp_SwizzledStore:
             processSwizzledStore((IRSwizzledStore*)inst);
+            break;
+        case kIROp_TrimHeadOfPack:
+        case kIROp_TrimTailOfPack:
+            processTrimOfPack(inst);
             break;
         case kIROp_TupleType:
             processTupleType((IRTupleType*)inst);

@@ -2059,7 +2059,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             elementTypes.add(loweredWitness.val->getFullType());
         }
         auto irWitnessPack = irBuilder->emitMakeWitnessPack(
-            irBuilder->getTupleType(
+            irBuilder->getTypePack(
                 (UInt)elementTypes.getCount(),
                 elementTypes.getArrayView().getBuffer()),
             witnesses.getArrayView().arrayView);
@@ -2122,6 +2122,32 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         return LoweredValInfo::simple(irBuilder->emitIntrinsicInst(
             witnessTableType,
             kIROp_ExtractLastFromPack,
+            1,
+            &basePack));
+    }
+
+    LoweredValInfo visitTrimHeadSubtypeWitness(TrimHeadSubtypeWitness* witness)
+    {
+        auto patternWitness = lowerVal(context, witness->getPatternTypeWitness());
+        auto irBuilder = getBuilder();
+        auto basePack = getSimpleVal(context, patternWitness);
+        auto resultType = lowerType(context, witness->getSub());
+        return LoweredValInfo::simple(irBuilder->emitIntrinsicInst(
+            as<IRType>(resultType),
+            kIROp_TrimHeadOfPack,
+            1,
+            &basePack));
+    }
+
+    LoweredValInfo visitTrimTailSubtypeWitness(TrimTailSubtypeWitness* witness)
+    {
+        auto patternWitness = lowerVal(context, witness->getPatternTypeWitness());
+        auto irBuilder = getBuilder();
+        auto basePack = getSimpleVal(context, patternWitness);
+        auto resultType = lowerType(context, witness->getSub());
+        return LoweredValInfo::simple(irBuilder->emitIntrinsicInst(
+            as<IRType>(resultType),
+            kIROp_TrimTailOfPack,
             1,
             &basePack));
     }
