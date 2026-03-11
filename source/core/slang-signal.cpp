@@ -66,11 +66,11 @@ void handleAssert(char const* message, bool isReleaseAssert)
                 return;
             }
         }
+#if _WIN32 && defined(_MSC_VER)
         else if (envSlice.caseInsensitiveEquals(UnownedStringSlice::fromLiteral("system")))
         {
             assert(!"SLANG_ASSERT triggered");
         }
-#if _WIN32 && defined(_MSC_VER)
         else if (envSlice.caseInsensitiveEquals(UnownedStringSlice::fromLiteral("debugbreak")))
         {
             if (IsDebuggerPresent())
