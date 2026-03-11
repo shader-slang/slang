@@ -553,8 +553,8 @@ private:
             return true;
         }
 
-        SLANG_UNEXPECTED(
-            "Inconsistent find result returned. This is a bug in OrderedDictionary implementation.");
+        SLANG_UNEXPECTED("Inconsistent find result returned. This is a bug in OrderedDictionary "
+                         "implementation.");
     }
     void add(KeyValuePair<TKey, TValue>&& kvPair)
     {
@@ -576,8 +576,8 @@ private:
             return _insert(_Move(kvPair), pos.insertionPosition);
         }
 
-        SLANG_UNEXPECTED(
-            "Inconsistent find result returned. This is a bug in OrderedDictionary implementation.");
+        SLANG_UNEXPECTED("Inconsistent find result returned. This is a bug in OrderedDictionary "
+                         "implementation.");
     }
 
 public:
