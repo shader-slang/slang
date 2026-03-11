@@ -148,7 +148,7 @@ inline int sprintf_s(char* buffer, size_t sizeOfBuffer, const char* format, ...)
 // __attribute__((format(wprintf, 3, 4)))
 inline int swprintf_s(wchar_t* buffer, size_t sizeOfBuffer, const wchar_t* format, ...)
 {
-    if (buffer == nullptr || format == nullptr)
+    if (buffer == nullptr || format == nullptr || sizeOfBuffer == 0)
     {
         errno = EINVAL;
         return -1;
