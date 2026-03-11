@@ -4428,11 +4428,11 @@ Expr* SemanticsExprVisitor::visitSizeOfLikeExpr(SizeOfLikeExpr* sizeOfLikeExpr)
             dataLayoutType = m_astBuilder->getScalarLayoutType();
         }
 
-        auto witness = as<SubtypeWitness>(
-            tryGetInterfaceConformanceWitness(dataLayoutType, m_astBuilder->getSharedASTBuilder()->getIBufferDataLayoutType()));
+        SubtypeWitness* witness = dataLayoutType ?
+            as<SubtypeWitness>(tryGetInterfaceConformanceWitness(dataLayoutType, m_astBuilder->getSharedASTBuilder()->getIBufferDataLayoutType())) : nullptr;
         if (!dataLayoutType || !witness)
         {
-            getSink()->diagnose(Diagnostics::SizeOfDataLayoutIsInvalid{ .type = dataLayoutType, .expr = sizeOfLikeExpr->dataLayout});
+            getSink()->diagnose(Diagnostics::SizeOfDataLayoutIsInvalid{ .expr = sizeOfLikeExpr->dataLayout });
 
             sizeOfLikeExpr->type = m_astBuilder->getErrorType();
             return sizeOfLikeExpr;
