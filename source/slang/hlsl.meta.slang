@@ -1059,7 +1059,6 @@ void __wgsl_check_texture_type()
                   access != $(kCoreModule_ResourceAccessReadWrite))
         , "WGSL does not support multisampled texture storage");
 
-
     // access
     static_assert(access != $(kCoreModule_ResourceAccessRasterizerOrdered)
         , "WGSL does not support RasterizerOrderedTexture types");

@@ -197,7 +197,7 @@ def getMetalTests():
         "Texture2D<float4>"        : TestInfo("1.0", 13),
         "Texture2DArray<float4>"   : TestInfo("1.0", 14),
         "Texture2DMS<float4>"      : TestInfo("1.0", 13).bug(8457),
-        "Texture2DMSArray<float4>" : TestInfo(None,  14),
+        "Texture2DMSArray<float4>" : TestInfo("2.0", 14).bug(8457),
         "Texture3D<float4>"        : TestInfo("1.0", 14),
         "TextureCube<float4>"      : TestInfo("1.0", 3),
         "TextureCubeArray<float4>" : TestInfo("1.0", 4),
@@ -266,8 +266,8 @@ def getGlslTests(nameSuffix, simpleTarget, vkTargetAdditionalFlags):
         "Texture1DArray<float4>"   : TestInfo("130", 2),
         "Texture2D<float4>"        : TestInfo("110", 2),
         "Texture2DArray<float4>"   : TestInfo("130", 3),
-        "Texture2DMS<float4>"      : TestInfo(None,  13), # accessibe only via combined texture+sampler
-        "Texture2DMSArray<float4>" : TestInfo(None,  14), # accessibe only via combined texture+sampler
+        "Texture2DMS<float4>"      : TestInfo(None,  13), # accessible only via combined texture+sampler
+        "Texture2DMSArray<float4>" : TestInfo(None,  14), # accessible only via combined texture+sampler
         "Texture3D<float4>"        : TestInfo("110", 3),
         "TextureCube<float4>"      : TestInfo("110", 3),
         "TextureCubeArray<float4>" : TestInfo("400", 4).disableNegativeTest(8912),

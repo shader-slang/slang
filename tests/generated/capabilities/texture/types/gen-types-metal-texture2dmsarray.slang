@@ -5,14 +5,15 @@
 //     extras/test-generators/generate-tests-capabilities-texture-types.py
 //
 // Texture types capability test: metal / Texture2DMSArray<float4>
-// - Type supported since target version:  None
-// - Target version for positive test:     None
-// - Target version for negative test:     2.4
+// - Type supported since target version:  2.0
+// - Target version for positive test:     2.3
+// - Target version for negative test:     None
 //
 
-//DISABLE_TEST:SIMPLE(filecheck=POSITIVE): -restrictive-capability-check -entry fragMain -stage fragment -target None
-//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=POSITIVE_RESULT): None
-//TEST:SIMPLE(filecheck=NEGATIVE): -restrictive-capability-check -entry fragMain -stage fragment -target metal -profile metallib_2_4
+// Test disabled, see https://github.com/shader-slang/slang/issues/8457
+//DISABLE_TEST:SIMPLE(filecheck=POSITIVE): -restrictive-capability-check -entry fragMain -stage fragment -target metal -profile metallib_2_3
+//DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=POSITIVE_RESULT): -mtl
+//DISABLE_TEST:SIMPLE(filecheck=NEGATIVE): -restrictive-capability-check -entry fragMain -stage fragment -target None
 
 //TEST_INPUT: ubuffer(data=[0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;

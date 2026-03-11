@@ -1,6 +1,6 @@
 # Capability Verification for Texture Types
 
-The goal of the capabitilies tests is as follows:
+The goal of the capabilities tests is as follows:
 
 - Verify that features that are supposed to enabled on specific backend versions compile successfully
 - Verify that features that are not supposed to work trigger `slangc` diagnostics accordingly
