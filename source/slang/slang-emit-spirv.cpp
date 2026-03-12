@@ -8421,23 +8421,32 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
         if (fromInfo == toInfo)
         {
+            // Same exact integer types, copy the object.
             return emitOpCopyObject(parent, inst, toTypeV, inst->getOperand(0));
         }
         else if (fromInfo.width == toInfo.width)
         {
+            // Same bit width, perform bit cast.
             return emitOpBitcast(parent, inst, toTypeV, inst->getOperand(0));
         }
         else if (!fromInfo.isSigned && !toInfo.isSigned)
         {
+            // Unsigned to unsigned, don't sign extend.
             return emitOpUConvert(parent, inst, toTypeV, inst->getOperand(0));
         }
         else if (!fromInfo.isSigned && toInfo.isSigned)
         {
+            // Unsigned to signed with different widths, don't sign extend.
+            // Perform unsigned conversion first to an unsigned integer of the same width as the
+            // result then perform bit cast to the signed result type. This is done because SPIRV's
+            // unsigned conversion (`OpUConvert`) requires result type to be unsigned.
             auto builderType = getUnsignedTypeFromSignedType(&builder, toTypeV);
+
             auto unsignedV = emitOpUConvert(parent, nullptr, builderType, inst->getOperand(0));
             return emitOpBitcast(parent, inst, toTypeV, unsignedV);
         }
         else if (fromInfo.isSigned)
+            // Signed to signed and signed to unsigned, sign extend.
             return emitOpSConvert(parent, inst, toTypeV, inst->getOperand(0));
 
         SLANG_UNREACHABLE(__func__);
