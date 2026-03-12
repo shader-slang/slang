@@ -10,6 +10,10 @@ void funcUint32(uint x) {}
 void funcUint64(uint64_t x) {}
 void funcHalf(half x) {}
 
+int8_t returnOverflow() { return 256; }
+//CHECK:                         ^^^ integer constant overflow in conversion
+//CHECK:                         ^^^ integer value '256' does not fit in type 'int8_t'
+
 struct GenericInt8<let N : int8_t> { int8_t val() { return N; } };
 
 [numthreads(1, 1, 1)]
@@ -67,6 +71,16 @@ void computeMain()
 //CHECK:       ^^^^^^^^^^ integer constant overflow in conversion
 //CHECK:       ^^^^^^^^^^ integer value '4294967296' does not fit in type 'uint'
 
+    // 64-bit overflow: 2^63 exceeds INT64_MAX, triggering the lexer-level
+    // "too large for signed" warning (not our overflow check). The literal is
+    // reinterpreted as unsigned, so no integer-constant-overflow fires.
+    funcInt64(9223372036854775808);
+//CHECK:      ^^^^^^^^^^^^^^^^^^^ integer literal is too large
+//CHECK:      ^^^^^^^^^^^^^^^^^^^ interpreting as unsigned
+    funcUint64(9223372036854775808);
+//CHECK:       ^^^^^^^^^^^^^^^^^^^ integer literal is too large
+//CHECK:       ^^^^^^^^^^^^^^^^^^^ interpreting as unsigned
+
     // Function arguments that fit - should NOT warn
     funcInt8(127);
     funcInt8(-128);
@@ -76,8 +90,8 @@ void computeMain()
     funcUint16(65535);
     funcInt32(42);
     funcUint32(42u);
-    funcInt64(42);
-    funcUint64(42u);
+    funcInt64(9223372036854775807);
+    funcUint64(9223372036854775807);
     funcHalf(2048);
 
     // Half is excluded from the integer overflow check (getMaximumTypeBitSize
