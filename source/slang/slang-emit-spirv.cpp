@@ -789,17 +789,14 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         m_operandStack.setCount(operandsStartIndex);
     }
 
-    SpvOp _specConstantOpcodeConvert(IROp irOpCode, IRBasicType* srcBasicType)
+    SpvOp _specConstantOpcodeConvert(IROp irOpCode, IRBasicType* basicType)
     {
         SpvOp opCode = SpvOpUndef;
-        opCode = _arithmeticOpCodeConvert(irOpCode, srcBasicType);
+        opCode = _arithmeticOpCodeConvert(irOpCode, basicType);
         if (opCode == SpvOpUndef)
         {
             switch (irOpCode)
             {
-            case kIROp_IntCast:
-            case kIROp_ConstexprIntCast:
-                return isSignedType(srcBasicType) ? SpvOpSConvert : SpvOpUConvert;
             case kIROp_FloatCast:
             case kIROp_ConstexprFloatCast:
                 return SpvOpFConvert;
@@ -3476,6 +3473,48 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return result;
     }
 
+    SpvInst* emitSpecConstantUConvert(IRInst* inst, IRType* resultType, SpvInst* operand)
+    {
+        return emitInst(
+            getSection(SpvLogicalSectionID::ConstantsAndTypes),
+            inst,
+            SpvOpSpecConstantOp,
+            resultType,
+            kResultID,
+            SpvOpUConvert,
+            operand);
+    }
+
+    SpvInst* emitSpecConstantSConvert(IRInst* inst, IRType* resultType, SpvInst* operand)
+    {
+        return emitInst(
+            getSection(SpvLogicalSectionID::ConstantsAndTypes),
+            inst,
+            SpvOpSpecConstantOp,
+            resultType,
+            kResultID,
+            SpvOpSConvert,
+            operand);
+    }
+
+    // Emit IAdd-by-zero wrapped in OpSpecConstantOp to reinterpret signedness.
+    // OpBitcast is not in the set of opcodes allowed by OpSpecConstantOp, so
+    // we use IAdd-by-zero instead (same approach as glslang's GlslangToSpv.cpp).
+    SpvInst* emitSpecConstantSignReinterpret(IRInst* inst, IRType* resultType, SpvInst* operand)
+    {
+        IRBuilder builder(m_irModule);
+        auto zero = emitIntConstant(0, builder.getIntType());
+        return emitInst(
+            getSection(SpvLogicalSectionID::ConstantsAndTypes),
+            inst,
+            SpvOpSpecConstantOp,
+            resultType,
+            kResultID,
+            SpvOpIAdd,
+            operand,
+            zero);
+    }
+
     SpvInst* emitSpecializationConstantOp(IRInst* inst)
     {
         SpvInst* spv = nullptr;
@@ -3507,9 +3546,11 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             return emitLit(inst);
         }
 
-        // Handle integer casts that the generic path below can't: same-width
-        // signedness changes and cross-signed different-width casts.
-        // Same-sign different-width casts fall through to the generic path.
+        // Handle integer casts in spec constant context.
+        // Inside OpSpecConstantOp, UConvert/SConvert require different bit widths
+        // and matching signedness on the result type, and OpBitcast is not in the
+        // set of allowed opcodes. See emitSpecConstantSignReinterpret for the
+        // workaround used for signedness changes.
         auto irOp = inst->getOp();
         if (irOp == kIROp_IntCast || irOp == kIROp_ConstexprIntCast)
         {
@@ -3519,58 +3560,34 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             {
                 auto srcInfo = getIntTypeInfo(m_targetRequest, srcType);
                 auto dstInfo = getIntTypeInfo(m_targetRequest, dstType);
+
                 if (srcInfo == dstInfo)
                 {
                     auto operand = emitSpecializationConstantOp(inst->getOperand(0));
                     registerInst(inst, operand);
                     return operand;
                 }
-                if (srcInfo.width == dstInfo.width)
+
+                auto operand = emitSpecializationConstantOp(inst->getOperand(0));
+                bool needsWidthChange = srcInfo.width != dstInfo.width;
+                bool needsSignReinterpret = srcInfo.isSigned != dstInfo.isSigned;
+
+                if (needsWidthChange)
                 {
-                    // OpSpecConstantOp forbids OpBitcast and requires width
-                    // change for UConvert/SConvert; use ShiftLeftLogical-by-0.
-                    auto operand = emitSpecializationConstantOp(inst->getOperand(0));
-                    auto zero = emitIntConstant(0, IRBuilder(m_irModule).getUIntType());
-                    return emitInst(
-                        getSection(SpvLogicalSectionID::ConstantsAndTypes),
-                        inst,
-                        SpvOpSpecConstantOp,
-                        inst->getFullType(),
-                        kResultID,
-                        SpvOpShiftLeftLogical,
-                        operand,
-                        zero);
-                }
-                if (srcInfo.isSigned != dstInfo.isSigned)
-                {
-                    // Cross-signed different-width: convert to intermediate
-                    // type (dst width, src signedness), then reinterpret.
-                    auto operand = emitSpecializationConstantOp(inst->getOperand(0));
-                    SpvOp convertOp = srcInfo.isSigned ? SpvOpSConvert : SpvOpUConvert;
                     IRBuilder builder(m_irModule);
-                    IntInfo intermediateInfo = {dstInfo.width, srcInfo.isSigned};
-                    auto intermediateType =
-                        builder.getType(getIntTypeOpFromInfo(intermediateInfo));
-                    auto intermediate = emitInst(
-                        getSection(SpvLogicalSectionID::ConstantsAndTypes),
-                        nullptr,
-                        SpvOpSpecConstantOp,
-                        intermediateType,
-                        kResultID,
-                        convertOp,
-                        operand);
-                    auto zero = emitIntConstant(0, builder.getUIntType());
-                    return emitInst(
-                        getSection(SpvLogicalSectionID::ConstantsAndTypes),
-                        inst,
-                        SpvOpSpecConstantOp,
-                        inst->getFullType(),
-                        kResultID,
-                        SpvOpShiftLeftLogical,
-                        intermediate,
-                        zero);
+                    auto convertType = needsSignReinterpret
+                        ? builder.getType(getIntTypeOpFromInfo({dstInfo.width, srcInfo.isSigned}))
+                        : inst->getFullType();
+                    auto convertInst = needsSignReinterpret ? nullptr : inst;
+                    operand = srcInfo.isSigned
+                        ? emitSpecConstantSConvert(convertInst, convertType, operand)
+                        : emitSpecConstantUConvert(convertInst, convertType, operand);
                 }
-                // Same-sign different-width: fall through to generic path.
+
+                if (needsSignReinterpret)
+                    operand = emitSpecConstantSignReinterpret(inst, inst->getFullType(), operand);
+
+                return operand;
             }
         }
 
