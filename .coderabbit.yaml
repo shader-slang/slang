@@ -22,6 +22,68 @@ reviews:
     - "!build/**"
     - "!external/**"
 
+  path_instructions:
+    - path: "source/slang/**"
+      instructions: >-
+        This is the core compiler. Review for:
+        (1) IR pass correctness — ensure SSA form and type invariants are maintained.
+        (2) Proper use of FIDDLE macros for AST/IR node definitions.
+        (3) Emit logic should stay simple; heavy transforms belong in IR passes.
+        (4) Check that new IR instructions are registered in slang-ir-insts.lua.
+        (5) Null pointer safety and proper error handling via diagnostics.
+
+    - path: "source/core/**"
+      instructions: >-
+        Core utilities shared across the compiler. Check for:
+        (1) Thread safety if the utility may be used concurrently.
+        (2) Memory management — Slang uses reference counting (RefPtr/ComPtr).
+        (3) Platform portability (Windows, Linux, macOS).
+
+    - path: "source/compiler-core/**"
+      instructions: >-
+        Compiler infrastructure (diagnostics, source locations, codegen utilities).
+        Ensure diagnostic messages are clear and include source locations.
+
+    - path: "include/**"
+      instructions: >-
+        PUBLIC API HEADERS. Changes here are potentially breaking for all downstream
+        users. Flag any modification to existing function signatures, struct layouts,
+        or enum values. New additions should follow existing naming conventions.
+        Check COM interface compatibility (ISlang* interfaces).
+
+    - path: "tests/**"
+      instructions: >-
+        Verify test correctness. Tests use //TEST directives:
+        COMPARE_COMPUTE for GPU compute tests, INTERPRET for CPU interpreter tests.
+        Ensure new features have corresponding tests. Check that expected outputs
+        match the intended behavior, not just current behavior.
+
+    - path: "prelude/**"
+      instructions: >-
+        Built-in language definitions and intrinsics. Changes here affect all
+        Slang programs. Verify backward compatibility and check that all target
+        backends handle new intrinsics.
+
+    - path: "cmake/**"
+      instructions: >-
+        Build system changes. Verify cross-platform compatibility (Windows/Linux/macOS).
+        Check for proper target dependency declarations and generator expressions.
+
+    - path: "CMakeLists.txt"
+      instructions: >-
+        Root build configuration. Verify minimum CMake version compatibility (3.22+).
+        Check that new targets are properly linked and installed.
+
+    - path: ".github/workflows/**"
+      instructions: >-
+        CI/CD workflow changes. Verify correct trigger conditions, proper secret
+        handling, and that matrix configurations cover all required platforms.
+
+    - path: "tools/**"
+      instructions: >-
+        Development tools (slang-test, slangd LSP, render-test, etc.).
+        Ensure command-line interface changes are backward compatible.
+
   auto_review:
     enabled: true
     drafts: false
@@ -31,6 +93,12 @@ reviews:
       - "DO NOT MERGE"
 
   enable_prompt_for_ai_agents: false
+
+  review_instructions: >-
+    Do not suggest formatting changes. The project uses clang-format and
+    ./extras/formatting.sh to enforce code style automatically. Skip any
+    comments about indentation, whitespace, brace placement, or code
+    formatting.
 
 chat:
   auto_reply: false
