@@ -145,6 +145,9 @@ jobs:
           export COVERAGE_HTML_DIR="$PWD/coverage-html"
           export COVERAGE_LCOV_FILE="$PWD/coverage.lcov"
 
+          # Set library path so slang-test can find libslang.so
+          export LD_LIBRARY_PATH="$PWD/build/RelWithDebInfo/lib:${LD_LIBRARY_PATH:-}"
+
           # Set SPIRV validation environment variables
           export SLANG_RUN_SPIRV_VALIDATION=1
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
