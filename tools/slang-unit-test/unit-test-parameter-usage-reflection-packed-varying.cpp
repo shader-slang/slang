@@ -1,4 +1,4 @@
-// unit-test-parameter-usage-reflection-wgsl.cpp
+// unit-test-parameter-usage-reflection-packed-varying.cpp
 
 #include "slang-com-ptr.h"
 #include "slang.h"
@@ -155,9 +155,18 @@ static void testParameterLocationUsed(SlangCompileTarget format)
         // Location 2 should not be used (only 2 user varying inputs).
         checkUsed(SLANG_PARAMETER_CATEGORY_VARYING_INPUT, 2, false);
 
-        // Descriptor table slots for the texture and sampler should also be used.
-        checkUsed(SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT, 0, true);
-        checkUsed(SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT, 1, true);
+        // Verify resource bindings for the texture and sampler.
+        // WGSL uses DescriptorTableSlot; Metal uses ShaderResource + SamplerState.
+        if (format == SLANG_WGSL)
+        {
+            checkUsed(SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT, 0, true);
+            checkUsed(SLANG_PARAMETER_CATEGORY_DESCRIPTOR_TABLE_SLOT, 1, true);
+        }
+        else if (format == SLANG_METAL)
+        {
+            checkUsed(SLANG_PARAMETER_CATEGORY_SHADER_RESOURCE, 0, true);
+            checkUsed(SLANG_PARAMETER_CATEGORY_SAMPLER_STATE, 0, true);
+        }
     }
 }
 
