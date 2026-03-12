@@ -2035,19 +2035,19 @@ bool SemanticsVisitor::_coerce(
 
             // Cache the constant-fold result so both the overflow check and
             // the UnrecommendedImplicitConversion check can reuse it.
-            Val* cachedFoldedVal = nullptr;
+            ConstantIntVal* cachedFoldedVal = nullptr;
             bool hasFolded = false;
             auto getFoldedIntVal = [&]() -> ConstantIntVal*
             {
                 if (!hasFolded)
                 {
-                    cachedFoldedVal = tryFoldIntegerConstantExpression(
+                    cachedFoldedVal = as<ConstantIntVal>(tryFoldIntegerConstantExpression(
                         fromExpr,
                         ConstantFoldingKind::CompileTime,
-                        nullptr);
+                        nullptr));
                     hasFolded = true;
                 }
-                return as<ConstantIntVal>(cachedFoldedVal);
+                return cachedFoldedVal;
             };
 
             int maxBitSize = getMaximumTypeBitSize(toType);
@@ -2055,7 +2055,15 @@ bool SemanticsVisitor::_coerce(
             {
                 if (auto val = getFoldedIntVal())
                 {
-                    if (getIntValueBitSize(val->getValue()) > maxBitSize)
+                    IntegerLiteralValue v = val->getValue();
+                    bool overflow = false;
+                    if (v < 0)
+                        overflow = static_cast<uint64_t>(-v) >
+                                   (static_cast<uint64_t>(1) << (maxBitSize - 1));
+                    else
+                        overflow = getIntValueBitSize(v) > maxBitSize;
+
+                    if (overflow)
                     {
                         // Set even when sink is null (probe/costing calls) to
                         // consistently suppress the UnrecommendedImplicitConversion
