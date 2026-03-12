@@ -30,10 +30,7 @@ struct ProcessLateRequireCapabilityInstsContext
         const CapabilitySet& targetCaps,
         CompilerOptionSet& optionSet,
         DiagnosticSink* sink)
-        : m_module(module)
-        , m_targetCaps(targetCaps)
-        , m_optionSet(optionSet)
-        , m_sink(sink)
+        : m_module(module), m_targetCaps(targetCaps), m_optionSet(optionSet), m_sink(sink)
     {
     }
 
