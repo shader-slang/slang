@@ -50,7 +50,7 @@ void TestOuterProductAccumulate<int InputSize, int OutputSize, TargetEnum Target
 {
     Address address = Address(outputBuffer);
 
-    typealias MMA = MMAHelper<DType, InputSize, OutputSize, SubgroupSize, Target, TestShMemSize>;
+    typealias MMA = MMAHelper<DType, InputSize, OutputSize, SubgroupSize, Target, TestShMemSize, false, workgroupCount>;
     const int OutSize = MMA.Uint4AlignedM;
     const int InSize = MMA.Uint4AlignedK;
 

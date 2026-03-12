@@ -79,6 +79,12 @@ public struct InlineVector<T, int N> : IVector<T>
         set() { this.data[index] = newValue; }
     }
 
+    [ForceInline]
+    override internal uint4 readUint4(int uint4Index)
+    {
+        return data.readUint4(uint4Index);
+    }
+
     // Linear transformation without bias
     [BackwardDerivative(linearTransformBwd)]
     public OutputVector linearTransform<Address, Layout, OutputVector>(

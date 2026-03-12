@@ -89,7 +89,7 @@ void testLoadShA<TargetEnum Target>(uint tid, uint tileIndex)
 
     Address address = Address(inputBuffer);
 
-    MMAHelper<half, InputSize, OutputSize, SubgroupSize, Target, TestShMemSize, false>.loadShA<half, Address>(OffsetA, tileIndex, address);
+    MMAHelper<half, InputSize, OutputSize, SubgroupSize, Target, TestShMemSize, false, 1>.loadShA<half, Address>(OffsetA, tileIndex, address);
     GroupMemoryBarrierWithWaveSync();
 }
 
@@ -104,7 +104,7 @@ void testLoadShB<TargetEnum Target>(uint tid, uint tileIndex)
     }
 
     // This test only has one subgroup, so the subgroup index is always 0.
-    MMAHelper<half, InputSize, OutputSize, SubgroupSize, Target, TestShMemSize, false>.loadVectorToShB(OffsetB, tileIndex, 0, inputVector);
+    MMAHelper<half, InputSize, OutputSize, SubgroupSize, Target, TestShMemSize, false, 1>.loadVectorToShB(OffsetB, tileIndex, 0, inputVector);
     GroupMemoryBarrierWithWaveSync();
 }
 

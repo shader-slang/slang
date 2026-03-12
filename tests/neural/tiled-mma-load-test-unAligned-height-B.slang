@@ -59,14 +59,14 @@ static const uint OffsetB = 0;
 
 void testLoadShB<TargetEnum Target, int K>(uint tid, uint tileIndex)
 {
-    half inputVector[MMAHelper<half, K, OutputSize, SubgroupSize, Target, TestShMemSize>.Uint4AlignedK] = {};
+    half inputVector[MMAHelper<half, K, OutputSize, SubgroupSize, Target, TestShMemSize, false, 1>.Uint4AlignedK] = {};
     for (int i = 0; i < K; i++)
     {
         inputVector[i] = half(tid * 32 + i);
     }
 
     // This test only has one subgroup, so the subgroup index is always 0.
-    MMAHelper<half, K, OutputSize, SubgroupSize, Target, TestShMemSize>.loadVectorToShB(OffsetB, tileIndex, 0, inputVector);
+    MMAHelper<half, K, OutputSize, SubgroupSize, Target, TestShMemSize, false, 1>.loadVectorToShB(OffsetB, tileIndex, 0, inputVector);
     GroupMemoryBarrierWithWaveSync();
 }
 
