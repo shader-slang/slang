@@ -2,8 +2,7 @@
 // type cannot be determined at the call site, the compiler must reject the program
 // because dynamic dispatch would be required for a specialization-only interface.
 
-// Disabled: requires compiler fix to emit error 52008 for [Specialize] interfaces
-//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target spirv -gnone
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -gnone
 
 #lang slang 2025
 
@@ -28,8 +27,9 @@ struct SquareProcessor : IProcessor
 // would need dynamic dispatch to resolve the method call.
 float applyProcessor(IProcessor proc, float val)
 {
-    // CHECK: ([[# @LINE+1]]): error 52008
     return proc.process(val);
+//CHECK:               ^ dynamic dispatch on specialize-only type
+//CHECK:               ^ type 'IProcessor' is marked for specialization only, but dynamic dispatch is needed for the call.
 }
 
 IProcessor selectProcessor(uint id)

@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -profile cs_5_0 -entry computeMain -line-directive-mode none
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target hlsl -profile cs_5_0 -entry computeMain -line-directive-mode none
 
 // Check that user code can declare and use a generic
 // `struct` type.
@@ -28,7 +28,7 @@ struct Impl2
 };
 
 __generic<T : ITest = Impl2>
-// CHECK: tests/diagnostics/generic-incorrect-default-arg.slang([[@LINE-1]]): error 38029: type argument 'Impl2' does not conform to the required interface 'ITest'
+//CHECK:              ^^^^^ type argument doesn't conform to interface
 struct GenStruct
 {
 	T obj;

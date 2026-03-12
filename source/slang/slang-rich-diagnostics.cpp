@@ -1,7 +1,10 @@
 #include "slang-rich-diagnostics.h"
 
 #include "../compiler-core/slang-rich-diagnostics-render.h"
+#include "slang-ast-modifier.h"
 #include "slang-ast-type.h"
+#include "slang-ir.h"
+#include "slang-target.h"
 
 //
 #include "slang-rich-diagnostics.cpp.fiddle"
@@ -11,6 +14,44 @@ namespace Slang
 namespace Diagnostics
 {
 
+// Generate DiagnosticInfo entries for all rich diagnostics.
+// These are needed for the warning suppression system (-Wno-xxx flags).
+// The 'name' field uses lowerCamelCase which matches the convention expected
+// by DiagnosticsLookup::findDiagnosticByName (which converts from kebab-case).
+#if 0 // FIDDLE TEMPLATE:
+% local lua_module = require("source/slang/slang-rich-diagnostics.h.lua")
+% local diagnostics = lua_module.getDiagnostics()
+% for _, diagnostic in ipairs(diagnostics) do
+%     local camel_name = lua_module.toLowerCamelCase(diagnostic.name)
+%     local class_name = lua_module.toPascalCase(diagnostic.name)
+%     -- Escape quotes and backslashes in the message
+%     local escaped_message = diagnostic.message:gsub('\\', '\\\\'):gsub('"', '\\"')
+const DiagnosticInfo $(camel_name)Info = {$(diagnostic.code), $(lua_module.getSeverityEnum(diagnostic.severity)), "$(camel_name)", "$(escaped_message)"};
+const DiagnosticInfo* $(class_name)::getInfo() { return &$(camel_name)Info; }
+% end
+
+static const DiagnosticInfo* const kRichDiagnostics[] = {
+% for _, diagnostic in ipairs(diagnostics) do
+%     local camel_name = lua_module.toLowerCamelCase(diagnostic.name)
+    &$(camel_name)Info,
+% end
+};
+
+#else // FIDDLE OUTPUT:
+#define FIDDLE_GENERATED_OUTPUT_ID 0
+#include "slang-rich-diagnostics.cpp.fiddle"
+#endif // FIDDLE END
+
+const DiagnosticInfo* const* getRichDiagnosticsInfo()
+{
+    return kRichDiagnostics;
+}
+
+Index getRichDiagnosticsInfoCount()
+{
+    return SLANG_COUNT_OF(kRichDiagnostics);
+}
+
 UnownedStringSlice nameToPrintableString(Name* name)
 {
     return name ? name->text.getUnownedSlice() : UnownedStringSlice{"<unknown name>"};
@@ -19,6 +60,60 @@ UnownedStringSlice nameToPrintableString(Name* name)
 String typeToPrintableString(Type* type)
 {
     return type ? type->toString() : "<unknown type>";
+}
+
+String qualTypeToPrintableString(QualType type)
+{
+    return type.type ? type.type->toString() : "<unknown type>";
+}
+
+String modifierToPrintableString(Modifier* modifier)
+{
+    if (!modifier)
+        return "<unknown modifier>";
+    StringBuilder sb;
+    if (modifier->keywordName && modifier->keywordName->text.getLength())
+        sb << modifier->keywordName->text;
+    if (auto hlslSemantic = as<HLSLSemantic>(modifier))
+        sb << hlslSemantic->name.getContent();
+    return sb.produceString();
+}
+
+String irInstToPrintableString(IRInst* inst)
+{
+    if (!inst)
+        return "<unknown>";
+    StringBuilder sb;
+    printDiagnosticArg(sb, inst);
+    return sb.produceString();
+}
+
+String paramPassingModeToPrintableString(ParamPassingMode mode)
+{
+    StringBuilder sb;
+    printDiagnosticArg(sb, mode);
+    return sb.produceString();
+}
+
+String capabilityAtomListToPrintableString(const List<CapabilityAtom>& list)
+{
+    StringBuilder sb;
+    printDiagnosticArg(sb, list);
+    return sb.produceString();
+}
+
+String astNodeTypeToPrintableString(ASTNodeType nodeType)
+{
+    StringBuilder sb;
+    printDiagnosticArg(sb, nodeType);
+    return sb.produceString();
+}
+
+String codeGenTargetToPrintableString(CodeGenTarget target)
+{
+    StringBuilder sb;
+    printDiagnosticArg(sb, target);
+    return sb.produceString();
 }
 
 // Generate member function implementations
@@ -111,7 +206,7 @@ String typeToPrintableString(Type* type)
 %   end
 %
 %   -- Generate null check condition for required params
-%   local generateNullCheck = function(required_params, var_mapping)
+%   local generateNullCheck = function(required_params, var_mapping, variadic_struct)
 %     var_mapping = var_mapping or {}
 %     if not required_params or #required_params == 0 then
 %       return nil
@@ -150,8 +245,22 @@ String typeToPrintableString(Type* type)
           nameToPrintableString($(base_expr))
 %           elseif ptype == "type" then
           typeToPrintableString($(base_expr))
+%           elseif ptype == "qualtype" then
+          qualTypeToPrintableString($(base_expr))
 %           elseif ptype == "decl" then
           nameToPrintableString($(base_expr)->getName())
+%           elseif ptype == "modifier" then
+          modifierToPrintableString($(base_expr))
+%           elseif ptype == "irinst" then
+          irInstToPrintableString($(base_expr))
+%           elseif ptype == "parampassingmode" then
+          paramPassingModeToPrintableString($(base_expr))
+%           elseif ptype == "capabilityatomlist" then
+          capabilityAtomListToPrintableString($(base_expr))
+%           elseif ptype == "astnodetype" then
+          astNodeTypeToPrintableString($(base_expr))
+%           elseif ptype == "codegentarget" then
+          codeGenTargetToPrintableString($(base_expr))
 %           elseif ptype == "expr" or ptype == "stmt" or ptype == "val" then
           $(base_expr)
 %           else
@@ -193,9 +302,15 @@ GenericDiagnostic $(class_name)::toGenericDiagnostic() const
 
     result.message = $(buildMessage(diagnostic.message_parts));
 
+%     if diagnostic.primary_span then
     // Set primary span
     result.primarySpan.range = SourceRange{$(lua_module.getLocationExpr(diagnostic.primary_span.location_name, diagnostic.primary_span.location_type))};
     result.primarySpan.message = $(buildMessage(diagnostic.primary_span.message_parts));
+%     else
+    // No primary span (locationless diagnostic)
+    result.primarySpan.range = SourceRange{SourceLoc()};
+    result.primarySpan.message = String();
+%     end
 
 %     if diagnostic.secondary_spans and #diagnostic.secondary_spans > 0 then
     // Set secondary spans
@@ -212,7 +327,7 @@ GenericDiagnostic $(class_name)::toGenericDiagnostic() const
 %                 for _, param in ipairs(vs.params) do
 %                     var_map[param.name] = item_var .. "." .. param.name
 %                 end
-%                 local null_check = generateNullCheck(vs.required_params, var_map)
+%                 local null_check = generateNullCheck(vs.required_params, var_map, vs)
     for (const auto& $(item_var) : $(vs.list_name))
     {
 %                 if null_check then
@@ -228,7 +343,7 @@ GenericDiagnostic $(class_name)::toGenericDiagnostic() const
 %                 end
     }
 %             else
-%                 local null_check = generateNullCheck(span.required_params)
+%                 local null_check = generateNullCheck(span.required_params, nil, nil)
 %                 if null_check then
     if ($(null_check))
 %                 end
@@ -257,7 +372,7 @@ GenericDiagnostic $(class_name)::toGenericDiagnostic() const
 %                 for _, param in ipairs(vs.params) do
 %                     var_map[param.name] = item_var .. "." .. param.name
 %                 end
-%                 local null_check = generateNullCheck(vs.required_params, var_map)
+%                 local null_check = generateNullCheck(vs.required_params, var_map, vs)
     for (const auto& $(item_var) : $(vs.list_name))
     {
 %                 if null_check then
@@ -273,7 +388,7 @@ GenericDiagnostic $(class_name)::toGenericDiagnostic() const
 %                 if note.spans and #note.spans > 0 then
             // Add additional spans to note
 %                     for _, span in ipairs(note.spans) do
-%                         local span_null_check = generateNullCheck(span.required_params)
+%                         local span_null_check = generateNullCheck(span.required_params, nil, nil)
 %                         if span_null_check then
             if ($(span_null_check))
 %                         end
@@ -291,9 +406,23 @@ GenericDiagnostic $(class_name)::toGenericDiagnostic() const
 %                 end
     }
 %             else
-%                 local null_check = generateNullCheck(note.required_params)
-%                 if null_check then
-    if ($(null_check))
+%                 local null_check = generateNullCheck(note.required_params, nil, nil)
+%                 -- For notes with untyped locations (plain SourceLoc), check validity
+%                 local validity_check = nil
+%                 if not note.location_type then
+%                     validity_check = note.location_name .. ".isValid()"
+%                 end
+%                 -- Combine checks
+%                 local combined_check = nil
+%                 if validity_check and null_check then
+%                     combined_check = validity_check .. " && " .. null_check
+%                 elseif validity_check then
+%                     combined_check = validity_check
+%                 elseif null_check then
+%                     combined_check = null_check
+%                 end
+%                 if combined_check then
+    if ($(combined_check))
 %                 end
     {
         DiagnosticNote note;
@@ -305,7 +434,7 @@ GenericDiagnostic $(class_name)::toGenericDiagnostic() const
 %                 if note.spans and #note.spans > 0 then
         // Add additional spans to note
 %                     for _, span in ipairs(note.spans) do
-%                         local span_null_check = generateNullCheck(span.required_params)
+%                         local span_null_check = generateNullCheck(span.required_params, nil, nil)
 %                         if span_null_check then
         if ($(span_null_check))
 %                         end
@@ -328,7 +457,7 @@ GenericDiagnostic $(class_name)::toGenericDiagnostic() const
 
 % end
 #else // FIDDLE OUTPUT:
-#define FIDDLE_GENERATED_OUTPUT_ID 0
+#define FIDDLE_GENERATED_OUTPUT_ID 1
 #include "slang-rich-diagnostics.cpp.fiddle"
 #endif // FIDDLE END
 

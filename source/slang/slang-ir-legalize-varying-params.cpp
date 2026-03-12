@@ -8,6 +8,7 @@
 #include "slang-ir-lower-tuple-types.h"
 #include "slang-ir-util.h"
 #include "slang-parameter-binding.h"
+#include "slang-rich-diagnostics.h"
 
 #include <set>
 
@@ -1042,10 +1043,9 @@ protected:
     {
         SLANG_UNUSED(info);
 
-        m_sink->diagnose(
-            m_param,
-            Diagnostics::unimplemented,
-            "this target doesn't support this system-defined varying parameter");
+        m_sink->diagnose(Diagnostics::Unimplemented{
+            .feature = "this target doesn't support this system-defined varying parameter",
+            .location = m_param->sourceLoc});
 
         return LegalizedVaryingVal();
     }
@@ -1054,10 +1054,9 @@ protected:
     {
         SLANG_UNUSED(info);
 
-        m_sink->diagnose(
-            m_param,
-            Diagnostics::unimplemented,
-            "this target doesn't support this user-defined varying parameter");
+        m_sink->diagnose(Diagnostics::Unimplemented{
+            .feature = "this target doesn't support this user-defined varying parameter",
+            .location = m_param->sourceLoc});
 
         return LegalizedVaryingVal();
     }
@@ -2106,11 +2105,11 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                     /*the builder in use*/ &builder);
                 if (ioBaseAttributeIndex > 8)
                 {
-                    m_sink->diagnose(
-                        m_param,
-                        Diagnostics::unexpected,
-                        "the supplied hit attribute exceeds the maximum hit attribute structure "
-                        "size (32 bytes)");
+                    m_sink->diagnose(Diagnostics::Unexpected{
+                        .message = "the supplied hit attribute exceeds the maximum hit attribute "
+                                   "structure "
+                                   "size (32 bytes)",
+                        .location = m_param->sourceLoc});
                     return LegalizedVaryingVal();
                 }
                 return LegalizedVaryingVal::makeValue(getHitAttributes);
@@ -2143,6 +2142,13 @@ struct CPUEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegalize
     IRStructKey* groupIDKey = nullptr;
     IRStructKey* groupThreadIDKey = nullptr;
 
+    TargetProgram* target;
+
+    CPUEntryPointVaryingParamLegalizeContext(TargetProgram* target)
+        : target(target)
+    {
+    }
+
     void beginModuleImpl() SLANG_OVERRIDE
     {
         IRBuilder builder(m_module);
@@ -2158,7 +2164,14 @@ struct CPUEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegalize
         // coming from the "prelude" file that already defines this type.
 
         varyingInputStructType = builder.createStructType();
-        varyingInputStructPtrType = builder.getPtrType(varyingInputStructType);
+        auto dataLayout = isCPUTargetViaLLVM(target->getTargetReq())
+                              ? (IRType*)builder.getLLVMBufferLayoutType()
+                              : (IRType*)builder.getCBufferLayoutType();
+        varyingInputStructPtrType = builder.getPtrType(
+            varyingInputStructType,
+            AccessQualifier::Read,
+            AddressSpace::Generic,
+            dataLayout);
 
         builder.addTargetIntrinsicDecoration(
             varyingInputStructType,
@@ -2226,9 +2239,8 @@ struct CPUEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegalize
 
         if (!groupExtents)
         {
-            m_sink->diagnose(
-                m_entryPointFunc,
-                Diagnostics::unsupportedSpecializationConstantForNumThreads);
+            m_sink->diagnose(Diagnostics::UnsupportedSpecializationConstantForNumThreads{
+                .location = m_entryPointFunc->sourceLoc});
 
             // Fill in placeholder values.
             static const int kAxisCount = 3;
@@ -2270,9 +2282,12 @@ struct CPUEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegalize
     }
 };
 
-void legalizeEntryPointVaryingParamsForCPU(IRModule* module, DiagnosticSink* sink)
+void legalizeEntryPointVaryingParamsForCPU(
+    IRModule* module,
+    TargetProgram* target,
+    DiagnosticSink* sink)
 {
-    CPUEntryPointVaryingParamLegalizeContext context;
+    CPUEntryPointVaryingParamLegalizeContext context(target);
     context.processModule(module, sink);
 }
 
@@ -2455,7 +2470,7 @@ protected:
                     {var,
                      varType,
                      String(semanticDecoration->getSemanticName()).toLower(),
-                     (UInt)semanticDecoration->getSemanticIndex()}};
+                     (UInt)semanticDecoration->getEffectiveSemanticIndex()}};
             }
         }
 
@@ -2537,13 +2552,10 @@ protected:
                 // If we can't convert the value, report an error.
                 for (auto permittedType : info.permittedTypes)
                 {
-                    StringBuilder typeNameSB;
-                    getTypeNameHint(typeNameSB, permittedType);
-                    m_sink->diagnose(
-                        var->sourceLoc,
-                        Diagnostics::systemValueTypeIncompatible,
-                        semanticName,
-                        typeNameSB.produceString());
+                    m_sink->diagnose(Diagnostics::SystemValueTypeIncompatible{
+                        .semanticName = semanticName,
+                        .requiredType = permittedType,
+                        .location = var->sourceLoc});
                 }
             }
         }
@@ -2964,10 +2976,9 @@ private:
 
     void reportUnsupportedSystemAttribute(IRInst* param, String semanticName)
     {
-        m_sink->diagnose(
-            param->sourceLoc,
-            Diagnostics::systemValueAttributeNotSupported,
-            semanticName);
+        m_sink->diagnose(Diagnostics::SystemValueAttributeNotSupported{
+            .semanticName = semanticName,
+            .location = param->sourceLoc});
     }
 
     template<LayoutResourceKind K>
@@ -2985,7 +2996,7 @@ private:
             {
                 if (semanticDecor->getSemanticName().startsWithCaseInsensitive(toSlice("sv_")))
                 {
-                    auto indexAsString = String(UInt(semanticDecor->getSemanticIndex()));
+                    auto indexAsString = String(UInt(semanticDecor->getEffectiveSemanticIndex()));
                     auto sysValInfo =
                         getSystemValueInfo(semanticDecor->getSemanticName(), &indexAsString, field);
                     if (sysValInfo.isUnsupported)
@@ -3553,8 +3564,9 @@ private:
 
                 auto loweredName = String(outName).toLower();
                 auto loweredNameSlice = getUserSemanticNameSlice(loweredName, isUserSemantic);
-                auto semanticIndex =
-                    hasStringIndex ? stringToInt(outIndex) : semanticDecoration->getSemanticIndex();
+                auto semanticIndex = hasStringIndex
+                                         ? stringToInt(outIndex)
+                                         : semanticDecoration->getEffectiveSemanticIndex();
                 auto newDecoration =
                     builder.addSemanticDecoration(key, loweredNameSlice, semanticIndex);
 
@@ -4053,10 +4065,10 @@ protected:
                 break;
             }
         default:
-            m_sink->diagnose(
-                parentVar,
-                Diagnostics::unimplementedSystemValueSemantic,
-                semanticName);
+            m_sink->diagnose(Diagnostics::UnimplementedSystemValueSemantic{
+                .semanticName = semanticName,
+                .location = parentVar->sourceLoc,
+            });
             return result;
         }
         return result;
@@ -4205,9 +4217,8 @@ protected:
                 emitCalcGroupExtents(svBuilder, entryPoint.entryPointFunc, uint3Type);
             if (!computeExtent)
             {
-                m_sink->diagnose(
-                    entryPoint.entryPointFunc,
-                    Diagnostics::unsupportedSpecializationConstantForNumThreads);
+                m_sink->diagnose(Diagnostics::UnsupportedSpecializationConstantForNumThreads{
+                    .location = entryPoint.entryPointFunc->sourceLoc});
 
                 // Fill in placeholder values.
                 static const int kAxisCount = 3;
@@ -4273,7 +4284,8 @@ protected:
                     const auto annotatedPayloadType = builder.getPtrType(
                         kIROp_RefParamType,
                         payloadPtrType->getValueType(),
-                        AddressSpace::MetalObjectData);
+                        AddressSpace::MetalObjectData,
+                        payloadPtrType->getDataLayout());
                     auto packedParam = builder.emitParam(annotatedPayloadType);
                     builder.addExternCppDecoration(packedParam, toSlice("_slang_mesh_payload"));
                     IRVarLayout::Builder varLayoutBuilder(
@@ -4677,10 +4689,10 @@ protected:
             }
         default:
             {
-                m_sink->diagnose(
-                    parentVar,
-                    Diagnostics::unimplementedSystemValueSemantic,
-                    semanticName);
+                m_sink->diagnose(Diagnostics::UnimplementedSystemValueSemantic{
+                    .semanticName = semanticName,
+                    .location = parentVar->sourceLoc,
+                });
                 return result;
             }
         }

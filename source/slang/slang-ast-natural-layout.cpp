@@ -224,6 +224,10 @@ NaturalSize ASTNaturalLayoutContext::_calcSizeImpl(Type* type)
         // which can be resolved later with target information.
         return NaturalSize::makeInvalid();
     }
+    else if (auto atomicType = as<AtomicType>(type))
+    {
+        return calcSize(atomicType->getElementType());
+    }
     else if (auto declRefType = as<DeclRefType>(type))
     {
         if (const auto enumDeclRef = declRefType->getDeclRef().as<EnumDecl>())

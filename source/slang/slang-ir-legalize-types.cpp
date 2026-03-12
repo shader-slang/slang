@@ -19,6 +19,7 @@
 #include "slang-ir.h"
 #include "slang-legalize-types.h"
 #include "slang-mangle.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -1975,7 +1976,8 @@ static LegalVal legalizeUndefined(IRTypeLegalizationContext* context, IRInst* in
         if (!loc.isValid())
             loc = getDiagnosticPos(opaqueType);
 
-        context->m_sink->diagnose(loc, Diagnostics::useOfUninitializedOpaqueHandle, opaqueType);
+        context->m_sink->diagnose(
+            Diagnostics::UseOfUninitializedOpaqueHandle{.handleType = opaqueType, .location = loc});
     }
 
     // It is not ideal, but this pass legalizes an undefined value to... nothing.
@@ -2263,9 +2265,8 @@ static LegalVal legalizeCoopMatMapElementIFunc(
                 // If functor legalizes to one or many special (resource) values, we
                 // can't handle this case very easily at the moment, so diagnose an error
                 // instead of crashing.
-                context->m_sink->diagnose(
-                    inst->getIFuncCall(),
-                    Diagnostics::cooperativeMatrixUnsupportedCapture);
+                context->m_sink->diagnose(Diagnostics::CooperativeMatrixUnsupportedCapture{
+                    .location = inst->getIFuncCall()->sourceLoc});
                 return LegalVal();
             }
         }
@@ -3282,14 +3283,36 @@ static LegalVal declareVars(
 
     case LegalType::Flavor::implicitDeref:
         {
-            // Just declare a variable of the pointed-to type,
+            auto unwrappedTypeLayout = typeLayout;
+            IRVarLayout* elementVarLayout = nullptr;
+
+            // If the type layout is a ParameterGroupTypeLayout wrapping a non-struct
+            // element, unwrap to the element layout so resource bindings (e.g.
+            // DescriptorTableSlot) propagate to the declared variable.
+            // Struct elements get pair-decomposed, and the element
+            // layout refers to the full struct rather than the ordinary-only part.
+            if (auto paramGroupLayout = as<IRParameterGroupTypeLayout>(typeLayout))
+            {
+                auto paramGroupElementVarLayout = paramGroupLayout->getElementVarLayout();
+                auto paramGroupElementTypeLayout = paramGroupElementVarLayout->getTypeLayout();
+                if (!as<IRStructTypeLayout>(paramGroupElementTypeLayout))
+                {
+                    elementVarLayout = paramGroupElementVarLayout;
+                    unwrappedTypeLayout = paramGroupElementTypeLayout;
+                }
+            }
+
+            // This constructor just copies `varChain` if `elementVarLayout` is null.
+            LegalVarChainLink varChainWithElement(varChain, elementVarLayout);
+
+            // Declare a variable of the pointed-to type,
             // since we are removing the indirection.
             auto val = declareVars(
                 context,
                 op,
                 type.getImplicitDeref()->valueType,
-                typeLayout,
-                varChain,
+                unwrappedTypeLayout,
+                varChainWithElement,
                 nameHint,
                 leafVar,
                 globalParamInfo,
@@ -3451,7 +3474,9 @@ static LegalVal legalizeGlobalVar(IRTypeLegalizationContext* context, IRGlobalVa
             context->builder->getPtrType(
                 legalValueType.getSimple(),
                 varPtrType ? varPtrType->getAccessQualifier() : AccessQualifier::ReadWrite,
-                varPtrType ? varPtrType->getAddressSpace() : AddressSpace::Global));
+                varPtrType ? varPtrType->getAddressSpace() : AddressSpace::Global,
+                varPtrType ? varPtrType->getDataLayout()
+                           : context->builder->getDefaultBufferLayoutType()));
         return LegalVal::simple(irGlobalVar);
 
     default:

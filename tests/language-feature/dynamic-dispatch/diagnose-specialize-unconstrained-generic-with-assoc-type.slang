@@ -5,6 +5,9 @@
 
 // Disabled: ICE -- should emit error 33180 but crashes with error 99999
 //DISABLE_TEST:SIMPLE(filecheck=CHECK): -target spirv
+//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry computeMain
+//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target glsl -stage compute -entry computeMain
+//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry computeMain
 
 #lang slang 2025
 
@@ -42,7 +45,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     ITransform obj = factory(dispatchThreadID.x);
     var result = obj.transform(1.0);
-    // CHECK: error 33180
+    // CHECK: ([[# @LINE+1]]): error 33180
     let processed = process(result);
     outputBuffer[0] = 0;
 }

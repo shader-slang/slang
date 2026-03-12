@@ -30,7 +30,7 @@ struct DefaultDataLayout : IBufferDataLayout
 {};
 
 /// @category misc_types
-__intrinsic_type($(kIROp_Std430BufferLayoutType))
+__intrinsic_type($(kIROp_DefaultPushConstantBufferLayoutType))
 __magic_type(DefaultPushConstantDataLayoutType)
 struct DefaultPushConstantDataLayout : IBufferDataLayout
 {};
@@ -629,8 +629,8 @@ extension vector<int64_t,2>:ITexelElement
 /// @param isArray Indicates whether the texture is an array texture.
 /// @param isMS Indicates whether the texture is a multisampled texture.
 /// @param sampleCount The number of samples of a multisampled texture.
-/// @param access The access mode of the texture. 0 for read-only, 1 for read-write, 2 for rasterizer-ordered, 3 for feedback.
-/// @param isShadow Indicates whether the texture is a shadow texture (for combined texture-sampler only).
+/// @param access The access mode of the texture. 0 for read-only, 1 for read-write, 2 for write-only, 3 for rasterizer-ordered, 4 for feedback.
+/// @param isShadow Indicates whether the texture is a depth texture (`isCombined==0`) or a shadow texture (`isCombined==1`).
 /// @param isCombined Indicates whether the texture is a combined texture-sampler.
 /// @param format The storage format of the texture. Users should specify the format using an `[format("...")]` attribute instead.
 /// @see `Texture1D`, `Texture2D`, `Texture3D`, `TextureCube`, `Texture1DArray`,
@@ -692,7 +692,91 @@ extension vector<int64_t,2>:ITexelElement
 ///
 /// When targeting Vulkan, a combined-texture-sampler type (`isCombined==1`) translates to a `OpTypeSampledImage` type in SPIR-V.
 /// For other targets, the combined-texture-sampler type is translated to a pair of a `Texture` and `SamplerState`.
-/// `isShadow` is only applicable to combined-texture-sampler types and must be `0` for non-combined texture types.
+///
+/// The defined texture types and their backend support:
+///
+/// | Type                              | Cuda | GLSL core version / extension         | HLSL   | Metal/macOS | SPIR-V | WGSL |
+/// |:----------------------------------|:-----|:--------------------------------------|:-------|:------------|:-------|:-----|
+/// | `DepthTexture1D`                  |      | 110                                   | SM 4.0 | -           |        | -    |
+/// | `DepthTexture1DArray`             |      | 130 / EXT_texture_array               | SM 4.0 | -           |        | -    |
+/// | `DepthTexture2D`                  |      | 110                                   | SM 4.0 | 1.0         |        | 1.0  |
+/// | `DepthTexture2DArray`             |      | 130 / EXT_texture_array               | SM 4.0 | 1.0         |        | 1.0  |
+/// | `DepthTexture2DMS`                |      | -                                     | SM 4.0 | 1.0         |        | 1.0  |
+/// | `DepthTexture2DMSArray`           |      | -                                     | SM 4.0 | 2.0         |        | -    |
+/// | `DepthTexture3D`                  |      | -                                     | -      | -           |        | -    |
+/// | `DepthTextureCube`                |      | 110                                   | SM 4.0 | 1.0         |        | 1.0  |
+/// | `DepthTextureCubeArray`           |      | 400 / ARB_texture_cube_map_array      | SM 4.0 | 1.0         |        | 1.0  |
+/// | `FeedbackTexture2D`               |      | -                                     | SM 6.5 | -           |        | -    |
+/// | `FeedbackTexture2DArray`          |      | -                                     | SM 6.5 | -           |        | -    |
+/// | `RWTexture1D`                     |      | 420 / ARB_shader_image_load_store     | SM 5.0 | 1.0         |        | 1.0  |
+/// | `RWTexture1DArray`                |      | 420 / ARB_shader_image_load_store     | SM 5.0 | 1.0         |        | -    |
+/// | `RWTexture2D`                     |      | 420 / ARB_shader_image_load_store     | SM 5.0 | 1.0         |        | 1.0  |
+/// | `RWTexture2DArray`                |      | 420 / ARB_shader_image_load_store     | SM 5.0 | 1.0         |        | 1.0  |
+/// | `RWTexture2DMS`                   |      | 420 / ARB_shader_image_load_store     | SM 6.7 | -           |        | -    |
+/// | `RWTexture2DMSArray`              |      | 420 / ARB_shader_image_load_store     | SM 6.7 | -           |        | -    |
+/// | `RWTexture3D`                     |      | 420 / ARB_shader_image_load_store     | SM 5.0 | 1.0         |        | 1.0  |
+/// | `RasterizerOrderedTexture1D`      |      | none / ARB_fragment_shader_interlock  | SM 5.1 | 2.0         |        | -    |
+/// | `RasterizerOrderedTexture1DArray` |      | none / ARB_fragment_shader_interlock  | SM 5.1 | 2.0         |        | -    |
+/// | `RasterizerOrderedTexture2D`      |      | none / ARB_fragment_shader_interlock  | SM 5.1 | 2.0         |        | -    |
+/// | `RasterizerOrderedTexture2DArray` |      | none / ARB_fragment_shader_interlock  | SM 5.1 | 2.0         |        | -    |
+/// | `RasterizerOrderedTexture3D`      |      | none / ARB_fragment_shader_interlock  | SM 5.1 | 2.0         |        | -    |
+/// | `Texture1D`                       |      | 110                                   | SM 4.0 | 1.0         |        | 1.0  |
+/// | `Texture1DArray`                  |      | 130 / EXT_texture_array               | SM 4.0 | 1.0         |        | -    |
+/// | `Texture2D`                       |      | 110                                   | SM 4.0 | 1.0         |        | 1.0  |
+/// | `Texture2DArray`                  |      | 130 / EXT_texture_array               | SM 4.0 | 1.0         |        | 1.0  |
+/// | `Texture2DMS`                     |      | 150(*)                                | SM 4.0 | 1.0         |        | 1.0  |
+/// | `Texture2DMSArray`                |      | 150(*)                                | SM 4.0 | 2.0         |        | -    |
+/// | `Texture3D`                       |      | 110                                   | SM 4.0 | 1.0         |        | 1.0  |
+/// | `TextureCube`                     |      | 110                                   | SM 4.0 | 1.0         |        | 1.0  |
+/// | `TextureCubeArray`                |      | 400 / ARB_texture_cube_map_array      | SM 4.0 | 1.0         |        | 1.0  |
+/// | `WTexture1D`                      |      | 420 / ARB_shader_image_load_store     | -      | 1.0         |        | 1.0  |
+/// | `WTexture1DArray`                 |      | 420 / ARB_shader_image_load_store     | -      | 1.0         |        | -    |
+/// | `WTexture2D`                      |      | 420 / ARB_shader_image_load_store     | -      | 1.0         |        | 1.0  |
+/// | `WTexture2DArray`                 |      | 420 / ARB_shader_image_load_store     | -      | 1.0         |        | 1.0  |
+/// | `WTexture3D`                      |      | 420 / ARB_shader_image_load_store     | -      | 1.0         |        | 1.0  |
+///
+/// (*) Usable only via combined texture-sampler types.
+///
+/// The combined texture-sampler types and their backend support:
+///
+/// | Type                              | Cuda | GLSL | HLSL   | Metal/macOS | SPIR-V | WGSL |
+/// |:----------------------------------|:-----|:-----|:-------|:------------|:-------|:-----|
+/// | `Sampler1DShadow`                 |      |      |        |             |        |      |
+/// | `Sampler1DArrayShadow`            |      |      |        |             |        |      |
+/// | `Sampler2DShadow`                 |      |      |        |             |        |      |
+/// | `Sampler2DArrayShadow`            |      |      |        |             |        |      |
+/// | `Sampler2DMSShadow`               |      |      |        |             |        |      |
+/// | `Sampler2DMSArrayShadow`          |      |      |        |             |        |      |
+/// | `Sampler3DShadow`                 |      |      |        |             |        |      |
+/// | `SamplerCubeShadow`               |      |      |        |             |        |      |
+/// | `SamplerCubeArrayShadow`          |      |      |        |             |        |      |
+/// | `RWSampler1D`                     |      |      |        |             |        |      |
+/// | `RWSampler1DArray`                |      |      |        |             |        |      |
+/// | `RWSampler2D`                     |      |      |        |             |        |      |
+/// | `RWSampler2DArray`                |      |      |        |             |        |      |
+/// | `RWSampler2DMS`                   |      |      |        |             |        |      |
+/// | `RWSampler2DMSArray`              |      |      |        |             |        |      |
+/// | `RWSampler3D`                     |      |      |        |             |        |      |
+/// | `RasterizerOrderedSampler1D`      |      |      |        |             |        |      |
+/// | `RasterizerOrderedSampler1DArray` |      |      |        |             |        |      |
+/// | `RasterizerOrderedSampler2D`      |      |      |        |             |        |      |
+/// | `RasterizerOrderedSampler2DArray` |      |      |        |             |        |      |
+/// | `RasterizerOrderedSampler3D`      |      |      |        |             |        |      |
+/// | `Sampler1D`                       |      |      |        |             |        |      |
+/// | `Sampler1DArray`                  |      |      |        |             |        |      |
+/// | `Sampler2D`                       |      |      |        |             |        |      |
+/// | `Sampler2DArray`                  |      |      |        |             |        |      |
+/// | `Sampler2DMS`                     |      |      |        |             |        |      |
+/// | `Sampler2DMSArray`                |      |      |        |             |        |      |
+/// | `Sampler3D`                       |      |      |        |             |        |      |
+/// | `SamplerCube`                     |      |      |        |             |        |      |
+/// | `SamplerCubeArray`                |      |      |        |             |        |      |
+/// | `WSampler1D`                      |      |      |        |             |        |      |
+/// | `WSampler1DArray`                 |      |      |        |             |        |      |
+/// | `WSampler2D`                      |      |      |        |             |        |      |
+/// | `WSampler2DArray`                 |      |      |        |             |        |      |
+/// | `WSampler3D`                      |      |      |        |             |        |      |
+///
 /// @internal
 /// @category texture_types Texture types
 __magic_type(TextureType)
@@ -967,9 +1051,21 @@ void __wgsl_check_texture_type()
     static_assert(isShadow == 0 || Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_CUBE)
         , "WGSL depth texture shape must be either 2D or Cube");
 
-    // Multisampled texture shapes
+    // Multisampled textures
     static_assert(isMS == 0 || Shape.flavor == $(SLANG_TEXTURE_2D)
         , "WGSL multisampled texture shape must be 2D");
+    static_assert(isMS == 0 ||
+                 (access != $(kCoreModule_ResourceAccessWriteOnly) &&
+                  access != $(kCoreModule_ResourceAccessReadWrite))
+        , "WGSL does not support multisampled texture storage");
+
+    // access
+    static_assert(access != $(kCoreModule_ResourceAccessRasterizerOrdered)
+        , "WGSL does not support RasterizerOrderedTexture types");
+    static_assert(access != $(kCoreModule_ResourceAccessFeedback)
+        , "WGSL does not support FeedbackTexture types");
+    static_assert(access <= $(kCoreModule_ResourceAccessFeedback)
+        , "WGSL: unhandled texture access type");
 }
 
 __generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
@@ -5576,20 +5672,20 @@ __intrinsic_op($(kIROp_ByteAddressBufferStore))
 void __byteAddressBufferStore<T>(RasterizerOrderedByteAddressBuffer buffer, uint offset, uint alignment, T value);
 
 __intrinsic_op($(kIROp_GetUntypedBufferPtr))
-[require(spirv, byteaddressbuffer)]
+[require(cpp_cuda, byteaddressbuffer)]
 Ptr<uint[]> __getByteAddressBufferPtr(ByteAddressBuffer buffer);
 
 __intrinsic_op($(kIROp_GetUntypedBufferPtr))
-[require(spirv, byteaddressbuffer_rw)]
+[require(cpp_cuda, byteaddressbuffer_rw)]
 Ptr<uint[]> __getByteAddressBufferPtr(RWByteAddressBuffer buffer);
 
 __intrinsic_op($(kIROp_GetStructuredBufferPtr))
-[require(spirv, structuredbuffer)]
-Ptr<T[]> __getStructuredBufferPtr<T>(StructuredBuffer<T> buffer);
+[require(cpp_cuda, structuredbuffer)]
+LayoutPtr<T[], L> __getStructuredBufferPtr<T, L:IBufferDataLayout>(StructuredBuffer<T, L> buffer);
 
 __intrinsic_op($(kIROp_GetStructuredBufferPtr))
-[require(spirv, structuredbuffer_rw)]
-Ptr<T[]> __getStructuredBufferPtr<T>(RWStructuredBuffer<T> buffer);
+[require(cpp_cuda, structuredbuffer)]
+LayoutPtr<T[], L> __getStructuredBufferPtr<T, L:IBufferDataLayout>(RWStructuredBuffer<T, L> buffer);
 
 /**
 Represents an opaque handle to a read-only structured buffer allocated in global memory.
@@ -19864,8 +19960,8 @@ float4x3 WorldToObject4x3()
 /// @return Time value between 0 and 1 for motion blur interpolation
 /// @remarks Available when motion blur extension is enabled
 /// @category raytracing
-__glsl_extension(GL_NV_ray_tracing_motion_blur)
 __glsl_extension(GL_EXT_ray_tracing)
+__glsl_extension(GL_NV_ray_tracing_motion_blur)
 [NonUniformReturn]
 [require(glsl_spirv, raytracing_motionblur_anyhit_closesthit_intersection_miss)]
 float RayCurrentTime()
@@ -20719,6 +20815,42 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
         }
     }
 
+    [require(metal, rayquery)]
+    [mutating]
+    internal void __reset(
+        float3 origin,
+        float3 direction,
+        float tMin,
+        float tMax,
+        RaytracingAccelerationStructure accelerationStructure,
+        uint instanceInclusionMask,
+        RAY_FLAG rayFlags)
+    {
+        __requirePrelude(R"(
+            raytracing::intersection_params _slang_ray_flags_to_intersection_params(uint flags){
+                raytracing::intersection_params params;
+                if (flags & 0x01) /* RAY_FLAG_FORCE_OPAQUE */
+                    params.force_opacity(raytracing::forced_opacity::opaque);
+                if (flags & 0x02) /* RAY_FLAG_FORCE_NON_OPAQUE */
+                    params.force_opacity(raytracing::forced_opacity::non_opaque);
+                if (flags & 0x10) /* RAY_FLAG_CULL_BACK_FACING_TRIANGLES */
+                    params.set_triangle_cull_mode(raytracing::triangle_cull_mode::back);
+                if (flags & 0x20) /* RAY_FLAG_CULL_FRONT_FACING_TRIANGLES */
+                    params.set_triangle_cull_mode(raytracing::triangle_cull_mode::front);
+                if (flags & 0x40) /* RAY_FLAG_CULL_OPAQUE */
+                    params.set_opacity_cull_mode(raytracing::opacity_cull_mode::opaque);
+                if (flags & 0x80) /* RAY_FLAG_CULL_NON_OPAQUE */
+                    params.set_opacity_cull_mode(raytracing::opacity_cull_mode::non_opaque);
+                if (flags & 0x100) /* RAY_FLAG_SKIP_TRIANGLES */
+                    params.set_geometry_cull_mode(raytracing::geometry_cull_mode::triangle);
+                if (flags & 0x200) /* RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES */
+                    params.set_geometry_cull_mode(raytracing::geometry_cull_mode::bounding_box);
+                return params;
+            }
+        )");
+        __intrinsic_asm "$0->reset({ $1, $2, $3, $4 }, $5, $6, _slang_ray_flags_to_intersection_params($7))";
+    }
+
     /// Initialize a ray-tracing query.
     ///
     /// This method may be called on a "fresh" ray query, or
@@ -20737,7 +20869,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     /// @param ray Description of ray parameters (origin, direction, tMin, tMax)
     [__unsafeForceInlineEarly]
     [mutating]
-    [require(glsl_hlsl_spirv, rayquery)]
+    [require(glsl_hlsl_metal_spirv, rayquery)]
     void TraceRayInline(
         RaytracingAccelerationStructure accelerationStructure,
         RAY_FLAG                        rayFlags,
@@ -20757,6 +20889,8 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
                 ray.TMin,
                 ray.Direction,
                 ray.TMax);
+        case metal:
+            __reset(ray.Origin, ray.Direction, ray.TMin, ray.TMax, accelerationStructure, instanceInclusionMask, rayFlags | rayFlagsGeneric);
         }
     }
 
@@ -20778,13 +20912,14 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     /// @remarks When true is returned, use Candidate* methods to evaluate the hit
     __glsl_extension(GL_EXT_ray_query)
     [mutating]
-    [require(glsl_hlsl_spirv, rayquery)]
+    [require(glsl_hlsl_metal_spirv, rayquery)]
     bool Proceed()
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".Proceed";
         case glsl: __intrinsic_asm "rayQueryProceedEXT";
+        case metal: __intrinsic_asm "$0->next()";
         case spirv: return spirv_asm
             {
                 result:$$bool = OpRayQueryProceedKHR &this
@@ -20796,13 +20931,14 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     /// @remarks Causes subsequent Proceed() calls to return false
     __glsl_extension(GL_EXT_ray_query)
     [mutating]
-    [require(glsl_hlsl_spirv, rayquery)]
+    [require(glsl_hlsl_metal_spirv, rayquery)]
     void Abort()
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".Abort";
         case glsl: __intrinsic_asm "rayQueryTerminateEXT";
+        case metal: __intrinsic_asm "$0->abort()";
         case spirv: spirv_asm { OpRayQueryTerminateKHR &this };
         }
     }
@@ -20811,13 +20947,14 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [mutating]
-    [require(glsl_hlsl_spirv, rayquery)]
+    [require(glsl_hlsl_metal_spirv, rayquery)]
     void CommitNonOpaqueTriangleHit()
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".CommitNonOpaqueTriangleHit";
         case glsl: __intrinsic_asm "rayQueryConfirmIntersectionEXT";
+        case metal: __intrinsic_asm "$0->commit_triangle_intersection()";
         case spirv: spirv_asm { OpRayQueryConfirmIntersectionKHR &this };
         }
     }
@@ -20827,13 +20964,14 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [mutating]
-    [require(glsl_hlsl_spirv, rayquery)]
+    [require(glsl_hlsl_metal_spirv, rayquery)]
     void CommitProceduralPrimitiveHit(float t)
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".CommitProceduralPrimitiveHit";
         case glsl: __intrinsic_asm "rayQueryGenerateIntersectionEXT";
+        case metal: __intrinsic_asm "$0->commit_bounding_box_intersection($1)";
         case spirv: spirv_asm { OpRayQueryGenerateIntersectionKHR &this $t };
         }
     }
@@ -20850,7 +20988,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [NonUniformReturn]
-    [require(glsl_hlsl_spirv, rayquery)]
+    [require(glsl_hlsl_metal_spirv, rayquery)]
     CANDIDATE_TYPE CandidateType()
     {
         __target_switch
@@ -20862,6 +21000,22 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
             return spirv_asm {
                 result:$$CANDIDATE_TYPE = OpRayQueryGetIntersectionTypeKHR &this $RayQueryCandidateIntersectionKHR;
             };
+        case metal:
+            __requirePrelude(R"(
+                uint _slang_candidate_intersection_type_to_uint(raytracing::intersection_type type){
+                    switch(type){
+                        case raytracing::intersection_type::triangle:
+                            return 0; /* CANDIDATE_NON_OPAQUE_TRIANGLE */
+                        case raytracing::intersection_type::bounding_box:
+                            return 1; /* CANDIDATE_PROCEDURAL_PRIMITIVE */
+                        default:
+                            return 0xFFFFFFFF; // Invalid value to indicate error case, should never be returned by the API
+                    }
+                }
+            )");
+            __intrinsic_asm R"(
+                _slang_candidate_intersection_type_to_uint($0->get_candidate_intersection_type())
+            )";
         }
     }
 
@@ -20871,7 +21025,7 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [NonUniformReturn]
-    [require(glsl_hlsl_spirv, rayquery)]
+    [require(glsl_hlsl_metal_spirv, rayquery)]
     COMMITTED_STATUS CommittedStatus()
     {
         __target_switch
@@ -20884,6 +21038,22 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
             {
                 result:$$COMMITTED_STATUS = OpRayQueryGetIntersectionTypeKHR &this $RayQueryCommittedIntersectionKHR;
             };
+        case metal:
+            __requirePrelude(R"(
+                uint _slang_committed_intersection_type_to_uint(raytracing::intersection_type type){
+                    switch(type){
+                        case raytracing::intersection_type::none:
+                            return 0; /* COMMITTED_NOTHING */
+                        case raytracing::intersection_type::triangle:
+                            return 1; /* COMMITTED_TRIANGLE_HIT */
+                        case raytracing::intersection_type::bounding_box:
+                            return 2; /* COMMITTED_PROCEDURAL_PRIMITIVE_HIT */
+                        default:
+                            return 0xFFFFFFFF; // Invalid value to indicate error case, should never be returned by the API
+                    }
+                }
+            )");
+            __intrinsic_asm "_slang_committed_intersection_type_to_uint($0->get_committed_intersection_type())";
         }
     }
 
@@ -20914,13 +21084,14 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [NonUniformReturn]
-    [require(glsl_hlsl_spirv, rayquery)]
+    [require(glsl_hlsl_metal_spirv, rayquery)]
     float CandidateTriangleRayT()
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".CandidateTriangleRayT";
         case glsl: __intrinsic_asm "rayQueryGetIntersectionTEXT($0, false)";
+        case metal: __intrinsic_asm "$0->get_candidate_triangle_distance()";
         case spirv:
             uint iCandidateOrCommitted = 0;
             return spirv_asm
@@ -20935,13 +21106,14 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [NonUniformReturn]
-    [require(glsl_hlsl_spirv, rayquery)]
+    [require(glsl_hlsl_metal_spirv, rayquery)]
     float CommittedRayT()
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".CommittedRayT";
         case glsl: __intrinsic_asm "rayQueryGetIntersectionTEXT($0, true)";
+        case metal: __intrinsic_asm "$0->get_committed_distance()";
         case spirv:
             uint iCandidateOrCommitted = 1;
             return spirv_asm
@@ -20953,15 +21125,16 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
 
     /// Gets the custom index of the instance containing the candidate hit.
     /// @return User-provided instance identifier
-    /// @remarks GLSL/SPIRV only
+    /// @remarks GLSL/METAL/SPIRV only
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
-    [require(glsl_spirv, rayquery)]
+    [require(glsl_metal_spirv, rayquery)]
     int CandidateRayInstanceCustomIndex()
     {
         __target_switch
         {
         case glsl: __intrinsic_asm "rayQueryGetIntersectionInstanceCustomIndexEXT($0, false)";
+        case metal: __intrinsic_asm "$0->get_candidate_user_instance_id()";
         case spirv:
             uint iCandidateOrCommitted = 0;
             return spirv_asm
@@ -21001,12 +21174,13 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     /// @remarks GLSL/SPIRV only
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
-    [require(glsl_spirv, rayquery)]
+    [require(glsl_metal_spirv, rayquery)]
     int CommittedRayInstanceCustomIndex()
     {
         __target_switch
         {
         case glsl: __intrinsic_asm "rayQueryGetIntersectionInstanceCustomIndexEXT($0, true)";
+        case metal: __intrinsic_asm "$0->get_committed_user_instance_id()";
         case spirv:
             uint iCandidateOrCommitted = 1;
             return spirv_asm
@@ -21046,12 +21220,13 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     /// @remarks GLSL/SPIRV only
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
-    [require(glsl_spirv, rayquery)]
+    [require(glsl_metal_spirv, rayquery)]
     int CandidateRayInstanceId()
     {
         __target_switch
         {
         case glsl: __intrinsic_asm "rayQueryGetIntersectionInstanceIdEXT($0, false)";
+        case metal: __intrinsic_asm "$0->get_candidate_instance_id()";
         case spirv:
             uint iCandidateOrCommitted = 0;
             return spirv_asm
@@ -21066,12 +21241,13 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     /// @remarks GLSL/SPIRV only
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
-    [require(glsl_spirv, rayquery)]
+    [require(glsl_metal_spirv, rayquery)]
     int CommittedRayInstanceId()
     {
         __target_switch
         {
         case glsl: __intrinsic_asm "rayQueryGetIntersectionInstanceIdEXT($0, true)";
+        case metal: __intrinsic_asm "$0->get_committed_instance_id()";
         case spirv:
             uint iCandidateOrCommitted = 1;
             return spirv_asm
@@ -21126,12 +21302,13 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     /// @remarks GLSL/SPIRV only
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
-    [require(glsl_spirv, rayquery)]
+    [require(glsl_metal_spirv, rayquery)]
     int CandidateRayGeometryIndex()
     {
         __target_switch
         {
         case glsl: __intrinsic_asm "rayQueryGetIntersectionGeometryIndexEXT($0, false)";
+        case metal: __intrinsic_asm "$0->get_candidate_geometry_id()";
         case spirv:
             uint iCandidateOrCommitted = 0;
             return spirv_asm
@@ -21146,12 +21323,13 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     /// @remarks GLSL/SPIRV only
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
-    [require(glsl_spirv, rayquery)]
+    [require(glsl_metal_spirv, rayquery)]
     int CommittedRayGeometryIndex()
     {
         __target_switch
         {
         case glsl: __intrinsic_asm "rayQueryGetIntersectionGeometryIndexEXT($0, true)";
+        case metal: __intrinsic_asm "$0->get_committed_geometry_id()";
         case spirv:
             uint iCandidateOrCommitted = 1;
             return spirv_asm
@@ -21166,12 +21344,13 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     /// @remarks GLSL/SPIRV only
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
-    [require(glsl_spirv, rayquery)]
+    [require(glsl_metal_spirv, rayquery)]
     int CandidateRayPrimitiveIndex()
     {
         __target_switch
         {
         case glsl: __intrinsic_asm "rayQueryGetIntersectionPrimitiveIndexEXT($0, false)";
+        case metal: __intrinsic_asm "$0->get_candidate_primitive_id()";
         case spirv:
             uint iCandidateOrCommitted = 0;
             return spirv_asm
@@ -21186,12 +21365,13 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     /// @remarks GLSL/SPIRV only
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
-    [require(glsl_spirv, rayquery)]
+    [require(glsl_metal_spirv, rayquery)]
     int CommittedRayPrimitiveIndex()
     {
         __target_switch
         {
         case glsl: __intrinsic_asm "rayQueryGetIntersectionPrimitiveIndexEXT($0, true)";
+        case metal: __intrinsic_asm "$0->get_committed_primitive_id()";
         case spirv:
             uint iCandidateOrCommitted = 1;
             return spirv_asm
@@ -21206,12 +21386,13 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     /// @remarks GLSL/SPIRV only
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
-    [require(glsl_spirv, rayquery)]
+    [require(glsl_metal_spirv, rayquery)]
     float2 CandidateRayBarycentrics()
     {
         __target_switch
         {
         case glsl: __intrinsic_asm "rayQueryGetIntersectionBarycentricsEXT($0, false)";
+        case metal: __intrinsic_asm "$0->get_candidate_triangle_barycentric_coord()";
         case spirv:
             uint iCandidateOrCommitted = 0;
             return spirv_asm
@@ -21226,12 +21407,13 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     /// @remarks GLSL/SPIRV only
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
-    [require(glsl_spirv, rayquery)]
+    [require(glsl_metal_spirv, rayquery)]
     float2 CommittedRayBarycentrics()
     {
         __target_switch
         {
         case glsl: __intrinsic_asm "rayQueryGetIntersectionBarycentricsEXT($0, true)";
+        case metal: __intrinsic_asm "$0->get_committed_triangle_barycentric_coord()";
         case spirv:
             uint iCandidateOrCommitted = 1;
             return spirv_asm
@@ -21246,12 +21428,13 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     /// @remarks GLSL/SPIRV only
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
-    [require(glsl_spirv, rayquery)]
+    [require(glsl_metal_spirv, rayquery)]
     bool CandidateRayFrontFace()
     {
         __target_switch
         {
         case glsl: __intrinsic_asm "rayQueryGetIntersectionFrontFaceEXT($0, false)";
+        case metal: __intrinsic_asm "$0->is_candidate_triangle_front_facing()";
         case spirv:
             uint iCandidateOrCommitted = 0;
             return spirv_asm
@@ -21266,12 +21449,13 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     /// @remarks GLSL/SPIRV only
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
-    [require(glsl_spirv, rayquery)]
+    [require(glsl_metal_spirv, rayquery)]
     bool CommittedRayFrontFace()
     {
         __target_switch
         {
         case glsl: __intrinsic_asm "rayQueryGetIntersectionFrontFaceEXT($0, true)";
+        case metal: __intrinsic_asm "$0->is_committed_triangle_front_facing()";
         case spirv:
             uint iCandidateOrCommitted = 1;
             return spirv_asm
@@ -21286,12 +21470,13 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     /// @remarks GLSL/SPIRV only
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
-    [require(glsl_spirv, rayquery)]
+    [require(glsl_metal_spirv, rayquery)]
     float3 CandidateRayObjectRayDirection()
     {
         __target_switch
         {
         case glsl: __intrinsic_asm "rayQueryGetIntersectionObjectRayDirectionEXT($0, false)";
+        case metal: __intrinsic_asm "$0->get_candidate_ray_direction()";
         case spirv:
             uint iCandidateOrCommitted = 0;
             return spirv_asm
@@ -21306,12 +21491,13 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     /// @remarks GLSL/SPIRV only
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
-    [require(glsl_spirv, rayquery)]
+    [require(glsl_metal_spirv, rayquery)]
     float3 CommittedRayObjectRayDirection()
     {
         __target_switch
         {
         case glsl: __intrinsic_asm "rayQueryGetIntersectionObjectRayDirectionEXT($0, true)";
+        case metal: __intrinsic_asm "$0->get_committed_ray_direction()";
         case spirv:
             uint iCandidateOrCommitted = 1;
             return spirv_asm
@@ -21326,12 +21512,13 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     /// @remarks GLSL/SPIRV only
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
-    [require(glsl_spirv, rayquery)]
+    [require(glsl_metal_spirv, rayquery)]
     float3 CandidateRayObjectRayOrigin()
     {
         __target_switch
         {
         case glsl: __intrinsic_asm "rayQueryGetIntersectionObjectRayOriginEXT($0, false)";
+        case metal: __intrinsic_asm "$0->get_candidate_ray_origin()";
         case spirv:
             uint iCandidateOrCommitted = 0;
             return spirv_asm
@@ -21346,12 +21533,13 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     /// @remarks GLSL/SPIRV only
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
-    [require(glsl_spirv, rayquery)]
+    [require(glsl_metal_spirv, rayquery)]
     float3 CommittedRayObjectRayOrigin()
     {
         __target_switch
         {
         case glsl: __intrinsic_asm "rayQueryGetIntersectionObjectRayOriginEXT($0, true)";
+        case metal: __intrinsic_asm "$0->get_committed_ray_origin()";
         case spirv:
             uint iCandidateOrCommitted = 1;
             return spirv_asm
@@ -21366,12 +21554,13 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     /// @remarks GLSL/SPIRV only
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
-    [require(glsl_spirv, rayquery)]
+    [require(glsl_metal_spirv, rayquery)]
     float4x3 CandidateRayObjectToWorld()
     {
         __target_switch
         {
         case glsl: __intrinsic_asm "rayQueryGetIntersectionObjectToWorldEXT($0, false)";
+        case metal: __intrinsic_asm "$0->get_candidate_object_to_world_transform()";
         case spirv:
             uint iCandidateOrCommitted = 0;
             return spirv_asm
@@ -21386,12 +21575,13 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     /// @remarks GLSL/SPIRV only
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
-    [require(glsl_spirv, rayquery)]
+    [require(glsl_metal_spirv, rayquery)]
     float4x3 CommittedRayObjectToWorld()
     {
         __target_switch
         {
         case glsl: __intrinsic_asm "rayQueryGetIntersectionObjectToWorldEXT($0, true)";
+        case metal: __intrinsic_asm "$0->get_committed_object_to_world_transform()";
         case spirv:
             uint iCandidateOrCommitted = 1;
             return spirv_asm
@@ -21406,12 +21596,13 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     /// @remarks GLSL/SPIRV only
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
-    [require(glsl_spirv, rayquery)]
+    [require(glsl_metal_spirv, rayquery)]
     float4x3 CandidateRayWorldToObject()
     {
         __target_switch
         {
         case glsl: __intrinsic_asm "rayQueryGetIntersectionWorldToObjectEXT($0, false)";
+        case metal: __intrinsic_asm "$0->get_candidate_world_to_object_transform()";
         case spirv:
             uint iCandidateOrCommitted = 0;
             return spirv_asm
@@ -21426,12 +21617,13 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
     /// @remarks GLSL/SPIRV only
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
-    [require(glsl_spirv, rayquery)]
+    [require(glsl_metal_spirv, rayquery)]
     float4x3 CommittedRayWorldToObject()
     {
         __target_switch
         {
         case glsl: __intrinsic_asm "rayQueryGetIntersectionWorldToObjectEXT($0, true)";
+        case metal: __intrinsic_asm "$0->get_committed_world_to_object_transform()";
         case spirv:
             uint iCandidateOrCommitted = 1;
             return spirv_asm
@@ -21444,13 +21636,34 @@ struct RayQuery <let rayFlagsGeneric : RAY_FLAG = RAY_FLAG_NONE>
 
 ${
     const char* kCandidateCommitted[] = {"Candidate", "Committed"};
+    const char* kCandidateCommittedMetal[] = {"get_candidate_", "get_committed_"};
 
     // Access Candidate and Committed Matrices.
     for (uint32_t candidateOrCommitted = 0; candidateOrCommitted < 2; candidateOrCommitted++)
     {
         auto ccName = kCandidateCommitted[candidateOrCommitted];
+        auto ccNameMetal = kCandidateCommittedMetal[candidateOrCommitted];
         auto ccTF = candidateOrCommitted == 0 ? "false" : "true";
 $}
+
+    __glsl_extension(GL_EXT_ray_query)
+    [__NoSideEffect]
+    [NonUniformReturn]
+    [require(glsl_hlsl_spirv, rayquery)]
+    uint $(ccName)InstanceContributionToHitGroupIndex()
+    {
+        __target_switch
+        {
+        case hlsl: __intrinsic_asm ".$(ccName)InstanceContributionToHitGroupIndex";
+        case glsl: __intrinsic_asm "rayQueryGetIntersectionInstanceShaderBindingTableRecordOffsetEXT($0, $(ccTF))";
+        case spirv:
+            uint iCandidateOrCommitted = $(candidateOrCommitted);
+            return spirv_asm
+            {
+                result:$$uint = OpRayQueryGetIntersectionInstanceShaderBindingTableRecordOffsetKHR &this $iCandidateOrCommitted;
+            };
+        }
+    }
 
     __glsl_extension(GL_EXT_ray_query)
     __glsl_extension(GL_EXT_ray_tracing_position_fetch)
@@ -21490,11 +21703,17 @@ $}
         }
     };
 
-    // CandidateObjectToWorld3x4, CandidateWorldToObject4x3
-    // CommittedObjectToWorld3x4, CommittedObjectToWorld4x3
     ${
-    const char* kRayQueryMatrixNames[] = {"ObjectToWorld", "WorldToObject"};
-    for (auto matName : kRayQueryMatrixNames) {
+    struct RayQueryMatrixMethodEntry
+    {
+        const char* name;
+        const char* metalName;
+    };
+    const RayQueryMatrixMethodEntry rayQueryMatrixMethods[] = {
+        {"ObjectToWorld", "object_to_world_transform"},
+        {"WorldToObject", "world_to_object_transform"},
+    };
+    for (auto method : rayQueryMatrixMethods) {
     $}
 
     /// Gets the object-to-world transform as a 3x4 matrix.
@@ -21503,18 +21722,19 @@ $}
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [NonUniformReturn]
-    [require(glsl_hlsl_spirv, rayquery)]
-    float3x4 $(ccName)$(matName)3x4()
+    [require(glsl_hlsl_metal_spirv, rayquery)]
+    float3x4 $(ccName)$(method.name)3x4()
     {
         __target_switch
         {
-        case glsl: __intrinsic_asm "transpose(rayQueryGetIntersection$(matName)EXT($0, $(ccTF)))";
-        case hlsl: __intrinsic_asm ".$(ccName)$(matName)3x4";
+        case glsl: __intrinsic_asm "transpose(rayQueryGetIntersection$(method.name)EXT($0, $(ccTF)))";
+        case hlsl: __intrinsic_asm ".$(ccName)$(method.name)3x4";
+        case metal: __intrinsic_asm "transpose($0->$(ccNameMetal)$(method.metalName)())";
         case spirv:
             uint iCandidateOrCommitted = $(candidateOrCommitted);
             return spirv_asm
             {
-                %m:$$float4x3 = OpRayQueryGetIntersection$(matName)KHR &this $iCandidateOrCommitted;
+                %m:$$float4x3 = OpRayQueryGetIntersection$(method.name)KHR &this $iCandidateOrCommitted;
                 result:$$float3x4 = OpTranspose %m;
             };
         }
@@ -21526,18 +21746,19 @@ $}
     __glsl_extension(GL_EXT_ray_query)
     [__readNone]
     [NonUniformReturn]
-    [require(glsl_hlsl_spirv, rayquery)]
-    float4x3 $(ccName)$(matName)4x3()
+    [require(glsl_hlsl_metal_spirv, rayquery)]
+    float4x3 $(ccName)$(method.name)4x3()
     {
         __target_switch
         {
-        case glsl: __intrinsic_asm "rayQueryGetIntersection$(matName)EXT($0, $(ccTF))";
-        case hlsl: __intrinsic_asm ".$(ccName)$(matName)4x3";
+        case glsl: __intrinsic_asm "rayQueryGetIntersection$(method.name)EXT($0, $(ccTF))";
+        case hlsl: __intrinsic_asm ".$(ccName)$(method.name)4x3";
+        case metal: __intrinsic_asm "$0->$(ccNameMetal)$(method.metalName)()";
         case spirv:
             uint iCandidateOrCommitted = $(candidateOrCommitted);
             return spirv_asm
             {
-                result:$$float4x3 = OpRayQueryGetIntersection$(matName)KHR &this $iCandidateOrCommitted;
+                result:$$float4x3 = OpRayQueryGetIntersection$(method.name)KHR &this $iCandidateOrCommitted;
             };
         }
     }
@@ -21551,17 +21772,17 @@ ${
         const char* type;
         const char* hlslName;
         const char* glslName;
+        const char* metalName;
     };
     const RayQueryMethodEntry rayQueryMethods[] = {
-        {"uint", "InstanceIndex", "InstanceId"},
-        {"uint", "InstanceID", "InstanceCustomIndex"},
-        {"uint", "PrimitiveIndex", "PrimitiveIndex"},
-        {"uint", "GeometryIndex", "GeometryIndex"},
-        {"uint", "InstanceContributionToHitGroupIndex", "InstanceShaderBindingTableRecordOffset"},
-        {"float3", "ObjectRayOrigin", "ObjectRayOrigin"},
-        {"float3", "ObjectRayDirection", "ObjectRayDirection"},
-        {"bool", "TriangleFrontFace", "FrontFace"},
-        {"float2", "TriangleBarycentrics", "Barycentrics"},
+        {"uint", "InstanceIndex", "InstanceId", "instance_id"},
+        {"uint", "InstanceID", "InstanceCustomIndex", "user_instance_id"},
+        {"uint", "PrimitiveIndex", "PrimitiveIndex", "primitive_id"},
+        {"uint", "GeometryIndex", "GeometryIndex", "geometry_id"},
+        {"float3", "ObjectRayOrigin", "ObjectRayOrigin", "ray_origin"},
+        {"float3", "ObjectRayDirection", "ObjectRayDirection", "ray_direction"},
+        {"bool", "TriangleFrontFace", "FrontFace", "triangle_front_facing"},
+        {"float2", "TriangleBarycentrics", "Barycentrics", "triangle_barycentric_coord"},
     };
     for (auto method : rayQueryMethods) {
 $}
@@ -21569,13 +21790,14 @@ $}
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [NonUniformReturn]
-    [require(glsl_hlsl_spirv, rayquery)]
+    [require(glsl_hlsl_metal_spirv, rayquery)]
     $(method.type) $(ccName)$(method.hlslName)()
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".$(ccName)$(method.hlslName)";
         case glsl: __intrinsic_asm "rayQueryGetIntersection$(method.glslName)EXT($0, $(ccTF))";
+        case metal: __intrinsic_asm "$0->$(ccNameMetal)$(method.metalName)()";
         case spirv:
             uint iCandidateOrCommitted = $(candidateOrCommitted);
             return spirv_asm
@@ -21594,13 +21816,46 @@ $}
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [NonUniformReturn]
-    [require(glsl_hlsl_spirv, rayquery)]
+    [require(glsl_hlsl_metal_spirv, rayquery)]
     uint RayFlags()
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".RayFlags";
         case glsl: __intrinsic_asm "rayQueryGetRayFlagsEXT";
+        case metal:
+            __requirePrelude(R"(
+                uint _slang_intersection_params_to_ray_flags(raytracing::intersection_params params) {
+                    uint flags = 0;
+
+                    const auto forced = params.get_forced_opacity();
+                    if (forced == raytracing::forced_opacity::opaque)
+                        flags |= 0x01; /* RAY_FLAG_FORCE_OPAQUE */
+                    if (forced == raytracing::forced_opacity::non_opaque)
+                        flags |= 0x02; /* RAY_FLAG_FORCE_NON_OPAQUE */
+
+                    const auto tri_cull = params.get_triangle_cull_mode();
+                    if (tri_cull == raytracing::triangle_cull_mode::back)
+                        flags |= 0x10; /* RAY_FLAG_CULL_BACK_FACING_TRIANGLES */
+                    if (tri_cull == raytracing::triangle_cull_mode::front)
+                        flags |= 0x20; /* RAY_FLAG_CULL_FRONT_FACING_TRIANGLES */
+
+                    const auto opac_cull = params.get_opacity_cull_mode();
+                    if (opac_cull == raytracing::opacity_cull_mode::opaque)
+                        flags |= 0x40; /* RAY_FLAG_CULL_OPAQUE */
+                    if (opac_cull == raytracing::opacity_cull_mode::non_opaque)
+                        flags |= 0x80; /* RAY_FLAG_CULL_NON_OPAQUE */
+
+                    const auto geo_cull = params.get_geometry_cull_mode();
+                    if (geo_cull == raytracing::geometry_cull_mode::triangle)
+                        flags |= 0x100; /* RAY_FLAG_SKIP_TRIANGLES */
+                    if (geo_cull == raytracing::geometry_cull_mode::bounding_box)
+                        flags |= 0x200; /* RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES */
+
+                    return flags;
+                }
+            )");
+            __intrinsic_asm "_slang_intersection_params_to_ray_flags($0->get_intersection_params())";
         case spirv:
             return spirv_asm
             {
@@ -21614,13 +21869,14 @@ $}
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [NonUniformReturn]
-    [require(glsl_hlsl_spirv, rayquery)]
+    [require(glsl_hlsl_metal_spirv, rayquery)]
     float3 WorldRayOrigin()
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".WorldRayOrigin";
         case glsl: __intrinsic_asm "rayQueryGetWorldRayOriginEXT";
+        case metal: __intrinsic_asm "$0->get_world_space_ray_origin()";
         case spirv:
             return spirv_asm
             {
@@ -21634,13 +21890,14 @@ $}
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [NonUniformReturn]
-    [require(glsl_hlsl_spirv, rayquery)]
+    [require(glsl_hlsl_metal_spirv, rayquery)]
     float3 WorldRayDirection()
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".WorldRayDirection";
         case glsl: __intrinsic_asm "rayQueryGetWorldRayDirectionEXT";
+        case metal: __intrinsic_asm "$0->get_world_space_ray_direction()";
         case spirv:
             return spirv_asm
             {
@@ -21655,13 +21912,14 @@ $}
     __glsl_extension(GL_EXT_ray_query)
     [__NoSideEffect]
     [NonUniformReturn]
-    [require(glsl_hlsl_spirv, rayquery)]
+    [require(glsl_hlsl_metal_spirv, rayquery)]
     float RayTMin()
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".RayTMin";
         case glsl: __intrinsic_asm "rayQueryGetRayTMinEXT";
+        case metal: __intrinsic_asm "$0->get_ray_min_distance()";
         case spirv:
             return spirv_asm
             {
@@ -21793,7 +22051,6 @@ int __hitObjectAttributesLocation(__ref Attributes attributes);
 /// or as a key in ReorderThread. Created by one of several methods described below. HitObject
 /// and its related functions are available in raytracing shader types only.
 /// @category raytracing Ray-tracing
-__glsl_extension(GL_NV_shader_invocation_reorder)
 __glsl_extension(GL_EXT_ray_tracing)
 [__NonCopyableType]
 __intrinsic_type($(kIROp_HitObjectType))
@@ -21839,6 +22096,7 @@ struct HitObject
             }
         case _GL_NV_shader_invocation_reorder:
             {
+                __requireTargetExtension("GL_NV_shader_invocation_reorder");
                 // Conditional: if T is int (location), pass directly; else convert data to location
                 if (T is int)
                 {
@@ -21883,8 +22141,11 @@ struct HitObject
                     Payload = p;
                 }
             }
-        case glsl:
+        case glsl: // use GL_EXT until KHR is available.
+        //case _GL_EXT_shader_invocation_reorder: // Not sure why, but needs to be commented out.
             {
+                __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+                __requireTargetExtension("GL_EXT_shader_invocation_reorder");
                 // Conditional: if T is int (location), pass directly; else convert data to location
                 if (T is int)
                 {
@@ -22042,6 +22303,8 @@ struct HitObject
         {
         case _GL_NV_shader_invocation_reorder:
             {
+                __requireTargetExtension("GL_NV_ray_tracing_motion_blur");
+                __requireTargetExtension("GL_NV_shader_invocation_reorder");
                 // Conditional: if T is int (location), pass directly; else convert data to location
                 if (T is int)
                 {
@@ -22086,8 +22349,11 @@ struct HitObject
                     Payload = p;
                 }
             }
-        case glsl:
+        case glsl: // use GL_EXT until KHR is available.
+        //case _GL_EXT_shader_invocation_reorder: // Not sure why, but needs to be commented out.
             {
+                __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+                __requireTargetExtension("GL_EXT_shader_invocation_reorder");
                 // Conditional: if T is int (location), pass directly; else convert data to location
                 if (T is int)
                 {
@@ -22580,8 +22846,12 @@ struct HitObject
         {
         case hlsl_nvapi: __intrinsic_asm "($2=NvMakeMiss($0,$1))";
         case _GL_NV_shader_invocation_reorder:
-            __glslMakeMiss(__return_val, MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax);
-        case glsl:
+            __requireTargetExtension("GL_NV_shader_invocation_reorder");
+            __glslMakeMissNV(__return_val, MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax);
+        case glsl: // use GL_EXT until KHR is available.
+        //case _GL_EXT_shader_invocation_reorder: // Not sure why, but needs to be commented out.
+            __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+            __requireTargetExtension("GL_EXT_shader_invocation_reorder");
             // EXT spec requires RayFlags parameter, pass 0 as default
             __glslMakeMissEXT(__return_val, 0, MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax);
         case cuda: __intrinsic_asm "optixMakeMissHitObject";
@@ -22622,10 +22892,15 @@ struct HitObject
         __target_switch
         {
         case _GL_NV_shader_invocation_reorder:
-            __glslMakeMotionMiss(__return_val, MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax, CurrentTime);
-        case glsl:
+            __requireTargetExtension("GL_NV_ray_tracing_motion_blur");
+            __requireTargetExtension("GL_NV_shader_invocation_reorder");
+            __glslMakeMissMotionNV(__return_val, MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax, CurrentTime);
+        case glsl: // use GL_EXT until KHR is available.
+        //case _GL_EXT_shader_invocation_reorder: // Not sure why, but needs to be commented out.
+            __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+            __requireTargetExtension("GL_EXT_shader_invocation_reorder");
             // EXT requires RayFlags parameter - use 0 as default
-            __intrinsic_asm "hitObjectRecordMissMotionEXT($R, 0, $0, $1.Origin, $1.TMin, $1.Direction, $1.TMax, $2)";
+            __glslMakeMissMotionEXT(__return_val, 0, MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax, CurrentTime);
         case cuda: __intrinsic_asm "optixMakeMissHitObject";
         case spvShaderInvocationReorderNV:
             {
@@ -22691,10 +22966,8 @@ struct HitObject
         {
         case hlsl_nvapi:
             __intrinsic_asm "($0 = NvMakeNop())";
-        case _GL_NV_shader_invocation_reorder:
-            __glslMakeNop(__return_val);
         case glsl:
-            __intrinsic_asm "hitObjectRecordEmptyEXT($R)";
+            __glslMakeNop(__return_val);
         case cuda: __intrinsic_asm "slangOptixMakeNopHitObject";
         case spvShaderInvocationReorderNV:
             spirv_asm
@@ -22757,6 +23030,7 @@ struct HitObject
                 __forceVarIntoRayPayloadStructTemporarily(Payload));
         case _GL_NV_shader_invocation_reorder:
             {
+                __requireTargetExtension("GL_NV_shader_invocation_reorder");
                 [__vulkanRayPayload]
                 static payload_t p;
 
@@ -22768,8 +23042,11 @@ struct HitObject
                 // Write payload result
                 Payload = p;
             }
-        case glsl:
+        case glsl: // use GL_EXT until KHR is available.
+        //case _GL_EXT_shader_invocation_reorder: // Not sure why, but needs to be commented out.
             {
+                __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+                __requireTargetExtension("GL_EXT_shader_invocation_reorder");
                 [__vulkanRayPayload]
                 static payload_t p;
 
@@ -22838,8 +23115,11 @@ struct HitObject
         __target_switch
         {
         case hlsl: __intrinsic_asm ".IsMiss";
-        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectIsMissNV($0)";
-        case glsl: __intrinsic_asm "hitObjectIsMissEXT($0)";
+        case _GL_NV_shader_invocation_reorder:
+            __intrinsic_asm "hitObjectIsMissNV($0)";
+        case glsl: // use GL_EXT until KHR is available.
+        case _GL_EXT_shader_invocation_reorder:
+            __intrinsic_asm "hitObjectIsMissEXT($0)";
         case cuda: __intrinsic_asm "slangOptixHitObjectIsMiss";
         case spvShaderInvocationReorderNV:
             return spirv_asm
@@ -22866,8 +23146,11 @@ struct HitObject
         __target_switch
         {
         case hlsl: __intrinsic_asm ".IsHit";
-        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectIsHitNV($0)";
-        case glsl: __intrinsic_asm "hitObjectIsHitEXT($0)";
+        case _GL_NV_shader_invocation_reorder:
+            __intrinsic_asm "hitObjectIsHitNV($0)";
+        case glsl: // use GL_EXT until KHR is available.
+        case _GL_EXT_shader_invocation_reorder:
+            __intrinsic_asm "hitObjectIsHitEXT($0)";
         case cuda: __intrinsic_asm "slangOptixHitObjectIsHit";
         case spvShaderInvocationReorderNV:
             return spirv_asm
@@ -22894,8 +23177,11 @@ struct HitObject
         __target_switch
         {
         case hlsl: __intrinsic_asm ".IsNop";
-        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectIsEmptyNV($0)";
-        case glsl: __intrinsic_asm "hitObjectIsEmptyEXT($0)";
+        case _GL_NV_shader_invocation_reorder:
+            __intrinsic_asm "hitObjectIsEmptyNV($0)";
+        case glsl: // use GL_EXT until KHR is available.
+        case _GL_EXT_shader_invocation_reorder:
+            __intrinsic_asm "hitObjectIsEmptyEXT($0)";
         case cuda: __intrinsic_asm "slangOptixHitObjectIsNop";
         case spvShaderInvocationReorderNV:
             return spirv_asm
@@ -22930,7 +23216,8 @@ struct HitObject
                 RayDesc ray = { __glslGetRayWorldOrigin(), __glslGetTMin(), __glslGetRayWorldDirection(), __glslGetTMax() };
                 return ray;
             }
-        case glsl:
+        case glsl: // use GL_EXT until KHR is available.
+        case _GL_EXT_shader_invocation_reorder:
             {
                 RayDesc ray = { __glslGetRayWorldOriginEXT(), __glslGetTMinEXT(), __glslGetRayWorldDirectionEXT(), __glslGetTMaxEXT() };
                 return ray;
@@ -22971,8 +23258,14 @@ struct HitObject
         {
         case hlsl:
             __intrinsic_asm ".GetShaderTableIndex";
-        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectGetShaderBindingTableRecordIndexNV($0)";
-        case glsl: __intrinsic_asm "hitObjectGetShaderBindingTableRecordIndexEXT($0)";
+        case _GL_NV_shader_invocation_reorder:
+            __requireTargetExtension("GL_NV_shader_invocation_reorder");
+            __intrinsic_asm "hitObjectGetShaderBindingTableRecordIndexNV($0)";
+        case glsl: // use GL_EXT until KHR is available.
+        case _GL_EXT_shader_invocation_reorder:
+            __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+            __requireTargetExtension("GL_EXT_shader_invocation_reorder");
+            __intrinsic_asm "hitObjectGetShaderBindingTableRecordIndexEXT($0)";
         case cuda: __intrinsic_asm "slangOptixHitObjectGetSbtRecordIndex";
         case spvShaderInvocationReorderNV:
             return spirv_asm
@@ -22992,6 +23285,8 @@ struct HitObject
     }
 
     __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_buffer_reference_uvec2)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
     [ForceInline]
     [require(cuda_glsl_spirv, ser_raygen_closesthit_miss)]
     [require(hlsl, ser_dxr_raygen_closesthit_miss)]
@@ -23004,6 +23299,8 @@ struct HitObject
         case cuda: __intrinsic_asm "slangOptixHitObjectSetSbtRecordIndex";
         case _GL_EXT_shader_invocation_reorder:
             __intrinsic_asm "hitObjectSetShaderBindingTableRecordIndexEXT($0, $RecordIndex)";
+        case spvShaderInvocationReorderNV:
+            static_assert(false, "SetShaderTableIndex() has no SPIRV NV equivalent (OpHitObjectSetShaderBindingTableRecordIndexNV does not exist). Use SPV_EXT_shader_invocation_reorder instead.");
         case spvShaderInvocationReorderEXT:
             spirv_asm
             {
@@ -23023,8 +23320,14 @@ struct HitObject
         {
         case hlsl:
             __intrinsic_asm ".GetInstanceIndex";
-        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectGetInstanceIdNV($0)";
-        case glsl: __intrinsic_asm "hitObjectGetInstanceIdEXT($0)";
+        case _GL_NV_shader_invocation_reorder:
+            __requireTargetExtension("GL_NV_shader_invocation_reorder");
+            __intrinsic_asm "hitObjectGetInstanceIdNV($0)";
+        case glsl: // use GL_EXT until KHR is available.
+        case _GL_EXT_shader_invocation_reorder:
+            __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+            __requireTargetExtension("GL_EXT_shader_invocation_reorder");
+            __intrinsic_asm "hitObjectGetInstanceIdEXT($0)";
         case cuda: __intrinsic_asm "slangOptixHitObjectGetInstanceIndex";
         case spvShaderInvocationReorderNV:
             return spirv_asm
@@ -23053,8 +23356,14 @@ struct HitObject
         {
         case hlsl:
             __intrinsic_asm ".GetInstanceID";
-        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectGetInstanceCustomIndexNV($0)";
-        case glsl: __intrinsic_asm "hitObjectGetInstanceCustomIndexEXT($0)";
+        case _GL_NV_shader_invocation_reorder:
+            __requireTargetExtension("GL_NV_shader_invocation_reorder");
+            __intrinsic_asm "hitObjectGetInstanceCustomIndexNV($0)";
+        case glsl: // use GL_EXT until KHR is available.
+        case _GL_EXT_shader_invocation_reorder:
+            __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+            __requireTargetExtension("GL_EXT_shader_invocation_reorder");
+            __intrinsic_asm "hitObjectGetInstanceCustomIndexEXT($0)";
         case cuda: __intrinsic_asm "slangOptixHitObjectGetInstanceId";
         case spvShaderInvocationReorderNV:
             return spirv_asm
@@ -23083,8 +23392,14 @@ struct HitObject
         {
         case hlsl:
             __intrinsic_asm ".GetGeometryIndex";
-        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectGetGeometryIndexNV($0)";
-        case glsl: __intrinsic_asm "hitObjectGetGeometryIndexEXT($0)";
+        case _GL_NV_shader_invocation_reorder:
+            __requireTargetExtension("GL_NV_shader_invocation_reorder");
+            __intrinsic_asm "hitObjectGetGeometryIndexNV($0)";
+        case glsl: // use GL_EXT until KHR is available.
+        case _GL_EXT_shader_invocation_reorder:
+            __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+            __requireTargetExtension("GL_EXT_shader_invocation_reorder");
+            __intrinsic_asm "hitObjectGetGeometryIndexEXT($0)";
         case cuda: __intrinsic_asm "slangOptixHitObjectGetSbtGASIndex";
         case spvShaderInvocationReorderNV:
             return spirv_asm
@@ -23113,8 +23428,14 @@ struct HitObject
         {
         case hlsl:
             __intrinsic_asm ".GetPrimitiveIndex";
-        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectGetPrimitiveIndexNV($0)";
-        case glsl: __intrinsic_asm "hitObjectGetPrimitiveIndexEXT($0)";
+        case _GL_NV_shader_invocation_reorder:
+            __requireTargetExtension("GL_NV_shader_invocation_reorder");
+            __intrinsic_asm "hitObjectGetPrimitiveIndexNV($0)";
+        case glsl: // use GL_EXT until KHR is available.
+        case _GL_EXT_shader_invocation_reorder:
+            __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+            __requireTargetExtension("GL_EXT_shader_invocation_reorder");
+            __intrinsic_asm "hitObjectGetPrimitiveIndexEXT($0)";
         case cuda: __intrinsic_asm "slangOptixHitObjectGetPrimitiveIndex";
         case spvShaderInvocationReorderNV:
             return spirv_asm
@@ -23143,8 +23464,14 @@ struct HitObject
         {
         case hlsl:
             __intrinsic_asm ".GetHitKind";
-        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectGetHitKindNV($0)";
-        case glsl: __intrinsic_asm "hitObjectGetHitKindEXT($0)";
+        case _GL_NV_shader_invocation_reorder:
+            __requireTargetExtension("GL_NV_shader_invocation_reorder");
+            __intrinsic_asm "hitObjectGetHitKindNV($0)";
+        case glsl: // use GL_EXT until KHR is available.
+        case _GL_EXT_shader_invocation_reorder:
+            __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+            __requireTargetExtension("GL_EXT_shader_invocation_reorder");
+            __intrinsic_asm "hitObjectGetHitKindEXT($0)";
         case cuda: __intrinsic_asm "optixHitObjectGetHitKind()";
         case spvShaderInvocationReorderNV:
             return spirv_asm
@@ -23291,16 +23618,21 @@ struct HitObject
         /// Note: NVAPI/SPIRV/GLSL extension. DXR 1.3 uses GetWorldToObject3x4() and GetWorldToObject4x3().
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
-    [require(glsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_spirv, ser_raygen_closesthit_miss)]
     [require(nvapi, ser_raygen_closesthit_miss)]
-    [require(cuda, ser_raygen_closesthit_miss)]
     float4x3 GetWorldToObject()
     {
         __target_switch
         {
         case hlsl_nvapi: __intrinsic_asm ".GetWorldToObject";
-        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectGetWorldToObjectNV($0)";
-        case glsl: __intrinsic_asm "hitObjectGetWorldToObjectEXT($0)";
+        case _GL_NV_shader_invocation_reorder:
+            __requireTargetExtension("GL_NV_shader_invocation_reorder");
+            __intrinsic_asm "hitObjectGetWorldToObjectNV($0)";
+        case glsl: // use GL_EXT until KHR is available.
+        case _GL_EXT_shader_invocation_reorder:
+            __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+            __requireTargetExtension("GL_EXT_shader_invocation_reorder");
+            __intrinsic_asm "hitObjectGetWorldToObjectEXT($0)";
         case cuda: __intrinsic_asm "slangOptixHitObjectGetWorldToObject";
         case spvShaderInvocationReorderNV:
             return spirv_asm
@@ -23323,16 +23655,21 @@ struct HitObject
         /// Note: NVAPI/SPIRV/GLSL extension. DXR 1.3 uses GetObjectToWorld3x4() and GetObjectToWorld4x3().
     __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
-    [require(glsl_spirv, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_spirv, ser_raygen_closesthit_miss)]
     [require(nvapi, ser_raygen_closesthit_miss)]
-    [require(cuda, ser_raygen_closesthit_miss)]
     float4x3 GetObjectToWorld()
     {
         __target_switch
         {
         case hlsl_nvapi: __intrinsic_asm ".GetObjectToWorld";
-        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectGetObjectToWorldNV($0)";
-        case glsl: __intrinsic_asm "hitObjectGetObjectToWorldEXT($0)";
+        case _GL_NV_shader_invocation_reorder:
+            __requireTargetExtension("GL_NV_shader_invocation_reorder");
+            __intrinsic_asm "hitObjectGetObjectToWorldNV($0)";
+        case glsl: // use GL_EXT until KHR is available.
+        case _GL_EXT_shader_invocation_reorder:
+            __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+            __requireTargetExtension("GL_EXT_shader_invocation_reorder");
+            __intrinsic_asm "hitObjectGetObjectToWorldEXT($0)";
         case cuda: __intrinsic_asm "slangOptixHitObjectGetObjectToWorld";
         case spvShaderInvocationReorderNV:
             return spirv_asm
@@ -23351,14 +23688,20 @@ struct HitObject
         }
     }
 
+    __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
     [require(cuda_glsl_spirv, ser_raygen_closesthit_miss)]
     float GetCurrentTime() {
         __target_switch
         {
         case _GL_NV_shader_invocation_reorder:
+            __requireTargetExtension("GL_NV_ray_tracing_motion_blur");
+            __requireTargetExtension("GL_NV_shader_invocation_reorder");
             __intrinsic_asm "hitObjectGetCurrentTimeNV($0)";
-        case glsl:
+        case glsl: // use GL_EXT until KHR is available.
+        case _GL_EXT_shader_invocation_reorder:
+            __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+            __requireTargetExtension("GL_EXT_shader_invocation_reorder");
             __intrinsic_asm "hitObjectGetCurrentTimeEXT($0)";
         case cuda: __intrinsic_asm "slangOptixHitObjectGetRayTime";
         case spvShaderInvocationReorderNV:
@@ -23379,6 +23722,7 @@ struct HitObject
     }
 
         /// Returns object-space ray origin. Valid if the hit object represents a hit.
+    __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     float3 GetObjectRayOrigin() {
@@ -23387,8 +23731,12 @@ struct HitObject
         case hlsl:
             __intrinsic_asm ".GetObjectRayOrigin";
         case _GL_NV_shader_invocation_reorder:
+            __requireTargetExtension("GL_NV_shader_invocation_reorder");
             __intrinsic_asm "hitObjectGetObjectRayOriginNV($0)";
-        case glsl:
+        case glsl: // use GL_EXT until KHR is available.
+        case _GL_EXT_shader_invocation_reorder:
+            __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+            __requireTargetExtension("GL_EXT_shader_invocation_reorder");
             __intrinsic_asm "hitObjectGetObjectRayOriginEXT($0)";
         case cuda: __intrinsic_asm "optixGetObjectRayOrigin()";
         case spvShaderInvocationReorderNV:
@@ -23409,6 +23757,7 @@ struct HitObject
     }
 
         /// Returns object-space ray direction. Valid if the hit object represents a hit.
+    __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     float3 GetObjectRayDirection() {
@@ -23417,8 +23766,12 @@ struct HitObject
         case hlsl:
             __intrinsic_asm ".GetObjectRayDirection";
         case _GL_NV_shader_invocation_reorder:
+            __requireTargetExtension("GL_NV_shader_invocation_reorder");
             __intrinsic_asm "hitObjectGetObjectRayDirectionNV($0)";
-        case glsl:
+        case glsl: // use GL_EXT until KHR is available.
+        case _GL_EXT_shader_invocation_reorder:
+            __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+            __requireTargetExtension("GL_EXT_shader_invocation_reorder");
             __intrinsic_asm "hitObjectGetObjectRayDirectionEXT($0)";
         case cuda: __intrinsic_asm "optixGetObjectRayDirection()";
         case spvShaderInvocationReorderNV:
@@ -23438,14 +23791,19 @@ struct HitObject
         }
     }
 
+    __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
     [require(glsl_spirv, ser_raygen_closesthit_miss)]
     uint2 GetShaderRecordBufferHandle() {
         __target_switch
         {
         case _GL_NV_shader_invocation_reorder:
+            __requireTargetExtension("GL_NV_shader_invocation_reorder");
             __intrinsic_asm "hitObjectGetShaderRecordBufferHandleNV($0)";
-        case glsl:
+        case glsl: // use GL_EXT until KHR is available.
+        case _GL_EXT_shader_invocation_reorder:
+            __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+            __requireTargetExtension("GL_EXT_shader_invocation_reorder");
             __intrinsic_asm "hitObjectGetShaderRecordBufferHandleEXT($0)";
         case spvShaderInvocationReorderNV:
             return spirv_asm
@@ -23465,9 +23823,9 @@ struct HitObject
     }
 
     /// Returns the attributes of a hit. Valid if the hit object represents a hit or a miss.
+    __glsl_extension(GL_EXT_ray_tracing)
     [ForceInline]
-    [require(cuda_hlsl_spirv, ser_raygen_closesthit_miss)]
-    [require(glsl, ser_raygen_closesthit_miss)]
+    [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     attr_t GetAttributes<attr_t>()
     {
         __target_switch
@@ -23483,6 +23841,8 @@ struct HitObject
             __intrinsic_asm ".GetAttributes";
         case _GL_NV_shader_invocation_reorder:
             {
+                __requireTargetExtension("GL_NV_shader_invocation_reorder");
+
                 // Work out the location
                 int attributeLocation = __hitObjectAttributesLocation(__hitObjectAttributes<attr_t>());
 
@@ -23492,8 +23852,12 @@ struct HitObject
                 // Return the attributes
                 return __hitObjectAttributes<attr_t>();
             }
-        case glsl:
+        case glsl: // use GL_EXT until KHR is available.
+        case _GL_EXT_shader_invocation_reorder:
             {
+                __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+                __requireTargetExtension("GL_EXT_shader_invocation_reorder");
+
                 // Work out the location
                 int attributeLocation = __hitObjectAttributesLocation(__hitObjectAttributes<attr_t>());
 
@@ -23546,16 +23910,21 @@ struct HitObject
 
         /// Returns the ray flags associated with the hit object. Valid if the hit object represents a hit or a miss.
         /// DXR 1.3 and GL_EXT_shader_invocation_reorder.
+    __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_buffer_reference_uvec2)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
     [ForceInline]
     [require(hlsl, ser_dxr_raygen_closesthit_miss)]
-    [require(spirv, ser_raygen_closesthit_miss)]
-    [require(glsl, ser_raygen_closesthit_miss)]
+    [require(glsl_spirv, ser_raygen_closesthit_miss)]
     uint GetRayFlags()
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".GetRayFlags";
         case _GL_EXT_shader_invocation_reorder: __intrinsic_asm "hitObjectGetRayFlagsEXT($0)";
+        case spvShaderInvocationReorderNV:
+            static_assert(false, "GetRayFlags() has no SPIRV NV equivalent (OpHitObjectGetRayFlagsNV does not exist). Use GetRayDesc() or SPV_EXT_shader_invocation_reorder instead.");
+            return 0u;
         case spvShaderInvocationReorderEXT:
             return spirv_asm
             {
@@ -23568,16 +23937,25 @@ struct HitObject
 
         /// Returns the parametric starting point (TMin) of the ray. Valid if the hit object represents a hit or a miss.
         /// DXR 1.3 and GL_EXT_shader_invocation_reorder.
+    __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_buffer_reference_uvec2)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
     [ForceInline]
     [require(hlsl, ser_dxr_raygen_closesthit_miss)]
-    [require(spirv, ser_raygen_closesthit_miss)]
-    [require(glsl, ser_raygen_closesthit_miss)]
+    [require(glsl_spirv, ser_raygen_closesthit_miss)]
     float GetRayTMin()
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".GetRayTMin";
         case _GL_EXT_shader_invocation_reorder: __intrinsic_asm "hitObjectGetRayTMinEXT($0)";
+        case spvShaderInvocationReorderNV:
+            return spirv_asm
+            {
+                OpExtension "SPV_NV_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderNV;
+                result:$$float = OpHitObjectGetRayTMinNV &this;
+            };
         case spvShaderInvocationReorderEXT:
             return spirv_asm
             {
@@ -23589,29 +23967,40 @@ struct HitObject
     }
 
         /// Returns the parametric ending point (T value at hit/miss). Valid if the hit object represents a hit or a miss.
-        /// DXR 1.3 only.
+        /// DXR 1.3 and OptiX.
     [ForceInline]
     [require(hlsl, ser_dxr_raygen_closesthit_miss)]
+    [require(cuda, ser_raygen_closesthit_miss)]
     float GetRayTCurrent()
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".GetRayTCurrent";
+        case cuda: __intrinsic_asm "slangOptixHitObjectGetRayTmax";
         }
     }
 
         /// Returns the world-space ray origin. Valid if the hit object represents a hit or a miss.
         /// DXR 1.3 and GL_EXT_shader_invocation_reorder.
+    __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_buffer_reference_uvec2)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
     [ForceInline]
     [require(hlsl, ser_dxr_raygen_closesthit_miss)]
-    [require(spirv, ser_raygen_closesthit_miss)]
-    [require(glsl, ser_raygen_closesthit_miss)]
+    [require(glsl_spirv, ser_raygen_closesthit_miss)]
     float3 GetWorldRayOrigin()
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".GetWorldRayOrigin";
         case _GL_EXT_shader_invocation_reorder: __intrinsic_asm "hitObjectGetWorldRayOriginEXT($0)";
+        case spvShaderInvocationReorderNV:
+            return spirv_asm
+            {
+                OpExtension "SPV_NV_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderNV;
+                result:$$float3 = OpHitObjectGetWorldRayOriginNV &this;
+            };
         case spvShaderInvocationReorderEXT:
             return spirv_asm
             {
@@ -23624,16 +24013,25 @@ struct HitObject
 
         /// Returns the world-space ray direction. Valid if the hit object represents a hit or a miss.
         /// DXR 1.3 and GL_EXT_shader_invocation_reorder.
+    __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_buffer_reference_uvec2)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
     [ForceInline]
     [require(hlsl, ser_dxr_raygen_closesthit_miss)]
-    [require(spirv, ser_raygen_closesthit_miss)]
-    [require(glsl, ser_raygen_closesthit_miss)]
+    [require(glsl_spirv, ser_raygen_closesthit_miss)]
     float3 GetWorldRayDirection()
     {
         __target_switch
         {
         case hlsl: __intrinsic_asm ".GetWorldRayDirection";
         case _GL_EXT_shader_invocation_reorder: __intrinsic_asm "hitObjectGetWorldRayDirectionEXT($0)";
+        case spvShaderInvocationReorderNV:
+            return spirv_asm
+            {
+                OpExtension "SPV_NV_shader_invocation_reorder";
+                OpCapability ShaderInvocationReorderNV;
+                result:$$float3 = OpHitObjectGetWorldRayDirectionNV &this;
+            };
         case spvShaderInvocationReorderEXT:
             return spirv_asm
             {
@@ -23694,10 +24092,12 @@ struct HitObject
 
         /// Creates a HitObject representing a miss with specified ray flags.
         /// DXR 1.3 and GL_EXT_shader_invocation_reorder - includes RayFlags parameter.
+    __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_buffer_reference_uvec2)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
     [ForceInline]
     [require(hlsl, ser_dxr_raygen_closesthit_miss)]
-    [require(spirv, ser_raygen_closesthit_miss)]
-    [require(glsl, ser_raygen_closesthit_miss)]
+    [require(glsl_spirv, ser_raygen_closesthit_miss)]
     static HitObject MakeMiss(
         uint RayFlags,
         uint MissShaderIndex,
@@ -23847,10 +24247,10 @@ struct HitObject
     /// !!!! Internal GLSL GL_NV_shader_invocation_reorder impl. Not part of interface! !!!!!!!!!!!!
     ///
 
-    __glsl_extension(GL_NV_shader_invocation_reorder)
     __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_NV_shader_invocation_reorder)
     [require(glsl, ser_raygen_closesthit_miss)]
-    static void __glslMakeMiss(
+    static void __glslMakeMissNV(
         out HitObject hitObj,
         uint MissShaderIndex,
         float3 Origin,
@@ -23860,15 +24260,16 @@ struct HitObject
     {
         __target_switch
         {
+        case glsl: // fallback - outer MakeMiss routes glsl to __glslMakeMissEXT
         case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectRecordMissNV";
         }
     }
 
     // EXT version with RayFlags parameter
     // "void hitObjectRecordMissEXT(hitObjectEXT, uint rayFlags, uint, vec3, float, vec3, float);"
-    __glsl_extension(GL_EXT_shader_invocation_reorder)
     __glsl_extension(GL_EXT_ray_tracing)
-    __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
+    __glsl_extension(GL_EXT_buffer_reference_uvec2)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
     [require(glsl, ser_raygen_closesthit_miss)]
     static void __glslMakeMissEXT(
         out HitObject hitObj,
@@ -23881,16 +24282,17 @@ struct HitObject
     {
         __target_switch
         {
-        case glsl: __intrinsic_asm "hitObjectRecordMissEXT";
+        case glsl:
+        case _GL_EXT_shader_invocation_reorder:
+            __intrinsic_asm "hitObjectRecordMissEXT";
         }
     }
 
     // "void hitObjectRecordMissMotionNV(hitObjectNV, uint, vec3, float, vec3, float, float);"
-    __glsl_extension(GL_NV_shader_invocation_reorder)
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_NV_ray_tracing_motion_blur)
     [require(glsl, ser_motion_raygen_closesthit_miss)]
-    static void __glslMakeMotionMiss(
+    static void __glslMakeMissMotionNV(
         out HitObject hitObj,
         uint MissShaderIndex,
         float3 Origin,
@@ -23905,42 +24307,84 @@ struct HitObject
         }
     }
 
+    // EXT version with RayFlags parameter
+    // "void hitObjectRecordMissMotionEXT(hitObjectEXT hitObject, uint rayFlags, uint sbtRecordIndex, vec3 origin, float Tmin, vec3 direction, float TMax, float currentTime)"
     __glsl_extension(GL_EXT_ray_tracing)
-    __glsl_extension(GL_NV_shader_invocation_reorder)
+    __glsl_extension(GL_EXT_buffer_reference_uvec2)
+    __glsl_extension(GL_EXT_shader_invocation_reorder)
+    [require(glsl, ser_motion_raygen_closesthit_miss)]
+    static void __glslMakeMissMotionEXT(
+        out HitObject hitObj,
+        uint RayFlags,
+        uint MissShaderIndex,
+        float3 Origin,
+        float TMin,
+        float3 Direction,
+        float TMax,
+        float currentTime)
+    {
+        __target_switch
+        {
+        case glsl:
+        case _GL_EXT_shader_invocation_reorder:
+            __intrinsic_asm "hitObjectRecordMissMotionEXT";
+        }
+    }
+
+    __glsl_extension(GL_EXT_ray_tracing)
     [require(glsl, ser_raygen_closesthit_miss)]
     static void __glslMakeNop(out HitObject hitObj)
     {
         __target_switch
         {
-        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectRecordEmptyNV";
+        case _GL_NV_shader_invocation_reorder:
+            __requireTargetExtension("GL_NV_shader_invocation_reorder");
+            __intrinsic_asm "hitObjectRecordEmptyNV";
+        case glsl: // use GL_EXT until KHR is available.
+        case _GL_EXT_shader_invocation_reorder:
+            __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+            __requireTargetExtension("GL_EXT_shader_invocation_reorder");
+            __intrinsic_asm "hitObjectRecordEmptyEXT";
         }
     }
 
     __glsl_extension(GL_EXT_ray_tracing)
-    __glsl_extension(GL_NV_shader_invocation_reorder)
     [require(glsl, ser_raygen_closesthit_miss)]
     float3 __glslGetRayDirection()
     {
         __target_switch
         {
-        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectGetObjectRayDirectionNV($0)";
+        case _GL_NV_shader_invocation_reorder:
+            __requireTargetExtension("GL_NV_shader_invocation_reorder");
+            __intrinsic_asm "hitObjectGetObjectRayDirectionNV($0)";
+        case glsl: // use GL_EXT until KHR is available.
+        case _GL_EXT_shader_invocation_reorder:
+            __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+            __requireTargetExtension("GL_EXT_shader_invocation_reorder");
+            __intrinsic_asm "hitObjectGetObjectRayDirectionEXT($0)";
         }
     }
 
     __glsl_extension(GL_EXT_ray_tracing)
-    __glsl_extension(GL_NV_shader_invocation_reorder)
     [require(glsl, ser_raygen_closesthit_miss)]
     float3 __glslGetRayWorldDirection()
     {
         __target_switch
         {
-        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectGetWorldRayDirectionNV($0)";
+        case _GL_NV_shader_invocation_reorder:
+            __requireTargetExtension("GL_NV_shader_invocation_reorder");
+            __intrinsic_asm "hitObjectGetWorldRayDirectionNV($0)";
+        case glsl: // use GL_EXT until KHR is available.
+        case _GL_EXT_shader_invocation_reorder:
+            __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+            __requireTargetExtension("GL_EXT_shader_invocation_reorder");
+            __intrinsic_asm "hitObjectGetWorldRayDirectionEXT($0)";
         }
     }
 
     __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_buffer_reference_uvec2)
     __glsl_extension(GL_EXT_shader_invocation_reorder)
-    __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
     [require(glsl, ser_raygen_closesthit_miss)]
     float3 __glslGetRayWorldDirectionEXT()
     {
@@ -23951,19 +24395,25 @@ struct HitObject
     }
 
     __glsl_extension(GL_EXT_ray_tracing)
-    __glsl_extension(GL_NV_shader_invocation_reorder)
     [require(glsl, ser_raygen_closesthit_miss)]
     float3 __glslGetRayWorldOrigin()
     {
         __target_switch
         {
-        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectGetWorldRayOriginNV($0)";
+        case _GL_NV_shader_invocation_reorder:
+            __requireTargetExtension("GL_NV_shader_invocation_reorder");
+            __intrinsic_asm "hitObjectGetWorldRayOriginNV($0)";
+        case glsl: // use GL_EXT until KHR is available.
+        case _GL_EXT_shader_invocation_reorder:
+            __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+            __requireTargetExtension("GL_EXT_shader_invocation_reorder");
+            __intrinsic_asm "hitObjectGetWorldRayOriginEXT($0)";
         }
     }
 
     __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_buffer_reference_uvec2)
     __glsl_extension(GL_EXT_shader_invocation_reorder)
-    __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
     [require(glsl, ser_raygen_closesthit_miss)]
     float3 __glslGetRayWorldOriginEXT()
     {
@@ -23974,19 +24424,25 @@ struct HitObject
     }
 
     __glsl_extension(GL_EXT_ray_tracing)
-    __glsl_extension(GL_NV_shader_invocation_reorder)
     [require(glsl, ser_raygen_closesthit_miss)]
     float __glslGetTMax()
     {
         __target_switch
         {
-        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectGetRayTMaxNV($0)";
+        case _GL_NV_shader_invocation_reorder:
+            __requireTargetExtension("GL_NV_shader_invocation_reorder");
+            __intrinsic_asm "hitObjectGetRayTMaxNV($0)";
+        case glsl: // use GL_EXT until KHR is available.
+        case _GL_EXT_shader_invocation_reorder:
+            __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+            __requireTargetExtension("GL_EXT_shader_invocation_reorder");
+            __intrinsic_asm "hitObjectGetRayTMaxEXT($0)";
         }
     }
 
     __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_buffer_reference_uvec2)
     __glsl_extension(GL_EXT_shader_invocation_reorder)
-    __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
     [require(glsl, ser_raygen_closesthit_miss)]
     float __glslGetTMaxEXT()
     {
@@ -23997,19 +24453,25 @@ struct HitObject
     }
 
     __glsl_extension(GL_EXT_ray_tracing)
-    __glsl_extension(GL_NV_shader_invocation_reorder)
     [require(glsl, ser_raygen_closesthit_miss)]
     float __glslGetTMin()
     {
         __target_switch
         {
-        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectGetRayTMinNV($0)";
+        case _GL_NV_shader_invocation_reorder:
+            __requireTargetExtension("GL_NV_shader_invocation_reorder");
+            __intrinsic_asm "hitObjectGetRayTMinNV($0)";
+        case glsl: // use GL_EXT until KHR is available.
+        case _GL_EXT_shader_invocation_reorder:
+            __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+            __requireTargetExtension("GL_EXT_shader_invocation_reorder");
+            __intrinsic_asm "hitObjectGetRayTMinEXT($0)";
         }
     }
 
     __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_buffer_reference_uvec2)
     __glsl_extension(GL_EXT_shader_invocation_reorder)
-    __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
     [require(glsl, ser_raygen_closesthit_miss)]
     float __glslGetTMinEXT()
     {
@@ -24039,14 +24501,15 @@ struct HitObject
     {
         __target_switch
         {
+        case glsl: // fallback - outer MakeHit routes glsl to EXT variant
         case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectRecordHitWithIndexNV";
         }
     }
 
     //  "void hitObjectRecordHitWithIndexMotionNV(hitObjectNV, accelerationStructureEXT,int,int,int,uint,uint,vec3,float,vec3,float,float,int);"
     __glsl_extension(GL_EXT_ray_tracing)
-    __glsl_extension(GL_NV_shader_invocation_reorder)
     __glsl_extension(GL_NV_ray_tracing_motion_blur)
+    __glsl_extension(GL_NV_shader_invocation_reorder)
     [require(glsl, ser_motion_raygen_closesthit_miss)]
     static void __glslMakeMotionHitWithIndex(
         out HitObject hitObj,
@@ -24090,14 +24553,15 @@ struct HitObject
     {
         __target_switch
         {
+        case glsl: // fallback - outer MakeHit routes glsl to EXT variant
         case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectRecordHitNV";
         }
     }
 
         // "void hitObjectRecordHitMotionNV(hitObjectNV,accelerationStructureEXT,int,int,int,uint,uint,uint,vec3,float,vec3,float,float,int);"
     __glsl_extension(GL_EXT_ray_tracing)
-    __glsl_extension(GL_NV_shader_invocation_reorder)
     __glsl_extension(GL_NV_ray_tracing_motion_blur)
+    __glsl_extension(GL_NV_shader_invocation_reorder)
     [require(glsl, ser_motion_raygen_closesthit_miss)]
     static void __glslMakeMotionHit(
         out HitObject hitObj,
@@ -24123,32 +24587,36 @@ struct HitObject
 
 
     __glsl_extension(GL_EXT_ray_tracing)
-    __glsl_extension(GL_NV_shader_invocation_reorder)
     [require(glsl, ser_raygen_closesthit_miss)]
     void __glslGetAttributes(int attributeLocation)
     {
         __target_switch
         {
-        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectGetAttributesNV($0, $1)";
+        case _GL_NV_shader_invocation_reorder:
+            __requireTargetExtension("GL_NV_shader_invocation_reorder");
+            __intrinsic_asm "hitObjectGetAttributesNV($0, $1)";
+        case glsl: // use GL_EXT until KHR is available.
+        case _GL_EXT_shader_invocation_reorder:
+            __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+            __requireTargetExtension("GL_EXT_shader_invocation_reorder");
+            __intrinsic_asm "hitObjectGetAttributesEXT($0, $1)";
         }
     }
 
     __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_buffer_reference_uvec2)
     __glsl_extension(GL_EXT_shader_invocation_reorder)
-    __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
     [require(glsl, ser_raygen_closesthit_miss)]
     void __glslGetAttributesEXT(int attributeLocation)
     {
         __target_switch
         {
+        case glsl:
         case _GL_EXT_shader_invocation_reorder: __intrinsic_asm "hitObjectGetAttributesEXT($0, $1)";
         }
     }
 
     __glsl_extension(GL_EXT_ray_tracing)
-    __glsl_extension(GL_NV_shader_invocation_reorder)
-    __glsl_extension(GL_EXT_shader_invocation_reorder)
-    __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
     [require(glsl, ser_raygen_closesthit_miss)]
     static void __glslTraceRay(
         out HitObject hitObject,
@@ -24166,14 +24634,20 @@ struct HitObject
     {
         __target_switch
         {
-        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectTraceRayNV";
-        case glsl: __intrinsic_asm "hitObjectTraceRayEXT";
+        case _GL_NV_shader_invocation_reorder:
+            __requireTargetExtension("GL_NV_shader_invocation_reorder");
+            __intrinsic_asm "hitObjectTraceRayNV";
+        case glsl: // use GL_EXT until KHR is available.
+        case _GL_EXT_shader_invocation_reorder:
+            __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+            __requireTargetExtension("GL_EXT_shader_invocation_reorder");
+            __intrinsic_asm "hitObjectTraceRayEXT";
         }
     }
 
     __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_buffer_reference_uvec2)
     __glsl_extension(GL_EXT_shader_invocation_reorder)
-    __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
     [require(glsl, ser_raygen_closesthit_miss)]
     static void __glslTraceRayEXT(
         out HitObject hitObject,
@@ -24191,8 +24665,8 @@ struct HitObject
     {
         __target_switch
         {
+        case glsl:
         case _GL_EXT_shader_invocation_reorder: __intrinsic_asm "hitObjectTraceRayEXT";
-        case glsl: __intrinsic_asm "hitObjectTraceRayEXT";
         }
     }
 
@@ -24664,10 +25138,6 @@ struct HitObject
     }
 
     __glsl_extension(GL_EXT_ray_tracing)
-    __glsl_extension(GL_NV_shader_invocation_reorder)
-    __glsl_extension(GL_EXT_shader_invocation_reorder)
-    __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-    __glsl_extension(GL_NV_ray_tracing_motion_blur)
     [require(glsl, ser_motion_raygen_closesthit_miss)]
     static void __glslTraceMotionRay(
         out HitObject hitObject,
@@ -24686,15 +25156,21 @@ struct HitObject
     {
         __target_switch
         {
-        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectTraceRayMotionNV";
-        case glsl: __intrinsic_asm "hitObjectTraceRayMotionEXT";
+        case _GL_NV_shader_invocation_reorder:
+            __requireTargetExtension("GL_NV_ray_tracing_motion_blur");
+            __requireTargetExtension("GL_NV_shader_invocation_reorder");
+            __intrinsic_asm "hitObjectTraceRayMotionNV";
+        case glsl: // use GL_EXT until KHR is available.
+        case _GL_EXT_shader_invocation_reorder:
+            __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+            __requireTargetExtension("GL_EXT_shader_invocation_reorder");
+            __intrinsic_asm "hitObjectTraceRayMotionEXT";
         }
     }
 
     __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_buffer_reference_uvec2)
     __glsl_extension(GL_EXT_shader_invocation_reorder)
-    __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
-    __glsl_extension(GL_NV_ray_tracing_motion_blur)
     [require(glsl, ser_motion_raygen_closesthit_miss)]
     static void __glslTraceMotionRayEXT(
         out HitObject hitObject,
@@ -24713,12 +25189,11 @@ struct HitObject
     {
         __target_switch
         {
-        case _GL_EXT_shader_invocation_reorder_motion: __intrinsic_asm "hitObjectTraceRayMotionEXT";
+        case _GL_EXT_shader_invocation_reorder: __intrinsic_asm "hitObjectTraceRayMotionEXT";
         }
     }
 
     __glsl_extension(GL_EXT_ray_tracing)
-    __glsl_extension(GL_NV_shader_invocation_reorder)
     [require(glsl, ser_raygen_closesthit_miss)]
     static void __glslInvoke(
         HitObject hitObj,
@@ -24726,13 +25201,20 @@ struct HitObject
     {
         __target_switch
         {
-        case _GL_NV_shader_invocation_reorder: __intrinsic_asm "hitObjectExecuteShaderNV";
+        case _GL_NV_shader_invocation_reorder:
+            __requireTargetExtension("GL_NV_shader_invocation_reorder");
+            __intrinsic_asm "hitObjectExecuteShaderNV";
+        case glsl: // use GL_EXT until KHR is available.
+        case _GL_EXT_shader_invocation_reorder:
+            __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+            __requireTargetExtension("GL_EXT_shader_invocation_reorder");
+            __intrinsic_asm "hitObjectExecuteShaderEXT";
         }
     }
 
     __glsl_extension(GL_EXT_ray_tracing)
+    __glsl_extension(GL_EXT_buffer_reference_uvec2)
     __glsl_extension(GL_EXT_shader_invocation_reorder)
-    __glsl_extension(GLSL_EXT_buffer_reference_uvec2)
     [require(glsl, ser_raygen_closesthit_miss)]
     static void __glslInvokeEXT(
         HitObject hitObj,
@@ -24740,6 +25222,7 @@ struct HitObject
     {
         __target_switch
         {
+        case glsl:
         case _GL_EXT_shader_invocation_reorder: __intrinsic_asm "hitObjectExecuteShaderEXT";
         }
     }
@@ -24753,8 +25236,6 @@ struct HitObject
     /// Where possible, reordering will also attempt to retain locality in the thread's launch indices
     /// (DispatchRaysIndex in DXR).
 __glsl_extension(GL_EXT_ray_tracing)
-__glsl_extension(GL_NV_shader_invocation_reorder)
-__glsl_extension(GL_EXT_shader_invocation_reorder)
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, ser_raygen)]
 void ReorderThread( uint CoherenceHint, uint NumCoherenceHintBitsFromLSB )
@@ -24763,8 +25244,14 @@ void ReorderThread( uint CoherenceHint, uint NumCoherenceHintBitsFromLSB )
     {
     case hlsl_nvapi: __intrinsic_asm "NvReorderThread";
     case hlsl: __intrinsic_asm "dx::MaybeReorderThread";
-    case _GL_NV_shader_invocation_reorder: __intrinsic_asm "reorderThreadNV";
-    case glsl: __intrinsic_asm "reorderThreadEXT";
+    case _GL_NV_shader_invocation_reorder:
+        __requireTargetExtension("GL_NV_shader_invocation_reorder");
+        __intrinsic_asm "reorderThreadNV";
+    case glsl: // use GL_EXT until KHR is available.
+    case _GL_EXT_shader_invocation_reorder:
+        __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+        __requireTargetExtension("GL_EXT_shader_invocation_reorder");
+        __intrinsic_asm "reorderThreadEXT";
     case cuda: __intrinsic_asm "optixReorder";
     case spvShaderInvocationReorderNV:
         spirv_asm
@@ -24800,8 +25287,6 @@ void ReorderThread( uint CoherenceHint, uint NumCoherenceHintBitsFromLSB )
     /// of equal coherence hints, it will attempt to maximize locality in 3D space of the ray hit (if any).
 
 __glsl_extension(GL_EXT_ray_tracing)
-__glsl_extension(GL_NV_shader_invocation_reorder)
-__glsl_extension(GL_EXT_shader_invocation_reorder)
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, ser_raygen)]
 void ReorderThread( HitObject HitOrMiss, uint CoherenceHint, uint NumCoherenceHintBitsFromLSB )
@@ -24810,8 +25295,14 @@ void ReorderThread( HitObject HitOrMiss, uint CoherenceHint, uint NumCoherenceHi
     {
     case hlsl_nvapi: __intrinsic_asm "NvReorderThread";
     case hlsl: __intrinsic_asm "dx::MaybeReorderThread";
-    case _GL_NV_shader_invocation_reorder: __intrinsic_asm "reorderThreadNV";
-    case glsl: __intrinsic_asm "reorderThreadEXT";
+    case _GL_NV_shader_invocation_reorder:
+        __requireTargetExtension("GL_NV_shader_invocation_reorder");
+        __intrinsic_asm "reorderThreadNV";
+    case glsl: // use GL_EXT until KHR is available.
+    case _GL_EXT_shader_invocation_reorder:
+        __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+        __requireTargetExtension("GL_EXT_shader_invocation_reorder");
+        __intrinsic_asm "reorderThreadEXT";
     case cuda: __intrinsic_asm "optixReorder($1, $2)";
     case spvShaderInvocationReorderNV:
         spirv_asm
@@ -24837,8 +25328,6 @@ void ReorderThread( HitObject HitOrMiss, uint CoherenceHint, uint NumCoherenceHi
     // With CoherenceHint and NumCoherenceHintBitsFromLSB as 0, meaning they are ignored.
 
 __glsl_extension(GL_EXT_ray_tracing)
-__glsl_extension(GL_NV_shader_invocation_reorder)
-__glsl_extension(GL_EXT_shader_invocation_reorder)
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, ser_raygen)]
 void ReorderThread( HitObject HitOrMiss )
@@ -24847,8 +25336,14 @@ void ReorderThread( HitObject HitOrMiss )
     {
     case hlsl_nvapi: __intrinsic_asm "NvReorderThread";
     case hlsl: __intrinsic_asm "dx::MaybeReorderThread";
-    case _GL_NV_shader_invocation_reorder: __intrinsic_asm "reorderThreadNV";
-    case glsl: __intrinsic_asm "reorderThreadEXT";
+    case _GL_NV_shader_invocation_reorder:
+        __requireTargetExtension("GL_NV_shader_invocation_reorder");
+        __intrinsic_asm "reorderThreadNV";
+    case glsl: // use GL_EXT until KHR is available.
+    case _GL_EXT_shader_invocation_reorder:
+        __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+        __requireTargetExtension("GL_EXT_shader_invocation_reorder");
+        __intrinsic_asm "reorderThreadEXT";
     case cuda: __intrinsic_asm "optixReorder()";
     case spvShaderInvocationReorderNV:
         spirv_asm
@@ -26346,6 +26841,16 @@ T __loadSamplerDescriptorFromHeap<T>(uint index);
 __intrinsic_op($(kIROp_LoadResourceDescriptorFromHeap))
 T __loadResourceDescriptorFromHeap<T>(uint index);
 
+// Used by the SPIRV backend, load a descriptor from the descriptor heap.
+__intrinsic_op($(kIROp_SPIRVLoadDescriptorFromHeap))
+internal T __spirvLoadDescriptorFromHeap<T>(uint heap, uint index);
+
+__intrinsic_op($(kIROp_SPIRVSamplerHeap))
+internal uint __spirvSamplerHeap();
+
+__intrinsic_op($(kIROp_SPIRVResourceHeap))
+internal uint __spirvResourceHeap();
+
 // Used by the HLSL and Metal backends only,
 // create a combined texture sampler object from a bindless handle.
 __intrinsic_op($(kIROp_MakeCombinedTextureSamplerFromHandle))
@@ -26374,8 +26879,6 @@ T defaultGetDescriptorFromHandle<T:IOpaqueDescriptor>(DescriptorHandle<T> handle
             return __makeCombinedTextureSamplerFromHandle<T>((uint2)handleValue);
         else
             return __loadResourceDescriptorFromHeap<T>(((uint2)handleValue).x);
-    case spvBindlessTextureNV:
-        return __castDescriptorHandleToResource<T>(handleValue);
     case spirv:
     case glsl:
 
@@ -26452,6 +26955,15 @@ $}
     }
     case wgsl:
         return __getDynamicResourceHeap<T>()[((uint2)handleValue).x];
+    case spvBindlessTextureNV:
+        return __castDescriptorHandleToResource<T>(handleValue);
+    case spvDescriptorHeapEXT:
+        if (T.kind == DescriptorKind.Sampler)
+            return __spirvLoadDescriptorFromHeap<T>(__spirvSamplerHeap(), ((uint2)handleValue).x);
+        else if (T.kind == DescriptorKind.CombinedTextureSampler)
+            return __makeCombinedTextureSamplerFromHandle<T>((uint2)handleValue);
+        else
+            return __spirvLoadDescriptorFromHeap<T>(__spirvResourceHeap(), ((uint2)handleValue).x);
     default:
         return __castDescriptorHandleToResource<T>(handleValue);
     }
@@ -26909,8 +27421,9 @@ struct CoopMat
     [ForceInline]
     [require(cooperative_matrix_conversion)]
     __init<
-        U : ICoopElement
-    >(CoopMat<U, S, M, N, R> other)
+        U : ICoopElement,
+        let R1 : CoopMatMatrixUse
+    >(CoopMat<U, S, M, N, R1> other)
     {
         this.copyFrom(other);
     }
@@ -26964,20 +27477,21 @@ struct CoopMat
     [mutating]
     [require(cooperative_matrix_conversion)]
     void copyFrom<
-        U : ICoopElement
-    >(CoopMat<U, S, M, N, R> other)
+        U : ICoopElement,
+        let R1 : CoopMatMatrixUse
+    >(CoopMat<U, S, M, N, R1> other)
     {
         __target_switch
         {
         case spirv:
             if (__isCoopFloat<T>() && __isInt<U>())
-                this = __int_to_float_cast<T>(other);
+                this = __int_to_float_cast<T, R>(other);
             else if (__isInt<T>() && __isCoopFloat<U>())
-                this = __float_to_int_cast<T>(other);
+                this = __float_to_int_cast<T, R>(other);
             else if (__isCoopFloat<T>() && __isCoopFloat<U>())
-                this = __real_cast<T>(other);
+                this = __real_cast<T, R>(other);
             else if (__isInt<T>() && __isInt<U>())
-                this = __int_cast<T>(other);
+                this = __int_cast<T, R>(other);
         case cuda:
             __intrinsic_asm "($0)->copyFrom<$T1::ElementType>($1)";
         }
@@ -27374,7 +27888,6 @@ struct CoopMat
     }
 
     /// Stores the cooperative matrix into a groupshared (workgroup) memory array with a different element type.
-    /// Vulkan only.
     /// @param matrixLayout The memory layout (RowMajor or ColMajor) to use when storing.
     /// @param U The element type of the groupshared array (may differ from T).
     /// @param V The size of the groupshared array.
@@ -27382,20 +27895,29 @@ struct CoopMat
     /// @param element The starting element index in the array.
     /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
     [ForceInline]
-    [require(cooperative_matrix_spirv)]
+    [require(cooperative_matrix)]
     void Store<
         let matrixLayout : CoopMatMatrixLayout,
         U,
         let V : int
     >(__ref groupshared U[V] data, uint element, uint stride)
     {
-        let alignment = 16U;
-        spirv_asm
+        __target_switch
         {
-            %workgroupPointerType = OpTypePointer Workgroup $$U;
-            %pointer:%workgroupPointerType = OpAccessChain &data $element;
-            OpCooperativeMatrixStoreKHR %pointer $this $matrixLayout $stride Aligned !alignment;
-        };
+        case spirv:
+            let alignment = 16U;
+            spirv_asm
+            {
+                %workgroupPointerType = OpTypePointer Workgroup $$U;
+                %pointer:%workgroupPointerType = OpAccessChain &data $element;
+                OpCooperativeMatrixStoreKHR %pointer $this $matrixLayout $stride Aligned !alignment;
+            };
+        case cuda:
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::RowMajor>(($1)->m_data + $2, $3)";
+            else
+                __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::ColMajor>(($1)->m_data + $2, $3)";
+        }
     }
 
     [ForceInline]
@@ -27613,7 +28135,6 @@ $}
     }
 
     /// Loads a cooperative matrix from a groupshared (workgroup) memory array with a different element type.
-    /// Vulkan only.
     /// @param matrixLayout The memory layout (RowMajor or ColMajor) of the data in the array.
     /// @param U The element type of the groupshared array (may differ from T).
     /// @param V The size of the groupshared array.
@@ -27622,20 +28143,29 @@ $}
     /// @param stride The stride in elements between consecutive rows (for row major) or columns (for column major).
     /// @return A cooperative matrix loaded from the groupshared array.
     [ForceInline]
-    [require(cooperative_matrix_spirv)]
+    [require(cooperative_matrix)]
     static This Load<
         let matrixLayout : CoopMatMatrixLayout,
         U,
         let V : int
     >(__constref groupshared U[V] data, uint element, uint stride)
     {
-        let alignment = 16U;
-        return spirv_asm
+        __target_switch
         {
-            %workgroupPointerType = OpTypePointer Workgroup $$U;
-            %pointer:%workgroupPointerType = OpAccessChain &data $element;
-            result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned !alignment;
-        };
+        case spirv:
+            let alignment = 16U;
+            return spirv_asm
+            {
+                %workgroupPointerType = OpTypePointer Workgroup $$U;
+                %pointer:%workgroupPointerType = OpAccessChain &data $element;
+                result:$$CoopMat<T, S, M, N, R> = OpCooperativeMatrixLoadKHR %pointer $matrixLayout $stride Aligned !alignment;
+            };
+        case cuda:
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::RowMajor>(($0)->m_data + $1, $2)";
+            else
+                __intrinsic_asm "$TR::Load<Slang_CUDA_WMMA::ColMajor>(($0)->m_data + $1, $2)";
+        }
     }
 
     [ForceInline]
@@ -28445,8 +28975,9 @@ CoopMat<T, S, M, N, R> coopMatLoad<
 
 [require(cooperative_matrix_conversion)]
 __intrinsic_op($(kIROp_IntCast))
-CoopMat<T,S,M,N,R> __int_cast<
+CoopMat<T,S,M,N,R1> __int_cast<
     T : ICoopElement,
+    let R1 : CoopMatMatrixUse,
     U : ICoopElement,
     let S : MemoryScope,
     let M : int,
@@ -28456,8 +28987,9 @@ CoopMat<T,S,M,N,R> __int_cast<
 
 [require(cooperative_matrix_conversion)]
 __intrinsic_op($(kIROp_FloatCast))
-CoopMat<T,S,M,N,R> __real_cast<
+CoopMat<T,S,M,N,R1> __real_cast<
     T : ICoopElement,
+    let R1 : CoopMatMatrixUse,
     U : ICoopElement,
     let S : MemoryScope,
     let M : int,
@@ -28467,8 +28999,9 @@ CoopMat<T,S,M,N,R> __real_cast<
 
 [require(cooperative_matrix_conversion)]
 __intrinsic_op($(kIROp_CastIntToFloat))
-CoopMat<T,S,M,N,R> __int_to_float_cast<
+CoopMat<T,S,M,N,R1> __int_to_float_cast<
     T : ICoopElement,
+    let R1 : CoopMatMatrixUse,
     U : ICoopElement,
     let S : MemoryScope,
     let M : int,
@@ -28478,8 +29011,9 @@ CoopMat<T,S,M,N,R> __int_to_float_cast<
 
 [require(cooperative_matrix_conversion)]
 __intrinsic_op($(kIROp_CastFloatToInt))
-CoopMat<T,S,M,N,R> __float_to_int_cast<
+CoopMat<T,S,M,N,R1> __float_to_int_cast<
     T : ICoopElement,
+    let R1 : CoopMatMatrixUse,
     U : ICoopElement,
     let S : MemoryScope,
     let M : int,
@@ -28909,12 +29443,7 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
         __target_switch
         {
         case spirv:
-            let ptr = buffer.GetBufferPointer();
-            spirv_asm
-            {
-                // TODO: Should this be a byte offset
-                OpCooperativeVectorStoreNV $ptr $byteOffset16ByteAligned $this None;
-            };
+            store(__getEquivalentStructuredBuffer<T>(buffer), byteOffset16ByteAligned);
         case hlsl:
             __intrinsic_asm "$1.Store< vector<$[0], $[1]> >($2, $0)", T, N;
         default:
@@ -28930,11 +29459,13 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
         __target_switch
         {
         case spirv:
-            let ptr = __getStructuredBufferPtr(buffer);
+            let zero = 0;
             spirv_asm
             {
-                // TODO: Should this be a byte offset
-                OpCooperativeVectorStoreNV $ptr $byteOffset16ByteAligned $this None;
+                %runtimeArrayType = OpTypeRuntimeArray $$T;
+                %storagePointerType = OpTypePointer StorageBuffer %runtimeArrayType;
+                %pointer:%storagePointerType = OpAccessChain $buffer $zero;
+                OpCooperativeVectorStoreNV %pointer $byteOffset16ByteAligned $this None;
             };
         default:
             for(int i = 0; i < N; ++i)
@@ -29030,11 +29561,7 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
         __target_switch
         {
         case spirv:
-            let ptr = buffer.GetBufferPointer();
-            return spirv_asm
-            {
-                result:$$CoopVec<T, N> = OpCooperativeVectorLoadNV $ptr $byteOffset16ByteAligned None;
-            };
+            return load(__getEquivalentStructuredBuffer<T>(buffer), byteOffset16ByteAligned);
         case hlsl:
             CoopVec<T, N> ret;
             ret.__Load(buffer, byteOffset16ByteAligned);
@@ -29058,11 +29585,7 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
         __target_switch
         {
         case spirv:
-            let ptr = buffer.GetBufferPointer();
-            return spirv_asm
-            {
-                result:$$CoopVec<T, N> = OpCooperativeVectorLoadNV $ptr $byteOffset16ByteAligned None;
-            };
+            return load(__getEquivalentStructuredBuffer<T>(buffer), byteOffset16ByteAligned);
         case hlsl:
             CoopVec<T, N> ret;
             ret.__Load(buffer, byteOffset16ByteAligned);
@@ -29085,10 +29608,13 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
         __target_switch
         {
         case spirv:
-            let ptr = __getStructuredBufferPtr(buffer);
+            let zero = 0;
             return spirv_asm
             {
-                result:$$CoopVec<T, N> = OpCooperativeVectorLoadNV $ptr $byteOffset16ByteAligned None;
+                %runtimeArrayType = OpTypeRuntimeArray $$T;
+                %storagePointerType = OpTypePointer StorageBuffer %runtimeArrayType;
+                %pointer:%storagePointerType = OpAccessChain $buffer $zero;
+                result:$$CoopVec<T, N> = OpCooperativeVectorLoadNV %pointer $byteOffset16ByteAligned None;
             };
         default:
             var vec = CoopVec<T, N>();
@@ -29106,10 +29632,13 @@ struct CoopVec<T : __BuiltinArithmeticType, let N : int> : IArray<T>, IArithmeti
         __target_switch
         {
         case spirv:
-            let ptr = __getStructuredBufferPtr(buffer);
+            let zero = 0;
             return spirv_asm
             {
-                result:$$CoopVec<T, N> = OpCooperativeVectorLoadNV $ptr $byteOffset16ByteAligned None;
+                %runtimeArrayType = OpTypeRuntimeArray $$T;
+                %storagePointerType = OpTypePointer StorageBuffer %runtimeArrayType;
+                %pointer:%storagePointerType = OpAccessChain $buffer $zero;
+                result:$$CoopVec<T, N> = OpCooperativeVectorLoadNV %pointer $byteOffset16ByteAligned None;
             };
         default:
             var vec = CoopVec<T, N>();
@@ -30704,21 +31233,24 @@ CoopVec<T, M> __coopVecMatMulPacked_impl(
         let matrixInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(matrixInterpretation);
         let inputInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(inputInterpretation);
         let memoryLayoutSpirv : int32_t = __getSpvCoopVecMatrixLayout(memoryLayout);
-        let matrixPtr = matrix.GetBufferPointer();
+        let matrixBuf = __getEquivalentStructuredBuffer<uint32_t>(matrix);
+        let zero = 0;
 
-        // https://github.com/KhronosGroup/SPIRV-Registry/blob/main/extensions/KHR/SPV_KHR_cooperative_matrix.asciidoc#3x-cooperative-matrix-operands
-        int operands = 0; // NoneKHR
+        int operands = 0;
         if (__isSignedInt<U>())
         {
-            operands |= 0x02; // MatrixBSignedComponentsKHR
+            operands |= 0x02;
         }
         if (__isSignedInt<T>())
         {
-            operands |= 0x08; // MatrixResultSignedComponentsKHR
+            operands |= 0x08;
         }
         return spirv_asm
         {
-            result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulNV $input $inputInterpretationSpirv $matrixPtr $matrixOffset $matrixInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride !operands;
+            %runtimeArrayType = OpTypeRuntimeArray $$uint32_t;
+            %storagePointerType = OpTypePointer StorageBuffer %runtimeArrayType;
+            %matrixPointer:%storagePointerType = OpAccessChain $matrixBuf $zero;
+            result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulNV $input $inputInterpretationSpirv %matrixPointer $matrixOffset $matrixInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride !operands;
         };
 
     case hlsl:
@@ -30951,22 +31483,26 @@ CoopVec<T, M> __coopVecMatMulAddPacked_impl<T : __BuiltinArithmeticType, let M :
         let biasInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(biasInterpretation);
         let inputInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(inputInterpretation);
         let memoryLayoutSpirv : int32_t = __getSpvCoopVecMatrixLayout(memoryLayout);
-        let matrixPtr = matrix.GetBufferPointer();
-        let biasPtr = bias.GetBufferPointer();
+        let matrixBuf = __getEquivalentStructuredBuffer<uint32_t>(matrix);
+        let biasBuf = __getEquivalentStructuredBuffer<uint32_t>(bias);
+        let zero = 0;
 
-        // https://github.com/KhronosGroup/SPIRV-Registry/blob/main/extensions/KHR/SPV_KHR_cooperative_matrix.asciidoc#3x-cooperative-matrix-operands
-        int operands = 0; // NoneKHR
+        int operands = 0;
         if (__isSignedInt<U>())
         {
-            operands |= 0x02; // MatrixBSignedComponentsKHR
+            operands |= 0x02;
         }
         if (__isSignedInt<T>())
         {
-            operands |= 0x08; // MatrixResultSignedComponentsKHR
+            operands |= 0x08;
         }
         return spirv_asm
         {
-            result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulAddNV $input $inputInterpretationSpirv $matrixPtr $matrixOffset $matrixInterpretationSpirv $biasPtr $biasOffset $biasInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride !operands;
+            %runtimeArrayType = OpTypeRuntimeArray $$uint32_t;
+            %storagePointerType = OpTypePointer StorageBuffer %runtimeArrayType;
+            %matrixPointer:%storagePointerType = OpAccessChain $matrixBuf $zero;
+            %biasPointer:%storagePointerType = OpAccessChain $biasBuf $zero;
+            result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulAddNV $input $inputInterpretationSpirv %matrixPointer $matrixOffset $matrixInterpretationSpirv %biasPointer $biasOffset $biasInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride !operands;
         };
 
     case hlsl:
@@ -31223,11 +31759,15 @@ void coopVecOuterProductAccumulate<T : __BuiltinArithmeticType, let M : int, let
     case spirv:
         let matrixInterpretationSpirv : int = __getSpvCoopVecComponentType(matrixInterpretation);
         let memoryLayoutSpirv : int = __getSpvCoopVecMatrixLayout(memoryLayout);
-        let matrixPtr = matrix.GetBufferPointer();
+        let matrixBuf = __getEquivalentStructuredBuffer<uint32_t>(matrix);
+        let zero = 0;
         spirv_asm
         {
             OpCapability CooperativeVectorTrainingNV;
-            OpCooperativeVectorOuterProductAccumulateNV $matrixPtr $matrixOffset $a $b $memoryLayoutSpirv $matrixInterpretationSpirv $matrixStride;
+            %runtimeArrayType = OpTypeRuntimeArray $$uint32_t;
+            %storagePointerType = OpTypePointer StorageBuffer %runtimeArrayType;
+            %matrixPointer:%storagePointerType = OpAccessChain $matrixBuf $zero;
+            OpCooperativeVectorOuterProductAccumulateNV %matrixPointer $matrixOffset $a $b $memoryLayoutSpirv $matrixInterpretationSpirv $matrixStride;
         };
     case optix_coopvec:
         __intrinsic_asm "optixCoopVecOuterProductAccumulate($0, $1, (CUdeviceptr)(&$2), $3, $4)";
@@ -31310,11 +31850,15 @@ void coopVecReduceSumAccumulate<T : __BuiltinArithmeticType, let N : int>(
     case hlsl:
         __intrinsic_asm "__builtin_VectorAccumulate($0, $1, $2)";
     case spirv:
-        let bufferPtr = buffer.GetBufferPointer();
+        let bufBuf = __getEquivalentStructuredBuffer<uint32_t>(buffer);
+        let zero = 0;
         spirv_asm
         {
             OpCapability CooperativeVectorTrainingNV;
-            OpCooperativeVectorReduceSumAccumulateNV $bufferPtr $offset $v;
+            %runtimeArrayType = OpTypeRuntimeArray $$uint32_t;
+            %storagePointerType = OpTypePointer StorageBuffer %runtimeArrayType;
+            %bufferPointer:%storagePointerType = OpAccessChain $bufBuf $zero;
+            OpCooperativeVectorReduceSumAccumulateNV %bufferPointer $offset $v;
         };
     case optix_coopvec:
         __intrinsic_asm "optixCoopVecReduceSumAccumulate($0, (CUdeviceptr)(&$1), $2)";
@@ -31370,7 +31914,7 @@ CoopVec<T, M> __coopVecMatMulPacked_impl(
         let matrixInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(matrixInterpretation);
         let inputInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(inputInterpretation);
         let memoryLayoutSpirv : int32_t = __getSpvCoopVecMatrixLayout(memoryLayout);
-        let matrixPtr = __getStructuredBufferPtr(matrix);
+        let zero = 0;
 
         // https://github.com/KhronosGroup/SPIRV-Registry/blob/main/extensions/KHR/SPV_KHR_cooperative_matrix.asciidoc#3x-cooperative-matrix-operands
         int operands = 0; // NoneKHR
@@ -31384,7 +31928,10 @@ CoopVec<T, M> __coopVecMatMulPacked_impl(
         }
         return spirv_asm
         {
-            result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulNV $input $inputInterpretationSpirv $matrixPtr $matrixOffset $matrixInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride !operands;
+            %runtimeArrayType = OpTypeRuntimeArray $$IgnoredBufferElementType;
+            %storagePointerType = OpTypePointer StorageBuffer %runtimeArrayType;
+            %matrixPointer:%storagePointerType = OpAccessChain $matrix $zero;
+            result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulNV $input $inputInterpretationSpirv %matrixPointer $matrixOffset $matrixInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride !operands;
         };
     case optix_coopvec:
         __intrinsic_asm "slangOptixCoopVecMatMul<$T0, $T0, $1, $5, $6>($0, (CUdeviceptr)(&($3)), $4, $8)";
@@ -31472,8 +32019,7 @@ CoopVec<T, M> __coopVecMatMulAddPacked_impl<T : __BuiltinArithmeticType, let M :
         let biasInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(biasInterpretation);
         let inputInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(inputInterpretation);
         let memoryLayoutSpirv : int32_t = __getSpvCoopVecMatrixLayout(memoryLayout);
-        let matrixPtr = __getStructuredBufferPtr(matrix);
-        let biasPtr = __getStructuredBufferPtr(bias);
+        let zero = 0;
 
         // https://github.com/KhronosGroup/SPIRV-Registry/blob/main/extensions/KHR/SPV_KHR_cooperative_matrix.asciidoc#3x-cooperative-matrix-operands
         int operands = 0; // NoneKHR
@@ -31488,7 +32034,11 @@ CoopVec<T, M> __coopVecMatMulAddPacked_impl<T : __BuiltinArithmeticType, let M :
 
         return spirv_asm
         {
-            result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulAddNV $input $inputInterpretationSpirv $matrixPtr $matrixOffset $matrixInterpretationSpirv $biasPtr $biasOffset $biasInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride !operands;
+            %runtimeArrayType = OpTypeRuntimeArray $$IgnoredBufferElementType;
+            %storagePointerType = OpTypePointer StorageBuffer %runtimeArrayType;
+            %matrixPointer:%storagePointerType = OpAccessChain $matrix $zero;
+            %biasPointer:%storagePointerType = OpAccessChain $bias $zero;
+            result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulAddNV $input $inputInterpretationSpirv %matrixPointer $matrixOffset $matrixInterpretationSpirv %biasPointer $biasOffset $biasInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride !operands;
         };
     case optix_coopvec:
         __intrinsic_asm "slangOptixCoopVecMatMul<OptixCoopVec<$[0], $[1]>, OptixCoopVec<$[2], $[3]>, $1, $5, $9, $8>($0, (CUdeviceptr)(&($3)), $4, (CUdeviceptr)(&($6)), $7, $11)", T, M, U, PackedK;
@@ -31579,11 +32129,14 @@ void coopVecOuterProductAccumulate<T : __BuiltinArithmeticType, let M : int, let
     case spirv:
         let matrixInterpretationSpirv : int = __getSpvCoopVecComponentType(matrixInterpretation);
         let memoryLayoutSpirv : int = __getSpvCoopVecMatrixLayout(memoryLayout);
-        let matrixPtr = __getStructuredBufferPtr(matrix);
+        let zero = 0;
         spirv_asm
         {
             OpCapability CooperativeVectorTrainingNV;
-            OpCooperativeVectorOuterProductAccumulateNV $matrixPtr $matrixOffset $a $b $memoryLayoutSpirv $matrixInterpretationSpirv $matrixStride;
+            %runtimeArrayType = OpTypeRuntimeArray $$IgnoredBufferElementType;
+            %storagePointerType = OpTypePointer StorageBuffer %runtimeArrayType;
+            %matrixPointer:%storagePointerType = OpAccessChain $matrix $zero;
+            OpCooperativeVectorOuterProductAccumulateNV %matrixPointer $matrixOffset $a $b $memoryLayoutSpirv $matrixInterpretationSpirv $matrixStride;
         };
     }
 }
@@ -31598,11 +32151,14 @@ void coopVecReduceSumAccumulate<T : __BuiltinArithmeticType, let N : int, Ignore
     __target_switch
     {
     case spirv:
-        let bufferPtr = __getStructuredBufferPtr(buffer);
+        let zero = 0;
         spirv_asm
         {
             OpCapability CooperativeVectorTrainingNV;
-            OpCooperativeVectorReduceSumAccumulateNV $bufferPtr $offset $v;
+            %runtimeArrayType = OpTypeRuntimeArray $$IgnoredBufferElementType;
+            %storagePointerType = OpTypePointer StorageBuffer %runtimeArrayType;
+            %bufferPointer:%storagePointerType = OpAccessChain $buffer $zero;
+            OpCooperativeVectorReduceSumAccumulateNV %bufferPointer $offset $v;
         };
     }
 }

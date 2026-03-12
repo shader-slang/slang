@@ -3,6 +3,7 @@ name: Check SPIRV Generated Files
 on:
   pull_request:
     branches: [master]
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "external/spirv-tools/**"
       - "external/spirv-headers/**"
@@ -12,6 +13,7 @@ on:
 
 jobs:
   check-spirv-generated:
+    if: github.event.pull_request.draft != true
     runs-on: ubuntu-latest
     name: Verify SPIRV Generated Files
 

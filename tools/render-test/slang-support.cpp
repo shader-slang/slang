@@ -614,8 +614,8 @@ static SlangResult compileProgram(
 /* static */ SlangResult readSource(const String& inSourcePath, List<char>& outSourceText)
 {
     // Read in the source code
-    FILE* sourceFile = fopen(inSourcePath.getBuffer(), "rb");
-    if (!sourceFile)
+    FILE* sourceFile = nullptr;
+    if (fopen_s(&sourceFile, inSourcePath.getBuffer(), "rb") != 0 || !sourceFile)
     {
         fprintf(stderr, "error: failed to open '%s' for reading\n", inSourcePath.getBuffer());
         return SLANG_FAIL;

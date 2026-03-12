@@ -625,9 +625,34 @@ bool DiagnosticSink::diagnoseImpl(
     return true;
 }
 
-bool DiagnosticSink::diagnoseRichImpl(const GenericDiagnostic& diagnostic)
+bool DiagnosticSink::diagnoseRichImpl(
+    const GenericDiagnostic& diagnostic,
+    const DiagnosticInfo* info)
 {
-    if (diagnostic.severity >= Severity::Error)
+    return diagnoseRichImpl(diagnostic, info, getSourceManager());
+}
+
+bool DiagnosticSink::diagnoseRichImpl(
+    const GenericDiagnostic& diagnostic,
+    const DiagnosticInfo* info,
+    SourceManager* sourceManager)
+{
+    // Check for severity overrides (e.g., from -Wno-xxx flags)
+    Severity effectiveSeverity = diagnostic.severity;
+    if (info)
+    {
+        effectiveSeverity = getEffectiveMessageSeverity(*info, diagnostic.primarySpan.range.begin);
+    }
+
+    // If the diagnostic has been disabled, don't emit it
+    if (effectiveSeverity == Severity::Disable)
+        return false;
+
+    // Create a copy with the effective severity for rendering
+    GenericDiagnostic effectiveDiagnostic = diagnostic;
+    effectiveDiagnostic.severity = effectiveSeverity;
+
+    if (effectiveSeverity >= Severity::Error)
     {
         m_errorCount++;
     }
@@ -635,15 +660,19 @@ bool DiagnosticSink::diagnoseRichImpl(const GenericDiagnostic& diagnostic)
     String message;
     if (isFlagSet(Flag::MachineReadableDiagnostics))
     {
-        message = renderDiagnosticMachineReadable(getSourceManager(), diagnostic);
+        message = renderDiagnosticMachineReadable(
+            getSourceLocationLexer(),
+            sourceManager,
+            effectiveDiagnostic);
     }
     else
     {
         message = renderDiagnostic(
             getSourceLocationLexer(),
-            getSourceManager(),
-            {.enableTerminalColors = false, .enableUnicode = false},
-            diagnostic);
+            sourceManager,
+            {.enableTerminalColors = shouldEnableTerminalColors(),
+             .enableUnicode = shouldEnableUnicode()},
+            effectiveDiagnostic);
     }
 
     if (writer)
@@ -655,15 +684,19 @@ bool DiagnosticSink::diagnoseRichImpl(const GenericDiagnostic& diagnostic)
         outputBuffer.append(message);
     }
 
+    // Route to parent sink - let it render with its own settings but using the same source manager.
+    // The source manager must be passed because the parent may have a different source manager
+    // that cannot resolve the locations in this diagnostic (e.g., command line source locations
+    // are in a separate source manager from the main compilation source manager).
     if (m_parentSink)
     {
-        m_parentSink->diagnoseRichImpl(diagnostic);
+        m_parentSink->diagnoseRichImpl(effectiveDiagnostic, info, sourceManager);
     }
 
-    if (diagnostic.severity >= Severity::Fatal)
+    if (effectiveSeverity >= Severity::Fatal)
     {
-        // TODO: figure out a better policy for aborting compilation
-        SLANG_ABORT_COMPILATION("fatal error encountered");
+        std::string msg(message.begin(), message.end());
+        SLANG_ABORT_COMPILATION(msg.c_str());
     }
     return true;
 }
@@ -686,7 +719,7 @@ bool DiagnosticSink::diagnoseRichImpl(
     diagnostic.primarySpan.range = SourceRange{loc};
     diagnostic.primarySpan.message = "";
 
-    return diagnoseRichImpl(diagnostic);
+    return diagnoseRichImpl(diagnostic, &info);
 }
 
 Severity DiagnosticSink::getEffectiveMessageSeverity(

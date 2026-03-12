@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv-asm
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -target spirv-asm
 //TEST_INPUT:ubuffer(data=[0], stride=4):out
 
 // Test that DerivativeGroupQuadsKHR execution mode validates workgroup size
@@ -23,4 +23,5 @@ void main() {
     g_ssbo[0] = texture_color;
 }
 
-// CHECK: error 31210: compute derivative group quad requires thread dispatch count of X and Y to each be at a multiple of 2
+// CHECK: error[E31210]
+// CHECK: compute derivative group quad requires thread dispatch count of X and Y to each be at a multiple of 2

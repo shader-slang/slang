@@ -7,8 +7,9 @@ struct S {};
 void test()
 {
     if (1+1==2);
-//foo          ^ empty statement
+//foo:         ^ potentially unintended empty statement
+//foo:         ^ potentially unintended empty statement at this location; use {} instead.
 
-// the above comment should match on the output: tests/diagnostics/rich-diag-test.slang(9): warning 20101: potentially unintended empty statement at this location; use {} instead.
+// the above comment matches the warning diagnostic
 		return;
 }

@@ -1,5 +1,5 @@
-//TEST:SIMPLE(filecheck=CHECK): -stage compute -entry computeMain -allow-glsl -target glsl
-//TEST:SIMPLE(filecheck=CHECK): -stage compute -entry computeMain -allow-glsl -target spirv -emit-spirv-directly
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -stage compute -entry computeMain -allow-glsl -target glsl
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -stage compute -entry computeMain -allow-glsl -target spirv -emit-spirv-directly
 
 readonly writeonly buffer MyBlockName3
 {
@@ -20,8 +20,10 @@ buffer dontOptimizeOutBlock
 layout(local_size_x = 1) in;
 void computeMain()
 {
-//CHECK: error 30011
     inputBuffer1.data1 = optimizeBlock.data1;
-//CHECK: error 30011
+//CHECK:               ^ left of '=' is not an l-value
+//CHECK:               ^ left of '=' is not an l-value.
     inputBuffer2.data1 = optimizeBlock.data2;
+//CHECK:               ^ left of '=' is not an l-value
+//CHECK:               ^ left of '=' is not an l-value.
 }
