@@ -5,7 +5,7 @@
 // Currently, only CUDA supports atomicAdd on half. So we can only test fp16 on CUDA.
 // TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0  -xslang -experimental-feature -xslang -DTEST_HALF=0
 // TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -xslang -experimental-feature -xslang -DTEST_HALF=1
-import neural;
+import slang.neural;
 
 #if TEST_HALF
 typealias ElementType = half;

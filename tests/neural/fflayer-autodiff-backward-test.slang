@@ -1,11 +1,15 @@
 // Test FFLayer backward pass via autodiff.
 // Verifies that autodiff correctly computes gradients through eval<A>().
 //
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly -xslang -DTEST_POINTER=0
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTEST_POINTER=0
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTEST_POINTER=1
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly -xslang -DTEST_POINTER=0 -xslang -DTEST_TENSORVIEW=0
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTEST_POINTER=0 -xslang -DTEST_TENSORVIEW=0
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -xslang -experimental-feature -xslang -DTEST_POINTER=1 -xslang -DTEST_TENSORVIEW=0
+//
+// Compile-only test for TorchTensorViewAddress (CUDA target):
+//TEST:SIMPLE(filecheck=CHECK): -target ptx -stage compute -entry computeMain -capability cuda_sm_7_0 -DTEST_TENSORVIEW=1 -DTEST_POINTER=0 -experimental-feature
+// CHECK: computeMain
 
-import neural;
+import slang.neural;
 
 // Weights: W = [[1,2],[3,4]], bias = [0.5, -0.5]
 //TEST_INPUT: set params = ubuffer(data=[1.0 2.0 3.0 4.0 0.5 -0.5], stride=4)
@@ -13,7 +17,11 @@ import neural;
 // Gradient buffer for weight gradients
 //TEST_INPUT: set gradParams = ubuffer(data=[0.0 0.0 0.0 0.0 0.0 0.0], stride=4)
 
-#if TEST_POINTER
+#if TEST_TENSORVIEW
+    uniform TensorView<float> params;
+    uniform TensorView<float> gradParams;
+    typealias Address = TorchTensorViewAddress<float>;
+#elif TEST_POINTER
     uniform float* params;
     uniform float* gradParams;
     typealias Address = PointerAddress<float>;
@@ -41,12 +49,9 @@ void testForwardPass(inout uint idx)
     let baseAddr = Address(params);
     let layer = Layer();
 
-    let weightAddr = baseAddr.getOffset(0);
-    let biasAddr = baseAddr.getOffset(4);
-
     float[2] xArr = {1.0, 2.0};
     let x = Vec2(xArr);
-    let y = layer.eval<Address>(x, weightAddr, biasAddr);
+    let y = layer.eval<Address>(x, baseAddr);
 
     // W = [[1,2],[3,4]], b = [0.5, -0.5]
     // y = W*x + b = [1*1+2*2, 3*1+4*2] + [0.5, -0.5] = [5, 11] + [0.5, -0.5] = [5.5, 10.5]
@@ -54,11 +59,12 @@ void testForwardPass(inout uint idx)
     testResult[idx++] = approxEqual(y[1], 10.5);   // y[1] == 10.5
 }
 
-// Wrapper function for autodiff - takes DifferentialPtrPair for weight and bias addresses
+// Wrapper function for autodiff - eval internally calls getOffset to derive
+// the bias address, exercising the custom derivative of getOffset through autodiff.
 [Differentiable]
-Vec2 computeOutput(Address weightAddr, Address biasAddr, Vec2 input, Layer layer)
+Vec2 computeOutput(Address baseAddr, Vec2 input, Layer layer)
 {
-    return layer.eval<Address>(input, weightAddr, biasAddr);
+    return layer.eval<Address>(input, baseAddr);
 }
 
 // Test backward pass using autodiff
@@ -72,18 +78,11 @@ void testBackwardPass(inout uint idx)
     let gradBaseAddr = Address(gradParams);
     let layer = Layer();
 
-    // Compute weight/bias addresses outside the differentiable function
-    let weightAddr = baseAddr.getOffset(0);
-    let biasAddr = baseAddr.getOffset(4);
-    let dWeightAddr = gradBaseAddr.getOffset(0);
-    let dBiasAddr = gradBaseAddr.getOffset(4);
-
     float[2] xArr = {1.0, 2.0};
     let x = Vec2(xArr);
 
-    // Create DifferentialPtrPair for weight and bias addresses (primal, gradient)
-    var weightAddrPair = DifferentialPtrPair<Address>(weightAddr, dWeightAddr);
-    var biasAddrPair = DifferentialPtrPair<Address>(biasAddr, dBiasAddr);
+    // Create DifferentialPtrPair for the single base address (primal, gradient)
+    var baseAddrPair = DifferentialPtrPair<Address>(baseAddr, gradBaseAddr);
     
     // Create diffPair for input
     var inputPair = diffPair(x);
@@ -91,8 +90,9 @@ void testBackwardPass(inout uint idx)
     // Output gradient: dL/dy = [1, 1]
     let dOutput = Vec2(1.0);
 
-    // Use bwd_diff to compute gradients
-    bwd_diff(computeOutput)(weightAddrPair, biasAddrPair, inputPair, layer, dOutput);
+    // Use bwd_diff to compute gradients - getOffset is called inside computeOutput,
+    // and its custom derivative propagates the DifferentialPtrPair correctly.
+    bwd_diff(computeOutput)(baseAddrPair, inputPair, layer, dOutput);
 
     // Expected weight gradients:
     // dL/dW = dy * x^T where dy = [1, 1], x = [1, 2]

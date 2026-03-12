@@ -10,6 +10,9 @@
 #ifdef _WIN32
 #include <shlobj.h>
 #include <windows.h>
+#endif
+
+#ifdef _MSC_VER
 #pragma comment(lib, "advapi32")
 #pragma comment(lib, "Shell32")
 #endif

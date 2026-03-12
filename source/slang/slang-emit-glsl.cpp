@@ -9,6 +9,7 @@
 #include "slang-ir-util.h"
 #include "slang-legalize-types.h"
 #include "slang-mangled-lexer.h"
+#include "slang-rich-diagnostics.h"
 #include "slang/slang-ir.h"
 
 #include <assert.h>
@@ -656,12 +657,10 @@ void GLSLSourceEmitter::_emitGLSLImageFormatModifier(IRInst* var, IRTextureType*
         const auto formatInfo = getImageFormatInfo(format);
         if (!isImageFormatSupportedByGLSL(format))
         {
-            getSink()->diagnose(
-                SourceLoc(),
-                Diagnostics::imageFormatUnsupportedByBackend,
-                formatInfo.name,
-                "GLSL",
-                "unknown");
+            getSink()->diagnose(Diagnostics::ImageFormatUnsupportedByBackend{
+                .format = formatInfo.name,
+                .backend = "GLSL",
+                .replacement = "unknown"});
             format = ImageFormat::unknown;
         }
 
@@ -3477,14 +3476,9 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             {
                 m_writer->emit("hitObjectNV");
             }
-            else if (targetCaps.implies(CapabilityAtom::_GL_EXT_shader_invocation_reorder))
+            else // if (targetCaps.implies(CapabilityAtom::_GL_EXT_shader_invocation_reorder))
             {
                 m_writer->emit("hitObjectEXT");
-            }
-            else
-            {
-                SLANG_UNEXPECTED(
-                    "HitObjectType requires GL_EXT or GL_NV shader_invocation_reorder capability");
             }
             return;
         }

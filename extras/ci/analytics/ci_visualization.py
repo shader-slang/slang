@@ -36,6 +36,10 @@ def parse_args():
         description="Generate CI analytics HTML from job data."
     )
     parser.add_argument("--input", default="ci_jobs.json", help="Input JSON file")
+    parser.add_argument(
+        "--pr-input", default="pr_merges.json",
+        help="Input JSON file with merged PR data (default: pr_merges.json)",
+    )
     parser.add_argument("--output", default="ci_analytics", help="Output directory")
     return parser.parse_args()
 
@@ -165,21 +169,109 @@ def chart_section(chart_id, title, description="", canvas_style=""):
     """Generate HTML for a chart section with anchor link and download button."""
     desc_html = f'\n<p style="color:#6c757d;font-size:0.9em">{description}</p>' if description else ""
     style_attr = f' style="{canvas_style}"' if canvas_style else ""
+    title_attr = html_mod.escape(title, quote=True)
+    desc_attr = html_mod.escape(description, quote=True) if description else ""
     return f"""<div class="chart-section" id="{chart_id}">
   <h2>{title} <a class="anchor" href="#{chart_id}">#</a>
-  <button class="download-btn" onclick="downloadChart('{chart_id}_canvas')">PNG</button></h2>{desc_html}
-  <div class="chart-container"{style_attr}><canvas id="{chart_id}_canvas"></canvas></div>
+  <select class="download-btn" onchange="downloadChart('{chart_id}_canvas', this.value); this.selectedIndex=0">
+    <option value="" disabled selected>Download PNG</option>
+    <option value="transparent">Transparent</option>
+    <option value="white">White background</option>
+  </select>
+  <select class="download-btn" onchange="copyChart('{chart_id}_canvas', this.value); this.selectedIndex=0">
+    <option value="" disabled selected>Copy PNG</option>
+    <option value="transparent">Transparent</option>
+    <option value="white">White background</option>
+  </select></h2>{desc_html}
+  <div class="chart-container"{style_attr}><canvas id="{chart_id}_canvas" data-title="{title_attr}" data-desc="{desc_attr}"></canvas></div>
 </div>"""
 
 
 DOWNLOAD_JS = """
-function downloadChart(canvasId) {
+function wrapText(ctx, text, maxWidth) {
+  if (!text) return [];
+  var words = text.split(/\\s+/);
+  var lines = [];
+  var cur = '';
+  for (var i = 0; i < words.length; i++) {
+    var test = cur ? (cur + ' ' + words[i]) : words[i];
+    if (ctx.measureText(test).width > maxWidth && cur) {
+      lines.push(cur);
+      cur = words[i];
+    } else {
+      cur = test;
+    }
+  }
+  if (cur) lines.push(cur);
+  return lines;
+}
+function renderChartPng(canvasId, bg) {
   var canvas = document.getElementById(canvasId);
-  if (!canvas) return;
+  if (!canvas || !bg) return null;
+  var title = canvas.getAttribute('data-title') || '';
+  var desc = canvas.getAttribute('data-desc') || '';
+  var pad = 16;
+  var titleFont = 'bold 18px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+  var descFont = '12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+  var titleLineH = 22;
+  var descLineH = 16;
+  var maxTextW = canvas.width;
+  var probe = document.createElement('canvas').getContext('2d');
+  probe.font = titleFont;
+  var titleLines = wrapText(probe, title, maxTextW);
+  probe.font = descFont;
+  var descLines = wrapText(probe, desc, maxTextW);
+  var headerH = titleLines.length * titleLineH + descLines.length * descLineH;
+  if (headerH > 0) headerH += pad;
+  var tmp = document.createElement('canvas');
+  tmp.width = canvas.width + pad * 2;
+  tmp.height = canvas.height + headerH + pad;
+  var ctx = tmp.getContext('2d');
+  if (bg === 'white') {
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, tmp.width, tmp.height);
+  }
+  var y = pad;
+  if (titleLines.length) {
+    ctx.font = titleFont;
+    ctx.fillStyle = '#212529';
+    for (var i = 0; i < titleLines.length; i++) {
+      ctx.fillText(titleLines[i], pad, y + titleLineH - 6);
+      y += titleLineH;
+    }
+  }
+  if (descLines.length) {
+    ctx.font = descFont;
+    ctx.fillStyle = '#6c757d';
+    for (var j = 0; j < descLines.length; j++) {
+      ctx.fillText(descLines[j], pad, y + descLineH - 4);
+      y += descLineH;
+    }
+  }
+  ctx.drawImage(canvas, pad, headerH);
+  return tmp;
+}
+function downloadChart(canvasId, bg) {
+  var tmp = renderChartPng(canvasId, bg);
+  if (!tmp) return;
   var link = document.createElement('a');
   link.download = canvasId.replace('_canvas', '') + '.png';
-  link.href = canvas.toDataURL('image/png', 1.0);
+  link.href = tmp.toDataURL('image/png', 1.0);
   link.click();
+}
+function copyChart(canvasId, bg) {
+  var tmp = renderChartPng(canvasId, bg);
+  if (!tmp) return;
+  if (!window.isSecureContext || !navigator.clipboard || !window.ClipboardItem) {
+    console.error('Clipboard API not available (requires HTTPS or localhost)');
+    downloadChart(canvasId, bg);
+    return;
+  }
+  tmp.toBlob(function(blob) {
+    navigator.clipboard.write([new ClipboardItem({'image/png': blob})]).catch(function(err) {
+      console.error('Failed to copy chart to clipboard:', err);
+    });
+  }, 'image/png');
 }
 """
 
@@ -189,6 +281,7 @@ def nav_html(active=""):
         ("index.html", "Home"),
         ("statistics.html", "Statistics"),
         ("health.html", "Health"),
+        ("status.html", "Status"),
     ]
     items = []
     for href, label in links:
@@ -221,7 +314,7 @@ def page_template(title, body, active=""):
   .chart-section h2 a.anchor {{ color: #adb5bd; text-decoration: none; font-size: 0.7em; visibility: hidden; }}
   .chart-section:hover h2 a.anchor {{ visibility: visible; }}
   .chart-section h2 a.anchor:hover {{ color: #0d6efd; }}
-  .download-btn {{ font-size: 12px; color: #6c757d; cursor: pointer; border: 1px solid #dee2e6; background: white; padding: 2px 8px; border-radius: 4px; margin-left: 8px; }}
+  .download-btn {{ font-size: 12px; color: #6c757d; cursor: pointer; border: 1px solid #dee2e6; background: white; padding: 2px 8px; border-radius: 4px; margin-left: 8px; -webkit-appearance: none; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M0 0l4 5 4-5z' fill='%236c757d'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 6px center; padding-right: 20px; }}
   .download-btn:hover {{ background: #f8f9fa; color: #333; }}
   .stat-card {{ display: inline-block; background: #f8f9fa; border-radius: 8px; padding: 15px 25px; margin: 5px; text-align: center; }}
   .stat-card .value {{ font-size: 2em; font-weight: bold; color: #212529; }}
@@ -405,6 +498,83 @@ def process_jobs(jobs_data, config):
             file=sys.stderr,
         )
 
+    # Merge queue statistics per date.
+    # A merge queue "check" is a CI workflow run with event=merge_group.
+    # We count success/failure/cancelled per run (not per job).
+    # Import shared helper for PR number extraction
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from gh_api import parse_merge_queue_pr_number
+
+    mq_runs_by_date = defaultdict(lambda: {"success": 0, "failure": 0, "cancelled": 0, "total": 0})
+    mq_tat_by_date = defaultdict(list)  # turnaround times for merge queue runs
+    mq_recent_failures = []  # most recent merge queue failures (for table)
+    for run_id, run_jobs in runs.items():
+        if not run_jobs:
+            continue
+        if run_jobs[0].get("event") != "merge_group":
+            continue
+        if run_jobs[0].get("workflow_name") != "CI":
+            continue
+
+        # Determine run conclusion from jobs
+        conclusions = [j.get("conclusion") for j in run_jobs]
+        if "failure" in conclusions:
+            conclusion = "failure"
+        elif "cancelled" in conclusions and "success" not in conclusions:
+            conclusion = "cancelled"
+        elif all(c == "success" for c in conclusions if c):
+            conclusion = "success"
+        else:
+            conclusion = "cancelled"
+
+        # Date from earliest created_at
+        earliest = None
+        latest = None
+        for j in run_jobs:
+            c = parse_dt(j.get("created_at"))
+            d = parse_dt(j.get("completed_at"))
+            if c and (earliest is None or c < earliest):
+                earliest = c
+            if d and (latest is None or d > latest):
+                latest = d
+        if not earliest:
+            continue
+
+        date_str = earliest.strftime("%Y-%m-%d")
+        if date_str == today_str:
+            continue
+        mq_runs_by_date[date_str][conclusion] += 1
+        mq_runs_by_date[date_str]["total"] += 1
+
+        if earliest and latest and latest > earliest:
+            tat = (latest - earliest).total_seconds() / 60
+            mq_tat_by_date[date_str].append(tat)
+
+        if conclusion == "failure":
+            branch = run_jobs[0].get("head_branch", "")
+            pr_num = parse_merge_queue_pr_number(branch)
+
+            # Find failing job names
+            failing_jobs = [
+                j.get("name", "") for j in run_jobs
+                if j.get("conclusion") == "failure"
+            ]
+            mq_recent_failures.append({
+                "date": date_str,
+                "created_at": earliest.isoformat(),
+                "run_id": run_id,
+                "branch": branch,
+                "pr_number": pr_num,
+                "url": run_jobs[0].get("html_url", ""),
+                "failing_jobs": failing_jobs[:5],
+            })
+
+    mq_recent_failures.sort(key=lambda x: x["created_at"], reverse=True)
+
+    generated_at = datetime.datetime.now(datetime.timezone.utc).strftime(
+        "%Y-%m-%d %H:%M UTC"
+    )
+
     return {
         "all_jobs": jobs_data,
         "active_jobs": active_jobs,
@@ -415,9 +585,31 @@ def process_jobs(jobs_data, config):
         "ci_sol_by_date": dict(ci_sol_by_date),
         "build_wait_by_date": dict(build_wait_by_date),
         "test_wait_by_date": dict(test_wait_by_date),
+        "mq_runs_by_date": dict(mq_runs_by_date),
+        "mq_tat_by_date": dict(mq_tat_by_date),
+        "mq_recent_failures": mq_recent_failures[:50],
         "dates": sorted(jobs_by_date.keys()),
         "months": sorted(jobs_by_month.keys()),
+        "generated_at": generated_at,
     }
+
+
+# --- Shared helpers ---
+
+
+def _count_pr_merges_by_date(pr_merges):
+    """Count PRs merged per date string from pr_collector data."""
+    counts = defaultdict(int)
+    for pr in pr_merges:
+        merged_at = pr.get("merged_at")
+        if not merged_at:
+            continue
+        try:
+            dt = parse_dt(merged_at)
+            counts[dt.strftime("%Y-%m-%d")] += 1
+        except (ValueError, TypeError):
+            continue
+    return counts
 
 
 # --- Index page ---
@@ -522,6 +714,22 @@ def generate_index(data, output_dir):
     prs_delta = _delta_str(prs_3d, prs_prev)
     fr_delta = _delta_str(failure_rate_3d, failure_rate_prev, "%", invert=True)
 
+    # PRs merged per day (from pr_collector data)
+    pr_merges = data.get("pr_merges", [])
+    prs_merged_by_date = _count_pr_merges_by_date(pr_merges)
+
+    def _avg_merged(window_dates):
+        total = sum(prs_merged_by_date.get(d, 0) for d in window_dates)
+        return total / len(window_dates) if window_dates else 0
+
+    merged_3d = _avg_merged(recent_dates)
+    merged_prev = _avg_merged(prev_dates)
+    merged_delta = _delta_str(merged_3d, merged_prev)
+
+    merged_card_html = ""
+    if pr_merges:
+        merged_card_html = f'  <div class="stat-card"><div class="value">{merged_3d:.1f}{merged_delta}</div><div class="label">PRs Merged / day</div></div>'
+
     months_html = ""
     for month in reversed(data["months"]):
         count = len(data["jobs_by_month"][month])
@@ -529,12 +737,13 @@ def generate_index(data, output_dir):
 
     body = f"""
 <h1>Slang CI Analytics</h1>
-<p style="color:#6c757d">CI workflow only. Excludes skipped jobs. Data range: {dates[0] if dates else 'N/A'} to {dates[-1] if dates else 'N/A'}.</p>
+<p style="color:#6c757d">Last updated: {data['generated_at']}. CI workflow only. Excludes skipped jobs. Data range: {dates[0] if dates else 'N/A'} to {dates[-1] if dates else 'N/A'}.</p>
 <h2>Last 3 Days</h2>
 <div>
   <div class="stat-card"><div class="value">{ci_tat_3d:.0f}m{tat_delta}</div><div class="label">CI Turnaround (avg)</div></div>
   <div class="stat-card"><div class="value">{prs_3d:.1f}{prs_delta}</div><div class="label">Active PRs / day</div></div>
   <div class="stat-card"><div class="value">{failure_rate_3d:.1f}%{fr_delta}</div><div class="label">Failure Rate</div></div>
+{merged_card_html}
 </div>
 
 <h2>Pages</h2>
@@ -700,6 +909,11 @@ def generate_statistics(data, config, output_dir):
             name = g["name"]
             if name not in sh_groups:
                 sh_groups[name] = g.get("runner_count", 0)
+    for p in config.get("runner_name_prefixes", []):
+        if p.get("self_hosted"):
+            name = p["name"]
+            if name not in sh_groups:
+                sh_groups[name] = p.get("runner_count", 0)
 
     group_parallel_per_day = defaultdict(list)
     cap_avg_queue = []
@@ -773,9 +987,80 @@ def generate_statistics(data, config, output_dir):
         os_list, os_phase_avg_by_date, dates, "test"
     )
 
+    # PRs merged per day (from pr_collector data)
+    pr_merges = data.get("pr_merges", [])
+    prs_merged_by_date = _count_pr_merges_by_date(pr_merges)
+    prs_merged_per_day = [prs_merged_by_date.get(d, 0) for d in dates]
+
+    if pr_merges:
+        pr_merged_chart_html = chart_section(
+            "prsMerged", "PRs Merged per Day",
+            "Number of pull requests merged each day."
+        )
+    else:
+        pr_merged_chart_html = ""
+
+    # Merge queue stats per day
+    mq_runs_by_date = data.get("mq_runs_by_date", {})
+    mq_tat_by_date = data.get("mq_tat_by_date", {})
+    mq_recent_failures = data.get("mq_recent_failures", [])
+    mq_success_per_day = []
+    mq_failure_per_day = []
+    mq_cancelled_per_day = []
+    mq_fail_rate_per_day = []
+    mq_avg_tat_per_day = []
+    has_mq_data = bool(mq_runs_by_date)
+    for date in dates:
+        mq = mq_runs_by_date.get(date, {})
+        s = mq.get("success", 0)
+        f = mq.get("failure", 0)
+        c = mq.get("cancelled", 0)
+        mq_success_per_day.append(s)
+        mq_failure_per_day.append(f)
+        mq_cancelled_per_day.append(c)
+        total_sf = s + f
+        mq_fail_rate_per_day.append(round(f / total_sf * 100, 1) if total_sf > 0 else 0)
+        tats = mq_tat_by_date.get(date, [])
+        mq_avg_tat_per_day.append(round(sum(tats) / len(tats), 1) if tats else 0)
+
+    # Build merge queue failure table HTML
+    mq_failures_html = ""
+    if mq_recent_failures:
+        mq_failures_html = '\n<h3>Recent Merge Queue Failures</h3>\n'
+        mq_failures_html += '<table><tr><th>Date</th><th>PR</th><th>Run</th><th>Failing Jobs</th></tr>\n'
+        for mf in mq_recent_failures[:20]:
+            pr_num = mf.get("pr_number", "")
+            url = mf.get("url", "")
+            run_url = url.split("/jobs/")[0] if "/jobs/" in url else url
+            if pr_num:
+                pr_link = f'<a href="https://github.com/shader-slang/slang/pull/{html_mod.escape(pr_num)}" target="_blank">#{html_mod.escape(pr_num)}</a>'
+            else:
+                pr_link = "?"
+            run_link = f'<a href="{html_mod.escape(run_url)}" target="_blank">logs</a>' if run_url else ""
+            failing = ", ".join(mf.get("failing_jobs", [])[:3])
+            if len(mf.get("failing_jobs", [])) > 3:
+                failing += f" (+{len(mf['failing_jobs']) - 3} more)"
+            mq_failures_html += f"<tr><td>{html_mod.escape(mf.get('date', ''))}</td><td>{pr_link}</td><td>{run_link}</td><td>{html_mod.escape(failing)}</td></tr>\n"
+        mq_failures_html += "</table>\n"
+
+    mq_chart_html = ""
+    if has_mq_data:
+        mq_chart_html = f"""
+{chart_section("mqChecks", "Merge Queue Checks per Day",
+    "Stacked by conclusion: success, failure, cancelled. Shows merge queue CI check runs triggered by GitHub merge queue.")}
+
+{chart_section("mqFailRate", "Merge Queue Failure Rate (%)",
+    "Percentage of merge queue CI checks that failed (excludes cancelled).")}
+
+{chart_section("mqTurnaround", "Merge Queue Turnaround Time (minutes)",
+    "Average time from merge queue CI check start to completion.")}
+
+{mq_failures_html}
+"""
+
     body = f"""
 <h1>Statistics &amp; Trends</h1>
-<p style="color:#6c757d">CI workflow only. Excludes skipped jobs. Data range: {dates[0] if dates else 'N/A'} to {dates[-1] if dates else 'N/A'}.</p>
+<p style="color:#6c757d">Last updated: {data['generated_at']}. CI workflow only. Excludes skipped jobs. Data range: {dates[0] if dates else 'N/A'} to {dates[-1] if dates else 'N/A'}.</p>
 
 <div style="margin-bottom:15px">
   <label>Date range: </label>
@@ -793,6 +1078,7 @@ def generate_statistics(data, config, output_dir):
 {chart_section("prsPerDay", "Active PRs per Day",
     "Unique PR branches with CI activity per day.")}
 
+{pr_merged_chart_html}
 {chart_section("buildTestWait", "Build and Test Wait Times (minutes)",
     "Build wait: run trigger to first build started. Test wait: last build completed to first test started (worst platform).")}
 
@@ -826,6 +1112,7 @@ def generate_statistics(data, config, output_dir):
 {chart_section("queueWait", "Queue Wait Time Percentiles (minutes)",
     "Time each job spent waiting in the CI queue for a runner before execution started. Shows average, median (p50), p90, and p95 per day.")}
 
+{mq_chart_html}
 
 <script src="{CHARTJS_CDN}"></script>
 <script>
@@ -845,6 +1132,13 @@ const allTurnP95 = {json.dumps(ci_p95_tat)};
 const allSoL = {json.dumps(ci_sol_avg)};
 const allBuildWait = {json.dumps(avg_build_wait)};
 const allTestWait = {json.dumps(avg_test_wait)};
+const allPRsMerged = {json.dumps(prs_merged_per_day)};
+const allMqSuccess = {json.dumps(mq_success_per_day)};
+const allMqFailure = {json.dumps(mq_failure_per_day)};
+const allMqCancelled = {json.dumps(mq_cancelled_per_day)};
+const allMqFailRate = {json.dumps(mq_fail_rate_per_day)};
+const allMqTat = {json.dumps(mq_avg_tat_per_day)};
+const hasMqData = {json.dumps(has_mq_data)};
 
 let charts = [];
 
@@ -940,6 +1234,17 @@ makeChart('prsPerDay_canvas', 'line', {{
   options: {{responsive:true}}
 }});
 
+// PRs merged per day
+if (document.getElementById('prsMerged_canvas')) {{
+  makeChart('prsMerged_canvas', 'bar', {{
+    data: {{
+      labels: sliceData(allLabels, 30),
+      datasets: [{{label:'PRs Merged', data:sliceData(allPRsMerged,30), _allData:allPRsMerged, backgroundColor:'#6f42c1'}}]
+    }},
+    options: {{responsive:true, scales:{{y:{{beginAtZero:true, title:{{display:true,text:'PRs'}}}}}}}}
+  }});
+}}
+
 // Runs per day
 makeChart('runsPerDay_canvas', 'line', {{
   data: {{
@@ -996,7 +1301,7 @@ new Chart(document.getElementById('parallelRate_canvas').getContext('2d'), {{
     labels: {json.dumps(dates)},
     datasets: {json.dumps(parallel_datasets)}
   }},
-  options: {{responsive:true, scales:{{y:{{min:0,title:{{display:true,text:'Avg Concurrent Runners'}}}}}}}}
+  options: {{responsive:true, scales:{{y:{{stacked:true,min:0,title:{{display:true,text:'Avg Concurrent Runners'}}}}}}}}
 }});
 
 // Queue wait time percentiles
@@ -1013,6 +1318,40 @@ new Chart(document.getElementById('queueWait_canvas').getContext('2d'), {{
   }},
   options: {{responsive:true, scales:{{y:{{title:{{display:true,text:'Minutes'}}}}}}}}
 }});
+
+// Merge queue charts (only if data exists)
+if (hasMqData) {{
+  // Merge queue checks per day (stacked bar)
+  makeChart('mqChecks_canvas', 'bar', {{
+    data: {{
+      labels: sliceData(allLabels, 30),
+      datasets: [
+        {{label:'Success', data:sliceData(allMqSuccess,30), _allData:allMqSuccess, backgroundColor:'{CONCLUSION_COLORS["success"]}'}},
+        {{label:'Failure', data:sliceData(allMqFailure,30), _allData:allMqFailure, backgroundColor:'{CONCLUSION_COLORS["failure"]}'}},
+        {{label:'Cancelled', data:sliceData(allMqCancelled,30), _allData:allMqCancelled, backgroundColor:'{CONCLUSION_COLORS["cancelled"]}'}},
+      ]
+    }},
+    options: {{responsive:true, scales:{{x:{{stacked:true}},y:{{stacked:true, title:{{display:true,text:'Merge Queue Checks'}}}}}}}}
+  }});
+
+  // Merge queue failure rate
+  makeChart('mqFailRate_canvas', 'line', {{
+    data: {{
+      labels: sliceData(allLabels, 30),
+      datasets: [{{label:'Failure Rate %', data:sliceData(allMqFailRate,30), _allData:allMqFailRate, borderColor:'#dc3545', fill:true, backgroundColor:'rgba(220,53,69,0.1)', tension:0.1}}]
+    }},
+    options: {{responsive:true, scales:{{y:{{min:0, max:100, title:{{display:true,text:'%'}}}}}}}}
+  }});
+
+  // Merge queue turnaround time
+  makeChart('mqTurnaround_canvas', 'line', {{
+    data: {{
+      labels: sliceData(allLabels, 30),
+      datasets: [{{label:'Avg Turnaround', data:sliceData(allMqTat,30), _allData:allMqTat, borderColor:'#0d6efd', fill:false, tension:0.1}}]
+    }},
+    options: {{responsive:true, scales:{{y:{{title:{{display:true,text:'Minutes'}}}}}}}}
+  }});
+}}
 </script>
 """
     with open(os.path.join(output_dir, "statistics.html"), "w") as f:
@@ -1022,7 +1361,7 @@ new Chart(document.getElementById('queueWait_canvas').getContext('2d'), {{
 # --- Monthly timeline pages ---
 
 
-def generate_month_page(month, month_jobs, config, output_dir):
+def generate_month_page(month, month_jobs, config, output_dir, generated_at=""):
     """Generate a monthly timeline page with daily Gantt views."""
     # Group by date, then by runner
     days = defaultdict(lambda: defaultdict(list))
@@ -1145,8 +1484,9 @@ def generate_month_page(month, month_jobs, config, output_dir):
         for b in sorted(branches) if b
     )
 
+    updated_html = f'\n<p style="color:#6c757d">Last updated: {generated_at}.</p>' if generated_at else ""
     body = f"""
-<h1>Timeline: {month}</h1>
+<h1>Timeline: {month}</h1>{updated_html}
 <div style="margin-bottom:15px">
   <label>Workflow: </label>
   <select id="wfFilter" onchange="filterJobs()">
@@ -1227,8 +1567,29 @@ def main():
         sys.exit(2)
     print(f"Loaded {len(jobs_data)} jobs")
 
+    # Load PR merge data (optional)
+    pr_data = []
+    if os.path.exists(args.pr_input):
+        try:
+            with open(args.pr_input, encoding="utf-8") as f:
+                pr_data = json.load(f)
+            if not isinstance(pr_data, list):
+                print(
+                    f"Warning: PR data in {args.pr_input} is not a list; ignoring",
+                    file=sys.stderr,
+                )
+                pr_data = []
+            else:
+                pr_data = [p for p in pr_data if isinstance(p, dict)]
+            print(f"Loaded {len(pr_data)} merged PRs from {args.pr_input}")
+        except (json.JSONDecodeError, OSError) as e:
+            print(f"Warning: Could not load PR data: {e}", file=sys.stderr)
+    else:
+        print(f"No PR data at {args.pr_input} (skipping PRs merged chart)")
+
     # Process
     data = process_jobs(jobs_data, config)
+    data["pr_merges"] = pr_data
     print(f"Active jobs (excluding skipped): {len(data['active_jobs'])}")
     print(f"Date range: {data['dates'][0] if data['dates'] else 'N/A'} to {data['dates'][-1] if data['dates'] else 'N/A'}")
     print(f"Months: {len(data['months'])}")
@@ -1247,7 +1608,7 @@ def main():
 
     for month in data["months"]:
         print(f"Generating month_{month}.html...")
-        generate_month_page(month, data["jobs_by_month"][month], config, args.output)
+        generate_month_page(month, data["jobs_by_month"][month], config, args.output, data["generated_at"])
 
     print(f"\nDone! Output written to {args.output}/")
     print(f"Open {args.output}/index.html in a browser to view.")

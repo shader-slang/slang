@@ -1,5 +1,8 @@
 //TEST:SIMPLE(filecheck=SPVDH): -target spirv -capability spvDescriptorHeapEXT
 
+// SPVDH-DAG: %[[SIZEOF:[a-zA-Z0-9_]+]] = OpConstantSizeOfEXT {{.*}}
+// SPVDH-DAG: OpDecorateId {{.*}} ArrayStrideIdEXT %[[SIZEOF]]
+
 // SPVDH-DAG: OpDecorate {{.*}} BuiltIn ResourceHeapEXT
 // SPVDH-DAG: OpBufferPointerEXT {{.*}}; NonWritable 
 

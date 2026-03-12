@@ -21,6 +21,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#if SLANG_UNIX_FAMILY
+#include <signal.h>
+#endif
+
 #if defined(_WIN32)
 #include <slang-rhi/agility-sdk.h>
 SLANG_RHI_EXPORT_AGILITY_SDK
@@ -638,5 +642,11 @@ SlangResult _execute(int argc, const char* const* argv)
 
 int main(int argc, const char* const* argv)
 {
+#if SLANG_UNIX_FAMILY
+    // Ignore SIGPIPE so that writing to a broken pipe returns EPIPE
+    // instead of killing this process.
+    signal(SIGPIPE, SIG_IGN);
+#endif
+
     return (int)Slang::TestToolUtil::getReturnCode(TestServer::_execute(argc, argv));
 }
