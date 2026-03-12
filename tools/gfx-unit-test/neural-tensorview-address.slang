@@ -13,14 +13,12 @@ uniform TensorView<float> output;
 void forwardMain()
 {
     Address baseAddr = Address(params);
-    Address weightAddr = baseAddr.getOffset(0);
-    Address biasAddr = baseAddr.getOffset(8);
 
     float[4] xArr = {1.0, 2.0, 3.0, 4.0};
     let x = Vec4(xArr);
 
     let layer = Layer();
-    let y = layer.eval<Address>(x, weightAddr, biasAddr);
+    let y = layer.eval<Address>(x, baseAddr);
 
     // W = [[1,2,3,4],[5,6,7,8]], b = [9, 10]
     // y = W*x + b = [1+4+9+16+9, 5+12+21+32+10] = [39, 80]
@@ -29,9 +27,9 @@ void forwardMain()
 }
 
 [Differentiable]
-Vec2 computeLayerOutput(Address weightAddr, Address biasAddr, Vec4 input, Layer layer)
+Vec2 computeLayerOutput(Address paramAddr, Vec4 input, Layer layer)
 {
-    return layer.eval<Address>(input, weightAddr, biasAddr);
+    return layer.eval<Address>(input, paramAddr);
 }
 
 uniform TensorView<float> gradParams;
@@ -42,25 +40,19 @@ uniform TensorView<float> gradOutput;
 void backwardMain()
 {
     Address baseAddr = Address(params);
-    Address weightAddr = baseAddr.getOffset(0);
-    Address biasAddr = baseAddr.getOffset(8);
-
     Address gradBaseAddr = Address(gradParams);
-    Address dWeightAddr = gradBaseAddr.getOffset(0);
-    Address dBiasAddr = gradBaseAddr.getOffset(8);
 
     float[4] xArr = {1.0, 2.0, 3.0, 4.0};
     let x = Vec4(xArr);
     let layer = Layer();
 
-    var weightAddrPair = DifferentialPtrPair<Address>(weightAddr, dWeightAddr);
-    var biasAddrPair = DifferentialPtrPair<Address>(biasAddr, dBiasAddr);
+    var paramAddrPair = DifferentialPtrPair<Address>(baseAddr, gradBaseAddr);
     var inputPair = diffPair(x);
 
     // dOutput = [1, 1]
     let dOut = Vec2(1.0);
 
-    bwd_diff(computeLayerOutput)(weightAddrPair, biasAddrPair, inputPair, layer, dOut);
+    bwd_diff(computeLayerOutput)(paramAddrPair, inputPair, layer, dOut);
 
     // dInput = W^T * dOutput = [1+5, 2+6, 3+7, 4+8] = [6, 8, 10, 12]
     output.store(0u, inputPair.d[0]);
