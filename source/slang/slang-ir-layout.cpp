@@ -933,7 +933,9 @@ IRTypeLayoutRules* IRTypeLayoutRules::get(IRTypeLayoutRuleName name)
     }
 }
 
-std::optional<IRTypeLayoutRuleName> getTypeLayoutRuleNameFromOp(IROp layoutTypeOp, IRTypeLayoutRuleName defaultLayout)
+std::optional<IRTypeLayoutRuleName> getTypeLayoutRuleNameFromOp(
+    IROp layoutTypeOp,
+    IRTypeLayoutRuleName defaultLayout)
 {
     switch (layoutTypeOp)
     {

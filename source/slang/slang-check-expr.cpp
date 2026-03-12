@@ -2375,8 +2375,9 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
 
         if (sizeOfLikeExpr.getExpr()->dataLayoutType)
         {
-            auto dataLayoutType = as<Type>(
-                sizeOfLikeExpr.getExpr()->dataLayoutType->substitute(m_astBuilder, expr.getSubsts()));
+            auto dataLayoutType = as<Type>(sizeOfLikeExpr.getExpr()->dataLayoutType->substitute(
+                m_astBuilder,
+                expr.getSubsts()));
             // we can only constant-fold sizeof-like expressions when in
             // natural/scalar data layout.
             if (!as<ScalarDataLayoutType>(dataLayoutType))
@@ -4621,11 +4622,15 @@ Expr* SemanticsExprVisitor::visitSizeOfLikeExpr(SizeOfLikeExpr* sizeOfLikeExpr)
             dataLayoutType = m_astBuilder->getScalarLayoutType();
         }
 
-        SubtypeWitness* witness = dataLayoutType ?
-            as<SubtypeWitness>(tryGetInterfaceConformanceWitness(dataLayoutType, m_astBuilder->getSharedASTBuilder()->getIBufferDataLayoutType())) : nullptr;
+        SubtypeWitness* witness =
+            dataLayoutType ? as<SubtypeWitness>(tryGetInterfaceConformanceWitness(
+                                 dataLayoutType,
+                                 m_astBuilder->getSharedASTBuilder()->getIBufferDataLayoutType()))
+                           : nullptr;
         if (!dataLayoutType || !witness)
         {
-            getSink()->diagnose(Diagnostics::SizeOfDataLayoutIsInvalid{ .expr = sizeOfLikeExpr->dataLayout });
+            getSink()->diagnose(
+                Diagnostics::SizeOfDataLayoutIsInvalid{.expr = sizeOfLikeExpr->dataLayout});
 
             sizeOfLikeExpr->type = m_astBuilder->getErrorType();
             return sizeOfLikeExpr;

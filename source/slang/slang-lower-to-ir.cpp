@@ -4985,7 +4985,8 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
     {
 
         NaturalSize size{0, NaturalSize::kInvalidAlignment};
-        if (!sizeOfLikeExpr->dataLayoutType || as<ScalarDataLayoutType>(sizeOfLikeExpr->dataLayoutType))
+        if (!sizeOfLikeExpr->dataLayoutType ||
+            as<ScalarDataLayoutType>(sizeOfLikeExpr->dataLayoutType))
         {
             // The layout should be the scalar data layout, so lets try and
             // lower to a constant already.

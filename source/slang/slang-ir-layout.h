@@ -142,7 +142,9 @@ Result getStd430SizeAndAlignment(
 ///
 Result getStd430Offset(TargetRequest* targetReq, IRStructField* field, IRIntegerValue* outOffset);
 
-std::optional<IRTypeLayoutRuleName> getTypeLayoutRuleNameFromOp(IROp layoutTypeOp, IRTypeLayoutRuleName defaultLayout);
+std::optional<IRTypeLayoutRuleName> getTypeLayoutRuleNameFromOp(
+    IROp layoutTypeOp,
+    IRTypeLayoutRuleName defaultLayout);
 
 IROp getOpFromTypeLayoutRuleName(IRTypeLayoutRuleName ruleName);
 

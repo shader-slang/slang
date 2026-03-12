@@ -2248,7 +2248,9 @@ void lowerBufferElementTypeToStorageType(
     context.processModule(module);
 }
 
-static IRTypeLayoutRuleName getTypeLayoutRuleNameFromOpAlways(IROp layoutTypeOp, IRTypeLayoutRuleName defaultLayout)
+static IRTypeLayoutRuleName getTypeLayoutRuleNameFromOpAlways(
+    IROp layoutTypeOp,
+    IRTypeLayoutRuleName defaultLayout)
 {
     return getTypeLayoutRuleNameFromOp(layoutTypeOp, defaultLayout).value_or(defaultLayout);
 }
@@ -2291,7 +2293,9 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
             if (layoutTypeOp != kIROp_DefaultBufferLayoutType &&
                 layoutTypeOp != kIROp_DefaultPushConstantBufferLayoutType)
             {
-                return getTypeLayoutRuleNameFromOpAlways(layoutTypeOp, IRTypeLayoutRuleName::Natural);
+                return getTypeLayoutRuleNameFromOpAlways(
+                    layoutTypeOp,
+                    IRTypeLayoutRuleName::Natural);
             }
         }
 

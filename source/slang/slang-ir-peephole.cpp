@@ -310,7 +310,8 @@ struct PeepholeContext : InstPassBase
                 {
                     auto layoutOp = inst->getOperand(1)->getOp();
 
-                    auto ruleName = getTypeLayoutRuleNameFromOp(layoutOp, IRTypeLayoutRuleName::Natural);
+                    auto ruleName =
+                        getTypeLayoutRuleNameFromOp(layoutOp, IRTypeLayoutRuleName::Natural);
 
                     if (!ruleName.has_value())
                         break;
