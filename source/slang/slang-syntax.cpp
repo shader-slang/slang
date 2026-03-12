@@ -213,6 +213,9 @@ void printDiagnosticArg(StringBuilder& sb, ASTNodeType nodeType)
     case ASTNodeType::GenericTypeConstraintDecl:
         sb << "GenericTypeConstraintDecl";
         break;
+    case ASTNodeType::NonEmptyPackConstraintDecl:
+        sb << "NonEmptyPackConstraintDecl";
+        break;
     case ASTNodeType::SimpleTypeDecl:
         sb << "SimpleTypeDecl";
         break;
