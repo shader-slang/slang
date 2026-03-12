@@ -2058,7 +2058,7 @@ bool SemanticsVisitor::_coerce(
                     IntegerLiteralValue v = val->getValue();
                     bool overflow = false;
                     if (v < 0)
-                        overflow = static_cast<uint64_t>(-v) >
+                        overflow = (0ULL - static_cast<uint64_t>(v)) >
                                    (static_cast<uint64_t>(1) << (maxBitSize - 1));
                     else
                         overflow = getIntValueBitSize(v) > maxBitSize;
