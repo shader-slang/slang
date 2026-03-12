@@ -578,6 +578,14 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                             // index).
                             IRBuilder builder(getElement);
                             builder.setInsertBefore(user);
+                            auto index = getElement->getIndex();
+                            auto indexValue = index;
+                            const bool isNonUniformIndex =
+                                index->getOp() == kIROp_NonUniformResourceIndex ||
+                                index->findDecoration<IRSPIRVNonUniformResourceDecoration>() !=
+                                    nullptr;
+                            if (index->getOp() == kIROp_NonUniformResourceIndex)
+                                indexValue = index->getOperand(0);
                             auto newAddr = builder.emitElementAddress(
                                 builder.getPtrType(
                                     innerElementType,
@@ -585,7 +593,18 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                                     addressSpace,
                                     dataLayout),
                                 inst,
-                                getElement->getIndex());
+                                indexValue);
+                            if (isNonUniformIndex)
+                            {
+                                // Preserve non-uniform provenance when array resource indexing
+                                // is rewritten into a pointer-valued access chain.
+                                if (!indexValue
+                                         ->findDecoration<IRSPIRVNonUniformResourceDecoration>())
+                                {
+                                    builder.addSPIRVNonUniformResourceDecoration(indexValue);
+                                }
+                                builder.addSPIRVNonUniformResourceDecoration(newAddr);
+                            }
                             user->replaceUsesWith(newAddr);
                             user->removeAndDeallocate();
                             return;
