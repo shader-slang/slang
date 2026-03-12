@@ -1,13 +1,8 @@
 // unit-test-parameter-usage-reflection-wgsl.cpp
 
-#include "../../source/core/slang-io.h"
-#include "../../source/core/slang-process.h"
 #include "slang-com-ptr.h"
 #include "slang.h"
 #include "unit-test/slang-unit-test.h"
-
-#include <stdio.h>
-#include <stdlib.h>
 
 using namespace Slang;
 
@@ -89,10 +84,14 @@ SLANG_UNIT_TEST(isParameterLocationUsedReflectionWGSL)
         SLANG_CHECK(compositeProgram != nullptr);
 
         ComPtr<slang::IComponentType> linkedProgram;
-        compositeProgram->link(linkedProgram.writeRef(), nullptr);
+        SLANG_CHECK(SLANG_SUCCEEDED(
+            compositeProgram->link(linkedProgram.writeRef(), diagnosticBlob.writeRef())));
+        SLANG_CHECK(linkedProgram != nullptr);
 
         ComPtr<slang::IMetadata> metadata;
-        linkedProgram->getTargetMetadata(0, metadata.writeRef(), nullptr);
+        SLANG_CHECK(SLANG_SUCCEEDED(
+            linkedProgram->getTargetMetadata(0, metadata.writeRef(), diagnosticBlob.writeRef())));
+        SLANG_CHECK(metadata != nullptr);
 
         // All three vertex inputs (POSITION=0, TEXCOORD=1, COLOR=2) are used.
         bool isUsed = false;
@@ -130,10 +129,14 @@ SLANG_UNIT_TEST(isParameterLocationUsedReflectionWGSL)
         SLANG_CHECK(compositeProgram != nullptr);
 
         ComPtr<slang::IComponentType> linkedProgram;
-        compositeProgram->link(linkedProgram.writeRef(), nullptr);
+        SLANG_CHECK(SLANG_SUCCEEDED(
+            compositeProgram->link(linkedProgram.writeRef(), diagnosticBlob.writeRef())));
+        SLANG_CHECK(linkedProgram != nullptr);
 
         ComPtr<slang::IMetadata> metadata;
-        linkedProgram->getTargetMetadata(0, metadata.writeRef(), nullptr);
+        SLANG_CHECK(SLANG_SUCCEEDED(
+            linkedProgram->getTargetMetadata(0, metadata.writeRef(), diagnosticBlob.writeRef())));
+        SLANG_CHECK(metadata != nullptr);
 
         // Fragment varying inputs: TEXCOORD=0 and COLOR=1 are used,
         // SV_Position is a system value, not a user varying input.
