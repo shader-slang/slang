@@ -4,6 +4,7 @@
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -180,7 +181,7 @@ struct GlobalVarTranslationContext
                 {
                     varLayoutBuilder.setSystemValueSemantic(
                         semanticDecor->getSemanticName(),
-                        semanticDecor->getSemanticIndex());
+                        semanticDecor->getEffectiveSemanticIndex());
                 }
                 else
                 {
@@ -201,10 +202,17 @@ struct GlobalVarTranslationContext
                     if (entryPointDecor->getProfile().getStage() == Stage::Fragment)
                     {
                         varLayoutBuilder.setUserSemantic("COLOR", inputVarIndex);
+                        if (!key->findDecoration<IRSemanticDecoration>())
+                            builder.addSemanticDecoration(key, toSlice("COLOR"), inputVarIndex);
                     }
                     else if (entryPointDecor->getProfile().getStage() == Stage::Vertex)
                     {
                         varLayoutBuilder.setUserSemantic("VERTEX_IN_", inputVarIndex);
+                        if (!key->findDecoration<IRSemanticDecoration>())
+                            builder.addSemanticDecoration(
+                                key,
+                                toSlice("VERTEX_IN_"),
+                                inputVarIndex);
                     }
                     inputVarIndex++;
                 }
@@ -270,8 +278,8 @@ struct GlobalVarTranslationContext
                     kIROp_VoidType)
                 {
                     context->getSink()->diagnose(
-                        entryPointFunc,
-                        Diagnostics::entryPointMustReturnVoidWhenGlobalOutputPresent);
+                        Diagnostics::EntryPointMustReturnVoidWhenGlobalOutputPresent{
+                            .location = entryPointFunc->sourceLoc});
                     continue;
                 }
                 builder.setInsertBefore(entryPointFunc);
@@ -309,7 +317,7 @@ struct GlobalVarTranslationContext
                     {
                         varLayoutBuilder.setSystemValueSemantic(
                             semanticDecor->getSemanticName(),
-                            semanticDecor->getSemanticIndex());
+                            semanticDecor->getEffectiveSemanticIndex());
                     }
                     else
                     {
@@ -326,10 +334,20 @@ struct GlobalVarTranslationContext
                         if (entryPointDecor->getProfile().getStage() == Stage::Fragment)
                         {
                             varLayoutBuilder.setSystemValueSemantic("SV_TARGET", outputVarIndex);
+                            if (!key->findDecoration<IRSemanticDecoration>())
+                                builder.addSemanticDecoration(
+                                    key,
+                                    toSlice("SV_TARGET"),
+                                    outputVarIndex);
                         }
                         else if (entryPointDecor->getProfile().getStage() == Stage::Vertex)
                         {
                             varLayoutBuilder.setUserSemantic("COLOR", outputVarIndex);
+                            if (!key->findDecoration<IRSemanticDecoration>())
+                                builder.addSemanticDecoration(
+                                    key,
+                                    toSlice("COLOR"),
+                                    outputVarIndex);
                         }
                         outputVarIndex++;
                     }

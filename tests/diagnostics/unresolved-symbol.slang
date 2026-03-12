@@ -4,9 +4,9 @@ interface IFoo
     int doThing();
 }
 
-// CHECK: ([[#@LINE+1]]): error 45001:
+// CHECK: error[E45001]: unresolved external symbol
 extern struct Foo : IFoo;
-// CHECK: ([[#@LINE+1]]): error 45001:
+// CHECK: error[E45001]: unresolved external symbol
 extern static const int c;
 
 RWStructuredBuffer<int> output;

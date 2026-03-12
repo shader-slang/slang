@@ -18,6 +18,9 @@
 #if defined(_WIN32)
 #include <d3d12.h>
 #include <windows.h>
+#endif
+
+#if defined(_MSC_VER)
 #pragma comment(lib, "advapi32")
 #endif
 
@@ -694,13 +697,19 @@ struct AssignValsFromLayoutContext
     SlangResult assignObject(ShaderCursor const& dstCursor, ShaderInputLayout::ObjectVal* srcVal)
     {
         auto typeName = srcVal->typeName;
-        slang::TypeReflection* slangType = nullptr;
+        ComPtr<IShaderObject> shaderObject;
+
         if (typeName.getLength() != 0)
         {
             // If the input line specified the name of the type
             // to allocate, then we use it directly.
             //
-            slangType = slangReflection()->findTypeByName(typeName.getBuffer());
+            auto slangType = slangReflection()->findTypeByName(typeName.getBuffer());
+            device->createShaderObject(
+                slangSession(),
+                slangType,
+                rhi::ShaderObjectContainerType::None,
+                shaderObject.writeRef());
         }
         else
         {
@@ -724,15 +733,9 @@ struct AssignValsFromLayoutContext
                 slangTypeLayout = slangTypeLayout->getElementTypeLayout();
                 break;
             }
-            slangType = slangTypeLayout->getType();
+            auto slangType = slangTypeLayout->getType();
+            device->createShaderObjectFromTypeLayout(slangTypeLayout, shaderObject.writeRef());
         }
-
-        ComPtr<IShaderObject> shaderObject;
-        device->createShaderObject(
-            slangSession(),
-            slangType,
-            ShaderObjectContainerType::None,
-            shaderObject.writeRef());
 
         SLANG_RETURN_ON_FAIL(assign(ShaderCursor(shaderObject), srcVal->contentVal));
         shaderObject->finalize();
@@ -1254,8 +1257,8 @@ Result RenderTestApp::writeBindingOutput(const String& fileName)
     // Wait until everything is complete
     m_queue->waitOnHost();
 
-    FILE* f = fopen(fileName.getBuffer(), "wb");
-    if (!f)
+    FILE* f = nullptr;
+    if (fopen_s(&f, fileName.getBuffer(), "wb") != 0 || !f)
     {
         return SLANG_FAIL;
     }
@@ -1277,11 +1280,24 @@ Result RenderTestApp::writeBindingOutput(const String& fileName)
 
             if (!blob)
             {
+                printf("Missing output blob\n");
                 return SLANG_FAIL;
             }
+
+            slang::TypeLayoutReflection* typeLayout = nullptr;
+            if (m_options.outputUsingType)
+            {
+                // TODO: always output using type
+                typeLayout = outputItem.typeLayout;
+                if (typeLayout == nullptr)
+                {
+                    printf("Output using type layout requested but type layout was null\n");
+                    return SLANG_FAIL;
+                }
+            }
+
             const SlangResult res = ShaderInputLayout::writeBinding(
-                m_options.outputUsingType ? outputItem.typeLayout
-                                          : nullptr, // TODO: always output using type
+                typeLayout,
                 blob->getBufferPointer(),
                 bufferSize,
                 &writer);

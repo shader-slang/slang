@@ -6,6 +6,7 @@
 #include "slang-ir-string-hash.h"
 #include "slang-ir-util.h"
 #include "slang-lookup.h"
+#include "slang-rich-diagnostics.h"
 #include "slang-type-layout.h"
 #include "slang.h"
 
@@ -570,7 +571,9 @@ LayoutSemanticInfo extractHLSLLayoutSemanticInfo(
     LayoutResourceKind kind = findRegisterClassFromName(registerClassName);
     if (kind == LayoutResourceKind::None)
     {
-        sink->diagnose(registerLoc, Diagnostics::unknownRegisterClass, registerClassName);
+        sink->diagnose(Diagnostics::UnknownRegisterClass{
+            .className = registerClassName,
+            .location = registerLoc});
         return info;
     }
 
@@ -578,7 +581,9 @@ LayoutSemanticInfo extractHLSLLayoutSemanticInfo(
     // how it works for varying input/output semantics).
     if (registerIndexDigits.getLength() == 0)
     {
-        sink->diagnose(registerLoc, Diagnostics::expectedARegisterIndex, registerClassName);
+        sink->diagnose(Diagnostics::ExpectedARegisterIndex{
+            .className = registerClassName,
+            .location = registerLoc});
     }
 
     UInt index = 0;
@@ -597,15 +602,17 @@ LayoutSemanticInfo extractHLSLLayoutSemanticInfo(
 
         if (kind == LayoutResourceKind::SubElementRegisterSpace)
         {
-            sink->diagnose(spaceLoc, Diagnostics::unexpectedSpecifierAfterSpace, spaceName);
+            sink->diagnose(Diagnostics::UnexpectedSpecifierAfterSpace{
+                .specifier = spaceName,
+                .location = spaceLoc});
         }
         else if (spaceSpelling != UnownedTerminatedStringSlice("space"))
         {
-            sink->diagnose(spaceLoc, Diagnostics::expectedSpace, spaceSpelling);
+            sink->diagnose(Diagnostics::ExpectedSpace{.got = spaceSpelling, .location = spaceLoc});
         }
         else if (spaceDigits.getLength() == 0)
         {
-            sink->diagnose(spaceLoc, Diagnostics::expectedSpaceIndex);
+            sink->diagnose(Diagnostics::ExpectedSpaceIndex{.location = spaceLoc});
         }
         else
         {
@@ -880,10 +887,9 @@ static void addExplicitParameterBinding(
         if (bindingInfo.count.compare(count) != std::partial_ordering::equivalent ||
             bindingInfo.index != semanticInfo.index || bindingInfo.space != semanticInfo.space)
         {
-            getSink(context)->diagnose(
-                varDecl,
-                Diagnostics::conflictingExplicitBindingsForParameter,
-                getReflectionName(varDecl));
+            getSink(context)->diagnose(Diagnostics::ConflictingExplicitBindingsForParameter{
+                .paramName = getReflectionName(varDecl),
+                .decl = varDecl});
         }
 
         // TODO(tfoley): `register` semantics can technically be
@@ -936,7 +942,7 @@ static void addExplicitParameterBinding(
             auto paramA = parameterInfo->varLayout->getVariable();
             auto paramB = overlappedVarLayout->getVariable();
 
-            auto& diagnosticInfo = Diagnostics::parameterBindingsOverlap;
+            auto* diagnosticInfo = Diagnostics::ParameterBindingsOverlap::getInfo();
 
             // If *both* of the shader parameters declarations agree
             // that overlapping bindings should be allowed, then we
@@ -944,22 +950,14 @@ static void addExplicitParameterBinding(
             // the user because such overlapping bindings are likely
             // to indicate a programming error.
             //
-            if (shouldDisableDiagnostic(paramA, diagnosticInfo) &&
-                shouldDisableDiagnostic(paramB, diagnosticInfo))
+            if (shouldDisableDiagnostic(paramA, *diagnosticInfo) &&
+                shouldDisableDiagnostic(paramB, *diagnosticInfo))
             {
             }
             else
             {
-                bool written = getSink(context)->diagnose(
-                    paramA,
-                    diagnosticInfo,
-                    getReflectionName(paramA),
-                    getReflectionName(paramB));
-                if (written)
-                    getSink(context)->diagnose(
-                        paramB,
-                        Diagnostics::seeDeclarationOf,
-                        getReflectionName(paramB));
+                getSink(context)->diagnose(
+                    Diagnostics::ParameterBindingsOverlap{.paramA = paramA, .paramB = paramB});
             }
         }
     }
@@ -1090,10 +1088,9 @@ static bool _maybeDiagnoseMissingVulkanLayoutModifier(
             if (textureType->isCombined())
             {
                 // Recommend [[vk::binding]] but not '-fvk-xxx-shift` for combined texture samplers
-                getSink(context)->diagnose(
-                    registerModifier,
-                    Diagnostics::registerModifierButNoVulkanLayout,
-                    varDecl.getName());
+                getSink(context)->diagnose(Diagnostics::RegisterModifierButNoVulkanLayout{
+                    .paramName = varDecl.getName(),
+                    .location = registerModifier->loc});
                 return true;
             }
         }
@@ -1105,11 +1102,10 @@ static bool _maybeDiagnoseMissingVulkanLayoutModifier(
             registerClassName,
             registerIndexDigits);
 
-        getSink(context)->diagnose(
-            registerModifier,
-            Diagnostics::registerModifierButNoVkBindingNorShift,
-            varDecl.getName(),
-            registerClassName);
+        getSink(context)->diagnose(Diagnostics::RegisterModifierButNoVkBindingNorShift{
+            .paramName = varDecl.getName(),
+            .className = registerClassName,
+            .location = registerModifier->loc});
         return true;
     }
     return false;
@@ -1231,11 +1227,10 @@ static void addExplicitParameterBindings_GLSL(
                 info[kResInfo].resInfo = foundResInfo;
                 if (attr->binding != 0)
                 {
-                    getSink(context)->diagnose(
-                        attr,
-                        Diagnostics::wholeSpaceParameterRequiresZeroBinding,
-                        varDecl.getName(),
-                        attr->binding);
+                    getSink(context)->diagnose(Diagnostics::WholeSpaceParameterRequiresZeroBinding{
+                        .paramName = varDecl.getName(),
+                        .binding = (int64_t)attr->binding,
+                        .location = attr->loc});
                 }
                 info[kResInfo].semanticInfo.index = attr->set;
                 info[kResInfo].semanticInfo.space = 0;
@@ -1914,7 +1909,7 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameterDecl(
     //
     SimpleSemanticInfo semanticInfo;
     int semanticIndex = 0;
-    if (!state.optSemanticName)
+    if (decl && !state.optSemanticName)
     {
         if (auto semantic = decl->findModifier<HLSLSimpleSemantic>())
         {
@@ -1950,6 +1945,9 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameterDecl(
     //
     auto typeLayout = processEntryPointVaryingParameter(context, type, state, varLayout);
 
+    if (!typeLayout)
+        return nullptr;
+
     // For Khronos targets (OpenGL and Vulkan), we need to process
     // the `[[vk::location(...)]]` and `[[vk::index(...)]]` attributes,
     // if present.
@@ -1962,8 +1960,9 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameterDecl(
     // `location`s in declaration order coincidentally matches
     // the `SV_Target` order.
     //
-    if (isKhronosTarget(context->getTargetRequest()) ||
-        isMetalTarget(context->getTargetRequest()) || isWGPUTarget(context->getTargetRequest()))
+    if (decl &&
+        (isKhronosTarget(context->getTargetRequest()) ||
+         isMetalTarget(context->getTargetRequest()) || isWGPUTarget(context->getTargetRequest())))
     {
         if (auto locationAttr = decl->findModifier<GLSLLocationAttribute>())
         {
@@ -2022,15 +2021,15 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameterDecl(
         else if (auto indexAttr = decl->findModifier<GLSLIndexAttribute>())
         {
             getSink(context)->diagnose(
-                indexAttr,
-                Diagnostics::vkIndexWithoutVkLocation,
-                decl->getName());
+                Diagnostics::VkIndexWithoutVkLocation{.location = indexAttr->loc});
         }
     }
 
     return typeLayout;
 }
 
+// Returns nullptr when `type` is not valid in a varying parameter position
+// (e.g. interface types, textures, samplers, constant buffers).
 static RefPtr<TypeLayout> processEntryPointVaryingParameter(
     ParameterBindingContext* context,
     Type* type,
@@ -2072,6 +2071,9 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
         auto elementTypeLayout =
             processEntryPointVaryingParameter(context, elementType, elementState, nullptr);
 
+        if (!elementTypeLayout)
+            return nullptr;
+
         RefPtr<StreamOutputTypeLayout> typeLayout = new StreamOutputTypeLayout();
         typeLayout->type = type;
         typeLayout->rules = elementTypeLayout->rules;
@@ -2102,10 +2104,9 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
         case Stage::Intersection:
         case Stage::RayGeneration:
             // Don't expect this case to have any `in out` parameters.
-            getSink(context)->diagnose(
-                state.loc,
-                Diagnostics::dontExpectOutParametersForStage,
-                getStageName(state.stage));
+            getSink(context)->diagnose(Diagnostics::DontExpectOutParametersForStage{
+                .stage = getStageName(state.stage),
+                .location = state.loc});
             break;
 
         case Stage::AnyHit:
@@ -2143,10 +2144,9 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
             // an `in` parameter as indicating a payload that the
             // programmer doesn't intend to write to.
             //
-            getSink(context)->diagnose(
-                state.loc,
-                Diagnostics::dontExpectInParametersForStage,
-                getStageName(state.stage));
+            getSink(context)->diagnose(Diagnostics::DontExpectInParametersForStage{
+                .stage = getStageName(state.stage),
+                .location = state.loc});
             break;
 
         case Stage::AnyHit:
@@ -2239,6 +2239,9 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                 state,
                 varLayout);
 
+            if (!elementTypeLayout)
+                return nullptr;
+
             // We still walk over subsequent elements to make sure they consume resources
             // as needed
             for (UInt ii = 1; ii < elementCount; ++ii)
@@ -2274,6 +2277,9 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                 state,
                 varLayout);
 
+            if (!elementTypeLayout)
+                return nullptr;
+
             RefPtr<ArrayTypeLayout> arrayTypeLayout = new ArrayTypeLayout();
             arrayTypeLayout->elementTypeLayout = elementTypeLayout;
             arrayTypeLayout->type = arrayType;
@@ -2302,6 +2308,9 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                 patchType->getElementType(),
                 state,
                 varLayout);
+
+            if (!elementTypeLayout)
+                return nullptr;
 
             RefPtr<ArrayTypeLayout> arrayTypeLayout = new ArrayTypeLayout();
             arrayTypeLayout->elementTypeLayout = elementTypeLayout;
@@ -2379,11 +2388,13 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
 
                 if (!fieldTypeLayout)
                 {
-                    getSink(context)->diagnose(
-                        varLayout->varDecl,
-                        Diagnostics::notValidVaryingParameter,
-                        fieldType);
-                    continue;
+                    if (fieldDecl)
+                    {
+                        getSink(context)->diagnose(Diagnostics::NotValidVaryingParameter{
+                            .paramName = fieldDecl->getName(),
+                            .decl = fieldDecl});
+                    }
+                    return nullptr;
                 }
                 fieldVarLayout->typeLayout = fieldTypeLayout;
 
@@ -2457,10 +2468,9 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
 
                     if (!fieldTypeLayout)
                     {
-                        getSink(context)->diagnose(
-                            field,
-                            Diagnostics::notValidVaryingParameter,
-                            field);
+                        getSink(context)->diagnose(Diagnostics::NotValidVaryingParameter{
+                            .paramName = field.getName(),
+                            .decl = field.getDecl()});
                         continue;
                     }
                     fieldVarLayout->typeLayout = fieldTypeLayout;
@@ -2513,10 +2523,10 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                 if (firstImplicit && firstExplicit)
                 {
                     getSink(context)->diagnose(
-                        firstImplicit,
-                        Diagnostics::mixingImplicitAndExplicitBindingForVaryingParams,
-                        firstImplicit->getName(),
-                        firstExplicit->getName());
+                        Diagnostics::MixingImplicitAndExplicitBindingForVaryingParams{
+                            .implicitName = firstImplicit->getName(),
+                            .explicitName = firstExplicit->getName(),
+                            .location = firstImplicit->loc});
                 }
 
                 return structLayout;
@@ -2578,6 +2588,10 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                 RefPtr<TypeLayout> assocTypeLayout = new TypeLayout();
                 assocTypeLayout->type = type;
                 return assocTypeLayout;
+            }
+            else if (declRef.as<InterfaceDecl>())
+            {
+                return nullptr;
             }
             else
             {
@@ -3170,14 +3184,13 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
             computeEntryPointParameterTypeLayout(context, paramDeclRef, paramVarLayout, state);
         paramVarLayout->typeLayout = paramTypeLayout;
 
-        // We expect to always be able to compute a layout for
-        // entry-point parameters, but to be defensive we will
-        // skip parameters that couldn't have a layout computed
-        // when assertions are disabled.
-        //
-        SLANG_ASSERT(paramTypeLayout);
         if (!paramTypeLayout)
+        {
+            getSink(context)->diagnose(Diagnostics::NotValidVaryingParameter{
+                .paramName = paramDeclRef.getName(),
+                .decl = paramDeclRef.getDecl()});
             continue;
+        }
 
         // Now that we've computed the layout to use for the parameter,
         // we need to add its resource usage to that of the entry
@@ -3222,9 +3235,15 @@ static RefPtr<EntryPointLayout> collectEntryPointParameters(
                     entryPointRes->count.getFiniteValue();
                 entryPointRes->count += rr.count;
             }
-        }
 
-        entryPointLayout->resultLayout = resultLayout;
+            entryPointLayout->resultLayout = resultLayout;
+        }
+        else
+        {
+            getSink(context)->diagnose(Diagnostics::NotValidVaryingParameter{
+                .paramName = entryPointFuncDeclRef.getName(),
+                .decl = entryPointFuncDeclRef.getDecl()});
+        }
     }
 
     // We don't want certain kinds of resource usage within an entry
@@ -3507,8 +3526,7 @@ void diagnoseGlobalUniform(SharedParameterBindingContext* sharedContext, VarDecl
     // marked as uniform
     if (!varDecl->hasModifier<HLSLUniformModifier>())
     {
-        getSink(sharedContext)
-            ->diagnose(varDecl, Diagnostics::globalUniformNotExpected, varDecl->getName());
+        getSink(sharedContext)->diagnose(Diagnostics::GlobalUniformNotExpected{.decl = varDecl});
     }
 
     // Always check and warn about binding attributes being ignored, regardless of uniform
@@ -3516,9 +3534,7 @@ void diagnoseGlobalUniform(SharedParameterBindingContext* sharedContext, VarDecl
     if (varDecl->findModifier<GLSLBindingAttribute>())
     {
         sharedContext->m_sink->diagnose(
-            varDecl,
-            Diagnostics::bindingAttributeIgnoredOnUniform,
-            varDecl->getName());
+            Diagnostics::BindingAttributeIgnoredOnUniform{.decl = varDecl});
     }
 }
 
@@ -3960,12 +3976,11 @@ static void _maybeApplyHLSLToVulkanShifts(
                         _appendRange(clashRange.begin, LayoutSize(clashRange.end), clashRangeBuf);
 
                         // Report the clash.
-                        sink->diagnose(
-                            curVar,
-                            Diagnostics::conflictingVulkanInferredBindingForParameter,
-                            getReflectionName(clashingVarLayout->getVariable()),
-                            curRangeBuf,
-                            clashRangeBuf);
+                        sink->diagnose(Diagnostics::ConflictingVulkanInferredBindingForParameter{
+                            .paramName = getReflectionName(clashingVarLayout->getVariable()),
+                            .overlap1 = curRangeBuf.produceString(),
+                            .overlap2 = clashRangeBuf.produceString(),
+                            .decl = curVar});
                     }
                 }
             }
@@ -4201,10 +4216,9 @@ RefPtr<ProgramLayout> generateParameterBindings(TargetProgram* targetProgram, Di
                 needDefaultConstantBuffer = true;
                 if (varLayout->varDecl.getDecl()->hasModifier<GLSLBindingAttribute>() ||
                     varLayout->varDecl.getDecl()->hasModifier<GLSLLocationAttribute>())
-                    sink->diagnose(
-                        varLayout->varDecl,
-                        Diagnostics::explicitUniformLocation,
-                        as<VarDecl>(varLayout->varDecl).getDecl()->getType());
+                    sink->diagnose(Diagnostics::ExplicitUniformLocation{
+                        .type = as<VarDecl>(varLayout->varDecl).getDecl()->getType(),
+                        .var = varLayout->varDecl.getDecl()});
                 diagnoseGlobalUniform(
                     &sharedContext,
                     as<VarDeclBase>(varLayout->varDecl.getDecl()));
@@ -4316,10 +4330,40 @@ RefPtr<ProgramLayout> generateParameterBindings(TargetProgram* targetProgram, Di
         if (numShaderRecordRegs > 1)
         {
             sink->diagnose(
-                SourceLoc(),
-                Diagnostics::tooManyShaderRecordConstantBuffers,
-                numShaderRecordRegs);
+                Diagnostics::TooManyShaderRecordConstantBuffers{.count = numShaderRecordRegs});
         }
+    }
+
+    // Allocate a space for the bindless resource descriptor heap if the target
+    // is compatible with the `descriptor_handle` capability. This alias covers
+    // all targets that support DescriptorHandle types (glsl_spirv, sm_6_6, cpp,
+    // cuda, metal, wgsl).
+    auto targetCaps = targetReq->getTargetCaps();
+    if (targetCaps.atLeastOneSetImpliedInOther(CapabilitySet(CapabilityName::descriptor_handle)) ==
+        CapabilitySet::ImpliesReturnFlags::Implied)
+    {
+        // Check if user has specified a preferred bindless space index
+        int requestedIndex =
+            targetProgram->getOptionSet().getIntOption(CompilerOptionName::BindlessSpaceIndex);
+
+        // Try to use the requested index, or find the next available one
+        int availableIndex = requestedIndex;
+        while (sharedContext.usedSpaces.contains(availableIndex))
+        {
+            availableIndex++;
+        }
+
+        // Warn if we had to use a different index than requested
+        if (availableIndex != requestedIndex &&
+            targetProgram->getOptionSet().hasOption(CompilerOptionName::BindlessSpaceIndex))
+        {
+            sink->diagnose(Diagnostics::RequestedBindlessSpaceIndexUnavailable{
+                .requested = requestedIndex,
+                .available = availableIndex});
+        }
+
+        markSpaceUsed(&context, nullptr, availableIndex);
+        programLayout->bindlessSpaceIndex = availableIndex;
     }
 
     return programLayout;

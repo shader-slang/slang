@@ -70,6 +70,11 @@ struct ASTIterator
         }
 
         void visitBuiltinCastExpr(BuiltinCastExpr* expr) { dispatchIfNotNull(expr->base); }
+        void visitFloatBitCastExpr(FloatBitCastExpr* expr)
+        {
+            iterator->maybeDispatchCallback(expr);
+            dispatchIfNotNull(expr->value);
+        }
         void visitParenExpr(ParenExpr* expr)
         {
             iterator->maybeDispatchCallback(expr);

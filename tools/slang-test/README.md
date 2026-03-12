@@ -80,6 +80,8 @@ Available APIs:
 - `-generate-hlsl-baselines`: Generate HLSL test baselines
 - `-emit-spirv-via-glsl`: Emit SPIR-V through GLSL instead of directly
 - `-expected-failure-list <file>`: Specify file containing expected failures
+- `-skip-list <file>`: Specify file containing tests to skip (path prefixes)
+- `-exclude-prefix <prefix>`: Exclude tests with specified path prefix
 
 ## Test Types
 

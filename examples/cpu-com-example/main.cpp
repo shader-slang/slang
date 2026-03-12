@@ -78,44 +78,48 @@ static SlangResult _innerMain(int argc, char** argv)
     // NOTE: This isn't strictly necessary, as preludes are embedded in the binary.
     TestToolUtil::setSessionDefaultPreludeFromExePath(argv[0], slangSession);
 
-    // Create a compile request
-    Slang::ComPtr<slang::ICompileRequest> request;
-    SLANG_ALLOW_DEPRECATED_BEGIN
-    SLANG_RETURN_ON_FAIL(slangSession->createCompileRequest(request.writeRef()));
-    SLANG_ALLOW_DEPRECATED_END
-
+    // Create session
+    slang::TargetDesc targetDesc = {};
     // We want to compile to 'HOST_CALLABLE' here such that we can execute the Slang code.
     //
     // Note that it is possible to use HOST_HOST_CALLABLE, but this currently only works with
     // 'regular' C++ compilers not with `slang-llvm`.
-    const int targetIndex = request->addCodeGenTarget(SLANG_SHADER_HOST_CALLABLE);
+    targetDesc.format = SLANG_SHADER_HOST_CALLABLE;
+    targetDesc.flags = SLANG_TARGET_FLAG_GENERATE_WHOLE_PROGRAM;
 
-    // Set the target flag to indicate that we want to compile all into a library.
-    request->setTargetFlags(targetIndex, SLANG_TARGET_FLAG_GENERATE_WHOLE_PROGRAM);
+    slang::SessionDesc sessionDesc = {};
+    sessionDesc.targets = &targetDesc;
+    sessionDesc.targetCount = 1;
 
-    // Add the translation unit
-    const int translationUnitIndex =
-        request->addTranslationUnit(SLANG_SOURCE_LANGUAGE_SLANG, nullptr);
+    ComPtr<slang::ISession> session;
+    SLANG_RETURN_ON_FAIL(slangSession->createSession(sessionDesc, session.writeRef()));
 
     // Set the source file for the translation unit
-    Slang::String path = resourceBase.resolveResource("shader.slang");
-    request->addTranslationUnitSourceFile(translationUnitIndex, path.getBuffer());
-
-    const SlangResult compileRes = request->compile();
-
-    // Even if there were no errors that forced compilation to fail, the
-    // compiler may have produced "diagnostic" output such as warnings.
-    // We will go ahead and print that output here.
-    //
-    if (auto diagnostics = request->getDiagnosticOutput())
+    slang::IModule* slangModule = nullptr;
     {
-        printf("%s", diagnostics);
+        ComPtr<slang::IBlob> diagnosticBlob;
+        Slang::String path = resourceBase.resolveResource("shader.slang");
+        slangModule = session->loadModule(path.getBuffer(), diagnosticBlob.writeRef());
+        diagnoseIfNeeded(diagnosticBlob);
+        if (!slangModule)
+            return -1;
     }
+
+    ComPtr<slang::IComponentType2> componentType2;
+    slangModule->queryInterface(SLANG_IID_PPV_ARGS(componentType2.writeRef()));
 
     // Get the 'shared library' (note that this doesn't necessarily have to be implemented as a
     // shared library it's just an interface to executable code).
     ComPtr<ISlangSharedLibrary> sharedLibrary;
-    SLANG_RETURN_ON_FAIL(request->getTargetHostCallable(0, sharedLibrary.writeRef()));
+    {
+        ComPtr<slang::IBlob> diagnosticsBlob;
+        SlangResult result = componentType2->getTargetHostCallable(
+            0,
+            sharedLibrary.writeRef(),
+            diagnosticsBlob.writeRef());
+        diagnoseIfNeeded(diagnosticsBlob);
+        SLANG_RETURN_ON_FAIL(result);
+    }
 
     DoThings doThings;
 

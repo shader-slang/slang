@@ -704,6 +704,30 @@ class RefAccessorDecl : public AccessorDecl
     FIDDLE(...)
 };
 
+/// A semantic declaration that defines valid types and stages for a system value semantic.
+/// Used to validate `: SV_*` annotations on shader parameters.
+FIDDLE()
+class SemanticDecl : public ContainerDecl
+{
+    FIDDLE(...)
+};
+
+/// A typed getter accessor for a semantic declaration: "get : <type>;"
+FIDDLE()
+class SemanticGetterDecl : public Decl
+{
+    FIDDLE(...)
+    FIDDLE() TypeExp type;
+};
+
+/// A typed setter accessor for a semantic declaration: "set : <type>;"
+FIDDLE()
+class SemanticSetterDecl : public Decl
+{
+    FIDDLE(...)
+    FIDDLE() TypeExp type;
+};
+
 FIDDLE()
 class FuncDecl : public FunctionDeclBase
 {
@@ -934,12 +958,49 @@ class TypeCoercionConstraintDecl : public Decl
 };
 
 FIDDLE()
+class NonEmptyPackConstraintDecl : public Decl
+{
+    FIDDLE(...)
+    SourceLoc whereTokenLoc = SourceLoc();
+    FIDDLE() Expr* packExpr = nullptr;
+};
+
+FIDDLE()
 class GenericValueParamDecl : public VarDeclBase
 {
     FIDDLE(...)
     // The index of the generic parameter.
     int parameterIndex = 0;
 };
+
+FIDDLE()
+class GenericValuePackParamDecl : public VarDeclBase
+{
+    FIDDLE(...)
+    int parameterIndex = 0;
+};
+
+inline bool isGenericValueParam(Decl* decl)
+{
+    return as<GenericValueParamDecl>(decl) || as<GenericValuePackParamDecl>(decl);
+}
+
+template<typename T>
+inline bool isGenericValueParam(DeclRef<T> declRef)
+{
+    return isGenericValueParam(declRef.getDecl());
+}
+
+inline bool isGenericParam(Decl* decl)
+{
+    return as<GenericTypeParamDeclBase>(decl) || isGenericValueParam(decl);
+}
+
+template<typename T>
+inline bool isGenericParam(DeclRef<T> declRef)
+{
+    return isGenericParam(declRef.getDecl());
+}
 
 // An empty declaration (which might still have modifiers attached).
 //
@@ -994,7 +1055,7 @@ class DerivativeRequirementDecl : public FunctionDeclBase
     FIDDLE() Decl* originalRequirementDecl = nullptr;
 
     // Type to use for 'ThisType'
-    FIDDLE() Type* diffThisType;
+    FIDDLE() Type* diffThisType = nullptr;
 };
 
 // A reference to a synthesized decl representing a differentiable function requirement, this decl

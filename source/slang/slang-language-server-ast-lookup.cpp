@@ -147,6 +147,20 @@ public:
         return dispatchIfNotNull(expr->value);
     }
 
+    bool visitFloatBitCastExpr(FloatBitCastExpr* expr)
+    {
+        // strlen("__floatAsInt") = 12
+        if (_isLocInRange(context, expr->loc, 12))
+        {
+            ASTLookupResult result;
+            result.path = context->nodePath;
+            result.path.add(expr);
+            context->results.add(result);
+            return true;
+        }
+        return dispatchIfNotNull(expr->value);
+    }
+
     bool visitParenExpr(ParenExpr* expr) { return dispatchIfNotNull(expr->base); }
 
     bool visitTupleExpr(TupleExpr* expr)
@@ -537,6 +551,12 @@ public:
         if (reportLookupResultIfInExprLeadingIdentifierRange(expr))
             return true;
         return dispatchIfNotNull(expr->baseExpr);
+    }
+    bool visitPackQueryExpr(PackQueryExpr* expr)
+    {
+        if (reportLookupResultIfInExprLeadingIdentifierRange(expr))
+            return true;
+        return dispatchIfNotNull(expr->value);
     }
     bool visitHigherOrderInvokeExpr(HigherOrderInvokeExpr* expr)
     {

@@ -89,6 +89,8 @@ struct SpecializationContext
         case kIROp_Leq:
         case kIROp_Geq:
         case kIROp_Less:
+        case kIROp_And:
+        case kIROp_Or:
         case kIROp_IRem:
         case kIROp_FRem:
         case kIROp_Greater:
@@ -104,6 +106,35 @@ struct SpecializationContext
         case kIROp_IntCast:
         case kIROp_FloatCast:
         case kIROp_Select:
+        case kIROp_ConstexprAdd:
+        case kIROp_ConstexprSub:
+        case kIROp_ConstexprMul:
+        case kIROp_ConstexprDiv:
+        case kIROp_ConstexprNeg:
+        case kIROp_ConstexprIRem:
+        case kIROp_ConstexprShl:
+        case kIROp_ConstexprShr:
+        case kIROp_ConstexprBitAnd:
+        case kIROp_ConstexprBitOr:
+        case kIROp_ConstexprBitXor:
+        case kIROp_ConstexprBitNot:
+        case kIROp_ConstexprNot:
+        case kIROp_ConstexprEql:
+        case kIROp_ConstexprNeq:
+        case kIROp_ConstexprGreater:
+        case kIROp_ConstexprLess:
+        case kIROp_ConstexprGeq:
+        case kIROp_ConstexprLeq:
+        case kIROp_ConstexprAnd:
+        case kIROp_ConstexprOr:
+        case kIROp_ConstexprSelect:
+        case kIROp_ConstexprIntCast:
+        case kIROp_ConstexprCastIntToFloat:
+        case kIROp_ConstexprCastFloatToInt:
+        case kIROp_ConstexprFloatCast:
+        case kIROp_ConstexprCastIntToEnum:
+        case kIROp_ConstexprCastEnumToInt:
+        case kIROp_ConstexprEnumCast:
             {
                 if (isSpecConstRateType(inst->getFullType()))
                 {
@@ -299,7 +330,7 @@ struct SpecializationContext
             {
                 IRUse* argUse = specializeInst->getArgOperand(ii);
                 auto originalArg = argUse->get();
-                IRInst* foldedArg = tryConstantFoldInst(module, originalArg);
+                IRInst* foldedArg = tryConstantFoldInst(module, targetProgram, originalArg);
                 if (foldedArg == originalArg)
                     continue;
 
@@ -775,13 +806,11 @@ struct SpecializationContext
         IRInst* newInst = nullptr;
         if (inst->getOp() == kIROp_MakeValuePack)
             newInst = builder.emitMakeValuePack(
-                inst->getFullType(),
-                flattendOperands.getCount(),
+                (UInt)flattendOperands.getCount(),
                 flattendOperands.getArrayView().getBuffer());
         else
             newInst = builder.emitMakeTuple(
-                inst->getFullType(),
-                flattendOperands.getCount(),
+                (UInt)flattendOperands.getCount(),
                 flattendOperands.getArrayView().getBuffer());
 
         inst->replaceUsesWith(newInst);
@@ -822,6 +851,8 @@ struct SpecializationContext
             case kIROp_Param:
             case kIROp_TypePack:
             case kIROp_ExpandTypeOrVal:
+            case kIROp_TrimHeadOfPack:
+            case kIROp_TrimTailOfPack:
                 return false;
             }
         }
@@ -1237,7 +1268,11 @@ struct SpecializationContext
             {
                 this->changed = true;
                 eliminateDeadCode(module->getModuleInst());
-                applySparseConditionalConstantPropagationForGlobalScope(this->module, this->sink);
+                peepholeOptimizeGlobalScope(targetProgram, this->module);
+                applySparseConditionalConstantPropagationForGlobalScope(
+                    this->module,
+                    targetProgram,
+                    this->sink);
             }
 
             // Once the work list has gone dry, we should have the invariant
@@ -1256,7 +1291,7 @@ struct SpecializationContext
                 if (iterChanged)
                 {
                     eliminateDeadCode(module->getModuleInst());
-                    lowerDispatchers(module, sink);
+                    lowerDispatchers(module, sink, options.reportDynamicDispatchSites);
                 }
             }
 
@@ -2830,7 +2865,8 @@ struct SpecializationContext
 
         for (UInt i = 0; i < expandInst->getCaptureCount(); i++)
         {
-            if (!as<IRTypePack>(expandInst->getCapture(i)))
+            auto capture = expandInst->getCapture(i);
+            if (!as<IRTypePack>(capture) && !as<IRMakeValuePack>(capture))
                 return false;
         }
 
@@ -2841,6 +2877,10 @@ struct SpecializationContext
         if (auto firstTypePack = as<IRTypePack>(expandInst->getCapture(0)))
         {
             elementCount = firstTypePack->getOperandCount();
+        }
+        else if (auto firstValuePack = as<IRMakeValuePack>(expandInst->getCapture(0)))
+        {
+            elementCount = firstValuePack->getOperandCount();
         }
         if (elementCount == 0)
         {

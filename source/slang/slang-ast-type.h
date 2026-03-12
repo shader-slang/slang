@@ -85,6 +85,7 @@ DeclRef<T> isDeclRefTypeOf(Val* type)
 
 bool isTypePack(Type* type);
 bool isAbstractTypePack(Type* type);
+bool isPackType(Type* type);
 
 // Base class for types that can be used in arithmetic expressions
 FIDDLE(abstract)
@@ -107,6 +108,30 @@ class BasicExpressionType : public ArithmeticExpressionType
     BasicExpressionType* _getScalarTypeOverride();
 
     BasicExpressionType(DeclRefBase* inDeclRef) { setOperands(inDeclRef); }
+};
+
+FIDDLE(abstract)
+class Fp8Type : public DeclRefType
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class FloatE4M3Type : public Fp8Type
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class FloatE5M2Type : public Fp8Type
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class BFloat16Type : public DeclRefType
+{
+    FIDDLE(...)
 };
 
 // Base type for things that are built in to the compiler,
@@ -534,6 +559,15 @@ class ArrayExpressionType : public DeclRefType
     IntVal* getElementCount();
 };
 
+// Conditional<T, hasValue> type - a compile-time conditional wrapper
+// that either holds a value of type T (if hasValue is true) or is empty.
+FIDDLE()
+class ConditionalType : public DeclRefType
+{
+    FIDDLE(...)
+    Type* getValueType();
+};
+
 FIDDLE()
 class AtomicType : public DeclRefType
 {
@@ -687,6 +721,7 @@ class PtrTypeBase : public BuiltinType
     Type* getValueType();
     Val* getAccessQualifier();
     Val* getAddressSpace();
+    Type* getDataLayout();
 
     std::optional<AccessQualifier> tryGetAccessQualifierValue();
 };
@@ -974,14 +1009,58 @@ class ExpandType : public Type
 {
     FIDDLE(...)
     Type* getPatternType() const { return as<Type>(getOperand(0)); }
-    Index getCapturedTypePackCount() { return getOperandCount() - 1; }
-    Type* getCapturedTypePack(Index i) { return as<Type>(getOperand(i + 1)); }
-    ExpandType(Type* patternType, ArrayView<Type*> capturedPacks)
+    Index getCapturedPackCount() { return getOperandCount() - 1; }
+    Val* getCapturedPack(Index i) { return getOperand(i + 1); }
+    ExpandType(Type* patternType, ArrayView<Val*> capturedPacks)
     {
         m_operands.add(ValNodeOperand(patternType));
         for (auto t : capturedPacks)
             m_operands.add(ValNodeOperand(t));
     }
+    void _toTextOverride(StringBuilder& out);
+    Type* _createCanonicalTypeOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
+FIDDLE()
+class FirstPackElementType : public Type
+{
+    FIDDLE(...)
+    Type* getBasePack() const { return as<Type>(getOperand(0)); }
+    FirstPackElementType(Type* basePack) { m_operands.add(ValNodeOperand(basePack)); }
+    void _toTextOverride(StringBuilder& out);
+    Type* _createCanonicalTypeOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
+FIDDLE()
+class LastPackElementType : public Type
+{
+    FIDDLE(...)
+    Type* getBasePack() const { return as<Type>(getOperand(0)); }
+    LastPackElementType(Type* basePack) { m_operands.add(ValNodeOperand(basePack)); }
+    void _toTextOverride(StringBuilder& out);
+    Type* _createCanonicalTypeOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
+FIDDLE()
+class TrimHeadTypePack : public Type
+{
+    FIDDLE(...)
+    Type* getBasePack() const { return as<Type>(getOperand(0)); }
+    TrimHeadTypePack(Type* basePack) { m_operands.add(ValNodeOperand(basePack)); }
+    void _toTextOverride(StringBuilder& out);
+    Type* _createCanonicalTypeOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
+FIDDLE()
+class TrimTailTypePack : public Type
+{
+    FIDDLE(...)
+    Type* getBasePack() const { return as<Type>(getOperand(0)); }
+    TrimTailTypePack(Type* basePack) { m_operands.add(ValNodeOperand(basePack)); }
     void _toTextOverride(StringBuilder& out);
     Type* _createCanonicalTypeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
@@ -999,6 +1078,19 @@ class ConcreteTypePack : public Type
     }
     Index getTypeCount() { return getOperandCount(); }
     Type* getElementType(Index i) { return as<Type>(getOperand(i)); }
+    void _toTextOverride(StringBuilder& out);
+    Type* _createCanonicalTypeOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
+// Represents the type of a generic value pack parameter.
+// e.g. `let each D : int` has type `ValuePackType(int)`.
+FIDDLE()
+class ValuePackType : public Type
+{
+    FIDDLE(...)
+    ValuePackType(Type* elementType) { m_operands.add(ValNodeOperand(elementType)); }
+    Type* getElementType() const { return as<Type>(getOperand(0)); }
     void _toTextOverride(StringBuilder& out);
     Type* _createCanonicalTypeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);

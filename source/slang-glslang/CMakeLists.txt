@@ -12,7 +12,6 @@ if(SLANG_ENABLE_SLANG_GLSLANG)
             ${CMAKE_CURRENT_BINARY_DIR}/../slang/slang-version-header
         INSTALL
         EXPORT_SET_NAME SlangTargets
-        DEBUG_INFO_INSTALL_COMPONENT slang-glslang-debug-info
     )
     # Our only interface is through what we define in source/slang-glslang, in the
     # interests of hygiene, hide anything else we link in.
@@ -31,6 +30,11 @@ if(SLANG_ENABLE_SLANG_GLSLANG)
             PROPERTIES OUTPUT_NAME slang-glslang-${SLANG_VERSION_NUMERIC}
         )
     endif()
+    add_supported_cxx_flags(
+        slang-glslang
+        PRIVATE
+        -fno-rtti
+    )
     add_supported_cxx_linker_flags(
         slang-glslang
         PRIVATE

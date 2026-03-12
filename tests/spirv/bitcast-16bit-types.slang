@@ -1,7 +1,7 @@
 // Test that 16-bit types use OpBitcast directly in SPIR-V
 // Tests uint16 -> float16 and uint16 -> int16 in scalar, vec2, vec3, vec4 forms
 
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly
+//TEST:SIMPLE(filecheck=CHECK): -target spirv -emit-spirv-directly -O0
 
 // Scalar: uint16 -> float16, uint16 -> int16
 // CHECK-DAG: %f16 = OpBitcast %half %u16

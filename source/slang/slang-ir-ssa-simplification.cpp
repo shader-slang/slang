@@ -71,7 +71,7 @@ void simplifyIR(
         changed |= deduplicateGenericChildren(module);
         changed |= propagateFuncProperties(module);
         changed |= removeUnusedGenericParam(module);
-        changed |= applySparseConditionalConstantPropagationForGlobalScope(module, sink);
+        changed |= applySparseConditionalConstantPropagationForGlobalScope(module, target, sink);
         changed |= peepholeOptimizeGlobalScope(target, module);
         changed |= trimOptimizableTypes(module);
 
@@ -87,7 +87,7 @@ void simplifyIR(
 
                 eliminateDeadCode(func, options.deadCodeElimOptions);
                 funcChanged = false;
-                funcChanged |= applySparseConditionalConstantPropagation(func, sink);
+                funcChanged |= applySparseConditionalConstantPropagation(func, target, sink);
                 funcChanged |= peepholeOptimize(target, func);
                 if (options.removeRedundancy)
                     funcChanged |= removeRedundancyInFunc(func, options.hoistLoopInvariantInsts);
@@ -123,7 +123,7 @@ void simplifyNonSSAIR(
     while (changed && iterationCounter < kMaxIterations)
     {
         changed = false;
-        changed |= applySparseConditionalConstantPropagationForGlobalScope(module, sink);
+        changed |= applySparseConditionalConstantPropagationForGlobalScope(module, target, sink);
         changed |= peepholeOptimize(target, module, options.peepholeOptions);
 
         if (!options.minimalOptimization)
@@ -155,7 +155,7 @@ void simplifyFunc(
             break;
 
         changed = false;
-        changed |= applySparseConditionalConstantPropagation(func, sink);
+        changed |= applySparseConditionalConstantPropagation(func, target, sink);
         changed |= peepholeOptimize(target, func);
         if (!options.minimalOptimization)
             changed |= removeRedundancyInFunc(func, options.hoistLoopInvariantInsts);

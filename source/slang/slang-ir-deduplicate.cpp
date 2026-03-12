@@ -35,6 +35,29 @@ void IRDeduplicationContext::removeHoistableInstFromGlobalNumberingMap(IRInst* i
     }
 }
 
+void IRDeduplicationContext::removeInstFromConstantMap(IRInst* inst)
+{
+    // m_constantMap stores an IRConstantKey{constInst} -> constInst.
+    // If we are about to remove `inst` from this map, we need to make sure
+    // inst is actually the value stored in the map, and not some temp/duplicate
+    // constant val that hashes to the same key.
+    //
+    IRConstant* constInst = as<IRConstant>(inst);
+    if (!constInst)
+        return;
+    IRConstantKey key;
+    key.inst = constInst;
+    IRConstant* existing = nullptr;
+    if (m_constantMap.tryGetValue(key, existing))
+    {
+        // Only remove if it's the same instance.
+        if (existing == constInst)
+        {
+            m_constantMap.remove(key);
+        }
+    }
+}
+
 void IRDeduplicationContext::tryHoistInst(IRInst* inst)
 {
     InstWorkList workList(inst->getModule());

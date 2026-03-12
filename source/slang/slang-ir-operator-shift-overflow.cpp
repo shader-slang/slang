@@ -3,7 +3,9 @@
 
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
+#include "slang-ir-util.h"
 #include "slang-ir.h"
+#include "slang-rich-diagnostics.h"
 #include "slang.h"
 
 namespace Slang
@@ -12,10 +14,7 @@ namespace Slang
 class DiagnosticSink;
 struct IRModule;
 
-void checkForOperatorShiftOverflowRecursive(
-    IRInst* inst,
-    CompilerOptionSet& optionSet,
-    DiagnosticSink* sink)
+void checkForOperatorShiftOverflowRecursive(IRInst* inst, DiagnosticSink* sink)
 {
     if (auto code = as<IRGlobalValueWithCode>(inst))
     {
@@ -39,17 +38,17 @@ void checkForOperatorShiftOverflowRecursive(
 
                         IRSizeAndAlignment sizeAlignment;
                         if (SLANG_FAILED(
-                                getNaturalSizeAndAlignment(optionSet, lhsType, &sizeAlignment)))
+                                getNaturalSizeAndAlignment(nullptr, lhsType, &sizeAlignment)))
                             continue;
 
                         IRIntegerValue shiftAmount = rhsLit->getValue();
                         if (sizeAlignment.size * 8 <= shiftAmount)
                         {
-                            sink->diagnose(
-                                opInst,
-                                Diagnostics::operatorShiftLeftOverflow,
-                                lhsType,
-                                shiftAmount);
+                            sink->diagnose(Diagnostics::OperatorShiftLeftOverflow{
+                                .lhsType = lhsType,
+                                .shiftAmount = shiftAmount,
+                                .location = opInst->sourceLoc,
+                            });
                         }
                         break;
                     }
@@ -60,17 +59,14 @@ void checkForOperatorShiftOverflowRecursive(
 
     for (auto childInst : inst->getChildren())
     {
-        checkForOperatorShiftOverflowRecursive(childInst, optionSet, sink);
+        checkForOperatorShiftOverflowRecursive(childInst, sink);
     }
 }
 
-void checkForOperatorShiftOverflow(
-    IRModule* module,
-    CompilerOptionSet& optionSet,
-    DiagnosticSink* sink)
+void checkForOperatorShiftOverflow(IRModule* module, DiagnosticSink* sink)
 {
     // Look for `operator<<` instructions
-    checkForOperatorShiftOverflowRecursive(module->getModuleInst(), optionSet, sink);
+    checkForOperatorShiftOverflowRecursive(module->getModuleInst(), sink);
 }
 
 } // namespace Slang

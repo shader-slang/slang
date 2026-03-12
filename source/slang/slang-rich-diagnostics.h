@@ -1,15 +1,11 @@
 #pragma once
 
-#ifdef SLANG_PROTOTYPE_DIAGNOSTICS
-
 #include "../compiler-core/slang-diagnostic-sink.h"
+#include "../compiler-core/slang-rich-diagnostics-render.h"
 #include "../core/slang-basic.h"
+#include "slang-ast-support-types.h"
+#include "slang-target.h"
 
-// Forward declaration for Type
-namespace Slang
-{
-class Type;
-}
 
 //
 #include "slang-rich-diagnostics.h.fiddle"
@@ -17,45 +13,74 @@ class Type;
 namespace Slang
 {
 
-// Generic diagnostic representation for layout rendering
-struct DiagnosticSpan
-{
-    SourceLoc location;
-    String message;
-};
-
-struct GenericDiagnostic
-{
-    int code;
-    String severity;
-    String message;
-    DiagnosticSpan primarySpan;
-    List<DiagnosticSpan> secondarySpans;
-};
+class Type;
+class Decl;
+class Expr;
+class Stmt;
+class Val;
+class Name;
 
 namespace Diagnostics
 {
+
+// Get the array of DiagnosticInfo entries for rich diagnostics.
+// These are used to register rich diagnostics with the DiagnosticsLookup
+// so that warning suppression flags like -Wno-xxx work correctly.
+const DiagnosticInfo* const* getRichDiagnosticsInfo();
+Index getRichDiagnosticsInfoCount();
 
 // Generate parameter structures for all diagnostics
 #if 0 // FIDDLE TEMPLATE:
 % local lua_module = require("source/slang/slang-rich-diagnostics.h.lua")
 % local diagnostics = lua_module.getDiagnostics()
 % for _, diagnostic in ipairs(diagnostics) do
-%     local class_name = lua_module.toPascalCase(diagnostic.name) .. "Params"
-%     local params = lua_module.getUniqueParams(diagnostic)
+%     local class_name = lua_module.toPascalCase(diagnostic.name)
 struct $(class_name)
 {
-%     for _, param in ipairs(params) do
-    $(param.cpp_type) $(param.name);
+%     -- Direct parameters (non-variadic or shared)
+%     for _, param in ipairs(diagnostic.params) do
+%         local type = lua_module.getCppType(param.type)
+%         local initializer = (type:sub(-1) == "*") and "nullptr" or type .. "{}"
+    $(type) $(param.name) = $(initializer);
 %     end
-    SourceLoc $(diagnostic.primary_span.location);
-%     if diagnostic.secondary_spans then
-%         for _, span in ipairs(diagnostic.secondary_spans) do
-    SourceLoc $(span.location);
+
+%     -- Direct locations (non-variadic or shared)
+%     for _, loc in ipairs(diagnostic.locations) do
+%         if loc.type then
+%             local loc_cpp_type = lua_module.getCppType(loc.type)
+%             local loc_initializer = (loc_cpp_type:sub(-1) == "*") and "nullptr" or loc_cpp_type .. "{}"
+    $(loc_cpp_type) $(loc.name) = $(loc_initializer);
+%         else
+    SourceLoc $(loc.name) = SourceLoc{};
 %         end
 %     end
 
+%     -- Nested structs for variadic spans/notes
+%     if diagnostic.variadic_structs then
+%         for _, vs in ipairs(diagnostic.variadic_structs) do
+    struct $(vs.struct_name)
+    {
+%             for _, loc in ipairs(vs.locations) do
+%                 if loc.type then
+%                     local loc_cpp_type = lua_module.getCppType(loc.type)
+%                     local loc_initializer = (loc_cpp_type:sub(-1) == "*") and "nullptr" or loc_cpp_type .. "{}"
+        $(loc_cpp_type) $(loc.name) = $(loc_initializer);
+%                 else
+        SourceLoc $(loc.name) = SourceLoc{};
+%                 end
+%             end
+%             for _, param in ipairs(vs.params) do
+%                 local type = lua_module.getCppType(param.type)
+%                 local initializer = (type:sub(-1) == "*") and "nullptr" or type .. "{}"
+        $(type) $(param.name) = $(initializer);
+%             end
+    };
+    List<$(vs.struct_name)> $(vs.list_name) = {};
+
+%         end
+%     end
     GenericDiagnostic toGenericDiagnostic() const;
+    static const DiagnosticInfo* getInfo();
 };
 
 % end
@@ -67,5 +92,3 @@ struct $(class_name)
 
 } // namespace Diagnostics
 } // namespace Slang
-
-#endif // SLANG_PROTOTYPE_DIAGNOSTICS

@@ -109,9 +109,81 @@ void legalizeNonStructParameterToStructForHLSL(IRModule* module)
 {
     for (auto globalInst : module->getGlobalInsts())
     {
+        // Only process functions - at this stage generics are already resolved,
+        // and the search only handles Block and Call children.
         if (globalInst->getOp() != kIROp_Func)
             continue;
         searchChildrenForForceVarIntoStructTemporarily(module, globalInst);
+    }
+}
+
+void legalizeEmptyRayPayloadsForHLSL(IRModule* module)
+{
+    // DXIL/HLSL with NVAPI requires non-empty ray payload structs because
+    // the NvInvokeHitObject macro expects a Payload argument.
+    IRBuilder builder(module);
+
+    // First, collect all empty ray payload structs to process.
+    // We must collect first because the processing phase inserts new global
+    // instructions (struct keys, string values) which would invalidate the iterator.
+    List<IRStructType*> emptyRayPayloadStructs;
+
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        auto structType = as<IRStructType>(globalInst);
+        if (!structType)
+            continue;
+
+        // Check if this struct has ray payload decoration
+        auto rayPayloadDec = structType->findDecoration<IRRayPayloadDecoration>();
+        auto vulkanRayPayloadDec = structType->findDecoration<IRVulkanRayPayloadDecoration>();
+        bool isRayPayload = rayPayloadDec != nullptr || vulkanRayPayloadDec != nullptr;
+
+        if (!isRayPayload)
+            continue;
+
+        // Check if the struct is empty (has no fields)
+        if (structType->getFields().begin() != structType->getFields().end())
+            continue;
+
+        emptyRayPayloadStructs.add(structType);
+    }
+
+    // Now process the collected structs
+    for (auto structType : emptyRayPayloadStructs)
+    {
+        // Add a dummy field to the empty ray payload struct
+        // Insert the key BEFORE the struct type so it's defined before being referenced
+        builder.setInsertBefore(structType);
+        auto dummyKey = builder.createStructKey();
+        builder.addNameHintDecoration(dummyKey, UnownedStringSlice("_slang_dummy"));
+
+        // Add stage access decorations that ray payload fields require
+        IRInst* stageName = builder.getStringValue(UnownedStringSlice("caller"));
+        builder.addDecoration(dummyKey, kIROp_StageReadAccessDecoration, &stageName, 1);
+        builder.addDecoration(dummyKey, kIROp_StageWriteAccessDecoration, &stageName, 1);
+
+        builder.createStructField(structType, dummyKey, builder.getIntType());
+
+        // Now find and update all makeStruct instructions that create this struct type.
+        List<IRInst*> makeStructsToUpdate;
+        for (auto use = structType->firstUse; use; use = use->nextUse)
+        {
+            auto user = use->getUser();
+            if (user->getOp() == kIROp_MakeStruct && user->getDataType() == structType)
+            {
+                makeStructsToUpdate.add(user);
+            }
+        }
+
+        for (auto makeStructInst : makeStructsToUpdate)
+        {
+            builder.setInsertBefore(makeStructInst);
+            auto defaultValue = builder.getIntValue(builder.getIntType(), 0);
+            auto newMakeStruct = builder.emitMakeStruct(structType, 1, &defaultValue);
+            makeStructInst->replaceUsesWith(newMakeStruct);
+            makeStructInst->removeAndDeallocate();
+        }
     }
 }
 

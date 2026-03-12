@@ -69,6 +69,8 @@
 
 static const int kSlangTorchTensorMaxDim = 5;
 
+// NOTE: If you change this struct's layout, also update the hard-coded size/alignment
+// in _createTypeLayout() in slang-type-layout.cpp.
 struct TensorView
 {
     uint8_t* data;
@@ -156,20 +158,19 @@ TensorView make_tensor_view(
                                      .append(")")
                                      .c_str());
 
-    bool isEmpty = true;
+    // A tensor can have zero elements even if some dimensions are non-zero
+    // (e.g. shape (10, 0)). Emptiness must be based on numel().
+    bool isEmpty = (val.numel() == 0);
     for (int i = 0; i < val.dim(); ++i)
     {
+        res.sizes[i] = val.size(i);
         res.strides[i] = val.stride(i) * elementSize;
-        if (res.strides[i] == 0)
+        if (!isEmpty && res.strides[i] == 0)
             throw std::runtime_error(
                 std::string(name)
                     .append(": tensors with broadcasted dimensions are not supported (use "
                             "tensor.contiguous() to make tensor whole)")
                     .c_str());
-
-        res.sizes[i] = val.size(i);
-        if (res.sizes[i] > 0)
-            isEmpty = false;
     }
 
     if (!res.data && !isEmpty)

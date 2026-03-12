@@ -72,6 +72,11 @@ The following table lists Slang's support for various HLSL feature sets, when ta
 | wave intrinsics | No |
 | barriers | Yes |
 | atomics | Yes |
+| switch fall-through | Restructured (warning 41026) |
+
+### Switch Fall-Through
+
+WGSL does not support fall-through in switch statements. When Slang encounters switch fall-through in source code targeting WGSL, it restructures the code by duplicating the fall-through destination into each source case. This produces correct results but may affect wave convergence if the duplicated code contains subgroup operations. See the [target compatibility documentation](../target-compatibility.md#switch-fallthrough) for details.
 
 
 Supported atomic types

@@ -546,7 +546,7 @@ Note that the biggest difference between C++ templates and generics is that temp
 
 ### Similarity to Swift and Rust
 
-Slang's `associatedtype` shares the same semantic meaning with `associatedtype` in a Swift `protocol` or `type` in a Rust `trait`, except that Slang currently does not support the more general `where` clause in these languages. C# does not have an equivalent to `associatedtype`, and programmers need to resort to generic interfaces to achieve similar goals.
+Slang's `associatedtype` shares the same semantic meaning with `associatedtype` in a Swift `protocol` or `type` in a Rust `trait`. C# does not have an equivalent to `associatedtype`, and programmers need to resort to generic interfaces to achieve similar goals.
 
 Generic Value Parameters
 -------------------------------
@@ -1015,6 +1015,10 @@ This feature is similar to extension traits in Rust.
 Variadic Generics
 -------------------------
 
+Slang supports variadic generics, allowing a generic declaration to accept a variable number of type or value arguments. There are two kinds of variadic generic parameters: *variadic type parameters* (packs of types) and *variadic value parameters* (packs of compile-time integer values). Both use the `each` keyword to declare a pack and the `expand` keyword to operate on pack elements.
+
+### Variadic Type Parameters
+
 Slang supports variadic generic type parameters:
 ```csharp
 struct MyType<each T>
@@ -1101,6 +1105,113 @@ void test()
 
 Note that a variadic type pack parameter must appear at the end of a parameter list. If a generic type contains more than one
 type pack parameters, then each type pack must contain the same number of arguments at instantiation sites.
+
+### Variadic Value Parameters
+
+In addition to variadic type parameters, Slang also supports variadic *value* parameters. A variadic value parameter declares a pack of compile-time integer values:
+
+```csharp
+struct Dims<let each D : int>
+{}
+```
+
+Here `let each D : int` defines a generic value pack parameter. Each element of the pack is a compile-time `int`. The following instantiations are valid:
+
+```
+Dims<>          // empty pack
+Dims<4>         // single element
+Dims<2, 3, 4>   // three elements
+```
+
+An equivalent traditional syntax is also supported:
+```csharp
+struct Dims<each int D>
+{}
+```
+
+The value pack parameter must appear at the end of the parameter list.
+
+#### Using `expand` and `each` with value packs
+
+The `expand` and `each` keywords work with value packs the same way they work with type packs. Use `each D` inside an `expand` expression to refer to individual elements of the value pack:
+
+```csharp
+struct Dims<let each D : int>
+{
+    void print()
+    {
+        expand printf("%d\n", each D);
+    }
+}
+```
+
+You can also use `each` to instantiate other generic types or perform arithmetic on each element:
+
+```csharp
+// Instantiate a generic type for each value in the pack.
+struct Wrapper<let N : int> { int getValue() { return N; } }
+
+struct WrapAll<let each D : int>
+{
+    void printValues()
+    {
+        expand printf("%d\n", Wrapper<each D>().getValue());
+    }
+}
+
+// Compute a sum over the value pack.
+void add(inout int a, int b) { a += b; }
+
+int sum<let each D : int>()
+{
+    int s = 0;
+    expand add(s, each D);
+    return s;
+}
+```
+
+### Using `countof` with Packs
+
+`countof` returns the number of elements in a type pack or value pack:
+
+```csharp
+struct Dims<let each D : int>
+{
+    int getDimCount() { return countof(D); }
+}
+
+int typeCount<each T>() { return countof(T); }
+```
+
+### Builtin Variadic Pack Operators
+
+Slang also supports simple pack queries:
+
+- `__first(P)` returns the first element of a type pack, value pack, or tuple-like pack source.
+- `__last(P)` returns the last element.
+- `__trimHead(P)` returns the pack with the first element removed.
+- `__trimTail(P)` returns the pack with the last element removed.
+
+For example:
+
+```csharp
+int firstValue<let each D : int>() where nonempty(D)
+{
+    return __first(D);
+}
+
+int restCount<let each D : int>()
+{
+    return countof(__trimHead(D));
+}
+
+struct FirstTypeHolder<each T> where nonempty(T)
+{
+    __first(T) value;
+}
+```
+
+`__first(...)` and `__last(...)` are only valid on packs that are known to be non-empty. For generic packs, use a `where nonempty(P)` constraint to make that guarantee explicit.
 
 Builtin Interfaces
 -----------------------------

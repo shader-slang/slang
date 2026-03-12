@@ -130,6 +130,7 @@
 #include "slang-lower-to-ir.h"
 #include "slang-mangle.h"
 #include "slang-pass-wrapper.h"
+#include "slang-rich-diagnostics.h"
 #include "slang-syntax.h"
 #include "slang-type-layout.h"
 #include "slang-visitor.h"
@@ -221,7 +222,7 @@ static void reportCheckpointIntermediates(
     IRModule* irModule)
 {
     // Report checkpointing information
-    CompilerOptionSet& optionSet = codeGenContext->getTargetProgram()->getOptionSet();
+    TargetRequest* targetReq = codeGenContext->getTargetReq();
     SourceManager* sourceManager = sink->getSourceManager();
 
     SourceWriter typeWriter(sourceManager, LineDirectiveMode::None, nullptr);
@@ -245,7 +246,7 @@ static void reportCheckpointIntermediates(
             continue;
 
         IRSizeAndAlignment structSize;
-        getNaturalSizeAndAlignment(optionSet, structType, &structSize);
+        getNaturalSizeAndAlignment(targetReq, structType, &structSize);
 
         // Reporting happens before empty structs are optimized out
         // and we still want to keep the checkpointing decorations,
@@ -254,36 +255,42 @@ static void reportCheckpointIntermediates(
             continue;
 
         auto func = checkpointDecoration->getSourceFunction();
-        sink->diagnose(
-            structType,
-            Diagnostics::reportCheckpointIntermediates,
-            func,
-            structSize.size);
+        sink->diagnose(Diagnostics::ReportCheckpointIntermediates{
+            .size = (int64_t)structSize.size,
+            .func = func,
+            .location = structType->sourceLoc});
         nonEmptyStructs++;
 
         for (auto field : structType->getFields())
         {
             IRType* fieldType = field->getFieldType();
             IRSizeAndAlignment fieldSize;
-            getNaturalSizeAndAlignment(optionSet, fieldType, &fieldSize);
+            getNaturalSizeAndAlignment(targetReq, fieldType, &fieldSize);
             if (fieldSize.size == 0)
                 continue;
 
             typeWriter.clearContent();
             emitter.emitType(fieldType);
 
-            sink->diagnose(
-                field->sourceLoc,
-                field->findDecoration<IRLoopCounterDecoration>()
-                    ? Diagnostics::reportCheckpointCounter
-                    : Diagnostics::reportCheckpointVariable,
-                fieldSize.size,
-                typeWriter.getContent());
+            if (field->findDecoration<IRLoopCounterDecoration>())
+            {
+                sink->diagnose(Diagnostics::ReportCheckpointCounter{
+                    .size = (int64_t)fieldSize.size,
+                    .typeName = typeWriter.getContent(),
+                    .location = field->sourceLoc});
+            }
+            else
+            {
+                sink->diagnose(Diagnostics::ReportCheckpointVariable{
+                    .size = (int64_t)fieldSize.size,
+                    .typeName = typeWriter.getContent(),
+                    .location = field->sourceLoc});
+            }
         }
     }
 
     if (nonEmptyStructs == 0)
-        sink->diagnose(SourceLoc(), Diagnostics::reportCheckpointNone);
+        sink->diagnose(Diagnostics::ReportCheckpointNone{});
 }
 
 struct LinkingAndOptimizationOptions
@@ -472,7 +479,8 @@ void diagnoseCallStack(IRInst* inst, DiagnosticSink* sink)
             auto user = use->getUser();
             if (auto call = as<IRCall>(user))
             {
-                sink->diagnose(call, Diagnostics::seeCallOfFunc, func);
+                sink->diagnose(
+                    Diagnostics::SeeCallOfFuncIr{.inst = func, .location = call->sourceLoc});
                 inst = call;
                 shouldContinue = true;
                 break;
@@ -497,21 +505,25 @@ bool checkStaticAssert(IRInst* inst, DiagnosticSink* sink)
                     IRInst* msg = inst->getOperand(1);
                     if (auto msgLit = as<IRStringLit>(msg))
                     {
-                        sink->diagnose(
-                            inst,
-                            Diagnostics::staticAssertionFailure,
-                            msgLit->getStringSlice());
+                        sink->diagnose(Diagnostics::StaticAssertionFailure{
+                            .message = String(msgLit->getStringSlice()),
+                            .location = inst->sourceLoc,
+                        });
                     }
                     else
                     {
-                        sink->diagnose(inst, Diagnostics::staticAssertionFailureWithoutMessage);
+                        sink->diagnose(Diagnostics::StaticAssertionFailureWithoutMessage{
+                            .location = inst->sourceLoc,
+                        });
                     }
                     diagnoseCallStack(inst, sink);
                 }
             }
             else
             {
-                sink->diagnose(condi, Diagnostics::staticAssertionConditionNotConstant);
+                sink->diagnose(Diagnostics::StaticAssertionConditionNotConstant{
+                    .location = condi->sourceLoc,
+                });
             }
 
             return true;
@@ -736,15 +748,16 @@ Result linkAndOptimizeIR(
     requiredLoweringPassSet = {};
     calcRequiredLoweringPassSet(requiredLoweringPassSet, codeGenContext, irModule->getModuleInst());
 
-    // Debug info is added by the front-end, and therefore needs to be stripped out by targets
-    // that opt out of debug info.
+    // Debug info is added by the front-end. If the target cannot express debug info, or if the user
+    // specifies -g0, we need to stripped them out now to allow more optimization and cleanups.
     if (requiredLoweringPassSet.debugInfo &&
-        (targetCompilerOptions.getIntOption(CompilerOptionName::DebugInformation) ==
-         SLANG_DEBUG_INFO_LEVEL_NONE))
+        (targetCompilerOptions.getDebugInfoLevel() == DebugInfoLevel::None))
         SLANG_PASS(stripDebugInfo);
 
     if (!isKhronosTarget(targetRequest) && requiredLoweringPassSet.glslSSBO)
         SLANG_PASS(lowerGLSLShaderStorageBufferObjectsToStructuredBuffers, sink);
+
+    SLANG_PASS(translateEntryPointInParamToBorrow, sink);
 
     if (requiredLoweringPassSet.globalVaryingVar)
         SLANG_PASS(translateGlobalVaryingVar, codeGenContext);
@@ -966,6 +979,8 @@ Result linkAndOptimizeIR(
             //
             SpecializationOptions specOptions;
             specOptions.lowerWitnessLookups = false;
+            specOptions.reportDynamicDispatchSites =
+                codeGenContext->shouldReportDynamicDispatchSites();
             changed |=
                 SLANG_PASS(specializeModule, targetProgram, codeGenContext->getSink(), specOptions);
         }
@@ -975,7 +990,10 @@ Result linkAndOptimizeIR(
 
         if (changed)
         {
-            SLANG_PASS(applySparseConditionalConstantPropagation, codeGenContext->getSink());
+            SLANG_PASS(
+                applySparseConditionalConstantPropagation,
+                targetProgram,
+                codeGenContext->getSink());
         }
         validateIRModuleIfEnabled(codeGenContext, irModule);
 
@@ -1036,6 +1054,7 @@ Result linkAndOptimizeIR(
     {
         SpecializationOptions specOptions;
         specOptions.lowerWitnessLookups = true;
+        specOptions.reportDynamicDispatchSites = codeGenContext->shouldReportDynamicDispatchSites();
         SLANG_PASS(specializeModule, targetProgram, codeGenContext->getSink(), specOptions);
     }
 
@@ -1045,7 +1064,10 @@ Result linkAndOptimizeIR(
     // after specialization, since otherwise incompatible copies of the lowered
     // result structure are generated.
     if (requiredLoweringPassSet.resultType)
-        SLANG_PASS(lowerResultType, sink);
+        SLANG_PASS(lowerResultType, targetProgram, sink);
+
+    if (requiredLoweringPassSet.optionalType)
+        SLANG_PASS(lowerReinterpretOptional, targetProgram, sink);
 
     if (requiredLoweringPassSet.optionalType)
         SLANG_PASS(lowerOptionalType, sink);
@@ -1179,7 +1201,7 @@ Result linkAndOptimizeIR(
 
     SLANG_PASS(lowerTuples, sink);
 
-    SLANG_PASS(generateAnyValueMarshallingFunctions);
+    SLANG_PASS(generateAnyValueMarshallingFunctions, targetProgram);
 
     // Don't need to run any further target-dependent passes if we are generating code
     // for host vm.
@@ -1232,6 +1254,7 @@ Result linkAndOptimizeIR(
         SLANG_PASS(
 
             applySparseConditionalConstantPropagation,
+            targetProgram,
             sink);
         SLANG_PASS(eliminateDeadCode, deadCodeEliminationOptions);
     }
@@ -1273,6 +1296,8 @@ Result linkAndOptimizeIR(
     }
 
     SLANG_PASS(legalizeEmptyArray, sink);
+
+    SLANG_PASS(legalizeVectorTypes, sink);
 
     // For CUDA targets, always inline global constants to avoid dynamic initialization
     // of __device__ variables rejected by NVRTC. This runs independently of the broader
@@ -1334,6 +1359,19 @@ Result linkAndOptimizeIR(
         //  we need to replace it with just an `X`, after which we
         //  will have (more) legal shader code.
         //
+        // For DXIL/HLSL with NVAPI and SPIRV: add dummy fields to empty ray payloads
+        if (isD3DTarget(targetRequest) || isSPIRV(targetRequest->getTarget()))
+        {
+            SLANG_PASS(legalizeEmptyRayPayloadsForHLSL);
+        }
+
+        // For DXIL only: unwrap ForceVarIntoRayPayloadStructTemporarily instructions
+        // (must run before legalizeExistentialTypeLayout removes empty struct parameters)
+        if (isD3DTarget(targetRequest))
+        {
+            SLANG_PASS(legalizeNonStructParameterToStructForHLSL);
+        }
+
         if (requiredLoweringPassSet.existentialTypeLayout)
         {
             SLANG_PASS(legalizeExistentialTypeLayout, targetProgram, sink);
@@ -1394,8 +1432,6 @@ Result linkAndOptimizeIR(
     }
 
     SLANG_PASS(legalizeMatrixTypes, targetProgram, sink);
-
-    SLANG_PASS(legalizeVectorTypes, sink);
 
     // Once specialization and type legalization have been performed,
     // we should perform some of our basic optimization steps again,
@@ -1650,7 +1686,7 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::MetalLib:
     case CodeGenTarget::MetalLibAssembly:
         {
-            SLANG_PASS(legalizeIRForMetal, sink);
+            SLANG_PASS(legalizeIRForMetal, targetProgram, sink);
         }
         break;
     case CodeGenTarget::CSource:
@@ -1660,7 +1696,10 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::ShaderObjectCode:
     case CodeGenTarget::ShaderHostCallable:
         {
-            SLANG_PASS(legalizeEntryPointVaryingParamsForCPU, codeGenContext->getSink());
+            SLANG_PASS(
+                legalizeEntryPointVaryingParamsForCPU,
+                targetProgram,
+                codeGenContext->getSink());
         }
         break;
 
@@ -1675,7 +1714,7 @@ Result linkAndOptimizeIR(
     case CodeGenTarget::WGSLSPIRV:
     case CodeGenTarget::WGSLSPIRVAssembly:
         {
-            SLANG_PASS(legalizeIRForWGSL, sink);
+            SLANG_PASS(legalizeIRForWGSL, targetProgram, sink);
         }
         break;
 
@@ -1690,11 +1729,7 @@ Result linkAndOptimizeIR(
 
     if (isD3DTarget(targetRequest) || isKhronosTarget(targetRequest) ||
         isWGPUTarget(targetRequest) || isMetalTarget(targetRequest))
-        SLANG_PASS(legalizeLogicalAndOr);
-
-    // Legalize non struct parameters that are expected to be structs for HLSL.
-    if (isD3DTarget(targetRequest))
-        SLANG_PASS(legalizeNonStructParameterToStructForHLSL);
+        SLANG_PASS(legalizeLogicalAndOr, targetProgram);
 
     // Create aliases for all dynamic resource parameters.
     if (requiredLoweringPassSet.dynamicResource && isKhronosTarget(targetRequest))
@@ -1915,7 +1950,7 @@ Result linkAndOptimizeIR(
         SLANG_PASS(performIntrinsicFunctionInlining);
     }
 
-    SLANG_PASS(eliminateMultiLevelBreak);
+    SLANG_PASS(eliminateMultiLevelBreak, targetProgram);
 
     if (!fastIRSimplificationOptions.minimalOptimization)
     {
@@ -2058,8 +2093,7 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
     auto targetRequest = getTargetReq();
     auto targetProgram = getTargetProgram();
 
-    auto lineDirectiveMode = targetProgram->getOptionSet().getEnumOption<LineDirectiveMode>(
-        CompilerOptionName::LineDirectiveMode);
+    auto lineDirectiveMode = targetProgram->getOptionSet().getLineDirectiveMode();
     // We will generally use C-style line directives in order to give the user good
     // source locations on error messages from downstream compilers, but there are
     // a few exceptions.
@@ -2164,10 +2198,8 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
 
     if (!sourceEmitter)
     {
-        sink->diagnose(
-            SourceLoc(),
-            Diagnostics::unableToGenerateCodeForTarget,
-            TypeTextUtil::getCompileTargetName(SlangCompileTarget(target)));
+        sink->diagnose(Diagnostics::UnableToGenerateCodeForTarget{
+            .target = TypeTextUtil::getCompileTargetName(SlangCompileTarget(target))});
         return SLANG_FAIL;
     }
 
@@ -2601,7 +2633,14 @@ static SlangResult createArtifactFromIR(
     ComPtr<IArtifact>& dbgArtifact)
 {
     List<uint8_t> spirv, outSpirv;
-    emitSPIRVFromIR(codeGenContext, irModule, irEntryPoints, spirv);
+    SLANG_RETURN_ON_FAIL(emitSPIRVFromIR(codeGenContext, irModule, irEntryPoints, spirv));
+
+    // If SPIR-V emission reported any errors, do not continue with
+    // downstream linking/validation/optimization on partial output.
+    if (codeGenContext->getSink()->getErrorCount() != 0)
+    {
+        return SLANG_FAIL;
+    }
 
     auto targetRequest = codeGenContext->getTargetReq();
     auto targetCompilerOptions = targetRequest->getOptionSet();
@@ -2610,7 +2649,7 @@ static SlangResult createArtifactFromIR(
     String optErr;
     if (SLANG_FAILED(optimizeSPIRV(spirv, optErr, outSpirv)))
     {
-        codeGenContext->getSink()->diagnose(SourceLoc(), Diagnostics::spirvOptFailed, optErr);
+        codeGenContext->getSink()->diagnose(Diagnostics::SpirvOptFailed{.error = optErr});
         spirv = _Move(outSpirv);
     }
 #endif
@@ -2694,9 +2733,7 @@ static SlangResult createArtifactFromIR(
                     compiler->validate((uint32_t*)spirv.getBuffer(), int(spirv.getCount() / 4))))
             {
                 compiler->disassemble((uint32_t*)spirv.getBuffer(), int(spirv.getCount() / 4));
-                codeGenContext->getSink()->diagnoseWithoutSourceView(
-                    SourceLoc{},
-                    Diagnostics::spirvValidationFailed);
+                codeGenContext->getSink()->diagnose(Diagnostics::SpirvValidationFailed{});
             }
         }
 
@@ -2705,8 +2742,7 @@ static SlangResult createArtifactFromIR(
         downstreamOptions.sourceArtifacts = makeSlice(artifact.readRef(), 1);
         downstreamOptions.targetType = SLANG_SPIRV;
         downstreamOptions.sourceLanguage = SLANG_SOURCE_LANGUAGE_SPIRV;
-        switch (codeGenContext->getTargetProgram()->getOptionSet().getEnumOption<OptimizationLevel>(
-            CompilerOptionName::Optimization))
+        switch (codeGenContext->getTargetProgram()->getOptionSet().getOptimizationLevel())
         {
         case OptimizationLevel::None:
             downstreamOptions.optimizationLevel = DownstreamCompileOptions::OptimizationLevel::None;
@@ -2848,10 +2884,8 @@ SlangResult emitLLVMForEntryPoints(CodeGenContext* codeGenContext, ComPtr<IArtif
     ISlangSharedLibrary* library = codeGenContext->getSession()->getOrLoadSlangLLVM();
     if (!library)
     {
-        codeGenContext->getSink()->diagnose(
-            SourceLoc(),
-            Diagnostics::unableToGenerateCodeForTarget,
-            TypeTextUtil::getCompileTargetName(SlangCompileTarget(target)));
+        codeGenContext->getSink()->diagnose(Diagnostics::UnableToGenerateCodeForTarget{
+            .target = TypeTextUtil::getCompileTargetName(SlangCompileTarget(target))});
         return SLANG_FAIL;
     }
 

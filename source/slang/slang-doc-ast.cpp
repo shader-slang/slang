@@ -33,7 +33,7 @@ namespace Slang
     {
         return getSearchStyle(genericDecl->inner);
     }
-    else if (as<GenericTypeParamDecl>(decl) || as<GenericValueParamDecl>(decl))
+    else if (isGenericParam(decl))
     {
         return SearchStyle::GenericParam;
     }

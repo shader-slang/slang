@@ -610,6 +610,32 @@ void ASTPrinter::addExpr(Expr* expr)
         }
         sb << ")";
     }
+    else if (const auto packQueryExpr = as<PackQueryExpr>(expr))
+    {
+        if (as<FirstExpr>(packQueryExpr))
+            sb << "__first(";
+        else if (as<LastExpr>(packQueryExpr))
+            sb << "__last(";
+        else if (as<TrimHeadExpr>(packQueryExpr))
+            sb << "__trimHead(";
+        else if (as<TrimTailExpr>(packQueryExpr))
+            sb << "__trimTail(";
+        else
+            SLANG_UNEXPECTED("unknown PackQueryExpr subtype");
+
+        if (packQueryExpr->value)
+            addExpr(packQueryExpr->value);
+        sb << ")";
+    }
+    else if (const auto floatBitCastExpr = as<FloatBitCastExpr>(expr))
+    {
+        sb << "__floatAsInt(";
+        if (floatBitCastExpr->value)
+        {
+            addExpr(floatBitCastExpr->value);
+        }
+        sb << ")";
+    }
     else if (const auto addressOfExpr = as<AddressOfExpr>(expr))
     {
         sb << "__getAddress(";
@@ -682,6 +708,14 @@ void ASTPrinter::addExpr(Expr* expr)
     else if (as<ReturnValExpr>(expr))
     {
         sb << "__return_val";
+    }
+    else if (as<SharedTypeExpr>(expr))
+    {
+        auto typeType = as<TypeType>(expr->type);
+        if (typeType)
+            sb << typeType->getType();
+        else
+            sb << expr->type;
     }
     else if (const auto letExpr = as<LetExpr>(expr))
     {
@@ -1279,8 +1313,7 @@ void ASTPrinter::_addDeclPathRec(const DeclRef<Decl>& declRef, Index depth)
 
     // If the parent declaration is a generic, then we need to print out its
     // signature
-    if (parentGenericDeclRef && !declRef.as<GenericValueParamDecl>() &&
-        !declRef.as<GenericTypeParamDeclBase>())
+    if (parentGenericDeclRef && !isGenericParam(declRef))
     {
         auto substArgs =
             tryGetGenericArguments(SubstitutionSet(declRef), parentGenericDeclRef.getDecl());
@@ -1394,6 +1427,25 @@ void ASTPrinter::addGenericParams(
                 ScopePart scopePart(this, Part::Type::GenericParamType);
                 sb << "each ";
                 sb << getText(genericTypePackParam.getName());
+            }
+        }
+        else if (auto genericValuePackParam = paramDeclRef.as<GenericValuePackParamDecl>())
+        {
+            if (!first)
+                sb << ", ";
+            first = false;
+            ParamScope paramScope(&sb, outParamRanges);
+            {
+                ScopePart scopePart(this, Part::Type::GenericParamValue);
+                sb << "let each ";
+                sb << getText(genericValuePackParam.getName());
+                sb << " : ";
+                auto type = getType(m_astBuilder, genericValuePackParam);
+                if (auto valuePackType = as<ValuePackType>(type))
+                {
+                    type = valuePackType->getElementType();
+                }
+                addType(type);
             }
         }
         else

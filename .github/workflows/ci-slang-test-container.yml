@@ -18,12 +18,19 @@ on:
 jobs:
   # Run GPU tests in container with Vulkan and CUDA support.
   # Requires mounting host NVIDIA Vulkan ICD and EGL vendor config for Vulkan to work.
-  # CUDA 12.4 is used because the host driver (550.54.15) doesn't support newer PTX versions.
   test-slang:
     runs-on: ["Linux", "self-hosted", "GPU"]
     timeout-minutes: 60
+
+    permissions:
+      contents: read
+      packages: read
+
     container:
-      image: nvidia/cuda:12.4.1-devel-ubuntu22.04
+      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.4.0
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
       options: >-
         --gpus all
         --user root
@@ -39,16 +46,17 @@ jobs:
         shell: bash
 
     steps:
-      - name: Install Git and dependencies
+      - name: GPU health check
         run: |
-          apt-get update && apt-get install -y \
-            git \
-            libx11-6 \
-            libxext6 \
-            libegl1 \
-            libvulkan1 \
-            python3
-          git config --global --add safe.directory '*'
+          if ! output=$(nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv,noheader 2>&1); then
+            echo "nvidia-smi output: $output"
+            echo "::error::GPU health check failed — this VM has a faulty GPU. Re-run to get a new VM."
+            exit 1
+          fi
+          echo "GPU: $output"
+
+      - name: Configure Git safe directory
+        run: git config --global --add safe.directory '*'
 
       - uses: actions/checkout@v4
         with:
@@ -76,13 +84,8 @@ jobs:
           chmod +x "$bin_dir"/* 2>/dev/null || true
           echo "LD_LIBRARY_PATH=$PWD/artifacts/${cmake_config}/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
 
-          # Verify GPU is accessible
-          echo "=== GPU Info ==="
-          nvidia-smi
-
-          # Check CUDA
-          echo "=== CUDA libraries ==="
-          ldconfig -p | grep -i cuda || echo "No CUDA libraries in ldconfig"
+          # Display environment configuration
+          print-env-info
 
       - name: Test Slang
         run: |
@@ -103,6 +106,11 @@ jobs:
             slang_test_args+=("-server-count" "${{ inputs.server-count }}")
           fi
 
+          # Skip most neural tests in debug builds to reduce CI time
+          if [[ "${{ inputs.config }}" == "debug" ]]; then
+            slang_test_args+=("-skip-list" "tests/skip-list-debug.txt")
+          fi
+
           "$bin_dir/slang-test" "${slang_test_args[@]}"
 
       - name: Run slangc tests
@@ -121,15 +129,23 @@ jobs:
             -emit-spirv-via-glsl \
             -ignore-abort-msg \
             -api vk \
+            -expected-failure-list tests/expected-failure-via-glsl.txt \
             -expected-failure-list tests/expected-failure-github.txt \
-            -expected-failure-list tests/expected-glsl-failure-github.txt \
             -expected-failure-list tests/expected-failure-linux-gpu.txt
 
   test-slang-rhi:
     runs-on: ["Linux", "self-hosted", "GPU"]
     timeout-minutes: 30
+
+    permissions:
+      contents: read
+      packages: read
+
     container:
-      image: nvidia/cuda:12.4.1-devel-ubuntu22.04
+      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.4.0
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
       options: >-
         --gpus all
         --user root
@@ -145,15 +161,17 @@ jobs:
         shell: bash
 
     steps:
-      - name: Install Git and dependencies
+      - name: GPU health check
         run: |
-          apt-get update && apt-get install -y \
-            git \
-            libx11-6 \
-            libxext6 \
-            libegl1 \
-            libvulkan1
-          git config --global --add safe.directory '*'
+          if ! output=$(nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv,noheader 2>&1); then
+            echo "nvidia-smi output: $output"
+            echo "::error::GPU health check failed — this VM has a faulty GPU. Re-run to get a new VM."
+            exit 1
+          fi
+          echo "GPU: $output"
+
+      - name: Configure Git safe directory
+        run: git config --global --add safe.directory '*'
 
       - uses: actions/checkout@v4
         with:
@@ -181,6 +199,9 @@ jobs:
           chmod +x "$bin_dir"/* 2>/dev/null || true
           echo "LD_LIBRARY_PATH=$PWD/artifacts/${cmake_config}/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
 
+          # Display environment configuration
+          print-env-info
+
       - name: Run slang-rhi tests
         run: |
           export SLANG_RHI_EXCLUDE_TESTS="md-clear*,cmd-copy*,cmd-upload*,fence*,staging-heap*,texture-create*"
@@ -193,5 +214,3 @@ jobs:
       - name: Run slang-rhi tests (OptiX 8.1)
         run: |
           "$bin_dir/slang-rhi-tests" -check-devices -optix-version=80100 -tc="ray-tracing-*.cuda"
-
-  # Skip slangpy tests - requires LLVM which is disabled in CUDA builds

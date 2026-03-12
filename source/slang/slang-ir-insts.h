@@ -865,6 +865,13 @@ struct IRSemanticDecoration : public IRDecoration
 
     UnownedStringSlice getSemanticName() { return getSemanticNameOperand()->getStringSlice(); }
     int getSemanticIndex() { return int(getIntVal(getSemanticIndexOperand())); }
+
+    /// Returns the semantic index, treating -1 (unspecified) as 0.
+    int getEffectiveSemanticIndex()
+    {
+        auto idx = getSemanticIndex();
+        return idx >= 0 ? idx : 0;
+    }
 };
 
 FIDDLE()
@@ -2614,6 +2621,11 @@ struct IRDebugVar : IRInst
     IRInst* getLine() { return getOperand(1); }
     IRInst* getCol() { return getOperand(2); }
     IRInst* getArgIndex() { return getOperandCount() >= 4 ? getOperand(3) : nullptr; }
+    void setArgIndex(IRInst* argIndex)
+    {
+        if (getOperandCount() >= 4)
+            setOperand(3, argIndex);
+    }
 };
 
 FIDDLE()
@@ -2960,10 +2972,18 @@ struct IR$(inst.struct_name) : IR$(inst.parent_struct)
     }
 %   end
 %   for _, operand in ipairs(inst.operands) do
-%     if operand.has_type then
-    $(operand.type)* $(operand.getter_name)() { return ($(operand.type)*)getOperand($(operand.index)); }
+%     if operand.optional then
+%       if operand.has_type then
+    $(operand.type)* $(operand.getter_name)() { return getOperandCount() > $(operand.index) ? ($(operand.type)*)getOperand($(operand.index)) : nullptr; }
+%       else
+    IRInst* $(operand.getter_name)() { return getOperandCount() > $(operand.index) ? getOperand($(operand.index)) : nullptr; }
+%       end
 %     else
+%       if operand.has_type then
+    $(operand.type)* $(operand.getter_name)() { return ($(operand.type)*)getOperand($(operand.index)); }
+%       else
     IRInst* $(operand.getter_name)() { return getOperand($(operand.index)); }
+%       end
 %     end
 %   end
 };
@@ -3305,26 +3325,37 @@ $(type_info.return_type) $(type_info.method_name)(
         IROp op,
         IRType* valueType,
         AccessQualifier accessQualifier,
-        AddressSpace addressSpace);
+        AddressSpace addressSpace,
+        IRType* dataLayoutType);
     IRPtrType* getPtrType(
         IROp op,
         IRType* valueType,
         IRInst* accessQualifier,
-        IRInst* addressSpace);
-    IRPtrType* getPtrType(IROp op, IRType* valueType, AddressSpace addressSpace)
+        IRInst* addressSpace,
+        IRType* dataLayoutType);
+    IRPtrType* getPtrType(
+        IROp op,
+        IRType* valueType,
+        AddressSpace addressSpace,
+        IRType* dataLayoutType)
     {
-        return getPtrType(op, valueType, AccessQualifier::ReadWrite, addressSpace);
+        return getPtrType(op, valueType, AccessQualifier::ReadWrite, addressSpace, dataLayoutType);
     }
     IRPtrType* getPtrType(
         IRType* valueType,
         AccessQualifier accessQualifier,
-        AddressSpace addressSpace)
+        AddressSpace addressSpace,
+        IRType* dataLayoutType)
     {
-        return getPtrType(kIROp_PtrType, valueType, accessQualifier, addressSpace);
+        return getPtrType(kIROp_PtrType, valueType, accessQualifier, addressSpace, dataLayoutType);
     }
     IRPtrType* getPtrType(IRType* valueType, AddressSpace addressSpace)
     {
-        return getPtrType(valueType, AccessQualifier::ReadWrite, addressSpace);
+        return getPtrType(
+            valueType,
+            AccessQualifier::ReadWrite,
+            addressSpace,
+            getDefaultBufferLayoutType());
     }
     // Copies the op-type of the oldPtrType, access-qualifier and address-space.
     // Does not reuse the same `inst` for access-qualifier and address-space.
@@ -3334,7 +3365,8 @@ $(type_info.return_type) $(type_info.method_name)(
             oldPtrType->getOp(),
             valueType,
             oldPtrType->getAccessQualifier(),
-            oldPtrType->getAddressSpace());
+            oldPtrType->getAddressSpace(),
+            oldPtrType->getDataLayout());
     }
 
     /// Get a GLSL output parameter group type
@@ -3681,7 +3713,7 @@ $(type_info.return_type) $(type_info.method_name)(
     IRInst* emitOptionalHasValue(IRInst* optValue);
     IRInst* emitGetOptionalValue(IRInst* optValue);
     IRInst* emitMakeOptionalValue(IRInst* optType, IRInst* value);
-    IRInst* emitMakeOptionalNone(IRInst* optType, IRInst* defaultValue);
+    IRInst* emitMakeOptionalNone(IRInst* optType);
 
     IRInst* emitDifferentialPairGetDifferential(IRType* diffType, IRInst* diffPair);
     IRInst* emitDifferentialValuePairGetDifferential(IRType* diffType, IRInst* diffPair);
@@ -3710,6 +3742,8 @@ $(type_info.return_type) $(type_info.method_name)(
     IRInst* emitMakeMatrix(IRType* type, UInt argCount, IRInst* const* args);
 
     IRInst* emitMakeMatrixFromScalar(IRType* type, IRInst* scalarValue);
+
+    IRInst* emitMakeCoopMatrixFromScalar(IRType* type, IRInst* scalarValue);
 
     IRInst* emitMakeCoopVector(IRType* type, UInt argCount, IRInst* const* args);
 
@@ -3778,6 +3812,19 @@ $(type_info.return_type) $(type_info.method_name)(
         IRInst* offset,
         IRInst* alignment,
         IRInst* value);
+
+    IRInst* emitLoadDescriptorFromHeap(IRType* type, IRInst* heap, IRInst* index);
+    IRInst* emitSPIRVLoadTexelPointerFromHeap(
+        IRType* type,
+        IRInst* heap,
+        IRInst* index,
+        IRInst* textureType,
+        IRInst* coord,
+        IRInst* sampleIndex);
+
+    IRInst* emitSPIRVResourceDescriptorHeap();
+    IRInst* emitSPIRVSamplerDescriptorHeap();
+    IRInst* emitMakeCombinedTextureSampler(IRType* type, IRInst* texture, IRInst* sampler);
 
     IRInst* emitEmbeddedDownstreamIR(CodeGenTarget target, ISlangBlob* blob);
 
@@ -4126,6 +4173,31 @@ $(type_info.return_type) $(type_info.method_name)(
     IRInst* emitSub(IRType* type, IRInst* left, IRInst* right);
     IRInst* emitMul(IRType* type, IRInst* left, IRInst* right);
     IRInst* emitDiv(IRType* type, IRInst* numerator, IRInst* denominator);
+
+    // Constexpr arithmetic ops - hoistable variants used for IntVal lowering
+    IRInst* emitConstexprAdd(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitConstexprSub(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitConstexprMul(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitConstexprDiv(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitConstexprNeg(IRType* type, IRInst* value);
+    IRInst* emitConstexprCast(IRType* type, IRInst* value);
+    IRInst* emitConstexprIRem(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitConstexprShl(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitConstexprShr(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitConstexprBitAnd(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitConstexprBitOr(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitConstexprBitXor(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitConstexprBitNot(IRType* type, IRInst* value);
+    IRInst* emitConstexprNot(IRType* type, IRInst* value);
+    IRInst* emitConstexprEql(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitConstexprNeq(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitConstexprGreater(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitConstexprLess(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitConstexprGeq(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitConstexprLeq(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitConstexprAnd(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitConstexprOr(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitConstexprSelect(IRType* type, IRInst* condition, IRInst* ifTrue, IRInst* ifFalse);
     IRInst* emitEql(IRInst* left, IRInst* right);
     IRInst* emitNeq(IRInst* left, IRInst* right);
     IRInst* emitLess(IRInst* left, IRInst* right);
@@ -4161,6 +4233,10 @@ $(type_info.return_type) $(type_info.method_name)(
     IRInst* emitGenericAsm(UnownedStringSlice asmText);
 
     IRInst* emitRWStructuredBufferGetElementPtr(IRInst* structuredBuffer, IRInst* index);
+    IRInst* emitRWStructuredBufferGetElementPtr(
+        IRType* pointerType,
+        IRInst* structuredBuffer,
+        IRInst* index);
 
     IRInst* emitNonUniformResourceIndexInst(IRInst* val);
 
@@ -4538,7 +4614,7 @@ $(type_info.return_type) $(type_info.method_name)(
     IRSemanticDecoration* addSemanticDecoration(
         IRInst* value,
         UnownedStringSlice const& text,
-        IRIntegerValue index = 0)
+        IRIntegerValue index = -1)
     {
         return as<IRSemanticDecoration>(addDecoration(
             value,

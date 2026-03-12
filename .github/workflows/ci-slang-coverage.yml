@@ -39,6 +39,12 @@ jobs:
   coverage:
     runs-on: ${{ fromJSON(inputs.runs-on) }}
     timeout-minutes: 120
+    permissions:
+      id-token: write # Required for Workload Identity (GCS auth)
+      contents: read
+
+    env:
+      IS_FORK_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == true }}
 
     defaults:
       run:
@@ -72,6 +78,26 @@ jobs:
           llvm-profdata --version
           llvm-cov --version
 
+      # Authenticate to Google Cloud (skip for fork PRs - no id-token available)
+      - name: Authenticate to Google Cloud
+        if: env.IS_FORK_PR != 'true'
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: "projects/125098404903/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider"
+          service_account: "github-ci@slang-runners.iam.gserviceaccount.com"
+
+      - name: Setup LLVM from GCS
+        if: inputs.build-llvm
+        uses: ./.github/actions/setup-llvm-from-gcs
+        with:
+          os: ${{ inputs.os }}
+          # Use gcc-built LLVM for Linux (ABI-compatible with clang-18)
+          compiler: ${{ inputs.os == 'linux' && 'gcc' || inputs.compiler }}
+          platform: ${{ inputs.platform }}
+          llvm-hash: ${{ hashFiles('external/build-llvm.sh') }}
+          build-if-missing: "true"
+          github-token: ${{ github.token }}
+
       - name: Setup
         uses: ./.github/actions/common-setup
         with:
@@ -80,6 +106,7 @@ jobs:
           platform: ${{ inputs.platform }}
           config: ${{ inputs.config }}
           build-llvm: ${{ inputs.build-llvm }}
+          use-cached-llvm: false
 
       - name: Build Slang with Coverage
         run: |
@@ -190,33 +217,78 @@ jobs:
 
           LIBSLANG="$BUILD_DIR/$CONFIG/lib/libslang.$LIB_EXT"
 
-          # Generate machine-readable coverage report
+          # Load slangc compiler-only ignore patterns (shared definition)
+          source tools/coverage/slangc-ignore-patterns.sh
+
+          # Generate full library coverage report
           REPORT_OUTPUT=$($LLVM_COV report "$LIBSLANG" -instr-profile="$COVERAGE_DIR/slang-test.profdata" 2>/dev/null || echo "")
 
+          # Generate slangc compiler-only coverage report
+          SLANGC_REPORT_OUTPUT=$($LLVM_COV report "$LIBSLANG" -instr-profile="$COVERAGE_DIR/slang-test.profdata" "${SLANGC_IGNORE_ARGS[@]}" 2>/dev/null || echo "")
+
           if [[ -n "$REPORT_OUTPUT" ]]; then
-            # Extract TOTALS line which contains all metrics
             TOTALS_LINE=$(echo "$REPORT_OUTPUT" | grep "^TOTAL" | head -1)
 
             if [[ -n "$TOTALS_LINE" ]]; then
-              # Parse the TOTALS line - format is typically:
-              # TOTAL  regions_hit regions_total region_pct  functions_hit functions_total function_pct  lines_hit lines_total line_pct  branches_hit branches_total branch_pct
               read -r _ regions_hit regions_total region_pct functions_hit functions_total function_pct lines_hit lines_total line_pct branches_hit branches_total branch_pct <<< "$TOTALS_LINE"
 
-              # Output for GitHub Actions
+              # Parse slangc-only metrics
+              slangc_line_pct=""
+              if [[ -n "$SLANGC_REPORT_OUTPUT" ]]; then
+                SLANGC_TOTALS=$(echo "$SLANGC_REPORT_OUTPUT" | grep "^TOTAL" | head -1)
+                if [[ -n "$SLANGC_TOTALS" ]]; then
+                  read -r _ slangc_regions_hit slangc_regions_total slangc_region_pct slangc_functions_hit slangc_functions_total slangc_function_pct slangc_lines_hit slangc_lines_total slangc_line_pct slangc_branches_hit slangc_branches_total slangc_branch_pct <<< "$SLANGC_TOTALS"
+                fi
+              fi
+
               echo "coverage=$line_pct" >> $GITHUB_OUTPUT
 
               # Generate step summary
               cat >> $GITHUB_STEP_SUMMARY <<EOF
           # Coverage Report
+
+          ## Full Library
           - **Line Coverage:** ${line_pct}% (${lines_hit} / ${lines_total})
           - **Region Coverage:** ${region_pct}% (${regions_hit} / ${regions_total})
           - **Function Coverage:** ${function_pct}% (${functions_hit} / ${functions_total})
           - **Branch Coverage:** ${branch_pct}% (${branches_hit} / ${branches_total})
           EOF
 
+              if [[ -n "$slangc_line_pct" ]]; then
+                cat >> $GITHUB_STEP_SUMMARY <<EOF
+
+          ## slangc Compiler Pipeline
+          - **Line Coverage:** ${slangc_line_pct}% (${slangc_lines_hit} / ${slangc_lines_total})
+          - **Region Coverage:** ${slangc_region_pct}% (${slangc_regions_hit} / ${slangc_regions_total})
+          - **Function Coverage:** ${slangc_function_pct}% (${slangc_functions_hit} / ${slangc_functions_total})
+          - **Branch Coverage:** ${slangc_branch_pct}% (${slangc_branches_hit} / ${slangc_branches_total})
+          EOF
+              fi
+
               # Save coverage summary as JSON for historical tracking
               REPORT_DATE=$(date -u +"%Y-%m-%d")
               COMMIT_SHORT=$(git rev-parse --short HEAD)
+
+              # Build JSON with optional slangc fields
+              SLANGC_JSON=""
+              if [[ -n "$slangc_line_pct" ]]; then
+                SLANGC_JSON=$(cat <<SLANGC_EOF
+            "slangc_line_coverage": "${slangc_line_pct}",
+            "slangc_lines_hit": ${slangc_lines_hit},
+            "slangc_lines_found": ${slangc_lines_total},
+            "slangc_region_coverage": "${slangc_region_pct}",
+            "slangc_regions_hit": ${slangc_regions_hit},
+            "slangc_regions_found": ${slangc_regions_total},
+            "slangc_function_coverage": "${slangc_function_pct}",
+            "slangc_functions_hit": ${slangc_functions_hit},
+            "slangc_functions_found": ${slangc_functions_total},
+            "slangc_branch_coverage": "${slangc_branch_pct}",
+            "slangc_branches_hit": ${slangc_branches_hit},
+            "slangc_branches_found": ${slangc_branches_total},
+          SLANGC_EOF
+              )
+              fi
+
               cat > coverage-summary.json <<EOF
           {
             "date": "${REPORT_DATE}",
@@ -234,7 +306,9 @@ jobs:
             "functions_found": ${functions_total},
             "branch_coverage": "${branch_pct}",
             "branches_hit": ${branches_hit},
-            "branches_found": ${branches_total}
+            "branches_found": ${branches_total},
+            ${SLANGC_JSON}
+            "_version": 2
           }
           EOF
               echo "Saved coverage summary to coverage-summary.json"
@@ -250,6 +324,7 @@ jobs:
           path: |
             coverage-summary.json
             coverage-html/
+            coverage-html-slangc/
             build/${{ inputs.config }}/coverage-data/slang-test.profdata
             build/${{ inputs.config }}/lib/libslang.*
           retention-days: 7
@@ -284,6 +359,12 @@ jobs:
           # Copy coverage HTML to historical location
           cp -r ../coverage-html/* "${REPORT_DIR}/"
 
+          # Copy slangc compiler-only HTML report if it exists
+          if [[ -d ../coverage-html-slangc ]]; then
+            mkdir -p "${REPORT_DIR}/slangc"
+            cp -r ../coverage-html-slangc/* "${REPORT_DIR}/slangc/"
+          fi
+
           # Copy coverage summary JSON if it exists
           if [[ -f ../coverage-summary.json ]]; then
             cp ../coverage-summary.json "${REPORT_DIR}/"
@@ -292,6 +373,12 @@ jobs:
           # Update latest (replace entire directory)
           rm -rf reports/latest/*
           cp -r ../coverage-html/* reports/latest/
+
+          # Copy slangc report to latest
+          if [[ -d ../coverage-html-slangc ]]; then
+            mkdir -p reports/latest/slangc
+            cp -r ../coverage-html-slangc/* reports/latest/slangc/
+          fi
 
           # Copy coverage summary to latest
           if [[ -f ../coverage-summary.json ]]; then

@@ -2,6 +2,7 @@
 
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -131,11 +132,14 @@ struct AddressInstEliminationContext
                 if (auto ptrType = as<IRPtrTypeBase>(inst->getDataType()))
                 {
                     auto valType = unwrapAttributedType(ptrType->getValueType());
-                    if (!getResolvedInstForDecorations(valType)
-                             ->findDecoration<IRNonCopyableTypeDecoration>())
-                    {
-                        workList.add(inst);
-                    }
+                    if (getResolvedInstForDecorations(valType)
+                            ->findDecoration<IRNonCopyableTypeDecoration>())
+                        continue;
+
+                    if (ptrType->getAddressSpace() == AddressSpace::UserPointer)
+                        continue;
+
+                    workList.add(inst);
                 }
             }
         }
@@ -177,9 +181,9 @@ struct AddressInstEliminationContext
                 case kIROp_GetOffsetPtr:
                     break;
                 default:
-                    sink->diagnose(
-                        use->getUser()->sourceLoc,
-                        Diagnostics::unsupportedUseOfLValueForAutoDiff);
+                    sink->diagnose(Diagnostics::UnsupportedUseOfLValueForAutoDiff{
+                        .location = use->getUser()->sourceLoc,
+                    });
                     break;
                 }
                 use = nextUse;

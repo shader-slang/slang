@@ -1,8 +1,0 @@
-result code = -1
-standard error = {
-tests/diagnostics/generic-invalid-type-specialization.slang(17): error 30060: expected a type, got a 'int'
-    Check<2 + 2> v;
-            ^
-}
-standard output = {
-}

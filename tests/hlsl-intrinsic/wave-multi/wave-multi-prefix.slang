@@ -34,14 +34,14 @@ struct OutputData
 
 RWStructuredBuffer<OutputData> outputBuffer;
 
-// CHECK_SPIRV: OpCapability GroupNonUniformPartitionedNV
+// CHECK_SPIRV: OpCapability GroupNonUniformPartitioned
 // CHECK_SPIRV: OpExtension "SPV_NV_shader_subgroup_partitioned"
-// CHECK_SPIRV: OpGroupNonUniformIAdd{{.*}}PartitionedExclusiveScanNV
-// CHECK_SPIRV: OpGroupNonUniformIMul{{.*}}PartitionedExclusiveScanNV
-// CHECK_SPIRV: OpGroupNonUniformBitwiseAnd{{.*}}PartitionedExclusiveScanNV
-// CHECK_SPIRV: OpGroupNonUniformBitwiseOr{{.*}}PartitionedExclusiveScanNV
-// CHECK_SPIRV: OpGroupNonUniformBitwiseXor{{.*}}PartitionedExclusiveScanNV
-// CHECK_SPIRV: OpGroupNonUniformFAdd{{.*}}PartitionedExclusiveScanNV
+// CHECK_SPIRV: OpGroupNonUniformIAdd{{.*}}PartitionedExclusiveScan
+// CHECK_SPIRV: OpGroupNonUniformIMul{{.*}}PartitionedExclusiveScan
+// CHECK_SPIRV: OpGroupNonUniformBitwiseAnd{{.*}}PartitionedExclusiveScan
+// CHECK_SPIRV: OpGroupNonUniformBitwiseOr{{.*}}PartitionedExclusiveScan
+// CHECK_SPIRV: OpGroupNonUniformBitwiseXor{{.*}}PartitionedExclusiveScan
+// CHECK_SPIRV: OpGroupNonUniformFAdd{{.*}}PartitionedExclusiveScan
 
 // CHECK_GLSL: GL_NV_shader_subgroup_partitioned
 // CHECK_GLSL: subgroupPartitionedExclusiveAddNV

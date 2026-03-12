@@ -102,6 +102,20 @@ if [[ -f "$COMBINED_SUMMARY" ]]; then
     LINUX_BRANCH_COV=$(get_json_value "branch_coverage" "$LINUX_SUMMARY")
     LINUX_BRANCHES_HIT=$(get_json_number "branches_hit" "$LINUX_SUMMARY")
     LINUX_BRANCHES_FOUND=$(get_json_number "branches_found" "$LINUX_SUMMARY")
+
+    # slangc compiler-only metrics (may not exist in older reports)
+    LINUX_SLANGC_LINE_COV=$(get_json_value "slangc_line_coverage" "$LINUX_SUMMARY")
+    LINUX_SLANGC_LINES_HIT=$(get_json_number "slangc_lines_hit" "$LINUX_SUMMARY")
+    LINUX_SLANGC_LINES_FOUND=$(get_json_number "slangc_lines_found" "$LINUX_SUMMARY")
+    LINUX_SLANGC_REGION_COV=$(get_json_value "slangc_region_coverage" "$LINUX_SUMMARY")
+    LINUX_SLANGC_REGIONS_HIT=$(get_json_number "slangc_regions_hit" "$LINUX_SUMMARY")
+    LINUX_SLANGC_REGIONS_FOUND=$(get_json_number "slangc_regions_found" "$LINUX_SUMMARY")
+    LINUX_SLANGC_FUNCTION_COV=$(get_json_value "slangc_function_coverage" "$LINUX_SUMMARY")
+    LINUX_SLANGC_FUNCTIONS_HIT=$(get_json_number "slangc_functions_hit" "$LINUX_SUMMARY")
+    LINUX_SLANGC_FUNCTIONS_FOUND=$(get_json_number "slangc_functions_found" "$LINUX_SUMMARY")
+    LINUX_SLANGC_BRANCH_COV=$(get_json_value "slangc_branch_coverage" "$LINUX_SUMMARY")
+    LINUX_SLANGC_BRANCHES_HIT=$(get_json_number "slangc_branches_hit" "$LINUX_SUMMARY")
+    LINUX_SLANGC_BRANCHES_FOUND=$(get_json_number "slangc_branches_found" "$LINUX_SUMMARY")
   fi
 
   if [[ -f "$MACOS_SUMMARY" ]]; then
@@ -118,6 +132,20 @@ if [[ -f "$COMBINED_SUMMARY" ]]; then
     MACOS_BRANCH_COV=$(get_json_value "branch_coverage" "$MACOS_SUMMARY")
     MACOS_BRANCHES_HIT=$(get_json_number "branches_hit" "$MACOS_SUMMARY")
     MACOS_BRANCHES_FOUND=$(get_json_number "branches_found" "$MACOS_SUMMARY")
+
+    # slangc compiler-only metrics (may not exist in older reports)
+    MACOS_SLANGC_LINE_COV=$(get_json_value "slangc_line_coverage" "$MACOS_SUMMARY")
+    MACOS_SLANGC_LINES_HIT=$(get_json_number "slangc_lines_hit" "$MACOS_SUMMARY")
+    MACOS_SLANGC_LINES_FOUND=$(get_json_number "slangc_lines_found" "$MACOS_SUMMARY")
+    MACOS_SLANGC_REGION_COV=$(get_json_value "slangc_region_coverage" "$MACOS_SUMMARY")
+    MACOS_SLANGC_REGIONS_HIT=$(get_json_number "slangc_regions_hit" "$MACOS_SUMMARY")
+    MACOS_SLANGC_REGIONS_FOUND=$(get_json_number "slangc_regions_found" "$MACOS_SUMMARY")
+    MACOS_SLANGC_FUNCTION_COV=$(get_json_value "slangc_function_coverage" "$MACOS_SUMMARY")
+    MACOS_SLANGC_FUNCTIONS_HIT=$(get_json_number "slangc_functions_hit" "$MACOS_SUMMARY")
+    MACOS_SLANGC_FUNCTIONS_FOUND=$(get_json_number "slangc_functions_found" "$MACOS_SUMMARY")
+    MACOS_SLANGC_BRANCH_COV=$(get_json_value "slangc_branch_coverage" "$MACOS_SUMMARY")
+    MACOS_SLANGC_BRANCHES_HIT=$(get_json_number "slangc_branches_hit" "$MACOS_SUMMARY")
+    MACOS_SLANGC_BRANCHES_FOUND=$(get_json_number "slangc_branches_found" "$MACOS_SUMMARY")
   fi
 
   # Use Linux coverage for the main badge (most comprehensive usually)
@@ -462,6 +490,82 @@ EOF
     cat >>"${OUTPUT_FILE}" <<EOF
                 </tbody>
             </table>
+EOF
+
+    # Check if any platform has slangc compiler-only metrics
+    HAS_SLANGC=false
+    if [[ "$HAS_LINUX" == "true" && -n "$LINUX_SLANGC_LINE_COV" ]]; then
+      HAS_SLANGC=true
+    fi
+    if [[ "$HAS_MACOS" == "true" && -n "$MACOS_SLANGC_LINE_COV" ]]; then
+      HAS_SLANGC=true
+    fi
+
+    if [[ "$HAS_SLANGC" == "true" ]]; then
+      cat >>"${OUTPUT_FILE}" <<EOF
+
+            <h2 style="color: #2c3e50; margin: 30px 0 10px 0; text-align: center;">Compiler Pipeline Coverage</h2>
+            <p style="color: #6c757d; text-align: center; margin-bottom: 20px; font-size: 0.9em;">
+                Hand-written compiler code only. Excludes generated code, language server, documentation generator, and record-replay instrumentation.
+            </p>
+
+            <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+                <thead>
+                    <tr style="background: #2c3e50; color: white;">
+                        <th style="padding: 15px; text-align: left;">Platform</th>
+                        <th style="padding: 15px; text-align: center;">Lines</th>
+                        <th style="padding: 15px; text-align: center;">Regions</th>
+                        <th style="padding: 15px; text-align: center;">Functions</th>
+                        <th style="padding: 15px; text-align: center;">Branches</th>
+                        <th style="padding: 15px; text-align: center;">Report</th>
+                    </tr>
+                </thead>
+                <tbody>
+EOF
+
+      if [[ "$HAS_LINUX" == "true" && -n "$LINUX_SLANGC_LINE_COV" ]]; then
+        linux_sl_line_class=$(get_badge_color "$LINUX_SLANGC_LINE_COV" | sed 's/#27ae60/cov-good/; s/#f39c12/cov-medium/; s/#e74c3c/cov-low/')
+        linux_sl_region_class=$(get_badge_color "$LINUX_SLANGC_REGION_COV" | sed 's/#27ae60/cov-good/; s/#f39c12/cov-medium/; s/#e74c3c/cov-low/')
+        linux_sl_function_class=$(get_badge_color "$LINUX_SLANGC_FUNCTION_COV" | sed 's/#27ae60/cov-good/; s/#f39c12/cov-medium/; s/#e74c3c/cov-low/')
+        linux_sl_branch_class=$(get_badge_color "$LINUX_SLANGC_BRANCH_COV" | sed 's/#27ae60/cov-good/; s/#f39c12/cov-medium/; s/#e74c3c/cov-low/')
+
+        cat >>"${OUTPUT_FILE}" <<EOF
+                    <tr style="border-bottom: 1px solid #ddd;">
+                        <td style="padding: 15px;"><strong>🐧 Linux GPU (x86_64)</strong></td>
+                        <td style="padding: 15px; text-align: center;"><span class="${linux_sl_line_class}">${LINUX_SLANGC_LINE_COV}</span><br><small>${LINUX_SLANGC_LINES_HIT}/${LINUX_SLANGC_LINES_FOUND}</small></td>
+                        <td style="padding: 15px; text-align: center;"><span class="${linux_sl_region_class}">${LINUX_SLANGC_REGION_COV}</span><br><small>${LINUX_SLANGC_REGIONS_HIT}/${LINUX_SLANGC_REGIONS_FOUND}</small></td>
+                        <td style="padding: 15px; text-align: center;"><span class="${linux_sl_function_class}">${LINUX_SLANGC_FUNCTION_COV}</span><br><small>${LINUX_SLANGC_FUNCTIONS_HIT}/${LINUX_SLANGC_FUNCTIONS_FOUND}</small></td>
+                        <td style="padding: 15px; text-align: center;"><span class="${linux_sl_branch_class}">${LINUX_SLANGC_BRANCH_COV}</span><br><small>${LINUX_SLANGC_BRANCHES_HIT}/${LINUX_SLANGC_BRANCHES_FOUND}</small></td>
+                        <td style="padding: 15px; text-align: center;"><a href="${LINK_PREFIX}latest/linux/slangc/index.html" style="color: #667eea;">View</a></td>
+                    </tr>
+EOF
+      fi
+
+      if [[ "$HAS_MACOS" == "true" && -n "$MACOS_SLANGC_LINE_COV" ]]; then
+        macos_sl_line_class=$(get_badge_color "$MACOS_SLANGC_LINE_COV" | sed 's/#27ae60/cov-good/; s/#f39c12/cov-medium/; s/#e74c3c/cov-low/')
+        macos_sl_region_class=$(get_badge_color "$MACOS_SLANGC_REGION_COV" | sed 's/#27ae60/cov-good/; s/#f39c12/cov-medium/; s/#e74c3c/cov-low/')
+        macos_sl_function_class=$(get_badge_color "$MACOS_SLANGC_FUNCTION_COV" | sed 's/#27ae60/cov-good/; s/#f39c12/cov-medium/; s/#e74c3c/cov-low/')
+        macos_sl_branch_class=$(get_badge_color "$MACOS_SLANGC_BRANCH_COV" | sed 's/#27ae60/cov-good/; s/#f39c12/cov-medium/; s/#e74c3c/cov-low/')
+
+        cat >>"${OUTPUT_FILE}" <<EOF
+                    <tr style="border-bottom: 1px solid #ddd;">
+                        <td style="padding: 15px;"><strong>🍎 macOS (aarch64)</strong></td>
+                        <td style="padding: 15px; text-align: center;"><span class="${macos_sl_line_class}">${MACOS_SLANGC_LINE_COV}</span><br><small>${MACOS_SLANGC_LINES_HIT}/${MACOS_SLANGC_LINES_FOUND}</small></td>
+                        <td style="padding: 15px; text-align: center;"><span class="${macos_sl_region_class}">${MACOS_SLANGC_REGION_COV}</span><br><small>${MACOS_SLANGC_REGIONS_HIT}/${MACOS_SLANGC_REGIONS_FOUND}</small></td>
+                        <td style="padding: 15px; text-align: center;"><span class="${macos_sl_function_class}">${MACOS_SLANGC_FUNCTION_COV}</span><br><small>${MACOS_SLANGC_FUNCTIONS_HIT}/${MACOS_SLANGC_FUNCTIONS_FOUND}</small></td>
+                        <td style="padding: 15px; text-align: center;"><span class="${macos_sl_branch_class}">${MACOS_SLANGC_BRANCH_COV}</span><br><small>${MACOS_SLANGC_BRANCHES_HIT}/${MACOS_SLANGC_BRANCHES_FOUND}</small></td>
+                        <td style="padding: 15px; text-align: center;"><a href="${LINK_PREFIX}latest/macos/slangc/index.html" style="color: #667eea;">View</a></td>
+                    </tr>
+EOF
+      fi
+
+      cat >>"${OUTPUT_FILE}" <<'EOF'
+                </tbody>
+            </table>
+EOF
+    fi
+
+    cat >>"${OUTPUT_FILE}" <<EOF
 
             <div class="info-section">
                 <div class="info-row">

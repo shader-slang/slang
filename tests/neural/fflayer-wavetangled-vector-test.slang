@@ -1,0 +1,214 @@
+// Test FFLayer with WaveTangledVector (CooperativeMatrix accelerated).
+// This verifies that FFLayer works with non-InlineVector types using Layout parameter.
+// Tests both single-warp (WARP_COUNT=1) and multi-warp (WARP_COUNT=2,4) configurations.
+//
+// Single-warp (WARP_COUNT=1):
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_POINTER=0 -xslang -DWARP_COUNT=1 -xslang -DTEST_TENSORVIEW=0 -emit-spirv-directly
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_POINTER=1 -xslang -DWARP_COUNT=1 -xslang -DTEST_TENSORVIEW=0 -emit-spirv-directly
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -xslang -experimental-feature -xslang -DTEST_POINTER=0 -xslang -DWARP_COUNT=1 -xslang -DTEST_TENSORVIEW=0
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -xslang -experimental-feature -xslang -DTEST_POINTER=1 -xslang -DWARP_COUNT=1 -xslang -DTEST_TENSORVIEW=0
+//
+// Multi-warp (WARP_COUNT=2):
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_POINTER=0 -xslang -DWARP_COUNT=2 -xslang -DTEST_TENSORVIEW=0 -emit-spirv-directly
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -xslang -experimental-feature -xslang -DTEST_POINTER=0 -xslang -DWARP_COUNT=2 -xslang -DTEST_TENSORVIEW=0
+//
+// Multi-warp (WARP_COUNT=4):
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_POINTER=0 -xslang -DWARP_COUNT=4 -xslang -DTEST_TENSORVIEW=0 -emit-spirv-directly
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -xslang -experimental-feature -xslang -DTEST_POINTER=0 -xslang -DWARP_COUNT=4 -xslang -DTEST_TENSORVIEW=0
+//
+// Compile-only test for TorchTensorViewAddress (CUDA target):
+// TEST:SIMPLE(filecheck=CHECK): -target ptx -stage compute -entry computeMain -capability cuda_sm_7_0 -DTEST_TENSORVIEW=1 -DTEST_POINTER=0 -DWARP_COUNT=1 -experimental-feature
+// CHECK: computeMain
+
+import slang.neural;
+
+#ifndef WARP_COUNT
+#define WARP_COUNT 1
+#endif
+
+#ifndef TEST_POINTER
+#define TEST_POINTER 0
+#endif
+
+typealias ElementType = float;
+
+// set up a 2x4 matrix for input parameters, the last 2 elements are for bias
+// W = [[1,2,3,4],[5,6,7,8]], b = [9, 10]
+//TEST_INPUT: set parametersFloat = ubuffer(data=[1.0 2.0 3.0 4.0 5.0 6.0 7.0 8.0 9.0 10.0], stride=4)
+uniform RWStructuredBuffer<float>.Handle parametersFloat;
+
+//TEST_INPUT: set parameters = ubuffer(data=[0 0 0 0 0 0 0 0 0 0], stride=4)
+
+// Create a buffer to store the test result
+//TEST_INPUT: ubuffer(data=[0 0 0], stride=4):out,name=testResult
+RWStructuredBuffer<uint> testResult;
+
+//TEST_INPUT: set dParameters = ubuffer(data=[0 0 0 0 0 0 0 0 0 0], stride=4)
+
+#if TEST_TENSORVIEW
+    uniform TensorView<ElementType> parameters;
+    uniform TensorView<ElementType> dParameters;
+    typealias Address = TorchTensorViewAddress<ElementType>;
+#elif TEST_POINTER
+    uniform ElementType* parameters;
+    uniform ElementType* dParameters;
+    typealias Address = PointerAddress<ElementType>;
+#else
+    uniform RWStructuredBuffer<ElementType>.Handle parameters;
+    uniform RWStructuredBuffer<ElementType>.Handle dParameters;
+    typealias Address = BindlessAddress<ElementType>;
+#endif
+
+static const int InputSize = 4;
+static const int OutputSize = 2;
+static const int SubgroupSize = 32;
+static const int WarpCount = WARP_COUNT;
+static const int BatchSize = WarpCount * SubgroupSize;
+
+typealias ShMemSize = SharedMemorySize<ElementType, TargetEnum.CUDA, ExecutionMode.Training, SubgroupSize, WarpCount>;
+typealias ShMemSizeLayer1 = ShMemSize.OfLayer1<InputSize, OutputSize>;
+typealias InVec = WaveTangledVector<ElementType, ShMemSizeLayer1, InputSize, SubgroupSize>;
+typealias OutVec = WaveTangledVector<ElementType, ShMemSizeLayer1, OutputSize, SubgroupSize>;
+
+// FFLayer with WaveTangledVector and LinearLayout
+typealias Layer = FFLayer<ElementType, InVec, OutVec, LinearLayout, IdentityActivation<ElementType>, true>;
+
+[Differentiable]
+OutVec computeLayerOutput(Address paramAddr, InVec input, Layer layer)
+{
+    return layer.eval<Address>(input, paramAddr);
+}
+
+// Test FFLayer forward pass with WaveTangledVector
+void testFFLayerForward(int tid, int resIndex)
+{
+    // Input: x = [1, 2, 3, 4]
+    // W = [[1,2,3,4],[5,6,7,8]], b = [9, 10]
+    // Output: W*x + b = [1*1+2*2+3*3+4*4+9, 5*1+6*2+7*3+8*4+10] = [39, 80]
+
+    ElementType[InputSize] inputData = { ElementType(1.0), ElementType(2.0), ElementType(3.0), ElementType(4.0) };
+    InVec input = InVec(inputData);
+
+    let baseAddr = Address(parameters);
+
+    let layer = Layer();
+
+    // Forward pass
+    let output = layer.eval<Address>(input, baseAddr);
+
+    // Verify output: [39, 80]
+    bool isPassed = true;
+    isPassed = isPassed && (output[0] == ElementType(39.0));
+    isPassed = isPassed && (output[1] == ElementType(80.0));
+
+    isPassed = WaveActiveAllTrue(isPassed);
+    if (tid == 0)
+    {
+        testResult[resIndex] = isPassed ? 1 : 0;
+    }
+}
+
+// Test FFLayer backward pass with WaveTangledVector (autodiff)
+void testFFLayerBackward(int tid, int resIndex)
+{
+    ElementType[InputSize] inputData = { ElementType(1.0), ElementType(2.0), ElementType(3.0), ElementType(4.0) };
+    InVec input = InVec(inputData);
+
+    let baseAddr = Address(parameters);
+    let dBaseAddr = Address(dParameters);
+
+    let layer = Layer();
+
+    var paramAddrPair = DifferentialPtrPair<Address>(baseAddr, dBaseAddr);
+    var inputPair = diffPair(input);
+
+    // dOutput = [1, 1]
+    let dOutput = OutVec(1.0);
+
+    // Backward pass
+    bwd_diff(computeLayerOutput)(paramAddrPair, inputPair, layer, dOutput);
+
+    // Verify input gradient: dInput = W^T * dOutput = [1+5, 2+6, 3+7, 4+8] = [6, 8, 10, 12]
+    bool isPassed = true;
+    isPassed = isPassed && (inputPair.d[0] == ElementType(6.0));
+    isPassed = isPassed && (inputPair.d[1] == ElementType(8.0));
+    isPassed = isPassed && (inputPair.d[2] == ElementType(10.0));
+    isPassed = isPassed && (inputPair.d[3] == ElementType(12.0));
+
+    // Weight gradients accumulated across BatchSize threads.
+    // Each thread contributes: dW = dOutput * input^T = [1,1]^T * [1,2,3,4] = [[1,2,3,4],[1,2,3,4]]
+    // Total: BatchSize * [[1,2,3,4],[1,2,3,4]]
+    ElementType scale = ElementType(BatchSize);
+    isPassed = isPassed && (dParameters[0] == scale * ElementType(1.0));
+    isPassed = isPassed && (dParameters[1] == scale * ElementType(2.0));
+    isPassed = isPassed && (dParameters[2] == scale * ElementType(3.0));
+    isPassed = isPassed && (dParameters[3] == scale * ElementType(4.0));
+    isPassed = isPassed && (dParameters[4] == scale * ElementType(1.0));
+    isPassed = isPassed && (dParameters[5] == scale * ElementType(2.0));
+    isPassed = isPassed && (dParameters[6] == scale * ElementType(3.0));
+    isPassed = isPassed && (dParameters[7] == scale * ElementType(4.0));
+
+    // Bias gradients: dBias = dOutput = [1, 1], accumulated: [BatchSize, BatchSize]
+    isPassed = isPassed && (dParameters[8] == scale);
+    isPassed = isPassed && (dParameters[9] == scale);
+
+    isPassed = WaveActiveAllTrue(isPassed);
+    if (tid == 0)
+    {
+        testResult[resIndex] = isPassed ? 1 : 0;
+    }
+}
+
+// Test FFLayer ParameterCount with WaveTangledVector
+void testFFLayerParameterCount(int tid, int resIndex)
+{
+    // For 4->2 layer with bias: 4*2 + 2 = 10
+    bool isPassed = (Layer.ParameterCount == 10);
+
+    isPassed = WaveActiveAllTrue(isPassed);
+    if (tid == 0)
+    {
+        testResult[resIndex] = isPassed ? 1 : 0;
+    }
+}
+
+void cleanupDParameters(uint tid)
+{
+    if (tid == 0)
+    {
+        for (int i = 0; i < 10; i++)
+        {
+            dParameters[i] = ElementType(0.0);
+        }
+    }
+}
+
+void setupParameters(uint tid)
+{
+    if (tid == 0)
+    {
+        for (int i = 0; i < 10; i++)
+        {
+            parameters[i] = ElementType(parametersFloat[i]);
+        }
+    }
+}
+
+[shader("compute")]
+[numthreads(BatchSize, 1, 1)]
+void computeMain(uint tid : SV_DispatchThreadID)
+{
+    setupParameters(tid);
+    AllMemoryBarrierWithGroupSync();
+
+    testFFLayerParameterCount(tid, 0);
+    // BUFFER: 1
+
+    testFFLayerForward(tid, 1);
+    // BUFFER: 1
+
+    cleanupDParameters(tid);
+    AllMemoryBarrierWithGroupSync();
+    testFFLayerBackward(tid, 2);
+    // BUFFER: 1
+}

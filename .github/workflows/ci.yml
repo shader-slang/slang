@@ -6,11 +6,13 @@ on:
     types: [checks_requested]
   pull_request:
     branches: [master]
+    types: [opened, synchronize, reopened, ready_for_review]
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name != 'push' }}
 jobs:
   filter:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft != true
     runs-on: ubuntu-latest
     outputs:
       should-run: ${{ steps.filter.outputs.should-run }}
@@ -94,6 +96,31 @@ jobs:
       config: release
       runs-on: '["macos-latest"]'
 
+  # Linux ARM64 builds (GitHub-hosted)
+  build-linux-debug-gcc-aarch64:
+    needs: [filter]
+    if: needs.filter.outputs.should-run == 'true'
+    uses: ./.github/workflows/ci-slang-build.yml
+    with:
+      os: linux
+      compiler: gcc
+      platform: aarch64
+      config: debug
+      runs-on: '["ubuntu-24.04-arm"]'
+      warnings-as-errors: false
+
+  build-linux-release-gcc-aarch64:
+    needs: [filter]
+    if: needs.filter.outputs.should-run == 'true'
+    uses: ./.github/workflows/ci-slang-build.yml
+    with:
+      os: linux
+      compiler: gcc
+      platform: aarch64
+      config: release
+      runs-on: '["ubuntu-24.04-arm"]'
+      warnings-as-errors: false
+
   # Windows builds (self-hosted)
   build-windows-debug-cl-x86_64-gpu:
     needs: [filter]
@@ -104,7 +131,7 @@ jobs:
       compiler: cl
       platform: x86_64
       config: debug
-      runs-on: '["Windows", "self-hosted", "GCP-T4"]'
+      runs-on: '["Windows", "self-hosted", "build"]'
 
   build-windows-release-cl-x86_64-gpu:
     needs: [filter]
@@ -115,7 +142,7 @@ jobs:
       compiler: cl
       platform: x86_64
       config: release
-      runs-on: '["Windows", "self-hosted", "GCP-T4"]'
+      runs-on: '["Windows", "self-hosted", "build"]'
 
   # Linux tests (self-hosted GPU runner, containerized)
   test-linux-debug-gcc-x86_64:
@@ -163,6 +190,33 @@ jobs:
       full-gpu-tests: true
       server-count: 3
 
+  # Linux ARM64 tests (GitHub-hosted, CPU only)
+  test-linux-debug-gcc-aarch64:
+    needs: [filter, build-linux-debug-gcc-aarch64]
+    if: needs.filter.outputs.should-run == 'true'
+    uses: ./.github/workflows/ci-slang-test.yml
+    with:
+      os: linux
+      compiler: gcc
+      platform: aarch64
+      config: debug
+      runs-on: '["ubuntu-24.04-arm"]'
+      test-category: smoke
+      full-gpu-tests: false
+
+  test-linux-release-gcc-aarch64:
+    needs: [filter, build-linux-release-gcc-aarch64]
+    if: needs.filter.outputs.should-run == 'true'
+    uses: ./.github/workflows/ci-slang-test.yml
+    with:
+      os: linux
+      compiler: gcc
+      platform: aarch64
+      config: release
+      runs-on: '["ubuntu-24.04-arm"]'
+      test-category: smoke
+      full-gpu-tests: false
+
   # Windows GPU tests (self-hosted)
   test-windows-debug-cl-x86_64-gpu:
     needs: [filter, build-windows-debug-cl-x86_64-gpu]
@@ -190,6 +244,18 @@ jobs:
       test-category: full
       full-gpu-tests: true
 
+  # MaterialX Integration Tests (Windows only for initial validation)
+  test-materialx-windows-release:
+    needs: [filter, build-windows-release-cl-x86_64-gpu]
+    if: needs.filter.outputs.should-run == 'true' && github.event_name == 'pull_request'
+    uses: ./.github/workflows/materialx-test.yml
+    with:
+      os: windows
+      compiler: cl
+      platform: x86_64
+      config: release
+      runs-on: '["windows-latest"]'
+
   check-ci:
     needs:
       [
@@ -199,9 +265,12 @@ jobs:
         test-macos-debug-clang-aarch64,
         test-linux-release-gcc-x86_64,
         test-linux-debug-gcc-x86_64,
+        test-linux-release-gcc-aarch64,
+        test-linux-debug-gcc-aarch64,
+        test-materialx-windows-release,
       ]
     runs-on: ubuntu-latest
-    if: always() # Always run, even if dependencies fail
+    if: always() && (github.event_name != 'pull_request' || github.event.pull_request.draft != true)
     steps:
       - name: Check CI Results
         run: |
@@ -212,6 +281,9 @@ jobs:
           echo "macOS Debug ARM64: ${{ needs.test-macos-debug-clang-aarch64.result }}"
           echo "Linux Release x64: ${{ needs.test-linux-release-gcc-x86_64.result }}"
           echo "Linux Debug x64: ${{ needs.test-linux-debug-gcc-x86_64.result }}"
+          echo "Linux Release ARM64: ${{ needs.test-linux-release-gcc-aarch64.result }}"
+          echo "Linux Debug ARM64: ${{ needs.test-linux-debug-gcc-aarch64.result }}"
+          echo "MaterialX Windows: ${{ needs.test-materialx-windows-release.result }}"
 
           # Check if any required jobs failed (allow success or skipped)
           if [[ "${{ needs.test-windows-release-cl-x86_64-gpu.result }}" == "failure" ]] || \
@@ -220,14 +292,50 @@ jobs:
              [[ "${{ needs.test-macos-debug-clang-aarch64.result }}" == "failure" ]] || \
              [[ "${{ needs.test-linux-release-gcc-x86_64.result }}" == "failure" ]] || \
              [[ "${{ needs.test-linux-debug-gcc-x86_64.result }}" == "failure" ]] || \
+             [[ "${{ needs.test-linux-release-gcc-aarch64.result }}" == "failure" ]] || \
+             [[ "${{ needs.test-linux-debug-gcc-aarch64.result }}" == "failure" ]] || \
+             [[ "${{ needs.test-materialx-windows-release.result }}" == "failure" ]] || \
              [[ "${{ needs.test-windows-release-cl-x86_64-gpu.result }}" == "cancelled" ]] || \
              [[ "${{ needs.test-windows-debug-cl-x86_64-gpu.result }}" == "cancelled" ]] || \
              [[ "${{ needs.test-macos-release-clang-aarch64.result }}" == "cancelled" ]] || \
              [[ "${{ needs.test-macos-debug-clang-aarch64.result }}" == "cancelled" ]] || \
              [[ "${{ needs.test-linux-release-gcc-x86_64.result }}" == "cancelled" ]] || \
-             [[ "${{ needs.test-linux-debug-gcc-x86_64.result }}" == "cancelled" ]]; then
+             [[ "${{ needs.test-linux-debug-gcc-x86_64.result }}" == "cancelled" ]] || \
+             [[ "${{ needs.test-linux-release-gcc-aarch64.result }}" == "cancelled" ]] || \
+             [[ "${{ needs.test-linux-debug-gcc-aarch64.result }}" == "cancelled" ]] || \
+             [[ "${{ needs.test-materialx-windows-release.result }}" == "cancelled" ]]; then
             echo "One or more CI jobs failed or were cancelled"
             exit 1
           fi
 
           echo "All CI jobs completed successfully (passed or skipped)!"
+
+  # Automatically retry GPU health check failures by dispatching ci-retry.yml,
+  # which watches this run until it completes, then reruns only failed jobs.
+  # Capped at 2 automatic retries via run_attempt check.
+  retry-on-gpu-failure:
+    needs: [check-ci]
+    if: failure() && fromJSON(github.run_attempt) < 3
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Check for GPU health check failures and dispatch retry
+        env:
+          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gpu_failures=$(gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs?per_page=100" \
+            --jq '[.jobs[] | select(.conclusion == "failure") | select(.steps[]? | select(.name == "GPU health check" and .conclusion == "failure"))] | length' \
+            || echo "0")
+          gpu_failures=${gpu_failures:-0}
+          if ! [[ "$gpu_failures" =~ ^[0-9]+$ ]]; then
+            gpu_failures=0
+          fi
+
+          if [ "$gpu_failures" -gt 0 ]; then
+            echo "Found $gpu_failures GPU health check failure(s) — dispatching retry workflow..."
+            gh workflow run ci-retry.yml -F run_id=${{ github.run_id }}
+          else
+            echo "No GPU health check failures — not retrying."
+          fi

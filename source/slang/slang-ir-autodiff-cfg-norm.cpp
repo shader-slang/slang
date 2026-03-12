@@ -712,6 +712,7 @@ struct CFGNormalizationPass
 };
 
 void normalizeCFG(
+    TargetProgram* targetProgram,
     IRModule* module,
     IRGlobalValueWithCode* func,
     IRCFGNormalizationPass const& options)
@@ -757,7 +758,7 @@ void normalizeCFG(
     // no longer dominate the use. We fix these up by going through the IR and create temp
     // vars for such uses.
     sortBlocksInFunc(func);
-    legalizeDefUse(func);
+    legalizeDefUse(func, targetProgram);
 
     {
         auto validationScope = disableIRValidationScope();

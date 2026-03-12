@@ -292,7 +292,7 @@ public:
         CapabilityAtomSet conjunction,
         CapabilityAtom knownTarget,
         CapabilityAtom knownStage);
-    inline void addUnexpandedCapabilites(CapabilityName atom);
+    void addUnexpandedCapabilites(CapabilityName atom);
 
     CapabilityTargetSets& getCapabilityTargetSets() { return m_targetSets; }
     const CapabilityTargetSets& getCapabilityTargetSets() const { return m_targetSets; }

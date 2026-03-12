@@ -27,7 +27,7 @@ void lowerTagInsts(IRModule* module, DiagnosticSink* sink);
 void lowerSequentialIDTagCasts(IRModule* module, Linkage* linkage, DiagnosticSink* sink);
 
 // Lower `GetDispatcher` and `GetSpecializedDispatcher` instructions
-bool lowerDispatchers(IRModule* module, DiagnosticSink* sink);
+bool lowerDispatchers(IRModule* module, DiagnosticSink* sink, bool reportDispatchLocations = false);
 
 // Lower `ExtractExistentialValue`, `ExtractExistentialType`, `ExtractExistentialWitnessTable`,
 // `InterfaceType`, `GetSequentialID`, `WitnessTableIDType` and `RTTIHandleType` instructions.

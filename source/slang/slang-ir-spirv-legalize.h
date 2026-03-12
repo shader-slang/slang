@@ -38,6 +38,14 @@ struct SPIRVEmitSharedContext
     bool isSpirv15OrLater() { return m_spvVersion >= 0x10500; }
     bool isSpirv16OrLater() { return m_spvVersion >= 0x10600; }
 
+    // Returns true if discard should be emitted as OpDemoteToHelperInvocation
+    // (which is NOT a terminator), false if it should be emitted as OpKill
+    // (which IS a terminator).
+    bool shouldEmitDiscardAsDemote()
+    {
+        return isSpirv16OrLater() || m_useDemoteToHelperInvocationExtension;
+    }
+
     void requireSpirvVersion(unsigned int version)
     {
         m_spvVersion = Math::Max(m_spvVersion, version);
