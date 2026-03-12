@@ -50,27 +50,28 @@ struct BasisScaled : IMixed
 
 struct WorldOffset : IMixed
 {
-    float4x4 worldMatrix;
+    float3x3 worldMatrix;
+    float3 translation;
     float2 offset;
 
     float resultX()
     {
-        float4 v = float4(1.0, 2.0, 3.0, 1.0);
-        float4 r = mul(worldMatrix, v);
+        float3 v = float3(1.0, 2.0, 3.0);
+        float3 r = mul(worldMatrix, v) + translation;
         return r.x + offset.x;
     }
 
     float resultY()
     {
-        float4 v = float4(1.0, 2.0, 3.0, 1.0);
-        float4 r = mul(worldMatrix, v);
+        float3 v = float3(1.0, 2.0, 3.0);
+        float3 r = mul(worldMatrix, v) + translation;
         return r.y + offset.y;
     }
 
     float resultZ()
     {
-        float4 v = float4(1.0, 2.0, 3.0, 1.0);
-        float4 r = mul(worldMatrix, v);
+        float3 v = float3(1.0, 2.0, 3.0);
+        float3 r = mul(worldMatrix, v) + translation;
         return r.z;
     }
 
@@ -93,11 +94,11 @@ IMixed makeMixed(int id)
     else
     {
         WorldOffset b;
-        b.worldMatrix = float4x4(
-            1.0, 0.0, 2.0, 10.0,
-            0.0, 1.0, 0.0, 20.0,
-            0.0, 3.0, 1.0, 30.0,
-            0.0, 0.0, 0.0, 1.0);
+        b.worldMatrix = float3x3(
+            1.0, 0.0, 2.0,
+            0.0, 1.0, 0.0,
+            0.0, 3.0, 1.0);
+        b.translation = float3(10.0, 20.0, 30.0);
         b.offset = float2(0.5, 0.5);
         return b;
     }
@@ -117,7 +118,7 @@ void computeMain(int id : SV_DispatchThreadID)
     outputBuffer[3] = a.extraValue();
     // CHECK: 0.5
 
-    // WorldOffset: [[1,0,2,10],[0,1,0,20],[0,3,1,30],[0,0,0,1]] * (1,2,3,1) + offset
+    // WorldOffset: [[1,0,2],[0,1,0],[0,3,1]] * (1,2,3) + (10,20,30) + offset
     var b = makeMixed(id + 1);
     outputBuffer[4] = b.resultX();
     // CHECK: 17.5
