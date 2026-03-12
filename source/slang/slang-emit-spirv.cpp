@@ -3503,8 +3503,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     // we use IAdd-by-zero instead (same approach as glslang's GlslangToSpv.cpp).
     SpvInst* emitSpecConstantSignReinterpret(IRInst* inst, IRType* resultType, SpvInst* operand)
     {
-        IRBuilder builder(m_irModule);
-        auto zero = emitIntConstant(0, builder.getIntType());
+        auto zero = emitIntConstant(0, resultType);
         return emitInst(
             getSection(SpvLogicalSectionID::ConstantsAndTypes),
             inst,
