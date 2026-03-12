@@ -105,7 +105,7 @@ if [ -n "$SKIPLIST" ]; then
     line="${line%%#*}"
     line="$(echo "$line" | xargs)"
     [ -n "$line" ] && KNOWN_FAILURES+=("$line")
-  done < "$SKIPLIST"
+  done <"$SKIPLIST"
   log_info "Loaded ${#KNOWN_FAILURES[@]} known failure(s) from $SKIPLIST"
 fi
 
