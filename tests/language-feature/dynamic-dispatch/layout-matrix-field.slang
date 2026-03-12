@@ -11,12 +11,14 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-metal -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-wgpu -compute -shaderobj -output-using-type
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 interface IMatField
 {
-    float readRC(int r, int c);
+    float readElemA();
+    float readElemB();
+    float readElemC();
     float computeTrace();
     float transformAndSum();
     float extraCheck();
@@ -26,7 +28,9 @@ struct Small2x2 : IMatField
 {
     float2x2 mat;
 
-    float readRC(int r, int c) { return mat[r][c]; }
+    float readElemA() { return mat[0][0]; }
+    float readElemB() { return mat[0][1]; }
+    float readElemC() { return mat[1][0]; }
     float computeTrace() { return mat[0][0] + mat[1][1]; }
 
     float transformAndSum()
@@ -46,7 +50,9 @@ struct Upper3x3 : IMatField
 {
     float3x3 rotation;
 
-    float readRC(int r, int c) { return rotation[r][c]; }
+    float readElemA() { return rotation[0][1]; }
+    float readElemB() { return rotation[2][1]; }
+    float readElemC() { return rotation[1][1]; }
     float computeTrace() { return rotation[0][0] + rotation[1][1] + rotation[2][2]; }
 
     float transformAndSum()
@@ -63,7 +69,9 @@ struct Shear4x4 : IMatField
 {
     float4x4 transform;
 
-    float readRC(int r, int c) { return transform[r][c]; }
+    float readElemA() { return transform[0][3]; }
+    float readElemB() { return transform[1][2]; }
+    float readElemC() { return transform[2][3]; }
 
     float computeTrace()
     {
@@ -119,11 +127,11 @@ void computeMain(int id : SV_DispatchThreadID)
 {
     // Small2x2: [[3,1],[2,5]], det=13, trace=8
     var a = makeMat(id);
-    outputBuffer[0] = a.readRC(0, 0);
+    outputBuffer[0] = a.readElemA();
     // CHECK: 3.0
-    outputBuffer[1] = a.readRC(0, 1);
+    outputBuffer[1] = a.readElemB();
     // CHECK: 1.0
-    outputBuffer[2] = a.readRC(1, 0);
+    outputBuffer[2] = a.readElemC();
     // CHECK: 2.0
     outputBuffer[3] = a.computeTrace();
     // CHECK: 8.0
@@ -134,27 +142,31 @@ void computeMain(int id : SV_DispatchThreadID)
 
     // Upper3x3: [[1,2,0],[0,3,0],[0,1,5]], trace=9
     var b = makeMat(id + 1);
-    outputBuffer[6] = b.readRC(0, 1);
+    outputBuffer[6] = b.readElemA();
     // CHECK: 2.0
-    outputBuffer[7] = b.readRC(2, 1);
+    outputBuffer[7] = b.readElemB();
     // CHECK: 1.0
-    outputBuffer[8] = b.computeTrace();
+    outputBuffer[8] = b.readElemC();
+    // CHECK: 3.0
+    outputBuffer[9] = b.computeTrace();
     // CHECK: 9.0
-    outputBuffer[9] = b.transformAndSum();
+    outputBuffer[10] = b.transformAndSum();
     // CHECK: 12.0
-    outputBuffer[10] = b.extraCheck();
+    outputBuffer[11] = b.extraCheck();
     // CHECK: 2.0
 
     // Shear4x4: identity + shear(1,2)=3 + translation(5,6,7), trace=4
     var c = makeMat(id + 2);
-    outputBuffer[11] = c.readRC(0, 3);
+    outputBuffer[12] = c.readElemA();
     // CHECK: 5.0
-    outputBuffer[12] = c.readRC(1, 2);
+    outputBuffer[13] = c.readElemB();
     // CHECK: 3.0
-    outputBuffer[13] = c.computeTrace();
+    outputBuffer[14] = c.readElemC();
+    // CHECK: 7.0
+    outputBuffer[15] = c.computeTrace();
     // CHECK: 4.0
-    outputBuffer[14] = c.transformAndSum();
+    outputBuffer[16] = c.transformAndSum();
     // CHECK: 25.0
-    outputBuffer[15] = c.extraCheck();
+    outputBuffer[17] = c.extraCheck();
     // CHECK: 3.0
 }
