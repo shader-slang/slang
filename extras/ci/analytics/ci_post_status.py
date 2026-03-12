@@ -117,9 +117,13 @@ def load_entries(repo_dir):
     path = os.path.join(repo_dir, STATUS_FILE)
     if not os.path.exists(path):
         return []
-    with open(path, encoding="utf-8") as f:
-        data = json.load(f)
-    return data.get("entries", [])
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+        return data.get("entries", [])
+    except (OSError, json.JSONDecodeError) as e:
+        print(f"Error: could not read {STATUS_FILE}: {e}", file=sys.stderr)
+        sys.exit(1)
 
 
 def save_entries(repo_dir, entries):
