@@ -71,8 +71,33 @@ struct EliminateMultiLevelBreakContext
             // If this is a loop, store the continue block.
             // We add it to the exitBlocks stack separately in collectBreakableRegionBlocks
             // so that nested constructs treat it as an exit point.
-            if (as<IRLoop>(headerInst))
+            if (auto loop = as<IRLoop>(headerInst))
+            {
                 continueBlock = getContinueBlock();
+                SLANG_ASSERT(continueBlock);
+
+                // For a for-loop with a switch statement inside, the IR looks like:
+                //
+                //   loop(target=%body, break=%after, continue=%incr)
+                //   %body: ...
+                //     switch(x, break=%post_switch, ...)
+                //       case 0: unconditionalBranch(%incr)   <- 'continue'
+                //       case 1: unconditionalBranch(%post_switch)  <- 'break'
+                //   %post_switch: ...
+                //     unconditionalBranch(%incr)             <- normal loop flow
+                //   %incr: i++; unconditionalBranch(%body)  <- back-edge
+                //   %after: ...                              <- loop break
+                //
+                // The 'continue' inside the switch branches to %incr (continueBlock).
+                // This is a multi-level branch: it exits the switch region to reach
+                // an exit block of the enclosing loop region.
+                //
+                // In order to handle the multi-level branch properly, the continueBlock
+                // needs to be added to exitBlocks.
+                //
+                if (continueBlock != loop->getTargetBlock())
+                    exitBlocks.add(continueBlock);
+            }
         }
 
         void replaceBreakBlock(IRBuilder* builder, IRBlock* block)
@@ -177,9 +202,11 @@ struct EliminateMultiLevelBreakContext
                 }
             }
 
-            // Pop the exit blocks.
+            // Pop the exit blocks that were pushed at the top of this function.
             for (auto exitBlock : info.exitBlocks)
                 exitBlocks.remove(exitBlock);
+            if (info.continueBlock)
+                exitBlocks.remove(info.continueBlock);
         }
 
         void gatherInfo(IRGlobalValueWithCode* func)
