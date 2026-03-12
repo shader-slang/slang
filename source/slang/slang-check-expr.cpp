@@ -4607,13 +4607,12 @@ Expr* SemanticsExprVisitor::visitSizeOfLikeExpr(SizeOfLikeExpr* sizeOfLikeExpr)
         if (sizeOfLikeExpr->dataLayout)
         {
             auto dataLayoutExpr = dispatch(sizeOfLikeExpr->dataLayout);
+            sizeOfLikeExpr->dataLayout = dataLayoutExpr;
             if (as<TypeType>(dataLayoutExpr->type))
             {
                 TypeExp typeExp;
                 typeExp.exp = dataLayoutExpr;
-
                 auto properTypeExpr = CoerceToProperType(typeExp);
-
                 dataLayoutType = properTypeExpr.type;
             }
         }

@@ -5007,11 +5007,13 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
 
             if (as<AlignOfExpr>(sizeOfLikeExpr))
             {
+                SLANG_ASSERT(sizeOfLikeExpr->dataLayoutType);
                 auto dataLayoutType = lowerType(context, sizeOfLikeExpr->dataLayoutType);
                 inst = builder->emitAlignOf(sizedType, dataLayoutType);
             }
             else if (as<SizeOfExpr>(sizeOfLikeExpr))
             {
+                SLANG_ASSERT(sizeOfLikeExpr->dataLayoutType);
                 auto dataLayoutType = lowerType(context, sizeOfLikeExpr->dataLayoutType);
                 inst = builder->emitSizeOf(sizedType, dataLayoutType);
             }

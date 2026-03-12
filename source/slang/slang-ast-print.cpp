@@ -588,6 +588,11 @@ void ASTPrinter::addExpr(Expr* expr)
             sb << ", ";
             addType(sizeOfExpr->dataLayoutType);
         }
+        else if (sizeOfExpr->dataLayout)
+        {
+            sb << ", ";
+            addExpr(sizeOfExpr->dataLayout);
+        }
         sb << ")";
     }
     else if (const auto alignOfExpr = as<AlignOfExpr>(expr))
@@ -606,6 +611,11 @@ void ASTPrinter::addExpr(Expr* expr)
         {
             sb << ", ";
             addType(alignOfExpr->dataLayoutType);
+        }
+        else if (alignOfExpr->dataLayout)
+        {
+            sb << ", ";
+            addExpr(alignOfExpr->dataLayout);
         }
         sb << ")";
     }
