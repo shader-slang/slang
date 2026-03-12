@@ -12,7 +12,7 @@ Slang tests are `.slang` files under `tests/` with test directives in comments. 
 - `//TEST:INTERPRET(filecheck=CHECK):` (interpreter mode, no GPU needed)
 - GPU tests use `-api dx12`, `-api vk`, etc.
 
-Focus ONLY on the changed files in this PR. For large files (>1000 lines like hlsl.meta.slang), use Grep to find relevant sections first, then Read with offset/limit. Do not attempt to read the entire file at once.
+Start with the changed files in this PR. For large files (>1000 lines like hlsl.meta.slang), use Grep to find relevant sections first, then Read with offset/limit. Do not attempt to read the entire file at once. You MUST also search `tests/` for existing related test files — coverage gaps are only visible by comparing what's in the diff against what already exists.
 
 **What to check:**
 

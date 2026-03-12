@@ -25,6 +25,7 @@ Each agent's prompt MUST include:
 - "Read CLAUDE.md for project context"
 - "Use `mcp__deepwiki__ask_question` with repo `shader-slang/slang` for Slang-specific questions"
 - "For large files (>1000 lines), use Grep first then Read with offset/limit"
+- "The Slang language spec has been cloned to `external/spec/` (if it exists). Check `external/spec/proposals/` when the PR implements or references a spec proposal"
 
 All 6 MUST be dispatched regardless of PR size.
 

@@ -98,6 +98,7 @@ reviews:
   enable_prompt_for_ai_agents: false
 
   finishing_touches:
+
     docstrings:
       enabled: false
     unit_tests:
