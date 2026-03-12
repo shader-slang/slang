@@ -218,7 +218,8 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
     case kIROp_AtomicType:
         {
             auto atomicType = cast<IRAtomicType>(type);
-            calcSizeAndAlignment(targetReq, atomicType->getElementType(), outSizeAndAlignment);
+            SLANG_RETURN_ON_FAIL(
+                calcSizeAndAlignment(targetReq, atomicType->getElementType(), outSizeAndAlignment));
             return SLANG_OK;
         }
         break;

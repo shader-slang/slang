@@ -487,6 +487,14 @@ void EntryPoint::_collectGenericSpecializationParamsRec(Decl* decl)
             param.object = genericValParam;
             m_genericSpecializationParams.add(param);
         }
+        else if (auto genericValPackParam = as<GenericValuePackParamDecl>(m))
+        {
+            SpecializationParam param;
+            param.flavor = SpecializationParam::Flavor::GenericValue;
+            param.loc = genericValPackParam->loc;
+            param.object = genericValPackParam;
+            m_genericSpecializationParams.add(param);
+        }
     }
 }
 
@@ -2045,6 +2053,8 @@ RefPtr<ComponentType::SpecializationInfo> EntryPoint::_validateSpecializationArg
 
         bool isVariadic =
             (genericDeclRef.getDecl()->getMembersOfType<GenericTypePackParamDecl>().getCount() !=
+             0) ||
+            (genericDeclRef.getDecl()->getMembersOfType<GenericValuePackParamDecl>().getCount() !=
              0);
 
         // If function is variadic generic, it will consume all the provided arguments.

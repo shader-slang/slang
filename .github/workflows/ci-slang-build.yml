@@ -31,7 +31,7 @@ on:
         type: number
         default: 8
       save-sccache:
-        description: "Save sccache to GitHub Actions cache (for populate-fork-cache on master)"
+        description: "Save sccache to GitHub Actions cache (for populate-sccache on master)"
         required: false
         type: boolean
         default: false
@@ -83,7 +83,7 @@ jobs:
           workload_identity_provider: "projects/125098404903/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider"
           service_account: "github-ci@slang-runners.iam.gserviceaccount.com"
 
-      # Setup sccache with local disk backend
+      # Setup sccache
       - name: Setup sccache
         uses: ./.github/actions/setup-sccache
         with:
@@ -292,7 +292,7 @@ jobs:
           path: artifacts-staging/
           retention-days: 1
 
-      # Save sccache cache (only when explicitly requested, e.g. from populate-fork-cache on master)
+      # Save sccache cache (only when explicitly requested, e.g. from populate-sccache on master)
       - name: Save sccache cache
         if: inputs.save-sccache && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
         uses: actions/cache/save@v4

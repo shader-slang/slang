@@ -894,7 +894,7 @@ Type* ASTBuilder::getEachType(Type* baseType)
     return getOrCreate<EachType>(baseType);
 }
 
-Type* ASTBuilder::getExpandType(Type* pattern, ArrayView<Type*> capturedPacks)
+Type* ASTBuilder::getExpandType(Type* pattern, ArrayView<Val*> capturedPacks)
 {
     // expand each T ==> T
     if (auto eachType = as<EachType>(pattern))
@@ -902,6 +902,103 @@ Type* ASTBuilder::getExpandType(Type* pattern, ArrayView<Type*> capturedPacks)
         return eachType->getElementType();
     }
     return getOrCreate<ExpandType>(pattern, capturedPacks);
+}
+
+static bool _containsEachType(Type* type)
+{
+    if (!type)
+        return false;
+    if (as<EachType>(type))
+        return true;
+    for (Index i = 0; i < type->getOperandCount(); ++i)
+    {
+        if (auto operandType = as<Type>(type->getOperand(i)))
+        {
+            if (_containsEachType(operandType))
+                return true;
+        }
+    }
+    return false;
+}
+
+Type* ASTBuilder::getFirstElement(Type* basePack)
+{
+    if (auto tupleType = as<TupleType>(basePack))
+        return getFirstElement(tupleType->getTypePack());
+
+    if (auto expandType = as<ExpandType>(basePack))
+    {
+        auto patternType = expandType->getPatternType();
+        if (!_containsEachType(patternType))
+            return patternType;
+    }
+
+    if (auto typePack = as<ConcreteTypePack>(basePack))
+    {
+        if (typePack->getTypeCount() > 0)
+            return typePack->getElementType(0);
+    }
+
+    return getOrCreate<FirstPackElementType>(basePack);
+}
+
+Type* ASTBuilder::getLastElement(Type* basePack)
+{
+    if (auto tupleType = as<TupleType>(basePack))
+        return getLastElement(tupleType->getTypePack());
+
+    if (auto expandType = as<ExpandType>(basePack))
+    {
+        auto patternType = expandType->getPatternType();
+        if (!_containsEachType(patternType))
+            return patternType;
+    }
+
+    if (auto typePack = as<ConcreteTypePack>(basePack))
+    {
+        if (typePack->getTypeCount() > 0)
+            return typePack->getElementType(typePack->getTypeCount() - 1);
+    }
+
+    return getOrCreate<LastPackElementType>(basePack);
+}
+
+Type* ASTBuilder::getTrimHeadPack(Type* basePack)
+{
+    if (auto tupleType = as<TupleType>(basePack))
+    {
+        Type* trimmedPack = getTrimHeadPack(tupleType->getTypePack());
+        return getTupleType(makeArrayView(&trimmedPack, 1));
+    }
+
+    if (auto typePack = as<ConcreteTypePack>(basePack))
+    {
+        ShortList<Type*> trimmedTypes;
+        for (Index i = 1; i < typePack->getTypeCount(); i++)
+            trimmedTypes.add(typePack->getElementType(i));
+        return getTypePack(trimmedTypes.getArrayView().arrayView);
+    }
+
+    return getOrCreate<TrimHeadTypePack>(basePack);
+}
+
+Type* ASTBuilder::getTrimTailPack(Type* basePack)
+{
+    if (auto tupleType = as<TupleType>(basePack))
+    {
+        Type* trimmedPack = getTrimTailPack(tupleType->getTypePack());
+        return getTupleType(makeArrayView(&trimmedPack, 1));
+    }
+
+    if (auto typePack = as<ConcreteTypePack>(basePack))
+    {
+        ShortList<Type*> trimmedTypes;
+        for (Index i = 0; i + 1 < typePack->getTypeCount(); i++)
+            trimmedTypes.add(typePack->getElementType(i));
+        return getTypePack(trimmedTypes.getArrayView().arrayView);
+    }
+
+    return getOrCreate<TrimTailTypePack>(basePack);
 }
 
 void flattenTypeList(ShortList<Type*>& flattenedList, Type* type)
@@ -924,6 +1021,127 @@ ConcreteTypePack* ASTBuilder::getTypePack(ArrayView<Type*> types)
     for (auto type : types)
         flattenTypeList(flattenedTypes, type);
     return getOrCreate<ConcreteTypePack>(flattenedTypes.getArrayView().arrayView);
+}
+
+static void flattenIntValList(ShortList<IntVal*>& flattenedList, IntVal* val)
+{
+    if (auto valPack = as<ConcreteIntValPack>(val))
+    {
+        for (Index i = 0; i < valPack->getCount(); i++)
+            flattenIntValList(flattenedList, valPack->getElement(i));
+    }
+    else
+    {
+        flattenedList.add(val);
+    }
+}
+
+ConcreteIntValPack* ASTBuilder::getIntValPack(ArrayView<IntVal*> vals)
+{
+    ShortList<IntVal*> flattenedVals;
+    for (auto val : vals)
+        flattenIntValList(flattenedVals, val);
+    Type* elementType = getIntType();
+    if (flattenedVals.getCount() > 0 && flattenedVals[0]->getType())
+        elementType = flattenedVals[0]->getType();
+    auto packType = getOrCreate<ValuePackType>(elementType);
+    return getOrCreate<ConcreteIntValPack>(packType, flattenedVals.getArrayView().arrayView);
+}
+
+IntVal* ASTBuilder::getEachIntVal(Type* elementType, Val* basePack)
+{
+    // each expand P ==> P (the pattern val)
+    if (auto expandPack = as<ExpandIntValPack>(basePack))
+    {
+        auto result = as<IntVal>(expandPack->getPatternVal());
+        SLANG_ASSERT(result);
+        return result;
+    }
+    return getOrCreate<EachIntVal>(elementType, basePack);
+}
+
+Val* ASTBuilder::getExpandIntValPack(Val* patternVal, ArrayView<Val*> capturedPacks)
+{
+    // expand each B ==> B (fold identity expansion)
+    if (auto eachVal = as<EachIntVal>(patternVal))
+    {
+        if (capturedPacks.getCount() == 1 && eachVal->getBasePack() == capturedPacks[0])
+        {
+            return capturedPacks[0];
+        }
+    }
+    auto patternIntVal = as<IntVal>(patternVal);
+    Type* packType = patternIntVal && patternIntVal->getType()
+                         ? getOrCreate<ValuePackType>(patternIntVal->getType())
+                         : (Type*)getIntType();
+    return getOrCreate<ExpandIntValPack>(packType, patternVal, capturedPacks);
+}
+
+Val* ASTBuilder::getFirstElement(Val* basePack)
+{
+    if (auto valPack = as<ConcreteIntValPack>(basePack))
+    {
+        if (valPack->getCount() > 0)
+            return valPack->getElement(0);
+    }
+
+    auto baseIntVal = as<IntVal>(basePack);
+    auto packType = baseIntVal ? as<ValuePackType>(baseIntVal->getType()) : nullptr;
+    auto elementType = packType ? packType->getElementType() : getIntType();
+    return getOrCreate<FirstIntVal>(elementType, basePack);
+}
+
+Val* ASTBuilder::getLastElement(Val* basePack)
+{
+    if (auto valPack = as<ConcreteIntValPack>(basePack))
+    {
+        if (valPack->getCount() > 0)
+            return valPack->getElement(valPack->getCount() - 1);
+    }
+
+    auto baseIntVal = as<IntVal>(basePack);
+    auto packType = baseIntVal ? as<ValuePackType>(baseIntVal->getType()) : nullptr;
+    auto elementType = packType ? packType->getElementType() : getIntType();
+    return getOrCreate<LastIntVal>(elementType, basePack);
+}
+
+Val* ASTBuilder::getTrimHeadPack(Val* basePack)
+{
+    if (auto valPack = as<ConcreteIntValPack>(basePack))
+    {
+        ShortList<IntVal*> trimmedVals;
+        for (Index i = 1; i < valPack->getCount(); i++)
+            trimmedVals.add(valPack->getElement(i));
+        return getOrCreate<ConcreteIntValPack>(
+            as<Type>(valPack->getType()),
+            trimmedVals.getArrayView().arrayView);
+    }
+
+    auto baseIntVal = as<IntVal>(basePack);
+    auto packType = baseIntVal ? baseIntVal->getType() : getOrCreate<ValuePackType>(getIntType());
+    return getOrCreate<TrimHeadIntValPack>(packType, basePack);
+}
+
+Val* ASTBuilder::getTrimTailPack(Val* basePack)
+{
+    if (auto valPack = as<ConcreteIntValPack>(basePack))
+    {
+        ShortList<IntVal*> trimmedVals;
+        for (Index i = 0; i + 1 < valPack->getCount(); i++)
+            trimmedVals.add(valPack->getElement(i));
+        return getOrCreate<ConcreteIntValPack>(
+            as<Type>(valPack->getType()),
+            trimmedVals.getArrayView().arrayView);
+    }
+
+    auto baseIntVal = as<IntVal>(basePack);
+    auto packType = baseIntVal ? baseIntVal->getType() : getOrCreate<ValuePackType>(getIntType());
+    return getOrCreate<TrimTailIntValPack>(packType, basePack);
+}
+
+NonEmptyPackWitness* ASTBuilder::getNonEmptyPackWitness()
+{
+    return getOrCreate<NonEmptyPackWitness>();
 }
 
 TypeEqualityWitness* ASTBuilder::getTypeEqualityWitness(Type* type)
@@ -957,6 +1175,32 @@ SubtypeWitness* ASTBuilder::getEachSubtypeWitness(
     if (auto expandWitness = as<ExpandSubtypeWitness>(patternWitness))
         return expandWitness->getPatternTypeWitness();
     return getOrCreate<EachSubtypeWitness>(subType, superType, patternWitness);
+}
+
+SubtypeWitness* ASTBuilder::getFirstSubtypeWitness(
+    Type* subType,
+    Type* superType,
+    SubtypeWitness* patternWitness)
+{
+    if (auto witnessPack = as<TypePackSubtypeWitness>(patternWitness))
+    {
+        if (witnessPack->getCount() > 0)
+            return witnessPack->getWitness(0);
+    }
+    return getOrCreate<FirstSubtypeWitness>(subType, superType, patternWitness);
+}
+
+SubtypeWitness* ASTBuilder::getLastSubtypeWitness(
+    Type* subType,
+    Type* superType,
+    SubtypeWitness* patternWitness)
+{
+    if (auto witnessPack = as<TypePackSubtypeWitness>(patternWitness))
+    {
+        if (witnessPack->getCount() > 0)
+            return witnessPack->getWitness(witnessPack->getCount() - 1);
+    }
+    return getOrCreate<LastSubtypeWitness>(subType, superType, patternWitness);
 }
 
 DeclaredSubtypeWitness* ASTBuilder::getDeclaredSubtypeWitness(
@@ -1035,50 +1279,6 @@ top:
     auto aType = aIsSubtypeOfBWitness->getSub();
     auto cType = bIsSubtypeOfCWitness->getSup();
 
-    // If the right-hand side is a conjunction witness for `B <: C`
-    // of the form `(B <: X)&(B <: Y)`, then we have it that `C = X&Y`
-    // and we'd rather form a conjunction witness for `A <: C`
-    // that is of the form `(A <: X)&(A <: Y)`.
-    //
-    if (auto bIsSubtypeOfXAndY = as<ConjunctionSubtypeWitness>(bIsSubtypeOfCWitness))
-    {
-        auto bIsSubtypeOfXWitness = bIsSubtypeOfXAndY->getLeftWitness();
-        auto bIsSubtypeOfYWitness = bIsSubtypeOfXAndY->getRightWitness();
-
-        return getConjunctionSubtypeWitness(
-            aType,
-            cType,
-            getTransitiveSubtypeWitness(aIsSubtypeOfBWitness, bIsSubtypeOfXWitness),
-            getTransitiveSubtypeWitness(aIsSubtypeOfBWitness, bIsSubtypeOfYWitness));
-    }
-
-    // If the right-hand witness `R` is of the form `extract(i, W)`, then
-    // `W` is a witness that `B <: X&Y&...` for some conjunction, where `C`
-    // is one component of that conjunction.
-    //
-    if (auto bIsSubtypeViaExtraction =
-            as<ExtractFromConjunctionSubtypeWitness>(bIsSubtypeOfCWitness))
-    {
-        // We decompose the witness `extract(i, W)` to get both
-        // the witness `W` that `B <: X&Y&...` as well as the index
-        // `i` of `C` within the conjunction.
-        //
-        auto bIsSubtypeOfConjunction = bIsSubtypeViaExtraction->getConjunctionWitness();
-        auto indexOfCInConjunction = bIsSubtypeViaExtraction->getIndexInConjunction();
-
-        // We lift the extraction to the outside of the composition, by
-        // forming a witness for `A <: C` that is of the form
-        // `extract(i, L . W )`, where `L` is the left-hand witnes (for `A <: B`).
-        // The composition `L . W` is a witness that `A <: X&Y&...`, and
-        // the `i`th component of it should be a witness that `A <: C`.
-        //
-        return getExtractFromConjunctionSubtypeWitness(
-            aType,
-            cType,
-            getTransitiveSubtypeWitness(aIsSubtypeOfBWitness, bIsSubtypeOfConjunction),
-            indexOfCInConjunction);
-    }
-
     // If left hand is a TypePackSubtypeWitness, then we should also return a TypePackSubtypeWitness
     // where each witness in the pack is the transitive subtype witness of the corresponding
     // witness in the original pack.
@@ -1141,80 +1341,6 @@ top:
         aIsSubtypeOfBWitness,
         bIsSubtypeOfCWitness);
     return transitiveWitness;
-}
-
-SubtypeWitness* ASTBuilder::getExtractFromConjunctionSubtypeWitness(
-    Type* subType,
-    Type* superType,
-    SubtypeWitness* conjunctionWitness,
-    int indexOfSuperTypeInConjunction)
-{
-    // We are taking a witness `W` for `S <: L&R` and
-    // using it to produce a witness for `S <: L`
-    // or `S <: R`.
-
-    // If it turns out that the witness `W` is itself
-    // formed as a conjuction of witnesses: `(S <: L) & (S <: R)`,
-    // then we can simply re-use the appropriate sub-witness.
-    //
-    if (auto conjWitness = as<ConjunctionSubtypeWitness>(conjunctionWitness))
-    {
-        return conjWitness->getComponentWitness(indexOfSuperTypeInConjunction);
-    }
-
-    // TODO: Are there other simplification cases we should be paying attention
-    // to here? For example:
-    //
-    // * What if the original witness is transitive?
-
-    auto witness = getOrCreate<ExtractFromConjunctionSubtypeWitness>(
-        subType,
-        superType,
-        conjunctionWitness,
-        indexOfSuperTypeInConjunction);
-    return witness;
-}
-
-SubtypeWitness* ASTBuilder::getConjunctionSubtypeWitness(
-    Type* sub,
-    Type* lAndR,
-    SubtypeWitness* subIsLWitness,
-    SubtypeWitness* subIsRWitness)
-{
-    // If a conjunction witness for `S <: L&R` is being formed,
-    // where the constituent witnesses for `S <: L` and `S <: R`
-    // are themselves extractions of the first and second
-    // components, respectively, of a single witness `W`, then
-    // we can simply use `W` as-is.
-    //
-    auto lExtract = as<ExtractFromConjunctionSubtypeWitness>(subIsLWitness);
-    auto rExtract = as<ExtractFromConjunctionSubtypeWitness>(subIsRWitness);
-    if (lExtract && rExtract)
-    {
-        if (lExtract->getIndexInConjunction() == 0 && rExtract->getIndexInConjunction() == 1)
-        {
-            auto lInner = lExtract->getConjunctionWitness();
-            auto rInner = rExtract->getConjunctionWitness();
-            if (lInner == rInner)
-            {
-                return lInner;
-            }
-        }
-    }
-
-    // TODO: Depending on how we decide our canonicalized witnesses
-    // should be structured, we could detect the case where the
-    // `S <: L` and `S <: R` witnesses are both transitive compositions
-    // of the form `X . A` and `X . B`, such that we *could* form
-    // a composition around a conjunction - that is, produce
-    // `X . (A & B)` rather than `(X . A) & (X . B)`.
-    //
-    // For now we are favoring putting the composition (transitive
-    // witness) deeper, so that we have more chances to expose a
-    // conjunction witness at higher levels.
-
-    auto witness = getOrCreate<ConjunctionSubtypeWitness>(sub, lAndR, subIsLWitness, subIsRWitness);
-    return witness;
 }
 
 BuiltinTypeCoercionWitness* ASTBuilder::getBuiltinTypeCoercionWitness(Type* fromType, Type* toType)

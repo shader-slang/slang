@@ -806,13 +806,11 @@ struct SpecializationContext
         IRInst* newInst = nullptr;
         if (inst->getOp() == kIROp_MakeValuePack)
             newInst = builder.emitMakeValuePack(
-                inst->getFullType(),
-                flattendOperands.getCount(),
+                (UInt)flattendOperands.getCount(),
                 flattendOperands.getArrayView().getBuffer());
         else
             newInst = builder.emitMakeTuple(
-                inst->getFullType(),
-                flattendOperands.getCount(),
+                (UInt)flattendOperands.getCount(),
                 flattendOperands.getArrayView().getBuffer());
 
         inst->replaceUsesWith(newInst);
@@ -853,6 +851,8 @@ struct SpecializationContext
             case kIROp_Param:
             case kIROp_TypePack:
             case kIROp_ExpandTypeOrVal:
+            case kIROp_TrimHeadOfPack:
+            case kIROp_TrimTailOfPack:
                 return false;
             }
         }
@@ -2865,7 +2865,8 @@ struct SpecializationContext
 
         for (UInt i = 0; i < expandInst->getCaptureCount(); i++)
         {
-            if (!as<IRTypePack>(expandInst->getCapture(i)))
+            auto capture = expandInst->getCapture(i);
+            if (!as<IRTypePack>(capture) && !as<IRMakeValuePack>(capture))
                 return false;
         }
 
@@ -2876,6 +2877,10 @@ struct SpecializationContext
         if (auto firstTypePack = as<IRTypePack>(expandInst->getCapture(0)))
         {
             elementCount = firstTypePack->getOperandCount();
+        }
+        else if (auto firstValuePack = as<IRMakeValuePack>(expandInst->getCapture(0)))
+        {
+            elementCount = firstValuePack->getOperandCount();
         }
         if (elementCount == 0)
         {
