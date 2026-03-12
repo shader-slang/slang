@@ -864,11 +864,6 @@ struct ForwardDiffTranslationContext
                 cast<IRInterfaceRequirementEntry>(bwdCallableInterfaceType->getOperand(0))
                     ->getRequirementKey();
 
-            // Key for 'getVal()' in IBackwardCallable table
-            auto bwdCallableGetValReqKey =
-                cast<IRInterfaceRequirementEntry>(bwdCallableInterfaceType->getOperand(1))
-                    ->getRequirementKey();
-
             // Lookup primal.fwd_diff : IForwardDifferentiable
             IRInst* higherOrderFwdDiffTableArgs[] = {fwdDiffCallee, builder->getVoidValue()};
             auto higherOrderFwdDiffTable = _lookupWitness(
@@ -1018,26 +1013,6 @@ struct ForwardDiffTranslationContext
                 fwdDiffCallee,
                 AnnotationKind::BackwardDerivativePropagate,
                 higherOrderBwdPropFunc);
-
-
-            // Lookup 'getVal()' in IBackwardCallable table
-            IRInst* funcResultTypeOperands[] = {
-                fwdDiffCallee->getFullType(),
-                higherOrderContextType};
-            auto higherOrderGetValFunc = _lookupWitness(
-                builder,
-                higherOrderContextCallableTable,
-                bwdCallableGetValReqKey,
-                (IRType*)builder->emitIntrinsicInst(
-                    builder->getTypeKind(),
-                    kIROp_FuncResultType,
-                    2,
-                    funcResultTypeOperands));
-
-            builder->addAnnotation(
-                fwdDiffCallee,
-                AnnotationKind::BackwardDerivativeContextGetVal,
-                higherOrderGetValFunc);
         }
     }
 
@@ -3580,22 +3555,6 @@ IRInst* maybeTranslateBackwardDerivativeWitness(
             as<IRInterfaceRequirementEntry>(callableConformanceBaseType->getOperand(0))
                 ->getRequirementKey(),
             propFunc);
-
-        IRInst* getValFuncOperands[] = {typeOperand};
-        auto getValFunc = builder.emitIntrinsicInst(
-            (IRType*)builder.emitIntrinsicInst(
-                builder.getTypeKind(),
-                kIROp_FuncResultType,
-                1,
-                getValFuncOperands),
-            kIROp_BackwardContextGetPrimalVal,
-            1,
-            &baseFunc);
-        builder.createWitnessTableEntry(
-            callableWitnessTable,
-            as<IRInterfaceRequirementEntry>(callableConformanceBaseType->getOperand(1))
-                ->getRequirementKey(),
-            getValFunc);
 
         builder.createWitnessTableEntry(
             newWitnessTable,

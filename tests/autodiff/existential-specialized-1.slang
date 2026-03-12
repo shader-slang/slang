@@ -7,9 +7,9 @@
 // (before autodiff) may change the identity of the callee, causing the
 // derivative function mapping to be lost.
 
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -shaderobj -output-using-type
+//TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type
 //TEST:SIMPLE(filecheck=REPORT):-target hlsl -stage compute -entry computeMain -report-dynamic-dispatch-sites
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
@@ -97,41 +97,11 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
         bwd_diff(callWithB)(dpx, 1.0);
         outputBuffer[3] = dpx.d;
     }
+
+    // CHECK: 12.0
+    // CHECK: 18.0
+    // CHECK: 12.0
+    // CHECK: 18.0
 }
 
-/*
-// No dynamic dispatch should be emitted.
-// After auto-diff, both calls should get specialized.
-//
-// REPORT-NOT: {{.*}} dispatch code {{.*}}
-
-// OpSpecializeExistentials(doThing, param1Info, param2Info, ...)
-// OpSpecializeExistentials(doThing, void, TaggedUnionType({A, B}, {...witnesses..}))
-float doThing(float, IInterface obj) { }
-
-void main()
-{
-    fwd_diff(doThing)(DifferentialPair<Impl>(Impl(0, 0)));
-    // OpCall(OpForwardDifferentiate(doThing), pairVal);
-    // OpSpecializeExistentials(doThing_fwd, DifferentialPair<Impl>)
-}
-
-void main1()
-{
-    let ab = factoryAB();
-    doThing(ab, 0.f); // OpSpecializeExistentials(doThing, void, TaggedUnionType({A, B}, {...witnesses..}))
-
-
-    // ... 
-    let bc = factoryBC();
-    doThing(bc, 0.f); // OpSpecializeExistentials(doThing, void, TaggedUnionType({B, C}, {...witnesses..}))
-
-    doThing_fwd // DifferentialPair<Impl> -> float
-
-
-    doThing_apply(float, IInterface obj)
-     -> s_bwdCallableCtx_doThing
-
-    doThing_backProp(s_bwdCallableCtx_doThing, out float outGradient)
-}
-
+// REPORT-NOT: generated

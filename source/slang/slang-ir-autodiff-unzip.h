@@ -22,7 +22,6 @@ IRFunc* splitApplyAndPropFuncs(
     HoistedPrimalsInfo* primalsInfo,
     IRInst*& intermediateType,
     IRInst*& minimalIntermediateType,
-    IRFunc*& getValFunc,
     IRFunc*& rematFunc,
     UnownedStringSlice intermediateTypeName = UnownedStringSlice());
 

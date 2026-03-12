@@ -1821,7 +1821,6 @@ FIDDLE() namespace Slang
         BwdApplyFunc,           ///< The "apply_bwd" built-in associated function
         BwdCallableRematFunc,   ///< The "remat" built-in associated function
         BwdCallablePropFunc,    ///< The "BwdCallable::operator()" built-in associated function
-        BwdCallableGetValFunc,  ///< The "BwdCallable::getVal()" built-in associated function
         LegacyBackwardDerivativeFunc, ///< The "bwdDiff" built-in associated function
     };
 

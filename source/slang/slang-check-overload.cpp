@@ -1419,7 +1419,6 @@ bool isEffectivelySynthesized(Decl* decl)
         {
         case kIROp_BackwardPrimalFromLegacyBwdDiffFunc:
         case kIROp_BackwardPropagateFromLegacyBwdDiffFunc:
-        case kIROp_BackwardContextGetValFromLegacyBwdDiffFunc:
         case kIROp_BackwardRematFromLegacyBwdDiffFunc:
             return false;
         default:

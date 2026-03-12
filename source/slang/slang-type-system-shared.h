@@ -164,7 +164,6 @@ enum class AnnotationKind
     BackwardDerivativeContextRemat = 5,
     BackwardDerivativeMinimalContext = 6,
     BackwardDerivativeContext = 7,
-    BackwardDerivativeContextGetVal = 8,
     BackwardDerivativePropagate = 9,
 
     // Annotations for differentiable types.

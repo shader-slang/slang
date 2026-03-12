@@ -689,11 +689,6 @@ __intrinsic_type($(kIROp_BackwardDiffFuncType))
 struct BwdDiffFuncType<FType> where FType : IHasDiffTypeInfo
 { };
 
-__magic_type(FuncResultType)
-__intrinsic_type($(kIROp_FuncResultType))
-struct FuncResultType<FType, CtxType> where FType : IHasDiffTypeInfo
-{ };
-
 __magic_type(ForwardDiffFuncInterfaceType)
 [KnownBuiltin($((int)KnownBuiltinDeclName::IForwardDifferentiable))]
 [__FunctionInterface]
@@ -711,9 +706,6 @@ interface IBwdCallable<FType> where FType : IHasDiffTypeInfo
 {
     __builtin_requirement($( (int)BuiltinRequirementKind::BwdCallablePropFunc))
     __associatedfunc BwdCallableFuncType<FType, This> operator(); // -> bwd_prop
-
-    __builtin_requirement($( (int)BuiltinRequirementKind::BwdCallableGetValFunc)) 
-    __associatedfunc FuncResultType<FType, This> val;
 };
 
 __magic_type(BwdDiffFuncInterfaceType)

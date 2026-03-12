@@ -7183,7 +7183,6 @@ bool SemanticsVisitor::trySynthesizeRequirementWitness(
             case BuiltinRequirementKind::ForwardDerivativeFunc:
             case BuiltinRequirementKind::BwdApplyFunc:
             case BuiltinRequirementKind::BwdCallablePropFunc:
-            case BuiltinRequirementKind::BwdCallableGetValFunc:
             case BuiltinRequirementKind::BwdCallableRematFunc:
             case BuiltinRequirementKind::LegacyBackwardDerivativeFunc:
                 return trySynthesizeDiffFuncRequirementWitness(
@@ -7539,31 +7538,6 @@ bool SemanticsVisitor::trySynthesizeDiffFuncRequirementWitness(
             SLANG_ASSERT(targetCallableDeclRef); // Expect a function-decl-base
             synFunc->operands.add(targetCallableDeclRef);
             synFunc->irOp = kIROp_BackwardDifferentiatePrimal;
-            break;
-        }
-    case BuiltinRequirementKind::BwdCallableGetValFunc:
-        {
-            auto synStructDecl = as<SynthesizedStructDecl>(context->parentDecl);
-            SLANG_ASSERT(synStructDecl);
-            synFunc->operands.addRange(synStructDecl->operands);
-            if (synStructDecl->irOp == kIROp_BackwardContextFromLegacyBwdDiffFunc)
-            {
-                synFunc->irOp = kIROp_BackwardContextGetValFromLegacyBwdDiffFunc;
-            }
-            else if (synStructDecl->irOp == kIROp_BackwardDiffIntermediateContextType)
-            {
-                synFunc->irOp = kIROp_BackwardContextGetPrimalVal;
-            }
-            else if (synStructDecl->irOp == kIROp_TrivialBackwardDiffIntermediateContextType)
-            {
-                synFunc->irOp = kIROp_TrivialBackwardContextGetPrimalVal;
-            }
-            else
-            {
-                // TODO: turn into a diagnostic
-                SLANG_UNEXPECTED(
-                    "unexpected synthesized struct IR op for backward callable propagation.");
-            }
             break;
         }
     case BuiltinRequirementKind::BwdCallablePropFunc:

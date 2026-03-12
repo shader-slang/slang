@@ -610,7 +610,6 @@ IROp getSetOpFromType(IRType* type)
     case kIROp_ApplyForBwdFuncType:
     case kIROp_BwdCallableFuncType:
     case kIROp_BackwardDiffFuncType:
-    case kIROp_FuncResultType:
     case kIROp_RematFuncType:
         return kIROp_FuncSet;
     default:
@@ -1777,12 +1776,12 @@ struct TypeFlowSpecializationContext
                     }
                 }
 
-                auto callSiteFuncType =
+                auto callSiteFuncTypeCtx =
                     this->callSiteFuncType[InstWithContext(edge.callerContext, callInst)];
 
                 // Also update infos of any out parameters
                 auto paramInfos =
-                    getParamInfos(edge.targetContext, maybeExpandFuncType(callSiteFuncType));
+                    getParamInfos(edge.targetContext, maybeExpandFuncType(callSiteFuncTypeCtx));
                 auto paramDirections = getParamDirections(edge.targetContext);
                 UIndex argIndex = 0;
                 for (auto paramInfo : paramInfos)
@@ -3233,6 +3232,27 @@ struct TypeFlowSpecializationContext
                     newParamTypes.getBuffer(),
                     (IRType*)substituteSets(funcType->getResultType()));
                 module->getContainerPool().free(&newParamTypes);
+            }
+            else if (auto witnessTableType = as<IRWitnessTableType>(inst->getDataType()))
+            {
+                IRBuilder builder(module);
+                builder.setInsertInto(module);
+
+                if (auto info = tryGetInfo(context, witnessTableType->getConformanceType()))
+                {
+                    if (as<IRElementOfSetType>(info))
+                    {
+                        // TODO: Does this make sense? Technically, this type isn't really important
+                        // since it's going to get removed anyway..
+                        // Should it be ElementOfSetType(WitnessTableType1, WitnessTableType2, ...)?
+                        //
+                        typeOfSpecialization = builder.getWitnessTableType((IRType*)info);
+                    }
+                    else
+                        typeOfSpecialization = inst->getDataType();
+                }
+                else
+                    typeOfSpecialization = inst->getDataType();
             }
             else if (auto typeInfo = tryGetInfo(context, inst->getDataType()))
             {
@@ -5101,12 +5121,10 @@ struct TypeFlowSpecializationContext
 
     IRFuncType* getEffectiveFuncTypeForDispatcher(
         IRWitnessTableSet* tableSet,
-        IRStructKey* key,
         IRFuncSet* resultFuncSet,
         IRFuncType* contextFuncType)
     {
         SLANG_ASSERT(contextFuncType);
-        SLANG_UNUSED(key);
 
         List<IRType*>& extraParamTypes = *module->getContainerPool().getList<IRType>();
         extraParamTypes.add((IRType*)makeTagType(tableSet));
@@ -5442,33 +5460,118 @@ struct TypeFlowSpecializationContext
         return newFuncSet;
     }
 
-    // Create a dispatcher function that dispatches to the correct function based on
-    // a witness table tag.
+    // Represents a single action to apply when building a dispatcher.
+    // Actions are collected by walking the callee operand chain backward
+    // and are applied in order to each witness table entry.
     //
-    // This method unifies the logic for both simple dispatchers (previously GetDispatcher)
-    // and specialized dispatchers (previously GetSpecializedDispatcher).
-    //
-    // For each witness table in the set:
-    //   1. Look up the function entry by key
-    //   2. If specArgs are provided, create a Specialize inst around the generic function
-    //   3. If bindings are non-trivial, create a FuncWithBindings and immediately lower it
-    //      via lowerFuncWithBindings to get a concrete cloned function
-    //   4. Build a dispatch function (switch-case) over all concrete functions
-    //
-    // Returns the dispatch function, or nullptr if the dispatcher has no uses.
-    //
-    IRFunc* getDispatcher(
-        IRWitnessTableSet* witnessTableSet,
-        IRStructKey* key,
-        IRFuncType* dispatchFuncType,
-        List<IRInst*>& bindings,
-        List<IRInst*>& specArgs,
-        WorkQueue<IRInst*>& globalsWorkList)
+    struct DispatchAction
     {
-        IRBuilder builder(module);
+        enum class Kind
+        {
+            Lookup,           // From IRGetTagForMappedSet: look up an entry by key
+            Specialize,       // From IRGetTagForSpecializedSet: specialize a generic
+            BindExistentials, // From calleeSet inspection: bind existential arguments
+        };
 
-        // Check if any binding is non-trivial.
+        Kind kind;
+        IRStructKey* lookupKey = nullptr;
+        List<IRInst*> specArgs;
+        List<IRInst*> bindings;
+    };
+
+    // Walk the callee operand chain backward, collecting DispatchActions
+    // and returning the base tag operand (whose type is SetTagType(witnessTableSet)).
+    //
+    // Also inspects the calleeSet for IRFuncWithBindings and appends a
+    // BindExistentials action if any are found.
+    //
+    // Additionally, any spec args that are tags of witness table sets are
+    // added to extraCallArgs (they become extra call arguments for dispatch selection).
+    //
+    IRInst* collectDispatchActions(
+        IRInst* callee,
+        IRFuncSet* calleeSet,
+        IRCall* inst,
+        List<DispatchAction>& actions,
+        List<IRInst*>& extraCallArgs)
+    {
+        IRInst* baseOperand = callee;
+
+        while (true)
+        {
+            if (auto mapped = as<IRGetTagForMappedSet>(baseOperand))
+            {
+                DispatchAction action;
+                action.kind = DispatchAction::Kind::Lookup;
+                action.lookupKey = cast<IRStructKey>(mapped->getOperand(1));
+                actions.add(action);
+                baseOperand = mapped->getOperand(0);
+            }
+            else if (auto specialized = as<IRGetTagForSpecializedSet>(baseOperand))
+            {
+                DispatchAction action;
+                action.kind = DispatchAction::Kind::Specialize;
+                for (UInt argIdx = 1; argIdx < specialized->getOperandCount(); ++argIdx)
+                {
+                    auto arg = specialized->getOperand(argIdx);
+                    if (auto tagType = as<IRSetTagType>(arg->getDataType()))
+                    {
+                        SLANG_ASSERT(!tagType->getSet()->isSingleton());
+                        if (as<IRWitnessTableSet>(tagType->getSet()))
+                        {
+                            extraCallArgs.add(arg);
+                            action.specArgs.add(tagType->getSet());
+                        }
+                        else
+                        {
+                            action.specArgs.add(tagType->getSet());
+                        }
+                    }
+                    else
+                    {
+                        SLANG_ASSERT(isGlobalInst(arg));
+                        action.specArgs.add(arg);
+                    }
+                }
+                actions.add(action);
+                baseOperand = specialized->getOperand(0);
+            }
+            else
+            {
+                break;
+            }
+        }
+
+        actions.reverse();
+
+        // Check calleeSet for bindings (IRFuncWithBindings).
+        IRBuilder builder(module);
+        List<IRInst*> bindings;
+        for (UInt i = 0; i < inst->getOperandCount() - 1; i++)
+            bindings.add(builder.getVoidValue());
+
         bool hasNonTrivialBindings = false;
+        forEachInSet(
+            module,
+            calleeSet,
+            [&](IRInst* element)
+            {
+                if (auto funcWithBindings = as<IRFuncWithBindings>(element))
+                {
+                    for (Index i = 1; i < funcWithBindings->getOperandCount(); i++)
+                    {
+                        if (!as<IRVoidLit>(bindings[i - 1]))
+                        {
+                            SLANG_ASSERT(bindings[i - 1] == funcWithBindings->getOperand(i));
+                        }
+                        else
+                        {
+                            bindings[i - 1] = funcWithBindings->getOperand(i);
+                        }
+                    }
+                }
+            });
+
         for (auto binding : bindings)
         {
             if (!as<IRVoidLit>(binding))
@@ -5478,7 +5581,33 @@ struct TypeFlowSpecializationContext
             }
         }
 
-        bool hasSpecArgs = specArgs.getCount() > 0;
+        if (hasNonTrivialBindings)
+        {
+            DispatchAction action;
+            action.kind = DispatchAction::Kind::BindExistentials;
+            action.bindings = bindings;
+            actions.add(action);
+        }
+
+        return baseOperand;
+    }
+
+    // Create a dispatcher function that dispatches to the correct function based on
+    // a witness table tag.
+    //
+    // For each witness table in the set, applies the full list of DispatchActions
+    // in order (lookup, specialize, bind) to resolve the concrete function, then
+    // builds a dispatch function (switch-case) over all concrete functions.
+    //
+    // Returns the dispatch function, or nullptr if the dispatcher has no uses.
+    //
+    IRFunc* getDispatcher(
+        IRWitnessTableSet* witnessTableSet,
+        IRFuncType* dispatchFuncType,
+        List<DispatchAction>& actions,
+        WorkQueue<IRInst*>& globalsWorkList)
+    {
+        IRBuilder builder(module);
 
         Dictionary<IRInst*, std::pair<IRInst*, IRFuncType*>> elements;
         forEachInSet(
@@ -5491,56 +5620,88 @@ struct TypeFlowSpecializationContext
                     table,
                     witnessTableSet);
 
-                IRInst* func = findWitnessTableEntry(cast<IRWitnessTable>(table), key);
+                IRInst* val = table;
 
-                // If we have specialization args, wrap in a Specialize inst.
-                if (hasSpecArgs)
+                for (auto& action : actions)
                 {
-                    auto generic = cast<IRGeneric>(func);
-
-                    auto specializedFuncType = (IRType*)specializeGeneric(
-                        cast<IRSpecialize>(builder.emitSpecializeInst(
-                            builder.getTypeKind(),
-                            generic->getDataType(),
-                            specArgs.getCount(),
-                            specArgs.getBuffer())));
-
-                    func = builder.emitSpecializeInst(
-                        specializedFuncType,
-                        generic,
-                        specArgs.getCount(),
-                        specArgs.getBuffer());
-                }
-
-                // If we have non-trivial bindings, create a FuncWithBindings and
-                // immediately lower it to get a concrete cloned function.
-                if (hasNonTrivialBindings)
-                {
-                    List<IRInst*> boundFuncOperands;
-                    boundFuncOperands.add(func);
-                    for (auto binding : bindings)
-                        boundFuncOperands.add(binding);
-
-                    auto funcWithBindings = cast<IRFuncWithBindings>(builder.emitIntrinsicInst(
-                        nullptr,
-                        kIROp_FuncWithBindings,
-                        (UInt)boundFuncOperands.getCount(),
-                        boundFuncOperands.getBuffer()));
-
-                    auto loweredFunc = lowerFuncWithBindings(funcWithBindings);
-                    if (loweredFunc)
+                    switch (action.kind)
                     {
-                        func = loweredFunc;
-                        globalsWorkList.enqueue(func);
+                    case DispatchAction::Kind::Lookup:
+                        val = findWitnessTableEntry(cast<IRWitnessTable>(val), action.lookupKey);
+                        break;
+
+                    case DispatchAction::Kind::Specialize:
+                        {
+                            auto generic = cast<IRGeneric>(val);
+                            auto genericType = cast<IRGeneric>(generic->getDataType());
+                            auto innerType = getGenericReturnVal(genericType);
+
+                            if (as<IRFuncType>(innerType))
+                            {
+                                auto specializedFuncType = (IRType*)specializeGeneric(
+                                    cast<IRSpecialize>(builder.emitSpecializeInst(
+                                        builder.getTypeKind(),
+                                        generic->getDataType(),
+                                        action.specArgs.getCount(),
+                                        action.specArgs.getBuffer())));
+
+                                val = builder.emitSpecializeInst(
+                                    specializedFuncType,
+                                    generic,
+                                    action.specArgs.getCount(),
+                                    action.specArgs.getBuffer());
+                            }
+                            else if (as<IRWitnessTableType>(innerType))
+                            {
+                                auto specializedWitnessTableType = (IRType*)specializeGeneric(
+                                    cast<IRSpecialize>(builder.emitSpecializeInst(
+                                        builder.getTypeKind(),
+                                        generic->getDataType(),
+                                        action.specArgs.getCount(),
+                                        action.specArgs.getBuffer())));
+
+                                val = builder.emitSpecializeInst(
+                                    specializedWitnessTableType,
+                                    generic,
+                                    action.specArgs.getCount(),
+                                    action.specArgs.getBuffer());
+
+                                val = translationContext.resolveInst(val);
+                            }
+                            else
+                            {
+                                SLANG_UNEXPECTED(
+                                    "Unexpected generic return type for specialization");
+                            }
+                            break;
+                        }
+
+                    case DispatchAction::Kind::BindExistentials:
+                        {
+                            List<IRInst*> boundFuncOperands;
+                            boundFuncOperands.add(val);
+                            for (auto binding : action.bindings)
+                                boundFuncOperands.add(binding);
+
+                            auto funcWithBindings =
+                                cast<IRFuncWithBindings>(builder.emitIntrinsicInst(
+                                    nullptr,
+                                    kIROp_FuncWithBindings,
+                                    (UInt)boundFuncOperands.getCount(),
+                                    boundFuncOperands.getBuffer()));
+
+                            auto loweredFunc = lowerFuncWithBindings(funcWithBindings);
+                            if (loweredFunc)
+                                val = loweredFunc;
+                            break;
+                        }
                     }
                 }
-                else
-                {
-                    globalsWorkList.enqueue(func);
-                }
 
-                auto effectiveFuncType = getEffectiveFuncType(func);
-                elements.add(tag, {func, effectiveFuncType});
+                globalsWorkList.enqueue(val);
+
+                auto effectiveFuncType = getEffectiveFuncType(val);
+                elements.add(tag, {val, effectiveFuncType});
             });
 
         if (dispatchFuncType == nullptr)
@@ -5548,21 +5709,32 @@ struct TypeFlowSpecializationContext
 
         auto dispatchFunc = createDispatchFunc(dispatchFuncType, elements);
 
-        // Add a name hint based on the lookup key.
-        if (auto nameHint = key->findDecoration<IRNameHintDecoration>())
+        // Add a name hint based on the actions.
         {
             builder.setInsertBefore(dispatchFunc);
             StringBuilder sb;
-            sb << "s_dispatch_" << nameHint->getName();
-            if (hasSpecArgs)
+            sb << "s_dispatch";
+            for (auto& action : actions)
             {
-                for (auto specArg : specArgs)
+                switch (action.kind)
                 {
-                    sb << "_";
-                    getTypeNameHint(sb, specArg);
+                case DispatchAction::Kind::Lookup:
+                    if (auto nameHint = action.lookupKey->findDecoration<IRNameHintDecoration>())
+                        sb << "_" << nameHint->getName();
+                    break;
+                case DispatchAction::Kind::Specialize:
+                    for (auto specArg : action.specArgs)
+                    {
+                        sb << "_";
+                        getTypeNameHint(sb, specArg);
+                    }
+                    break;
+                default:
+                    break;
                 }
             }
-            builder.addNameHintDecoration(dispatchFunc, sb.getUnownedSlice());
+            if (sb.getLength() > strlen("s_dispatch"))
+                builder.addNameHintDecoration(dispatchFunc, sb.getUnownedSlice());
         }
 
         return dispatchFunc;
@@ -5583,64 +5755,27 @@ struct TypeFlowSpecializationContext
         //
         // 1. If the callee is already a concrete function, there's nothing to do
         //
-        // 2. If the callee is a dynamic inst of tag type, then we need to look at the
-        //    tag inst's structure:
+        // 2. If the callee is a dynamic inst of tag type with multiple callees,
+        //    we walk the callee operand chain backward (through GetTagForMappedSet,
+        //    GetTagForSpecializedSet, etc.) collecting a list of DispatchActions,
+        //    until we reach a base tag of a witness table set. The dispatcher then
+        //    applies these actions to each witness table to resolve the concrete function.
         //
-        //    i. If inst is a GetTagForMappedSet (resulting from a lookup),
-        //
-        //          let tableTag : TagType(witnessTableSet) = /* ... */;
-        //          let tag : TagType(funcSet) = GetTagForMappedSet(tableTag, key);
-        //          let val = Call(tag, arg1, arg2, ...);
-        //      becomes
-        //          let tableTag : TagType(witnessTableSet) = /* ... */;
-        //          let dispatcher : FuncType(...) = GetDispatcher(witnessTableSet, key);
-        //          let val = Call(dispatcher, tableTag, arg1, arg2, ...);
-        //      where the dispatcher represents a dispatch function that selects the function
-        //      based on the witness table tag.
-        //
-        //    ii. If the inst is a GetTagForSpecializedCollection (resulting from a
-        //    specialization resulting from a lookup),
-        //
+        //    For example, a chain like:
         //          let tableTag : TagType(witnessTableSet) = /* ... */;
         //          let tag : TagType(genericSet) = GetTagForMappedSet(tableTag, key);
         //          let specializedTag :
-        //               TagType(funcSet) = GetTagForSpecializedCollection(tag, specArgs...);
+        //               TagType(funcSet) = GetTagForSpecializedSet(tag, specArgs...);
         //          let val = Call(specializedTag, arg1, arg2, ...);
-        //      becomes
+        //    becomes:
         //          let tableTag : TagType(witnessTableSet) = /* ... */;
-        //          let dispatcher : FuncType(...) =
-        //              GetSpecializedDispatcher(witnessTableSet, key, specArgs...);
+        //          let dispatcher : FuncType(...) = /* dispatcher over witnessTableSet */;
         //          let val = Call(dispatcher, tableTag, arg1, arg2, ...);
+        //    where the dispatcher absorbs the lookup + specialization into itself.
         //
-        //    iii. If the inst is a Specialize of a concrete generic, then
-        //         it means that one or more specialization arguments are dynamic.
-        //
-        //          let specCallee = Specialize(generic, specArgs...);
-        //          let val = Call(specCallee, callArgs...);
-        //      becomes
-        //          let specCallee = Specialize(generic, staticFormOfSpecArgs...);
-        //          let val = Call(specCallee, dynamicSpecArgs..., callArgs...);
-        //      where the new dynamicSpecArgs are the tag insts of WitnessTableSets
-        //      and the static form is the corresponding WitnessTableSet itself.
-        //
-        //      This creates a specialization that includes set arguments (and is handled
-        //      by `specializeGenericWithSetArgs`)
-        //
-        //      More concrete example for (iii):
-        //
-        //      // --- before specialization ---
-        //      let s1 : TagType(WitnessTableSet(tA, tB, tC)) = /* ... */;
-        //      let s2 : TagType(TypeSet(A, B, C)) = /* ... */;
-        //      let specCallee = Specialize(generic, s1, s2);
-        //      let val = Call(specCallee, /* call args */);
-        //
-        //      // --- after specialization ---
-        //      let s1 : TagType(WitnessTableSet(tA, tB, tC)) = /* ... */;
-        //      let s2 : TagType(TypeSet(A, B, C)) = /* ... */;
-        //      let newSpecCallee = Specialize(generic,
-        //          WitnessTableSet(tA, tB, tC), TypeSet(A, B, C));
-        //      let newVal = Call(newSpecCallee, s1, /* call args */);
-        //
+        // 3. If the callee is a Specialize of a concrete generic with dynamic
+        //    specialization arguments (set-specialized generic), then the arguments
+        //    are lowered into extra call parameters.
         //
         // After the callee has been selected, we handle the argument types:
         //    It is possible that the parameters in the callee have been specialized
@@ -5683,152 +5818,60 @@ struct TypeFlowSpecializationContext
             {
                 // Multiple callees case:
                 //
-                // If we need to use a tag, we'll do a bit of an optimization here..
-                //
-                // Instead of building a dispatcher on then func-set, we'll
-                // build it on the table set that it is looked up from. This
-                // avoids the extra map.
-                //
-                // This works primarily because this is the only way to call a dynamic
-                // function. If we ever have the ability to pass functions around more
-                // flexibly, then this should just become a specific case.
+                // Walk the callee operand chain backward, collecting dispatch
+                // actions (lookups, specializations, bindings) that can be
+                // absorbed into the dispatcher. This generalizes the previously
+                // separate GetTagForMappedSet and GetTagForSpecializedSet cases.
 
-                if (auto tagMapOperand = as<IRGetTagForMappedSet>(callee))
+                List<DispatchAction> actions;
+                auto tableTag = collectDispatchActions(
+                    callee,
+                    cast<IRFuncSet>(calleeSet),
+                    inst,
+                    actions,
+                    callArgs);
+
+                auto tableSet =
+                    cast<IRWitnessTableSet>(cast<IRSetTagType>(tableTag->getDataType())->getSet());
+
+                // Use the callee's declared func type recorded during analysis.
+                auto contextFuncTypePtr =
+                    this->callSiteFuncType.tryGetValue(InstWithContext(context, inst));
+                SLANG_ASSERT(contextFuncTypePtr);
+
+                effectiveFuncType = getEffectiveFuncTypeForDispatcher(
+                    tableSet,
+                    cast<IRFuncSet>(calleeSet),
+                    *contextFuncTypePtr);
+
+                callee = getDispatcher(tableSet, effectiveFuncType, actions, globalsWorkList);
+
+                if (shouldReportDynamicDispatchSites)
                 {
-                    auto tableTag = tagMapOperand->getOperand(0);
-                    auto lookupKey = cast<IRStructKey>(tagMapOperand->getOperand(1));
-
-                    auto tableSet = cast<IRWitnessTableSet>(
-                        cast<IRSetTagType>(tableTag->getDataType())->getSet());
-                    IRBuilder builder(module);
-
-                    // Use the callee's declared func type recorded during analysis.
-                    auto contextFuncTypePtr =
-                        this->callSiteFuncType.tryGetValue(InstWithContext(context, inst));
-                    SLANG_ASSERT(contextFuncTypePtr);
-
-                    effectiveFuncType = getEffectiveFuncTypeForDispatcher(
-                        tableSet,
-                        lookupKey,
-                        cast<IRFuncSet>(calleeSet),
-                        *contextFuncTypePtr);
-
-                    // Add a binding slot for each argument of the call.
-                    // Note: We won't use the effective func type since that is for the dispatcher,
-                    // and may have extra parameters for dispatch selection, that are irrelevant to
-                    // binding.
-                    //
-                    List<IRInst*> bindings;
-                    for (UInt i = 0; i < inst->getOperandCount() - 1; i++)
-                        bindings.add(builder.getVoidValue());
-
-                    forEachInSet(
-                        module,
-                        calleeSet,
-                        [&](IRInst* callee)
-                        {
-                            if (auto funcWithBindings = as<IRFuncWithBindings>(callee))
-                            {
-                                for (Index i = 1; i < funcWithBindings->getOperandCount(); i++)
-                                {
-                                    if (!as<IRVoidLit>(bindings[i - 1]))
-                                    {
-                                        // Validate that all func-with-bindings in the set have the
-                                        // same bindings or else this is an error.
-                                        //
-                                        SLANG_ASSERT(
-                                            bindings[i - 1] == funcWithBindings->getOperand(i));
-                                    }
-                                    else
-                                    {
-                                        bindings[i - 1] = (funcWithBindings->getOperand(i));
-                                    }
-                                }
-                            }
-                        });
-
-                    List<IRInst*> emptySpecArgs;
-                    callee = getDispatcher(
-                        tableSet,
-                        lookupKey,
-                        effectiveFuncType,
-                        bindings,
-                        emptySpecArgs,
-                        globalsWorkList);
-
-                    if (shouldReportDynamicDispatchSites)
-                        reportDispatchLocation(module, sink, inst->getCalleeUse(), tableSet);
-
-                    callArgs.add(tableTag);
-                }
-                else if (auto specializedTagMapOperand = as<IRGetTagForSpecializedSet>(callee))
-                {
-                    auto innerTagMapOperand =
-                        cast<IRGetTagForMappedSet>(specializedTagMapOperand->getOperand(0));
-                    auto tableTag = innerTagMapOperand->getOperand(0);
-                    auto tableSet = cast<IRWitnessTableSet>(
-                        cast<IRSetTagType>(tableTag->getDataType())->getSet());
-                    auto lookupKey = cast<IRStructKey>(innerTagMapOperand->getOperand(1));
-
-                    List<IRInst*> specArgs;
-                    for (UInt argIdx = 1; argIdx < specializedTagMapOperand->getOperandCount();
-                         ++argIdx)
+                    // Collect specArgs from the actions for reporting.
+                    List<IRInst*> allSpecArgs;
+                    bool hasSpecArgs = false;
+                    for (auto& action : actions)
                     {
-                        auto arg = specializedTagMapOperand->getOperand(argIdx);
-                        if (auto tagType = as<IRSetTagType>(arg->getDataType()))
+                        if (action.kind == DispatchAction::Kind::Specialize)
                         {
-                            SLANG_ASSERT(!tagType->getSet()->isSingleton());
-                            if (as<IRWitnessTableSet>(tagType->getSet()))
-                            {
-                                callArgs.add(arg);
-                                specArgs.add(tagType->getSet());
-                            }
-                            else
-                            {
-                                specArgs.add(tagType->getSet());
-                            }
-                        }
-                        else
-                        {
-                            SLANG_ASSERT(isGlobalInst(arg));
-                            specArgs.add(arg);
+                            allSpecArgs.addRange(action.specArgs);
+                            hasSpecArgs = true;
                         }
                     }
 
-                    // Use the callee's declared func type recorded during analysis.
-                    auto contextFuncTypePtr =
-                        this->callSiteFuncType.tryGetValue(InstWithContext(context, inst));
-                    SLANG_ASSERT(contextFuncTypePtr);
-
-                    effectiveFuncType = getEffectiveFuncTypeForDispatcher(
-                        tableSet,
-                        lookupKey,
-                        cast<IRFuncSet>(calleeSet),
-                        *contextFuncTypePtr);
-
-                    List<IRInst*> emptyBindings;
-                    callee = getDispatcher(
-                        tableSet,
-                        lookupKey,
-                        effectiveFuncType,
-                        emptyBindings,
-                        specArgs,
-                        globalsWorkList);
-
-                    if (shouldReportDynamicDispatchSites)
+                    if (hasSpecArgs)
                         reportSpecializedDispatchLocation(
                             module,
                             sink,
                             inst->getCalleeUse(),
                             tableSet,
-                            specArgs);
+                            allSpecArgs);
+                    else
+                        reportDispatchLocation(module, sink, inst->getCalleeUse(), tableSet);
+                }
 
-                    callArgs.add(tableTag);
-                }
-                else
-                {
-                    SLANG_UNEXPECTED("Cannot specialize call with non-singleton set tag callee");
-                }
+                callArgs.add(tableTag);
             }
             else if (isSetSpecializedGeneric(calleeSet->getElement(0)))
             {
@@ -5863,10 +5906,9 @@ struct TypeFlowSpecializationContext
             }
             else
             {
-                // If we reach here, then something is wrong. If our callee is an inst of
-                // tag-type, we expect it to either be a `GetTagForMappedSet`, `Specialize` or
-                // `GetTagForSpecializedSet`.
-                // Any other case should never occur (in the current design of the compiler)
+                // If we reach here, then something is wrong. Our callee is an inst of
+                // tag-type, but we could not resolve it through the dispatch action
+                // collection or set-specialized generic paths.
                 //
                 SLANG_UNEXPECTED(
                     "Unexpected operand type for type-flow specialization of Call inst");
@@ -6506,6 +6548,33 @@ struct TypeFlowSpecializationContext
             else
             {
                 args.add(arg);
+            }
+        }
+
+        // Is our base operand a set-tag-type?
+        // This needs a slight change..
+        //
+        if (as<IRSetTagType>(inst->getBase()->getDataType()) &&
+            as<IRWitnessTableType>(inst->getDataType()))
+        {
+            if (auto info = tryGetInfo(context, inst))
+            {
+                auto thisInstInfo = cast<IRElementOfSetType>(info);
+
+                List<IRInst*> operands = {inst->getBase()};
+                for (UInt i = 0; i < inst->getArgCount(); i++)
+                    operands.add(inst->getArg(i));
+
+                IRBuilder builder(inst);
+                builder.setInsertBefore(inst);
+                auto newInst = builder.emitIntrinsicInst(
+                    (IRType*)makeTagType(thisInstInfo->getSet()),
+                    kIROp_GetTagForSpecializedSet,
+                    operands.getCount(),
+                    operands.getBuffer());
+                inst->replaceUsesWith(newInst);
+                inst->removeAndDeallocate();
+                return true;
             }
         }
 

@@ -341,9 +341,8 @@ struct DifferentiableTypeConformanceContext
                 if (as<IRVoidType>(innerFnType->getResultType()))
                     resultType = (IRType*)contextType;
                 else
-                    resultType = builder->getTupleType(
-                        innerFnType->getResultType(),
-                        (IRType*)contextType);
+                    resultType =
+                        builder->getTupleType(innerFnType->getResultType(), (IRType*)contextType);
 
                 return builder->getFuncType(paramTypes, resultType);
                 break;
@@ -376,16 +375,6 @@ struct DifferentiableTypeConformanceContext
                 }
 
                 return builder->getFuncType(paramTypes, fullCtxType);
-                break;
-            }
-        case kIROp_FuncResultType:
-            {
-                auto bwdContextType = typeInst->getOperand(1);
-                auto innerFnType = cast<IRFuncType>(resolveType(builder, typeInst->getOperand(0)));
-
-                return builder->getFuncType(
-                    List<IRType*>((IRType*)bwdContextType),
-                    innerFnType->getResultType());
                 break;
             }
         case kIROp_BwdCallableFuncType:

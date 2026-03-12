@@ -2878,13 +2878,6 @@ void registerAssociatedMethods(SemanticsVisitor* context, DeclRef<Decl> declRef)
 
             maybeRegisterVal(
                 context,
-                DeclRefType::create(getCurrentASTBuilder(), bwdCallableType),
-                declRef.declRefBase,
-                context->getName("val"),
-                AnnotationKind::BackwardDerivativeContextGetVal);
-
-            maybeRegisterVal(
-                context,
                 funcAsType,
                 declRef.declRefBase,
                 context->getName("remat"),

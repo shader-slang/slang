@@ -714,13 +714,6 @@ class RematFuncType : public BuiltinType
 };
 
 
-FIDDLE()
-class FuncResultType : public BuiltinType
-{
-    FIDDLE(...)
-    Val* _resolveImplOverride();
-};
-
 // A vector type, e.g., `vector<T,N>`
 FIDDLE()
 class VectorExpressionType : public ArithmeticExpressionType

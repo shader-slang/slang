@@ -301,34 +301,6 @@ Type* MatrixExpressionType::getRowType()
     return rowType;
 }
 
-Val* FuncResultType::_resolveImplOverride()
-{
-    // Resolve the operands.
-    auto resolvedBase = _getGenericTypeArg(this, 0)->resolve();
-    auto resolvedCtxType = as<Type>(_getGenericTypeArg(this, 1)->resolve());
-    auto resolvedWitness = _getGenericTypeArg(this, 2)->resolve();
-
-    auto astBuilder = getCurrentASTBuilder();
-    if (auto baseDeclRefType = as<DeclRefType>(resolvedBase))
-    {
-        if (auto callableDeclRef = baseDeclRefType->getDeclRef().as<CallableDecl>())
-        {
-            auto funcType = getFuncType(astBuilder, callableDeclRef);
-
-            // Create a func type with no parameters and the result type of the base function.
-            auto newFuncType = astBuilder->getFuncType(
-                List<Type*>().getArrayView(),
-                funcType->getResultType(),
-                funcType->getErrorType());
-
-            return newFuncType;
-        }
-    }
-
-    Val* args[] = {as<Type>(resolvedBase), resolvedCtxType, as<Witness>(resolvedWitness)};
-    return astBuilder->getSpecializedBuiltinType(makeArrayView(args), "FuncResultType");
-}
-
 static Type* getEffectiveDiffPairType(Type* primalType, SubtypeWitness* diffWitness)
 {
     auto astBuilder = getCurrentASTBuilder();

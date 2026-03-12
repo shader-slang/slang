@@ -201,7 +201,6 @@ local insts = {
 			{ ForwardDiffFuncType = { hoistable = true } },
 			{ BackwardDiffFuncType = { hoistable = true } },
 			{ ApplyForBwdFuncType = { hoistable = true } },
-			{ FuncResultType = { hoistable = true } },
 			{ BwdCallableFuncType = { hoistable = true } },
 			{ RematFuncType = { hoistable = true } },
 
@@ -2570,14 +2569,12 @@ local insts = {
 		{ BackwardDifferentiatePrimal = { min_operands = 1 } },
 		{ BackwardRemat = { min_operands = 1 } },
 		{ BackwardDifferentiatePropagate = { min_operands = 1 } },
-		{ BackwardContextGetPrimalVal = { min_operands = 1 } },
 
 		{ TrivialBackwardDifferentiate = { min_operands = 1 } },
 
 		{ TrivialBackwardDifferentiatePrimal = { min_operands = 1 } },
 		{ TrivialBackwardRemat = { min_operands = 1 } },
 		{ TrivialBackwardDifferentiatePropagate = { min_operands = 1 } },
-		{ TrivialBackwardContextGetPrimalVal = { min_operands = 1 } },
 
 		{ FunctionCopy = { min_operands = 1 } },
 
@@ -2588,7 +2585,6 @@ local insts = {
 		
 		{ BackwardPrimalFromLegacyBwdDiffFunc = { min_operands = 2 } },
 		{ BackwardRematFromLegacyBwdDiffFunc = { min_operands = 2 } },
-		{ BackwardContextGetValFromLegacyBwdDiffFunc = { min_operands = 2 } },
 		{ BackwardPropagateFromLegacyBwdDiffFunc = { min_operands = 2 } },
 
 		{ BackwardFromLegacyBwdDiffFunc = { min_operands = 2 } },

@@ -1191,43 +1191,20 @@ bool isDifferentialOrRecomputeBlock(IRBlock* block)
 
 IRUse* findUniqueStoredVal(IRVar* var)
 {
-    if (isDerivativeContextVar(var))
+    IRUse* storeUse = nullptr;
+    for (auto use = var->firstUse; use; use = use->nextUse)
     {
-        SLANG_UNEXPECTED("Should not see this case anymore");
-        IRUse* primalCallUse = nullptr;
-        for (auto use = var->firstUse; use; use = use->nextUse)
+        if (const auto storeInst = as<IRStore>(use->getUser()))
         {
-            if (const auto callInst = as<IRCall>(use->getUser()))
-            {
-                // Ignore uses from differential blocks.
-                if (callInst->getParent()->findDecoration<IRDifferentialInstDecoration>())
-                    continue;
-                // Should not see more than one IRCall. If we do
-                // we'll need to pick the primal call.
-                //
-                SLANG_RELEASE_ASSERT(!primalCallUse);
-                primalCallUse = use;
-            }
+            // Ignore uses from differential blocks.
+            if (storeInst->getParent()->findDecoration<IRDifferentialInstDecoration>())
+                continue;
+            // Should not see more than one IRStore
+            SLANG_RELEASE_ASSERT(!storeUse);
+            storeUse = use;
         }
-        return primalCallUse;
     }
-    else
-    {
-        IRUse* storeUse = nullptr;
-        for (auto use = var->firstUse; use; use = use->nextUse)
-        {
-            if (const auto storeInst = as<IRStore>(use->getUser()))
-            {
-                // Ignore uses from differential blocks.
-                if (storeInst->getParent()->findDecoration<IRDifferentialInstDecoration>())
-                    continue;
-                // Should not see more than one IRStore
-                SLANG_RELEASE_ASSERT(!storeUse);
-                storeUse = use;
-            }
-        }
-        return storeUse;
-    }
+    return storeUse;
 }
 
 // Given a local var that is supposed to have a unique write, find the last inst

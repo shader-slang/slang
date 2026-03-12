@@ -255,7 +255,7 @@ struct UnzippingContext
             applyBwdFuncType->getResultType(),
             applyBwdFunc,
             applyFuncArgs);
-        primalBuilder->addAutoDiffOriginalValueDecoration(applyResult, baseFn);
+        // primalBuilder->addAutoDiffOriginalValueDecoration(applyResult, baseFn);
         primalBuilder->markInstAsPrimal(applyResult);
 
         // Extract primal return value and minimal context from apply_bwd result.
@@ -1476,7 +1476,6 @@ IRFunc* splitApplyAndPropFuncs(
     HoistedPrimalsInfo* primalsInfo,
     IRInst*& fullContextType,
     IRInst*& minimalContextType,
-    IRFunc*& getValFunc,
     IRFunc*& rematFunc,
     UnownedStringSlice intermediateTypeName)
 {
@@ -1514,9 +1513,6 @@ IRFunc* splitApplyAndPropFuncs(
         returnValueKey,
         paramsContextKey,
         minimalContextKey);
-
-    // No more get-val func.
-    getValFunc = nullptr;
 
     if (auto nameHint = primalFunc->findDecoration<IRNameHintDecoration>())
     {

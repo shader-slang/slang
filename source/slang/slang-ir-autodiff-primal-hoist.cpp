@@ -2758,13 +2758,6 @@ static bool shouldStoreInst(IRInst* inst)
             if (callee->findDecoration<IRReadNoneDecoration>())
                 return false;
 
-            // Treat 'get-val' funcs as effectively a simple extraction.
-            if (callee->getOp() == kIROp_BackwardContextGetValFromLegacyBwdDiffFunc ||
-                callee->getOp() == kIROp_BackwardContextGetPrimalVal)
-            {
-                return false;
-            }
-
             // Treat 'remat' as always recomputable.
             if (callee->getOp() == kIROp_BackwardRematFromLegacyBwdDiffFunc)
             {

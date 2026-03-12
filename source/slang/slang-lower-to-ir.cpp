@@ -2067,14 +2067,6 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             lowerFuncDependentType(base, kIROp_BwdCallableFuncType, ctxType));
     }
 
-    LoweredValInfo visitFuncResultType(FuncResultType* funcResultType)
-    {
-        auto base = as<Type>(as<GenericAppDeclRef>(funcResultType->getDeclRefBase())->getArg(0));
-        auto ctxType = as<Type>(as<GenericAppDeclRef>(funcResultType->getDeclRefBase())->getArg(1));
-
-        return LoweredValInfo::simple(lowerFuncDependentType(base, kIROp_FuncResultType, ctxType));
-    }
-
     LoweredValInfo visitHigherOrderDiffTypeTranslationWitness(
         HigherOrderDiffTypeTranslationWitness* val)
     {
@@ -4395,7 +4387,7 @@ void lowerAssociatedVals(IRGenContext* context, Val* val, IRInst* irVal)
     }
 }
 
-void lowerRelatedTypes(IRGenContext* context, Val* val, IRInst* irVal)
+void lowerRelatedTypes(IRGenContext* context, Val* val, IRInst*)
 {
     // For some types, we may need information about additional types that are
     // related to it, but may never appear in the front-end checking.

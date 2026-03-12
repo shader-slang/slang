@@ -174,7 +174,6 @@ struct BackwardDiffTranslationContext
         IRInst*& applyFuncInst,
         IRInst*& rematFuncInst,
         IRInst*& propagateFuncInst,
-        IRInst*& contextGetValFuncInst,
         IRInst*& contextTypeInst,
         IRInst*& minimalContextTypeInst,
         bool isTrivial)
@@ -231,7 +230,6 @@ struct BackwardDiffTranslationContext
         //
         IRInst* intermediateType = nullptr;
         IRInst* minimalIntermediateType = nullptr;
-        IRFunc* getValFunc = nullptr;
         IRFunc* rematFuncResult = nullptr;
 
         // Compute the intermediate type name from the target function before splitting,
@@ -249,7 +247,6 @@ struct BackwardDiffTranslationContext
             primalsInfo,
             intermediateType,
             minimalIntermediateType,
-            getValFunc,
             rematFuncResult,
             intermediateTypeNameStorage.getUnownedSlice());
 
@@ -323,7 +320,6 @@ struct BackwardDiffTranslationContext
         // Clean up block labels & other temp decorations.
         stripTempDecorations(propagateFunc);
         stripTempDecorations(applyFunc);
-        // stripTempDecorations(getValFunc);
         stripTempDecorations(rematFuncResult);
 
         // Make sure blocks are in control-flow order.
@@ -332,28 +328,24 @@ struct BackwardDiffTranslationContext
 
         generateName(builder, targetFunc, applyFunc, "s_apply_");
         generateName(builder, targetFunc, propagateFunc, "s_bwdProp_");
-        // generateName(builder, targetFunc, getValFunc, "s_getVal_");
         generateName(builder, targetFunc, rematFuncResult, "s_remat_");
         // generateName(builder, targetFunc, intermediateType, "s_bwdCallableCtx_");
 
         copyDebugInfo(targetFunc, applyFunc);
         copyDebugInfo(targetFunc, propagateFunc);
-        // copyDebugInfo(targetFunc, getValFunc);
         copyDebugInfo(targetFunc, rematFuncResult);
 
         propagatePropertiesForSingleFunc(builder->getModule(), propagateFunc);
         propagatePropertiesForSingleFunc(builder->getModule(), applyFunc);
-        // propagatePropertiesForSingleFunc(builder->getModule(), getValFunc);
         propagatePropertiesForSingleFunc(builder->getModule(), rematFuncResult);
 
-        // Output the 6-tuple result of the translation.
+        // Output the 5-tuple result of the translation.
 
         contextTypeInst = intermediateType;
         minimalContextTypeInst = minimalIntermediateType;
         propagateFuncInst = propagateFunc;
         applyFuncInst = applyFunc;
         rematFuncInst = rematFuncResult;
-        contextGetValFuncInst = builder->createFunc();
     }
 };
 
@@ -384,7 +376,6 @@ IRInst* maybeTranslateLegacyToNewBackwardDerivative(
     auto applyFunc = builder.createFunc();
     auto rematFunc = builder.createFunc();
     auto bwdPropFunc = builder.createFunc();
-    auto getValFunc = builder.createFunc();
 
     auto legacyBwdDiffFuncType = as<IRFuncType>(legacyBwdDiffFunc->getDataType());
 
@@ -572,44 +563,6 @@ IRInst* maybeTranslateLegacyToNewBackwardDerivative(
         }
     }
 
-    /*
-    //
-    // Build the getVal() function.
-    //
-
-    auto getValFuncType = builder.getFuncType(
-        {contextType},
-        as<IRFuncType>(primalFunc->getDataType())->getResultType());
-
-    // Emit a call to the primal-func & store the result in a new key,
-    // then load that key in the getValFunc and return it.
-    //
-    IRStructKey* resultKeyInst = contextTypeBuilder.createStructKey();
-    auto resultFieldType = as<IRFuncType>(primalFunc->getDataType())->getResultType();
-    auto returnValueContextField =
-        contextTypeBuilder.createStructField(contextType, resultKeyInst, resultFieldType);
-    contextTypeBuilder.addReturnValueContextFieldDecoration(returnValueContextField);
-
-    getValFunc->setFullType(getValFuncType);
-    IRBuilder getValFuncBuilder(builder.getModule());
-    getValFuncBuilder.setInsertInto(getValFunc);
-    getValFuncBuilder.emitBlock();
-    auto getValContextParam = getValFuncBuilder.emitParam(contextType);
-    getValFuncBuilder.addNameHintDecoration(getValContextParam, UnownedStringSlice("ctx"));
-
-    if (!as<IRVoidType>(resultFieldType))
-    {
-        // Load the result value from the context and return it
-        auto resultVal =
-            getValFuncBuilder.emitFieldExtract(resultFieldType, getValContextParam, resultKeyInst);
-        getValFuncBuilder.emitReturn(resultVal);
-    }
-    else
-    {
-        getValFuncBuilder.emitReturn();
-    }
-    */
-
     // Now we need to emit the call to the primal function in the apply function
     List<IRInst*> primalFuncArgs;
 
@@ -701,7 +654,6 @@ IRInst* maybeTranslateLegacyToNewBackwardDerivative(
     generateName(&builder, primalFunc, applyFunc, "s_apply_");
     generateName(&builder, primalFunc, rematFunc, "s_remat_");
     generateName(&builder, primalFunc, bwdPropFunc, "s_bwdProp_");
-    // generateName(&builder, primalFunc, getValFunc, "s_getVal_");
     generateName(&builder, primalFunc, fullContextType, "s_bwdCallableCtx_");
 
     // Hoist contextType first.
@@ -712,7 +664,6 @@ IRInst* maybeTranslateLegacyToNewBackwardDerivative(
     auto applyFuncGlobalVal = maybeHoistAndSpecialize(builder, applyFunc);
     auto rematFuncGlobalVal = maybeHoistAndSpecialize(builder, rematFunc);
     auto bwdPropFuncGlobalVal = maybeHoistAndSpecialize(builder, bwdPropFunc);
-    // auto getValFuncGlobalVal = maybeHoistAndSpecialize(builder, getValFunc);
     builder.setInsertInto(builder.getModule());
 
     // For the legacy case, minimalContextType is empty.
@@ -720,7 +671,6 @@ IRInst* maybeTranslateLegacyToNewBackwardDerivative(
         {applyFuncGlobalVal,
          rematFuncGlobalVal,
          bwdPropFuncGlobalVal,
-         builder.createFunc(),
          fullContextTypeGlobalVal,
          minimalContextTypeGlobalVal});
 }
@@ -984,7 +934,6 @@ IRInst* maybeTranslateBackwardDerivative(
     IRInst* bwdPrimalFunc;
     IRInst* bwdRematFunc;
     IRInst* bwdPropagateFunc;
-    IRInst* bwdContextGetValFunc;
     IRInst* bwdContextType;
     IRInst* bwdMinimalContextType;
     translater.translateFunc(
@@ -993,7 +942,6 @@ IRInst* maybeTranslateBackwardDerivative(
         bwdPrimalFunc,
         bwdRematFunc,
         bwdPropagateFunc,
-        bwdContextGetValFunc,
         bwdContextType,
         bwdMinimalContextType,
         false);
@@ -1003,7 +951,6 @@ IRInst* maybeTranslateBackwardDerivative(
         {bwdPrimalFunc,
          bwdRematFunc,
          bwdPropagateFunc,
-         bwdContextGetValFunc,
          (IRType*)bwdContextType,
          (IRType*)bwdMinimalContextType});
 }
@@ -1035,7 +982,6 @@ IRInst* maybeTranslateTrivialBackwardDerivative(
     IRInst* bwdPrimalFunc;
     IRInst* bwdRematFunc;
     IRInst* bwdPropagateFunc;
-    IRInst* bwdContextGetValFunc;
     IRInst* bwdContextType;
     IRInst* bwdMinimalContextType;
     translater.translateFunc(
@@ -1044,7 +990,6 @@ IRInst* maybeTranslateTrivialBackwardDerivative(
         bwdPrimalFunc,
         bwdRematFunc,
         bwdPropagateFunc,
-        bwdContextGetValFunc,
         bwdContextType,
         bwdMinimalContextType,
         true);
@@ -1054,7 +999,6 @@ IRInst* maybeTranslateTrivialBackwardDerivative(
         {bwdPrimalFunc,
          bwdRematFunc,
          bwdPropagateFunc,
-         bwdContextGetValFunc,
          (IRType*)bwdContextType,
          (IRType*)bwdMinimalContextType});
 }
