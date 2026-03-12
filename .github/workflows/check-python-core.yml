@@ -29,42 +29,49 @@ jobs:
       - name: Compile-check all extras Python scripts
         run: |
           failed=0
-          for f in extras/*.py; do
+          while IFS= read -r -d '' f; do
             if ! python3 -m py_compile "$f"; then
               echo "FAIL: $f"
               failed=1
             fi
-          done
+          done < <(find extras -type f -name '*.py' -print0)
           exit $failed
 
       - name: Check for non-stdlib imports
         run: |
           python3 -c "
-          import ast, sys, os
+          import ast, sys
+          from pathlib import Path
 
           stdlib = sys.stdlib_module_names
 
+          # Collect all .py stems and package dirs under extras/ so that
+          # cross-directory project-local imports are recognized.
+          extras = Path('extras')
+          project_modules = set()
+          for p in extras.rglob('*.py'):
+              project_modules.add(p.stem)
+          for p in extras.rglob('__init__.py'):
+              project_modules.add(p.parent.name)
+
           failed = False
-          for path in sorted(os.listdir('extras')):
-              if not path.endswith('.py'):
-                  continue
-              filepath = os.path.join('extras', path)
+          for filepath in sorted(extras.rglob('*.py')):
               with open(filepath) as f:
-                  tree = ast.parse(f.read(), filepath)
+                  tree = ast.parse(f.read(), str(filepath))
               for node in ast.walk(tree):
                   if isinstance(node, ast.Import):
                       for alias in node.names:
                           top = alias.name.split('.')[0]
-                          if top not in stdlib:
+                          if top not in stdlib and top not in project_modules:
                               print(f'{filepath}: non-stdlib import: {alias.name}')
                               failed = True
                   elif isinstance(node, ast.ImportFrom):
                       if node.module and node.level == 0:
                           top = node.module.split('.')[0]
-                          if top not in stdlib:
+                          if top not in stdlib and top not in project_modules:
                               print(f'{filepath}: non-stdlib import: from {node.module}')
                               failed = True
           if failed:
               sys.exit(1)
-          print('All imports are stdlib-only.')
+          print('All imports are stdlib-only (local sibling modules allowed).')
           "
