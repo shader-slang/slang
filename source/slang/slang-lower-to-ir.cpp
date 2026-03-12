@@ -8174,8 +8174,13 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         List<CapabilityName> capNames;
         for (const Token& t : stmt->requiredCaps)
         {
-            // note: capability names have already been validated
-            capNames.add(findCapabilityName(t.getContent()));
+            CapabilityName capName = findCapabilityName(t.getContent());
+
+            // Note: capability names have already been validated, so we'll
+            // just do a quick assert here
+            SLANG_ASSERT(capName != CapabilityName::Invalid);
+
+            capNames.add(capName);
         }
 
         CapabilitySet capabilitySet(capNames);

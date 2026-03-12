@@ -17,7 +17,6 @@ struct ProcessLateRequireCapabilityInstsContext
 {
     IRModule* const m_module;
     CapabilitySet m_targetCaps;
-    const CodeGenTarget m_target;
     CompilerOptionSet& m_optionSet;
     DiagnosticSink* const m_sink;
 
@@ -29,12 +28,10 @@ struct ProcessLateRequireCapabilityInstsContext
     ProcessLateRequireCapabilityInstsContext(
         IRModule* module,
         const CapabilitySet& targetCaps,
-        CodeGenTarget target,
         CompilerOptionSet& optionSet,
         DiagnosticSink* sink)
         : m_module(module)
         , m_targetCaps(targetCaps)
-        , m_target(target)
         , m_optionSet(optionSet)
         , m_sink(sink)
     {
@@ -58,7 +55,6 @@ struct ProcessLateRequireCapabilityInstsContext
         if (stageTargetCaps.atLeastOneSetImpliedInOther(required) ==
             CapabilitySet::ImpliesReturnFlags::Implied)
             return;
-
 
         // figure out the missing delta
         CapabilityAtomSet addedAtoms{};
@@ -172,7 +168,6 @@ void processLateRequireCapabilityInsts(
     ProcessLateRequireCapabilityInstsContext context(
         module,
         codeGenContext->getTargetCaps(),
-        codeGenContext->getTargetFormat(),
         codeGenContext->getTargetReq()->getOptionSet(),
         sink);
 
