@@ -655,6 +655,9 @@ local insts = {
 					hoistable = true,
 				},
 			},
+			-- Represents the type of a generic value pack parameter.
+			-- e.g. `let each D : int` lowers to a param of type ValuePackType(int).
+			{ ValuePackType = { operands = { { "elementType", "IRType" } }, hoistable = true } },
 			{ ExpandTypeOrVal = { operands = { { "type" } }, hoistable = true } },
 			{
 				spirvLiteralType = {
@@ -930,7 +933,7 @@ local insts = {
 	{ makeStruct = {} },
 	{ makeTuple = {} },
 	{ makeTargetTuple = { struct_name = "MakeTargetTuple" } },
-	{ makeValuePack = {} },
+	{ makeValuePack = { hoistable=true } },
 	{ makeCombinedTextureSampler = { operands = { {"texture"}, {"sampler"} } } },
 	{ getTargetTupleElement = {} },
 	{
@@ -2460,6 +2463,11 @@ local insts = {
 	{ sizeOf = { operands = { { "type" } } } },
 	{ alignOf = { operands = { { "baseOp" } } } },
 	{ countOf = { operands = { { "type" } } } },
+	{ ExtractFirstFromPack = { operands = { { "pack" } }, hoistable = true } },
+	{ ExtractLastFromPack = { operands = { { "pack" } }, hoistable = true } },
+	{ TrimHeadOfPack = { operands = { { "pack" } }, hoistable = true } },
+	{ TrimTailOfPack = { operands = { { "pack" } }, hoistable = true } },
+	{ NonEmptyPackWitness = { hoistable = true } },
 	{ GetArrayLength = { operands = { { "array" } } } },
 	{
 		IsType = {

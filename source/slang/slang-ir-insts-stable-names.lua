@@ -765,4 +765,10 @@ return {
 	["constexprAnd"] = 763,
 	["constexprOr"] = 764,
 	["constexprSelect"] = 765,
+	["Type.ValuePackType"] = 766,
+	["ExtractFirstFromPack"] = 767,
+	["ExtractLastFromPack"] = 768,
+	["TrimHeadOfPack"] = 769,
+	["TrimTailOfPack"] = 770,
+	["NonEmptyPackWitness"] = 771,
 }

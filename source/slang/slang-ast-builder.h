@@ -329,7 +329,7 @@ public:
         if (!parent)
             return getDirectDeclRef(memberDecl);
         // A Generic value/type ParamDecl is always referred to directly.
-        if (as<GenericTypeParamDecl>(memberDecl) || as<GenericValueParamDecl>(memberDecl))
+        if (isGenericParam(memberDecl))
             return getDirectDeclRef(memberDecl);
         if (as<ThisTypeDecl>(memberDecl) && !as<InterfaceDecl>(memberDecl->parentDecl))
             return as<T>(parent);
@@ -651,9 +651,33 @@ public:
 
     Type* getEachType(Type* baseType);
 
-    Type* getExpandType(Type* pattern, ArrayView<Type*> capturedPacks);
+    Type* getExpandType(Type* pattern, ArrayView<Val*> capturedPacks);
+
+    Type* getFirstElement(Type* basePack);
+
+    Type* getLastElement(Type* basePack);
+
+    Type* getTrimHeadPack(Type* basePack);
+
+    Type* getTrimTailPack(Type* basePack);
 
     ConcreteTypePack* getTypePack(ArrayView<Type*> types);
+
+    ConcreteIntValPack* getIntValPack(ArrayView<IntVal*> vals);
+
+    IntVal* getEachIntVal(Type* elementType, Val* basePack);
+
+    Val* getExpandIntValPack(Val* patternVal, ArrayView<Val*> capturedPacks);
+
+    Val* getFirstElement(Val* basePack);
+
+    Val* getLastElement(Val* basePack);
+
+    Val* getTrimHeadPack(Val* basePack);
+
+    Val* getTrimTailPack(Val* basePack);
+
+    NonEmptyPackWitness* getNonEmptyPackWitness();
 
     /// Produce a witness that `T : T` for any type `T`
     TypeEqualityWitness* getTypeEqualityWitness(Type* type);
@@ -674,6 +698,16 @@ public:
         SubtypeWitness* patternWitness);
 
     SubtypeWitness* getEachSubtypeWitness(
+        Type* subType,
+        Type* superType,
+        SubtypeWitness* patternWitness);
+
+    SubtypeWitness* getFirstSubtypeWitness(
+        Type* subType,
+        Type* superType,
+        SubtypeWitness* patternWitness);
+
+    SubtypeWitness* getLastSubtypeWitness(
         Type* subType,
         Type* superType,
         SubtypeWitness* patternWitness);

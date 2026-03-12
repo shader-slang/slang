@@ -2384,8 +2384,115 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
         }
         else if (auto countOfExpr = expr.as<CountOfExpr>())
         {
+            // For value packs, sizedType is ValuePackType. Try to fold
+            // the value expression to get the pack reference instead.
+            Val* countArg = type;
+            if (as<ValuePackType>(type))
+            {
+                auto valExprFolded = tryConstantFoldExpr(
+                    SubstExpr<Expr>(countOfExpr.getExpr()->value, expr.getSubsts()),
+                    kind,
+                    circularityInfo);
+                if (valExprFolded)
+                    countArg = valExprFolded;
+            }
             return as<IntVal>(
-                CountOfIntVal::tryFold(m_astBuilder, expr.getExpr()->type.type, type));
+                CountOfIntVal::tryFold(m_astBuilder, expr.getExpr()->type.type, countArg));
+        }
+    }
+
+    if (auto packQueryExpr = expr.as<PackQueryExpr>())
+    {
+        auto foldedOperand = tryConstantFoldExpr(
+            SubstExpr<Expr>(packQueryExpr.getExpr()->value, expr.getSubsts()),
+            kind,
+            circularityInfo);
+        if (!foldedOperand)
+            return nullptr;
+
+        if (as<FirstExpr>(packQueryExpr.getExpr()))
+            return as<IntVal>(m_astBuilder->getFirstElement(foldedOperand));
+        if (as<LastExpr>(packQueryExpr.getExpr()))
+            return as<IntVal>(m_astBuilder->getLastElement(foldedOperand));
+        if (as<TrimHeadExpr>(packQueryExpr.getExpr()))
+            return as<IntVal>(m_astBuilder->getTrimHeadPack(foldedOperand));
+        return as<IntVal>(m_astBuilder->getTrimTailPack(foldedOperand));
+    }
+
+    // `each D` where D is a value pack parameter produces an EachIntVal.
+    if (auto eachExpr = expr.as<EachExpr>())
+    {
+        if (auto baseExpr = eachExpr.getExpr()->baseExpr)
+        {
+            if (auto valPackType = as<ValuePackType>(baseExpr->type))
+            {
+                if (auto baseDeclRefExpr = as<DeclRefExpr>(baseExpr))
+                {
+                    auto baseDeclRef = getDeclRef(m_astBuilder, baseDeclRefExpr);
+                    if (auto packParamRef = baseDeclRef.as<GenericValuePackParamDecl>())
+                    {
+                        auto elementType = valPackType->getElementType();
+                        auto packRef =
+                            m_astBuilder->getOrCreate<DeclRefIntVal>(valPackType, packParamRef);
+                        Val* substPackRef = packRef->substitute(m_astBuilder, expr.getSubsts());
+                        return m_astBuilder->getEachIntVal(elementType, substPackRef);
+                    }
+                }
+            }
+        }
+    }
+
+    // A PackExpr with integer elements folds to a ConcreteIntValPack.
+    if (auto packExpr = expr.as<PackExpr>())
+    {
+        ShortList<IntVal*> elements;
+        for (auto arg : packExpr.getExpr()->args)
+        {
+            auto elementVal =
+                tryConstantFoldExpr(SubstExpr<Expr>(arg, expr.getSubsts()), kind, circularityInfo);
+            if (!elementVal)
+                return nullptr;
+            elements.add(elementVal);
+        }
+        return m_astBuilder->getIntValPack(elements.getArrayView().arrayView);
+    }
+
+    // A TupleExpr with integer elements also folds to a ConcreteIntValPack so
+    // tuple-backed pack queries can participate in integer-constant contexts.
+    if (auto tupleExpr = expr.as<TupleExpr>())
+    {
+        ShortList<IntVal*> elements;
+        for (auto elementExpr : tupleExpr.getExpr()->elements)
+        {
+            auto elementVal = tryConstantFoldExpr(
+                SubstExpr<Expr>(elementExpr, expr.getSubsts()),
+                kind,
+                circularityInfo);
+            if (!elementVal)
+                return nullptr;
+            elements.add(elementVal);
+        }
+        return m_astBuilder->getIntValPack(elements.getArrayView().arrayView);
+    }
+
+    // `expand <expr>` where the expr involves value packs produces an ExpandIntValPack.
+    if (auto expandExpr = expr.as<ExpandExpr>())
+    {
+        if (auto expandType = as<ExpandType>(getType(m_astBuilder, expandExpr)))
+        {
+            auto patternVal = tryConstantFoldExpr(
+                SubstExpr<Expr>(expandExpr.getExpr()->baseExpr, expr.getSubsts()),
+                kind,
+                circularityInfo);
+            if (patternVal)
+            {
+                ShortList<Val*> capturedPacks;
+                for (Index i = 0; i < expandType->getCapturedPackCount(); i++)
+                    capturedPacks.add(expandType->getCapturedPack(i));
+                return as<IntVal>(m_astBuilder->getExpandIntValPack(
+                    patternVal,
+                    capturedPacks.getArrayView().arrayView));
+            }
         }
     }
 
@@ -2399,6 +2506,15 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
             Val* valResult = m_astBuilder->getOrCreate<DeclRefIntVal>(
                 declRef.substitute(m_astBuilder, genericValParamRef.getDecl()->getType()),
                 genericValParamRef);
+            valResult = valResult->substitute(m_astBuilder, expr.getSubsts());
+            return as<IntVal>(valResult);
+        }
+
+        if (auto genericValPackParamRef = declRef.as<GenericValuePackParamDecl>())
+        {
+            Val* valResult = m_astBuilder->getOrCreate<DeclRefIntVal>(
+                genericValPackParamRef.getDecl()->getType(),
+                genericValPackParamRef);
             valResult = valResult->substitute(m_astBuilder, expr.getSubsts());
             return as<IntVal>(valResult);
         }
@@ -3781,16 +3897,17 @@ Type* SemanticsVisitor::getDifferentialPairType(Type* primalType)
         auto diffPairEachType = getDifferentialPairType(eachType);
         if (auto expandType = as<ExpandType>(primalType))
         {
-            List<Type*> capturedTypePacks;
-            for (Index i = 0; i < expandType->getCapturedTypePackCount(); i++)
+            List<Val*> capturedPacks;
+            for (Index i = 0; i < expandType->getCapturedPackCount(); i++)
             {
-                capturedTypePacks.add(expandType->getCapturedTypePack(i));
+                capturedPacks.add(expandType->getCapturedPack(i));
             }
-            return m_astBuilder->getExpandType(diffPairEachType, capturedTypePacks.getArrayView());
+            return m_astBuilder->getExpandType(diffPairEachType, capturedPacks.getArrayView());
         }
         else
         {
-            return m_astBuilder->getExpandType(diffPairEachType, makeArrayViewSingle(primalType));
+            Val* primalVal = primalType;
+            return m_astBuilder->getExpandType(diffPairEachType, makeArrayViewSingle(primalVal));
         }
     }
 
@@ -4245,7 +4362,7 @@ static bool _isSizeOfType(Type* type)
     return false;
 }
 
-static bool _isCountOfType(Type* type)
+static bool _isTypeOrValValidForCountOf(Type* type)
 {
     if (!type)
     {
@@ -4267,12 +4384,172 @@ static bool _isCountOfType(Type* type)
         return true;
     }
 
+    if (as<ValuePackType>(type))
+    {
+        return true;
+    }
+
     return false;
+}
+
+static bool _isTypeOrValValidForPackQuery(Type* type)
+{
+    if (!type)
+        return false;
+
+    if (isTypePack(type))
+        return true;
+
+    if (as<TupleType>(type))
+        return true;
+
+    if (as<ValuePackType>(type))
+        return true;
+
+    return false;
+}
+
+static const char* _getPackQueryName(PackQueryExpr* expr)
+{
+    if (as<FirstExpr>(expr))
+        return "__first";
+    if (as<LastExpr>(expr))
+        return "__last";
+    if (as<TrimHeadExpr>(expr))
+        return "__trimHead";
+    return "__trimTail";
+}
+
+bool SemanticsVisitor::hasNonEmptyPackConstraint(Decl* decl)
+{
+    auto genericDecl = decl ? as<GenericDecl>(decl->parentDecl) : nullptr;
+    if (!genericDecl)
+        return false;
+
+    for (auto constraintDecl :
+         genericDecl->getDirectMemberDeclsOfType<NonEmptyPackConstraintDecl>())
+    {
+        if (auto packDeclRefExpr = as<DeclRefExpr>(constraintDecl->packExpr))
+        {
+            if (getDeclRef(m_astBuilder, packDeclRefExpr).getDecl() == decl)
+            {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+VariadicPackCardinality SemanticsVisitor::getPackCardinality(Val* packVal)
+{
+    if (!packVal)
+        return VariadicPackCardinality::Unknown;
+
+    if (auto packType = as<Type>(packVal))
+        packVal = unwrapModifiedType(packType);
+
+    if (auto cached = getShared()->m_packCardinalityCache.tryGetValue(packVal))
+        return *cached;
+
+    auto mergeCaptureCardinality = [&](auto packWithCaptures) -> VariadicPackCardinality
+    {
+        VariadicPackCardinality result = VariadicPackCardinality::Unknown;
+        for (Index i = 0; i < packWithCaptures->getCapturedPackCount(); ++i)
+        {
+            auto capturedPack = packWithCaptures->getCapturedPack(i);
+            auto capturedCardinality = getPackCardinality(capturedPack);
+            if (capturedCardinality == VariadicPackCardinality::Empty)
+                return VariadicPackCardinality::Empty;
+            if (capturedCardinality == VariadicPackCardinality::NonEmpty)
+                result = VariadicPackCardinality::NonEmpty;
+        }
+        return result;
+    };
+
+    VariadicPackCardinality result = VariadicPackCardinality::Unknown;
+
+    if (auto tupleType = as<TupleType>(packVal))
+    {
+        result = getPackCardinality(tupleType->getTypePack());
+        getShared()->m_packCardinalityCache[packVal] = result;
+        return result;
+    }
+
+    if (auto concreteTypePack = as<ConcreteTypePack>(packVal))
+    {
+        result = concreteTypePack->getTypeCount() > 0 ? VariadicPackCardinality::NonEmpty
+                                                      : VariadicPackCardinality::Empty;
+        getShared()->m_packCardinalityCache[packVal] = result;
+        return result;
+    }
+
+    if (auto concreteIntValPack = as<ConcreteIntValPack>(packVal))
+    {
+        result = concreteIntValPack->getCount() > 0 ? VariadicPackCardinality::NonEmpty
+                                                    : VariadicPackCardinality::Empty;
+        getShared()->m_packCardinalityCache[packVal] = result;
+        return result;
+    }
+
+    if (auto expandType = as<ExpandType>(packVal))
+    {
+        result = mergeCaptureCardinality(expandType);
+        getShared()->m_packCardinalityCache[packVal] = result;
+        return result;
+    }
+
+    if (auto expandIntValPack = as<ExpandIntValPack>(packVal))
+    {
+        result = mergeCaptureCardinality(expandIntValPack);
+        getShared()->m_packCardinalityCache[packVal] = result;
+        return result;
+    }
+
+    if (as<TrimHeadTypePack>(packVal) || as<TrimTailTypePack>(packVal) ||
+        as<TrimHeadIntValPack>(packVal) || as<TrimTailIntValPack>(packVal))
+    {
+        result = VariadicPackCardinality::Unknown;
+        getShared()->m_packCardinalityCache[packVal] = result;
+        return result;
+    }
+
+    if (auto declRefType = as<DeclRefType>(packVal))
+    {
+        if (auto typePackParam = declRefType->getDeclRef().as<GenericTypePackParamDecl>())
+        {
+            result = hasNonEmptyPackConstraint(typePackParam.getDecl())
+                         ? VariadicPackCardinality::NonEmpty
+                         : VariadicPackCardinality::Unknown;
+            getShared()->m_packCardinalityCache[packVal] = result;
+            return result;
+        }
+    }
+
+    if (auto declRefIntVal = as<DeclRefIntVal>(packVal))
+    {
+        if (auto valuePackParam = declRefIntVal->getDeclRef().as<GenericValuePackParamDecl>())
+        {
+            result = hasNonEmptyPackConstraint(valuePackParam.getDecl())
+                         ? VariadicPackCardinality::NonEmpty
+                         : VariadicPackCardinality::Unknown;
+            getShared()->m_packCardinalityCache[packVal] = result;
+            return result;
+        }
+    }
+
+    getShared()->m_packCardinalityCache[packVal] = result;
+    return result;
+}
+
+bool SemanticsVisitor::isKnownNonEmptyPack(Val* packVal)
+{
+    return getPackCardinality(packVal) == VariadicPackCardinality::NonEmpty;
 }
 
 Expr* SemanticsExprVisitor::visitSizeOfLikeExpr(SizeOfLikeExpr* sizeOfLikeExpr)
 {
     auto valueExpr = dispatch(sizeOfLikeExpr->value);
+    sizeOfLikeExpr->value = valueExpr;
     sizeOfLikeExpr->type = m_astBuilder->getIntType();
 
     Type* type = nullptr;
@@ -4297,7 +4574,7 @@ Expr* SemanticsExprVisitor::visitSizeOfLikeExpr(SizeOfLikeExpr* sizeOfLikeExpr)
 
     if (as<CountOfExpr>(sizeOfLikeExpr))
     {
-        if (!_isCountOfType(type))
+        if (!_isTypeOrValValidForCountOf(type))
         {
             getSink()->diagnose(Diagnostics::CountOfArgumentIsInvalid{.expr = sizeOfLikeExpr});
 
@@ -4323,6 +4600,109 @@ Expr* SemanticsExprVisitor::visitSizeOfLikeExpr(SizeOfLikeExpr* sizeOfLikeExpr)
     sizeOfLikeExpr->sizedType = type;
 
     return sizeOfLikeExpr;
+}
+
+Expr* SemanticsExprVisitor::visitPackQueryExpr(PackQueryExpr* packQueryExpr)
+{
+    auto valueExpr = dispatch(packQueryExpr->value);
+    packQueryExpr->value = valueExpr;
+
+    auto queryName = _getPackQueryName(packQueryExpr);
+    bool isTypeExpr = false;
+    Type* operandType = nullptr;
+
+    if (auto typeType = as<TypeType>(valueExpr->type))
+    {
+        isTypeExpr = true;
+        TypeExp typeExp;
+        typeExp.exp = valueExpr;
+        operandType = CoerceToProperType(typeExp).type;
+    }
+    else
+    {
+        operandType = valueExpr->type.type;
+    }
+
+    if (!_isTypeOrValValidForPackQuery(operandType))
+    {
+        getSink()->diagnose(
+            Diagnostics::PackQueryArgumentIsInvalid{.queryName = queryName, .expr = packQueryExpr});
+        packQueryExpr->type = m_astBuilder->getErrorType();
+        return packQueryExpr;
+    }
+
+    Val* foldedOperandVal =
+        tryConstantFoldExpr(SubstExpr<Expr>(valueExpr), ConstantFoldingKind::CompileTime, nullptr);
+    Val* cardinalitySource = foldedOperandVal;
+    if (!cardinalitySource && (isTypeExpr || isTypePack(operandType) || as<TupleType>(operandType)))
+        cardinalitySource = operandType;
+
+    auto packCardinality = cardinalitySource ? getPackCardinality(cardinalitySource)
+                                             : VariadicPackCardinality::Unknown;
+
+    auto isFirstOrLastQuery = [&]()
+    { return as<FirstExpr>(packQueryExpr) || as<LastExpr>(packQueryExpr); };
+    auto applyPackQueryToType = [&](Type* type) -> Type*
+    {
+        if (as<FirstExpr>(packQueryExpr))
+            return m_astBuilder->getFirstElement(type);
+        if (as<LastExpr>(packQueryExpr))
+            return m_astBuilder->getLastElement(type);
+        if (as<TrimHeadExpr>(packQueryExpr))
+            return m_astBuilder->getTrimHeadPack(type);
+        return m_astBuilder->getTrimTailPack(type);
+    };
+
+    if (isFirstOrLastQuery())
+    {
+        if (packCardinality == VariadicPackCardinality::Empty)
+        {
+            getSink()->diagnose(Diagnostics::EmptyPackQueryIsInvalid{
+                .queryName = queryName,
+                .expr = packQueryExpr});
+            packQueryExpr->type = m_astBuilder->getErrorType();
+            return packQueryExpr;
+        }
+
+        if (packCardinality != VariadicPackCardinality::NonEmpty)
+        {
+            getSink()->diagnose(Diagnostics::PackQueryRequiresNonEmptyPack{
+                .queryName = queryName,
+                .expr = packQueryExpr});
+            packQueryExpr->type = m_astBuilder->getErrorType();
+            return packQueryExpr;
+        }
+    }
+
+    if (isTypeExpr)
+    {
+        Type* resultType = applyPackQueryToType(operandType);
+        packQueryExpr->type = m_astBuilder->getTypeType(resultType);
+        return packQueryExpr;
+    }
+
+    if (auto valuePackType = as<ValuePackType>(operandType))
+    {
+        if (isFirstOrLastQuery())
+            packQueryExpr->type = QualType(valuePackType->getElementType());
+        else
+            packQueryExpr->type = QualType(valuePackType);
+        return packQueryExpr;
+    }
+
+    if (!isTypeExpr && !as<TupleType>(operandType))
+    {
+        // This branch handles term-valued expressions whose checked type is a type pack rather than
+        // a `ValuePackType` or `TupleType`, e.g. `expand Wrapper<each T>`. Value-pack queries are
+        // handled above, and tuple-valued queries are handled separately.
+        SLANG_ASSERT(isTypePack(operandType));
+        packQueryExpr->type = QualType(applyPackQueryToType(operandType));
+        return packQueryExpr;
+    }
+
+    Type* resultType = applyPackQueryToType(operandType);
+    packQueryExpr->type = QualType(resultType);
+    return packQueryExpr;
 }
 
 Expr* SemanticsExprVisitor::visitFloatBitCastExpr(FloatBitCastExpr* expr)
@@ -4906,8 +5286,8 @@ Expr* SemanticsExprVisitor::visitAsTypeExpr(AsTypeExpr* expr)
 
 Expr* SemanticsExprVisitor::visitExpandExpr(ExpandExpr* expr)
 {
-    OrderedHashSet<Type*> capturedTypePackSet;
-    auto subContext = this->withParentExpandExpr(expr, &capturedTypePackSet);
+    OrderedHashSet<Val*> capturedPackSet;
+    auto subContext = this->withParentExpandExpr(expr, &capturedPackSet);
     expr->baseExpr = dispatchExpr(expr->baseExpr, subContext);
 
     Type* patternType = nullptr;
@@ -4926,16 +5306,16 @@ Expr* SemanticsExprVisitor::visitExpandExpr(ExpandExpr* expr)
         expr->type = m_astBuilder->getErrorType();
         return expr;
     }
-    if (subContext.getCapturedTypePacks()->getCount() == 0)
+    if (subContext.getCapturedPacks()->getCount() == 0)
     {
         getSink()->diagnose(Diagnostics::ExpandTermCapturesNoTypePacks{.expr = expr});
     }
-    List<Type*> capturedTypePacks;
-    for (auto capturedType : capturedTypePackSet)
+    List<Val*> capturedPacks;
+    for (auto capturedVal : capturedPackSet)
     {
-        capturedTypePacks.add(capturedType);
+        capturedPacks.add(capturedVal);
     }
-    auto expandType = m_astBuilder->getExpandType(patternType, capturedTypePacks.getArrayView());
+    auto expandType = m_astBuilder->getExpandType(patternType, capturedPacks.getArrayView());
     if (isTypeExpr)
         expr->type = m_astBuilder->getTypeType(expandType);
     else
@@ -4969,14 +5349,28 @@ Expr* SemanticsExprVisitor::visitEachExpr(EachExpr* expr)
         expr->type = m_astBuilder->getErrorType();
         return expr;
     }
+
+    // Check if this is a value pack parameter reference (e.g. `each D` where D is
+    // `let each D : int`).
+    if (!isTypeNode)
+    {
+        if (auto valPackType = as<ValuePackType>(baseType))
+        {
+            SLANG_ASSERT(m_capturedPacks);
+            if (auto declRefExpr = as<DeclRefExpr>(expr->baseExpr))
+            {
+                auto declRef = getDeclRef(m_astBuilder, declRefExpr);
+                m_capturedPacks->add(
+                    m_astBuilder->getOrCreate<DeclRefIntVal>(valPackType, declRef));
+            }
+            expr->type = QualType(valPackType->getElementType());
+            return expr;
+        }
+    }
+
     if (isTypeNode)
     {
-        auto declRefType = as<DeclRefType>(baseType);
-        if (!declRefType)
-        {
-            goto error;
-        }
-        if (!declRefType->getDeclRef().as<GenericTypePackParamDecl>() && !as<TupleType>(baseType))
+        if (!isTypePack(baseType) && !as<TupleType>(baseType))
         {
             goto error;
         }
@@ -4991,18 +5385,18 @@ Expr* SemanticsExprVisitor::visitEachExpr(EachExpr* expr)
         baseType = tupleType->getTypePack();
 
     {
-        SLANG_ASSERT(m_capturedTypePacks);
+        SLANG_ASSERT(m_capturedPacks);
         if (auto baseExpandType = as<ExpandType>(baseType))
         {
-            for (Index i = 0; i < baseExpandType->getCapturedTypePackCount(); i++)
+            for (Index i = 0; i < baseExpandType->getCapturedPackCount(); i++)
             {
-                auto capturedType = baseExpandType->getCapturedTypePack(i);
-                m_capturedTypePacks->add(capturedType);
+                auto capturedPack = baseExpandType->getCapturedPack(i);
+                m_capturedPacks->add(capturedPack);
             }
         }
         else
         {
-            m_capturedTypePacks->add(baseType);
+            m_capturedPacks->add(baseType);
         }
         auto eachType = m_astBuilder->getEachType(baseType);
         if (isTypeNode)
