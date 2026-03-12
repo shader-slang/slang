@@ -685,6 +685,16 @@ private:
     Dictionary<int, int64_t> bindingToByteOffset;
 };
 
+/// Represents what the compiler can currently prove about a variadic pack's cardinality.
+/// This is intentionally coarse-grained: we only track whether a pack is known to be empty,
+/// known to be non-empty, or still unknown.
+enum class VariadicPackCardinality
+{
+    Unknown,
+    Empty,
+    NonEmpty,
+};
+
 /// Shared state for a semantics-checking session.
 struct SharedSemanticsContext : public RefObject
 {
@@ -724,6 +734,8 @@ struct SharedSemanticsContext : public RefObject
     Dictionary<Decl*, bool> m_typeContainsRecursionCache;
 
     Dictionary<TypePair, ConversionCost> m_typeConversionCostCache;
+
+    Dictionary<Val*, VariadicPackCardinality> m_packCardinalityCache;
 
     // Track diagnostics that have already been reported to avoid duplicates.
     // Key format: "diagnosticId|sourceLocRaw" or "diagnosticId|sourceLocRaw|extraInfo"
@@ -1020,11 +1032,11 @@ public:
         return result;
     }
 
-    SemanticsContext withParentExpandExpr(ExpandExpr* expr, OrderedHashSet<Type*>* capturedTypes)
+    SemanticsContext withParentExpandExpr(ExpandExpr* expr, OrderedHashSet<Val*>* capturedPacks)
     {
         SemanticsContext result(*this);
         result.m_parentExpandExpr = expr;
-        result.m_capturedTypePacks = capturedTypes;
+        result.m_capturedPacks = capturedPacks;
         return result;
     }
 
@@ -1184,7 +1196,7 @@ public:
 
     bool getExcludeTransparentMembersFromLookup() { return m_excludeTransparentMembersFromLookup; }
 
-    OrderedHashSet<Type*>* getCapturedTypePacks() { return m_capturedTypePacks; }
+    OrderedHashSet<Val*>* getCapturedPacks() { return m_capturedPacks; }
 
     GLSLBindingOffsetTracker* getGLSLBindingOffsetTracker()
     {
@@ -1242,7 +1254,7 @@ protected:
 
     ExpandExpr* m_parentExpandExpr = nullptr;
 
-    OrderedHashSet<Type*>* m_capturedTypePacks = nullptr;
+    OrderedHashSet<Val*>* m_capturedPacks = nullptr;
 
     // If we are checking inside a lambda expression, we need
     // to track the referenced variables that should be captured
@@ -1513,6 +1525,10 @@ public:
     {
         return resolveOverloadedExpr(overloadedExpr, nullptr, mask);
     }
+
+    bool hasNonEmptyPackConstraint(Decl* decl);
+    VariadicPackCardinality getPackCardinality(Val* packVal);
+    bool isKnownNonEmptyPack(Val* packVal);
 
     /// Worker reoutine for `maybeResolveOverloadedExpr` and `resolveOverloadedExpr`.
     Expr* _resolveOverloadedExprImpl(
@@ -2285,10 +2301,7 @@ public:
 
     Stmt* maybeParseStmt(Stmt* stmt, const SemanticsContext& context);
 
-    void getGenericParams(
-        GenericDecl* decl,
-        List<Decl*>& outParams,
-        List<GenericTypeConstraintDecl*>& outConstraints);
+    void getGenericParams(GenericDecl* decl, List<Decl*>& outParams, List<Decl*>& outConstraints);
 
     /// Determine if `left` and `right` have matching generic signatures.
     /// If they do, then outputs a specialized declRef to `ioSubstRightToLeft` that
@@ -3205,6 +3218,8 @@ public:
     Expr* visitTreatAsDifferentiableExpr(TreatAsDifferentiableExpr* expr);
 
     Expr* visitGetArrayLengthExpr(GetArrayLengthExpr* expr);
+
+    Expr* visitPackQueryExpr(PackQueryExpr* expr);
 
     Expr* visitDefaultConstructExpr(DefaultConstructExpr* expr);
 

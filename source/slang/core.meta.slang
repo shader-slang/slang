@@ -4718,12 +4718,34 @@ semantic sv_position
     [require(geometry)]
     get : float4;
 
+    [require(fragment)]
+    [require(geometry)]
+    get : float3;
+
+    [require(fragment)]
+    [require(geometry)]
+    get : float2;
+
     [require(vertex)]
     [require(geometry)]
     [require(hull)]
     [require(domain)]
     [require(mesh)]
     set : float4;
+
+    [require(vertex)]
+    [require(geometry)]
+    [require(hull)]
+    [require(domain)]
+    [require(mesh)]
+    set : float3;
+
+    [require(vertex)]
+    [require(geometry)]
+    [require(hull)]
+    [require(domain)]
+    [require(mesh)]
+    set : float2;
 }
 
 semantic sv_depth
@@ -4756,12 +4778,14 @@ semantic sv_clipdistance
     [require(geometry)]
     [require(hull)]
     [require(domain)]
+    [require(mesh)]
     set : float;
 
     [require(vertex)]
     [require(geometry)]
     [require(hull)]
     [require(domain)]
+    [require(mesh)]
     set : float[];
 }
 
@@ -4777,12 +4801,14 @@ semantic sv_culldistance
     [require(geometry)]
     [require(hull)]
     [require(domain)]
+    [require(mesh)]
     set : float;
 
     [require(vertex)]
     [require(geometry)]
     [require(hull)]
     [require(domain)]
+    [require(mesh)]
     set : float[];
 }
 
@@ -5035,8 +5061,13 @@ semantic sv_drawindex
 semantic sv_deviceindex
 {
     [require(vertex)]
+    [require(hull)]
+    [require(domain)]
+    [require(geometry)]
     [require(fragment)]
     [require(compute)]
+    [require(mesh)]
+    [require(amplification)]
     get : uint;
 }
 

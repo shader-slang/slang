@@ -356,11 +356,15 @@ struct SemanticsDeclHeaderVisitor : public SemanticsDeclVisitorBase,
 
     void visitGenericValueParamDecl(GenericValueParamDecl* decl);
 
+    void visitGenericValuePackParamDecl(GenericValuePackParamDecl* decl);
+
     void visitGenericTypeConstraintDecl(GenericTypeConstraintDecl* decl);
 
     void checkGenericTypeEqualityConstraintSubType(GenericTypeConstraintDecl* decl);
 
     void visitTypeCoercionConstraintDecl(TypeCoercionConstraintDecl* decl);
+
+    void visitNonEmptyPackConstraintDecl(NonEmptyPackConstraintDecl* decl);
 
     bool validateGenericConstraintSubType(
         GenericTypeConstraintDecl* decl,
@@ -550,6 +554,11 @@ struct SemanticsDeclBodyVisitor : public SemanticsDeclVisitorBase,
     void visitGenericValueParamDecl(GenericValueParamDecl* genValDecl)
     {
         checkVarDeclCommon(genValDecl);
+    }
+
+    void visitGenericValuePackParamDecl(GenericValuePackParamDecl* genValPackDecl)
+    {
+        checkVarDeclCommon(genValPackDecl);
     }
 
     void visitGlobalGenericValueParamDecl(GlobalGenericValueParamDecl* decl)
@@ -1235,7 +1244,7 @@ QualType getTypeForDeclRef(
             isLValue = false;
 
         // Generic value parameters are always immutable
-        if (varDeclRef.is<GenericValueParamDecl>())
+        if (isGenericValueParam(varDeclRef))
             isLValue = false;
 
         // Function parameters declared in the "modern" style
@@ -2171,7 +2180,7 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         {
             if (!varDecl->type.type)
             {
-                if (as<GenericValueParamDecl>(varDecl))
+                if (isGenericValueParam(varDecl))
                 {
                     getSink()->diagnose(
                         Diagnostics::GenericValueParameterMustHaveType{.decl = varDecl});
@@ -3493,6 +3502,55 @@ void SemanticsDeclHeaderVisitor::visitTypeCoercionConstraintDecl(TypeCoercionCon
         decl->toType = TranslateTypeNodeForced(decl->toType);
 }
 
+void SemanticsDeclHeaderVisitor::visitNonEmptyPackConstraintDecl(NonEmptyPackConstraintDecl* decl)
+{
+    decl->packExpr = CheckTerm(decl->packExpr);
+    auto packExpr = decl->packExpr;
+    if (!packExpr)
+        return;
+
+    if (decl->hasModifier<OptionalConstraintModifier>())
+    {
+        getSink()->diagnose(Diagnostics::OptionalNonEmptyPackConstraintIsInvalid{.expr = packExpr});
+    }
+
+    if (auto declRefExpr = as<DeclRefExpr>(packExpr))
+    {
+        auto declRef = getDeclRef(m_astBuilder, declRefExpr);
+        if (auto typePackDeclRef = declRef.as<GenericTypePackParamDecl>())
+        {
+            if (typePackDeclRef.getDecl()->parentDecl == decl->parentDecl)
+                return;
+            getSink()->diagnose(Diagnostics::NonEmptyPackConstraintTargetMustBeFromCurrentGeneric{
+                .expr = packExpr});
+            return;
+        }
+        if (auto valuePackDeclRef = declRef.as<GenericValuePackParamDecl>())
+        {
+            if (valuePackDeclRef.getDecl()->parentDecl == decl->parentDecl)
+                return;
+            getSink()->diagnose(Diagnostics::NonEmptyPackConstraintTargetMustBeFromCurrentGeneric{
+                .expr = packExpr});
+            return;
+        }
+    }
+
+    getSink()->diagnose(Diagnostics::InvalidNonEmptyPackConstraintTarget{.expr = packExpr});
+}
+
+static void maybeFlattenConjunctionType(Type* type, List<Type*>& outTypes)
+{
+    if (auto andType = as<AndType>(type))
+    {
+        maybeFlattenConjunctionType(andType->getLeft(), outTypes);
+        maybeFlattenConjunctionType(andType->getRight(), outTypes);
+    }
+    else
+    {
+        outTypes.add(type);
+    }
+}
+
 void SemanticsDeclHeaderVisitor::visitGenericTypeConstraintDecl(GenericTypeConstraintDecl* decl)
 {
     CheckConstraintSubType(decl->sub);
@@ -3501,6 +3559,44 @@ void SemanticsDeclHeaderVisitor::visitGenericTypeConstraintDecl(GenericTypeConst
         decl->sub = TranslateTypeNodeForced(decl->sub);
     if (!decl->sup.type)
         decl->sup = TranslateTypeNodeForced(decl->sup);
+
+    // If the super-type is an AndType (e.g. `T : A & B`), flatten it and create
+    // individual GenericTypeConstraintDecls for each element in the conjunction.
+    if (decl->sup.type && !decl->isEqualityConstraint)
+    {
+        List<Type*> flattenedTypes;
+        maybeFlattenConjunctionType(decl->sup.type, flattenedTypes);
+        if (flattenedTypes.getCount() > 1)
+        {
+            auto parentDecl = as<ContainerDecl>(decl->parentDecl);
+            SLANG_ASSERT(parentDecl);
+
+            // Update the current decl's sup to the first type in the flattened list.
+            decl->sup = TypeExp(flattenedTypes[0]);
+
+            // Create new constraint decls for the remaining types.
+            List<GenericTypeConstraintDecl*> newConstraints;
+            for (Index i = 1; i < flattenedTypes.getCount(); i++)
+            {
+                auto newConstraint = m_astBuilder->create<GenericTypeConstraintDecl>();
+                newConstraint->sub = decl->sub;
+                newConstraint->sup = TypeExp(flattenedTypes[i]);
+                newConstraint->loc = decl->loc;
+                newConstraint->parentDecl = parentDecl;
+                parentDecl->addDirectMemberDecl(newConstraint);
+                newConstraints.add(newConstraint);
+            }
+
+            // Clear cached substitutions before proceeding with checking.
+            if (auto genericParentDecl = as<GenericDecl>(parentDecl))
+                genericParentDecl->_cachedArgsForDefaultSubstitution.clear();
+
+            for (auto newConstraint : newConstraints)
+            {
+                ensureDecl(newConstraint, DeclCheckState::SignatureChecked);
+            }
+        }
+    }
 
     if (getLinkage()->m_optionSet.shouldRunNonEssentialValidation())
     {
@@ -3525,6 +3621,26 @@ void SemanticsDeclHeaderVisitor::visitGenericTypeConstraintDecl(GenericTypeConst
                 getSink()->diagnose(Diagnostics::InvalidTypeForConstraint{
                     .type = decl->sup.type,
                     .typeExp = decl->sup.exp});
+                if (isValidCompileTimeConstantType(decl->sup.type) &&
+                    !decl->whereTokenLoc.isValid())
+                {
+                    if (auto subDeclRefType = as<DeclRefType>(decl->sub.type))
+                    {
+                        auto subDecl = subDeclRefType->getDeclRef().getDecl();
+                        if (as<GenericTypePackParamDecl>(subDecl))
+                        {
+                            getSink()->diagnose(Diagnostics::UseLetEachForGenericValuePackParam{
+                                .paramName = subDecl->getName(),
+                                .type = decl->sup.type});
+                        }
+                        else if (as<GenericTypeParamDecl>(subDecl))
+                        {
+                            getSink()->diagnose(Diagnostics::UseLetForGenericValueParam{
+                                .paramName = subDecl->getName(),
+                                .type = decl->sup.type});
+                        }
+                    }
+                }
             }
         }
     }
@@ -3617,6 +3733,24 @@ void SemanticsDeclHeaderVisitor::visitGenericValueParamDecl(GenericValueParamDec
     }
 }
 
+void SemanticsDeclHeaderVisitor::visitGenericValuePackParamDecl(GenericValuePackParamDecl* decl)
+{
+    checkVarDeclCommon(decl);
+
+    if (decl->type.type && !as<ValuePackType>(decl->type.type))
+    {
+        if (!isValidCompileTimeConstantType(decl->type.type))
+        {
+            getSink()->diagnose(Diagnostics::GenericValueParameterTypeNotSupported{
+                .type = decl->type.type,
+                .decl = decl});
+            decl->type.type = m_astBuilder->getErrorType();
+            return;
+        }
+        decl->type.type = m_astBuilder->getOrCreate<ValuePackType>(decl->type.type);
+    }
+}
+
 void SemanticsDeclHeaderVisitor::visitGenericDecl(GenericDecl* genericDecl)
 {
     genericDecl->setCheckState(DeclCheckState::ReadyForLookup);
@@ -3637,14 +3771,37 @@ void SemanticsDeclHeaderVisitor::visitGenericDecl(GenericDecl* genericDecl)
             ensureDecl(typeParam, DeclCheckState::ReadyForReference);
             typeParam->parameterIndex = parameterIndex++;
         }
+        else if (auto valPackParam = as<GenericValuePackParamDecl>(m))
+        {
+            ensureDecl(valPackParam, DeclCheckState::ReadyForReference);
+            valPackParam->parameterIndex = parameterIndex++;
+        }
         else if (auto valParam = as<GenericValueParamDecl>(m))
         {
             ensureDecl(valParam, DeclCheckState::ReadyForReference);
             valParam->parameterIndex = parameterIndex++;
         }
-        else if (as<GenericTypeConstraintDecl>(m) || as<TypeCoercionConstraintDecl>(m))
+        else if (
+            as<GenericTypeConstraintDecl>(m) || as<TypeCoercionConstraintDecl>(m) ||
+            as<NonEmptyPackConstraintDecl>(m))
         {
             ensureDecl(m, DeclCheckState::ReadyForReference);
+        }
+    }
+
+    // Validate that pack parameters only appear at the end of the parameter list.
+    bool seenPack = false;
+    for (Index i = 0; i < genericDecl->getDirectMemberDeclCount(); ++i)
+    {
+        Decl* m = genericDecl->getDirectMemberDecl(i);
+        bool isPack = as<GenericTypePackParamDecl>(m) || as<GenericValuePackParamDecl>(m);
+        if (isPack)
+        {
+            seenPack = true;
+        }
+        else if (seenPack && isGenericParam(m))
+        {
+            getSink()->diagnose(Diagnostics::PackParamMustBeLast{.param = m});
         }
     }
 }
@@ -3663,6 +3820,33 @@ void SemanticsDeclBasesVisitor::visitInheritanceDecl(InheritanceDecl* inheritanc
     baseVistor.CheckConstraintSubType(base);
     base = baseVistor.TranslateTypeNode(base);
     inheritanceDecl->base = base;
+
+    // If the base type is an AndType (e.g. `struct Foo : IBar & IBaz`), flatten it
+    // into individual InheritanceDecls for each element in the conjunction.
+    if (base.type)
+    {
+        List<Type*> flattenedTypes;
+        maybeFlattenConjunctionType(base.type, flattenedTypes);
+        if (flattenedTypes.getCount() > 1)
+        {
+            auto parentDecl = as<ContainerDecl>(inheritanceDecl->parentDecl);
+            SLANG_ASSERT(parentDecl);
+
+            // Update the current decl's base to the first type in the flattened list.
+            inheritanceDecl->base = TypeExp(flattenedTypes[0]);
+
+            // Create new inheritance decls for the remaining types.
+            for (Index i = 1; i < flattenedTypes.getCount(); i++)
+            {
+                auto newInheritance = m_astBuilder->create<InheritanceDecl>();
+                newInheritance->base = TypeExp(flattenedTypes[i]);
+                newInheritance->loc = inheritanceDecl->loc;
+                newInheritance->parentDecl = parentDecl;
+                parentDecl->addDirectMemberDecl(newInheritance);
+                ensureDecl(newInheritance, DeclCheckState::ReadyForLookup);
+            }
+        }
+    }
 
     // Note: we do not check whether the type being inherited from
     // is valid to use for inheritance here, because there could
@@ -4525,6 +4709,13 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
     //
     auto requiredMemberDeclRefs = getMembers(m_astBuilder, requiredGenericDeclRef);
     auto satisfyingMemberDeclRefs = getMembers(m_astBuilder, satisfyingGenericDeclRef);
+
+    auto getNonEmptyConstraintTargetDecl = [&](NonEmptyPackConstraintDecl* constraintDecl) -> Decl*
+    {
+        if (auto declRefExpr = as<DeclRefExpr>(constraintDecl->packExpr))
+            return getDeclRef(m_astBuilder, declRefExpr).getDecl();
+        return nullptr;
+    };
     //
     // We start by performing a superficial "structural" match of the parameters
     // to ensure that the two generics have an equivalent mix of type, value,
@@ -4551,10 +4742,15 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
         auto requiredMemberDeclRef = requiredMemberDeclRefs[i];
         auto satisfyingMemberDeclRef = satisfyingMemberDeclRefs[i];
 
-        if (as<GenericTypeParamDecl>(requiredMemberDeclRef))
+        if (as<GenericTypeParamDeclBase>(requiredMemberDeclRef))
         {
-            if (as<GenericTypeParamDecl>(satisfyingMemberDeclRef))
+            if (as<GenericTypeParamDeclBase>(satisfyingMemberDeclRef))
             {
+                if ((requiredMemberDeclRef.as<GenericTypePackParamDecl>() != nullptr) !=
+                    (satisfyingMemberDeclRef.as<GenericTypePackParamDecl>() != nullptr))
+                {
+                    return false;
+                }
             }
             else
                 return false;
@@ -4569,7 +4765,19 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
                 return false;
         }
         else if (
-            auto requiredConstraintDeclRef = requiredMemberDeclRef.as<GenericTypeConstraintDecl>())
+            auto requiredValuePackParamDeclRef =
+                requiredMemberDeclRef.as<GenericValuePackParamDecl>())
+        {
+            if (auto satisfyingValuePackParamDeclRef =
+                    satisfyingMemberDeclRef.as<GenericValuePackParamDecl>())
+            {
+            }
+            else
+                return false;
+        }
+        else if (
+            auto requiredTypeConstraintDeclRef =
+                requiredMemberDeclRef.as<GenericTypeConstraintDecl>())
         {
             if (auto satisfyingConstraintDeclRef =
                     satisfyingMemberDeclRef.as<GenericTypeConstraintDecl>())
@@ -4578,6 +4786,30 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
             else
                 return false;
         }
+        else if (
+            auto requiredTypeCoercionConstraintDeclRef =
+                requiredMemberDeclRef.as<TypeCoercionConstraintDecl>())
+        {
+            if (auto satisfyingConstraintDeclRef =
+                    satisfyingMemberDeclRef.as<TypeCoercionConstraintDecl>())
+            {
+            }
+            else
+                return false;
+        }
+        else if (
+            auto requiredNonEmptyConstraintDeclRef =
+                requiredMemberDeclRef.as<NonEmptyPackConstraintDecl>())
+        {
+            if (auto satisfyingConstraintDeclRef =
+                    satisfyingMemberDeclRef.as<NonEmptyPackConstraintDecl>())
+            {
+            }
+            else
+                return false;
+        }
+        else
+            return false;
     }
 
     // In order to compare the inner declarations of the two generics, we need to
@@ -4613,9 +4845,10 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
         auto requiredMemberDeclRef = requiredMemberDeclRefs[i];
         auto satisfyingMemberDeclRef = satisfyingMemberDeclRefs[i];
 
-        if (auto requiredTypeParamDeclRef = requiredMemberDeclRef.as<GenericTypeParamDecl>())
+        if (auto requiredTypeParamDeclRef = requiredMemberDeclRef.as<GenericTypeParamDeclBase>())
         {
-            auto satisfyingTypeParamDeclRef = satisfyingMemberDeclRef.as<GenericTypeParamDecl>();
+            auto satisfyingTypeParamDeclRef =
+                satisfyingMemberDeclRef.as<GenericTypeParamDeclBase>();
             SLANG_ASSERT(satisfyingTypeParamDeclRef);
             auto satisfyingType = DeclRefType::create(m_astBuilder, satisfyingTypeParamDeclRef);
 
@@ -4633,13 +4866,28 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
 
             requiredSubstArgs.add(satisfyingVal);
         }
+        else if (
+            auto requiredValuePackParamDeclRef =
+                requiredMemberDeclRef.as<GenericValuePackParamDecl>())
+        {
+            auto satisfyingValuePackParamDeclRef =
+                satisfyingMemberDeclRef.as<GenericValuePackParamDecl>();
+            SLANG_ASSERT(satisfyingValuePackParamDeclRef);
+
+            auto satisfyingVal = m_astBuilder->getOrCreate<DeclRefIntVal>(
+                requiredValuePackParamDeclRef.getDecl()->getType(),
+                satisfyingValuePackParamDeclRef);
+
+            requiredSubstArgs.add(satisfyingVal);
+        }
     }
     for (Index i = 0; i < memberCount; i++)
     {
         auto requiredMemberDeclRef = requiredMemberDeclRefs[i];
         auto satisfyingMemberDeclRef = satisfyingMemberDeclRefs[i];
 
-        if (auto requiredConstraintDeclRef = requiredMemberDeclRef.as<GenericTypeConstraintDecl>())
+        if (auto requiredTypeConstraintDeclRef =
+                requiredMemberDeclRef.as<GenericTypeConstraintDecl>())
         {
             auto satisfyingConstraintDeclRef =
                 satisfyingMemberDeclRef.as<GenericTypeConstraintDecl>();
@@ -4651,6 +4899,29 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
                 satisfyingConstraintDeclRef.getDecl());
 
             requiredSubstArgs.add(satisfyingWitness);
+        }
+        else if (
+            auto requiredTypeCoercionConstraintDeclRef =
+                requiredMemberDeclRef.as<TypeCoercionConstraintDecl>())
+        {
+            auto satisfyingConstraintDeclRef =
+                satisfyingMemberDeclRef.as<TypeCoercionConstraintDecl>();
+            SLANG_ASSERT(satisfyingConstraintDeclRef);
+
+            auto satisfyingWitness = m_astBuilder->getBuiltinTypeCoercionWitness(
+                getFromType(m_astBuilder, satisfyingConstraintDeclRef),
+                getToType(m_astBuilder, satisfyingConstraintDeclRef));
+
+            requiredSubstArgs.add(satisfyingWitness);
+        }
+        else if (
+            auto requiredNonEmptyConstraintDeclRef =
+                requiredMemberDeclRef.as<NonEmptyPackConstraintDecl>())
+        {
+            [[maybe_unused]] auto satisfyingConstraintDeclRef =
+                satisfyingMemberDeclRef.as<NonEmptyPackConstraintDecl>();
+            SLANG_ASSERT(satisfyingConstraintDeclRef);
+            requiredSubstArgs.add(m_astBuilder->getNonEmptyPackWitness());
         }
     }
 
@@ -4667,10 +4938,10 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
         auto requiredMemberDeclRef = requiredMemberDeclRefs[i];
         auto satisfyingMemberDeclRef = satisfyingMemberDeclRefs[i];
 
-        if (auto requiredTypeParamDeclRef = requiredMemberDeclRef.as<GenericTypeParamDecl>())
+        if (auto requiredTypeParamDeclRef = requiredMemberDeclRef.as<GenericTypeParamDeclBase>())
         {
             [[maybe_unused]] auto satisfyingTypeParamDeclRef =
-                satisfyingMemberDeclRef.as<GenericTypeParamDecl>();
+                satisfyingMemberDeclRef.as<GenericTypeParamDeclBase>();
             SLANG_ASSERT(satisfyingTypeParamDeclRef);
 
             // There are no additional checks we need to make on plain old
@@ -4686,16 +4957,27 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
             auto satisfyingValueParamDeclRef = satisfyingMemberDeclRef.as<GenericValueParamDecl>();
             SLANG_ASSERT(satisfyingValueParamDeclRef);
 
-            // For a generic value parameter, we need to check that the required
-            // and satisfying declaration both agree on the type of the parameter.
-            //
             auto requiredParamType = getType(m_astBuilder, requiredValueParamDeclRef);
             auto satisfyingParamType = getType(m_astBuilder, satisfyingValueParamDeclRef);
             if (!satisfyingParamType->equals(requiredParamType))
                 return false;
         }
         else if (
-            auto requiredConstraintDeclRef = requiredMemberDeclRef.as<GenericTypeConstraintDecl>())
+            auto requiredValuePackParamDeclRef =
+                requiredMemberDeclRef.as<GenericValuePackParamDecl>())
+        {
+            auto satisfyingValuePackParamDeclRef =
+                satisfyingMemberDeclRef.as<GenericValuePackParamDecl>();
+            SLANG_ASSERT(satisfyingValuePackParamDeclRef);
+
+            auto requiredParamType = getType(m_astBuilder, requiredValuePackParamDeclRef);
+            auto satisfyingParamType = getType(m_astBuilder, satisfyingValuePackParamDeclRef);
+            if (!satisfyingParamType->equals(requiredParamType))
+                return false;
+        }
+        else if (
+            auto requiredTypeConstraintDeclRef =
+                requiredMemberDeclRef.as<GenericTypeConstraintDecl>())
         {
             auto satisfyingConstraintDeclRef =
                 satisfyingMemberDeclRef.as<GenericTypeConstraintDecl>();
@@ -4707,12 +4989,13 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
             // In current code the sub type will always be one of the generic type parameters,
             // and the super-type will always be an interface, but there should be no
             // need to make use of those additional details here.
-            auto specializedRequiredConstraintDeclRef = m_astBuilder
-                                                            ->getGenericAppDeclRef(
-                                                                requiredGenericDeclRef,
-                                                                requiredSubstArgs.getArrayView(),
-                                                                requiredConstraintDeclRef.getDecl())
-                                                            .as<GenericTypeConstraintDecl>();
+            auto specializedRequiredConstraintDeclRef =
+                m_astBuilder
+                    ->getGenericAppDeclRef(
+                        requiredGenericDeclRef,
+                        requiredSubstArgs.getArrayView(),
+                        requiredTypeConstraintDeclRef.getDecl())
+                    .as<GenericTypeConstraintDecl>();
             auto requiredSubType = getSub(m_astBuilder, specializedRequiredConstraintDeclRef);
             auto satisfyingSubType = getSub(m_astBuilder, satisfyingConstraintDeclRef);
             if (!satisfyingSubType->equals(requiredSubType))
@@ -4722,6 +5005,66 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
             auto satisfyingSuperType = getSup(m_astBuilder, satisfyingConstraintDeclRef);
             if (!satisfyingSuperType->equals(requiredSuperType))
                 return false;
+        }
+        else if (
+            auto requiredTypeCoercionConstraintDeclRef =
+                requiredMemberDeclRef.as<TypeCoercionConstraintDecl>())
+        {
+            auto satisfyingConstraintDeclRef =
+                satisfyingMemberDeclRef.as<TypeCoercionConstraintDecl>();
+            SLANG_ASSERT(satisfyingConstraintDeclRef);
+
+            auto specializedRequiredConstraintDeclRef =
+                m_astBuilder
+                    ->getGenericAppDeclRef(
+                        requiredGenericDeclRef,
+                        requiredSubstArgs.getArrayView(),
+                        requiredTypeCoercionConstraintDeclRef.getDecl())
+                    .as<TypeCoercionConstraintDecl>();
+            auto requiredFromType = getFromType(m_astBuilder, specializedRequiredConstraintDeclRef);
+            auto satisfyingFromType = getFromType(m_astBuilder, satisfyingConstraintDeclRef);
+            if (!satisfyingFromType->equals(requiredFromType))
+                return false;
+
+            auto requiredToType = getToType(m_astBuilder, specializedRequiredConstraintDeclRef);
+            auto satisfyingToType = getToType(m_astBuilder, satisfyingConstraintDeclRef);
+            if (!satisfyingToType->equals(requiredToType))
+                return false;
+
+            if (requiredTypeCoercionConstraintDeclRef.getDecl()
+                    ->hasModifier<ImplicitConversionModifier>() !=
+                satisfyingConstraintDeclRef.getDecl()->hasModifier<ImplicitConversionModifier>())
+            {
+                return false;
+            }
+        }
+        else if (
+            auto requiredNonEmptyConstraintDeclRef =
+                requiredMemberDeclRef.as<NonEmptyPackConstraintDecl>())
+        {
+            auto satisfyingConstraintDeclRef =
+                satisfyingMemberDeclRef.as<NonEmptyPackConstraintDecl>();
+            SLANG_ASSERT(satisfyingConstraintDeclRef);
+
+            auto specializedRequiredConstraintDeclRef =
+                m_astBuilder
+                    ->getGenericAppDeclRef(
+                        requiredGenericDeclRef,
+                        requiredSubstArgs.getArrayView(),
+                        requiredNonEmptyConstraintDeclRef.getDecl())
+                    .as<NonEmptyPackConstraintDecl>();
+            if (!specializedRequiredConstraintDeclRef)
+                return false;
+
+            if (getNonEmptyConstraintTargetDecl(specializedRequiredConstraintDeclRef.getDecl()) !=
+                getNonEmptyConstraintTargetDecl(satisfyingConstraintDeclRef.getDecl()))
+            {
+                return false;
+            }
+        }
+        else
+        {
+            return false;
         }
     }
 
@@ -5048,16 +5391,8 @@ GenericDecl* SemanticsVisitor::synthesizeGenericSignatureForRequirementWitness(
             synValParamDecl->parameterIndex = valParamDecl->parameterIndex;
             synValParamDecl->type = valParamDecl->type;
 
-            // Note: we intentionally do not copy GenericValueParamDecl::initExpr here,
-            // because initType maybe dependent on the original type/value parameters,
-            // and if we copy we must also substitute all the original type parameters with the
-            // synthesized ones. It shouldn't be required for the implementing declaration to define
-            // initType anyways, so we'll just save ourselves from the trouble.
-            //
-
             mapOrigToSynTypeParams.add(valParamDecl, synGenericDecl);
 
-            // Construct a DeclRefExpr from the value parameter.
             auto synValParamDeclRef = makeDeclRef(synValParamDecl);
 
             auto synValParamDeclRefExpr = m_astBuilder->create<VarExpr>();
@@ -5065,6 +5400,24 @@ GenericDecl* SemanticsVisitor::synthesizeGenericSignatureForRequirementWitness(
             synValParamDeclRefExpr->type = synValParamDecl->type.type;
 
             synGenericArgs.add(synValParamDeclRefExpr);
+        }
+        else if (auto valPackParamDecl = as<GenericValuePackParamDecl>(member))
+        {
+            auto synValPackParamDecl = m_astBuilder->create<GenericValuePackParamDecl>();
+            synValPackParamDecl->nameAndLoc = valPackParamDecl->nameAndLoc;
+            synGenericDecl->addMember(synValPackParamDecl);
+            synValPackParamDecl->parameterIndex = valPackParamDecl->parameterIndex;
+            synValPackParamDecl->type = valPackParamDecl->type;
+
+            mapOrigToSynTypeParams.add(valPackParamDecl, synGenericDecl);
+
+            auto synValPackParamDeclRef = makeDeclRef(synValPackParamDecl);
+
+            auto synValPackParamDeclRefExpr = m_astBuilder->create<VarExpr>();
+            synValPackParamDeclRefExpr->declRef = synValPackParamDeclRef;
+            synValPackParamDeclRefExpr->type = synValPackParamDecl->type.type;
+
+            synGenericArgs.add(synValPackParamDeclRefExpr);
         }
     }
 
@@ -5086,24 +5439,68 @@ GenericDecl* SemanticsVisitor::synthesizeGenericSignatureForRequirementWitness(
     // from the original requirement decl. For example, we can simply apply declref substituion on
     // the original type constraint `U:IDerived` to get `UImpl : IDerived`.
     //
-    for (auto constraintDecl :
-         requiredMemberDeclRef.getDecl()->getDirectMemberDeclsOfType<GenericTypeConstraintDecl>())
+    for (auto constraintDecl : requiredMemberDeclRef.getDecl()->getDirectMemberDecls())
     {
-        auto synConstraintDecl = m_astBuilder->create<GenericTypeConstraintDecl>();
-        synConstraintDecl->nameAndLoc = constraintDecl->getNameAndLoc();
-        synConstraintDecl->parentDecl = synGenericDecl;
+        if (auto genericTypeConstraintDecl = as<GenericTypeConstraintDecl>(constraintDecl))
+        {
+            auto synConstraintDecl = m_astBuilder->create<GenericTypeConstraintDecl>();
+            synConstraintDecl->nameAndLoc = genericTypeConstraintDecl->getNameAndLoc();
+            synConstraintDecl->parentDecl = synGenericDecl;
+            synConstraintDecl->isEqualityConstraint =
+                genericTypeConstraintDecl->isEqualityConstraint;
 
-        // For generic constraint Sub : Sup, we need to substitute them with
-        // synthesized generic parameters.
-        //
-        synConstraintDecl->sub = TypeExp((Type*)constraintDecl->sub.type->substitute(
-            m_astBuilder,
-            SubstitutionSet(partiallySpecializedRequiredGenericDeclRef)));
-        synConstraintDecl->sup = TypeExp((Type*)constraintDecl->sup.type->substitute(
-            m_astBuilder,
-            SubstitutionSet(partiallySpecializedRequiredGenericDeclRef)));
+            // For generic constraint Sub : Sup, we need to substitute them with
+            // synthesized generic parameters.
+            //
+            synConstraintDecl->sub = TypeExp((Type*)genericTypeConstraintDecl->sub.type->substitute(
+                m_astBuilder,
+                SubstitutionSet(partiallySpecializedRequiredGenericDeclRef)));
+            synConstraintDecl->sup = TypeExp((Type*)genericTypeConstraintDecl->sup.type->substitute(
+                m_astBuilder,
+                SubstitutionSet(partiallySpecializedRequiredGenericDeclRef)));
 
-        synGenericDecl->addDirectMemberDecl(synConstraintDecl);
+            synGenericDecl->addDirectMemberDecl(synConstraintDecl);
+        }
+        else if (auto typeCoercionConstraintDecl = as<TypeCoercionConstraintDecl>(constraintDecl))
+        {
+            auto synConstraintDecl = m_astBuilder->create<TypeCoercionConstraintDecl>();
+            synConstraintDecl->nameAndLoc = typeCoercionConstraintDecl->getNameAndLoc();
+            synConstraintDecl->parentDecl = synGenericDecl;
+            synConstraintDecl->fromType =
+                TypeExp((Type*)typeCoercionConstraintDecl->fromType.type->substitute(
+                    m_astBuilder,
+                    SubstitutionSet(partiallySpecializedRequiredGenericDeclRef)));
+            synConstraintDecl->toType =
+                TypeExp((Type*)typeCoercionConstraintDecl->toType.type->substitute(
+                    m_astBuilder,
+                    SubstitutionSet(partiallySpecializedRequiredGenericDeclRef)));
+
+            synGenericDecl->addDirectMemberDecl(synConstraintDecl);
+        }
+        else if (auto nonEmptyConstraintDecl = as<NonEmptyPackConstraintDecl>(constraintDecl))
+        {
+            auto synConstraintDecl = m_astBuilder->create<NonEmptyPackConstraintDecl>();
+            synConstraintDecl->nameAndLoc = nonEmptyConstraintDecl->getNameAndLoc();
+            synConstraintDecl->parentDecl = synGenericDecl;
+
+            auto synPackDeclRefExpr = m_astBuilder->create<VarExpr>();
+            if (auto declRefExpr = as<DeclRefExpr>(nonEmptyConstraintDecl->packExpr))
+            {
+                auto origPackDecl = getDeclRef(m_astBuilder, declRefExpr).getDecl();
+                auto synPackDecl = mapOrigToSynTypeParams.tryGetValue(origPackDecl);
+                SLANG_ASSERT(synPackDecl);
+                synPackDeclRefExpr->declRef = makeDeclRef(*synPackDecl);
+                synPackDeclRefExpr->type =
+                    getTypeForDeclRef(m_astBuilder, synPackDeclRefExpr->declRef, SourceLoc());
+            }
+            else
+            {
+                SLANG_UNEXPECTED("nonempty constraint target must be a direct decl ref");
+            }
+            synConstraintDecl->packExpr = synPackDeclRefExpr;
+
+            synGenericDecl->addDirectMemberDecl(synConstraintDecl);
+        }
     }
 
     // Override generic pointer to point to the original generic container.
@@ -5616,6 +6013,14 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
                 synValParamDeclRefExpr->declRef = synValParamDeclRef;
                 synValParamDeclRefExpr->type = getType(m_astBuilder, synValParamDeclRef);
                 genericAppExpr->arguments.add(synValParamDeclRefExpr);
+            }
+            else if (auto valPackParamDecl = as<GenericValuePackParamDecl>(member))
+            {
+                auto synValPackParamDeclRef = makeDeclRef(valPackParamDecl);
+                auto synValPackParamDeclRefExpr = m_astBuilder->create<VarExpr>();
+                synValPackParamDeclRefExpr->declRef = synValPackParamDeclRef;
+                synValPackParamDeclRefExpr->type = getType(m_astBuilder, synValPackParamDeclRef);
+                genericAppExpr->arguments.add(synValPackParamDeclRefExpr);
             }
         }
         synBase = subVisitor.checkGenericAppWithCheckedArgs(genericAppExpr);
@@ -7617,13 +8022,13 @@ bool SemanticsVisitor::checkConformance(
             auto superTypeDecl = superDeclRefType->getDeclRef().getDecl();
             if (superTypeDecl->findModifier<ComInterfaceAttribute>())
             {
-                // A struct cannot implement a COM Interface.
-                if (auto classDecl = as<ClassDecl>(superTypeDecl))
+                auto subTypeDecl = declRef.getDecl();
+                if (auto classDecl = as<ClassDecl>(subTypeDecl))
                 {
-                    // OK.
+                    // Classes can implement COM interfaces.
                     SLANG_UNUSED(classDecl);
                 }
-                else if (auto subInterfaceDecl = as<InterfaceDecl>(superTypeDecl))
+                else if (auto subInterfaceDecl = as<InterfaceDecl>(subTypeDecl))
                 {
                     if (!subInterfaceDecl->findModifier<ComInterfaceAttribute>())
                     {
@@ -7631,7 +8036,7 @@ bool SemanticsVisitor::checkConformance(
                             Diagnostics::InterfaceInheritingComMustBeCom{.decl = inheritanceDecl});
                     }
                 }
-                else if (const auto structDecl = as<StructDecl>(superTypeDecl))
+                else if (const auto structDecl = as<StructDecl>(subTypeDecl))
                 {
                     getSink()->diagnose(
                         Diagnostics::StructCannotImplementComInterface{.decl = inheritanceDecl});
@@ -8053,6 +8458,15 @@ void SemanticsDeclBasesVisitor::visitInterfaceDecl(InterfaceDecl* decl)
         // a circular inheritance relationship.
 
         _validateCrossModuleInheritance(decl, inheritanceDecl);
+
+        if (baseInterfaceDeclRef.getDecl()->findModifier<ComInterfaceAttribute>())
+        {
+            if (!decl->findModifier<ComInterfaceAttribute>())
+            {
+                getSink()->diagnose(
+                    Diagnostics::InterfaceInheritingComMustBeCom{.decl = inheritanceDecl});
+            }
+        }
     }
 
     if (decl->findModifier<ComInterfaceAttribute>())
@@ -8773,19 +9187,25 @@ void SemanticsDeclBodyVisitor::visitFunctionDeclBase(FunctionDeclBase* decl)
 void SemanticsVisitor::getGenericParams(
     GenericDecl* decl,
     List<Decl*>& outParams,
-    List<GenericTypeConstraintDecl*>& outConstraints)
+    List<Decl*>& outConstraints)
 {
     for (auto dd : decl->getDirectMemberDecls())
     {
         if (dd == decl->inner)
             continue;
 
-        if (auto typeParamDecl = as<GenericTypeParamDecl>(dd))
+        if (auto typeParamDecl = as<GenericTypeParamDeclBase>(dd))
             outParams.add(typeParamDecl);
         else if (auto valueParamDecl = as<GenericValueParamDecl>(dd))
             outParams.add(valueParamDecl);
+        else if (auto valuePackParamDecl = as<GenericValuePackParamDecl>(dd))
+            outParams.add(valuePackParamDecl);
         else if (auto constraintDecl = as<GenericTypeConstraintDecl>(dd))
             outConstraints.add(constraintDecl);
+        else if (auto typeCoercionConstraintDecl = as<TypeCoercionConstraintDecl>(dd))
+            outConstraints.add(typeCoercionConstraintDecl);
+        else if (auto nonEmptyConstraintDecl = as<NonEmptyPackConstraintDecl>(dd))
+            outConstraints.add(nonEmptyConstraintDecl);
     }
 }
 
@@ -8807,11 +9227,11 @@ bool SemanticsVisitor::doGenericSignaturesMatch(
     // and the constraints from each declaration.
     //
     List<Decl*> leftParams;
-    List<GenericTypeConstraintDecl*> leftConstraints;
+    List<Decl*> leftConstraints;
     getGenericParams(left, leftParams, leftConstraints);
 
     List<Decl*> rightParams;
-    List<GenericTypeConstraintDecl*> rightConstraints;
+    List<Decl*> rightConstraints;
     getGenericParams(right, rightParams, rightConstraints);
 
     // For there to be any hope of a match, the two decls
@@ -8829,10 +9249,16 @@ bool SemanticsVisitor::doGenericSignaturesMatch(
         Decl* leftParam = leftParams[pp];
         Decl* rightParam = rightParams[pp];
 
-        if (const auto leftTypeParam = as<GenericTypeParamDecl>(leftParam))
+        if (const auto leftTypeParam = as<GenericTypeParamDeclBase>(leftParam))
         {
-            if (const auto rightTypeParam = as<GenericTypeParamDecl>(rightParam))
+            if (const auto rightTypeParam = as<GenericTypeParamDeclBase>(rightParam))
             {
+                if ((as<GenericTypePackParamDecl>(leftTypeParam) != nullptr) !=
+                    (as<GenericTypePackParamDecl>(rightTypeParam) != nullptr))
+                {
+                    return false;
+                }
+
                 // Right now any two type parameters are a match.
                 // Names are irrelevant to matching, and any constraints
                 // on the type parameters are represented as implicit
@@ -8851,26 +9277,17 @@ bool SemanticsVisitor::doGenericSignaturesMatch(
         {
             if (auto rightValueParam = as<GenericValueParamDecl>(rightParam))
             {
-                // In this case we have two generic value parameters,
-                // and they should only be considered to match if
-                // they have the same type.
-                //
-                // Note: We are assuming here that the type of a value
-                // parameter cannot be dependent on any of the type
-                // parameters in the same signature. This is a reasonable
-                // assumption for now, but could get thorny down the road.
-                //
                 if (!leftValueParam->getType()->equals(rightValueParam->getType()))
-                {
-                    // If the value parameters have non-matching types,
-                    // then the full generic signatures do not match.
-                    //
                     return false;
-                }
-
-                // Generic value parameters with the same type are
-                // always considered to match.
-                //
+                continue;
+            }
+        }
+        else if (auto leftValuePackParam = as<GenericValuePackParamDecl>(leftParam))
+        {
+            if (auto rightValuePackParam = as<GenericValuePackParamDecl>(rightParam))
+            {
+                if (!leftValuePackParam->getType()->equals(rightValuePackParam->getType()))
+                    return false;
                 continue;
             }
         }
@@ -8914,6 +9331,13 @@ bool SemanticsVisitor::doGenericSignaturesMatch(
     List<Val*> leftArgs = getDefaultSubstitutionArgs(m_astBuilder, this, left);
     substInnerRightToLeft =
         m_astBuilder->getGenericAppDeclRef(makeDeclRef(right), leftArgs.getArrayView());
+
+    auto getNonEmptyConstraintTargetDecl = [&](NonEmptyPackConstraintDecl* constraintDecl) -> Decl*
+    {
+        if (auto declRefExpr = as<DeclRefExpr>(constraintDecl->packExpr))
+            return getDeclRef(m_astBuilder, declRefExpr).getDecl();
+        return nullptr;
+    };
 
     // We should now be able to enumerate the constraints
     // on `right` in a way that uses the same type parameters
@@ -8984,32 +9408,93 @@ bool SemanticsVisitor::doGenericSignaturesMatch(
         // constraint so that we can take the substitution
         // arguments into account.
         //
-        GenericTypeConstraintDecl* leftConstraint = leftConstraints[cc];
-        auto unspecializedRightConstarintDeclRef = createDefaultSubstitutionsIfNeeded(
-            m_astBuilder,
-            this,
-            makeDeclRef(rightConstraints[cc]));
-        DeclRef<GenericTypeConstraintDecl> rightConstraint =
-            substInnerRightToLeft.substitute(m_astBuilder, unspecializedRightConstarintDeclRef)
-                .as<GenericTypeConstraintDecl>();
+        if (auto leftTypeConstraint = as<GenericTypeConstraintDecl>(leftConstraints[cc]))
+        {
+            auto unspecializedRightConstarintDeclRef = createDefaultSubstitutionsIfNeeded(
+                m_astBuilder,
+                this,
+                makeDeclRef(rightConstraints[cc]));
+            DeclRef<GenericTypeConstraintDecl> rightConstraint =
+                substInnerRightToLeft.substitute(m_astBuilder, unspecializedRightConstarintDeclRef)
+                    .as<GenericTypeConstraintDecl>();
+            if (!rightConstraint)
+                return false;
 
-        // For now, every constraint has the form `sub : sup`
-        // to indicate that `sub` must be a subtype of `sup`.
-        //
-        // Two such constraints are equivalent if their `sub`
-        // and `sup` types are pairwise equivalent.
-        //
-        auto leftSub = leftConstraint->sub.type;
-        auto rightSub =
-            substInnerRightToLeft.substitute(m_astBuilder, rightConstraint.getDecl()->sub.type);
-        if (!leftSub->equals(rightSub))
-            return false;
+            if (leftTypeConstraint->isEqualityConstraint !=
+                rightConstraint.getDecl()->isEqualityConstraint)
+                return false;
+            if (leftTypeConstraint->hasModifier<OptionalConstraintModifier>() !=
+                rightConstraint.getDecl()->hasModifier<OptionalConstraintModifier>())
+            {
+                return false;
+            }
 
-        auto leftSup = leftConstraint->sup.type;
-        auto rightSup =
-            substInnerRightToLeft.substitute(m_astBuilder, rightConstraint.getDecl()->sup.type);
-        if (!leftSup->equals(rightSup))
+            auto leftSub = leftTypeConstraint->sub.type;
+            auto rightSub =
+                substInnerRightToLeft.substitute(m_astBuilder, rightConstraint.getDecl()->sub.type);
+            if (!leftSub->equals(rightSub))
+                return false;
+
+            auto leftSup = leftTypeConstraint->sup.type;
+            auto rightSup =
+                substInnerRightToLeft.substitute(m_astBuilder, rightConstraint.getDecl()->sup.type);
+            if (!leftSup->equals(rightSup))
+                return false;
+        }
+        else if (
+            auto leftTypeCoercionConstraint = as<TypeCoercionConstraintDecl>(leftConstraints[cc]))
+        {
+            auto unspecializedRightConstraintDeclRef = createDefaultSubstitutionsIfNeeded(
+                m_astBuilder,
+                this,
+                makeDeclRef(rightConstraints[cc]));
+            auto rightConstraint =
+                substInnerRightToLeft.substitute(m_astBuilder, unspecializedRightConstraintDeclRef)
+                    .as<TypeCoercionConstraintDecl>();
+            if (!rightConstraint)
+                return false;
+
+            auto leftFromType = leftTypeCoercionConstraint->fromType.type;
+            auto rightFromType = substInnerRightToLeft.substitute(
+                m_astBuilder,
+                rightConstraint.getDecl()->fromType.type);
+            if (!leftFromType->equals(rightFromType))
+                return false;
+
+            auto leftToType = leftTypeCoercionConstraint->toType.type;
+            auto rightToType = substInnerRightToLeft.substitute(
+                m_astBuilder,
+                rightConstraint.getDecl()->toType.type);
+            if (!leftToType->equals(rightToType))
+                return false;
+
+            if (leftTypeCoercionConstraint->hasModifier<ImplicitConversionModifier>() !=
+                rightConstraint.getDecl()->hasModifier<ImplicitConversionModifier>())
+            {
+                return false;
+            }
+        }
+        else if (auto leftNonEmptyConstraint = as<NonEmptyPackConstraintDecl>(leftConstraints[cc]))
+        {
+            auto unspecializedRightConstraintDeclRef = createDefaultSubstitutionsIfNeeded(
+                m_astBuilder,
+                this,
+                makeDeclRef(rightConstraints[cc]));
+            auto rightConstraint =
+                substInnerRightToLeft.substitute(m_astBuilder, unspecializedRightConstraintDeclRef)
+                    .as<NonEmptyPackConstraintDecl>();
+            if (!rightConstraint)
+                return false;
+            if (getNonEmptyConstraintTargetDecl(leftNonEmptyConstraint) !=
+                getNonEmptyConstraintTargetDecl(rightConstraint.getDecl()))
+            {
+                return false;
+            }
+        }
+        else
+        {
             return false;
+        }
     }
 
     // If we have checked all of the (canonicalized) constraints
@@ -9093,6 +9578,15 @@ List<Val*> getDefaultSubstitutionArgs(
                 astBuilder->getDirectDeclRef(genericTypePackParamDecl));
             args.add(packType);
         }
+        else if (auto genericValuePackParamDecl = as<GenericValuePackParamDecl>(mm))
+        {
+            if (semantics)
+                semantics->ensureDecl(genericValuePackParamDecl, DeclCheckState::ReadyForLookup);
+
+            args.add(astBuilder->getOrCreate<DeclRefIntVal>(
+                genericValuePackParamDecl->getType(),
+                astBuilder->getDirectDeclRef(genericValuePackParamDecl)));
+        }
         else if (auto genericValueParamDecl = as<GenericValueParamDecl>(mm))
         {
             if (semantics)
@@ -9106,34 +9600,76 @@ List<Val*> getDefaultSubstitutionArgs(
 
     bool shouldCache = true;
 
-    // create default substitution arguments for constraints
-    for (auto genericTypeConstraintDecl :
-         genericDecl->getDirectMemberDeclsOfType<GenericTypeConstraintDecl>())
+    // check all constraints. It is possible that checking the constraint can split it
+    // into multiple constraints, so we will check all the constraints first, and then proceed with
+    // constructing the args list.
+    //
+    if (semantics)
     {
-        if (semantics)
-            semantics->ensureDecl(genericTypeConstraintDecl, DeclCheckState::ReadyForReference);
-        auto constraintDeclRef =
-            astBuilder->getDirectDeclRef<GenericTypeConstraintDecl>(genericTypeConstraintDecl);
-        auto supType = getSup(astBuilder, constraintDeclRef);
-        if (!supType)
+        for (auto member : genericDecl->getDirectMemberDecls())
         {
-            args.add(astBuilder->getErrorType());
-            shouldCache = false;
-            continue;
+            if (auto genericTypeConstraintDecl = as<GenericTypeConstraintDecl>(member))
+            {
+                semantics->ensureDecl(genericTypeConstraintDecl, DeclCheckState::ReadyForReference);
+            }
+            else if (auto typeCoercionConstraintDecl = as<TypeCoercionConstraintDecl>(member))
+            {
+                semantics->ensureDecl(
+                    typeCoercionConstraintDecl,
+                    DeclCheckState::ReadyForReference);
+            }
+            else if (auto nonEmptyConstraintDecl = as<NonEmptyPackConstraintDecl>(member))
+            {
+                semantics->ensureDecl(nonEmptyConstraintDecl, DeclCheckState::ReadyForReference);
+            }
         }
-        auto witness = astBuilder->getDeclaredSubtypeWitness(
-            getSub(astBuilder, constraintDeclRef),
-            getSup(astBuilder, constraintDeclRef),
-            constraintDeclRef);
-        // TODO: this is an ugly hack to prevent crashing.
-        // In early stages of compilation witness->sub and witness->sup may not be checked yet.
-        // When semanticVisitor is present we have used that to ensure the type is checked.
-        // However due to how the code is written we cannot guarantee semanticVisitor is always
-        // available here, and if we can't get the checked sup/sub type this subst is incomplete
-        // and should not be cached.
-        if (!witness->getSub())
-            shouldCache = false;
-        args.add(witness);
+    }
+
+    for (auto member : genericDecl->getDirectMemberDecls())
+    {
+        if (auto genericTypeConstraintDecl = as<GenericTypeConstraintDecl>(member))
+        {
+            auto constraintDeclRef =
+                astBuilder->getDirectDeclRef<GenericTypeConstraintDecl>(genericTypeConstraintDecl);
+            auto supType = getSup(astBuilder, constraintDeclRef);
+            if (!supType)
+            {
+                args.add(astBuilder->getErrorType());
+                shouldCache = false;
+                continue;
+            }
+            auto witness = astBuilder->getDeclaredSubtypeWitness(
+                getSub(astBuilder, constraintDeclRef),
+                getSup(astBuilder, constraintDeclRef),
+                constraintDeclRef);
+            // TODO: this is an ugly hack to prevent crashing.
+            // In early stages of compilation witness->sub and witness->sup may not be checked yet.
+            // When semanticVisitor is present we have used that to ensure the type is checked.
+            // However due to how the code is written we cannot guarantee semanticVisitor is always
+            // available here, and if we can't get the checked sup/sub type this subst is incomplete
+            // and should not be cached.
+            if (!witness->getSub())
+                shouldCache = false;
+            args.add(witness);
+        }
+        else if (auto typeCoercionConstraintDecl = as<TypeCoercionConstraintDecl>(member))
+        {
+            auto constraintDeclRef = astBuilder->getDirectDeclRef<TypeCoercionConstraintDecl>(
+                typeCoercionConstraintDecl);
+            auto fromType = getFromType(astBuilder, constraintDeclRef);
+            auto toType = getToType(astBuilder, constraintDeclRef);
+            if (!fromType || !toType)
+            {
+                args.add(astBuilder->getErrorType());
+                shouldCache = false;
+                continue;
+            }
+            args.add(astBuilder->getBuiltinTypeCoercionWitness(fromType, toType));
+        }
+        else if (as<NonEmptyPackConstraintDecl>(member))
+        {
+            args.add(astBuilder->getNonEmptyPackWitness());
+        }
     }
 
     if (shouldCache)
@@ -10564,7 +11100,7 @@ void SemanticsDeclBasesVisitor::_validateExtensionDeclGenericParams(ExtensionDec
         // Check each generic parameter directly
         for (auto member : genericDecl->getDirectMemberDecls())
         {
-            if (as<GenericTypeParamDeclBase>(member) || as<GenericValueParamDecl>(member))
+            if (isGenericParam(member))
             {
                 bool referencedByTargetType = genericParamsReferencedByTargetType.contains(member);
                 bool referencedByConstraint = genericParamsReferencedByConstraints.contains(member);
@@ -12599,8 +13135,7 @@ void checkDerivativeAttributeImpl(
         Index count = 0;
         for (auto member : genericDecl->getDirectMemberDecls())
         {
-            if (as<GenericTypeParamDecl>(member) || as<GenericValueParamDecl>(member) ||
-                as<GenericTypePackParamDecl>(member))
+            if (isGenericParam(member))
                 count++;
         }
 
@@ -14666,8 +15201,7 @@ void SemanticsDeclCapabilityVisitor::visitInheritanceDecl(InheritanceDecl* inher
 
 DeclVisibility getDeclVisibility(Decl* decl)
 {
-    if (as<GenericTypeParamDeclBase>(decl) || as<GenericValueParamDecl>(decl) ||
-        as<GenericTypeConstraintDecl>(decl))
+    if (isGenericParam(decl) || as<GenericTypeConstraintDecl>(decl))
     {
         auto genericDecl = as<GenericDecl>(decl->parentDecl);
         if (!genericDecl)

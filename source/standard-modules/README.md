@@ -68,11 +68,12 @@ To change the standard module paths:
 3. C++ code includes `slang-standard-module-config.h` and uses the constants internally
 4. Each module's CMakeLists.txt uses the same variables for consistent paths
 5. Standard modules are compiled using `slangc` at build time
-6. Standard modules are placed in the same directory as libslang.so/slang.dll:
-   - **Build - Windows**: `build/Debug/bin/slang-standard-module-${SLANG_VERSION_FULL}/`
-   - **Build - Linux/Mac**: `build/Debug/lib/slang-standard-module-${SLANG_VERSION_FULL}/`
-   - **Install - Windows**: `<prefix>/bin/slang-standard-module-${SLANG_VERSION_FULL}/`
-   - **Install - Linux/Mac**: `<prefix>/lib/slang-standard-module-${SLANG_VERSION_FULL}/`
+6. Standard modules are placed under a `slang/` subdirectory next to libslang.so/slang.dll,
+   so that `import slang.<module>;` resolves correctly at runtime:
+   - **Build - Windows**: `build/Debug/bin/slang-standard-module-${SLANG_VERSION_FULL}/slang/`
+   - **Build - Linux/Mac**: `build/Debug/lib/slang-standard-module-${SLANG_VERSION_FULL}/slang/`
+   - **Install - Windows**: `<prefix>/bin/slang-standard-module-${SLANG_VERSION_FULL}/slang/`
+   - **Install - Linux/Mac**: `<prefix>/lib/slang-standard-module-${SLANG_VERSION_FULL}/slang/`
 
 This ensures that both the C++ runtime search logic and the CMake build logic use exactly the same path configuration, while keeping the implementation details internal to the slang library.
 

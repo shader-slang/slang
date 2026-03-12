@@ -552,6 +552,12 @@ public:
             return true;
         return dispatchIfNotNull(expr->baseExpr);
     }
+    bool visitPackQueryExpr(PackQueryExpr* expr)
+    {
+        if (reportLookupResultIfInExprLeadingIdentifierRange(expr))
+            return true;
+        return dispatchIfNotNull(expr->value);
+    }
     bool visitHigherOrderInvokeExpr(HigherOrderInvokeExpr* expr)
     {
         if (reportLookupResultIfInExprLeadingIdentifierRange(expr))

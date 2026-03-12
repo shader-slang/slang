@@ -5,7 +5,7 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-mtl -compute -shaderobj -output-using-type -xslang -experimental-feature
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -xslang -experimental-feature
 
-import neural;
+import slang.neural;
 
 // Parameter packing:
 // Layer1: FFLayer<float, InlineVector<float,2>, InlineVector<float,2>, IdentityActivation<float>, HasBias=true>
@@ -46,14 +46,12 @@ bool forwardCheck()
     let layer1 = Layer1();
     let layer2 = Layer2();
 
-    // Compute weight/bias addresses for each layer
-    let w1Addr = baseAddr.getOffset(0);
-    let b1Addr = baseAddr.getOffset(4);
-    let w2Addr = baseAddr.getOffset(6);
-    let b2Addr = baseAddr.getOffset(8);
+    // Compute base addresses for each layer's parameter block
+    let layer1Addr = baseAddr.getOffset(0);
+    let layer2Addr = baseAddr.getOffset(6);
 
-    let h = layer1.eval<Address>(x, w1Addr, b1Addr);
-    let y = layer2.eval<Address>(h, w2Addr, b2Addr);
+    let h = layer1.eval<Address>(x, layer1Addr);
+    let y = layer2.eval<Address>(h, layer2Addr);
 
     // Expected:
     // h = W1*x + b1

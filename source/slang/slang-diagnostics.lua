@@ -1652,6 +1652,55 @@ err(
     span { loc = "expr:Expr", message = "argument to countof can only be a type pack or tuple" }
 )
 
+err(
+    "pack-query-argument-is-invalid",
+    30410,
+    "invalid ~queryName argument",
+    span { loc = "expr:Expr", message = "argument to ~queryName is invalid" }
+)
+
+err(
+    "empty-pack-query-is-invalid",
+    30411,
+    "cannot apply ~queryName to an empty pack",
+    span { loc = "expr:Expr", message = "~queryName requires a non-empty pack" }
+)
+
+err(
+    "pack-query-requires-non-empty-pack",
+    30412,
+    "cannot apply ~queryName to a pack that may be empty",
+    span { loc = "expr:Expr", message = "~queryName requires a non-empty pack; add a `where nonempty(...)` constraint or use a structurally non-empty pack" }
+)
+
+err(
+    "invalid-non-empty-pack-constraint-target",
+    30413,
+    "`nonempty(...)` requires a generic type pack or value pack parameter",
+    span { loc = "expr:Expr", message = "expected a direct reference to a generic pack parameter here" }
+)
+
+err(
+    "empty-pack-does-not-satisfy-non-empty-constraint",
+    30414,
+    "empty pack does not satisfy `nonempty(...)` constraint",
+    span { loc = "location", message = "pack argument here is empty" }
+)
+
+err(
+    "optional-non-empty-pack-constraint-is-invalid",
+    30415,
+    "`optional nonempty(...)` is not meaningful",
+    span { loc = "expr:Expr", message = "remove `optional` from this `nonempty(...)` constraint" }
+)
+
+err(
+    "non-empty-pack-constraint-target-must-be-from-current-generic",
+    30416,
+    "`nonempty(...)` target must be a generic pack parameter declared in the current generic",
+    span { loc = "expr:Expr", message = "this pack parameter is declared outside the current generic" }
+)
+
 -- Float bit cast diagnostics
 
 err(
@@ -1797,6 +1846,13 @@ err(
     30117,
     "forward reference in generic constraint",
     span { loc = "expr:Expr", message = "generic constraint for parameter '~param:Type' references type parameter '~referenced:Decl' before it is declared" }
+)
+
+err(
+    "cannot-mix-differentiable-value-and-ptr-outputs",
+    30118,
+    "cannot mix differentiable value types with differentiable pointer outputs",
+    span { loc = "location", message = "function has both IDifferentiable value types and IDifferentiablePtrType outputs, which is not currently supported. Please split the function so that differentiable value parameters and pointer differentiable outputs are in separate functions." }
 )
 
 
@@ -2775,6 +2831,25 @@ err(
     span { loc = "typeExp:Expr", message = "type '~type' cannot be used as a constraint" }
 )
 
+standalone_note(
+    "use-let-for-generic-value-param",
+    30499,
+    "use 'let' keyword to declare a generic value parameter: 'let ~paramName:Name : ~type:Type'"
+)
+
+standalone_note(
+    "use-let-each-for-generic-value-pack-param",
+    30501,
+    "use 'let each' to declare a variadic generic value parameter: 'let each ~paramName:Name : ~type:Type'"
+)
+
+err(
+    "pack-param-must-be-last",
+    30500,
+    "generic parameter after a variadic pack parameter is not allowed",
+    span { loc = "param:Decl", message = "generic parameter '~param' cannot appear after a variadic pack parameter" }
+)
+
 err(
     "invalid-constraint-sub-type",
     30402,
@@ -3429,6 +3504,13 @@ err(
     38011,
     "entry point cannot return type that contains resource types",
     span { loc = "location", message = "entry point '~entryPoint:Name' cannot return type '~returnType:Type' that contains resource types" }
+)
+
+err(
+    "entry-point-cannot-return-array-type",
+    38012,
+    "entry point cannot return array type",
+    span { loc = "location", message = "entry point '~entryPoint:Name' cannot return array type '~returnType:Type'" }
 )
 
 
