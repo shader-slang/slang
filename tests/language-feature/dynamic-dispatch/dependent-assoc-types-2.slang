@@ -136,7 +136,7 @@ float g(float x)
     let obj = factoryAB(id);
     obj.Data d = obj.DataSerializer::deserialize(buf.withOffset(1));
     return obj.calc(d, x);
-    // REPORT: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
+    // REPORT: note[E50102]: generated dynamic dispatch code
 }
 
 [numthreads(1, 1, 1)]

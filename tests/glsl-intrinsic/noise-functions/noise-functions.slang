@@ -1,7 +1,6 @@
-//TEST:SIMPLE(filecheck=CHECK):  -allow-glsl -stage compute -entry computeMain -target glsl
-//TEST:SIMPLE(filecheck=CHECK):  -allow-glsl -stage compute -entry computeMain -target spirv -emit-spirv-directly
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):  -allow-glsl -stage compute -entry computeMain -target glsl
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive):  -allow-glsl -stage compute -entry computeMain -target spirv -emit-spirv-directly
 #version 460
-// CHECK: warning 31200
 
 buffer MyBlockName2
 {
@@ -14,6 +13,7 @@ bool testNoiseScalar()
 {
     return true
         && noise1(1.0f) == 0.0f
+//CHECK:   ^^^^^^ use of deprecated declaration
         && noise2(1.0f) == vec2(0.0f)
         && noise3(1.0f) == vec3(0.0f)
         && noise4(1.0f) == vec4(0.0f)

@@ -1037,6 +1037,8 @@ typedef uint32_t SlangSizeT;
         AllowGLSL,
         EnableExperimentalPasses,
         BindlessSpaceIndex, // int
+        SPIRVResourceHeapStride,
+        SPIRVSamplerHeapStride,
 
         // Internal
 
@@ -4189,6 +4191,13 @@ enum class ContainerType
     ParameterBlock
 };
 
+struct SourceLocation
+{
+    const char* filePath = nullptr;
+    SlangInt line = -1;
+    SlangInt column = -1;
+};
+
 /** A session provides a scope for code that is loaded.
 
 A session can be used to load modules of Slang source code,
@@ -4421,6 +4430,13 @@ struct ISession : public ISlangUnknown
         SlangInt& outModuleVersion,
         const char*& outModuleCompilerVersion,
         const char*& outModuleName) = 0;
+
+    /** Get the source location of a declaration.
+     *
+     * The returned filePath pointer is valid for as long as the session.
+     */
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    getDeclSourceLocation(slang::DeclReflection* decl, slang::SourceLocation* outLocation) = 0;
 };
 
     #define SLANG_UUID_ISession ISession::getTypeGuid()

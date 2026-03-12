@@ -3,11 +3,13 @@
 
 //TEST:SIMPLE(filecheck=CHECK):-target spirv
 
-//CHECK: ([[# @LINE+2]]): warning 39071
+//CHECK-DAG: warning{{.*}}39071
+//CHECK-DAG: g_position
 [[vk::binding(1, 2)]]
 uniform float4 g_position;
 
-//CHECK: ([[# @LINE+2]]): warning 39071
+//CHECK-DAG: warning{{.*}}39071
+//CHECK-DAG: g_transform
 [[vk::binding(3, 1)]]
 uniform float4x4 g_transform;
 

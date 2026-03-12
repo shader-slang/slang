@@ -327,6 +327,12 @@ public:
             outModuleName);
         RECORD_RETURN(result);
     }
+
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    getDeclSourceLocation(slang::DeclReflection* decl, slang::SourceLocation* outLocation) override
+    {
+        return getActual<slang::ISession>()->getDeclSourceLocation(decl, outLocation);
+    }
 };
 
 } // namespace SlangRecord

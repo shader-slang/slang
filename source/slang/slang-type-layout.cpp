@@ -419,6 +419,12 @@ struct GLSLBaseLayoutRulesImpl : DefaultLayoutRulesImpl
         size_t elementCount) override
     {
         SLANG_UNUSED(elementType);
+        if (elementInfo.kind != LayoutResourceKind::Uniform)
+        {
+            auto arrayInfo = GetArrayLayout(elementInfo, LayoutSize(elementCount));
+            return SimpleLayoutInfo(arrayInfo.kind, arrayInfo.size, arrayInfo.alignment);
+        }
+
         // The `std140` and `std430` rules require vectors to be aligned to the next power of
         // two up from their size (so a `float2` is 8-byte aligned, and a `float3` is
         // 16-byte aligned).
@@ -5396,14 +5402,14 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
             type,
             rules);
     }
-    else if (auto fp8Type = as<Fp8Type>(type))
+    else if (as<Fp8Type>(type))
     {
         return createSimpleTypeLayout(
             rules->GetScalarLayout(BaseType::UInt8, context),
             type,
             rules);
     }
-    else if (auto bf168Type = as<BFloat16Type>(type))
+    else if (as<BFloat16Type>(type))
     {
         return createSimpleTypeLayout(
             rules->GetScalarLayout(BaseType::UInt16, context),

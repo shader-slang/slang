@@ -1,13 +1,14 @@
 // Test that __subscript without return type produces proper error message
 
-//TEST:SIMPLE(filecheck=CHECK): -target spirv
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv
 
 struct MyType
 {
     int val[12];
-    
-    // CHECK: ([[# @LINE+1]]): error 30901: __subscript declaration must have a return type specified after '->'
+
     __subscript(int x, int y)
+//CHECK:       ^ __subscript declaration must have a return type specified after '->'
+//CHECK:       ^ __subscript declaration must have a return type specified after '->'
     {
         get { return val[x*3 + y]; }
     }

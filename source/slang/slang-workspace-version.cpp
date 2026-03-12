@@ -201,106 +201,276 @@ void Workspace::invalidate()
 
 void WorkspaceVersion::parseDiagnostics(String compilerOutput)
 {
+    // ===================================================================================
+    // Machine-Readable Diagnostic Format Parser
+    // ===================================================================================
+    //
+    // The compiler emits diagnostics in a tab-separated machine-readable format:
+    //   E<code>\t<severity>\t<filename>\t<beginline>\t<begincol>\t<endline>\t<endcol>\t<message>
+    //
+    // Each diagnostic produces multiple lines grouped by error code:
+    //
+    //   1. Primary line (severity = "error", "warning", or "fatal"):
+    //      The main diagnostic with the technical error message.
+    //
+    //   2. Primary span line (severity = "span", immediately follows primary):
+    //      Points to the specific code location with a more descriptive message.
+    //
+    //   3. Secondary span lines (severity = "span", same code):
+    //      Additional locations relevant to the error, shown as LSP relatedInformation.
+    //
+    //   4. Note lines (severity = "note"):
+    //      Supplementary information, shown as LSP relatedInformation.
+    //
+    //   5. Note-span lines (severity = "note-span"):
+    //      Location highlights for notes, shown as LSP relatedInformation.
+    //
+    // -----------------------------------------------------------------------------------
+    // Example: For the following rich diagnostic output:
+    //
+    //   error[E30013]: invalid subscript expression
+    //     ╭╼ tests/diagnostics/no-subscript.slang:5:13
+    //     │
+    //   5 │ return x[0];
+    //     │         ━ no subscript declarations found for type 'int'
+    //   ──╯
+    //
+    // The machine-readable format produces:
+    //   E30013\terror\ttests/diagnostics/no-subscript.slang\t5\t13\t5\t13\tinvalid subscript
+    //   expression E30013\tspan\ttests/diagnostics/no-subscript.slang\t5\t13\t5\t14\tno subscript
+    //   declarations found for type 'int'
+    //
+    // -----------------------------------------------------------------------------------
+    // Why we prefer the primary span message over the main diagnostic message:
+    // -----------------------------------------------------------------------------------
+    //
+    // The main diagnostic message is the error title (e.g., "invalid subscript expression").
+    // The primary span message describes the specific problem at the code location
+    // (e.g., "no subscript declarations found for type 'int'").
+    //
+    // For LSP, we show the span message because:
+    //   - It's more specific and actionable for the user
+    //   - It appears directly at the error location in the editor
+    //   - It matches what users see under the highlighted code in terminal output
+    //
+    // We use the primary span's RANGE for precise error highlighting, and fall back
+    // to the main diagnostic message only if the span message is empty.
+    // ===================================================================================
+
     List<UnownedStringSlice> lines;
     StringUtil::calcLines(compilerOutput.getUnownedSlice(), lines);
 
-    for (Index lineIndex = 0; lineIndex < lines.getCount(); lineIndex++)
+    // Structure to hold parsed diagnostic line info
+    struct ParsedLine
     {
-        auto line = lines[lineIndex];
-        Index colonIndex = line.indexOf(UnownedStringSlice("):"));
-        if (colonIndex == -1)
-            continue;
-        Index lparentIndex = line.indexOf('(');
-        if (lparentIndex > colonIndex)
-            continue;
-        String fileName = line.subString(0, lparentIndex);
-        Path::getCanonical(fileName, fileName);
-        auto& diagnosticList = diagnostics.getOrAddValue(fileName, DocumentDiagnostics());
+        String code;
+        String severity;
+        String fileName;
+        int beginLine;
+        int beginCol;
+        int endLine;
+        int endCol;
+        String message;
+    };
 
-        LanguageServerProtocol::Diagnostic diagnostic;
-        Index pos = lparentIndex + 1;
-        int lineLoc = StringUtil::parseIntAndAdvancePos(line, pos);
-        if (lineLoc == 0)
-            lineLoc = 1;
-        diagnostic.range.end.line = diagnostic.range.start.line = lineLoc;
-        pos++;
-        int colLoc = StringUtil::parseIntAndAdvancePos(line, pos);
-        if (colLoc == 0)
-            colLoc = 1;
-        diagnostic.range.end.character = diagnostic.range.start.character = colLoc;
-        if (pos >= line.getLength())
-            continue;
-        line = line.tail(colonIndex + 3);
-        colonIndex = line.indexOf(':');
-        if (colonIndex == -1)
-            continue;
-        if (line.startsWith("error"))
-        {
-            diagnostic.severity = LanguageServerProtocol::kDiagnosticsSeverityError;
-        }
-        else if (line.startsWith("warning"))
-        {
-            diagnostic.severity = LanguageServerProtocol::kDiagnosticsSeverityWarning;
-        }
-        else if (line.startsWith("note"))
-        {
-            diagnostic.severity = LanguageServerProtocol::kDiagnosticsSeverityInformation;
-        }
-        else
-        {
-            continue;
-        }
-        pos = line.indexOf(' ');
-        diagnostic.code = StringUtil::parseIntAndAdvancePos(line, pos);
-        diagnostic.message = line.tail(colonIndex + 2);
-        if (lineIndex + 1 < lines.getCount() && lines[lineIndex + 1].startsWith("^+"))
-        {
-            lineIndex++;
-            pos = 2;
-            auto tokenLength = StringUtil::parseIntAndAdvancePos(lines[lineIndex], pos);
-            diagnostic.range.end.character += tokenLength;
-        }
+    // Parse a single line into its components
+    auto parseLine = [](UnownedStringSlice line, ParsedLine& out) -> bool
+    {
+        // Must start with 'E'
+        if (!line.startsWith("E"))
+            return false;
+
+        List<UnownedStringSlice> fields;
+        StringUtil::split(line, '\t', fields);
+
+        // Must have 8 fields: E<code>, severity, filename, beginline, begincol, endline, endcol,
+        // message
+        if (fields.getCount() < 8)
+            return false;
+
+        out.code = fields[0].tail(1); // Skip the 'E' prefix
+        out.severity = fields[1];
+        out.fileName = fields[2];
+
+        Index pos = 0;
+        out.beginLine = StringUtil::parseIntAndAdvancePos(fields[3], pos);
+        pos = 0;
+        out.beginCol = StringUtil::parseIntAndAdvancePos(fields[4], pos);
+        pos = 0;
+        out.endLine = StringUtil::parseIntAndAdvancePos(fields[5], pos);
+        pos = 0;
+        out.endCol = StringUtil::parseIntAndAdvancePos(fields[6], pos);
+
+        out.message = fields[7];
+
+        return true;
+    };
+
+    // Helper to convert parsed location to LSP range, handling UTF-16 conversion
+    auto convertToLSPRange =
+        [this](const ParsedLine& parsed, LanguageServerProtocol::Range& range, String& fileName)
+    {
+        Path::getCanonical(parsed.fileName, fileName);
+
+        int beginLine = parsed.beginLine > 0 ? parsed.beginLine : 1;
+        int beginCol = parsed.beginCol > 0 ? parsed.beginCol : 1;
+        int endLine = parsed.endLine > 0 ? parsed.endLine : beginLine;
+        int endCol = parsed.endCol > 0 ? parsed.endCol : beginCol;
+
+        range.start.line = beginLine;
+        range.start.character = beginCol;
+        range.end.line = endLine;
+        range.end.character = endCol;
 
         if (auto doc = workspace->openedDocuments.tryGetValue(fileName))
         {
             // If the file is open, translate to UTF16 positions using the document.
             Index lineUTF16, colUTF16;
             doc->Ptr()->oneBasedUTF8LocToZeroBasedUTF16Loc(
-                diagnostic.range.start.line,
-                diagnostic.range.start.character,
+                range.start.line,
+                range.start.character,
                 lineUTF16,
                 colUTF16);
-            diagnostic.range.start.line = (int)lineUTF16;
-            diagnostic.range.start.character = (int)colUTF16;
+            range.start.line = (int)lineUTF16;
+            range.start.character = (int)colUTF16;
             doc->Ptr()->oneBasedUTF8LocToZeroBasedUTF16Loc(
-                diagnostic.range.end.line,
-                diagnostic.range.end.character,
+                range.end.line,
+                range.end.character,
                 lineUTF16,
                 colUTF16);
-            diagnostic.range.end.line = (int)lineUTF16;
-            diagnostic.range.end.character = (int)colUTF16;
+            range.end.line = (int)lineUTF16;
+            range.end.character = (int)colUTF16;
         }
         else
         {
             // Otherwise, just return an 0-based position.
-            diagnostic.range.start.line--;
-            diagnostic.range.start.character--;
-            diagnostic.range.end.line--;
-            diagnostic.range.end.character--;
+            range.start.line--;
+            range.start.character--;
+            range.end.line--;
+            range.end.character--;
         }
-        if (diagnostic.code == -1 && diagnosticList.messages.getCount())
+    };
+
+    // Helper to check if severity represents a primary diagnostic.
+    // Possible values from getSeverityName(): "error", "warning", "fatal error",
+    // "internal error", "note", "ignored", "unknown error"
+    auto isPrimarySeverity = [](const String& severity) -> bool
+    {
+        // Primary diagnostics are errors or warnings (not notes/spans)
+        return severity == "error" || severity == "warning" || severity == "fatal error" ||
+               severity == "internal error" || severity == "unknown error";
+    };
+
+    // Helper to check if severity is an error (not warning)
+    auto isErrorSeverity = [](const String& severity) -> bool
+    {
+        return severity == "error" || severity == "fatal error" || severity == "internal error" ||
+               severity == "unknown error";
+    };
+
+    // Helper to add a span/note as related information
+    auto addRelatedInfo =
+        [&](LanguageServerProtocol::Diagnostic& diag, const ParsedLine& line, const String& message)
+    {
+        if (message.getLength() == 0)
+            return; // Skip spans with no message
+
+        LanguageServerProtocol::DiagnosticRelatedInformation relatedInfo;
+        String relatedFileName;
+        convertToLSPRange(line, relatedInfo.location.range, relatedFileName);
+        relatedInfo.location.uri = URI::fromLocalFilePath(relatedFileName.getUnownedSlice()).uri;
+        relatedInfo.message = message;
+        diag.relatedInformation.add(relatedInfo);
+    };
+
+    // Process lines - group by diagnostic code
+    Index lineIndex = 0;
+    while (lineIndex < lines.getCount())
+    {
+        ParsedLine primaryLine;
+        if (!parseLine(lines[lineIndex], primaryLine))
         {
-            // If this is a decoration message, add it as related information.
-            LanguageServerProtocol::DiagnosticRelatedInformation relatedInfo;
-            relatedInfo.location.range = diagnostic.range;
-            relatedInfo.location.uri = URI::fromLocalFilePath(fileName.getUnownedSlice()).uri;
-            relatedInfo.message = diagnostic.message;
-            diagnosticList.messages.getLast().relatedInformation.add(relatedInfo);
+            lineIndex++;
+            continue;
         }
+
+        // Check if this is a primary diagnostic
+        if (!isPrimarySeverity(primaryLine.severity))
+        {
+            lineIndex++;
+            continue;
+        }
+
+        String currentCode = primaryLine.code;
+
+        // Build the LSP diagnostic
+        LanguageServerProtocol::Diagnostic diagnostic;
+
+        // Set severity
+        if (isErrorSeverity(primaryLine.severity))
+            diagnostic.severity = LanguageServerProtocol::kDiagnosticsSeverityError;
         else
+            diagnostic.severity = LanguageServerProtocol::kDiagnosticsSeverityWarning;
+
+        // Parse the error code number
+        Index codePos = 0;
+        diagnostic.code = StringUtil::parseIntAndAdvancePos(currentCode.getUnownedSlice(), codePos);
+
+        // Default message and range from primary line
+        String primaryMessage = primaryLine.message;
+        LanguageServerProtocol::Range primaryRange;
+        String fileName;
+        convertToLSPRange(primaryLine, primaryRange, fileName);
+
+        diagnostic.message = primaryMessage;
+        diagnostic.range = primaryRange;
+
+        lineIndex++;
+
+        // Look for the primary span line (immediately follows, same code, severity = "span")
+        if (lineIndex < lines.getCount())
         {
-            diagnosticList.messages.add(diagnostic);
+            ParsedLine spanLine;
+            if (parseLine(lines[lineIndex], spanLine) && spanLine.code == currentCode &&
+                spanLine.severity == "span")
+            {
+                // Use span's range
+                String spanFileName;
+                convertToLSPRange(spanLine, diagnostic.range, spanFileName);
+
+                // Use span's message if non-empty, otherwise keep the primary message
+                if (spanLine.message.getLength() > 0)
+                {
+                    diagnostic.message = spanLine.message;
+                }
+                lineIndex++;
+            }
         }
+
+        // Collect related information from secondary spans and notes (same code)
+        while (lineIndex < lines.getCount())
+        {
+            ParsedLine relatedLine;
+            if (!parseLine(lines[lineIndex], relatedLine) || relatedLine.code != currentCode)
+            {
+                break;
+            }
+
+            if (relatedLine.severity == "span" || relatedLine.severity == "note" ||
+                relatedLine.severity == "note-span")
+            {
+                // Secondary spans, notes, and note-spans - add as related info if they have a
+                // message
+                addRelatedInfo(diagnostic, relatedLine, relatedLine.message);
+            }
+
+            lineIndex++;
+        }
+
+        // Add the diagnostic to the appropriate file's list
+        auto& diagnosticList = diagnostics.getOrAddValue(fileName, DocumentDiagnostics());
+        diagnosticList.messages.add(diagnostic);
+
         if (diagnosticList.messages.getCount() >= 1000)
             break;
     }

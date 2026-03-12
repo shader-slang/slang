@@ -1,12 +1,13 @@
-//TEST:SIMPLE(filecheck=CHK): -allow-glsl -target spirv -entry computeMain
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHK): -allow-glsl -target spirv -entry computeMain
 
 // Using groupshared variables
 groupshared float4 gsUninitialized;
 
 float use_undefined_gs()
 {
-    //CHK-DAG: ([[# @LINE + 1]]): warning 41017: use of uninitialized global variable 'gsUninitialized'
     return gsUninitialized.x;
+//CHK:                     ^ use of uninitialized global variable
+//CHK:                     ^ use of uninitialized global variable 'gsUninitialized'
 }
 
 // Using static variables
@@ -28,8 +29,11 @@ void write_to_later()
 
 float use_never_written()
 {
-    //CHK-DAG: ([[# @LINE + 1]]): warning 41017: use of uninitialized global variable 'writtenNever'
     return writtenNever;
+/*CHK:
+    ^^^^^^ use of uninitialized global variable
+    ^^^^^^ use of uninitialized global variable 'writtenNever'
+*/
 }
 
 // OK because of prior store
@@ -51,8 +55,11 @@ layout(location = 1) out vec4 x;
 
 vec4 glsl_layout_out_undefined()
 {
-    //CHK-DAG: ([[# @LINE + 1]]): warning 41017: use of uninitialized global variable 'x'
     return x;
+/*CHK:
+    ^^^^^^ use of uninitialized global variable
+    ^^^^^^ use of uninitialized global variable 'x'
+*/
 }
 
 layout(location = 2) out vec4 y;
@@ -69,11 +76,8 @@ vec4 glsl_layout_out_ok()
     return y;
 }
 
-//CHK-NOT: warning 41017
-
 [Shader("compute")]
 [NumThreads(4, 1, 1)]
 void computeMain(int3 dispatchThreadID : SV_DispatchThreadID)
 {
 }
-

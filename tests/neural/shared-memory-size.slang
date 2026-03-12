@@ -9,7 +9,7 @@
 // SharedMemorySize<DType, TargetEnum, ExecutionMode, SubgroupSize, SubgroupCount>.OfHiddenN<LayerConfiguration>.Bytes
 // is the compile time (or link time) constant that represents the total shared memory needed for launcing the inference kernel or training kernel.
 
-import neural;
+import slang.neural;
 #pragma warning(disable: 41017)
 
 #if TEST_HALF

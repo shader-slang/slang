@@ -5,7 +5,7 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-mtl -compute -shaderobj -output-using-type -xslang -experimental-feature
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -xslang -experimental-feature
 
-import neural;
+import slang.neural;
 
 // Simple weights for testing: identity-like transform
 // For 2x2 -> 2: W = [[1,0],[0,1]], b = [0,0]
@@ -45,13 +45,10 @@ bool testFFLayerReLU()
     typealias Layer = FFLayer<float, Vec2, Vec2, LinearLayout, ReLU<float>, true>;
     let layer = Layer();
     
-    let weightAddr = baseAddr.getOffset(0);
-    let biasAddr = baseAddr.getOffset(4);
-    
     float[2] arr = {-1.0, 2.0};
     let x = Vec2(arr);
     
-    let y = layer.eval<Address>(x, weightAddr, biasAddr);
+    let y = layer.eval<Address>(x, baseAddr);
     
     // ReLU([-1, 2]) = [0, 2]
     return approxEqual(y[0], 0.0) && approxEqual(y[1], 2.0);
@@ -68,13 +65,10 @@ bool testFFLayerLeakyReLU()
     let leakyRelu = LeakyReLU<float>(0.1);  // alpha = 0.1
     let layer = Layer(leakyRelu);
     
-    let weightAddr = baseAddr.getOffset(0);
-    let biasAddr = baseAddr.getOffset(4);
-    
     float[2] arr = {-1.0, 2.0};
     let x = Vec2(arr);
     
-    let y = layer.eval<Address>(x, weightAddr, biasAddr);
+    let y = layer.eval<Address>(x, baseAddr);
     
     // LeakyReLU([-1, 2], 0.1) = [-0.1, 2]
     return approxEqual(y[0], -0.1) && approxEqual(y[1], 2.0);
@@ -90,13 +84,10 @@ bool testFFLayerSigmoid()
     typealias Layer = FFLayer<float, Vec2, Vec2, LinearLayout, Sigmoid<float>, true>;
     let layer = Layer();
     
-    let weightAddr = baseAddr.getOffset(0);
-    let biasAddr = baseAddr.getOffset(4);
-    
     float[2] arr = {0.0, 0.0};
     let x = Vec2(arr);
     
-    let y = layer.eval<Address>(x, weightAddr, biasAddr);
+    let y = layer.eval<Address>(x, baseAddr);
     
     // Sigmoid([0, 0]) = [0.5, 0.5]
     return approxEqual(y[0], 0.5) && approxEqual(y[1], 0.5);
@@ -112,13 +103,10 @@ bool testFFLayerTanh()
     typealias Layer = FFLayer<float, Vec2, Vec2, LinearLayout, TanhActivation<float>, true>;
     let layer = Layer();
     
-    let weightAddr = baseAddr.getOffset(0);
-    let biasAddr = baseAddr.getOffset(4);
-    
     float[2] arr = {0.0, 0.0};
     let x = Vec2(arr);
     
-    let y = layer.eval<Address>(x, weightAddr, biasAddr);
+    let y = layer.eval<Address>(x, baseAddr);
     
     // Tanh([0, 0]) = [0, 0]
     return approxEqual(y[0], 0.0) && approxEqual(y[1], 0.0);
@@ -134,13 +122,10 @@ bool testFFLayerExp()
     typealias Layer = FFLayer<float, Vec2, Vec2, LinearLayout, ExpActivation<float>, true>;
     let layer = Layer();
     
-    let weightAddr = baseAddr.getOffset(0);
-    let biasAddr = baseAddr.getOffset(4);
-    
     float[2] arr = {0.0, 0.0};
     let x = Vec2(arr);
     
-    let y = layer.eval<Address>(x, weightAddr, biasAddr);
+    let y = layer.eval<Address>(x, baseAddr);
     
     // Exp([0, 0]) = [1, 1]
     return approxEqual(y[0], 1.0) && approxEqual(y[1], 1.0);
@@ -156,13 +141,10 @@ bool testFFLayerIdentity()
     typealias Layer = FFLayer<float, Vec2, Vec2, LinearLayout, IdentityActivation<float>, true>;
     let layer = Layer();
     
-    let weightAddr = baseAddr.getOffset(0);
-    let biasAddr = baseAddr.getOffset(4);
-    
     float[2] arr = {-1.0, 2.0};
     let x = Vec2(arr);
     
-    let y = layer.eval<Address>(x, weightAddr, biasAddr);
+    let y = layer.eval<Address>(x, baseAddr);
     
     // Identity([-1, 2]) = [-1, 2]
     return approxEqual(y[0], -1.0) && approxEqual(y[1], 2.0);
@@ -178,14 +160,11 @@ bool testFFLayerSine()
     typealias Layer = FFLayer<float, Vec2, Vec2, LinearLayout, SineActivation<float>, true>;
     let layer = Layer();
     
-    let weightAddr = baseAddr.getOffset(0);
-    let biasAddr = baseAddr.getOffset(4);
-    
     float pi = 3.14159265;
     float[2] arr = {0.0, pi / 2.0};
     let x = Vec2(arr);
     
-    let y = layer.eval<Address>(x, weightAddr, biasAddr);
+    let y = layer.eval<Address>(x, baseAddr);
     
     // Sin([0, pi/2]) = [0, 1]
     return approxEqual(y[0], 0.0, 0.001) && approxEqual(y[1], 1.0, 0.001);

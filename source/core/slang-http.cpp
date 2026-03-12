@@ -381,6 +381,14 @@ SlangResult HTTPPacketConnection::waitForResult(Int timeOutInMs)
         }
     }
 
+    // If we exited the loop without reaching Done state (e.g., due to timeout,
+    // connection closure, or error), report failure so callers don't mistakenly
+    // treat an incomplete/missing response as success.
+    if (SLANG_SUCCEEDED(m_readResult) && m_readState != ReadState::Done)
+    {
+        return SLANG_FAIL;
+    }
+
     return m_readResult;
 }
 

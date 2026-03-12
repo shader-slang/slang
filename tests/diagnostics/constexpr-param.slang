@@ -1,6 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK1):
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK2):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 // Failure to pass compile-time-constant argument
 // where it is expected.
@@ -19,14 +17,16 @@ int func_with_constexpr_params(constexpr int const_a)
 int func_internal(int a)
 {
     // Error: arg passed through isn't compile-time constant
-    // CHECK: ([[# @LINE+1]]): error 40013:
     return func_with_constexpr_params(a);
+//CHECK:                             ^ argument is not a compile-time constant
+//CHECK:                             ^ arg 1 in 'func_with_constexpr_params' is not a compile-time constant
 }
 
 int func_external(int a)
 {
-    // CHECK1: ([[# @LINE+1]]): error 40012:
     int2 offset = int2(a, a);
+//CHECK:              ^ expected a compile-time constant
+//CHECK:              ^ expected a compile-time constant
     int3 location = int3(0, 0, 0);
     // Load requires constexpr offset
     return input.Load(location, offset);
@@ -47,8 +47,9 @@ void Test(uint3 thread_index : SV_DispatchThreadID)
         ii = 1;
     }
     // Pass non-compile-time-constant argument to function that requires constexpr parameter
-    // CHECK2: ([[# @LINE+1]]): error 40013:
     result += func_with_constexpr_params(ii);
+//CHECK:                                ^ argument is not a compile-time constant
+//CHECK:                                ^ arg 1 in 'func_with_constexpr_params' is not a compile-time constant
 
     // The nested function calls should issue compile errors
     result += func_internal(ii);

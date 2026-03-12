@@ -181,6 +181,8 @@ public:
     virtual SLANG_NO_THROW slang::IModule* SLANG_MCALL getLoadedModule(SlangInt index) override;
     virtual SLANG_NO_THROW bool SLANG_MCALL
     isBinaryModuleUpToDate(const char* modulePath, slang::IBlob* binaryModuleBlob) override;
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    getDeclSourceLocation(slang::DeclReflection* decl, slang::SourceLocation* outLocation) override;
 
     // Updates the supplied builder with linkage-related information, which includes preprocessor
     // defines, the compiler version, and other compiler options. This is then merged with the hash

@@ -425,7 +425,8 @@ char* String::prepareForAppend(Index count)
     auto oldLength = getLength();
     auto newLength = oldLength + count;
     ensureUniqueStorageWithCapacity(newLength);
-    return getData() + oldLength;
+
+    return getMutableData() + oldLength;
 }
 void String::appendInPlace(const char* chars, Index count)
 {
@@ -515,8 +516,8 @@ void String::append(const char* textBegin, char const* textEnd)
 
     ensureUniqueStorageWithCapacity(newLength);
 
-    memcpy(getData() + oldLength, textBegin, textLength);
-    getData()[newLength] = 0;
+    memcpy(getMutableData() + oldLength, textBegin, textLength);
+    getMutableData()[newLength] = 0;
     m_buffer->length = newLength;
 }
 

@@ -80,6 +80,17 @@ slang-test must run from repository root
 - Use interpreter: `//TEST:INTERPRET(filecheck=CHECK):`
 - Example test structure in `tests/language-feature/lambda/lambda-0.slang`
 
+**Diagnostic Tests** (see `docs/diagnostics.md` for full details):
+
+Use `// DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):` as the test directive to verify that the compiler emits expected diagnostics. Annotations in comments match against compiler output by message text, severity, or error code. Carets align to columns on the preceding source line:
+
+```slang
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv
+int foo = undefined;
+//CHECK: E01234
+//CHECK:  ^^^^^^^^^ error
+```
+
 **SPIRV Validation**:
 
 - Set `SLANG_RUN_SPIRV_VALIDATION=1` when using `slangc -target spirv`
@@ -197,6 +208,20 @@ python3 ./extras/insttrace.py <debugUID> ./build/Debug/bin/slangc tests/my-test.
 - `slangc -target spirv-asm` — compile to SPIRV assembly
 - Set `SLANG_RUN_SPIRV_VALIDATION=1` for static validation; use `-skip-spirv-validation` to see SPIRV output even when validation fails
 - `slangc -target spirv-asm -emit-spirv-via-glsl` — generate reference SPIRV via GLSL for comparison
+
+#### Assertion Behavior (`SLANG_ASSERT`)
+
+On Windows, assertion failures normally open a modal dialog that blocks execution. Set the `SLANG_ASSERT` environment variable to control this:
+
+| Value | Behavior |
+|---|---|
+| `system` | Use the system `assert()`, which shows a modal dialog and allows the developers to attach the debugger |
+| `debugbreak` | When a debugger is already attached, it will hit a debug-break; fall back to `system` behavior when a debugger is not attached |
+| `release-assert-only` | Skip debug-only assertions (`SLANG_ASSERT`, `SLANG_ASSERT_FAILURE`) and continue; `SLANG_RELEASE_ASSERT` still fires |
+| *(unset)* | Throws an exception |
+
+The behavior on Windows after an exception is thrown is controlled by a CMake option `SLANG_BOOTSTRAP_IGNORE_ABORT_MSG` or `-ignore-abort-msg` command-line argument.
+Both options are highly recommended for unattended automation with LLM workflow.
 
 #### RTX Remix Testing
 
