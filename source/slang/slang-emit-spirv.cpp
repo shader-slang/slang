@@ -3577,12 +3577,13 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 {
                     IRBuilder builder(m_irModule);
                     auto convertType = needsSignReinterpret
-                        ? builder.getType(getIntTypeOpFromInfo({dstInfo.width, srcInfo.isSigned}))
-                        : inst->getFullType();
+                                           ? builder.getType(getIntTypeOpFromInfo(
+                                                 {dstInfo.width, srcInfo.isSigned}))
+                                           : inst->getFullType();
                     auto convertInst = needsSignReinterpret ? nullptr : inst;
                     operand = srcInfo.isSigned
-                        ? emitSpecConstantSConvert(convertInst, convertType, operand)
-                        : emitSpecConstantUConvert(convertInst, convertType, operand);
+                                  ? emitSpecConstantSConvert(convertInst, convertType, operand)
+                                  : emitSpecConstantUConvert(convertInst, convertType, operand);
                 }
 
                 if (needsSignReinterpret)
