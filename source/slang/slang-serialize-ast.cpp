@@ -8,6 +8,7 @@
 #include "slang-diagnostics.h"
 #include "slang-mangle.h"
 #include "slang-parser.h"
+#include "slang-rich-diagnostics.h"
 #include "slang-serialize-fossil.h"
 #include "slang-serialize-riff.h"
 
@@ -1513,7 +1514,9 @@ ModuleDecl* ASTSerialReadContext::_readImportedModule(ASTSerializer const& seria
     if (!module)
     {
         if (_sink)
-            _sink->diagnose(_requestingSourceLoc, Diagnostics::importFailed, moduleName);
+            _sink->diagnose(Diagnostics::ImportFailed{
+                .path = moduleName ? moduleName->text : String(),
+                .location = _requestingSourceLoc});
         return nullptr;
     }
     return module->getModuleDecl();
@@ -1561,11 +1564,9 @@ NodeBase* ASTSerialReadContext::_readImportedDecl(ASTSerializer const& serialize
         importedFromModule->findExportedDeclByMangledName(mangledName.getUnownedSlice());
     if (!importedDecl)
     {
-        _sink->diagnose(
-            SourceLoc(),
-            Diagnostics::cannotResolveImportedDecl,
-            mangledName,
-            importedFromModule->getName());
+        _sink->diagnose(Diagnostics::CannotResolveImportedDecl{
+            .declName = mangledName,
+            .moduleName = importedFromModule->getName()});
     }
     return importedDecl;
 }
@@ -1658,6 +1659,10 @@ void ASTSerialReadContext::_assignGenericParameterIndices(GenericDecl* genericDe
         if (auto typeParam = as<GenericTypeParamDeclBase>(m))
         {
             typeParam->parameterIndex = parameterCounter++;
+        }
+        else if (auto valPackParam = as<GenericValuePackParamDecl>(m))
+        {
+            valPackParam->parameterIndex = parameterCounter++;
         }
         else if (auto valParam = as<GenericValueParamDecl>(m))
         {
@@ -1899,8 +1904,8 @@ void writeSerializedModuleAST(
         // (which is more or less just a pair of pointers, to the two
         // values described above).
         //
-        Fossil::SerialWriter writer(blobBuilder);
         ASTSerialWriteContext context(moduleDecl, sourceLocWriter);
+        Fossil::SerialWriter writer(blobBuilder);
         ASTSerialWriteContext::ASTSerializer serializer(&writer, &context);
 
         // Once we have our `serializer`, we can finally invoke

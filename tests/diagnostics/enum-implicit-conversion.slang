@@ -1,6 +1,6 @@
 // enum-implicit-conversion.slang
 
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 // Confirm that suitable error messages are
 // generated for code that relies on implicit
@@ -25,19 +25,23 @@ int baz(Color x) { return (int)x; }
 int test(int val)
 {
     // Implicit conversion from `int` to `enum` isn't allowed.
-    // CHECK: ([[# @LINE+1]]): error
     Color c = val;
+//CHECK:      ^^^ type mismatch in expression
+//CHECK:      ^^^ expected an expression of type 'Color', got 'int'
+//CHECK:      ^^^ explicit conversion from 'int' to 'Color' is possible
 
     // Implicit cast from enum to int types other than the tag type is not allowed.
-    // CHECK: ([[# @LINE+1]]): error
     uint y = c;
+//CHECK:     ^ type mismatch in expression
+//CHECK:     ^ expected an expression of type 'uint', got 'Color'
+//CHECK:     ^ explicit conversion from 'Color' to 'uint' is possible
 
     // Call that expects implicit conversion from int to enum shouldn't be allowed.
-    // CHECK: ([[# @LINE+1]]): error
     int z = baz(5);
-    
-    // CHECK-NOT: error
-    
+//CHECK:        ^ type mismatch in expression
+//CHECK:        ^ expected an expression of type 'Color', got 'int'
+//CHECK:        ^ explicit conversion from 'int' to 'Color' is possible
+
     // Call that has an explicit overload on `enum` type should succeed.
     int zz = bar(c);
     

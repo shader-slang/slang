@@ -45,13 +45,13 @@ struct Foo<T : IInterface>
 Foo<T> make<T : IInterface>(T obj, float y)
 {
     return {obj, obj.preCalc(y)};
-    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
+    // REPORT-DAG: note[E50102]: generated dynamic dispatch code
 }
 
 float calc<T : IInterface>(Foo<T> obj)
 {
     return obj.a.postCalc(obj.extras);
-    // REPORT-DAG: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
+    // REPORT-DAG: note[E50102]: generated dynamic dispatch code
 }
 
 float f(uint id, float x)

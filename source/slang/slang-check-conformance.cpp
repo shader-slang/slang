@@ -284,31 +284,11 @@ SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
         auto witness = m_astBuilder->getOrCreate<DynamicSubtypeWitness>(subType, superType);
         return witness;
     }
-    else if (auto conjunctionSuperType = as<AndType>(superType))
+    else if (as<AndType>(superType))
     {
-        // We know that `T <: L & R` if `T <: L` and `T <: R`.
-        //
-        // We therefore simply recursively test both `T <: L`
-        // and `T <: R`.
-        //
-        auto leftWitness =
-            isSubtype(subType, conjunctionSuperType->getLeft(), IsSubTypeOptions::None);
-        if (!leftWitness)
-            return nullptr;
-        //
-        auto rightWitness =
-            isSubtype(subType, conjunctionSuperType->getRight(), IsSubTypeOptions::None);
-        if (!rightWitness)
-            return nullptr;
-
-        // If both of the sub-relationships hold, we can construct
-        // a conjunction of those witnesses to witness `T <: L&R`
-        //
-        return m_astBuilder->getConjunctionSubtypeWitness(
-            subType,
-            conjunctionSuperType,
-            leftWitness,
-            rightWitness);
+        // AndType constraints should have been flattened into individual constraints
+        // during visitGenericTypeConstraintDecl. If we get here, something is wrong.
+        SLANG_UNEXPECTED("AndType should have been flattened before reaching isSubtype");
     }
     else if (auto extractExistentialType = as<ExtractExistentialType>(subType))
     {

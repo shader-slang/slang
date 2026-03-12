@@ -55,16 +55,21 @@ public struct BindlessAddress<T> : IPointerLikeAddress<T>
         }
     }
 
-    [ForceInline]
+    // [ForceInline]
     public void atomicAdd(uint index, vector<T, 2> value)
     {
         __target_switch
         {
         case cuda:
             // On CUDA, use packed vector atomic for types that support it (half2, bfloat16x2).
-            let scalarPtr = &handle[baseIndex + index];
-            let vecPtr = reinterpret<vector<T, 2>*>(scalarPtr);
-            __atomic_reduce_add(vecPtr[0], value);
+            // Note: Only use this on CUDA, because Ptr<T[]> is just T** on CUDA.
+
+            // *handle will be resolved to RWStructuredBuffer<T>
+            let bufferPtr = __getStructuredBufferPtr(*handle);
+            let doublePtr = reinterpret<T**>(bufferPtr);
+            let offsetPtr = doublePtr[0] + baseIndex + index;
+            let vecPtr = reinterpret<vector<T, 2>*>(offsetPtr);
+            __atomic_reduce_add(*vecPtr, value);
         default:
             // On other targets, fall back to two scalar atomic adds.
             atomicAdd(index, value[0]);
@@ -72,6 +77,8 @@ public struct BindlessAddress<T> : IPointerLikeAddress<T>
         }
     }
 
+    [Differentiable]
+    [ForwardDerivative(fwd_getOffset)]
     public This getOffset(int elements)
     {
         uint newBaseIndex = baseIndex + elements;
@@ -79,6 +86,13 @@ public struct BindlessAddress<T> : IPointerLikeAddress<T>
         This address = This(handle);
         address.baseIndex = newBaseIndex;
         return address;
+    }
+
+    static DifferentialPtrPair<This> fwd_getOffset(DifferentialPtrPair<This> self, int elements)
+    {
+        return DifferentialPtrPair<This>(
+            self.p.getOffset(elements),
+            self.d.getOffset(elements));
     }
 
     [ForceInline]
@@ -124,9 +138,18 @@ public struct PointerAddress<T> : IPointerLikeAddress<T>
         set { ptr[index] = newValue; }
     }
 
+    [Differentiable]
+    [ForwardDerivative(fwd_getOffset)]
     public This getOffset(int elements)
     {
-        return This(ptr + elements);
+        return no_diff(This(ptr + elements));
+    }
+
+    static DifferentialPtrPair<This> fwd_getOffset(DifferentialPtrPair<This> self, int elements)
+    {
+        return DifferentialPtrPair<This>(
+            self.p.getOffset(elements),
+            self.d.getOffset(elements));
     }
 
     [ForceInline]
@@ -193,6 +216,94 @@ public struct PointerAddress<T> : IPointerLikeAddress<T>
     }
 }
 
+/**
+TensorView address type with pointer-like semantics for slangtorch integration.
+Wraps a TensorView by extracting its data pointer into a PointerAddress, delegating
+all IPointerLikeAddress operations to it.
+@param T The element type.
+@remarks CUDA-only, since TensorView is a CUDA-specific type.
+@category neural
+*/
+
+public struct TorchTensorViewAddress<T> : IPointerLikeAddress<T>
+    where T : __BuiltinFloatingPointType
+    where T.Differential == T
+{
+    public typealias Differential = TorchTensorViewAddress<T.Differential>;
+
+    internal PointerAddress<T> inner;
+
+    [require(cuda)]
+    public __init(TensorView<T> tensor, uint baseAddress = 0U)
+    {
+        this.inner = PointerAddress<T>(tensor.data_ptr() + baseAddress);
+    }
+
+    [require(cuda)]
+    public __subscript(uint index)->T
+    {
+        [nonmutating] get { return inner[index]; }
+        [mutating] set { inner[index] = newValue; }
+    }
+
+    [require(cuda)]
+    [Differentiable]
+    [ForwardDerivative(fwd_getOffset)]
+    public This getOffset(int elements)
+    {
+        This result;
+        result.inner = inner.getOffset(elements);
+        return result;
+    }
+
+    static DifferentialPtrPair<This> fwd_getOffset(DifferentialPtrPair<This> self, int elements)
+    {
+        return DifferentialPtrPair<This>(
+            self.p.getOffset(elements),
+            self.d.getOffset(elements));
+    }
+
+    [ForceInline]
+    [require(cuda_glsl_hlsl_metal_spirv, sm_6_6)]
+    public void atomicAdd(uint index, T value)
+    {
+        __target_switch
+        {
+        case cuda:
+            inner.atomicAdd(index, value);
+        default:
+            static_assert(false, "atomicAdd is not supported on this target");
+        }
+    }
+
+    [ForceInline]
+    public void atomicAdd(uint index, vector<T, 2> value) {
+        __target_switch
+        {
+        case cuda:
+            inner.atomicAdd(index, value);
+        default:
+            static_assert(false, "atomicAdd is not supported on this target");
+        }
+    }
+
+    [ForceInline]
+    internal uint4 readUint4<DstType, bool IsAligned, uint ActualBoundary>(int offsetIndex)
+        where DstType : __BuiltinFloatingPointType
+        where DstType.Differential == DstType
+    {
+        return inner.readUint4<DstType, IsAligned, ActualBoundary>(offsetIndex);
+    }
+
+    [ForceInline]
+    internal void writeUint4Atomic<SrcType, bool IsAligned, uint ActualBoundary>(int offsetIndex, uint4 value)
+        where SrcType : __BuiltinFloatingPointType
+        where SrcType.Differential == SrcType
+    {
+        inner.writeUint4Atomic<SrcType, IsAligned, ActualBoundary>(offsetIndex, value);
+    }
+}
+
 // We currently don't support UserPointer as an `IDifferentiablePtrType`, the issue is tracked in
 // https://github.com/shader-slang/slang/issues/8834.
 // So we define an internal extension for now, once we can resolve the issue, we can make it public.
@@ -216,9 +327,18 @@ internal extension<T> Ptr<T, Access.ReadWrite, AddressSpace.Device> : IPointerLi
         set { this[index] = newValue; }
     }
 
+    [Differentiable]
+    [ForwardDerivative(fwd_getOffset)]
     internal This getOffset(int elements)
     {
-        return This(this + elements);
+        return no_diff(This(this + elements));
+    }
+
+    static DifferentialPtrPair<This> fwd_getOffset(DifferentialPtrPair<This> self, int elements)
+    {
+        return DifferentialPtrPair<This>(
+            self.p + elements,
+            self.d + elements);
     }
 
     [require(hlsl, sm_6_6)]

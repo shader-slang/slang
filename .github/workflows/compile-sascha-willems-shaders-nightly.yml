@@ -1,0 +1,132 @@
+name: Sascha Willems Vulkan Shaders (Nightly)
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Run daily at 4 AM UTC (after RTX Remix and coverage runs)
+    - cron: "0 4 * * *"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  sascha-willems-shader-test:
+    runs-on: windows-2022
+    timeout-minutes: 30
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout Slang repository
+        uses: actions/checkout@v4
+
+      - name: Add bash to PATH
+        shell: pwsh
+        run: |
+          Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\bin"
+
+      - name: Download Slang build from latest successful merge queue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "Finding latest successful merge queue CI run..."
+          RUN_INFO=$(gh run list --repo ${{ github.repository }} \
+            --workflow ci.yml --status success --event merge_group --limit 1 \
+            --json databaseId,headSha,createdAt)
+
+          RUN_ID=$(echo "$RUN_INFO" | jq -r '.[0].databaseId')
+          COMMIT=$(echo "$RUN_INFO" | jq -r '.[0].headSha')
+          CREATED=$(echo "$RUN_INFO" | jq -r '.[0].createdAt')
+
+          if [ -z "$RUN_ID" ] || [ "$RUN_ID" = "null" ]; then
+            echo "No successful CI run found"
+            exit 1
+          fi
+
+          echo "Downloading from CI run $RUN_ID (commit: ${COMMIT:0:12}, created: $CREATED)"
+          gh run download "$RUN_ID" --repo ${{ github.repository }} \
+            --name slang-build-windows-x86_64-cl-release \
+            --dir slang-build/
+
+          slangcPath=$(find slang-build -name "slangc.exe" -type f | head -1)
+          if [ -z "$slangcPath" ]; then
+            echo "slangc.exe not found in artifact"
+            find slang-build -type f | head -30
+            exit 1
+          fi
+
+          echo "Found slangc at: $slangcPath"
+          "$slangcPath" -version
+
+      - name: Clone SaschaWillems/Vulkan repository (sparse checkout)
+        run: |
+          echo "Cloning SaschaWillems/Vulkan (shaders/slang only)..."
+          git clone --depth 1 --filter=blob:none --sparse \
+            https://github.com/SaschaWillems/Vulkan.git external/SaschaWillems-Vulkan
+          cd external/SaschaWillems-Vulkan || exit 1
+          git sparse-checkout set shaders/slang
+          commit=$(git rev-parse HEAD)
+          echo "Using SaschaWillems/Vulkan commit: $commit"
+
+          slangCount=$(find shaders/slang -name "*.slang" | wc -l | xargs)
+          echo "Found $slangCount .slang shader files"
+
+      - name: Compile Slang shaders
+        run: |
+          echo "Compiling Sascha Willems Vulkan Slang shaders..."
+
+          slangcPath=$(find slang-build -name "slangc.exe" -type f | head -1)
+          ./extras/compile-sascha-willems-shaders.sh \
+            --slangc "$slangcPath" \
+            --repo external/SaschaWillems-Vulkan \
+            --skiplist extras/compile-sascha-willems-skiplist.txt \
+            --spirv-val
+
+      - name: Report results
+        if: always()
+        run: |
+          echo ""
+          echo "================================================"
+          if [ "$BUILD_RESULT" = "success" ]; then
+            echo "Sascha Willems shader test PASSED"
+            echo "Slang compiler changes are compatible with Sascha Willems Vulkan shaders"
+          else
+            echo "Sascha Willems shader test FAILED"
+            echo "Slang compiler changes may have broken shader compilation"
+            echo "Review build logs for details"
+          fi
+          echo "================================================"
+        env:
+          BUILD_RESULT: ${{ job.status }}
+
+      # Slack notifications disabled - will be enabled in a follow-up PR
+      - name: Success notification
+        id: slack-notify-success
+        if: false # ${{ github.event_name == 'schedule' && success() }}
+        uses: slackapi/slack-github-action@v1.26.0
+        with:
+          payload: |
+            {
+              "Sascha-Willems-Nightly": ":green-check-mark: Sascha Willems shader nightly status: ${{ job.status }}"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Failure notification
+        id: slack-notify-failure
+        if: false # ${{ github.event_name == 'schedule' && !success() }}
+        uses: slackapi/slack-github-action@v1.26.0
+        with:
+          payload: |
+            {
+              "Sascha-Willems-Nightly": ":alert: :alert: :alert: :alert: :alert: :alert:\nSascha Willems shader nightly status: ${{ job.status }}: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

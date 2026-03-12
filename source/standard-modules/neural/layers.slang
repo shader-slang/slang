@@ -13,14 +13,14 @@ suitable for building multi-layer perceptrons (MLPs) and similar architectures.
    let layer = FFLayer<float, Vec4, Vec2, LinearLayout, ReLU<float>>();
    ```
 
-2. **Forward pass:** Call `eval()` with address and input:
+2. **Forward pass:** Call `eval()` with base parameter address and input:
    ```
-   let output = layer.eval<Address>(input, weightAddr, biasAddr);
+   let output = layer.eval<Address>(input, paramAddr);
    ```
 
 3. **Training (backward pass):** Use autodiff with `DifferentialPtrPair`:
    ```
-   var addrPair = DifferentialPtrPair<Address>(addr, gradAddr);
+   var addrPair = DifferentialPtrPair<Address>(paramAddr, gradAddr);
    bwd_diff(computeOutput)(addrPair, inputPair, layer, dOutput);
    ```
 
@@ -67,23 +67,23 @@ public struct FFLayer<
 
     /// Forward evaluation: y = Activation(W*x + b).
     /// @param input Input vector.
-    /// @param weightAddr Weight address (pointer-like).
-    /// @param biasAddr Bias address (pointer-like). Pass `none` if no bias.
+    /// @param parameterAddr Base address of contiguous parameter block (weights then bias).
     /// @return Output vector after linear transform and activation.
     [Differentiable]
     [ForceInline]
-    public OutputVector eval<A>(InputVector input, A weightAddr, Optional<A> biasAddr = none)
+    public OutputVector eval<A>(InputVector input, A parameterAddr)
         where A : IPointerLikeAddress<T>
         where A.Differential : IPointerLikeAddress<T>
     {
         OutputVector y;
         if(HasBias)
         {
-            y = input.linearTransform<A, Layout, OutputVector>(weightAddr, biasAddr.value);
+            let biasAddr = parameterAddr.getOffset(OutputVector.Size * InputVector.Size);
+            y = input.linearTransform<A, Layout, OutputVector>(parameterAddr, biasAddr);
         }
         else
         {
-            y = input.linearTransform<A, Layout, OutputVector>(weightAddr);
+            y = input.linearTransform<A, Layout, OutputVector>(parameterAddr);
         }
         return activation.eval<OutputVector>(y);
     }

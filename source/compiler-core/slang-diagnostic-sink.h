@@ -219,7 +219,7 @@ public:
     template<typename D>
     bool diagnose(D const& d)
     {
-        return diagnoseRichImpl(d.toGenericDiagnostic());
+        return diagnoseRichImpl(d.toGenericDiagnostic(), D::getInfo());
     }
 
     // Useful for notes on existing diagnostics, where it would be redundant to display the same
@@ -303,9 +303,22 @@ public:
         }
     }
 
-    /// Set whether to enable unicode in rich diagnostics
-    void setEnableUnicode(bool enable) { m_enableUnicode = enable; }
+    /// Set whether to enable unicode in rich diagnostics.
+    /// When not explicitly set, unicode is auto-detected based on whether
+    /// output goes to a console (matching the behavior of color auto-detection).
+    void setEnableUnicode(bool enable)
+    {
+        m_enableUnicode = enable;
+        m_unicodeExplicitlySet = true;
+    }
     bool getEnableUnicode() const { return m_enableUnicode; }
+
+    bool shouldEnableUnicode() const
+    {
+        if (m_unicodeExplicitlySet)
+            return m_enableUnicode;
+        return shouldEnableTerminalColors();
+    }
 
     /// The parent sink is another sink that will receive diagnostics from this sink.
     void setParentSink(DiagnosticSink* parentSink) { m_parentSink = parentSink; }
@@ -354,11 +367,15 @@ protected:
         DiagnosticArg const* args);
     bool diagnoseImpl(DiagnosticInfo const& info, const UnownedStringSlice& formattedMessage);
 
-    // Returns true if a diagnostic is written, doesn't return at all if the diagnostic is fatal
-    bool diagnoseRichImpl(const GenericDiagnostic& diagnostic);
+    // Returns true if a diagnostic is written, doesn't return at all if the diagnostic is fatal.
+    // The info parameter is used for severity override lookup (e.g., -Wno-xxx flags).
+    bool diagnoseRichImpl(const GenericDiagnostic& diagnostic, const DiagnosticInfo* info);
 
     // Overload that allows specifying a source manager (used when routing to parent sinks)
-    bool diagnoseRichImpl(const GenericDiagnostic& diagnostic, SourceManager* sourceManager);
+    bool diagnoseRichImpl(
+        const GenericDiagnostic& diagnostic,
+        const DiagnosticInfo* info,
+        SourceManager* sourceManager);
 
     // An overload which takes an old-style diagnostic and manipulates it into a GenericDiagnostic
     bool diagnoseRichImpl(
@@ -386,14 +403,18 @@ protected:
 
     SourceLocationLexer m_sourceLocationLexer;
 
-    // Configuration that allows the user to control the severity of certain diagnostic messages
+    // Configuration that allows the user to control the severity of certain diagnostic messages.
+    // Currently keyed by diagnostic code (int). This means diagnostics with duplicate codes
+    // will share the same override. TODO: Consider keying by DiagnosticInfo* instead for
+    // more precise per-diagnostic control.
     Dictionary<int, Severity> m_severityOverrides;
 
     RefPtr<SourceWarningStateTrackerBase> m_sourceWarningStateTracker = nullptr;
 
     // Rich diagnostics rendering options
     SlangDiagnosticColor m_diagnosticColorMode = SLANG_DIAGNOSTIC_COLOR_AUTO;
-    bool m_enableUnicode = true; // Enable unicode unconditionally
+    bool m_enableUnicode = false;
+    bool m_unicodeExplicitlySet = false;
 };
 
 /// An `ISlangWriter` that writes directly to a diagnostic sink.

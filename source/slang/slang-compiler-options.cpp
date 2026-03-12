@@ -225,7 +225,7 @@ CompilerOptionValue Slang::CompilerOptionSet::getDefault(CompilerOptionName name
 SlangTargetFlags CompilerOptionSet::getTargetFlags()
 {
     SlangTargetFlags result = 0;
-    if (getBoolOption(CompilerOptionName::DumpIr))
+    if (shouldDumpIR())
         result |= SLANG_TARGET_FLAG_DUMP_IR;
     if (getBoolOption(CompilerOptionName::GenerateWholeProgram))
         result |= SLANG_TARGET_FLAG_GENERATE_WHOLE_PROGRAM;

@@ -14,6 +14,7 @@
 #include "slang-ir-ssa-simplification.h"
 #include "slang-ir-util.h"
 #include "slang-ir-validate.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -1093,6 +1094,7 @@ struct ForwardDiffTranslationContext
             IRInst* primalCall = maybeCloneForPrimalInst(builder, origCall);
             return InstPair(primalCall, nullptr);
         }
+
 
         auto calleeType = _getCalleeActualFuncType(&diffTypeContext, primalCallee);
         SLANG_ASSERT(calleeType);

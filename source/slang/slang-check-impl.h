@@ -24,6 +24,17 @@ bool diagnoseCapabilityErrors(
     return sink->diagnose(pos, info, args...);
 }
 
+template<typename D>
+bool diagnoseCapabilityErrors(
+    DiagnosticSink* sink,
+    CompilerOptionSet& optionSet,
+    D const& diagnostic)
+{
+    if (optionSet.getBoolOption(CompilerOptionName::IgnoreCapabilities))
+        return false;
+    return sink->diagnose(diagnostic);
+}
+
 enum class IsSubTypeOptions
 {
     None = 0,
@@ -674,6 +685,16 @@ private:
     Dictionary<int, int64_t> bindingToByteOffset;
 };
 
+/// Represents what the compiler can currently prove about a variadic pack's cardinality.
+/// This is intentionally coarse-grained: we only track whether a pack is known to be empty,
+/// known to be non-empty, or still unknown.
+enum class VariadicPackCardinality
+{
+    Unknown,
+    Empty,
+    NonEmpty,
+};
+
 /// Shared state for a semantics-checking session.
 struct SharedSemanticsContext : public RefObject
 {
@@ -713,6 +734,8 @@ struct SharedSemanticsContext : public RefObject
     Dictionary<Decl*, bool> m_typeContainsRecursionCache;
 
     Dictionary<TypePair, ConversionCost> m_typeConversionCostCache;
+
+    Dictionary<Val*, VariadicPackCardinality> m_packCardinalityCache;
 
     // Track diagnostics that have already been reported to avoid duplicates.
     // Key format: "diagnosticId|sourceLocRaw" or "diagnosticId|sourceLocRaw|extraInfo"
@@ -1012,11 +1035,11 @@ public:
         return result;
     }
 
-    SemanticsContext withParentExpandExpr(ExpandExpr* expr, OrderedHashSet<Type*>* capturedTypes)
+    SemanticsContext withParentExpandExpr(ExpandExpr* expr, OrderedHashSet<Val*>* capturedPacks)
     {
         SemanticsContext result(*this);
         result.m_parentExpandExpr = expr;
-        result.m_capturedTypePacks = capturedTypes;
+        result.m_capturedPacks = capturedPacks;
         return result;
     }
 
@@ -1190,7 +1213,7 @@ public:
 
     bool getAllowDroppingDerivatives() { return m_allowDroppingDerivatives; }
 
-    OrderedHashSet<Type*>* getCapturedTypePacks() { return m_capturedTypePacks; }
+    OrderedHashSet<Val*>* getCapturedPacks() { return m_capturedPacks; }
 
     GLSLBindingOffsetTracker* getGLSLBindingOffsetTracker()
     {
@@ -1250,7 +1273,7 @@ protected:
 
     ExpandExpr* m_parentExpandExpr = nullptr;
 
-    OrderedHashSet<Type*>* m_capturedTypePacks = nullptr;
+    OrderedHashSet<Val*>* m_capturedPacks = nullptr;
 
     // If we are checking inside a lambda expression, we need
     // to track the referenced variables that should be captured
@@ -1319,6 +1342,21 @@ struct SemanticsVisitor : public SemanticsContext
         if (!getShared()->m_reportedDiagnosticKeys.add(key))
             return; // Already reported
         getSink()->diagnose(loc, diagnostic, std::forward<Args>(args)...);
+    }
+
+    /// Diagnose a rich diagnostic only once per unique key (diagnostic ID + serialized content).
+    template<typename D>
+    void diagnoseOnce(D const& diagnostic)
+    {
+        auto genericDiag = diagnostic.toGenericDiagnostic();
+        StringBuilder keyBuilder;
+        keyBuilder << D::getInfo()->id;
+        keyBuilder << "|" << genericDiag.primarySpan.range.begin.getRaw();
+        keyBuilder << "|" << genericDiag.primarySpan.message;
+        String key = keyBuilder.produceString();
+        if (!getShared()->m_reportedDiagnosticKeys.add(key))
+            return; // Already reported
+        getSink()->diagnose(diagnostic);
     }
 
 public:
@@ -1508,6 +1546,10 @@ public:
     {
         return resolveOverloadedExpr(overloadedExpr, nullptr, mask);
     }
+
+    bool hasNonEmptyPackConstraint(Decl* decl);
+    VariadicPackCardinality getPackCardinality(Val* packVal);
+    bool isKnownNonEmptyPack(Val* packVal);
 
     /// Worker reoutine for `maybeResolveOverloadedExpr` and `resolveOverloadedExpr`.
     Expr* _resolveOverloadedExprImpl(
@@ -1821,6 +1863,17 @@ public:
     /// when a conversion is being done "for real" so that diagnostics
     /// should be emitted on failure.
     ///
+    /// If `outWitnessOfConversion` is non-null and zero valid conversions are found
+    /// `outWitnessOfConversion` will be set to a `nullptr`.
+    ///
+    /// If `outWitnessOfConversion` is non-null and a conversion is found,
+    /// `outWitnessOfConversion` will either be set to:
+    /// (1) `BuiltinTypeCoercionWitness*` to signify that Slang casts without
+    /// a user-definition.
+    /// (2) `DeclRefTypeCoercionWitness*` to signify that Slang will cast
+    /// via a user-definition.
+    /// (3) `nullptr` to signify that the case is unhandled and should be handled
+    ///
     bool _coerce(
         CoercionSite site,
         Type* toType,
@@ -1828,7 +1881,8 @@ public:
         QualType fromType,
         Expr* fromExpr,
         DiagnosticSink* sink,
-        ConversionCost* outCost);
+        ConversionCost* outCost,
+        TypeCoercionWitness** outWitnessOfConversion);
 
     /// Check whether implicit type coercion from `fromType` to `toType` is possible.
     ///
@@ -2301,10 +2355,7 @@ public:
 
     Stmt* maybeParseStmt(Stmt* stmt, const SemanticsContext& context);
 
-    void getGenericParams(
-        GenericDecl* decl,
-        List<Decl*>& outParams,
-        List<GenericTypeConstraintDecl*>& outConstraints);
+    void getGenericParams(GenericDecl* decl, List<Decl*>& outParams, List<Decl*>& outConstraints);
 
     /// Determine if `left` and `right` have matching generic signatures.
     /// If they do, then outputs a specialized declRef to `ioSubstRightToLeft` that
@@ -3277,6 +3328,8 @@ public:
 
     Expr* visitGetArrayLengthExpr(GetArrayLengthExpr* expr);
 
+    Expr* visitPackQueryExpr(PackQueryExpr* expr);
+
     Expr* visitDefaultConstructExpr(DefaultConstructExpr* expr);
 
     Expr* visitDetachExpr(DetachExpr* expr);
@@ -3461,5 +3514,25 @@ RefPtr<ComponentType> createSpecializedGlobalComponentType(EndToEndCompileReques
 RefPtr<ComponentType> createSpecializedGlobalAndEntryPointsComponentType(
     EndToEndCompileRequest* endToEndReq,
     List<RefPtr<ComponentType>>& outSpecializedEntryPoints);
+
+// Returns `false` if coerce fails.
+// * `constraintDecl` is the constraint we need to satisfy
+// * `genericDeclRef` is the generic decl we are operating on
+// * `maybeContext` is the contect for our current operation. This variable must be filled if
+// `shouldEmitError == true`.
+// * `maybeConstrainedGenericParams` contains set of constrained params relative to `genericDeclRef`
+// and current context.
+//   This param is optional. Coercion `toType` and `fromType` will be added to the set if function
+//   succeeds.
+// * `args` are the current arguments relative to `genericDeclRef`.
+bool addTypeCoercionWitnessToArgs(
+    ASTBuilder* astBuilder,
+    SemanticsVisitor* visitor,
+    TypeCoercionConstraintDecl* constraintDecl,
+    DeclRef<GenericDecl> genericDeclRef,
+    SemanticsVisitor::OverloadResolveContext* maybeContext,
+    HashSet<Decl*>* maybeConstrainedGenericParams,
+    ShortList<Val*>& args,
+    bool shouldEmitError);
 
 } // namespace Slang

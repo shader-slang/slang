@@ -201,6 +201,9 @@ void printDiagnosticArg(StringBuilder& sb, ASTNodeType nodeType)
     case ASTNodeType::GenericTypeConstraintDecl:
         sb << "GenericTypeConstraintDecl";
         break;
+    case ASTNodeType::NonEmptyPackConstraintDecl:
+        sb << "NonEmptyPackConstraintDecl";
+        break;
     case ASTNodeType::SimpleTypeDecl:
         sb << "SimpleTypeDecl";
         break;
@@ -663,19 +666,6 @@ RequirementWitness tryLookUpRequirementWitness(
                 }
                 return result;
             }
-        }
-    }
-    else if (
-        auto extractFromConjunctionTypeWitness =
-            as<ExtractFromConjunctionSubtypeWitness>(subtypeWitness))
-    {
-        if (auto conjunctionTypeWitness = as<ConjunctionSubtypeWitness>(
-                extractFromConjunctionTypeWitness->getConjunctionWitness()))
-        {
-            auto componentWitness = as<SubtypeWitness>(conjunctionTypeWitness->getComponentWitness(
-                extractFromConjunctionTypeWitness->getIndexInConjunction()));
-
-            return tryLookUpRequirementWitness(astBuilder, componentWitness, requirementKey);
         }
     }
 

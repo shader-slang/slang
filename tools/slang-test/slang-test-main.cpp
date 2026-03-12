@@ -49,6 +49,10 @@
 #include <atomic>
 #include <thread>
 
+#if SLANG_UNIX_FAMILY
+#include <signal.h>
+#endif
+
 #if defined(_WIN32)
 #include <slang-rhi/agility-sdk.h>
 SLANG_RHI_EXPORT_AGILITY_SDK
@@ -1583,6 +1587,15 @@ static RenderApiFlags _getAvailableRenderApiFlags(TestContext* context)
                         SLANG_PASS_THROUGH_GENERIC_C_CPP)))
                 {
                     availableRenderApiFlags |= RenderApiFlags(1) << int(apiType);
+                    StdWriters::getOut().print(
+                        "Check %s: Supported\n",
+                        RenderApiUtil::getApiName(apiType).begin());
+                }
+                else
+                {
+                    StdWriters::getOut().print(
+                        "Check %s: Not Supported\n",
+                        RenderApiUtil::getApiName(apiType).begin());
                 }
                 continue;
             }
@@ -3109,17 +3122,15 @@ static TestResult runCPPCompilerSharedLibrary(TestContext* context, TestInput& i
     options.modulePath = SliceUtil::asTerminatedCharSlice(modulePath);
 
     ComPtr<IArtifact> artifact;
-    if (SLANG_FAILED(compiler->compile(options, artifact.writeRef())))
-    {
-        return TestResult::Fail;
-    }
+    const SlangResult compileRes = compiler->compile(options, artifact.writeRef());
 
-    auto diagnostics = findAssociatedRepresentation<IArtifactDiagnostics>(artifact);
+    auto diagnostics =
+        artifact ? findAssociatedRepresentation<IArtifactDiagnostics>(artifact) : nullptr;
 
-    if (diagnostics && SLANG_FAILED(diagnostics->getResult()))
+    if (SLANG_FAILED(compileRes) || (diagnostics && SLANG_FAILED(diagnostics->getResult())))
     {
         // Compilation failed
-        String actualOutput = _calcSummary(diagnostics);
+        String actualOutput = diagnostics ? _calcSummary(diagnostics) : String("Compile: Error\n");
 
         // Write the output
         Slang::File::writeAllText(actualOutputPath, actualOutput);
@@ -5698,6 +5709,52 @@ SlangResult innerMain(int argc, char** argv)
     _disableD3D12Backend(&context);
 #endif
 
+    // If -only-api-detection mode, run API detection and exit
+    if (options.apiDetectionOnly)
+    {
+        // Create a TestReporter since _getAvailableRenderApiFlags may use it in verbose mode
+        TestReporter reporter;
+        SLANG_RETURN_ON_FAIL(reporter.init(options.outputMode, options.expectedFailureList));
+        context.setTestReporter(&reporter);
+        reporter.m_verbosity = options.verbosity;
+
+        _getAvailableRenderApiFlags(&context);
+
+        // Print which APIs were not checked
+        printf("Not checked:");
+        bool anyNotChecked = false;
+        for (int i = 0; i < int(RenderApiType::CountOf); ++i)
+        {
+            const RenderApiType apiType = RenderApiType(i);
+
+            // An API was "not checked" if it's not available on this platform
+            bool wasChecked = false;
+            if (apiType == RenderApiType::CPU)
+            {
+                wasChecked = (context.availableBackendFlags & PassThroughFlag::Generic_C_CPP) != 0;
+            }
+            else
+            {
+                wasChecked = RenderApiUtil::calcHasApi(apiType);
+            }
+
+            if (!wasChecked)
+            {
+                auto name = RenderApiUtil::getApiName(apiType);
+                printf(" %.*s", (int)name.getLength(), name.begin());
+                anyNotChecked = true;
+            }
+        }
+        if (!anyNotChecked)
+        {
+            printf(" (none)");
+        }
+        printf("\n");
+        fflush(stdout);
+
+        return SLANG_OK;
+    }
+
     if (options.subCommand.getLength())
     {
         // Get the function from the tool
@@ -5855,6 +5912,12 @@ SlangResult innerMain(int argc, char** argv)
 
 int main(int argc, char** argv)
 {
+#if SLANG_UNIX_FAMILY
+    // Ignore SIGPIPE so that writing to a broken pipe (e.g. a crashed test-server)
+    // returns EPIPE instead of killing this process (exit code 141).
+    signal(SIGPIPE, SIG_IGN);
+#endif
+
     // Fallback: run without cleanup if context initialization fails
     SlangResult res = innerMain(argc, argv);
     slang::shutdown();

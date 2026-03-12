@@ -6,7 +6,7 @@ Struct *no-body* declaration:
 > *`struct-decl`* =<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;[*`modifier-list`*]<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;**`'struct'`** [*`identifier`*] [*`generic-params-decl`*]<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** *`bases-clause`*] [**`'='`** *`type-expr`*] **`';'`**
+> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** *`bases-clause`*] [**`'='`** *`simple-type-spec`*] **`';'`**
 
 Struct *with-members* declaration:
 > *`struct-decl`* =<br>
@@ -20,13 +20,13 @@ Struct *link-time extern type* declaration:
 > *`struct-decl`* =<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;[*`modifier-list`*]<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;**`'extern'`** **`'struct'`** [*`identifier`*] [*`generic-params-decl`*]<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** *`bases-clause`*] [**`'='`** *`type-expr`*] **`';'`**
+> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** *`bases-clause`*] [**`'='`** *`simple-type-spec`*] **`';'`**
 
 Struct *link-time export type alias* declaration:
 > *`struct-decl`* =<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;[*`modifier-list`*]<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;**`'export'`** **`'struct'`** [*`identifier`*] [*`generic-params-decl`*]<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** *`bases-clause`*] **`'='`** *`type-expr`* **`';'`**
+> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** *`bases-clause`*] **`'='`** *`simple-type-spec`* **`';'`**
 
 Member list:
 > *`member-list`* =<br>
@@ -42,10 +42,10 @@ Member list:
 
 - *`modifier-list`* is an optional list of modifiers (TODO: link)
 - *`identifier`* is an optional name of the declared struct type
-- *`generic-params-decl`* is an optional generic parameters declaration. See [Generics (TODO)](TODO).
+- *`generic-params-decl`* is an optional generic parameters declaration. See [generics](generics.md).
 - *`bases-clause`* is an optional list of inherited [interfaces](types-interface.md).
-- *`type-expr`* is an optional type expression for an alias type. See [Modules (TODO)](TODO).
-- *`where-clause`* is an optional generic constraint expression. See [Generics (TODO)](TODO).
+- *`simple-type-spec`* is an optional type expression for an alias type. See [Modules (TODO)](TODO).
+- *`where-clause`* is an optional generic constraint expression. See [generics](generics.md).
 - *`member-list`* is a list of struct members. A member is one of:
   - *`var-decl`* is a member variable declaration. See [Variables (TODO)](TODO)
   - *`type-decl`* is a nested [type declaration](types.md).
@@ -141,10 +141,10 @@ An object is an *instance* of a `struct`. An instance consists of all non-static
 ### Syntax
 
 Declaration without body: (interfaces only)
-> **`'__init'`** **`'('`** *`param-list`* **`')'`** (**`'where'`** *`where-clause`*)\* **`';'`**
+> **`'__init'`** [*`generic-params-decl`*] **`'('`** *`param-list`* **`')'`** (**`'where'`** *`where-clause`*)\* **`';'`**
 
 Declaration with body:
-> **`'__init'`** **`'('`** *`param-list`* **`')'`** (**`'where'`** *`where-clause`*)\*<br>
+> **`'__init'`** [*`generic-params-decl`*] **`'('`** *`param-list`* **`')'`** (**`'where'`** *`where-clause`*)\*<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;**`'{'`** *`body-stmt`*\*  **`'}'`**
 
 
@@ -163,7 +163,7 @@ instantiation.
 
 `const` data members cannot be initialized by the constructor.
 
-*`where-clause`* is an optional generic constraint expression, discussed in [Generics (TODO)](TODO).
+*`where-clause`* is an optional generic constraint expression, discussed in [generics](generics.md).
 
 
 **Example:**
@@ -269,10 +269,10 @@ Non-static member functions cannot be invoked without an object.
 ### Syntax
 
 Modern syntax, implicit `get` declaration: (interfaces only)
-> **`'property'`** *`identifier`* **`':'`** *`type-expr`* **`';'`**
+> **`'property'`** *`identifier`* **`':'`** *`simple-type-spec`* **`';'`**
 
 Modern syntax, explicit accessor declarations:
-> **`'property'`** *`identifier`* **`':'`** *`type-expr`*<br>
+> **`'property'`** *`identifier`* **`':'`** *`simple-type-spec`*<br>
 > **`'{'`** *`accessor-decl`*\*  **`'}'`**
 
 Traditional syntax, implicit `get` declaration: (interfaces only)
@@ -471,10 +471,10 @@ int tmp4 = TestStruct::incrementAndReturnB();
 ### Syntax
 
 Implicit `get` declaration: (interfaces only)
-> **`'__subscript'`** [**`'('`** *`param-list`* **`')'`**]<br>
+> **`'__subscript'`** **`'('`** *`param-list`* **`')'`** **`'->'`** *`simple-type-spec`* **`';'`**
 
 Explicit accessor declarations:
-> **`'__subscript'`** [**`'('`** *`param-list`* **`')'`**] **`'->'`** *`type-expr`*<br>
+> **`'__subscript'`** **`'('`** *`param-list`* **`')'`** **`'->'`** *`simple-type-spec`*<br>
 > **`'{'`** *`accessor-decl`*\*  **`'}'`**
 
 See [properties](#property) for *`accessor-decl`* syntax.
@@ -532,6 +532,7 @@ struct TestStruct
     }
 }
 
+[numthreads(1,1,1)]
 void main(uint3 id : SV_DispatchThreadID)
 {
     TestStruct x = { };
@@ -551,10 +552,10 @@ void main(uint3 id : SV_DispatchThreadID)
 ### Syntax
 
 Declaration without body: (interfaces only)
-> *`type-expr`* **`'operator'`** **`'(' ')'`** **`'('`** *`param-list`* **`')'`** **`';'`**
+> *`simple-type-spec`* **`'operator'`** **`'(' ')'`** **`'('`** *`param-list`* **`')'`** **`';'`**
 
 Declaration with body:
-> *`type-expr`* **`'operator'`** **`'(' ')'`** **`'('`** *`param-list`* **`')'`**<br>
+> *`simple-type-spec`* **`'operator'`** **`'(' ')'`** **`'('`** *`param-list`* **`')'`**<br>
 > **`'{'`** *`body-stmt`*\* **`'}'`**
 
 ### Description

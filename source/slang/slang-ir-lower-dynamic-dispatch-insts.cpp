@@ -8,6 +8,7 @@
 #include "slang-ir-typeflow-set.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -605,9 +606,10 @@ struct UntaggedUnionLoweringContext : public InstPassBase
             if (sink && !canTypeBeStored(type))
             {
                 sink->diagnose(
-                    type->sourceLoc,
-                    Slang::Diagnostics::typeCannotBePackedIntoAnyValue,
-                    type);
+                    Diagnostics::TypeCannotBePackedIntoAnyValue{
+                        .type = type,
+                        .location = type->sourceLoc,
+                    });
             }
         }
 

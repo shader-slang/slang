@@ -131,6 +131,7 @@
 #include "slang-lower-to-ir.h"
 #include "slang-mangle.h"
 #include "slang-pass-wrapper.h"
+#include "slang-rich-diagnostics.h"
 #include "slang-syntax.h"
 #include "slang-type-layout.h"
 #include "slang-visitor.h"
@@ -317,15 +318,15 @@ static void reportCheckpointIntermediates(
             emitter.emitType(entry.storedType);
 
             sink->diagnose(
-                entry.sourceLoc,
-                Diagnostics::reportCheckpointVariable,
-                entrySize.size,
-                typeWriter.getContent());
+                Diagnostics::ReportCheckpointVariable{
+                    .size = (int64_t)fieldSize.size,
+                    .typeName = typeWriter.getContent(),
+                    .location = field->sourceLoc});
         }
     }
 
     if (nonEmptyFuncs == 0)
-        sink->diagnose(SourceLoc(), Diagnostics::reportCheckpointNone);
+        sink->diagnose(Diagnostics::ReportCheckpointNone{});
 
     // Remove all consumed ReportCheckpointStore instructions.
     for (auto inst : reportInstsToRemove)
@@ -523,7 +524,8 @@ void diagnoseCallStack(IRInst* inst, DiagnosticSink* sink)
             auto user = use->getUser();
             if (auto call = as<IRCall>(user))
             {
-                sink->diagnose(call, Diagnostics::seeCallOfFunc, func);
+                sink->diagnose(
+                    Diagnostics::SeeCallOfFuncIr{.inst = func, .location = call->sourceLoc});
                 inst = call;
                 shouldContinue = true;
                 break;
@@ -549,20 +551,27 @@ bool checkStaticAssert(IRInst* inst, DiagnosticSink* sink)
                     if (auto msgLit = as<IRStringLit>(msg))
                     {
                         sink->diagnose(
-                            inst,
-                            Diagnostics::staticAssertionFailure,
-                            msgLit->getStringSlice());
+                            Diagnostics::StaticAssertionFailure{
+                                .message = String(msgLit->getStringSlice()),
+                                .location = inst->sourceLoc,
+                            });
                     }
                     else
                     {
-                        sink->diagnose(inst, Diagnostics::staticAssertionFailureWithoutMessage);
+                        sink->diagnose(
+                            Diagnostics::StaticAssertionFailureWithoutMessage{
+                                .location = inst->sourceLoc,
+                            });
                     }
                     diagnoseCallStack(inst, sink);
                 }
             }
             else
             {
-                sink->diagnose(condi, Diagnostics::staticAssertionConditionNotConstant);
+                sink->diagnose(
+                    Diagnostics::StaticAssertionConditionNotConstant{
+                        .location = condi->sourceLoc,
+                    });
             }
 
             return true;
@@ -900,11 +909,10 @@ Result linkAndOptimizeIR(
     requiredLoweringPassSet = {};
     calcRequiredLoweringPassSet(requiredLoweringPassSet, codeGenContext, irModule->getModuleInst());
 
-    // Debug info is added by the front-end, and therefore needs to be stripped out by targets
-    // that opt out of debug info.
+    // Debug info is added by the front-end. If the target cannot express debug info, or if the user
+    // specifies -g0, we need to stripped them out now to allow more optimization and cleanups.
     if (requiredLoweringPassSet.debugInfo &&
-        (targetCompilerOptions.getIntOption(CompilerOptionName::DebugInformation) ==
-         SLANG_DEBUG_INFO_LEVEL_NONE))
+        (targetCompilerOptions.getDebugInfoLevel() == DebugInfoLevel::None))
         SLANG_PASS(stripDebugInfo);
 
     if (!isKhronosTarget(targetRequest) && requiredLoweringPassSet.glslSSBO)
@@ -2240,8 +2248,7 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
     auto targetRequest = getTargetReq();
     auto targetProgram = getTargetProgram();
 
-    auto lineDirectiveMode = targetProgram->getOptionSet().getEnumOption<LineDirectiveMode>(
-        CompilerOptionName::LineDirectiveMode);
+    auto lineDirectiveMode = targetProgram->getOptionSet().getLineDirectiveMode();
     // We will generally use C-style line directives in order to give the user good
     // source locations on error messages from downstream compilers, but there are
     // a few exceptions.
@@ -2347,9 +2354,8 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
     if (!sourceEmitter)
     {
         sink->diagnose(
-            SourceLoc(),
-            Diagnostics::unableToGenerateCodeForTarget,
-            TypeTextUtil::getCompileTargetName(SlangCompileTarget(target)));
+            Diagnostics::UnableToGenerateCodeForTarget{
+                .target = TypeTextUtil::getCompileTargetName(SlangCompileTarget(target))});
         return SLANG_FAIL;
     }
 
@@ -2800,7 +2806,7 @@ static SlangResult createArtifactFromIR(
     String optErr;
     if (SLANG_FAILED(optimizeSPIRV(spirv, optErr, outSpirv)))
     {
-        codeGenContext->getSink()->diagnose(SourceLoc(), Diagnostics::spirvOptFailed, optErr);
+        codeGenContext->getSink()->diagnose(Diagnostics::SpirvOptFailed{.error = optErr});
         spirv = _Move(outSpirv);
     }
 #endif
@@ -2884,9 +2890,7 @@ static SlangResult createArtifactFromIR(
                     compiler->validate((uint32_t*)spirv.getBuffer(), int(spirv.getCount() / 4))))
             {
                 compiler->disassemble((uint32_t*)spirv.getBuffer(), int(spirv.getCount() / 4));
-                codeGenContext->getSink()->diagnoseWithoutSourceView(
-                    SourceLoc{},
-                    Diagnostics::spirvValidationFailed);
+                codeGenContext->getSink()->diagnose(Diagnostics::SpirvValidationFailed{});
             }
         }
 
@@ -2895,8 +2899,7 @@ static SlangResult createArtifactFromIR(
         downstreamOptions.sourceArtifacts = makeSlice(artifact.readRef(), 1);
         downstreamOptions.targetType = SLANG_SPIRV;
         downstreamOptions.sourceLanguage = SLANG_SOURCE_LANGUAGE_SPIRV;
-        switch (codeGenContext->getTargetProgram()->getOptionSet().getEnumOption<OptimizationLevel>(
-            CompilerOptionName::Optimization))
+        switch (codeGenContext->getTargetProgram()->getOptionSet().getOptimizationLevel())
         {
         case OptimizationLevel::None:
             downstreamOptions.optimizationLevel = DownstreamCompileOptions::OptimizationLevel::None;
@@ -3039,9 +3042,8 @@ SlangResult emitLLVMForEntryPoints(CodeGenContext* codeGenContext, ComPtr<IArtif
     if (!library)
     {
         codeGenContext->getSink()->diagnose(
-            SourceLoc(),
-            Diagnostics::unableToGenerateCodeForTarget,
-            TypeTextUtil::getCompileTargetName(SlangCompileTarget(target)));
+            Diagnostics::UnableToGenerateCodeForTarget{
+                .target = TypeTextUtil::getCompileTargetName(SlangCompileTarget(target))});
         return SLANG_FAIL;
     }
 

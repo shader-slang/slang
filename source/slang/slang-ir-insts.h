@@ -903,6 +903,13 @@ struct IRSemanticDecoration : public IRDecoration
 
     UnownedStringSlice getSemanticName() { return getSemanticNameOperand()->getStringSlice(); }
     int getSemanticIndex() { return int(getIntVal(getSemanticIndexOperand())); }
+
+    /// Returns the semantic index, treating -1 (unspecified) as 0.
+    int getEffectiveSemanticIndex()
+    {
+        auto idx = getSemanticIndex();
+        return idx >= 0 ? idx : 0;
+    }
 };
 
 FIDDLE()
@@ -3904,6 +3911,19 @@ $(type_info.return_type) $(type_info.method_name)(
         IRInst* alignment,
         IRInst* value);
 
+    IRInst* emitLoadDescriptorFromHeap(IRType* type, IRInst* heap, IRInst* index);
+    IRInst* emitSPIRVLoadTexelPointerFromHeap(
+        IRType* type,
+        IRInst* heap,
+        IRInst* index,
+        IRInst* textureType,
+        IRInst* coord,
+        IRInst* sampleIndex);
+
+    IRInst* emitSPIRVResourceDescriptorHeap();
+    IRInst* emitSPIRVSamplerDescriptorHeap();
+    IRInst* emitMakeCombinedTextureSampler(IRType* type, IRInst* texture, IRInst* sampler);
+
     IRInst* emitEmbeddedDownstreamIR(CodeGenTarget target, ISlangBlob* blob);
 
     IRFunc* createFunc();
@@ -4267,6 +4287,23 @@ $(type_info.return_type) $(type_info.method_name)(
     IRInst* emitConstexprDiv(IRType* type, IRInst* left, IRInst* right);
     IRInst* emitConstexprNeg(IRType* type, IRInst* value);
     IRInst* emitConstexprCast(IRType* type, IRInst* value);
+    IRInst* emitConstexprIRem(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitConstexprShl(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitConstexprShr(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitConstexprBitAnd(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitConstexprBitOr(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitConstexprBitXor(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitConstexprBitNot(IRType* type, IRInst* value);
+    IRInst* emitConstexprNot(IRType* type, IRInst* value);
+    IRInst* emitConstexprEql(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitConstexprNeq(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitConstexprGreater(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitConstexprLess(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitConstexprGeq(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitConstexprLeq(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitConstexprAnd(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitConstexprOr(IRType* type, IRInst* left, IRInst* right);
+    IRInst* emitConstexprSelect(IRType* type, IRInst* condition, IRInst* ifTrue, IRInst* ifFalse);
     IRInst* emitEql(IRInst* left, IRInst* right);
     IRInst* emitNeq(IRInst* left, IRInst* right);
     IRInst* emitLess(IRInst* left, IRInst* right);
@@ -4704,7 +4741,7 @@ $(type_info.return_type) $(type_info.method_name)(
     IRSemanticDecoration* addSemanticDecoration(
         IRInst* value,
         UnownedStringSlice const& text,
-        IRIntegerValue index = 0)
+        IRIntegerValue index = -1)
     {
         return as<IRSemanticDecoration>(addDecoration(
             value,

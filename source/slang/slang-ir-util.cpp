@@ -4,6 +4,7 @@
 #include "slang-ir-dce.h"
 #include "slang-ir-dominators.h"
 #include "slang-ir-insts.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -2444,7 +2445,8 @@ void verifyComputeDerivativeGroupModifiers(
 
     if (quadAttr && linearAttr)
     {
-        sink->diagnose(errorLoc, Diagnostics::onlyOneOfDerivativeGroupLinearOrQuadCanBeSet);
+        sink->diagnose(
+            Diagnostics::OnlyOneOfDerivativeGroupLinearOrQuadCanBeSet{.location = errorLoc});
     }
 
     IRIntegerValue x = 1;
@@ -2460,14 +2462,14 @@ void verifyComputeDerivativeGroupModifiers(
     if (quadAttr)
     {
         if (x % 2 != 0 || y % 2 != 0)
-            sink->diagnose(errorLoc, Diagnostics::derivativeGroupQuadMustBeMultiple2ForXYThreads);
+            sink->diagnose(
+                Diagnostics::DerivativeGroupQuadMustBeMultiple2ForXyThreads{.location = errorLoc});
     }
     else if (linearAttr)
     {
         if ((x * y * z) % 4 != 0)
-            sink->diagnose(
-                errorLoc,
-                Diagnostics::derivativeGroupLinearMustBeMultiple4ForTotalThreadCount);
+            sink->diagnose(Diagnostics::DerivativeGroupLinearMustBeMultiple4ForTotalThreadCount{
+                .location = errorLoc});
     }
 }
 
@@ -3101,6 +3103,36 @@ IRIntegerValue getInterfaceAnyValueSize(IRInst* type, SourceLoc usageLoc)
     // type without an explicit attribute as using that size.
     //
     return kDefaultAnyValueSize;
+}
+
+IRType* getTextureTypeFromCombinedTextureSampler(IRType* type)
+{
+    IRBuilder builder(type);
+    builder.setInsertBefore(type);
+    auto textureType = as<IRTextureTypeBase>(type);
+    return builder.getTextureType(
+        textureType->getElementType(),
+        textureType->getShapeInst(),
+        textureType->getIsArrayInst(),
+        textureType->getIsMultisampleInst(),
+        textureType->getSampleCountInst(),
+        textureType->getAccessInst(),
+        textureType->getIsShadowInst(),
+        builder.getIntValue(builder.getIntType(), 0),
+        textureType->getFormatInst());
+}
+
+IRType* getSamplerTypeFromCombinedTextureSampler(IRType* type)
+{
+    IRBuilder builder(type);
+    builder.setInsertBefore(type);
+
+    auto textureType = as<IRTextureTypeBase>(type);
+
+    if (getIntVal(textureType->getIsShadowInst()) != 0)
+        return builder.getType(kIROp_SamplerComparisonStateType);
+    else
+        return builder.getType(kIROp_SamplerStateType);
 }
 
 } // namespace Slang

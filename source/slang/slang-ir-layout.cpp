@@ -218,7 +218,8 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
     case kIROp_AtomicType:
         {
             auto atomicType = cast<IRAtomicType>(type);
-            calcSizeAndAlignment(targetReq, atomicType->getElementType(), outSizeAndAlignment);
+            SLANG_RETURN_ON_FAIL(
+                calcSizeAndAlignment(targetReq, atomicType->getElementType(), outSizeAndAlignment));
             return SLANG_OK;
         }
         break;
@@ -240,7 +241,11 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
         {
             auto vecType = cast<IRVectorType>(type);
             IRSizeAndAlignment elementTypeLayout;
-            getSizeAndAlignment(targetReq, this, vecType->getElementType(), &elementTypeLayout);
+            SLANG_RETURN_ON_FAIL(getSizeAndAlignment(
+                targetReq,
+                this,
+                vecType->getElementType(),
+                &elementTypeLayout));
             *outSizeAndAlignment = getVectorSizeAndAlignment(
                 elementTypeLayout,
                 getIntegerValueFromInst(vecType->getElementCount()));

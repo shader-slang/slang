@@ -17,15 +17,14 @@ void exp_BackwardAutoDiff<T : __BuiltinFloatingPointType, let K : int>(inout Dif
 [Differentiable]
 CoopVec<T, K> eval<T : __BuiltinFloatingPointType, let K : int>(CoopVec<T, K> x)
 {
-    // CHECK-NOT: ([[# @LINE+1]]): error 41020: {{.*}} CoopVec.$init
+    // CHECK-NOT: error[E41020]
     return exp(x) - CoopVec<T, K>(1.);
 }
 
 [Differentiable]
 CoopVec<T, K> eval1<T : __BuiltinFloatingPointType, let K : int>(CoopVec<T, K> x)
 {
-    // test.slang(25): error 41020: derivative cannot be propagated through call to non-backward-differentiable function `CoopVec.$init`, use 'no_diff' to clarify intention.
-    // CHECK: ([[# @LINE+1]]): error 41020
+    // CHECK: error[E41020]: derivative cannot be propagated through non-differentiable call
     return exp(x) - CoopVec<T, K>(x[0]);
 }
 

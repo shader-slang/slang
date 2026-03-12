@@ -45,7 +45,7 @@ public extension<T> ROTensor<T, 1>
 // Extensions cannot declare new interface requirements.
 public extension<T, TensorType : IROTensor<T, 1>> TensorType
 {
-    // CHECK: ([[# @LINE+1]]): error 45001
+    // CHECK: error[E45001]: unresolved external symbol
     public T loadGeneric(int i0);  // Error: function declaration without definition
 }
 

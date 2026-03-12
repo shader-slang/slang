@@ -705,6 +705,9 @@ local insts = {
 					hoistable = true,
 				},
 			},
+			-- Represents the type of a generic value pack parameter.
+			-- e.g. `let each D : int` lowers to a param of type ValuePackType(int).
+			{ ValuePackType = { operands = { { "elementType", "IRType" } }, hoistable = true } },
 			{ ExpandTypeOrVal = { operands = { { "type" } }, hoistable = true } },
 			{
 				spirvLiteralType = {
@@ -980,7 +983,8 @@ local insts = {
 	{ makeStruct = {} },
 	{ makeTuple = {} },
 	{ makeTargetTuple = { struct_name = "MakeTargetTuple" } },
-	{ makeValuePack = {} },
+	{ makeValuePack = { hoistable=true } },
+	{ makeCombinedTextureSampler = { operands = { {"texture"}, {"sampler"} } } },
 	{ getTargetTupleElement = {} },
 	{
 		getTupleElement = {
@@ -992,6 +996,22 @@ local insts = {
 		LoadSamplerDescriptorFromHeap = {
 			operands = { { "index" } },
 		},
+	},
+	{
+		SPIRVLoadDescriptorFromHeap = {
+			operands = { { "heap" }, { "index" } },
+		},
+	},
+	{
+		SPIRVLoadTexelPointerFromHeap = {
+			operands = { { "heap" }, { "index" }, { "textureType" }, { "coord" }, { "sampleIndex" } },
+		},
+	},
+	{
+		SPIRVResourceHeap = { hoistable = true }
+	},
+	{
+		SPIRVSamplerHeap = { hoistable = true }
 	},
 	{ MakeCombinedTextureSamplerFromHandle = { operands = { { "handle" } } } },
 	{
@@ -2543,6 +2563,11 @@ local insts = {
 	{ sizeOf = { operands = { { "type" } }, hoistable = true } },
 	{ alignOf = { operands = { { "baseOp" } }, hoistable = true } },
 	{ countOf = { operands = { { "type" } } } },
+	{ ExtractFirstFromPack = { operands = { { "pack" } }, hoistable = true } },
+	{ ExtractLastFromPack = { operands = { { "pack" } }, hoistable = true } },
+	{ TrimHeadOfPack = { operands = { { "pack" } }, hoistable = true } },
+	{ TrimTailOfPack = { operands = { { "pack" } }, hoistable = true } },
+	{ NonEmptyPackWitness = { hoistable = true } },
 	{ GetArrayLength = { operands = { { "array" } } } },
 	{
 		IsType = {
@@ -3130,6 +3155,23 @@ local insts = {
 	{ constexprMul = { operands = { { "left" }, { "right" } }, hoistable = true } },
 	{ constexprNeg = { operands = { { "value" } }, hoistable = true } },
 	{ constexprDiv = { operands = { { "left" }, { "right" } }, hoistable = true } },
+	{ constexprIRem = { operands = { { "left" }, { "right" } }, hoistable = true } },
+	{ constexprShl = { operands = { { "left" }, { "right" } }, hoistable = true } },
+	{ constexprShr = { operands = { { "left" }, { "right" } }, hoistable = true } },
+	{ constexprBitAnd = { operands = { { "left" }, { "right" } }, hoistable = true } },
+	{ constexprBitOr = { operands = { { "left" }, { "right" } }, hoistable = true } },
+	{ constexprBitXor = { operands = { { "left" }, { "right" } }, hoistable = true } },
+	{ constexprBitNot = { operands = { { "value" } }, hoistable = true } },
+	{ constexprNot = { operands = { { "value" } }, hoistable = true } },
+	{ constexprEql = { operands = { { "left" }, { "right" } }, hoistable = true } },
+	{ constexprNeq = { operands = { { "left" }, { "right" } }, hoistable = true } },
+	{ constexprGreater = { operands = { { "left" }, { "right" } }, hoistable = true } },
+	{ constexprLess = { operands = { { "left" }, { "right" } }, hoistable = true } },
+	{ constexprGeq = { operands = { { "left" }, { "right" } }, hoistable = true } },
+	{ constexprLeq = { operands = { { "left" }, { "right" } }, hoistable = true } },
+	{ constexprAnd = { operands = { { "left" }, { "right" } }, hoistable = true } },
+	{ constexprOr = { operands = { { "left" }, { "right" } }, hoistable = true } },
+	{ constexprSelect = { operands = { { "condition" }, { "ifTrue" }, { "ifFalse" } }, hoistable = true } },
 	-- Constexpr cast ops. Hoistable variants of casting ops used for IntVal lowering.
 	{ constexprIntCast = { operands = { { "value" } }, hoistable = true } },
 	{ constexprCastIntToFloat = { operands = { { "value" } }, hoistable = true } },
