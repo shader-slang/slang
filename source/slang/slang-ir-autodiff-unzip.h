@@ -727,7 +727,7 @@ struct DiffUnzipPass
             return InstPair(primalBuilder->emitUnreachable(), diffBuilder->emitUnreachable());
 
         default:
-            SLANG_ASSERT_FAILURE("Unhandled mixed diff inst");
+            SLANG_UNIMPLEMENTED_X("Unhandled mixed diff inst");
         }
     }
 
