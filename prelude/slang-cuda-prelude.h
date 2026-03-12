@@ -8755,6 +8755,7 @@ struct WmmaFragment
     {
         unsigned packed = Pack32Helper(value);
         constexpr int nregs = RegisterCount<T, M, N, K, R>::value;
+#pragma unroll
         for (int i = 0; i < nregs; i++)
         {
             regs[i] = packed;
@@ -8764,11 +8765,23 @@ struct WmmaFragment
     __device__ This operator*(T b)
     {
         This result;
-
-        // This loop will be unrolled by the compiler becuase nregs is constexpr
-        for (int i = 0; i < GetLength(); i++)
+#if SLANG_CUDA_ENABLE_HALF
+        if (sizeof(T) == 2)
         {
-            result.set(i, get(i) * b);
+            __half bh = *reinterpret_cast<const __half*>(&b);
+            __half2 bv = __half2half2(bh);
+            #pragma unroll
+            for (int i = 0; i < RegsCount; i++)
+            {
+                __half2 r = __hmul2(*reinterpret_cast<const __half2*>(&regs[i]), bv);
+                memcpy(&result.regs[i], &r, 4);
+            }
+        }
+        else
+#endif
+        {
+            for (int i = 0; i < GetLength(); i++)
+                result.set(i, get(i) * b);
         }
         return result;
     }
@@ -8776,11 +8789,22 @@ struct WmmaFragment
     __device__ This operator*(const This& b)
     {
         This result;
-
-        // This loop will be unrolled by the compiler becuase nregs is constexpr
-        for (int i = 0; i < GetLength(); i++)
+#if SLANG_CUDA_ENABLE_HALF
+        if (sizeof(T) == 2)
         {
-            result.set(i, get(i) * b.get(i));
+            #pragma unroll
+            for (int i = 0; i < RegsCount; i++)
+            {
+                __half2 r = __hmul2(*reinterpret_cast<const __half2*>(&regs[i]),
+                                    *reinterpret_cast<const __half2*>(&b.regs[i]));
+                memcpy(&result.regs[i], &r, 4);
+            }
+        }
+        else
+#endif
+        {
+            for (int i = 0; i < GetLength(); i++)
+                result.set(i, get(i) * b.get(i));
         }
         return result;
     }
@@ -8788,10 +8812,22 @@ struct WmmaFragment
     __device__ This operator/(const This& other)
     {
         This result;
-
-        for (int i = 0; i < GetLength(); i++)
+#if SLANG_CUDA_ENABLE_HALF
+        if (sizeof(T) == 2)
         {
-            result.set(i, get(i) / other.get(i));
+            #pragma unroll
+            for (int i = 0; i < RegsCount; i++)
+            {
+                __half2 r = __h2div(*reinterpret_cast<const __half2*>(&regs[i]),
+                                    *reinterpret_cast<const __half2*>(&other.regs[i]));
+                memcpy(&result.regs[i], &r, 4);
+            }
+        }
+        else
+#endif
+        {
+            for (int i = 0; i < GetLength(); i++)
+                result.set(i, get(i) / other.get(i));
         }
         return result;
     }
@@ -8799,10 +8835,22 @@ struct WmmaFragment
     __device__ This operator-(const This& other)
     {
         This result;
-
-        for (int i = 0; i < GetLength(); i++)
+#if SLANG_CUDA_ENABLE_HALF
+        if (sizeof(T) == 2)
         {
-            result.set(i, get(i) - other.get(i));
+            #pragma unroll
+            for (int i = 0; i < RegsCount; i++)
+            {
+                __half2 r = __hsub2(*reinterpret_cast<const __half2*>(&regs[i]),
+                                    *reinterpret_cast<const __half2*>(&other.regs[i]));
+                memcpy(&result.regs[i], &r, 4);
+            }
+        }
+        else
+#endif
+        {
+            for (int i = 0; i < GetLength(); i++)
+                result.set(i, get(i) - other.get(i));
         }
         return result;
     }
@@ -8810,10 +8858,21 @@ struct WmmaFragment
     __device__ This operator-()
     {
         This result;
-
-        for (int i = 0; i < GetLength(); i++)
+#if SLANG_CUDA_ENABLE_HALF
+        if (sizeof(T) == 2)
         {
-            result.set(i, -get(i));
+            #pragma unroll
+            for (int i = 0; i < RegsCount; i++)
+            {
+                __half2 r = __hneg2(*reinterpret_cast<const __half2*>(&regs[i]));
+                memcpy(&result.regs[i], &r, 4);
+            }
+        }
+        else
+#endif
+        {
+            for (int i = 0; i < GetLength(); i++)
+                result.set(i, -get(i));
         }
         return result;
     }
@@ -8821,10 +8880,22 @@ struct WmmaFragment
     __device__ This operator+(const This& other)
     {
         This result;
-
-        for (int i = 0; i < GetLength(); i++)
+#if SLANG_CUDA_ENABLE_HALF
+        if (sizeof(T) == 2)
         {
-            result.set(i, get(i) + other.get(i));
+            #pragma unroll
+            for (int i = 0; i < RegsCount; i++)
+            {
+                __half2 r = __hadd2(*reinterpret_cast<const __half2*>(&regs[i]),
+                                    *reinterpret_cast<const __half2*>(&other.regs[i]));
+                memcpy(&result.regs[i], &r, 4);
+            }
+        }
+        else
+#endif
+        {
+            for (int i = 0; i < GetLength(); i++)
+                result.set(i, get(i) + other.get(i));
         }
         return result;
     }
@@ -8832,11 +8903,8 @@ struct WmmaFragment
     __device__ This operator%(const This& other)
     {
         This result;
-
         for (int i = 0; i < GetLength(); i++)
-        {
             result.set(i, get(i) % other.get(i));
-        }
         return result;
     }
 
@@ -9111,6 +9179,31 @@ struct WmmaFragment
     unsigned regs[RegsCount] = {};
 
     static constexpr uint32_t elements_per_thread = RegsCount * (4 / sizeof(T));
+
+    // Tin2-style store_native / load_native for efficient shared memory reductions.
+    // Each lane stores/loads its raw registers as a contiguous block at shmem[offset + laneId].
+
+    // Number of uint4s per lane needed to store all registers.
+    static constexpr int Uint4PerLane = (RegsCount + 3) / 4;
+
+    // Stores raw registers to shmem. Each lane writes Uint4PerLane uint4s
+    static constexpr int NativeStridePerLane = RegsCount;
+
+    template<typename U>
+    __device__ void storeNative(U* shmem, unsigned offset)
+    {
+        unsigned lane_id = threadIdx.x % 32;
+        unsigned* dst = reinterpret_cast<unsigned*>(shmem + offset) + lane_id * NativeStridePerLane;
+        memcpy(dst, regs, RegsCount * sizeof(unsigned));
+    }
+
+    template<typename U>
+    __device__ void loadNative(const U* shmem, unsigned offset)
+    {
+        unsigned lane_id = threadIdx.x % 32;
+        const unsigned* src = reinterpret_cast<const unsigned*>(shmem + offset) + lane_id * NativeStridePerLane;
+        memcpy(regs, src, RegsCount * sizeof(unsigned));
+    }
 };
 
 // ====================================================================================

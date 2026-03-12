@@ -86,13 +86,13 @@ void fillWeightMatrixTiled<int InputSize, int OutputSize, int PaddedK, int Padde
     }
 }
 
-DType[TiledMMAHelper<DType, PaddedInputSize, PaddedOutputSize, SubgroupSize, Target, TestShMemSize>.TileInfoT.Uint4AlignedM]
+DType[TiledMMAHelper<DType, PaddedInputSize, PaddedOutputSize, SubgroupSize, Target, TestShMemSize, false, 2>.TileInfoT.Uint4AlignedM]
     testMatVecMul<int InputSize, int OutputSize, int PaddedInputSize, int PaddedOutputSize, TargetEnum Target>(uint tid)
 {
     typealias Address = BindlessAddress<DType>;
     Address address = Address(weightBuffer);
 
-    typealias MMA = TiledMMAHelper<DType, PaddedInputSize, PaddedOutputSize, SubgroupSize, Target, TestShMemSize, false>;
+    typealias MMA = TiledMMAHelper<DType, PaddedInputSize, PaddedOutputSize, SubgroupSize, Target, TestShMemSize, false, 2>;
     const int InSize = MMA.TileInfoT.Uint4AlignedK;
     const int OutSize = MMA.TileInfoT.Uint4AlignedM;
 
@@ -120,7 +120,7 @@ void test<int InputSize, int OutputSize>(uint tid, int resIndex)
     static const int PaddedInputSize = PadToTile<InputSize>.Value;
     static const int PaddedOutputSize = PadToTile<OutputSize>.Value;
 
-    DType[TiledMMAHelper<DType, PaddedInputSize, PaddedOutputSize, SubgroupSize, TargetEnum.CUDA, TestShMemSize>.TileInfoT.Uint4AlignedM] outputVector;
+    DType[TiledMMAHelper<DType, PaddedInputSize, PaddedOutputSize, SubgroupSize, TargetEnum.CUDA, TestShMemSize, false, 2>.TileInfoT.Uint4AlignedM] outputVector;
 
     __target_switch
     {

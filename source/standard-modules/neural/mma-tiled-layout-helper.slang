@@ -371,6 +371,8 @@ VISIBILITY_LEVEL struct TiledMMAHelper<T, int InputSize, int OutputSize, int Sub
         return outputVector;
     }
 
+
+
     // Forward sumReduceRows to BaseMMA.
     [ForceInline]
     [require(cuda_spirv, subgroup_partitioned, subgroup_basic)]
@@ -418,59 +420,18 @@ VISIBILITY_LEVEL struct TiledMMAHelper<T, int InputSize, int OutputSize, int Sub
     {
         const uint subgroupIndex = getWaveId();
 
-        static const int BatchSize = CMShape.COLUMN_A;
         static const int CoopMatCRows = (M + CMShape.ROW_A - 1) / CMShape.ROW_A;
         static const int CoopMatCColumns = (K + CMShape.COLUMN_A - 1) / CMShape.COLUMN_A;
-        static const int StrideInVectorTileB = CoopMatCColumns * CMShape.COLUMN_B / CMShape.ElementCountPerVector;
-        static const int StrideInVectorTileA = CoopMatCRows * CMShape.ROW_A / CMShape.ElementCountPerVector;
 
         MatC matC[CoopMatCRows * CoopMatCColumns];
         [ForceUnroll]
         for (int i = 0; i < CoopMatCRows * CoopMatCColumns; i++)
-        {
             matC[i].fill(T(0.0f));
-        }
 
-        uint warpLocalPtrAOffset = sharedMemoryAOffset + subgroupIndex * StrideInVectorTileA * BatchSize;
-        uint warpLocalPtrBOffset = sharedMemoryBOffset + subgroupIndex * StrideInVectorTileB * BatchSize;
+        BaseMMA.outerProduct<CoopMatCRows, CoopMatCColumns, TypeA, InArrayTypeA, TypeB, InArrayTypeB>(
+            sharedMemoryAOffset, sharedMemoryBOffset, subgroupIndex, inputVectorA, inputVectorB, matC);
 
-        // Outer product computation (identical to MMAHelper.outerProductAccumulate).
-        [ForceUnroll]
-        for (uint k = 0; k < N; k += CMShape.COLUMN_A)
-        {
-            uint tileIndex = k / CMShape.COLUMN_A;
-            BaseMMA.loadVectorForOuterProduct<BatchSize, TileInfoT.Uint4AlignedM / CMShape.ElementCountPerVector, StrideInVectorTileA, TypeA, InArrayTypeA>(warpLocalPtrAOffset, tileIndex, inputVectorA);
-            BaseMMA.loadVectorForOuterProduct<BatchSize, TileInfoT.Uint4AlignedK / CMShape.ElementCountPerVector, StrideInVectorTileB, TypeB, InArrayTypeB>(warpLocalPtrBOffset, tileIndex, inputVectorB);
-            GroupMemoryBarrierWithWaveSync();
-
-            MatA matA[CoopMatCRows];
-            [ForceUnroll]
-            for (uint i = 0; i < CoopMatCRows; i++)
-            {
-                matA[i] = MatA.Load<ColumnMajor, uint4>(ShMemPool.data, warpLocalPtrAOffset + i * CMShape.ROW_A / CMShape.ElementCountPerVector, StrideInVectorTileA);
-            }
-
-            [ForceUnroll]
-            for (uint j = 0; j < CoopMatCColumns; j++)
-            {
-                let matB = MatB.Load<RowMajor, uint4>(ShMemPool.data, warpLocalPtrBOffset + j * CMShape.COLUMN_B / CMShape.ElementCountPerVector, StrideInVectorTileB);
-                for (uint i = 0; i < CoopMatCRows; i++)
-                {
-                    int index = i * CoopMatCColumns + j;
-                    matC[index] = linalg.coopMatMulAdd<T, false, half, half, T,
-                                            MemoryScope.Subgroup, CMShape.ROW_A, CMShape.COLUMN_A, CMShape.COLUMN_B
-                                            >(matA[i], matB, matC[index]);
-                }
-            }
-        }
-
-        // Group sync needed: unlike mma where we can widen the per-warp B stride
-        // to match C, the outer product's A+B regions already fill the shared
-        // memory pool. Widening B would overflow. So we sync to ensure all warps
-        // finish MMA reads before sumReduceTiles overwrites shared memory.
         GroupMemoryBarrierWithGroupSync();
-
-        // Cross-warp reduction (skipped at compile time when SubgroupCount <= 1).
         BaseMMA.sumReduceTiles<CoopMatCRows, CoopMatCColumns>(matC, subgroupIndex, sharedMemoryBOffset);
 
         // Store result in tiled layout. Row-at-a-time; write-back uses direct half2 atomicAdd (Tin2-style).
@@ -485,7 +446,7 @@ VISIBILITY_LEVEL struct TiledMMAHelper<T, int InputSize, int OutputSize, int Sub
             for (uint i = 0; i < CoopMatCRows; i++)
             {
                 // Phase 1: Store this row of tiles to shmem.
-                // [ForceUnroll]
+                [ForceUnroll]
                 for (uint j = 0; j < CoopMatCColumns; j++)
                 {
                     uint tileOffset = j * CMShape.CoopMatCSizeInVector;
@@ -497,6 +458,7 @@ VISIBILITY_LEVEL struct TiledMMAHelper<T, int InputSize, int OutputSize, int Sub
                 // Phase 2: Flat loop at half2 granularity — one atomicAdd(half2) per slot (Tin2: _atomic_addh2).
                 // Loop over k (compile-time bound) so [ForceUnroll] can apply; h2Idx = laneId + k*N remains runtime.
                 static const int ItersPerLane = (TotalHalf2PerRow + N - 1) / N;
+
                 [ForceUnroll]
                 for (uint k = 0; k < ItersPerLane; k++)
                 {

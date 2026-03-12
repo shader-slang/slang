@@ -37,7 +37,7 @@ void TestBiasSumReduce<int OutputSize, TargetEnum Target>(uint tid)
 {
     Address biasAddress = Address(outputBuffer);
 
-    typealias MMA = MMAHelper<DType, InputSize, OutputSize, SubgroupSize, Target, Layer1, false>;
+    typealias MMA = MMAHelper<DType, InputSize, OutputSize, SubgroupSize, Target, Layer1, false, workgroupCount>;
     const int OutSize = MMA.Uint4AlignedM;
     const int InSize = MMA.Uint4AlignedK;
 

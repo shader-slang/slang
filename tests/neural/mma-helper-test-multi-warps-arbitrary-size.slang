@@ -80,7 +80,7 @@ void fillWeightMatrix<int InputSize, int OutputSize>(uint tid)
     }
 }
 
-DType[MMAHelper<DType, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA, TestShMemSize>.Uint4AlignedM]
+DType[MMAHelper<DType, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA, TestShMemSize, false, 2>.Uint4AlignedM]
 testMatVecMul<int InputSize, int OutputSize, TargetEnum Target>(uint tid)
 {
     typealias Address = BindlessAddress<DType>;
@@ -89,7 +89,7 @@ testMatVecMul<int InputSize, int OutputSize, TargetEnum Target>(uint tid)
     // Construct the input vector as follow:
     // x = tid + 1
     // const int uint4AlignedInputSize = MMAHelper<half, InputSize, OutputSize, SubgroupSize>.Uint4AlignedK;
-    typealias MMA = MMAHelper<DType, InputSize, OutputSize, SubgroupSize, Target, TestShMemSize, false>;
+    typealias MMA = MMAHelper<DType, InputSize, OutputSize, SubgroupSize, Target, TestShMemSize, false, 2>;
     const int InSize = MMA.Uint4AlignedK;
     const int OutSize = MMA.Uint4AlignedM;
     DType inputVector[InSize] = {};
@@ -150,7 +150,7 @@ void serialRead<T : __BuiltinFloatingPointType>(uint tid, uint sharedMemOffset, 
 
 void test<int InputSize, int OutputSize>(uint tid, int resIndex)
 {
-    DType[MMAHelper<DType, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA, TestShMemSize>.Uint4AlignedM] outputVector;
+    DType[MMAHelper<DType, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA, TestShMemSize, false, 2>.Uint4AlignedM] outputVector;
 
     __target_switch
     {

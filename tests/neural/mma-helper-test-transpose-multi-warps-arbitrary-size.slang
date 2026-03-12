@@ -100,7 +100,7 @@ void fillWeightMatrix<int InputSize, int OutputSize>(uint tid, bool clear = fals
     }
 }
 
-DType[MMAHelper<DType, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA, TestShMemSize, true>.Uint4AlignedK] testMatTransposeVecMul<int InputSize, int OutputSize, TargetEnum Target>(uint tid)
+DType[MMAHelper<DType, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA, TestShMemSize, true, 2>.Uint4AlignedK] testMatTransposeVecMul<int InputSize, int OutputSize, TargetEnum Target>(uint tid)
 {
     typealias Address = BindlessAddress<DType>;
     Address address = Address(inputBuffer);
@@ -108,7 +108,7 @@ DType[MMAHelper<DType, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA, Tes
     // Construct the input vector as follow:
     // x = tid + 1
     // const int uint4AlignedInputSize = MMAHelper<half, InputSize, OutputSize, SubgroupSize>.Uint4AlignedK;
-    typealias MMA = MMAHelper<DType, InputSize, OutputSize, SubgroupSize, Target, TestShMemSize, true>;
+    typealias MMA = MMAHelper<DType, InputSize, OutputSize, SubgroupSize, Target, TestShMemSize, true, 2>;
     const int OutSize = MMA.Uint4AlignedK;
     const int InSize = MMA.Uint4AlignedM;
     DType inputVector[InSize] = {};
@@ -182,7 +182,7 @@ void test<int InputSize, int OutputSize>(uint tid, int resIndex)
     const int COL = InputSize;
     const int ROW = OutputSize;
 
-    DType[MMAHelper<DType, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA, TestShMemSize, true>.Uint4AlignedK] outputVector;
+    DType[MMAHelper<DType, InputSize, OutputSize, SubgroupSize, TargetEnum.CUDA, TestShMemSize, true, 2>.Uint4AlignedK] outputVector;
     __target_switch
     {
     case cuda:

@@ -534,6 +534,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
 
         uint index = (laneId % BatchSize) * TileStrideInVector;
 
+        [ForceUnroll]
         for (uint i = 0; i < TileStrideInVector; i++)
         {
             uint4 value;
@@ -541,9 +542,19 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
             {
                 value = uint4(0, 0, 0, 0);
             }
+            else if (sizeof(U) == sizeof(half))
+            {
+                value = inputVector.readUint4(i);
+            }
             else
             {
-                accessUint4Aligned<AccessOp.READ, half, U>(inputVector, i * CMShape.ElementCountPerVector, value);
+                uint4 pack1 = inputVector.readUint4(i * 2);
+                uint4 pack2 = inputVector.readUint4(i * 2 + 1);
+                float4 floatValue1 = bit_cast<float4>(pack1);
+                float4 floatValue2 = bit_cast<float4>(pack2);
+                half4 halfValue1 = half4(floatValue1);
+                half4 halfValue2 = half4(floatValue2);
+                value = uint4(bit_cast<uint2>(halfValue1), bit_cast<uint2>(halfValue2));
             }
             ShMemPool.data[sharedMemoryOffset + index + i] = value;
         }
@@ -555,52 +566,45 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
         if (SubgroupCount <= 1)
             return;
 
-        // perform n/2 sum reduces, so each iteration will perform a 2-way reduce operation,
-        // totally log2(n) steps, where n is the number of subgroups.
+        // Cross-warp tree reduction using storeNative/loadNative.
+        // Process one row of tiles at a time to keep shmem usage at COLUMN * TileStride
+        // per warp pair (instead of ROW * COLUMN * TileStride for all tiles at once).
+        static const int ElementsPerLane = CMShape.SizeCInElements / N;
+        static const int RegsPerLane = (ElementsPerLane * sizeof(T) + 3) / 4;
+        static const int TileStride = (RegsPerLane * N * 4 + sizeof(uint4) - 1) / sizeof(uint4);
+
         for (int k = 1; k < SubgroupCount; k <<= 1)
         {
-            // (subgroupId / k<< 1 ) calculate which cooperative matrix tile this warp will write to.
-            // The whole shared memory is divided into subgroupCount/2 parts. So each two neighboring subgroups
-            // will use one shared memory. And left subgroup loads, right subgroup stores.
-            uint subgroupOffset = (subgroupId / (k<<1)) * (CMShape.CoopMatCSizeInVector * COLUMN);
-            uint ptrPerWarpOffset = sharedMemoryOffset + subgroupOffset;
-            [ForceUnroll]
+            uint subgroupOffset = (subgroupId / (k<<1)) * (COLUMN * TileStride);
+            uint base = sharedMemoryOffset + subgroupOffset;
+
             for (int i = 0; i < ROW; i++)
             {
-                // Store one row of cooperative matrix to the shared memory.
-                [ForceUnroll]
-                for (int j = 0; j < COLUMN; j++)
+                if (subgroupId % (k<<1) == k)
                 {
-                    // This is the right node in the 2-way merge operation.
-                    if (subgroupId % (k<<1) == k)
+                    [ForceUnroll]
+                    for (int j = 0; j < COLUMN; j++)
                     {
-                        // We choose to process one row of cooperative matrices at a time, store the cooperative matrix in column major is more efficient.
-                        // Because in column major, each column of the cooperative matrix is contiguous in the shared memory, so there will not be bank conflict.
-                        matC[i * COLUMN + j].Store<RowMajor, uint4>(ShMemPool.data, ptrPerWarpOffset + j * CMShape.CoopMatCSizeInVector,
-                                                CMShape.ROW_C / CMShape.ElementCountPerVectorMatC);
+                        matC[i * COLUMN + j].storeNative(ShMemPool.data, base + j * TileStride);
                     }
                 }
 
-                // wait for all subgroups finishing store the cooperative matrix to the shared memory.
                 GroupMemoryBarrierWithGroupSync();
 
-                // This the left node in the 2-way merge operation.
                 if (subgroupId % (k<<1) == 0)
                 {
-                    // If the left node is the last subgroup, it means that there is no right node for it, so we don't need to do any addition for this subgroup.
                     if (subgroupId != (SubgroupCount - 1))
                     {
                         [ForceUnroll]
                         for (int j = 0; j < COLUMN; j++)
                         {
-                            MatC rightMatC = MatC.Load<RowMajor, uint4>(ShMemPool.data, ptrPerWarpOffset + j * CMShape.CoopMatCSizeInVector,
-                                                CMShape.ROW_C / CMShape.ElementCountPerVectorMatC);
-
-                            matC[i * COLUMN + j] = matC[i * COLUMN + j] + rightMatC;
+                            MatC other;
+                            other.loadNative(ShMemPool.data, base + j * TileStride);
+                            matC[i * COLUMN + j] = matC[i * COLUMN + j] + other;
                         }
                     }
                 }
-                // wait for all subgroups finishing the addition.
+
                 GroupMemoryBarrierWithGroupSync();
             }
         }
@@ -645,36 +649,27 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
             {
                 if (packed_col_idx < ColsPacked)
                 {
-                    // Sum packed half2 across all warps
-                    half sum0 = half(0);
-                    half sum1 = half(0);
+                    // Sum packed half2 across all warps using vector<half, 2> add
+                    vector<half, 2> sum_h2 = vector<half, 2>(half(0), half(0));
 
                     for (int i = 0; i < subgroupCount; i++)
                     {
-                        // Each warp's data is at offset i * ColsPacked (in half2/uint units)
                         uint packed = ShMemPool.smemLoad<uint>(sharedMemoryOffset, packed_col_idx + i * ColsPacked);
-                        half elem0 = bit_cast<half>(uint16_t(packed & 0xFFFF));
-                        half elem1 = bit_cast<half>(uint16_t((packed >> 16) & 0xFFFF));
-                        sum0 = sum0 + elem0;
-                        sum1 = sum1 + elem1;
+                        sum_h2 = sum_h2 + bit_cast<vector<half, 2>>(packed);
                     }
 
-                    // Only write valid elements
                     int elemIdx0 = packed_col_idx * 2;
                     int elemIdx1 = elemIdx0 + 1;
 
                     if (elemIdx1 < M)
                     {
-                        // Both elements are valid - use vector<half, 2> atomic
-                        // TODO: vector<U,2> atomicAdd needs to be added to IPointerLikeAddress
-                        vector<U, 2> sum_v2 = vector<U, 2>(U(sum0), U(sum1));
+                        vector<U, 2> sum_v2 = vector<U, 2>(U(sum_h2[0]), U(sum_h2[1]));
                         let addr = biasAddress.getOffset(elemIdx0);
                         addr.atomicAdd(0u, sum_v2);
                     }
                     else if (elemIdx0 < M)
                     {
-                        // Only first element is valid (M is odd)
-                        biasAddress.atomicAdd(uint(elemIdx0), U(sum0));
+                        biasAddress.atomicAdd(uint(elemIdx0), U(sum_h2[0]));
                     }
                 }
 
@@ -974,6 +969,61 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
         }
     }
 
+    // Load vectors to shmem and compute the outer product via CoopMat MMA.
+    // Shared by both linear and tiled layout outerProductAccumulate paths.
+    [ForceInline]
+    [require(cooperative_matrix, subgroup_basic, cuda_spirv)]
+    VISIBILITY_LEVEL static void outerProduct<int CoopMatCRows, int CoopMatCColumns, TypeA, InArrayTypeA, TypeB, InArrayTypeB>(
+        uint sharedMemoryAOffset,
+        uint sharedMemoryBOffset,
+        uint subgroupIndex,
+        InArrayTypeA inputVectorA,
+        InArrayTypeB inputVectorB,
+        inout MatC matC[CoopMatCRows * CoopMatCColumns])
+            where TypeA : __BuiltinFloatingPointType
+            where TypeA.Differential == TypeA
+            where TypeB : __BuiltinFloatingPointType
+            where TypeB.Differential == TypeB
+            where InArrayTypeA : IArrayAccessor<TypeA>
+            where InArrayTypeB : IArrayAccessor<TypeB>
+    {
+        static const int BatchSize = CMShape.COLUMN_A;
+        static const int StrideInVectorTileA = CoopMatCRows * CMShape.ROW_A / CMShape.ElementCountPerVector;
+        static const int StrideInVectorTileB = CoopMatCColumns * CMShape.COLUMN_B / CMShape.ElementCountPerVector;
+
+        uint warpLocalPtrAOffset = sharedMemoryAOffset + subgroupIndex * StrideInVectorTileA * BatchSize;
+        uint warpLocalPtrBOffset = sharedMemoryBOffset + subgroupIndex * StrideInVectorTileB * BatchSize;
+
+        [ForceUnroll]
+        for (uint k = 0; k < N; k += CMShape.COLUMN_A)
+        {
+            uint tileIndex = k / CMShape.COLUMN_A;
+            loadVectorForOuterProduct<BatchSize, TileInfo.Uint4AlignedM / CMShape.ElementCountPerVector, StrideInVectorTileA, TypeA, InArrayTypeA>(warpLocalPtrAOffset, tileIndex, inputVectorA);
+            loadVectorForOuterProduct<BatchSize, TileInfo.Uint4AlignedK / CMShape.ElementCountPerVector, StrideInVectorTileB, TypeB, InArrayTypeB>(warpLocalPtrBOffset, tileIndex, inputVectorB);
+            GroupMemoryBarrierWithWaveSync();
+
+            MatA matA[CoopMatCRows];
+            [ForceUnroll]
+            for (uint i = 0; i < CoopMatCRows; i++)
+                matA[i] = MatA.Load<ColumnMajor, uint4>(ShMemPool.data, warpLocalPtrAOffset + i * CMShape.ROW_A / CMShape.ElementCountPerVector, StrideInVectorTileA);
+
+            [ForceUnroll]
+            for (uint j = 0; j < CoopMatCColumns; j++)
+            {
+                let matB = MatB.Load<RowMajor, uint4>(ShMemPool.data, warpLocalPtrBOffset + j * CMShape.COLUMN_B / CMShape.ElementCountPerVector, StrideInVectorTileB);
+
+                for (uint i = 0; i < CoopMatCRows; i++)
+                {
+                    int index = i * CoopMatCColumns + j;
+                    matC[index] = linalg.coopMatMulAdd<T, false, half, half, T,
+                                            MemoryScope.Subgroup, CMShape.ROW_A, CMShape.COLUMN_A, CMShape.COLUMN_B
+                                            >(matA[i], matB, matC[index]);
+                }
+            }
+        }
+    }
+
+    // Concrete outer product using WaveTangledVector's loadToSharedMemoryForOuterProduct.
     [ForceInline]
     [require(cooperative_matrix, subgroup_basic, cuda_spirv)]
     VISIBILITY_LEVEL static void outerProductAccumulate<U, Address, TypeA, InArrayTypeA, TypeB, InArrayTypeB>(
@@ -994,75 +1044,33 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
     {
         const uint subgroupIndex = getWaveId();
 
-        // Batch size is either CoopMatA row count or CoopMatB column count, they are the same.
-        static const int BatchSize = CMShape.COLUMN_A;
         static const int CoopMatCRows = (M + CMShape.ROW_A - 1) / CMShape.ROW_A;
         static const int CoopMatCColumns = (K + CMShape.COLUMN_A - 1) / CMShape.COLUMN_A;
-        static const int StrideInVectorTileB = CoopMatCColumns * CMShape.COLUMN_B / CMShape.ElementCountPerVector;
-        static const int StrideInVectorTileA = CoopMatCRows * CMShape.ROW_A / CMShape.ElementCountPerVector;
         static const int StrideInVectorTileC = CoopMatCColumns * CMShape.COLUMN_C / CMShape.ElementCountPerVectorMatC;
 
         MatC matC[CoopMatCRows * CoopMatCColumns];
+
+        [ForceUnroll]
         for (int i = 0; i < CoopMatCRows * CoopMatCColumns; i++)
-        {
             matC[i].fill(T(0.0f));
-        }
 
-        uint warpLocalPtrAOffset = sharedMemoryAOffset + subgroupIndex * StrideInVectorTileA * BatchSize;
-        uint warpLocalPtrBOffset = sharedMemoryBOffset + subgroupIndex * StrideInVectorTileB * BatchSize;
+        outerProduct<CoopMatCRows, CoopMatCColumns, TypeA, InArrayTypeA, TypeB, InArrayTypeB>(
+            sharedMemoryAOffset, sharedMemoryBOffset, subgroupIndex, inputVectorA, inputVectorB, matC);
 
-        // Perform outer product for each warp.
-        // The shared dimension is the Subgroup size N.
-        for (uint k = 0; k < N; k += CMShape.COLUMN_A)
-        {
-            uint tileIndex = k / CMShape.COLUMN_A;
-            loadVectorForOuterProduct<BatchSize, TileInfo.Uint4AlignedM / CMShape.ElementCountPerVector, StrideInVectorTileA, TypeA, InArrayTypeA>(warpLocalPtrAOffset, tileIndex, inputVectorA);
-            loadVectorForOuterProduct<BatchSize, TileInfo.Uint4AlignedK / CMShape.ElementCountPerVector, StrideInVectorTileB, TypeB, InArrayTypeB>(warpLocalPtrBOffset, tileIndex, inputVectorB);
-            GroupMemoryBarrierWithWaveSync();
-
-            MatA matA[CoopMatCRows];
-            for (uint i = 0; i < CoopMatCRows; i++)
-            {
-                matA[i] = MatA.Load<ColumnMajor, uint4>(ShMemPool.data, warpLocalPtrAOffset + i * CMShape.ROW_A / CMShape.ElementCountPerVector, StrideInVectorTileA);
-            }
-
-            for (uint j = 0; j < CoopMatCColumns; j++)
-            {
-                // For matrix B, stride will be the width of the tile. This is different from the forward pass in A*B where the stride is height of tile B.
-                //  Since width of the tile B in outer product is K (input vector length), so the stride will be alignedK / ElementCountPerVector.
-                let matB = MatB.Load<RowMajor, uint4>(ShMemPool.data, warpLocalPtrBOffset + j * CMShape.COLUMN_B / CMShape.ElementCountPerVector, StrideInVectorTileB);
-                for (uint i = 0; i < CoopMatCRows; i++)
-                {
-                    int index = i * CoopMatCColumns + j;
-                    matC[index] = linalg.coopMatMulAdd<T, false, half, half, T,
-                                            MemoryScope.Subgroup, CMShape.ROW_A, CMShape.COLUMN_A, CMShape.COLUMN_B
-                                            >(matA[i], matB, matC[index]);
-                }
-            }
-        }
-
-        // Group sync needed: unlike mma where we can widen the per-warp B stride
-        // to match C, the outer product's A+B regions already fill the shared
-        // memory pool. Widening B would overflow. So we sync to ensure all warps
-        // finish MMA reads before sumReduceTiles overwrites shared memory.
         GroupMemoryBarrierWithGroupSync();
-
-        // Cross-warp reduction (skipped at compile time when SubgroupCount <= 1).
         sumReduceTiles<CoopMatCRows, CoopMatCColumns>(matC, subgroupIndex, sharedMemoryBOffset);
-
-        // Only the first subgroup need to store the result to the global memory.
 
         if (subgroupIndex == 0)
         {
-            // Store the result shared memory. We store one row of the cooperative matrix at a time.
+            [ForceUnroll]
             for (uint i = 0; i < CoopMatCRows; i++)
             {
                 for (uint j = 0; j < CoopMatCColumns; j++)
                 {
-                    // Save the result to shared memory in row major, because this is cache friendly for global memory access.
-                    // As each row of the tile will be corresponding to the contiguous global memory.
-                    matC[i * CoopMatCColumns + j].Store<RowMajor, uint4>(ShMemPool.data, sharedMemoryBOffset + j * CMShape.COLUMN_C / CMShape.ElementCountPerVectorMatC, (uint)StrideInVectorTileC);
-
+                    matC[i * CoopMatCColumns + j].Store<RowMajor, uint4>(
+                        ShMemPool.data,
+                        sharedMemoryBOffset + j * CMShape.COLUMN_C / CMShape.ElementCountPerVectorMatC,
+                        (uint)StrideInVectorTileC);
                 }
 
                 // We will leverage the fact that the result the outerproduct is the same shape as matrix A. But, the tile organization is different.
@@ -1263,12 +1271,6 @@ public struct WaveTangledVector<T, ShMemSize : ISharedMemorySize, int N, int Sub
 
     private typealias DTypeMatC = half;
 
-    // TODO: This is just an easiest solution to make the alignment work. But the disadvantage is wasting of registers.
-    //       A better solution is that we can implement a "special" alignment rule for the vectorized reader.
-    //       Normally, the alignment rule is that one uint4 can pack 8 half type elements, so we want our internal data
-    //       is always 8 elements aligned. But we can have a "byte-aligned" rule such that we just need our data is 16 bytes aligned.
-    //       So for example, float[4] is also considered as aligned. We can just pack 4 elements into a uint4, the remaining 4 elements
-    //       just fill with 0.
     // Since we always use half type for A and B, we want to follow the alignment requirement of half type.
     internal static const uint ElementCountPerVector = sizeof(uint4) / sizeof(DTypeMatC);
     internal static const int Uint4AlignedInputSize = ((N + (ElementCountPerVector - 1)) / ElementCountPerVector) * ElementCountPerVector;
@@ -1281,20 +1283,14 @@ public struct WaveTangledVector<T, ShMemSize : ISharedMemorySize, int N, int Sub
     public __init(T value)
     {
         for (int i = 0; i < N; i++)
-        {
             this.data[i] = value;
-        }
-
         cleanPaddingData();
     }
 
     public __init(T[Size] inData)
     {
         for (int i = 0; i < N; i++)
-        {
             this.data[i] = inData[i];
-        }
-
         cleanPaddingData();
     }
 
@@ -1309,7 +1305,6 @@ public struct WaveTangledVector<T, ShMemSize : ISharedMemorySize, int N, int Sub
     {
         for (int i = 0; i < N; i++)
             this.data[i] = inData[i];
-
         cleanPaddingData();
     }
 
@@ -1319,11 +1314,8 @@ public struct WaveTangledVector<T, ShMemSize : ISharedMemorySize, int N, int Sub
     {
         const int elementCountPerUint4 = sizeof(uint4) / sizeof(DTypeMatC);
         const int alignedSize = ((N + (elementCountPerUint4 - 1)) / elementCountPerUint4) * elementCountPerUint4;
-
         for (int i = N; i < alignedSize; i++)
-        {
             this.data[i] = T(0.0f);
-        }
     }
 
     public __subscript(int index) -> T
@@ -1333,6 +1325,12 @@ public struct WaveTangledVector<T, ShMemSize : ISharedMemorySize, int N, int Sub
 
         [ForceInline]
         set { this.data[index] = newValue; }
+    }
+
+    [ForceInline]
+    override internal uint4 readUint4(int uint4Index)
+    {
+        return data.readUint4(uint4Index);
     }
 
     [ForceInline]
@@ -1396,7 +1394,7 @@ public struct WaveTangledVector<T, ShMemSize : ISharedMemorySize, int N, int Sub
             This.Differential dInput = This.Differential(outArray);
             dthis = DifferentialPair<This>(dthis.p, dInput);
 
-            // GroupMemoryBarrierWithGroupSync();
+            GroupMemoryBarrierWithGroupSync();
 
             static const int _outerRows = (MMA.M + MMA.CMShape.ROW_A - 1) / MMA.CMShape.ROW_A;
             static const int _outerPerWarpA = _outerRows * MMA.CMShape.ROW_A / MMA.CMShape.ElementCountPerVector * MMA.CMShape.COLUMN_A;

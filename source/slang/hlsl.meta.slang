@@ -27775,6 +27775,45 @@ struct CoopMat
     }
 
     //
+    // Native register store/load for efficient shmem reductions (Tin2 store_native pattern).
+    // Stores/loads raw CoopMat registers to/from groupshared memory.
+    // On CUDA: direct register copy via reinterpret_cast in prelude.
+    // On Vulkan: element-by-element via subscript.
+    //
+
+    /// Stores raw registers to groupshared memory in native layout (Tin2 store_native pattern).
+    /// Each lane writes its registers contiguously at data[offset + laneId * RegsPerLane].
+    [ForceInline]
+    [require(cooperative_matrix, subgroup_basic)]
+    void storeNative<U, let V : int>(__ref groupshared U[V] data, uint offset)
+    {
+        __target_switch
+        {
+        case cuda:
+            __intrinsic_asm "($0).storeNative(($1)->m_data, $2)";
+        default:
+            // Stride is in units of U (the array element type). For RowMajor,
+            // stride = number of U elements per row = N * sizeof(T) / sizeof(U).
+            Store<CoopMatMatrixLayout.RowMajor>(data, offset, N * sizeof(T) / sizeof(U));
+        }
+    }
+
+    /// Loads raw registers from groupshared memory in native layout (Tin2 load_native pattern).
+    [ForceInline]
+    [mutating]
+    [require(cooperative_matrix, subgroup_basic)]
+    void loadNative<U, let V : int>(__constref groupshared U[V] data, uint offset)
+    {
+        __target_switch
+        {
+        case cuda:
+            __intrinsic_asm "($0)->loadNative(($1)->m_data, $2)";
+        default:
+            this = This.Load<CoopMatMatrixLayout.RowMajor>(data, offset, N * sizeof(T) / sizeof(U));
+        }
+    }
+
+    //
     // CoopMat operations
     //
 
