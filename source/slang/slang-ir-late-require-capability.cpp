@@ -54,26 +54,6 @@ struct ProcessLateRequireCapabilityInstsContext
         stageTargetCaps.join(stageCapabilitySet);
         required.join(stageCapabilitySet);
 
-#if 0
-        {
-            sb.clear();
-            printDiagnosticArg(sb, capSet->getCaps());
-            fprintf(stderr, "required (full):    %s\n", sb.toString().getBuffer());
-
-            sb.clear();
-            printDiagnosticArg(sb, m_targetCaps);
-            fprintf(stderr, "target (full):      %s\n", sb.toString().getBuffer());
-
-            sb.clear();
-            printDiagnosticArg(sb, profile.getCapabilityName());
-            fprintf(stderr, "stageCapabilitySet: %s\n", sb.toString().getBuffer());
-
-            sb.clear();
-            printDiagnosticArg(sb, stageTargetCaps);
-            fprintf(stderr, "target (stage):     %s\n", sb.toString().getBuffer());
-        }
-#endif
-
         // check that we have the required caps for this stage
         if (stageTargetCaps.atLeastOneSetImpliedInOther(required) ==
             CapabilitySet::ImpliesReturnFlags::Implied)
@@ -98,17 +78,6 @@ struct ProcessLateRequireCapabilityInstsContext
         // Add if not already added
         if (!m_diagnosedCapsStrs[entry].add(missingCapsStr))
             return; // already added, don't diagnose again
-
-#if 0
-        {
-            sb.clear();
-            printDiagnosticArg(sb, required);
-            fprintf(stderr, "required (stage):   %s\n", sb.toString().getBuffer());
-
-            sb.clear();
-            fprintf(stderr, "diff:               %s\n", missingCapsStr.getBuffer());
-        }
-#endif
 
         sb.clear();
         printDiagnosticArg(sb, entry);
