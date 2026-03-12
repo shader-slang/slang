@@ -851,6 +851,8 @@ struct SpecializationContext
             case kIROp_Param:
             case kIROp_TypePack:
             case kIROp_ExpandTypeOrVal:
+            case kIROp_TrimHeadOfPack:
+            case kIROp_TrimTailOfPack:
                 return false;
             }
         }
