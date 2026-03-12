@@ -80,6 +80,14 @@ void computeMain()
     funcUint64(42u);
     funcHalf(2048);
 
+    // Half is excluded from the integer overflow check (getMaximumTypeBitSize
+    // returns 0 for half). Values beyond 16-bit integers still don't trigger
+    // the integer overflow warning, but do trigger the general implicit
+    // conversion warning since they exceed half's exact integer range.
+    funcHalf(131072);
+//CHECK:     ^^^^^^ implicit conversion not recommended
+//CHECK:     ^^^^^^ implicit conversion from 'int' to 'half' is not recommended
+
     // Bit-width boundary: max values that fit exactly in the type's bit width
     funcInt8(255);
     funcUint32(4294967295u);
