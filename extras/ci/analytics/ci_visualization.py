@@ -281,6 +281,7 @@ def nav_html(active=""):
         ("index.html", "Home"),
         ("statistics.html", "Statistics"),
         ("health.html", "Health"),
+        ("status.html", "Status"),
     ]
     items = []
     for href, label in links:

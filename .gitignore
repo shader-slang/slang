@@ -88,6 +88,7 @@ prelude/*.h.cpp
 /external/mimalloc/
 /external/slangpy/
 /external/dxvk-remix/
+/external/SaschaWillems-Vulkan/
 
 build/**/*.tlog
 build/**/*.lastbuildstate
