@@ -12,11 +12,12 @@
 #   ./extras/compile-sascha-willems-shaders.sh [options]
 #
 # Options:
-#   --slangc PATH  Path to slangc executable (default: auto-detect from build/)
-#   --repo DIR     Path to existing SaschaWillems/Vulkan clone (default: clones to tmp/)
-#   --clean        Remove existing clone and start fresh
-#   --spirv-val    Enable SPIRV validation (sets SLANG_RUN_SPIRV_VALIDATION=1)
-#   --help         Show this help message
+#   --slangc PATH    Path to slangc executable (default: auto-detect from build/)
+#   --repo DIR       Path to existing SaschaWillems/Vulkan clone (default: external/SaschaWillems-Vulkan)
+#   --skiplist FILE  Path to skip list file (default: none, all shaders compiled)
+#   --clean          Remove existing clone and start fresh
+#   --spirv-val      Enable SPIRV validation (sets SLANG_RUN_SPIRV_VALIDATION=1)
+#   --help           Show this help message
 #
 
 set -u
@@ -27,22 +28,11 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-# Shaders with known compilation issues in the Slang compiler.
-# Each entry is a relative path under shaders/slang/.
-# These are skipped during compilation and tracked separately.
-# Remove entries as the underlying issues are fixed.
-KNOWN_FAILURES=(
-  # SV_PointSize cannot be used as input in fragment stage when
-  # vertex/fragment share a struct (https://github.com/shader-slang/slang/issues/10473)
-  "computenbody/particle.slang"
-  "computeparticles/particle.slang"
-  "particlesystem/particle.slang"
-)
-
 CLEAN=false
 SPIRV_VAL=false
 SLANGC=""
 REPO_DIR=""
+SKIPLIST=""
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -62,6 +52,14 @@ while [[ $# -gt 0 ]]; do
     REPO_DIR="$2"
     shift 2
     ;;
+  --skiplist)
+    if [[ $# -lt 2 ]]; then
+      echo -e "${RED}Missing value for --skiplist${NC}"
+      exit 1
+    fi
+    SKIPLIST="$2"
+    shift 2
+    ;;
   --clean)
     CLEAN=true
     shift
@@ -71,7 +69,7 @@ while [[ $# -gt 0 ]]; do
     shift
     ;;
   --help)
-    head -n 22 "$0" | grep "^#" | sed 's/^# //' | sed 's/^#//'
+    head -n 23 "$0" | grep "^#" | sed 's/^# //' | sed 's/^#//'
     exit 0
     ;;
   *)
@@ -94,6 +92,21 @@ cd "$SLANG_ROOT" || exit 1
 if [ ! -f "CMakeLists.txt" ]; then
   log_error "Cannot find Slang repository root"
   exit 1
+fi
+
+# Load skip list from file if provided (comments and blank lines are ignored)
+KNOWN_FAILURES=()
+if [ -n "$SKIPLIST" ]; then
+  if [ ! -f "$SKIPLIST" ]; then
+    log_error "Skip list not found: $SKIPLIST"
+    exit 1
+  fi
+  while IFS= read -r line; do
+    line="${line%%#*}"
+    line="$(echo "$line" | xargs)"
+    [ -n "$line" ] && KNOWN_FAILURES+=("$line")
+  done <"$SKIPLIST"
+  log_info "Loaded ${#KNOWN_FAILURES[@]} known failure(s) from $SKIPLIST"
 fi
 
 # Find slangc
@@ -123,7 +136,7 @@ fi
 
 # Clone or use existing repo
 if [ -z "$REPO_DIR" ]; then
-  REPO_DIR="$SLANG_ROOT/tmp/SaschaWillems-Vulkan"
+  REPO_DIR="$SLANG_ROOT/external/SaschaWillems-Vulkan"
 fi
 
 if [ "$CLEAN" = true ] && [ -d "$REPO_DIR" ]; then
@@ -159,6 +172,9 @@ trap 'rm -rf "$OUTDIR"' EXIT
 
 is_known_failure() {
   local rel_path="$1"
+  if [ ${#KNOWN_FAILURES[@]} -eq 0 ]; then
+    return 1
+  fi
   for known in "${KNOWN_FAILURES[@]}"; do
     if [ "$rel_path" = "$known" ]; then
       return 0
