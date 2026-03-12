@@ -39,6 +39,15 @@ jobs:
         shell: bash
 
     steps:
+      - name: GPU health check
+        run: |
+          if ! output=$(nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv,noheader 2>&1); then
+            echo "nvidia-smi output: $output"
+            echo "::error::GPU health check failed — this VM has a faulty GPU. Re-run to get a new VM."
+            exit 1
+          fi
+          echo "GPU: $output"
+
       # Git must be installed before checkout for submodules to work in containers
       - name: Install Git and dependencies
         run: |
@@ -145,12 +154,24 @@ jobs:
           export COVERAGE_HTML_DIR="$PWD/coverage-html"
           export COVERAGE_LCOV_FILE="$PWD/coverage.lcov"
 
-          # Set library path so slang-test can find libslang.so
+          # Set library path so slang-test can find shared libraries
           export LD_LIBRARY_PATH="$PWD/build/RelWithDebInfo/lib:${LD_LIBRARY_PATH:-}"
+
+          # Ensure binaries are executable
+          chmod +x build/RelWithDebInfo/bin/* 2>/dev/null || true
 
           # Set SPIRV validation environment variables
           export SLANG_RUN_SPIRV_VALIDATION=1
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
+
+          # Diagnostics: verify binary can load and run
+          SLANG_TEST="$PWD/build/RelWithDebInfo/bin/slang-test"
+          echo "=== Binary check ==="
+          ls -la "$SLANG_TEST"
+          echo "=== Library dependencies ==="
+          ldd "$SLANG_TEST" 2>&1 | grep -E "not found|libslang|librender" || echo "All dependencies found"
+          echo "=== Smoke test ==="
+          "$SLANG_TEST" -help 2>&1 | head -5 || echo "slang-test -help exited with code $?"
 
           # Build slang-test arguments for GPU testing
           test_args=(
@@ -167,14 +188,6 @@ jobs:
             test_args+=("-use-test-server")
             test_args+=("-server-count" "${{ inputs.server-count }}")
           fi
-
-          # Verify GPU is accessible
-          echo "=== GPU Info ==="
-          nvidia-smi
-
-          # Check CUDA
-          echo "=== CUDA libraries ==="
-          ldconfig -p | grep -i cuda || echo "No CUDA libraries in ldconfig"
 
           # Run coverage with GPU test suite
           ./tools/coverage/run-coverage.sh "${test_args[@]}"
