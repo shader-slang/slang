@@ -2373,14 +2373,17 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
         auto type = as<Type>(
             sizeOfLikeExpr.getExpr()->sizedType->substitute(m_astBuilder, expr.getSubsts()));
 
-        if (sizeOfLikeExpr.getExpr()->dataLayoutType &&
-            !as<ScalarDataLayoutType>(sizeOfLikeExpr.getExpr()->dataLayoutType))
+        if (sizeOfLikeExpr.getExpr()->dataLayoutType)
         {
-            // We can only constant-fold sizeof-like expressions when in natural
-            // data layout.
-            return nullptr;
+            auto dataLayoutType = as<Type>(
+                sizeOfLikeExpr.getExpr()->dataLayoutType->substitute(m_astBuilder, expr.getSubsts()));
+            // we can only constant-fold sizeof-like expressions when in
+            // natural/scalar data layout.
+            if (!as<ScalarDataLayoutType>(dataLayoutType))
+                return nullptr;
         }
-        else if (auto sizeOfExpr = expr.as<SizeOfExpr>())
+
+        if (auto sizeOfExpr = expr.as<SizeOfExpr>())
         {
             return as<IntVal>(SizeOfIntVal::tryFold(m_astBuilder, expr.getExpr()->type.type, type));
         }

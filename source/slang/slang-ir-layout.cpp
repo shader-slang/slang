@@ -933,7 +933,7 @@ IRTypeLayoutRules* IRTypeLayoutRules::get(IRTypeLayoutRuleName name)
     }
 }
 
-IRTypeLayoutRuleName getTypeLayoutRuleNameFromOp(IROp layoutTypeOp, IRTypeLayoutRuleName defaultLayout)
+std::optional<IRTypeLayoutRuleName> getTypeLayoutRuleNameFromOp(IROp layoutTypeOp, IRTypeLayoutRuleName defaultLayout)
 {
     switch (layoutTypeOp)
     {
@@ -957,7 +957,7 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameFromOp(IROp layoutTypeOp, IRTypeLayout
     case kIROp_LLVMBufferLayoutType:
         return IRTypeLayoutRuleName::LLVM;
     }
-    return defaultLayout;
+    return {};
 }
 
 IROp getOpFromTypeLayoutRuleName(IRTypeLayoutRuleName ruleName)

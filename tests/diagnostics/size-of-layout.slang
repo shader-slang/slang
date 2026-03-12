@@ -3,10 +3,10 @@
 int func<L>()
 {
     int a = sizeof(float3, L);
-//CHECK:                   ^ invalid sizeof data layout
+//CHECK:                   ^ invalid data layout for sizeof/alignof
 //CHECK:                   ^ argument does not conform to IBufferDataLayout
     int b = sizeof(float3, 14);
-//CHECK:                   ^^ invalid sizeof data layout
+//CHECK:                   ^^ invalid data layout for sizeof/alignof
 //CHECK:                   ^^ argument does not conform to IBufferDataLayout
     return a + b;
 }

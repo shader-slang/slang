@@ -2248,6 +2248,11 @@ void lowerBufferElementTypeToStorageType(
     context.processModule(module);
 }
 
+static IRTypeLayoutRuleName getTypeLayoutRuleNameFromOpAlways(IROp layoutTypeOp, IRTypeLayoutRuleName defaultLayout)
+{
+    return getTypeLayoutRuleNameFromOp(layoutTypeOp, defaultLayout).value_or(defaultLayout);
+}
+
 IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRType* bufferType)
 {
     if (bufferType->getOp() == kIROp_ParameterBlockType && isMetalTarget(target->getTargetReq()))
@@ -2286,7 +2291,7 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
             if (layoutTypeOp != kIROp_DefaultBufferLayoutType &&
                 layoutTypeOp != kIROp_DefaultPushConstantBufferLayoutType)
             {
-                return getTypeLayoutRuleNameFromOp(layoutTypeOp, IRTypeLayoutRuleName::Natural);
+                return getTypeLayoutRuleNameFromOpAlways(layoutTypeOp, IRTypeLayoutRuleName::Natural);
             }
         }
 
@@ -2322,7 +2327,7 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
             auto layoutTypeOp = structBufferType->getDataLayout()
                                     ? structBufferType->getDataLayout()->getOp()
                                     : kIROp_DefaultBufferLayoutType;
-            return getTypeLayoutRuleNameFromOp(layoutTypeOp, IRTypeLayoutRuleName::Std430);
+            return getTypeLayoutRuleNameFromOpAlways(layoutTypeOp, IRTypeLayoutRuleName::Std430);
         }
     case kIROp_ParameterBlockType:
     case kIROp_ConstantBufferType:
@@ -2342,7 +2347,7 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
             auto defaultTypeOp =
                 isCPUTarget(targetReq) ? IRTypeLayoutRuleName::C : IRTypeLayoutRuleName::Std140;
 
-            return getTypeLayoutRuleNameFromOp(layoutTypeOp, defaultTypeOp);
+            return getTypeLayoutRuleNameFromOpAlways(layoutTypeOp, defaultTypeOp);
         }
     case kIROp_GLSLShaderStorageBufferType:
         {
@@ -2350,7 +2355,7 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
             auto layoutTypeOp = storageBufferType->getDataLayout()
                                     ? storageBufferType->getDataLayout()->getOp()
                                     : kIROp_Std430BufferLayoutType;
-            return getTypeLayoutRuleNameFromOp(layoutTypeOp, IRTypeLayoutRuleName::Std430);
+            return getTypeLayoutRuleNameFromOpAlways(layoutTypeOp, IRTypeLayoutRuleName::Std430);
         }
     }
     if (auto ptrType = as<IRPtrTypeBase>(bufferType))
@@ -2362,7 +2367,7 @@ IRTypeLayoutRuleName getTypeLayoutRuleNameForBuffer(TargetProgram* target, IRTyp
         if (isCPUTargetViaLLVM(targetReq))
             defaultRule = IRTypeLayoutRuleName::LLVM;
 
-        return getTypeLayoutRuleNameFromOp(layoutTypeOp, defaultRule);
+        return getTypeLayoutRuleNameFromOpAlways(layoutTypeOp, defaultRule);
     }
     return IRTypeLayoutRuleName::Natural;
 }

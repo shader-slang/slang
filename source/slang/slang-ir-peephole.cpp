@@ -310,22 +310,12 @@ struct PeepholeContext : InstPassBase
                 {
                     auto layoutOp = inst->getOperand(1)->getOp();
 
-                    IRTypeLayoutRuleName defaultLayout = IRTypeLayoutRuleName::Natural;
-                    if (isInGeneric)
-                    {
-                        // If we're in a generic context, it's possible that the
-                        // data layout still depends on a generic parameter.
-                        // _Count is used as a sentinel value to exit when this
-                        // happens.
-                        defaultLayout = IRTypeLayoutRuleName::_Count;
-                    }
+                    auto ruleName = getTypeLayoutRuleNameFromOp(layoutOp, IRTypeLayoutRuleName::Natural);
 
-                    auto ruleName = getTypeLayoutRuleNameFromOp(layoutOp, defaultLayout);
-
-                    if (ruleName == IRTypeLayoutRuleName::_Count)
+                    if (!ruleName.has_value())
                         break;
 
-                    layoutRules = IRTypeLayoutRules::get(ruleName);
+                    layoutRules = IRTypeLayoutRules::get(ruleName.value());
                 }
 
                 // Special handling for DescriptorHandleType - its size/alignment is
