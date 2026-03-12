@@ -13,7 +13,7 @@
 #
 # Options:
 #   --slangc PATH    Path to slangc executable (default: auto-detect from build/)
-#   --repo DIR       Path to existing SaschaWillems/Vulkan clone (default: clones to tmp/)
+#   --repo DIR       Path to existing SaschaWillems/Vulkan clone (default: external/SaschaWillems-Vulkan)
 #   --skiplist FILE  Path to skip list file (default: none, all shaders compiled)
 #   --clean          Remove existing clone and start fresh
 #   --spirv-val      Enable SPIRV validation (sets SLANG_RUN_SPIRV_VALIDATION=1)
