@@ -58,19 +58,39 @@ jobs:
           for filepath in sorted(extras.rglob('*.py')):
               with open(filepath) as f:
                   tree = ast.parse(f.read(), str(filepath))
+              def check_module(top, desc):
+                  nonlocal failed
+                  if top not in stdlib and top not in project_modules:
+                      print(f'{filepath}: non-stdlib import: {desc}')
+                      failed = True
+
               for node in ast.walk(tree):
                   if isinstance(node, ast.Import):
                       for alias in node.names:
-                          top = alias.name.split('.')[0]
-                          if top not in stdlib and top not in project_modules:
-                              print(f'{filepath}: non-stdlib import: {alias.name}')
-                              failed = True
+                          check_module(alias.name.split('.')[0], alias.name)
                   elif isinstance(node, ast.ImportFrom):
                       if node.module and node.level == 0:
-                          top = node.module.split('.')[0]
-                          if top not in stdlib and top not in project_modules:
-                              print(f'{filepath}: non-stdlib import: from {node.module}')
-                              failed = True
+                          check_module(node.module.split('.')[0], f'from {node.module}')
+                  elif (
+                      isinstance(node, ast.Call)
+                      and isinstance(node.func, ast.Name)
+                      and node.func.id == '__import__'
+                      and node.args
+                      and isinstance(node.args[0], ast.Constant)
+                      and isinstance(node.args[0].value, str)
+                  ):
+                      check_module(node.args[0].value.split('.')[0], f'__import__({node.args[0].value!r})')
+                  elif (
+                      isinstance(node, ast.Call)
+                      and isinstance(node.func, ast.Attribute)
+                      and isinstance(node.func.value, ast.Name)
+                      and node.func.value.id == 'importlib'
+                      and node.func.attr == 'import_module'
+                      and node.args
+                      and isinstance(node.args[0], ast.Constant)
+                      and isinstance(node.args[0].value, str)
+                  ):
+                      check_module(node.args[0].value.split('.')[0], f'importlib.import_module({node.args[0].value!r})')
           if failed:
               sys.exit(1)
           print('All imports are stdlib-only (local sibling modules allowed).')
