@@ -38,15 +38,15 @@ float3 infinitesimal(float3 x)
     return x - detach(x);
 }
 
-//CHK: note: checkpointing context of 20 bytes associated with function: 'computeLoop'
+//CHK-DAG: note: checkpointing context of 16 bytes associated with function: 'computeLoop'
 [BackwardDifferentiable]
 [PreferRecompute]
 float3 computeLoop(float y)
 {
-    //CHK: note: 4 bytes (float) used to checkpoint the following item:
+    //CHK-DAG: note: 4 bytes (float) used to checkpoint the following item:
     float w = 0;
 
-    //CHK: note: 12 bytes (Vector<float, 3> ) used to checkpoint the following item:
+    //CHK-DAG: note: 12 bytes (Vector<float, 3> ) used to checkpoint the following item:
     float3 w3 = float3(0, 0, 0);
 
     for (int i = 0; i < 8; i++)
@@ -61,12 +61,9 @@ float3 computeLoop(float y)
     return infinitesimal(p);
 }
 
-//CHK: note: checkpointing context of 4 bytes associated with function: 'test_simple_loop'
 [BackwardDifferentiable]
 float test_simple_loop(float y)
-{  
-    // This func will store 'y', but shouldnt need anything else.
-    //CHK: note: 4 bytes (float) used to checkpoint the following item:
+{
     float3 x = computeLoop(y);
     return y + x.x;
 }

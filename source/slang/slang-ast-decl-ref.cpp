@@ -794,7 +794,9 @@ DeclRef<Decl> createDefaultSubstitutionsIfNeeded(
             break;
         if (lastLookup && lastLookup->getDecl()->isChildOf(dd))
             break;
-        if (as<GenericTypeConstraintDecl>(declRef.getDecl()) && dd == declRef.getDecl()->parentDecl)
+        if ((as<GenericTypeConstraintDecl>(declRef.getDecl()) ||
+             as<TypeCoercionConstraintDecl>(declRef.getDecl())) &&
+            dd == declRef.getDecl()->parentDecl)
             continue;
         if (auto gen = as<GenericDecl>(dd))
             genericParentDecls.add(gen);

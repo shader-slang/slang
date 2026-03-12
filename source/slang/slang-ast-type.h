@@ -706,6 +706,13 @@ class ApplyForBwdFuncType : public BuiltinType
     Val* _resolveImplOverride();
 };
 
+FIDDLE()
+class RematFuncType : public BuiltinType
+{
+    FIDDLE(...)
+    Val* _resolveImplOverride();
+};
+
 
 FIDDLE()
 class FuncResultType : public BuiltinType

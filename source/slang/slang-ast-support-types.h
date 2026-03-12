@@ -1817,7 +1817,9 @@ FIDDLE() namespace Slang
         // Requirement keys for auto-diff built-in requirements
         ForwardDerivativeFunc,  ///< The "fwd_diff" built-in associated function
         BwdCallableContextType, ///< The "BwdCallable" built-in associated type
+        MinimalContextType,     ///< The "MinimalContext" built-in associated type
         BwdApplyFunc,           ///< The "apply_bwd" built-in associated function
+        BwdCallableRematFunc,   ///< The "remat" built-in associated function
         BwdCallablePropFunc,    ///< The "BwdCallable::operator()" built-in associated function
         BwdCallableGetValFunc,  ///< The "BwdCallable::getVal()" built-in associated function
         LegacyBackwardDerivativeFunc, ///< The "bwdDiff" built-in associated function

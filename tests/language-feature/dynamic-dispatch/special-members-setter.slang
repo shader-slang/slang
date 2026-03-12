@@ -1,21 +1,17 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -entry computeMain -stage compute
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry computeMain -stage compute
-//TEST:SIMPLE(filecheck=CHECK): -target cuda -entry computeMain -stage compute
-//TEST:SIMPLE(filecheck=CHECK): -target cpp -entry computeMain -stage compute
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-slang -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cpu -compute -shaderobj -output-using-type
 
 //
-// Limitation: Property setters and subscript setters through dynamic dispatch
+// Property setters and subscript setters through dynamic dispatch.
 //
-// When a property setter or subscript setter is invoked through an interface-typed variable
-// (dynamic dispatch), the compiler emits a controlled error (not a crash/segfault):
-//   error 99999: unimplemented: Unimplemented type packing
+// Verifies that setting properties and subscripts on an interface-typed variable
+// (dynamic dispatch) correctly repacks the modified value back into AnyValue storage.
 //
-// The mutation requires repacking the modified concrete value back into the AnyValue
-// storage of the existential interface value, which is not yet implemented.
-//
-// When this limitation is fixed, this test should be replaced with a positive
-// compute test verifying correct runtime behavior.
-//
+
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
+RWStructuredBuffer<float> outputBuffer;
 
 interface IFullFeatured
 {
@@ -62,20 +58,20 @@ IFullFeatured makeObj(int id)
     else { ImplB b; b._val = 20; b._storage = 0.0; b._scale = 2.0; return b; }
 }
 
-RWStructuredBuffer<float> outputBuffer;
 
 [numthreads(1, 1, 1)]
 void computeMain(int id : SV_DispatchThreadID)
 {
     IFullFeatured obj = makeObj(id);
 
-    // Property setter through dynamic dispatch — emits error 99999: unimplemented type packing
-    // CHECK: error 99999
+    // Property setter through dynamic dispatch
     obj.value = 5.0;
 
-    // Subscript setter through dynamic dispatch — same limitation
+    // Subscript setter through dynamic dispatch
     obj[0] = 3.0;
 
+    // CHECK: 5.0
     outputBuffer[0] = obj.value;
+    // CHECK: 3.0
     outputBuffer[1] = obj[0];
 }

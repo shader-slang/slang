@@ -83,6 +83,7 @@
 #include "slang-ir-lower-enum-type.h"
 #include "slang-ir-lower-glsl-ssbo-types.h"
 #include "slang-ir-lower-l-value-cast.h"
+#include "slang-ir-lower-matrix-swizzle-store.h"
 #include "slang-ir-lower-optional-type.h"
 #include "slang-ir-lower-reinterpret.h"
 #include "slang-ir-lower-result-type.h"
@@ -472,6 +473,9 @@ void calcRequiredLoweringPassSet(
         break;
     case kIROp_MissingReturn:
         result.missingReturn = true;
+        break;
+    case kIROp_MatrixSwizzleStore:
+        result.matrixSwizzleStore = true;
         break;
     case kIROp_Select:
         if (!isScalarOrVectorType(inst->getFullType()))
@@ -1129,6 +1133,8 @@ Result linkAndOptimizeIR(
     }
 
     SLANG_PASS(finalizeAutoDiffPass, targetProgram);
+    if (requiredLoweringPassSet.matrixSwizzleStore)
+        SLANG_PASS(lowerMatrixSwizzleStores);
     SLANG_PASS(eliminateDeadCode, deadCodeEliminationOptions);
 
     SLANG_PASS(finalizeSpecialization);
@@ -2170,6 +2176,15 @@ Result linkAndOptimizeIR(
     }
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
+
+    /*
+    if (sink->getErrorCount() != 0)
+    {
+        // If there are any errors at this point, we should bail out before
+        // doing more work.
+        return SLANG_FAIL;
+    }
+    */
 
     // Run a final round of simplifications to clean up unused things after phi-elimination.
     SLANG_PASS(simplifyNonSSAIR, targetProgram, fastIRSimplificationOptions, sink);

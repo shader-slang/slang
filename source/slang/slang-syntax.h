@@ -468,6 +468,7 @@ Module* getModule(Decl* decl);
 ContainerDecl* getParentDecl(Decl* decl);
 AggTypeDecl* getParentAggTypeDecl(Decl* decl);
 AggTypeDeclBase* getParentAggTypeDeclBase(Decl* decl);
+ExtensionDecl* getParentExtensionDecl(Decl* decl);
 FunctionDeclBase* getParentFunc(Decl* decl);
 
 /// Get the parent declref, skipping any generic decls in between.

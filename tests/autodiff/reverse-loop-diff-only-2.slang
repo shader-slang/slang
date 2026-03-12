@@ -31,11 +31,6 @@ float infinitesimal(float x)
 
 // Test that computeLoop's intermediates have no float sitting
 // around (must not cache the outvar from 'compute()')
-// 
-// Further, if loop exit value inference is working correctly, 
-// then there should be no additional context beyond the input parameter.
-//
-// REPORT-DAG: 4 bytes associated with function: 'computeLoop'
 //
 
 [BackwardDifferentiable]
@@ -57,7 +52,7 @@ float computeLoop(float y)
 // Since computeLoop is recomputed, test_simple_loop should have nothing to store
 // therefore we check that there is no intermediate context type generated for test_simple_loop.
 //
-// REPORT-DAG: 4 bytes associated with function: 'test_simple_loop'
+// REPORT-DAG: note: no checkpoint contexts to report
 //
 [BackwardDifferentiable]
 float test_simple_loop(float y)

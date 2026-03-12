@@ -674,6 +674,11 @@ __intrinsic_type($(kIROp_BwdCallableFuncType))
 struct BwdCallableFuncType<FType, CtxType> where FType : IHasDiffTypeInfo
 { };
 
+__magic_type(RematFuncType)
+__intrinsic_type($(kIROp_RematFuncType))
+struct RematFuncType<FType, MinimalCtxType, FullCtxType> where FType : IHasDiffTypeInfo
+{ };
+
 __magic_type(ApplyForBwdFuncType)
 __intrinsic_type($(kIROp_ApplyForBwdFuncType))
 struct ApplyForBwdFuncType<FType, CtxType> where FType : IHasDiffTypeInfo
@@ -719,8 +724,19 @@ interface IBackwardDifferentiable<FType> where FType : IHasDiffTypeInfo
     __builtin_requirement($( (int)BuiltinRequirementKind::BwdCallableContextType)) 
     associatedtype BwdCallable : IBwdCallable<FType>; // -> intermediate_context_type
 
+    __builtin_requirement($( (int)BuiltinRequirementKind::MinimalContextType)) 
+    associatedtype MinimalContext; // -> minimal_context_type
+
     __builtin_requirement($( (int)BuiltinRequirementKind::BwdApplyFunc))
-    __associatedfunc ApplyForBwdFuncType<FType, This.BwdCallable> apply_bwd; // -> apply_bwd
+    __associatedfunc ApplyForBwdFuncType<FType, This.MinimalContext> apply_bwd; // -> apply_bwd
+
+    // WARNING: Currently, the func-type produced by 'remat' is actually inconsistent
+    // with the implementation because the position of the 'this-type' is different.
+    // This isn't an issue at the moment since the IR generates
+    // both the implementation and the call, butthis needs to be fixed.
+    // 
+    __builtin_requirement($( (int)BuiltinRequirementKind::BwdCallableRematFunc))
+    __associatedfunc RematFuncType<FType, This.MinimalContext, This.BwdCallable> remat; // -> remat
 
     __builtin_requirement($( (int)BuiltinRequirementKind::LegacyBackwardDerivativeFunc))
     __associatedfunc BwdDiffFuncType<FType> bwd_diff; // -> bwd_diff

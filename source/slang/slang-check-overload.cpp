@@ -1420,6 +1420,7 @@ bool isEffectivelySynthesized(Decl* decl)
         case kIROp_BackwardPrimalFromLegacyBwdDiffFunc:
         case kIROp_BackwardPropagateFromLegacyBwdDiffFunc:
         case kIROp_BackwardContextGetValFromLegacyBwdDiffFunc:
+        case kIROp_BackwardRematFromLegacyBwdDiffFunc:
             return false;
         default:
             // All other synthesized functions are considered synthesized.
@@ -2646,10 +2647,10 @@ void SemanticsVisitor::AddDeclRefOverloadCandidates(
     else if (auto funcAliasDeclRef = item.declRef.as<FuncAliasDecl>())
     {
         auto aliasFuncDeclRef = substituteDeclRef(
-                               SubstitutionSet(item.declRef),
-                               m_astBuilder,
-                               funcAliasDeclRef.getDecl()->targetDeclRef)
-                               .as<CallableDecl>();
+                                    SubstitutionSet(item.declRef),
+                                    m_astBuilder,
+                                    funcAliasDeclRef.getDecl()->targetDeclRef)
+                                    .as<CallableDecl>();
         AddFuncOverloadCandidate(item, aliasFuncDeclRef, context, baseCost);
     }
     else if (auto genericTypeParamDeclRef = item.declRef.as<GenericTypeParamDecl>())

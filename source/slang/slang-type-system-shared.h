@@ -161,17 +161,19 @@ enum class AnnotationKind
     BackwardDerivativeWitnessTable = 3,
 
     BackwardDerivativeApply = 4,
-    BackwardDerivativeContext = 5,
-    BackwardDerivativeContextGetVal = 6,
-    BackwardDerivativePropagate = 7,
+    BackwardDerivativeContextRemat = 5,
+    BackwardDerivativeMinimalContext = 6,
+    BackwardDerivativeContext = 7,
+    BackwardDerivativeContextGetVal = 8,
+    BackwardDerivativePropagate = 9,
 
     // Annotations for differentiable types.
-    DifferentialPairType = 8,
-    DifferentialType = 9,
-    DifferentialPtrType = 10,
-    DifferentialPtrPairType = 11,
-    DifferentialZero = 12,
-    DifferentialAdd = 13,
+    DifferentialPairType = 10,
+    DifferentialType = 11,
+    DifferentialPtrType = 12,
+    DifferentialPtrPairType = 13,
+    DifferentialZero = 14,
+    DifferentialAdd = 15,
 };
 
 

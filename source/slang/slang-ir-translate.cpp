@@ -103,6 +103,7 @@ IRInst* TranslationContext::maybeTranslateInst(IRInst* inst)
     case kIROp_FuncResultType:
     case kIROp_BwdCallableFuncType:
     case kIROp_BackwardDiffFuncType:
+    case kIROp_RematFuncType:
         {
             DifferentiableTypeConformanceContext ctx(&autodiffContext);
             translationResult = ctx.resolveType(&subBuilder, inst);
@@ -159,16 +160,18 @@ IRInst* TranslationContext::maybeTranslateInst(IRInst* inst)
                 cast<IRLegacyBackwardDifferentiate>(inst)));
         }
     case kIROp_BackwardDifferentiatePrimal:
+    case kIROp_BackwardRemat:
     case kIROp_BackwardDifferentiatePropagate:
     case kIROp_BackwardContextGetPrimalVal:
     case kIROp_BackwardDiffIntermediateContextType:
+    case kIROp_BackwardDiffMinimalContextType:
         {
             auto operand = inst->getOperand(0);
 
             auto bwdDiffInst =
                 subBuilder.emitIntrinsicInst(nullptr, kIROp_BackwardDifferentiate, 1, &operand);
 
-            // Translate the full 4-tuple result.
+            // Translate the full 6-tuple result.
             auto translatedTuple = maybeTranslateInst(cast<IRBackwardDifferentiate>(bwdDiffInst));
             if (translatedTuple == bwdDiffInst)
                 return (bwdDiffInst);
@@ -178,22 +181,28 @@ IRInst* TranslationContext::maybeTranslateInst(IRInst* inst)
             {
             case kIROp_BackwardDifferentiatePrimal:
                 return memoize(as<IRMakeTuple>(translatedTuple)->getOperand(0));
-            case kIROp_BackwardDifferentiatePropagate:
+            case kIROp_BackwardRemat:
                 return memoize(as<IRMakeTuple>(translatedTuple)->getOperand(1));
-            case kIROp_BackwardContextGetPrimalVal:
+            case kIROp_BackwardDifferentiatePropagate:
                 return memoize(as<IRMakeTuple>(translatedTuple)->getOperand(2));
-            case kIROp_BackwardDiffIntermediateContextType:
+            case kIROp_BackwardContextGetPrimalVal:
                 return memoize(as<IRMakeTuple>(translatedTuple)->getOperand(3));
+            case kIROp_BackwardDiffIntermediateContextType:
+                return memoize(as<IRMakeTuple>(translatedTuple)->getOperand(4));
+            case kIROp_BackwardDiffMinimalContextType:
+                return memoize(as<IRMakeTuple>(translatedTuple)->getOperand(5));
             default:
-                SLANG_UNEXPECTED("unhandled trivial backward differentiation case");
+                SLANG_UNEXPECTED("unhandled backward differentiation case");
                 break;
             }
         }
         break;
     case kIROp_TrivialBackwardDifferentiatePrimal:
+    case kIROp_TrivialBackwardRemat:
     case kIROp_TrivialBackwardDifferentiatePropagate:
     case kIROp_TrivialBackwardContextGetPrimalVal:
     case kIROp_TrivialBackwardDiffIntermediateContextType:
+    case kIROp_TrivialBackwardDiffMinimalContextType:
         {
             auto operand = inst->getOperand(0);
 
@@ -203,7 +212,7 @@ IRInst* TranslationContext::maybeTranslateInst(IRInst* inst)
                 1,
                 &operand);
 
-            // Translate the full 4-tuple result.
+            // Translate the full 6-tuple result.
             auto translatedTuple =
                 maybeTranslateInst(cast<IRTrivialBackwardDifferentiate>(bwdDiffInst));
             if (translatedTuple == bwdDiffInst)
@@ -214,12 +223,16 @@ IRInst* TranslationContext::maybeTranslateInst(IRInst* inst)
             {
             case kIROp_TrivialBackwardDifferentiatePrimal:
                 return memoize(as<IRMakeTuple>(translatedTuple)->getOperand(0));
-            case kIROp_TrivialBackwardDifferentiatePropagate:
+            case kIROp_TrivialBackwardRemat:
                 return memoize(as<IRMakeTuple>(translatedTuple)->getOperand(1));
-            case kIROp_TrivialBackwardContextGetPrimalVal:
+            case kIROp_TrivialBackwardDifferentiatePropagate:
                 return memoize(as<IRMakeTuple>(translatedTuple)->getOperand(2));
-            case kIROp_TrivialBackwardDiffIntermediateContextType:
+            case kIROp_TrivialBackwardContextGetPrimalVal:
                 return memoize(as<IRMakeTuple>(translatedTuple)->getOperand(3));
+            case kIROp_TrivialBackwardDiffIntermediateContextType:
+                return memoize(as<IRMakeTuple>(translatedTuple)->getOperand(4));
+            case kIROp_TrivialBackwardDiffMinimalContextType:
+                return memoize(as<IRMakeTuple>(translatedTuple)->getOperand(5));
             default:
                 SLANG_UNEXPECTED("unhandled trivial backward differentiation case");
                 break;
@@ -234,8 +247,10 @@ IRInst* TranslationContext::maybeTranslateInst(IRInst* inst)
         break;
     case kIROp_BackwardContextFromLegacyBwdDiffFunc:
     case kIROp_BackwardPrimalFromLegacyBwdDiffFunc:
+    case kIROp_BackwardRematFromLegacyBwdDiffFunc:
     case kIROp_BackwardPropagateFromLegacyBwdDiffFunc:
     case kIROp_BackwardContextGetValFromLegacyBwdDiffFunc:
+    case kIROp_BackwardMinimalContextFromLegacyBwdDiffFunc:
         {
             auto targetFunc = inst->getOperand(0);
             auto bwdDiffFunc = inst->getOperand(1);
@@ -250,7 +265,7 @@ IRInst* TranslationContext::maybeTranslateInst(IRInst* inst)
                 args.getCount(),
                 args.getBuffer());
 
-            // Translate the full 4-tuple result.
+            // Translate the full 6-tuple result.
             auto translatedTuple =
                 maybeTranslateInst(cast<IRBackwardFromLegacyBwdDiffFunc>(legacyToNewBwdDiffInst));
             if (translatedTuple == legacyToNewBwdDiffInst)
@@ -261,14 +276,18 @@ IRInst* TranslationContext::maybeTranslateInst(IRInst* inst)
             {
             case kIROp_BackwardPrimalFromLegacyBwdDiffFunc:
                 return memoize(as<IRMakeTuple>(translatedTuple)->getOperand(0));
-            case kIROp_BackwardPropagateFromLegacyBwdDiffFunc:
+            case kIROp_BackwardRematFromLegacyBwdDiffFunc:
                 return memoize(as<IRMakeTuple>(translatedTuple)->getOperand(1));
-            case kIROp_BackwardContextGetValFromLegacyBwdDiffFunc:
+            case kIROp_BackwardPropagateFromLegacyBwdDiffFunc:
                 return memoize(as<IRMakeTuple>(translatedTuple)->getOperand(2));
-            case kIROp_BackwardContextFromLegacyBwdDiffFunc:
+            case kIROp_BackwardContextGetValFromLegacyBwdDiffFunc:
                 return memoize(as<IRMakeTuple>(translatedTuple)->getOperand(3));
+            case kIROp_BackwardContextFromLegacyBwdDiffFunc:
+                return memoize(as<IRMakeTuple>(translatedTuple)->getOperand(4));
+            case kIROp_BackwardMinimalContextFromLegacyBwdDiffFunc:
+                return memoize(as<IRMakeTuple>(translatedTuple)->getOperand(5));
             default:
-                SLANG_UNEXPECTED("unhandled trivial backward differentiation case");
+                SLANG_UNEXPECTED("unhandled legacy backward differentiation case");
                 break;
             }
         }

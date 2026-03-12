@@ -363,4 +363,14 @@ private:
 };
 
 RefPtr<HoistedPrimalsInfo> applyCheckpointPolicy(IRGlobalValueWithCode* func);
+
+enum CheckpointPreference
+{
+    None,
+    PreferCheckpoint,
+    PreferRecompute
+};
+
+CheckpointPreference getCheckpointPreference(IRInst* callee);
+
 }; // namespace Slang

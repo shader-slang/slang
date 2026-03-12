@@ -2450,28 +2450,41 @@ public:
 
     DeclRef<Decl> getRequirementAsLookedUpDecl(ASTBuilder* astBuilder, Decl* decl);
 
+    FuncType* getCalculatedDiffFuncType(const char* magicCalcName, Type* baseFuncAsType)
+    {
+        Val* args[] = {
+            baseFuncAsType,
+            tryGetSubtypeWitness(baseFuncAsType, m_astBuilder->getDiffTypeInfoInterfaceType())};
+        return as<FuncType>(
+            m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName));
+    }
+
     FuncType* getCalculatedDiffFuncType(
         const char* magicCalcName,
         Type* baseFuncAsType,
-        Type* contextType = nullptr)
+        Type* operand1)
     {
-        if (contextType)
-        {
-            Val* args[] = {
-                baseFuncAsType,
-                contextType,
-                tryGetSubtypeWitness(baseFuncAsType, m_astBuilder->getDiffTypeInfoInterfaceType())};
-            return as<FuncType>(
-                m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName));
-        }
-        else
-        {
-            Val* args[] = {
-                baseFuncAsType,
-                tryGetSubtypeWitness(baseFuncAsType, m_astBuilder->getDiffTypeInfoInterfaceType())};
-            return as<FuncType>(
-                m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName));
-        }
+        Val* args[] = {
+            baseFuncAsType,
+            operand1,
+            tryGetSubtypeWitness(baseFuncAsType, m_astBuilder->getDiffTypeInfoInterfaceType())};
+        return as<FuncType>(
+            m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName));
+    }
+
+    FuncType* getCalculatedDiffFuncType(
+        const char* magicCalcName,
+        Type* baseFuncAsType,
+        Type* operand1,
+        Type* operand2)
+    {
+        Val* args[] = {
+            baseFuncAsType,
+            operand1,
+            operand2,
+            tryGetSubtypeWitness(baseFuncAsType, m_astBuilder->getDiffTypeInfoInterfaceType())};
+        return as<FuncType>(
+            m_astBuilder->getSpecializedBuiltinType(makeArrayView(args), magicCalcName));
     }
 
     Type* getForwardDiffFuncInterfaceType(Type* baseType);
@@ -2483,17 +2496,17 @@ public:
     struct Constraint
     {
         Decl* decl = nullptr;  // the declaration of the thing being constraints
-        Index indexInPack = 0; // If the constraint is for a type parameter pack, which index in the
-                               // pack is this constraint for?
+        Index indexInPack = 0; // If the constraint is for a type parameter pack, which index in
+                               // the pack is this constraint for?
 
         Val* val = nullptr;          // the value to which we are constraining it
-        bool isUsedAsLValue = false; // If this constraint is for a type parameter, is the type used
-                                     // in an l-value parameter?
+        bool isUsedAsLValue = false; // If this constraint is for a type parameter, is the type
+                                     // used in an l-value parameter?
         bool satisfied = false;      // Has this constraint been met?
 
-        // Is this constraint optional? An optional constraint provides a hint value to a parameter
-        // if it is otherwise unconstrained, but doesn't take precedence over a constraint that is
-        // not optional.
+        // Is this constraint optional? An optional constraint provides a hint value to a
+        // parameter if it is otherwise unconstrained, but doesn't take precedence over a
+        // constraint that is not optional.
         bool isOptional = false;
 
         // Is this constraint an equality? This tells us that "joining" types is meaningless, we

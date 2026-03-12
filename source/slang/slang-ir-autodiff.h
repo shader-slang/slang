@@ -308,10 +308,10 @@ struct DifferentiableTypeConformanceContext
             }
         case kIROp_ApplyForBwdFuncType:
             {
-                auto bwdContextType = typeInst->getOperand(1);
+                auto contextType = typeInst->getOperand(1);
 
                 // Copy the func's parameter types as-is and replace the result type with
-                // the bwd context type.
+                // the context type (MinimalContext in the new design).
                 //
                 auto innerFnType = cast<IRFuncType>(resolveType(builder, typeInst->getOperand(0)));
 
@@ -335,7 +335,47 @@ struct DifferentiableTypeConformanceContext
                         paramTypes.add(innerFnType->getParamType(i));
                 }
 
-                return builder->getFuncType(paramTypes, (IRType*)bwdContextType);
+                // Result type: Tuple<ResultType, ContextType> for non-void,
+                // ContextType for void.
+                IRType* resultType;
+                if (as<IRVoidType>(innerFnType->getResultType()))
+                    resultType = (IRType*)contextType;
+                else
+                    resultType = builder->getTupleType(
+                        innerFnType->getResultType(),
+                        (IRType*)contextType);
+
+                return builder->getFuncType(paramTypes, resultType);
+                break;
+            }
+        case kIROp_RematFuncType:
+            {
+                auto innerFnType = cast<IRFuncType>(resolveType(builder, typeInst->getOperand(0)));
+                auto minimalCtxType = (IRType*)typeInst->getOperand(1);
+                auto fullCtxType = (IRType*)typeInst->getOperand(2);
+
+                List<IRType*> paramTypes;
+                // First parameter: MinimalCtxType.
+                paramTypes.add(minimalCtxType);
+                // Remaining parameters: same as original function params (with ptr pair wrapping).
+                for (UIndex i = 0; i < innerFnType->getParamCount(); ++i)
+                {
+                    if (isDifferentiablePtrType(innerFnType->getParamType(i)))
+                    {
+                        const auto& [paramDirection, paramType] =
+                            splitParameterDirectionAndType(innerFnType->getParamType(i));
+                        paramTypes.add(fromDirectionAndType(
+                            builder,
+                            paramDirection,
+                            (IRType*)tryGetAssociationOfKind(
+                                paramType,
+                                AnnotationKind::DifferentialPtrPairType)));
+                    }
+                    else
+                        paramTypes.add(innerFnType->getParamType(i));
+                }
+
+                return builder->getFuncType(paramTypes, fullCtxType);
                 break;
             }
         case kIROp_FuncResultType:

@@ -435,6 +435,10 @@ bool isConcreteType(IRInst* inst)
         return false;
     case kIROp_TypeType: // Can be refined into set of concrete types
         return false;
+    case kIROp_ThisType:
+    case kIROp_AssociatedType: // Shouldn't really appear in general, but we have some synthesized
+                               // methods that do use this
+        return false;
     case kIROp_ArrayType:
         return isConcreteType(cast<IRArrayType>(inst)->getElementType()) &&
                isGlobalInst(cast<IRArrayType>(inst)->getElementCount());
@@ -473,54 +477,106 @@ bool isConcreteType(IRInst* inst)
     return true;
 }
 
-IRInst* makeInfoForConcreteType(IRModule* module, IRInst* type)
+// Create info for a concrete type, using `paramType` as context to determine
+// how much structural decomposition to perform.
+//
+// - If `paramType` is concrete, return the bare type (no wrapping needed).
+// - If `paramType` is structural and `type` matches the same structural form,
+//   recurse into sub-components using `paramType`'s sub-types as context.
+// - Otherwise (non-concrete, non-matching paramType), produce a flat UntaggedUnion.
+//
+IRInst* makeInfoForConcreteType(IRModule* module, IRInst* type, IRInst* paramType)
 {
     SLANG_ASSERT(isConcreteType(type));
+    SLANG_ASSERT(paramType);
     IRBuilder builder(module);
+
+    // If paramType is concrete, return the bare type directly.
+    // (No wrapping needed since concrete positions can't be further refined.)
+    //
+    if (isConcreteType(paramType))
+        return type;
+
+    // Structural cases - recurse only when both type and paramType match the same form.
+    // If they don't match, fall through to the flat union at the bottom.
+    //
     if (auto ptrType = as<IRPtrTypeBase>(type))
     {
-        return builder.getPtrTypeWithAddressSpace(
-            (IRType*)makeInfoForConcreteType(module, ptrType->getValueType()),
-            ptrType);
+        if (auto paramPtrType = as<IRPtrTypeBase>(paramType))
+        {
+            return builder.getPtrTypeWithAddressSpace(
+                (IRType*)makeInfoForConcreteType(
+                    module,
+                    ptrType->getValueType(),
+                    paramPtrType->getValueType()),
+                ptrType);
+        }
     }
 
     if (auto arrayType = as<IRArrayType>(type))
     {
-        return builder.getArrayType(
-            (IRType*)makeInfoForConcreteType(module, arrayType->getElementType()),
-            arrayType->getElementCount(),
-            getArrayStride(arrayType));
+        if (auto paramArrayType = as<IRArrayType>(paramType))
+        {
+            return builder.getArrayType(
+                (IRType*)makeInfoForConcreteType(
+                    module,
+                    arrayType->getElementType(),
+                    paramArrayType->getElementType()),
+                arrayType->getElementCount(),
+                getArrayStride(arrayType));
+        }
     }
 
     if (auto attributedType = as<IRAttributedType>(type))
     {
-        List<IRAttr*>& attrs = *module->getContainerPool().getList<IRAttr>();
-        for (auto attr : attributedType->getAllAttrs())
-            attrs.add(attr);
+        if (auto paramAttributedType = as<IRAttributedType>(paramType))
+        {
+            List<IRAttr*>& attrs = *module->getContainerPool().getList<IRAttr>();
+            for (auto attr : attributedType->getAllAttrs())
+                attrs.add(attr);
 
-        auto newAttributedType = builder.getAttributedType(
-            (IRType*)makeInfoForConcreteType(module, attributedType->getBaseType()),
-            attrs);
-        module->getContainerPool().free(&attrs);
-        return newAttributedType;
+            auto newAttributedType = builder.getAttributedType(
+                (IRType*)makeInfoForConcreteType(
+                    module,
+                    attributedType->getBaseType(),
+                    paramAttributedType->getBaseType()),
+                attrs);
+            module->getContainerPool().free(&attrs);
+            return newAttributedType;
+        }
     }
 
     if (auto tupleType = as<IRTupleType>(type))
     {
-        List<IRType*> elementInfos;
-        for (UInt i = 0; i < tupleType->getOperandCount(); i++)
+        if (auto paramTupleType = as<IRTupleType>(paramType))
         {
-            elementInfos.add((IRType*)makeInfoForConcreteType(module, tupleType->getOperand(i)));
+            if (tupleType->getOperandCount() == paramTupleType->getOperandCount())
+            {
+                List<IRType*> elementInfos;
+                for (UInt i = 0; i < tupleType->getOperandCount(); i++)
+                {
+                    elementInfos.add((IRType*)makeInfoForConcreteType(
+                        module,
+                        tupleType->getOperand(i),
+                        paramTupleType->getOperand(i)));
+                }
+                return builder.getTupleType(elementInfos);
+            }
         }
-        return builder.getTupleType(elementInfos);
     }
 
     if (auto optionalType = as<IROptionalType>(type))
     {
-        return builder.getOptionalType(
-            (IRType*)makeInfoForConcreteType(module, optionalType->getValueType()));
+        if (auto paramOptionalType = as<IROptionalType>(paramType))
+        {
+            return builder.getOptionalType((IRType*)makeInfoForConcreteType(
+                module,
+                optionalType->getValueType(),
+                paramOptionalType->getValueType()));
+        }
     }
 
+    // Non-structural or mismatched structural paramType: produce a flat UntaggedUnion.
     return builder.getUntaggedUnionType(
         cast<IRTypeSet>(builder.getSingletonSet(kIROp_TypeSet, type)));
 }
@@ -555,6 +611,7 @@ IROp getSetOpFromType(IRType* type)
     case kIROp_BwdCallableFuncType:
     case kIROp_BackwardDiffFuncType:
     case kIROp_FuncResultType:
+    case kIROp_RematFuncType:
         return kIROp_FuncSet;
     default:
         break;
@@ -773,7 +830,10 @@ struct TypeFlowSpecializationContext
     //
     // Such 'argument' cases arise for phi-args and function args.
     //
-    IRInst* tryGetArgInfo(IRInst* context, IRInst* inst)
+    // `paramType` provides the declared type of the merge-point (parameter, return type, etc.)
+    // so that `makeInfoForConcreteType` can produce info in the correct structural shape.
+    //
+    IRInst* tryGetArgInfo(IRInst* context, IRInst* inst, IRInst* paramType)
     {
         if (auto info = tryGetInfo(context, inst))
             return info;
@@ -785,7 +845,10 @@ struct TypeFlowSpecializationContext
             // nested into any relevant type structure that we want to propagate through
             // `makeInfoForConcreteType` handles this logic.
             //
-            return makeInfoForConcreteType(module, inst->getDataType());
+            // When paramType is provided, the info is shaped to match the merge-point's
+            // structural expectations.
+            //
+            return makeInfoForConcreteType(module, inst->getDataType(), paramType);
         }
 
         return none();
@@ -857,92 +920,14 @@ struct TypeFlowSpecializationContext
             allValues)); // Create a new set with the union of values
     }
 
-    // Find the union of two propagation info insts, and return and
-    // inst representing the result.
+    // Performs a flat (non-structural) union of two propagation infos that are
+    // both composites of sets (TaggedUnion, UntaggedUnion, ElementOfSet, SetTag).
     //
-    IRInst* unionPropagationInfo(IRInst* info1, IRInst* info2)
+    // This is the leaf-level union used when the type context is non-structural
+    // and non-concrete (e.g., InterfaceType, WitnessTableType, FuncType).
+    //
+    IRInst* flatUnionPropagationInfo(IRInst* info1, IRInst* info2)
     {
-        // This is similar to unionSet, but must consider structures that
-        // can be built out of collections.
-        //
-        // We allow some level of nesting of collections into other type instructions,
-        // to let us propagate information elegantly for pointers, parameters, arrays,
-        // tuples and existential tuples.
-        //
-        // A few cases are missing, but could be added in easily in the future:
-        //    - Vector/Matrix types
-        //    - TypePack
-
-        // Basic cases: if either info is null, it is considered "empty"
-        // if they're equal, union must be the same inst.
-        //
-
-        if (!info1)
-            return info2;
-
-        if (!info2)
-            return info1;
-
-        if (areInfosEqual(info1, info2))
-            return info1;
-
-        if (as<IRArrayType>(info1) && as<IRArrayType>(info2))
-        {
-            SLANG_ASSERT(info1->getOperand(1) == info2->getOperand(1));
-            // If both are array types, union their element types
-            IRBuilder builder(module);
-            builder.setInsertInto(module);
-            return builder.getArrayType(
-                (IRType*)unionPropagationInfo(info1->getOperand(0), info2->getOperand(0)),
-                as<IRArrayType>(info1)->getElementCount(),
-                getArrayStride(as<IRArrayType>(info1))); // Keep the same size
-        }
-
-        if (as<IRPtrTypeBase>(info1) && as<IRPtrTypeBase>(info2))
-        {
-            SLANG_ASSERT(info1->getOp() == info2->getOp());
-
-            // If both are array types, union their element types
-            IRBuilder builder(module);
-            builder.setInsertInto(module);
-            return builder.getPtrTypeWithAddressSpace(
-                (IRType*)unionPropagationInfo(info1->getOperand(0), info2->getOperand(0)),
-                as<IRPtrTypeBase>(info1));
-        }
-
-        if (as<IRTupleType>(info1) && as<IRTupleType>(info2))
-        {
-            // If both are tuple types, union each element type
-            SLANG_ASSERT(info1->getOperandCount() == info2->getOperandCount());
-            IRBuilder builder(module);
-            builder.setInsertInto(module);
-            List<IRType*> elementInfos;
-            for (UInt i = 0; i < info1->getOperandCount(); i++)
-            {
-                elementInfos.add(
-                    (IRType*)unionPropagationInfo(info1->getOperand(i), info2->getOperand(i)));
-            }
-            return builder.getTupleType(elementInfos);
-        }
-
-        if (as<IROptionalType>(info1) && as<IROptionalNoneType>(info2))
-            return info1;
-
-        if (as<IROptionalNoneType>(info1) && (as<IROptionalType>(info2)))
-            return info2;
-
-        if (as<IROptionalType>(info1) && as<IROptionalType>(info2))
-        {
-            // If both are optional types, union their value types
-            IRBuilder builder(module);
-            return builder.getOptionalType(
-                (IRType*)unionPropagationInfo(info1->getOperand(0), info2->getOperand(0)));
-        }
-
-        // For all other cases which are structured composites of sets,
-        // we simply take the set union for all the set operands.
-        //
-
         if (as<IRTaggedUnionType>(info1) && as<IRTaggedUnionType>(info2))
         {
             return makeTaggedUnionType(
@@ -975,57 +960,228 @@ struct TypeFlowSpecializationContext
                     cast<IRTypeSet>(info2->getOperand(0))));
         }
 
-        if (as<IRAttributedType>(info1) && as<IRAttributedType>(info2))
-        {
-            SLANG_ASSERT(info1->getOp() == info2->getOp());
+        if (as<IROptionalType>(info1) && as<IROptionalNoneType>(info2))
+            return info1;
 
-            IRBuilder builder(module);
-            builder.setInsertInto(module);
+        if (as<IROptionalNoneType>(info1) && (as<IROptionalType>(info2)))
+            return info2;
 
-            List<IRAttr*>& attrs = *module->getContainerPool().getList<IRAttr>();
-            for (auto attr : as<IRAttributedType>(info1)->getAllAttrs())
-                attrs.add(attr);
-
-            auto unionAttributedType = builder.getAttributedType(
-                (IRType*)unionPropagationInfo(info1->getOperand(0), info2->getOperand(0)),
-                attrs);
-            module->getContainerPool().free(&attrs);
-            return unionAttributedType;
-        }
-
-        SLANG_UNEXPECTED("Unhandled propagation info types in unionPropagationInfo");
+        SLANG_UNEXPECTED("Incompatible propagation infos during union");
     }
 
-    // Centralized method to update propagation info and add
-    // relevant work items to the work queue if the info changed.
+    // Context-aware union of two propagation infos using a three-input structural approach.
     //
-    void updateInfo(
+    // `typeContext` is the declared type of the merge point (e.g., parameter type, field type,
+    // return type). It determines how much structural decomposition to perform during union:
+    //
+    // - If typeContext is structural (Tuple, Array, Ptr, Optional, Attributed), and both infos
+    //   match that structure, recurse element-wise using typeContext's sub-types as sub-contexts.
+    //
+    // - If typeContext is concrete, both infos should represent the same thing; return info1.
+    //
+    // - If typeContext is non-concrete and non-structural (e.g., InterfaceType, WitnessTableType,
+    //   FuncType, LookupWitnessMethod result), perform a flat union without structural
+    //   decomposition.
+    //
+    IRInst* unionPropagationInfo(IRInst* typeContext, IRInst* info1, IRInst* info2)
+    {
+        // Basic cases: if either info is null, it is considered "empty";
+        // if they're equal, union must be the same inst.
+        if (!info1)
+            return info2;
+        if (!info2)
+            return info1;
+        if (areInfosEqual(info1, info2))
+            return info1;
+
+        // If type context is concrete, infos should be equivalent representations
+        // of the same concrete type. Return the existing info.
+        if (isConcreteType(typeContext))
+            return info1;
+
+        // --- Structural type contexts ---
+        // If typeContext is structural and both infos match that structure,
+        // recurse element-wise using typeContext's sub-types as sub-contexts.
+
+        // Tuple
+        if (auto tupleCtx = as<IRTupleType>(typeContext))
+        {
+            auto tuple1 = as<IRTupleType>(info1);
+            auto tuple2 = as<IRTupleType>(info2);
+
+            IRBuilder builder(module);
+            List<IRType*> elementInfos;
+            for (UInt i = 0; i < tupleCtx->getOperandCount(); i++)
+            {
+                elementInfos.add((IRType*)unionPropagationInfo(
+                    tupleCtx->getOperand(i),
+                    tuple1->getOperand(i),
+                    tuple2->getOperand(i)));
+            }
+            return builder.getTupleType(elementInfos);
+        }
+
+        // Array
+        if (auto arrayCtx = as<IRArrayType>(typeContext))
+        {
+            auto arr1 = as<IRArrayType>(info1);
+            auto arr2 = as<IRArrayType>(info2);
+            if (arr1 && arr2)
+            {
+                IRBuilder builder(module);
+                return builder.getArrayType(
+                    (IRType*)unionPropagationInfo(
+                        arrayCtx->getElementType(),
+                        arr1->getOperand(0),
+                        arr2->getOperand(0)),
+                    arr1->getElementCount(),
+                    getArrayStride(arr1));
+            }
+        }
+
+        // Ptr
+        if (auto ptrCtx = as<IRPtrTypeBase>(typeContext))
+        {
+            auto ptr1 = as<IRPtrTypeBase>(info1);
+            auto ptr2 = as<IRPtrTypeBase>(info2);
+            if (ptr1 && ptr2)
+            {
+                IRBuilder builder(module);
+                return builder.getPtrTypeWithAddressSpace(
+                    (IRType*)unionPropagationInfo(
+                        ptrCtx->getValueType(),
+                        ptr1->getOperand(0),
+                        ptr2->getOperand(0)),
+                    ptr1);
+            }
+        }
+
+        // Optional (non-existential)
+        if (as<IROptionalType>(typeContext) && !isOptionalExistentialType(typeContext))
+        {
+            auto optCtx = as<IROptionalType>(typeContext);
+
+            // Handle OptionalNone + Optional cases
+            if (as<IROptionalType>(info1) && as<IROptionalNoneType>(info2))
+                return info1;
+            if (as<IROptionalNoneType>(info1) && as<IROptionalType>(info2))
+                return info2;
+
+            auto opt1 = as<IROptionalType>(info1);
+            auto opt2 = as<IROptionalType>(info2);
+            if (opt1 && opt2)
+            {
+                IRBuilder builder(module);
+                return builder.getOptionalType((IRType*)unionPropagationInfo(
+                    optCtx->getValueType(),
+                    opt1->getOperand(0),
+                    opt2->getOperand(0)));
+            }
+        }
+
+        // AttributedType
+        if (auto attrCtx = as<IRAttributedType>(typeContext))
+        {
+            auto attr1 = as<IRAttributedType>(info1);
+            auto attr2 = as<IRAttributedType>(info2);
+            if (attr1 && attr2)
+            {
+                IRBuilder builder(module);
+                List<IRAttr*>& attrs = *module->getContainerPool().getList<IRAttr>();
+                for (auto attr : attr1->getAllAttrs())
+                    attrs.add(attr);
+                auto result = builder.getAttributedType(
+                    (IRType*)unionPropagationInfo(
+                        attrCtx->getBaseType(),
+                        attr1->getOperand(0),
+                        attr2->getOperand(0)),
+                    attrs);
+                module->getContainerPool().free(&attrs);
+                return result;
+            }
+        }
+
+        if (auto diffPairCtx = as<IRDifferentialPairType>(typeContext))
+        {
+            auto attr1 = as<IRTupleType>(info1);
+            auto attr2 = as<IRTupleType>(info2);
+            if (attr1 && attr2)
+            {
+                IRBuilder builder(module);
+                List<IRType*> elementInfos;
+
+                elementInfos.add((IRType*)unionPropagationInfo(
+                    diffPairCtx->getValueType(),
+                    attr1->getOperand(0),
+                    attr2->getOperand(0)));
+
+                elementInfos.add((IRType*)unionPropagationInfo(
+                    diffPairCtx->getValueType(),
+                    attr1->getOperand(1),
+                    attr2->getOperand(1)));
+
+                return builder.getTupleType(elementInfos);
+            }
+
+            auto diffPair1 = as<IRDifferentialPairType>(info1);
+            auto diffPair2 = as<IRDifferentialPairType>(info2);
+            if (diffPair1 && diffPair2)
+            {
+                // Expect either a type or an ElementOfSetType.
+                // and either a  getWitness()
+            }
+        }
+
+        // --- Non-structural, non-concrete type contexts ---
+        // For any remaining case (InterfaceType, WitnessTableType, FuncType,
+        // LookupWitnessMethod result, etc.), or when the structural match failed,
+        // perform a flat union over the set-based composites.
+        //
+        return flatUnionPropagationInfo(info1, info2);
+    }
+
+    // Replace the propagation info for an instruction (no union with existing info).
+    // Used at single-definition sites where there is exactly one incoming edge.
+    //
+    void updateInfo(IRInst* context, IRInst* inst, IRInst* newInfo, WorkQueue<WorkItem>& workQueue)
+    {
+        if (isConcreteType(inst->getDataType()))
+            return;
+
+        auto existingInfo = tryGetInfo(context, inst);
+        if (areInfosEqual(existingInfo, newInfo))
+            return;
+
+        IRBuilder builder(module);
+        propagationMap[InstWithContext(context, inst)] = builder.getWeakUse(newInfo);
+        addUsersToWorkQueue(context, inst, newInfo, workQueue);
+    }
+
+    // Union new propagation info with existing info at a merge point, then update.
+    // Used at sites with multiple incoming edges (phi params, func params, call returns,
+    // struct fields, vars with multiple stores).
+    //
+    // `mergePointType` is the declared type of the merge point and controls
+    // how much structural decomposition is performed during the union.
+    //
+    void updateInfoForMerge(
         IRInst* context,
         IRInst* inst,
         IRInst* newInfo,
-        bool takeUnion,
+        IRInst* mergePointType,
         WorkQueue<WorkItem>& workQueue)
     {
         if (isConcreteType(inst->getDataType()))
-        {
-            // No need to update info for insts with already defined concrete types,
-            // since these can't be refined any further.
-            //
             return;
-        }
 
         auto existingInfo = tryGetInfo(context, inst);
-        auto unionedInfo = (takeUnion) ? unionPropagationInfo(existingInfo, newInfo) : newInfo;
+        auto unionedInfo = unionPropagationInfo(mergePointType, existingInfo, newInfo);
 
-        // Only proceed if info actually changed
         if (areInfosEqual(existingInfo, unionedInfo))
             return;
 
-        // Update the propagation map
         IRBuilder builder(module);
         propagationMap[InstWithContext(context, inst)] = builder.getWeakUse(unionedInfo);
-
-        // Add all users to appropriate work items
         addUsersToWorkQueue(context, inst, unionedInfo, workQueue);
     }
 
@@ -1130,7 +1286,9 @@ struct TypeFlowSpecializationContext
             return;
 
         auto existingReturnInfo = getFuncReturnInfo(callable);
-        auto newReturnInfo = unionPropagationInfo(existingReturnInfo, returnInfo);
+        // Use the function's declared return type as context for structural union.
+        auto newReturnInfo =
+            unionPropagationInfo(callableFuncType->getResultType(), existingReturnInfo, returnInfo);
 
         if (!areInfosEqual(existingReturnInfo, newReturnInfo))
         {
@@ -1376,7 +1534,7 @@ struct TypeFlowSpecializationContext
             info = analyzeByType(context, inst);
 
         if (info)
-            updateInfo(context, inst, info, false, workQueue);
+            updateInfo(context, inst, info, workQueue);
     }
 
     void processBlock(IRInst* context, IRBlock* block, WorkQueue<WorkItem>& workQueue)
@@ -1393,7 +1551,13 @@ struct TypeFlowSpecializationContext
         {
             auto val = returnInfo->getVal();
             if (!as<IRVoidType>(val->getDataType()))
-                updateFuncReturnInfo(context, tryGetArgInfo(context, val), workQueue);
+            {
+                // Get the function's declared return type as context for the arg info shape.
+                auto func = getContextFunc(context);
+                SLANG_ASSERT(func);
+                IRType* returnType = cast<IRFuncType>(func->getDataType())->getResultType();
+                updateFuncReturnInfo(context, tryGetArgInfo(context, val, returnType), workQueue);
+            }
         }
     };
 
@@ -1424,10 +1588,10 @@ struct TypeFlowSpecializationContext
             if (paramIndex < unconditionalBranch->getArgCount())
             {
                 auto arg = unconditionalBranch->getArg(paramIndex);
-                if (auto argInfo = tryGetArgInfo(context, arg))
+                if (auto argInfo = tryGetArgInfo(context, arg, param->getDataType()))
                 {
-                    // Use centralized update method
-                    updateInfo(context, param, argInfo, true, workQueue);
+                    // Use merge update with phi param's type as context.
+                    updateInfoForMerge(context, param, argInfo, param->getDataType(), workQueue);
                 }
             }
             paramIndex++;
@@ -1519,7 +1683,8 @@ struct TypeFlowSpecializationContext
                             continue;
                         }
 
-                        IRInst* argInfo = tryGetArgInfo(edge.callerContext, arg);
+                        IRInst* argInfo =
+                            tryGetArgInfo(edge.callerContext, arg, param->getDataType());
 
                         switch (paramDirection.kind)
                         {
@@ -1538,13 +1703,23 @@ struct TypeFlowSpecializationContext
                                     &builder,
                                     paramDirection,
                                     (IRType*)valueInfo);
-                                updateInfo(edge.targetContext, param, newInfo, true, workQueue);
+                                updateInfoForMerge(
+                                    edge.targetContext,
+                                    param,
+                                    newInfo,
+                                    param->getDataType(),
+                                    workQueue);
                                 break;
                             }
                         case ParameterDirectionInfo::Kind::In:
                             {
                                 argInfo = matchAttributes(argInfo, paramType);
-                                updateInfo(edge.targetContext, param, argInfo, true, workQueue);
+                                updateInfoForMerge(
+                                    edge.targetContext,
+                                    param,
+                                    argInfo,
+                                    param->getDataType(),
+                                    workQueue);
                                 break;
                             }
                         default:
@@ -1581,9 +1756,10 @@ struct TypeFlowSpecializationContext
                         if (isConcreteType(concreteReturnType))
                         {
                             IRBuilder builder(module);
-                            returnInfo = builder.getUntaggedUnionType(
-                                cast<IRTypeSet>(
-                                    builder.getSingletonSet(kIROp_TypeSet, concreteReturnType)));
+                            returnInfo = makeInfoForConcreteType(
+                                module,
+                                concreteReturnType,
+                                callInst->getDataType());
                         }
                     }
 
@@ -1591,13 +1767,22 @@ struct TypeFlowSpecializationContext
                     {
                         // Match attribute wrapping to the call site's return type.
                         returnInfo = matchAttributes(returnInfo, callInst->getDataType());
-                        // Use centralized update method
-                        updateInfo(edge.callerContext, callInst, returnInfo, true, workQueue);
+                        // Use merge update with call inst's type as context.
+                        updateInfoForMerge(
+                            edge.callerContext,
+                            callInst,
+                            returnInfo,
+                            callInst->getDataType(),
+                            workQueue);
                     }
                 }
 
+                auto callSiteFuncType =
+                    this->callSiteFuncType[InstWithContext(edge.callerContext, callInst)];
+
                 // Also update infos of any out parameters
-                auto paramInfos = getParamInfos(edge.targetContext);
+                auto paramInfos =
+                    getParamInfos(edge.targetContext, maybeExpandFuncType(callSiteFuncType));
                 auto paramDirections = getParamDirections(edge.targetContext);
                 UIndex argIndex = 0;
                 for (auto paramInfo : paramInfos)
@@ -1615,11 +1800,11 @@ struct TypeFlowSpecializationContext
                             auto valueInfo = matchAttributes(
                                 as<IRPtrTypeBase>(paramInfo)->getValueType(),
                                 argPtrType ? argPtrType->getValueType() : nullptr);
-                            updateInfo(
+                            updateInfoForMerge(
                                 edge.callerContext,
                                 arg,
                                 builder.getPtrTypeWithAddressSpace((IRType*)valueInfo, argPtrType),
-                                true,
+                                arg->getDataType(),
                                 workQueue);
                         }
                     }
@@ -1724,7 +1909,9 @@ struct TypeFlowSpecializationContext
             {
                 IRInst* existingInfo = nullptr;
                 this->fieldInfo.tryGetValue(field, existingInfo);
-                auto newInfo = unionPropagationInfo(existingInfo, operandInfo);
+                // Use the field's declared type as context for structural union.
+                auto newInfo =
+                    unionPropagationInfo(field->getFieldType(), existingInfo, operandInfo);
                 if (newInfo && !areInfosEqual(existingInfo, newInfo))
                 {
                     // Update the field info map
@@ -1761,7 +1948,9 @@ struct TypeFlowSpecializationContext
             auto element = makeArray->getOperand(i);
             if (auto elementInfo = tryGetInfo(context, element))
             {
-                unionInfo = unionPropagationInfo(unionInfo, elementInfo);
+                // Use the array's declared element type as context for structural union.
+                unionInfo =
+                    unionPropagationInfo(arrayType->getElementType(), unionInfo, elementInfo);
             }
             else
             {
@@ -3281,10 +3470,112 @@ struct TypeFlowSpecializationContext
                 auto binding = funcWithBindings->getOperand(paramIndex + 1);
                 if (binding && !as<IRVoidLit>(binding))
                 {
-                    updateInfo(funcWithBindings, param, binding, true, workQueue);
+                    updateInfoForMerge(
+                        funcWithBindings,
+                        param,
+                        binding,
+                        param->getDataType(),
+                        workQueue);
                 }
             }
             paramIndex++;
+        }
+    }
+
+
+    // If any arguments in a call is a value pack, we will expand them into the argument list,
+    // so that the call has no arguments of type `IRTypePack`.
+    // For example, we will turn `f(MakeValuePack(a, b))` into `f(a, b)`.
+    //
+    IRCall* tryExpandArgPack(IRCall* call)
+    {
+        bool anyArgPack = false;
+        for (UInt i = 0; i < call->getArgCount(); i++)
+        {
+            auto arg = call->getArg(i);
+            if (as<IRTypePack>(arg->getDataType()))
+            {
+                anyArgPack = true;
+                break;
+            }
+        }
+        if (!anyArgPack)
+            return call;
+        IRBuilder builder(call);
+        builder.setInsertBefore(call);
+        List<IRInst*> newArgs;
+        for (UInt i = 0; i < call->getArgCount(); i++)
+        {
+            auto arg = call->getArg(i);
+            if (auto typePack = as<IRTypePack>(arg->getDataType()))
+            {
+                for (UInt elementIndex = 0; elementIndex < typePack->getOperandCount();
+                     elementIndex++)
+                {
+                    auto newArg = builder.emitGetTupleElement(
+                        (IRType*)typePack->getOperand(elementIndex),
+                        arg,
+                        elementIndex);
+                    newArgs.add(newArg);
+                }
+            }
+            else
+            {
+                newArgs.add(arg);
+            }
+        }
+        auto newCall =
+            builder.emitCallInst(call->getFullType(), call->getCallee(), newArgs.getArrayView());
+        call->replaceUsesWith(newCall);
+        call->transferDecorationsTo(newCall);
+        call->removeAndDeallocate();
+
+        return newCall;
+    }
+
+    IRFuncType* maybeExpandFuncType(IRFuncType* funcType)
+    {
+        List<IRType*> newArgTypes;
+
+        for (auto paramType : funcType->getParamTypes())
+        {
+            if (auto typePack = as<IRTypePack>(paramType))
+            {
+                for (UInt elementIndex = 0; elementIndex < typePack->getOperandCount();
+                     elementIndex++)
+                {
+                    newArgTypes.add((IRType*)typePack->getOperand(elementIndex));
+                }
+            }
+            else
+            {
+                newArgTypes.add(paramType);
+            }
+        }
+
+        IRBuilder builder(module);
+        return as<IRFuncType>(
+            builder.getFuncType(newArgTypes.getArrayView(), funcType->getResultType()));
+    }
+
+    void expandArgPacksInFunc(IRFunc* func)
+    {
+        // Go through any IRCall insts in func and expand any argument packs.
+        List<IRCall*> callsToConsider;
+        for (auto block = func->getFirstBlock(); block; block = block->getNextBlock())
+        {
+            for (auto inst = block->getFirstInst(); inst; inst = inst->getNextInst())
+            {
+                if (auto call = as<IRCall>(inst))
+                {
+                    callsToConsider.add(call);
+                }
+            }
+        }
+
+        for (auto call : callsToConsider)
+        {
+            tryExpandArgPack(call);
         }
     }
 
@@ -3320,6 +3611,9 @@ struct TypeFlowSpecializationContext
                     for (auto block = func->getFirstBlock(); block; block = block->getNextBlock())
                         workQueue.enqueue(WorkItem(context, block));
 
+                    if (this->uniqueDefs.add(func))
+                        expandArgPacksInFunc(func);
+
                     break;
                 }
             case kIROp_Specialize:
@@ -3342,37 +3636,42 @@ struct TypeFlowSpecializationContext
 
                         if (auto set = as<IRSetBase>(arg))
                         {
-                            updateInfo(context, param, makeElementOfSetType(set), true, workQueue);
+                            updateInfoForMerge(
+                                context,
+                                param,
+                                makeElementOfSetType(set),
+                                param->getDataType(),
+                                workQueue);
                         }
                         else if (auto untaggedUnion = as<IRUntaggedUnionType>(arg))
                         {
                             IRBuilder builder(module);
-                            updateInfo(
+                            updateInfoForMerge(
                                 context,
                                 param,
                                 makeElementOfSetType(untaggedUnion->getSet()),
-                                true,
+                                param->getDataType(),
                                 workQueue);
                         }
                         else if (as<IRType>(arg))
                         {
                             IRBuilder builder(module);
-                            updateInfo(
+                            updateInfoForMerge(
                                 context,
                                 param,
                                 makeElementOfSetType(builder.getSingletonSet(kIROp_TypeSet, arg)),
-                                true,
+                                param->getDataType(),
                                 workQueue);
                         }
                         else if (as<IRWitnessTable>(arg))
                         {
                             IRBuilder builder(module);
-                            updateInfo(
+                            updateInfoForMerge(
                                 context,
                                 param,
                                 makeElementOfSetType(
                                     builder.getSingletonSet(kIROp_WitnessTableSet, arg)),
-                                true,
+                                param->getDataType(),
                                 workQueue);
                         }
                         else
@@ -3398,6 +3697,9 @@ struct TypeFlowSpecializationContext
                 {
                     auto funcWithBindings = cast<IRFuncWithBindings>(context);
                     func = getContextFunc(context);
+
+                    if (this->uniqueDefs.add(func))
+                        expandArgPacksInFunc(func);
 
                     // Initialize the first block parameters
                     initializeFirstBlockParameters(context, func);
@@ -3473,7 +3775,7 @@ struct TypeFlowSpecializationContext
                 if (argIdx < inst->getOperandCount())
                 {
                     auto arg = inst->getOperand(argIdx);
-                    auto argInfo = tryGetArgInfo(context, arg);
+                    auto argInfo = tryGetArgInfo(context, arg, paramType);
 
                     // For pointer-wrapped params (out/inout/borrow), unwrap to get value info
                     if (argInfo)
@@ -3565,6 +3867,12 @@ struct TypeFlowSpecializationContext
             IRBuilder builder(module);
             this->callSiteInfo[InstWithContext(context, inst)] =
                 makeElementOfSetType(builder.getSet(kIROp_FuncSet, calleeSet));
+
+            // Store the callee's declared func type before specialization replaces it
+            // with tag/set types. This is the abstract func type from the interface.
+            if (auto calleeFuncType = as<IRFuncType>(inst->getCallee()->getDataType()))
+                this->callSiteFuncType[InstWithContext(context, inst)] = calleeFuncType;
+
             for (auto callee : calleeSet)
             {
                 this->calleeRefCounts.addIfNotExists(callee, 0);
@@ -3704,7 +4012,9 @@ struct TypeFlowSpecializationContext
                     // This case is not handled by updateInfo(), though in the future
                     // it makes sense to include this as a case in updateInfo()
                     //
-                    if (auto newInfo = unionPropagationInfo(info, existingInfo))
+                    // Use the field address's pointer type as context for structural union.
+                    if (auto newInfo =
+                            unionPropagationInfo(fieldAddress->getDataType(), info, existingInfo))
                     {
                         if (newInfo != existingInfo)
                         {
@@ -3727,7 +4037,7 @@ struct TypeFlowSpecializationContext
             //
             // This is one of the base cases for the recursion.
             //
-            updateInfo(context, var, info, true, workQueue);
+            updateInfoForMerge(context, var, info, var->getDataType(), workQueue);
         }
         else if (auto param = as<IRParam>(inst))
         {
@@ -3752,7 +4062,7 @@ struct TypeFlowSpecializationContext
                     (IRType*)as<IRPtrTypeBase>(info)->getValueType(),
                     as<IRPtrTypeBase>(param->getDataType()));
 
-                updateInfo(context, param, newInfo, true, workQueue);
+                updateInfoForMerge(context, param, newInfo, param->getDataType(), workQueue);
             }
         }
         else
@@ -3760,6 +4070,33 @@ struct TypeFlowSpecializationContext
             // If we hit something unsupported, assume there's nothing to update.
             return;
         }
+    }
+
+    List<IRInst*> getParamInfos(IRInst* context, IRFuncType* contextFuncType)
+    {
+        auto baseFunc = getContextFunc(context);
+        List<IRInst*> paramInfos;
+        UInt index = 0;
+        for (auto param : baseFunc->getParams())
+        {
+            if (auto paramInfo = tryGetInfo(context, param))
+                paramInfos.add(paramInfo);
+            else if (isConcreteType(param->getDataType()))
+            {
+                paramInfos.add(makeInfoForConcreteType(
+                    module,
+                    param->getDataType(),
+                    contextFuncType->getParamType(index)));
+            }
+            else
+            {
+                // Info not ready yet.
+                paramInfos.add(nullptr);
+            }
+
+            index++;
+        }
+        return paramInfos;
     }
 
     // Returns the effective parameter types for a given calling context, after
@@ -3819,20 +4156,20 @@ struct TypeFlowSpecializationContext
         if (as<IRFunc>(context))
         {
             for (auto param : as<IRFunc>(context)->getParams())
-                infos.add(tryGetArgInfo(context, param));
+                infos.add(tryGetArgInfo(context, param, param->getDataType()));
         }
         else if (auto specialize = as<IRSpecialize>(context))
         {
             auto generic = specialize->getBase();
             auto innerFunc = getGenericReturnVal(generic);
             for (auto param : as<IRFunc>(innerFunc)->getParams())
-                infos.add(tryGetArgInfo(context, param));
+                infos.add(tryGetArgInfo(context, param, param->getDataType()));
         }
         else if (auto funcWithBindings = as<IRFuncWithBindings>(context))
         {
             auto baseFunc = getContextFunc(funcWithBindings);
             for (auto param : baseFunc->getParams())
-                infos.add(tryGetArgInfo(context, param));
+                infos.add(tryGetArgInfo(context, param, param->getDataType()));
         }
         else
         {
@@ -4209,6 +4546,11 @@ struct TypeFlowSpecializationContext
                 {
                     this->callSiteInfo[InstWithContext(clonedFunc, kv.second)] =
                         this->callSiteInfo[InstWithContext(funcWithBindings, kv.first)];
+                }
+                if (this->callSiteFuncType.containsKey(InstWithContext(funcWithBindings, kv.first)))
+                {
+                    this->callSiteFuncType[InstWithContext(clonedFunc, kv.second)] =
+                        this->callSiteFuncType[InstWithContext(funcWithBindings, kv.first)];
                 }
             }
         }
@@ -4736,95 +5078,40 @@ struct TypeFlowSpecializationContext
 
     bool isTaggedUnionType(IRInst* type) { return as<IRTaggedUnionType>(type) != nullptr; }
 
-    IRType* updateType(IRType* currentType, IRType* newType)
+    // Union two lowered types using a context type for structural decomposition.
+    //
+    // `typeContext` is the declared type of the position being aggregated
+    // (e.g., the declared parameter type from the interface's func type).
+    // Concrete lowered types are first wrapped via makeInfoForConcreteType so
+    // that unionPropagationInfo can decompose them structurally.
+    //
+    IRType* updateType(IRType* typeContext, IRType* currentType, IRType* newType)
     {
-        if (auto valOfSetType = as<IRUntaggedUnionType>(currentType))
-        {
-            HashSet<IRInst*>& setElements = *module->getContainerPool().getHashSet<IRInst>();
-            forEachInSet(
-                module,
-                valOfSetType->getSet(),
-                [&](IRInst* element) { setElements.add(element); });
+        // If our context doesn't allow any specialization.. then it should serve as
+        // the final type.
+        //
+        if (isConcreteType(typeContext))
+            return typeContext;
 
-            if (auto newValOfSetType = as<IRUntaggedUnionType>(newType))
-            {
-                // If the new type is also a set, merge the two sets
-                forEachInSet(
-                    module,
-                    newValOfSetType->getSet(),
-                    [&](IRInst* element) { setElements.add(element); });
-            }
-            else
-            {
-                // Otherwise, just add the new type to the set
-                setElements.add(newType);
-            }
+        // if (isConcreteType(newType))
+        //     newType = (IRType*)makeInfoForConcreteType(module, newType, typeContext);
 
-            // If this is a set, we need to create a new set with the new type
-            IRBuilder builder(module);
-            auto newSet = builder.getSet(kIROp_TypeSet, setElements);
-            module->getContainerPool().free(&setElements);
-            return makeUntaggedUnionType(cast<IRTypeSet>(newSet));
-        }
-        else if (currentType == newType)
-        {
-            return currentType;
-        }
-        else if (currentType == nullptr)
-        {
-            return newType;
-        }
-        else if (as<IRAttributedType>(currentType) && as<IRAttributedType>(newType))
-        {
-            // Merge the base types of both attributed types
-            auto baseCurrentType = as<IRAttributedType>(currentType)->getBaseType();
-            auto baseNewType = as<IRAttributedType>(newType)->getBaseType();
-            auto mergedBaseType = updateType(baseCurrentType, baseNewType);
-
-            IRBuilder builder(module);
-            List<IRAttr*>& attrs = *module->getContainerPool().getList<IRAttr>();
-            for (auto attr : as<IRAttributedType>(currentType)->getAllAttrs())
-                attrs.add(attr);
-
-            auto mergedAttributedType = builder.getAttributedType((IRType*)mergedBaseType, attrs);
-            module->getContainerPool().free(&attrs);
-            return mergedAttributedType;
-        }
-        else if (as<IRTaggedUnionType>(currentType) && as<IRTaggedUnionType>(newType))
-        {
-            // Merge the elements of both tagged unions into a new tuple type
-            return (IRType*)makeTaggedUnionType((unionSet<IRWitnessTableSet>(
-                as<IRTaggedUnionType>(currentType)->getWitnessTableSet(),
-                as<IRTaggedUnionType>(newType)->getWitnessTableSet())));
-        }
-        else // Need to create a new set.
-        {
-            HashSet<IRInst*>& setElements = *module->getContainerPool().getHashSet<IRInst>();
-
-            SLANG_ASSERT(!as<IRSetBase>(currentType) && !as<IRSetBase>(newType));
-
-            setElements.add(currentType);
-            setElements.add(newType);
-
-            // If this is a set, we need to create a new set with the new type
-            IRBuilder builder(module);
-            auto newSet = builder.getSet(kIROp_TypeSet, setElements);
-            module->getContainerPool().free(&setElements);
-            return makeUntaggedUnionType(cast<IRTypeSet>(newSet));
-        }
+        return (IRType*)unionPropagationInfo(typeContext, currentType, (IRType*)newType);
     }
 
     IRFuncType* getEffectiveFuncTypeForDispatcher(
         IRWitnessTableSet* tableSet,
         IRStructKey* key,
-        IRFuncSet* resultFuncSet)
+        IRFuncSet* resultFuncSet,
+        IRFuncType* contextFuncType)
     {
+        SLANG_ASSERT(contextFuncType);
         SLANG_UNUSED(key);
 
         List<IRType*>& extraParamTypes = *module->getContainerPool().getList<IRType>();
         extraParamTypes.add((IRType*)makeTagType(tableSet));
 
-        auto innerFuncType = getEffectiveFuncTypeForSet(resultFuncSet);
+        auto innerFuncType = getEffectiveFuncTypeForSet(resultFuncSet, contextFuncType);
         List<IRType*>& allParamTypes = *module->getContainerPool().getList<IRType>();
         allParamTypes.addRange(extraParamTypes);
         for (auto paramType : innerFuncType->getParamTypes())
@@ -4842,9 +5129,9 @@ struct TypeFlowSpecializationContext
     // Get an effective func type to use for the callee.
     // The callee may be a set, in which case, this returns a union-ed functype.
     //
-    IRFuncType* getEffectiveFuncTypeForSet(IRFuncSet* calleeSet)
+    IRFuncType* getEffectiveFuncTypeForSet(IRFuncSet* calleeSet, IRFuncType* contextFuncType)
     {
-        // The effective func type for a callee is calculated as follows:
+        // The effective func type for a callee set is calculated as follows:
         //
         // (i) we build up the effective parameter types for the callee
         //     by taking the union of each parameter type
@@ -4861,6 +5148,8 @@ struct TypeFlowSpecializationContext
         //        table-set argument, a tag is required as input.
         //
 
+        SLANG_ASSERT(contextFuncType);
+
         if (calleeSet->isUnbounded())
         {
             IRUnboundedFuncElement* unboundedFuncElement =
@@ -4873,57 +5162,91 @@ struct TypeFlowSpecializationContext
         List<IRType*>& paramTypes = *module->getContainerPool().getList<IRType>();
         IRType* resultType = nullptr;
 
-        auto updateParamType = [&](Index index, IRType* paramType) -> IRType*
+        List<IRInst*>& calleesToProcess = *module->getContainerPool().getList<IRInst>();
+        forEachInSet(module, calleeSet, [&](IRInst* func) { calleesToProcess.add(func); });
+
+        // Helper to get the context base type for a given parameter index.
+        auto getContextBaseType = [&](Index index) -> IRType*
         {
+            if ((UInt)index < contextFuncType->getParamCount())
+            {
+                auto [ctxDir, ctxBase] =
+                    splitParameterDirectionAndType(contextFuncType->getParamType((UInt)index));
+                SLANG_UNUSED(ctxDir);
+                return ctxBase;
+            }
+            return nullptr;
+        };
+
+        auto updateParamType = [&](Index index, IRInst* paramInfo) -> IRType*
+        {
+            auto contextParamType = contextFuncType->getParamType((UInt)index);
+
             if (paramTypes.getCount() <= index)
             {
                 // If this index hasn't been seen yet, expand the buffer and initialize
                 // the type.
                 //
                 paramTypes.growToCount(index + 1);
-                paramTypes[index] = paramType;
-                return paramType;
+                paramTypes[index] = nullptr;
             }
-            else
+
             {
-                // Otherwise, update the existing type
-                auto [currentDirection, currentType] =
-                    splitParameterDirectionAndType(paramTypes[index]);
-                auto [newDirection, newType] = splitParameterDirectionAndType(paramType);
-                auto updatedType = updateType(currentType, newType);
-                SLANG_ASSERT(currentDirection == newDirection);
-                paramTypes[index] = fromDirectionAndType(&builder, currentDirection, updatedType);
+                // Then, update the existing type using context-aware union.
+                auto [contextDirection, contextBaseType] =
+                    splitParameterDirectionAndType(contextParamType);
+                auto [newDirection, newType] = splitParameterDirectionAndType((IRType*)paramInfo);
+
+                IRType* currentBaseType = nullptr;
+                if (paramTypes[index] != nullptr)
+                {
+                    auto [_, _currentBaseType] = splitParameterDirectionAndType(paramTypes[index]);
+                    currentBaseType = _currentBaseType;
+                }
+
+                auto updatedType = updateType(contextBaseType, currentBaseType, newType);
+                SLANG_ASSERT(contextDirection == newDirection);
+                paramTypes[index] = fromDirectionAndType(&builder, contextDirection, updatedType);
                 return updatedType;
             }
         };
 
-        List<IRInst*>& calleesToProcess = *module->getContainerPool().getList<IRInst>();
-        forEachInSet(module, calleeSet, [&](IRInst* func) { calleesToProcess.add(func); });
+        IRType* contextResultType = contextFuncType->getResultType();
 
         for (auto context : calleesToProcess)
         {
-            auto paramEffectiveTypes = getEffectiveParamTypes(context);
-            auto paramDirections = getParamDirections(context);
+            auto paramInfos = getParamInfos(context, maybeExpandFuncType(contextFuncType));
 
-            for (Index i = 0; i < paramEffectiveTypes.getCount(); i++)
-                updateParamType(i, getLoweredType(paramEffectiveTypes[i]));
+            for (Index i = 0; i < paramInfos.getCount(); i++)
+                updateParamType(i, paramInfos[i]);
 
-            auto returnType = getFuncReturnInfo(context);
-            if (auto newResultType = getLoweredType(returnType))
+            if (auto resultInfo = getFuncReturnInfo(context))
             {
-                resultType = updateType(resultType, newResultType);
+                resultType = updateType(contextResultType, resultType, (IRType*)resultInfo);
             }
             else if (auto funcType = as<IRFuncType>(context->getDataType()))
             {
                 SLANG_ASSERT(isGlobalInst(funcType->getResultType()));
-                resultType = updateType(resultType, funcType->getResultType());
+                resultType = updateType(
+                    contextResultType,
+                    resultType,
+                    (IRType*)makeInfoForConcreteType(
+                        module,
+                        funcType->getResultType(),
+                        contextResultType));
             }
             else if (auto boundFuncContext = as<IRFuncWithBindings>(context))
             {
                 auto baseFuncForType = getContextFunc(boundFuncContext);
                 auto funcType2 = cast<IRFuncType>(baseFuncForType->getDataType());
                 SLANG_ASSERT(isGlobalInst(funcType2->getResultType()));
-                resultType = updateType(resultType, funcType2->getResultType());
+                resultType = updateType(
+                    contextResultType,
+                    resultType,
+                    (IRType*)makeInfoForConcreteType(
+                        module,
+                        funcType2->getResultType(),
+                        contextResultType));
             }
             else
             {
@@ -4932,6 +5255,17 @@ struct TypeFlowSpecializationContext
         }
 
         module->getContainerPool().free(&calleesToProcess);
+
+        // Normalize infos into types.
+        for (Index i = 0; i < paramTypes.getCount(); i++)
+        {
+            if (auto lowered = getLoweredType(paramTypes[i]))
+                paramTypes[i] = lowered;
+        }
+
+        if (auto lowered = getLoweredType(resultType))
+            resultType = lowered;
+
 
         //
         // Add in extra parameter types for a call to a dynamic generic callee
@@ -4968,11 +5302,67 @@ struct TypeFlowSpecializationContext
         return resultFuncType;
     }
 
+    // Get the effective func type for a single callee (func, specialize, or funcWithBindings).
+    // This directly reads the parameter and return info without any union logic,
+    // since there is only one callee.
+    //
     IRFuncType* getEffectiveFuncType(IRInst* callee)
     {
         IRBuilder builder(module);
-        return getEffectiveFuncTypeForSet(
-            cast<IRFuncSet>(builder.getSingletonSet(kIROp_FuncSet, callee)));
+
+        auto paramEffectiveTypes = getEffectiveParamTypes(callee);
+
+        List<IRType*>& paramTypes = *module->getContainerPool().getList<IRType>();
+        for (auto paramType : paramEffectiveTypes)
+        {
+            if (auto lowered = getLoweredType(paramType))
+                paramTypes.add(lowered);
+            else
+                paramTypes.add(paramType);
+        }
+
+        // Determine the result type.
+        IRType* resultType = nullptr;
+        auto returnInfo = getFuncReturnInfo(callee);
+        if (auto loweredResult = getLoweredType(returnInfo))
+        {
+            resultType = loweredResult;
+        }
+        else if (auto funcType = as<IRFuncType>(callee->getDataType()))
+        {
+            resultType = funcType->getResultType();
+        }
+        else if (auto boundFunc = as<IRFuncWithBindings>(callee))
+        {
+            auto baseFunc = getContextFunc(boundFunc);
+            resultType = cast<IRFuncType>(baseFunc->getDataType())->getResultType();
+        }
+        else
+        {
+            SLANG_UNEXPECTED("Cannot determine result type for callee");
+        }
+
+        // Handle set-specialized generics: add tag types for dynamic WitnessTableSet args.
+        List<IRType*>& extraParamTypes = *module->getContainerPool().getList<IRType>();
+        if (isSetSpecializedGeneric(callee))
+        {
+            auto specializeInst = as<IRSpecialize>(callee);
+            for (UIndex i = 0; i < specializeInst->getArgCount(); i++)
+                if (auto tableSet = as<IRWitnessTableSet>(specializeInst->getArg(i)))
+                    extraParamTypes.add((IRType*)makeTagType(tableSet));
+        }
+
+        List<IRType*>& allParamTypes = *module->getContainerPool().getList<IRType>();
+        allParamTypes.addRange(extraParamTypes);
+        allParamTypes.addRange(paramTypes);
+
+        auto resultFuncType = builder.getFuncType(allParamTypes, resultType);
+
+        module->getContainerPool().free(&paramTypes);
+        module->getContainerPool().free(&extraParamTypes);
+        module->getContainerPool().free(&allParamTypes);
+
+        return resultFuncType;
     }
 
     // Helper function for specializing calls.
@@ -5312,10 +5702,16 @@ struct TypeFlowSpecializationContext
                         cast<IRSetTagType>(tableTag->getDataType())->getSet());
                     IRBuilder builder(module);
 
+                    // Use the callee's declared func type recorded during analysis.
+                    auto contextFuncTypePtr =
+                        this->callSiteFuncType.tryGetValue(InstWithContext(context, inst));
+                    SLANG_ASSERT(contextFuncTypePtr);
+
                     effectiveFuncType = getEffectiveFuncTypeForDispatcher(
                         tableSet,
                         lookupKey,
-                        cast<IRFuncSet>(calleeSet));
+                        cast<IRFuncSet>(calleeSet),
+                        *contextFuncTypePtr);
 
                     // Add a binding slot for each argument of the call.
                     // Note: We won't use the effective func type since that is for the dispatcher,
@@ -5399,10 +5795,16 @@ struct TypeFlowSpecializationContext
                         }
                     }
 
+                    // Use the callee's declared func type recorded during analysis.
+                    auto contextFuncTypePtr =
+                        this->callSiteFuncType.tryGetValue(InstWithContext(context, inst));
+                    SLANG_ASSERT(contextFuncTypePtr);
+
                     effectiveFuncType = getEffectiveFuncTypeForDispatcher(
                         tableSet,
                         lookupKey,
-                        cast<IRFuncSet>(calleeSet));
+                        cast<IRFuncSet>(calleeSet),
+                        *contextFuncTypePtr);
 
                     List<IRInst*> emptyBindings;
                     callee = getDispatcher(
@@ -6764,11 +7166,24 @@ struct TypeFlowSpecializationContext
     //
     Dictionary<InstWithContext, IRInst*> callSiteInfo;
 
+    // The declared func type of the callee at each call site, recorded during analysis
+    // before the callee's type is replaced by tag/set types during specialization.
+    // Used as the context type for structural union operations when computing effective
+    // func types for dispatch.
+    //
+    Dictionary<InstWithContext, IRFuncType*> callSiteFuncType;
+
     // Incoming edge counts for each callee.
     Dictionary<IRInst*, Int> calleeRefCounts;
 
     // Translation context.
     TranslationContext translationContext;
+
+    // Unique definitions (independent of bindings/specializations)
+    // Used when applying simplifications as definitions are generated, to avoid
+    // re-processing the same definition.
+    //
+    HashSet<IRFunc*> uniqueDefs;
 };
 
 // Main entry point

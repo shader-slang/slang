@@ -176,8 +176,26 @@ local insts = {
 						BackwardContextFromLegacyBwdDiffFunc = {
 							operands = { { "func" }, {"legacyBwdDiffFunc"} }
 						}
-					}
-				}
+					},
+					{
+						BackwardDiffMinimalContextType = {
+							struct_name = "BackwardDiffMinimalContextType",
+							operands = { { "func" } }
+						}
+					},
+					{
+						TrivialBackwardDiffMinimalContextType = {
+							struct_name = "TrivialBackwardDiffMinimalContextType",
+							operands = { { "func" } }
+						}
+					},
+					{
+						BackwardMinimalContextFromLegacyBwdDiffFunc = {
+							struct_name = "BackwardMinimalContextFromLegacyBwdDiffFunc",
+							operands = { { "func" }, {"legacyBwdDiffFunc"} }
+				  		}
+					},
+				},
 			},
 
 			{ ForwardDiffFuncType = { hoistable = true } },
@@ -185,6 +203,7 @@ local insts = {
 			{ ApplyForBwdFuncType = { hoistable = true } },
 			{ FuncResultType = { hoistable = true } },
 			{ BwdCallableFuncType = { hoistable = true } },
+			{ RematFuncType = { hoistable = true } },
 
 			{
 				TensorView = {
@@ -1234,6 +1253,20 @@ local insts = {
 	--     dst[ii] = src[idx[ii]];
 	
 	{ swizzledStore = { operands = { { "dest" }, { "source" } }, min_operands = 2 } },
+	-- Store to a matrix with a swizzle
+	--
+	-- matrixSwizzleStore %dst %src %row0 %col0 %row1 %col1 ...
+	--
+	-- where:
+	-- - `dst` is a pointer to a matrix<T,R,C>
+	-- - `src` is a scalar T or vector<T,M>
+	-- - pairs of (row_i, col_i) are literal integers identifying matrix elements
+	--
+	-- The semantics of the op is:
+	--
+	--   for(ii : 0 ... M-1 )
+	--     dst[row_ii][col_ii] = src[ii];  (or src if scalar)
+	{ matrixSwizzleStore = { operands = { { "dest" }, { "source" } }, min_operands = 2 } },
 	-- Transposed operation of MakeVectorFromScalar
 	{ SumVectorElements = { min_operands = 1 } },
 	-- Transposed operation of MakeMatrixFromScalar
@@ -2232,6 +2265,7 @@ local insts = {
 			},
 			{ loopCounterDecoration = {} },
 			{ loopCounterUpdateDecoration = {} },
+			{ ParamsContextDecoration = { operands = {"value"} } },
 			{
 				AutodiffInstDecoration = {
 					-- Auto-diff inst decorations
@@ -2269,7 +2303,7 @@ local insts = {
 					-- Used by the auto-diff pass to mark insts whose result is stored
 					-- in an intermediary struct for reuse in backward propagation phase.
 					struct_name = "PrimalValueStructKeyDecoration",
-					operands = { { "structKey", "IRStructKey" } },
+					operands = { { "firstKey", "IRStructKey" }, { "secondKey", "IRStructKey" } },
 				},
 			},
 			{
@@ -2534,12 +2568,14 @@ local insts = {
 		{ TrivialForwardDifferentiate = { min_operands = 1 } },
 
 		{ BackwardDifferentiatePrimal = { min_operands = 1 } },
+		{ BackwardRemat = { min_operands = 1 } },
 		{ BackwardDifferentiatePropagate = { min_operands = 1 } },
 		{ BackwardContextGetPrimalVal = { min_operands = 1 } },
 
 		{ TrivialBackwardDifferentiate = { min_operands = 1 } },
 
 		{ TrivialBackwardDifferentiatePrimal = { min_operands = 1 } },
+		{ TrivialBackwardRemat = { min_operands = 1 } },
 		{ TrivialBackwardDifferentiatePropagate = { min_operands = 1 } },
 		{ TrivialBackwardContextGetPrimalVal = { min_operands = 1 } },
 
@@ -2551,6 +2587,7 @@ local insts = {
 		{ LegacyBackwardDifferentiate = { min_operands = 3 } },
 		
 		{ BackwardPrimalFromLegacyBwdDiffFunc = { min_operands = 2 } },
+		{ BackwardRematFromLegacyBwdDiffFunc = { min_operands = 2 } },
 		{ BackwardContextGetValFromLegacyBwdDiffFunc = { min_operands = 2 } },
 		{ BackwardPropagateFromLegacyBwdDiffFunc = { min_operands = 2 } },
 

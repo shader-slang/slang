@@ -9,9 +9,7 @@ RWStructuredBuffer<float> outputBuffer;
 typedef DifferentialPair<float> dpfloat;
 typedef float.Differential dfloat;
 
-//CHK:reverse-control-flow-1.slang({{[0-9]+}}): note: checkpointing context of 4 bytes associated with function: 'test_single_branch'
 [BackwardDifferentiable]
-//CHK:reverse-control-flow-1.slang([[# @LINE + 1]]): note: 4 bytes (float) used to checkpoint the following item:
 float test_single_branch(float y)
 {
     float o;
@@ -45,4 +43,4 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     }
 }
 
-//CHK-NOT:reverse-control-flow-1.slang({{[0-9]+}}): note
+//CHK: note: no checkpoint contexts to report

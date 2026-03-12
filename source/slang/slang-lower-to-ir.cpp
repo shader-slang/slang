@@ -874,6 +874,8 @@ IRType* lowerType(IRGenContext* context, Type* type);
 
 void lowerAssociatedVals(IRGenContext* context, Val* val, IRInst* irVal);
 
+void lowerRelatedTypes(IRGenContext* context, Val* val, IRInst* irVal);
+
 static IRType* lowerType(IRGenContext* context, QualType const& type)
 {
     return lowerType(context, type.type);
@@ -2582,6 +2584,7 @@ IRType* lowerType(IRGenContext* context, Type* type)
     IRType* loweredType = (IRType*)getSimpleVal(context, visitor.dispatchType(type));
 
     lowerAssociatedVals(context, type, loweredType);
+    lowerRelatedTypes(context, type, loweredType);
 
     return loweredType;
 }
@@ -3263,6 +3266,17 @@ ParamPassingMode getDeclaredParamPassingModeForImplicitThisParam(
         if (as<ClassDecl>(outerAggTypeDecl))
         {
             return ParamPassingMode::In;
+        }
+    }
+
+    if (auto outerExtensionDecl = getParentExtensionDecl(declWithImplicitThisParam))
+    {
+        if (as<CallableDecl>(declWithImplicitThisParam) &&
+            isDeclRefTypeOf<CallableDecl>(outerExtensionDecl->targetType))
+        {
+            return getDeclaredParamPassingModeForImplicitThisParam(
+                as<DeclRefType>(outerExtensionDecl->targetType)->getDeclRef().getDecl(),
+                defaultModeFromContext);
         }
     }
 
@@ -4381,6 +4395,25 @@ void lowerAssociatedVals(IRGenContext* context, Val* val, IRInst* irVal)
     }
 }
 
+void lowerRelatedTypes(IRGenContext* context, Val* val, IRInst* irVal)
+{
+    // For some types, we may need information about additional types that are
+    // related to it, but may never appear in the front-end checking.
+    //
+    // E.g. matrix swizzles produce vector row types during IR lowering, but the vector
+    // row type is not actually checked since it is not the result of any term or expression
+    //
+    // Here we invoke lowerType for any such related types to force their associated values
+    // to be lowered.
+    //
+
+    if (as<MatrixExpressionType>(val))
+    {
+        auto matrixType = as<MatrixExpressionType>(val);
+        auto rowVectorType = matrixType->getRowType();
+        lowerType(context, rowVectorType);
+    }
+}
 
 template<typename Derived>
 struct ExprLoweringContext
@@ -4846,12 +4879,26 @@ struct ExprLoweringContext
                             baseExpr = memberExpr->baseExpression;
                         }
                     }
+                    else if (auto staticMemberExpr = as<StaticMemberExpr>(baseExpr))
+                    {
+                        // TODO: We really shouldn't hit this case.. for some reason
+                        // it's possible to see a regular member expr of static member expr of
+                        // something
+                        //
+                        if (staticMemberExpr->declRef.template as<CallableDecl>())
+                        {
+                            baseExpr = nullptr;
+                        }
+                    }
 
-                    auto thisParamMode = getActualParamPassingModeForImplicitThisParam(
-                        funcDeclRef.getDecl(),
-                        thisType);
+                    if (baseExpr)
+                    {
+                        auto thisParamMode = getActualParamPassingModeForImplicitThisParam(
+                            funcDeclRef.getDecl(),
+                            thisType);
 
-                    addCallArgsForParam(context, thisParamMode, baseExpr, &irArgs, &argFixups);
+                        addCallArgsForParam(context, thisParamMode, baseExpr, &irArgs, &argFixups);
+                    }
                 }
             }
 
@@ -6855,9 +6902,12 @@ struct RValueExprLoweringVisitor : public ExprLoweringVisitorBase<RValueExprLowe
             // Second index expression
             irExtracts[ii] = getSimpleVal(context, subscriptValue(subscript2, irExtract1, index2));
         }
-        auto irVector = builder->emitMakeVector(resultType, elementCount, irExtracts);
 
-        return LoweredValInfo::simple(irVector);
+        if (elementCount > 1)
+            return LoweredValInfo::simple(
+                builder->emitMakeVector(resultType, elementCount, irExtracts));
+        else
+            return LoweredValInfo::simple(irExtracts[0]);
     }
 
     // A swizzle in an r-value context can save time by just
@@ -8877,56 +8927,26 @@ top:
 
             IRInst* irRightVal = getSimpleVal(context, right);
 
-            const UInt maxRowIndex = 4;
-            const UInt maxCols = 4; // swizzleInfo->elementCount;
-
-            // Sort the swizzle elements according to the row to which they
-            // write.
-            // Using row-major terminology
-
-            // The number of element writes in each row
-            UInt rowSizes[maxRowIndex] = {};
-            // The columns being written to in each row
-            uint32_t rowWrites[maxRowIndex][maxCols];
-            // The RHS element indices being written in each row
-            UInt rowIndices[maxRowIndex][maxCols];
-            for (UInt i = 0; i < swizzleInfo->elementCount; ++i)
-            {
-                const auto& c = swizzleInfo->elementCoords[i];
-                auto& rowSize = rowSizes[c.row];
-                rowWrites[c.row][rowSize] = (uint32_t)c.col;
-                rowIndices[c.row][rowSize] = i;
-                ++rowSize;
-            }
-
-            const auto rElemType = composeGetters<IRType>(
-                irRightVal,
-                &IRInst::getDataType,
-                &IRVectorType::getElementType);
-
             switch (loweredBase.flavor)
             {
             case LoweredValInfo::Flavor::Ptr:
                 {
-                    // Matrix swizzle writes are implemented as several vector swizzle writes
-                    for (UInt r = 0; r < maxRowIndex; ++r)
+                    // Emit a MatrixSwizzleStore that keeps the full swizzle pattern
+                    // as a single operation. This will be lowered into per-row vector
+                    // swizzle stores after autodiff passes are complete.
+                    uint32_t rows[4];
+                    uint32_t cols[4];
+                    for (UInt i = 0; i < swizzleInfo->elementCount; ++i)
                     {
-                        // Skip if we have nothing in this row
-                        if (rowSizes[r] == 0)
-                        {
-                            continue;
-                        }
-                        const auto rowAddr = builder->emitElementAddress(loweredBase.val, r);
-                        // Only select the RHS elements if it's a vector
-                        const auto rSwizzled =
-                            rElemType ? builder->emitSwizzle(
-                                            builder->getVectorType(rElemType, rowSizes[r]),
-                                            irRightVal,
-                                            rowSizes[r],
-                                            rowIndices[r])
-                                      : irRightVal;
-                        swizzledStore(rowAddr, rSwizzled, rowSizes[r], rowWrites[r]);
+                        rows[i] = (uint32_t)swizzleInfo->elementCoords[i].row;
+                        cols[i] = (uint32_t)swizzleInfo->elementCoords[i].col;
                     }
+                    builder->emitMatrixSwizzleStore(
+                        loweredBase.val,
+                        irRightVal,
+                        swizzleInfo->elementCount,
+                        rows,
+                        cols);
                 }
                 break;
             default:

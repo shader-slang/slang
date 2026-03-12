@@ -273,6 +273,7 @@ static InstructionUsageType getInstructionUsageType(IRInst* user, IRInst* inst)
     // These instructions will store data...
     case kIROp_Store:
     case kIROp_SwizzledStore:
+    case kIROp_MatrixSwizzleStore:
     case kIROp_SPIRVAsm:
     case kIROp_AtomicStore:
         return Store;

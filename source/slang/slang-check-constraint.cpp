@@ -927,6 +927,17 @@ bool SemanticsVisitor::TryUnifyVals(
         }
     }
 
+    if (auto fstWit = as<TypeCoercionWitness>(fst))
+    {
+        if (auto sndWit = as<TypeCoercionWitness>(snd))
+        {
+            // Ignore unification for coercion constraints for now,
+            // they will be checked later anyway.
+            //
+            return true;
+        }
+    }
+
     if (as<TypeEqualityWitness>(fst) && as<DeclaredSubtypeWitness>(snd))
     {
         if (as<DeclaredSubtypeWitness>(snd)->isEquality())

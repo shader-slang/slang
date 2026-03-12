@@ -1785,6 +1785,14 @@ void SemanticsVisitor::maybeRegisterDifferentiableTypeImplRecursive(ASTBuilder* 
         // Fall through to register the array type itself.
     }
 
+    if (auto matrixType = as<MatrixExpressionType>(type))
+    {
+        // Matrix types are lowered using sub-vector (row) types, so we need to
+        // register the row vector type as well.
+        maybeRegisterDifferentiableTypeImplRecursive(builder, matrixType->getRowType());
+        // Fall through to register the matrix type itself.
+    }
+
     if (auto typePack = as<ConcreteTypePack>(type))
     {
         for (Index i = 0; i < typePack->getTypeCount(); i++)
@@ -2874,6 +2882,13 @@ void registerAssociatedMethods(SemanticsVisitor* context, DeclRef<Decl> declRef)
                 declRef.declRefBase,
                 context->getName("val"),
                 AnnotationKind::BackwardDerivativeContextGetVal);
+
+            maybeRegisterVal(
+                context,
+                funcAsType,
+                declRef.declRefBase,
+                context->getName("remat"),
+                AnnotationKind::BackwardDerivativeContextRemat);
         }
     }
 }

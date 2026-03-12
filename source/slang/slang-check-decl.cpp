@@ -3142,60 +3142,102 @@ bool SemanticsVisitor::trySynthesizeDiffContextTypeRequirementWitness(
 
     auto targetFuncDeclRef =
         as<DeclRefType>(context->conformingType)->getDeclRef().as<FunctionDeclBase>();
-    auto synStructDecl = getCurrentASTBuilder()->create<SynthesizedStructDecl>();
 
     // We currently support this type of synthesis only for extensions.
     SLANG_ASSERT(as<ExtensionDecl>(context->parentDecl));
-    SLANG_ASSERT(requirementKind == BuiltinRequirementKind::BwdCallableContextType);
-    synStructDecl->irOp = kIROp_BackwardDiffIntermediateContextType;
 
-    // Put the synthesized struct in the same scope as the requirement.
-    // This is technically improper since struct types shouldn't be defined
-    // inside extensions (or other AggTypeDecl) in this way
-    //
-    synStructDecl->parentDecl = context->parentDecl;
-    synStructDecl->ownedScope = m_astBuilder->create<Scope>();
-
-    // Now, we'll "lift" the declaration out of the parent declarations,
-    // and in the process, clone any necessary generic parents
-    //
-    SubstitutionSet substSet;
-    auto newSynStructDeclRef = liftDeclFromGenericContainers(synStructDecl, substSet);
-
-    synStructDecl->nameAndLoc.name = getNamePool()->getName(
-        "$__syn_BwdCallable_" + getMangledName(getCurrentASTBuilder(), targetFuncDeclRef));
-
-    // Substitute the target funcDeclRef to reference it from the
-    // new generic context (if any)
-    //
-    synStructDecl->operands.add(
-        substituteDeclRef(substSet, getCurrentASTBuilder(), targetFuncDeclRef)
-            .as<FunctionDeclBase>());
-
-    // Insert an InheritanceDecl for SynStruct : IBwdCallable<Self>
-    auto ctxTypeInheritanceDecl = getCurrentASTBuilder()->create<InheritanceDecl>();
-    ctxTypeInheritanceDecl->parentDecl = synStructDecl;
-
-    ctxTypeInheritanceDecl->base.type = getBwdCallableBaseType(
-        DeclRefType::create(getCurrentASTBuilder(), as<DeclRefBase>(synStructDecl->operands[0])));
-
-    synStructDecl->addDirectMemberDecl(ctxTypeInheritanceDecl);
-
-    checkAggTypeConformance(synStructDecl);
-
-    witnessTable->add(requirementDeclRef.getDecl(), RequirementWitness(newSynStructDeclRef));
-
-    if (!doesTypeSatisfyConstraintRequirements(
-            DeclRefType::create(getCurrentASTBuilder(), newSynStructDeclRef),
-            requirementDeclRef,
-            witnessTable))
+    if (requirementKind == BuiltinRequirementKind::MinimalContextType)
     {
-        // If the synthesized type does not satisfy the requirement, we will remove it from the
-        // witness table.
-        witnessTable->m_requirementDictionary.remove(requirementDeclRef.getDecl());
-        return false;
+        // For MinimalContextType, synthesize a simple struct without any conformances.
+        // Initially this will hold the same data as BwdCallable; the backward diff translation
+        // pass will later determine exactly what goes in the minimal context.
+        auto synStructDecl = getCurrentASTBuilder()->create<SynthesizedStructDecl>();
+        synStructDecl->irOp = kIROp_BackwardDiffMinimalContextType;
+
+        synStructDecl->parentDecl = context->parentDecl;
+        synStructDecl->ownedScope = m_astBuilder->create<Scope>();
+
+        SubstitutionSet substSet;
+        auto newSynStructDeclRef = liftDeclFromGenericContainers(synStructDecl, substSet);
+
+        synStructDecl->nameAndLoc.name = getNamePool()->getName(
+            "$__syn_MinimalContext_" + getMangledName(getCurrentASTBuilder(), targetFuncDeclRef));
+
+        synStructDecl->operands.add(
+            substituteDeclRef(substSet, getCurrentASTBuilder(), targetFuncDeclRef)
+                .as<FunctionDeclBase>());
+
+        // No conformance needed for MinimalContext (unlike BwdCallable which needs IBwdCallable).
+
+        witnessTable->add(requirementDeclRef.getDecl(), RequirementWitness(newSynStructDeclRef));
+
+        if (!doesTypeSatisfyConstraintRequirements(
+                DeclRefType::create(getCurrentASTBuilder(), newSynStructDeclRef),
+                requirementDeclRef,
+                witnessTable))
+        {
+            witnessTable->m_requirementDictionary.remove(requirementDeclRef.getDecl());
+            return false;
+        }
+        return true;
     }
-    return true;
+    else if (requirementKind == BuiltinRequirementKind::BwdCallableContextType)
+    {
+        auto synStructDecl = getCurrentASTBuilder()->create<SynthesizedStructDecl>();
+
+        SLANG_ASSERT(requirementKind == BuiltinRequirementKind::BwdCallableContextType);
+        synStructDecl->irOp = kIROp_BackwardDiffIntermediateContextType;
+
+        // Put the synthesized struct in the same scope as the requirement.
+        // This is technically improper since struct types shouldn't be defined
+        // inside extensions (or other AggTypeDecl) in this way
+        //
+        synStructDecl->parentDecl = context->parentDecl;
+        synStructDecl->ownedScope = m_astBuilder->create<Scope>();
+
+        // Now, we'll "lift" the declaration out of the parent declarations,
+        // and in the process, clone any necessary generic parents
+        //
+        SubstitutionSet substSet;
+        auto newSynStructDeclRef = liftDeclFromGenericContainers(synStructDecl, substSet);
+
+        synStructDecl->nameAndLoc.name = getNamePool()->getName(
+            "$__syn_BwdCallable_" + getMangledName(getCurrentASTBuilder(), targetFuncDeclRef));
+
+        // Substitute the target funcDeclRef to reference it from the
+        // new generic context (if any)
+        //
+        synStructDecl->operands.add(
+            substituteDeclRef(substSet, getCurrentASTBuilder(), targetFuncDeclRef)
+                .as<FunctionDeclBase>());
+
+        // Insert an InheritanceDecl for SynStruct : IBwdCallable<Self>
+        auto ctxTypeInheritanceDecl = getCurrentASTBuilder()->create<InheritanceDecl>();
+        ctxTypeInheritanceDecl->parentDecl = synStructDecl;
+
+        ctxTypeInheritanceDecl->base.type = getBwdCallableBaseType(
+            DeclRefType::create(
+                getCurrentASTBuilder(),
+                as<DeclRefBase>(synStructDecl->operands[0])));
+
+        synStructDecl->addDirectMemberDecl(ctxTypeInheritanceDecl);
+
+        checkAggTypeConformance(synStructDecl);
+
+        witnessTable->add(requirementDeclRef.getDecl(), RequirementWitness(newSynStructDeclRef));
+
+        if (!doesTypeSatisfyConstraintRequirements(
+                DeclRefType::create(getCurrentASTBuilder(), newSynStructDeclRef),
+                requirementDeclRef,
+                witnessTable))
+        {
+            // If the synthesized type does not satisfy the requirement, we will remove it from the
+            // witness table.
+            witnessTable->m_requirementDictionary.remove(requirementDeclRef.getDecl());
+            return false;
+        }
+        return true;
+    }
 }
 
 bool SemanticsVisitor::trySynthesizeDifferentialAssociatedTypeRequirementWitness(
@@ -5500,6 +5542,43 @@ DeclRef<Decl> SemanticsVisitor::liftDeclFromGenericContainers(
                     getCurrentASTBuilder(),
                     SubstitutionSet(_partiallySpecializedRequiredGenericDeclRef)));
             }
+            else if (auto coercionDecl = as<TypeCoercionConstraintDecl>(member))
+            {
+                auto synCoercionDecl = m_astBuilder->create<TypeCoercionConstraintDecl>();
+                synCoercionDecl->nameAndLoc = coercionDecl->getNameAndLoc();
+                synCoercionDecl->parentDecl = synGenericDecl;
+                synCoercionDecl->whereTokenLoc = coercionDecl->whereTokenLoc;
+                if (coercionDecl->findModifier<ImplicitConversionModifier>())
+                {
+                    addModifier(
+                        synCoercionDecl,
+                        m_astBuilder->create<ImplicitConversionModifier>());
+                }
+
+                synCoercionDecl->fromType = TypeExp((Type*)coercionDecl->fromType.type->substitute(
+                    m_astBuilder,
+                    SubstitutionSet(currentDeclRef)));
+                synCoercionDecl->toType = TypeExp((Type*)coercionDecl->toType.type->substitute(
+                    m_astBuilder,
+                    SubstitutionSet(currentDeclRef)));
+                synGenericDecl->addDirectMemberDecl(synCoercionDecl);
+                mapSynToOrigTypeParams.add(synCoercionDecl, coercionDecl);
+
+                // Update out decl-ref after adding each constraint, since future constraints
+                // even within the same generic decl may depend on previous ones.
+                //
+                m_astBuilder->m_cachedGenericDefaultArgs.remove(synGenericDecl);
+                synGenericDecl->_cachedArgsForDefaultSubstitution.clear();
+                auto _partialDefaultArgs =
+                    getDefaultSubstitutionArgs(m_astBuilder, this, synGenericDecl);
+                DeclRef<Decl> _partiallySpecializedRequiredGenericDeclRef =
+                    m_astBuilder->getGenericAppDeclRef(
+                        genericDecl,
+                        _partialDefaultArgs.getArrayView());
+                currentDeclRef = as<DeclRefBase>(currentDeclRef->substitute(
+                    getCurrentASTBuilder(),
+                    SubstitutionSet(_partiallySpecializedRequiredGenericDeclRef)));
+            }
         }
 
         // Override generic pointer to point to the original generic container.
@@ -5679,6 +5758,28 @@ GenericDecl* SemanticsVisitor::synthesizeGenericSignatureForRequirementWitness(
             SubstitutionSet(partiallySpecializedRequiredGenericDeclRef)));
 
         synGenericDecl->addDirectMemberDecl(synConstraintDecl);
+    }
+
+    for (auto coercionDecl :
+         requiredMemberDeclRef.getDecl()->getDirectMemberDeclsOfType<TypeCoercionConstraintDecl>())
+    {
+        auto synCoercionDecl = m_astBuilder->create<TypeCoercionConstraintDecl>();
+        synCoercionDecl->nameAndLoc = coercionDecl->getNameAndLoc();
+        synCoercionDecl->parentDecl = synGenericDecl;
+        synCoercionDecl->whereTokenLoc = coercionDecl->whereTokenLoc;
+        if (coercionDecl->findModifier<ImplicitConversionModifier>())
+        {
+            addModifier(synCoercionDecl, m_astBuilder->create<ImplicitConversionModifier>());
+        }
+
+        synCoercionDecl->fromType = TypeExp((Type*)coercionDecl->fromType.type->substitute(
+            m_astBuilder,
+            SubstitutionSet(partiallySpecializedRequiredGenericDeclRef)));
+        synCoercionDecl->toType = TypeExp((Type*)coercionDecl->toType.type->substitute(
+            m_astBuilder,
+            SubstitutionSet(partiallySpecializedRequiredGenericDeclRef)));
+
+        synGenericDecl->addDirectMemberDecl(synCoercionDecl);
     }
 
     // Override generic pointer to point to the original generic container.
@@ -7083,6 +7184,7 @@ bool SemanticsVisitor::trySynthesizeRequirementWitness(
             case BuiltinRequirementKind::BwdApplyFunc:
             case BuiltinRequirementKind::BwdCallablePropFunc:
             case BuiltinRequirementKind::BwdCallableGetValFunc:
+            case BuiltinRequirementKind::BwdCallableRematFunc:
             case BuiltinRequirementKind::LegacyBackwardDerivativeFunc:
                 return trySynthesizeDiffFuncRequirementWitness(
                     context,
@@ -7140,6 +7242,7 @@ bool SemanticsVisitor::trySynthesizeRequirementWitness(
                     requiredAssocTypeDeclRef,
                     witnessTable);
             case BuiltinRequirementKind::BwdCallableContextType:
+            case BuiltinRequirementKind::MinimalContextType:
                 return trySynthesizeDiffContextTypeRequirementWitness(
                     context,
                     requiredAssocTypeDeclRef,
@@ -7525,6 +7628,20 @@ bool SemanticsVisitor::trySynthesizeDiffFuncRequirementWitness(
 
             auto applyBwdDeclRef = applyBwdLookupResult.item.declRef.as<FunctionDeclBase>();
 
+            // First, lookup the "remat" method.
+            LookupResult rematFuncLookupResult = lookUpMember(
+                m_astBuilder,
+                this,
+                getName("remat"),
+                declRefType,
+                getScope(extensionDecl));
+            rematFuncLookupResult = resolveOverloadedLookup(rematFuncLookupResult);
+
+            if (!rematFuncLookupResult.item.declRef) // Couldn't find a "remat", so fail early.
+                return false;
+
+            auto rematFuncDeclRef = rematFuncLookupResult.item.declRef.as<FunctionDeclBase>();
+
             // Next, lookup the "BwdCallable" type.
             LookupResult bwdCallableLookupResult = lookUpMember(
                 m_astBuilder,
@@ -7602,8 +7719,21 @@ bool SemanticsVisitor::trySynthesizeDiffFuncRequirementWitness(
             // function.
             synFunc->irOp = kIROp_LegacyBackwardDifferentiate;
             synFunc->operands.add(applyBwdDeclRef);
-            synFunc->operands.add(bwdCallableLookupResult.item.declRef);
+            synFunc->operands.add(rematFuncDeclRef);
             synFunc->operands.add(bwdPropFnDeclRef);
+            break;
+        }
+    case BuiltinRequirementKind::BwdCallableRematFunc:
+        {
+            auto extensionDecl = as<ExtensionDecl>(context->parentDecl);
+            if (!isDeclRefTypeOf<FunctionDeclBase>(extensionDecl->targetType))
+                return false;
+
+            auto declRefType = as<DeclRefType>(extensionDecl->targetType);
+            auto targetCallableDeclRef = declRefType->getDeclRef().as<FunctionDeclBase>();
+            SLANG_ASSERT(targetCallableDeclRef); // Expect a function-decl-base
+            synFunc->operands.add(targetCallableDeclRef);
+            synFunc->irOp = kIROp_BackwardRemat;
             break;
         }
     default:
@@ -10617,36 +10747,70 @@ List<Val*> getDefaultSubstitutionArgs(
     bool shouldCache = true;
 
     // create default substitution arguments for constraints
-    for (auto genericTypeConstraintDecl :
-         genericDecl->getDirectMemberDeclsOfType<GenericTypeConstraintDecl>())
+    for (auto decl : genericDecl->getDirectMemberDecls())
     {
-        if (semantics)
-            semantics->ensureDecl(genericTypeConstraintDecl, DeclCheckState::ReadyForReference);
-        auto constraintDeclRef = createDefaultSubstitutionsIfNeeded(
-                                     astBuilder,
-                                     semantics,
-                                     genericTypeConstraintDecl->getDefaultDeclRef())
-                                     .as<GenericTypeConstraintDecl>();
-        auto supType = getSup(astBuilder, constraintDeclRef);
-        if (!supType)
+        if (auto genericTypeConstraintDecl = as<GenericTypeConstraintDecl>(decl))
         {
-            args.add(astBuilder->getErrorType());
-            shouldCache = false;
-            continue;
+            if (semantics)
+                semantics->ensureDecl(genericTypeConstraintDecl, DeclCheckState::ReadyForReference);
+            auto constraintDeclRef = createDefaultSubstitutionsIfNeeded(
+                                         astBuilder,
+                                         semantics,
+                                         genericTypeConstraintDecl->getDefaultDeclRef())
+                                         .as<GenericTypeConstraintDecl>();
+            auto supType = getSup(astBuilder, constraintDeclRef);
+            if (!supType)
+            {
+                args.add(astBuilder->getErrorType());
+                shouldCache = false;
+                continue;
+            }
+            auto witness = astBuilder->getDeclaredSubtypeWitness(
+                getSub(astBuilder, constraintDeclRef),
+                getSup(astBuilder, constraintDeclRef),
+                constraintDeclRef);
+            // TODO: this is an ugly hack to prevent crashing.
+            // In early stages of compilation witness->sub and witness->sup may not be checked yet.
+            // When semanticVisitor is present we have used that to ensure the type is checked.
+            // However due to how the code is written we cannot guarantee semanticVisitor is always
+            // available here, and if we can't get the checked sup/sub type this subst is incomplete
+            // and should not be cached.
+            if (!witness->getSub())
+                shouldCache = false;
+            args.add(witness);
         }
-        auto witness = astBuilder->getDeclaredSubtypeWitness(
-            getSub(astBuilder, constraintDeclRef),
-            getSup(astBuilder, constraintDeclRef),
-            constraintDeclRef);
-        // TODO: this is an ugly hack to prevent crashing.
-        // In early stages of compilation witness->sub and witness->sup may not be checked yet.
-        // When semanticVisitor is present we have used that to ensure the type is checked.
-        // However due to how the code is written we cannot guarantee semanticVisitor is always
-        // available here, and if we can't get the checked sup/sub type this subst is incomplete
-        // and should not be cached.
-        if (!witness->getSub())
-            shouldCache = false;
-        args.add(witness);
+        else if (auto typeCoercionConstraintDecl = as<TypeCoercionConstraintDecl>(decl))
+        {
+            if (semantics)
+                semantics->ensureDecl(
+                    typeCoercionConstraintDecl,
+                    DeclCheckState::ReadyForReference);
+
+            auto constraintDeclRef = createDefaultSubstitutionsIfNeeded(
+                                         astBuilder,
+                                         semantics,
+                                         typeCoercionConstraintDecl->getDefaultDeclRef())
+                                         .as<TypeCoercionConstraintDecl>();
+
+            auto fromType = substituteType(
+                SubstitutionSet(constraintDeclRef),
+                astBuilder,
+                constraintDeclRef.getDecl()->fromType.type);
+            auto toType = substituteType(
+                SubstitutionSet(constraintDeclRef),
+                astBuilder,
+                constraintDeclRef.getDecl()->toType.type);
+
+            if (!fromType || !toType)
+            {
+                args.add(astBuilder->getErrorType());
+                shouldCache = false;
+                continue;
+            }
+
+            auto witness = astBuilder->getTypeCoercionWitness(fromType, toType, constraintDeclRef);
+            args.add(witness);
+        }
     }
 
     if (shouldCache)
@@ -12195,6 +12359,20 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
                         {getBwdCallableBaseType(funcAsTypeFromExtension)},
                         visibility);
 
+                    auto synMinimalContextStruct = addOrExtendSynthesizedStruct(
+                        this,
+                        bwdDiffExtension.getDecl(),
+                        getName("MinimalContext"),
+                        kIROp_BackwardDiffMinimalContextType,
+                        {funcAsTypeFromExtension->getDeclRefBase()},
+                        {},
+                        visibility);
+
+                    auto minimalCtxType =
+                        DeclRefType::create(getCurrentASTBuilder(), synMinimalContextStruct);
+                    auto fullCtxType =
+                        DeclRefType::create(getCurrentASTBuilder(), synContextStruct);
+
                     addSynthesizedFunc(
                         this,
                         bwdDiffExtension.getDecl(),
@@ -12204,7 +12382,21 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
                         getCalculatedDiffFuncType(
                             "ApplyForBwdFuncType",
                             funcAsTypeFromExtension,
-                            DeclRefType::create(getCurrentASTBuilder(), synContextStruct)),
+                            minimalCtxType),
+                        false,
+                        visibility);
+
+                    addSynthesizedFunc(
+                        this,
+                        bwdDiffExtension.getDecl(),
+                        getName("remat"),
+                        kIROp_BackwardRemat,
+                        {funcAsTypeFromExtension->getDeclRefBase()},
+                        getCalculatedDiffFuncType(
+                            "RematFuncType",
+                            funcAsTypeFromExtension,
+                            minimalCtxType,
+                            fullCtxType),
                         false,
                         visibility);
 
@@ -12248,6 +12440,20 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
                         {getBwdCallableBaseType(funcAsTypeFromExtension)},
                         visibility);
 
+                    auto synMinimalContextStruct = addOrExtendSynthesizedStruct(
+                        this,
+                        bwdDiffExtension.getDecl(),
+                        getName("MinimalContext"),
+                        kIROp_TrivialBackwardDiffMinimalContextType,
+                        {funcAsTypeFromExtension->getDeclRefBase()},
+                        {},
+                        visibility);
+
+                    auto minimalCtxType =
+                        DeclRefType::create(getCurrentASTBuilder(), synMinimalContextStruct);
+                    auto fullCtxType =
+                        DeclRefType::create(getCurrentASTBuilder(), synContextStruct);
+
                     addSynthesizedFunc(
                         this,
                         bwdDiffExtension.getDecl(),
@@ -12257,7 +12463,21 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
                         getCalculatedDiffFuncType(
                             "ApplyForBwdFuncType",
                             funcAsTypeFromExtension,
-                            DeclRefType::create(getCurrentASTBuilder(), synContextStruct)),
+                            minimalCtxType),
+                        false,
+                        visibility);
+
+                    addSynthesizedFunc(
+                        this,
+                        bwdDiffExtension.getDecl(),
+                        getName("remat"),
+                        kIROp_TrivialBackwardRemat,
+                        {funcAsTypeFromExtension->getDeclRefBase()},
+                        getCalculatedDiffFuncType(
+                            "RematFuncType",
+                            funcAsTypeFromExtension,
+                            minimalCtxType,
+                            fullCtxType),
                         false,
                         visibility);
 
@@ -15567,10 +15787,22 @@ static void translateBwdDerivativeAttributeToAD2(
         {visitor->getBwdCallableBaseType(funcAsTypeFromExtension)},
         visibility);
 
+    auto synMinimalContextStruct = addOrExtendSynthesizedStruct(
+        visitor,
+        bwdDiffExtension.getDecl(),
+        visitor->getName("MinimalContext"),
+        kIROp_BackwardMinimalContextFromLegacyBwdDiffFunc,
+        {substFuncAsTypeFromExtension->getDeclRefBase(), synBwdDiffFunc},
+        {},
+        visibility);
+
+    auto minimalCtxType = DeclRefType::create(getCurrentASTBuilder(), synMinimalContextStruct);
+    auto fullCtxType = DeclRefType::create(getCurrentASTBuilder(), synContextStruct);
+
     FuncType* applyBwdFuncType = visitor->getCalculatedDiffFuncType(
         "ApplyForBwdFuncType",
         funcAsTypeFromExtension,
-        DeclRefType::create(getCurrentASTBuilder(), synContextStruct));
+        minimalCtxType);
     addSynthesizedFunc(
         visitor,
         bwdDiffExtension.getDecl(),
@@ -15578,6 +15810,20 @@ static void translateBwdDerivativeAttributeToAD2(
         kIROp_BackwardPrimalFromLegacyBwdDiffFunc,
         {substFuncAsTypeFromExtension->getDeclRefBase(), synBwdDiffFunc},
         applyBwdFuncType,
+        false,
+        visibility);
+
+    addSynthesizedFunc(
+        visitor,
+        bwdDiffExtension.getDecl(),
+        visitor->getName("remat"),
+        kIROp_BackwardRematFromLegacyBwdDiffFunc,
+        {substFuncAsTypeFromExtension->getDeclRefBase(), synBwdDiffFunc},
+        visitor->getCalculatedDiffFuncType(
+            "RematFuncType",
+            funcAsTypeFromExtension,
+            minimalCtxType,
+            fullCtxType),
         false,
         visibility);
 }
@@ -15800,6 +16046,19 @@ static void checkDerivativeAttribute(
                     {visitor->getBwdCallableBaseType(funcAsTypeFromExtension)},
                     visibility);
 
+                auto synMinimalContextStruct = addOrExtendSynthesizedStruct(
+                    visitor,
+                    bwdDiffExtension.getDecl(),
+                    visitor->getName("MinimalContext"),
+                    kIROp_BackwardDiffMinimalContextType,
+                    {substFuncAsTypeFromExtension->getDeclRefBase()},
+                    {},
+                    visibility);
+
+                auto minimalCtxType =
+                    DeclRefType::create(getCurrentASTBuilder(), synMinimalContextStruct);
+                auto fullCtxType = DeclRefType::create(getCurrentASTBuilder(), synContextStruct);
+
                 addSynthesizedFunc(
                     visitor,
                     bwdDiffExtension.getDecl(),
@@ -15809,7 +16068,21 @@ static void checkDerivativeAttribute(
                     visitor->getCalculatedDiffFuncType(
                         "ApplyForBwdFuncType",
                         funcAsTypeFromExtension,
-                        DeclRefType::create(getCurrentASTBuilder(), synContextStruct)),
+                        minimalCtxType),
+                    false,
+                    visibility);
+
+                addSynthesizedFunc(
+                    visitor,
+                    bwdDiffExtension.getDecl(),
+                    visitor->getName("remat"),
+                    kIROp_BackwardRemat,
+                    {substFuncAsTypeFromExtension->getDeclRefBase()},
+                    visitor->getCalculatedDiffFuncType(
+                        "RematFuncType",
+                        funcAsTypeFromExtension,
+                        minimalCtxType,
+                        fullCtxType),
                     false,
                     visibility);
             }

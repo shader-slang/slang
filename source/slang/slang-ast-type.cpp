@@ -584,7 +584,7 @@ Val* ApplyForBwdFuncType::_resolveImplOverride()
 {
     // Resolve all three operands.
     // Operand 0: base function type
-    // Operand 1: context type (bwdCallableType)
+    // Operand 1: context type (MinimalContextType in new design)
     // Operand 2: diff-type-info-witness
     auto resolvedBase = _getGenericTypeArg(this, 0)->resolve();
     auto resolvedCtxType = as<Type>(_getGenericTypeArg(this, 1)->resolve());
@@ -599,8 +599,19 @@ Val* ApplyForBwdFuncType::_resolveImplOverride()
         auto funcType =
             getFuncType(astBuilder, as<DeclRefType>(resolvedBase)->getDeclRef().as<CallableDecl>());
 
-        // The result type is the context type (bwdCallableType).
-        auto resultType = resolvedCtxType;
+        // The result type is Tuple<FuncResultType, MinimalContextType> when non-void,
+        // or just MinimalContextType when the function returns void.
+        auto funcResultType = funcType->getResultType();
+        Type* resultType;
+        if (funcResultType->equals(astBuilder->getVoidType()))
+        {
+            resultType = resolvedCtxType;
+        }
+        else
+        {
+            Type* tupleTypes[] = {funcResultType, resolvedCtxType};
+            resultType = astBuilder->getTupleType(makeArrayView(tupleTypes));
+        }
         auto errorType = funcType->getErrorType();
 
         // Get references to the differentiable interfaces to determine witness type.
@@ -663,6 +674,97 @@ Val* ApplyForBwdFuncType::_resolveImplOverride()
     {
         Val* args[] = {as<Type>(resolvedBase), resolvedCtxType, as<Witness>(resolvedWitness)};
         return astBuilder->getSpecializedBuiltinType(makeArrayView(args), "ApplyForBwdFuncType");
+    }
+}
+
+Val* RematFuncType::_resolveImplOverride()
+{
+    // Resolve all four operands.
+    // Operand 0: base function type (FType)
+    // Operand 1: MinimalCtxType
+    // Operand 2: FullCtxType (BwdCallable)
+    // Operand 3: diff-type-info-witness
+    auto resolvedBase = _getGenericTypeArg(this, 0)->resolve();
+    auto resolvedMinimalCtxType = as<Type>(_getGenericTypeArg(this, 1)->resolve());
+    auto resolvedFullCtxType = as<Type>(_getGenericTypeArg(this, 2)->resolve());
+    auto resolvedWitness = _getGenericTypeArg(this, 3)->resolve();
+
+    auto astBuilder = getCurrentASTBuilder();
+    if (auto diffTypeWitness = as<DiffTypeInfoWitness>(resolvedWitness))
+    {
+        List<Type*> newParamTypes;
+
+        auto funcType =
+            getFuncType(astBuilder, as<DeclRefType>(resolvedBase)->getDeclRef().as<CallableDecl>());
+
+        // First parameter is the MinimalCtxType.
+        newParamTypes.add(resolvedMinimalCtxType);
+
+        // Get references to the differentiable interfaces to determine witness type.
+        auto differentiableRefInterface = astBuilder->getDifferentiableRefInterfaceType();
+
+        // Helper to check if witness is for IDifferentiablePtrType.
+        auto isPtrTypeWitness = [&](SubtypeWitness* witness) -> bool
+        {
+            if (!witness)
+                return false;
+            return witness->getSup() == differentiableRefInterface;
+        };
+
+        // Remaining parameters match apply_bwd's parameters
+        // (DifferentialPtrPair-wrapped for differentiable params).
+        for (Index i = 0; i < funcType->getParamCount(); ++i)
+        {
+            auto paramInfo = funcType->getParamInfo(i);
+            auto diffWitness = diffTypeWitness->getParamTypeDiffWitness(i);
+
+            if (diffWitness && isPtrTypeWitness(diffWitness))
+            {
+                auto ptrPairType =
+                    astBuilder->getDifferentialPtrPairType(paramInfo.type, diffWitness);
+
+                switch (paramInfo.mode)
+                {
+                case ParamPassingMode::Out:
+                    newParamTypes.add(astBuilder->getOutParamType(ptrPairType));
+                    break;
+                case ParamPassingMode::In:
+                    newParamTypes.add(ptrPairType);
+                    break;
+                case ParamPassingMode::BorrowInOut:
+                    newParamTypes.add(astBuilder->getBorrowInOutParamType(ptrPairType));
+                    break;
+                case ParamPassingMode::BorrowIn:
+                    newParamTypes.add(astBuilder->getConstRefParamType(ptrPairType));
+                    break;
+                case ParamPassingMode::Ref:
+                    newParamTypes.add(astBuilder->getRefParamType(ptrPairType));
+                    break;
+                default:
+                    SLANG_ASSERT(!"Unknown parameter direction");
+                    break;
+                }
+            }
+            else
+            {
+                newParamTypes.add(funcType->getParamTypeWithModeWrapper(i));
+            }
+        }
+
+        // Return type is the FullCtxType (BwdCallable).
+        return astBuilder->getFuncType(
+            newParamTypes.getArrayView(),
+            resolvedFullCtxType,
+            funcType->getErrorType());
+    }
+    else
+    {
+        Val* args[] = {
+            as<Type>(resolvedBase),
+            resolvedMinimalCtxType,
+            resolvedFullCtxType,
+            as<Witness>(resolvedWitness)};
+        return astBuilder->getSpecializedBuiltinType(makeArrayView(args), "RematFuncType");
     }
 }
 

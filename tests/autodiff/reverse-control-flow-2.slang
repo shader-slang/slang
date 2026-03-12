@@ -6,9 +6,7 @@
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
-//CHK:reverse-control-flow-2.slang({{[0-9]+}}): note: checkpointing context of 4 bytes associated with function: 'doWork'
 [BackwardDifferentiable]
-//CHK:reverse-control-flow-2.slang([[# @LINE + 1]]): note: 4 bytes (float) used to checkpoint the following item:
 bool doWork(float x, out float y)
 {
     bool retVal = false;
@@ -37,9 +35,7 @@ bool doWork(float x, out float y)
     return retVal;
 }
 
-//CHK:reverse-control-flow-2.slang({{[0-9]+}}): note: checkpointing context of 4 bytes associated with function: 'doWork2'
 [BackwardDifferentiable]
-//CHK:reverse-control-flow-2.slang([[# @LINE + 1]]): note: 4 bytes (float) used to checkpoint the following item:
 bool doWork2(float x, out float y)
 {
     y = 0;
@@ -80,4 +76,4 @@ void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
     }
 }
 
-//CHK-NOT:reverse-control-flow-2.slang({{[0-9]+}}): note
+//CHK: note: no checkpoint contexts to report

@@ -4704,9 +4704,12 @@ IRInst* IRBuilder::emitWrapExistential(
     return inst;
 }
 
-IRInst* IRBuilder::addPrimalValueStructKeyDecoration(IRInst* target, IRStructKey* key)
+IRInst* IRBuilder::addPrimalValueStructKeyDecoration(
+    IRInst* target,
+    IRStructKey* firstKey,
+    IRStructKey* secondKey)
 {
-    return addDecoration(target, kIROp_PrimalValueStructKeyDecoration, key);
+    return addDecoration(target, kIROp_PrimalValueStructKeyDecoration, firstKey, secondKey);
 }
 
 IRInst* IRBuilder::addPrimalElementTypeDecoration(IRInst* target, IRInst* type)
@@ -5862,6 +5865,36 @@ IRInst* IRBuilder::emitSwizzledStore(
     }
 
     return emitSwizzledStore(dest, source, elementCount, irElementIndices);
+}
+
+IRInst* IRBuilder::emitMatrixSwizzleStore(
+    IRInst* dest,
+    IRInst* source,
+    UInt elementCount,
+    uint32_t const* rowIndices,
+    uint32_t const* colIndices)
+{
+    auto intType = getBasicType(BaseType::Int);
+
+    // Interleave row/col pairs as trailing operands
+    ShortList<IRInst*> args;
+    args.add(dest);
+    args.add(source);
+    for (UInt ii = 0; ii < elementCount; ++ii)
+    {
+        args.add(getIntValue(intType, rowIndices[ii]));
+        args.add(getIntValue(intType, colIndices[ii]));
+    }
+
+    auto inst = createInstWithTrailingArgs<IRMatrixSwizzleStore>(
+        this,
+        kIROp_MatrixSwizzleStore,
+        nullptr,
+        args.getCount(),
+        args.getArrayView().getBuffer());
+
+    addInst(inst);
+    return inst;
 }
 
 IRInst* IRBuilder::emitReturn(IRInst* val)
@@ -9324,6 +9357,8 @@ IRInst* getResolvedInstForDecorations(IRInst* inst, bool resolveThroughDifferent
             case kIROp_BackwardDifferentiate:
             case kIROp_BackwardDifferentiatePrimal:
             case kIROp_BackwardDifferentiatePropagate:
+            case kIROp_BackwardPrimalFromLegacyBwdDiffFunc:
+            case kIROp_BackwardRemat:
                 candidate = candidate->getOperand(0);
                 continue;
             default:

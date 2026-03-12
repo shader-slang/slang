@@ -1139,6 +1139,18 @@ AggTypeDeclBase* getParentAggTypeDeclBase(Decl* decl)
     return nullptr;
 }
 
+ExtensionDecl* getParentExtensionDecl(Decl* decl)
+{
+    decl = decl->parentDecl;
+    while (decl)
+    {
+        if (auto found = as<ExtensionDecl>(decl))
+            return found;
+        decl = decl->parentDecl;
+    }
+    return nullptr;
+}
+
 FunctionDeclBase* getParentFunc(Decl* decl)
 {
     while (decl)

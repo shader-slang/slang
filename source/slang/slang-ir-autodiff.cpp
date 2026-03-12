@@ -795,7 +795,6 @@ void stripAutoDiffDecorationsFromChildren(IRInst* parent)
             case kIROp_BackwardDerivativePrimalReturnDecoration:
             case kIROp_AutoDiffOriginalValueDecoration:
             case kIROp_IntermediateContextFieldDifferentialTypeDecoration:
-            case kIROp_CheckpointIntermediateDecoration:
                 decor->removeAndDeallocate();
                 break;
             case kIROp_AutoDiffBuiltinDecoration:
@@ -930,7 +929,6 @@ bool canTypeBeStored(IRInst* type)
     {
     case kIROp_StructType:
     case kIROp_OptionalType:
-    case kIROp_TupleType:
     case kIROp_ArrayType:
     case kIROp_DifferentialPairType:
     case kIROp_InterfaceType:
@@ -942,9 +940,21 @@ bool canTypeBeStored(IRInst* type)
     case kIROp_CoopVectorType:
     case kIROp_MatrixType:
     case kIROp_BackwardDiffIntermediateContextType:
+    case kIROp_BackwardDiffMinimalContextType:
+    case kIROp_BackwardContextFromLegacyBwdDiffFunc:
+    case kIROp_BackwardMinimalContextFromLegacyBwdDiffFunc:
         return true;
     case kIROp_AttributedType:
         return canTypeBeStored(type->getOperand(0));
+    case kIROp_TupleType:
+        for (UIndex i = 0; i < type->getOperandCount(); i++)
+        {
+            if (as<IRTupleNameType>(type->getOperand(i)))
+                continue;
+            if (!canTypeBeStored(type->getOperand(i)))
+                return false;
+        }
+        return true;
     default:
         return false;
     }
@@ -1183,6 +1193,7 @@ IRUse* findUniqueStoredVal(IRVar* var)
 {
     if (isDerivativeContextVar(var))
     {
+        SLANG_UNEXPECTED("Should not see this case anymore");
         IRUse* primalCallUse = nullptr;
         for (auto use = var->firstUse; use; use = use->nextUse)
         {

@@ -1221,6 +1221,7 @@ struct PreAutoDiffForceInliningPass : InliningPassBase
                 case kIROp_BackwardDifferentiate:
                 case kIROp_BackwardDifferentiatePrimal:
                 case kIROp_BackwardDifferentiatePropagate:
+                case kIROp_BackwardRemat:
                     canInline = false;
                     goto end;
 

@@ -2148,6 +2148,19 @@ struct IRSwizzledStore : IRInst
     IRInst* getElementIndex(UInt index) { return getOperand(index + 2); }
 };
 
+// Store into a matrix with a swizzle pattern.
+// Operands: dest (ptr to matrix), source (scalar or vector),
+// followed by pairs of (row, col) literal ints.
+FIDDLE()
+struct IRMatrixSwizzleStore : IRInst
+{
+    FIDDLE(leafInst())
+    // Number of matrix elements being written
+    UInt getElementCount() { return (getOperandCount() - 2) / 2; }
+    IRInst* getElementRow(UInt index) { return getOperand(2 + index * 2); }
+    IRInst* getElementCol(UInt index) { return getOperand(2 + index * 2 + 1); }
+};
+
 
 FIDDLE()
 struct IRPatchConstantFuncDecoration : IRDecoration
@@ -3605,7 +3618,10 @@ $(type_info.return_type) $(type_info.method_name)(
 
     IRInst* addDifferentiableTypeDictionaryDecoration(IRInst* target);
 
-    IRInst* addPrimalValueStructKeyDecoration(IRInst* target, IRStructKey* key);
+    IRInst* addPrimalValueStructKeyDecoration(
+        IRInst* target,
+        IRStructKey* firstKey,
+        IRStructKey* secondKey);
     IRInst* addPrimalElementTypeDecoration(IRInst* target, IRInst* type);
     IRInst* addIntermediateContextFieldDifferentialTypeDecoration(IRInst* target, IRInst* witness);
 
@@ -4097,6 +4113,12 @@ $(type_info.return_type) $(type_info.method_name)(
         UInt elementCount,
         uint64_t const* elementIndices);
 
+    IRInst* emitMatrixSwizzleStore(
+        IRInst* dest,
+        IRInst* source,
+        UInt elementCount,
+        uint32_t const* rowIndices,
+        uint32_t const* colIndices);
 
     IRInst* emitReturn(IRInst* val);
 

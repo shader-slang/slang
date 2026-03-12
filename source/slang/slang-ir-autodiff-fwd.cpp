@@ -839,6 +839,11 @@ struct ForwardDiffTranslationContext
                 cast<IRInterfaceRequirementEntry>(bwdDiffInterfaceType->getOperand(0))
                     ->getRequirementKey();
 
+            // Key for minimalContextType in IBackwardDifferentiable table
+            auto bwdDiffMinimalContextTypeReqKey =
+                cast<IRInterfaceRequirementEntry>(bwdDiffInterfaceType->getOperand(2))
+                    ->getRequirementKey();
+
             // Key for contextType : IBackwardCallable in IBackwardDifferentiable table
             auto bwdDiffContextTypeCallableConformanceReqKey =
                 cast<IRInterfaceRequirementEntry>(bwdDiffInterfaceType->getOperand(1))
@@ -846,7 +851,12 @@ struct ForwardDiffTranslationContext
 
             // Key for `apply` in IBackwardDifferentiable table
             auto bwdDiffApplyReqKey =
-                cast<IRInterfaceRequirementEntry>(bwdDiffInterfaceType->getOperand(2))
+                cast<IRInterfaceRequirementEntry>(bwdDiffInterfaceType->getOperand(3))
+                    ->getRequirementKey();
+
+            // Key for `remat` in IBackwardDifferentiable table
+            auto bwdDiffRematReqKey =
+                cast<IRInterfaceRequirementEntry>(bwdDiffInterfaceType->getOperand(4))
                     ->getRequirementKey();
 
             // Key for 'operator()' (back-prop) in IBackwardCallable table
@@ -923,11 +933,23 @@ struct ForwardDiffTranslationContext
                 AnnotationKind::BackwardDerivativeContext,
                 higherOrderContextType);
 
+            // Lookup minimalContextType in IBackwardDifferentiable table
+            auto higherOrderMinimalContextType = _lookupWitness(
+                builder,
+                higherOrderBwdDiffTable,
+                bwdDiffMinimalContextTypeReqKey,
+                (IRType*)builder->getTypeKind());
+
+            builder->addAnnotation(
+                fwdDiffCallee,
+                AnnotationKind::BackwardDerivativeMinimalContext,
+                higherOrderMinimalContextType);
+
 
             // Lookup `apply` in IBackwardDifferentiable table
             IRInst* bwdApplyFuncTypeOperands[] = {
                 fwdDiffCallee->getFullType(),
-                higherOrderContextType};
+                higherOrderMinimalContextType};
             auto higherOrderBwdDiffFunc = _lookupWitness(
                 builder,
                 higherOrderBwdDiffTable,
@@ -942,6 +964,26 @@ struct ForwardDiffTranslationContext
                 fwdDiffCallee,
                 AnnotationKind::BackwardDerivativeApply,
                 higherOrderBwdDiffFunc);
+
+            // Lookup `remat` in IBackwardDifferentiable table
+            IRInst* bwdRematFuncTypeOperands[] = {
+                fwdDiffCallee->getFullType(),
+                higherOrderMinimalContextType,
+                higherOrderContextType};
+            auto higherOrderBwdRematFunc = _lookupWitness(
+                builder,
+                higherOrderBwdDiffTable,
+                bwdDiffRematReqKey,
+                (IRType*)builder->emitIntrinsicInst(
+                    builder->getTypeKind(),
+                    kIROp_RematFuncType,
+                    3,
+                    bwdRematFuncTypeOperands));
+
+            builder->addAnnotation(
+                fwdDiffCallee,
+                AnnotationKind::BackwardDerivativeContextRemat,
+                higherOrderBwdRematFunc);
 
 
             // Lookup contextType : IBackwardCallable in IBackwardDifferentiable table
@@ -2152,6 +2194,30 @@ struct ForwardDiffTranslationContext
                     }
                     instsToRemove.add(inst);
                 }
+                else if (auto matSwizzleStore = as<IRMatrixSwizzleStore>(inst))
+                {
+                    if (!isLocalPointer(matSwizzleStore->getDest()))
+                        continue;
+
+                    builder.setInsertBefore(inst);
+                    auto source = matSwizzleStore->getSource();
+                    bool sourceIsScalar = !as<IRVectorType>(source->getDataType());
+                    for (UIndex ii = 0; ii < matSwizzleStore->getElementCount(); ii++)
+                    {
+                        auto rowIdx = matSwizzleStore->getElementRow(ii);
+                        auto colIdx = matSwizzleStore->getElementCol(ii);
+                        auto rowPtr =
+                            builder.emitElementAddress(matSwizzleStore->getDest(), rowIdx);
+                        auto elemPtr = builder.emitElementAddress(rowPtr, colIdx);
+                        auto elemVal = sourceIsScalar
+                                           ? source
+                                           : builder.emitElementExtract(
+                                                 source,
+                                                 builder.getIntValue(builder.getIntType(), ii));
+                        builder.emitStore(elemPtr, elemVal);
+                    }
+                    instsToRemove.add(inst);
+                }
             }
         }
 
@@ -2458,6 +2524,13 @@ struct ForwardDiffTranslationContext
                 auto swizzledStore = as<IRSwizzledStore>(origInst);
                 SLANG_RELEASE_ASSERT(lookupDiffInst(swizzledStore->getDest(), nullptr) == nullptr);
                 return translateNonDiffInst(builder, swizzledStore);
+            }
+        case kIROp_MatrixSwizzleStore:
+            {
+                auto matSwizzleStore = as<IRMatrixSwizzleStore>(origInst);
+                SLANG_RELEASE_ASSERT(
+                    lookupDiffInst(matSwizzleStore->getDest(), nullptr) == nullptr);
+                return translateNonDiffInst(builder, matSwizzleStore);
             }
             // Known non-differentiable insts.
         case kIROp_Not:
@@ -3460,7 +3533,15 @@ IRInst* maybeTranslateBackwardDerivativeWitness(
     //
     // This will help us catch errors if the interface definition changes.
     //
-    SLANG_ASSERT(baseConformanceType->getRequirementCount() == 4);
+    // IBackwardDifferentiable has 6 requirements:
+    // 0: BwdCallable associated type
+    // 1: BwdCallable : IBwdCallable conformance
+    // 2: MinimalContext associated type
+    // 3: apply_bwd func
+    // 4: remat func
+    // 5: bwd_diff (legacy)
+    //
+    SLANG_ASSERT(baseConformanceType->getRequirementCount() == 6);
     IRInst* typeOperand = baseFunc->getFullType();
 
     auto contextType = builder.emitIntrinsicInst(
@@ -3523,8 +3604,21 @@ IRInst* maybeTranslateBackwardDerivativeWitness(
             callableWitnessTable);
     }
 
+    // MinimalContext type (initially same as contextType).
+    auto minimalContextType = builder.emitIntrinsicInst(
+        builder.getTypeKind(),
+        kIROp_BackwardDiffMinimalContextType,
+        1,
+        &baseFunc);
+    builder.createWitnessTableEntry(
+        newWitnessTable,
+        as<IRInterfaceRequirementEntry>(baseConformanceType->getOperand(2))->getRequirementKey(),
+        minimalContextType);
+
+    // apply_bwd func.
+    // ApplyForBwdFuncType<FType, MinimalContext> — second operand is MinimalContext.
     {
-        IRInst* applyFuncTypeOperands[] = {typeOperand, contextType};
+        IRInst* applyFuncTypeOperands[] = {typeOperand, minimalContextType};
         auto applyFunc = builder.emitBackwardDifferentiatePrimalInst(
             (IRType*)builder.emitIntrinsicInst(
                 builder.getTypeKind(),
@@ -3534,16 +3628,36 @@ IRInst* maybeTranslateBackwardDerivativeWitness(
             baseFunc);
         builder.createWitnessTableEntry(
             newWitnessTable,
-            as<IRInterfaceRequirementEntry>(baseConformanceType->getOperand(2))
+            as<IRInterfaceRequirementEntry>(baseConformanceType->getOperand(3))
                 ->getRequirementKey(),
             applyFunc);
     }
 
+    // remat func.
+    // RematFuncType<FType, MinimalContext, FullContext> — operands are minimalCtx, fullCtx.
     {
-        // This should never be required, so we just emit a poison value.
+        IRInst* rematFuncTypeOperands[] = {typeOperand, minimalContextType, contextType};
+        auto rematFunc = builder.emitIntrinsicInst(
+            (IRType*)builder.emitIntrinsicInst(
+                builder.getTypeKind(),
+                kIROp_RematFuncType,
+                3,
+                rematFuncTypeOperands),
+            kIROp_BackwardRemat,
+            1,
+            &baseFunc);
         builder.createWitnessTableEntry(
             newWitnessTable,
-            as<IRInterfaceRequirementEntry>(baseConformanceType->getOperand(3))
+            as<IRInterfaceRequirementEntry>(baseConformanceType->getOperand(4))
+                ->getRequirementKey(),
+            rematFunc);
+    }
+
+    {
+        // bwd_diff (legacy) - should never be required, so we just emit a poison value.
+        builder.createWitnessTableEntry(
+            newWitnessTable,
+            as<IRInterfaceRequirementEntry>(baseConformanceType->getOperand(5))
                 ->getRequirementKey(),
             builder.emitPoison(builder.getVoidType()));
     }

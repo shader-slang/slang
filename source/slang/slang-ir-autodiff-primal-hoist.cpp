@@ -640,7 +640,7 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
                     {
                         checkpointInfo->recomputeSet.add(storeUser);
                         checkpointInfo->storeSet.remove(storeUser);
-                        if (callVarWorkListSet.add(callUser))
+                        if (callVarWorkListSet.add(callUser)) // TODO: wut?
                             callVarWorkList.add(callUser);
                     }
                 }
@@ -682,6 +682,16 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
                         usesToReplace.add(use);
                 }
             }
+            /*
+            else if (auto contextUse = as<IRContextUse>(inst))
+            {
+                auto baseCall = contextUse->getBase();
+                checkpointInfo->recomputeSet.add(baseCall);
+                checkpointInfo->storeSet.remove(baseCall);
+                if (callVarWorkListSet.add(baseCall)) // TODO: wut?
+                    callVarWorkList.add(baseCall);
+            }
+            */
         }
     }
 
@@ -2191,6 +2201,11 @@ RefPtr<HoistedPrimalsInfo> ensurePrimalAvailability(
                 if (isLoopCounter)
                     builder.addLoopCounterDecoration(localVar);
 
+                if (as<IRParam>(instToStore) && instToStore->getParent() == func->getFirstBlock())
+                {
+                    builder.addDecoration(localVar, kIROp_ParamsContextDecoration, instToStore);
+                }
+
                 for (auto use : outOfScopeUses)
                 {
                     // TODO: Prevent terminator insts from being treated as passthrough..
@@ -2507,6 +2522,22 @@ void lowerCheckpointObjectInsts(IRGlobalValueWithCode* func)
                 loopExitValueInst->removeAndDeallocate();
             }
 
+            /*
+            if (auto contextUse = as<IRContextUse>(inst))
+            {
+                auto originalVal = contextUse->getBase();
+                contextUse->replaceUsesWith(originalVal);
+                contextUse->removeAndDeallocate();
+            }
+
+            if (auto valUse = as<IRValUse>(inst))
+            {
+                auto originalVal = valUse->getBase();
+                valUse->replaceUsesWith(originalVal);
+                valUse->removeAndDeallocate();
+            }
+            */
+
             inst = nextInst;
         }
     }
@@ -2569,14 +2600,7 @@ void DefaultCheckpointPolicy::preparePolicy(IRGlobalValueWithCode* func)
     return;
 }
 
-enum CheckpointPreference
-{
-    None,
-    PreferCheckpoint,
-    PreferRecompute
-};
-
-static CheckpointPreference getCheckpointPreference(IRInst* callee)
+CheckpointPreference getCheckpointPreference(IRInst* callee)
 {
     callee = getResolvedInstForDecorations(callee, true);
     for (auto decor : callee->getDecorations())
@@ -2709,7 +2733,6 @@ static bool shouldStoreInst(IRInst* inst)
         //    to store it because the param may be modified by the func at exit. Similarly,
         //    this will be handled in canRecompute().
         return false;
-
     case kIROp_Call:
         {
             // If the callee has a preference, we should follow it.
@@ -2725,18 +2748,25 @@ static bool shouldStoreInst(IRInst* inst)
                 return true;
             }
 
+            IRInst* effectiveInst = inst->getOperand(0);
 
             // If not, we'll default to recomputing calls that don't have side effects & don't
             // load from non-local variables. A previous data-flow pass should have already tagged
             // functions with the appropriate decorations.
             //
-            auto callee = getResolvedInstForDecorations(inst->getOperand(0), true);
+            auto callee = getResolvedInstForDecorations(effectiveInst, true);
             if (callee->findDecoration<IRReadNoneDecoration>())
                 return false;
 
             // Treat 'get-val' funcs as effectively a simple extraction.
             if (callee->getOp() == kIROp_BackwardContextGetValFromLegacyBwdDiffFunc ||
                 callee->getOp() == kIROp_BackwardContextGetPrimalVal)
+            {
+                return false;
+            }
+
+            // Treat 'remat' as always recomputable.
+            if (callee->getOp() == kIROp_BackwardRematFromLegacyBwdDiffFunc)
             {
                 return false;
             }

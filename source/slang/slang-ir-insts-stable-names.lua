@@ -782,5 +782,14 @@ return {
 	["constexprDiv"] = 785,
 	["FuncWithBindings"] = 786,
 	["ReportCheckpointStore"] = 787,
-	["Type.TupleName"] = 788
+	["Type.TupleName"] = 788,
+	["TranslateBase.BackwardRematFromLegacyBwdDiffFunc"] = 789,
+	["TranslateBase.BackwardRemat"] = 790,
+	["Type.RematFuncType"] = 791,
+	["TranslateBase.TrivialBackwardRemat"] = 792,
+	["Type.TranslatedTypeBase.BackwardDiffMinimalContextType"] = 793,
+	["Type.TranslatedTypeBase.TrivialBackwardDiffMinimalContextType"] = 794,
+	["Type.TranslatedTypeBase.BackwardMinimalContextFromLegacyBwdDiffFunc"] = 795,
+	["Decoration.ParamsContextDecoration"] = 796,
+	["matrixSwizzleStore"] = 797,
 }

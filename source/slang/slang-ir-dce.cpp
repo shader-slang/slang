@@ -336,41 +336,6 @@ bool isFieldUsed(IRStructField* fieldInst)
             return true;
     }
 
-    // Check fields that have this field as a sub-field.
-    auto parentType = cast<IRStructType>(fieldInst->getParent());
-
-    if (as<IRModuleInst>(parentType->getParent()))
-    {
-        for (auto use = parentType->firstUse; use; use = use->nextUse)
-        {
-            auto useField = as<IRStructField>(use->getUser());
-            if (useField && isFieldUsed(useField))
-                return true;
-        }
-    }
-    else if (as<IRBlock>(parentType->getParent()))
-    {
-        if (auto genericParentType = as<IRGeneric>(parentType->getParent()))
-        {
-            List<IRSpecialize*> specInsts;
-            for (auto use = genericParentType->firstUse; use; use = use->nextUse)
-            {
-                if (auto specInst = as<IRSpecialize>(use->getUser()))
-                    specInsts.add(specInst);
-            }
-
-            for (auto specInst : specInsts)
-            {
-                for (auto use = specInst->firstUse; use; use = use->nextUse)
-                {
-                    auto useField = as<IRStructField>(use->getUser());
-                    if (useField && isFieldUsed(useField))
-                        return true;
-                }
-            }
-        }
-    }
-
     return false;
 }
 
