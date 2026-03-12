@@ -3,19 +3,20 @@
 language: "en-US"
 
 reviews:
+  profile: assertive
   high_level_summary: false
   auto_title_placeholder: ""
-  poem: true
+  poem: false
   in_progress_fortune: false
   collapse_walkthrough: true
-  sequence_diagrams: true
-  review_effort: false
-  issue_assessment: false
+  sequence_diagrams: false
+  estimate_code_review_effort: false
+  assess_linked_issues: true
   related_issues: false
-  related_pull_requests: false
-  labels: false
+  related_prs: false
+  suggested_labels: false
   auto_label: false
-  reviewers: false
+  suggested_reviewers: true
   auto_assign_reviewers: true
 
   path_filters:
@@ -87,6 +88,8 @@ reviews:
   auto_review:
     enabled: true
     drafts: false
+    base_branches:
+      - "master"
     ignore_title_keywords:
       - "WIP"
       - "wip"
@@ -94,11 +97,113 @@ reviews:
 
   enable_prompt_for_ai_agents: false
 
-  review_instructions: >-
-    Do not suggest formatting changes. The project uses clang-format and
-    ./extras/formatting.sh to enforce code style automatically. Skip any
-    comments about indentation, whitespace, brace placement, or code
-    formatting.
+  finishing_touches:
+    docstrings:
+      enabled: false
+    unit_tests:
+      enabled: false
+
+  tools:
+    # C++ — relevant
+    cppcheck:
+      enabled: true
+    clang:
+      enabled: true
+    # Scripts/config — relevant
+    shellcheck:
+      enabled: true
+    yamllint:
+      enabled: true
+    luacheck:
+      enabled: true
+    actionlint:
+      enabled: true
+    # Security — relevant
+    gitleaks:
+      enabled: true
+    # Everything else — not applicable to a C++ compiler project
+    ruff:
+      enabled: false
+    markdownlint:
+      enabled: false
+    languagetool:
+      enabled: false
+    biome:
+      enabled: false
+    hadolint:
+      enabled: false
+    swiftlint:
+      enabled: false
+    phpstan:
+      enabled: false
+    phpmd:
+      enabled: false
+    phpcs:
+      enabled: false
+    golangci-lint:
+      enabled: false
+    trufflehog:
+      enabled: false
+    checkov:
+      enabled: false
+    tflint:
+      enabled: false
+    detekt:
+      enabled: false
+    eslint:
+      enabled: false
+    flake8:
+      enabled: false
+    fortitudeLint:
+      enabled: false
+    rubocop:
+      enabled: false
+    buf:
+      enabled: false
+    regal:
+      enabled: false
+    pmd:
+      enabled: false
+    opengrep:
+      enabled: false
+    semgrep:
+      enabled: false
+    circleci:
+      enabled: false
+    clippy:
+      enabled: false
+    sqlfluff:
+      enabled: false
+    trivy:
+      enabled: false
+    prismaLint:
+      enabled: false
+    pylint:
+      enabled: false
+    oxc:
+      enabled: false
+    shopifyThemeCheck:
+      enabled: false
+    brakeman:
+      enabled: false
+    dotenvLint:
+      enabled: false
+    htmlhint:
+      enabled: false
+    stylelint:
+      enabled: false
+    checkmake:
+      enabled: false
+    osvScanner:
+      enabled: false
+    blinter:
+      enabled: false
+    smartyLint:
+      enabled: false
+    emberTemplateLint:
+      enabled: false
+    psscriptanalyzer:
+      enabled: false
 
 chat:
   auto_reply: false
