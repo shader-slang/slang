@@ -69,7 +69,6 @@ public interface IPointerLikeAddress<T> : IDifferentiablePtrType
     @param[in] index The element index.
     @param[in] value The value to add.
     */
-    [require(cuda_glsl_hlsl_metal_spirv, sm_6_6)]
     public void atomicAdd(uint index, T value);
 
     /**
@@ -79,15 +78,20 @@ public interface IPointerLikeAddress<T> : IDifferentiablePtrType
     */
     public void atomicAdd(uint index, vector<T, 2> value);
 
-    /**
-    Returns a raw pointer to the element at the given offset from the current base.
-    This is needed for operations that require a concrete pointer type, such as
-    `CoopMat.Load` from global memory.
-    @param[in] offset Element offset from the current base position.
-    @return A `T*` pointing to the element at the offset.
-    */
+    /// The underlying buffer type used by this address for cooperative matrix loads.
+    /// Buffer-backed addresses (e.g. BindlessAddress) use `RWStructuredBuffer<T>`,
+    /// which generates `OpAccessChain` on SPIR-V and avoids variable pointer requirements.
+    /// Pointer-backed addresses use `T*`.
+    associatedtype BufferType;
+
+    /// Returns the underlying buffer or pointer that backs this address.
     [ForceInline]
-    internal T* getPointer(uint offset);
+    internal BufferType getBuffer();
+
+    /// Returns the current element offset within the buffer.
+    /// For pointer-based addresses where the offset is baked into the pointer, returns 0.
+    [ForceInline]
+    internal uint getBaseIndex();
 
     /**
     Reads sequential elements starting from the given offset address, packed into a uint4.

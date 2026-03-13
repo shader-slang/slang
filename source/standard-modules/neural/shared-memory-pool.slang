@@ -26,7 +26,7 @@ public struct SharedMemoryPool<ShMemSize: ISharedMemorySize>
 
     [ForceInline]
     static void smemStore<U>(uint memOffset, int index, U value)
-        where U : __BuiltinArithmeticType
+        where U : IArithmetic
     {
         switch (sizeof(U))
         {
@@ -67,7 +67,7 @@ public struct SharedMemoryPool<ShMemSize: ISharedMemorySize>
 
     [ForceInline]
     static U smemLoad<U>(uint memOffset, int index)
-        where U : __BuiltinArithmeticType
+        where U : IArithmetic
     {
         switch (sizeof(U))
         {
