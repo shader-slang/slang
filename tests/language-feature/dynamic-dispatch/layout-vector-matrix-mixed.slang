@@ -1,8 +1,10 @@
 // Mixed field types in interface implementations that go through dynamic dispatch.
 // Impl A uses vectors + scalar (28 bytes), Impl B uses matrix + vectors (56 bytes),
 // exercising different-sized AnyValue payloads and composite packing.
-// Note: float3 + float3x3 in the same Metal struct triggers a Metal compiler
-// failure (filed separately), so the matrix is only in Impl B.
+// Note: a struct with float3 preceding float3x3 (e.g. float3 + float3x3 + float)
+// triggers a Metal compiler failure due to alignment, so Impl A avoids that
+// layout. Impl B places the matrix first (float3x3 + float3 + float2) which
+// compiles correctly on Metal.
 
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-dx12 -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type
