@@ -29,6 +29,8 @@ void compute_forward_pass(
     uniform float x0,
     uniform float x1)
 {
+    // CoopMat types must be declared per entry point — WaveTangledVector
+    // shared memory layout is tied to the compute shader's numthreads.
     typealias V2 = WaveTangledVector<float, ShMemSizeLayer, InputSize, SubgroupSize>;
     typealias V1 = WaveTangledVector<float, ShMemSizeLayer, OutputSize, SubgroupSize>;
     typealias Act = IdentityActivation<float>;

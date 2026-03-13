@@ -1,7 +1,9 @@
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
 from __future__ import annotations
 
-import importlib.util
-import sys
+import os
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -10,14 +12,43 @@ import pytest
 
 import slangpy as spy
 
-_STRESS_DIR = Path(__file__).resolve().parent
-_spec = importlib.util.spec_from_file_location("stress_conftest", _STRESS_DIR / "conftest.py")
-_conftest = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(_conftest)
-REF_IMAGE_PATH = _conftest.REF_IMAGE_PATH
-TEST_DIR = _conftest.TEST_DIR
-get_artifact_path = _conftest.get_artifact_path
-get_slangpy_include_paths = _conftest.get_slangpy_include_paths
+TEST_DIR = Path(__file__).resolve().parent
+REF_IMAGE_PATH = TEST_DIR / "neural-mlp-test-image.png"
+ARTIFACT_DIR = Path(tempfile.gettempdir()) / "slang-neural-large-model"
+
+
+def get_slangpy_include_paths():
+    """Return include paths for slangpy's slang modules and neural standard module."""
+    if spy.__file__ is not None:
+        pkg_dir = Path(spy.__file__).parent
+    else:
+        pkg_dir = Path(spy.__path__[0]) / "slangpy"
+
+    paths = [str(TEST_DIR)]
+
+    slangpy_slang = pkg_dir / "slang"
+    if slangpy_slang.exists():
+        paths.append(str(slangpy_slang))
+
+    for d in sorted(pkg_dir.iterdir()):
+        if d.is_dir() and d.name.startswith("slang-standard-module-"):
+            paths.append(str(d))
+            inner_slang = d / "slang"
+            if inner_slang.is_dir():
+                paths.append(str(inner_slang))
+            break
+
+    env_neural = os.environ.get("NEURAL_MODULE_PATH")
+    if env_neural:
+        paths.append(env_neural)
+
+    return paths
+
+
+def get_artifact_path(filename: str) -> Path:
+    """Return a temp-dir path for optional locally saved test artifacts."""
+    ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
+    return ARTIFACT_DIR / filename
 
 WORKGROUP_SIZE = 64
 KNUTH_HASH = 2654435761
