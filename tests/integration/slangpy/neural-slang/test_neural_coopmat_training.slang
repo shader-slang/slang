@@ -35,15 +35,13 @@ void compute_forward_pass(
     typealias LinearLayer = FFLayer<float, V2, V1, LinearLayout, Act>;
     typealias Address = PointerAddress<float>;
 
-    let baseAddr = Address(params);
-    let weightAddr = baseAddr.getOffset(0);
-    let biasAddr = baseAddr.getOffset(2);
+    let paramAddr = Address(params);
     let layer = LinearLayer();
 
     float featsArr[InputSize] = { x0, x1 };
     let feats = V2(featsArr);
 
-    let predV = layer.eval<Address>(feats, weightAddr, biasAddr);
+    let predV = layer.eval<Address>(feats, paramAddr);
 
     if (gtid == 0)
     {
@@ -68,9 +66,7 @@ void compute_eval_loss(
     typealias LinearLayer = FFLayer<float, V2, V1, LinearLayout, Act>;
     typealias Address = PointerAddress<float>;
 
-    let baseAddr = Address(params);
-    let weightAddr = baseAddr.getOffset(0);
-    let biasAddr = baseAddr.getOffset(2);
+    let paramAddr = Address(params);
     let layer = LinearLayer();
 
     float sum = 0.0;
@@ -80,7 +76,7 @@ void compute_eval_loss(
         float featsArr[InputSize] = { x, x * x };
         let feats = V2(featsArr);
 
-        let predV = layer.eval<Address>(feats, weightAddr, biasAddr);
+        let predV = layer.eval<Address>(feats, paramAddr);
         let pred = predV[0];
         let target = ys[i];
 
@@ -114,9 +110,7 @@ void compute_train_step(
     typealias LinearLayer = FFLayer<float, V2, V1, LinearLayout, Act>;
     typealias Address = PointerAddress<float>;
 
-    let baseAddr = Address(params_handle);
-    let weightAddr = baseAddr.getOffset(0);
-    let biasAddr = baseAddr.getOffset(2);
+    let paramAddr = Address(params_handle);
     let layer = LinearLayer();
 
     if (gtid == 0)
@@ -139,7 +133,7 @@ void compute_train_step(
         float featsArr[InputSize] = { x, x * x };
         let feats = V2(featsArr);
 
-        let predV = layer.eval<Address>(feats, weightAddr, biasAddr);
+        let predV = layer.eval<Address>(feats, paramAddr);
         let pred = predV[0];
 
         let err = pred - t;
@@ -187,9 +181,7 @@ void compute_grad_multiworkgroup(
     if (idx >= count)
         return;
 
-    let baseAddr = Address(params);
-    let weightAddr = baseAddr.getOffset(0);
-    let biasAddr = baseAddr.getOffset(2);
+    let paramAddr = Address(params);
     let layer = LinearLayer();
 
     let x = xs[idx];
@@ -198,7 +190,7 @@ void compute_grad_multiworkgroup(
     float featsArr[InputSize] = { x, x * x };
     let feats = V2(featsArr);
 
-    let predV = layer.eval<Address>(feats, weightAddr, biasAddr);
+    let predV = layer.eval<Address>(feats, paramAddr);
     let pred = predV[0];
 
     let err = pred - t;
