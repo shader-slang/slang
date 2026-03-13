@@ -2,32 +2,47 @@
 
 Follow this protocol. Do NOT skip steps. Do NOT write a free-form review. Do NOT post a review without dispatching all 6 teammates first.
 
-## Step 1: Fetch the PR diff and changed files
+## Step 1: Fetch the PR diff and save to file
+
+Save the diff and file list to `tmp/` so agents can read them without bloating prompts:
+
+```bash
+mkdir -p tmp
+gh pr diff <number> -R <repo> > tmp/pr-diff.patch
+gh pr view <number> -R <repo> --json files -q '.files[].path' > tmp/pr-files.txt
+```
+
+Agents will read these files directly — do NOT embed the full diff in agent prompts.
+
+## Step 2: Determine applicable reviewers and dispatch
+
+Classify changed files to decide which reviewers to dispatch:
+
+| Reviewer | Dispatch when changed files match | Skip when |
+|----------|----------------------------------|-----------|
+| `code-quality-reviewer` | **Always** — every PR gets this | Never skip |
+| `ir-correctness-reviewer` | `source/slang/slang-ir-*.cpp`, `slang-lower-*.cpp`, `slang-check-*.cpp`, `*.meta.slang`, `slang-ir-insts.lua` | Only tests/docs/build changes |
+| `security-code-reviewer` | `source/**/*.cpp`, `source/**/*.h` (any C++ source) | Only tests/docs/build changes |
+| `test-coverage-reviewer` | **Always** — every PR gets this | Never skip |
+| `cross-backend-reviewer` | `source/slang/slang-emit-*.cpp`, `prelude/**`, `*.meta.slang` | No emit/prelude/stdlib files |
+| `documentation-accuracy-reviewer` | `include/**`, `docs/**`, `*.meta.slang`, or PR touches public API | Only internal refactors with no API/doc surface |
+
+**Minimum**: `code-quality-reviewer` + `test-coverage-reviewer` always run.
+**Typical**: 4-6 reviewers for source changes. 2 for test-only or doc-only PRs.
+
+Make all applicable Agent calls in a SINGLE message so they run concurrently:
 
 ```
-gh pr diff <number> -R <repo>
-gh pr view <number> -R <repo> --json files
+Agent(subagent_type="<reviewer>", run_in_background=true, ...)
 ```
-
-## Step 2: Dispatch 6 reviewers in parallel
-
-Make ALL 6 Agent calls in a SINGLE message so they run concurrently:
-
-1. `Agent(subagent_type="code-quality-reviewer", run_in_background=true, ...)`
-2. `Agent(subagent_type="ir-correctness-reviewer", run_in_background=true, ...)`
-3. `Agent(subagent_type="security-code-reviewer", run_in_background=true, ...)`
-4. `Agent(subagent_type="test-coverage-reviewer", run_in_background=true, ...)`
-5. `Agent(subagent_type="cross-backend-reviewer", run_in_background=true, ...)`
-6. `Agent(subagent_type="documentation-accuracy-reviewer", run_in_background=true, ...)`
 
 Each agent's prompt MUST include:
-- The FULL diff content and changed file list
+- The PR number, repo name, title, and linked issue (if any)
+- "Read `tmp/pr-diff.patch` for the full diff and `tmp/pr-files.txt` for the changed file list"
 - "Read CLAUDE.md for project context"
 - "Use `mcp__deepwiki__ask_question` with repo `shader-slang/slang` as a SUPPLEMENTARY reference only — always prioritize the actual code, PR diff, and CLAUDE.md over DeepWiki answers"
 - "For large files (>1000 lines), use Grep first then Read with offset/limit"
 - "The Slang language spec has been cloned to `external/spec/` (if it exists). Check `external/spec/proposals/` when the PR implements or references a spec proposal"
-
-All 6 MUST be dispatched regardless of PR size.
 
 ## Step 3: Wait for all 6 agents, then editorially filter
 
