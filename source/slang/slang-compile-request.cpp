@@ -9,6 +9,7 @@
 #include "slang-compiler.h"
 #include "slang-emit-source-writer.h"
 #include "slang-lower-to-ir.h"
+#include "slang-markdown.h"
 #include "slang-parser.h"
 #include "slang-rich-diagnostics.h"
 #include "slang-serialize-container.h"
@@ -319,6 +320,53 @@ void FrontEndCompileRequest::parseTranslationUnit(TranslationUnitRequest* transl
 
     for (auto sourceFile : translationUnit->getSourceFiles())
     {
+        if (sourceFile->getPathInfo().foundPath.endsWith(".slang.md"))
+        {
+            auto content = sourceFile->getContent();
+            auto codeBlocks =
+                extractSlangCodeBlocks(content.begin(), content.getLength());
+            auto* sourceManager = getSourceManager();
+            Scope* languageScope = getSession()->slangLanguageScope;
+
+            for (Index blockIndex = 0; blockIndex < codeBlocks.getCount(); blockIndex++)
+            {
+                auto& block = codeBlocks[blockIndex];
+
+                StringBuilder syntheticContent;
+                syntheticContent << "#line " << block.startLine << "\n";
+                syntheticContent << block.content;
+
+                auto syntheticFile = sourceManager->createSourceFileWithString(
+                    sourceFile->getPathInfo(),
+                    syntheticContent.produceString());
+
+                SourceLanguage sourceLanguage = SourceLanguage::Slang;
+                SlangLanguageVersion languageVersion =
+                    translationUnit->compileRequest->optionSet.getLanguageVersion();
+                auto tokens = preprocessSource(
+                    syntheticFile,
+                    getSink(),
+                    &includeSystem,
+                    combinedPreprocessorDefinitions,
+                    getLinkage(),
+                    sourceLanguage,
+                    languageVersion,
+                    &preprocessorHandler);
+
+                translationUnitSyntax->languageVersion = languageVersion;
+
+                parseSourceFile(
+                    astBuilder,
+                    translationUnit,
+                    SourceLanguage::Slang,
+                    tokens,
+                    getSink(),
+                    languageScope,
+                    translationUnitSyntax);
+            }
+            continue;
+        }
+
         SourceLanguage sourceLanguage = translationUnit->sourceLanguage;
         SlangLanguageVersion languageVersion =
             translationUnit->compileRequest->optionSet.getLanguageVersion();

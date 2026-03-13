@@ -295,6 +295,11 @@ advanced_option(
     "Build using user defined path for mimalloc"
     OFF
 )
+advanced_option(
+    SLANG_OVERRIDE_CMARK_PATH
+    "Build using user defined path for cmark"
+    OFF
+)
 
 advanced_option(
     SLANG_EXCLUDE_DAWN

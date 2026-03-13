@@ -1478,6 +1478,7 @@ SlangSourceLanguage findSourceLanguageFromPath(const String& path, Stage& outImp
     };
 
     static const Entry entries[] = {
+        {".slang.md", SLANG_SOURCE_LANGUAGE_SLANG, SLANG_STAGE_NONE},
         {".slang", SLANG_SOURCE_LANGUAGE_SLANG, SLANG_STAGE_NONE},
 
         {".hlsl", SLANG_SOURCE_LANGUAGE_HLSL, SLANG_STAGE_NONE},
@@ -1528,7 +1529,8 @@ SlangResult OptionsParser::addInputPath(char const* inPath, SourceLanguage langO
     {
         return addReferencedModule(path, SourceLoc(), false);
     }
-    else if (path.endsWith(".slang") || langOverride == SourceLanguage::Slang)
+    else if (path.endsWith(".slang") || path.endsWith(".slang.md") ||
+             langOverride == SourceLanguage::Slang)
     {
         // Plain old slang code
         addInputSlangPath(path);

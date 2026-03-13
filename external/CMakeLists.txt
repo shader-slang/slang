@@ -81,6 +81,20 @@ if(NOT ${SLANG_USE_SYSTEM_LZ4})
     endif()
 endif()
 
+# cmark (CommonMark Markdown parser)
+set(CMARK_LIB_FUZZER OFF)
+set(BUILD_TESTING OFF)
+if(NOT SLANG_OVERRIDE_CMARK_PATH)
+    add_subdirectory(cmark EXCLUDE_FROM_ALL ${system})
+else()
+    add_subdirectory(
+        ${SLANG_OVERRIDE_CMARK_PATH}/cmark
+        cmark
+        EXCLUDE_FROM_ALL
+        ${system}
+    )
+endif()
+
 # Vulkan headers
 if(NOT TARGET Vulkan::Headers)
     if(NOT ${SLANG_USE_SYSTEM_VULKAN_HEADERS})
