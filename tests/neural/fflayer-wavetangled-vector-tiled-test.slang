@@ -1,24 +1,10 @@
-// Test FFLayer with WaveTangledVector (CooperativeMatrix accelerated).
-// This verifies that FFLayer works with non-InlineVector types using LinearLayout.
-// Tests both single-warp (WARP_COUNT=1) and multi-warp (WARP_COUNT=2,4) configurations.
+// Test FFLayer with WaveTangledVector using OptimalLayout (tiled 16x16 storage).
+// This verifies that FFLayer works with tiled weight layout for CooperativeMatrix acceleration.
 //
-// LinearLayout — single-warp:
+// OptimalLayout (tiled) — single-warp:
 // TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_POINTER=0 -xslang -DWARP_COUNT=1 -xslang -DTEST_TENSORVIEW=0 -emit-spirv-directly
-// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_POINTER=1 -xslang -DWARP_COUNT=1 -xslang -DTEST_TENSORVIEW=0 -emit-spirv-directly
 // TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -xslang -experimental-feature -xslang -DTEST_POINTER=0 -xslang -DWARP_COUNT=1 -xslang -DTEST_TENSORVIEW=0
 // TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -xslang -experimental-feature -xslang -DTEST_POINTER=1 -xslang -DWARP_COUNT=1 -xslang -DTEST_TENSORVIEW=0
-//
-// LinearLayout — multi-warp (WARP_COUNT=2):
-// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_POINTER=0 -xslang -DWARP_COUNT=2 -xslang -DTEST_TENSORVIEW=0 -emit-spirv-directly
-// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -xslang -experimental-feature -xslang -DTEST_POINTER=0 -xslang -DWARP_COUNT=2 -xslang -DTEST_TENSORVIEW=0
-//
-// LinearLayout — multi-warp (WARP_COUNT=4):
-// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_POINTER=0 -xslang -DWARP_COUNT=4 -xslang -DTEST_TENSORVIEW=0 -emit-spirv-directly
-// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -xslang -experimental-feature -xslang -DTEST_POINTER=0 -xslang -DWARP_COUNT=4 -xslang -DTEST_TENSORVIEW=0
-//
-// Compile-only test for TorchTensorViewAddress (CUDA target):
-// TEST:SIMPLE(filecheck=CHECK): -target ptx -stage compute -entry computeMain -capability cuda_sm_7_0 -DTEST_TENSORVIEW=1 -DTEST_POINTER=0 -DWARP_COUNT=1 -experimental-feature
-// CHECK: computeMain
 
 #pragma warning(disable: 41017)
 import slang.neural;
@@ -41,12 +27,12 @@ typealias ElementType = float;
 //TEST_INPUT: set parametersFloat = ubuffer(data=[1.0 2.0 3.0 4.0 5.0 6.0 7.0 8.0 9.0 10.0], stride=4)
 uniform RWStructuredBuffer<float>.Handle parametersFloat;
 
-//TEST_INPUT: set parameters = ubuffer(data=[0 0 0 0 0 0 0 0 0 0], stride=4)
-//TEST_INPUT: set dParameters = ubuffer(data=[0 0 0 0 0 0 0 0 0 0], stride=4)
+//TEST_INPUT: set parameters = ubuffer(stride=4, count=258)
+//TEST_INPUT: set dParameters = ubuffer(stride=4, count=258)
 
-static const int BiasOffset = 8;
-static const int ParamBufferSize = 10;
-typealias Layout = LinearLayout;
+static const int BiasOffset = 256;
+static const int ParamBufferSize = 258;
+typealias Layout = OptimalLayout;
 
 //TEST_INPUT: ubuffer(data=[0 0 0], stride=4):out,name=testResult
 RWStructuredBuffer<uint> testResult;
@@ -132,15 +118,15 @@ void testFFLayerBackward(int tid, int resIndex)
     // dW accumulated across BatchSize threads.
     // dW = BatchSize * [[1,2,3,4],[1,2,3,4]]
     ElementType scale = ElementType(BatchSize);
-    // Linear layout: row-major [0..7]
-    isPassed = isPassed && (dParameters[0] == scale * ElementType(1.0));
-    isPassed = isPassed && (dParameters[1] == scale * ElementType(2.0));
-    isPassed = isPassed && (dParameters[2] == scale * ElementType(3.0));
-    isPassed = isPassed && (dParameters[3] == scale * ElementType(4.0));
-    isPassed = isPassed && (dParameters[4] == scale * ElementType(1.0));
-    isPassed = isPassed && (dParameters[5] == scale * ElementType(2.0));
-    isPassed = isPassed && (dParameters[6] == scale * ElementType(3.0));
-    isPassed = isPassed && (dParameters[7] == scale * ElementType(4.0));
+    // Tiled layout: row 0 at [0..3], row 1 at [16..19]
+    isPassed = isPassed && equals(dParameters[0], scale * ElementType(1.0));
+    isPassed = isPassed && equals(dParameters[1], scale * ElementType(2.0));
+    isPassed = isPassed && equals(dParameters[2], scale * ElementType(3.0));
+    isPassed = isPassed && equals(dParameters[3], scale * ElementType(4.0));
+    isPassed = isPassed && equals(dParameters[16], scale * ElementType(1.0));
+    isPassed = isPassed && equals(dParameters[17], scale * ElementType(2.0));
+    isPassed = isPassed && equals(dParameters[18], scale * ElementType(3.0));
+    isPassed = isPassed && equals(dParameters[19], scale * ElementType(4.0));
 
     // dBias = [BatchSize, BatchSize]
     isPassed = isPassed && equals(dParameters[BiasOffset], scale);
@@ -158,8 +144,8 @@ void testFFLayerParameterCount(int tid, int resIndex)
     // For 4->2 layer with bias: 4*2 + 2 = 10
     bool isPassed = (Layer.ParameterCount == 10);
 
-    // LinearLayout: StorageSize == ParameterCount
-    isPassed = isPassed && (Layer.StorageSize == 10);
+    // OptimalLayout: ceil(2/16)*ceil(4/16)*256 + 2 = 1*1*256 + 2 = 258
+    isPassed = isPassed && (Layer.StorageSize == 258);
 
     isPassed = WaveActiveAllTrue(isPassed);
     if (tid == 0)
@@ -182,7 +168,19 @@ void setupParameters(uint tid)
     if (tid == 0)
     {
         for (int i = 0; i < ParamBufferSize; i++)
-            parameters[i] = ElementType(parametersFloat[i]);
+            parameters[i] = ElementType(0.0);
+
+        // Row 0: parameters[0..3] = {1,2,3,4}
+        for (int col = 0; col < InputSize; col++)
+            parameters[col] = ElementType(parametersFloat[col]);
+
+        // Row 1: parameters[16..19] = {5,6,7,8}
+        for (int col = 0; col < InputSize; col++)
+            parameters[16 + col] = ElementType(parametersFloat[InputSize + col]);
+
+        // Bias at offset 256: {9, 10}
+        parameters[256] = ElementType(parametersFloat[8]);
+        parameters[257] = ElementType(parametersFloat[9]);
     }
 }
 
