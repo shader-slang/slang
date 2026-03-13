@@ -1,0 +1,86 @@
+name: Build VSIX
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: 'recursive'
+    - name: Build and cache WASM dependencies
+      uses: ./.github/actions/build-wasm-deps
+      with:
+        build-artifacts-dir: ./media
+    - name: Download artifact - windows-x86_64
+      id: download-windows-x86_64
+      uses: dsaltares/fetch-gh-release-asset@master
+      with:
+        repo: shader-slang/slang
+        file: 'slang-.*-windows-x86_64\.zip'
+        target: "./"
+        regex: true
+    - name: Download artifact - windows-aarch64
+      id: download-windows-aarch64
+      uses: dsaltares/fetch-gh-release-asset@master
+      with:
+        repo: shader-slang/slang
+        file: 'slang-.*-windows-aarch64\.zip'
+        target: "./"
+        regex: true
+    - name: Download artifact - linux-x86_64
+      id: download-linux-x86_64
+      uses: dsaltares/fetch-gh-release-asset@master
+      with:
+        repo: shader-slang/slang
+        file: 'slang-.*-linux-x86_64\.zip'
+        target: "./"
+        regex: true
+    - name: Download artifact - linux-aarch64
+      id: download-linux-aarch64
+      uses: dsaltares/fetch-gh-release-asset@master
+      with:
+        repo: shader-slang/slang
+        file: 'slang-.*-linux-aarch64\.zip'
+        target: "./"
+        regex: true
+    - name: Download artifact - macos-x86_64
+      id: download-macos-x86_64
+      uses: dsaltares/fetch-gh-release-asset@master
+      with:
+        repo: shader-slang/slang
+        file: 'slang-.*-macos-x86_64\.zip'
+        target: "./"
+        regex: true
+    - name: Download artifact - macos-aarch64
+      id: download-macos-aarch64
+      uses: dsaltares/fetch-gh-release-asset@master
+      with:
+        repo: shader-slang/slang
+        file: 'slang-.*-macos-aarch64\.zip'
+        target: "./"
+        regex: true
+    - name: Copy Slang binaries and Build VSIX
+      run: |
+        export TAGNAME=${{ steps.download-windows-x86_64.outputs.version }}
+        export WIN32_X64_ZIP=slang-${TAGNAME:1}-windows-x86_64.zip
+        export WIN32_ARM64_ZIP=slang-${TAGNAME:1}-windows-aarch64.zip
+        export LINUX_X64_ZIP=slang-${TAGNAME:1}-linux-x86_64.zip
+        export LINUX_ARM64_ZIP=slang-${TAGNAME:1}-linux-aarch64.zip
+        export DARWIN_X64_ZIP=slang-${TAGNAME:1}-macos-x86_64.zip
+        export DARWIN_ARM64_ZIP=slang-${TAGNAME:1}-macos-aarch64.zip
+        source ./build_scripts/build-package.sh
+
+        for file in ./*.vsix
+        do
+          echo "Built VSIX: $file"
+        done
+    - uses: actions/upload-artifact@v4
+      with:
+        name: slang-vsix
+        path: |
+          *.vsix
