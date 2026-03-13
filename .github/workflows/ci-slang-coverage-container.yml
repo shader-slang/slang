@@ -22,8 +22,16 @@ jobs:
   coverage-container:
     runs-on: ${{ fromJSON(inputs.runs-on) }}
     timeout-minutes: 180
+
+    permissions:
+      contents: read
+      packages: read
+
     container:
-      image: nvidia/cuda:12.4.1-devel-ubuntu22.04
+      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.4.0
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
       options: >-
         --gpus all
         --user root
@@ -48,79 +56,36 @@ jobs:
           fi
           echo "GPU: $output"
 
-      # Git must be installed before checkout for submodules to work in containers
-      - name: Install Git and dependencies
-        run: |
-          apt-get update && apt-get install -y \
-            git \
-            build-essential \
-            ninja-build \
-            curl \
-            unzip \
-            python3 \
-            libx11-dev \
-            libxcursor-dev \
-            libxrandr-dev \
-            libxinerama-dev \
-            libxi-dev \
-            libgl1-mesa-dev \
-            libvulkan-dev \
-            vulkan-validationlayers \
-            spirv-tools \
-            glslang-tools \
-            wget \
-            ca-certificates \
-            libx11-6 \
-            libxext6 \
-            libegl1 \
-            libvulkan1 \
-            gnupg \
-            lsb-release
-          git config --global --add safe.directory '*'
+      - name: Configure Git safe directory
+        run: git config --global --add safe.directory '*'
 
       - uses: actions/checkout@v4
         with:
           submodules: "recursive"
           fetch-depth: "0"
 
-      - name: Install Clang 18, LLVM Tools, and CMake
+      - name: Install Clang 18 and LLVM Coverage Tools
         run: |
           # Add LLVM APT repository
           wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add -
-          echo "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-18 main" > /etc/apt/sources.list.d/llvm.list
+          . /etc/os-release
+          echo "deb http://apt.llvm.org/$VERSION_CODENAME/ llvm-toolchain-$VERSION_CODENAME-18 main" \
+            > /etc/apt/sources.list.d/llvm.list
           apt-get update
 
           # Install clang-18 and LLVM coverage tools
           apt-get install -y clang-18 clang++-18 llvm-18
 
           # Create symlinks for coverage tools
-          update-alternatives --install /usr/bin/clang clang /usr/bin/clang-18 100
-          update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-18 100
           update-alternatives --install /usr/bin/llvm-profdata llvm-profdata /usr/bin/llvm-profdata-18 100
           update-alternatives --install /usr/bin/llvm-cov llvm-cov /usr/bin/llvm-cov-18 100
 
           # Verify installation
-          echo "Clang version:"
           clang-18 --version
-          echo "Clang++ version:"
-          clang++-18 --version
-          echo "llvm-profdata version:"
           llvm-profdata --version
-          echo "llvm-cov version:"
           llvm-cov --version
-
-          # Install CMake 3.30 (required for CMakePresets.json version 6)
-          wget -q https://github.com/Kitware/CMake/releases/download/v3.30.0/cmake-3.30.0-linux-x86_64.tar.gz
-          tar -xzf cmake-3.30.0-linux-x86_64.tar.gz -C /opt
-          rm cmake-3.30.0-linux-x86_64.tar.gz
-          ln -s /opt/cmake-3.30.0-linux-x86_64/bin/cmake /usr/local/bin/cmake
-          ln -s /opt/cmake-3.30.0-linux-x86_64/bin/ctest /usr/local/bin/ctest
-          ln -s /opt/cmake-3.30.0-linux-x86_64/bin/cpack /usr/local/bin/cpack
-
-          echo "CMake version:"
-          cmake --version
-          echo "CUDA version:"
-          nvcc --version
+          echo "CMake version: $(cmake --version | head -1)"
+          echo "CUDA version: $(nvcc --version | tail -1)"
 
       - name: Build Slang with Coverage and CUDA
         run: |
@@ -164,17 +129,6 @@ jobs:
           # Set SPIRV validation environment variables
           export SLANG_RUN_SPIRV_VALIDATION=1
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
-
-          # Diagnostics: verify binary can load and run
-          SLANG_TEST="$PWD/build/RelWithDebInfo/bin/slang-test"
-          echo "=== Binary check ==="
-          ls -la "$SLANG_TEST"
-          echo "=== Library dependencies ==="
-          ldd "$SLANG_TEST" 2>&1 || true
-          echo "=== slang-llvm check ==="
-          ls -la build/RelWithDebInfo/lib/libslang-llvm* 2>/dev/null || echo "WARNING: slang-llvm not found in lib dir"
-          echo "=== Smoke test ==="
-          "$SLANG_TEST" -h 2>&1 | head -5 || echo "slang-test -h exited with code $?"
 
           # Build slang-test arguments for GPU testing
           test_args=(
