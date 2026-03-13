@@ -3286,16 +3286,21 @@ static LegalVal declareVars(
             auto unwrappedTypeLayout = typeLayout;
             IRVarLayout* elementVarLayout = nullptr;
 
-            // If the type layout is a ParameterGroupTypeLayout wrapping a non-struct
-            // element, unwrap to the element layout so resource bindings (e.g.
-            // DescriptorTableSlot) propagate to the declared variable.
-            // Struct elements get pair-decomposed, and the element
-            // layout refers to the full struct rather than the ordinary-only part.
+            // If the type layout is a ParameterGroupTypeLayout whose element
+            // type layout carries its own DescriptorTableSlot size (i.e. the
+            // element is itself a resource type), unwrap to the element layout
+            // so resource bindings propagate to the declared variable.
+            //
+            // We must NOT unwrap when the element is a plain data type (e.g.
+            // uint inside ConstantBuffer<uint>), because its type layout lacks
+            // DescriptorTableSlot and createVarLayout would then never apply
+            // binding/set offsets from the var chain.
             if (auto paramGroupLayout = as<IRParameterGroupTypeLayout>(typeLayout))
             {
                 auto paramGroupElementVarLayout = paramGroupLayout->getElementVarLayout();
                 auto paramGroupElementTypeLayout = paramGroupElementVarLayout->getTypeLayout();
-                if (!as<IRStructTypeLayout>(paramGroupElementTypeLayout))
+                if (paramGroupElementTypeLayout->findSizeAttr(
+                        LayoutResourceKind::DescriptorTableSlot))
                 {
                     elementVarLayout = paramGroupElementVarLayout;
                     unwrappedTypeLayout = paramGroupElementTypeLayout;
