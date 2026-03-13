@@ -1395,15 +1395,10 @@ Result linkAndOptimizeIR(
         //
         SLANG_PASS(legalizeResourceTypes, targetProgram, sink);
 
-        // We also need to legalize empty types for Metal targets.
-        switch (target)
-        {
-        case CodeGenTarget::Metal:
-        case CodeGenTarget::MetalLib:
-        case CodeGenTarget::MetalLibAssembly:
-            SLANG_PASS(legalizeEmptyTypes, targetProgram, sink);
-            break;
-        }
+        // After resource type legalization, clean up void/empty types
+        // that were kept as LegalVal::simple(voidValue) for consistency
+        // during the legalization process.
+        SLANG_PASS(legalizeEmptyTypes, targetProgram, sink);
         //  Debugging output of legalization
         validateIRModuleIfEnabled(codeGenContext, irModule);
     }
