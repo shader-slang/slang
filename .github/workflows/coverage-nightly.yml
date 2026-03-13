@@ -22,7 +22,7 @@ jobs:
     with:
       config: relwithdebinfo
       runs-on: '["Linux", "self-hosted", "GPU"]'
-      server-count: 4
+      server-count: 1
       deploy-pages: false
     secrets: inherit
 
