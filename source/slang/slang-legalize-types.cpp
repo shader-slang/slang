@@ -355,9 +355,16 @@ struct TupleTypeBuilder
                 }
 
                 // `void` is currently legalized to simple, but we don't want to add a
-                // `void` field to the struct.
+                // `void` field to the struct. Reset ordinaryType so the field won't be
+                // emitted, but fall through to register a PairInfo entry (flags=0) so
+                // that downstream field-extract/address lookups find the key and produce
+                // LegalVal::none instead of crashing.
                 if (legalLeafType.getSimple()->getOp() == kIROp_VoidType)
-                    return;
+                {
+                    ordinaryType = LegalType();
+                    anyComplex = true;
+                    break;
+                }
             }
             break;
 

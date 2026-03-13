@@ -1043,6 +1043,13 @@ static LegalVal legalizeFieldExtract(
                 UNREACHABLE_RETURN(LegalVal());
             }
 
+            // A void field (flags==0) has no data on either side.
+            // Return a void value to preserve the original Void semantics.
+            if (pairElement->flags == 0)
+            {
+                return LegalVal::simple(context->getBuilder()->getVoidValue());
+            }
+
             // If the field we are extracting has a pair type,
             // that means it exists on both the ordinary and
             // special sides.
@@ -1091,11 +1098,10 @@ static LegalVal legalizeFieldExtract(
                 }
             }
 
-            // TODO: we can legally reach this case now
-            // when the field is "ordinary".
-
-            SLANG_UNEXPECTED("didn't find tuple element");
-            UNREACHABLE_RETURN(LegalVal());
+            // The field is ordinary and not in the special-side tuple.
+            // This can happen for void fields or ordinary-only fields
+            // when the struct collapsed to just its special side.
+            return LegalVal::simple(context->getBuilder()->getVoidValue());
         }
 
     default:
@@ -1311,6 +1317,12 @@ static LegalVal legalizeFieldAddress(
                 UNREACHABLE_RETURN(LegalVal());
             }
 
+            // A void field (flags==0) has no data on either side — no address to return.
+            if (pairElement->flags == 0)
+            {
+                return LegalVal();
+            }
+
             // If the field we are extracting has a pair type,
             // that means it exists on both the ordinary and
             // special sides.
@@ -1359,11 +1371,8 @@ static LegalVal legalizeFieldAddress(
                 }
             }
 
-            // TODO: we can legally reach this case now
-            // when the field is "ordinary".
-
-            SLANG_UNEXPECTED("didn't find tuple element");
-            UNREACHABLE_RETURN(LegalVal());
+            // The field is ordinary and not in the special-side tuple.
+            return LegalVal();
         }
 
     case LegalVal::Flavor::implicitDeref:
