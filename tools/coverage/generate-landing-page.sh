@@ -452,7 +452,7 @@ EOF
 
       cat >>"${OUTPUT_FILE}" <<EOF
                     <tr style="border-bottom: 1px solid #ddd;">
-                        <td style="padding: 15px;"><strong>🐧 Linux (x86_64)</strong></td>
+                        <td style="padding: 15px;"><strong>🐧 Linux GPU (x86_64)</strong></td>
                         <td style="padding: 15px; text-align: center;"><span class="${linux_line_class}">${LINUX_LINE_COV}</span>${linux_line_diff_html}<br><small>${LINUX_LINES_HIT}/${LINUX_LINES_FOUND}</small></td>
                         <td style="padding: 15px; text-align: center;"><span class="${linux_region_class}">${LINUX_REGION_COV}</span>${linux_region_diff_html}<br><small>${LINUX_REGIONS_HIT}/${LINUX_REGIONS_FOUND}</small></td>
                         <td style="padding: 15px; text-align: center;"><span class="${linux_function_class}">${LINUX_FUNCTION_COV}</span>${linux_function_diff_html}<br><small>${LINUX_FUNCTIONS_HIT}/${LINUX_FUNCTIONS_FOUND}</small></td>
@@ -531,7 +531,7 @@ EOF
 
         cat >>"${OUTPUT_FILE}" <<EOF
                     <tr style="border-bottom: 1px solid #ddd;">
-                        <td style="padding: 15px;"><strong>🐧 Linux (x86_64)</strong></td>
+                        <td style="padding: 15px;"><strong>🐧 Linux GPU (x86_64)</strong></td>
                         <td style="padding: 15px; text-align: center;"><span class="${linux_sl_line_class}">${LINUX_SLANGC_LINE_COV}</span><br><small>${LINUX_SLANGC_LINES_HIT}/${LINUX_SLANGC_LINES_FOUND}</small></td>
                         <td style="padding: 15px; text-align: center;"><span class="${linux_sl_region_class}">${LINUX_SLANGC_REGION_COV}</span><br><small>${LINUX_SLANGC_REGIONS_HIT}/${LINUX_SLANGC_REGIONS_FOUND}</small></td>
                         <td style="padding: 15px; text-align: center;"><span class="${linux_sl_function_class}">${LINUX_SLANGC_FUNCTION_COV}</span><br><small>${LINUX_SLANGC_FUNCTIONS_HIT}/${LINUX_SLANGC_FUNCTIONS_FOUND}</small></td>
