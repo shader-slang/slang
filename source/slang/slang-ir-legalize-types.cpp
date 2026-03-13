@@ -1091,10 +1091,11 @@ static LegalVal legalizeFieldExtract(
                 }
             }
 
-            // The field is ordinary and not in the special-side tuple.
-            // This can happen for void fields or ordinary-only fields
-            // when the struct collapsed to just its special side.
-            return LegalVal::simple(context->getBuilder()->getVoidValue());
+            // Void fields now carry kFlag_hasOrdinary and are resolved
+            // through the pair's ordinary side before reaching this tuple
+            // case, so we should never fall through here.
+            SLANG_UNEXPECTED("didn't find tuple element in field extract");
+            UNREACHABLE_RETURN(LegalVal());
         }
 
     default:
@@ -1358,10 +1359,11 @@ static LegalVal legalizeFieldAddress(
                 }
             }
 
-            // The field is ordinary and not in the special-side tuple.
-            // This can happen for void/ordinary-only fields when the
-            // struct collapsed to just its special side.
-            return LegalVal();
+            // Void fields now carry kFlag_hasOrdinary and are resolved
+            // through the pair's ordinary side before reaching this tuple
+            // case, so we should never fall through here.
+            SLANG_UNEXPECTED("didn't find tuple element in field address");
+            UNREACHABLE_RETURN(LegalVal());
         }
 
     case LegalVal::Flavor::implicitDeref:
