@@ -3303,19 +3303,19 @@ static LegalVal declareVars(
             {
                 auto paramGroupElementVarLayout = paramGroupLayout->getElementVarLayout();
                 auto paramGroupElementTypeLayout = paramGroupElementVarLayout->getTypeLayout();
-                bool elementHasDescriptorBindingSize = false;
+                bool elementHasNonUniformResourceSize = false;
                 if (!as<IRStructTypeLayout>(paramGroupElementTypeLayout))
                 {
                     for (auto sizeAttr : paramGroupElementTypeLayout->getSizeAttrs())
                     {
                         if (sizeAttr->getResourceKind() != LayoutResourceKind::Uniform)
                         {
-                            elementHasDescriptorBindingSize = true;
+                            elementHasNonUniformResourceSize = true;
                             break;
                         }
                     }
                 }
-                if (elementHasDescriptorBindingSize)
+                if (elementHasNonUniformResourceSize)
                 {
                     elementVarLayout = paramGroupElementVarLayout;
                     unwrappedTypeLayout = paramGroupElementTypeLayout;
