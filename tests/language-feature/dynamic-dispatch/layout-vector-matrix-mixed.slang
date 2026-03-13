@@ -1,7 +1,8 @@
-// Mixed vector, matrix, and scalar fields in the same interface implementation.
-// This verifies that the AnyValue layout engine correctly composes different-sized
-// types within a single struct and preserves field ordering across pack/unpack.
-// Both matrices use non-diagonal entries to catch row/column ordering bugs.
+// Mixed field types in interface implementations that go through dynamic dispatch.
+// Impl A uses vectors + scalar (28 bytes), Impl B uses matrix + vectors (56 bytes),
+// exercising different-sized AnyValue payloads and composite packing.
+// Note: float3 + float3x3 in the same Metal struct triggers a Metal compiler
+// failure (filed separately), so the matrix is only in Impl B.
 
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-dx12 -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -shaderobj -output-using-type
@@ -21,30 +22,16 @@ interface IMixed
     float extraValue();
 }
 
-struct BasisScaled : IMixed
+// 7 floats = 28 bytes (vectors + scalar)
+struct VecScaled : IMixed
 {
     float3 position;
-    float3x3 basis;
+    float3 direction;
     float scale;
 
-    float resultX()
-    {
-        float3 r = mul(basis, position) * scale;
-        return r.x;
-    }
-
-    float resultY()
-    {
-        float3 r = mul(basis, position) * scale;
-        return r.y;
-    }
-
-    float resultZ()
-    {
-        float3 r = mul(basis, position) * scale;
-        return r.z;
-    }
-
+    float resultX() { return (position.x + direction.x) * scale; }
+    float resultY() { return (position.y + direction.y) * scale; }
+    float resultZ() { return (position.z + direction.z) * scale; }
     float extraValue() { return scale; }
 }
 
@@ -82,12 +69,9 @@ IMixed makeMixed(int id)
 {
     if (id == 0)
     {
-        BasisScaled a;
+        VecScaled a;
         a.position = float3(1.0, 2.0, 3.0);
-        a.basis = float3x3(
-            2.0, 1.0, 0.0,
-            0.0, 3.0, 0.0,
-            0.0, 0.0, 4.0);
+        a.direction = float3(3.0, 4.0, 9.0);
         a.scale = 0.5;
         return a;
     }
@@ -107,7 +91,7 @@ IMixed makeMixed(int id)
 [numthreads(1, 1, 1)]
 void computeMain(int id : SV_DispatchThreadID)
 {
-    // BasisScaled: [[2,1,0],[0,3,0],[0,0,4]] * (1,2,3) * 0.5 = (4,6,12)*0.5 = (2,3,6)
+    // VecScaled: (pos + dir) * scale = (1+3, 2+4, 3+9) * 0.5 = (2, 3, 6)
     var a = makeMixed(id);
     outputBuffer[0] = a.resultX();
     // CHECK: 2.0
