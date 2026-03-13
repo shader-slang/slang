@@ -6,7 +6,9 @@
 //
 // When a ConstantBuffer<T> is a field inside a struct wrapped by ParameterBlock,
 // the ConstantBuffer must still receive Binding and DescriptorSet decorations.
-// Tests both scalar (uint) and struct element types.
+// ConstantBuffer<uint> (scalar element) exercises the new non-Uniform size
+// check. ConstantBuffer<MyData> (struct element) serves as a non-regression
+// check for the existing struct-exclusion path.
 
 struct MyData {
     float4 value;
