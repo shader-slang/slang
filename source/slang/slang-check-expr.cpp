@@ -2371,7 +2371,11 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
     if (auto sizeOfLikeExpr = expr.as<SizeOfLikeExpr>())
     {
         if (!sizeOfLikeExpr.getExpr()->sizedType)
+            CheckTerm(sizeOfLikeExpr.getExpr());
+
+        if (!sizeOfLikeExpr.getExpr()->sizedType)
             return nullptr;
+
         auto type = as<Type>(
             sizeOfLikeExpr.getExpr()->sizedType->substitute(m_astBuilder, expr.getSubsts()));
 

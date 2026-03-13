@@ -2162,31 +2162,6 @@ void SemanticsDeclHeaderVisitor::deriveVarTypeFromInitExpr(VarDeclBase* varDecl)
     _validateCircularVarDefinition(varDecl);
 }
 
-static bool _containsSizeOfLikeExpr(Expr* expr)
-{
-    if (!expr)
-        return false;
-    if (as<SizeOfLikeExpr>(expr))
-        return true;
-    if (auto paren = as<ParenExpr>(expr))
-        return _containsSizeOfLikeExpr(paren->base);
-    if (auto invoke = as<InvokeExpr>(expr))
-    {
-        for (auto arg : invoke->arguments)
-            if (_containsSizeOfLikeExpr(arg))
-                return true;
-    }
-    if (auto indexExpr = as<IndexExpr>(expr))
-    {
-        if (_containsSizeOfLikeExpr(indexExpr->baseExpression))
-            return true;
-        for (auto idx : indexExpr->indexExprs)
-            if (_containsSizeOfLikeExpr(idx))
-                return true;
-    }
-    return false;
-}
-
 void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
 {
     // A variable that didn't have an explicit type written must
@@ -2282,17 +2257,6 @@ void SemanticsDeclHeaderVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
                 (as<NamespaceDeclBase>(parentDecl) || as<FileDecl>(parentDecl) ||
                  varDecl->findModifier<HLSLStaticModifier>()))
             {
-                if (_containsSizeOfLikeExpr(varDecl->initExpr))
-                {
-                    // If the init expression contains a sizeof/alignof/countof, we need to
-                    // check it early so that SizeOfLikeExpr::sizedType is populated before
-                    // tryConstantFoldExpr attempts to fold the expression.
-                    auto initExpr = CheckTerm(varDecl->initExpr);
-                    initExpr =
-                        coerce(CoercionSite::Initializer, varDecl->type.Ptr(), initExpr, getSink());
-                    varDecl->initExpr = initExpr;
-                    varDecl->setCheckState(DeclCheckState::DefinitionChecked);
-                }
                 varDecl->val =
                     tryConstantFoldExpr(varDecl->initExpr, ConstantFoldingKind::LinkTime, nullptr);
             }
