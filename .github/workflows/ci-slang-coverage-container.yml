@@ -80,6 +80,11 @@ jobs:
           update-alternatives --install /usr/bin/llvm-profdata llvm-profdata /usr/bin/llvm-profdata-18 100
           update-alternatives --install /usr/bin/llvm-cov llvm-cov /usr/bin/llvm-cov-18 100
 
+          # Create clang/clang++ symlinks so Slang's downstream compiler
+          # detection finds them (it looks for 'clang++', not 'clang++-18')
+          update-alternatives --install /usr/bin/clang clang /usr/bin/clang-18 100
+          update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-18 100
+
           # Verify installation
           clang-18 --version
           llvm-profdata --version
