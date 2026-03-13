@@ -1225,6 +1225,28 @@ LegalType legalizeTypeImpl(TypeLegalizationContext* context, IRType* type)
         else
         {
             legalElementType = legalizeType(context, originalElementType);
+
+            // When special types leak out of a parameter group, they need to
+            // be bound differently. Warn the user when this happens.
+            if (legalElementType.flavor == LegalType::Flavor::pair)
+            {
+                context->m_sink->diagnose(Diagnostics::SpecialTypeLeaksFromParameterGroup{
+                    .location = findFirstUseLoc(type)});
+
+                // indicate which elements cannot be part of the parameter group
+                auto& specialType = legalElementType.getPair()->specialType;
+                if (specialType.flavor == LegalType::Flavor::tuple)
+                {
+                    auto specialTuple = specialType.getTuple();
+                    for (auto specialElement : specialTuple->elements)
+                    {
+                        context->m_sink->diagnose(
+                            Diagnostics::SpecialTypeMemberLeaksFromParameterGroup{
+                                .member = specialElement.key});
+                    }
+                }
+            }
+
             // As a bit of a corner case, if the user requested something
             // like `ConstantBuffer<Texture2D>` the element type would
             // legalize to a "simple" type, and that would be interpreted

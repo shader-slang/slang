@@ -1,7 +1,7 @@
 // parameter-block-explicit-space.slang
 
-//TEST:REFLECTION:-D__SLANG__ -stage fragment -entry main -profile sm_5_1 -target hlsl -no-codegen
-//TEST:COMPARE_HLSL:-stage fragment -entry main -profile sm_5_1
+//TEST:REFLECTION:-D__SLANG__ -stage fragment -entry main -profile sm_5_1 -target hlsl -no-codegen -warnings-disable 31106,31107
+//TEST:COMPARE_HLSL:-stage fragment -entry main -profile sm_5_1 -warnings-disable 31106,31107
 
 #ifdef __SLANG__
 struct A
