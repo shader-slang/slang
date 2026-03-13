@@ -155,10 +155,16 @@ public struct SharedMemorySize0<T, TargetEnum Target, ExecutionMode ExeMode, int
 {
     typealias ShMemInfo = SharedMemoryUsage<T, Target, ExeMode, InputSize, OutputSize, SubgroupSize>;
 
-    // Notice that in the actual implementation, we always reuse shared memory for Tile B and Tile C because they are always used at
-    // different stages of the computation, and they have the same size.
-    public static const uint Bytes =
+    // The MMA forward/backward uses: shared A tiles + per-warp B/C tiles.
+    static const uint BytesForMMA =
         (ShMemInfo.SharedMemSizeInVectorMatA + (ShMemInfo.SharedMemSizeInVectorMatC) * SubgroupCount) * sizeof(uint4);
+
+    // The backward outer product (dW = dOut * input^T) uses per-warp copies
+    // of BOTH A and B tiles, requiring more shared memory than the MMA layout.
+    static const uint BytesForOuterProduct = !ShMemInfo.IsTraining ? 0 :
+        (ShMemInfo.SharedMemSizeInVectorMatA + ShMemInfo.SharedMemSizeInVectorMatB) * SubgroupCount * sizeof(uint4);
+
+    public static const uint Bytes = Max(BytesForMMA, BytesForOuterProduct);
 }
 
 // The following code is a macro-based implementation of the shared memory size calculation.
