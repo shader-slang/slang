@@ -26,9 +26,7 @@ float eval_loss(
     StructuredBuffer<float> ys,
     int count)
 {
-    let baseAddr = Address(params_ptr);
-    let weightAddr = baseAddr.getOffset(0);
-    let biasAddr = baseAddr.getOffset(2);
+    let paramAddr = Address(params_ptr);
     let layer = LinearLayer();
 
     float sum = 0.0;
@@ -38,7 +36,7 @@ float eval_loss(
         let x = xs[i];
         float featsArr[2] = { x, x * x };
         let feats = V2(featsArr);
-        let predV = layer.eval<Address>(feats, weightAddr, biasAddr);
+        let predV = layer.eval<Address>(feats, paramAddr);
         let pred = predV[0];
         let target = ys[i];
         let err = pred - target;
@@ -64,8 +62,6 @@ float train_step(
         grads_ptr[i] = 0.0;
 
     let layer = LinearLayer();
-    let weightAddr = pAddr.getOffset(0);
-    let biasAddr = pAddr.getOffset(2);
 
     float g0 = 0.0;
     float g1 = 0.0;
@@ -79,7 +75,7 @@ float train_step(
         let t = ys[i];
         float featsArr[2] = { x, x * x };
         let feats = V2(featsArr);
-        let predV = layer.eval<Address>(feats, weightAddr, biasAddr);
+        let predV = layer.eval<Address>(feats, pAddr);
         let pred = predV[0];
         let err = pred - t;
         lossSum += err * err;
@@ -114,16 +110,14 @@ void compute_grad_multiworkgroup(
     if (idx >= count)
         return;
 
-    let baseAddr = Address(params_ptr);
-    let weightAddr = baseAddr.getOffset(0);
-    let biasAddr = baseAddr.getOffset(2);
+    let paramAddr = Address(params_ptr);
     let layer = LinearLayer();
 
     let x = xs[idx];
     let t = ys[idx];
     float featsArr[2] = { x, x * x };
     let feats = V2(featsArr);
-    let predV = layer.eval<Address>(feats, weightAddr, biasAddr);
+    let predV = layer.eval<Address>(feats, paramAddr);
     let pred = predV[0];
     let err = pred - t;
 

@@ -53,28 +53,10 @@ struct LCG
     [mutating] float next_float() { return (next_uint() >> 8) * 0x1p-24; }
 };
 
-struct LayerAddr { Address w0, b0, w1, b1, w2, b2, w3, b3; };
-
-LayerAddr make_addr(float* ptr)
-{
-    Address base = Address(ptr);
-    LayerAddr a;
-    uint off = 0u;
-    a.w0 = base.getOffset(off); a.b0 = base.getOffset(off + INPUT_DIM * HIDDEN_DIM);
-    off += Layer0.ParameterCount;
-    a.w1 = base.getOffset(off); a.b1 = base.getOffset(off + HIDDEN_DIM * HIDDEN_DIM);
-    off += Layer1.ParameterCount;
-    a.w2 = base.getOffset(off); a.b2 = base.getOffset(off + HIDDEN_DIM * HIDDEN_DIM);
-    off += Layer2.ParameterCount;
-    a.w3 = base.getOffset(off); a.b3 = base.getOffset(off + HIDDEN_DIM * OUTPUT_DIM);
-    return a;
-}
-
 #ifdef USE_WAVE_TANGLED
 [Differentiable]
 OutputVec mlp_forward_coords(
-    Address w0, Address b0, Address w1, Address b1,
-    Address w2, Address b2, Address w3, Address b3,
+    Address paramAddr,
     no_diff float2 uv)
 {
     InputVec input;
@@ -82,24 +64,30 @@ OutputVec mlp_forward_coords(
     input[1] = uv.y;
 
     let act = LeakyReLU<float>(ALPHA);
-    let h0 = Layer0(act).eval<Address>(input, w0, b0);
-    let h1 = Layer1(act).eval<Address>(h0, w1, b1);
-    let h2 = Layer2(act).eval<Address>(h1, w2, b2);
-    return Layer3(Sigmoid<float>()).eval<Address>(h2, w3, b3);
+    let h0 = Layer0(act).eval<Address>(input, paramAddr);
+    let a1 = paramAddr.getOffset(Layer0.ParameterCount);
+    let h1 = Layer1(act).eval<Address>(h0, a1);
+    let a2 = a1.getOffset(Layer1.ParameterCount);
+    let h2 = Layer2(act).eval<Address>(h1, a2);
+    let a3 = a2.getOffset(Layer2.ParameterCount);
+    return Layer3(Sigmoid<float>()).eval<Address>(h2, a3);
 }
 
 OutputVec forward_inference(float* params, float2 uv)
 {
-    LayerAddr la = make_addr(params);
+    Address paramAddr = Address(params);
     InputVec input;
     input[0] = uv.x;
     input[1] = uv.y;
 
     let act = LeakyReLU<float>(ALPHA);
-    let h0 = Layer0(act).eval<Address>(input, la.w0, la.b0);
-    let h1 = Layer1(act).eval<Address>(h0, la.w1, la.b1);
-    let h2 = Layer2(act).eval<Address>(h1, la.w2, la.b2);
-    return Layer3(Sigmoid<float>()).eval<Address>(h2, la.w3, la.b3);
+    let h0 = Layer0(act).eval<Address>(input, paramAddr);
+    let a1 = paramAddr.getOffset(Layer0.ParameterCount);
+    let h1 = Layer1(act).eval<Address>(h0, a1);
+    let a2 = a1.getOffset(Layer1.ParameterCount);
+    let h2 = Layer2(act).eval<Address>(h1, a2);
+    let a3 = a2.getOffset(Layer2.ParameterCount);
+    return Layer3(Sigmoid<float>()).eval<Address>(h2, a3);
 }
 
 [shader("compute")]
@@ -135,13 +123,8 @@ void compute_calculate_grads(
     doutArr[2] = 2.0f * (float(out[2]) - ref_color.z) / float(OUTPUT_DIM);
     OutputVec dOutput = OutputVec(doutArr);
 
-    LayerAddr la = make_addr(params);
-    LayerAddr ga = make_addr(params_grad);
     bwd_diff(mlp_forward_coords)(
-        DifferentialPtrPair<Address>(la.w0, ga.w0), DifferentialPtrPair<Address>(la.b0, ga.b0),
-        DifferentialPtrPair<Address>(la.w1, ga.w1), DifferentialPtrPair<Address>(la.b1, ga.b1),
-        DifferentialPtrPair<Address>(la.w2, ga.w2), DifferentialPtrPair<Address>(la.b2, ga.b2),
-        DifferentialPtrPair<Address>(la.w3, ga.w3), DifferentialPtrPair<Address>(la.b3, ga.b3),
+        DifferentialPtrPair<Address>(Address(params), Address(params_grad)),
         pixel_uv,
         dOutput);
 }
@@ -223,16 +206,16 @@ void compute_optimizer_step(
 }
 #else
 [Differentiable]
-OutputVec mlp_forward(
-    Address w0, Address b0, Address w1, Address b1,
-    Address w2, Address b2, Address w3, Address b3,
-    InputVec input)
+OutputVec mlp_forward(Address paramAddr, InputVec input)
 {
     let act = LeakyReLU<float>(ALPHA);
-    let h0 = Layer0(act).eval<Address>(input, w0, b0);
-    let h1 = Layer1(act).eval<Address>(h0, w1, b1);
-    let h2 = Layer2(act).eval<Address>(h1, w2, b2);
-    return Layer3(Sigmoid<float>()).eval<Address>(h2, w3, b3);
+    let h0 = Layer0(act).eval<Address>(input, paramAddr);
+    let a1 = paramAddr.getOffset(Layer0.ParameterCount);
+    let h1 = Layer1(act).eval<Address>(h0, a1);
+    let a2 = a1.getOffset(Layer1.ParameterCount);
+    let h2 = Layer2(act).eval<Address>(h1, a2);
+    let a3 = a2.getOffset(Layer2.ParameterCount);
+    return Layer3(Sigmoid<float>()).eval<Address>(h2, a3);
 }
 
 struct Network
@@ -243,15 +226,14 @@ struct Network
 
 [Differentiable]
 float3 loss(
-    Address w0, Address b0, Address w1, Address b1,
-    Address w2, Address b2, Address w3, Address b3,
+    Address paramAddr,
     no_diff int2 pixel, no_diff int2 resolution, no_diff float3 reference)
 {
     float2 uv = (float2(pixel) + 0.5f) / float2(resolution);
     InputVec input;
     input[0] = uv.x;
     input[1] = uv.y;
-    let out = mlp_forward(w0, b0, w1, b1, w2, b2, w3, b3, input);
+    let out = mlp_forward(paramAddr, input);
     float3 error = float3(out[0], out[1], out[2]) - reference;
     return error * error;
 }
@@ -265,13 +247,8 @@ void calculate_grads(uint seed, int2 batch_index, int2 batch_size,
     int2 pixel = int2(uv * float2(resolution));
     float3 ref_color = reference[pixel];
 
-    LayerAddr la = make_addr(network.params);
-    LayerAddr ga = make_addr(network.params_grad);
     bwd_diff(loss)(
-        DifferentialPtrPair<Address>(la.w0, ga.w0), DifferentialPtrPair<Address>(la.b0, ga.b0),
-        DifferentialPtrPair<Address>(la.w1, ga.w1), DifferentialPtrPair<Address>(la.b1, ga.b1),
-        DifferentialPtrPair<Address>(la.w2, ga.w2), DifferentialPtrPair<Address>(la.b2, ga.b2),
-        DifferentialPtrPair<Address>(la.w3, ga.w3), DifferentialPtrPair<Address>(la.b3, ga.b3),
+        DifferentialPtrPair<Address>(Address(network.params), Address(network.params_grad)),
         pixel, resolution, ref_color, float3(1.0f));
 }
 
@@ -281,16 +258,13 @@ float3 render(int2 pixel, int2 resolution, Network network)
     InputVec input;
     input[0] = uv.x;
     input[1] = uv.y;
-    LayerAddr la = make_addr(network.params);
-    let out = mlp_forward(la.w0, la.b0, la.w1, la.b1, la.w2, la.b2, la.w3, la.b3, input);
+    let out = mlp_forward(Address(network.params), input);
     return float3(out[0], out[1], out[2]);
 }
 
 float3 show_loss(int2 pixel, int2 resolution, float3 reference, Network network)
 {
-    LayerAddr la = make_addr(network.params);
-    return loss(la.w0, la.b0, la.w1, la.b1, la.w2, la.b2, la.w3, la.b3,
-                pixel, resolution, reference);
+    return loss(Address(network.params), pixel, resolution, reference);
 }
 
 void optimizer_step(inout float primal, inout float grad,
