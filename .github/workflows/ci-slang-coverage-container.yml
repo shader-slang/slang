@@ -131,9 +131,10 @@ jobs:
           export CXX=clang++-18
 
           # Configure with coverage preset + CUDA
+          # FETCH_BINARY downloads pre-built slang-llvm (needed by slang-test for FileCheck)
           cmake --preset coverage --fresh \
             -DSLANG_ENABLE_CUDA=ON \
-            -DSLANG_SLANG_LLVM_FLAVOR=DISABLE
+            -DSLANG_SLANG_LLVM_FLAVOR=FETCH_BINARY
 
           # Build
           cmake --build --preset coverage -j$(nproc)
@@ -169,9 +170,11 @@ jobs:
           echo "=== Binary check ==="
           ls -la "$SLANG_TEST"
           echo "=== Library dependencies ==="
-          ldd "$SLANG_TEST" 2>&1 | grep -E "not found|libslang|librender" || echo "All dependencies found"
+          ldd "$SLANG_TEST" 2>&1 || true
+          echo "=== slang-llvm check ==="
+          ls -la build/RelWithDebInfo/lib/libslang-llvm* 2>/dev/null || echo "WARNING: slang-llvm not found in lib dir"
           echo "=== Smoke test ==="
-          "$SLANG_TEST" -help 2>&1 | head -5 || echo "slang-test -help exited with code $?"
+          "$SLANG_TEST" -h 2>&1 | head -5 || echo "slang-test -h exited with code $?"
 
           # Build slang-test arguments for GPU testing
           test_args=(
