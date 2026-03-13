@@ -21,15 +21,28 @@ enum ValidEnum : int { X = 1, Y = 2 }
 extension Outer {
     static int ext_static;
     void ext_method() {}
+    struct ExtInnerStruct { int z; }
+    enum ExtInnerEnum { C, D }
+    typealias MyType = int;
 }
 namespace ValidNS {}
 typedef int MyInt;
 
-// --- Invalid nesting: non-static field in extension (#9599) ---
+// --- Invalid nesting: non-static field in extension ---
 
 struct ForExt { int a; }
 extension ForExt {
     int bad_field;
 //CHECK:^^^^^^^^^ declaration not allowed in this context
-//CHECK:^^^^^^^^^ a non-static member variable declaration is not allowed inside a extension.
+//CHECK:^^^^^^^^^ non-static member variable declaration is not allowed inside extension.
+}
+
+// --- Invalid nesting: non-static field in interface ---
+
+interface IBadField {
+    int bad_iface_field;
+//CHECK:^^^^^^^^^^^^^^^ declaration not allowed in this context
+//CHECK:^^^^^^^^^^^^^^^ non-static member variable declaration is not allowed inside interface.
+//CHECK:^^^^^^^^^^^^^^^ value requirement requires static const
+//CHECK:^^^^^^^^^^^^^^^ requirement in the form of a simple value must be declared as 'static const'.
 }
