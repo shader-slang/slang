@@ -1,8 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
-
-// Use a regular test here rather than a DIAGNOSTIC_TEST because the test
-// runner can't yet parse the new diagnostic style
-//TEST:SIMPLE(): -enable-experimental-rich-diagnostics
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 // Failure to pass compile-time-constant data
 // where it is expected.
@@ -28,8 +24,9 @@ float4 main() : SV_Target
     result += t.Sample(s, uv, int2(0,0));
 
     // Error: data passed through cbuffer isn't compile-time constant
-    // CHECK: ([[# @LINE+1]]): error 40012:
     result += t.Sample(s, uv, offset);
+//CHECK:                      ^^^^^^ expected a compile-time constant
+//CHECK:                      ^^^^^^ expected a compile-time constant
 
     // Error: data computed via conditional isn't compile-time cosntant
     uint ii = 0;
@@ -37,15 +34,21 @@ float4 main() : SV_Target
     {
     	ii = 1;
     }
-    // CHECK: ([[# @LINE+1]]): error 40012:
     result += t.Sample(s, uv, int2(ii));
+//CHECK:                          ^ expected a compile-time constant
+//CHECK:                          ^ expected a compile-time constant
 
     // Error: data computed in loop isn't compile-time constant
     // (and loop isn't unroll-able)
-    // CHECK: ([[# @LINE+1]]): error 40012:
     for(uint jj = 0; jj < uv.y; jj++)
+//CHECK:             ^^ expected a compile-time constant
+//CHECK:             ^^ expected a compile-time constant
+//CHECK:                          ^^ expected a compile-time constant
+//CHECK:                          ^^ expected a compile-time constant
     {
     	result += t.Sample(s, uv, int2(jj));
+//CHECK:                           ^ expected a compile-time constant
+//CHECK:                           ^ expected a compile-time constant
     }
 
 

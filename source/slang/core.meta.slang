@@ -1013,6 +1013,11 @@ __generic<T> Optional<T> select(bool condition, T ifTrue, __none_t ifFalse)
     return select(condition, Optional<T>(ifTrue), Optional<T>(none));
 }
 
+// Cast between any two floating point types, including substandard floating point types
+// like FloatE4M3, FloatE5M2, BFloat16, etc.
+__intrinsic_op($(kIROp_FloatCast))
+T floatCast<T:IFloatingPointCoopElement, U:IFloatingPointCoopElement>(U val);
+
 // Allow real-number types to be cast into each other
 //@hidden:
 __intrinsic_op($(kIROp_FloatCast))
@@ -1352,12 +1357,13 @@ __magic_type(PtrType)
 struct Ptr<
     T,
     Access access = Access.ReadWrite,
-    AddressSpace addrSpace = AddressSpace.Device>
+    AddressSpace addrSpace = AddressSpace.Device,
+    L:IBufferDataLayout = DefaultDataLayout>
 {
     // A user is allowed to explicitly cast between any pointer type of
     // the same address space
     __intrinsic_op($(kIROp_BitCast))
-    __init<U, Access accessOther>(Ptr<U, accessOther, addrSpace> ptr);
+    __init<U, Access accessOther>(Ptr<U, accessOther, addrSpace, L> ptr);
 
     __intrinsic_op($(kIROp_CastIntToPtr))
     __init(uint64_t val);
@@ -1414,7 +1420,11 @@ struct Ptr<
 /// execution of the program. This knowledge allows the compiler to perform more aggressive optimizations around the memory
 /// accesses through such pointers. If the data is changed during the program execution, the behavior is undefined and loaded
 /// data through such pointers may be invalid.
-typealias ImmutablePtr<T, AddressSpace addrSpace = AddressSpace.Device> = Ptr<T, Access.Immutable, addrSpace>;
+typealias ImmutablePtr<T, AddressSpace addrSpace = AddressSpace.Device, L:IBufferDataLayout = DefaultDataLayout> = Ptr<T, Access.Immutable, addrSpace, L>;
+
+/// Represents a pointer with custom data layout as a shorthand for Ptr<T>.
+/// Such pointers are almost always in the Device address space.
+typealias LayoutPtr<T, L:IBufferDataLayout> = Ptr<T, Access.ReadWrite, AddressSpace.Device, L>;
 
 //@hidden:
 __intrinsic_op($(kIROp_AlignedAttr))
@@ -1462,10 +1472,10 @@ __intrinsic_op($(kIROp_MemoryScopeAttr))
 internal int __memoryscope_attr(MemoryScope scope);
 
 __intrinsic_op($(kIROp_Load))
-internal T __load_coherent<T, Access access, AddressSpace addrSpace>(Ptr<T, access, addrSpace> ptr, int alignmentAttr, int memoryScopeAttr);
+internal T __load_coherent<T, Access access, AddressSpace addrSpace, L:IBufferDataLayout>(Ptr<T, access, addrSpace, L> ptr, int alignmentAttr, int memoryScopeAttr);
 
 __intrinsic_op($(kIROp_Store))
-internal void __store_coherent<T, AddressSpace addrSpace>(Ptr<T, Access::ReadWrite, addrSpace> ptr, T value, int alignmentAttr, int memoryScopeAttr);
+internal void __store_coherent<T, AddressSpace addrSpace, L:IBufferDataLayout>(Ptr<T, Access::ReadWrite, addrSpace, L> ptr, T value, int alignmentAttr, int memoryScopeAttr);
 
 /// Store a value coherently to a memoryscope.
 /// Tighter memory scopes may be faster to operate on.
@@ -1474,10 +1484,10 @@ internal void __store_coherent<T, AddressSpace addrSpace>(Ptr<T, Access::ReadWri
 ///
 [require(SPV_KHR_vulkan_memory_model)]
 [ForceInline]
-__generic<int alignment, MemoryScope scope, T, AddressSpace addrSpace>
-void storeCoherent(Ptr<T, Access::ReadWrite, addrSpace> ptr, T value)
+__generic<int alignment, MemoryScope scope, T, AddressSpace addrSpace, L:IBufferDataLayout>
+void storeCoherent(Ptr<T, Access::ReadWrite, addrSpace, L> ptr, T value)
 {
-    __store_coherent<T, addrSpace>(ptr, value, __align_attr(alignment), __memoryscope_attr(scope));
+    __store_coherent<T, addrSpace, L>(ptr, value, __align_attr(alignment), __memoryscope_attr(scope));
 }
 
 /// Load a value coherently to a memoryscope.
@@ -1487,19 +1497,19 @@ void storeCoherent(Ptr<T, Access::ReadWrite, addrSpace> ptr, T value)
 [require(SPV_KHR_vulkan_memory_model)]
 [ForceInline]
 [__NoSideEffect]
-__generic<int alignment, MemoryScope scope, T, Access access, AddressSpace addrSpace>
-T loadCoherent(Ptr<T, access, addrSpace> ptr)
+__generic<int alignment, MemoryScope scope, T, Access access, AddressSpace addrSpace, L:IBufferDataLayout>
+T loadCoherent(Ptr<T, access, addrSpace, L> ptr)
 {
-    return __load_coherent<T, access, addrSpace>(ptr, __align_attr(alignment), __memoryscope_attr(scope));
+    return __load_coherent<T, access, addrSpace, L>(ptr, __align_attr(alignment), __memoryscope_attr(scope));
 }
 
 ${
     StringBuilder ptrTypeParameterListBuilder;
-    ptrTypeParameterListBuilder << "T, Access access, AddressSpace addrSpace";
+    ptrTypeParameterListBuilder << "T, Access access, AddressSpace addrSpace, L:IBufferDataLayout";
     String ptrTypeParameterList = ptrTypeParameterListBuilder.toString();
 
     StringBuilder ptrArgListBuilder;
-    ptrArgListBuilder << "T, access, addrSpace";
+    ptrArgListBuilder << "T, access, addrSpace, L";
     String ptrArgList = ptrArgListBuilder.toString();
 
     StringBuilder fullPtrTypeBuilder;
@@ -2857,9 +2867,9 @@ for (auto op : intrinsicUnaryOps)
 $}
 
 // Only ReadWrite is an L-value.
-__generic<T, Access access, AddressSpace addrSpace>
+__generic<T, Access access, AddressSpace addrSpace, L:IBufferDataLayout>
 __intrinsic_op(0)
-__prefix Ref<T, access, addrSpace> operator*(Ptr<T, access, addrSpace> value);
+__prefix Ref<T, access, addrSpace> operator*(Ptr<T, access, addrSpace, L> value);
 
 // TODO: [require(cpu)]. This cannot be done yet since this change breaks slangpy
 __generic<T>
@@ -4708,12 +4718,34 @@ semantic sv_position
     [require(geometry)]
     get : float4;
 
+    [require(fragment)]
+    [require(geometry)]
+    get : float3;
+
+    [require(fragment)]
+    [require(geometry)]
+    get : float2;
+
     [require(vertex)]
     [require(geometry)]
     [require(hull)]
     [require(domain)]
     [require(mesh)]
     set : float4;
+
+    [require(vertex)]
+    [require(geometry)]
+    [require(hull)]
+    [require(domain)]
+    [require(mesh)]
+    set : float3;
+
+    [require(vertex)]
+    [require(geometry)]
+    [require(hull)]
+    [require(domain)]
+    [require(mesh)]
+    set : float2;
 }
 
 semantic sv_depth
@@ -4746,12 +4778,14 @@ semantic sv_clipdistance
     [require(geometry)]
     [require(hull)]
     [require(domain)]
+    [require(mesh)]
     set : float;
 
     [require(vertex)]
     [require(geometry)]
     [require(hull)]
     [require(domain)]
+    [require(mesh)]
     set : float[];
 }
 
@@ -4767,12 +4801,14 @@ semantic sv_culldistance
     [require(geometry)]
     [require(hull)]
     [require(domain)]
+    [require(mesh)]
     set : float;
 
     [require(vertex)]
     [require(geometry)]
     [require(hull)]
     [require(domain)]
+    [require(mesh)]
     set : float[];
 }
 
@@ -5025,8 +5061,13 @@ semantic sv_drawindex
 semantic sv_deviceindex
 {
     [require(vertex)]
+    [require(hull)]
+    [require(domain)]
+    [require(geometry)]
     [require(fragment)]
     [require(compute)]
+    [require(mesh)]
+    [require(amplification)]
     get : uint;
 }
 

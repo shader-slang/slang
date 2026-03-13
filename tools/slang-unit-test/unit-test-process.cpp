@@ -91,6 +91,33 @@ static SlangResult _httpReflectTest(UnitTestContext* context)
     return finalRes;
 }
 
+static SlangResult _httpCrashTest(UnitTestContext* context)
+{
+    RefPtr<Process> process;
+    SLANG_RETURN_ON_FAIL(_createProcess(context, "http-crash", nullptr, process));
+
+    Stream* writeStream = process->getStream(StdStreamType::In);
+    RefPtr<BufferedReadStream> readStream(
+        new BufferedReadStream(process->getStream(StdStreamType::Out)));
+    RefPtr<HTTPPacketConnection> connection = new HTTPPacketConnection(readStream, writeStream);
+
+    const char payload[] = "ping";
+    SLANG_RETURN_ON_FAIL(connection->write(payload, SLANG_COUNT_OF(payload) - 1));
+
+    // The server exits without replying; waitForResult should fail and no content should exist.
+    if (SLANG_SUCCEEDED(connection->waitForResult(1000)))
+    {
+        return SLANG_FAIL;
+    }
+    if (connection->hasContent())
+    {
+        return SLANG_FAIL;
+    }
+
+    process->waitForTermination();
+    return SLANG_OK;
+}
+
 static SlangResult _countTest(UnitTestContext* context, Index size, Index crashIndex = -1)
 {
     /* Here we are trying to test what happens if the server produces a large amount of data, and
@@ -196,4 +223,5 @@ SLANG_UNIT_TEST(CommandLineProcess)
     SLANG_CHECK(SLANG_SUCCEEDED(_countTests(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_reflectTest(unitTestContext)));
     SLANG_CHECK(SLANG_SUCCEEDED(_httpReflectTest(unitTestContext)));
+    SLANG_CHECK(SLANG_SUCCEEDED(_httpCrashTest(unitTestContext)));
 }

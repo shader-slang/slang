@@ -3,6 +3,8 @@
 #include "../compiler-core/slang-diagnostic-sink.h"
 #include "../compiler-core/slang-rich-diagnostics-render.h"
 #include "../core/slang-basic.h"
+#include "slang-ast-support-types.h"
+#include "slang-target.h"
 
 
 //
@@ -20,6 +22,12 @@ class Name;
 
 namespace Diagnostics
 {
+
+// Get the array of DiagnosticInfo entries for rich diagnostics.
+// These are used to register rich diagnostics with the DiagnosticsLookup
+// so that warning suppression flags like -Wno-xxx work correctly.
+const DiagnosticInfo* const* getRichDiagnosticsInfo();
+Index getRichDiagnosticsInfoCount();
 
 // Generate parameter structures for all diagnostics
 #if 0 // FIDDLE TEMPLATE:
@@ -72,6 +80,7 @@ struct $(class_name)
 %         end
 %     end
     GenericDiagnostic toGenericDiagnostic() const;
+    static const DiagnosticInfo* getInfo();
 };
 
 % end

@@ -163,6 +163,18 @@ struct Options
 
     /// Seed for shuffling deterministically
     uint32_t shuffleSeed = 1;
+
+    /// Whether to run tests in the order specified by test prefixes
+    bool explicitTestOrder = false;
+
+    /// Whether to list tests without running them
+    bool dryRun = false;
+
+    /// Whether to disable automatic retries of failed tests
+    bool disableRetries = false;
+
+    /// Only run API detection and print results, then exit
+    bool apiDetectionOnly = false;
 };
 
 #endif // OPTIONS_H_INCLUDED

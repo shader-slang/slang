@@ -3,6 +3,7 @@ name: MDL Benchmark
 on:
   pull_request:
     branches: [master]
+    types: [opened, synchronize, reopened, ready_for_review]
     paths-ignore:
       - "docs/**"
       - "LICENSES/**"
@@ -15,6 +16,7 @@ concurrency:
 
 jobs:
   build:
+    if: github.event.pull_request.draft != true
     runs-on: [Windows, self-hosted, benchmark]
     permissions:
       id-token: write # Required for Workload Identity (unused by fork PRs)

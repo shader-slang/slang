@@ -1,6 +1,6 @@
 // Test that arrays of structs containing unbounded arrays are not allowed
 
-//TEST:SIMPLE(filecheck=CHECK): -target spirv -allow-glsl -stage compute -entry computeMain
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target spirv -allow-glsl -stage compute -entry computeMain
 
 // Struct containing unbounded array (must be last member)
 struct StructWithUnbounded
@@ -10,8 +10,9 @@ struct StructWithUnbounded
 }
 
 // Array of struct containing unbounded array - should error (struct is NonAddressable)
-//CHECK: ([[# @LINE+1]]): error 30027
 StructWithUnbounded myArray[2];
+//CHECK:            ^^^^^^^ arrays of non-addressable type not allowed
+//CHECK:            ^^^^^^^ cannot instantiate unsized type
 
 [numthreads(1, 1, 1)]
 void computeMain()

@@ -51,7 +51,7 @@ float f(uint id, float x)
     let obj = factoryAB(id, x);
     obj.Data d = obj.make(x);
     return obj.calc(d, x);
-    // REPORT: ([[# @LINE-1]]): {{.*}} generated {{.*}} dispatch code{{.*}} 2 possible types:
+    // REPORT: note[E50102]: generated dynamic dispatch code
 }
 
 [numthreads(1, 1, 1)]

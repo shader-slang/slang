@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE:
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 
 #define SOME +
@@ -12,3 +12,5 @@
 
 
 PASTE(A, B)
+//CHECK: unexpected token
+//CHECK: unexpected '++', expected identifier
