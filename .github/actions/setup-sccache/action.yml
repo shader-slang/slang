@@ -1,5 +1,5 @@
 name: Setup sccache
-description: Install and configure sccache with local disk backend for Linux, macOS, and Windows
+description: Install and configure sccache for Linux, macOS, and Windows
 
 inputs:
   platform:

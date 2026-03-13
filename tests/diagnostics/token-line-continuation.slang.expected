@@ -1,8 +1,0 @@
-result code = -1
-standard error = {
-tests/diagnostics/token-line-continuation.slang(5): error 30003: 'break' must appear inside loop or switch constructs.
-void foo() { br\
-             ^~
-}
-standard output = {
-}

@@ -3,6 +3,7 @@
 
 #include "slang-ir-insts.h"
 #include "slang-ir.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -87,7 +88,9 @@ Result checkGetStringHashInsts(IRModule* module, DiagnosticSink* sink)
         {
             if (sink)
             {
-                sink->diagnose(inst, Diagnostics::getStringHashMustBeOnStringLiteral);
+                sink->diagnose(Diagnostics::GetStringHashMustBeOnStringLiteral{
+                    .location = inst->sourceLoc,
+                });
             }
 
             // Doesn't access a string literal

@@ -2,6 +2,7 @@
 #include "slang-target-program.h"
 
 #include "slang-compiler.h"
+#include "slang-rich-diagnostics.h"
 #include "slang-type-layout.h"
 
 namespace Slang
@@ -117,11 +118,9 @@ IArtifact* TargetProgram::getOrCreateEntryPointResult(Int entryPointIndex, Diagn
     }
     catch (const Exception& e)
     {
-        sink->diagnose(
-            SourceLoc(),
-            Diagnostics::compilationAbortedDueToException,
-            typeid(e).name(),
-            e.Message);
+        sink->diagnose(Diagnostics::CompilationAbortedDueToException{
+            .exceptionType = typeid(e).name(),
+            .exceptionMessage = e.Message});
         return nullptr;
     }
 }

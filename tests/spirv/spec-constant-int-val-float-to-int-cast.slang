@@ -1,7 +1,7 @@
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -entry computeMain -stage compute -target spirv
 
-// CHECK: error 38041: cannot cast non-integer specialization
-// CHECK-NEXT: const float X
+// CHECK: error[E38041]
+// CHECK: const float X
 
 [[SpecializationConstant]]
 const float X = 10.0;

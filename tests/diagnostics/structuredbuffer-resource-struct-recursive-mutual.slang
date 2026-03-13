@@ -1,18 +1,22 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -target spirv
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv
 
 struct MutualB
 {
-    //CHECK-DAG: ([[# @LINE+1]]): error 38205
     StructuredBuffer<MutualA> aBuffer;
+//CHECK:                      ^^^^^^^ recursive type in structured buffer
+//CHECK:                      ^^^^^^^ structured buffer element type 'MutualA' contains recursive type references
 }
 
 struct MutualA
 {
-    //CHECK-DAG: ([[# @LINE+1]]): error 38205
     StructuredBuffer<MutualB> bBuffer;
+//CHECK:                      ^^^^^^^ recursive type in structured buffer
+//CHECK:                      ^^^^^^^ structured buffer element type 'MutualB' contains recursive type references
 }
 
 StructuredBuffer<MutualA> mutualRoot;
+//CHECK:                  ^^^^^^^^^^ recursive type in structured buffer
+//CHECK:                  ^^^^^^^^^^ structured buffer element type 'MutualA' contains recursive type references
 RWStructuredBuffer<float> output;
 
 // External function to force consumption of recursive types

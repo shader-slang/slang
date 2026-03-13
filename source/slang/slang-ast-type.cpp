@@ -17,6 +17,10 @@ bool isAbstractTypePack(Type* type)
     type = unwrapModifiedType(type);
     if (as<ExpandType>(type))
         return true;
+    if (as<TrimHeadTypePack>(type))
+        return true;
+    if (as<TrimTailTypePack>(type))
+        return true;
     if (isDeclRefTypeOf<GenericTypePackParamDecl>(type))
         return true;
     return false;
@@ -28,6 +32,16 @@ bool isTypePack(Type* type)
     if (as<ConcreteTypePack>(type))
         return true;
     return isAbstractTypePack(type);
+}
+
+bool isPackType(Type* type)
+{
+    type = unwrapModifiedType(type);
+    if (isTypePack(type))
+        return true;
+    if (as<ValuePackType>(type))
+        return true;
+    return false;
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! Type !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -158,9 +172,7 @@ Val* DeclRefType::_substituteImplOverride(
                 return lookupDeclRef->getLookupSource();
             }
         }
-        else if (
-            as<GenericTypeParamDeclBase>(substDeclRef.getDecl()) ||
-            as<GenericValueParamDecl>(substDeclRef.getDecl()))
+        else if (isGenericParam(substDeclRef.getDecl()))
         {
             auto resultVal =
                 maybeSubstituteGenericParam(nullptr, substDeclRef.getDecl(), subst, ioDiff);
@@ -791,10 +803,10 @@ Type* ExpandType::_createCanonicalTypeOverride()
     auto canonicalPatternType = getPatternType()->getCanonicalType();
     if (canonicalPatternType == getPatternType())
         return this;
-    ShortList<Type*> capturedPacks;
-    for (Index i = 0; i < getCapturedTypePackCount(); i++)
+    ShortList<Val*> capturedPacks;
+    for (Index i = 0; i < getCapturedPackCount(); i++)
     {
-        capturedPacks.add(getCapturedTypePack(i));
+        capturedPacks.add(getCapturedPack(i));
     }
     return getCurrentASTBuilder()->getExpandType(
         canonicalPatternType,
@@ -805,42 +817,46 @@ Val* ExpandType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet
 {
     int diff = 0;
 
-    // Given ExpandType(PatternType, CapturedTypePackParams), we first need to know
-    // if all captured GenericTypePackParams can be substituted into concrete type packs.
-    // We can't expand the ExpandType into a concrete type pack, if any of the captured type
-    // pack parameters aren't concrete themselves.
+    // Given ExpandType(PatternType, CapturedPacks), we first need to know
+    // if all captured pack params can be substituted into concrete packs.
+    // We can't expand the ExpandType if any captured pack is still abstract.
     //
-    ShortList<Type*> capturedPacks;
-    ShortList<ConcreteTypePack*> concreteTypePacks;
-    for (Index i = 0; i < getCapturedTypePackCount(); i++)
+    ShortList<Val*> capturedPacks;
+    Index concretePackCount = 0;
+    Index firstConcretePackSize = -1;
+    for (Index i = 0; i < getCapturedPackCount(); i++)
     {
-        auto substCapturedTypePack =
-            getCapturedTypePack(i)->substituteImpl(astBuilder, subst, &diff);
-        if (auto expandType = as<ExpandType>(substCapturedTypePack))
+        auto substCapturedPack = getCapturedPack(i)->substituteImpl(astBuilder, subst, &diff);
+
+        if (auto expandType = as<ExpandType>(substCapturedPack))
         {
-            for (Index j = 0; j < expandType->getCapturedTypePackCount(); j++)
-                capturedPacks.add(expandType->getCapturedTypePack(j));
+            for (Index j = 0; j < expandType->getCapturedPackCount(); j++)
+                capturedPacks.add(expandType->getCapturedPack(j));
         }
         else
         {
-            capturedPacks.add(as<Type>(substCapturedTypePack));
-            if (auto pack = as<ConcreteTypePack>(capturedPacks.getLast()))
+            capturedPacks.add(substCapturedPack);
+            if (auto typePack = as<ConcreteTypePack>(substCapturedPack))
             {
-                concreteTypePacks.add(pack);
+                concretePackCount++;
+                if (firstConcretePackSize < 0)
+                    firstConcretePackSize = typePack->getTypeCount();
+            }
+            else if (auto valPack = as<ConcreteIntValPack>(substCapturedPack))
+            {
+                concretePackCount++;
+                if (firstConcretePackSize < 0)
+                    firstConcretePackSize = valPack->getCount();
             }
         }
     }
 
-    if (!diff || concreteTypePacks.getCount() != capturedPacks.getCount())
+    if (!diff || concretePackCount != capturedPacks.getCount())
     {
         auto substPatternType = getPatternType()->substituteImpl(astBuilder, subst, &diff);
         if (!diff)
             return this;
 
-        // If some part of pattern type or captured type can be substituted into something else,
-        // but not all of the captured types are resolved to concrete type packs yet, we will just
-        // create a new ExpandType with the substituted pattern/capture types, instead of actually
-        // expanding into a concrete type pack.
         (*ioDiff)++;
         return astBuilder->getExpandType(
             as<Type>(substPatternType),
@@ -848,12 +864,13 @@ Val* ExpandType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet
     }
     else
     {
-        // All type pack parameters are now concrete type packs, so we can construct a concrete type
-        // pack by substituting the pattern type with each element of the captured type pack.
+        // All captured packs are now concrete, so we can expand the pattern
+        // for each element index.
         ShortList<Type*> expandedTypes;
         SLANG_ASSERT(capturedPacks.getCount() != 0);
+        SLANG_ASSERT(firstConcretePackSize >= 0);
 
-        for (int i = 0; i < (int)concreteTypePacks[0]->getTypeCount(); i++)
+        for (int i = 0; i < (int)firstConcretePackSize; i++)
         {
             subst.packExpansionIndex = i;
             auto substElementType = getPatternType()->substituteImpl(astBuilder, subst, &diff);
@@ -864,6 +881,122 @@ Val* ExpandType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet
         (*ioDiff)++;
         return astBuilder->getTypePack(expandedTypes.getArrayView().arrayView);
     }
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! FirstType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+void FirstPackElementType::_toTextOverride(StringBuilder& out)
+{
+    out << "__first(";
+    getBasePack()->toText(out);
+    out << ")";
+}
+
+Type* FirstPackElementType::_createCanonicalTypeOverride()
+{
+    auto canonicalBasePack = getBasePack()->getCanonicalType();
+    if (canonicalBasePack == getBasePack())
+        return this;
+    return getCurrentASTBuilder()->getFirstElement(canonicalBasePack);
+}
+
+Val* FirstPackElementType::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    int diff = 0;
+    auto substBasePack = as<Type>(getBasePack()->substituteImpl(astBuilder, subst, &diff));
+    if (!diff)
+        return this;
+    (*ioDiff)++;
+    return astBuilder->getFirstElement(substBasePack);
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! LastType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+void LastPackElementType::_toTextOverride(StringBuilder& out)
+{
+    out << "__last(";
+    getBasePack()->toText(out);
+    out << ")";
+}
+
+Type* LastPackElementType::_createCanonicalTypeOverride()
+{
+    auto canonicalBasePack = getBasePack()->getCanonicalType();
+    if (canonicalBasePack == getBasePack())
+        return this;
+    return getCurrentASTBuilder()->getLastElement(canonicalBasePack);
+}
+
+Val* LastPackElementType::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    int diff = 0;
+    auto substBasePack = as<Type>(getBasePack()->substituteImpl(astBuilder, subst, &diff));
+    if (!diff)
+        return this;
+    (*ioDiff)++;
+    return astBuilder->getLastElement(substBasePack);
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TrimHeadTypePack !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+void TrimHeadTypePack::_toTextOverride(StringBuilder& out)
+{
+    out << "__trimHead(";
+    getBasePack()->toText(out);
+    out << ")";
+}
+
+Type* TrimHeadTypePack::_createCanonicalTypeOverride()
+{
+    auto canonicalBasePack = getBasePack()->getCanonicalType();
+    if (canonicalBasePack == getBasePack())
+        return this;
+    return getCurrentASTBuilder()->getTrimHeadPack(canonicalBasePack);
+}
+
+Val* TrimHeadTypePack::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    int diff = 0;
+    auto substBasePack = as<Type>(getBasePack()->substituteImpl(astBuilder, subst, &diff));
+    if (!diff)
+        return this;
+    (*ioDiff)++;
+    return astBuilder->getTrimHeadPack(substBasePack);
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TrimTailTypePack !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+void TrimTailTypePack::_toTextOverride(StringBuilder& out)
+{
+    out << "__trimTail(";
+    getBasePack()->toText(out);
+    out << ")";
+}
+
+Type* TrimTailTypePack::_createCanonicalTypeOverride()
+{
+    auto canonicalBasePack = getBasePack()->getCanonicalType();
+    if (canonicalBasePack == getBasePack())
+        return this;
+    return getCurrentASTBuilder()->getTrimTailPack(canonicalBasePack);
+}
+
+Val* TrimTailTypePack::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    int diff = 0;
+    auto substBasePack = as<Type>(getBasePack()->substituteImpl(astBuilder, subst, &diff));
+    if (!diff)
+        return this;
+    (*ioDiff)++;
+    return astBuilder->getTrimTailPack(substBasePack);
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ConcreteTypePack !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -914,6 +1047,33 @@ Val* ConcreteTypePack::_substituteImplOverride(
         return this;
     (*ioDiff)++;
     return getCurrentASTBuilder()->getTypePack(substElementTypes.getArrayView().arrayView);
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ValuePackType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+void ValuePackType::_toTextOverride(StringBuilder& out)
+{
+    out << "ValuePack<";
+    getElementType()->toText(out);
+    out << ">";
+}
+
+Type* ValuePackType::_createCanonicalTypeOverride()
+{
+    return getCurrentASTBuilder()->getOrCreate<ValuePackType>(getElementType()->getCanonicalType());
+}
+
+Val* ValuePackType::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    int diff = 0;
+    auto newElementType = as<Type>(getElementType()->substituteImpl(astBuilder, subst, &diff));
+    if (!diff)
+        return this;
+    (*ioDiff)++;
+    return astBuilder->getOrCreate<ValuePackType>(newElementType);
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ExtractExistentialType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

@@ -1,12 +1,11 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 
 struct VertexOutput{float Input;}
 float4 fragmentMain(VertexOutput vertex) : SV_Target
 {
-   // CHECK: ([[# @LINE+1]]): error 30102
   static float GetValue(int val) { return vertex.Input; } // Simplified example
-  float a = GetValue(vertex.Input);
-
-  // etc
+//CHECK:       ^^^^^^^^ declaration not allowed here
+//CHECK:       ^^^^^^^^ function is not allowed here.
+  return float4(0);
 }

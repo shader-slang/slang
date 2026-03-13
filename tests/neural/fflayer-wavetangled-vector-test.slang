@@ -3,20 +3,24 @@
 // Tests both single-warp (WARP_COUNT=1) and multi-warp (WARP_COUNT=2,4) configurations.
 //
 // Single-warp (WARP_COUNT=1):
-// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_POINTER=0 -xslang -DWARP_COUNT=1 -emit-spirv-directly
-// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_POINTER=1 -xslang -DWARP_COUNT=1 -emit-spirv-directly
-// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -xslang -experimental-feature -xslang -DTEST_POINTER=0 -xslang -DWARP_COUNT=1
-// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -xslang -experimental-feature -xslang -DTEST_POINTER=1 -xslang -DWARP_COUNT=1
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_POINTER=0 -xslang -DWARP_COUNT=1 -xslang -DTEST_TENSORVIEW=0 -emit-spirv-directly
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_POINTER=1 -xslang -DWARP_COUNT=1 -xslang -DTEST_TENSORVIEW=0 -emit-spirv-directly
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -xslang -experimental-feature -xslang -DTEST_POINTER=0 -xslang -DWARP_COUNT=1 -xslang -DTEST_TENSORVIEW=0
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -xslang -experimental-feature -xslang -DTEST_POINTER=1 -xslang -DWARP_COUNT=1 -xslang -DTEST_TENSORVIEW=0
 //
 // Multi-warp (WARP_COUNT=2):
-// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_POINTER=0 -xslang -DWARP_COUNT=2 -emit-spirv-directly
-// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -xslang -experimental-feature -xslang -DTEST_POINTER=0 -xslang -DWARP_COUNT=2
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_POINTER=0 -xslang -DWARP_COUNT=2 -xslang -DTEST_TENSORVIEW=0 -emit-spirv-directly
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -xslang -experimental-feature -xslang -DTEST_POINTER=0 -xslang -DWARP_COUNT=2 -xslang -DTEST_TENSORVIEW=0
 //
 // Multi-warp (WARP_COUNT=4):
-// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_POINTER=0 -xslang -DWARP_COUNT=4 -emit-spirv-directly
-// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -xslang -experimental-feature -xslang -DTEST_POINTER=0 -xslang -DWARP_COUNT=4
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -xslang -DTEST_POINTER=0 -xslang -DWARP_COUNT=4 -xslang -DTEST_TENSORVIEW=0 -emit-spirv-directly
+// TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -xslang -experimental-feature -xslang -DTEST_POINTER=0 -xslang -DWARP_COUNT=4 -xslang -DTEST_TENSORVIEW=0
+//
+// Compile-only test for TorchTensorViewAddress (CUDA target):
+// TEST:SIMPLE(filecheck=CHECK): -target ptx -stage compute -entry computeMain -capability cuda_sm_7_0 -DTEST_TENSORVIEW=1 -DTEST_POINTER=0 -DWARP_COUNT=1 -experimental-feature
+// CHECK: computeMain
 
-import neural;
+import slang.neural;
 
 #ifndef WARP_COUNT
 #define WARP_COUNT 1
@@ -41,7 +45,11 @@ RWStructuredBuffer<uint> testResult;
 
 //TEST_INPUT: set dParameters = ubuffer(data=[0 0 0 0 0 0 0 0 0 0], stride=4)
 
-#if TEST_POINTER
+#if TEST_TENSORVIEW
+    uniform TensorView<ElementType> parameters;
+    uniform TensorView<ElementType> dParameters;
+    typealias Address = TorchTensorViewAddress<ElementType>;
+#elif TEST_POINTER
     uniform ElementType* parameters;
     uniform ElementType* dParameters;
     typealias Address = PointerAddress<ElementType>;
@@ -65,11 +73,10 @@ typealias OutVec = WaveTangledVector<ElementType, ShMemSizeLayer1, OutputSize, S
 // FFLayer with WaveTangledVector and LinearLayout
 typealias Layer = FFLayer<ElementType, InVec, OutVec, LinearLayout, IdentityActivation<ElementType>, true>;
 
-// Wrapper function for autodiff
 [Differentiable]
-OutVec computeLayerOutput(Address weightAddr, Address biasAddr, InVec input, Layer layer)
+OutVec computeLayerOutput(Address paramAddr, InVec input, Layer layer)
 {
-    return layer.eval<Address>(input, weightAddr, biasAddr);
+    return layer.eval<Address>(input, paramAddr);
 }
 
 // Test FFLayer forward pass with WaveTangledVector
@@ -86,12 +93,8 @@ void testFFLayerForward(int tid, int resIndex)
 
     let layer = Layer();
 
-    // Compute weight/bias addresses
-    let weightAddr = baseAddr.getOffset(0);
-    let biasAddr = baseAddr.getOffset(8);
-
     // Forward pass
-    let output = layer.eval<Address>(input, weightAddr, biasAddr);
+    let output = layer.eval<Address>(input, baseAddr);
 
     // Verify output: [39, 80]
     bool isPassed = true;
@@ -116,22 +119,14 @@ void testFFLayerBackward(int tid, int resIndex)
 
     let layer = Layer();
 
-    // Compute weight/bias addresses outside differentiable function
-    let weightAddr = baseAddr.getOffset(0);
-    let biasAddr = baseAddr.getOffset(8);
-    let dWeightAddr = dBaseAddr.getOffset(0);
-    let dBiasAddr = dBaseAddr.getOffset(8);
-
-    // Set up differential pairs for weight and bias addresses
-    var weightAddrPair = DifferentialPtrPair<Address>(weightAddr, dWeightAddr);
-    var biasAddrPair = DifferentialPtrPair<Address>(biasAddr, dBiasAddr);
+    var paramAddrPair = DifferentialPtrPair<Address>(baseAddr, dBaseAddr);
     var inputPair = diffPair(input);
 
     // dOutput = [1, 1]
     let dOutput = OutVec(1.0);
 
     // Backward pass
-    bwd_diff(computeLayerOutput)(weightAddrPair, biasAddrPair, inputPair, layer, dOutput);
+    bwd_diff(computeLayerOutput)(paramAddrPair, inputPair, layer, dOutput);
 
     // Verify input gradient: dInput = W^T * dOutput = [1+5, 2+6, 3+7, 4+8] = [6, 8, 10, 12]
     bool isPassed = true;

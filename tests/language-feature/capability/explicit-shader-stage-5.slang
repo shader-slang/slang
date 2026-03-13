@@ -1,7 +1,7 @@
 //TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry main -allow-glsl -profile sm_6_5
 
 // Our code compiles here since we specify profile sm_6_5 (supports raytracing)
-//CHECK: warning 36113
+//CHECK: warning[E36113]
 //CHECK: main
 struct RayPayload
 {

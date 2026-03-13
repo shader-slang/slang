@@ -13,6 +13,7 @@
 #include "slang-ir-util.h"
 #include "slang-ir.h"
 #include "slang-lookup-spirv.h"
+#include "slang-rich-diagnostics.h"
 #include "spirv/unified1/spirv.h"
 
 #include <type_traits>
@@ -796,10 +797,12 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         {
             switch (irOpCode)
             {
-            case kIROp_IntCast:
-                return SpvOpUConvert;
             case kIROp_FloatCast:
+            case kIROp_ConstexprFloatCast:
                 return SpvOpFConvert;
+            case kIROp_Select:
+            case kIROp_ConstexprSelect:
+                return SpvOpSelect;
             default:
                 break;
             }
@@ -833,91 +836,112 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         switch (irOpCode)
         {
         case kIROp_Add:
+        case kIROp_ConstexprAdd:
             opCode = isFloatingPoint ? SpvOpFAdd : SpvOpIAdd;
             break;
         case kIROp_Sub:
+        case kIROp_ConstexprSub:
             opCode = isFloatingPoint ? SpvOpFSub : SpvOpISub;
             break;
         case kIROp_Mul:
+        case kIROp_ConstexprMul:
             opCode = isFloatingPoint ? SpvOpFMul : SpvOpIMul;
             break;
         case kIROp_Div:
+        case kIROp_ConstexprDiv:
             opCode = isFloatingPoint ? SpvOpFDiv : isSigned ? SpvOpSDiv : SpvOpUDiv;
             break;
         case kIROp_IRem:
+        case kIROp_ConstexprIRem:
             opCode = isSigned ? SpvOpSRem : SpvOpUMod;
             break;
         case kIROp_FRem:
             opCode = SpvOpFRem;
             break;
         case kIROp_Less:
+        case kIROp_ConstexprLess:
             opCode = isFloatingPoint ? SpvOpFOrdLessThan
                      : isSigned      ? SpvOpSLessThan
                                      : SpvOpULessThan;
             break;
         case kIROp_Leq:
+        case kIROp_ConstexprLeq:
             opCode = isFloatingPoint ? SpvOpFOrdLessThanEqual
                      : isSigned      ? SpvOpSLessThanEqual
                                      : SpvOpULessThanEqual;
             break;
         case kIROp_Eql:
+        case kIROp_ConstexprEql:
             opCode = isFloatingPoint ? SpvOpFOrdEqual : isBool ? SpvOpLogicalEqual : SpvOpIEqual;
             break;
         case kIROp_Neq:
+        case kIROp_ConstexprNeq:
             opCode = isFloatingPoint ? SpvOpFUnordNotEqual
                      : isBool        ? SpvOpLogicalNotEqual
                                      : SpvOpINotEqual;
             break;
         case kIROp_Geq:
+        case kIROp_ConstexprGeq:
             opCode = isFloatingPoint ? SpvOpFOrdGreaterThanEqual
                      : isSigned      ? SpvOpSGreaterThanEqual
                                      : SpvOpUGreaterThanEqual;
             break;
         case kIROp_Greater:
+        case kIROp_ConstexprGreater:
             opCode = isFloatingPoint ? SpvOpFOrdGreaterThan
                      : isSigned      ? SpvOpSGreaterThan
                                      : SpvOpUGreaterThan;
             break;
         case kIROp_Neg:
+        case kIROp_ConstexprNeg:
             opCode = isFloatingPoint ? SpvOpFNegate : SpvOpSNegate;
             break;
         case kIROp_And:
+        case kIROp_ConstexprAnd:
             opCode = SpvOpLogicalAnd;
             break;
         case kIROp_Or:
+        case kIROp_ConstexprOr:
             opCode = SpvOpLogicalOr;
             break;
         case kIROp_Not:
+        case kIROp_ConstexprNot:
             opCode = SpvOpLogicalNot;
             break;
         case kIROp_BitAnd:
+        case kIROp_ConstexprBitAnd:
             if (isBool)
                 opCode = SpvOpLogicalAnd;
             else
                 opCode = SpvOpBitwiseAnd;
             break;
         case kIROp_BitOr:
+        case kIROp_ConstexprBitOr:
             if (isBool)
                 opCode = SpvOpLogicalOr;
             else
                 opCode = SpvOpBitwiseOr;
             break;
         case kIROp_BitXor:
+        case kIROp_ConstexprBitXor:
             if (isBool)
                 opCode = SpvOpLogicalNotEqual;
             else
                 opCode = SpvOpBitwiseXor;
             break;
         case kIROp_BitNot:
+        case kIROp_ConstexprBitNot:
             if (isBool)
                 opCode = SpvOpLogicalNot;
             else
                 opCode = SpvOpNot;
             break;
         case kIROp_Rsh:
+        case kIROp_ConstexprShr:
             opCode = isSigned ? SpvOpShiftRightArithmetic : SpvOpShiftRightLogical;
             break;
         case kIROp_Lsh:
+        case kIROp_ConstexprShl:
             opCode = SpvOpShiftLeftLogical;
             break;
         }
@@ -2768,12 +2792,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             return SpvImageFormatR64i;
         default:
             const auto imageFormatInfo = getImageFormatInfo(imageFormat);
-            m_sink->diagnose(
-                SourceLoc(),
-                Diagnostics::imageFormatUnsupportedByBackend,
-                imageFormatInfo.name,
-                "SPIRV",
-                "unknown");
+            m_sink->diagnose(Diagnostics::ImageFormatUnsupportedByBackend{
+                .format = imageFormatInfo.name,
+                .backend = "SPIRV",
+                .replacement = "unknown"});
             return SpvImageFormatUnknown;
         }
     }
@@ -3048,9 +3070,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
         if (format == SpvImageFormatUnknown && sampled == ImageOpConstants::readWriteImage)
         {
-            // TODO: It may not be necessary to have both of these
-            // depending on if we read or write
-            requireSPIRVCapability(SpvCapabilityStorageImageReadWithoutFormat);
+            // Write-only textures (WTexture*) only need the write capability.
+            // Read-write and rasterizer-ordered textures need both.
+            if (inst->getAccess() != SLANG_RESOURCE_ACCESS_WRITE)
+                requireSPIRVCapability(SpvCapabilityStorageImageReadWithoutFormat);
             requireSPIRVCapability(SpvCapabilityStorageImageWriteWithoutFormat);
         }
 
@@ -3451,6 +3474,47 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return result;
     }
 
+    SpvInst* emitSpecConstantUConvert(IRInst* inst, IRType* resultType, SpvInst* operand)
+    {
+        return emitInst(
+            getSection(SpvLogicalSectionID::ConstantsAndTypes),
+            inst,
+            SpvOpSpecConstantOp,
+            resultType,
+            kResultID,
+            SpvOpUConvert,
+            operand);
+    }
+
+    SpvInst* emitSpecConstantSConvert(IRInst* inst, IRType* resultType, SpvInst* operand)
+    {
+        return emitInst(
+            getSection(SpvLogicalSectionID::ConstantsAndTypes),
+            inst,
+            SpvOpSpecConstantOp,
+            resultType,
+            kResultID,
+            SpvOpSConvert,
+            operand);
+    }
+
+    // Emit IAdd-by-zero wrapped in OpSpecConstantOp to reinterpret signedness.
+    // OpBitcast is not in the set of opcodes allowed by OpSpecConstantOp, so
+    // we use IAdd-by-zero instead (same approach as glslang's GlslangToSpv.cpp).
+    SpvInst* emitSpecConstantSignReinterpret(IRInst* inst, IRType* resultType, SpvInst* operand)
+    {
+        auto zero = emitIntConstant(0, resultType);
+        return emitInst(
+            getSection(SpvLogicalSectionID::ConstantsAndTypes),
+            inst,
+            SpvOpSpecConstantOp,
+            resultType,
+            kResultID,
+            SpvOpIAdd,
+            operand,
+            zero);
+    }
+
     SpvInst* emitSpecializationConstantOp(IRInst* inst)
     {
         SpvInst* spv = nullptr;
@@ -3480,6 +3544,52 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         {
             // We need to emit the constant as a specialization constant
             return emitLit(inst);
+        }
+
+        // Handle integer casts in spec constant context.
+        // Inside OpSpecConstantOp, UConvert/SConvert require different bit widths
+        // and matching signedness on the result type, and OpBitcast is not in the
+        // set of allowed opcodes. See emitSpecConstantSignReinterpret for the
+        // workaround used for signedness changes.
+        auto irOp = inst->getOp();
+        if (irOp == kIROp_IntCast || irOp == kIROp_ConstexprIntCast)
+        {
+            auto srcType = inst->getOperand(0)->getDataType();
+            auto dstType = inst->getDataType();
+            if (isIntegralType(srcType) && isIntegralType(dstType))
+            {
+                auto srcInfo = getIntTypeInfo(m_targetRequest, srcType);
+                auto dstInfo = getIntTypeInfo(m_targetRequest, dstType);
+
+                if (srcInfo == dstInfo)
+                {
+                    auto operand = emitSpecializationConstantOp(inst->getOperand(0));
+                    registerInst(inst, operand);
+                    return operand;
+                }
+
+                auto operand = emitSpecializationConstantOp(inst->getOperand(0));
+                bool needsWidthChange = srcInfo.width != dstInfo.width;
+                bool needsSignReinterpret = srcInfo.isSigned != dstInfo.isSigned;
+
+                if (needsWidthChange)
+                {
+                    IRBuilder builder(m_irModule);
+                    auto convertType = needsSignReinterpret
+                                           ? builder.getType(getIntTypeOpFromInfo(
+                                                 {dstInfo.width, srcInfo.isSigned}))
+                                           : inst->getFullType();
+                    auto convertInst = needsSignReinterpret ? nullptr : inst;
+                    operand = srcInfo.isSigned
+                                  ? emitSpecConstantSConvert(convertInst, convertType, operand)
+                                  : emitSpecConstantUConvert(convertInst, convertType, operand);
+                }
+
+                if (needsSignReinterpret)
+                    operand = emitSpecConstantSignReinterpret(inst, inst->getFullType(), operand);
+
+                return operand;
+            }
         }
 
         IRType* type = inst->getOperand(0)->getDataType();
@@ -3715,7 +3825,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     SpvInst* emitFuncDefinition(IRFunc* irFunc)
     {
         if (!irFunc->getFirstBlock())
-            m_sink->diagnose(irFunc, Diagnostics::noBlocksOrIntrinsic, "spirv");
+            m_sink->diagnose(
+                Diagnostics::NoBlocksOrIntrinsic{.target = "spirv", .location = irFunc->sourceLoc});
 
         // [2.4: Logical Layout of a Module]
         //
@@ -4918,6 +5029,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case kIROp_MakeTensorAddressingTensorView:
             result = emitOpCreateTensorView(parent, inst, getID(ensureInst(inst->getDataType())));
             break;
+        case kIROp_ConstexprSelect:
         case kIROp_Select:
             result = emitInst(
                 parent,
@@ -5682,10 +5794,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                             else if (arg.caseInsensitiveEquals(toSlice("fractional_odd")))
                                 mode = SpvExecutionModeSpacingFractionalOdd;
                             else
-                                m_sink->diagnose(
-                                    partitioningDecor,
-                                    Diagnostics::unknownTessPartitioning,
-                                    arg);
+                                m_sink->diagnose(Diagnostics::UnknownTessPartitioning{
+                                    .partitioning = arg,
+                                    .location = partitioningDecor->sourceLoc});
                         }
                         requireSPIRVExecutionMode(nullptr, getIRInstSpvID(entryPoint), mode);
                     }
@@ -8447,12 +8558,12 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         // wrong, so it can help the user or developers to locate the issue easier.
         if (!isFloatOrPackedFloatType(fromType))
         {
-            m_sink->diagnose(inst, Diagnostics::internalCompilerError);
+            m_sink->diagnose(Diagnostics::InternalCompilerError{.location = inst->sourceLoc});
         }
 
         if (!isFloatOrPackedFloatType(toType))
         {
-            m_sink->diagnose(inst, Diagnostics::internalCompilerError);
+            m_sink->diagnose(Diagnostics::InternalCompilerError{.location = inst->sourceLoc});
         }
 
         if (isTypeEqual(fromType, toType))
@@ -9641,6 +9752,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
                 auto fieldType = field->getFieldType();
                 getNaturalSizeAndAlignment(m_targetRequest, fieldType, &sizeAlignment);
+                IRIntegerValue size = sizeAlignment.size;
+                SLANG_ASSERT(size == IRSizeAndAlignment::kIndeterminateSize || size >= 0);
+                if (size == IRSizeAndAlignment::kIndeterminateSize)
+                    size = 0;
 
                 SpvInst* forwardRef = nullptr;
                 SpvInst* spvFieldType = nullptr;
@@ -9701,7 +9816,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     fieldLine,
                     fieldCol,
                     builder.getIntValue(builder.getUIntType(), offset * 8),
-                    builder.getIntValue(builder.getUIntType(), sizeAlignment.size * 8),
+                    builder.getIntValue(builder.getUIntType(), size * 8),
                     builder.getIntValue(builder.getUIntType(), 0));
                 members.add(memberType);
             }
@@ -10276,7 +10391,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     const auto fromVector = cast<IRVectorType>(unwrapAttributedType(fromType));
                     const auto fromVectorSize = getIntVal(fromVector->getElementCount());
                     if (toVectorSize > fromVectorSize)
-                        m_sink->diagnose(inst, Diagnostics::spirvInvalidTruncate);
+                        m_sink->diagnose(
+                            Diagnostics::SpirvInvalidTruncate{.location = inst->sourceLoc});
                     last = emitInstCustomOperandFunc(
                         parent,
                         isLast ? as<IRInst>(inst) : spvInst,
@@ -10724,7 +10840,8 @@ SlangResult emitSPIRVFromIR(
 
     if (!symbolsEmitted)
     {
-        sink->diagnose(irModule->getModuleInst(), Diagnostics::outputSpvIsEmpty);
+        sink->diagnose(
+            Diagnostics::OutputSpvIsEmpty{.location = irModule->getModuleInst()->sourceLoc});
         return SLANG_FAIL;
     }
 

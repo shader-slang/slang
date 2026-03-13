@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 RWStructuredBuffer<float> buf;
 
@@ -15,27 +15,37 @@ int foo(const int constParam)
     spirv_asm
     {
         %bar : %wrong = OpTypeInt 32 0
-        // CHECK: wrong-assignment-opcode.slang([[#@LINE-1]]): error {{.*}}: cannot use this 'x : <type> = OpTypeInt...' syntax because OpTypeInt does not have a <result-type-id> operand
+//CHECK:        ^^^^^ instruction has no result-type-id operand
+//CHECK:        ^^^^^ cannot use this 'x : <type> = OpTypeInt ...' syntax because OpTypeInt does not have a <result-type-id> operand
 
     };
+/*CHECK:
+    ^ unexpected token
+    ^ unexpected '}'
+*/
 
     // Doesn't have a result value
     spirv_asm
     {
         %foo = OpStore 1 2;
-        // CHECK: wrong-assignment-opcode.slang([[#@LINE-1]]): error {{.*}}: cannot use this 'x = OpStore...' syntax because OpStore does not have a <result-id> operand
+//CHECK: ^^^ instruction has no result-id operand
+//CHECK: ^^^ cannot use this 'x = OpStore ...' syntax because OpStore does not have a <result-id> operand
     };
 
     // garbage
     spirv_asm
     {
         %foo =;
-        // CHECK: wrong-assignment-opcode.slang([[#@LINE-1]]): error {{.*}}: unexpected ';'
+//CHECK:      ^ unexpected token
+//CHECK:      ^ unexpected ';'
         %foo :;
-        // CHECK: wrong-assignment-opcode.slang([[#@LINE-1]]): error {{.*}}: unexpected ';'
+//CHECK:      ^ unexpected token
+//CHECK:      ^ unexpected ';'
         %foo : bar;
-        // CHECK: wrong-assignment-opcode.slang([[#@LINE-1]]): error {{.*}}: unexpected ';', expected '='
+//CHECK:          ^ unexpected token
+//CHECK:          ^ unexpected ';', expected '='
         %foo : bar =;
-        // CHECK: wrong-assignment-opcode.slang([[#@LINE-1]]): error {{.*}}: unexpected ';'
+//CHECK:            ^ unexpected token
+//CHECK:            ^ unexpected ';'
     };
 }

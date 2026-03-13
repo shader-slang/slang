@@ -655,6 +655,9 @@ local insts = {
 					hoistable = true,
 				},
 			},
+			-- Represents the type of a generic value pack parameter.
+			-- e.g. `let each D : int` lowers to a param of type ValuePackType(int).
+			{ ValuePackType = { operands = { { "elementType", "IRType" } }, hoistable = true } },
 			{ ExpandTypeOrVal = { operands = { { "type" } }, hoistable = true } },
 			{
 				spirvLiteralType = {
@@ -930,7 +933,7 @@ local insts = {
 	{ makeStruct = {} },
 	{ makeTuple = {} },
 	{ makeTargetTuple = { struct_name = "MakeTargetTuple" } },
-	{ makeValuePack = {} },
+	{ makeValuePack = { hoistable=true } },
 	{ makeCombinedTextureSampler = { operands = { {"texture"}, {"sampler"} } } },
 	{ getTargetTupleElement = {} },
 	{
@@ -2460,6 +2463,11 @@ local insts = {
 	{ sizeOf = { operands = { { "type" } } } },
 	{ alignOf = { operands = { { "baseOp" } } } },
 	{ countOf = { operands = { { "type" } } } },
+	{ ExtractFirstFromPack = { operands = { { "pack" } }, hoistable = true } },
+	{ ExtractLastFromPack = { operands = { { "pack" } }, hoistable = true } },
+	{ TrimHeadOfPack = { operands = { { "pack" } }, hoistable = true } },
+	{ TrimTailOfPack = { operands = { { "pack" } }, hoistable = true } },
+	{ NonEmptyPackWitness = { hoistable = true } },
 	{ GetArrayLength = { operands = { { "array" } } } },
 	{
 		IsType = {
@@ -2984,6 +2992,39 @@ local insts = {
 		--
 		hoistable = true
 	} },
+	-- Constexpr arithmetic ops. These are hoistable variants of the regular
+	-- arithmetic ops, used for lowering compile-time integer expressions
+	-- (IntVal subclasses like PolynomialIntVal) so that they get deduplicated.
+	{ constexprAdd = { operands = { { "left" }, { "right" } }, hoistable = true } },
+	{ constexprSub = { operands = { { "left" }, { "right" } }, hoistable = true } },
+	{ constexprMul = { operands = { { "left" }, { "right" } }, hoistable = true } },
+	{ constexprNeg = { operands = { { "value" } }, hoistable = true } },
+	{ constexprDiv = { operands = { { "left" }, { "right" } }, hoistable = true } },
+	{ constexprIRem = { operands = { { "left" }, { "right" } }, hoistable = true } },
+	{ constexprShl = { operands = { { "left" }, { "right" } }, hoistable = true } },
+	{ constexprShr = { operands = { { "left" }, { "right" } }, hoistable = true } },
+	{ constexprBitAnd = { operands = { { "left" }, { "right" } }, hoistable = true } },
+	{ constexprBitOr = { operands = { { "left" }, { "right" } }, hoistable = true } },
+	{ constexprBitXor = { operands = { { "left" }, { "right" } }, hoistable = true } },
+	{ constexprBitNot = { operands = { { "value" } }, hoistable = true } },
+	{ constexprNot = { operands = { { "value" } }, hoistable = true } },
+	{ constexprEql = { operands = { { "left" }, { "right" } }, hoistable = true } },
+	{ constexprNeq = { operands = { { "left" }, { "right" } }, hoistable = true } },
+	{ constexprGreater = { operands = { { "left" }, { "right" } }, hoistable = true } },
+	{ constexprLess = { operands = { { "left" }, { "right" } }, hoistable = true } },
+	{ constexprGeq = { operands = { { "left" }, { "right" } }, hoistable = true } },
+	{ constexprLeq = { operands = { { "left" }, { "right" } }, hoistable = true } },
+	{ constexprAnd = { operands = { { "left" }, { "right" } }, hoistable = true } },
+	{ constexprOr = { operands = { { "left" }, { "right" } }, hoistable = true } },
+	{ constexprSelect = { operands = { { "condition" }, { "ifTrue" }, { "ifFalse" } }, hoistable = true } },
+	-- Constexpr cast ops. Hoistable variants of casting ops used for IntVal lowering.
+	{ constexprIntCast = { operands = { { "value" } }, hoistable = true } },
+	{ constexprCastIntToFloat = { operands = { { "value" } }, hoistable = true } },
+	{ constexprCastFloatToInt = { operands = { { "value" } }, hoistable = true } },
+	{ constexprFloatCast = { operands = { { "value" } }, hoistable = true } },
+	{ constexprCastIntToEnum = { operands = { { "value" } }, hoistable = true } },
+	{ constexprCastEnumToInt = { operands = { { "value" } }, hoistable = true } },
+	{ constexprEnumCast = { operands = { { "value" } }, hoistable = true } },
 }
 
 -- A function to calculate some useful properties and put it in the table,

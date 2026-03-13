@@ -1,15 +1,17 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -target spirv
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv
 
 struct HasResource
 {
     Texture2D tex;
 }
 
-//CHECK-DAG: ([[# @LINE+1]]): error 38204
 StructuredBuffer<HasResource> bufferArray[4];
+//CHECK:                      ^^^^^^^^^^^ resource type in StructuredBuffer
+//CHECK:                      ^^^^^^^^^^^ StructuredBuffer element type 'HasResource' cannot contain resource or opaque handle types
 
-//CHECK-DAG: ([[# @LINE+1]]): error 38204
 RWStructuredBuffer<Texture2D> rwBufferArray[2];
+//CHECK:                      ^^^^^^^^^^^^^ resource type in StructuredBuffer
+//CHECK:                      ^^^^^^^^^^^^^ StructuredBuffer element type 'Texture2D' cannot contain resource or opaque handle types
 
 SamplerState sampler;
 RWStructuredBuffer<float> output;
