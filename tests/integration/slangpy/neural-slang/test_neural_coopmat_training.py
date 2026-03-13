@@ -28,6 +28,8 @@ from slangpy.testing import helpers
 from conftest import get_slangpy_include_paths
 
 
+# CUDA because the shader uses TargetEnum.CUDA for SharedMemorySize.
+# Vulkan CoopMat would need a separate shader with TargetEnum.SPIR_V.
 COOPMAT_DEVICE_TYPES: list[spy.DeviceType] = [spy.DeviceType.cuda]
 
 

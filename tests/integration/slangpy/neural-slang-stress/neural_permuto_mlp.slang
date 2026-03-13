@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
 // Permuto Encoder + MLP image fitting test.
 //
 // InlineVector mode exposes regular slangpy-callable functions.
