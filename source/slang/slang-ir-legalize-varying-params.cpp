@@ -1,6 +1,8 @@
 // slang-ir-legalize-varying-params.cpp
 #include "slang-ir-legalize-varying-params.h"
 
+#include "../core/slang-uint-set.h"
+
 #include "slang-ir-clone.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
@@ -4757,6 +4759,358 @@ protected:
 private:
     const UnownedStringSlice userSemanticName = toSlice("user_semantic");
 };
+
+// Rebuild a varying-output type layout for entry-point results using IR semantics.
+// This mirrors the field-walk + semantic handling in `createPatchConstantFuncResultTypeLayout`
+// (source/slang/slang-ir-glsl-legalize.cpp), but runs earlier so later legalization passes
+// see a struct layout that matches the resolved IR return type.
+//
+// This is intentionally IR-only: we can't reuse AST layout helpers here because the AST
+// is already gone by the time link-time specialization resolves associated types.
+static UInt getVaryingOutputSlotCount(IRType* type)
+{
+    if (as<IRVoidType>(type))
+        return 0;
+    if (as<IRBasicType>(type) || as<IRVectorType>(type))
+        return 1;
+    if (auto matrixType = as<IRMatrixType>(type))
+    {
+        if (auto rowCount = as<IRIntLit>(matrixType->getOperand(1)))
+            return (UInt)rowCount->getValue();
+        return 1;
+    }
+    if (auto arrayType = as<IRArrayTypeBase>(type))
+    {
+        UInt elementCount = 1;
+        if (auto count = as<IRIntLit>(arrayType->getElementCount()))
+            elementCount = (UInt)count->getValue();
+        return elementCount * getVaryingOutputSlotCount(arrayType->getElementType());
+    }
+    if (auto structType = as<IRStructType>(type))
+    {
+        UInt count = 0;
+        for (auto field : structType->getFields())
+            count += getVaryingOutputSlotCount(field->getFieldType());
+        return count;
+    }
+    return 1;
+}
+
+// Reserve a consecutive range of varying slots.
+static void reserveVaryingOutputSlots(UIntSet& usedSlots, UInt offset, UInt count)
+{
+    for (UInt ii = 0; ii < count; ++ii)
+        usedSlots.add(offset + ii);
+}
+
+// Find the first free contiguous varying-output range of `count` slots.
+static UInt findContiguousFreeVaryingOutputSlots(UIntSet& usedSlots, UInt count)
+{
+    if (count == 0)
+        return (UInt)usedSlots.getLSBZero();
+
+    UInt candidate = (UInt)usedSlots.getLSBZero();
+    for (;;)
+    {
+        bool overlaps = false;
+        for (UInt ii = 0; ii < count; ++ii)
+        {
+            if (usedSlots.contains(candidate + ii))
+            {
+                overlaps = true;
+                candidate = candidate + ii + 1;
+                break;
+            }
+        }
+        if (!overlaps)
+            return candidate;
+    }
+}
+
+struct EntryPointOuterSemantic
+{
+    String name;
+    UInt index = 0;
+    bool isSystemValue = false;
+    bool isTargetSemantic = false;
+    bool isValid = false;
+};
+
+// Build an IR type layout for an entry-point result type after link-time specialization.
+// The goal is to match the same output location assignment we would get if the return type
+// were known at compile time and the AST layout path had run.
+static IRTypeLayout* createEntryPointResultTypeLayout(
+    IRBuilder& builder,
+    IRType* type,
+    UIntSet* usedOutputSlots,
+    EntryPointOuterSemantic* outerSemantic)
+{
+    if (auto structType = as<IRStructType>(type))
+    {
+        IRStructTypeLayout::Builder structTypeLayoutBuilder(&builder);
+        UIntSet localUsedSlots;
+        UIntSet& usedSlots = usedOutputSlots ? *usedOutputSlots : localUsedSlots;
+
+        for (auto field : structType->getFields())
+        {
+            auto fieldTypeLayout =
+                createEntryPointResultTypeLayout(builder, field->getFieldType(), nullptr, nullptr);
+            IRVarLayout::Builder fieldVarLayoutBuilder(&builder, fieldTypeLayout);
+
+            UInt fieldSlotCount = getVaryingOutputSlotCount(field->getFieldType());
+
+            auto glslLocationDecor = field->getKey()->findDecoration<IRGLSLLocationDecoration>();
+            if (auto semanticDecor = field->getKey()->findDecoration<IRSemanticDecoration>())
+            {
+                auto semanticName = semanticDecor->getSemanticName();
+                auto semanticIndex = semanticDecor->getSemanticIndex();
+                UnownedStringSlice semanticNameSlice;
+                UnownedStringSlice semanticIndexSlice;
+                if (splitNameAndIndex(semanticName, semanticNameSlice, semanticIndexSlice))
+                {
+                    semanticName = semanticNameSlice;
+                    semanticIndex = stringToInt(String(semanticIndexSlice));
+                }
+                if (semanticName.startsWithCaseInsensitive(toSlice("sv_target")))
+                {
+                    // `SV_Target<N>` preserves semantic name/index for reflection, but does
+                    // not force an explicit location. For Khronos targets, AST layout
+                    // auto-assigns output locations in declaration order unless `vk::location`
+                    // is present, so we reproduce that policy here.
+                    fieldVarLayoutBuilder.setUserSemantic(semanticName, semanticIndex);
+                    auto varLayoutForKind =
+                        fieldVarLayoutBuilder.findOrAddResourceInfo(
+                            LayoutResourceKind::VaryingOutput);
+                    UInt location = 0;
+                    if (glslLocationDecor)
+                    {
+                        // Explicit `vk::location` wins over auto-assignment.
+                        location = (UInt)glslLocationDecor->getLocation()->getValue();
+                    }
+                    else
+                    {
+                        location = findContiguousFreeVaryingOutputSlots(usedSlots, fieldSlotCount);
+                    }
+                    varLayoutForKind->offset = location;
+                    varLayoutForKind->space = 0;
+                    reserveVaryingOutputSlots(usedSlots, location, fieldSlotCount);
+                }
+                else if (semanticName.startsWithCaseInsensitive(toSlice("sv_")))
+                {
+                    // System-value semantics are carried through for reflection, but they
+                    // don't consume varying locations unless explicitly overridden.
+                    fieldVarLayoutBuilder.setSystemValueSemantic(semanticName, semanticIndex);
+                    if (glslLocationDecor)
+                    {
+                        auto varLayoutForKind =
+                            fieldVarLayoutBuilder.findOrAddResourceInfo(
+                                LayoutResourceKind::VaryingOutput);
+                        auto location = (UInt)glslLocationDecor->getLocation()->getValue();
+                        varLayoutForKind->offset = location;
+                        varLayoutForKind->space = 0;
+                        reserveVaryingOutputSlots(usedSlots, location, fieldSlotCount);
+                    }
+                }
+                else
+                {
+                    // User semantics also preserve name/index for reflection but follow the
+                    // same auto-assignment policy as AST layout (declaration order unless
+                    // `vk::location` is present).
+                    fieldVarLayoutBuilder.setUserSemantic(semanticName, semanticIndex);
+                    auto varLayoutForKind =
+                        fieldVarLayoutBuilder.findOrAddResourceInfo(
+                            LayoutResourceKind::VaryingOutput);
+                    UInt location = 0;
+                    if (glslLocationDecor)
+                    {
+                        // Explicit `vk::location` wins over auto-assignment.
+                        location = (UInt)glslLocationDecor->getLocation()->getValue();
+                    }
+                    else
+                    {
+                        location = findContiguousFreeVaryingOutputSlots(usedSlots, fieldSlotCount);
+                    }
+                    varLayoutForKind->offset = location;
+                    varLayoutForKind->space = 0;
+                    reserveVaryingOutputSlots(usedSlots, location, fieldSlotCount);
+                }
+            }
+            else if (glslLocationDecor)
+            {
+                // `vk::location` forces explicit location assignment.
+                auto location = (UInt)glslLocationDecor->getLocation()->getValue();
+                auto varLayoutForKind =
+                    fieldVarLayoutBuilder.findOrAddResourceInfo(
+                        LayoutResourceKind::VaryingOutput);
+                varLayoutForKind->offset = location;
+                varLayoutForKind->space = 0;
+                reserveVaryingOutputSlots(usedSlots, location, fieldSlotCount);
+            }
+            else if (outerSemantic && outerSemantic->isValid)
+            {
+                // Outer semantic applies to the whole return struct; distribute it across
+                // fields in declaration order, using the same slot-counting rules as the
+                // AST layout path.
+                UInt semanticIndex = outerSemantic->index;
+                if (outerSemantic->isSystemValue && !outerSemantic->isTargetSemantic)
+                {
+                    fieldVarLayoutBuilder.setSystemValueSemantic(
+                        outerSemantic->name,
+                        semanticIndex);
+                }
+                else
+                {
+                    fieldVarLayoutBuilder.setUserSemantic(
+                        outerSemantic->name,
+                        semanticIndex);
+                    // Match AST behavior: auto-assign locations for non-system semantics.
+                    auto varLayoutForKind =
+                        fieldVarLayoutBuilder.findOrAddResourceInfo(
+                            LayoutResourceKind::VaryingOutput);
+                    auto unusedBinding =
+                        findContiguousFreeVaryingOutputSlots(usedSlots, fieldSlotCount);
+                    varLayoutForKind->offset = unusedBinding;
+                    varLayoutForKind->space = 0;
+                    reserveVaryingOutputSlots(usedSlots, unusedBinding, fieldSlotCount);
+                }
+                outerSemantic->index += fieldSlotCount;
+            }
+            else
+            {
+                // Fields without explicit semantics use the next available varying slot,
+                // matching AST auto-assignment.
+                auto varLayoutForKind =
+                    fieldVarLayoutBuilder.findOrAddResourceInfo(
+                        LayoutResourceKind::VaryingOutput);
+                auto unusedBinding =
+                    findContiguousFreeVaryingOutputSlots(usedSlots, fieldSlotCount);
+                varLayoutForKind->offset = unusedBinding;
+                varLayoutForKind->space = 0;
+                reserveVaryingOutputSlots(usedSlots, unusedBinding, fieldSlotCount);
+            }
+
+            structTypeLayoutBuilder.addField(field->getKey(), fieldVarLayoutBuilder.build());
+        }
+        return structTypeLayoutBuilder.build();
+    }
+    else if (auto arrayType = as<IRArrayTypeBase>(type))
+    {
+        auto elementTypeLayout =
+            createEntryPointResultTypeLayout(builder, arrayType->getElementType(), nullptr, nullptr);
+        IRArrayTypeLayout::Builder arrayTypeLayoutBuilder(&builder, elementTypeLayout);
+        return arrayTypeLayoutBuilder.build();
+    }
+    else
+    {
+        IRTypeLayout::Builder typeLayoutBuilder(&builder);
+        typeLayoutBuilder.addResourceUsage(
+            LayoutResourceKind::VaryingOutput,
+            LayoutSize::fromRaw(1));
+        return typeLayoutBuilder.build();
+    }
+}
+
+// Collect any existing output locations from entry-point parameters so we can avoid collisions
+// when assigning output locations to the rebuilt result layout (e.g. explicit params + return).
+static void collectUsedOutputSlots(IRFunc* entryPoint, UIntSet& usedSlots)
+{
+    if (auto firstBlock = entryPoint->getFirstBlock())
+    {
+        for (auto param = firstBlock->getFirstParam(); param; param = param->getNextParam())
+        {
+            auto varLayout = findVarLayout(param);
+            if (!varLayout)
+                continue;
+            if (auto offsetAttr = varLayout->findOffsetAttr(LayoutResourceKind::VaryingOutput))
+            {
+                UInt slotCount = 1;
+                if (auto typeLayout = varLayout->getTypeLayout())
+                {
+                    if (auto sizeAttr = typeLayout->findSizeAttr(LayoutResourceKind::VaryingOutput))
+                    {
+                        auto size = sizeAttr->getSize();
+                        if (size.isFinite())
+                            slotCount = size.getFiniteValue().getValidValue();
+                    }
+                }
+                reserveVaryingOutputSlots(usedSlots, offsetAttr->getOffset(), slotCount);
+            }
+        }
+    }
+}
+
+// If the entry-point return type has been resolved to a concrete struct but the attached
+// layout still references a generic/non-struct type layout, rebuild the result layout to
+// match the resolved IR return type. This keeps later legalization passes in sync with
+// the post-link IR without relying on late-stage GLSL/HLSL fallbacks.
+void refreshEntryPointResultLayouts(IRModule* module, List<IRFunc*> const& entryPoints)
+{
+    IRBuilder builder(module);
+    builder.setInsertInto(module->getModuleInst());
+
+    for (auto entryPoint : entryPoints)
+    {
+        auto layoutDecor = entryPoint->findDecoration<IRLayoutDecoration>();
+        if (!layoutDecor)
+            continue;
+
+        auto entryPointLayout = as<IREntryPointLayout>(layoutDecor->getLayout());
+        if (!entryPointLayout)
+            continue;
+
+        auto resultLayout = entryPointLayout->getResultLayout();
+        if (!resultLayout)
+            continue;
+
+        auto resultType = entryPoint->getResultType();
+        if (as<IRVoidType>(resultType))
+            continue;
+
+        auto resultStructType = as<IRStructType>(resultType);
+        if (!resultStructType)
+            continue;
+
+        if (as<IRStructTypeLayout>(resultLayout->getTypeLayout()))
+            continue;
+
+        UIntSet usedOutputSlots;
+        collectUsedOutputSlots(entryPoint, usedOutputSlots);
+
+        EntryPointOuterSemantic outerSemantic;
+        if (auto userSemantic = resultLayout->findAttr<IRUserSemanticAttr>())
+        {
+            outerSemantic.name = userSemantic->getName();
+            outerSemantic.index = userSemantic->getIndex();
+            outerSemantic.isSystemValue = false;
+            outerSemantic.isTargetSemantic =
+                outerSemantic.name.getUnownedSlice().startsWithCaseInsensitive(toSlice("sv_target"));
+            outerSemantic.isValid = true;
+        }
+        else if (auto systemSemantic = resultLayout->findAttr<IRSystemValueSemanticAttr>())
+        {
+            outerSemantic.name = systemSemantic->getName();
+            outerSemantic.index = systemSemantic->getIndex();
+            outerSemantic.isSystemValue = true;
+            outerSemantic.isTargetSemantic =
+                outerSemantic.name.getUnownedSlice().startsWithCaseInsensitive(toSlice("sv_target"));
+            outerSemantic.isValid = true;
+        }
+
+        auto newResultTypeLayout =
+            createEntryPointResultTypeLayout(
+                builder,
+                resultStructType,
+                &usedOutputSlots,
+                outerSemantic.isValid ? &outerSemantic : nullptr);
+        IRVarLayout::Builder resultVarLayoutBuilder(&builder, newResultTypeLayout);
+        resultVarLayoutBuilder.cloneEverythingButOffsetsFrom(resultLayout);
+        auto newResultLayout = resultVarLayoutBuilder.build();
+
+        auto newEntryPointLayout =
+            builder.getEntryPointLayout(entryPointLayout->getParamsLayout(), newResultLayout);
+        layoutDecor->setOperand(0, newEntryPointLayout);
+    }
+}
 
 void legalizeVertexShaderOutputParamsForMetal(DiagnosticSink* sink, EntryPointInfo& entryPoint)
 {
