@@ -24,6 +24,7 @@ jobs:
     timeout-minutes: 180
 
     permissions:
+      id-token: write # Required for Workload Identity (GCS auth for LLVM)
       contents: read
       packages: read
 
@@ -64,6 +65,22 @@ jobs:
           submodules: "recursive"
           fetch-depth: "0"
 
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: "projects/125098404903/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider"
+          service_account: "github-ci@slang-runners.iam.gserviceaccount.com"
+
+      - name: Setup LLVM from GCS
+        uses: ./.github/actions/setup-llvm-from-gcs
+        with:
+          os: linux
+          compiler: gcc
+          platform: x86_64
+          llvm-hash: ${{ hashFiles('external/build-llvm.sh') }}
+          build-if-missing: "true"
+          github-token: ${{ github.token }}
+
       - name: Install Clang 18 and LLVM Coverage Tools
         run: |
           # Add LLVM APT repository
@@ -96,10 +113,10 @@ jobs:
           export CXX=clang++-18
 
           # Configure with coverage preset + CUDA
-          # FETCH_BINARY downloads pre-built slang-llvm (needed by slang-test for FileCheck)
+          # USE_SYSTEM_LLVM uses the full LLVM from GCS (enables CPU backend + FileCheck)
           cmake --preset coverage --fresh \
             -DSLANG_ENABLE_CUDA=ON \
-            -DSLANG_SLANG_LLVM_FLAVOR=FETCH_BINARY
+            -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM
 
           # Build
           cmake --build --preset coverage -j$(nproc)
