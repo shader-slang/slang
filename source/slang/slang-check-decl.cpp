@@ -184,17 +184,19 @@ static constexpr uint32_t containerBit(ContainerNestingCategory c)
 /// ContainerNestingCategory values.
 // clang-format off
 static const uint32_t kAllowedNestingContainers[static_cast<uint32_t>(DeclNestingCategory::Count)] = {
-    // StructType: Module, StructOrClass
+    // StructType: Module, StructOrClass, Extension
     containerBit(ContainerNestingCategory::Module) |
-    containerBit(ContainerNestingCategory::StructOrClass),
+    containerBit(ContainerNestingCategory::StructOrClass) |
+    containerBit(ContainerNestingCategory::Extension),
 
     // InterfaceType: Module
     containerBit(ContainerNestingCategory::Module),
 
-    // EnumType: Module, StructOrClass, Enum (nested enums)
+    // EnumType: Module, StructOrClass, Enum (nested enums), Extension
     containerBit(ContainerNestingCategory::Module) |
     containerBit(ContainerNestingCategory::StructOrClass) |
-    containerBit(ContainerNestingCategory::Enum),
+    containerBit(ContainerNestingCategory::Enum) |
+    containerBit(ContainerNestingCategory::Extension),
 
     // AssocType: Interface
     containerBit(ContainerNestingCategory::Interface),
@@ -788,9 +790,6 @@ struct SemanticsDeclHeaderVisitor : public SemanticsDeclVisitorBase,
     ///
     /// The type of storage is determined by the parent declaration.
     Type* _getAccessorStorageType(AccessorDecl* decl);
-
-    /// Perform checks common to all types of accessors.
-    void _visitAccessorDeclCommon(AccessorDecl* decl);
 
     void visitAccessorDecl(AccessorDecl* decl);
     void visitSetterDecl(SetterDecl* decl);
@@ -2165,7 +2164,7 @@ void SemanticsDeclModifiersVisitor::visitInterfaceDecl(InterfaceDecl* interfaceD
 
 void SemanticsDeclModifiersVisitor::visitStructDecl(StructDecl* structDecl)
 {
-    checkModifiers(structDecl);
+    visitDecl(structDecl);
 
     // Replace any bitfield member with a property, do this here before
     // name lookup to avoid the original var decl being referenced
@@ -9581,10 +9580,6 @@ void SemanticsDeclHeaderVisitor::visitGlobalGenericParamDecl(GlobalGenericParamD
 
 void SemanticsDeclHeaderVisitor::visitAssocTypeDecl(AssocTypeDecl* decl)
 {
-    // assoctype only allowed in an interface
-    auto interfaceDecl = as<InterfaceDecl>(decl->parentDecl);
-    if (!interfaceDecl)
-        getSink()->diagnose(Diagnostics::AssocTypeInInterfaceOnly{.decl = decl});
     checkVisibility(decl);
 }
 
@@ -11767,7 +11762,8 @@ Type* SemanticsVisitor::findResultTypeForConstructorDecl(ConstructorDecl* decl)
     auto thisType = calcThisType(makeDeclRef(parent));
     if (!thisType)
     {
-        getSink()->diagnose(Diagnostics::InitializerNotInsideType{.decl = decl});
+        // The nesting validation in validateDeclNesting already reports the error;
+        // we just need error recovery here.
         thisType = m_astBuilder->getErrorType();
     }
     return thisType;
@@ -11863,26 +11859,8 @@ Type* SemanticsDeclHeaderVisitor::_getAccessorStorageType(AccessorDecl* decl)
     }
 }
 
-void SemanticsDeclHeaderVisitor::_visitAccessorDeclCommon(AccessorDecl* decl)
-{
-    // An accessor must appear nested inside a subscript or property declaration.
-    //
-    auto parentDecl = decl->parentDecl;
-    if (as<SubscriptDecl>(parentDecl))
-    {
-    }
-    else if (as<PropertyDecl>(parentDecl))
-    {
-    }
-    else
-    {
-        getSink()->diagnose(Diagnostics::AccessorMustBeInsideSubscriptOrProperty{.decl = decl});
-    }
-}
-
 void SemanticsDeclHeaderVisitor::visitAccessorDecl(AccessorDecl* decl)
 {
-    _visitAccessorDeclCommon(decl);
 
     // Note: This subroutine is used by both `get`
     // and `ref` accessors, but is bypassed by
@@ -11919,9 +11897,6 @@ void SemanticsDeclHeaderVisitor::visitAccessorDecl(AccessorDecl* decl)
 
 void SemanticsDeclHeaderVisitor::visitSetterDecl(SetterDecl* decl)
 {
-    // Make sure to invoke the common checking logic for all accessors.
-    _visitAccessorDeclCommon(decl);
-
     // A `set` accessor always returns `void`.
     //
     decl->returnType.type = getASTBuilder()->getVoidType();
