@@ -2656,13 +2656,6 @@ err(
 -- 303xx: interfaces and associated types
 
 err(
-    "assoc-type-in-interface-only",
-    30300,
-    "associatedtype outside interface",
-    span { loc = "decl:Decl", message = "'associatedtype' can only be defined in an 'interface'." }
-)
-
-err(
     "global-gen-param-in-global-scope-only",
     30301,
     "type_param outside global scope",
@@ -3213,13 +3206,6 @@ err(
 -- 311xx: accessors
 --
 err(
-    "accessor-must-be-inside-subscript-or-property",
-    31100,
-    "invalid accessor declaration location",
-    span { loc = "decl:Decl", message = "an accessor declaration is only allowed inside a subscript or property declaration" }
-)
-
-err(
     "non-set-accessor-must-not-have-params",
     31101,
     "accessors other than 'set' must not have parameters",
@@ -3264,7 +3250,7 @@ err(
     "decl-not-allowed-in-context",
     31400,
     "declaration not allowed in this context",
-    span { loc = "decl:Decl", message = "a ~childKind declaration is not allowed inside a ~parentKind." }
+    span { loc = "decl:Decl", message = "~childKind declaration is not allowed inside ~parentKind." }
 )
 
 --
@@ -3617,13 +3603,6 @@ err(
     38101,
     "'this' used outside aggregate type",
     span { loc = "expr:Expr", message = "'this' expression can only be used in members of an aggregate type" }
-)
-
-err(
-    "initializer-not-inside-type",
-    38102,
-    "'init' used outside type",
-    span { loc = "decl:Decl", message = "an 'init' declaration is only allowed inside a type or 'extension' declaration" }
 )
 
 err(
