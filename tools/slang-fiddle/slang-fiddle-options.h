@@ -9,6 +9,12 @@ using namespace Slang;
 
 //
 
+enum class FiddleMode
+{
+    Default, // Default: Generate .fiddle files for C++ code
+    TestGen  // Generate test files from .slang templates
+};
+
 struct Options
 {
 public:
@@ -40,11 +46,42 @@ public:
 
             if (arg == UnownedTerminatedStringSlice("-i"))
             {
-                inputPathPrefix = expectArg(argCursor, argEnd);
+                auto val = expectArg(argCursor, argEnd);
+                if (!val)
+                    sink.diagnose(SourceLoc(), Diagnostics::unknownOption, arg);
+                else
+                    inputPathPrefix = val;
             }
             else if (arg == UnownedTerminatedStringSlice("-o"))
             {
-                outputPathPrefix = expectArg(argCursor, argEnd);
+                auto val = expectArg(argCursor, argEnd);
+                if (!val)
+                    sink.diagnose(SourceLoc(), Diagnostics::unknownOption, arg);
+                else
+                    outputPathPrefix = val;
+            }
+            else if (arg == UnownedTerminatedStringSlice("-m"))
+            {
+                auto modeStr = expectArg(argCursor, argEnd);
+                if (!modeStr)
+                {
+                    sink.diagnose(SourceLoc(), Diagnostics::unknownOption, arg);
+                }
+                else if (strcmp(modeStr, "default") == 0)
+                {
+                    fiddleMode = FiddleMode::Default;
+                }
+                else if (strcmp(modeStr, "test-gen") == 0)
+                {
+                    fiddleMode = FiddleMode::TestGen;
+                }
+                else
+                {
+                    sink.diagnose(
+                        SourceLoc(),
+                        Diagnostics::unknownOption,
+                        String("-m ") + modeStr);
+                }
             }
             else
             {
@@ -57,5 +94,7 @@ public:
     String inputPathPrefix = "";
     String outputPathPrefix = "";
     List<String> inputPaths;
+
+    FiddleMode fiddleMode = FiddleMode::Default;
 };
 } // namespace fiddle
