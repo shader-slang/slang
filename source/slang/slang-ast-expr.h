@@ -480,8 +480,14 @@ class SizeOfLikeExpr : public Expr
     // Set during the parse, could be an expression, a variable or a type
     FIDDLE() Expr* value = nullptr;
 
+    // The (optional) data layout expression used for the value.
+    FIDDLE() Expr* dataLayout = nullptr;
+
     // The type the size/alignment needs to operate on. Set during traversal of SemanticsExprVisitor
     FIDDLE() Type* sizedType = nullptr;
+
+    // The type of `dataLayout`.
+    FIDDLE() Type* dataLayoutType = nullptr;
 };
 
 FIDDLE()
