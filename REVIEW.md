@@ -23,7 +23,7 @@ Make ALL 6 Agent calls in a SINGLE message so they run concurrently:
 Each agent's prompt MUST include:
 - The FULL diff content and changed file list
 - "Read CLAUDE.md for project context"
-- "Use `mcp__deepwiki__ask_question` with repo `shader-slang/slang` for Slang-specific questions"
+- "Use `mcp__deepwiki__ask_question` with repo `shader-slang/slang` as a SUPPLEMENTARY reference only — always prioritize the actual code, PR diff, and CLAUDE.md over DeepWiki answers"
 - "For large files (>1000 lines), use Grep first then Read with offset/limit"
 - "The Slang language spec has been cloned to `external/spec/` (if it exists). Check `external/spec/proposals/` when the PR implements or references a spec proposal"
 

@@ -26,12 +26,14 @@ reviews:
   path_instructions:
     - path: "source/slang/**"
       instructions: >-
-        This is the core compiler. Review for:
+        This is the core compiler AND all target emitters (slang-emit-*.cpp).
+        Review for:
         (1) IR pass correctness — ensure SSA form and type invariants are maintained.
         (2) Proper use of FIDDLE macros for AST/IR node definitions.
         (3) Emit logic should stay simple; heavy transforms belong in IR passes.
         (4) Check that new IR instructions are registered in slang-ir-insts.lua.
         (5) Null pointer safety and proper error handling via diagnostics.
+        (6) Cross-backend consistency — changes to one emitter may need parallel changes in others.
 
     - path: "source/core/**"
       instructions: >-
