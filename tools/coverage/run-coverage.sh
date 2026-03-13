@@ -78,14 +78,25 @@ else
   rm -rf "$COVERAGE_DIR"/*.profraw "$COVERAGE_DIR"/*.profdata
 
   # Set up coverage output in temp directory
-  export LLVM_PROFILE_FILE="$COVERAGE_DIR/slang-test-%p.profraw"
+  # Use %c for continuous mode: profraw data is memory-mapped and written
+  # incrementally, surviving process crashes (e.g. GPU assertion failures).
+  # Falls back to normal mode if %c is not supported by the runtime.
+  if [[ "$OSTYPE" == "darwin"* ]]; then
+    # macOS Apple Clang doesn't support %c continuous mode
+    export LLVM_PROFILE_FILE="$COVERAGE_DIR/slang-test-%p.profraw"
+  else
+    export LLVM_PROFILE_FILE="$COVERAGE_DIR/slang-test-%p%c.profraw"
+  fi
 
   # Run tests
   echo
   echo "Running tests with coverage instrumentation..."
   echo "Coverage data directory: $COVERAGE_DIR"
   cd "$REPO_ROOT"
-  "$SLANG_TEST" "${TEST_ARGS[@]}"
+  "$SLANG_TEST" "${TEST_ARGS[@]}" || {
+    echo
+    echo "Warning: slang-test exited with code $?. Continuing with partial coverage data."
+  }
 
   # Run record-replay API tests with recording enabled to capture record-replay coverage
   # This runs only the focused RecordReplayApi* tests with SLANG_RECORD_LAYER=1 to
