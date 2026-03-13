@@ -32,9 +32,9 @@ ParameterBlock<Resources> resources;
 // WGSL-DAG: @binding(1) @group(0) var<uniform> resources_structBuf
 // WGSL-DAG: @binding(2) @group(0) var<storage, read_write> resources_writeBuf
 
-// HLSL-DAG: register(b0)
-// HLSL-DAG: register(b1)
-// HLSL-DAG: register(u0)
+// HLSL-DAG: resources_constantBuf{{.*}}register(b0)
+// HLSL-DAG: resources_structBuf{{.*}}register(b1)
+// HLSL-DAG: resources_writeBuf{{.*}}register(u0)
 
 [shader("compute")]
 [numthreads(1, 1, 1)]
