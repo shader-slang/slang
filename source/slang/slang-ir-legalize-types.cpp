@@ -3287,20 +3287,35 @@ static LegalVal declareVars(
             IRVarLayout* elementVarLayout = nullptr;
 
             // If the type layout is a ParameterGroupTypeLayout whose element
-            // type layout carries its own DescriptorTableSlot size (i.e. the
-            // element is itself a resource type), unwrap to the element layout
-            // so resource bindings propagate to the declared variable.
+            // is a resource type (not a struct, and not plain data), unwrap to
+            // the element layout so resource bindings propagate to the declared
+            // variable.
             //
             // We must NOT unwrap when the element is a plain data type (e.g.
-            // uint inside ConstantBuffer<uint>), because its type layout lacks
-            // DescriptorTableSlot and createVarLayout would then never apply
+            // uint inside ConstantBuffer<uint>), because its type layout only
+            // has Uniform size attributes and createVarLayout would never apply
             // binding/set offsets from the var chain.
+            //
+            // Struct elements are excluded because they get pair-decomposed, and
+            // the element layout refers to the full struct rather than the
+            // ordinary-only part.
             if (auto paramGroupLayout = as<IRParameterGroupTypeLayout>(typeLayout))
             {
                 auto paramGroupElementVarLayout = paramGroupLayout->getElementVarLayout();
                 auto paramGroupElementTypeLayout = paramGroupElementVarLayout->getTypeLayout();
-                if (paramGroupElementTypeLayout->findSizeAttr(
-                        LayoutResourceKind::DescriptorTableSlot))
+                bool elementHasDescriptorBindingSize = false;
+                if (!as<IRStructTypeLayout>(paramGroupElementTypeLayout))
+                {
+                    for (auto sizeAttr : paramGroupElementTypeLayout->getSizeAttrs())
+                    {
+                        if (sizeAttr->getResourceKind() != LayoutResourceKind::Uniform)
+                        {
+                            elementHasDescriptorBindingSize = true;
+                            break;
+                        }
+                    }
+                }
+                if (elementHasDescriptorBindingSize)
                 {
                     elementVarLayout = paramGroupElementVarLayout;
                     unwrappedTypeLayout = paramGroupElementTypeLayout;
