@@ -7,6 +7,7 @@
 // CHECK-DAG: %[[ATTACH:[A-Za-z0-9_]+]] = OpLoad %{{[A-Za-z0-9_]+}} %[[ATTACH_PTR]]
 // CHECK-DAG: OpDecorate %[[ATTACH_PTR]] NonUniform
 // CHECK-DAG: OpDecorate %[[ATTACH]] NonUniform
+// CHECK: %{{[A-Za-z0-9_]+}} = OpImageRead %{{[A-Za-z0-9_]+}} %[[ATTACH]] %{{[A-Za-z0-9_]+}}
 
 layout(input_attachment_index = 0, set = 0, binding = 0) uniform subpassInput subpasses[4];
 layout(location = 0) flat in int idx;

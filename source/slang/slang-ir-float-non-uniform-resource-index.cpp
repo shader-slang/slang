@@ -92,6 +92,9 @@ void processNonUniformResourceIndex(
                     else if (floatMode == NonUniformResourceIndexFloatMode::SPIRV &&
                              user->getOperand(1) == inst)
                     {
+                        // Only SPIR-V needs the index itself to carry resource non-uniform
+                        // provenance after this rewrite. Other backends continue to reason about
+                        // the wrapper on the source index directly.
                         // Replace getElement(obj, nonUniformRes(i)), into
                         // nonUniformRes(getElement(obj, i)).
                         newUser = builder.emitElementExtract(

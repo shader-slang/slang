@@ -596,14 +596,12 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                                 indexValue);
                             if (isNonUniformIndex)
                             {
-                                // Preserve non-uniform provenance when array resource indexing
-                                // is rewritten into a pointer-valued access chain.
-                                if (!indexValue
-                                         ->findDecoration<IRSPIRVNonUniformResourceDecoration>())
+                                // Preserve non-uniform provenance on the rewritten access chain
+                                // without mutating the shared index SSA that other uses may rely on.
+                                if (!newAddr->findDecoration<IRSPIRVNonUniformResourceDecoration>())
                                 {
-                                    builder.addSPIRVNonUniformResourceDecoration(indexValue);
+                                    builder.addSPIRVNonUniformResourceDecoration(newAddr);
                                 }
-                                builder.addSPIRVNonUniformResourceDecoration(newAddr);
                             }
                             user->replaceUsesWith(newAddr);
                             user->removeAndDeallocate();

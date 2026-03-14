@@ -14,7 +14,7 @@
 // CHECK-DAG: OpDecorate %[[NONUNIFORM_SAMPLED:[A-Za-z0-9_]+]] NonUniform
 // CHECK-LABEL: %sampleHelper_0 = OpFunction
 // CHECK: %[[NONUNIFORM_PARAM:[A-Za-z0-9_]+]] = OpFunctionParameter %uint
-// CHECK: %[[NONUNIFORM_SAMPLER_PARAM:[A-Za-z0-9_]+]] = OpFunctionParameter %11
+// CHECK: %[[NONUNIFORM_SAMPLER_PARAM:[A-Za-z0-9_]+]] = OpFunctionParameter %{{[A-Za-z0-9_]+}}
 // CHECK: %[[NONUNIFORM_ACCESS]] = OpAccessChain %_ptr_UniformConstant_{{[A-Za-z0-9_]+}} %resources %[[NONUNIFORM_PARAM]]
 // CHECK: %[[NONUNIFORM_LOAD:[A-Za-z0-9_]+]] = OpLoad %{{[A-Za-z0-9_]+}} %[[NONUNIFORM_ACCESS]]
 // CHECK: %[[NONUNIFORM_SAMPLED]] = OpSampledImage %{{[A-Za-z0-9_]+}} %[[NONUNIFORM_LOAD]] %[[NONUNIFORM_SAMPLER_PARAM]]

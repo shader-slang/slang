@@ -4,14 +4,14 @@
 // CHECK-DAG: %[[CALL_IDX:[A-Za-z0-9_]+]] = OpCompositeExtract %uint %{{[A-Za-z0-9_]+}} 0
 // CHECK-DAG: OpDecorate %[[NONUNIFORM_ACCESS:[A-Za-z0-9_]+]] NonUniform
 // CHECK-DAG: OpDecorate %[[NONUNIFORM_SAMPLED_IMAGE:[A-Za-z0-9_]+]] NonUniform
-// CHECK-DAG: %[[UNIFORM_CALL:[A-Za-z0-9_]+]] = OpFunctionCall %float %sampleHelper %int_0 %{{[A-Za-z0-9_]+}}
-// CHECK-DAG: %[[NONUNIFORM_CALL:[A-Za-z0-9_]+]] = OpFunctionCall %float %sampleHelper_0 %[[CALL_IDX]] %{{[A-Za-z0-9_]+}}
-// CHECK-LABEL: %sampleHelper_0 = OpFunction
+// CHECK-DAG: %[[UNIFORM_CALL:[A-Za-z0-9_]+]] = OpFunctionCall %float %[[UNIFORM_HELPER:[A-Za-z0-9_]+]] %int_0 %{{[A-Za-z0-9_]+}}
+// CHECK-DAG: %[[NONUNIFORM_CALL:[A-Za-z0-9_]+]] = OpFunctionCall %float %[[NONUNIFORM_HELPER:[A-Za-z0-9_]+]] %[[CALL_IDX]] %{{[A-Za-z0-9_]+}}
+// CHECK: %[[NONUNIFORM_HELPER]] = OpFunction %float DontInline %{{[A-Za-z0-9_]+}}
 // CHECK: %[[NONUNIFORM_PARAM:[A-Za-z0-9_]+]] = OpFunctionParameter %uint
-// CHECK: %[[NONUNIFORM_SAMPLER_PARAM:[A-Za-z0-9_]+]] = OpFunctionParameter %11
-// CHECK: %[[NONUNIFORM_ACCESS]] = OpAccessChain %_ptr_UniformConstant_23 %resources %[[NONUNIFORM_PARAM]]
-// CHECK: %[[NONUNIFORM_LOAD:[A-Za-z0-9_]+]] = OpLoad %23 %[[NONUNIFORM_ACCESS]]
-// CHECK: %[[NONUNIFORM_SAMPLED_IMAGE]] = OpSampledImage %31 %[[NONUNIFORM_LOAD]] %[[NONUNIFORM_SAMPLER_PARAM]]
+// CHECK: %[[NONUNIFORM_SAMPLER_PARAM:[A-Za-z0-9_]+]] = OpFunctionParameter %{{[A-Za-z0-9_]+}}
+// CHECK: %[[NONUNIFORM_ACCESS]] = OpAccessChain %[[RESOURCE_PTR_T:[A-Za-z0-9_]+]] %resources %[[NONUNIFORM_PARAM]]
+// CHECK: %[[NONUNIFORM_LOAD:[A-Za-z0-9_]+]] = OpLoad %[[RESOURCE_T:[A-Za-z0-9_]+]] %[[NONUNIFORM_ACCESS]]
+// CHECK: %[[NONUNIFORM_SAMPLED_IMAGE]] = OpSampledImage %[[SAMPLED_IMAGE_T:[A-Za-z0-9_]+]] %[[NONUNIFORM_LOAD]] %[[NONUNIFORM_SAMPLER_PARAM]]
 
 [vk::binding(0, 0)]
 RWTexture1D<float> render_target;

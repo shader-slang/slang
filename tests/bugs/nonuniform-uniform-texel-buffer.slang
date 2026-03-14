@@ -5,6 +5,7 @@
 // CHECK-DAG: %[[TEXEL:[A-Za-z0-9_]+]] = OpLoad %{{[A-Za-z0-9_]+}} %[[TEXEL_PTR]]
 // CHECK-DAG: OpDecorate %[[TEXEL_PTR]] NonUniform
 // CHECK-DAG: OpDecorate %[[TEXEL]] NonUniform
+// CHECK: {{OpImageFetch|OpImageRead}} {{.*}} %[[TEXEL]]
 
 [vk::binding(0, 0)]
 Buffer<float> buffers[8];

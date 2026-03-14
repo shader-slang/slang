@@ -10,11 +10,11 @@
 // CHECK-DAG: OpCapability StorageImageArrayNonUniformIndexing
 // CHECK-DAG: %[[BUF_AC:[A-Za-z0-9_]+]] = OpAccessChain %_ptr_Uniform_StructuredBuffer %bindless_storage_buffers %[[BUF_IDX:[A-Za-z0-9_]+]]
 // CHECK-DAG: %[[BUF_PTR:[A-Za-z0-9_]+]] = OpAccessChain %_ptr_Uniform_float %[[BUF_AC]] %int_0 %int_0
-// CHECK-DAG: %[[TEX_AC:[A-Za-z0-9_]+]] = OpAccessChain %_ptr_UniformConstant_21 %bindless_storage_buffers_0 %[[TEX_IDX:[A-Za-z0-9_]+]]
-// CHECK-DAG: %[[TEX:[A-Za-z0-9_]+]] = OpLoad %21 %[[TEX_AC]]
-// CHECK-DAG: %sampledImage = OpSampledImage
-// CHECK-DAG: %[[IMG_AC:[A-Za-z0-9_]+]] = OpAccessChain %_ptr_UniformConstant_30 %bindless_storage_buffers_1 %[[IMG_IDX:[A-Za-z0-9_]+]]
-// CHECK-DAG: %[[RW_IMG:[A-Za-z0-9_]+]] = OpLoad %30 %[[IMG_AC]]
+// CHECK-DAG: %[[TEX_AC:[A-Za-z0-9_]+]] = OpAccessChain %[[TEX_PTR_T:[A-Za-z0-9_]+]] %bindless_storage_buffers_0 %[[TEX_IDX:[A-Za-z0-9_]+]]
+// CHECK-DAG: %[[TEX:[A-Za-z0-9_]+]] = OpLoad %[[TEX_T:[A-Za-z0-9_]+]] %[[TEX_AC]]
+// CHECK-DAG: %[[SAMPLED_IMAGE:[A-Za-z0-9_]+]] = OpSampledImage
+// CHECK-DAG: %[[IMG_AC:[A-Za-z0-9_]+]] = OpAccessChain %[[IMG_PTR_T:[A-Za-z0-9_]+]] %bindless_storage_buffers_1 %[[IMG_IDX:[A-Za-z0-9_]+]]
+// CHECK-DAG: %[[RW_IMG:[A-Za-z0-9_]+]] = OpLoad %[[IMG_T:[A-Za-z0-9_]+]] %[[IMG_AC]]
 // CHECK-DAG: OpDecorate %[[BUF_IDX]] NonUniform
 // CHECK-DAG: OpDecorate %[[BUF_AC]] NonUniform
 // CHECK-DAG: OpDecorate %[[BUF_PTR]] NonUniform
@@ -24,7 +24,7 @@
 // CHECK-DAG: OpDecorate %[[IMG_IDX]] NonUniform
 // CHECK-DAG: OpDecorate %[[IMG_AC]] NonUniform
 // CHECK-DAG: OpDecorate %[[RW_IMG]] NonUniform
-// CHECK-DAG: OpDecorate %sampledImage NonUniform
+// CHECK-DAG: OpDecorate %[[SAMPLED_IMAGE]] NonUniform
 
 [vk::binding(0, 0)]
 RWTexture1D<float> render_target;

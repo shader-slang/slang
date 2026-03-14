@@ -682,7 +682,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return id;
     }
 
-    SpvWord getExistingResultID(SpvInst* inst)
+    SpvWord ensureResultIDRegistered(SpvInst* inst)
     {
         if (!inst)
             return 0;
@@ -1013,6 +1013,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case SpvOpImageSparseGather:
         case SpvOpImageSparseDrefGather:
         case SpvOpImageTexelPointer:
+        case SpvOpUntypedImageTexelPointerEXT:
             if (firstOperandIndex < inst->operandWordsCount)
                 outIndices.add(firstOperandIndex);
             return;
@@ -1052,6 +1053,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case SpvOpLoad:
         case SpvOpCopyObject:
         case SpvOpBitcast:
+        case SpvOpImage:
         case SpvOpPhi:
         case SpvOpSampledImage:
         case SpvOpAccessChain:
@@ -1059,6 +1061,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case SpvOpPtrAccessChain:
         case SpvOpInBoundsPtrAccessChain:
         case SpvOpUntypedAccessChainKHR:
+        case SpvOpImageTexelPointer:
+        case SpvOpUntypedImageTexelPointerEXT:
             for (UInt i = firstOperandIndex; i < inst->operandWordsCount; ++i)
             {
                 auto operandInfo =
@@ -1072,7 +1076,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     return result;
                 }
             }
-            default:
+        default:
             break;
         }
 
@@ -1145,7 +1149,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         // every result ID up front before we start chasing use-def chains.
         for (auto child = parent->m_firstChild; child; child = child->nextSibling)
         {
-            getExistingResultID(child);
+            ensureResultIDRegistered(child);
             registerSPIRVResultIDsInParent(child);
         }
     }
@@ -10687,7 +10691,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             if (!needsNonUniform)
                 return;
 
-            SpvWord resultId = getExistingResultID(emittedInst);
+            SpvWord resultId = ensureResultIDRegistered(emittedInst);
 
             if (!resultId)
                 return;
@@ -10697,6 +10701,47 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
 
         // This keeps track of the named IDs used in the asm block
         Dictionary<UnownedStringSlice, SpvWord> idMap;
+        HashSet<UnownedStringSlice> pendingNonUniformSymbolicDecorations;
+
+        const auto getAsmNonUniformDecorationTarget =
+            [&](IRSPIRVAsmInst* asmInst, SpvWord& ioTargetID, UnownedStringSlice& ioTargetName) -> bool
+        {
+            const SpvOp opcode = SpvOp(asmInst->getOpcodeOperandWord());
+            if (opcode != SpvOpDecorate && opcode != SpvOpDecorateId)
+                return false;
+
+            const auto operands = asmInst->getSPIRVOperands();
+            if (operands.getCount() < 2)
+                return false;
+
+            const auto decorationOperand = operands[1];
+            const auto decorationValue = as<IRConstant>(decorationOperand->getValue());
+            if (!decorationValue ||
+                SpvDecoration(getIntVal(decorationValue)) != SpvDecorationNonUniform)
+            {
+                return false;
+            }
+
+            const auto targetOperand = operands[0];
+            switch (targetOperand->getOp())
+            {
+            case kIROp_SPIRVAsmOperandId:
+                ioTargetName = cast<IRStringLit>(targetOperand->getValue())->getStringSlice();
+                if (SpvWord mappedID = 0; idMap.tryGetValue(ioTargetName, mappedID))
+                {
+                    ioTargetID = mappedID;
+                }
+                return true;
+
+            case kIROp_SPIRVAsmOperandInst:
+            case kIROp_SPIRVAsmOperandBuiltinVar:
+                ioTargetID = getID(ensureInst(targetOperand->getValue()));
+                return ioTargetID != 0;
+
+            default:
+                return false;
+            }
+        };
 
         for (const auto spvInst : inst->getInsts())
         {
@@ -11035,6 +11080,25 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         }
                         continue;
                     }
+                case SpvOpDecorate:
+                case SpvOpDecorateId:
+                    {
+                        SpvWord targetID = 0;
+                        UnownedStringSlice targetName;
+                        if (getAsmNonUniformDecorationTarget(spvInst, targetID, targetName))
+                        {
+                            if (targetID)
+                            {
+                                emitNonUniformDecoration(nullptr, targetID);
+                            }
+                            else if (targetName.getLength())
+                            {
+                                pendingNonUniformSymbolicDecorations.add(targetName);
+                            }
+                            continue;
+                        }
+                        break;
+                    }
                 default:
                     break;
                 }
@@ -11115,7 +11179,13 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     {
                         const auto idName =
                             cast<IRStringLit>(resOperand->getValue())->getStringSlice();
+                        SpvWord oldID = 0;
+                        idMap.tryGetValue(idName, oldID);
                         idMap[idName] = last->id;
+                        if (pendingNonUniformSymbolicDecorations.contains(idName))
+                            emitNonUniformDecoration(nullptr, last->id);
+                        else if (oldID && oldID != last->id && m_nonUniformValueIDs.contains(oldID))
+                            emitNonUniformDecoration(nullptr, last->id);
                     }
 
                     maybeDecorateSampledImageResultNonUniform(spvInst, last);
@@ -11170,6 +11240,17 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                                 emitOperand(memoryScope);
                             }
                         });
+
+                    if (const auto resOperand = getSPIRVAsmResultIDOperand(spvInst))
+                    {
+                        if (resOperand->getOp() == kIROp_SPIRVAsmOperandId)
+                        {
+                            const auto idName =
+                                cast<IRStringLit>(resOperand->getValue())->getStringSlice();
+                            if (pendingNonUniformSymbolicDecorations.contains(idName))
+                                emitNonUniformDecoration(nullptr, ensureResultIDRegistered(last));
+                        }
+                    }
 
                     maybeDecorateSampledImageResultNonUniform(spvInst, last);
                 }

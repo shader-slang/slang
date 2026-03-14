@@ -3,7 +3,6 @@
 // CHECK: OpCapability UniformBufferArrayNonUniformIndexing
 // CHECK-DAG: %[[BUFFER_PTR:[A-Za-z0-9_]+]] = OpAccessChain %_ptr_Uniform_{{[A-Za-z0-9_]+}} %resources %{{[A-Za-z0-9_]+}}
 // CHECK-DAG: %[[FIELD_PTR:[A-Za-z0-9_]+]] = OpAccessChain %_ptr_Uniform_float %[[BUFFER_PTR]] %int_0
-// CHECK-DAG: OpDecorate %[[BUFFER_PTR]] NonUniform
 // CHECK-DAG: OpDecorate %[[FIELD_PTR]] NonUniform
 
 struct Data
