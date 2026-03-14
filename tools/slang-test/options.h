@@ -175,6 +175,11 @@ struct Options
 
     /// Only run API detection and print results, then exit
     bool apiDetectionOnly = false;
+
+    /// Synthesize compile-only tests for all available backends from GPU-requiring tests.
+    /// This exercises backend code generation paths (emit HLSL, GLSL, SPIRV, etc.)
+    /// without needing a GPU, improving code coverage of emit/codegen code.
+    bool synthesizeCompileTargets = false;
 };
 
 #endif // OPTIONS_H_INCLUDED
