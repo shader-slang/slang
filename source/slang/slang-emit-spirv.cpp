@@ -1012,10 +1012,16 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         case SpvOpImageSparseFetch:
         case SpvOpImageSparseGather:
         case SpvOpImageSparseDrefGather:
+        case SpvOpImageSparseRead:
         case SpvOpImageTexelPointer:
-        case SpvOpUntypedImageTexelPointerEXT:
             if (firstOperandIndex < inst->operandWordsCount)
                 outIndices.add(firstOperandIndex);
+            return;
+
+        case SpvOpUntypedImageTexelPointerEXT:
+            // Operand layout after result words: ImageType, Image, Coordinate, Sample.
+            if (firstOperandIndex + 1 < inst->operandWordsCount)
+                outIndices.add(firstOperandIndex + 1);
             return;
 
         default:
@@ -1076,6 +1082,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     return result;
                 }
             }
+            break;
         default:
             break;
         }
@@ -10663,11 +10670,12 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         auto maybeDecorateSampledImageResultNonUniform =
             [&](IRSPIRVAsmInst* asmInst, SpvInst* emittedInst)
         {
+            constexpr UInt kSampledImageOperandWordCount = 4;
             if (!emittedInst || emittedInst->opcode != SpvOpSampledImage)
                 return;
 
             bool needsNonUniform = false;
-            if (emittedInst->operandWordsCount >= 4)
+            if (emittedInst->operandWordsCount >= kSampledImageOperandWordCount)
             {
                 needsNonUniform = isNonUniformSpvValue(emittedInst->operandWords[2]) ||
                                   isNonUniformSpvValue(emittedInst->operandWords[3]);
