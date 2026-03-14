@@ -80,7 +80,6 @@ void processNonUniformResourceIndex(
                     }
                     break;
                 case kIROp_GetElement:
-                    // Ignore when `NonUniformResourceIndex` is not on base
                     if (user->getOperand(0) == inst)
                     {
                         // Replace getElement(nonuniformRes(obj), i), into
@@ -89,6 +88,19 @@ void processNonUniformResourceIndex(
                             user->getFullType(),
                             inst->getOperand(0),
                             user->getOperand(1));
+                    }
+                    else if (floatMode == NonUniformResourceIndexFloatMode::SPIRV &&
+                             user->getOperand(1) == inst)
+                    {
+                        // Only SPIR-V needs the index itself to carry resource non-uniform
+                        // provenance after this rewrite. Other backends continue to reason about
+                        // the wrapper on the source index directly.
+                        // Replace getElement(obj, nonUniformRes(i)), into
+                        // nonUniformRes(getElement(obj, i)).
+                        newUser = builder.emitElementExtract(
+                            user->getFullType(),
+                            user->getOperand(0),
+                            inst->getOperand(0));
                     }
                     break;
                 case kIROp_Swizzle:
@@ -106,6 +118,22 @@ void processNonUniformResourceIndex(
                             kIROp_Swizzle,
                             operands.getCount(),
                             operands.getArrayView().getBuffer());
+                    }
+                    break;
+                case kIROp_MakeCombinedTextureSampler:
+                    // Replace makeCombined(nonUniformRes(tex), samp), into
+                    // nonUniformRes(makeCombined(tex, samp)).
+                    // Also handle a non-uniform sampler operand conservatively.
+                    if (user->getOperand(0) == inst || user->getOperand(1) == inst)
+                    {
+                        auto textureOperand =
+                            user->getOperand(0) == inst ? inst->getOperand(0) : user->getOperand(0);
+                        auto samplerOperand =
+                            user->getOperand(1) == inst ? inst->getOperand(0) : user->getOperand(1);
+                        newUser = builder.emitMakeCombinedTextureSampler(
+                            user->getFullType(),
+                            textureOperand,
+                            samplerOperand);
                     }
                     break;
                 case kIROp_NonUniformResourceIndex:
@@ -142,6 +170,7 @@ void processNonUniformResourceIndex(
                 case kIROp_CastDescriptorHandleToUInt2:
                 case kIROp_GetElement:
                 case kIROp_Swizzle:
+                case kIROp_MakeCombinedTextureSampler:
                     resWorkList.add(nonuniformUser);
                     break;
                 };
