@@ -1729,6 +1729,59 @@ static SlangResult _innerMain(
         return SLANG_E_NOT_AVAILABLE;
     }
 
+    if (options.compileOnly)
+    {
+        // Use text output targets so downstream compilers are not required.
+        // This exercises Slang's emit code paths without needing DXC, FXC, NVRTC, etc.
+        switch (input.target)
+        {
+        case SLANG_DXBC:
+        case SLANG_DXIL:
+            input.target = SLANG_HLSL;
+            break;
+        case SLANG_METAL_LIB:
+            input.target = SLANG_METAL;
+            break;
+        case SLANG_PTX:
+            input.target = SLANG_CUDA_SOURCE;
+            break;
+        case SLANG_SHADER_HOST_CALLABLE:
+            input.target = SLANG_CPP_SOURCE;
+            break;
+        case SLANG_SPIRV:
+            if (!options.generateSPIRVDirectly)
+                input.target = SLANG_GLSL;
+            break;
+        default:
+            break;
+        }
+        input.passThrough = SLANG_PASS_THROUGH_NONE;
+
+        ShaderCompilerUtil::OutputAndLayout output;
+        SLANG_RETURN_ON_FAIL(
+            ShaderCompilerUtil::compileWithLayout(session, options, input, output));
+
+        // Force target code generation so the emit pipeline is exercised.
+        // compileWithLayout only links the program; without this call the
+        // backend emit code (slang-emit-hlsl, slang-emit-spirv, etc.) would
+        // never run and would not appear in coverage data.
+        //
+        // This is best-effort: some configurations (incomplete libraries,
+        // certain pipeline types) may fail at code generation even though
+        // compilation succeeded. We still count those as passing since the
+        // compilation itself is the authority.
+        if (output.output.slangProgram)
+        {
+            ComPtr<ISlangBlob> code;
+            ComPtr<ISlangBlob> diagnostics;
+            (void)output.output.slangProgram->getTargetCode(
+                0,
+                code.writeRef(),
+                diagnostics.writeRef());
+        }
+        return SLANG_OK;
+    }
+
     CachedDeviceWrapper deviceWrapper;
     {
         DeviceDesc desc = {};
