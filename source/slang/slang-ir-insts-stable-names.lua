@@ -771,4 +771,5 @@ return {
 	["TrimHeadOfPack"] = 769,
 	["TrimTailOfPack"] = 770,
 	["NonEmptyPackWitness"] = 771,
+	["PackBranch"] = 772,
 }

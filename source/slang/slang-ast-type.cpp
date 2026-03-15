@@ -883,6 +883,45 @@ Val* ExpandType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet
     }
 }
 
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! PackBranchType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+void PackBranchType::_toTextOverride(StringBuilder& out)
+{
+    out << "__packBranch(";
+    getPackOperand()->toText(out);
+    out << ", ";
+    getEmptyType()->toText(out);
+    out << ", ";
+    getNonEmptyType()->toText(out);
+    out << ")";
+}
+
+Type* PackBranchType::_createCanonicalTypeOverride()
+{
+    auto canonicalPack = getPackOperand()->resolve();
+    auto canonicalEmptyType = getEmptyType()->getCanonicalType();
+    auto canonicalNonEmptyType = getNonEmptyType()->getCanonicalType();
+    if (canonicalPack == getPackOperand() && canonicalEmptyType == getEmptyType() &&
+        canonicalNonEmptyType == getNonEmptyType())
+        return this;
+    return getCurrentASTBuilder()->getPackBranchType(
+        canonicalPack,
+        canonicalEmptyType,
+        canonicalNonEmptyType);
+}
+
+Val* PackBranchType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
+{
+    int diff = 0;
+    auto substPackOperand = getPackOperand()->substituteImpl(astBuilder, subst, &diff);
+    auto substEmptyType = as<Type>(getEmptyType()->substituteImpl(astBuilder, subst, &diff));
+    auto substNonEmptyType =
+        as<Type>(getNonEmptyType()->substituteImpl(astBuilder, subst, &diff));
+    if (!diff)
+        return this;
+    (*ioDiff)++;
+    return astBuilder->getPackBranchType(substPackOperand, substEmptyType, substNonEmptyType);
+}
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! FirstType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 void FirstPackElementType::_toTextOverride(StringBuilder& out)
 {

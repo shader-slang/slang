@@ -287,6 +287,13 @@ void emitType(ManglingContext* context, Type* type)
         emitRaw(context, "Tx");
         emitType(context, expandType->getPatternType());
     }
+    else if (auto packBranchType = as<PackBranchType>(type))
+    {
+        emitRaw(context, "Tb");
+        emitVal(context, packBranchType->getPackOperand());
+        emitType(context, packBranchType->getEmptyType());
+        emitType(context, packBranchType->getNonEmptyType());
+    }
     else if (auto firstType = as<FirstPackElementType>(type))
     {
         emitRaw(context, "Tf");

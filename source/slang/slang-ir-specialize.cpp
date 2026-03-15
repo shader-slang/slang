@@ -56,12 +56,16 @@ struct SpecializationContext
     SpecializationOptions options;
     Dictionary<IROp, IRInst*> irDictionaryMap;
     bool changed = false;
+    Dictionary<IRInst*, HashSet<IRPackBranch*>*> packBranchBlockedSubgraphs;
+    Dictionary<IRSimpleSpecializationKey, IRSpecialize*> activeGenericSpecializations;
+    Dictionary<IRInst*, UInt> genericSpecializationCounts;
 
 
     SpecializationContext(IRModule* inModule, TargetProgram* target, SpecializationOptions options)
         : workList(*inModule->getContainerPool().getList<IRInst>())
         , workListSet(*inModule->getContainerPool().getHashSet<IRInst>())
         , cleanInsts(*inModule->getContainerPool().getHashSet<IRInst>())
+        , activePackBranches(*inModule->getContainerPool().getHashSet<IRPackBranch>())
         , module(inModule)
         , targetProgram(target)
         , options(options)
@@ -72,6 +76,7 @@ struct SpecializationContext
         module->getContainerPool().free(&workList);
         module->getContainerPool().free(&workListSet);
         module->getContainerPool().free(&cleanInsts);
+        module->getContainerPool().free(&activePackBranches);
     }
 
     bool isUnsimplifiedArithmeticInst(IRInst* inst)
@@ -161,11 +166,22 @@ struct SpecializationContext
         if (!inst)
             return true;
 
+        if (auto blockedByRoots = packBranchBlockedSubgraphs.tryGetValue(inst))
+        {
+            if ((*blockedByRoots)->getCount() != 0)
+                return false;
+        }
+
         switch (inst->getOp())
         {
         case kIROp_GlobalGenericParam:
         case kIROp_LookupWitnessMethod:
         case kIROp_GetTupleElement:
+        case kIROp_ExtractFirstFromPack:
+        case kIROp_ExtractLastFromPack:
+        case kIROp_TrimHeadOfPack:
+        case kIROp_TrimTailOfPack:
+        case kIROp_PackBranch:
             return false;
         case kIROp_Specialize:
             // The `specialize` instruction is a bit sepcial,
@@ -262,6 +278,7 @@ struct SpecializationContext
     List<IRInst*>& workList;
     HashSet<IRInst*>& workListSet;
     HashSet<IRInst*>& cleanInsts;
+    HashSet<IRPackBranch*>& activePackBranches;
 
     void addToWorkList(IRInst* inst)
     {
@@ -272,6 +289,35 @@ struct SpecializationContext
 
             addUsersToWorkList(inst);
         }
+    }
+
+    static constexpr UInt kMaxIRSpecializationDepthBudget = 512;
+
+    bool diagnoseGenericSpecializationCycle(IRSpecialize* specInst, IRInst* generic)
+    {
+        if (sink)
+        {
+            Diagnostics::GenericSpecializationRecursionCycle diag = {};
+            diag.location = specInst->sourceLoc;
+            diag.generic = generic;
+            sink->diagnose(diag);
+        }
+        cleanInsts.add(specInst);
+        return false;
+    }
+
+    bool diagnoseGenericSpecializationBudgetExceeded(IRSpecialize* specInst, IRInst* generic)
+    {
+        if (sink)
+        {
+            Diagnostics::GenericSpecializationBudgetExceeded diag = {};
+            diag.location = specInst->sourceLoc;
+            diag.generic = generic;
+            diag.budget = int(kMaxIRSpecializationDepthBudget);
+            sink->diagnose(diag);
+        }
+        cleanInsts.add(specInst);
+        return false;
     }
 
     // When a transformation makes a change to an instruction,
@@ -287,6 +333,89 @@ struct SpecializationContext
 
             addToWorkList(user);
         }
+    }
+
+    void _markInstBlockedByPackBranch(IRInst* inst, IRPackBranch* packBranch)
+    {
+        auto blockedByRoots = packBranchBlockedSubgraphs.tryGetValue(inst);
+        if (!blockedByRoots)
+        {
+            auto newSet = module->getContainerPool().getHashSet<IRPackBranch>();
+            packBranchBlockedSubgraphs[inst] = newSet;
+            blockedByRoots = packBranchBlockedSubgraphs.tryGetValue(inst);
+        }
+        (*blockedByRoots)->add(packBranch);
+    }
+
+    void _unmarkInstBlockedByPackBranch(IRInst* inst, IRPackBranch* packBranch)
+    {
+        auto blockedByRoots = packBranchBlockedSubgraphs.tryGetValue(inst);
+        if (!blockedByRoots)
+            return;
+        (*blockedByRoots)->remove(packBranch);
+    }
+
+    bool _shouldStopPackBranchTraversal(IRInst* inst)
+    {
+        switch (inst->getOp())
+        {
+        case kIROp_Specialize:
+        case kIROp_LookupWitnessMethod:
+        case kIROp_PackBranch:
+            return true;
+        default:
+            return false;
+        }
+    }
+
+    template<typename TFunc>
+    void _forEachPackBranchBlockedInst(IRInst* root, TFunc func)
+    {
+        auto work = module->getContainerPool().getList<IRInst>();
+        auto visited = module->getContainerPool().getHashSet<IRInst>();
+        work->add(root);
+        while (work->getCount() != 0)
+        {
+            auto inst = work->getLast();
+            work->removeLast();
+            if (!visited->add(inst))
+                continue;
+
+            func(inst);
+
+            if (_shouldStopPackBranchTraversal(inst))
+                continue;
+
+            for (UInt i = 0; i < inst->getOperandCount(); ++i)
+            {
+                if (auto operand = inst->getOperand(i))
+                    work->add(operand);
+            }
+        }
+        module->getContainerPool().free(work);
+        module->getContainerPool().free(visited);
+    }
+
+    void blockPackBranchOperands(IRPackBranch* packBranch)
+    {
+        _forEachPackBranchBlockedInst(packBranch->getOperand(1), [&](IRInst* inst) {
+            _markInstBlockedByPackBranch(inst, packBranch);
+        });
+        _forEachPackBranchBlockedInst(packBranch->getOperand(2), [&](IRInst* inst) {
+            _markInstBlockedByPackBranch(inst, packBranch);
+        });
+    }
+
+    void unblockPackBranchOperands(IRPackBranch* packBranch)
+    {
+        _forEachPackBranchBlockedInst(packBranch->getOperand(1), [&](IRInst* inst) {
+            _unmarkInstBlockedByPackBranch(inst, packBranch);
+            addToWorkList(inst);
+        });
+        _forEachPackBranchBlockedInst(packBranch->getOperand(2), [&](IRInst* inst) {
+            _unmarkInstBlockedByPackBranch(inst, packBranch);
+            addToWorkList(inst);
+        });
     }
 
     // Of course, somewhere along the way we expect
@@ -364,6 +493,21 @@ struct SpecializationContext
                 return specializedVal;
         }
 
+        if (activeGenericSpecializations.containsKey(key))
+        {
+            diagnoseGenericSpecializationCycle(specializeInst, genericVal);
+            return nullptr;
+        }
+
+        UInt specializationCount = 0;
+        if (auto foundCount = genericSpecializationCounts.tryGetValue(genericVal))
+            specializationCount = *foundCount;
+        if (specializationCount >= kMaxIRSpecializationDepthBudget)
+        {
+            diagnoseGenericSpecializationBudgetExceeded(specializeInst, genericVal);
+            return nullptr;
+        }
+
         // If no existing specialization is found, we need
         // to create the specialization instead.
         // This mostly amounts to evaluating the generic as
@@ -374,7 +518,13 @@ struct SpecializationContext
         // can be re-used in other cases that need to
         // do one-off specialization.
         //
+        activeGenericSpecializations[key] = specializeInst;
+        SLANG_DEFER(activeGenericSpecializations.remove(key));
+
+        genericSpecializationCounts[genericVal] = specializationCount + 1;
         IRInst* specializedVal = specializeGenericImpl(genericVal, specializeInst, module, this);
+        if (!specializedVal)
+            return nullptr;
 
         // The body of the specialized generic may expose more specialization opportunities, so
         // we add the children to workList.
@@ -487,6 +637,9 @@ struct SpecializationContext
     //
     bool maybeSpecializeGeneric(IRSpecialize* specInst)
     {
+        if (cleanInsts.contains(specInst))
+            return false;
+
         // We will only attempt to specialize when all of the
         // operands to the `speicalize(...)` instruction are
         // themselves fully specialized.
@@ -598,6 +751,8 @@ struct SpecializationContext
         // type, function, or whatever).
         //
         auto specializedVal = specializeGeneric(genericVal, specInst);
+        if (!specializedVal)
+            return false;
 
         // Any uses of this `specialize(...)` instruction will
         // become uses of `specializeVal`, so we want to re-consider
@@ -686,6 +841,12 @@ struct SpecializationContext
         case kIROp_GetTupleElement:
             return maybeSpecializeFoldableInst(inst);
 
+        case kIROp_ExtractFirstFromPack:
+        case kIROp_ExtractLastFromPack:
+        case kIROp_TrimHeadOfPack:
+        case kIROp_TrimTailOfPack:
+            return maybeSpecializeFoldableInst(inst);
+
         case kIROp_TypePack:
         case kIROp_TupleType:
             return maybeSpecializeTypePackOrTupleType(inst);
@@ -693,6 +854,9 @@ struct SpecializationContext
         case kIROp_MakeValuePack:
         case kIROp_MakeTuple:
             return maybeSpecializeMakeValuePackOrTuple(inst);
+
+        case kIROp_PackBranch:
+            return maybeSpecializePackBranch(cast<IRPackBranch>(inst));
 
         case kIROp_CountOf:
             return maybeSpecializeCountOf(inst);
@@ -816,6 +980,98 @@ struct SpecializationContext
         inst->replaceUsesWith(newInst);
         inst->removeAndDeallocate();
         addUsersToWorkList(newInst);
+        return true;
+    }
+
+    enum class PackBranchCardinality
+    {
+        Unknown,
+        Empty,
+        NonEmpty,
+    };
+
+    PackBranchCardinality getPackBranchCardinality(IRInst* pack)
+    {
+        if (!pack)
+            return PackBranchCardinality::Unknown;
+
+        switch (pack->getOp())
+        {
+        case kIROp_TypePack:
+        case kIROp_TupleType:
+            for (UInt i = 0; i < pack->getOperandCount(); ++i)
+            {
+                switch (pack->getOperand(i)->getOp())
+                {
+                case kIROp_GlobalGenericParam:
+                case kIROp_Param:
+                case kIROp_TypePack:
+                case kIROp_ExpandTypeOrVal:
+                case kIROp_TrimHeadOfPack:
+                case kIROp_TrimTailOfPack:
+                case kIROp_PackBranch:
+                    return PackBranchCardinality::Unknown;
+                default:
+                    break;
+                }
+            }
+            return pack->getOperandCount() == 0 ? PackBranchCardinality::Empty
+                                                : PackBranchCardinality::NonEmpty;
+
+        case kIROp_MakeValuePack:
+        case kIROp_MakeTuple:
+            for (UInt i = 0; i < pack->getOperandCount(); ++i)
+            {
+                switch (pack->getOperand(i)->getOp())
+                {
+                case kIROp_GlobalGenericParam:
+                case kIROp_Param:
+                case kIROp_MakeValuePack:
+                case kIROp_TypePack:
+                case kIROp_ExpandTypeOrVal:
+                case kIROp_TrimHeadOfPack:
+                case kIROp_TrimTailOfPack:
+                case kIROp_PackBranch:
+                    return PackBranchCardinality::Unknown;
+                default:
+                    break;
+                }
+            }
+            return pack->getOperandCount() == 0 ? PackBranchCardinality::Empty
+                                                : PackBranchCardinality::NonEmpty;
+
+        default:
+            return PackBranchCardinality::Unknown;
+        }
+    }
+
+    bool maybeSpecializePackBranch(IRPackBranch* packBranch)
+    {
+        auto cardinality = getPackBranchCardinality(packBranch->getOperand(0));
+        switch (cardinality)
+        {
+        case PackBranchCardinality::Unknown:
+            if (activePackBranches.add(packBranch))
+                blockPackBranchOperands(packBranch);
+            return false;
+
+        case PackBranchCardinality::Empty:
+        case PackBranchCardinality::NonEmpty:
+            if (activePackBranches.contains(packBranch))
+            {
+                activePackBranches.remove(packBranch);
+                unblockPackBranchOperands(packBranch);
+            }
+            break;
+        }
+
+        auto replacement =
+            cardinality == PackBranchCardinality::Empty ? packBranch->getOperand(1)
+                                                        : packBranch->getOperand(2);
+        packBranch->replaceUsesWith(replacement);
+        packBranch->removeAndDeallocate();
+        addToWorkList(replacement);
+        addUsersToWorkList(replacement);
         return true;
     }
 
@@ -3576,8 +3832,10 @@ IRInst* specializeGeneric(IRSpecialize* specializeInst)
     if (isSetSpecializedGeneric(specializeInst))
         return specializeGenericWithSetArgs(specializeInst);
 
-    // Standard static specialization of generic.
-    return specializeGenericImpl(baseGeneric, specializeInst, module, nullptr);
+    SpecializationContext context(module, nullptr, SpecializationOptions());
+    context.readSpecializationDictionaries();
+    context.sink = nullptr;
+    return context.specializeGeneric(baseGeneric, specializeInst);
 }
 
 } // namespace Slang

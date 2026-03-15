@@ -12,6 +12,24 @@
 namespace Slang
 {
 
+static SourceLoc _getTypeNestingDiagnosticPosForDecl(Decl* decl)
+{
+    if (auto varDecl = as<VarDeclBase>(decl))
+    {
+        auto loc = getDiagnosticPos(varDecl->type);
+        if (loc.isValid())
+            return loc;
+    }
+    else if (auto callableDecl = as<CallableDecl>(decl))
+    {
+        auto loc = getDiagnosticPos(callableDecl->returnType);
+        if (loc.isValid())
+            return loc;
+    }
+
+    return getDiagnosticPos(decl);
+}
+
 static bool _isPow2(size_t v)
 {
     return v > 0 && ((v - 1) & v) == 0;
@@ -4445,6 +4463,7 @@ static TypeLayoutResult _createTypeLayout(
     Decl* declForModifiers)
 {
     TypeLayoutContext subContext = context;
+    subContext.layoutDeclForDiagnostics = declForModifiers;
 
     if (declForModifiers)
     {
@@ -5263,6 +5282,24 @@ static TypeLayoutResult _updateLayout(
 
 static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type)
 {
+    static constexpr UInt kMaxTypeLayoutRecursionDepth = 128;
+    if (context.recursionDepth >= kMaxTypeLayoutRecursionDepth)
+    {
+        if (context.sink)
+        {
+            Diagnostics::MaximumTypeNestingLevelExceeded diag = {};
+            diag.location =
+                context.layoutDeclForDiagnostics
+                    ? _getTypeNestingDiagnosticPosForDecl(context.layoutDeclForDiagnostics)
+                    : SourceLoc();
+            context.sink->diagnose(diag);
+        }
+        return TypeLayoutResult();
+    }
+
+    context.recursionDepth++;
+    SLANG_DEFER(context.recursionDepth--);
+
     if (auto layoutResultPtr = context.layoutMap.tryGetValue(type))
     {
         return *layoutResultPtr;

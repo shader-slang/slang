@@ -619,6 +619,9 @@ struct IRGenContext
     // The current scope end for use with `defer`.
     IRBlock* scopeEndBlock = nullptr;
 
+    // Recursion depth for lowering nested invoke/default-construction chains.
+    UInt invokeLoweringRecursionDepth = 0;
+
     // A chain of nested `catch` handlers for `try` and `throw.
     CatchHandler* catchHandler = nullptr;
 
@@ -627,7 +630,7 @@ struct IRGenContext
         nullptr;
 
     explicit IRGenContext(SharedIRGenContext* inShared, ASTBuilder* inAstBuilder)
-        : shared(inShared), astBuilder(inAstBuilder), env(&inShared->globalEnv), irBuilder(nullptr)
+        : astBuilder(inAstBuilder), shared(inShared), env(&inShared->globalEnv), irBuilder(nullptr)
     {
     }
 
@@ -2011,6 +2014,21 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             capturedPacks.getArrayView().arrayView));
     }
 
+    LoweredValInfo visitPackBranchType(PackBranchType* packBranchType)
+    {
+        auto irBuilder = getBuilder();
+        auto loweredPack = as<Type>(packBranchType->getPackOperand())
+                              ? lowerType(context, as<Type>(packBranchType->getPackOperand()))
+                              : lowerSimpleVal(context, packBranchType->getPackOperand());
+        auto irEmptyType = lowerType(context, packBranchType->getEmptyType());
+        auto irNonEmptyType = lowerType(context, packBranchType->getNonEmptyType());
+        return LoweredValInfo::simple(irBuilder->emitPackBranchInst(
+            irBuilder->getTypeKind(),
+            loweredPack,
+            irEmptyType,
+            irNonEmptyType));
+    }
+
     LoweredValInfo visitFirstPackElementType(FirstPackElementType* firstType)
     {
         auto irBuilder = getBuilder();
@@ -2154,6 +2172,23 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             &basePackType));
         return LoweredValInfo::simple(
             irBuilder->emitIntrinsicInst(resultType, kIROp_TrimTailOfPack, 1, &basePack));
+    }
+
+    LoweredValInfo visitPackBranchSubtypeWitness(PackBranchSubtypeWitness* witness)
+    {
+        auto irBuilder = getBuilder();
+        auto loweredPack = as<Type>(witness->getPackOperand())
+                              ? lowerType(context, as<Type>(witness->getPackOperand()))
+                              : lowerSimpleVal(context, witness->getPackOperand());
+        auto emptyWitness = getSimpleVal(context, lowerVal(context, witness->getEmptyWitness()));
+        auto nonEmptyWitness = getSimpleVal(context, lowerVal(context, witness->getNonEmptyWitness()));
+        auto supType = lowerType(context, witness->getSup());
+        auto witnessTableType = irBuilder->getWitnessTableType(supType);
+        return LoweredValInfo::simple(irBuilder->emitPackBranchInst(
+            witnessTableType,
+            loweredPack,
+            emptyWitness,
+            nonEmptyWitness));
     }
 
     LoweredValInfo visitDeclaredSubtypeWitness(DeclaredSubtypeWitness* val)
@@ -4600,6 +4635,24 @@ struct ExprLoweringContext
         LoweredValInfo destination,
         const TryClauseEnvironment& tryEnv)
     {
+        // Guard recursive invoke lowering so an infinitely nesting type that keeps
+        // synthesizing constructor calls diagnoses cleanly instead of overflowing
+        // the native stack while lowering the ctor call tree.
+        static constexpr UInt kMaxIRInvokeLoweringRecursionDepth = 128;
+        if (context->invokeLoweringRecursionDepth >= kMaxIRInvokeLoweringRecursionDepth)
+        {
+            if (context->getSink())
+            {
+                Diagnostics::MaximumTypeNestingLevelExceeded loweringDiag = {};
+                loweringDiag.location = expr->loc;
+                context->getSink()->diagnose(loweringDiag);
+            }
+            auto irType = lowerType(context, expr->type);
+            return LoweredValInfo::simple(getBuilder()->emitPoison(irType));
+        }
+        context->invokeLoweringRecursionDepth++;
+        SLANG_DEFER(context->invokeLoweringRecursionDepth--);
+
         auto type = lowerType(context, expr->type);
 
         // We are going to look at the syntactic form of
@@ -6385,6 +6438,12 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
     LoweredValInfo visitTupleTypeExpr(TupleTypeExpr* /*expr*/)
     {
         SLANG_UNIMPLEMENTED_X("type expression during code generation");
+        UNREACHABLE_RETURN(LoweredValInfo());
+    }
+
+    LoweredValInfo visitPackBranchTypeExpr(PackBranchTypeExpr* /*expr*/)
+    {
+        SLANG_UNIMPLEMENTED_X("__packBranch type expression during code generation");
         UNREACHABLE_RETURN(LoweredValInfo());
     }
 
@@ -13778,6 +13837,11 @@ struct IRLayoutGenContext : IRGenContext
 
     /// Cache for custom key instructions used for entry-point parameter layout information.
     Dictionary<ParamDecl*, IRInst*> mapEntryPointParamToKey;
+
+    Dictionary<TypeLayout*, IRTypeLayout*> mapTypeLayoutToIRLayout;
+    Dictionary<VarLayout*, IRVarLayout*> mapVarLayoutToIRLayout;
+    List<TypeLayout*> activeTypeLayouts;
+    List<VarLayout*> activeVarLayouts;
 };
 
 /// Lower an AST-level type layout to an IR-level type layout.
@@ -13791,18 +13855,94 @@ IRVarLayout* lowerVarLayout(IRLayoutGenContext* context, VarLayout* varLayout);
 /// Handles copying of resource usage from the AST `typeLayout` to the
 /// specified `builder`.
 ///
-static IRTypeLayout* _lowerTypeLayoutCommon(IRTypeLayout::Builder* builder, TypeLayout* typeLayout)
+static IRTypeLayout* _lowerTypeLayoutCommon(
+    IRLayoutGenContext* context,
+    IRTypeLayout::Builder* builder,
+    TypeLayout* typeLayout)
 {
     for (auto resInfo : typeLayout->resourceInfos)
     {
         builder->addResourceUsage(resInfo.kind, resInfo.count);
     }
 
-    return builder->build();
+    auto irLayout = builder->build();
+    context->mapTypeLayoutToIRLayout.add(typeLayout, irLayout);
+    return irLayout;
+}
+
+static bool _isTypeLayoutBeingLowered(IRLayoutGenContext* context, TypeLayout* typeLayout)
+{
+    for (auto activeTypeLayout : context->activeTypeLayouts)
+    {
+        if (activeTypeLayout == typeLayout)
+            return true;
+    }
+    return false;
+}
+
+static bool _isVarLayoutBeingLowered(IRLayoutGenContext* context, VarLayout* varLayout)
+{
+    for (auto activeVarLayout : context->activeVarLayouts)
+    {
+        if (activeVarLayout == varLayout)
+            return true;
+    }
+    return false;
+}
+
+static SourceLoc _getTypeNestingDiagnosticPos(TypeLayout* typeLayout)
+{
+    if (!typeLayout)
+        return SourceLoc();
+
+    if (auto type = typeLayout->getType())
+    {
+        if (auto declRefType = as<DeclRefType>(type))
+            return declRefType->getDeclRef().getLoc();
+    }
+
+    return SourceLoc();
+}
+
+static SourceLoc _getTypeNestingDiagnosticPos(VarLayout* varLayout)
+{
+    if (!varLayout)
+        return SourceLoc();
+
+    if (auto varDecl = varLayout->varDecl.as<VarDeclBase>().getDecl())
+    {
+        auto loc = getDiagnosticPos(varDecl->type);
+        if (loc.isValid())
+            return loc;
+    }
+
+    if (auto decl = varLayout->varDecl.getDecl())
+        return getDiagnosticPos(decl);
+
+    return SourceLoc();
 }
 
 IRTypeLayout* lowerTypeLayout(IRLayoutGenContext* context, TypeLayout* typeLayout)
 {
+    if (auto cachedIRLayout = context->mapTypeLayoutToIRLayout.tryGetValue(typeLayout))
+        return *cachedIRLayout;
+
+    if (_isTypeLayoutBeingLowered(context, typeLayout))
+    {
+        if (context->getSink())
+        {
+            Diagnostics::MaximumTypeNestingLevelExceeded diag = {};
+            diag.location = _getTypeNestingDiagnosticPos(typeLayout);
+            context->getSink()->diagnose(diag);
+        }
+
+        IRTypeLayout::Builder builder(context->irBuilder);
+        return builder.build();
+    }
+
+    context->activeTypeLayouts.add(typeLayout);
+    SLANG_DEFER(context->activeTypeLayouts.removeLast());
+
     // TODO: We chould consider caching the layouts we create based on `typeLayout`
     // and re-using them. This isn't strictly necessary because we emit the
     // instructions as "hoistable" which should give us de-duplication, and it wouldn't
@@ -13823,14 +13963,14 @@ IRTypeLayout* lowerTypeLayout(IRLayoutGenContext* context, TypeLayout* typeLayou
         builder.setOffsetElementTypeLayout(
             lowerTypeLayout(context, paramGroupTypeLayout->offsetElementTypeLayout));
 
-        return _lowerTypeLayoutCommon(&builder, paramGroupTypeLayout);
+        return _lowerTypeLayoutCommon(context, &builder, paramGroupTypeLayout);
     }
     else if (auto structuredBufferTypeLayout = as<StructuredBufferTypeLayout>(typeLayout))
     {
         auto irElementTypeLayout =
             lowerTypeLayout(context, structuredBufferTypeLayout->elementTypeLayout);
         IRStructuredBufferTypeLayout::Builder builder(context->irBuilder, irElementTypeLayout);
-        return _lowerTypeLayoutCommon(&builder, structuredBufferTypeLayout);
+        return _lowerTypeLayoutCommon(context, &builder, structuredBufferTypeLayout);
     }
     else if (auto structTypeLayout = as<StructTypeLayout>(typeLayout))
     {
@@ -13906,13 +14046,13 @@ IRTypeLayout* lowerTypeLayout(IRLayoutGenContext* context, TypeLayout* typeLayou
             builder.addField(irFieldKey, irFieldLayout);
         }
 
-        return _lowerTypeLayoutCommon(&builder, structTypeLayout);
+        return _lowerTypeLayoutCommon(context, &builder, structTypeLayout);
     }
     else if (auto arrayTypeLayout = as<ArrayTypeLayout>(typeLayout))
     {
         auto irElementTypeLayout = lowerTypeLayout(context, arrayTypeLayout->elementTypeLayout);
         IRArrayTypeLayout::Builder builder(context->irBuilder, irElementTypeLayout);
-        return _lowerTypeLayoutCommon(&builder, arrayTypeLayout);
+        return _lowerTypeLayoutCommon(context, &builder, arrayTypeLayout);
     }
     else if (auto ptrTypeLayout = as<PointerTypeLayout>(typeLayout))
     {
@@ -13922,7 +14062,7 @@ IRTypeLayout* lowerTypeLayout(IRLayoutGenContext* context, TypeLayout* typeLayou
 
         // auto irValueTypeLayout = lowerTypeLayout(context, ptrTypeLayout->valueTypeLayout);
         IRPointerTypeLayout::Builder builder(context->irBuilder);
-        return _lowerTypeLayoutCommon(&builder, ptrTypeLayout);
+        return _lowerTypeLayoutCommon(context, &builder, ptrTypeLayout);
     }
     else if (auto streamOutputTypeLayout = as<StreamOutputTypeLayout>(typeLayout))
     {
@@ -13930,7 +14070,7 @@ IRTypeLayout* lowerTypeLayout(IRLayoutGenContext* context, TypeLayout* typeLayou
             lowerTypeLayout(context, streamOutputTypeLayout->elementTypeLayout);
 
         IRStreamOutputTypeLayout::Builder builder(context->irBuilder, irElementTypeLayout);
-        return _lowerTypeLayoutCommon(&builder, streamOutputTypeLayout);
+        return _lowerTypeLayoutCommon(context, &builder, streamOutputTypeLayout);
     }
     else if (auto matrixTypeLayout = as<MatrixTypeLayout>(typeLayout))
     {
@@ -13943,19 +14083,19 @@ IRTypeLayout* lowerTypeLayout(IRLayoutGenContext* context, TypeLayout* typeLayou
         // along this data as best we can for now.
 
         IRMatrixTypeLayout::Builder builder(context->irBuilder, matrixTypeLayout->mode);
-        return _lowerTypeLayoutCommon(&builder, matrixTypeLayout);
+        return _lowerTypeLayoutCommon(context, &builder, matrixTypeLayout);
     }
     else if (auto existentialTypeLayout = as<ExistentialTypeLayout>(typeLayout))
     {
         IRExistentialTypeLayout::Builder builder(context->irBuilder);
-        return _lowerTypeLayoutCommon(&builder, existentialTypeLayout);
+        return _lowerTypeLayoutCommon(context, &builder, existentialTypeLayout);
     }
     else
     {
         // If no special case applies we will build a generic `IRTypeLayout`.
         //
         IRTypeLayout::Builder builder(context->irBuilder);
-        return _lowerTypeLayoutCommon(&builder, typeLayout);
+        return _lowerTypeLayoutCommon(context, &builder, typeLayout);
     }
 }
 
@@ -14000,8 +14140,31 @@ IRVarLayout* lowerVarLayout(
 
 IRVarLayout* lowerVarLayout(IRLayoutGenContext* context, VarLayout* varLayout)
 {
+    if (auto cachedIRLayout = context->mapVarLayoutToIRLayout.tryGetValue(varLayout))
+        return *cachedIRLayout;
+
+    if (_isVarLayoutBeingLowered(context, varLayout))
+    {
+        if (context->getSink())
+        {
+            Diagnostics::MaximumTypeNestingLevelExceeded diag = {};
+            diag.location = _getTypeNestingDiagnosticPos(varLayout);
+            context->getSink()->diagnose(diag);
+        }
+
+        IRTypeLayout::Builder typeLayoutBuilder(context->irBuilder);
+        auto irTypeLayout = typeLayoutBuilder.build();
+        IRVarLayout::Builder varLayoutBuilder(context->irBuilder, irTypeLayout);
+        return varLayoutBuilder.build();
+    }
+
+    context->activeVarLayouts.add(varLayout);
+    SLANG_DEFER(context->activeVarLayouts.removeLast());
+
     auto irTypeLayout = lowerTypeLayout(context, varLayout->typeLayout);
-    return lowerVarLayout(context, varLayout, irTypeLayout);
+    auto irVarLayout = lowerVarLayout(context, varLayout, irTypeLayout);
+    context->mapVarLayoutToIRLayout.add(varLayout, irVarLayout);
+    return irVarLayout;
 }
 
 /// Handle the lowering of an entry-point result layout to the IR
@@ -14146,7 +14309,7 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
         globalStructTypeLayoutBuilder.addField(irVar, irLayout);
     }
     auto irGlobalStructTypeLayout =
-        _lowerTypeLayoutCommon(&globalStructTypeLayoutBuilder, globalStructLayout);
+        _lowerTypeLayoutCommon(context, &globalStructTypeLayoutBuilder, globalStructLayout);
 
     auto globalScopeVarLayout = programLayout->parametersLayout;
     auto globalScopeTypeLayout = globalScopeVarLayout->typeLayout;
@@ -14165,8 +14328,10 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
         globalParameterGroupTypeLayoutBuilder.setOffsetElementTypeLayout(
             lowerTypeLayout(context, paramGroupTypeLayout->offsetElementTypeLayout));
 
-        auto irParamGroupTypeLayout =
-            _lowerTypeLayoutCommon(&globalParameterGroupTypeLayoutBuilder, paramGroupTypeLayout);
+        auto irParamGroupTypeLayout = _lowerTypeLayoutCommon(
+            context,
+            &globalParameterGroupTypeLayoutBuilder,
+            paramGroupTypeLayout);
 
         irGlobalScopeTypeLayout = irParamGroupTypeLayout;
     }

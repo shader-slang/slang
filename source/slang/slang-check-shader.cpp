@@ -14,6 +14,24 @@
 namespace Slang
 {
 
+static SourceLoc _getTypeNestingDiagnosticPosForDecl(Decl* decl)
+{
+    if (auto varDecl = as<VarDeclBase>(decl))
+    {
+        auto loc = getDiagnosticPos(varDecl->type);
+        if (loc.isValid())
+            return loc;
+    }
+    else if (auto callableDecl = as<CallableDecl>(decl))
+    {
+        auto loc = getDiagnosticPos(callableDecl->returnType);
+        if (loc.isValid())
+            return loc;
+    }
+
+    return getDiagnosticPos(decl);
+}
+
 // Direction of a semantic value (input from previous stage, or output to next stage)
 enum class SemanticDirection
 {
@@ -290,10 +308,23 @@ static void validateSystemValueSemantic(
     Decl* decl,
     Stage stage,
     SemanticDirection direction,
-    Scope* scope)
+    Scope* scope,
+    UInt recursionDepth = 0)
 {
+    static constexpr UInt kMaxSystemValueSemanticRecursionDepth = 128;
     if (!decl)
         return;
+
+    if (recursionDepth >= kMaxSystemValueSemanticRecursionDepth)
+    {
+        if (sink)
+        {
+            Diagnostics::MaximumTypeNestingLevelExceeded diag = {};
+            diag.location = _getTypeNestingDiagnosticPosForDecl(decl);
+            sink->diagnose(diag);
+        }
+        return;
+    }
 
     // Get the type from the declaration
     Type* type = nullptr;
@@ -339,7 +370,14 @@ static void validateSystemValueSemantic(
                  getFields(astBuilder, structDeclRef, MemberFilterStyle::Instance))
             {
                 auto fieldDecl = fieldDeclRef.getDecl();
-                validateSystemValueSemantic(visitor, sink, fieldDecl, stage, direction, scope);
+                validateSystemValueSemantic(
+                    visitor,
+                    sink,
+                    fieldDecl,
+                    stage,
+                    direction,
+                    scope,
+                    recursionDepth + 1);
             }
         }
     }
@@ -365,7 +403,8 @@ static void validateSystemValueSemantic(
 static void _collectExistentialSpecializationParamsRec(
     ASTBuilder* astBuilder,
     SpecializationParams& ioSpecializationParams,
-    DeclRef<VarDeclBase> paramDeclRef);
+    DeclRef<VarDeclBase> paramDeclRef,
+    UInt recursionDepth);
 
 /// Recursively walk `type` and add any existential/interface specialization parameters to
 /// `ioSpecializationParams`.
@@ -373,8 +412,13 @@ static void _collectExistentialSpecializationParamsRec(
     ASTBuilder* astBuilder,
     SpecializationParams& ioSpecializationParams,
     Type* type,
-    SourceLoc loc)
+    SourceLoc loc,
+    UInt recursionDepth)
 {
+    static constexpr UInt kMaxExistentialSpecializationParamRecursionDepth = 64;
+    if (recursionDepth >= kMaxExistentialSpecializationParamRecursionDepth)
+        return;
+
     // Whether or not something is an array does not affect
     // the number of existential slots it introduces.
     //
@@ -389,7 +433,8 @@ static void _collectExistentialSpecializationParamsRec(
             astBuilder,
             ioSpecializationParams,
             parameterGroupType->getElementType(),
-            loc);
+            loc,
+            recursionDepth + 1);
         return;
     }
 
@@ -419,7 +464,8 @@ static void _collectExistentialSpecializationParamsRec(
                 _collectExistentialSpecializationParamsRec(
                     astBuilder,
                     ioSpecializationParams,
-                    fieldDeclRef);
+                    fieldDeclRef,
+                    recursionDepth + 1);
             }
         }
     }
@@ -432,13 +478,15 @@ static void _collectExistentialSpecializationParamsRec(
 static void _collectExistentialSpecializationParamsRec(
     ASTBuilder* astBuilder,
     SpecializationParams& ioSpecializationParams,
-    DeclRef<VarDeclBase> paramDeclRef)
+    DeclRef<VarDeclBase> paramDeclRef,
+    UInt recursionDepth)
 {
     _collectExistentialSpecializationParamsRec(
         astBuilder,
         ioSpecializationParams,
         getType(astBuilder, paramDeclRef),
-        paramDeclRef.getLoc());
+        paramDeclRef.getLoc(),
+        recursionDepth);
 }
 
 
@@ -451,7 +499,11 @@ static void _collectExistentialSpecializationParamsForShaderParam(
     DeclRef<VarDeclBase> paramDeclRef)
 {
     Index beginParamIndex = ioSpecializationParams.getCount();
-    _collectExistentialSpecializationParamsRec(astBuilder, ioSpecializationParams, paramDeclRef);
+    _collectExistentialSpecializationParamsRec(
+        astBuilder,
+        ioSpecializationParams,
+        paramDeclRef,
+        0);
     Index endParamIndex = ioSpecializationParams.getCount();
 
     ioParamInfo.firstSpecializationParamIndex = beginParamIndex;
@@ -2321,7 +2373,8 @@ Type* Linkage::specializeType(
         getASTBuilder(),
         specializationParams,
         unspecializedType,
-        SourceLoc());
+        SourceLoc(),
+        0);
 
     SLANG_ASSERT(specializationParams.getCount() == argCount);
 

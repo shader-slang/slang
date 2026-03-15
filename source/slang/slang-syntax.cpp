@@ -585,11 +585,50 @@ RequirementWitness RequirementWitness::specialize(
     }
 }
 
+static int _getKnownPackBranchCardinality(Val* packOperand)
+{
+    if (!packOperand)
+        return -1;
+
+    if (auto modifiedType = as<ModifiedType>(packOperand))
+        return _getKnownPackBranchCardinality(modifiedType->getBase());
+
+    if (auto tupleType = as<TupleType>(packOperand))
+        return _getKnownPackBranchCardinality(tupleType->getTypePack());
+
+    if (auto concreteTypePack = as<ConcreteTypePack>(packOperand))
+        return concreteTypePack->getTypeCount() > 0 ? 1 : 0;
+
+    if (auto concreteIntValPack = as<ConcreteIntValPack>(packOperand))
+        return concreteIntValPack->getCount() > 0 ? 1 : 0;
+
+    return -1;
+}
+
 RequirementWitness tryLookUpRequirementWitness(
     ASTBuilder* astBuilder,
     SubtypeWitness* subtypeWitness,
     Decl* requirementKey)
 {
+    if (auto packBranchWitness = as<PackBranchSubtypeWitness>(subtypeWitness))
+    {
+        switch (_getKnownPackBranchCardinality(packBranchWitness->getPackOperand()))
+        {
+        case 0:
+            return tryLookUpRequirementWitness(
+                astBuilder,
+                packBranchWitness->getEmptyWitness(),
+                requirementKey);
+        case 1:
+            return tryLookUpRequirementWitness(
+                astBuilder,
+                packBranchWitness->getNonEmptyWitness(),
+                requirementKey);
+        default:
+            return RequirementWitness();
+        }
+    }
+
     if (auto declaredSubtypeWitness = as<DeclaredSubtypeWitness>(subtypeWitness))
     {
         if (auto inheritanceDeclRef = declaredSubtypeWitness->getDeclRef().as<InheritanceDecl>())

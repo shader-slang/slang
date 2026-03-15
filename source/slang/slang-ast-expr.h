@@ -849,6 +849,15 @@ class TupleTypeExpr : public Expr
     FIDDLE() List<TypeExp> members;
 };
 
+FIDDLE()
+class PackBranchTypeExpr : public Expr
+{
+    FIDDLE(...)
+    FIDDLE() TypeExp packOperand;
+    FIDDLE() TypeExp emptyType;
+    FIDDLE() TypeExp nonEmptyType;
+};
+
 /// An expression that applies a generic to arguments for some,
 /// but not all, of its explicit parameters.
 ///

@@ -3004,13 +3004,7 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
     //
     bool typeOverloadChecked = false;
 
-    DiagnosticSink collectedErrorsSink(getSourceManager(), nullptr);
-    if (auto parentSink = getSink())
-    {
-        collectedErrorsSink.setFlags(parentSink->getFlags());
-        collectedErrorsSink.setDiagnosticColorMode(parentSink->getDiagnosticColorMode());
-        collectedErrorsSink.setEnableUnicode(parentSink->getEnableUnicode());
-    }
+    DiagnosticSink collectedErrorsSink(getSourceManager(), nullptr, getSink());
     if (expr->arguments.getCount() == 1 && !as<ExplicitCtorInvokeExpr>(expr) &&
         !as<InitializerListExpr>(expr->arguments[0]))
     {

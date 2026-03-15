@@ -150,7 +150,8 @@ IntVal* SemanticsVisitor::ExtractGenericArgInteger(
     Expr* exp,
     Type* genericParamType,
     ConstantFoldingKind kind,
-    DiagnosticSink* sink)
+    DiagnosticSink* sink,
+    ConstantFoldingCircularityInfo* circularityInfo)
 {
     IntVal* val = CheckIntegerConstantExpression(
         exp,
@@ -158,7 +159,8 @@ IntVal* SemanticsVisitor::ExtractGenericArgInteger(
                          : IntegerConstantExpressionCoercionType::AnyInteger,
         genericParamType,
         kind,
-        sink);
+        sink,
+        circularityInfo);
     if (val)
         return val;
 
@@ -176,10 +178,13 @@ IntVal* SemanticsVisitor::ExtractGenericArgInteger(Expr* exp, Type* genericParam
         exp,
         genericParamType,
         ConstantFoldingKind::LinkTime,
-        getSink());
+        getSink(),
+        nullptr);
 }
 
-Val* SemanticsVisitor::ExtractGenericArgVal(Expr* exp)
+Val* SemanticsVisitor::ExtractGenericArgVal(
+    Expr* exp,
+    ConstantFoldingCircularityInfo* circularityInfo)
 {
     if (auto overloadedExpr = as<OverloadedExpr>(exp))
     {
@@ -200,7 +205,7 @@ Val* SemanticsVisitor::ExtractGenericArgVal(Expr* exp)
         {
             CheckExpr(exp);
         }
-        return ExtractGenericArgInteger(exp, nullptr);
+        return ExtractGenericArgInteger(exp, nullptr, ConstantFoldingKind::LinkTime, getSink(), circularityInfo);
     }
 }
 
@@ -348,7 +353,10 @@ bool SemanticsVisitor::CoerceToProperTypeImpl(
                 }
                 // TODO: this is one place where syntax should get cloned!
                 if (outProperType)
-                    args.add(ExtractGenericArgVal(valParam->initExpr));
+                {
+                    ConstantFoldingCircularityInfo newCircularityInfo(valParam, nullptr);
+                    args.add(ExtractGenericArgVal(valParam->initExpr, &newCircularityInfo));
+                }
             }
         }
 

@@ -833,6 +833,12 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
             dispatchIfNotNull(t.type);
         }
     }
+    void visitPackBranchTypeExpr(PackBranchTypeExpr* expr)
+    {
+        dispatchIfNotNull(expr->packOperand.type);
+        dispatchIfNotNull(expr->emptyType.type);
+        dispatchIfNotNull(expr->nonEmptyType.type);
+    }
     void visitTryExpr(TryExpr* expr) { dispatchIfNotNull(expr->base); }
     void visitHigherOrderInvokeExpr(HigherOrderInvokeExpr* expr)
     {
@@ -2678,6 +2684,21 @@ static Expr* constructDefaultConstructorForType(
     Type* type,
     SourceLoc loc)
 {
+    static constexpr UInt kMaxDefaultConstructorRecursionDepth = 16;
+    if (visitor->getDefaultCtorRecursionDepth() >= kMaxDefaultConstructorRecursionDepth)
+    {
+        if (visitor->getSink())
+        {
+            Diagnostics::MaximumTypeNestingLevelExceeded diag = {};
+            diag.location = loc;
+            visitor->getSink()->diagnose(diag);
+        }
+        return nullptr;
+    }
+
+    visitor->pushDefaultCtorRecursionDepth();
+    SLANG_DEFER(visitor->popDefaultCtorRecursionDepth());
+
     ConstructorDecl* defaultCtor = nullptr;
     auto declRefType = as<DeclRefType>(type);
     if (declRefType)
@@ -2731,7 +2752,10 @@ static Expr* constructDefaultInitExprForType(SemanticsVisitor* visitor, VarDeclB
         return nullptr;
 
     if (auto defaultInitExpr =
-            constructDefaultConstructorForType(visitor, varDecl->type.type, varDecl->loc))
+            constructDefaultConstructorForType(
+                visitor,
+                varDecl->type.type,
+                getDiagnosticPos(varDecl->type)))
     {
         return defaultInitExpr;
     }
@@ -9157,15 +9181,18 @@ SemanticsContext SemanticsDeclBodyVisitor::registerDifferentiableTypesForFunc(
         auto oldAttr = m_parentDifferentiableAttr;
         m_parentDifferentiableAttr = newContext.getParentDifferentiableAttribute();
         for (auto param : decl->getParameters())
-            maybeRegisterDifferentiableType(m_astBuilder, param->type.type);
-        maybeRegisterDifferentiableType(m_astBuilder, decl->returnType.type);
+            maybeRegisterDifferentiableType(m_astBuilder, param->type.type, getDiagnosticPos(param->type));
+        maybeRegisterDifferentiableType(
+            m_astBuilder,
+            decl->returnType.type,
+            getDiagnosticPos(decl->returnType));
         if (as<ConstructorDecl>(decl) || !isEffectivelyStatic(decl))
         {
             auto parentDecl = getParentDecl(decl);
             auto parentDeclRef =
                 createDefaultSubstitutionsIfNeeded(m_astBuilder, this, makeDeclRef(parentDecl));
             auto thisType = calcThisType(parentDeclRef);
-            maybeRegisterDifferentiableType(m_astBuilder, thisType);
+            maybeRegisterDifferentiableType(m_astBuilder, thisType, parentDeclRef.getLoc());
         }
         m_parentDifferentiableAttr = oldAttr;
     }
@@ -14150,7 +14177,8 @@ static Expr* _getParamDefaultValue(SemanticsVisitor* visitor, VarDeclBase* varDe
     if (!isDefaultInitializable(varDecl))
         return nullptr;
 
-    if (auto expr = constructDefaultConstructorForType(visitor, varDecl->type.type, varDecl->loc))
+    if (auto expr =
+            constructDefaultConstructorForType(visitor, varDecl->type.type, getDiagnosticPos(varDecl->type)))
     {
         return expr;
     }

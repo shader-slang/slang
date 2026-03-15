@@ -903,6 +903,12 @@ local insts = {
 	},
 	{ specialize = { operands = { { "base" }, { "arg" } }, hoistable = true } },
 	{ lookupWitness = { struct_name = "LookupWitnessMethod", min_operands = 2, hoistable = true } },
+	{
+		PackBranch = {
+			operands = { { "pack" }, { "emptyValue" }, { "nonEmptyValue" } },
+			hoistable = true,
+		},
+	},
 	{ GetSequentialID = { operands = { { "RTTIOperand" } }, hoistable = true } },
 	{
 		bind_global_generic_param = {
