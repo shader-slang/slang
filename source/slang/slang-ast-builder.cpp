@@ -1203,6 +1203,36 @@ SubtypeWitness* ASTBuilder::getLastSubtypeWitness(
     return getOrCreate<LastSubtypeWitness>(subType, superType, patternWitness);
 }
 
+SubtypeWitness* ASTBuilder::getTrimHeadSubtypeWitness(
+    Type* subType,
+    Type* superType,
+    SubtypeWitness* patternWitness)
+{
+    if (auto witnessPack = as<TypePackSubtypeWitness>(patternWitness))
+    {
+        List<SubtypeWitness*> newWitnesses;
+        for (Index i = 1; i < witnessPack->getCount(); i++)
+            newWitnesses.add(witnessPack->getWitness(i));
+        return getSubtypeWitnessPack(subType, superType, newWitnesses.getArrayView());
+    }
+    return getOrCreate<TrimHeadSubtypeWitness>(subType, superType, patternWitness);
+}
+
+SubtypeWitness* ASTBuilder::getTrimTailSubtypeWitness(
+    Type* subType,
+    Type* superType,
+    SubtypeWitness* patternWitness)
+{
+    if (auto witnessPack = as<TypePackSubtypeWitness>(patternWitness))
+    {
+        List<SubtypeWitness*> newWitnesses;
+        for (Index i = 0; i + 1 < witnessPack->getCount(); i++)
+            newWitnesses.add(witnessPack->getWitness(i));
+        return getSubtypeWitnessPack(subType, superType, newWitnesses.getArrayView());
+    }
+    return getOrCreate<TrimTailSubtypeWitness>(subType, superType, patternWitness);
+}
+
 DeclaredSubtypeWitness* ASTBuilder::getDeclaredSubtypeWitness(
     Type* subType,
     Type* superType,
@@ -1303,6 +1333,22 @@ top:
             expandWitness->getPatternTypeWitness(),
             bIsSubtypeOfCWitness);
         return getExpandSubtypeWitness(expandWitness->getSub(), cType, innerTransitiveWitness);
+    }
+
+    if (auto trimHeadWitness = as<TrimHeadSubtypeWitness>(aIsSubtypeOfBWitness))
+    {
+        auto innerTransitiveWitness = getTransitiveSubtypeWitness(
+            trimHeadWitness->getPatternTypeWitness(),
+            bIsSubtypeOfCWitness);
+        return getTrimHeadSubtypeWitness(trimHeadWitness->getSub(), cType, innerTransitiveWitness);
+    }
+
+    if (auto trimTailWitness = as<TrimTailSubtypeWitness>(aIsSubtypeOfBWitness))
+    {
+        auto innerTransitiveWitness = getTransitiveSubtypeWitness(
+            trimTailWitness->getPatternTypeWitness(),
+            bIsSubtypeOfCWitness);
+        return getTrimTailSubtypeWitness(trimTailWitness->getSub(), cType, innerTransitiveWitness);
     }
 
     // If left hand is a DeclaredWitness for a type pack parameter T, then we want to perform the
