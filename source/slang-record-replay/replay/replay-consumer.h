@@ -70,7 +70,7 @@ public:
         ObjectID objectId,
         ObjectID outLinkedComponentTypeId,
         uint32_t compilerOptionEntryCount,
-        slang::CompilerOptionEntry* compilerOptionEntries,
+        slang::CompilerOptionEntry const* compilerOptionEntries,
         ObjectID outDiagnosticsId);
 
     SlangResult queryInterface(ObjectID objectId, const SlangUUID& guid, ObjectID outInterfaceId);
@@ -396,7 +396,7 @@ public:
         ObjectID objectId,
         ObjectID outLinkedComponentTypeId,
         uint32_t compilerOptionEntryCount,
-        slang::CompilerOptionEntry* compilerOptionEntries,
+        slang::CompilerOptionEntry const* compilerOptionEntries,
         ObjectID outDiagnosticsId) override;
 
     // IEntryPoint
@@ -457,7 +457,7 @@ public:
         ObjectID objectId,
         ObjectID outLinkedComponentTypeId,
         uint32_t compilerOptionEntryCount,
-        slang::CompilerOptionEntry* compilerOptionEntries,
+        slang::CompilerOptionEntry const* compilerOptionEntries,
         ObjectID outDiagnosticsId) override;
 
     // ICompositeComponentType
@@ -519,7 +519,7 @@ public:
         ObjectID objectId,
         ObjectID outLinkedComponentTypeId,
         uint32_t compilerOptionEntryCount,
-        slang::CompilerOptionEntry* compilerOptionEntries,
+        slang::CompilerOptionEntry const* compilerOptionEntries,
         ObjectID outDiagnosticsId) override;
 
     virtual void ICompositeComponentType_queryInterface(
@@ -585,7 +585,7 @@ public:
         ObjectID objectId,
         ObjectID outLinkedComponentTypeId,
         uint32_t compilerOptionEntryCount,
-        slang::CompilerOptionEntry* compilerOptionEntries,
+        slang::CompilerOptionEntry const* compilerOptionEntries,
         ObjectID outDiagnosticsId) override;
 
     // IComponentType2 methods.

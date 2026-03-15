@@ -676,7 +676,7 @@ struct SessionDesc
 
     /** Pointer to an array of compiler option entries, whose size is compilerOptionEntryCount.
     */
-    CompilerOptionEntry* compilerOptionEntries = nullptr;
+    CompilerOptionEntry const* compilerOptionEntries = nullptr;
 
     /** Number of additional compiler option entries.
     */
