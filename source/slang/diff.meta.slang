@@ -2051,13 +2051,18 @@ void __d_atan2(inout DifferentialPair<T> dpy, inout DifferentialPair<T> dpx, T.D
 VECTOR_MATRIX_BINARY_DIFF_IMPL(atan2)
 
 // fmod
+// fmod(x, y) = x - y * floor(x / y)
+// d/dx fmod(x, y) = 1
+// d/dy fmod(x, y) = -floor(x / y)
 __generic<T : __BuiltinFloatingPointType>
 [BackwardDifferentiable]
 [PreferRecompute]
 [ForwardDerivativeOf(fmod)]
 DifferentialPair<T> __d_fmod(DifferentialPair<T> x, DifferentialPair<T> y)
 {
-    return DifferentialPair<T>(fmod(x.p, y.p), x.d);
+    T.Differential dx = x.d;
+    T.Differential dy = __mul_p_d(-floor(x.p / y.p), y.d);
+    return DifferentialPair<T>(fmod(x.p, y.p), T.dadd(dx, dy));
 }
 __generic<T : __BuiltinFloatingPointType>
 [BackwardDifferentiable]
@@ -2066,7 +2071,7 @@ __generic<T : __BuiltinFloatingPointType>
 void __d_fmod(inout DifferentialPair<T> x, inout DifferentialPair<T> y, T.Differential dOut)
 {
     x = diffPair(x.p, dOut);
-    y = diffPair(y.p);
+    y = diffPair(y.p, __mul_p_d(-floor(x.p / y.p), dOut));
 }
 VECTOR_MATRIX_BINARY_DIFF_IMPL(fmod)
 
