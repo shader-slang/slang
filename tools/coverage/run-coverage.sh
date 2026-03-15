@@ -78,15 +78,7 @@ else
   rm -rf "$COVERAGE_DIR"/*.profraw "$COVERAGE_DIR"/*.profdata
 
   # Set up coverage output in temp directory
-  # Use %c for continuous mode: profraw data is memory-mapped and written
-  # incrementally, surviving process crashes (e.g. GPU assertion failures).
-  # Falls back to normal mode if %c is not supported by the runtime.
-  if [[ "$OSTYPE" == "darwin"* ]]; then
-    # macOS Apple Clang doesn't support %c continuous mode
-    export LLVM_PROFILE_FILE="$COVERAGE_DIR/slang-test-%p.profraw"
-  else
-    export LLVM_PROFILE_FILE="$COVERAGE_DIR/slang-test-%p%c.profraw"
-  fi
+  export LLVM_PROFILE_FILE="$COVERAGE_DIR/slang-test-%p.profraw"
 
   # Run tests
   echo

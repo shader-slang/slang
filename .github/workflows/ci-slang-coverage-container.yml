@@ -117,6 +117,32 @@ jobs:
             ldd build/RelWithDebInfo/lib/librender-test-tool.so 2>/dev/null || true
           fi
 
+      - name: Build SIGABRT coverage flush helper
+        run: |
+          # When running in-process (server-count 1), GPU assertion failures in
+          # slang-rhi call std::abort() which skips atexit handlers and loses all
+          # profraw coverage data. This LD_PRELOAD shim intercepts SIGABRT and
+          # calls __llvm_profile_write_file() to flush coverage before dying.
+          cat > /tmp/coverage_flush.c << 'CEOF'
+          #include <signal.h>
+          #include <stdio.h>
+          #include <stdlib.h>
+          extern int __llvm_profile_write_file(void) __attribute__((weak));
+          static void sigabrt_handler(int sig) {
+              fprintf(stderr, "SIGABRT caught — flushing coverage data before exit\n");
+              if (__llvm_profile_write_file)
+                  __llvm_profile_write_file();
+              signal(SIGABRT, SIG_DFL);
+              raise(SIGABRT);
+          }
+          __attribute__((constructor))
+          static void install_handler(void) {
+              signal(SIGABRT, sigabrt_handler);
+          }
+          CEOF
+          clang-18 -shared -fPIC -o /tmp/coverage_flush.so /tmp/coverage_flush.c
+          echo "Built SIGABRT coverage flush helper"
+
       - name: Run Tests with Coverage
         run: |
           # Generate both HTML and LCOV formats
@@ -127,6 +153,9 @@ jobs:
 
           # Set library path so slang-test can find shared libraries
           export LD_LIBRARY_PATH="$PWD/build/RelWithDebInfo/lib:${LD_LIBRARY_PATH:-}"
+
+          # Preload SIGABRT handler to flush coverage data on GPU assertion crashes
+          export LD_PRELOAD="/tmp/coverage_flush.so"
 
           # Ensure binaries are executable
           chmod +x build/RelWithDebInfo/bin/* 2>/dev/null || true
