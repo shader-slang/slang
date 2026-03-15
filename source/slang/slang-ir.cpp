@@ -3579,6 +3579,16 @@ IRInst* IRBuilder::emitEachInst(IRType* type, IRInst* base, IRInst* indexArg)
     return emitIntrinsicInst(type, kIROp_Each, indexArg ? 2 : 1, args);
 }
 
+IRInst* IRBuilder::emitPackBranchInst(
+    IRType* type,
+    IRInst* pack,
+    IRInst* emptyValue,
+    IRInst* nonEmptyValue)
+{
+    IRInst* args[] = {pack, emptyValue, nonEmptyValue};
+    return emitIntrinsicInst(type, kIROp_PackBranch, 3, args);
+}
+
 IRInst* IRBuilder::emitLookupInterfaceMethodInst(
     IRType* type,
     IRInst* witnessTableVal,
@@ -8900,6 +8910,7 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_ExtractLastFromPack:
     case kIROp_TrimHeadOfPack:
     case kIROp_TrimTailOfPack:
+    case kIROp_PackBranch:
     case kIROp_MakeWitnessPack:
     case kIROp_NonEmptyPackWitness:
     case kIROp_MakeArray:

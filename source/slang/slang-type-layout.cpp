@@ -4445,6 +4445,8 @@ static TypeLayoutResult _createTypeLayout(
     Decl* declForModifiers)
 {
     TypeLayoutContext subContext = context;
+    if (!subContext.layoutDeclForDiagnostics)
+        subContext.layoutDeclForDiagnostics = declForModifiers;
 
     if (declForModifiers)
     {
@@ -5263,6 +5265,27 @@ static TypeLayoutResult _updateLayout(
 
 static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type)
 {
+    if (context.recursionDepth >= kMaxTypeNestingDepth)
+    {
+        if (context.sink)
+        {
+            Diagnostics::MaximumTypeNestingLevelExceeded diag = {};
+            diag.location =
+                context.layoutDeclForDiagnostics
+                    ? _getTypeNestingDiagnosticPosForDecl(context.layoutDeclForDiagnostics)
+                    : SourceLoc();
+            context.sink->diagnose(diag);
+        }
+        // Return a layout with unknown size, if we run out of recursion depth.
+        ObjectLayoutInfo info;
+        info.layoutInfos.add(
+            SimpleLayoutInfo(UniformLayoutInfo(LayoutSize::invalid(), LayoutOffset(0))));
+        return createSimpleTypeLayout(info, type, context.rules);
+    }
+
+    context.recursionDepth++;
+    SLANG_DEFER(context.recursionDepth--);
+
     if (auto layoutResultPtr = context.layoutMap.tryGetValue(type))
     {
         return *layoutResultPtr;

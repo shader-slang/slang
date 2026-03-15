@@ -17,4 +17,3 @@ enum E
 
 E e = E::A;
 //diag:  ^ ambiguous reference to 'A'
-//diag:  ^ ambiguous reference to 'A'

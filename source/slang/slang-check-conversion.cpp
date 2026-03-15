@@ -369,6 +369,70 @@ Expr* SemanticsVisitor::_createCtorInvokeExpr(
     return constructorExpr;
 }
 
+static bool _canLookupConstructorsThroughAbstractType(Type* type)
+{
+    return isDeclRefTypeOf<GenericTypeParamDeclBase>(type) || as<FirstPackElementType>(type) ||
+           as<LastPackElementType>(type) || as<PackBranchType>(type);
+}
+
+bool SemanticsVisitor::createCtorInvokeExprForAbstractType(
+    Type* toType,
+    InitializerListExpr* fromInitializerListExpr,
+    Expr** outExpr)
+{
+    if (!_canLookupConstructorsThroughAbstractType(toType))
+        return false;
+
+    auto ctors = lookupConstructorsInType(toType, m_outerScope);
+    if (!ctors.isValid())
+        return false;
+
+    Expr* ctorExpr = nullptr;
+    if (ctors.isOverloaded())
+    {
+        auto overloadedExpr = m_astBuilder->create<OverloadedExpr2>();
+        overloadedExpr->type = m_astBuilder->getOverloadedType();
+        for (auto item : ctors.items)
+        {
+            overloadedExpr->candidateExprs.add(ConstructDeclRefExpr(
+                item.declRef,
+                nullptr,
+                item.declRef.getName(),
+                fromInitializerListExpr->loc,
+                nullptr));
+        }
+        ctorExpr = overloadedExpr;
+    }
+    else
+    {
+        ctorExpr = ConstructDeclRefExpr(
+            ctors.item.declRef,
+            nullptr,
+            ctors.item.declRef.getName(),
+            fromInitializerListExpr->loc,
+            nullptr);
+    }
+
+    auto ctorInvokeExpr = m_astBuilder->create<InvokeExpr>();
+    ctorInvokeExpr->functionExpr = ctorExpr;
+    ctorInvokeExpr->arguments.addRange(fromInitializerListExpr->args);
+    ctorInvokeExpr->loc = fromInitializerListExpr->loc;
+
+    DiagnosticSink tempSink(getSourceManager(), nullptr, getSink());
+
+    SemanticsVisitor subVisitor(withSink(&tempSink));
+    Expr* checkedCtorInvokeExpr = subVisitor.CheckExpr(ctorInvokeExpr);
+
+    if (tempSink.getErrorCount())
+    {
+        return false;
+    }
+
+    if (outExpr)
+        *outExpr = checkedCtorInvokeExpr;
+    return true;
+}
+
 // translation from initializer list to constructor invocation if the struct has constructor.
 bool SemanticsVisitor::createInvokeExprForExplicitCtor(
     Type* toType,
@@ -395,13 +459,7 @@ bool SemanticsVisitor::createInvokeExprForExplicitCtor(
                 fromInitializerListExpr->loc,
                 fromInitializerListExpr->args);
 
-            DiagnosticSink tempSink(getSourceManager(), nullptr);
-            if (auto parentSink = getSink())
-            {
-                tempSink.setFlags(parentSink->getFlags());
-                tempSink.setDiagnosticColorMode(parentSink->getDiagnosticColorMode());
-                tempSink.setEnableUnicode(parentSink->getEnableUnicode());
-            }
+            DiagnosticSink tempSink(getSourceManager(), nullptr, getSink());
 
             SemanticsVisitor subVisitor(withSink(&tempSink));
             ctorInvokeExpr = subVisitor.CheckTerm(ctorInvokeExpr);
@@ -484,13 +542,7 @@ bool SemanticsVisitor::createInvokeExprForSynthesizedCtor(
             return false;
     }
 
-    DiagnosticSink tempSink(getSourceManager(), nullptr);
-    if (auto parentSink = getSink())
-    {
-        tempSink.setFlags(parentSink->getFlags());
-        tempSink.setDiagnosticColorMode(parentSink->getDiagnosticColorMode());
-        tempSink.setEnableUnicode(parentSink->getEnableUnicode());
-    }
+    DiagnosticSink tempSink(getSourceManager(), nullptr, getSink());
     SemanticsVisitor subVisitor(withSink(&tempSink));
 
     // First make sure the struct is fully checked, otherwise the synthesized constructor may not be
@@ -980,6 +1032,13 @@ bool SemanticsVisitor::_coerceInitializerList(
 
     // Try to invoke the synthesized constructor if it exists
     if (createInvokeExprForSynthesizedCtor(toType, fromInitializerListExpr, outToExpr))
+    {
+        return true;
+    }
+
+    // Finally, allow selected abstract wrapper types to surface a common
+    // default constructor through their facets.
+    if (createCtorInvokeExprForAbstractType(toType, fromInitializerListExpr, outToExpr))
     {
         return true;
     }

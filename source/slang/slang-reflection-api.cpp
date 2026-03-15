@@ -4650,16 +4650,28 @@ SLANG_API SlangReflectionType* spReflection_specializeType(
     auto linkage = programLayout->getProgram()->getLinkage();
 
     DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
+    try
+    {
+        auto specializedType = linkage->specializeType(
+            unspecializedType,
+            specializationArgCount,
+            (Type* const*)specializationArgs,
+            &sink);
 
-    auto specializedType = linkage->specializeType(
-        unspecializedType,
-        specializationArgCount,
-        (Type* const*)specializationArgs,
-        &sink);
+        sink.getBlobIfNeeded(outDiagnostics);
 
-    sink.getBlobIfNeeded(outDiagnostics);
-
-    return convert(specializedType);
+        return convert(specializedType);
+    }
+    catch (const AbortCompilationException& e)
+    {
+        outputExceptionDiagnostic(e, sink, outDiagnostics);
+        return nullptr;
+    }
+    catch (...)
+    {
+        outputExceptionDiagnostic(sink, outDiagnostics);
+        return nullptr;
+    }
 }
 
 

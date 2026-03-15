@@ -8,17 +8,13 @@ struct S
 {
     static const int kVal = kVal;
 //diag:              ^^^^ the initial-value expression for variable 'kVal' depends on the value of the variable itself
-//diag:              ^^^^ the initial-value expression for variable 'kVal' depends on the value of the variable itself
 
     static const int kInf = kInf + 1;
-//diag:              ^^^^ the initial-value expression for variable 'kInf' depends on the value of the variable itself
 //diag:              ^^^^ the initial-value expression for variable 'kInf' depends on the value of the variable itself
 
     static const int kA = kB;
 //diag:              ^^ the initial-value expression for variable 'kA' depends on the value of the variable itself
-//diag:              ^^ the initial-value expression for variable 'kA' depends on the value of the variable itself
     static const int kB = kA;
-//diag:              ^^ the initial-value expression for variable 'kB' depends on the value of the variable itself
 //diag:              ^^ the initial-value expression for variable 'kB' depends on the value of the variable itself
 }
 

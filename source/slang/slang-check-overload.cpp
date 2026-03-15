@@ -486,9 +486,7 @@ bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
                     // Otherwise, the generic decl had better provide a default value
                     // or this reference is ill-formed.
                     ensureDecl(valParamRef, DeclCheckState::DefinitionChecked);
-                    ConstantFoldingCircularityInfo newCircularityInfo(
-                        valParamRef.getDecl(),
-                        nullptr);
+                    ConstantFoldingCircularityInfo newCircularityInfo(valParamRef, nullptr);
                     auto defaultVal = tryConstantFoldExpr(
                         valParamRef.substitute(m_astBuilder, valParamRef.getDecl()->initExpr),
                         ConstantFoldingKind::CompileTime,
@@ -1192,7 +1190,7 @@ bool SemanticsVisitor::TryCheckOverloadCandidateConstraints(
                 return false;
             }
 
-            newArgs.add(m_astBuilder->getNonEmptyPackWitness());
+            newArgs.add(m_astBuilder->getNonEmptyPackWitness(constrainedArg));
         }
     }
 
@@ -3004,13 +3002,6 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
     //
     bool typeOverloadChecked = false;
 
-    DiagnosticSink collectedErrorsSink(getSourceManager(), nullptr);
-    if (auto parentSink = getSink())
-    {
-        collectedErrorsSink.setFlags(parentSink->getFlags());
-        collectedErrorsSink.setDiagnosticColorMode(parentSink->getDiagnosticColorMode());
-        collectedErrorsSink.setEnableUnicode(parentSink->getEnableUnicode());
-    }
     if (expr->arguments.getCount() == 1 && !as<ExplicitCtorInvokeExpr>(expr) &&
         !as<InitializerListExpr>(expr->arguments[0]))
     {
@@ -3020,6 +3011,10 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
             {
                 Expr* resultExpr = nullptr;
                 ConversionCost conversionCost = kConversionCost_None;
+                // `_coerce()` is only a speculative path for the "T(expr)" explicit-coercion
+                // interpretation. Keep any diagnostics it produces isolated from the real sink so
+                // we can silently fall back to ordinary invoke resolution if coercion fails.
+                DiagnosticSink collectedErrorsSink(getSourceManager(), nullptr, getSink());
                 auto coerceResult = SemanticsVisitor(withSink(&collectedErrorsSink))
                                         ._coerce(
                                             CoercionSite::ExplicitCoercion,
@@ -3296,16 +3291,6 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
             // for language server to use.
             if (IsErrorExpr(outExpr))
             {
-                // Drain our error sink of "saved errors"
-                if (collectedErrorsSink.getErrorCount())
-                {
-                    Slang::ComPtr<ISlangBlob> blob;
-                    collectedErrorsSink.getBlobIfNeeded(blob.writeRef());
-                    getSink()->diagnoseRaw(
-                        Severity::Error,
-                        static_cast<char const*>(blob->getBufferPointer()));
-                }
-
                 if (auto invokeExpr = as<InvokeExpr>(outExpr))
                 {
                     invokeExpr->originalFunctionExpr = typeExpr;
