@@ -1091,10 +1091,10 @@ static LegalVal legalizeFieldExtract(
                 }
             }
 
-            // TODO: we can legally reach this case now
-            // when the field is "ordinary".
-
-            SLANG_UNEXPECTED("didn't find tuple element");
+            // Void fields now carry kFlag_hasOrdinary and are resolved
+            // through the pair's ordinary side before reaching this tuple
+            // case, so we should never fall through here.
+            SLANG_UNEXPECTED("didn't find tuple element in field extract");
             UNREACHABLE_RETURN(LegalVal());
         }
 
@@ -1359,10 +1359,10 @@ static LegalVal legalizeFieldAddress(
                 }
             }
 
-            // TODO: we can legally reach this case now
-            // when the field is "ordinary".
-
-            SLANG_UNEXPECTED("didn't find tuple element");
+            // Void fields now carry kFlag_hasOrdinary and are resolved
+            // through the pair's ordinary side before reaching this tuple
+            // case, so we should never fall through here.
+            SLANG_UNEXPECTED("didn't find tuple element in field address");
             UNREACHABLE_RETURN(LegalVal());
         }
 
