@@ -653,6 +653,8 @@ public:
 
     Type* getExpandType(Type* pattern, ArrayView<Val*> capturedPacks);
 
+    Type* getPackBranchType(Val* packOperand, Type* emptyType, Type* nonEmptyType);
+
     Type* getFirstElement(Type* basePack);
 
     Type* getLastElement(Type* basePack);
@@ -721,6 +723,13 @@ public:
         Type* subType,
         Type* superType,
         SubtypeWitness* patternWitness);
+
+    SubtypeWitness* getPackBranchSubtypeWitness(
+        Type* subType,
+        Type* superType,
+        Val* packOperand,
+        SubtypeWitness* emptyWitness,
+        SubtypeWitness* nonEmptyWitness);
 
     /// Produce a witness that `A <: C` given witnesses that `A <: B` and `B <: C`
     SubtypeWitness* getTransitiveSubtypeWitness(

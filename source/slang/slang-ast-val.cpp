@@ -719,6 +719,61 @@ void TrimTailSubtypeWitness::_toTextOverride(StringBuilder& out)
     out << toSlice(")");
 }
 
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! PackBranchSubtypeWitness !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+Val* PackBranchSubtypeWitness::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    int diff = 0;
+    auto newSub = as<Type>(getSub()->substituteImpl(astBuilder, subst, &diff));
+    auto newSup = as<Type>(getSup()->substituteImpl(astBuilder, subst, &diff));
+    auto newPackOperand = getPackOperand()->substituteImpl(astBuilder, subst, &diff);
+    auto newEmptyWitness = as<SubtypeWitness>(getEmptyWitness()->substituteImpl(astBuilder, subst, &diff));
+    auto newNonEmptyWitness =
+        as<SubtypeWitness>(getNonEmptyWitness()->substituteImpl(astBuilder, subst, &diff));
+    if (!diff)
+        return this;
+    (*ioDiff)++;
+    return astBuilder->getPackBranchSubtypeWitness(
+        newSub,
+        newSup,
+        newPackOperand,
+        newEmptyWitness,
+        newNonEmptyWitness);
+}
+
+Val* PackBranchSubtypeWitness::_resolveImplOverride()
+{
+    auto astBuilder = getCurrentASTBuilder();
+    auto newSub = as<Type>(getSub()->resolve());
+    auto newSup = as<Type>(getSup()->resolve());
+    auto newPackOperand = getPackOperand()->resolve();
+    auto newEmptyWitness = as<SubtypeWitness>(getEmptyWitness()->resolve());
+    auto newNonEmptyWitness = as<SubtypeWitness>(getNonEmptyWitness()->resolve());
+    if (newSub == getSub() && newSup == getSup() && newPackOperand == getPackOperand() &&
+        newEmptyWitness == getEmptyWitness() && newNonEmptyWitness == getNonEmptyWitness())
+        return this;
+    return astBuilder->getPackBranchSubtypeWitness(
+        newSub,
+        newSup,
+        newPackOperand,
+        newEmptyWitness,
+        newNonEmptyWitness);
+}
+
+void PackBranchSubtypeWitness::_toTextOverride(StringBuilder& out)
+{
+    out << toSlice("PackBranchWitness(");
+    getPackOperand()->toText(out);
+    out << toSlice(", ");
+    getEmptyWitness()->toText(out);
+    out << toSlice(", ");
+    getNonEmptyWitness()->toText(out);
+    out << toSlice(")");
+}
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DeclaredSubtypeWitness !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 Val* DeclaredSubtypeWitness::_resolveImplOverride()

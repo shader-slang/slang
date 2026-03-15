@@ -1613,7 +1613,10 @@ void SemanticsVisitor::addDifferentiableTypeToDiffTypeRegistry(Type* type, Subty
     }
 }
 
-void SemanticsVisitor::maybeRegisterDifferentiableType(ASTBuilder* builder, Type* type)
+void SemanticsVisitor::maybeRegisterDifferentiableType(
+    ASTBuilder* builder,
+    Type* type,
+    SourceLoc diagnosticLoc)
 {
     if (!builder->isDifferentiableInterfaceAvailable())
     {
@@ -1623,6 +1626,11 @@ void SemanticsVisitor::maybeRegisterDifferentiableType(ASTBuilder* builder, Type
     if (!m_parentDifferentiableAttr)
     {
         return;
+    }
+
+    if (diagnosticLoc.isValid())
+    {
+        m_parentDifferentiableAttr->m_typeRegistrationDiagnosticLoc = diagnosticLoc;
     }
 
     maybeRegisterDifferentiableTypeImplRecursive(builder, type);
@@ -1636,6 +1644,24 @@ void SemanticsVisitor::maybeRegisterDifferentiableTypeImplRecursive(ASTBuilder* 
         return;
     if (!type)
         return;
+
+    static constexpr UInt kMaxDifferentiableTypeRegistrationDepth = 64;
+    if (m_parentDifferentiableAttr->m_typeRegistrationRecursionDepth >=
+        kMaxDifferentiableTypeRegistrationDepth)
+    {
+        if (!m_parentDifferentiableAttr->m_typeRegistrationDepthExceeded && getSink())
+        {
+            Diagnostics::MaximumTypeNestingLevelExceeded diag = {};
+            diag.location = m_parentDifferentiableAttr->m_typeRegistrationDiagnosticLoc.isValid()
+                                ? m_parentDifferentiableAttr->m_typeRegistrationDiagnosticLoc
+                                : m_parentDifferentiableAttr->loc;
+            getSink()->diagnose(diag);
+            m_parentDifferentiableAttr->m_typeRegistrationDepthExceeded = true;
+        }
+        return;
+    }
+    m_parentDifferentiableAttr->m_typeRegistrationRecursionDepth++;
+    SLANG_DEFER(m_parentDifferentiableAttr->m_typeRegistrationRecursionDepth--);
 
     // Have we already registered this type? If so we can exit now.
     if (m_parentDifferentiableAttr->m_typeRegistrationWorkingSet.contains(type))
@@ -1763,7 +1789,7 @@ Expr* SemanticsVisitor::CheckTerm(Expr* term)
     // TODO: This can be super slow.
     if (this->m_parentFunc && this->m_parentFunc->findModifier<DifferentiableAttribute>())
     {
-        maybeRegisterDifferentiableType(getASTBuilder(), checkedTerm->type.type);
+        maybeRegisterDifferentiableType(getASTBuilder(), checkedTerm->type.type, checkedTerm->loc);
 
         if (!this->m_parentFunc->findModifier<TreatAsDifferentiableAttribute>())
         {
@@ -2232,17 +2258,27 @@ bool SemanticsVisitor::_checkForCircularityInConstantFolding(
     Decl* decl,
     ConstantFoldingCircularityInfo* circularityInfo)
 {
-    // TODO: If the `decl` is already on the chain of `circularityInfo`,
-    // then we know that we are trying to recursively fold the
-    // same declaration as part of its own definition, and we need
-    // to diagnose that as an error.
-    //
-    for (auto info = circularityInfo; info; info = info->next)
+    static constexpr UInt kMaxGenericEvaluationRecursionDepth = 64;
+
+    if (circularityInfo && circularityInfo->depth >= kMaxGenericEvaluationRecursionDepth)
     {
-        if (decl == info->decl)
+        Diagnostics::GenericEvaluationRecursionLimitExceeded diag = {};
+        diag.decl = decl;
+        diag.budget = int(kMaxGenericEvaluationRecursionDepth);
+        getSink()->diagnose(diag);
+        return true;
+    }
+
+    // Keep the old immediate self-cycle diagnostic for non-generic declarations.
+    if (!findNextOuterGeneric(decl))
+    {
+        for (auto info = circularityInfo; info; info = info->next)
         {
-            getSink()->diagnose(Diagnostics::VariableUsedInItsOwnDefinition{.decl = decl});
-            return true;
+            if (decl == info->decl)
+            {
+                getSink()->diagnose(Diagnostics::VariableUsedInItsOwnDefinition{.decl = decl});
+                return true;
+            }
         }
     }
 
@@ -2673,6 +2709,23 @@ IntVal* SemanticsVisitor::CheckIntegerConstantExpression(
     ConstantFoldingKind kind,
     DiagnosticSink* sink)
 {
+    return CheckIntegerConstantExpression(
+        inExpr,
+        coercionType,
+        expectedType,
+        kind,
+        sink,
+        nullptr);
+}
+
+IntVal* SemanticsVisitor::CheckIntegerConstantExpression(
+    Expr* inExpr,
+    IntegerConstantExpressionCoercionType coercionType,
+    Type* expectedType,
+    ConstantFoldingKind kind,
+    DiagnosticSink* sink,
+    ConstantFoldingCircularityInfo* circularityInfo)
+{
     // No need to issue further errors if the expression didn't even type-check.
     if (IsErrorExpr(inExpr))
         return nullptr;
@@ -2700,7 +2753,7 @@ IntVal* SemanticsVisitor::CheckIntegerConstantExpression(
     if (IsErrorExpr(expr))
         return nullptr;
 
-    auto result = tryFoldIntegerConstantExpression(expr, kind, nullptr);
+    auto result = tryFoldIntegerConstantExpression(expr, kind, circularityInfo);
     if (!result && sink)
     {
         sink->diagnose(Diagnostics::ExpectedIntegerConstantNotConstant{.location = expr->loc});
@@ -3584,7 +3637,7 @@ Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
     {
         for (auto& arg : expr->arguments)
         {
-            maybeRegisterDifferentiableType(m_astBuilder, arg->type.type);
+            maybeRegisterDifferentiableType(m_astBuilder, arg->type.type, arg->loc);
         }
     }
 
@@ -3604,7 +3657,7 @@ Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
             // Register types for final resolved invoke arguments again.
             for (auto& arg : expr->arguments)
             {
-                maybeRegisterDifferentiableType(m_astBuilder, arg->type.type);
+                maybeRegisterDifferentiableType(m_astBuilder, arg->type.type, arg->loc);
             }
 
             if (auto calleeExpr = as<DeclRefExpr>(checkedInvokeExpr->functionExpr))
@@ -3632,7 +3685,7 @@ Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
                 }
             }
         }
-        maybeRegisterDifferentiableType(m_astBuilder, checkedExpr->type.type);
+        maybeRegisterDifferentiableType(m_astBuilder, checkedExpr->type.type, checkedExpr->loc);
     }
     return checkedExpr;
 }
@@ -4409,6 +4462,11 @@ static bool _isTypeOrValValidForPackQuery(Type* type)
     return false;
 }
 
+static bool _isTypeOrValValidForPackBranch(Type* type)
+{
+    return _isTypeOrValValidForPackQuery(type);
+}
+
 static const char* _getPackQueryName(PackQueryExpr* expr)
 {
     if (as<FirstExpr>(expr))
@@ -4447,6 +4505,12 @@ VariadicPackCardinality SemanticsVisitor::getPackCardinality(Val* packVal)
 
     if (auto packType = as<Type>(packVal))
         packVal = unwrapModifiedType(packType);
+
+    for (auto assumedInfo = m_assumedNonEmptyPack; assumedInfo; assumedInfo = assumedInfo->next)
+    {
+        if (assumedInfo->pack == packVal)
+            return VariadicPackCardinality::NonEmpty;
+    }
 
     if (auto cached = getShared()->m_packCardinalityCache.tryGetValue(packVal))
         return *cached;
@@ -6280,7 +6344,10 @@ Expr* SemanticsVisitor::checkBaseForMemberExpr(
 
     // We might want to register differentiability on any implicit ops that we add in.
     if (this->m_parentFunc && this->m_parentFunc->findModifier<DifferentiableAttribute>())
-        maybeRegisterDifferentiableType(getASTBuilder(), resultBaseExpr->type.type);
+        maybeRegisterDifferentiableType(
+            getASTBuilder(),
+            resultBaseExpr->type.type,
+            resultBaseExpr->loc);
 
     return resultBaseExpr;
 }
@@ -6796,6 +6863,77 @@ Expr* SemanticsExprVisitor::visitTupleTypeExpr(TupleTypeExpr* expr)
     auto tupleType = m_astBuilder->getTupleType(types.getArrayView());
     expr->type = m_astBuilder->getTypeType(tupleType);
 
+    return expr;
+}
+
+Expr* SemanticsExprVisitor::visitPackBranchTypeExpr(PackBranchTypeExpr* expr)
+{
+    expr->packOperand.exp = CheckTerm(expr->packOperand.exp);
+
+    bool isTypeExpr = false;
+    Type* operandType = nullptr;
+    if (auto typeType = as<TypeType>(expr->packOperand.exp->type))
+    {
+        isTypeExpr = true;
+        operandType = CoerceToProperType(expr->packOperand).type;
+    }
+    else
+    {
+        operandType = expr->packOperand.exp->type.type;
+    }
+
+    if (!_isTypeOrValValidForPackBranch(operandType))
+    {
+        getSink()->diagnose(
+            Diagnostics::PackQueryArgumentIsInvalid{.queryName = "__packBranch", .expr = expr});
+        expr->type = m_astBuilder->getErrorType();
+        return expr;
+    }
+
+    Val* packOperandVal =
+        tryConstantFoldExpr(SubstExpr<Expr>(expr->packOperand.exp), ConstantFoldingKind::CompileTime, nullptr);
+    if (!packOperandVal && (isTypeExpr || isTypePack(operandType) || as<TupleType>(operandType)))
+        packOperandVal = operandType;
+
+    if (!packOperandVal)
+        packOperandVal = operandType;
+
+    auto packCardinality = getPackCardinality(packOperandVal);
+
+    auto checkNonEmptyBranchType = [&]() -> TypeExp
+    {
+        AssumedNonEmptyPackInfo assumedNonEmptyPackInfo;
+        assumedNonEmptyPackInfo.pack = packOperandVal;
+        assumedNonEmptyPackInfo.next = m_assumedNonEmptyPack;
+        SemanticsVisitor subVisitor(this->withAssumedNonEmptyPack(&assumedNonEmptyPackInfo));
+        return subVisitor.CheckProperType(expr->nonEmptyType);
+    };
+
+    if (packCardinality == VariadicPackCardinality::Empty)
+    {
+        expr->emptyType = CheckProperType(expr->emptyType);
+        expr->type = m_astBuilder->getTypeType(expr->emptyType.type);
+        return expr;
+    }
+
+    if (packCardinality == VariadicPackCardinality::NonEmpty)
+    {
+        expr->nonEmptyType = checkNonEmptyBranchType();
+        expr->type = m_astBuilder->getTypeType(expr->nonEmptyType.type);
+        return expr;
+    }
+
+    expr->emptyType = CheckProperType(expr->emptyType);
+    expr->nonEmptyType = checkNonEmptyBranchType();
+    if (as<ErrorType>(expr->emptyType.type) || as<ErrorType>(expr->nonEmptyType.type))
+    {
+        expr->type = m_astBuilder->getErrorType();
+        return expr;
+    }
+
+    auto packBranchType =
+        m_astBuilder->getPackBranchType(packOperandVal, expr->emptyType.type, expr->nonEmptyType.type);
+    expr->type = m_astBuilder->getTypeType(packBranchType);
     return expr;
 }
 

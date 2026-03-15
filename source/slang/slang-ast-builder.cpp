@@ -1,6 +1,7 @@
 // slang-ast-builder.cpp
 #include "slang-ast-builder.h"
 
+#include "slang-check.h"
 #include "slang-compiler.h"
 
 #include <assert.h>
@@ -904,6 +905,46 @@ Type* ASTBuilder::getExpandType(Type* pattern, ArrayView<Val*> capturedPacks)
     return getOrCreate<ExpandType>(pattern, capturedPacks);
 }
 
+static int _getConcretePackBranchCardinality(Val* packOperand)
+{
+    if (auto packType = as<Type>(packOperand))
+    {
+        packOperand = unwrapModifiedType(packType);
+    }
+
+    if (auto tupleType = as<TupleType>(packOperand))
+        return _getConcretePackBranchCardinality(tupleType->getTypePack());
+
+    if (auto typePack = as<ConcreteTypePack>(packOperand))
+        return typePack->getTypeCount() > 0 ? 1 : 0;
+
+    if (auto valPack = as<ConcreteIntValPack>(packOperand))
+        return valPack->getCount() > 0 ? 1 : 0;
+
+    return -1;
+}
+
+Type* ASTBuilder::getPackBranchType(Val* packOperand, Type* emptyType, Type* nonEmptyType)
+{
+    if (auto tupleType = as<TupleType>(packOperand))
+        packOperand = tupleType->getTypePack();
+
+    if (emptyType == nonEmptyType)
+        return emptyType;
+
+    switch (_getConcretePackBranchCardinality(packOperand))
+    {
+    case 0:
+        return emptyType;
+    case 1:
+        return nonEmptyType;
+    default:
+        break;
+    }
+
+    return getOrCreate<PackBranchType>(packOperand, emptyType, nonEmptyType);
+}
+
 static bool _containsEachType(Type* type)
 {
     if (!type)
@@ -1233,6 +1274,34 @@ SubtypeWitness* ASTBuilder::getTrimTailSubtypeWitness(
     return getOrCreate<TrimTailSubtypeWitness>(subType, superType, patternWitness);
 }
 
+SubtypeWitness* ASTBuilder::getPackBranchSubtypeWitness(
+    Type* subType,
+    Type* superType,
+    Val* packOperand,
+    SubtypeWitness* emptyWitness,
+    SubtypeWitness* nonEmptyWitness)
+{
+    switch (_getConcretePackBranchCardinality(packOperand))
+    {
+    case 0:
+        return emptyWitness;
+    case 1:
+        return nonEmptyWitness;
+    default:
+        break;
+    }
+
+    if (emptyWitness == nonEmptyWitness)
+        return emptyWitness;
+
+    return getOrCreate<PackBranchSubtypeWitness>(
+        subType,
+        superType,
+        packOperand,
+        emptyWitness,
+        nonEmptyWitness);
+}
+
 DeclaredSubtypeWitness* ASTBuilder::getDeclaredSubtypeWitness(
     Type* subType,
     Type* superType,
@@ -1349,6 +1418,22 @@ top:
             trimTailWitness->getPatternTypeWitness(),
             bIsSubtypeOfCWitness);
         return getTrimTailSubtypeWitness(trimTailWitness->getSub(), cType, innerTransitiveWitness);
+    }
+
+    if (auto packBranchWitness = as<PackBranchSubtypeWitness>(aIsSubtypeOfBWitness))
+    {
+        auto emptyTransitiveWitness = getTransitiveSubtypeWitness(
+            packBranchWitness->getEmptyWitness(),
+            bIsSubtypeOfCWitness);
+        auto nonEmptyTransitiveWitness = getTransitiveSubtypeWitness(
+            packBranchWitness->getNonEmptyWitness(),
+            bIsSubtypeOfCWitness);
+        return getPackBranchSubtypeWitness(
+            packBranchWitness->getSub(),
+            cType,
+            packBranchWitness->getPackOperand(),
+            emptyTransitiveWitness,
+            nonEmptyTransitiveWitness);
     }
 
     // If left hand is a DeclaredWitness for a type pack parameter T, then we want to perform the
