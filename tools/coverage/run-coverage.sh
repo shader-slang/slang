@@ -88,7 +88,8 @@ else
   TEST_EXIT=0
   "$SLANG_TEST" "${TEST_ARGS[@]}" || TEST_EXIT=$?
   if [ "$TEST_EXIT" -ne 0 ]; then
-    echo "Warning: slang-test exited with code $TEST_EXIT (coverage data still collected)"
+    echo "Warning: slang-test exited with code $TEST_EXIT"
+    echo "  (This may indicate test failures or infrastructure issues. Coverage data still collected.)"
   fi
 
   # Run record-replay API tests with recording enabled to capture record-replay coverage

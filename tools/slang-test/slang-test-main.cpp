@@ -4100,7 +4100,8 @@ TestResult runComputeComparisonImpl(
                   nullptr,
                   ".expected.txt",
                   actualOutputContent,
-                  [](const auto& a, const auto& e) {
+                  [](const auto& a, const auto& e)
+                  {
                       return SLANG_SUCCEEDED(
                           _compareWithType(a.getUnownedSlice(), e.getUnownedSlice()));
                   });
@@ -4723,7 +4724,7 @@ static void _calcSynthesizedTests(
 static bool _isGpuComputeCommand(const String& command)
 {
     return command == "COMPARE_COMPUTE" || command == "COMPARE_COMPUTE_EX" ||
-           command == "HLSL_COMPUTE";
+           command == "COMPARE_RENDER_COMPUTE" || command == "HLSL_COMPUTE";
 }
 
 static RenderApiType _getRenderApiFromArgs(const List<String>& args)
@@ -4749,7 +4750,7 @@ static void _calcSynthesizedCompileTargetTests(
 {
     SLANG_UNUSED(filePath);
 
-    HashSet<String> synthesizedApis;
+    HashSet<String> synthesizedKeys;
 
     for (const auto& srcTest : srcTests)
     {
@@ -4761,8 +4762,10 @@ static void _calcSynthesizedCompileTargetTests(
         if (renderApi == RenderApiType::Unknown)
             continue;
 
-        String apiName = RenderApiUtil::getApiName(renderApi);
-        if (synthesizedApis.contains(apiName))
+        StringBuilder keyBuilder;
+        keyBuilder << RenderApiUtil::getApiName(renderApi) << "|" << srcTest.options.command;
+        String synthKey = keyBuilder.produceString();
+        if (synthesizedKeys.contains(synthKey))
             continue;
 
         TestDetails synthDetails;
@@ -4777,11 +4780,18 @@ static void _calcSynthesizedCompileTargetTests(
 
         synthOptions.args = srcTest.options.args;
 
-        // Add the implicit args that each handler normally appends
+        // Add the implicit args that each command handler normally appends.
+        // COMPARE_COMPUTE_EX adds no implicit args (passes nullptr, 0 to
+        // runComputeComparisonImpl), so no branch is needed for it.
         if (srcTest.options.command == "COMPARE_COMPUTE")
         {
             synthOptions.args.add("-slang");
             synthOptions.args.add("-compute");
+        }
+        else if (srcTest.options.command == "COMPARE_RENDER_COMPUTE")
+        {
+            synthOptions.args.add("-slang");
+            synthOptions.args.add("-gcompute");
         }
         else if (srcTest.options.command == "HLSL_COMPUTE")
         {
@@ -4794,7 +4804,7 @@ static void _calcSynthesizedCompileTargetTests(
         context->setTestRequirements(nullptr);
 
         ioSynthTests.add(synthDetails);
-        synthesizedApis.add(apiName);
+        synthesizedKeys.add(synthKey);
     }
 }
 

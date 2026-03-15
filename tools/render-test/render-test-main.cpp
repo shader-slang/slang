@@ -1748,6 +1748,10 @@ static SlangResult _innerMain(
         case SLANG_SHADER_HOST_CALLABLE:
             input.target = SLANG_CPP_SOURCE;
             break;
+        case SLANG_SPIRV:
+            if (!options.generateSPIRVDirectly)
+                input.target = SLANG_GLSL;
+            break;
         default:
             break;
         }
@@ -1770,7 +1774,7 @@ static SlangResult _innerMain(
         {
             ComPtr<ISlangBlob> code;
             ComPtr<ISlangBlob> diagnostics;
-            output.output.slangProgram->getTargetCode(
+            (void)output.output.slangProgram->getTargetCode(
                 0,
                 code.writeRef(),
                 diagnostics.writeRef());
