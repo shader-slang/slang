@@ -316,6 +316,13 @@ struct TupleTypeBuilder
 
     List<PairInfo::Element> pairElements;
 
+    // When true, void-typed fields are skipped entirely (the original
+    // behavior needed by legalizeEmptyTypes to collapse void-only
+    // structs). When false, void fields flow through as ordinary
+    // fields so that PairInfo stays consistent during resource
+    // legalization.
+    bool skipVoidFields = false;
+
     // Did we have any fields that forced us to change
     // the actual type away from the declared type?
     bool anyComplex = false;
@@ -354,12 +361,12 @@ struct TupleTypeBuilder
                     specialType = legalFieldType;
                 }
 
-                // `void` is currently legalized to simple. We keep it as an
-                // ordinary field so that pair-split structs stay consistent:
-                // the PairInfo entry gets kFlag_hasOrdinary, and downstream
-                // field-extract/address naturally produces a void value from
-                // the ordinary side. A follow-up legalizeEmptyTypes pass
-                // cleans up these void fields after resource legalization.
+                // When cleaning up empty types, void fields should be
+                // skipped so that void-only structs collapse to none.
+                // During resource legalization we keep them as ordinary
+                // so that PairInfo stays consistent.
+                if (skipVoidFields && legalLeafType.getSimple()->getOp() == kIROp_VoidType)
+                    return;
             }
             break;
 
@@ -1435,6 +1442,7 @@ LegalType legalizeTypeImpl(TypeLegalizationContext* context, IRType* type)
         builder.context = context;
         builder.type = type;
         builder.originalStructType = structType;
+        builder.skipVoidFields = context->shouldSkipVoidFields();
 
         for (auto ff : structType->getFields())
         {

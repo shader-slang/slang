@@ -3933,6 +3933,8 @@ struct IREmptyTypeLegalizationContext : IRTypeLegalizationContext
 
     bool isSpecialType(IRType*) override { return false; }
 
+    bool shouldSkipVoidFields() override { return true; }
+
     bool isSimpleType(IRType* type) override
     {
         if (isMetalTarget(targetProgram->getTargetReq()))
