@@ -28,10 +28,34 @@ description: Comprehensive test coverage analysis and gap-filling for Slang lang
    - Clone `https://github.com/shader-slang/spec.git` under `external/` if not present
 2. **User Guide**: `docs/user-guide/` — search all chapters for feature mentions
 3. **DeepWiki**: Use `mcp__deepwiki__ask_question` with repoName "shader-slang/slang"
-4. **Diagnostic definitions**: `source/slang/slang-diagnostics.lua` for error codes
+4. **Diagnostic definitions**: `source/slang/slang-diagnostics-defs.h` for error codes
 5. **Compiler source**: `source/slang/` for implementation details
 
 **Extract from reference**: Core concepts, syntax, restrictions, error conditions
+
+### Exhaustive Diagnostic Enumeration (mandatory)
+
+Do NOT rely on keyword search alone to find relevant diagnostics. Extract
+ALL diagnostic codes related to the feature from the source:
+
+```bash
+# Search diagnostic definition files for feature-related terms
+# Use multiple keywords: the feature name, related concepts, synonyms
+rg -i "generic|constraint|speciali|conform|type.param|pack|where.clause" \
+  source/slang/slang-diagnostic*.h --context 2
+
+# Extract the numeric codes and message text
+# Organize into a complete table in research.md
+```
+
+For each diagnostic code found:
+1. Record the code, name, and message text
+2. Search `tests/` to determine if it is already tested
+3. Mark as COVERED (test exists) or UNCOVERED (no test)
+
+Include the complete diagnostic table in research.md. This is the
+ground truth for error-path coverage -- keyword search of docs will
+miss codes that use different terminology.
 
 **Create** `tmp/feature-name/README.md` with feature overview, concepts, behaviors, restrictions.
 
@@ -106,6 +130,24 @@ Document overlap analysis in test-coverage.md:
 | **Risk** | Low regression risk | Medium risk | High risk |
 
 **Decision**: 0-4 SKIP, 5 Maybe, 6-10 WRITE
+
+### Gap Traceability (mandatory)
+
+Every gap identified in research must map to one of:
+- A specific test to write (with filename and sub-plan assignment)
+- An explicit SKIP with documented reason
+
+No gap may be silently dropped. In `test-coverage.md`, create a
+traceability table:
+
+```markdown
+| Gap | Action | Target | Reason |
+|-----|--------|--------|--------|
+| 30400 generic-type-needs-args | WRITE | diagnose-generic-type-needs-args.slang | No test exists |
+| 30404 invalid-equality-constraint | SKIP | — | Already tested in conjunction-equality-witness.slang |
+| Coercion constraints | SKIP | — | Only 2 existing tests, low risk, score 3/10 |
+| Constructor type inference | SKIP | — | Feature not implemented in compiler |
+```
 
 ---
 

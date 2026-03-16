@@ -40,17 +40,39 @@ Gather all available knowledge about the feature. This runs in the orchestrator 
 3. **Search spec and proposals** for the feature keyword
 4. **Search user guide** chapters
 5. **Query DeepWiki** for implementation details and edge cases
-6. **Search diagnostics** for related error codes
+6. **Enumerate ALL diagnostics** (see below)
 7. **Inventory existing tests**: find all tests related to the feature, categorize what they cover
 8. **Search compiler source** for TODO/FIXME related to the feature
+
+### Exhaustive Diagnostic Enumeration (mandatory)
+
+Do NOT rely on keyword search of documentation alone. Extract ALL
+diagnostic codes related to the feature directly from compiler source:
+
+```bash
+# Search diagnostic definition files with multiple keywords
+# Include the feature name, related concepts, and synonyms
+rg -i "generic|constraint|speciali|conform|type.param|pack|where.clause" \
+  source/slang/slang-diagnostic*.h --context 2
+```
+
+For each code found:
+1. Record: code number, diagnostic name, message text
+2. Search `tests/` to check if any test triggers this code
+3. Mark as COVERED or UNCOVERED
+
+This produces the ground truth for error-path coverage. Keyword search
+of docs misses codes that use different terminology -- the generics
+feature had 22 diagnostic codes (out of 57 total) that were missed by
+doc-based keyword search.
 
 ### Output
 
 Write `tmp/<feature>/research.md`:
 - Feature overview (from spec + docs)
 - Complete list of behaviors/constraints/error conditions
+- **Complete diagnostic code table** with COVERED/UNCOVERED status
 - Existing test inventory with coverage assessment
-- Relevant diagnostic codes
 - Known limitations or open issues
 
 ---
@@ -123,6 +145,25 @@ Add tests for [feature]: [dimension]
 - Checked against: [list files searched]
 - No significant overlap / Extending [file] instead of creating new
 ```
+
+### Gap Traceability (mandatory)
+
+Every gap from research.md must map to either a sub-plan or an explicit
+SKIP with reason. No gap may be silently dropped.
+
+Write `tmp/<feature>/gap-traceability.md`:
+
+```markdown
+| Gap | Action | Sub-plan | Reason |
+|-----|--------|----------|--------|
+| 30400 generic-type-needs-args | WRITE | A | No test exists |
+| 30404 invalid-equality-constraint | SKIP | — | Already tested in existing file |
+| Coercion constraints | SKIP | — | Low priority, score 3/10 |
+| Constructor type inference | SKIP | — | Feature not implemented |
+```
+
+Present this table alongside the plan for user review. If any research
+gap is not accounted for, the plan is incomplete.
 
 ### Plan Summary
 
