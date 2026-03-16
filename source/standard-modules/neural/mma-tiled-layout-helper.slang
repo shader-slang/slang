@@ -275,9 +275,10 @@ VISIBILITY_LEVEL struct TiledMMAHelper<T, int InputSize, int OutputSize, int Sub
 
             if (U is half)
             {
-                // Fast path: each warp loads weight tiles directly from global memory,
-                // then loads its input vector into per-warp shared memory B.
-                // Only a warp-level sync is needed (for shared memory B visibility).
+                // Ensure all warps finished reading shared memory from the previous
+                // tile iteration (or from the previous layer's output writeback in
+                // fused multi-layer kernels) before overwriting with new tile data.
+                GroupMemoryBarrierWithGroupSync();
 
                 // Phase 1: Load weight tiles into CoopMat A.
                 for (uint i = 0; i < TileInfoT.NCoopMatRow; i++)
@@ -291,6 +292,11 @@ VISIBILITY_LEVEL struct TiledMMAHelper<T, int InputSize, int OutputSize, int Sub
             }
             else
             {
+                // Ensure all warps finished reading shared memory from the previous
+                // tile iteration (or from the previous layer's output writeback in
+                // fused multi-layer kernels) before overwriting with new tile data.
+                GroupMemoryBarrierWithGroupSync();
+
                 // Slow path: first warp loads the tiles to workgroup-shared memory
                 // for type conversion. All warps load their input vectors in parallel.
                 if (subgroupIndex == 0)
