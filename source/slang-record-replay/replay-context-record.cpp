@@ -670,8 +670,15 @@ void ReplayContext::record(RecordFlag flags, slang::TypeReflection*& type)
         type->getFullName(nameBlob.writeRef());
         const char* typeName = nameBlob ? (const char*)nameBlob->getBufferPointer() : nullptr;
 
-        // Go via decl ref to get to the module that owns the type, and from there its module
+        // Go via decl ref to get to the module that owns the type, and from there its module.
+        // Not all TypeReflections are DeclRefTypes (e.g. basic types), so guard against null.
         Slang::DeclRefType* declRefType = Slang::as<Slang::DeclRefType>(Slang::asInternal(type));
+        if (!declRefType)
+        {
+            uint64_t nullHandle = kNullHandle;
+            recordHandle(flags, nullHandle);
+            return;
+        }
         Slang::Module* owningModule = Slang::getModule(declRefType->getDeclRef().getDecl());
 
         // Get the module handle (the module should already be registered)

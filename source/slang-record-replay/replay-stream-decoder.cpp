@@ -388,7 +388,7 @@ void ReplayStreamDecoder::decodeValueFromStream(
                 indent(output, indentLevel + 1);
                 output << "... (" << (count - 100) << " more elements)";
                 // Skip remaining elements
-                for (uint32_t i = 100; i < count; i++)
+                for (uint64_t i = 100; i < count; ++i)
                     skipValueInStream(stream);
             }
         }

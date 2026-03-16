@@ -82,17 +82,21 @@ SharedSemanticsContext* Linkage::getSemanticsForReflection()
 SLANG_NO_THROW SlangResult SLANG_MCALL
 Linkage::queryInterface(SlangUUID const& uuid, void** outObject)
 {
+    if (!outObject)
+        return SLANG_E_INVALID_ARG;
+    *outObject = nullptr;
+
     if (uuid == Linkage::getTypeGuid())
     {
-        addReference();
         *outObject = static_cast<Linkage*>(this);
+        addReference();
         return SLANG_OK;
     }
 
     if (uuid == ISlangUnknown::getTypeGuid() || uuid == ISession::getTypeGuid())
     {
-        addReference();
         *outObject = static_cast<slang::ISession*>(this);
+        addReference();
         return SLANG_OK;
     }
 

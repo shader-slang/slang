@@ -194,6 +194,7 @@ public:
             type,
             interfaceType,
             outId);
+        RECORD_OUTPUT(outId);
         RECORD_RETURN(result);
     }
 

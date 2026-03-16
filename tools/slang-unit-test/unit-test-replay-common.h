@@ -63,6 +63,6 @@ template<typename T>
 static bool roundTripCheck(T value)
 {
     T readValue{};
-    roundTripValue(value, readValue);
-    return readValue == value;
+    bool atEnd = roundTripValue(value, readValue);
+    return atEnd && (readValue == value);
 }

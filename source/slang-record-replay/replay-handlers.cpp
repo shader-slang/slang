@@ -150,7 +150,6 @@ static void registerAllHandlers()
     REPLAY_REGISTER(SessionProxy, loadModuleInfoFromIRBlob);
     REPLAY_REGISTER(SessionProxy, getLoadedModuleCount);
     REPLAY_REGISTER(SessionProxy, getLoadedModule);
-    REPLAY_REGISTER(SessionProxy, loadModuleFromSource);
 
     // =========================================================================
     // ComponentTypeProxy handlers (unified: IComponentType, IModule, IEntryPoint, ITypeConformance)

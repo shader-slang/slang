@@ -192,6 +192,7 @@ public:
         RECORD_CALL();
         uint8_t kindVal = static_cast<uint8_t>(kind);
         _ctx.record(RecordFlag::Input, kindVal);
+        kind = static_cast<PathKind>(kindVal);
         RECORD_INPUT(path);
         PREPARE_POINTER_OUTPUT(outPath);
         SlangResult result;
