@@ -2059,7 +2059,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             elementTypes.add(loweredWitness.val->getFullType());
         }
         auto irWitnessPack = irBuilder->emitMakeWitnessPack(
-            irBuilder->getTupleType(
+            irBuilder->getTypePack(
                 (UInt)elementTypes.getCount(),
                 elementTypes.getArrayView().getBuffer()),
             witnesses.getArrayView().arrayView);
@@ -2124,6 +2124,36 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             kIROp_ExtractLastFromPack,
             1,
             &basePack));
+    }
+
+    LoweredValInfo visitTrimHeadSubtypeWitness(TrimHeadSubtypeWitness* witness)
+    {
+        auto patternWitness = lowerVal(context, witness->getPatternTypeWitness());
+        auto irBuilder = getBuilder();
+        auto basePack = getSimpleVal(context, patternWitness);
+        IRInst* basePackType = basePack->getDataType();
+        auto resultType = as<IRType>(irBuilder->emitIntrinsicInst(
+            irBuilder->getTypeKind(),
+            kIROp_TrimHeadOfPack,
+            1,
+            &basePackType));
+        return LoweredValInfo::simple(
+            irBuilder->emitIntrinsicInst(resultType, kIROp_TrimHeadOfPack, 1, &basePack));
+    }
+
+    LoweredValInfo visitTrimTailSubtypeWitness(TrimTailSubtypeWitness* witness)
+    {
+        auto patternWitness = lowerVal(context, witness->getPatternTypeWitness());
+        auto irBuilder = getBuilder();
+        auto basePack = getSimpleVal(context, patternWitness);
+        IRInst* basePackType = basePack->getDataType();
+        auto resultType = as<IRType>(irBuilder->emitIntrinsicInst(
+            irBuilder->getTypeKind(),
+            kIROp_TrimTailOfPack,
+            1,
+            &basePackType));
+        return LoweredValInfo::simple(
+            irBuilder->emitIntrinsicInst(resultType, kIROp_TrimTailOfPack, 1, &basePack));
     }
 
     LoweredValInfo visitDeclaredSubtypeWitness(DeclaredSubtypeWitness* val)

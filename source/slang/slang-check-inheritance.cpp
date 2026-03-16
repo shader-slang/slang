@@ -508,7 +508,7 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
             {
                 if (auto subEachType = as<EachType>(subType))
                 {
-                    subDeclRefType = as<DeclRefType>(subEachType->getElementType());
+                    subDeclRefType = subEachType->getElementDeclRefType();
                 }
                 if (!subDeclRefType)
                     continue;
@@ -1104,79 +1104,41 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
         // during visitGenericTypeConstraintDecl. If we get here, something is wrong.
         SLANG_UNEXPECTED("AndType should have been flattened before reaching getInheritanceInfo");
     }
-    else if (as<EachType>(type) || as<FirstPackElementType>(type) || as<LastPackElementType>(type))
+    auto projectBaseFacets =
+        [&](Type* projectedType, InheritanceInfo elementInheritanceInfo, auto makeProjectedWitness)
     {
         SemanticsVisitor visitor(this);
-        auto projectDirectBaseFacets =
-            [&](InheritanceInfo elementInheritanceInfo, auto makeProjectedWitness)
+        auto directFacet = new (arena) Facet::Impl(
+            astBuilder,
+            Facet::Kind::Type,
+            Facet::Directness::Self,
+            DeclRef<Decl>(),
+            projectedType,
+            visitor.createTypeEqualityWitness(projectedType));
+        Facet tail = directFacet;
+        for (auto facet : elementInheritanceInfo.facets)
         {
-            auto directFacet = new (arena) Facet::Impl(
-                astBuilder,
-                Facet::Kind::Type,
-                Facet::Directness::Self,
-                DeclRef<Decl>(),
-                type,
-                visitor.createTypeEqualityWitness(type));
-            Facet tail = directFacet;
-            for (auto facet : elementInheritanceInfo.facets)
+            if (facet->directness != Facet::Directness::Self)
             {
-                if (facet->directness == Facet::Directness::Direct)
-                {
-                    auto projectedFacet = new (arena) Facet::Impl(
-                        astBuilder,
-                        facet->kind,
-                        Facet::Directness::Direct,
-                        facet->origin.declRef,
-                        facet->origin.type,
-                        makeProjectedWitness(facet->subtypeWitness));
-                    tail->next = projectedFacet;
-                    tail = projectedFacet;
-                }
+                auto projectedFacet = new (arena) Facet::Impl(
+                    astBuilder,
+                    facet->kind,
+                    facet->directness,
+                    facet->origin.declRef,
+                    facet->origin.type,
+                    makeProjectedWitness(facet->subtypeWitness));
+                tail->next = projectedFacet;
+                tail = projectedFacet;
             }
-            InheritanceInfo info;
-            info.facets = FacetList(directFacet);
-            return info;
-        };
+        }
+        InheritanceInfo info;
+        info.facets = FacetList(directFacet);
+        return info;
+    };
 
-        if (auto eachType = as<EachType>(type))
-        {
-            auto elementInheritanceInfo =
-                getInheritanceInfo(eachType->getElementType(), circularityInfo);
-            return projectDirectBaseFacets(
-                elementInheritanceInfo,
-                [&](SubtypeWitness* patternWitness) {
-                    return astBuilder->getEachSubtypeWitness(
-                        type,
-                        patternWitness->getSup(),
-                        patternWitness);
-                });
-        }
-        else if (auto firstType = as<FirstPackElementType>(type))
-        {
-            auto packInheritanceInfo =
-                getInheritanceInfo(firstType->getBasePack(), circularityInfo);
-            return projectDirectBaseFacets(
-                packInheritanceInfo,
-                [&](SubtypeWitness* patternWitness) {
-                    return astBuilder->getFirstSubtypeWitness(
-                        type,
-                        patternWitness->getSup(),
-                        patternWitness);
-                });
-        }
-        else if (auto lastType = as<LastPackElementType>(type))
-        {
-            auto packInheritanceInfo = getInheritanceInfo(lastType->getBasePack(), circularityInfo);
-            return projectDirectBaseFacets(
-                packInheritanceInfo,
-                [&](SubtypeWitness* patternWitness) {
-                    return astBuilder->getLastSubtypeWitness(
-                        type,
-                        patternWitness->getSup(),
-                        patternWitness);
-                });
-        }
-
+    if (auto concreteTypePack = as<ConcreteTypePack>(type))
+    {
+        SemanticsVisitor visitor(this);
         auto directFacet = new (arena) Facet::Impl(
             astBuilder,
             Facet::Kind::Type,
@@ -1184,9 +1146,148 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
             DeclRef<Decl>(),
             type,
             visitor.createTypeEqualityWitness(type));
+        Facet tail = directFacet;
+
+        if (concreteTypePack->getTypeCount() > 0)
+        {
+            List<InheritanceInfo> elementInheritanceInfos;
+            for (Index i = 0; i < concreteTypePack->getTypeCount(); i++)
+            {
+                elementInheritanceInfos.add(
+                    getInheritanceInfo(concreteTypePack->getElementType(i), circularityInfo));
+            }
+
+            for (auto facet : elementInheritanceInfos[0].facets)
+            {
+                if (facet->directness == Facet::Directness::Self)
+                    continue;
+
+                List<SubtypeWitness*> witnesses;
+                witnesses.add(facet->subtypeWitness);
+
+                bool foundMatchInAll = true;
+                for (Index i = 1; i < elementInheritanceInfos.getCount(); i++)
+                {
+                    SubtypeWitness* matchingWitness = nullptr;
+                    for (auto otherFacet : elementInheritanceInfos[i].facets)
+                    {
+                        if (originsMatch(facet, otherFacet))
+                        {
+                            matchingWitness = otherFacet->subtypeWitness;
+                            break;
+                        }
+                    }
+
+                    if (!matchingWitness)
+                    {
+                        foundMatchInAll = false;
+                        break;
+                    }
+
+                    witnesses.add(matchingWitness);
+                }
+
+                if (!foundMatchInAll)
+                    continue;
+
+                auto projectedFacet = new (arena) Facet::Impl(
+                    astBuilder,
+                    facet->kind,
+                    facet->directness,
+                    facet->origin.declRef,
+                    facet->origin.type,
+                    astBuilder->getSubtypeWitnessPack(
+                        type,
+                        facet->subtypeWitness->getSup(),
+                        witnesses.getArrayView()));
+                tail->next = projectedFacet;
+                tail = projectedFacet;
+            }
+        }
+
         InheritanceInfo info;
         info.facets = FacetList(directFacet);
         return info;
+    }
+    else if (auto eachType = as<EachType>(type))
+    {
+        auto elementInheritanceInfo =
+            getInheritanceInfo(eachType->getElementType(), circularityInfo);
+        return projectBaseFacets(
+            type,
+            elementInheritanceInfo,
+            [&](SubtypeWitness* patternWitness) {
+                return astBuilder->getEachSubtypeWitness(
+                    type,
+                    patternWitness->getSup(),
+                    patternWitness);
+            });
+    }
+    else if (auto firstType = as<FirstPackElementType>(type))
+    {
+        auto packInheritanceInfo = getInheritanceInfo(firstType->getBasePack(), circularityInfo);
+        return projectBaseFacets(
+            type,
+            packInheritanceInfo,
+            [&](SubtypeWitness* patternWitness) {
+                return astBuilder->getFirstSubtypeWitness(
+                    type,
+                    patternWitness->getSup(),
+                    patternWitness);
+            });
+    }
+    else if (auto lastType = as<LastPackElementType>(type))
+    {
+        auto packInheritanceInfo = getInheritanceInfo(lastType->getBasePack(), circularityInfo);
+        return projectBaseFacets(
+            type,
+            packInheritanceInfo,
+            [&](SubtypeWitness* patternWitness) {
+                return astBuilder->getLastSubtypeWitness(
+                    type,
+                    patternWitness->getSup(),
+                    patternWitness);
+            });
+    }
+    else if (auto expandType = as<ExpandType>(type))
+    {
+        auto patternInheritanceInfo =
+            getInheritanceInfo(expandType->getPatternType(), circularityInfo);
+        return projectBaseFacets(
+            type,
+            patternInheritanceInfo,
+            [&](SubtypeWitness* patternWitness) {
+                return astBuilder->getExpandSubtypeWitness(
+                    type,
+                    patternWitness->getSup(),
+                    patternWitness);
+            });
+    }
+    else if (auto trimHeadType = as<TrimHeadTypePack>(type))
+    {
+        auto packInheritanceInfo = getInheritanceInfo(trimHeadType->getBasePack(), circularityInfo);
+        return projectBaseFacets(
+            type,
+            packInheritanceInfo,
+            [&](SubtypeWitness* patternWitness) {
+                return astBuilder->getTrimHeadSubtypeWitness(
+                    type,
+                    patternWitness->getSup(),
+                    patternWitness);
+            });
+    }
+    else if (auto trimTailType = as<TrimTailTypePack>(type))
+    {
+        auto packInheritanceInfo = getInheritanceInfo(trimTailType->getBasePack(), circularityInfo);
+        return projectBaseFacets(
+            type,
+            packInheritanceInfo,
+            [&](SubtypeWitness* patternWitness) {
+                return astBuilder->getTrimTailSubtypeWitness(
+                    type,
+                    patternWitness->getSup(),
+                    patternWitness);
+            });
     }
     else if (auto modifiedType = as<ModifiedType>(type))
     {
