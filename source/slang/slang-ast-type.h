@@ -996,6 +996,7 @@ class EachType : public Type
 {
     FIDDLE(...)
     Type* getElementType() const { return as<Type>(getOperand(0)); }
+    // Convenience accessor for the subset of EachType forms whose element is a bare decl-ref.
     DeclRefType* getElementDeclRefType() const { return as<DeclRefType>(getOperand(0)); }
 
     EachType(Type* elementType) { m_operands.add(ValNodeOperand(elementType)); }

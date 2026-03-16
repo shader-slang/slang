@@ -23,7 +23,9 @@ User-specific instructions for Slang (optional, may not exist):
 cmake --preset default
 
 # Configure with visual studio 2022 settings (Preferred on Windows)
-cmake.exe --preset vs2022
+# On Windows, include -DSLANG_BOOTSTRAP_IGNORE_ABORT_MSG=ON to suppress
+# modal abort dialogs during unattended/LLM-driven builds.
+cmake.exe --preset vs2022 -DSLANG_BOOTSTRAP_IGNORE_ABORT_MSG=ON
 
 # Build Release/Debug binaries.
 # It can take from 5 minutes to 20 minutes depending on the machine.
