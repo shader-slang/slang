@@ -1762,7 +1762,7 @@ IntVal* SemanticsVisitor::_validateCircularVarDefinition(VarDeclBase* varDecl)
         return nullptr;
     return tryConstantFoldDeclRef(
         DeclRef<VarDeclBase>(varDecl),
-        ConstantFoldingKind::LinkTime,
+        ConstantFoldingKind::SpecializationConstant,
         nullptr);
 }
 

@@ -929,24 +929,8 @@ LoweredValInfo emitCallToDeclRef(
             SLANG_ASSERT(argCount == 2);
             return LoweredValInfo::simple(builder->emitGetOffsetPtr(args[0], args[1]));
         default:
-            {
-                // At global scope, if any operand is spec-const-rate qualified,
-                // propagate the rate qualifier to the result type so that the
-                // instruction is correctly typed as specialization-constant-derived.
-                if (!getParentFunc(builder->getInsertLoc().getInst()))
-                {
-                    for (UInt i = 0; i < argCount; i++)
-                    {
-                        if (isSpecConstRateType(args[i]->getFullType()))
-                        {
-                            type = maybeAddRateType(builder, args[i]->getFullType(), type);
-                            break;
-                        }
-                    }
-                }
-                return LoweredValInfo::simple(
-                    builder->emitIntrinsicInst(type, intrinsicOp, argCount, args));
-            }
+            return LoweredValInfo::simple(
+                builder->emitIntrinsicInst(type, intrinsicOp, argCount, args));
         }
     }
 

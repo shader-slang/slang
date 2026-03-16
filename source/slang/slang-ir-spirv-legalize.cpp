@@ -1791,11 +1791,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
             case kIROp_MakeVectorFromScalar:
                 return true;
             default:
-                if (as<IRSPIRVAsmOperand>(inst))
-                    return true;
-                if (isSpecConstRateType(inst->getFullType()))
-                    return true;
-                return false;
+                return as<IRSPIRVAsmOperand>(inst);
             };
         }
 
