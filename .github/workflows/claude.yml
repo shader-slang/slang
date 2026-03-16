@@ -190,7 +190,7 @@ jobs:
               echo "Claude can build on-demand if needed via cmake commands."
             elif [ "${RUNNER_OS}" = "Windows" ]; then
               echo "Setting up Windows environment..."
-              cmake.exe --preset vs2022 --fresh
+              cmake.exe --preset vs2022 --fresh -DSLANG_BOOTSTRAP_IGNORE_ABORT_MSG=ON
               cmake.exe --build --preset release >/dev/null 2>&1 || cmake.exe --build --preset release
             else
               echo "Setting up Linux environment..."

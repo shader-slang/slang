@@ -2463,6 +2463,11 @@ local insts = {
 	{ sizeOf = { operands = { { "type" } } } },
 	{ alignOf = { operands = { { "baseOp" } } } },
 	{ countOf = { operands = { { "type" } } } },
+	{ ExtractFirstFromPack = { operands = { { "pack" } }, hoistable = true } },
+	{ ExtractLastFromPack = { operands = { { "pack" } }, hoistable = true } },
+	{ TrimHeadOfPack = { operands = { { "pack" } }, hoistable = true } },
+	{ TrimTailOfPack = { operands = { { "pack" } }, hoistable = true } },
+	{ NonEmptyPackWitness = { hoistable = true } },
 	{ GetArrayLength = { operands = { { "array" } } } },
 	{
 		IsType = {
