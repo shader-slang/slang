@@ -52,6 +52,11 @@ function(example dir)
         set(main_wrapper_libraries example-main)
     endif()
 
+    set(_optional_requires_arg "")
+    if(copy_assets_target)
+        set(_optional_requires_arg OPTIONAL_REQUIRES ${copy_assets_target})
+    endif()
+
     slang_add_target(
         .
         EXECUTABLE
@@ -69,7 +74,7 @@ function(example dir)
             SLANG_EXAMPLE_NAME=${dir}
             $<$<BOOL:${SLANG_ENABLE_XLIB}>:SLANG_ENABLE_XLIB>
         REQUIRED_BY all-examples
-        OPTIONAL_REQUIRES ${copy_assets_target} copy-prebuilt-binaries
+        ${_optional_requires_arg}
         FOLDER examples
         DEBUG_DIR ${debug_dir}
         ${ARGN}
