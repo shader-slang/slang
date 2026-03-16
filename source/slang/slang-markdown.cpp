@@ -2,7 +2,6 @@
 
 #include <cmark.h>
 #include <node.h>
-
 #include <string.h>
 
 namespace Slang
@@ -16,8 +15,7 @@ List<MarkdownCodeBlock> extractSlangCodeBlocks(const char* source, size_t length
     if (!doc)
         return result;
 
-    for (cmark_node* node = cmark_node_first_child(doc); node;
-         node = cmark_node_next(node))
+    for (cmark_node* node = cmark_node_first_child(doc); node; node = cmark_node_next(node))
     {
         if (cmark_node_get_type(node) != CMARK_NODE_CODE_BLOCK)
             continue;

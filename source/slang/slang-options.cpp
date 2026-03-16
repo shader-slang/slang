@@ -1529,8 +1529,9 @@ SlangResult OptionsParser::addInputPath(char const* inPath, SourceLanguage langO
     {
         return addReferencedModule(path, SourceLoc(), false);
     }
-    else if (path.endsWith(".slang") || path.endsWith(".slang.md") ||
-             langOverride == SourceLanguage::Slang)
+    else if (
+        path.endsWith(".slang") || path.endsWith(".slang.md") ||
+        langOverride == SourceLanguage::Slang)
     {
         // Plain old slang code
         addInputSlangPath(path);
