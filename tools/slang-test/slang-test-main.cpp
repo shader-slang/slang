@@ -5022,8 +5022,9 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
         Index subTestIndex = testOrder[orderIdx];
         auto& testDetails = testList.tests[subTestIndex];
 
-        // When -only-synthesized is set, skip non-synthesized tests
-        if (context->options.onlySynthesized && testDetails.options.command != "COMPILE_TARGET")
+        // When -only-synthesized is set, only run synthesized compile-target tests
+        if (context->options.onlySynthesized &&
+            !(testDetails.options.isSynthesized && testDetails.options.command == "COMPILE_TARGET"))
         {
             continue;
         }

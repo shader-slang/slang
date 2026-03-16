@@ -83,17 +83,12 @@ else
   # Set up coverage output in temp directory
   export LLVM_PROFILE_FILE="$COVERAGE_DIR/slang-test-%p.profraw"
 
-  # Run tests (continue on failure -- coverage data is still recorded)
+  # Run tests
   echo
   echo "Running tests with coverage instrumentation..."
   echo "Coverage data directory: $COVERAGE_DIR"
   cd "$REPO_ROOT"
-  TEST_EXIT=0
-  "$SLANG_TEST" "${TEST_ARGS[@]}" || TEST_EXIT=$?
-  if [ "$TEST_EXIT" -ne 0 ]; then
-    echo "Warning: slang-test exited with code $TEST_EXIT"
-    echo "  (This may indicate test failures or infrastructure issues. Coverage data still collected.)"
-  fi
+  "$SLANG_TEST" "${TEST_ARGS[@]}"
 
   # Run record-replay API tests with recording enabled to capture record-replay coverage
   # This runs only the focused RecordReplayApi* tests with SLANG_RECORD_LAYER=1 to

@@ -1749,6 +1749,9 @@ static SlangResult _innerMain(
             input.target = SLANG_CPP_SOURCE;
             break;
         case SLANG_SPIRV:
+            // When not generating SPIRV directly, remap to GLSL to avoid
+            // needing glslang. This exercises the GLSL emitter rather than
+            // the SPIRV emitter for these tests.
             if (!options.generateSPIRVDirectly)
                 input.target = SLANG_GLSL;
             break;
