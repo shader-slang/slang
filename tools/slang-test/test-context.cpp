@@ -325,7 +325,7 @@ bool TestContext::reportTestFailure()
     int count = s_consecutiveFailures.fetch_add(1) + 1;
     if (count >= kConsecutiveFailureAbortThreshold)
     {
-        abortTestRun.store(true);
+        stopSchedulingTests.store(true);
         return true;
     }
     return false;

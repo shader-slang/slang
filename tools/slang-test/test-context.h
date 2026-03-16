@@ -191,8 +191,8 @@ public:
     Slang::List<Slang::String> failedUnitTests;
 
     /// Set when too many consecutive failures indicate a systemic issue (e.g., GPU driver crash).
-    /// Checked by the parallel test loop to abort early.
-    std::atomic<bool> abortTestRun{false};
+    /// Checked by the parallel test loop to stop scheduling new tests.
+    std::atomic<bool> stopSchedulingTests{false};
 
     /// Track consecutive failures per-thread to detect catastrophic GPU failure.
     /// Returns true if the abort threshold was reached.

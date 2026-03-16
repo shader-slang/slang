@@ -4880,8 +4880,8 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
     // We have found a test to run!
     for (Index orderIdx = 0; orderIdx < testOrder.getCount(); orderIdx++)
     {
-        // Early abort if too many consecutive failures (e.g., GPU driver crash)
-        if (context->abortTestRun.load())
+        // Stop scheduling new tests if too many consecutive failures suggest a systemic issue.
+        if (context->stopSchedulingTests.load())
             return SLANG_OK;
 
         Index subTestIndex = testOrder[orderIdx];
@@ -5182,7 +5182,7 @@ void runTestsInParallel(TestContext* context, int count, const F& f)
         context->setTestReporter(&reporter);
         do
         {
-            if (context->abortTestRun.load())
+            if (context->stopSchedulingTests.load())
                 break;
             int index = consumePtr.fetch_add(1);
             if (index >= count)
@@ -5867,13 +5867,13 @@ SlangResult innerMain(int argc, char** argv)
         // If we have a couple failed tests, they maybe intermittent failures due to parallel
         // excution or driver instability. We can try running them again. Debug build has more
         // instability at this moment, so we allow more retries.
-        if (context.abortTestRun.load())
+        if (context.stopSchedulingTests.load())
         {
             fprintf(
                 stderr,
-                "\n*** Test run aborted: too many consecutive failures detected.\n"
+                "\n*** Stopped scheduling new tests after too many consecutive failures.\n"
                 "*** This usually indicates a systemic issue such as a GPU driver crash.\n"
-                "*** %d tests were queued for retry before abort.\n\n",
+                "*** Retrying %d already-queued failed tests.\n\n",
                 (int)context.failedFileTests.getCount());
             fflush(stderr);
         }
