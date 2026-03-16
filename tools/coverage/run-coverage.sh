@@ -116,7 +116,13 @@ else
   if [[ "$WITH_SYNTHESIS" == "true" ]]; then
     echo
     echo "Running synthesized compile-target tests..."
-    "$SLANG_TEST" "${TEST_ARGS[@]}" -only-synthesized || true
+    SYNTH_EXIT=0
+    "$SLANG_TEST" "${TEST_ARGS[@]}" -only-synthesized || SYNTH_EXIT=$?
+    if [ "$SYNTH_EXIT" -gt 128 ]; then
+      echo "Warning: synthesis pass crashed (signal $((SYNTH_EXIT - 128)))"
+    elif [ "$SYNTH_EXIT" -ne 0 ]; then
+      echo "Note: synthesis pass had test failures (exit code $SYNTH_EXIT). Coverage data still collected."
+    fi
   fi
 
   # Check if any profraw files were generated

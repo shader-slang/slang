@@ -1777,10 +1777,27 @@ static SlangResult _innerMain(
         {
             ComPtr<ISlangBlob> code;
             ComPtr<ISlangBlob> diagnostics;
-            (void)output.output.slangProgram->getTargetCode(
+            SlangResult codeGenResult = output.output.slangProgram->getTargetCode(
                 0,
                 code.writeRef(),
                 diagnostics.writeRef());
+            if (SLANG_FAILED(codeGenResult))
+            {
+                if (diagnostics)
+                {
+                    fprintf(
+                        stderr,
+                        "compile-only: code generation failed: %s\n",
+                        (const char*)diagnostics->getBufferPointer());
+                }
+                else
+                {
+                    fprintf(
+                        stderr,
+                        "compile-only: code generation failed (0x%08x)\n",
+                        (unsigned)codeGenResult);
+                }
+            }
         }
         return SLANG_OK;
     }
