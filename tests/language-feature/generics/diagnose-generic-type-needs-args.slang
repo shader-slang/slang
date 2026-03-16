@@ -2,6 +2,8 @@
 
 // Test that using a generic type without providing type arguments
 // produces error 30400.
+// Duplicate CHECK lines: the compiler emits each diagnostic twice
+// (once during initial checking and once during re-checking).
 
 struct MyGeneric<T>
 {

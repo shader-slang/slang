@@ -1,16 +1,15 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
-// Test error 30404: invalid type in equality constraint.
 // Test error 30405: non-dependent equality constraint.
+// Duplicate CHECK lines: the compiler emits each diagnostic twice
+// (once during initial checking and once during re-checking).
 
 interface IFoo
 {
     associatedtype A;
 }
 
-// Error 30404: 'int' is not a proper type for the right-hand side
-// of a generic equality constraint (it should be an associated type or
-// type parameter).
+// Valid: constraining an associated type to 'int' is allowed.
 void foo<T : IFoo>(T val) where T.A == int
 {
 }

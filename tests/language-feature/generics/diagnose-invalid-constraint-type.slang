@@ -2,6 +2,8 @@
 
 // Test that using a non-interface type as a generic constraint
 // produces error 30401.
+// Duplicate CHECK lines: the compiler emits each diagnostic twice
+// (once during initial checking and once during re-checking).
 
 // Using a concrete type like 'int' as a constraint is invalid.
 void foo<T : int>(T val)
