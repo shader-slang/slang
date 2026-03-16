@@ -1,7 +1,7 @@
 // generic-constructor-constraint.slang
 
 // Test that a generic constructor with interface constraints works correctly.
-// The struct has a generic __init that requires T to conform to IArithmetic,
+// The struct has a generic __init that requires T to conform to IValueProvider,
 // and the constructed object's methods produce correct results.
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK): -output-using-type

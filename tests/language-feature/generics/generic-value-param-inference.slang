@@ -29,4 +29,10 @@ void main()
     float s4 = sumVector(v4);
     printf("%f\n", s4);
     // CHECK: 10.0
+
+    // N should be inferred as 5 from the array size.
+    int arr[5] = { 1, 2, 3, 4, 5 };
+    int len = getLength(arr);
+    printf("%d\n", len);
+    // CHECK: 5
 }

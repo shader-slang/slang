@@ -1,4 +1,4 @@
-// generic-constructor-inference.slang
+// generic-constructor-explicit.slang
 
 // Test that generic structs with constrained type parameters can be
 // constructed using explicit generic arguments in the constructor call.
