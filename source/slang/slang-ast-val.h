@@ -769,6 +769,38 @@ class LastSubtypeWitness : public SubtypeWitness
 };
 
 FIDDLE()
+class TrimHeadSubtypeWitness : public SubtypeWitness
+{
+    FIDDLE(...)
+    TrimHeadSubtypeWitness(Type* sub, Type* sup, SubtypeWitness* patternWitness)
+    {
+        setOperands(sub, sup, patternWitness);
+    }
+    Type* getSub() { return as<Type>(getOperand(0)); }
+    Type* getSup() { return as<Type>(getOperand(1)); }
+    SubtypeWitness* getPatternTypeWitness() { return as<SubtypeWitness>(getOperand(2)); }
+    void _toTextOverride(StringBuilder& out);
+    Val* _resolveImplOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
+FIDDLE()
+class TrimTailSubtypeWitness : public SubtypeWitness
+{
+    FIDDLE(...)
+    TrimTailSubtypeWitness(Type* sub, Type* sup, SubtypeWitness* patternWitness)
+    {
+        setOperands(sub, sup, patternWitness);
+    }
+    Type* getSub() { return as<Type>(getOperand(0)); }
+    Type* getSup() { return as<Type>(getOperand(1)); }
+    SubtypeWitness* getPatternTypeWitness() { return as<SubtypeWitness>(getOperand(2)); }
+    void _toTextOverride(StringBuilder& out);
+    Val* _resolveImplOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
+FIDDLE()
 class ExpandSubtypeWitness : public SubtypeWitness
 {
     FIDDLE(...)
@@ -1144,6 +1176,14 @@ inline bool isTypeEqualityWitness(Val* witness)
     else if (auto expandWitness = as<ExpandSubtypeWitness>(witness))
     {
         return isTypeEqualityWitness(expandWitness->getPatternTypeWitness());
+    }
+    else if (auto trimHeadWitness = as<TrimHeadSubtypeWitness>(witness))
+    {
+        return isTypeEqualityWitness(trimHeadWitness->getPatternTypeWitness());
+    }
+    else if (auto trimTailWitness = as<TrimTailSubtypeWitness>(witness))
+    {
+        return isTypeEqualityWitness(trimTailWitness->getPatternTypeWitness());
     }
     return false;
 }
