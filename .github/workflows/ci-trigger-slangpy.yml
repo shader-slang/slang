@@ -21,6 +21,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
   merge_group:
     branches: [master]
+    types: [checks_requested]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || inputs.pr_number || github.ref }}
@@ -29,7 +30,7 @@ concurrency:
 jobs:
   trigger-slangpy-tests:
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request_target' && github.event.pull_request.draft != true || github.event_name == 'workflow_dispatch' || github.event_name == 'merge_group'
+    if: (github.event_name == 'pull_request_target' && github.event.pull_request.draft != true) || github.event_name == 'workflow_dispatch' || github.event_name == 'merge_group'
 
     steps:
       - name: Get PR info (manual trigger)
@@ -59,20 +60,16 @@ jobs:
       - name: Get PR info (merge queue)
         if: github.event_name == 'merge_group'
         id: pr_mq
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
-          # Extract PR number from merge queue branch name
-          # Format: gh-readonly-queue/master/pr-NNNN-<base_sha>
-          PR_NUMBER=$(echo "${{ github.event.merge_group.head_ref }}" | sed -n 's|.*/pr-\([0-9]*\)-.*|\1|p')
-          PR_JSON=$(gh api repos/${{ github.repository }}/pulls/"$PR_NUMBER")
-          PR_IS_FORK=$(echo "$PR_JSON" | jq -r '.head.repo.fork')
-          PR_HEAD_REPO=$(echo "$PR_JSON" | jq -r '.head.repo.full_name')
+          QUEUE_REF="${{ github.event.merge_group.head_ref || github.ref_name }}"
+          PR_NUMBER=$(echo "$QUEUE_REF" | sed -n 's|.*/pr-\([0-9]*\)-.*|\1|p')
           echo "number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
-          # Use the merge queue SHA for status reporting
-          echo "sha=${{ github.event.merge_group.head_sha }}" >> "$GITHUB_OUTPUT"
-          echo "is_fork_pr=$PR_IS_FORK" >> "$GITHUB_OUTPUT"
-          echo "head_repo=$PR_HEAD_REPO" >> "$GITHUB_OUTPUT"
+          echo "sha=${{ github.event.merge_group.head_sha || github.sha }}" >> "$GITHUB_OUTPUT"
+          echo "ref=$QUEUE_REF" >> "$GITHUB_OUTPUT"
+          echo "checkout_mode=ref" >> "$GITHUB_OUTPUT"
+          echo "checkout_repo=${{ github.repository }}" >> "$GITHUB_OUTPUT"
+          echo "is_fork_pr=false" >> "$GITHUB_OUTPUT"
+          echo "head_repo=${{ github.repository }}" >> "$GITHUB_OUTPUT"
 
       - name: Post pending status
         uses: actions/github-script@v7
@@ -98,7 +95,9 @@ jobs:
             {
               "slang_pr_number": "${{ steps.pr_auto.outputs.number || steps.pr_manual.outputs.number || steps.pr_mq.outputs.number }}",
               "slang_commit_sha": "${{ steps.pr_auto.outputs.sha || steps.pr_manual.outputs.sha || steps.pr_mq.outputs.sha }}",
-              "slang_ref": "${{ steps.pr_auto.outputs.sha || steps.pr_manual.outputs.sha || steps.pr_mq.outputs.sha }}",
+              "slang_ref": "${{ steps.pr_mq.outputs.ref || steps.pr_auto.outputs.sha || steps.pr_manual.outputs.sha }}",
+              "slang_checkout_mode": "${{ steps.pr_mq.outputs.checkout_mode || 'pr' }}",
+              "slang_checkout_repo": "${{ steps.pr_mq.outputs.checkout_repo || github.repository }}",
               "is_fork_pr": "${{ steps.pr_auto.outputs.is_fork_pr || steps.pr_manual.outputs.is_fork_pr || steps.pr_mq.outputs.is_fork_pr }}",
               "slang_pr_head_repo": "${{ steps.pr_auto.outputs.head_repo || steps.pr_manual.outputs.head_repo || steps.pr_mq.outputs.head_repo }}",
               "slang_trigger_source": "${{ github.event_name }}"
