@@ -17,6 +17,12 @@ Slang performs several transformations on entry point parameters when targeting 
 - System value semantics are translated to Metal attributes
 - Parameters without semantics are given automatic attribute indices
 
+### Limitation: `isParameterLocationUsed` for varying inputs
+
+Because Metal entry point varying inputs are packed into a single `[[stage_in]]` struct parameter during legalization, `IMetadata::isParameterLocationUsed` cannot distinguish between used and unused individual varying inputs. The metadata is recorded at the struct level, so if any varying input is used, all varying input locations covered by the struct will be reported as used. This differs from SPIR-V, where each varying input becomes a separate global parameter that can be individually tracked.
+
+This limitation does not affect non-varying resource types (e.g. descriptor table slots), which are tracked individually.
+
 ## System-Value semantics
 
 The system-value semantics are translated to the following Metal attributes:

@@ -2946,6 +2946,7 @@ private:
             }
 
             layoutBuilder.addField(key, paramVarLayout);
+            layoutBuilder.addResourceUsageFrom(paramVarLayout->getTypeLayout());
             builder.addLayoutDecoration(key, paramVarLayout);
             keys.add(key);
         }
