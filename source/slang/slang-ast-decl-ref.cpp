@@ -358,7 +358,8 @@ Val* LookupDeclRef::tryResolve(SubtypeWitness* newWitness, Type* newLookupSource
         if (!builtinReq)
             return nullptr;
     }
-    if (builtinReq->kind != BuiltinRequirementKind::DifferentialType)
+    if (builtinReq->kind != BuiltinRequirementKind::DifferentialType &&
+        builtinReq->kind != BuiltinRequirementKind::DifferentialPtrType)
         return nullptr;
     // Is the concrete type a Differential associated type?
     auto innerDeclRefType = as<DeclRefType>(newLookupSource);
@@ -368,7 +369,8 @@ Val* LookupDeclRef::tryResolve(SubtypeWitness* newWitness, Type* newLookupSource
         innerDeclRefType->getDeclRef().getDecl()->findModifier<BuiltinRequirementModifier>();
     if (!innerBuiltinReq)
         return nullptr;
-    if (innerBuiltinReq->kind != BuiltinRequirementKind::DifferentialType)
+    if (innerBuiltinReq->kind != BuiltinRequirementKind::DifferentialType &&
+        innerBuiltinReq->kind != BuiltinRequirementKind::DifferentialPtrType)
         return nullptr;
     if (isConstraint)
         return newWitness;
@@ -778,8 +780,6 @@ DeclRef<Decl> createDefaultSubstitutionsIfNeeded(
     DeclRef<Decl> declRef)
 {
     if (isGenericParam(declRef))
-        return declRef;
-    if (declRef.as<GenericTypePackParamDecl>())
         return declRef;
     ShortList<GenericDecl*> genericParentDecls;
     auto lastSubstNode = SubstitutionSet(declRef).getInnerMostNodeWithSubstInfo();

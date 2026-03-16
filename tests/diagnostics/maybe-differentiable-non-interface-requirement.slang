@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 // Test that [MaybeDifferentiable] can only be applied to interface requirements.
 
@@ -9,8 +9,11 @@ interface IFoo
     float compute(float x);
 }
 
-// CHECK: ([[# @LINE+2]]): error 30314
 [MaybeDifferentiable]
+/*CHECK:
+ ^^^^^^^^^^^^^^^^^^^ [MaybeDifferentiable] cannot be applied to non-interface requirement
+ ^^^^^^^^^^^^^^^^^^^ '[MaybeDifferentiable]' cannot be applied to non-interface requirement; it can only be applied to interface requirements.
+*/
 float bar(float x)
 {
     return x * x;
@@ -18,8 +21,11 @@ float bar(float x)
 
 struct MyType
 {
-    // CHECK: ([[# @LINE+2]]): error 30314
-    [MaybeDifferentiable]
+[MaybeDifferentiable]
+/*CHECK:
+ ^^^^^^^^^^^^^^^^^^^ [MaybeDifferentiable] cannot be applied to non-interface requirement
+ ^^^^^^^^^^^^^^^^^^^ '[MaybeDifferentiable]' cannot be applied to non-interface requirement; it can only be applied to interface requirements.
+*/
     float compute(float x)
     {
         return x;
@@ -33,8 +39,11 @@ interface IBar
     float genericReq<T : IFloat>(T x);
 }
 
-// CHECK: ([[# @LINE+2]]): error 30314
 [MaybeDifferentiable]
+/*CHECK:
+ ^^^^^^^^^^^^^^^^^^^ [MaybeDifferentiable] cannot be applied to non-interface requirement
+ ^^^^^^^^^^^^^^^^^^^ '[MaybeDifferentiable]' cannot be applied to non-interface requirement; it can only be applied to interface requirements.
+*/
 T genericBar<T : IFloat>(T x)
 {
     return T(x);
@@ -42,8 +51,11 @@ T genericBar<T : IFloat>(T x)
 
 struct MyType2
 {
-    // CHECK: ([[# @LINE+2]]): error 30314
-    [MaybeDifferentiable]
+[MaybeDifferentiable]
+/*CHECK:
+ ^^^^^^^^^^^^^^^^^^^ [MaybeDifferentiable] cannot be applied to non-interface requirement
+ ^^^^^^^^^^^^^^^^^^^ '[MaybeDifferentiable]' cannot be applied to non-interface requirement; it can only be applied to interface requirements.
+*/
     T genericMethod<T : IFloat>(T x)
     {
         return T(x);

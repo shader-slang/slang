@@ -313,12 +313,13 @@ inline Type* getType(ASTBuilder* astBuilder, DeclRef<TypeDefDecl> declRef)
 
 inline Type* getResultType(ASTBuilder* astBuilder, DeclRef<CallableDecl> declRef)
 {
-    /*if (hasDirectFuncType(declRef))
+    if (hasDirectFuncType(declRef))
     {
         return as<FuncType>(
                    declRef.substitute(astBuilder, declRef.getDecl()->funcType.type)->resolve())
             ->getResultType();
     }
+    /*
     else
     {*/
     /*auto returnType = declRef.substitute(astBuilder, declRef.getDecl()->returnType.type);

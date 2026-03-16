@@ -107,11 +107,10 @@ static void validateDynInterfaceUsage(
 
             auto inheritedInterfaceDecl = inheritedInterfaceDeclRefType.getDecl();
             if (!inheritedInterfaceDecl->hasModifier<DynModifier>())
-                sink->diagnose(
-                    Diagnostics::DynInterfaceCannotInheritNonDynInterface{
-                        .dynInterface = decl,
-                        .inherited = inheritedInterfaceDecl,
-                        .inheritance = m});
+                sink->diagnose(Diagnostics::DynInterfaceCannotInheritNonDynInterface{
+                    .dynInterface = decl,
+                    .inherited = inheritedInterfaceDecl,
+                    .inheritance = m});
         }
     }
 
@@ -141,18 +140,16 @@ static void validateDynInterfaceUseWithInheritanceDecl(
         if (auto extensionDeclParent = as<ExtensionDecl>(decl->parentDecl))
         {
             // not allowed to extend to conform to a 'dyn interface'
-            sink->diagnose(
-                Diagnostics::CannotUseExtensionToMakeTypeConformToDynInterface{
-                    .interface = interfaceDecl,
-                    .extension = extensionDeclParent});
+            sink->diagnose(Diagnostics::CannotUseExtensionToMakeTypeConformToDynInterface{
+                .interface = interfaceDecl,
+                .extension = extensionDeclParent});
         }
         else if (visitor->GetOuterGeneric(decl->parentDecl))
         {
-            sink->diagnose(
-                Diagnostics::CannotConformGenericToDynInterface{
-                    .generic = decl->parentDecl,
-                    .interface = interfaceDecl,
-                    .inheritance = decl});
+            sink->diagnose(Diagnostics::CannotConformGenericToDynInterface{
+                .generic = decl->parentDecl,
+                .interface = interfaceDecl,
+                .inheritance = decl});
         }
     }
     if (auto aggTypeDeclParent = as<AggTypeDecl>(decl->parentDecl))
@@ -165,25 +162,22 @@ static void validateDynInterfaceUseWithInheritanceDecl(
 
             if (isNonCopyableType(varDecl->getType()))
             {
-                sink->diagnose(
-                    Diagnostics::CannotHaveNonCopyableMemberWhenInheritingDynInterface{
-                        .interface = interfaceDecl,
-                        .member = varDecl});
+                sink->diagnose(Diagnostics::CannotHaveNonCopyableMemberWhenInheritingDynInterface{
+                    .interface = interfaceDecl,
+                    .member = varDecl});
             }
 
             int varTypeTags = (int)visitor->getTypeTags(varDecl->getType());
             bool isUnsized = varTypeTags & (int)TypeTag::Unsized;
             bool isOpaque = varTypeTags & (int)TypeTag::Opaque;
             if (isUnsized)
-                sink->diagnose(
-                    Diagnostics::CannotHaveUnsizedMemberWhenInheritingDynInterface{
-                        .interface = interfaceDecl,
-                        .member = varDecl});
+                sink->diagnose(Diagnostics::CannotHaveUnsizedMemberWhenInheritingDynInterface{
+                    .interface = interfaceDecl,
+                    .member = varDecl});
             if (isOpaque)
-                sink->diagnose(
-                    Diagnostics::CannotHaveOpaqueMemberWhenInheritingDynInterface{
-                        .interface = interfaceDecl,
-                        .member = varDecl});
+                sink->diagnose(Diagnostics::CannotHaveOpaqueMemberWhenInheritingDynInterface{
+                    .interface = interfaceDecl,
+                    .member = varDecl});
         }
     }
 }
@@ -1159,7 +1153,7 @@ bool isEffectivelyStatic(Decl* decl)
     // function for it.
 
     auto parentDecl = decl->parentDecl;
-    if (auto genericDecl = as<GenericDecl>(parentDecl))
+    while (auto genericDecl = as<GenericDecl>(parentDecl))
         parentDecl = genericDecl->parentDecl;
 
     return isEffectivelyStatic(decl, parentDecl);
@@ -1170,7 +1164,7 @@ bool isGlobalDecl(Decl* decl)
     if (!decl)
         return false;
     auto parentDecl = decl->parentDecl;
-    if (auto genericDecl = as<GenericDecl>(parentDecl))
+    while (auto genericDecl = as<GenericDecl>(parentDecl))
         parentDecl = genericDecl->parentDecl;
     return as<NamespaceDeclBase>(parentDecl) != nullptr || as<FileDecl>(parentDecl) != nullptr;
 }
@@ -1373,10 +1367,12 @@ QualType getTypeForDeclRef(
     }
     else if (auto funcDeclRef = declRef.as<CallableDecl>())
     {
-        if (auto existingFuncType = as<Type>(funcDeclRef.getDecl()->funcType.type))
+        if (hasDirectFuncType(funcDeclRef))
         {
             return QualType(
-                as<Type>(existingFuncType->substitute(astBuilder, SubstitutionSet(declRef))));
+                as<Type>(funcDeclRef.getDecl()
+                             ->funcType.type->substitute(astBuilder, SubstitutionSet(declRef))
+                             ->resolve()));
         }
         else
         {
@@ -1923,9 +1919,8 @@ void SemanticsDeclHeaderVisitor::checkDerivativeMemberAttributeParent(
     auto thisType = calcThisType(makeDeclRef(varDecl->parentDecl));
     if (!thisType)
     {
-        getSink()->diagnose(
-            Diagnostics::DerivativeMemberAttributeCanOnlyBeUsedOnMembers{
-                .attr = derivativeMemberAttr->loc});
+        getSink()->diagnose(Diagnostics::DerivativeMemberAttributeCanOnlyBeUsedOnMembers{
+            .attr = derivativeMemberAttr->loc});
     }
     auto diffThisType = getDifferentialType(m_astBuilder, thisType, derivativeMemberAttr->loc);
     if (!diffThisType)
@@ -1948,10 +1943,9 @@ void SemanticsDeclHeaderVisitor::checkExtensionExternVarAttribute(
             auto extVarType = varDecl->type;
             if (!extVarType.type || !extVarType.type->equals(originalType))
             {
-                getSink()->diagnose(
-                    Diagnostics::TypeOfExternDeclMismatchesOriginalDefinition{
-                        .expectedType = originalType,
-                        .decl = varDecl});
+                getSink()->diagnose(Diagnostics::TypeOfExternDeclMismatchesOriginalDefinition{
+                    .expectedType = originalType,
+                    .decl = varDecl});
             }
             else
             {
@@ -2711,10 +2705,9 @@ bool DiagnoseIsAllowedInitExpr(VarDeclBase* varDecl, DiagnosticSink* sink)
     if (as<InterfaceDecl>(varDecl->parentDecl))
     {
         if (sink && varDecl->initExpr)
-            sink->diagnose(
-                Diagnostics::CannotHaveInitializer{
-                    .reason = "an interface requirement",
-                    .decl = varDecl});
+            sink->diagnose(Diagnostics::CannotHaveInitializer{
+                .reason = "an interface requirement",
+                .decl = varDecl});
         return false;
     }
 
@@ -3097,10 +3090,9 @@ void SemanticsDeclBodyVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
                 getTrailingUnsizedArrayElement(elementType, varDecl, trailingArrayType);
             if (trailingArrayField && !isOpaqueHandleType(trailingArrayType->getElementType()))
             {
-                getSink()->diagnose(
-                    Diagnostics::CannotUseUnsizedTypeInConstantBuffer{
-                        .type = trailingArrayType,
-                        .field = trailingArrayField});
+                getSink()->diagnose(Diagnostics::CannotUseUnsizedTypeInConstantBuffer{
+                    .type = trailingArrayType,
+                    .field = trailingArrayField});
                 getSink()->diagnose(
                     Diagnostics::SeeConstantBufferDefinition{.location = varDecl->loc});
             }
@@ -3229,10 +3221,9 @@ bool SemanticsVisitor::trySynthesizeDiffContextTypeRequirementWitness(
         auto ctxTypeInheritanceDecl = getCurrentASTBuilder()->create<InheritanceDecl>();
         ctxTypeInheritanceDecl->parentDecl = synStructDecl;
 
-        ctxTypeInheritanceDecl->base.type = getBwdCallableBaseType(
-            DeclRefType::create(
-                getCurrentASTBuilder(),
-                as<DeclRefBase>(synStructDecl->operands[0])));
+        ctxTypeInheritanceDecl->base.type = getBwdCallableBaseType(DeclRefType::create(
+            getCurrentASTBuilder(),
+            as<DeclRefBase>(synStructDecl->operands[0])));
 
         synStructDecl->addDirectMemberDecl(ctxTypeInheritanceDecl);
 
@@ -3532,10 +3523,9 @@ bool SemanticsDeclHeaderVisitor::validateGenericConstraintSubType(
         {
             if (decl->isEqualityConstraint)
             {
-                sink->diagnose(
-                    Diagnostics::InvalidEqualityConstraintSubType{
-                        .type = type.type,
-                        .typeExp = type.exp});
+                sink->diagnose(Diagnostics::InvalidEqualityConstraintSubType{
+                    .type = type.type,
+                    .typeExp = type.exp});
             }
             else
             {
@@ -3700,11 +3690,10 @@ void SemanticsDeclHeaderVisitor::checkForwardReferencesInGenericConstraint(
                 !declaredBeforeConstraint.contains(typeParam))
             {
                 // Found a forward reference, report an error.
-                getSink()->diagnose(
-                    Diagnostics::ForwardReferenceInGenericConstraint{
-                        .param = decl->sub.type,
-                        .referenced = typeParam,
-                        .expr = decl->sup.exp});
+                getSink()->diagnose(Diagnostics::ForwardReferenceInGenericConstraint{
+                    .param = decl->sub.type,
+                    .referenced = typeParam,
+                    .expr = decl->sup.exp});
             }
         }
     }
@@ -3739,18 +3728,16 @@ void SemanticsDeclHeaderVisitor::visitNonEmptyPackConstraintDecl(NonEmptyPackCon
         {
             if (typePackDeclRef.getDecl()->parentDecl == decl->parentDecl)
                 return;
-            getSink()->diagnose(
-                Diagnostics::NonEmptyPackConstraintTargetMustBeFromCurrentGeneric{
-                    .expr = packExpr});
+            getSink()->diagnose(Diagnostics::NonEmptyPackConstraintTargetMustBeFromCurrentGeneric{
+                .expr = packExpr});
             return;
         }
         if (auto valuePackDeclRef = declRef.as<GenericValuePackParamDecl>())
         {
             if (valuePackDeclRef.getDecl()->parentDecl == decl->parentDecl)
                 return;
-            getSink()->diagnose(
-                Diagnostics::NonEmptyPackConstraintTargetMustBeFromCurrentGeneric{
-                    .expr = packExpr});
+            getSink()->diagnose(Diagnostics::NonEmptyPackConstraintTargetMustBeFromCurrentGeneric{
+                .expr = packExpr});
             return;
         }
     }
@@ -3873,10 +3860,9 @@ void SemanticsDeclHeaderVisitor::visitGenericTypeConstraintDecl(GenericTypeConst
             checkGenericTypeEqualityConstraintSubType(decl);
             if (!isProperConstraineeType(decl->sup) && !as<ErrorType>(decl->sup.type))
             {
-                getSink()->diagnose(
-                    Diagnostics::InvalidEqualityConstraintSupType{
-                        .type = decl->sup.type,
-                        .typeExp = decl->sup.exp});
+                getSink()->diagnose(Diagnostics::InvalidEqualityConstraintSupType{
+                    .type = decl->sup.type,
+                    .typeExp = decl->sup.exp});
             }
         }
         else
@@ -3884,10 +3870,9 @@ void SemanticsDeclHeaderVisitor::visitGenericTypeConstraintDecl(GenericTypeConst
             validateGenericConstraintSubType(decl, decl->sub, getSink());
             if (!isValidGenericConstraintType(decl->sup) && !as<ErrorType>(decl->sup.type))
             {
-                getSink()->diagnose(
-                    Diagnostics::InvalidTypeForConstraint{
-                        .type = decl->sup.type,
-                        .typeExp = decl->sup.exp});
+                getSink()->diagnose(Diagnostics::InvalidTypeForConstraint{
+                    .type = decl->sup.type,
+                    .typeExp = decl->sup.exp});
                 if (isValidCompileTimeConstantType(decl->sup.type) &&
                     !decl->whereTokenLoc.isValid())
                 {
@@ -3896,17 +3881,15 @@ void SemanticsDeclHeaderVisitor::visitGenericTypeConstraintDecl(GenericTypeConst
                         auto subDecl = subDeclRefType->getDeclRef().getDecl();
                         if (as<GenericTypePackParamDecl>(subDecl))
                         {
-                            getSink()->diagnose(
-                                Diagnostics::UseLetEachForGenericValuePackParam{
-                                    .paramName = subDecl->getName(),
-                                    .type = decl->sup.type});
+                            getSink()->diagnose(Diagnostics::UseLetEachForGenericValuePackParam{
+                                .paramName = subDecl->getName(),
+                                .type = decl->sup.type});
                         }
                         else if (as<GenericTypeParamDecl>(subDecl))
                         {
-                            getSink()->diagnose(
-                                Diagnostics::UseLetForGenericValueParam{
-                                    .paramName = subDecl->getName(),
-                                    .type = decl->sup.type});
+                            getSink()->diagnose(Diagnostics::UseLetForGenericValueParam{
+                                .paramName = subDecl->getName(),
+                                .type = decl->sup.type});
                         }
                     }
                 }
@@ -4002,10 +3985,9 @@ void SemanticsDeclHeaderVisitor::visitGenericValueParamDecl(GenericValueParamDec
     {
         if (!isValidCompileTimeConstantType(decl->type.type))
         {
-            getSink()->diagnose(
-                Diagnostics::GenericValueParameterTypeNotSupported{
-                    .type = decl->type.type,
-                    .decl = decl});
+            getSink()->diagnose(Diagnostics::GenericValueParameterTypeNotSupported{
+                .type = decl->type.type,
+                .decl = decl});
         }
     }
 }
@@ -4018,10 +4000,9 @@ void SemanticsDeclHeaderVisitor::visitGenericValuePackParamDecl(GenericValuePack
     {
         if (!isValidCompileTimeConstantType(decl->type.type))
         {
-            getSink()->diagnose(
-                Diagnostics::GenericValueParameterTypeNotSupported{
-                    .type = decl->type.type,
-                    .decl = decl});
+            getSink()->diagnose(Diagnostics::GenericValueParameterTypeNotSupported{
+                .type = decl->type.type,
+                .decl = decl});
             decl->type.type = m_astBuilder->getErrorType();
             return;
         }
@@ -4231,9 +4212,9 @@ struct SemanticsDeclFunctionConformancesVisitor
                                      ->findModifier<FunctionInterfaceAttribute>())
                             {
                                 getSink()->diagnose(
-                                    inheritanceDecl,
-                                    Diagnostics::interfaceMissingFunctionInterfaceModifier,
-                                    interfaceDecl.getDecl());
+                                    Diagnostics::InterfaceMissingFunctionInterfaceAttribute{
+                                        .decl = interfaceDecl.getDecl(),
+                                        .location = extensionDecl->loc});
                             }
                         }
                     }
@@ -4423,9 +4404,8 @@ void SemanticsDeclVisitorBase::checkModule(ModuleDecl* moduleDecl)
             if (!getShared()->isInLanguageServer())
             {
                 // A primary module file can't start with an "implementing" declaration.
-                getSink()->diagnose(
-                    Diagnostics::PrimaryModuleFileCannotStartWithImplementingDecl{
-                        .decl = firstDeclInModule});
+                getSink()->diagnose(Diagnostics::PrimaryModuleFileCannotStartWithImplementingDecl{
+                    .decl = firstDeclInModule});
             }
         }
         else if (!as<ModuleDeclarationDecl>(firstDeclInModule))
@@ -5256,18 +5236,22 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
 
     for (Index i = 0; i < requiredConstraints.getCount(); i++)
     {
-        auto requiredMemberDeclRef = requiredMemberDeclRefs[i];
-        auto satisfyingMemberDeclRef = satisfyingMemberDeclRefs[i];
+        auto requiredMemberDeclRef = requiredConstraints[i];
+        auto satisfyingMemberDeclRef = satisfyingConstraints[i];
 
         if (auto requiredTypeConstraintDeclRef =
                 requiredMemberDeclRef.as<GenericTypeConstraintDecl>())
         {
-            auto satisfyingTypePackParamDeclRef =
-                satisfyingMemberDeclRef.as<GenericTypePackParamDecl>();
-            SLANG_ASSERT(satisfyingTypePackParamDeclRef);
-            auto satisfyingType = DeclRefType::create(m_astBuilder, satisfyingTypePackParamDeclRef);
+            auto satisfyingConstraintDeclRef =
+                satisfyingMemberDeclRef.as<GenericTypeConstraintDecl>();
+            SLANG_ASSERT(satisfyingConstraintDeclRef);
 
-            requiredSubstArgs.add(satisfyingType);
+            auto satisfyingWitness = m_astBuilder->getDeclaredSubtypeWitness(
+                getSub(m_astBuilder, satisfyingConstraintDeclRef),
+                getSup(m_astBuilder, satisfyingConstraintDeclRef),
+                satisfyingConstraintDeclRef);
+
+            requiredSubstArgs.add(satisfyingWitness);
         }
         else if (
             auto requiredTypeCoercionConstraintDeclRef =
@@ -5984,6 +5968,58 @@ DeclRef<Decl> SemanticsVisitor::liftDeclFromGenericContainers(
     return newDeclRef ? DeclRef<Decl>(newDeclRef) : DeclRef<Decl>(decl->getDefaultDeclRef());
 }
 
+
+static void populateParams(
+    ASTBuilder* astBuilder,
+    CallableDecl* decl,
+    FuncType* funcType,
+    List<Expr*>& synArgs)
+{
+    // Insert synthesized param-decls.
+    for (auto paramType : funcType->getParamTypes())
+    {
+        auto paramDecl = astBuilder->create<ParamDecl>();
+
+        if (auto outType = as<OutParamType>(paramType))
+        {
+            paramDecl->type.type = outType->getValueType();
+            addModifier(paramDecl, astBuilder->create<OutModifier>());
+        }
+        else if (auto inOutType = as<BorrowInOutParamType>(paramType))
+        {
+            paramDecl->type.type = inOutType->getValueType();
+            addModifier(paramDecl, astBuilder->create<InOutModifier>());
+        }
+        else if (auto inType = as<BorrowInParamType>(paramType))
+        {
+            paramDecl->type.type = inType->getValueType();
+            addModifier(paramDecl, astBuilder->create<BorrowModifier>());
+        }
+        else
+        {
+            paramDecl->type.type = paramType;
+        }
+
+        // If the resolved type is a ModifiedType with NoDiffModifierVal,
+        // move the no_diff from the type to the param decl.
+        if (auto modifiedType = as<ModifiedType>(paramDecl->type.type))
+        {
+            if (modifiedType->findModifier<NoDiffModifierVal>())
+            {
+                paramDecl->type.type = modifiedType->getBase();
+                addModifier(paramDecl, astBuilder->create<NoDiffModifier>());
+            }
+        }
+        decl->addMember(paramDecl);
+
+        // Create an expression that references the parameter for use in arguments.
+        auto synArg = astBuilder->create<VarExpr>();
+        synArg->declRef = makeDeclRef(paramDecl);
+        synArg->type = paramType;
+        synArgs.add(synArg);
+    }
+}
+
 GenericDecl* SemanticsVisitor::synthesizeGenericSignatureForRequirementWitness(
     ConformanceCheckingContext* context,
     DeclRef<GenericDecl> requiredMemberDeclRef,
@@ -6276,16 +6312,7 @@ void SemanticsVisitor::addModifiersToSynthesizedDecl(
             addModifier(synthesized, noDiffThisAttr);
         }
     }
-    if (requiredMemberDeclRef.getDecl()->hasModifier<ForwardDifferentiableAttribute>())
-    {
-        auto attr = m_astBuilder->create<ForwardDifferentiableAttribute>();
-        addModifier(synthesized, attr);
-    }
-    if (requiredMemberDeclRef.getDecl()->hasModifier<BackwardDifferentiableAttribute>())
-    {
-        auto attr = m_astBuilder->create<BackwardDifferentiableAttribute>();
-        addModifier(synthesized, attr);
-    }
+
     // The visibility of synthesized decl should be the min of the parent decl and the requirement.
     if (requiredMemberDeclRef.getDecl()->findModifier<VisibilityModifier>())
     {
@@ -6301,6 +6328,17 @@ void SemanticsVisitor::addRequiredParamsToSynthesizedDecl(
     CallableDecl* synthesized,
     List<Expr*>& synArgs)
 {
+    if (hasDirectFuncType(requirement))
+    {
+        auto substFuncType = as<FuncType>(substituteType(
+                                              SubstitutionSet(requirement),
+                                              getCurrentASTBuilder(),
+                                              requirement.getDecl()->funcType)
+                                              ->resolve());
+        populateParams(getCurrentASTBuilder(), synthesized, substFuncType, synArgs);
+        return;
+    }
+
     // Our synthesized method will have parameters matching the names
     // and types of those on the requirement, and it will use expressions
     // that reference those parameters as arguments for the call expresison
@@ -6485,7 +6523,26 @@ static void removeNonStaticLookupItems(LookupResult& lookupResult)
     List<LookupResultItem> newItems;
     for (auto item : lookupResult)
     {
-        if (item.declRef.getDecl()->hasModifier<HLSLStaticModifier>())
+        if (item.declRef.getDecl()->findModifier<HLSLStaticModifier>())
+        {
+            newItems.add(item);
+        }
+    }
+
+    lookupResult.items = newItems;
+    lookupResult.item = LookupResultItem();
+    if (lookupResult.items.getCount() > 0)
+    {
+        lookupResult.item = lookupResult.items[0];
+    }
+}
+
+static void removeStaticLookupItems(LookupResult& lookupResult)
+{
+    List<LookupResultItem> newItems;
+    for (auto item : lookupResult)
+    {
+        if (!item.declRef.getDecl()->findModifier<HLSLStaticModifier>())
         {
             newItems.add(item);
         }
@@ -6634,10 +6691,42 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
 
     baseOverloadedExpr->lookupResult2 = lookupResult;
 
+    // Track whether we are using a non-static method to satisfy a static requirement
+    // by treating the first parameter as the implicit 'this' argument.
+    bool nonStaticSatisfiesStatic = false;
+
     // Non-static methods cannot implement static methods, remove them.
     if (requiredMemberDeclRef.getDecl()->hasModifier<HLSLStaticModifier>())
     {
         removeNonStaticLookupItems(baseOverloadedExpr->lookupResult2);
+
+        // If no static candidates remain, check if a non-static method can satisfy
+        // this static requirement when the first parameter type matches the conforming
+        // type (i.e. the 'This' type). In that case, we can synthesize a static wrapper
+        // that calls the non-static method on the first argument.
+        //
+        // E.g.:
+        //      interface IFoo { static int method(This val, int x); }
+        //      struct MyStruct : IFoo { int method(int x) { ... } }
+        //
+        // Synthesized:
+        //      static int $__syn_method(MyStruct val, int x) { return val.method(x); }
+        //
+        if (!baseOverloadedExpr->lookupResult2.isValid() && synArgs.getCount() > 0)
+        {
+            // Restore the full lookup result and keep only non-static items.
+            baseOverloadedExpr->lookupResult2 = lookupResult;
+            removeStaticLookupItems(baseOverloadedExpr->lookupResult2);
+            if (baseOverloadedExpr->lookupResult2.isValid())
+            {
+                nonStaticSatisfiesStatic = true;
+                // Use the first synArg (corresponding to the first parameter
+                // of the static requirement) as the base expression for the
+                // member method call.
+                baseOverloadedExpr->base = synArgs[0];
+                synArgs.removeAt(0);
+            }
+        }
     }
 
     // If `synThis` is non-null, then we will use it as the base of
@@ -6803,6 +6892,11 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
                 auto synParams = synFuncDecl->getParameters();
                 auto calleeParams = callee.getDecl()->getParameters();
                 auto synParamIter = synParams.begin();
+                // When a non-static method satisfies a static requirement, the first
+                // parameter of the synthesized function was consumed as the base
+                // expression for the member call, so skip it in the direction check.
+                if (nonStaticSatisfiesStatic && synParamIter != synParams.end())
+                    ++synParamIter;
                 auto calleeParamIter = calleeParams.begin();
                 for (; synParamIter != synParams.end() && calleeParamIter != calleeParams.end();
                      ++synParamIter, ++calleeParamIter)
@@ -6827,9 +6921,54 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
                 }
 
                 markOverridingDecl(context, callee.getDecl(), requiredMemberDeclRef);
+
+                // If our method has associated functions, we need to add some decorators to
+                // materialize those conformances.
+                {
+                    bool hasFwdDerivative = false;
+                    auto lookupResult = lookUpMember(
+                        getASTBuilder(),
+                        this,
+                        getName("fwd_diff"),
+                        DeclRefType::create(getASTBuilder(), callee),
+                        getOuterScope(),
+                        LookupMask::Default);
+                    lookupResult = resolveOverloadedLookup(lookupResult);
+                    if (!lookupResult.isOverloaded() && lookupResult.isValid())
+                        hasFwdDerivative = true;
+
+                    if (hasFwdDerivative)
+                    {
+                        auto fwdDerivativeModifier =
+                            m_astBuilder->create<ForwardDifferentiableAttribute>();
+                        addModifier(synFuncDecl, fwdDerivativeModifier);
+                    }
+                }
+
+                {
+                    bool hasBwdDerivative = false;
+                    auto lookupResult = lookUpMember(
+                        getASTBuilder(),
+                        this,
+                        getName("bwd_diff"),
+                        DeclRefType::create(getASTBuilder(), callee),
+                        getOuterScope(),
+                        LookupMask::Default);
+                    lookupResult = resolveOverloadedLookup(lookupResult);
+                    if (!lookupResult.isOverloaded() && lookupResult.isValid())
+                        hasBwdDerivative = true;
+
+                    if (hasBwdDerivative)
+                    {
+                        auto bwdDerivativeModifier =
+                            m_astBuilder->create<BackwardDifferentiableAttribute>();
+                        addModifier(synFuncDecl, bwdDerivativeModifier);
+                    }
+                }
             }
         }
     }
+
 
     // We've already created the outer declaration (including its
     // parameters), and the inner expression, so the main work
@@ -7603,11 +7742,13 @@ bool SemanticsVisitor::trySynthesizeRequirementWitness(
             case BuiltinRequirementKind::BwdCallablePropFunc:
             case BuiltinRequirementKind::BwdCallableRematFunc:
             case BuiltinRequirementKind::LegacyBackwardDerivativeFunc:
-                return trySynthesizeDiffFuncRequirementWitness(
-                    context,
-                    requiredFuncDeclRef,
-                    witnessTable,
-                    builtinAttr->kind);
+                // Only synthesize if nothing of the same
+                if (!lookupResult.isValid())
+                    return trySynthesizeDiffFuncRequirementWitness(
+                        context,
+                        requiredFuncDeclRef,
+                        witnessTable,
+                        builtinAttr->kind);
                 break;
             }
         }
@@ -7762,35 +7903,6 @@ Stmt* _synthesizeMemberAssignMemberHelper(
     return synth.emitAssignStmt(leftValue, synth.emitInvokeExpr(callee, _Move(args)));
 }
 
-static void populateParams(ASTBuilder* astBuilder, SynthesizedFuncDecl* decl, FuncType* funcType)
-{
-    // Insert synthesized param-decls.
-    for (auto paramType : funcType->getParamTypes())
-    {
-        auto paramDecl = astBuilder->create<ParamDecl>();
-
-        if (auto outType = as<OutParamType>(paramType))
-        {
-            paramDecl->type.type = outType->getValueType();
-            addModifier(paramDecl, astBuilder->create<OutModifier>());
-        }
-        else if (auto inOutType = as<BorrowInOutParamType>(paramType))
-        {
-            paramDecl->type.type = inOutType->getValueType();
-            addModifier(paramDecl, astBuilder->create<InOutModifier>());
-        }
-        else if (auto inType = as<BorrowInParamType>(paramType))
-        {
-            paramDecl->type.type = inType->getValueType();
-            addModifier(paramDecl, astBuilder->create<BorrowModifier>());
-        }
-        else
-        {
-            paramDecl->type.type = paramType;
-        }
-        decl->addMember(paramDecl);
-    }
-}
 
 bool SemanticsVisitor::trySynthesizeEnumTypeMethodRequirementWitness(
     ConformanceCheckingContext* context,
@@ -8133,7 +8245,8 @@ bool SemanticsVisitor::trySynthesizeDiffFuncRequirementWitness(
     }
     synFunc->parentDecl = context->parentDecl;
 
-    populateParams(getCurrentASTBuilder(), synFunc, funcType);
+    List<Expr*> synArgs;
+    populateParams(getCurrentASTBuilder(), synFunc, funcType, synArgs);
 
     synFunc->returnType.type = funcType->getResultType();
 
@@ -8853,13 +8966,11 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
         }
         else
         {
-            getSink()->diagnose(
-                Diagnostics::TypeDoesntImplementInterfaceRequirement{
-                    .type = subType,
-                    .member = requiredMemberDeclRef.getName()
-                                  ? requiredMemberDeclRef.getName()->text
-                                  : String(),
-                    .location = inheritanceDecl->loc});
+            getSink()->diagnose(Diagnostics::TypeDoesntImplementInterfaceRequirement{
+                .type = subType,
+                .member = requiredMemberDeclRef.getName() ? requiredMemberDeclRef.getName()->text
+                                                          : String(),
+                .location = inheritanceDecl->loc});
             getSink()->diagnose(
                 Diagnostics::SeeDeclarationOf{.decl = requiredMemberDeclRef.getDecl()});
             return false;
@@ -8952,44 +9063,38 @@ bool SemanticsVisitor::findWitnessForInterfaceRequirement(
     if (failureDetails.reason == WitnessSynthesisFailureReason::MethodResultTypeMismatch)
     {
         // Emit specific return type mismatch diagnostic
-        getSink()->diagnose(
-            Diagnostics::MemberReturnTypeMismatch{
-                .actualType = failureDetails.actualType,
-                .expectedType = failureDetails.expectedType,
-                .member = failureDetails.candidateMethod.getDecl()});
+        getSink()->diagnose(Diagnostics::MemberReturnTypeMismatch{
+            .actualType = failureDetails.actualType,
+            .expectedType = failureDetails.expectedType,
+            .member = failureDetails.candidateMethod.getDecl()});
     }
     else if (failureDetails.reason == WitnessSynthesisFailureReason::ParameterDirMismatch)
     {
-        getSink()->diagnose(
-            Diagnostics::ParameterDirectionDoesNotMatchRequirement{
-                .actualDirection = failureDetails.actualDir,
-                .expectedDirection = failureDetails.expectedDir,
-                .param = failureDetails.paramDecl});
+        getSink()->diagnose(Diagnostics::ParameterDirectionDoesNotMatchRequirement{
+            .actualDirection = failureDetails.actualDir,
+            .expectedDirection = failureDetails.expectedDir,
+            .param = failureDetails.paramDecl});
     }
     else if (failureDetails.reason == WitnessSynthesisFailureReason::GenericSignatureMismatch)
     {
-        getSink()->diagnose(
-            Diagnostics::GenericSignatureDoesNotMatchRequirement{
-                .member = requiredMemberDeclRef.getDecl()->getName()});
+        getSink()->diagnose(Diagnostics::GenericSignatureDoesNotMatchRequirement{
+            .member = requiredMemberDeclRef.getDecl()->getName()});
     }
     else
     {
         // General failure - use existing logic
         if (!lookupResult.isOverloaded() && lookupResult.isValid())
         {
-            getSink()->diagnose(
-                Diagnostics::MemberDoesNotMatchRequirementSignature{
-                    .member = lookupResult.item.declRef.getDecl()});
+            getSink()->diagnose(Diagnostics::MemberDoesNotMatchRequirementSignature{
+                .member = lookupResult.item.declRef.getDecl()});
         }
         else
         {
-            getSink()->diagnose(
-                Diagnostics::TypeDoesntImplementInterfaceRequirement{
-                    .type = subType,
-                    .member = requiredMemberDeclRef.getName()
-                                  ? requiredMemberDeclRef.getName()->text
-                                  : String(),
-                    .location = inheritanceDecl->loc});
+            getSink()->diagnose(Diagnostics::TypeDoesntImplementInterfaceRequirement{
+                .type = subType,
+                .member = requiredMemberDeclRef.getName() ? requiredMemberDeclRef.getName()->text
+                                                          : String(),
+                .location = inheritanceDecl->loc});
 
             for (auto& item : lookupResult)
             {
@@ -9219,7 +9324,10 @@ void SemanticsVisitor::_checkDifferentialConformance(
 {
     SLANG_UNUSED(subType);
     // Only perform this check if the super type is IDifferentiable.
-    if (superInterfaceDeclRef.getDecl() != m_astBuilder->getDifferentiableInterfaceDecl().getDecl())
+    if (superInterfaceDeclRef.getDecl() !=
+            m_astBuilder->getDifferentiableInterfaceDecl().getDecl() &&
+        superInterfaceDeclRef.getDecl() !=
+            m_astBuilder->getDifferentiableRefInterfaceDecl().getDecl())
         return;
 
     // Don't check for interface decls (they declare requirements, not conformances).
@@ -9228,8 +9336,22 @@ void SemanticsVisitor::_checkDifferentialConformance(
 
     // Look up the DifferentialType requirement witness.
     RequirementWitness witnessValue;
-    auto requirementDecl = m_astBuilder->getSharedASTBuilder()->findBuiltinRequirementDecl(
-        BuiltinRequirementKind::DifferentialType);
+    Decl* requirementDecl = nullptr;
+    if (superInterfaceDeclRef.getDecl() == m_astBuilder->getDifferentiableInterfaceDecl().getDecl())
+    {
+        requirementDecl = m_astBuilder->getSharedASTBuilder()->findBuiltinRequirementDecl(
+            BuiltinRequirementKind::DifferentialType);
+    }
+    else if (
+        superInterfaceDeclRef.getDecl() ==
+        m_astBuilder->getDifferentiableRefInterfaceDecl().getDecl())
+    {
+        requirementDecl = m_astBuilder->getSharedASTBuilder()->findBuiltinRequirementDecl(
+            BuiltinRequirementKind::DifferentialPtrType);
+    }
+
+    SLANG_ASSERT(requirementDecl);
+
     if (!witnessTable->getRequirementDictionary().tryGetValue(requirementDecl, witnessValue))
         return;
 
@@ -9244,11 +9366,10 @@ void SemanticsVisitor::_checkDifferentialConformance(
     auto diffDiffType = tryGetDifferentialType(m_astBuilder, differentialType);
     if (!differentialType->equals(diffDiffType))
     {
-        getSink()->diagnose(
-            Diagnostics::DifferentialTypeShouldServeAsItsOwnDifferentialType{
-                .type = differentialType,
-                .diffType = diffDiffType,
-                .inheritance = inheritanceDecl});
+        getSink()->diagnose(Diagnostics::DifferentialTypeShouldServeAsItsOwnDifferentialType{
+            .type = differentialType,
+            .diffType = diffDiffType,
+            .inheritance = inheritanceDecl});
         getSink()->diagnose(
             Diagnostics::SeeDefinitionOf{.decl = differentialType->getDeclRef().getDecl()});
     }
@@ -9367,10 +9488,9 @@ bool SemanticsVisitor::checkConformanceToType(
     }
     if (!as<ErrorType>(superType))
     {
-        getSink()->diagnose(
-            Diagnostics::InvalidTypeForInheritance{
-                .type = superType,
-                .inheritanceDecl = inheritanceDecl});
+        getSink()->diagnose(Diagnostics::InvalidTypeForInheritance{
+            .type = superType,
+            .inheritanceDecl = inheritanceDecl});
     }
     return false;
 }
@@ -9460,11 +9580,10 @@ bool SemanticsVisitor::checkConformance(
             {
                 if (!as<ErrorType>(aggTypeDecl->aliasedType))
                 {
-                    getSink()->diagnose(
-                        Diagnostics::TypeArgumentDoesNotConformToInterface{
-                            .typeArg = aggTypeDecl->aliasedType,
-                            .interface = superType,
-                            .location = inheritanceDecl->loc});
+                    getSink()->diagnose(Diagnostics::TypeArgumentDoesNotConformToInterface{
+                        .typeArg = aggTypeDecl->aliasedType,
+                        .interface = superType,
+                        .location = inheritanceDecl->loc});
                 }
             }
             return witness != nullptr;
@@ -9912,11 +10031,10 @@ void SemanticsDeclBasesVisitor::visitInterfaceDecl(InterfaceDecl* decl)
         auto baseDeclRefType = as<DeclRefType>(baseType);
         if (!baseDeclRefType)
         {
-            getSink()->diagnose(
-                Diagnostics::BaseOfInterfaceMustBeInterface{
-                    .decl = decl,
-                    .baseType = baseType,
-                    .inheritanceDecl = inheritanceDecl});
+            getSink()->diagnose(Diagnostics::BaseOfInterfaceMustBeInterface{
+                .decl = decl,
+                .baseType = baseType,
+                .inheritanceDecl = inheritanceDecl});
             continue;
         }
 
@@ -9924,11 +10042,10 @@ void SemanticsDeclBasesVisitor::visitInterfaceDecl(InterfaceDecl* decl)
         auto baseInterfaceDeclRef = baseDeclRef.as<InterfaceDecl>();
         if (!baseInterfaceDeclRef)
         {
-            getSink()->diagnose(
-                Diagnostics::BaseOfInterfaceMustBeInterface{
-                    .decl = decl,
-                    .baseType = baseType,
-                    .inheritanceDecl = inheritanceDecl});
+            getSink()->diagnose(Diagnostics::BaseOfInterfaceMustBeInterface{
+                .decl = decl,
+                .baseType = baseType,
+                .inheritanceDecl = inheritanceDecl});
             continue;
         }
 
@@ -9990,7 +10107,7 @@ void SemanticsDeclBasesVisitor::visitCallableDecl(CallableDecl* decl)
         {
             // TODO: Figure out what diagnostic should go here.
             getSink()->diagnose(
-                Diagnostics::InternalCompilerError{.location = inheritanceDecl->sourceLoc});
+                Diagnostics::InternalCompilerError{.location = inheritanceDecl->loc});
             continue;
         }
 
@@ -10003,16 +10120,16 @@ void SemanticsDeclBasesVisitor::visitCallableDecl(CallableDecl* decl)
             //
             if (!baseInterfaceDeclRef.getDecl()->findModifier<FunctionInterfaceAttribute>())
             {
-                getSink()->diagnose(
-                    Diagnostics::InterfaceUsedAsConstraintOnCallableMustBeFunctionInterface{
-                        .decl = decl});
+                getSink()->diagnose(Diagnostics::InterfaceMissingFunctionInterfaceAttribute{
+                    .decl = inheritanceDecl,
+                    .location = decl->loc});
             }
         }
         else
         {
             // TODO: Figure out what diagnostic should go here.
             getSink()->diagnose(
-                Diagnostics::InternalCompilerError{.location = inheritanceDecl->sourceLoc});
+                Diagnostics::InternalCompilerError{.location = inheritanceDecl->loc});
             continue;
         }
 
@@ -10055,11 +10172,10 @@ void SemanticsDeclBasesVisitor::visitStructDecl(StructDecl* decl)
         auto baseDeclRefType = as<DeclRefType>(baseType);
         if (!baseDeclRefType)
         {
-            getSink()->diagnose(
-                Diagnostics::BaseOfStructMustBeInterface{
-                    .decl = decl,
-                    .baseType = baseType,
-                    .inheritanceDecl = inheritanceDecl});
+            getSink()->diagnose(Diagnostics::BaseOfStructMustBeInterface{
+                .decl = decl,
+                .baseType = baseType,
+                .inheritanceDecl = inheritanceDecl});
             continue;
         }
 
@@ -10074,11 +10190,10 @@ void SemanticsDeclBasesVisitor::visitStructDecl(StructDecl* decl)
                 // In Slang 2026, we no longer allow structs to inherit from other structs.
                 if (isSlang2026OrLater(this))
                 {
-                    getSink()->diagnose(
-                        Diagnostics::BaseOfStructMustBeInterface{
-                            .decl = decl,
-                            .baseType = baseType,
-                            .inheritanceDecl = inheritanceDecl});
+                    getSink()->diagnose(Diagnostics::BaseOfStructMustBeInterface{
+                        .decl = decl,
+                        .baseType = baseType,
+                        .inheritanceDecl = inheritanceDecl});
                 }
                 else
                 {
@@ -10107,11 +10222,10 @@ void SemanticsDeclBasesVisitor::visitStructDecl(StructDecl* decl)
         }
         else
         {
-            getSink()->diagnose(
-                Diagnostics::BaseOfStructMustBeInterface{
-                    .decl = decl,
-                    .baseType = baseType,
-                    .inheritanceDecl = inheritanceDecl});
+            getSink()->diagnose(Diagnostics::BaseOfStructMustBeInterface{
+                .decl = decl,
+                .baseType = baseType,
+                .inheritanceDecl = inheritanceDecl});
             continue;
         }
 
@@ -10175,11 +10289,10 @@ void SemanticsDeclBasesVisitor::visitClassDecl(ClassDecl* decl)
         auto baseDeclRefType = as<DeclRefType>(baseType);
         if (!baseDeclRefType)
         {
-            getSink()->diagnose(
-                Diagnostics::BaseOfClassMustBeClassOrInterface{
-                    .decl = decl,
-                    .baseType = baseType,
-                    .inheritanceDecl = inheritanceDecl});
+            getSink()->diagnose(Diagnostics::BaseOfClassMustBeClassOrInterface{
+                .decl = decl,
+                .baseType = baseType,
+                .inheritanceDecl = inheritanceDecl});
             continue;
         }
 
@@ -10206,11 +10319,10 @@ void SemanticsDeclBasesVisitor::visitClassDecl(ClassDecl* decl)
         }
         else
         {
-            getSink()->diagnose(
-                Diagnostics::BaseOfClassMustBeClassOrInterface{
-                    .decl = decl,
-                    .baseType = baseType,
-                    .inheritanceDecl = inheritanceDecl});
+            getSink()->diagnose(Diagnostics::BaseOfClassMustBeClassOrInterface{
+                .decl = decl,
+                .baseType = baseType,
+                .inheritanceDecl = inheritanceDecl});
             continue;
         }
 
@@ -10388,11 +10500,10 @@ void SemanticsDeclBasesVisitor::visitEnumDecl(EnumDecl* decl)
         auto baseDeclRefType = as<DeclRefType>(baseType);
         if (!baseDeclRefType)
         {
-            getSink()->diagnose(
-                Diagnostics::BaseOfEnumMustBeIntegerOrInterface{
-                    .decl = decl,
-                    .baseType = baseType,
-                    .inheritanceDecl = inheritanceDecl});
+            getSink()->diagnose(Diagnostics::BaseOfEnumMustBeIntegerOrInterface{
+                .decl = decl,
+                .baseType = baseType,
+                .inheritanceDecl = inheritanceDecl});
             continue;
         }
 
@@ -10432,11 +10543,10 @@ void SemanticsDeclBasesVisitor::visitEnumDecl(EnumDecl* decl)
         }
         else
         {
-            getSink()->diagnose(
-                Diagnostics::BaseOfEnumMustBeIntegerOrInterface{
-                    .decl = decl,
-                    .baseType = baseType,
-                    .inheritanceDecl = inheritanceDecl});
+            getSink()->diagnose(Diagnostics::BaseOfEnumMustBeIntegerOrInterface{
+                .decl = decl,
+                .baseType = baseType,
+                .inheritanceDecl = inheritanceDecl});
             continue;
         }
     }
@@ -10596,9 +10706,8 @@ void SemanticsDeclBodyVisitor::visitEnumDecl(EnumDecl* decl)
             {
                 // If this happens, then the explicit tag value expression
                 // doesn't seem to be a constant after all.
-                getSink()->diagnose(
-                    Diagnostics::ExpectedIntegerConstantNotConstant{
-                        .location = explicitTagValExpr->loc});
+                getSink()->diagnose(Diagnostics::ExpectedIntegerConstantNotConstant{
+                    .location = explicitTagValExpr->loc});
             }
         }
         else
@@ -11184,10 +11293,9 @@ List<Val*> getDefaultSubstitutionArgs(
     {
         if (auto genericTypeParamDecl = as<GenericTypeParamDecl>(mm))
         {
-            args.add(
-                DeclRefType::create(
-                    astBuilder,
-                    astBuilder->getDirectDeclRef(genericTypeParamDecl)));
+            args.add(DeclRefType::create(
+                astBuilder,
+                astBuilder->getDirectDeclRef(genericTypeParamDecl)));
         }
         else if (auto genericTypePackParamDecl = as<GenericTypePackParamDecl>(mm))
         {
@@ -11300,7 +11408,7 @@ List<Val*> getDefaultSubstitutionArgs(
             }
             args.add(astBuilder->getBuiltinTypeCoercionWitness(fromType, toType));
         }
-        else if (as<NonEmptyPackConstraintDecl>(member))
+        else if (as<NonEmptyPackConstraintDecl>(decl))
         {
             args.add(astBuilder->getNonEmptyPackWitness());
         }
@@ -11506,11 +11614,10 @@ Result SemanticsVisitor::checkFuncRedeclaration(FuncDecl* newDecl, FuncDecl* old
     if (!resultType->equals(prevResultType))
     {
         // Bad redeclaration
-        getSink()->diagnose(
-            Diagnostics::FunctionRedeclarationWithDifferentReturnType{
-                .newReturnType = resultType,
-                .prevReturnType = prevResultType,
-                .decl = newDecl});
+        getSink()->diagnose(Diagnostics::FunctionRedeclarationWithDifferentReturnType{
+            .newReturnType = resultType,
+            .prevReturnType = prevResultType,
+            .decl = newDecl});
         getSink()->diagnose(Diagnostics::SeePreviousDeclarationOf{.decl = oldDecl});
 
         // Don't bother emitting other errors at this point
@@ -11780,10 +11887,9 @@ void SemanticsDeclHeaderVisitor::visitParamDecl(ParamDecl* paramDecl)
         if (!MemoryQualifierSet)
             return;
         for (auto mod : MemoryQualifierSet->getModifiers())
-            getSink()->diagnose(
-                Diagnostics::MemoryQualifierNotAllowedOnANonImageTypeParameter{
-                    .modifier = mod,
-                    .param = paramDecl});
+            getSink()->diagnose(Diagnostics::MemoryQualifierNotAllowedOnANonImageTypeParameter{
+                .modifier = mod,
+                .param = paramDecl});
     }
 }
 
@@ -12432,7 +12538,8 @@ static DeclRef<SynthesizedFuncDecl> addSynthesizedFunc(
     synFunc->irOp = opCode;
     synFunc->nameAndLoc.name = name;
 
-    populateParams(getCurrentASTBuilder(), synFunc, targetFuncType);
+    List<Expr*> synArgs;
+    populateParams(getCurrentASTBuilder(), synFunc, targetFuncType, synArgs);
     synFunc->returnType.type = targetFuncType->getResultType();
 
     if (isStatic)
@@ -12535,8 +12642,8 @@ static DeclRef<SynthesizedStructDecl> addOrExtendSynthesizedStruct(
                     auto genericDecl = synStructGenericDecls[i];
                     auto origGenericDecl = extGenericDecls[i];
                     auto substArgs = getDefaultSubstitutionArgs(astBuilder, visitor, genericDecl);
-                    auto genericSubst = SubstitutionSet(
-                        getCurrentASTBuilder()->getGenericAppDeclRef(
+                    auto genericSubst =
+                        SubstitutionSet(getCurrentASTBuilder()->getGenericAppDeclRef(
                             origGenericDecl->getDefaultDeclRef(),
                             substArgs.getArrayView(),
                             origGenericDecl->inner));
@@ -12619,11 +12726,10 @@ static DeclRef<Decl> buildQualifiedReference(SemanticsVisitor* visitor, Decl* de
         auto genericDecl = fromGenericDecls[i];
         auto origGenericDecl = genericDecls[i];
         auto substArgs = getDefaultSubstitutionArgs(astBuilder, visitor, genericDecl);
-        auto genericSubst = SubstitutionSet(
-            getCurrentASTBuilder()->getGenericAppDeclRef(
-                origGenericDecl->getDefaultDeclRef(),
-                substArgs.getArrayView(),
-                origGenericDecl->inner));
+        auto genericSubst = SubstitutionSet(getCurrentASTBuilder()->getGenericAppDeclRef(
+            origGenericDecl->getDefaultDeclRef(),
+            substArgs.getArrayView(),
+            origGenericDecl->inner));
         declRef = substituteDeclRef(genericSubst, astBuilder, declRef);
     }
 
@@ -12657,9 +12763,8 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
             {
                 if (auto modifier = paramDecl->findModifier<BorrowModifier>())
                 {
-                    getSink()->diagnose(
-                        Diagnostics::CannotUseBorrowInOnDifferentiableParameter{
-                            .modifier = modifier});
+                    getSink()->diagnose(Diagnostics::CannotUseBorrowInOnDifferentiableParameter{
+                        .modifier = modifier});
                 }
             }
         }
@@ -13101,19 +13206,19 @@ void SemanticsDeclHeaderVisitor::checkInterfaceRequirement(Decl* decl)
             getSink()->diagnose(Diagnostics::InterfaceRequirementCannotBeOverride{.decl = decl});
         }
         // [TreatAsDifferentiable] cannot be applied to an interface requirement.
-        if (decl->findModifier<TreatAsDifferentiableAttribute>())
+        if (auto treatAsDiffModifier = decl->findModifier<TreatAsDifferentiableAttribute>())
         {
-            getSink()->diagnose(
-                Diagnostics::TreatAsDifferentiableOnInterfaceRequirement{.decl = decl});
+            getSink()->diagnose(Diagnostics::TreatAsDifferentiableOnInterfaceRequirement{
+                .attr = treatAsDiffModifier});
         }
     }
     else
     {
         // [MaybeDifferentiable] can only be applied to interface requirements.
-        if (decl->findModifier<MaybeDifferentiableAttribute>())
+        if (auto maybeDiffAttr = decl->findModifier<MaybeDifferentiableAttribute>())
         {
             getSink()->diagnose(
-                Diagnostics::MaybeDifferentiableOnNonInterfaceRequirement{.decl = decl});
+                Diagnostics::MaybeDifferentiableOnNonInterfaceRequirement{.attr = maybeDiffAttr});
         }
     }
 }
@@ -13286,10 +13391,9 @@ void SemanticsVisitor::validateArrayElementTypeForVariable(VarDeclBase* varDecl)
     TypeTag elementTags = getTypeTags(elementType);
     if ((int)elementTags & (int)TypeTag::NonAddressable)
     {
-        getSink()->diagnose(
-            Diagnostics::DisallowedArrayOfNonAddressableType{
-                .elementType = elementType,
-                .location = varDecl->loc});
+        getSink()->diagnose(Diagnostics::DisallowedArrayOfNonAddressableType{
+            .elementType = elementType,
+            .location = varDecl->loc});
         return;
     }
 }
@@ -13344,10 +13448,9 @@ void SemanticsDeclBasesVisitor::_validateExtensionDeclTargetType(ExtensionDecl* 
         // Attach our extension to that type as a candidate...
         if (targetDeclRefType->getDeclRef().as<InterfaceDecl>())
         {
-            getSink()->diagnose(
-                Diagnostics::InvalidExtensionOnInterface{
-                    .type = decl->targetType.type,
-                    .typeExp = decl->targetType.exp});
+            getSink()->diagnose(Diagnostics::InvalidExtensionOnInterface{
+                .type = decl->targetType.type,
+                .typeExp = decl->targetType.exp});
             return;
         }
         else if (auto aggTypeDeclRef = targetDeclRefType->getDeclRef().as<AggTypeDecl>())
@@ -13394,10 +13497,9 @@ void SemanticsDeclBasesVisitor::_validateExtensionDeclTargetType(ExtensionDecl* 
 error:;
     if (!as<ErrorType>(decl->targetType.type))
     {
-        getSink()->diagnose(
-            Diagnostics::InvalidExtensionOnType{
-                .type = decl->targetType.type,
-                .typeExp = decl->targetType.exp});
+        getSink()->diagnose(Diagnostics::InvalidExtensionOnType{
+            .type = decl->targetType.type,
+            .typeExp = decl->targetType.exp});
     }
 }
 
@@ -13421,10 +13523,9 @@ void SemanticsDeclBasesVisitor::_validateExtensionDeclMembers(ExtensionDecl* dec
         {
             StringBuilder sb;
             printDiagnosticArg(sb, ctor->astNodeType);
-            getSink()->diagnose(
-                Diagnostics::InvalidMemberTypeInExtension{
-                    .nodeType = sb.produceString(),
-                    .decl = ctor});
+            getSink()->diagnose(Diagnostics::InvalidMemberTypeInExtension{
+                .nodeType = sb.produceString(),
+                .decl = ctor});
         }
     }
 }
@@ -13465,11 +13566,10 @@ void SemanticsDeclBasesVisitor::_validateExtensionDeclGenericParams(ExtensionDec
                 bool referencedByConstraint = genericParamsReferencedByConstraints.contains(member);
                 if (!referencedByTargetType && !referencedByConstraint)
                 {
-                    getSink()->diagnose(
-                        Diagnostics::UnreferencedGenericParamInExtension{
-                            .paramName = member->getName(),
-                            .targetType = decl->targetType.type,
-                            .decl = member});
+                    getSink()->diagnose(Diagnostics::UnreferencedGenericParamInExtension{
+                        .paramName = member->getName(),
+                        .targetType = decl->targetType.type,
+                        .decl = member});
                 }
                 else if (!referencedByTargetType && !isFromCoreModule(decl))
                 {
@@ -13524,10 +13624,9 @@ void SemanticsDeclBasesVisitor::visitExtensionDecl(ExtensionDecl* decl)
         auto baseDeclRefType = as<DeclRefType>(baseType);
         if (!baseDeclRefType)
         {
-            getSink()->diagnose(
-                Diagnostics::BaseOfExtensionMustBeInterface{
-                    .baseType = baseType,
-                    .inheritanceDecl = inheritanceDecl});
+            getSink()->diagnose(Diagnostics::BaseOfExtensionMustBeInterface{
+                .baseType = baseType,
+                .inheritanceDecl = inheritanceDecl});
             continue;
         }
 
@@ -13535,10 +13634,9 @@ void SemanticsDeclBasesVisitor::visitExtensionDecl(ExtensionDecl* decl)
         auto baseInterfaceDeclRef = baseDeclRef.as<InterfaceDecl>();
         if (!baseInterfaceDeclRef)
         {
-            getSink()->diagnose(
-                Diagnostics::BaseOfExtensionMustBeInterface{
-                    .baseType = baseType,
-                    .inheritanceDecl = inheritanceDecl});
+            getSink()->diagnose(Diagnostics::BaseOfExtensionMustBeInterface{
+                .baseType = baseType,
+                .inheritanceDecl = inheritanceDecl});
             continue;
         }
 
@@ -13885,11 +13983,10 @@ void SemanticsDeclHeaderVisitor::visitSetterDecl(SetterDecl* decl)
         }
         else
         {
-            getSink()->diagnose(
-                Diagnostics::SetAccessorParamWrongType{
-                    .actualType = actualType,
-                    .expectedType = newValueType,
-                    .param = newValueParam});
+            getSink()->diagnose(Diagnostics::SetAccessorParamWrongType{
+                .actualType = actualType,
+                .expectedType = newValueType,
+                .param = newValueParam});
         }
     }
     checkDifferentiableCallableCommon(decl);
@@ -14191,11 +14288,10 @@ void SemanticsDeclHeaderVisitor::visitIncludeDecl(IncludeDecl* decl)
     {
         // We are trying to include a file that defines a module, the user could mean "import"
         // instead.
-        getSink()->diagnose(
-            Diagnostics::IncludedFileMissingImplementingDoYouMeanImport{
-                .fileName = getText(name),
-                .moduleName = getText(moduleDeclaration->getName()),
-                .location = decl->moduleNameAndLoc.loc});
+        getSink()->diagnose(Diagnostics::IncludedFileMissingImplementingDoYouMeanImport{
+            .fileName = getText(name),
+            .moduleName = getText(moduleDeclaration->getName()),
+            .location = decl->moduleNameAndLoc.loc});
         return;
     }
 
@@ -14244,11 +14340,10 @@ void SemanticsDeclHeaderVisitor::visitIncludeDecl(IncludeDecl* decl)
                 if (normalizedName.getUnownedSlice().caseInsensitiveEquals(
                         expectedModuleNameStr.getUnownedSlice()))
                 {
-                    getSink()->diagnose(
-                        Diagnostics::ModuleImplementationHasFileExtension{
-                            .moduleName = moduleNameStr,
-                            .normalizedName = normalizedName,
-                            .location = implementing->moduleNameAndLoc.loc});
+                    getSink()->diagnose(Diagnostics::ModuleImplementationHasFileExtension{
+                        .moduleName = moduleNameStr,
+                        .normalizedName = normalizedName,
+                        .location = implementing->moduleNameAndLoc.loc});
                     return;
                 }
             }
@@ -14256,11 +14351,10 @@ void SemanticsDeclHeaderVisitor::visitIncludeDecl(IncludeDecl* decl)
             if (!moduleNameStr.getUnownedSlice().caseInsensitiveEquals(
                     expectedModuleNameStr.getUnownedSlice()))
             {
-                getSink()->diagnose(
-                    Diagnostics::IncludedFileDoesNotImplementCurrentModule{
-                        .expectedModule = expectedModuleName,
-                        .actualModule = moduleName,
-                        .location = decl->moduleNameAndLoc.loc});
+                getSink()->diagnose(Diagnostics::IncludedFileDoesNotImplementCurrentModule{
+                    .expectedModule = expectedModuleName,
+                    .actualModule = moduleName,
+                    .location = decl->moduleNameAndLoc.loc});
                 return;
             }
         }
@@ -14268,10 +14362,9 @@ void SemanticsDeclHeaderVisitor::visitIncludeDecl(IncludeDecl* decl)
         return;
     }
 
-    getSink()->diagnose(
-        Diagnostics::IncludedFileMissingImplementing{
-            .fileName = getText(name),
-            .location = decl->moduleNameAndLoc.loc});
+    getSink()->diagnose(Diagnostics::IncludedFileMissingImplementing{
+        .fileName = getText(name),
+        .location = decl->moduleNameAndLoc.loc});
 }
 
 
@@ -14317,9 +14410,8 @@ void SemanticsDeclScopeWiringVisitor::visitImplementingDecl(ImplementingDecl* de
     }
     else if (as<ImplementingDecl>(firstDeclInFile))
     {
-        getSink()->diagnose(
-            Diagnostics::ImplementingMustReferencePrimaryModuleFile{
-                .location = decl->moduleNameAndLoc.loc});
+        getSink()->diagnose(Diagnostics::ImplementingMustReferencePrimaryModuleFile{
+            .location = decl->moduleNameAndLoc.loc});
         return;
     }
 
@@ -15331,9 +15423,8 @@ OrderedDictionary<GenericTypeParamDeclBase*, List<Type*>> getCanonicalGenericCon
         }
         else
         {
-            SLANG_UNEXPECTED(
-                "Cannot extract Cannonical Generic Constraints on non DeclRefTypes. "
-                "Use getCanonicalGenericConstraints2(...) instead.");
+            SLANG_UNEXPECTED("Cannot extract Cannonical Generic Constraints on non DeclRefTypes. "
+                             "Use getCanonicalGenericConstraints2(...) instead.");
         }
     }
     OrderedDictionary<GenericTypeParamDeclBase*, List<Type*>> result;
@@ -15733,10 +15824,9 @@ void checkDerivativeAttributeImpl(
                         derivativeNextGeneric,
                         &specializedDecl))
                 {
-                    visitor->getSink()->diagnose(
-                        Diagnostics::CustomDerivativeSignatureMismatch{
-                            .expectedSignature = String{},
-                            .attr = attr->loc});
+                    visitor->getSink()->diagnose(Diagnostics::CustomDerivativeSignatureMismatch{
+                        .expectedSignature = String{},
+                        .attr = attr->loc});
                     return;
                 }
 
@@ -15773,10 +15863,9 @@ error:;
     }
     builder << ")";
 
-    visitor->getSink()->diagnose(
-        Diagnostics::CustomDerivativeSignatureMismatch{
-            .expectedSignature = builder.produceString(),
-            .attr = attr->loc});
+    visitor->getSink()->diagnose(Diagnostics::CustomDerivativeSignatureMismatch{
+        .expectedSignature = builder.produceString(),
+        .attr = attr->loc});
 }
 
 template<typename TDerivativeAttr>
@@ -16106,9 +16195,8 @@ void checkDerivativeOfAttributeImpl(
 
     if (isInterfaceRequirement(calleeFunc))
     {
-        visitor->getSink()->diagnose(
-            Diagnostics::CannotAssociateInterfaceRequirementWithDerivative{
-                .attr = derivativeOfAttr->loc});
+        visitor->getSink()->diagnose(Diagnostics::CannotAssociateInterfaceRequirementWithDerivative{
+            .attr = derivativeOfAttr->loc});
         return;
     }
     if (isInterfaceRequirement(funcDecl))
@@ -16121,11 +16209,10 @@ void checkDerivativeOfAttributeImpl(
     if (auto existingModifier = _findModifier<TDerivativeAttr>(calleeFunc))
     {
         // The primal function already has a `[*Derivative]` attribute, this is invalid.
-        visitor->getSink()->diagnose(
-            Diagnostics::DeclAlreadyHasAttribute{
-                .decl = calleeDeclRef.getDecl(),
-                .attrName = getDerivativeAttrName<TDerivativeAttr>(),
-                .attr = derivativeOfAttr->loc});
+        visitor->getSink()->diagnose(Diagnostics::DeclAlreadyHasAttribute{
+            .decl = calleeDeclRef.getDecl(),
+            .attrName = getDerivativeAttrName<TDerivativeAttr>(),
+            .attr = derivativeOfAttr->loc});
         visitor->getSink()->diagnose(
             Diagnostics::SeeDeclarationOf{.decl = calleeDeclRef.getDecl()});
     }
@@ -16199,9 +16286,13 @@ static void translateFwdDerivativeAttributeToAD2(
     auto funcAliasDecl = astBuilder->create<FuncAliasDecl>();
     funcAliasDecl->nameAndLoc.name = astBuilder->getNamePool()->getName("fwd_diff");
     visitor->addVisibilityModifier(funcAliasDecl, getDeclVisibility(funcDecl));
-    auto staticModifier = astBuilder->create<HLSLStaticModifier>();
     funcAliasDecl->targetDeclRef = userDefinedFwdDiffFunc;
-    addModifier(funcAliasDecl, staticModifier);
+
+    if (userDefinedFwdDiffFunc.getDecl()->findModifier<HLSLStaticModifier>() ||
+        (userDefinedFwdDiffFunc.as<FunctionDeclBase>() &&
+         !getTypeForThisExpr(visitor, userDefinedFwdDiffFunc.as<FunctionDeclBase>()).type))
+        addModifier(funcAliasDecl, astBuilder->create<HLSLStaticModifier>());
+
     fwdDiffExtension->addMember(funcAliasDecl);
 
     // Add the forward diff extension to the module.
@@ -16663,10 +16754,9 @@ void SemanticsDeclAttributesVisitor::checkHLSLRegisterSemantic(
     auto registerName = registerSemantic->registerName.getContent();
     if (registerName.getLength() < 1)
     {
-        getSink()->diagnose(
-            Diagnostics::InvalidHlslRegisterName{
-                .registerName = String(registerName),
-                .location = registerSemantic->registerName.getLoc()});
+        getSink()->diagnose(Diagnostics::InvalidHlslRegisterName{
+            .registerName = String(registerName),
+            .location = registerSemantic->registerName.getLoc()});
         return;
     }
 
@@ -16733,11 +16823,10 @@ void SemanticsDeclAttributesVisitor::checkHLSLRegisterSemantic(
     }
     if (!isValid)
     {
-        getSink()->diagnose(
-            Diagnostics::InvalidHlslRegisterNameForType{
-                .registerName = String(registerName),
-                .type = varType,
-                .location = registerSemantic->registerName.getLoc()});
+        getSink()->diagnose(Diagnostics::InvalidHlslRegisterNameForType{
+            .registerName = String(registerName),
+            .type = varType,
+            .location = registerSemantic->registerName.getLoc()});
     }
 }
 
@@ -17092,12 +17181,11 @@ void SemanticsDeclAttributesVisitor::visitStructDecl(StructDecl* structDecl)
         SLANG_ASSERT(thisFieldTypeWidth != 0);
         if (thisFieldWidth > thisFieldTypeWidth)
         {
-            getSink()->diagnose(
-                Diagnostics::BitFieldTooWide{
-                    .fieldWidth = (int64_t)thisFieldWidth,
-                    .type = t,
-                    .typeWidth = (int64_t)thisFieldTypeWidth,
-                    .location = v->loc});
+            getSink()->diagnose(Diagnostics::BitFieldTooWide{
+                .fieldWidth = (int64_t)thisFieldWidth,
+                .type = t,
+                .typeWidth = (int64_t)thisFieldTypeWidth,
+                .location = v->loc});
             // Not much we can do with this field, just ignore it
             continue;
         }
@@ -18138,20 +18226,18 @@ void validateStructuredBufferElementType(SemanticsVisitor* visitor, VarDeclBase*
     // Check if the element type contains recursive references
     if (containsRecursiveType(visitor, elementType))
     {
-        visitor->getSink()->diagnose(
-            Diagnostics::RecursiveTypesFoundInStructuredBuffer{
-                .type = elementType,
-                .location = varDecl->loc});
+        visitor->getSink()->diagnose(Diagnostics::RecursiveTypesFoundInStructuredBuffer{
+            .type = elementType,
+            .location = varDecl->loc});
     }
 
     // Check if the element type is NonAddressable
     TypeTag elementTags = visitor->getTypeTags(elementType);
     if ((int)elementTags & (int)TypeTag::NonAddressable)
     {
-        visitor->getSink()->diagnose(
-            Diagnostics::NonAddressableTypeInStructuredBuffer{
-                .type = elementType,
-                .location = varDecl->loc});
+        visitor->getSink()->diagnose(Diagnostics::NonAddressableTypeInStructuredBuffer{
+            .type = elementType,
+            .location = varDecl->loc});
     }
 }
 

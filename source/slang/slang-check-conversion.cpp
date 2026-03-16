@@ -1472,7 +1472,8 @@ bool SemanticsVisitor::_coerce(
                     fromBase,
                     fromExpr,
                     sink,
-                    &baseCost))
+                    &baseCost,
+                    outWitnessOfConversion))
             {
                 return false;
             }

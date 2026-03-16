@@ -265,6 +265,59 @@ public:
         }
     }
 
+    bool checkIsPtrPairMethod(
+        DifferentiableTypeConformanceContext& diffTypeContext,
+        IRFuncType* funcType)
+    {
+        // Determine if this call should use "pointer pair method" mode.
+        // If any output (out/inout/ref parameter, or return value) is a differentiable pointer type
+        // (conforms to IDifferentiablePtrType), we should not mark the call as mixed-differential
+        // so that the transposition logic won't try to reverse it (doesn't make sense for
+        // differential pointers).
+        //
+        // If we detect a differentiable pointer output but there are also any differentiable
+        // value types (either inputs or outputs, i.e. conforming to IDifferentiable), we
+        // emit a diagnostic since we cannot transpose such mixed functions.
+        //
+        bool hasDiffPtrOutput = false;
+        bool hasDiffValueType = false;
+
+        // Check all parameters for differentiable value types (inputs and outputs)
+        // and output parameters for differentiable pointer types.
+        for (UIndex ii = 0; ii < funcType->getParamCount(); ii++)
+        {
+            auto paramType = funcType->getParamType(ii);
+            bool isOutput = as<IROutParamTypeBase>(paramType) || as<IRRefParamType>(paramType);
+
+            // For outputs (out/inout/ref), get the value type from the pointer.
+            // For inputs, use the param type directly.
+            IRType* valueType;
+            if (isOutput)
+                valueType = (IRType*)as<IRPtrTypeBase>(paramType)->getValueType();
+            else
+                valueType = paramType;
+
+            // Only outputs can contribute differentiable pointer types.
+            if (isOutput && diffTypeContext.isDifferentiablePtrType(valueType))
+                hasDiffPtrOutput = true;
+
+            // Any parameter (input or output) can contribute differentiable value types.
+            if (diffTypeContext.isDifferentiableValueType(valueType))
+                hasDiffValueType = true;
+        }
+
+        // Check return type.
+        if (auto retType = funcType->getResultType())
+        {
+            if (diffTypeContext.isDifferentiablePtrType((IRType*)retType))
+                hasDiffPtrOutput = true;
+            if (diffTypeContext.isDifferentiableValueType((IRType*)retType))
+                hasDiffValueType = true;
+        }
+
+        return hasDiffPtrOutput;
+    }
+
     bool checkType(IRInst* type)
     {
         type = unwrapAttributedType(type);
@@ -539,11 +592,19 @@ public:
                 if (auto call = as<IRCall>(inst))
                 {
                     const auto callee = call->getCallee();
+
+                    DiffCheckingLevel diffLevelForCall = requiredDiffLevel;
+
+                    if (checkIsPtrPairMethod(
+                            diffTypeContext,
+                            cast<IRFuncType>(callee->getDataType())))
+                        diffLevelForCall = DiffCheckingLevel::Forward;
+
                     // If inst's type is differentiable, and it is in expectDiffInstWorkList,
-                    // then some user is expecting the result of the call to produce a derivative.
-                    // In this case we need to issue a diagnostic.
+                    // then some user is expecting the result of the call to produce a
+                    // derivative. In this case we need to issue a diagnostic.
                     if (diffTypeContext.isDifferentiableType(inst->getFullType()) &&
-                        !isDifferentiableFunc(diffTypeContext, callee, requiredDiffLevel))
+                        !isDifferentiableFunc(diffTypeContext, callee, diffLevelForCall))
                     {
                         // No need to fail here if the function is no_diff in
                         // both inputs and all outputs, this is equivalent of
@@ -553,7 +614,7 @@ public:
                         {
                             sink->diagnose(
                                 Diagnostics::LossOfDerivativeDueToCallOfNonDifferentiableFunction{
-                                    .diffLevel = requiredDiffLevel == DifferentiableLevel::Forward
+                                    .diffLevel = diffLevelForCall == DiffCheckingLevel::Forward
                                                      ? "forward"
                                                      : "backward",
                                     .funcName = getResolvedInstForDecorations(call->getCallee()),

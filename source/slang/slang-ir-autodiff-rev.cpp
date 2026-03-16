@@ -73,7 +73,7 @@ SlangResult prepareFuncForBackwardDiff(
     {
         // The function is ill-formed and never returns (such as having an infinite loop),
         // we can't possibly reverse-differentiate such functions, so we will diagnose it here.
-        getSink()->diagnose(
+        sink->diagnose(
             Diagnostics::FunctionNeverReturnsFatal{
                 .funcName = func,
                 .location = func->sourceLoc,

@@ -399,9 +399,8 @@ bool addTypeCoercionWitnessToArgs(
                 if (auto declRefTypeCoercionWitness =
                         as<DeclRefTypeCoercionWitness>(typeCoercionWitness))
                 {
-                    visitor->getSink()->diagnose(
-                        Diagnostics::SeeDefinitionOfConversionFunction{
-                            .decl = declRefTypeCoercionWitness->getDeclRef().getDecl()});
+                    visitor->getSink()->diagnose(Diagnostics::SeeDefinitionOfConversionFunction{
+                        .decl = declRefTypeCoercionWitness->getDeclRef().getDecl()});
                 }
                 visitor->getSink()->diagnose(
                     Diagnostics::SeeDefinitionOfConstraint{.decl = constraintDecl});
@@ -415,11 +414,10 @@ bool addTypeCoercionWitnessToArgs(
     {
         if (shouldEmitError)
         {
-            visitor->getSink()->diagnose(
-                Diagnostics::TypeCoerceConstraintMissingConversion{
-                    .fromType = fromType,
-                    .toType = toType,
-                    .location = maybeContext->loc});
+            visitor->getSink()->diagnose(Diagnostics::TypeCoerceConstraintMissingConversion{
+                .fromType = fromType,
+                .toType = toType,
+                .location = maybeContext->loc});
             visitor->getSink()->diagnose(
                 Diagnostics::SeeDefinitionOf{.decl = genericDeclRef.getDecl()->inner});
         }
@@ -648,9 +646,9 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
                 continue;
             }
 
-            if (solvedArgs.getCount() <= valPackParam->parameterIndex)
-                solvedArgs.setCount(valPackParam->parameterIndex + 1);
-            Val*& val = solvedArgs[valPackParam->parameterIndex].val;
+            if (solvedArgs[valPackParam->parentDecl].getCount() <= valPackParam->parameterIndex)
+                solvedArgs[valPackParam->parentDecl].setCount(valPackParam->parameterIndex + 1);
+            Val*& val = solvedArgs[valPackParam->parentDecl][valPackParam->parameterIndex].val;
 
             auto cValPack = as<ConcreteIntValPack>(c.val);
             if (cValPack)
@@ -845,7 +843,7 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
 
     DeclRef<Decl*> substDeclRef;
     for (auto _genericDecl : genericDecls)
-        for (auto constraintDecl : genericDeclRef.getDecl()->getDirectMemberDecls())
+        for (auto constraintDecl : _genericDecl->getDirectMemberDecls())
         {
             if (auto genericTypeConstraintDecl = as<GenericTypeConstraintDecl>(constraintDecl))
             {
@@ -899,7 +897,7 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
                                                            : IsSubTypeOptions::None);
                 }
 
-                if (constraintDecl->isEqualityConstraint)
+                if (genericTypeConstraintDecl->isEqualityConstraint)
                 {
                     // If constraint is an equality constraint, we need to make sure
                     // the witness is equality witness.
@@ -946,7 +944,7 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
                         genericDeclRef,
                         nullptr,
                         &constrainedGenericParams,
-                        args,
+                        args[_genericDecl],
                         false))
                 {
                     return DeclRef<Decl>();
@@ -963,19 +961,19 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
                 Val* constrainedArg = nullptr;
                 if (auto typePackDecl = as<GenericTypePackParamDecl>(constrainedPackDecl))
                 {
-                    if (typePackDecl->parameterIndex < args.getCount())
-                        constrainedArg = args[typePackDecl->parameterIndex];
+                    if (typePackDecl->parameterIndex < args[_genericDecl].getCount())
+                        constrainedArg = args[_genericDecl][typePackDecl->parameterIndex];
                 }
                 else if (auto valuePackDecl = as<GenericValuePackParamDecl>(constrainedPackDecl))
                 {
-                    if (valuePackDecl->parameterIndex < args.getCount())
-                        constrainedArg = args[valuePackDecl->parameterIndex];
+                    if (valuePackDecl->parameterIndex < args[_genericDecl].getCount())
+                        constrainedArg = args[_genericDecl][valuePackDecl->parameterIndex];
                 }
 
                 if (!constrainedArg || !isKnownNonEmptyPack(constrainedArg))
                     return DeclRef<Decl>();
 
-                args.add(m_astBuilder->getNonEmptyPackWitness());
+                args[_genericDecl].add(m_astBuilder->getNonEmptyPackWitness());
             }
         }
 

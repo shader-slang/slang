@@ -1478,6 +1478,38 @@ Type* SemanticsVisitor::tryGetDifferentialType(ASTBuilder* builder, Type* type)
 {
     if (auto ptrType = as<PtrTypeBase>(type))
     {
+        if (as<SubtypeWitness>(tryGetInterfaceConformanceWitness(
+                type,
+                builder->getDifferentiableRefInterfaceType())))
+        {
+            auto diffTypeLookupResult = lookUpMember(
+                getASTBuilder(),
+                this,
+                getName("Differential"),
+                type,
+                nullptr,
+                Slang::LookupMask::type,
+                Slang::LookupOptions::NoDeref);
+
+            diffTypeLookupResult = resolveOverloadedLookup(diffTypeLookupResult, nullptr);
+
+            if (diffTypeLookupResult.isValid())
+            {
+                SharedTypeExpr* baseTypeExpr = m_astBuilder->create<SharedTypeExpr>();
+                baseTypeExpr->base.type = type;
+                baseTypeExpr->type.type = m_astBuilder->getTypeType(type);
+
+                auto diffTypeExpr = ConstructLookupResultExpr(
+                    diffTypeLookupResult.item,
+                    baseTypeExpr,
+                    ptrType->getDeclRef().getName(),
+                    ptrType->getDeclRef().getLoc(),
+                    baseTypeExpr);
+
+                return resolveType(ExtractTypeFromTypeRepr(diffTypeExpr));
+            }
+        }
+
         auto baseDiffType = tryGetDifferentialType(builder, ptrType->getValueType());
         if (!baseDiffType)
             return nullptr;
@@ -1914,9 +1946,9 @@ void SemanticsVisitor::maybeRegisterDifferentiableTypeImplRecursive(ASTBuilder* 
             {
                 if (auto declRefType = as<DeclRefType>(type))
                     getSink()->diagnose(
-                        declRefType->getDeclRef(),
-                        Diagnostics::typeCannotConformToBothValueAndPointerDiffInterfaces,
-                        type);
+                        Diagnostics::TypeCannotConformToBothValueAndPointerDiffInterfaces{
+                            .type = type,
+                            .decl = declRefType->getDeclRef().getDecl()});
                 return;
             }
             maybeRegisterVal(
@@ -3474,9 +3506,7 @@ static Expr* convertHigherOrderExprToLookup(
     else
     {
         visitor->getSink()->diagnose(
-            resultExpr,
-            Diagnostics::internalCompilerError,
-            "Unsupported higher order invoke expression");
+            Diagnostics::InternalCompilerError{.location = resultExpr->loc});
         return resultExpr;
     }
 
@@ -3528,19 +3558,14 @@ static Expr* convertHigherOrderExprToLookup(
         else
         {
             visitor->getSink()->diagnose(
-                resultExpr,
-                Diagnostics::internalCompilerError,
-                "Could not find derivative function for operand. Operand may not be "
-                "differentiable.");
+                Diagnostics::InternalCompilerError{.location = resultExpr->loc});
             return resultExpr;
         }
     }
     else
     {
         visitor->getSink()->diagnose(
-            resultExpr,
-            Diagnostics::internalCompilerError,
-            "Higher order invoke operand did not resolve to a function");
+            Diagnostics::InternalCompilerError{.location = resultExpr->loc});
         return resultExpr;
     }
 }
@@ -4693,14 +4718,14 @@ Expr* SemanticsExprVisitor::visitFuncAsTypeExpr(FuncAsTypeExpr* expr)
     if (!declRefExpr)
     {
         // Diagnose.
-        getSink()->diagnose(expr->base, Diagnostics::expectedFunction);
+        getSink()->diagnose(Diagnostics::ExpectedFunction{.expr = expr->base});
     }
 
     auto funcDeclRef = declRefExpr->declRef.as<CallableDecl>();
     if (!funcDeclRef)
     {
         // Diagnose.
-        getSink()->diagnose(expr->base, Diagnostics::expectedFunction);
+        getSink()->diagnose(Diagnostics::ExpectedFunction{.expr = expr->base});
     }
 
     auto declRefType = DeclRefType::create(m_astBuilder, funcDeclRef);
@@ -4719,7 +4744,7 @@ Expr* SemanticsExprVisitor::visitFuncTypeOfExpr(FuncTypeOfExpr* expr)
     auto funcType = as<FuncType>(expr->base->type.type);
     if (!funcType)
     {
-        getSink()->diagnose(expr->base, Diagnostics::expectedFunction);
+        getSink()->diagnose(Diagnostics::ExpectedFunction{.expr = expr->base});
         expr->type = m_astBuilder->getErrorType();
         return expr;
     }

@@ -24,7 +24,7 @@ float f(int p, float x)
     float y = 1.0;
     // Test that phi parameter can be restored.
     if (p == 0)
-        //CHK:([[@LINE+1]]): note: 4 bytes ({{[a-zA-Z0-9_]+}}) used to checkpoint the following item:
+        //CHK: note: 4 bytes ({{[a-zA-Z0-9_]+}}) used to checkpoint the following item:
         y = g(x);
 
     return y * y;

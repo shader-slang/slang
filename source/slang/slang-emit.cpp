@@ -303,10 +303,10 @@ static void reportCheckpointIntermediates(
             continue;
 
         sink->diagnose(
-            originalFunc,
-            Diagnostics::reportCheckpointIntermediates,
-            originalFunc,
-            totalSize.size);
+            Diagnostics::ReportCheckpointIntermediates{
+                .size = (int64_t)totalSize.size,
+                .func = originalFunc,
+                .location = originalFunc->sourceLoc});
         nonEmptyFuncs++;
 
         for (auto& entry : nonZeroEntries)
@@ -319,9 +319,9 @@ static void reportCheckpointIntermediates(
 
             sink->diagnose(
                 Diagnostics::ReportCheckpointVariable{
-                    .size = (int64_t)fieldSize.size,
+                    .size = (int64_t)entrySize.size,
                     .typeName = typeWriter.getContent(),
-                    .location = field->sourceLoc});
+                    .location = entry.sourceLoc});
         }
     }
 

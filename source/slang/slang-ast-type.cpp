@@ -345,14 +345,15 @@ static Type* getEffectiveDiffPairType(Type* primalType, SubtypeWitness* diffWitn
 
         if (auto expandType = as<ExpandType>(primalType))
         {
-            List<Type*> capturedTypePacks;
-            for (Index i = 0; i < expandType->getCapturedTypePackCount(); i++)
-                capturedTypePacks.add(expandType->getCapturedTypePack(i));
+            List<Val*> capturedTypePacks;
+            for (Index i = 0; i < expandType->getCapturedPackCount(); i++)
+                capturedTypePacks.add(expandType->getCapturedPack(i));
             return astBuilder->getExpandType(diffPairEachType, capturedTypePacks.getArrayView());
         }
         else
         {
-            return astBuilder->getExpandType(diffPairEachType, makeArrayViewSingle(primalType));
+            auto primalVal = (Val*)primalType;
+            return astBuilder->getExpandType(diffPairEachType, makeArrayViewSingle(primalVal));
         }
     }
 
@@ -424,14 +425,15 @@ static Type* getDifferentialValueTypeFromWitness(
                 astBuilder->getLookupDeclRef(eachType, eachWitness, differentialTypeRequirement));
             if (auto expandType = as<ExpandType>(primalType))
             {
-                List<Type*> capturedTypePacks;
-                for (Index i = 0; i < expandType->getCapturedTypePackCount(); i++)
-                    capturedTypePacks.add(expandType->getCapturedTypePack(i));
-                return astBuilder->getExpandType(diffEachType, capturedTypePacks.getArrayView());
+                List<Val*> capturedPacks;
+                for (Index i = 0; i < expandType->getCapturedPackCount(); i++)
+                    capturedPacks.add(expandType->getCapturedPack(i));
+                return astBuilder->getExpandType(diffEachType, capturedPacks.getArrayView());
             }
             else
             {
-                return astBuilder->getExpandType(diffEachType, makeArrayViewSingle(primalType));
+                auto primalVal = (Val*)primalType;
+                return astBuilder->getExpandType(diffEachType, makeArrayViewSingle(primalVal));
             }
         }
 
@@ -473,24 +475,31 @@ Val* BwdCallableFuncType::_resolveImplOverride()
             splitParameterTypeAndDirection(astBuilder, thisParamType);
         if (auto thisTypeDiffWitness = diffTypeWitness->getThisTypeDiffWitness())
         {
-            auto diffThisType = getDifferentialValueTypeFromWitness(
-                astBuilder,
-                thisParamValueType,
-                thisTypeDiffWitness);
-            SLANG_ASSERT(diffThisType);
-            // Flip direction: In -> Out, BorrowInOut -> BorrowInOut
-            switch (thisParamDirection)
+            if (auto diffThisType = getDifferentialValueTypeFromWitness(
+                    astBuilder,
+                    thisParamValueType,
+                    thisTypeDiffWitness))
             {
-            case ParamPassingMode::In:
-                newParamTypes.add(astBuilder->getOutParamType(diffThisType));
-                break;
-            case ParamPassingMode::BorrowInOut:
-                newParamTypes.add(astBuilder->getBorrowInOutParamType(diffThisType));
-                break;
-            default:
-                // For other modes, just add as-is or with out
-                newParamTypes.add(astBuilder->getOutParamType(diffThisType));
-                break;
+                // Flip direction: In -> Out, BorrowInOut -> BorrowInOut
+                switch (thisParamDirection)
+                {
+                case ParamPassingMode::In:
+                    newParamTypes.add(astBuilder->getOutParamType(diffThisType));
+                    break;
+                case ParamPassingMode::BorrowInOut:
+                    newParamTypes.add(astBuilder->getBorrowInOutParamType(diffThisType));
+                    break;
+                default:
+                    // For other modes, just add as-is or with out
+                    newParamTypes.add(astBuilder->getOutParamType(diffThisType));
+                    break;
+                }
+            }
+            else
+            {
+                // We had a witness but not for a differentiable value type (most like diff ptr
+                // type)
+                newParamTypes.add(astBuilder->getNoneType());
             }
         }
         else if (thisParamType)
@@ -910,53 +919,104 @@ Val* FwdDiffFuncType::_resolveImplOverride()
         else if (thisParamType)
         {
             // Non-differentiable this type
-            newParamTypes.add(thisParamType);
+            newParamTypes.add(getCurrentASTBuilder()->getModifiedType(
+                thisParamType,
+                {getCurrentASTBuilder()->getNoDiffModifierVal()}));
         }
 
         for (Index i = 0; i < funcType->getParamCount(); ++i)
         {
             auto paramInfo = funcType->getParamInfo(i);
-            auto rawParamType = funcType->getParamTypeWithModeWrapper(i);
+            auto diffWitness = diffTypeWitness->getParamTypeDiffWitness(i);
 
-            if (auto diffWitness = diffTypeWitness->getParamTypeDiffWitness(i))
+            switch (paramInfo.mode)
             {
-                auto pairType = getEffectiveDiffPairType(paramInfo.type, diffWitness);
-
-                switch (paramInfo.mode)
+            case ParamPassingMode::In:
                 {
-                case ParamPassingMode::In:
-                    newParamTypes.add(pairType);
+                    if (diffWitness)
+                    {
+                        auto pairType = getEffectiveDiffPairType(paramInfo.type, diffWitness);
+                        newParamTypes.add(pairType);
+                    }
+                    else
+                    {
+                        newParamTypes.add(getCurrentASTBuilder()->getModifiedType(
+                            paramInfo.type,
+                            {getCurrentASTBuilder()->getNoDiffModifierVal()}));
+                    }
                     break;
-                case ParamPassingMode::Out:
-                    newParamTypes.add(getCurrentASTBuilder()->getOutParamType(pairType));
+                }
+            case ParamPassingMode::Out:
+                {
+                    if (diffWitness)
+                    {
+                        auto pairType = getEffectiveDiffPairType(paramInfo.type, diffWitness);
+                        newParamTypes.add(getCurrentASTBuilder()->getOutParamType(pairType));
+                    }
+                    else
+                    {
+                        newParamTypes.add(getCurrentASTBuilder()->getOutParamType(
+                            getCurrentASTBuilder()->getModifiedType(
+                                paramInfo.type,
+                                {getCurrentASTBuilder()->getNoDiffModifierVal()})));
+                    }
                     break;
-                case ParamPassingMode::BorrowInOut:
-                    newParamTypes.add(getCurrentASTBuilder()->getBorrowInOutParamType(pairType));
+                }
+            case ParamPassingMode::BorrowInOut:
+                {
+                    if (diffWitness)
+                    {
+                        auto pairType = getEffectiveDiffPairType(paramInfo.type, diffWitness);
+                        newParamTypes.add(
+                            getCurrentASTBuilder()->getBorrowInOutParamType(pairType));
+                    }
+                    else
+                    {
+                        newParamTypes.add(getCurrentASTBuilder()->getBorrowInOutParamType(
+                            getCurrentASTBuilder()->getModifiedType(
+                                paramInfo.type,
+                                {getCurrentASTBuilder()->getNoDiffModifierVal()})));
+                    }
                     break;
-                case ParamPassingMode::Ref:
+                }
+            case ParamPassingMode::Ref:
+                {
                     // do not differentiate ref params
                     newParamTypes.add(getCurrentASTBuilder()->getRefParamType(paramInfo.type));
                     break;
-                case ParamPassingMode::BorrowIn:
-                    newParamTypes.add(getCurrentASTBuilder()->getConstRefParamType(paramInfo.type));
-                    break;
-                default:
-                    SLANG_UNEXPECTED("Unhandled param passing mode");
+                }
+            case ParamPassingMode::BorrowIn:
+                {
+                    if (diffWitness)
+                    {
+                        auto pairType = getEffectiveDiffPairType(paramInfo.type, diffWitness);
+                        newParamTypes.add(getCurrentASTBuilder()->getConstRefParamType(pairType));
+                    }
+                    else
+                    {
+                        newParamTypes.add(getCurrentASTBuilder()->getConstRefParamType(
+                            getCurrentASTBuilder()->getModifiedType(
+                                paramInfo.type,
+                                {getCurrentASTBuilder()->getNoDiffModifierVal()})));
+                    }
                     break;
                 }
-
-                continue;
+            default:
+                SLANG_UNEXPECTED("Unhandled param passing mode");
+                break;
             }
-
-            // If none of the above applied, just use the original param type.
-            newParamTypes.add(rawParamType);
-            continue;
         }
 
         Type* newReturnType = funcType->getResultType();
         if (auto resultDiffWitness = diffTypeWitness->getReturnTypeDiffWitness())
         {
             newReturnType = getEffectiveDiffPairType(funcType->getResultType(), resultDiffWitness);
+        }
+        else if (!funcType->getResultType()->equals(getCurrentASTBuilder()->getVoidType()))
+        {
+            newReturnType = getCurrentASTBuilder()->getModifiedType(
+                funcType->getResultType(),
+                {getCurrentASTBuilder()->getNoDiffModifierVal()});
         }
 
         return getCurrentASTBuilder()->getFuncType(

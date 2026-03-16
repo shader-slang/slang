@@ -1,11 +1,14 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 // Test that [TreatAsDifferentiable] cannot be applied to interface requirements.
 
 interface IFoo
 {
-    // CHECK: ([[# @LINE+2]]): error 30313
     [TreatAsDifferentiable]
+/*CHECK:
+     ^^^^^^^^^^^^^^^^^^^^^ [TreatAsDifferentiable] cannot be applied to interface requirement
+     ^^^^^^^^^^^^^^^^^^^^^ '[TreatAsDifferentiable]' cannot be applied to an interface requirement; it can only be applied to concrete function definitions.
+*/
     float compute(float x);
 }
 
@@ -18,8 +21,11 @@ float bar(float x)
 
 interface IBar
 {
-    // CHECK: ([[# @LINE+2]]): error 30313
     [TreatAsDifferentiable]
+/*CHECK:
+     ^^^^^^^^^^^^^^^^^^^^^ [TreatAsDifferentiable] cannot be applied to interface requirement
+     ^^^^^^^^^^^^^^^^^^^^^ '[TreatAsDifferentiable]' cannot be applied to an interface requirement; it can only be applied to concrete function definitions.
+*/
     float genericReq<T : IFloat>(T x);
 }
 
@@ -27,7 +33,7 @@ interface IBar
 [TreatAsDifferentiable]
 float genericBar<T : IFloat>(T x)
 {
-    return float(x);
+    return x.toFloat();
 }
 
 struct Impl : IFoo
@@ -46,6 +52,6 @@ struct Impl2
     [TreatAsDifferentiable]
     float genericMethod<T : IFloat>(T x)
     {
-        return float(x);
+        return x.toFloat();
     }
 }

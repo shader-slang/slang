@@ -486,9 +486,7 @@ struct ForwardDiffTranslationContext
                 }
             default:
                 getSink()->diagnose(
-                    origArith->sourceLoc,
-                    Diagnostics::unimplemented,
-                    "this arithmetic instruction cannot be differentiated");
+                    Diagnostics::InternalCompilerError{.location = origArith->sourceLoc});
             }
         }
 
@@ -1017,6 +1015,69 @@ struct ForwardDiffTranslationContext
         }
     }
 
+    bool checkIsPtrPairMethod(IRFuncType* funcType, SourceLoc diagnosticLoc)
+    {
+        // Determine if this call should use "pointer pair method" mode.
+        // If any output (out/inout/ref parameter, or return value) is a differentiable pointer type
+        // (conforms to IDifferentiablePtrType), we should not mark the call as mixed-differential
+        // so that the transposition logic won't try to reverse it (doesn't make sense for
+        // differential pointers).
+        //
+        // If we detect a differentiable pointer output but there are also any differentiable
+        // value types (either inputs or outputs, i.e. conforming to IDifferentiable), we
+        // emit a diagnostic since we cannot transpose such mixed functions.
+        //
+        bool hasDiffPtrOutput = false;
+        bool hasDiffValueType = false;
+
+        // Check all parameters for differentiable value types (inputs and outputs)
+        // and output parameters for differentiable pointer types.
+        for (UIndex ii = 0; ii < funcType->getParamCount(); ii++)
+        {
+            auto paramType = funcType->getParamType(ii);
+            bool isOutput = as<IROutParamTypeBase>(paramType) || as<IRRefParamType>(paramType);
+
+            // For outputs (out/inout/ref), get the value type from the pointer.
+            // For inputs, use the param type directly.
+            IRType* valueType;
+            if (isOutput)
+                valueType = (IRType*)as<IRPtrTypeBase>(paramType)->getValueType();
+            else
+                valueType = paramType;
+
+            // Only outputs can contribute differentiable pointer types.
+            if (isOutput && diffTypeContext.isDifferentiablePtrType(valueType))
+                hasDiffPtrOutput = true;
+
+            // Any parameter (input or output) can contribute differentiable value types.
+            if (diffTypeContext.isDifferentiableValueType(valueType))
+                hasDiffValueType = true;
+        }
+
+        // Check return type.
+        if (auto retType = funcType->getResultType())
+        {
+            if (diffTypeContext.isDifferentiablePtrType((IRType*)retType))
+                hasDiffPtrOutput = true;
+            if (diffTypeContext.isDifferentiableValueType((IRType*)retType))
+                hasDiffValueType = true;
+        }
+
+        // If there are pointer differentiable outputs AND any differentiable value types
+        // (inputs or outputs), emit a diagnostic.
+        if (hasDiffPtrOutput && hasDiffValueType)
+        {
+            getSink()->diagnose(
+                Diagnostics::CannotMixDifferentiableValueAndPtrOutputs{.location = diagnosticLoc});
+
+            // We'll continue transcribing instead of erroring out right away since we
+            // can still generate code (it just won't be correct). The diagnostic
+            // will still disallow any final code from being generated.
+        }
+
+        return hasDiffPtrOutput;
+    }
+
     // Differentiating a call instruction here is primarily about generating
     // an appropriate call list based on whichever parameters have differentials
     // in the current transcription context.
@@ -1033,9 +1094,7 @@ struct ForwardDiffTranslationContext
             // TODO(sai): Should probably get checked in the front-end.
             //
             getSink()->diagnose(
-                origCall->sourceLoc,
-                Diagnostics::internalCompilerError,
-                "attempting to differentiate unresolved callee");
+                Diagnostics::InternalCompilerError{.location = origCall->sourceLoc});
 
             return InstPair(nullptr, nullptr);
         }
@@ -1082,8 +1141,8 @@ struct ForwardDiffTranslationContext
         {
             // Diagnose.
             getSink()->diagnose(
-                origCall->sourceLoc,
-                Diagnostics::encounteredNonDifferentiableFunctionDuringHigherOrderDiff);
+                Diagnostics::EncounteredNonDifferentiableFunctionDuringHigherOrderDiff{
+                    .location = origCall->sourceLoc});
             IRInst* primalCall = maybeCloneForPrimalInst(builder, origCall);
             return InstPair(primalCall, nullptr);
         }
@@ -1103,6 +1162,8 @@ struct ForwardDiffTranslationContext
         auto diffCalleeType = _getCalleeActualFuncType(&diffTypeContext, diffCallee);
         SLANG_ASSERT(diffCalleeType);
         SLANG_RELEASE_ASSERT(diffCalleeType->getParamCount() == origCall->getArgCount());
+
+        auto isPointerPairMethod = checkIsPtrPairMethod(calleeType, origCall->sourceLoc);
 
         auto placeholderCallee = builder->emitPoison(builder->getTypeKind());
         auto placeholderCall = builder->emitCallInst(nullptr, placeholderCallee, 0, nullptr);
@@ -1317,13 +1378,14 @@ struct ForwardDiffTranslationContext
         placeholderCall->removeAndDeallocate();
         placeholderCallee->removeAndDeallocate();
 
-        // We'll always mark the call as a mixed differential, even if the return
-        // type isn't differentiable since the call may have out-parameters
+        // We'll always mark the call as a mixed differential (unless it's a pointer pair method),
+        // even if the return type isn't differentiable since the call may have out-parameters
         // that are differentiable.
         //
         // The unzipping step will take care of splitting the call appropriately.
         //
-        argBuilder.markInstAsMixedDifferential(callInst, diffReturnType);
+        if (!isPointerPairMethod)
+            argBuilder.markInstAsMixedDifferential(callInst, diffReturnType);
 
         IRBuilder annotationBuilder(argBuilder.getModule());
         annotationBuilder.setInsertInto(argBuilder.getModule());
@@ -1516,9 +1578,9 @@ struct ForwardDiffTranslationContext
         }
 
         getSink()->diagnose(
-            origInst->sourceLoc,
-            Diagnostics::unimplemented,
-            "attempting to differentiate unhandled control flow");
+            Diagnostics::Unimplemented{
+                .feature = "attempting to differentiate unhandled control flow",
+                .location = origInst->sourceLoc});
 
         return InstPair(nullptr, nullptr);
     }
@@ -1535,9 +1597,9 @@ struct ForwardDiffTranslationContext
         }
 
         getSink()->diagnose(
-            origInst->sourceLoc,
-            Diagnostics::unimplemented,
-            "attempting to differentiate unhandled const type");
+            Diagnostics::Unimplemented{
+                .feature = "attempting to differentiate unhandled const type",
+                .location = origInst->sourceLoc});
 
         return InstPair(nullptr, nullptr);
     }
@@ -2758,9 +2820,7 @@ struct ForwardDiffTranslationContext
             cloneEnv.mapOldValToNew[origInst] != primalInst)
         {
             getSink()->diagnose(
-                origInst->sourceLoc,
-                Diagnostics::internalCompilerError,
-                "inconsistent primal instruction for original");
+                Diagnostics::InternalCompilerError{.location = origInst->sourceLoc});
         }
         else
         {
@@ -3065,9 +3125,8 @@ struct ForwardDiffTranslationContext
             }
 
             getSink()->diagnose(
-                primalType->sourceLoc,
-                Diagnostics::internalCompilerError,
-                "could not generate zero value for given type");
+                Diagnostics::InternalCompilerError{.location = primalType->sourceLoc});
+
             return nullptr;
         }
     }
@@ -3260,10 +3319,7 @@ struct ForwardDiffTranslationContext
             return pair.differential;
         }
 
-        getSink()->diagnose(
-            origInst->sourceLoc,
-            Diagnostics::internalCompilerError,
-            "failed to transcibe instruction");
+        getSink()->diagnose(Diagnostics::InternalCompilerError{.location = origInst->sourceLoc});
         return nullptr;
     }
 
@@ -3298,9 +3354,7 @@ struct ForwardDiffTranslationContext
         {
             // If we reach this statement, the instruction type is likely unhandled.
             getSink()->diagnose(
-                origInst->sourceLoc,
-                Diagnostics::unimplemented,
-                "this instruction cannot be differentiated");
+                Diagnostics::InternalCompilerError{.location = origInst->sourceLoc});
         }
 
         return result;

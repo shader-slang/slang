@@ -1307,14 +1307,16 @@ struct SpecializationContext
             //
             if (options.lowerWitnessLookups)
             {
-                iterChanged = specializeDynamicInsts(
+                bool changed = specializeDynamicInsts(
                     module,
                     targetProgram,
                     sink,
                     options.reportDynamicDispatchSites);
 
-                if (iterChanged)
+                if (changed)
                     eliminateDeadCode(module->getModuleInst());
+
+                iterChanged |= changed;
             }
 
             if (!iterChanged || sink->getErrorCount())

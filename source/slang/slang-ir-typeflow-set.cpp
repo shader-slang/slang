@@ -22,6 +22,16 @@ IRInst* upcastSet(IRBuilder* builder, IRInst* arg, IRType* destInfo)
     // composites of these insts)
     //
 
+    // If either side has attributes, we drop them for now.
+    if (as<IRAttributedType>(destInfo))
+    {
+        // Unwrap and upcast.
+        auto argBase = unwrapAttributedType(arg->getDataType());
+        auto destBase = (IRType*)unwrapAttributedType(destInfo);
+
+        return upcastSet(builder, arg, destBase);
+    }
+
     auto argInfo = arg->getDataType();
     if (!argInfo || !destInfo)
         return arg;

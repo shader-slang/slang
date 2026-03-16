@@ -1995,10 +1995,10 @@ void reportDispatchLocation(
             });
 
         sink->diagnose(
-            use->getUser()->sourceLoc,
-            Diagnostics::dynamicDispatchCodeGeneratedHere,
-            count,
-            tableElementsStr.getUnownedSlice());
+            Diagnostics::DynamicDispatchCodeGeneratedHere{
+                .count = (int64_t)count,
+                .types = tableElementsStr.produceString(),
+                .location = use->getUser()->sourceLoc});
     }
 }
 
@@ -2049,11 +2049,11 @@ void reportSpecializedDispatchLocation(
         }
 
         sink->diagnose(
-            use->getUser()->sourceLoc,
-            Diagnostics::specializedDynamicDispatchCodeGeneratedHere,
-            count,
-            tableElementsStr.getUnownedSlice(),
-            specArgsStr.getUnownedSlice());
+            Diagnostics::SpecializedDynamicDispatchCodeGeneratedHere{
+                .count = (int64_t)count,
+                .types = tableElementsStr.produceString(),
+                .specArgs = specArgsStr.produceString(),
+                .location = use->getUser()->sourceLoc});
     }
 }
 

@@ -5958,11 +5958,12 @@ struct TypeFlowSpecializationContext
                 auto contextFuncTypePtr =
                     this->callSiteFuncType.tryGetValue(InstWithContext(context, inst));
                 SLANG_ASSERT(contextFuncTypePtr);
+                auto contextFuncType = *contextFuncTypePtr;
 
                 effectiveFuncType = getEffectiveFuncTypeForDispatcher(
                     tableSet,
                     cast<IRFuncSet>(calleeSet),
-                    *contextFuncTypePtr);
+                    maybeExpandFuncType(contextFuncType));
 
                 callee = getDispatcher(tableSet, effectiveFuncType, actions, globalsWorkList);
 
@@ -6086,13 +6087,17 @@ struct TypeFlowSpecializationContext
             globalsWorkList.enqueue(callee);
         }
 
-        // If by this point, we haven't resolved our callee into a global inst (
-        // either a set or a single function), then we can't specialize it (likely unbounded)
-        //
-        if (!isGlobalInst(callee))
+        auto contextFuncTypePtr =
+            this->callSiteFuncType.tryGetValue(InstWithContext(context, inst));
+        if (!contextFuncTypePtr || !isGlobalInst(callee))
+        {
+
+            module->getContainerPool().free(&callArgs);
             return false;
+        }
 
         SLANG_ASSERT(effectiveFuncType);
+        auto contextFuncType = maybeExpandFuncType(*contextFuncTypePtr);
 
         // First, we'll legalize all operands by upcasting if necessary.
         // This needs to be done even if the callee is not a set.
@@ -6103,6 +6108,11 @@ struct TypeFlowSpecializationContext
             auto arg = inst->getArg(i);
             const auto [paramDirection, paramType] =
                 splitParameterDirectionAndType(effectiveFuncType->getParamType(i + extraArgCount));
+            if (isConcreteType(contextFuncType->getParamType(i)))
+            {
+                callArgs.add(arg);
+                continue;
+            }
 
             switch (paramDirection.kind)
             {
