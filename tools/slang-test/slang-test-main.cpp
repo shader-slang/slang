@@ -5022,6 +5022,12 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
         Index subTestIndex = testOrder[orderIdx];
         auto& testDetails = testList.tests[subTestIndex];
 
+        // When -only-synthesized is set, skip non-synthesized tests
+        if (context->options.onlySynthesized && testDetails.options.command != "COMPILE_TARGET")
+        {
+            continue;
+        }
+
         // Check that the test passes our current category mask
         if (!testPassesCategoryMask(context, testDetails.options))
         {

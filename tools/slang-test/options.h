@@ -180,6 +180,10 @@ struct Options
     /// This exercises backend code generation paths (emit HLSL, GLSL, SPIRV, etc.)
     /// without needing a GPU, improving code coverage of emit/codegen code.
     bool synthesizeCompileTargets = false;
+
+    /// When true, only run synthesized compile-target tests (skip original tests).
+    /// Implies -synthesize-compile-targets.
+    bool onlySynthesized = false;
 };
 
 #endif // OPTIONS_H_INCLUDED

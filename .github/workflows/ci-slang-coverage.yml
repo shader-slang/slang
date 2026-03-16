@@ -183,7 +183,6 @@ jobs:
           test_args=(
             "-expected-failure-list" "tests/expected-failure-github.txt"
             "-expected-failure-list" "tests/expected-failure-no-gpu.txt"
-            "-synthesize-compile-targets"
             "-skip-reference-image-generation"
             "-show-adapter-info"
             "-ignore-abort-msg"
@@ -196,8 +195,10 @@ jobs:
             test_args+=("-server-count" "${{ inputs.server-count }}")
           fi
 
-          # Run coverage with standard CI options
-          ./tools/coverage/run-coverage.sh "${test_args[@]}"
+          # --with-synthesis runs a second pass with -only-synthesized to
+          # exercise backend emit paths without a GPU. The main pass is strict
+          # (test failures are reported); the synthesis pass is tolerant.
+          ./tools/coverage/run-coverage.sh --with-synthesis "${test_args[@]}"
 
       - name: Generate Coverage Summary
         id: coverage-summary

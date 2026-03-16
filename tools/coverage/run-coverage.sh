@@ -5,10 +5,13 @@ set -e
 
 # Parse arguments
 REPORT_ONLY=false
+WITH_SYNTHESIS=false
 TEST_ARGS=()
 for arg in "$@"; do
   if [[ "$arg" == "--report-only" ]]; then
     REPORT_ONLY=true
+  elif [[ "$arg" == "--with-synthesis" ]]; then
+    WITH_SYNTHESIS=true
   else
     TEST_ARGS+=("$arg")
   fi
@@ -111,6 +114,15 @@ else
 
   # Clean up recording files (only need coverage data)
   rm -rf "$RECORD_DIR"
+
+  # Optional: run synthesized compile-target tests for backend emit coverage.
+  # These exercise code generation paths (HLSL, SPIRV, Metal, etc.) without a GPU.
+  # Failures are tolerated since some targets have known gaps.
+  if [[ "$WITH_SYNTHESIS" == "true" ]]; then
+    echo
+    echo "Running synthesized compile-target tests..."
+    "$SLANG_TEST" "${TEST_ARGS[@]}" -only-synthesized || true
+  fi
 
   # Check if any profraw files were generated
   if ! ls "$COVERAGE_DIR"/slang-test-*.profraw >/dev/null 2>&1; then
