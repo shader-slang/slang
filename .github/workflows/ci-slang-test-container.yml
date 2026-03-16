@@ -113,6 +113,19 @@ jobs:
 
           "$bin_dir/slang-test" "${slang_test_args[@]}"
 
+      - name: GPU post-test diagnostics
+        if: failure()
+        run: |
+          echo "=== GPU State ==="
+          nvidia-smi 2>&1 || echo "nvidia-smi FAILED (GPU may have crashed)"
+          echo ""
+          echo "=== GPU Memory & ECC ==="
+          nvidia-smi --query-gpu=name,driver_version,memory.used,memory.free,temperature.gpu,ecc.errors.uncorrected.volatile.total,pstate \
+            --format=csv,noheader 2>&1 || true
+          echo ""
+          echo "=== Kernel GPU Messages ==="
+          dmesg 2>/dev/null | grep -iE "nvidia|nvrm|xid|gpu|fault" | tail -50 || echo "(dmesg not available in container)"
+
       - name: Run slangc tests
         run: |
           PATH=$bin_dir:$PATH tools/slangc-test/test.sh
