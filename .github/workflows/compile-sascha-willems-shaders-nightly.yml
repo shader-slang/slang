@@ -116,7 +116,7 @@ jobs:
               "Sascha-Willems-Nightly": ":green-check-mark: Sascha Willems shader nightly status: ${{ job.status }}"
             }
         env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_SWILLEMS_VULKAN }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_SWILLEMS_VK }}
 
       - name: Failure notification
         id: slack-notify-failure
@@ -128,4 +128,4 @@ jobs:
               "Sascha-Willems-Nightly": ":alert: :alert: :alert: :alert: :alert: :alert:\nSascha Willems shader nightly status: ${{ job.status }}: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
             }
         env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_SWILLEMS_VULKAN }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_SWILLEMS_VK }}
