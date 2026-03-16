@@ -2,11 +2,13 @@ name: Trigger SlangPy CI
 
 permissions:
   contents: read
+  pull-requests: read
+  statuses: write
 
-# Manual-only trigger for now. Cross-repo dispatch to SlangPy is functional
-# but needs performance tuning before being enabled on every PR.
-# To test a PR against SlangPy, run this workflow manually and provide the
-# PR number.
+# Triggers SlangPy CI to test against SlangPy tip-of-tree.
+# Uses pull_request_target so secrets are available for fork PRs.
+# This workflow only dispatches metadata (PR number, SHA, fork status)
+# and never checks out or executes PR code.
 on:
   workflow_dispatch:
     inputs:
@@ -14,19 +16,57 @@ on:
         description: "Slang PR number to test against SlangPy"
         required: true
         type: string
+  pull_request_target:
+    branches: [master]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || inputs.pr_number }}
+  cancel-in-progress: true
 
 jobs:
   trigger-slangpy-tests:
     runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request_target' || github.event.pull_request.draft != true
 
     steps:
-      - name: Get PR info
-        id: pr
+      - name: Get PR info (manual trigger)
+        if: github.event_name == 'workflow_dispatch'
+        id: pr_manual
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          PR_SHA=$(gh api repos/${{ github.repository }}/pulls/${{ inputs.pr_number }} --jq '.head.sha')
+          PR_JSON=$(gh api repos/${{ github.repository }}/pulls/${{ inputs.pr_number }})
+          PR_SHA=$(echo "$PR_JSON" | jq -r '.head.sha')
+          PR_IS_FORK=$(echo "$PR_JSON" | jq -r '.head.repo.fork')
+          PR_HEAD_REPO=$(echo "$PR_JSON" | jq -r '.head.repo.full_name')
+          echo "number=${{ inputs.pr_number }}" >> "$GITHUB_OUTPUT"
           echo "sha=$PR_SHA" >> "$GITHUB_OUTPUT"
+          echo "is_fork_pr=$PR_IS_FORK" >> "$GITHUB_OUTPUT"
+          echo "head_repo=$PR_HEAD_REPO" >> "$GITHUB_OUTPUT"
+
+      - name: Get PR info (automatic trigger)
+        if: github.event_name == 'pull_request_target'
+        id: pr_auto
+        run: |
+          echo "number=${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
+          echo "sha=${{ github.event.pull_request.head.sha }}" >> "$GITHUB_OUTPUT"
+          echo "is_fork_pr=${{ github.event.pull_request.head.repo.fork }}" >> "$GITHUB_OUTPUT"
+          echo "head_repo=${{ github.event.pull_request.head.repo.full_name }}" >> "$GITHUB_OUTPUT"
+
+      - name: Post pending status
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: '${{ steps.pr_auto.outputs.sha || steps.pr_manual.outputs.sha }}',
+              state: 'pending',
+              context: 'SlangPy Tests',
+              description: 'SlangPy tests queued...',
+              target_url: 'https://github.com/shader-slang/slangpy/actions/workflows/ci-latest-slang.yml'
+            });
 
       - name: Trigger SlangPy CI
         uses: peter-evans/repository-dispatch@ff45666b9427631e3450c54a1bcbee4d9ff4d7c0 # v3
@@ -36,7 +76,10 @@ jobs:
           event-type: slang-pr-test
           client-payload: |
             {
-              "slang_pr_number": "${{ inputs.pr_number }}",
-              "slang_commit_sha": "${{ steps.pr.outputs.sha }}",
-              "slang_ref": "${{ steps.pr.outputs.sha }}"
+              "slang_pr_number": "${{ steps.pr_auto.outputs.number || steps.pr_manual.outputs.number }}",
+              "slang_commit_sha": "${{ steps.pr_auto.outputs.sha || steps.pr_manual.outputs.sha }}",
+              "slang_ref": "${{ steps.pr_auto.outputs.sha || steps.pr_manual.outputs.sha }}",
+              "is_fork_pr": "${{ steps.pr_auto.outputs.is_fork_pr || steps.pr_manual.outputs.is_fork_pr }}",
+              "slang_pr_head_repo": "${{ steps.pr_auto.outputs.head_repo || steps.pr_manual.outputs.head_repo }}",
+              "slang_trigger_source": "${{ github.event_name }}"
             }

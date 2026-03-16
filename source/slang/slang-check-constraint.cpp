@@ -812,13 +812,9 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
                 constrainedGenericParams.add(subDeclRefType->getDeclRef().getDecl());
             else if (auto subEachType = as<EachType>(constraintDeclRef.getDecl()->sub.type))
             {
-                if (auto elementDeclRefType = as<DeclRefType>(subEachType->getElementType()))
+                if (auto elementDeclRefType = subEachType->getElementDeclRefType())
                 {
                     constrainedGenericParams.add(elementDeclRefType->getDeclRef().getDecl());
-                }
-                else
-                {
-                    return DeclRef<Decl>();
                 }
             }
 

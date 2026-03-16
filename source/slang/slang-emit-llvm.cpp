@@ -205,7 +205,7 @@ public:
             return builder->getPointerSizeInBits();
 
         default:
-            SLANG_ASSERT_FAILURE("Unexpected type in getTypeBits!");
+            SLANG_UNIMPLEMENTED_X("Unexpected type in getTypeBits!");
         }
     }
 
@@ -1546,7 +1546,7 @@ struct LLVMEmitter
 
     static LLVMInst* _defaultOnReturnHandler(IRReturn*)
     {
-        SLANG_ASSERT_FAILURE("Unexpected terminator in global scope!");
+        SLANG_UNIMPLEMENTED_X("Unexpected terminator in global scope!");
     }
 
     // Caution! This is only for emitting things which are considered

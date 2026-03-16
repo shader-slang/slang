@@ -553,6 +553,82 @@ Val* _resolveExtractPackSubtypeWitness(TWitness* witness, bool useLast)
                ? getCurrentASTBuilder()->getLastSubtypeWitness(newSub, newSup, newPatternWitness)
                : getCurrentASTBuilder()->getFirstSubtypeWitness(newSub, newSup, newPatternWitness);
 }
+
+template<typename TWitness>
+Val* _substituteTrimPackSubtypeWitness(
+    TWitness* witness,
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff,
+    bool trimTail)
+{
+    int diff = 0;
+    auto newPatternWitness = as<SubtypeWitness>(
+        witness->getPatternTypeWitness()->substituteImpl(astBuilder, subst, &diff));
+    auto newSub = as<Type>(witness->getSub()->substituteImpl(astBuilder, subst, &diff));
+    auto newSup = as<Type>(witness->getSup()->substituteImpl(astBuilder, subst, &diff));
+    if (auto witnessPack = as<TypePackSubtypeWitness>(newPatternWitness))
+    {
+        List<SubtypeWitness*> newWitnesses;
+        Index end = trimTail ? witnessPack->getCount() - 1 : witnessPack->getCount();
+        Index start = trimTail ? 0 : 1;
+        for (Index i = start; i < end; i++)
+            newWitnesses.add(witnessPack->getWitness(i));
+        (*ioDiff)++;
+        return getCurrentASTBuilder()->getSubtypeWitnessPack(
+            newSub,
+            newSup,
+            newWitnesses.getArrayView());
+    }
+    if (!diff)
+        return witness;
+    (*ioDiff)++;
+    return trimTail ? getCurrentASTBuilder()->getTrimTailSubtypeWitness(
+                          newSub,
+                          newSup,
+                          newPatternWitness)
+                    : getCurrentASTBuilder()->getTrimHeadSubtypeWitness(
+                          newSub,
+                          newSup,
+                          newPatternWitness);
+}
+
+template<typename TWitness>
+Val* _resolveTrimPackSubtypeWitness(TWitness* witness, bool trimTail)
+{
+    int diff = 0;
+    auto newPatternWitness = as<SubtypeWitness>(witness->getPatternTypeWitness()->resolve());
+    if (newPatternWitness != witness->getPatternTypeWitness())
+        diff++;
+    auto newSub = as<Type>(witness->getSub()->resolve());
+    if (newSub != witness->getSub())
+        diff++;
+    auto newSup = as<Type>(witness->getSup()->resolve());
+    if (newSup != witness->getSup())
+        diff++;
+    if (auto witnessPack = as<TypePackSubtypeWitness>(newPatternWitness))
+    {
+        List<SubtypeWitness*> newWitnesses;
+        Index end = trimTail ? witnessPack->getCount() - 1 : witnessPack->getCount();
+        Index start = trimTail ? 0 : 1;
+        for (Index i = start; i < end; i++)
+            newWitnesses.add(witnessPack->getWitness(i));
+        return getCurrentASTBuilder()->getSubtypeWitnessPack(
+            newSub,
+            newSup,
+            newWitnesses.getArrayView());
+    }
+    if (!diff)
+        return witness;
+    return trimTail ? getCurrentASTBuilder()->getTrimTailSubtypeWitness(
+                          newSub,
+                          newSup,
+                          newPatternWitness)
+                    : getCurrentASTBuilder()->getTrimHeadSubtypeWitness(
+                          newSub,
+                          newSup,
+                          newPatternWitness);
+}
 } // namespace
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! FirstSubtypeWitness !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -595,6 +671,50 @@ Val* LastSubtypeWitness::_resolveImplOverride()
 void LastSubtypeWitness::_toTextOverride(StringBuilder& out)
 {
     out << toSlice("LastWitness(");
+    getPatternTypeWitness()->toText(out);
+    out << toSlice(")");
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TrimHeadSubtypeWitness !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+Val* TrimHeadSubtypeWitness::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    return _substituteTrimPackSubtypeWitness(this, astBuilder, subst, ioDiff, false);
+}
+
+Val* TrimHeadSubtypeWitness::_resolveImplOverride()
+{
+    return _resolveTrimPackSubtypeWitness(this, false);
+}
+
+void TrimHeadSubtypeWitness::_toTextOverride(StringBuilder& out)
+{
+    out << toSlice("TrimHeadWitness(");
+    getPatternTypeWitness()->toText(out);
+    out << toSlice(")");
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TrimTailSubtypeWitness !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+Val* TrimTailSubtypeWitness::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    return _substituteTrimPackSubtypeWitness(this, astBuilder, subst, ioDiff, true);
+}
+
+Val* TrimTailSubtypeWitness::_resolveImplOverride()
+{
+    return _resolveTrimPackSubtypeWitness(this, true);
+}
+
+void TrimTailSubtypeWitness::_toTextOverride(StringBuilder& out)
+{
+    out << toSlice("TrimTailWitness(");
     getPatternTypeWitness()->toText(out);
     out << toSlice(")");
 }

@@ -712,6 +712,16 @@ public:
         Type* superType,
         SubtypeWitness* patternWitness);
 
+    SubtypeWitness* getTrimHeadSubtypeWitness(
+        Type* subType,
+        Type* superType,
+        SubtypeWitness* patternWitness);
+
+    SubtypeWitness* getTrimTailSubtypeWitness(
+        Type* subType,
+        Type* superType,
+        SubtypeWitness* patternWitness);
+
     /// Produce a witness that `A <: C` given witnesses that `A <: B` and `B <: C`
     SubtypeWitness* getTransitiveSubtypeWitness(
         SubtypeWitness* aIsSubtypeOfBWitness,

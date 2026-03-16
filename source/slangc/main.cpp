@@ -135,15 +135,28 @@ int wmain(int argc, wchar_t** argv)
         List<String> args;
         for (int ii = 0; ii < argc; ++ii)
         {
-            args.add(String::fromWString(argv[ii]));
-        }
-        List<char const*> argBuffers;
-        for (int ii = 0; ii < argc; ++ii)
-        {
-            argBuffers.add(args[ii].getBuffer());
+            String arg = String::fromWString(argv[ii]);
+            if (arg == "-ignore-abort-msg")
+            {
+#ifdef _MSC_VER
+                // Suppress the modal dialog when
+                // an exception is thrown.
+                _set_abort_behavior(0, _WRITE_ABORT_MSG);
+#endif
+            }
+            else
+            {
+                args.add(arg);
+            }
         }
 
-        result = MAIN(argc, (char**)&argBuffers[0]);
+        // argBuffers holds raw pointers into the String buffers owned by args.
+        // args must outlive argBuffers.
+        List<char const*> argBuffers;
+        for (const auto& arg : args)
+            argBuffers.add(arg.getBuffer());
+
+        result = MAIN((int)argBuffers.getCount(), (char**)&argBuffers[0]);
     }
 
 #ifdef _MSC_VER
