@@ -54,6 +54,21 @@ grep -rn "functionName" source/
 
 **Create** `tmp/feature-name/test-coverage.md` categorizing: Basic functionality, Error handling, Edge cases, Integration.
 
+### Duplicate Detection (mandatory before writing any test)
+
+For each test you plan to write:
+1. Search for existing tests by diagnostic code:
+   `rg "30500\|pack.*param.*position" tests/ --files-with-matches`
+2. Search by scenario keyword:
+   `rg "nonempty\|pack.*query" tests/language-feature/<feature>/`
+3. Read the top candidates and compare scenarios
+4. If an existing test covers >= 80% of your planned scenario, SKIP
+   or extend the existing test instead of creating a new file
+
+Document overlap analysis in test-coverage.md:
+- "Checked against: [file1, file2]. No significant overlap."
+- or "Overlap with [file]. Extending existing test instead."
+
 ---
 
 ## Phase 3: Gap Identification
@@ -136,7 +151,7 @@ See the `slang-test-development` skill for complete test templates, syntax refer
 - **Compilation tests**: `SIMPLE(filecheck=CHECK): -target spirv`
 - **Diagnostic tests**: `DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv` (see `docs/diagnostics.md`)
 - **Interpreter tests**: `INTERPRET(filecheck=CHECK):`
-- `-shaderobj` — Use shader-object based parameter binding (preferred for new tests)
+- `-shaderobj` — Use shader-object-based parameter binding (preferred for new tests)
 
 ---
 
@@ -163,7 +178,7 @@ cmake --build --preset release --target slangc
 ## Phase 6: Bug Investigation
 
 **Decision tree**:
-```
+```text
 Test fails
 ├─ Wrong expected value → Fix test
 ├─ Wrong setup → Fix test
@@ -210,12 +225,21 @@ Create `tmp/feature-name/SUMMARY.md`:
 2. **Dead code testing**: Not checking reachability first
 3. **Test duplication**: Not checking existing coverage
 4. **Execution-only tests**: Tests that run but don't verify behavior
+5. **Testing unsupported features**: Attempting to write functional tests
+   for compiler features that are not yet implemented (e.g., constructor
+   type inference from arguments). Always verify the feature compiles
+   with a quick `slangc` invocation before writing the full test. If the
+   feature does not compile, file a bug/feature request instead of
+   writing a test.
+6. **Misleading comments**: Comments referencing wrong interface names,
+   wrong error codes, or describing behavior that does not match the
+   actual code. Always cross-check comment text against the real code.
 
 ---
 
 ## Output Structure
 
-```
+```text
 tmp/feature-name/                    # Working directory (do NOT check in)
 ├── README.md          # Feature overview
 ├── test-coverage.md   # Analysis with gap status

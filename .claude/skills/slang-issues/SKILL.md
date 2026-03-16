@@ -172,12 +172,32 @@ Do NOT list or describe the code changes themselves -- reviewers can read the di
 
 ### PR Rules
 
-1. **Label the PR**: Use `pr: non-breaking` (default) or `pr: breaking` (for ABI/language breaking changes)
+1. **Label the PR**: Use `pr: non-breaking` (default) or `pr: breaking` (for ABI/language-breaking changes)
 2. **Include tests**: Add regression tests as `.slang` files under `tests/`
 3. **Keep PRs focused**: One issue per PR when possible
 4. **Link to issue**: Reference the issue number (e.g., "Fixes #1234")
 5. **Do NOT mention AI tools** in commit messages or PR descriptions
 6. **Include technical depth**: Root cause, design rationale, trade-offs. Do not narrate the diff -- reviewers read the code themselves
+
+### Test Quality Rules (for PRs adding tests)
+
+When a PR adds test files, verify each test before committing:
+
+1. **Filename matches content**: If the test verifies "no applicable
+   generic", the file must be named accordingly, not after a different
+   scenario.
+2. **Comments match code**: All interface names, error codes, and
+   behavior descriptions in comments must match the actual code.
+3. **No dead code**: Every function, struct, or variable in the test
+   must be called or used.
+4. **No duplicates**: Search existing tests for the same scenario before
+   adding a new file. Extend existing tests when possible.
+5. **Feature verified**: For functional tests, confirm the feature
+   compiles before writing the full test. Do not test unsupported
+   features.
+6. **Diagnostic tests**: Prefer exhaustive mode. Only use
+   `non-exhaustive` when there is a documented reason.
+7. **All tests pass locally**: Run every new test before committing.
 
 ---
 
@@ -231,7 +251,7 @@ If a detailed implementation plan exists, keep it in a separate `tmp/<topic>/pla
 - [ ] Title is specific and scannable
 - [ ] Reproducer code is self-contained and minimal
 - [ ] Expected vs actual behavior is clear
-- [ ] Issue is under ~50 lines of markdown (excluding code blocks)
+- [ ] Issue is under ~50 lines of Markdown (excluding code blocks)
 - [ ] No internal implementation details in the issue body
 - [ ] Solution proposal (if any) matches confidence level
 - [ ] Checked for duplicate issues

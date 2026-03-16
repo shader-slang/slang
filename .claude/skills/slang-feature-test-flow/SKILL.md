@@ -62,7 +62,7 @@ Decompose the feature into **semantic dimensions** — each becomes an independe
 ### Decomposition Strategy
 
 Split by semantic area, NOT by test type:
-```
+```text
 Feature: generics
 ├── Sub-plan A: Type parameters on structs
 │   ├── Positive: basic usage, multiple params, nested
@@ -118,6 +118,10 @@ Add tests for [feature]: [dimension]
 
 ## Anti-overlap
 - Do NOT test [X] — covered by sub-plan [other]
+
+## Overlap with Existing Tests
+- Checked against: [list files searched]
+- No significant overlap / Extending [file] instead of creating new
 ```
 
 ### Plan Summary
@@ -154,7 +158,7 @@ Each agent receives:
 
 ### Agent Prompt
 
-```
+```text
 You are implementing tests for the Slang compiler.
 
 ## Your Sub-plan
@@ -179,10 +183,23 @@ For each test in the sub-plan:
      - Compiler bug → record bug in structured format (see below)
        For DISABLED tests: rename the //TEST directive to //DISABLE_TEST
 
-### Step 2: Format
+### Step 2: Pre-commit quality checks
+Before formatting or committing, verify EVERY test file:
+  a. Filename matches what the test actually verifies
+  b. All comments reference the correct interfaces, error codes, and
+     behavior (cross-check against actual code in the file)
+  c. No dead code: every declared function/struct/variable is used
+  d. No duplicates: search existing tests for the same scenario
+     (rg "keyword" tests/language-feature/<feature>/)
+  e. Feature support: for functional tests, confirm the feature compiles
+     with a quick slangc invocation before writing the full test
+  f. DIAGNOSTIC_TEST uses exhaustive mode unless there is a documented
+     reason for non-exhaustive; never use non-exhaustive "just in case"
+
+### Step 3: Format
 Run ./extras/formatting.sh on changed files.
 
-### Step 3: Create branch & commit
+### Step 4: Create branch & commit
 Create a dedicated branch from master for this sub-plan:
   git checkout -b <branch-name>
 Stage all new test files. Create a commit with message:
@@ -193,7 +210,7 @@ Do NOT mention AI tools in the commit message.
 The orchestrator does NOT merge agents' work into a single branch/PR.
 One sub-plan = one branch = one PR. This keeps PRs focused and reviewable.
 
-### Step 4: Mode-dependent actions
+### Step 5: Mode-dependent actions
 **Dry-run mode (default)**:
 - Do NOT push or create PRs
 - The branch stays local in the worktree
@@ -207,7 +224,7 @@ One sub-plan = one branch = one PR. This keeps PRs focused and reviewable.
   - Body: Summary of tests added + what they cover
 - Each agent is responsible for creating its own PR — do not defer to the orchestrator
 
-### Step 5: Report back
+### Step 6: Report back
 Return a structured result:
 
 BRANCH: <branch-name>
@@ -344,7 +361,7 @@ dry-run | live
 
 ## Output Structure
 
-```
+```text
 tmp/<feature>/
 ├── research.md                    # Phase 1 output
 ├── plan.md                        # Phase 2 overview

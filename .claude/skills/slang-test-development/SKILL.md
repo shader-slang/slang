@@ -64,7 +64,7 @@ void computeMain()
 - `-cpu` - Run on CPU (no GPU required)
 - `-vk` - Run on Vulkan
 - `-output-using-type` - Print typed values
-- `-shaderobj` - Use shader-object based parameter binding (preferred for new tests)
+- `-shaderobj` - Use shader-object-based parameter binding (preferred for new tests)
 - `//TEST_INPUT:` - Declare input/output buffers
 
 ### 2. Simple Compilation Tests
@@ -98,11 +98,21 @@ int foo = undefined;
 - Combined: `//CHECK: ^ warning E20101`
 
 **Exhaustive vs non-exhaustive**:
-- Default (exhaustive): test fails if any diagnostic lacks an annotation
-- `non-exhaustive` option: only checks annotated diagnostics, ignores extras
+- Default (exhaustive): test fails if any diagnostic lacks an annotation.
+  **Prefer exhaustive mode** -- it catches unexpected diagnostic changes.
+- `non-exhaustive` option: only checks annotated diagnostics, ignores extras.
+  Use ONLY when the compiler emits additional cascading diagnostics that are
+  not the focus of the test and may change between versions.
+- The test harness **rejects** `non-exhaustive` when all diagnostics are
+  already matched by annotations. Never use it "just in case".
 ```slang
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK, non-exhaustive):-target spirv
 ```
+
+**Duplicate CHECK lines**: When the compiler emits the same diagnostic
+twice (e.g., initial checking + re-checking phase), add one CHECK per
+emission. Add a brief comment at the top of the file explaining why
+duplicates are expected.
 
 **Block comments** for early columns:
 ```slang
@@ -205,6 +215,35 @@ outputBuffer[0] = 42.0;
    ```bash
    ./build/Release/bin/slang-test tests/your/test.slang
    ```
+
+## Pre-submission Checklist
+
+Before committing any test file, verify:
+
+1. **Filename matches content**: The filename must describe what the test
+   actually verifies. If it tests "no applicable generic", name it
+   `diagnose-no-applicable-generic.slang`, not `diagnose-existential.slang`.
+
+2. **Comments match code**: Verify all interface names, error codes, and
+   behavior descriptions in comments match the actual code. If a comment
+   says "requires T to conform to IArithmetic" but the constraint is
+   `IValueProvider`, the comment is wrong.
+
+3. **No dead code**: Every declared function, struct, or variable must be
+   called or used in the test. Remove or exercise unused declarations.
+
+4. **No duplicate tests**: Search existing tests before adding new ones:
+   ```bash
+   rg "keyword" tests/language-feature/<feature>/ --files-with-matches
+   ```
+   If the same scenario is already tested, extend the existing test
+   instead of creating a duplicate.
+
+5. **Feature support verified**: For functional tests, confirm the feature
+   compiles before writing the full test. Run a quick `slangc` check.
+   Do not write tests for unsupported or unimplemented features.
+
+6. **Run the test**: Every test must pass locally before committing.
 
 ## Troubleshooting
 
