@@ -66,12 +66,21 @@ of docs misses codes that use different terminology -- the generics
 feature had 22 diagnostic codes (out of 57 total) that were missed by
 doc-based keyword search.
 
+### Line/Branch Coverage Baseline (optional)
+
+Check the nightly coverage report at
+`https://shader-slang.org/slang-coverage-reports/reports/latest/linux/index.html`
+for key source files related to the feature. Record baseline coverage
+numbers in research.md and use low branch coverage as a signal for
+untested error paths. Do not use coverage % as a test-writing target.
+
 ### Output
 
 Write `tmp/<feature>/research.md`:
 - Feature overview (from spec + docs)
 - Complete list of behaviors/constraints/error conditions
 - **Complete diagnostic code table** with COVERED/UNCOVERED status
+- Coverage baseline for key source files (if checked)
 - Existing test inventory with coverage assessment
 - Known limitations or open issues
 

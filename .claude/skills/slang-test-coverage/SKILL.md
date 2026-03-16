@@ -59,6 +59,24 @@ miss codes that use different terminology.
 
 **Create** `tmp/feature-name/README.md` with feature overview, concepts, behaviors, restrictions.
 
+### Line/Branch Coverage Baseline (optional)
+
+The nightly coverage report at
+`https://shader-slang.org/slang-coverage-reports/reports/latest/linux/index.html`
+shows line and branch coverage for each compiler source file. Use it as
+a signal, not a driver:
+
+1. Identify key source files for the feature (e.g., for generics:
+   `slang-check-constraint.cpp`, `slang-ir-specialize.cpp`)
+2. Note their current line/branch coverage as a baseline
+3. After writing tests, check if coverage improved
+4. If a feature-related function has very low branch coverage, inspect
+   the uncovered branches -- they may reveal untested error paths
+
+Do NOT use line coverage % as a test-writing target. A covered line is
+not the same as a verified behavior. The diagnostic enumeration and gap
+traceability steps above are the primary drivers for what tests to write.
+
 ---
 
 ## Phase 2: Analysis
