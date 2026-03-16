@@ -103,8 +103,7 @@ class UnresolvedTypeException : public Slang::Exception
 {
 public:
     UnresolvedTypeException(slang::TypeReflection* type)
-        : Slang::Exception(
-              String("Unresolved type: ") + String(type ? type->getName() : "<null>"))
+        : Slang::Exception(String("Unresolved type: ") + String(type ? type->getName() : "<null>"))
         , m_type(type)
     {
     }
