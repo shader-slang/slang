@@ -3921,9 +3921,10 @@ struct IRExistentialTypeLegalizationContext : IRTypeLegalizationContext
     }
 };
 
-// This customization of type legalization is used to remove empty
-// structs from cpp/cuda programs if the empty type isn't used in
-// a public function signature.
+// This customization of type legalization removes empty/void types.
+// It runs after legalizeResourceTypes for all targets, and also as the
+// sole legalization pass for CPU/CUDA. Public-facing types (with layout
+// decorations) are preserved on non-Metal targets.
 struct IREmptyTypeLegalizationContext : IRTypeLegalizationContext
 {
     IREmptyTypeLegalizationContext(TargetProgram* target, IRModule* module, DiagnosticSink* sink)
