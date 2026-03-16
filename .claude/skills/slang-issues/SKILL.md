@@ -173,11 +173,12 @@ Do NOT list or describe the code changes themselves -- reviewers can read the di
 ### PR Rules
 
 1. **Label the PR**: Use `pr: non-breaking` (default) or `pr: breaking` (for ABI/language-breaking changes)
-2. **Include tests**: Add regression tests as `.slang` files under `tests/`
-3. **Keep PRs focused**: One issue per PR when possible
-4. **Link to issue**: Reference the issue number (e.g., "Fixes #1234")
-5. **Do NOT mention AI tools** in commit messages or PR descriptions
-6. **Include technical depth**: Root cause, design rationale, trade-offs. Do not narrate the diff -- reviewers read the code themselves
+2. **Assign to author**: Always use `--assignee @me` when creating PRs
+3. **Include tests**: Add regression tests as `.slang` files under `tests/`
+4. **Keep PRs focused**: One issue per PR when possible
+5. **Link to issue**: Reference the issue number (e.g., "Fixes #1234")
+6. **Do NOT mention AI tools** in commit messages or PR descriptions
+7. **Include technical depth**: Root cause, design rationale, trade-offs. Do not narrate the diff -- reviewers read the code themselves
 
 ### Test Quality Rules (for PRs adding tests)
 
@@ -256,3 +257,4 @@ If a detailed implementation plan exists, keep it in a separate `tmp/<topic>/pla
 - [ ] Solution proposal (if any) matches confidence level
 - [ ] Checked for duplicate issues
 - [ ] Test Plan section is filled in
+- [ ] Issue is assigned to author (`--assignee @me`)

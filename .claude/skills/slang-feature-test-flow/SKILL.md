@@ -271,6 +271,7 @@ One sub-plan = one branch = one PR. This keeps PRs focused and reviewable.
 - Create PR using gh pr create with:
   - Title: {title from sub-plan}
   - Label: pr: non-breaking
+  - Assignee: @me
   - Body: Summary of tests added + what they cover
 - Each agent is responsible for creating its own PR — do not defer to the orchestrator
 
@@ -359,7 +360,7 @@ slangc -target [target] test.slang
 
 **Live mode**:
 - Search existing GitHub issues for each bug
-- File new issues for confirmed new bugs using `slang-issues` bug report format
+- File new issues for confirmed new bugs using `slang-issues` bug report format with `--assignee @me`
 - Comment on existing issues with new reproducers
 - Update PR descriptions to link to filed issues
 
