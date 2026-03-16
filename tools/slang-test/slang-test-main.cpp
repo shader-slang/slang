@@ -5041,25 +5041,9 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
 static bool endsWithAllowedExtension(TestContext* /*context*/, String filePath)
 {
     char const* allowedExtensions[] = {
-        ".slang.md",
-        ".slang",
-        ".hlsl",
-        ".fx",
-        ".glsl",
-        ".vert",
-        ".frag",
-        ".geom",
-        ".tesc",
-        ".tese",
-        ".comp",
-        ".internal",
-        ".ahit",
-        ".chit",
-        ".miss",
-        ".rgen",
-        ".c",
-        ".cpp",
-        ".cu",
+        ".slang.md", ".slang", ".hlsl", ".fx",   ".glsl",     ".vert", ".frag",
+        ".geom",     ".tesc",  ".tese", ".comp", ".internal", ".ahit", ".chit",
+        ".miss",     ".rgen",  ".c",    ".cpp",  ".cu",
     };
 
     for (auto allowedExtension : allowedExtensions)

@@ -323,8 +323,7 @@ void FrontEndCompileRequest::parseTranslationUnit(TranslationUnitRequest* transl
         if (sourceFile->getPathInfo().foundPath.endsWith(".slang.md"))
         {
             auto content = sourceFile->getContent();
-            auto codeBlocks =
-                extractSlangCodeBlocks(content.begin(), content.getLength());
+            auto codeBlocks = extractSlangCodeBlocks(content.begin(), content.getLength());
             auto* sourceManager = getSourceManager();
             Scope* languageScope = getSession()->slangLanguageScope;
 
