@@ -124,7 +124,9 @@ jobs:
             --format=csv,noheader 2>&1 || true
           echo ""
           echo "=== Kernel GPU Messages ==="
-          dmesg 2>/dev/null | grep -iE "nvidia|nvrm|xid|gpu|fault" | tail -50 || echo "(dmesg not available in container)"
+          dmesg 2>/dev/null | grep -iE "nvidia|nvrm|xid|gpu|fault" | tail -50 || \
+          sudo dmesg 2>/dev/null | grep -iE "nvidia|nvrm|xid|gpu|fault" | tail -50 || \
+          echo "(dmesg not available in container)"
 
       - name: Run slangc tests
         run: |
