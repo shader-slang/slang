@@ -3179,8 +3179,7 @@ local insts = {
 	{ constexprFloatCast = { operands = { { "value" } }, hoistable = true } },
 	{ constexprCastIntToEnum = { operands = { { "value" } }, hoistable = true } },
 	{ constexprCastEnumToInt = { operands = { { "value" } }, hoistable = true } },
-	{ constexprEnumCast = { operands = { { "value" } }, hoistable = true } },
-	{ externalInterfaceLayout = { operands = { {"interfaceType"} }, hoistable = true } }
+	{ constexprEnumCast = { operands = { { "value" } }, hoistable = true } }
 }
 
 -- A function to calculate some useful properties and put it in the table,

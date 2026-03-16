@@ -1159,15 +1159,6 @@ struct TaggedUnionLoweringContext : public InstPassBase
                         auto baseInterfaceType = as<IRInterfaceType>(
                             as<IRPtrTypeBase>(baseInterfacePtr->getDataType())->getValueType());
 
-                        if (!baseInterfaceType)
-                        {
-                            baseInterfaceType = as<IRInterfaceType>(
-                                as<IRExternalInterfaceLayout>(
-                                    as<IRPtrTypeBase>(baseInterfacePtr->getDataType())
-                                        ->getValueType())
-                                    ->getInterfaceType());
-                        }
-
                         // Rewrite the load to use the original ptr and load
                         // an interface-typed object.
                         //
@@ -1871,10 +1862,6 @@ struct ExistentialLoweringContext : public InstPassBase
         // TupleType(RTTI, witness table ID, AnyValue) for regular interface types or a
         // TupleType(RTTI, witness table ID, PseudoPtr, AnyValue) for bound interface types.
         //
-        processInstsOfType<IRExternalInterfaceLayout>(
-            kIROp_ExternalInterfaceLayout,
-            [&](IRExternalInterfaceLayout* inst)
-            { inst->replaceUsesWith(inst->getInterfaceType()); });
 
         processInstsOfType<IRInterfaceType>(
             kIROp_InterfaceType,

@@ -2227,33 +2227,6 @@ struct TypeFlowSpecializationContext
                         kIROp_WitnessTableSet,
                         boundInterfaceType->getWitnessTable())));
                 }
-                else if (!isConcreteType(loadInst->getDataType()))
-                {
-                    // If we end up with a non-concrete type that is being loaded from an
-                    // external address, then we need to change any interface typed nodes into
-                    // ExternalInterfaceLayout(interfaceType) to indicate a concrete layout
-                    //
-
-                    // Stop-gap solution for just pointer types for now..
-                    // once we validate the solution, implment for other structural types as well.
-                    //
-                    /*
-                    if (auto ptrTypeBase = as<IRPtrTypeBase>(loadInst->getDataType()))
-                    {
-                        if (IRInst* interfaceType =
-                                as<IRInterfaceType>(ptrTypeBase->getValueType()))
-                        {
-                            return builder.getPtrTypeWithAddressSpace(
-                                (IRType*)builder.emitIntrinsicInst(
-                                    nullptr,
-                                    kIROp_ExternalInterfaceLayout,
-                                    1,
-                                    &interfaceType),
-                                ptrTypeBase);
-                        }
-                    }*/
-                    return none();
-                }
                 else
                 {
                     // Loading from a resource pointer that isn't a direct interface?s
@@ -2267,15 +2240,7 @@ struct TypeFlowSpecializationContext
             if (auto addrInfo = tryGetInfo(context, address))
             {
                 auto valueInfo = as<IRPtrTypeBase>(addrInfo)->getValueType();
-                if (auto extInterfaceLayout = as<IRExternalInterfaceLayout>(valueInfo))
-                {
-                    return findGlobalTables(
-                        cast<IRInterfaceType>(extInterfaceLayout->getInterfaceType()));
-                }
-                else
-                {
-                    return valueInfo;
-                }
+                return valueInfo;
             }
             else
                 return none(); // No info for the address
@@ -3522,10 +3487,7 @@ struct TypeFlowSpecializationContext
     // info for them yet (not ready to propagate). The caller should skip adding
     // the propagation edge in this case.
     //
-    IRInst* maybeGetBoundFunc(
-        IRInst* callee,
-        List<IRInst*>& paramInfos,
-        WorkQueue<WorkItem>& workQueue)
+    IRInst* maybeGetBoundFunc(IRInst* callee, List<IRInst*>& paramInfos, WorkQueue<WorkItem>&)
     {
         // Only handle direct (non-generic, non-intrinsic) functions.
         IRFunc* func = as<IRFunc>(callee);
@@ -4027,10 +3989,10 @@ struct TypeFlowSpecializationContext
             if (auto calleeFuncType = as<IRFuncType>(inst->getCallee()->getDataType()))
                 this->callSiteFuncType[InstWithContext(context, inst)] = calleeFuncType;
 
-            for (auto callee : calleeSet)
+            for (auto _callee : calleeSet)
             {
-                this->calleeRefCounts.addIfNotExists(callee, 0);
-                this->calleeRefCounts[callee]++;
+                this->calleeRefCounts.addIfNotExists(_callee, 0);
+                this->calleeRefCounts[_callee]++;
             }
         }
 
@@ -5692,7 +5654,7 @@ struct TypeFlowSpecializationContext
             {
                 if (auto funcWithBindings = as<IRFuncWithBindings>(element))
                 {
-                    for (Index i = 1; i < funcWithBindings->getOperandCount(); i++)
+                    for (UInt i = 1; i < funcWithBindings->getOperandCount(); i++)
                     {
                         if (!as<IRVoidLit>(bindings[i - 1]))
                         {
@@ -5867,8 +5829,8 @@ struct TypeFlowSpecializationContext
                     break;
                 }
             }
-            if (sb.getLength() > strlen("s_dispatch"))
-                builder.addNameHintDecoration(dispatchFunc, sb.getUnownedSlice());
+
+            builder.addNameHintDecoration(dispatchFunc, sb.getUnownedSlice());
         }
 
         return dispatchFunc;
@@ -6816,8 +6778,8 @@ struct TypeFlowSpecializationContext
         IRType* specializedType = (IRType*)getLoweredType(valInfo);
         if (ptrValType != specializedType)
         {
-            if ((as<IRInterfaceType>(ptrValType) || as<IRExternalInterfaceLayout>(ptrValType)) &&
-                !isComInterfaceType(ptrValType) && !isBuiltin(ptrValType))
+            if ((as<IRInterfaceType>(ptrValType)) && !isComInterfaceType(ptrValType) &&
+                !isBuiltin(ptrValType))
             {
                 // If we're dealing with a loading a known tagged union value from
                 // an interface-typed pointer, we'll cast the pointer itself and

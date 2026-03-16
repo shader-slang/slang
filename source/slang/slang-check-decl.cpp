@@ -3243,6 +3243,10 @@ bool SemanticsVisitor::trySynthesizeDiffContextTypeRequirementWitness(
         }
         return true;
     }
+    else
+    {
+        SLANG_UNEXPECTED("unexpected context type requirement kind");
+    }
 }
 
 bool SemanticsVisitor::trySynthesizeDifferentialAssociatedTypeRequirementWitness(
@@ -6926,15 +6930,15 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
                 // materialize those conformances.
                 {
                     bool hasFwdDerivative = false;
-                    auto lookupResult = lookUpMember(
+                    auto fwdDiffLookupResult = lookUpMember(
                         getASTBuilder(),
                         this,
                         getName("fwd_diff"),
                         DeclRefType::create(getASTBuilder(), callee),
                         getOuterScope(),
                         LookupMask::Default);
-                    lookupResult = resolveOverloadedLookup(lookupResult);
-                    if (!lookupResult.isOverloaded() && lookupResult.isValid())
+                    fwdDiffLookupResult = resolveOverloadedLookup(fwdDiffLookupResult);
+                    if (!fwdDiffLookupResult.isOverloaded() && fwdDiffLookupResult.isValid())
                         hasFwdDerivative = true;
 
                     if (hasFwdDerivative)
@@ -6947,15 +6951,15 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
 
                 {
                     bool hasBwdDerivative = false;
-                    auto lookupResult = lookUpMember(
+                    auto bwdDiffLookupResult = lookUpMember(
                         getASTBuilder(),
                         this,
                         getName("bwd_diff"),
                         DeclRefType::create(getASTBuilder(), callee),
                         getOuterScope(),
                         LookupMask::Default);
-                    lookupResult = resolveOverloadedLookup(lookupResult);
-                    if (!lookupResult.isOverloaded() && lookupResult.isValid())
+                    bwdDiffLookupResult = resolveOverloadedLookup(bwdDiffLookupResult);
+                    if (!bwdDiffLookupResult.isOverloaded() && bwdDiffLookupResult.isValid())
                         hasBwdDerivative = true;
 
                     if (hasBwdDerivative)

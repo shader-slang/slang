@@ -9244,7 +9244,6 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_MakeStorageTypeLoweringConfig:
     case kIROp_WeakUse:
     case kIROp_SPIRVLoadTexelPointerFromHeap:
-    case kIROp_ExternalInterfaceLayout:
         return false;
 
     case kIROp_UnboundedFuncElement:
