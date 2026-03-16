@@ -9783,9 +9783,12 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // FuncCallIntVal means the initializer was symbolically folded but
             // not fully evaluated (operands are spec constants or generic value
             // params). Lower via visitFuncCallIntVal which emits constexpr IR
+            // ops and propagates @SpecConst rate when any operand carries it.
+            // The raw initExpr path would emit plain ops without that rate.
+            //
             IRInst* irInitVal;
-            if (decl->val && !as<ConstantIntVal>(decl->val))
-                irInitVal = lowerSimpleVal(subContext, decl->val);
+            if (auto funcCallIntVal = as<FuncCallIntVal>(decl->val))
+                irInitVal = lowerSimpleVal(subContext, funcCallIntVal);
             else
                 irInitVal = getSimpleVal(subContext, lowerRValueExpr(subContext, initExpr));
 
