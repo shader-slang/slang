@@ -605,11 +605,10 @@ struct UntaggedUnionLoweringContext : public InstPassBase
             //
             if (sink && !canTypeBeStored(type))
             {
-                sink->diagnose(
-                    Diagnostics::TypeCannotBePackedIntoAnyValue{
-                        .type = type,
-                        .location = type->sourceLoc,
-                    });
+                sink->diagnose(Diagnostics::TypeCannotBePackedIntoAnyValue{
+                    .type = type,
+                    .location = type->sourceLoc,
+                });
             }
         }
 
@@ -1159,6 +1158,15 @@ struct TaggedUnionLoweringContext : public InstPassBase
                         auto baseInterfacePtr = inst->getPtr();
                         auto baseInterfaceType = as<IRInterfaceType>(
                             as<IRPtrTypeBase>(baseInterfacePtr->getDataType())->getValueType());
+
+                        if (!baseInterfaceType)
+                        {
+                            baseInterfaceType = as<IRInterfaceType>(
+                                as<IRExternalInterfaceLayout>(
+                                    as<IRPtrTypeBase>(baseInterfacePtr->getDataType())
+                                        ->getValueType())
+                                    ->getInterfaceType());
+                        }
 
                         // Rewrite the load to use the original ptr and load
                         // an interface-typed object.
@@ -1863,6 +1871,11 @@ struct ExistentialLoweringContext : public InstPassBase
         // TupleType(RTTI, witness table ID, AnyValue) for regular interface types or a
         // TupleType(RTTI, witness table ID, PseudoPtr, AnyValue) for bound interface types.
         //
+        processInstsOfType<IRExternalInterfaceLayout>(
+            kIROp_ExternalInterfaceLayout,
+            [&](IRExternalInterfaceLayout* inst)
+            { inst->replaceUsesWith(inst->getInterfaceType()); });
+
         processInstsOfType<IRInterfaceType>(
             kIROp_InterfaceType,
             [&](IRInterfaceType* inst)
@@ -1994,11 +2007,10 @@ void reportDispatchLocation(
                 count++;
             });
 
-        sink->diagnose(
-            Diagnostics::DynamicDispatchCodeGeneratedHere{
-                .count = (int64_t)count,
-                .types = tableElementsStr.produceString(),
-                .location = use->getUser()->sourceLoc});
+        sink->diagnose(Diagnostics::DynamicDispatchCodeGeneratedHere{
+            .count = (int64_t)count,
+            .types = tableElementsStr.produceString(),
+            .location = use->getUser()->sourceLoc});
     }
 }
 
@@ -2048,12 +2060,11 @@ void reportSpecializedDispatchLocation(
             printDiagnosticArg(specArgsStr, arg);
         }
 
-        sink->diagnose(
-            Diagnostics::SpecializedDynamicDispatchCodeGeneratedHere{
-                .count = (int64_t)count,
-                .types = tableElementsStr.produceString(),
-                .specArgs = specArgsStr.produceString(),
-                .location = use->getUser()->sourceLoc});
+        sink->diagnose(Diagnostics::SpecializedDynamicDispatchCodeGeneratedHere{
+            .count = (int64_t)count,
+            .types = tableElementsStr.produceString(),
+            .specArgs = specArgsStr.produceString(),
+            .location = use->getUser()->sourceLoc});
     }
 }
 

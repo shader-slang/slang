@@ -463,9 +463,10 @@ bool isConcreteType(IRInst* inst)
         break;
     }
 
-    if (as<IRPtrTypeBase>(inst))
+    if (auto ptrType = as<IRPtrTypeBase>(inst))
     {
-        auto ptrType = as<IRPtrTypeBase>(inst);
+        if (ptrType->getAddressSpace() == AddressSpace::UserPointer)
+            return true; // Don't refine user pointers (for now)
         return isConcreteType(ptrType->getValueType());
     }
 
@@ -823,10 +824,9 @@ struct TypeFlowSpecializationContext
 
         if (conformanceType)
         {
-            sink->diagnose(
-                Diagnostics::DynamicDispatchOnSpecializeOnlyInterface{
-                    .conformanceType = conformanceType,
-                    .location = callSiteLoc});
+            sink->diagnose(Diagnostics::DynamicDispatchOnSpecializeOnlyInterface{
+                .conformanceType = conformanceType,
+                .location = callSiteLoc});
             return SLANG_FAIL;
         }
         return SLANG_OK;
@@ -1012,34 +1012,30 @@ struct TypeFlowSpecializationContext
     {
         if (as<IRTaggedUnionType>(info1) && as<IRTaggedUnionType>(info2))
         {
-            return makeTaggedUnionType(
-                unionSet<IRWitnessTableSet>(
-                    as<IRTaggedUnionType>(info1)->getWitnessTableSet(),
-                    as<IRTaggedUnionType>(info2)->getWitnessTableSet()));
+            return makeTaggedUnionType(unionSet<IRWitnessTableSet>(
+                as<IRTaggedUnionType>(info1)->getWitnessTableSet(),
+                as<IRTaggedUnionType>(info2)->getWitnessTableSet()));
         }
 
         if (as<IRSetTagType>(info1) && as<IRSetTagType>(info2))
         {
-            return makeTagType(
-                unionSet<IRSetBase>(
-                    cast<IRSetBase>(info1->getOperand(0)),
-                    cast<IRSetBase>(info2->getOperand(0))));
+            return makeTagType(unionSet<IRSetBase>(
+                cast<IRSetBase>(info1->getOperand(0)),
+                cast<IRSetBase>(info2->getOperand(0))));
         }
 
         if (as<IRElementOfSetType>(info1) && as<IRElementOfSetType>(info2))
         {
-            return makeElementOfSetType(
-                unionSet<IRSetBase>(
-                    cast<IRSetBase>(info1->getOperand(0)),
-                    cast<IRSetBase>(info2->getOperand(0))));
+            return makeElementOfSetType(unionSet<IRSetBase>(
+                cast<IRSetBase>(info1->getOperand(0)),
+                cast<IRSetBase>(info2->getOperand(0))));
         }
 
         if (as<IRUntaggedUnionType>(info1) && as<IRUntaggedUnionType>(info2))
         {
-            return makeUntaggedUnionType(
-                unionSet<IRTypeSet>(
-                    cast<IRTypeSet>(info1->getOperand(0)),
-                    cast<IRTypeSet>(info2->getOperand(0))));
+            return makeUntaggedUnionType(unionSet<IRTypeSet>(
+                cast<IRTypeSet>(info1->getOperand(0)),
+                cast<IRTypeSet>(info2->getOperand(0))));
         }
 
         if (as<IROptionalType>(info1) && as<IROptionalNoneType>(info2))
@@ -1952,10 +1948,9 @@ struct TypeFlowSpecializationContext
             {
                 StringBuilder typeStr;
                 printDiagnosticArg(typeStr, interfaceType);
-                sink->diagnose(
-                    Diagnostics::NoTypeConformancesFoundForInterface{
-                        .interfaceType = typeStr.produceString(),
-                        .location = inst->sourceLoc});
+                sink->diagnose(Diagnostics::NoTypeConformancesFoundForInterface{
+                    .interfaceType = typeStr.produceString(),
+                    .location = inst->sourceLoc});
                 module->getContainerPool().free(&tables);
                 return none();
             }
@@ -1982,9 +1977,8 @@ struct TypeFlowSpecializationContext
 
         // Concrete case.
         if (as<IRWitnessTable>(witnessTable))
-            return makeTaggedUnionType(
-                as<IRWitnessTableSet>(
-                    builder.getSingletonSet(kIROp_WitnessTableSet, witnessTable)));
+            return makeTaggedUnionType(as<IRWitnessTableSet>(
+                builder.getSingletonSet(kIROp_WitnessTableSet, witnessTable)));
 
         // Get the witness table info
         auto witnessTableInfo = tryGetInfo(context, witnessTable);
@@ -2190,6 +2184,28 @@ struct TypeFlowSpecializationContext
             //    for the pointer, which should be of the form PtrTypeBase(valueInfo), and
             //    use the valueInfo
             //
+            auto findGlobalTables = [&](IRInterfaceType* interfaceType) -> IRInst*
+            {
+                HashSet<IRInst*>& tables = *module->getContainerPool().getHashSet<IRInst>();
+                collectExistentialTables(interfaceType, tables);
+                if (tables.getCount() > 0)
+                {
+                    auto resultTaggedUnionType = makeTaggedUnionType(
+                        as<IRWitnessTableSet>(builder.getSet(kIROp_WitnessTableSet, tables)));
+                    module->getContainerPool().free(&tables);
+                    return resultTaggedUnionType;
+                }
+                else
+                {
+                    StringBuilder typeStr;
+                    printDiagnosticArg(typeStr, interfaceType);
+                    sink->diagnose(Diagnostics::NoTypeConformancesFoundForInterface{
+                        .interfaceType = typeStr.produceString(),
+                        .location = loadInst->sourceLoc});
+                    module->getContainerPool().free(&tables);
+                    return none();
+                }
+            };
 
             if (isResourcePointer(loadInst->getPtr()))
             {
@@ -2197,27 +2213,7 @@ struct TypeFlowSpecializationContext
                 {
                     if (!isComInterfaceType(interfaceType))
                     {
-                        HashSet<IRInst*>& tables = *module->getContainerPool().getHashSet<IRInst>();
-                        collectExistentialTables(interfaceType, tables);
-                        if (tables.getCount() > 0)
-                        {
-                            auto resultTaggedUnionType = makeTaggedUnionType(
-                                as<IRWitnessTableSet>(
-                                    builder.getSet(kIROp_WitnessTableSet, tables)));
-                            module->getContainerPool().free(&tables);
-                            return resultTaggedUnionType;
-                        }
-                        else
-                        {
-                            StringBuilder typeStr;
-                            printDiagnosticArg(typeStr, interfaceType);
-                            sink->diagnose(
-                                Diagnostics::NoTypeConformancesFoundForInterface{
-                                    .interfaceType = typeStr.produceString(),
-                                    .location = loadInst->sourceLoc});
-                            module->getContainerPool().free(&tables);
-                            return none();
-                        }
+                        return findGlobalTables(interfaceType);
                     }
                     else
                     {
@@ -2227,14 +2223,40 @@ struct TypeFlowSpecializationContext
                 else if (
                     auto boundInterfaceType = as<IRBoundInterfaceType>(loadInst->getDataType()))
                 {
-                    return makeTaggedUnionType(
-                        cast<IRWitnessTableSet>(builder.getSingletonSet(
-                            kIROp_WitnessTableSet,
-                            boundInterfaceType->getWitnessTable())));
+                    return makeTaggedUnionType(cast<IRWitnessTableSet>(builder.getSingletonSet(
+                        kIROp_WitnessTableSet,
+                        boundInterfaceType->getWitnessTable())));
+                }
+                else if (!isConcreteType(loadInst->getDataType()))
+                {
+                    // If we end up with a non-concrete type that is being loaded from an
+                    // external address, then we need to change any interface typed nodes into
+                    // ExternalInterfaceLayout(interfaceType) to indicate a concrete layout
+                    //
+
+                    // Stop-gap solution for just pointer types for now..
+                    // once we validate the solution, implment for other structural types as well.
+                    //
+                    /*
+                    if (auto ptrTypeBase = as<IRPtrTypeBase>(loadInst->getDataType()))
+                    {
+                        if (IRInst* interfaceType =
+                                as<IRInterfaceType>(ptrTypeBase->getValueType()))
+                        {
+                            return builder.getPtrTypeWithAddressSpace(
+                                (IRType*)builder.emitIntrinsicInst(
+                                    nullptr,
+                                    kIROp_ExternalInterfaceLayout,
+                                    1,
+                                    &interfaceType),
+                                ptrTypeBase);
+                        }
+                    }*/
+                    return none();
                 }
                 else
                 {
-                    // Loading from a resource pointer that isn't an interface?
+                    // Loading from a resource pointer that isn't a direct interface?s
                     // Just return no info.
                     return none();
                 }
@@ -2243,7 +2265,18 @@ struct TypeFlowSpecializationContext
             // If the load is from a pointer, we can transfer the info directly
             auto address = as<IRLoad>(loadInst)->getPtr();
             if (auto addrInfo = tryGetInfo(context, address))
-                return as<IRPtrTypeBase>(addrInfo)->getValueType();
+            {
+                auto valueInfo = as<IRPtrTypeBase>(addrInfo)->getValueType();
+                if (auto extInterfaceLayout = as<IRExternalInterfaceLayout>(valueInfo))
+                {
+                    return findGlobalTables(
+                        cast<IRInterfaceType>(extInterfaceLayout->getInterfaceType()));
+                }
+                else
+                {
+                    return valueInfo;
+                }
+            }
             else
                 return none(); // No info for the address
         }
@@ -2278,10 +2311,9 @@ struct TypeFlowSpecializationContext
             }
             else if (auto boundInterfaceType = as<IRBoundInterfaceType>(inst->getDataType()))
             {
-                return makeTaggedUnionType(
-                    cast<IRWitnessTableSet>(builder.getSingletonSet(
-                        kIROp_WitnessTableSet,
-                        boundInterfaceType->getWitnessTable())));
+                return makeTaggedUnionType(cast<IRWitnessTableSet>(builder.getSingletonSet(
+                    kIROp_WitnessTableSet,
+                    boundInterfaceType->getWitnessTable())));
             }
         }
 
@@ -3109,10 +3141,9 @@ struct TypeFlowSpecializationContext
             {
                 StringBuilder sb;
                 printDiagnosticArg(sb, uninitElement->getOperand(0));
-                sink->diagnose(
-                    Diagnostics::DynamicDispatchOnPotentiallyUninitializedExistential{
-                        .object = sb.produceString(),
-                        .location = inst->sourceLoc});
+                sink->diagnose(Diagnostics::DynamicDispatchOnPotentiallyUninitializedExistential{
+                    .object = sb.produceString(),
+                    .location = inst->sourceLoc});
 
                 return none(); // We'll return none so that the analysis doesn't
                                // crash early, before we can detect the error count
@@ -3173,10 +3204,9 @@ struct TypeFlowSpecializationContext
         if (isComInterfaceType(inst->getOperand(0)->getDataType()))
         {
             IRBuilder builder(module);
-            return makeUntaggedUnionType(
-                cast<IRTypeSet>(builder.getSingletonSet(
-                    kIROp_TypeSet,
-                    builder.getUnboundedTypeElement(inst->getOperand(0)->getDataType()))));
+            return makeUntaggedUnionType(cast<IRTypeSet>(builder.getSingletonSet(
+                kIROp_TypeSet,
+                builder.getUnboundedTypeElement(inst->getOperand(0)->getDataType()))));
         }
 
         auto operandInfo = tryGetInfo(context, operand);
@@ -3321,9 +3351,8 @@ struct TypeFlowSpecializationContext
                                     elementOfSetType->getSet()->tryGetUnboundedElement())
                             {
                                 IRBuilder builder(module);
-                                return makeUntaggedUnionType(
-                                    cast<IRTypeSet>(
-                                        builder.getSingletonSet(kIROp_TypeSet, unboundedElement)));
+                                return makeUntaggedUnionType(cast<IRTypeSet>(
+                                    builder.getSingletonSet(kIROp_TypeSet, unboundedElement)));
                             }
                             else
                                 return makeUntaggedUnionType(
@@ -3738,9 +3767,6 @@ struct TypeFlowSpecializationContext
                 {
                     func = cast<IRFunc>(context);
 
-                    // Initialize the first block parameters
-                    initializeFirstBlockParameters(context, func);
-
                     // Add all blocks to the work queue
                     for (auto block = func->getFirstBlock(); block; block = block->getNextBlock())
                         workQueue.enqueue(WorkItem(context, block));
@@ -3814,9 +3840,6 @@ struct TypeFlowSpecializationContext
                         }
                     }
 
-                    // Initialize the first block parameters
-                    initializeFirstBlockParameters(context, func);
-
                     // Add all blocks to the work queue for an initial sweep
                     for (auto block = generic->getFirstBlock(); block;
                          block = block->getNextBlock())
@@ -3834,9 +3857,6 @@ struct TypeFlowSpecializationContext
 
                     if (this->uniqueDefs.add(func))
                         expandArgPacksInFunc(func);
-
-                    // Initialize the first block parameters
-                    initializeFirstBlockParameters(context, func);
 
                     // Initialize parameter infos from the bindings
                     initializeBindingsForFuncWithBindings(funcWithBindings, func, workQueue);
@@ -6014,10 +6034,9 @@ struct TypeFlowSpecializationContext
                         genericName = nameHint->getName();
                     else
                         genericName = "<generic>";
-                    sink->diagnose(
-                        Diagnostics::CannotSpecializeGenericWithExistential{
-                            .generic = genericName,
-                            .location = inst->sourceLoc});
+                    sink->diagnose(Diagnostics::CannotSpecializeGenericWithExistential{
+                        .generic = genericName,
+                        .location = inst->sourceLoc});
                     return false;
                 }
                 else
@@ -6797,8 +6816,8 @@ struct TypeFlowSpecializationContext
         IRType* specializedType = (IRType*)getLoweredType(valInfo);
         if (ptrValType != specializedType)
         {
-            if (as<IRInterfaceType>(ptrValType) && !isComInterfaceType(ptrValType) &&
-                !isBuiltin(ptrValType))
+            if ((as<IRInterfaceType>(ptrValType) || as<IRExternalInterfaceLayout>(ptrValType)) &&
+                !isComInterfaceType(ptrValType) && !isBuiltin(ptrValType))
             {
                 // If we're dealing with a loading a known tagged union value from
                 // an interface-typed pointer, we'll cast the pointer itself and

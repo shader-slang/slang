@@ -3263,7 +3263,7 @@ IRInst* IRBuilder::tryLookupAnnotation(IRInst* target, AnnotationKind kind)
         return nullptr;
 
     AnnotationCacheKey key = {target, kind};
-    if (IRAnnotation* cachedResult;
+    if (IRAnnotation * cachedResult;
         getModule()->getAnnotationLookupCache()->tryGetValue(key, cachedResult))
     {
         if (!cachedResult)
@@ -9244,6 +9244,7 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_MakeStorageTypeLoweringConfig:
     case kIROp_WeakUse:
     case kIROp_SPIRVLoadTexelPointerFromHeap:
+    case kIROp_ExternalInterfaceLayout:
         return false;
 
     case kIROp_UnboundedFuncElement:
