@@ -2370,6 +2370,15 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
 
     if (auto sizeOfLikeExpr = expr.as<SizeOfLikeExpr>())
     {
+        // sizedType is populated by visitSizeOfLikeExpr during expression visiting,
+        // which may not have run yet if we are constant-folding during header checking.
+        // Check the expression now to ensure it is populated.
+        if (!sizeOfLikeExpr.getExpr()->sizedType)
+            CheckTerm(sizeOfLikeExpr.getExpr());
+
+        if (!sizeOfLikeExpr.getExpr()->sizedType)
+            return nullptr;
+
         auto type = as<Type>(
             sizeOfLikeExpr.getExpr()->sizedType->substitute(m_astBuilder, expr.getSubsts()));
 
