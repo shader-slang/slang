@@ -316,13 +316,6 @@ struct TupleTypeBuilder
 
     List<PairInfo::Element> pairElements;
 
-    // When true, void-typed fields are skipped entirely (the original
-    // behavior needed by legalizeEmptyTypes to collapse void-only
-    // structs). When false, void fields flow through as ordinary
-    // fields so that PairInfo stays consistent during resource
-    // legalization.
-    bool skipVoidFields = false;
-
     // Did we have any fields that forced us to change
     // the actual type away from the declared type?
     bool anyComplex = false;
@@ -365,7 +358,8 @@ struct TupleTypeBuilder
                 // skipped so that void-only structs collapse to none.
                 // During resource legalization we keep them as ordinary
                 // so that PairInfo stays consistent.
-                if (skipVoidFields && legalLeafType.getSimple()->getOp() == kIROp_VoidType)
+                if (context->shouldSkipVoidFields() &&
+                    legalLeafType.getSimple()->getOp() == kIROp_VoidType)
                     return;
             }
             break;
@@ -1442,7 +1436,6 @@ LegalType legalizeTypeImpl(TypeLegalizationContext* context, IRType* type)
         builder.context = context;
         builder.type = type;
         builder.originalStructType = structType;
-        builder.skipVoidFields = context->shouldSkipVoidFields();
 
         for (auto ff : structType->getFields())
         {
@@ -1458,11 +1451,16 @@ LegalType legalizeTypeImpl(TypeLegalizationContext* context, IRType* type)
         if (legalElementType.flavor == LegalType::Flavor::simple)
         {
             // An array of void (e.g. from a zero-length array whose element
-            // was legalized away) legalizes to simple void, not none.
-            // This keeps type legalization consistent; a follow-up
-            // legalizeEmptyTypes pass cleans up remaining void values.
+            // was legalized away) legalizes to simple void during resource
+            // legalization so PairInfo stays consistent. During empty-type
+            // legalization it collapses to none so void-only structs are
+            // removed.
             if (legalElementType.getSimple()->getOp() == kIROp_VoidType)
+            {
+                if (context->shouldSkipVoidFields())
+                    return LegalType();
                 return LegalType::simple(legalElementType.getSimple());
+            }
 
             // If element type hasn't change, return original type.
             if (legalElementType.getSimple() == arrayType->getElementType())
