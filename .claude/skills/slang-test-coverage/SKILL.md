@@ -221,6 +221,9 @@ See the `slang-test-development` skill for complete test templates, syntax refer
 **Naming**: `feature-scenario.slang` or `diagnose-error-condition.slang`
 
 ```bash
+# Configure (required at least once per build dir)
+cmake --preset default
+
 # Build if needed
 cmake --build --preset release --target slangc
 

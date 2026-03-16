@@ -7,7 +7,7 @@ description: Orchestrator that researches a language feature, produces a test pl
 
 **For**: End-to-end test coverage for a Slang language feature — from research through parallel test implementation to bug triage.
 
-**Usage**: `/slang-feature-test-flow <feature-name> [--dry-run] [--max-agents N] [--reference-url URL]`
+**Usage**: `/slang-feature-test-flow <feature-name> [--dry-run | --live] [--max-agents N] [--reference-url URL]`
 
 - `--dry-run` (default): Local branches + local bug files, no PRs or GitHub issues filed
 - `--live`: Push branches, create PRs, file GitHub issues

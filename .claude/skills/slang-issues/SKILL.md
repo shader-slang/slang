@@ -63,7 +63,7 @@ slangc -target [target] test.slang
 
 1. **Reproducer is mandatory** -- self-contained, minimal code that anyone can copy-paste and compile
 2. **Use `slangc` single-dash options** -- `-target spirv` not `--target spirv`, `-dump-ir` not `--dump-ir`
-3. **State the target** -- many bugs are target-specific (SPIRV has most bugs at 242, followed by GLSL at 149, HLSL at 120)
+3. **State the target** -- many bugs are target-specific (SPIRV is most common, followed by GLSL and HLSL)
 4. **Include actual error output** -- paste the exact error message or crash output
 5. **Do NOT include internal analysis** in the issue body (root cause analysis, file locations, line numbers belong in a separate plan document or PR description, not the issue)
 6. **Keep it short** -- a maintainer should understand the problem in under 60 seconds
@@ -161,7 +161,7 @@ When creating a PR for a fix or feature:
 Include file names, function names, and reasoning for the chosen approach.
 Mention alternative approaches considered and why they were rejected.
 This is where implementation-level analysis belongs -- not in the issue.
-Do NOT list or describe the code changes themselves -- reviewers can read the diff.]
+Do not narrate the diff line by line -- reviewers read the code themselves.]
 
 ## Test Plan
 [How this was tested]
@@ -226,16 +226,16 @@ Titles should be scannable and specific. Follow patterns from existing issues:
 
 ## Common Slang Issue Patterns
 
-Based on analysis of 3,659 issues, these are the most common categories:
+These are the most common categories:
 
 | Pattern | Frequency | Notes |
 |---------|-----------|-------|
-| SPIRV validation errors | 242 bugs | Most common. Include `SLANG_RUN_SPIRV_VALIDATION=1` output |
-| ICE (Internal Compiler Error) | 460 issues | Error 99999 with exception. Always a bug |
+| SPIRV validation errors | Most common | Include `SLANG_RUN_SPIRV_VALIDATION=1` output |
+| ICE (Internal Compiler Error) | Very common | Error 99999 with exception. Always a bug |
 | Wrong codegen | Common | Include expected vs actual output comparison |
-| Missing HLSL compatibility | 120 bugs | Reference HLSL spec or DXC behavior |
-| Generics/interface issues | 82 bugs | Often complex interactions, be cautious with solutions |
-| Diagnostic quality | 101 issues | User-facing error messages need improvement |
+| Missing HLSL compatibility | Common | Reference HLSL spec or DXC behavior |
+| Generics/interface issues | Common | Often complex interactions, be cautious with solutions |
+| Diagnostic quality | Common | User-facing error messages need improvement |
 
 ---
 
