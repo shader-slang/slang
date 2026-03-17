@@ -1,4 +1,5 @@
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj -output-using-type
 
 // Verify that generic constructor type parameters are inferred
 // from the argument types at the call site without explicit specialization.
@@ -39,8 +40,13 @@ void computeMain()
     // CHECK: 24
     outputBuffer[1] = acc2.result;
 
-    // T inferred as int8_t, U inferred as int16_t
+    // T inferred as int8_t, U inferred as int16_t (multi-parameter inference)
     Pair p = Pair(int8_t(10), int16_t(20));
     // CHECK: 30
     outputBuffer[2] = p.sum;
+
+    // T inferred as int64_t, U inferred as int16_t (wide integer inference)
+    Pair p2 = Pair(int64_t(100), int16_t(7));
+    // CHECK: 107
+    outputBuffer[3] = p2.sum;
 }
