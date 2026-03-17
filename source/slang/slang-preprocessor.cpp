@@ -1997,6 +1997,14 @@ Token MacroInvocation::_readTokenImpl()
                 token.flags |= TokenFlag::AtStartOfLine;
                 m_isStartOfLine = false;
             }
+            // For tokens that come directly from a macro body (RawSpan), record the
+            // macro invocation location so that user-facing diagnostics can point to
+            // where the macro was used rather than where it was defined.
+            if (m_macroInvocationLoc.isValid() &&
+                m_macro->ops[tokenOpIndex].opcode == MacroDefinition::Opcode::RawSpan)
+            {
+                token.macroInvocationLoc = m_macroInvocationLoc;
+            }
             return token;
         }
 
@@ -2026,6 +2034,14 @@ Token MacroInvocation::_readTokenImpl()
             {
                 token.flags |= TokenFlag::AtStartOfLine;
                 m_isStartOfLine = false;
+            }
+            // For tokens that come directly from a macro body (RawSpan), record the
+            // macro invocation location.
+            if (token.type != TokenType::EndOfFile && m_macroInvocationLoc.isValid() &&
+                tokenOpIndex < m_macro->ops.getCount() &&
+                m_macro->ops[tokenOpIndex].opcode == MacroDefinition::Opcode::RawSpan)
+            {
+                token.macroInvocationLoc = m_macroInvocationLoc;
             }
             return token;
         }
@@ -4820,6 +4836,11 @@ static Token ReadToken(Preprocessor* preprocessor)
         }
 
         expansionStream->readToken();
+        // If the token came from a macro body (RawSpan op), use the macro invocation
+        // location for user-facing diagnostics so that errors point to the use site
+        // rather than the macro definition site.
+        if (token.macroInvocationLoc.isValid())
+            token.loc = token.macroInvocationLoc;
         return token;
     }
 }

@@ -14,10 +14,10 @@ PASTE(flo,at) bar() { return 0.0; }
 // no space before parens? not a function-like macro
 
 #define M (x) - (x)
-//diag:    ^ undefined identifier
-//diag:    ^ undefined identifier 'x'.
-//diag:          ^ undefined identifier
-//diag:          ^ undefined identifier 'x'.
 
-// Error: undefined identifier `x`
+// Error: undefined identifier `x` - errors point to the macro use site (M invocation)
 float bar(float a) { return M(a); }
+//diag:                     ^ undefined identifier
+//diag:                     ^ undefined identifier 'x'.
+//diag:                     ^ undefined identifier
+//diag:                     ^ undefined identifier 'x'.

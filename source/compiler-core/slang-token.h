@@ -38,6 +38,10 @@ public:
     TokenFlags flags = 0;
 
     SourceLoc loc;
+    /// When this token came from a macro body (RawSpan op) expansion, this holds
+    /// the location where the macro was invoked. Used to improve error messages by
+    /// pointing to the use site rather than the macro definition site. Zero if unset.
+    SourceLoc macroInvocationLoc;
     uint32_t charsCount = 0; ///< Amount of characters. Is set if name or not.
 
     union CharsNameUnion
