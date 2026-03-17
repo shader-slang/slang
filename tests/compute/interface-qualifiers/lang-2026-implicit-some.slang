@@ -7,7 +7,7 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -lang slang -std 2026 -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=CHECK_HLSL): -target hlsl -lang slang -std 2026 -stage compute -entry computeMain
 
-dyn interface IFoo
+interface IFoo
 {
     int get();
 }

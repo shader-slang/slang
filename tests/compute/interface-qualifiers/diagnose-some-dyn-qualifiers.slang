@@ -20,15 +20,15 @@ struct A : IFoo
 // `dyn` as function modifier is rejected.
 dyn IFoo globalFunc() { return A(); }
 /*CHECK:
-^^^ E31201
-^^^ E31201
+^^^ modifier not allowed
+^^^ modifier 'dyn' is not allowed here.
 */
 
 // `dyn` on struct declarations is rejected.
 dyn struct BadStruct
 /*CHECK:
-^^^ E31201
-^^^ E31201
+^^^ modifier not allowed
+^^^ modifier 'dyn' is not allowed here.
 */
 {
     int x;
@@ -37,8 +37,8 @@ dyn struct BadStruct
 // `dyn` on enum declarations is rejected.
 dyn enum BadEnum
 /*CHECK:
-^^^ E31201
-^^^ E31201
+^^^ modifier not allowed
+^^^ modifier 'dyn' is not allowed here.
 */
 {
     Val1,
