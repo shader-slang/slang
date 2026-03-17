@@ -3747,6 +3747,20 @@ err(
     span { loc = "location", message = "'~fromType:Type' is not convertible to '~toType:Type', not satisfying the type coerce constraint '~toType:Type(~fromType:Type)'" }
 )
 
+err(
+    "geometry-shader-missing-output-stream",
+    38045,
+    "geometry shader missing output stream parameter",
+    span { loc = "location", message = "geometry shader entry point '~entryPoint:Name' must have an output stream parameter of type PointStream<T>, LineStream<T>, or TriangleStream<T>" }
+)
+
+err(
+    "geometry-shader-missing-max-vertex-count",
+    38046,
+    "geometry shader missing [maxvertexcount] attribute",
+    span { loc = "location", message = "geometry shader entry point '~entryPoint:Name' must have a '[maxvertexcount(N)]' attribute" }
+)
+
 --
 -- 382xx: module imports
 --
