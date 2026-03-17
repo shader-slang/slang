@@ -1,10 +1,11 @@
 // Test E30300: 'is'/'as' operator on a concrete (non-interface) typed expression.
 //
 // DISABLED: E30300 (IsOperatorValueMustBeInterfaceType) is unreachable dead code.
-// The error requires tryGetSubtypeWitness(targetType, valueType) to return non-null
-// when valueType is a non-interface type. Since Slang has no struct inheritance, the
-// only subtype relationships are through interface conformance, and isInterfaceType()
-// returns true for those. The guard at slang-check-expr.cpp:5228 can never fire.
+// The diagnostic appears in both visitIsTypeExpr (line 5237) and visitAsTypeExpr
+// (line 5285) of slang-check-expr.cpp. Both guards require a non-interface type to
+// have a subtype relationship, but Slang has no struct inheritance — the only subtype
+// relationships are through interface conformance, so isInterfaceType() is always true
+// when these guards are reached.
 
 //DISABLE_DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv
 
