@@ -106,10 +106,9 @@ jobs:
         env:
           BUILD_RESULT: ${{ job.status }}
 
-      # Slack notifications disabled - will be enabled in a follow-up PR
       - name: Success notification
         id: slack-notify-success
-        if: false # ${{ github.event_name == 'schedule' && success() }}
+        if: ${{ github.event_name == 'schedule' && success() }}
         uses: slackapi/slack-github-action@v1.26.0
         with:
           payload: |
@@ -117,11 +116,11 @@ jobs:
               "Sascha-Willems-Nightly": ":green-check-mark: Sascha Willems shader nightly status: ${{ job.status }}"
             }
         env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_SWILLEMS_VK }}
 
       - name: Failure notification
         id: slack-notify-failure
-        if: false # ${{ github.event_name == 'schedule' && !success() }}
+        if: ${{ github.event_name == 'schedule' && !success() }}
         uses: slackapi/slack-github-action@v1.26.0
         with:
           payload: |
@@ -129,4 +128,4 @@ jobs:
               "Sascha-Willems-Nightly": ":alert: :alert: :alert: :alert: :alert: :alert:\nSascha Willems shader nightly status: ${{ job.status }}: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
             }
         env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_SWILLEMS_VK }}
