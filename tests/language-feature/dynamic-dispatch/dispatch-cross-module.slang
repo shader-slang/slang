@@ -27,8 +27,6 @@ void computeMain()
 {
     ICrossModule a = HelperImpl(5);
     ICrossModule b = LocalImpl(3);
-    outputBuffer[0] = doDispatch(a);
-    // CHECK: 5
-    outputBuffer[1] = doDispatch(b);
-    // CHECK: 6
+    outputBuffer[0] = doDispatch(a); // CHECK: 5
+    outputBuffer[1] = doDispatch(b); // CHECK: 6
 }

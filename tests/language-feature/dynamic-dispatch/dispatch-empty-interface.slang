@@ -32,6 +32,5 @@ void computeMain()
     acceptMarker(m);
     m = B(2.0);
     acceptMarker(m);
-    outputBuffer[0] = 42;
-    // CHECK: 42
+    outputBuffer[0] = 42; // CHECK: 42
 }

@@ -37,12 +37,8 @@ void computeMain()
     IGreeter def = makeGreeter(0);
     IGreeter ovr = makeGreeter(1);
 
-    outputBuffer[0] = def.greet(10);
-    // CHECK: 11
-    outputBuffer[1] = def.defaultGreet(10);
-    // CHECK: 110
-    outputBuffer[2] = ovr.greet(10);
-    // CHECK: 12
-    outputBuffer[3] = ovr.defaultGreet(10);
-    // CHECK: 210
+    outputBuffer[0] = def.greet(10);         // CHECK: 11
+    outputBuffer[1] = def.defaultGreet(10);  // CHECK: 110
+    outputBuffer[2] = ovr.greet(10);         // CHECK: 12
+    outputBuffer[3] = ovr.defaultGreet(10);  // CHECK: 210
 }
