@@ -22,7 +22,7 @@ struct A : IFoo
     int get() { return 1; }
 }
 
-// `dyn` as function modifier is rejected.
+// `dyn` on a function declaration (parsed as declaration modifier, not return type qualifier) is rejected.
 dyn IFoo globalFunc() { return A(); }
 /*CHECK:
 ^^^ modifier not allowed

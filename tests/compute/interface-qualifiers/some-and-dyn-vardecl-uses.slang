@@ -14,7 +14,7 @@
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0], stride=4)
 RWStructuredBuffer<int> outputBuffer;
 
-dyn interface IFoo
+interface IFoo
 {
     int get();
 }
