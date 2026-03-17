@@ -14,6 +14,11 @@ using namespace Slang;
 
 thread_local int slangTestThreadIndex = 0;
 
+// Number of consecutive failures across all threads before aborting.
+// When GPU driver crashes, all threads fail simultaneously so this triggers quickly.
+static constexpr int kConsecutiveFailureAbortThreshold = 32;
+static std::atomic<int> s_consecutiveFailures{0};
+
 TestContext::TestContext()
 {
     /// if we are testing on arm, debug, we may want to increase the connection timeout
@@ -313,4 +318,20 @@ SpawnType TestContext::getFinalSpawnType(SpawnType spawnType)
 SpawnType TestContext::getFinalSpawnType()
 {
     return getFinalSpawnType(options.defaultSpawnType);
+}
+
+bool TestContext::reportTestFailure()
+{
+    int count = s_consecutiveFailures.fetch_add(1) + 1;
+    if (count >= kConsecutiveFailureAbortThreshold)
+    {
+        stopSchedulingTests.store(true);
+        return true;
+    }
+    return false;
+}
+
+void TestContext::reportTestPass()
+{
+    s_consecutiveFailures.store(0);
 }
