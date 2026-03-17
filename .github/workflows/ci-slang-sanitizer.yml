@@ -1,0 +1,211 @@
+name: CI Sanitizer Workflow
+
+on:
+  workflow_call:
+    inputs:
+      runs-on:
+        required: true
+        type: string
+      build-llvm:
+        required: false
+        type: boolean
+        default: true
+      server-count:
+        required: false
+        type: number
+        default: 1
+      test-category:
+        required: false
+        type: string
+        default: smoke
+
+jobs:
+  sanitizer:
+    runs-on: ${{ fromJSON(inputs.runs-on) }}
+    timeout-minutes: 120
+    permissions:
+      id-token: write
+      contents: read
+
+    env:
+      IS_FORK_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == true }}
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
+          fetch-depth: "2"
+
+      - name: Install Clang 18 and LLVM Tools
+        run: |
+          wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
+          sudo add-apt-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-18 main"
+          sudo apt-get update
+          sudo apt-get install -y clang-18 clang++-18 llvm-18
+
+          clang-18 --version
+          clang++-18 --version
+
+      - name: Authenticate to Google Cloud
+        if: env.IS_FORK_PR != 'true'
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: "projects/125098404903/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider"
+          service_account: "github-ci@slang-runners.iam.gserviceaccount.com"
+
+      - name: Setup sccache
+        uses: ./.github/actions/setup-sccache
+        with:
+          platform: linux
+
+      - name: Restore sccache cache
+        uses: actions/cache/restore@v4
+        with:
+          path: /tmp/.cache/sccache
+          key: sccache-linux-clang-18-x86_64-asan-${{ github.sha }}
+          restore-keys: |
+            sccache-linux-clang-18-x86_64-asan-
+
+      - name: Setup LLVM from GCS
+        if: inputs.build-llvm
+        uses: ./.github/actions/setup-llvm-from-gcs
+        with:
+          os: linux
+          # GCC-built LLVM is ABI-compatible with clang-18
+          compiler: gcc
+          platform: x86_64
+          llvm-hash: ${{ hashFiles('external/build-llvm.sh') }}
+          build-if-missing: "true"
+          github-token: ${{ github.token }}
+
+      - name: Setup
+        uses: ./.github/actions/common-setup
+        with:
+          os: linux
+          compiler: clang-18
+          platform: x86_64
+          config: relwithdebinfo
+          build-llvm: ${{ inputs.build-llvm }}
+          use-cached-llvm: false
+
+      - name: Build Slang with Sanitizers
+        run: |
+          echo "cmake version: $(cmake --version)"
+          echo "Building with AddressSanitizer and UndefinedBehaviorSanitizer"
+
+          if command -v sccache &> /dev/null; then
+            echo "sccache statistics (pre-build):"
+            sccache --show-stats || true
+          fi
+
+          cmake_launcher_defines=()
+          if [[ -n "${sccache_path:-}" ]]; then
+            cmake_launcher_defines+=("-DCMAKE_C_COMPILER_LAUNCHER=${sccache_path}")
+            cmake_launcher_defines+=("-DCMAKE_CXX_COMPILER_LAUNCHER=${sccache_path}")
+            cmake_launcher_defines+=("-DSLANG_ENABLE_PCH=OFF")
+          fi
+
+          cmake --preset default --fresh \
+            -DSLANG_ENABLE_ASAN=ON \
+            -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
+            "${cmake_launcher_defines[@]}"
+
+          cmake --build --preset releaseWithDebugInfo -j$(nproc)
+
+          if command -v sccache &> /dev/null; then
+            echo "sccache statistics (post-build):"
+            sccache --show-stats || true
+          fi
+
+      - name: Run Tests with Sanitizers
+        run: |
+          export ASAN_OPTIONS="detect_leaks=1:print_scariness=1:log_path=$PWD/asan-logs/asan"
+          export UBSAN_OPTIONS="print_stacktrace=1"
+          export LSAN_OPTIONS="suppressions=$PWD/cmake/lsan-suppressions.txt"
+
+          export SLANG_RUN_SPIRV_VALIDATION=1
+          export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
+
+          mkdir -p asan-logs
+
+          slang_test_args=(
+            "-category" "${{ inputs.test-category }}"
+            "-expected-failure-list" "tests/expected-failure-github.txt"
+            "-expected-failure-list" "tests/expected-failure-no-gpu.txt"
+            "-skip-reference-image-generation"
+            "-show-adapter-info"
+            "-ignore-abort-msg"
+            "-enable-debug-layers" "false"
+          )
+
+          if [ "${{ inputs.server-count }}" -gt 1 ]; then
+            slang_test_args+=("-use-test-server")
+            slang_test_args+=("-server-count" "${{ inputs.server-count }}")
+          fi
+
+          "$bin_dir/slang-test" "${slang_test_args[@]}" || true
+
+          echo "=== Sanitizer Results ==="
+          asan_log_count=$(find asan-logs -name 'asan.*' 2>/dev/null | wc -l)
+          if [ "$asan_log_count" -gt 0 ]; then
+            echo "Found $asan_log_count sanitizer report(s):"
+            for f in asan-logs/asan.*; do
+              echo "--- $f ---"
+              head -50 "$f"
+              echo "..."
+            done
+
+            echo ""
+            echo "::warning::AddressSanitizer detected $asan_log_count issue(s). See uploaded artifacts for details."
+          else
+            echo "No sanitizer issues detected."
+          fi
+
+      - name: Run slangc tests with Sanitizers
+        run: |
+          export ASAN_OPTIONS="detect_leaks=1:print_scariness=1:log_path=$PWD/asan-logs/asan-slangc"
+          export UBSAN_OPTIONS="print_stacktrace=1"
+          export LSAN_OPTIONS="suppressions=$PWD/cmake/lsan-suppressions.txt"
+
+          PATH=$bin_dir:$PATH tools/slangc-test/test.sh || true
+
+      - name: Sanitizer Summary
+        if: always()
+        run: |
+          total_logs=$(find asan-logs -name 'asan*' -size +0c 2>/dev/null | wc -l)
+          if [ "$total_logs" -gt 0 ]; then
+            echo "## Sanitizer Report" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Found **$total_logs** sanitizer issue(s)." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Download the \`sanitizer-logs\` artifact for full reports." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+
+            unique_issues=$(grep -h 'SUMMARY:' asan-logs/asan* 2>/dev/null | sort -u | head -20)
+            if [ -n "$unique_issues" ]; then
+              echo "### Unique Issues" >> $GITHUB_STEP_SUMMARY
+              echo '```' >> $GITHUB_STEP_SUMMARY
+              echo "$unique_issues" >> $GITHUB_STEP_SUMMARY
+              echo '```' >> $GITHUB_STEP_SUMMARY
+            fi
+
+            echo "::error::AddressSanitizer/UBSan detected $total_logs issue(s). See the sanitizer-logs artifact."
+            exit 1
+          else
+            echo "## Sanitizer Report" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "No sanitizer issues detected." >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Upload Sanitizer Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sanitizer-logs
+          path: asan-logs/
+          retention-days: 7
+          if-no-files-found: ignore

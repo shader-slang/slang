@@ -1,0 +1,10 @@
+# LeakSanitizer suppression file for Slang.
+#
+# Add patterns here for known leaks in third-party code or drivers that
+# are not actionable. Each line suppresses leaks whose stack trace
+# contains the given function or module pattern.
+#
+# Syntax:
+#   leak:<function_or_module_pattern>
+#
+# See https://clang.llvm.org/docs/AddressSanitizer.html#suppressing-memory-leaks

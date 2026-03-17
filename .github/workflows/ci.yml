@@ -73,6 +73,14 @@ jobs:
       config: release
       runs-on: '["ubuntu-22.04"]'
 
+  # Sanitizer build+test (non-blocking, runs on every PR for early detection)
+  sanitizer-linux-clang-x86_64:
+    needs: [filter]
+    if: needs.filter.outputs.should-run == 'true'
+    uses: ./.github/workflows/ci-slang-sanitizer.yml
+    with:
+      runs-on: '["ubuntu-22.04"]'
+
   # macOS builds
   build-macos-debug-clang-aarch64:
     needs: [filter]
