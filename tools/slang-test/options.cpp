@@ -98,6 +98,11 @@ static bool _isSubCommand(const char* arg)
         "                                 (alphabetical for prefixes matching multiple tests)\n"
         "  -dry-run                       List tests that would be run without running them\n"
         "  -disable-retries               Disable automatic retries of failed tests\n"
+        "  -synthesize-compile-targets    Synthesize compile-only tests for all available\n"
+        "                                 backends from GPU-requiring tests, exercising\n"
+        "                                 emit paths without needing a GPU\n"
+        "  -only-synthesized             Only run synthesized compile-target tests\n"
+        "                                 (implies -synthesize-compile-targets)\n"
 
         // Recent Windows runtime versions started opening a dialog popup window when
         // `abort()` is called, which breaks the CI workflow and some scripts that
@@ -295,6 +300,15 @@ static bool _isSubCommand(const char* arg)
         else if (strcmp(arg, "-disable-retries") == 0)
         {
             optionsOut->disableRetries = true;
+        }
+        else if (strcmp(arg, "-synthesize-compile-targets") == 0)
+        {
+            optionsOut->synthesizeCompileTargets = true;
+        }
+        else if (strcmp(arg, "-only-synthesized") == 0)
+        {
+            optionsOut->onlySynthesized = true;
+            optionsOut->synthesizeCompileTargets = true;
         }
         else if (strcmp(arg, "-shuffle-seed") == 0)
         {
