@@ -897,6 +897,11 @@ void PackBranchType::_toTextOverride(StringBuilder& out)
 
 Type* PackBranchType::_createCanonicalTypeOverride()
 {
+    // `__packBranch` stores its pack operand as a `Val*`, not always a `Type*`.
+    // When the operand is a type pack we do want type canonicalization here, but
+    // term-valued symbolic packs must continue to be treated as plain `Val`s.
+    // Do not blindly call `getCanonicalType()` on the operand unless this path is
+    // updated to use a helper like `_getCanonicalValue()`.
     auto canonicalPack = getPackOperand()->resolve();
     auto canonicalEmptyType = getEmptyType()->getCanonicalType();
     auto canonicalNonEmptyType = getNonEmptyType()->getCanonicalType();

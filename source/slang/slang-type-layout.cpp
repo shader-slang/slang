@@ -5279,7 +5279,7 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
         // Return a layout with unknown size, if we run out of recursion depth.
         ObjectLayoutInfo info;
         info.layoutInfos.add(
-            SimpleLayoutInfo(UniformLayoutInfo(LayoutSize::invalid(), LayoutOffset(0))));
+            SimpleLayoutInfo(UniformLayoutInfo(LayoutSize::invalid(), LayoutOffset(1))));
         return createSimpleTypeLayout(info, type, context.rules);
     }
 

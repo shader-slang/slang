@@ -4693,51 +4693,63 @@ SLANG_API SlangReflectionGeneric* spReflection_specializeGeneric(
     auto linkage = programLayout->getProgram()->getLinkage();
 
     DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
-
-    List<Expr*> argExprs;
-    for (SlangInt i = 0; i < argCount; ++i)
+    try
     {
-        auto argType = argTypes[i];
-        auto arg = args[i];
-
-        switch (argType)
+        List<Expr*> argExprs;
+        for (SlangInt i = 0; i < argCount; ++i)
         {
-        case SLANG_GENERIC_ARG_TYPE:
+            auto argType = argTypes[i];
+            auto arg = args[i];
+
+            switch (argType)
             {
-                auto type = convert(arg.typeVal);
-                auto declRefType = as<DeclRefType>(type);
-                auto declRefExpr = astBuilder->create<DeclRefExpr>();
-                declRefExpr->declRef = declRefType->getDeclRef();
-                declRefExpr->type.type = astBuilder->getOrCreate<TypeType>(type);
-                argExprs.add(declRefExpr);
-                break;
+            case SLANG_GENERIC_ARG_TYPE:
+                {
+                    auto type = convert(arg.typeVal);
+                    auto declRefType = as<DeclRefType>(type);
+                    auto declRefExpr = astBuilder->create<DeclRefExpr>();
+                    declRefExpr->declRef = declRefType->getDeclRef();
+                    declRefExpr->type.type = astBuilder->getOrCreate<TypeType>(type);
+                    argExprs.add(declRefExpr);
+                    break;
+                }
+            case SLANG_GENERIC_ARG_INT:
+                {
+                    auto literalExpr = astBuilder->create<IntegerLiteralExpr>();
+                    literalExpr->value = args[i].intVal;
+                    literalExpr->type = astBuilder->getIntType();
+                    argExprs.add(literalExpr);
+                    break;
+                }
+            case SLANG_GENERIC_ARG_BOOL:
+                {
+                    auto literalExpr = astBuilder->create<BoolLiteralExpr>();
+                    literalExpr->value = args[i].boolVal;
+                    literalExpr->type = astBuilder->getBoolType();
+                    argExprs.add(literalExpr);
+                    break;
+                }
+            default:
+                // abort (TODO: throw a proper error)
+                return nullptr;
             }
-        case SLANG_GENERIC_ARG_INT:
-            {
-                auto literalExpr = astBuilder->create<IntegerLiteralExpr>();
-                literalExpr->value = args[i].intVal;
-                literalExpr->type = astBuilder->getIntType();
-                argExprs.add(literalExpr);
-                break;
-            }
-        case SLANG_GENERIC_ARG_BOOL:
-            {
-                auto literalExpr = astBuilder->create<BoolLiteralExpr>();
-                literalExpr->value = args[i].boolVal;
-                literalExpr->type = astBuilder->getBoolType();
-                argExprs.add(literalExpr);
-                break;
-            }
-        default:
-            // abort (TODO: throw a proper error)
-            return nullptr;
         }
+
+        auto specialized = linkage->specializeGeneric(slangGeneric, argExprs, &sink);
+        sink.getBlobIfNeeded(outDiagnostics);
+
+        return convertDeclToGeneric(specialized);
     }
-
-    auto specialized = linkage->specializeGeneric(slangGeneric, argExprs, &sink);
-    sink.getBlobIfNeeded(outDiagnostics);
-
-    return convertDeclToGeneric(specialized);
+    catch (const AbortCompilationException& e)
+    {
+        outputExceptionDiagnostic(e, sink, outDiagnostics);
+        return nullptr;
+    }
+    catch (...)
+    {
+        outputExceptionDiagnostic(sink, outDiagnostics);
+        return nullptr;
+    }
 }
 
 
