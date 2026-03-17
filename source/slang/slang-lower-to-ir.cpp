@@ -9780,7 +9780,17 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // with the value `5`, then we might have only a single
             // instruction to represent `5`.
             //
-            auto irInitVal = getSimpleVal(subContext, lowerRValueExpr(subContext, initExpr));
+            // FuncCallIntVal means the initializer was symbolically folded but
+            // not fully evaluated (operands are spec constants or generic value
+            // params). Lower via visitFuncCallIntVal which emits constexpr IR
+            // ops and propagates @SpecConst rate when any operand carries it.
+            // The raw initExpr path would emit plain ops without that rate.
+            //
+            IRInst* irInitVal;
+            if (auto funcCallIntVal = as<FuncCallIntVal>(decl->val))
+                irInitVal = lowerSimpleVal(subContext, funcCallIntVal);
+            else
+                irInitVal = getSimpleVal(subContext, lowerRValueExpr(subContext, initExpr));
 
             // We construct a distinct IR instruction to represent the
             // constant itself, with the value as an operand.

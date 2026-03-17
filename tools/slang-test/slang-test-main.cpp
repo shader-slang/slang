@@ -1482,18 +1482,24 @@ static SlangResult _extractRenderTestRequirements(
         passThru = SLANG_PASS_THROUGH_NONE;
     }
 
-    if (passThru == SLANG_PASS_THROUGH_NONE)
+    // In compile-only mode, we need neither the GPU API nor downstream compilers.
+    // render-test will use text output targets (HLSL, GLSL, MSL, CUDA source)
+    // that only exercise Slang's own emit code.
+    bool isCompileOnly =
+        cmdLine.findArgIndex(UnownedStringSlice::fromLiteral("-compile-only")) >= 0;
+    if (!isCompileOnly)
     {
-        // Work out backends needed based on the target
-        ioRequirements->addUsedBackends(_getPassThroughFlagsForTarget(target));
-    }
-    else
-    {
-        ioRequirements->addUsedBackEnd(passThru);
-    }
+        if (passThru == SLANG_PASS_THROUGH_NONE)
+        {
+            ioRequirements->addUsedBackends(_getPassThroughFlagsForTarget(target));
+        }
+        else
+        {
+            ioRequirements->addUsedBackEnd(passThru);
+        }
 
-    // Add the render api used
-    ioRequirements->addUsedRenderApi(renderApiType);
+        ioRequirements->addUsedRenderApi(renderApiType);
+    }
 
     return SLANG_OK;
 }
@@ -2850,6 +2856,44 @@ TestResult runCompile(TestContext* context, TestInput& input)
             cmdLine.addArg(arg);
         }
     }
+
+    ExecuteResult exeRes;
+    TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));
+    if (context->isCollectingRequirements())
+    {
+        return TestResult::Pass;
+    }
+
+    if (exeRes.resultCode != 0)
+    {
+        auto reporter = context->getTestReporter();
+        if (reporter)
+        {
+            auto output = getOutput(exeRes);
+            reporter->message(TestMessageType::TestFailure, output);
+        }
+
+        return TestResult::Fail;
+    }
+
+    return TestResult::Pass;
+}
+
+TestResult runCompileTarget(TestContext* context, TestInput& input)
+{
+    auto outputStem = input.outputStem;
+
+    CommandLine cmdLine;
+    cmdLine.setExecutableLocation(ExecutableLocation(context->options.binDir, "render-test"));
+    cmdLine.addArg(input.filePath);
+    _addRenderTestOptions(context->options, cmdLine);
+
+    for (auto arg : input.testOptions->args)
+    {
+        cmdLine.addArg(arg);
+    }
+
+    cmdLine.addArg("-compile-only");
 
     ExecuteResult exeRes;
     TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));
@@ -4464,6 +4508,7 @@ static const TestCommandInfo s_testCommandInfos[] = {
     {"CPP_COMPILER_COMPILE", &runCPPCompilerCompile, RenderApiFlag::CPU},
     {"PERFORMANCE_PROFILE", &runPerformanceProfile, 0},
     {"COMPILE", &runCompile, 0},
+    {"COMPILE_TARGET", &runCompileTarget, 0},
     {"DOC", &runDocTest, 0},
     {"LANG_SERVER", &runLanguageServerTest, 0},
     {"EXECUTABLE", &runExecutableTest, RenderApiFlag::CPU}};
@@ -4675,6 +4720,93 @@ static void _calcSynthesizedTests(
     }
 }
 
+static bool _isGpuComputeCommand(const String& command)
+{
+    return command == "COMPARE_COMPUTE" || command == "COMPARE_COMPUTE_EX" ||
+           command == "COMPARE_RENDER_COMPUTE" || command == "HLSL_COMPUTE";
+}
+
+static RenderApiType _getRenderApiFromArgs(const List<String>& args)
+{
+    for (const auto& arg : args)
+    {
+        if (arg.getLength() > 1 && arg[0] == '-')
+        {
+            UnownedStringSlice name(arg.getUnownedSlice().begin() + 1, arg.getUnownedSlice().end());
+            RenderApiType apiType = RenderApiUtil::findApiTypeByName(name);
+            if (apiType != RenderApiType::Unknown)
+                return apiType;
+        }
+    }
+    return RenderApiType::Unknown;
+}
+
+static void _calcSynthesizedCompileTargetTests(
+    TestContext* context,
+    const String& filePath,
+    const List<TestDetails>& srcTests,
+    List<TestDetails>& ioSynthTests)
+{
+    SLANG_UNUSED(filePath);
+
+    HashSet<String> synthesizedKeys;
+
+    for (const auto& srcTest : srcTests)
+    {
+        if (!srcTest.options.isEnabled || srcTest.options.isSynthesized ||
+            !_isGpuComputeCommand(srcTest.options.command))
+            continue;
+
+        RenderApiType renderApi = _getRenderApiFromArgs(srcTest.options.args);
+        if (renderApi == RenderApiType::Unknown)
+            continue;
+
+        StringBuilder keyBuilder;
+        keyBuilder << RenderApiUtil::getApiName(renderApi) << "|" << srcTest.options.command;
+        String synthKey = keyBuilder.produceString();
+        if (synthesizedKeys.contains(synthKey))
+            continue;
+
+        TestDetails synthDetails;
+        TestOptions& synthOptions = synthDetails.options;
+        synthOptions.command = "COMPILE_TARGET";
+        synthOptions.isSynthesized = true;
+
+        if (auto c = context->categorySet.find("compile-target"))
+        {
+            synthOptions.categories.add(c);
+        }
+
+        synthOptions.args = srcTest.options.args;
+
+        // Add the implicit args that each command handler normally appends.
+        // COMPARE_COMPUTE_EX adds no implicit args (passes nullptr, 0 to
+        // runComputeComparisonImpl), so no branch is needed for it.
+        if (srcTest.options.command == "COMPARE_COMPUTE")
+        {
+            synthOptions.args.add("-slang");
+            synthOptions.args.add("-compute");
+        }
+        else if (srcTest.options.command == "COMPARE_RENDER_COMPUTE")
+        {
+            synthOptions.args.add("-slang");
+            synthOptions.args.add("-gcompute");
+        }
+        else if (srcTest.options.command == "HLSL_COMPUTE")
+        {
+            synthOptions.args.add("--hlsl-rewrite");
+            synthOptions.args.add("-compute");
+        }
+
+        context->setTestRequirements(&synthDetails.requirements);
+        runTest(context, "", "", "", synthOptions);
+        context->setTestRequirements(nullptr);
+
+        ioSynthTests.add(synthDetails);
+        synthesizedKeys.add(synthKey);
+    }
+}
+
 static bool _canIgnore(TestContext* context, const TestDetails& details)
 {
     if (details.options.isEnabled == false)
@@ -4833,6 +4965,13 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
         testList.tests.addRange(synthesizedTests);
     }
 
+    if (context->options.synthesizeCompileTargets)
+    {
+        List<TestDetails> compileTargetTests;
+        _calcSynthesizedCompileTargetTests(context, filePath, testList.tests, compileTargetTests);
+        testList.tests.addRange(compileTargetTests);
+    }
+
     // If explicit test order is requested, reorder subtests by prefix order
     List<Index> testOrder;
     for (Index i = 0; i < testList.tests.getCount(); i++)
@@ -4883,6 +5022,13 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
         Index subTestIndex = testOrder[orderIdx];
         auto& testDetails = testList.tests[subTestIndex];
 
+        // When -only-synthesized is set, only run synthesized compile-target tests
+        if (context->options.onlySynthesized &&
+            !(testDetails.options.isSynthesized && testDetails.options.command == "COMPILE_TARGET"))
+        {
+            continue;
+        }
+
         // Check that the test passes our current category mask
         if (!testPassesCategoryMask(context, testDetails.options))
         {
@@ -4907,6 +5053,16 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
         }
 
         const auto& requirements = testDetails.requirements;
+
+        // For synthesized compile-target tests, show the render API name
+        if (testDetails.options.isSynthesized && testDetails.options.command == "COMPILE_TARGET")
+        {
+            RenderApiType renderApi = _getRenderApiFromArgs(testDetails.options.args);
+            if (renderApi != RenderApiType::Unknown)
+            {
+                testName << " (" << RenderApiUtil::getApiName(renderApi) << ")";
+            }
+        }
 
         // Display list of used apis on render test
         if (requirements.usedRenderApiFlags)
@@ -5586,6 +5742,8 @@ SlangResult innerMain(int argc, char** argv)
     auto compatibilityIssueCategory = categorySet.add("compatibility-issue", fullTestCategory);
 
     auto sharedLibraryCategory = categorySet.add("shared-library", fullTestCategory);
+
+    categorySet.add("compile-target", fullTestCategory);
 
 #if SLANG_WINDOWS_FAMILY
     auto windowsCategory = categorySet.add("windows", fullTestCategory);

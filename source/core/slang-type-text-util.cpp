@@ -195,7 +195,7 @@ static const NamesDescriptionValue s_optimizationLevels[] = {
     {SLANG_OPTIMIZATION_LEVEL_NONE, "0,none", "Disable all optimizations"},
     {SLANG_OPTIMIZATION_LEVEL_DEFAULT,
      "1,default",
-     "Enable a default level of optimization.This is the default if no -o options are used."},
+     "Enable a default level of optimization.This is the default if no -O options are used."},
     {SLANG_OPTIMIZATION_LEVEL_HIGH, "2,high", "Enable aggressive optimizations for speed."},
     {SLANG_OPTIMIZATION_LEVEL_MAXIMAL,
      "3,maximal",
