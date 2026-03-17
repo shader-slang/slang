@@ -13,8 +13,8 @@ String maybeStripLiterateFileExtension(const String& path);
 struct MarkdownCodeBlock
 {
     String content;
-    int startLine;
-    int startColumn;
+    int startLine = 0;
+    int startColumn = 0;
 };
 
 List<MarkdownCodeBlock> extractSlangCodeBlocks(const char* source, size_t length);
