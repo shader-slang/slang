@@ -1625,6 +1625,16 @@ void printVarLayout(
 }
 ```
 
+### Target-Specific Limitations
+
+On targets where entry point varying inputs are packed into a single struct parameter during legalization (currently Metal and WGSL), `isParameterLocationUsed` cannot distinguish between used and unused individual varying inputs.
+The post-emit metadata is recorded at the struct level, so if any varying input is used, all varying input locations covered by the struct will be reported as used.
+
+This limitation does not apply to SPIR-V or GLSL targets, where each varying input becomes a separate global parameter that can be individually eliminated by dead code elimination and individually tracked in the metadata.
+Non-varying resource types (e.g. `DescriptorTableSlot`, `ShaderResource`) are not affected by this limitation on any target.
+
+See the [Metal](a2-02-metal-target-specific.md#limitation-isparameterlocationused-for-varying-inputs) and [WGSL](a2-03-wgsl-target-specific.md#limitation-isparameterlocationused-for-varying-inputs) target-specific documentation for details.
+
 Conclusion
 ----------
 

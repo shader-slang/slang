@@ -79,12 +79,28 @@ SharedSemanticsContext* Linkage::getSemanticsForReflection()
     return m_semanticsForReflection.get();
 }
 
-ISlangUnknown* Linkage::getInterface(const Guid& guid)
+SLANG_NO_THROW SlangResult SLANG_MCALL
+Linkage::queryInterface(SlangUUID const& uuid, void** outObject)
 {
-    if (guid == ISlangUnknown::getTypeGuid() || guid == ISession::getTypeGuid())
-        return asExternal(this);
+    if (!outObject)
+        return SLANG_E_INVALID_ARG;
+    *outObject = nullptr;
 
-    return nullptr;
+    if (uuid == Linkage::getTypeGuid())
+    {
+        *outObject = static_cast<Linkage*>(this);
+        addReference();
+        return SLANG_OK;
+    }
+
+    if (uuid == ISlangUnknown::getTypeGuid() || uuid == ISession::getTypeGuid())
+    {
+        *outObject = static_cast<slang::ISession*>(this);
+        addReference();
+        return SLANG_OK;
+    }
+
+    return SLANG_E_NO_INTERFACE;
 }
 
 Linkage::~Linkage()
@@ -1793,6 +1809,30 @@ Linkage::isBinaryModuleUpToDate(const char* modulePath, slang::IBlob* binaryModu
     if (!rootChunk)
         return false;
     return isBinaryModuleUpToDate(modulePath, rootChunk);
+}
+
+SLANG_NO_THROW SlangResult SLANG_MCALL
+Linkage::getDeclSourceLocation(slang::DeclReflection* inDecl, slang::SourceLocation* outLocation)
+{
+    if (!inDecl || !outLocation)
+        return SLANG_E_INVALID_ARG;
+
+    Decl* decl = (Decl*)inDecl;
+    SourceManager* sourceManager = getSourceManager();
+    auto sourceView = sourceManager->findSourceViewRecursively(decl->getNameLoc());
+    if (!sourceView)
+        return SLANG_E_NOT_FOUND;
+
+    auto humaneLoc = sourceView->getHumaneLoc(decl->getNameLoc());
+    outLocation->filePath = nullptr;
+    if (humaneLoc.pathInfo.hasFoundPath())
+    {
+        auto pathSlice = m_stringSlicePool.addAndGetSlice(humaneLoc.pathInfo.foundPath);
+        outLocation->filePath = pathSlice.begin();
+    }
+    outLocation->line = humaneLoc.line;
+    outLocation->column = humaneLoc.column;
+    return SLANG_OK;
 }
 
 SourceFile* Linkage::findFile(Name* name, SourceLoc loc, IncludeSystem& outIncludeSystem)

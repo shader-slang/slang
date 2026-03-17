@@ -996,6 +996,7 @@ class EachType : public Type
 {
     FIDDLE(...)
     Type* getElementType() const { return as<Type>(getOperand(0)); }
+    // Convenience accessor for the subset of EachType forms whose element is a bare decl-ref.
     DeclRefType* getElementDeclRefType() const { return as<DeclRefType>(getOperand(0)); }
 
     EachType(Type* elementType) { m_operands.add(ValNodeOperand(elementType)); }
@@ -1017,6 +1018,50 @@ class ExpandType : public Type
         for (auto t : capturedPacks)
             m_operands.add(ValNodeOperand(t));
     }
+    void _toTextOverride(StringBuilder& out);
+    Type* _createCanonicalTypeOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
+FIDDLE()
+class FirstPackElementType : public Type
+{
+    FIDDLE(...)
+    Type* getBasePack() const { return as<Type>(getOperand(0)); }
+    FirstPackElementType(Type* basePack) { m_operands.add(ValNodeOperand(basePack)); }
+    void _toTextOverride(StringBuilder& out);
+    Type* _createCanonicalTypeOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
+FIDDLE()
+class LastPackElementType : public Type
+{
+    FIDDLE(...)
+    Type* getBasePack() const { return as<Type>(getOperand(0)); }
+    LastPackElementType(Type* basePack) { m_operands.add(ValNodeOperand(basePack)); }
+    void _toTextOverride(StringBuilder& out);
+    Type* _createCanonicalTypeOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
+FIDDLE()
+class TrimHeadTypePack : public Type
+{
+    FIDDLE(...)
+    Type* getBasePack() const { return as<Type>(getOperand(0)); }
+    TrimHeadTypePack(Type* basePack) { m_operands.add(ValNodeOperand(basePack)); }
+    void _toTextOverride(StringBuilder& out);
+    Type* _createCanonicalTypeOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
+FIDDLE()
+class TrimTailTypePack : public Type
+{
+    FIDDLE(...)
+    Type* getBasePack() const { return as<Type>(getOperand(0)); }
+    TrimTailTypePack(Type* basePack) { m_operands.add(ValNodeOperand(basePack)); }
     void _toTextOverride(StringBuilder& out);
     Type* _createCanonicalTypeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);

@@ -11,6 +11,7 @@ if ANALYTICS_DIR not in sys.path:
     sys.path.insert(0, ANALYTICS_DIR)
 
 import ci_health
+import ci_status
 import ci_visualization
 
 
@@ -446,6 +447,119 @@ class TestUtilityBehavior(unittest.TestCase):
             snaps = ci_health.load_snapshots(tmp, hours=1)
 
         self.assertEqual([s["id"] for s in snaps], [2])
+
+
+class TestStatusPage(unittest.TestCase):
+    def test_generate_with_entries(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            data = {
+                "entries": [
+                    {
+                        "date": "2026-03-12",
+                        "severity": "warning",
+                        "title": "Runner flaky",
+                        "body": "Investigating.",
+                        "author": "testuser",
+                    },
+                    {
+                        "date": "2026-03-10",
+                        "severity": "info",
+                        "title": "Maintenance",
+                        "body": "Scheduled downtime.",
+                        "author": "admin",
+                    },
+                ]
+            }
+            with open(os.path.join(tmp, "status_updates.json"), "w") as f:
+                json.dump(data, f)
+
+            ci_status.generate_status_html(tmp)
+
+            with open(os.path.join(tmp, "status.html")) as f:
+                html = f.read()
+            self.assertIn("Runner flaky", html)
+            self.assertIn("Maintenance", html)
+            self.assertIn("testuser", html)
+            # warning entry should appear before info (sorted by date desc)
+            self.assertGreater(html.index("Maintenance"), html.index("Runner flaky"))
+
+    def test_generate_empty_entries(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with open(os.path.join(tmp, "status_updates.json"), "w") as f:
+                json.dump({"entries": []}, f)
+
+            ci_status.generate_status_html(tmp)
+
+            with open(os.path.join(tmp, "status.html")) as f:
+                html = f.read()
+            self.assertIn("All Systems Operational", html)
+
+    def test_generate_no_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ci_status.generate_status_html(tmp)
+
+            with open(os.path.join(tmp, "status.html")) as f:
+                html = f.read()
+            self.assertIn("All Systems Operational", html)
+
+    def test_severity_colors(self):
+        for sev in ("info", "warning", "critical"):
+            entry = {"severity": sev, "title": f"Test {sev}", "body": "x"}
+            rendered = ci_status.render_entry(entry)
+            fg, bg = ci_status.SEVERITY_COLORS[sev]
+            self.assertIn(fg, rendered)
+            self.assertIn(bg, rendered)
+
+    def test_html_escaping(self):
+        entry = {
+            "title": "<script>alert(1)</script>",
+            "body": "a < b & c > d",
+            "author": "<img>",
+        }
+        rendered = ci_status.render_entry(entry)
+        self.assertNotIn("<script>", rendered)
+        self.assertIn("&lt;script&gt;", rendered)
+        self.assertIn("a &lt; b &amp; c &gt; d", rendered)
+
+    def test_hidden_entries_not_rendered(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            data = {
+                "entries": [
+                    {"date": "2026-03-12", "severity": "info", "title": "Visible", "body": "shown", "visible": True},
+                    {"date": "2026-03-11", "severity": "warning", "title": "Hidden", "body": "not shown", "visible": False},
+                ]
+            }
+            with open(os.path.join(tmp, "status_updates.json"), "w") as f:
+                json.dump(data, f)
+
+            ci_status.generate_status_html(tmp)
+
+            with open(os.path.join(tmp, "status.html")) as f:
+                html = f.read()
+            self.assertIn("Visible", html)
+            self.assertNotIn("Hidden", html)
+
+    def test_all_hidden_shows_all_clear(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            data = {
+                "entries": [
+                    {"date": "2026-03-12", "severity": "info", "title": "Old issue", "body": "resolved", "visible": False},
+                ]
+            }
+            with open(os.path.join(tmp, "status_updates.json"), "w") as f:
+                json.dump(data, f)
+
+            ci_status.generate_status_html(tmp)
+
+            with open(os.path.join(tmp, "status.html")) as f:
+                html = f.read()
+            self.assertIn("All Systems Operational", html)
+            self.assertNotIn("Old issue", html)
+
+    def test_nav_includes_status(self):
+        nav = ci_visualization.nav_html("Status")
+        self.assertIn("status.html", nav)
+        self.assertIn("Status", nav)
 
 
 if __name__ == "__main__":
