@@ -6,6 +6,11 @@
 // Each E31201 position emits both a short summary and a detailed message.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv -stage compute -entry computeMain
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -stage compute -entry computeMain
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target cuda -stage compute -entry computeMain
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target metal -stage compute -entry computeMain
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target wgsl -stage compute -entry computeMain
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target cpp -stage compute -entry computeMain
 
 interface IFoo
 {

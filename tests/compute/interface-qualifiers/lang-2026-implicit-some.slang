@@ -6,6 +6,10 @@
 
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -lang slang -std 2026 -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=CHECK_HLSL): -target hlsl -lang slang -std 2026 -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK_OTHER): -target cuda -lang slang -std 2026 -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK_OTHER): -target metal -lang slang -std 2026 -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK_OTHER): -target wgsl -lang slang -std 2026 -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK_OTHER): -target cpp -lang slang -std 2026 -stage compute -entry computeMain
 
 interface IFoo
 {
@@ -41,6 +45,8 @@ int callFooDyn(dyn IFoo x)
 // CHECK: OpStore
 
 // CHECK_HLSL: void computeMain
+
+// CHECK_OTHER: computeMain
 
 RWStructuredBuffer<int> outputBuffer;
 
