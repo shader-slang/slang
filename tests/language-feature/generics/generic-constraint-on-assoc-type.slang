@@ -1,7 +1,8 @@
 // Test that a where clause constraining an associated type to a concrete type
 // enables operations that depend on knowing the concrete type (e.g. arithmetic).
 
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj -output-using-type
 
 interface IProvider
 {

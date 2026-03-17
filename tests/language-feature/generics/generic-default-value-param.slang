@@ -1,7 +1,8 @@
 // Test generic value parameters with default values.
 // When no explicit value argument is provided, the default value should be used.
 
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj -output-using-type
 
 struct FixedArray<let N : uint = 4>
 {
