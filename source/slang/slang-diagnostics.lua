@@ -3747,6 +3747,28 @@ err(
     span { loc = "location", message = "'~fromType:Type' is not convertible to '~toType:Type', not satisfying the type coerce constraint '~toType:Type(~fromType:Type)'" }
 )
 
+err(
+    "mesh-shader-missing-vertices-output",
+    38047,
+    "mesh shader missing vertices output parameter",
+    span { loc = "location", message = "mesh shader entry point '~entryPoint:Name' must have an output parameter of type Vertices<T, N>" }
+)
+
+err(
+    "mesh-shader-missing-indices-output",
+    38048,
+    "mesh shader missing indices output parameter",
+    span { loc = "location", message = "mesh shader entry point '~entryPoint:Name' must have an output parameter of type Indices<T, N>" }
+)
+
+err(
+    "mesh-shader-missing-output-topology",
+    38049,
+    "mesh shader missing [outputtopology] attribute",
+    span { loc = "location", message = "mesh shader entry point '~entryPoint:Name' must have an '[outputtopology(...)]' attribute" }
+)
+
+
 --
 -- 382xx: module imports
 --
