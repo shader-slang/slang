@@ -5873,7 +5873,7 @@ SlangResult innerMain(int argc, char** argv)
                 stderr,
                 "\n*** Stopped scheduling new tests after too many consecutive failures.\n"
                 "*** This usually indicates a systemic issue such as a GPU driver crash.\n"
-                "*** Retrying %d already-queued failed tests.\n\n",
+                "*** Skipping retries for %d failed tests.\n\n",
                 (int)context.failedFileTests.getCount());
             fflush(stderr);
         }
