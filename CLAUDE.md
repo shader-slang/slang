@@ -23,9 +23,9 @@ User-specific instructions for Slang (optional, may not exist):
 cmake --preset default
 
 # Configure with visual studio 2022 settings (Preferred on Windows)
-# On Windows, include -DSLANG_BOOTSTRAP_IGNORE_ABORT_MSG=ON to suppress
+# On Windows, include -DSLANG_IGNORE_ABORT_MSG=ON to suppress
 # modal abort dialogs during unattended/LLM-driven builds.
-cmake.exe --preset vs2022 -DSLANG_BOOTSTRAP_IGNORE_ABORT_MSG=ON
+cmake.exe --preset vs2022 -DSLANG_IGNORE_ABORT_MSG=ON
 
 # Build Release/Debug binaries.
 # It can take from 5 minutes to 20 minutes depending on the machine.
@@ -222,7 +222,7 @@ On Windows, assertion failures normally open a modal dialog that blocks executio
 | `release-assert-only` | Skip debug-only assertions (`SLANG_ASSERT`, `SLANG_ASSERT_FAILURE`) and continue; `SLANG_RELEASE_ASSERT` still fires |
 | *(unset)* | Throws an exception |
 
-The behavior on Windows after an exception is thrown is controlled by a CMake option `SLANG_BOOTSTRAP_IGNORE_ABORT_MSG` or `-ignore-abort-msg` command-line argument.
+The behavior on Windows after an exception is thrown is controlled by a CMake option `SLANG_IGNORE_ABORT_MSG` or `-ignore-abort-msg` command-line argument.
 Both options are highly recommended for unattended automation with LLM workflow.
 
 #### RTX Remix Testing
