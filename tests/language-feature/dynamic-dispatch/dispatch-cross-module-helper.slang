@@ -1,3 +1,4 @@
+//TEST_IGNORE_FILE:
 module "dispatch-cross-module-helper";
 
 public interface ICrossModule
