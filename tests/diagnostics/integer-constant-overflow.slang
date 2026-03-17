@@ -50,6 +50,11 @@ void computeMain()
 //CHECK:      ^^^ integer constant overflow in conversion
 //CHECK:      ^^^ integer value '-256' does not fit in type 'int8_t'
 
+    // Negative overflow into unsigned type
+    funcUint8(-129);
+//CHECK:       ^^^ integer constant overflow in conversion
+//CHECK:       ^^^ integer value '-129' does not fit in type 'uint8_t'
+
     // Constant expressions that overflow
     funcInt8(100 + 200);
 //CHECK:         ^ integer constant overflow in conversion

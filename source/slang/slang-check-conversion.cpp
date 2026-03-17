@@ -2057,6 +2057,10 @@ bool SemanticsVisitor::_coerce(
                 {
                     IntegerLiteralValue v = val->getValue();
                     bool overflow = false;
+                    // For negative values, overflow if magnitude exceeds 2^(N-1)
+                    // (the two's complement minimum). For positive values, use
+                    // bit-width comparison to avoid false positives on hex
+                    // bit-pattern idioms like int x = 0xFF030206.
                     if (v < 0)
                         overflow = (0ULL - static_cast<uint64_t>(v)) >
                                    (static_cast<uint64_t>(1) << (maxBitSize - 1));
@@ -2065,9 +2069,9 @@ bool SemanticsVisitor::_coerce(
 
                     if (overflow)
                     {
-                        // Set even when sink is null (probe/costing calls) to
-                        // consistently suppress the UnrecommendedImplicitConversion
-                        // path below.
+                        // Set even when sink is null so that the
+                        // UnrecommendedImplicitConversion path below is
+                        // consistently suppressed for overflow cases.
                         overflowWarningDetected = true;
                         if (sink)
                         {
