@@ -5878,7 +5878,7 @@ SlangResult innerMain(int argc, char** argv)
             fflush(stderr);
         }
 
-        if (!context.options.disableRetries)
+        if (!context.options.disableRetries && !context.stopSchedulingTests.load())
         {
 #if _DEBUG
             static constexpr int kFailedTestLimitForRetry = 100;

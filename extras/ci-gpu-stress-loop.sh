@@ -214,7 +214,7 @@ sudo dmesg 2>/dev/null | grep -iE 'nvidia|nvrm|xid|gpu|fault' | tail -30 || echo
   DURATION="$((END_TIME - START_TIME))"
 
   # Determine result
-  if grep -q "Test run aborted: too many consecutive failures" "$ITER_DIR/test_output.log"; then
+  if grep -q "Stopped scheduling new tests after too many consecutive failures" "$ITER_DIR/test_output.log"; then
     EXIT_CODE="aborted"
     echo "  *** ABORT TRIGGERED — driver crash detected!"
   elif grep -q "CUDA_ERROR_NO_DEVICE\|NVIDIA-SMI FAILED\|CUDA_ERROR_NOT_PERMITTED" "$ITER_DIR/test_output.log"; then
