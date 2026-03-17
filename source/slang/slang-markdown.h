@@ -6,6 +6,10 @@
 namespace Slang
 {
 
+bool hasLiterateFileExtension(const String& path);
+
+String maybeStripLiterateFileExtension(const String& path);
+
 struct MarkdownCodeBlock
 {
     String content;

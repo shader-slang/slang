@@ -310,6 +310,14 @@ void FrontEndCompileRequest::parseTranslationUnit(TranslationUnitRequest* transl
         module->getIncludedSourceFileMap().addIfNotExists(sourceFile, nullptr);
     }
 
+    // For a new translation unit, we need to reset the WarningStateTracker
+    // to avoid pragma state pollution from previously parsed modules.
+    // This is only done for the first file of the translation unit.
+    // Subsequent files (if any) in the same translation unit, as well as
+    // files included via __include during semantic checking, will reuse
+    // the tracker to preserve pragma states within the module.
+    getSink()->setSourceWarningStateTracker(nullptr);
+
     for (auto sourceFile : translationUnit->getSourceFiles())
     {
         // Build a list of source segments to process. A plain .slang file
@@ -319,7 +327,7 @@ void FrontEndCompileRequest::parseTranslationUnit(TranslationUnitRequest* transl
         // in the original Markdown file.
         List<SourceFile*> segments;
 
-        if (sourceFile->getPathInfo().foundPath.endsWith(".slang.md"))
+        if (hasLiterateFileExtension(sourceFile->getPathInfo().foundPath))
         {
             auto content = sourceFile->getContent();
             auto codeBlocks = extractSlangCodeBlocks(content.begin(), content.getLength());
@@ -351,8 +359,6 @@ void FrontEndCompileRequest::parseTranslationUnit(TranslationUnitRequest* transl
 
         for (auto segmentFile : segments)
         {
-            getSink()->setSourceWarningStateTracker(nullptr);
-
             SourceLanguage sourceLanguage = translationUnit->sourceLanguage;
             SlangLanguageVersion languageVersion =
                 translationUnit->compileRequest->optionSet.getLanguageVersion();
@@ -394,7 +400,7 @@ void FrontEndCompileRequest::parseTranslationUnit(TranslationUnitRequest* transl
                         tokens,
                         m_writers->getWriter(SLANG_WRITER_CHANNEL_STD_OUTPUT));
                 }
-                return;
+                continue;
             }
 
             parseSourceFile(
@@ -406,6 +412,10 @@ void FrontEndCompileRequest::parseTranslationUnit(TranslationUnitRequest* transl
                 languageScope,
                 translationUnitSyntax);
         }
+
+        // If we are only outputting preprocessor tokens, skip AST work.
+        if (optionSet.getBoolOption(CompilerOptionName::PreprocessorOutput))
+            continue;
 
         if (optionSet.getBoolOption(CompilerOptionName::DumpAst))
         {
@@ -621,10 +631,7 @@ void FrontEndCompileRequest::addTranslationUnitSourceArtifact(
 
     if (!translationUnit->moduleName)
     {
-        String artifactName = sourceArtifact->getName();
-        if (artifactName.endsWith(".slang.md"))
-            artifactName =
-                String(artifactName.getUnownedSlice().subString(0, artifactName.getLength() - 3));
+        String artifactName = maybeStripLiterateFileExtension(sourceArtifact->getName());
         translationUnit->setModuleName(
             getNamePool()->getName(Path::getFileNameWithoutExt(artifactName)));
     }

@@ -23,6 +23,7 @@
 #include "slang-compiler-options.h"
 #include "slang-compiler.h"
 #include "slang-hlsl-to-vulkan-layout-options.h"
+#include "slang-markdown.h"
 #include "slang-profile.h"
 #include "slang-repro.h"
 #include "slang-rich-diagnostics.h"
@@ -1530,7 +1531,7 @@ SlangResult OptionsParser::addInputPath(char const* inPath, SourceLanguage langO
         return addReferencedModule(path, SourceLoc(), false);
     }
     else if (
-        path.endsWith(".slang") || path.endsWith(".slang.md") ||
+        path.endsWith(".slang") || hasLiterateFileExtension(path) ||
         langOverride == SourceLanguage::Slang)
     {
         // Plain old slang code

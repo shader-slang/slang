@@ -1,10 +1,24 @@
 #include "slang-markdown.h"
 
+#include "../core/slang-io.h"
+
 #include <cmark-gfm.h>
 #include <string.h>
 
 namespace Slang
 {
+
+bool hasLiterateFileExtension(const String& path)
+{
+    return path.endsWith(".md");
+}
+
+String maybeStripLiterateFileExtension(const String& path)
+{
+    if (hasLiterateFileExtension(path))
+        return Path::getPathWithoutExt(path);
+    return path;
+}
 
 List<MarkdownCodeBlock> extractSlangCodeBlocks(const char* source, size_t length)
 {
@@ -13,6 +27,12 @@ List<MarkdownCodeBlock> extractSlangCodeBlocks(const char* source, size_t length
     cmark_node* doc = cmark_parse_document(source, length, CMARK_OPT_SOURCEPOS);
     if (!doc)
         return result;
+
+    struct CmarkDocGuard
+    {
+        cmark_node* node;
+        ~CmarkDocGuard() { if (node) cmark_node_free(node); }
+    } docGuard{doc};
 
     for (cmark_node* node = cmark_node_first_child(doc); node; node = cmark_node_next(node))
     {
@@ -43,7 +63,6 @@ List<MarkdownCodeBlock> extractSlangCodeBlocks(const char* source, size_t length
         result.add(block);
     }
 
-    cmark_node_free(doc);
     return result;
 }
 
