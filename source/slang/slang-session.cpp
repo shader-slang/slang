@@ -1393,6 +1393,8 @@ bool Linkage::isBeingImported(Module* module)
 // and then appending `.slang`.
 //
 // For example, `foo_bar` becomes `foo-bar.slang`.
+// If the name already ends with `.slang` or `.slang.md`,
+// it is returned as-is.
 String getFileNameFromModuleName(Name* name, bool translateUnderScore)
 {
     String fileName;
@@ -1830,9 +1832,9 @@ Linkage::getDeclSourceLocation(slang::DeclReflection* inDecl, slang::SourceLocat
 
 SourceFile* Linkage::findFile(Name* name, SourceLoc loc, IncludeSystem& outIncludeSystem)
 {
-    auto impl = [&](bool translateUnderScore, const char* suffix = "") -> SourceFile*
+    auto impl = [&](bool translateUnderScore) -> SourceFile*
     {
-        auto fileName = getFileNameFromModuleName(name, translateUnderScore) + suffix;
+        auto fileName = getFileNameFromModuleName(name, translateUnderScore);
 
         auto& searchDirs = getSearchDirectories();
         outIncludeSystem = IncludeSystem(&searchDirs, getFileSystemExt(), getSourceManager());
@@ -1856,11 +1858,7 @@ SourceFile* Linkage::findFile(Name* name, SourceLoc loc, IncludeSystem& outInclu
     };
     if (auto rs = impl(false))
         return rs;
-    if (auto rs = impl(true))
-        return rs;
-    if (auto rs = impl(false, ".md"))
-        return rs;
-    return impl(true, ".md");
+    return impl(true);
 }
 
 Linkage::IncludeResult Linkage::findAndIncludeFile(

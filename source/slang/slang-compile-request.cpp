@@ -310,93 +310,35 @@ void FrontEndCompileRequest::parseTranslationUnit(TranslationUnitRequest* transl
         module->getIncludedSourceFileMap().addIfNotExists(sourceFile, nullptr);
     }
 
-    // For a new translation unit, we need to reset the WarningStateTracker
-    // to avoid pragma state pollution from previously parsed modules.
-    // This is only done for the first file of the translation unit.
-    // Subsequent files (if any) in the same translation unit, as well as
-    // files included via __include during semantic checking, will reuse
-    // the tracker to preserve pragma states within the module.
-    getSink()->setSourceWarningStateTracker(nullptr);
-
     for (auto sourceFile : translationUnit->getSourceFiles())
     {
+        // Build a list of source segments to process. A plain .slang file
+        // is treated as a single segment (the file itself). A .slang.md
+        // file is split into one segment per Slang code block, each with
+        // a #line directive so diagnostics point to the correct location
+        // in the original Markdown file.
+        List<SourceFile*> segments;
+
         if (sourceFile->getPathInfo().foundPath.endsWith(".slang.md"))
         {
             auto content = sourceFile->getContent();
             auto codeBlocks = extractSlangCodeBlocks(content.begin(), content.getLength());
             auto* sourceManager = getSourceManager();
-            Scope* languageScope = getSession()->slangLanguageScope;
 
-            for (Index blockIndex = 0; blockIndex < codeBlocks.getCount(); blockIndex++)
+            for (auto& block : codeBlocks)
             {
-                auto& block = codeBlocks[blockIndex];
-
                 StringBuilder syntheticContent;
                 syntheticContent << "#line " << block.startLine << "\n";
                 syntheticContent << block.content;
 
-                auto syntheticFile = sourceManager->createSourceFileWithString(
+                segments.add(sourceManager->createSourceFileWithString(
                     sourceFile->getPathInfo(),
-                    syntheticContent.produceString());
-
-                SourceLanguage sourceLanguage = SourceLanguage::Slang;
-                SlangLanguageVersion languageVersion =
-                    translationUnit->compileRequest->optionSet.getLanguageVersion();
-                auto tokens = preprocessSource(
-                    syntheticFile,
-                    getSink(),
-                    &includeSystem,
-                    combinedPreprocessorDefinitions,
-                    getLinkage(),
-                    sourceLanguage,
-                    languageVersion,
-                    &preprocessorHandler);
-
-                translationUnitSyntax->languageVersion = languageVersion;
-
-                parseSourceFile(
-                    astBuilder,
-                    translationUnit,
-                    SourceLanguage::Slang,
-                    tokens,
-                    getSink(),
-                    languageScope,
-                    translationUnitSyntax);
+                    syntheticContent.produceString()));
             }
-            continue;
         }
-
-        SourceLanguage sourceLanguage = translationUnit->sourceLanguage;
-        SlangLanguageVersion languageVersion =
-            translationUnit->compileRequest->optionSet.getLanguageVersion();
-        auto tokens = preprocessSource(
-            sourceFile,
-            getSink(),
-            &includeSystem,
-            combinedPreprocessorDefinitions,
-            getLinkage(),
-            sourceLanguage,
-            languageVersion,
-            &preprocessorHandler);
-
-        translationUnitSyntax->languageVersion = languageVersion;
-
-        if (sourceLanguage == SourceLanguage::Unknown)
-            sourceLanguage = translationUnit->sourceLanguage;
-
-        Scope* languageScope = nullptr;
-        switch (sourceLanguage)
+        else
         {
-        case SourceLanguage::HLSL:
-            languageScope = getSession()->hlslLanguageScope;
-            break;
-        case SourceLanguage::GLSL:
-            languageScope = getSession()->glslLanguageScope;
-            break;
-        case SourceLanguage::Slang:
-        default:
-            languageScope = getSession()->slangLanguageScope;
-            break;
+            segments.add(sourceFile);
         }
 
         if (optionSet.getBoolOption(CompilerOptionName::OutputIncludes))
@@ -407,28 +349,63 @@ void FrontEndCompileRequest::parseTranslationUnit(TranslationUnitRequest* transl
                 getSink());
         }
 
-        if (optionSet.getBoolOption(CompilerOptionName::PreprocessorOutput))
+        for (auto segmentFile : segments)
         {
-            if (m_writers)
+            getSink()->setSourceWarningStateTracker(nullptr);
+
+            SourceLanguage sourceLanguage = translationUnit->sourceLanguage;
+            SlangLanguageVersion languageVersion =
+                translationUnit->compileRequest->optionSet.getLanguageVersion();
+            auto tokens = preprocessSource(
+                segmentFile,
+                getSink(),
+                &includeSystem,
+                combinedPreprocessorDefinitions,
+                getLinkage(),
+                sourceLanguage,
+                languageVersion,
+                &preprocessorHandler);
+
+            translationUnitSyntax->languageVersion = languageVersion;
+
+            if (sourceLanguage == SourceLanguage::Unknown)
+                sourceLanguage = translationUnit->sourceLanguage;
+
+            Scope* languageScope = nullptr;
+            switch (sourceLanguage)
             {
-                _outputPreprocessorTokens(
-                    tokens,
-                    m_writers->getWriter(SLANG_WRITER_CHANNEL_STD_OUTPUT));
+            case SourceLanguage::HLSL:
+                languageScope = getSession()->hlslLanguageScope;
+                break;
+            case SourceLanguage::GLSL:
+                languageScope = getSession()->glslLanguageScope;
+                break;
+            case SourceLanguage::Slang:
+            default:
+                languageScope = getSession()->slangLanguageScope;
+                break;
             }
-            // If we output the preprocessor output then we are done doing anything else
-            return;
+
+            if (optionSet.getBoolOption(CompilerOptionName::PreprocessorOutput))
+            {
+                if (m_writers)
+                {
+                    _outputPreprocessorTokens(
+                        tokens,
+                        m_writers->getWriter(SLANG_WRITER_CHANNEL_STD_OUTPUT));
+                }
+                return;
+            }
+
+            parseSourceFile(
+                astBuilder,
+                translationUnit,
+                sourceLanguage,
+                tokens,
+                getSink(),
+                languageScope,
+                translationUnitSyntax);
         }
-
-        parseSourceFile(
-            astBuilder,
-            translationUnit,
-            sourceLanguage,
-            tokens,
-            getSink(),
-            languageScope,
-            translationUnitSyntax);
-
-        // Let's try dumping
 
         if (optionSet.getBoolOption(CompilerOptionName::DumpAst))
         {
@@ -644,8 +621,11 @@ void FrontEndCompileRequest::addTranslationUnitSourceArtifact(
 
     if (!translationUnit->moduleName)
     {
+        String artifactName = sourceArtifact->getName();
+        if (artifactName.endsWith(".slang.md"))
+            artifactName = String(artifactName.getUnownedSlice().subString(0, artifactName.getLength() - 3));
         translationUnit->setModuleName(
-            getNamePool()->getName(Path::getFileNameWithoutExt(sourceArtifact->getName())));
+            getNamePool()->getName(Path::getFileNameWithoutExt(artifactName)));
     }
     if (translationUnit->module->getFilePath() == nullptr)
         translationUnit->module->setPathInfo(PathInfo::makePath(sourceArtifact->getName()));

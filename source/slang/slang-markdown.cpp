@@ -1,7 +1,6 @@
 #include "slang-markdown.h"
 
-#include <cmark.h>
-#include <node.h>
+#include <cmark-gfm.h>
 #include <string.h>
 
 namespace Slang
@@ -31,7 +30,11 @@ List<MarkdownCodeBlock> extractSlangCodeBlocks(const char* source, size_t length
         MarkdownCodeBlock block;
         block.content = literal;
 
-        bool isFenced = node->as.code.fenced != 0;
+        int fenceLength = 0;
+        int fenceOffset = 0;
+        char fenceChar = 0;
+        bool isFenced = cmark_node_get_fenced(node, &fenceLength, &fenceOffset, &fenceChar) != 0;
+
         int nodeLine = cmark_node_get_start_line(node);
         block.startLine = isFenced ? nodeLine + 1 : nodeLine;
 

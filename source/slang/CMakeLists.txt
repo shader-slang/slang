@@ -254,7 +254,7 @@ set(slang_link_args
     slang-fiddle-output
     slang-lookup-tables
     SPIRV-Headers::SPIRV-Headers
-    cmark
+    libcmark-gfm
 )
 set(slang_interface_args INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/include)
 set(slang_public_lib_args

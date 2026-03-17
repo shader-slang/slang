@@ -49,4 +49,5 @@
 	url = https://github.com/NVIDIA/optix-dev.git
 [submodule "external/cmark"]
 	path = external/cmark
-	url = https://github.com/commonmark/cmark.git
+	url = https://github.com/swiftlang/swift-cmark.git
+	branch = gfm
