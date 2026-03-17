@@ -97,6 +97,16 @@ IRInst* cloneInstAndOperands(IRCloneEnv* env, IRBuilder* builder, IRInst* oldIns
 
     ShortList<IRInst*> newOperands;
     newOperands.setCount(operandCount);
+
+    // An instruction whose result carries a spec-const rate will be hoisted
+    // to global scope and, for SPIR-V, emitted as OpSpecConstantOp. That is
+    // only valid when every operand is itself a specialization constant or a
+    // plain constant. Mixing in a runtime value (e.g. a function parameter)
+    // would produce invalid SPIR-V. For other backends, the operand is simply
+    // emitted inline regardless of the rate.
+    //
+    bool allOperandsSpecConst = canBeSpecConst && operandCount > 0;
+    IRType* specConstRateType = nullptr;
     for (UInt ii = 0; ii < operandCount; ++ii)
     {
         auto oldOperand = oldInst->getOperand(ii);
@@ -104,9 +114,23 @@ IRInst* cloneInstAndOperands(IRCloneEnv* env, IRBuilder* builder, IRInst* oldIns
 
         newOperands[ii] = newOperand;
 
-        if (canBeSpecConst)
-            newType = maybeAddRateType(builder, newOperand->getFullType(), newType);
+        if (allOperandsSpecConst)
+        {
+            auto operandType = newOperand->getFullType();
+            if (isSpecConstRateType(operandType))
+            {
+                if (!specConstRateType)
+                    specConstRateType = operandType;
+            }
+            else if (!as<IRConstant>(newOperand))
+            {
+                allOperandsSpecConst = false;
+            }
+        }
     }
+
+    if (allOperandsSpecConst && specConstRateType)
+        newType = maybeAddRateType(builder, specConstRateType, newType);
 
     // Finally we create the inst with the updated operands.
     auto newInst = builder->emitIntrinsicInst(
