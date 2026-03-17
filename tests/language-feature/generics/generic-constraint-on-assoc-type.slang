@@ -1,5 +1,8 @@
 // Test that a where clause constraining an associated type to a concrete type
 // enables operations that depend on knowing the concrete type (e.g. arithmetic).
+// Unlike where-2.slang (which returns a constant), this test uses the
+// constrained associated type in arithmetic to verify the constraint is
+// propagated into the function body.
 
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj -output-using-type

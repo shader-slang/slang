@@ -29,4 +29,16 @@ void computeMain()
     explicitHolder.value = 99;
     outputBuffer[1] = explicitHolder.getValue();
     // CHECK: 99
+
+    // Default type used in arithmetic to exercise type-specific behavior
+    Holder<> arithHolder;
+    arithHolder.value = 7;
+    outputBuffer[2] = arithHolder.getValue() * 3;
+    // CHECK: 21
+
+    // Non-int explicit type (float) to verify default isn't hardcoded
+    Holder<float> floatHolder;
+    floatHolder.value = 3.14;
+    outputBuffer[3] = int(floatHolder.getValue() * 10);
+    // CHECK: 31
 }
