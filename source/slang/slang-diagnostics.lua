@@ -3042,6 +3042,13 @@ err(
     span { loc = "location" }
 )
 
+err(
+    "per-primitive-semantic-in-vertex-output",
+    30703,
+    "per-primitive system value semantic '~semantic' must be placed in an 'OutputPrimitives' (or 'out primitives') parameter, not in a vertex or index output",
+    span { loc = "location" }
+)
+
 --
 -- 308xx: inheritance
 --
