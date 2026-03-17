@@ -4,6 +4,7 @@
 // Both should dispatch correctly without errors.
 
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cpu -compute -shaderobj -output-using-type
+//TEST:SIMPLE(filecheck=SIZE):-target spirv-asm -stage compute -entry computeMain -dump-ir-after inferAnyValueSizeWhereNecessary
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
@@ -103,3 +104,8 @@ void computeMain(uint3 tid : SV_DispatchThreadID)
     outputBuffer[3] = d.getValue();
     // CHECK: 500
 }
+// Verify explicit AnyValueSize attributes are preserved in the IR.
+// SIZE: AnyValueSize(8 : Int)
+// SIZE: %IExact
+// SIZE: AnyValueSize(32 : Int)
+// SIZE: %IOversized
