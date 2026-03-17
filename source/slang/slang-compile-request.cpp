@@ -623,7 +623,8 @@ void FrontEndCompileRequest::addTranslationUnitSourceArtifact(
     {
         String artifactName = sourceArtifact->getName();
         if (artifactName.endsWith(".slang.md"))
-            artifactName = String(artifactName.getUnownedSlice().subString(0, artifactName.getLength() - 3));
+            artifactName =
+                String(artifactName.getUnownedSlice().subString(0, artifactName.getLength() - 3));
         translationUnit->setModuleName(
             getNamePool()->getName(Path::getFileNameWithoutExt(artifactName)));
     }
