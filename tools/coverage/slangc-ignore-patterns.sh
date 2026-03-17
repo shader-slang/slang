@@ -22,9 +22,6 @@ SLANGC_IGNORE_ARGS=(
   -ignore-filename-regex='tools/'
   -ignore-filename-regex='source/slang/slang-(language-server|doc-markdown-writer|doc-ast|ast-dump|repro|workspace-version)[.\-]'
 
-  # Dead code (functions never called from anywhere in the codebase)
-  -ignore-filename-regex='source/slang/slang-ir-(composite-reg-to-mem|address-analysis|augment-make-existential|diff-call)\.'
-
   # Declaration-only headers (FIDDLE-generated, no executable code)
   -ignore-filename-regex='source/slang/slang-ast-(builder|decl|expr|type|val|modifier|stmt)\.h$'
   -ignore-filename-regex='source/slang/slang-capability-val\.h$'
