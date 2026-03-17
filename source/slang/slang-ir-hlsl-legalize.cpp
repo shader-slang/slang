@@ -132,7 +132,28 @@ void legalizeEmptyRayPayloadsForHLSL(IRModule* module)
     {
         auto structType = as<IRStructType>(globalInst);
         if (!structType)
+        {
+            // Also check global variables with IRVulkanRayPayloadDecoration.
+            // These arise from [__vulkanRayPayload] parameters in built-in functions
+            // (e.g. __spirvTraceRayHitObjectEXT) where the decoration is on the
+            // variable rather than the struct type itself.
+            auto globalVar = as<IRGlobalVar>(globalInst);
+            if (!globalVar)
+                continue;
+            if (!globalVar->findDecoration<IRVulkanRayPayloadDecoration>())
+                continue;
+            auto ptrType = as<IRPtrTypeBase>(globalVar->getDataType());
+            if (!ptrType)
+                continue;
+            structType = as<IRStructType>(ptrType->getValueType());
+            if (!structType)
+                continue;
+            // Check if the struct is empty
+            if (structType->getFields().begin() != structType->getFields().end())
+                continue;
+            emptyRayPayloadStructs.add(structType);
             continue;
+        }
 
         // Check if this struct has ray payload decoration
         auto rayPayloadDec = structType->findDecoration<IRRayPayloadDecoration>();
