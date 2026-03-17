@@ -40,8 +40,8 @@ static const int workgroupCount = WorkgroupSize / SubgroupSize;
 static const int MaxK = 64;
 static const int MaxM = 64;
 
-static const int ShMemSizeA = MaxM * 2;
-static const int ShMemSizeB = MaxK * 2;
+static const int ShMemSizeA = MaxM * 4;
+static const int ShMemSizeB = MaxK * 4;
 static const int TotalShMemSizeA = ShMemSizeA * workgroupCount;
 static const int TotalShMemSizeB = ShMemSizeB * workgroupCount * sizeof(DType)/sizeof(half);
 
