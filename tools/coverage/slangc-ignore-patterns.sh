@@ -22,8 +22,7 @@ SLANGC_IGNORE_ARGS=(
   -ignore-filename-regex='tools/'
   -ignore-filename-regex='source/slang/slang-(language-server|doc-markdown-writer|doc-ast|ast-dump|repro|workspace-version)[.\-]'
 
-  # Declaration-only headers (FIDDLE-generated, no executable code)
-  -ignore-filename-regex='source/slang/slang-ast-(builder|decl|expr|type|val|modifier|stmt)\.h$'
+  # FIDDLE-generated AST declaration headers (no executable code)
+  -ignore-filename-regex='source/slang/slang-ast-(decl|expr|modifier|stmt)\.h$'
   -ignore-filename-regex='source/slang/slang-capability-val\.h$'
-  -ignore-filename-regex='source/slang/slang-(compile-request|compiler-api|compiler-options|end-to-end-request|entry-point|fossil|global-session|hlsl-to-vulkan-layout-options|ir|linkable-impls|module-library|module|profile|session|syntax|translation-unit|code-gen|serialize-source-loc|serialize-ir-types|serialize-riff)\.h$'
 )
