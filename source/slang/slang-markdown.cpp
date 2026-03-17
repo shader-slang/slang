@@ -31,7 +31,11 @@ List<MarkdownCodeBlock> extractSlangCodeBlocks(const char* source, size_t length
     struct CmarkDocGuard
     {
         cmark_node* node;
-        ~CmarkDocGuard() { if (node) cmark_node_free(node); }
+        ~CmarkDocGuard()
+        {
+            if (node)
+                cmark_node_free(node);
+        }
     } docGuard{doc};
 
     for (cmark_node* node = cmark_node_first_child(doc); node; node = cmark_node_next(node))
