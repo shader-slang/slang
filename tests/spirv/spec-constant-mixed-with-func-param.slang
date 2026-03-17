@@ -16,8 +16,8 @@ RWStructuredBuffer<float> outputBuffer;
 // The expression `Bc * HS / 4` mixes spec const Bc with function param HS,
 // so it must NOT appear as OpSpecConstantOp but as regular instructions
 // inside the function body.
-// CHECK-NOT: OpSpecConstantOp %uint UDiv %[[BC]]
-// CHECK-NOT: OpSpecConstantOp %uint IMul %[[BC]]
+// CHECK-NOT: OpSpecConstantOp {{.*}} UDiv
+// CHECK-NOT: OpSpecConstantOp {{.*}} IMul
 
 // CHECK: OpFunction
 // CHECK: OpIMul %uint %[[BC]]
