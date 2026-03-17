@@ -21,14 +21,17 @@ struct Impl7 : ICalc { int calc(int x) { return x + 7; } }
 
 ICalc makeCalc(int id)
 {
-    if (id == 0) return Impl0();
-    if (id == 1) return Impl1();
-    if (id == 2) return Impl2();
-    if (id == 3) return Impl3();
-    if (id == 4) return Impl4();
-    if (id == 5) return Impl5();
-    if (id == 6) return Impl6();
-    return Impl7();
+    switch (id)
+    {
+    case 0: return Impl0();
+    case 1: return Impl1();
+    case 2: return Impl2();
+    case 3: return Impl3();
+    case 4: return Impl4();
+    case 5: return Impl5();
+    case 6: return Impl6();
+    default: return Impl7();
+    }
 }
 
 [numthreads(1, 1, 1)]

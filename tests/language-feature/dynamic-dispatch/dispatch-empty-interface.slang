@@ -1,5 +1,5 @@
 // Empty (marker) interface with no methods. Verifies the existential
-// layout machinery works even when there are zero dispatch targets.
+// layout machinery works even when there are no methods to dispatch.
 
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -shaderobj -output-using-type
 

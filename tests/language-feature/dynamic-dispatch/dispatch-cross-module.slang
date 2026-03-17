@@ -2,6 +2,7 @@
 // implementation live in a helper module; a second implementation
 // and the dispatch site are in this file.
 
+//TEST:COMPILE: tests/language-feature/dynamic-dispatch/dispatch-cross-module-helper.slang -o tests/language-feature/dynamic-dispatch/dispatch-cross-module-helper.slang-module
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -shaderobj -output-using-type
 
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0], stride=4)
@@ -9,6 +10,7 @@ RWStructuredBuffer<int> outputBuffer;
 
 import "dispatch-cross-module-helper";
 
+// Uses synthesized init (no explicit __init), unlike HelperImpl.
 struct LocalImpl : ICrossModule
 {
     int w;
