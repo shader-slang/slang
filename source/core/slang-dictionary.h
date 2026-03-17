@@ -225,7 +225,7 @@ public:
     {
         if (const auto x = tryGetValue(key))
             return *x;
-        SLANG_ASSERT_FAILURE("The key does not exist in dictionary.");
+        SLANG_UNEXPECTED("The key does not exist in dictionary.");
     }
 
     // Returns a reference to the value at the given key. Asserts if the
@@ -234,7 +234,7 @@ public:
     {
         if (const auto x = tryGetValue(key))
             return *x;
-        SLANG_ASSERT_FAILURE("The key does not exist in dictionary.");
+        SLANG_UNEXPECTED("The key does not exist in dictionary.");
     }
 
     //
@@ -504,7 +504,7 @@ private:
         }
         if (insertPos != -1)
             return FindPositionResult(-1, insertPos);
-        SLANG_ASSERT_FAILURE(
+        SLANG_UNEXPECTED(
             "Hash map is full. This indicates an error in Key::Equal or Key::GetHashCode.");
     }
     TValue& _insert(KeyValuePair<TKey, TValue>&& kvPair, int pos)
@@ -552,9 +552,9 @@ private:
             _insert(_Move(kvPair), pos.insertionPosition);
             return true;
         }
-        else
-            SLANG_ASSERT_FAILURE(
-                "Inconsistent find result returned. This is a bug in Dictionary implementation.");
+
+        SLANG_UNEXPECTED("Inconsistent find result returned. This is a bug in OrderedDictionary "
+                         "implementation.");
     }
     void add(KeyValuePair<TKey, TValue>&& kvPair)
     {
@@ -575,9 +575,9 @@ private:
             m_count++;
             return _insert(_Move(kvPair), pos.insertionPosition);
         }
-        else
-            SLANG_ASSERT_FAILURE(
-                "Inconsistent find result returned. This is a bug in Dictionary implementation.");
+
+        SLANG_UNEXPECTED("Inconsistent find result returned. This is a bug in OrderedDictionary "
+                         "implementation.");
     }
 
 public:
@@ -680,10 +680,8 @@ public:
             {
                 return dict->m_hashMap[pos.objectPosition]->value.value;
             }
-            else
-            {
-                SLANG_ASSERT_FAILURE("The key does not exists in dictionary.");
-            }
+
+            SLANG_UNEXPECTED("The key does not exist in dictionary.");
         }
         inline TValue& operator()() const { return getValue(); }
         operator TValue&() const { return getValue(); }

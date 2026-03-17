@@ -77,6 +77,8 @@ public struct BindlessAddress<T> : IPointerLikeAddress<T>
         }
     }
 
+    [Differentiable]
+    [ForwardDerivative(fwd_getOffset)]
     public This getOffset(int elements)
     {
         uint newBaseIndex = baseIndex + elements;
@@ -84,6 +86,13 @@ public struct BindlessAddress<T> : IPointerLikeAddress<T>
         This address = This(handle);
         address.baseIndex = newBaseIndex;
         return address;
+    }
+
+    static DifferentialPtrPair<This> fwd_getOffset(DifferentialPtrPair<This> self, int elements)
+    {
+        return DifferentialPtrPair<This>(
+            self.p.getOffset(elements),
+            self.d.getOffset(elements));
     }
 
     [ForceInline]
@@ -129,9 +138,18 @@ public struct PointerAddress<T> : IPointerLikeAddress<T>
         set { ptr[index] = newValue; }
     }
 
+    [Differentiable]
+    [ForwardDerivative(fwd_getOffset)]
     public This getOffset(int elements)
     {
-        return This(ptr + elements);
+        return no_diff(This(ptr + elements));
+    }
+
+    static DifferentialPtrPair<This> fwd_getOffset(DifferentialPtrPair<This> self, int elements)
+    {
+        return DifferentialPtrPair<This>(
+            self.p.getOffset(elements),
+            self.d.getOffset(elements));
     }
 
     [ForceInline]
@@ -229,11 +247,20 @@ public struct TorchTensorViewAddress<T> : IPointerLikeAddress<T>
     }
 
     [require(cuda)]
+    [Differentiable]
+    [ForwardDerivative(fwd_getOffset)]
     public This getOffset(int elements)
     {
         This result;
         result.inner = inner.getOffset(elements);
         return result;
+    }
+
+    static DifferentialPtrPair<This> fwd_getOffset(DifferentialPtrPair<This> self, int elements)
+    {
+        return DifferentialPtrPair<This>(
+            self.p.getOffset(elements),
+            self.d.getOffset(elements));
     }
 
     [ForceInline]
@@ -300,9 +327,18 @@ internal extension<T> Ptr<T, Access.ReadWrite, AddressSpace.Device> : IPointerLi
         set { this[index] = newValue; }
     }
 
+    [Differentiable]
+    [ForwardDerivative(fwd_getOffset)]
     internal This getOffset(int elements)
     {
-        return This(this + elements);
+        return no_diff(This(this + elements));
+    }
+
+    static DifferentialPtrPair<This> fwd_getOffset(DifferentialPtrPair<This> self, int elements)
+    {
+        return DifferentialPtrPair<This>(
+            self.p + elements,
+            self.d + elements);
     }
 
     [require(hlsl, sm_6_6)]

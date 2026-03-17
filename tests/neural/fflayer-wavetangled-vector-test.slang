@@ -73,11 +73,10 @@ typealias OutVec = WaveTangledVector<ElementType, ShMemSizeLayer1, OutputSize, S
 // FFLayer with WaveTangledVector and LinearLayout
 typealias Layer = FFLayer<ElementType, InVec, OutVec, LinearLayout, IdentityActivation<ElementType>, true>;
 
-// Wrapper function for autodiff
 [Differentiable]
-OutVec computeLayerOutput(Address weightAddr, Address biasAddr, InVec input, Layer layer)
+OutVec computeLayerOutput(Address paramAddr, InVec input, Layer layer)
 {
-    return layer.eval<Address>(input, weightAddr, biasAddr);
+    return layer.eval<Address>(input, paramAddr);
 }
 
 // Test FFLayer forward pass with WaveTangledVector
@@ -94,12 +93,8 @@ void testFFLayerForward(int tid, int resIndex)
 
     let layer = Layer();
 
-    // Compute weight/bias addresses
-    let weightAddr = baseAddr.getOffset(0);
-    let biasAddr = baseAddr.getOffset(8);
-
     // Forward pass
-    let output = layer.eval<Address>(input, weightAddr, biasAddr);
+    let output = layer.eval<Address>(input, baseAddr);
 
     // Verify output: [39, 80]
     bool isPassed = true;
@@ -124,22 +119,14 @@ void testFFLayerBackward(int tid, int resIndex)
 
     let layer = Layer();
 
-    // Compute weight/bias addresses outside differentiable function
-    let weightAddr = baseAddr.getOffset(0);
-    let biasAddr = baseAddr.getOffset(8);
-    let dWeightAddr = dBaseAddr.getOffset(0);
-    let dBiasAddr = dBaseAddr.getOffset(8);
-
-    // Set up differential pairs for weight and bias addresses
-    var weightAddrPair = DifferentialPtrPair<Address>(weightAddr, dWeightAddr);
-    var biasAddrPair = DifferentialPtrPair<Address>(biasAddr, dBiasAddr);
+    var paramAddrPair = DifferentialPtrPair<Address>(baseAddr, dBaseAddr);
     var inputPair = diffPair(input);
 
     // dOutput = [1, 1]
     let dOutput = OutVec(1.0);
 
     // Backward pass
-    bwd_diff(computeLayerOutput)(weightAddrPair, biasAddrPair, inputPair, layer, dOutput);
+    bwd_diff(computeLayerOutput)(paramAddrPair, inputPair, layer, dOutput);
 
     // Verify input gradient: dInput = W^T * dOutput = [1+5, 2+6, 3+7, 4+8] = [6, 8, 10, 12]
     bool isPassed = true;

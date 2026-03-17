@@ -1149,6 +1149,51 @@ bool SemanticsVisitor::TryCheckOverloadCandidateConstraints(
                     context.mode != OverloadResolveContext::Mode::JustTrying))
                 return false;
         }
+        else if (auto nonEmptyConstraintDecl = as<NonEmptyPackConstraintDecl>(constraintDecl))
+        {
+            Decl* constrainedPackDecl = nullptr;
+            if (auto declRefExpr = as<DeclRefExpr>(nonEmptyConstraintDecl->packExpr))
+            {
+                constrainedPackDecl = getDeclRef(m_astBuilder, declRefExpr).getDecl();
+            }
+
+            Val* constrainedArg = nullptr;
+            if (auto typePackDecl = as<GenericTypePackParamDecl>(constrainedPackDecl))
+            {
+                if (typePackDecl->parameterIndex < newArgs.getCount())
+                    constrainedArg = newArgs[typePackDecl->parameterIndex];
+            }
+            else if (auto valuePackDecl = as<GenericValuePackParamDecl>(constrainedPackDecl))
+            {
+                if (valuePackDecl->parameterIndex < newArgs.getCount())
+                    constrainedArg = newArgs[valuePackDecl->parameterIndex];
+            }
+
+            auto packCardinality = constrainedArg ? getPackCardinality(constrainedArg)
+                                                  : VariadicPackCardinality::Unknown;
+            if (packCardinality != VariadicPackCardinality::NonEmpty)
+            {
+                if (context.mode != OverloadResolveContext::Mode::JustTrying)
+                {
+                    if (packCardinality == VariadicPackCardinality::Empty)
+                    {
+                        getSink()->diagnose(Diagnostics::EmptyPackDoesNotSatisfyNonEmptyConstraint{
+                            .location = context.loc});
+                    }
+                    else
+                    {
+                        auto diagExpr =
+                            context.originalExpr ? context.originalExpr : context.baseExpr;
+                        getSink()->diagnose(Diagnostics::PackQueryRequiresNonEmptyPack{
+                            .queryName = "nonempty(...)",
+                            .expr = diagExpr});
+                    }
+                }
+                return false;
+            }
+
+            newArgs.add(m_astBuilder->getNonEmptyPackWitness());
+        }
     }
 
     candidate.subst = SubstitutionSet(

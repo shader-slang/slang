@@ -20,8 +20,9 @@ enum class SignalType
 // Note that message can be passed as nullptr for no message.
 [[noreturn]] void handleSignal(SignalType type, char const* message);
 
-// Special handler for assertions that can optionally return based on environment variable
-void handleAssert(char const* message);
+// Special handler for assertions that can optionally return based on environment variable.
+// Pass isReleaseAssert=true for assertions that should fire even in release-assert-only mode.
+void handleAssert(char const* message, bool isReleaseAssert = false);
 
 #define SLANG_UNEXPECTED(reason) ::Slang::handleSignal(::Slang::SignalType::Unexpected, reason)
 
@@ -29,7 +30,7 @@ void handleAssert(char const* message);
 
 #define SLANG_UNREACHABLE(msg) ::Slang::handleSignal(::Slang::SignalType::Unreachable, msg)
 
-#define SLANG_ASSERT_FAILURE(msg) ::Slang::handleSignal(::Slang::SignalType::AssertFailure, msg)
+#define SLANG_ASSERT_FAILURE(msg) ::Slang::handleAssert(msg)
 
 #define SLANG_INVALID_OPERATION(msg) \
     ::Slang::handleSignal(::Slang::SignalType::InvalidOperation, msg)
