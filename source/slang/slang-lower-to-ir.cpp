@@ -2059,7 +2059,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             elementTypes.add(loweredWitness.val->getFullType());
         }
         auto irWitnessPack = irBuilder->emitMakeWitnessPack(
-            irBuilder->getTupleType(
+            irBuilder->getTypePack(
                 (UInt)elementTypes.getCount(),
                 elementTypes.getArrayView().getBuffer()),
             witnesses.getArrayView().arrayView);
@@ -2124,6 +2124,36 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             kIROp_ExtractLastFromPack,
             1,
             &basePack));
+    }
+
+    LoweredValInfo visitTrimHeadSubtypeWitness(TrimHeadSubtypeWitness* witness)
+    {
+        auto patternWitness = lowerVal(context, witness->getPatternTypeWitness());
+        auto irBuilder = getBuilder();
+        auto basePack = getSimpleVal(context, patternWitness);
+        IRInst* basePackType = basePack->getDataType();
+        auto resultType = as<IRType>(irBuilder->emitIntrinsicInst(
+            irBuilder->getTypeKind(),
+            kIROp_TrimHeadOfPack,
+            1,
+            &basePackType));
+        return LoweredValInfo::simple(
+            irBuilder->emitIntrinsicInst(resultType, kIROp_TrimHeadOfPack, 1, &basePack));
+    }
+
+    LoweredValInfo visitTrimTailSubtypeWitness(TrimTailSubtypeWitness* witness)
+    {
+        auto patternWitness = lowerVal(context, witness->getPatternTypeWitness());
+        auto irBuilder = getBuilder();
+        auto basePack = getSimpleVal(context, patternWitness);
+        IRInst* basePackType = basePack->getDataType();
+        auto resultType = as<IRType>(irBuilder->emitIntrinsicInst(
+            irBuilder->getTypeKind(),
+            kIROp_TrimTailOfPack,
+            1,
+            &basePackType));
+        return LoweredValInfo::simple(
+            irBuilder->emitIntrinsicInst(resultType, kIROp_TrimTailOfPack, 1, &basePack));
     }
 
     LoweredValInfo visitDeclaredSubtypeWitness(DeclaredSubtypeWitness* val)
@@ -9750,7 +9780,17 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // with the value `5`, then we might have only a single
             // instruction to represent `5`.
             //
-            auto irInitVal = getSimpleVal(subContext, lowerRValueExpr(subContext, initExpr));
+            // FuncCallIntVal means the initializer was symbolically folded but
+            // not fully evaluated (operands are spec constants or generic value
+            // params). Lower via visitFuncCallIntVal which emits constexpr IR
+            // ops and propagates @SpecConst rate when any operand carries it.
+            // The raw initExpr path would emit plain ops without that rate.
+            //
+            IRInst* irInitVal;
+            if (auto funcCallIntVal = as<FuncCallIntVal>(decl->val))
+                irInitVal = lowerSimpleVal(subContext, funcCallIntVal);
+            else
+                irInitVal = getSimpleVal(subContext, lowerRValueExpr(subContext, initExpr));
 
             // We construct a distinct IR instruction to represent the
             // constant itself, with the value as an operand.
