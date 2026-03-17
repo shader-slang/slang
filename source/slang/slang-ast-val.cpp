@@ -2095,7 +2095,23 @@ Val* CountOfIntVal::_substituteImplOverride(
     int* ioDiff)
 {
     if (!getValArg())
-        return this;
+    {
+        fprintf(
+            stderr,
+            "\n*** BUG: CountOfIntVal::_substituteImplOverride: getValArg() is null!\n"
+            "*** this=%p, operand count=%d, type=%p\n",
+            (void*)this,
+            (int)m_operands.getCount(),
+            (void*)getType());
+        for (Index i = 0; i < m_operands.getCount(); i++)
+            fprintf(
+                stderr,
+                "***   operand[%d] = %p\n",
+                (int)i,
+                (void*)m_operands[i].values.nodeOperand);
+        fflush(stderr);
+        SLANG_ASSERT_FAILURE("CountOfIntVal has null valArg operand");
+    }
     int diff = 0;
     auto newVal = getValArg()->substituteImpl(astBuilder, subst, &diff);
     if (!diff)
@@ -2108,7 +2124,23 @@ Val* CountOfIntVal::_substituteImplOverride(
 Val* CountOfIntVal::_resolveImplOverride()
 {
     if (!getValArg())
-        return this;
+    {
+        fprintf(
+            stderr,
+            "\n*** BUG: CountOfIntVal::_resolveImplOverride: getValArg() is null!\n"
+            "*** this=%p, operand count=%d, type=%p\n",
+            (void*)this,
+            (int)m_operands.getCount(),
+            (void*)getType());
+        for (Index i = 0; i < m_operands.getCount(); i++)
+            fprintf(
+                stderr,
+                "***   operand[%d] = %p\n",
+                (int)i,
+                (void*)m_operands[i].values.nodeOperand);
+        fflush(stderr);
+        SLANG_ASSERT_FAILURE("CountOfIntVal has null valArg operand");
+    }
     auto resolvedArg = getValArg()->resolve();
     if (resolvedArg == getValArg())
         return this;
