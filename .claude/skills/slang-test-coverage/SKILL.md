@@ -131,6 +131,30 @@ Document overlap analysis in test-coverage.md:
 - [ ] Direct return
 - [ ] Return via `out`/`inout` parameter
 
+### Type Coverage Matrix (for data marshalling / layout features)
+
+When the feature involves data type handling (e.g., AnyValue packing, serialization,
+type legalization), build an explicit matrix of **all relevant types** from Slang's
+type system vs **existing test files**. Do not summarize coverage in prose ("vectors
+are covered") — list each specific type individually and verify it has a dedicated test.
+
+| Type Category | Specific Types to Check |
+|---|---|
+| Scalars | int, uint, float, bool, int64_t, uint64_t, double, half, int8_t, uint8_t, int16_t, uint16_t |
+| Standard vectors | float2, float3, float4, int2, int3, int4, uint2, uint3, uint4, bool2, bool3, bool4 |
+| Matrices | float2x2, float3x3, float4x4, float2x3, float3x4 |
+| Arrays | T[N] fixed-size, nested T[N][M] |
+| Structs | flat struct, nested struct, empty struct |
+| Enums | enum with underlying type, enum as field, enum as return |
+| Tuples | Tuple<T...>, empty tuple, nested tuple |
+| Optionals | Optional<T>, Optional with zero-size T |
+| Resources | Texture, Buffer, DescriptorHandle |
+
+For each row, identify the test file(s) that exercise it. Mark any type without a
+dedicated test as a gap. Distinguish tests by *what they validate* — a test named
+`layout-8bit-vectors.slang` tests bit-width edge cases, not standard float vector
+field marshalling.
+
 ### Prioritize Gaps
 
 - **HIGH**: Core functionality untested, error cases missing
@@ -225,7 +249,7 @@ See the `slang-test-development` skill for complete test templates, syntax refer
 cmake --preset default
 
 # Build if needed
-cmake --build --preset release --target slangc
+cmake --build --preset release --target slangc slang-test
 
 # Run test
 ./build/Release/bin/slang-test tests/path/to/test.slang
@@ -273,7 +297,7 @@ Create `tmp/feature-name/SUMMARY.md`:
 
 ### SKIP test if:
 - Code unreachable (dead code)
-- **Exact same scenario** already tested (not just "feature is tested")
+- **Same scenario** already tested (not just "feature is tested")
 - Value score <5
 
 ### Investigate as BUG if:
