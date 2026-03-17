@@ -97,6 +97,12 @@ jobs:
           echo "cmake version: $(cmake --version)"
           echo "Building with AddressSanitizer and UndefinedBehaviorSanitizer"
 
+          # Build-time generators are compiled with -shared-libsan and need
+          # the ASan runtime library in LD_LIBRARY_PATH when cmake runs them.
+          CLANG_RUNTIME_DIR=$(clang-18 -print-runtime-dir)
+          export LD_LIBRARY_PATH="${CLANG_RUNTIME_DIR}:${LD_LIBRARY_PATH:-}"
+          echo "Clang runtime dir: $CLANG_RUNTIME_DIR"
+
           if command -v sccache &> /dev/null; then
             echo "sccache statistics (pre-build):"
             sccache --show-stats || true
