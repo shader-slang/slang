@@ -23,6 +23,5 @@ SLANGC_IGNORE_ARGS=(
   -ignore-filename-regex='source/slang/slang-(language-server|doc-markdown-writer|doc-ast|ast-dump|repro|workspace-version)[.\-]'
 
   # FIDDLE-generated AST declaration headers (no executable code)
-  -ignore-filename-regex='source/slang/slang-ast-(decl|expr|modifier|stmt)\.h$'
-  -ignore-filename-regex='source/slang/slang-capability-val\.h$'
+  -ignore-filename-regex='source/slang/slang-ast-(expr|modifier|stmt)\.h$'
 )
