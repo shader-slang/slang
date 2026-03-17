@@ -1,5 +1,6 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -shaderobj -output-using-type
 
 // Verify that a generic typealias with where-clause constraints
 // correctly enforces the interface requirement and computes results.
@@ -32,7 +33,7 @@ struct Wrapper<T : IValueProvider>
 
 typealias WrappedProvider<T : IValueProvider> = Wrapper<T>;
 
-//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0], stride=4)
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0], stride=4)
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(1, 1, 1)]

@@ -1,5 +1,6 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj -output-using-type
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -shaderobj -output-using-type
 
 // Verify that a generic typealias can partially bind type parameters,
 // leaving a subset to be specified at the use site.
@@ -20,7 +21,7 @@ struct ArrayOfElements<T : IArithmetic, let size : int>
 typealias ArrayOfFive<T : IArithmetic> = ArrayOfElements<T, 5>;
 typealias ArrayOfThree<T : IArithmetic> = ArrayOfElements<T, 3>;
 
-//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0], stride=4)
+//TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0], stride=4)
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(1, 1, 1)]
