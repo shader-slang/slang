@@ -2094,6 +2094,8 @@ Val* CountOfIntVal::_substituteImplOverride(
     SubstitutionSet subst,
     int* ioDiff)
 {
+    if (!getValArg())
+        return this;
     int diff = 0;
     auto newVal = getValArg()->substituteImpl(astBuilder, subst, &diff);
     if (!diff)
@@ -2105,6 +2107,8 @@ Val* CountOfIntVal::_substituteImplOverride(
 
 Val* CountOfIntVal::_resolveImplOverride()
 {
+    if (!getValArg())
+        return this;
     auto resolvedArg = getValArg()->resolve();
     if (resolvedArg == getValArg())
         return this;
