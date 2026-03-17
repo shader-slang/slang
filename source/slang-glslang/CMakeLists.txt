@@ -30,6 +30,11 @@ if(SLANG_ENABLE_SLANG_GLSLANG)
             PROPERTIES OUTPUT_NAME slang-glslang-${SLANG_VERSION_NUMERIC}
         )
     endif()
+    add_supported_cxx_flags(
+        slang-glslang
+        PRIVATE
+        -fno-rtti
+    )
     add_supported_cxx_linker_flags(
         slang-glslang
         PRIVATE

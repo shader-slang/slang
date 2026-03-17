@@ -127,7 +127,20 @@ option(SLANG_ENABLE_DXIL "Enable generating DXIL with DXC" ON)
 
 option(SLANG_ENABLE_FULL_IR_VALIDATION "Enable full IR validation (SLOW!)")
 option(SLANG_ENABLE_IR_BREAK_ALLOC "Enable _debugUID on IR allocation")
-option(SLANG_ENABLE_ASAN "Enable ASAN (address sanitizer)")
+option(
+    SLANG_IGNORE_ABORT_MSG
+    "Ignore the system modal assert dialog while running build tools to help LLM workflow."
+    OFF
+)
+if(SLANG_IGNORE_ABORT_MSG)
+    set(slang_ignore_abort_msg_arg -ignore-abort-msg)
+else()
+    set(slang_ignore_abort_msg_arg)
+endif()
+option(
+    SLANG_ENABLE_ASAN
+    "Enable AddressSanitizer (ASan), and UndefinedBehaviorSanitizer (UBSan) if available as well"
+)
 option(SLANG_ENABLE_COVERAGE "Enable code coverage instrumentation")
 option(
     SLANG_ENABLE_TIME_TRACE

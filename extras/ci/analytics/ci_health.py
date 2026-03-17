@@ -28,6 +28,11 @@ from ci_visualization import page_template, chart_section, DOWNLOAD_JS
 
 DEFAULT_REPO = "shader-slang/slang"
 
+# GCP T4 GPU quota configuration
+GPU_QUOTA_PROJECT = "slang-runners"
+GPU_QUOTA_REGIONS = ["us-central1", "us-east1", "us-west1"]
+GPU_QUOTA_METRIC = "NVIDIA_T4_GPUS"
+
 
 def _esc(s):
     """HTML-escape a string."""
@@ -49,6 +54,57 @@ def _round_time(hhmm, interval=DISPLAY_INTERVAL_MIN):
     return f"{h:02d}:{m:02d}"
 SNAPSHOTS_FILE = "health_snapshots.jsonl"
 CHARTJS_CDN = "https://cdn.jsdelivr.net/npm/chart.js"
+
+
+def fetch_gpu_quota():
+    """Fetch T4 GPU usage and limits from GCP across all configured regions.
+
+    Returns a dict with 'usage', 'limit', and per-region breakdown,
+    or None if gcloud is unavailable.
+    """
+    total_usage = 0
+    total_limit = 0
+    regions = {}
+
+    for region in GPU_QUOTA_REGIONS:
+        cmd = [
+            "gcloud", "compute", "regions", "describe", region,
+            "--project", GPU_QUOTA_PROJECT,
+            "--format", "json(quotas)",
+        ]
+        try:
+            result = subprocess.run(
+                cmd, capture_output=True, text=True, timeout=30
+            )
+        except FileNotFoundError:
+            return None
+        except subprocess.TimeoutExpired:
+            print(f"Warning: timeout fetching GPU quota for {region}", file=sys.stderr)
+            continue
+        if result.returncode != 0:
+            print(
+                f"Warning: gcloud failed for {region}: {result.stderr.strip()}",
+                file=sys.stderr,
+            )
+            continue
+        try:
+            data = json.loads(result.stdout)
+        except json.JSONDecodeError:
+            print(f"Warning: invalid GPU quota JSON for {region}", file=sys.stderr)
+            continue
+
+        for q in data.get("quotas", []):
+            if q.get("metric") == GPU_QUOTA_METRIC:
+                usage = int(q.get("usage", 0))
+                limit = int(q.get("limit", 0))
+                regions[region] = {"usage": usage, "limit": limit}
+                total_usage += usage
+                total_limit += limit
+                break
+
+    if not regions:
+        return None
+    return {"usage": total_usage, "limit": total_limit, "regions": regions}
 
 
 def parse_args():
@@ -106,6 +162,8 @@ def fetch_recent_failures(repo):
             continue
         if run.get("conclusion") != "failure":
             continue
+        if run.get("event") == "merge_group":
+            continue  # Merge queue failures shown separately
         event_time = run.get("updated_at") or run.get("created_at", "")
         if event_time < cutoff:
             continue
@@ -118,41 +176,94 @@ def fetch_recent_failures(repo):
     return failures[:10]
 
 
-def record_snapshot(queue_data, output_dir):
+def fetch_merge_queue_status(repo):
+    """Fetch recent merge queue CI runs (last 24 hours).
+
+    Returns a dict with 'recent' (list of runs), 'summary' counts.
+    """
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+    from gh_api import gh_api_list, parse_merge_queue_pr_number
+
+    runs, err = gh_api_list(
+        f"repos/{repo}/actions/runs?event=merge_group&per_page=50",
+        "workflow_runs",
+    )
+    if err:
+        return None
+
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=24)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    recent = []
+    counts = {"success": 0, "failure": 0, "cancelled": 0, "in_progress": 0}
+    for run in (runs or []):
+        if run.get("name") != "CI":
+            continue
+        event_time = run.get("created_at", "")
+        if event_time < cutoff:
+            continue
+        conclusion = run.get("conclusion")
+        if conclusion in counts:
+            counts[conclusion] += 1
+        elif run.get("status") in ("queued", "in_progress"):
+            counts["in_progress"] += 1
+
+        pr_number = parse_merge_queue_pr_number(run.get("head_branch", ""))
+        recent.append({
+            "conclusion": conclusion or run.get("status", "in_progress"),
+            "branch": run.get("head_branch", ""),
+            "pr_number": pr_number,
+            "pr_url": f"https://github.com/{repo}/pull/{pr_number}" if pr_number else "",
+            "url": run.get("html_url", ""),
+            "created_at": event_time,
+            "updated_at": run.get("updated_at", ""),
+        })
+
+    return {"recent": recent, "summary": counts}
+
+
+def record_snapshot(queue_data, output_dir, gpu_quota=None, mq_data=None):
     """Append a runner status snapshot to the JSONL time-series file."""
-    if not queue_data:
+    if not queue_data and not gpu_quota:
         return
 
     now = datetime.now(timezone.utc)
     snapshot = {"timestamp": now.strftime("%Y-%m-%dT%H:%M:%SZ")}
 
-    # Aggregate runner counts by group
-    summary = queue_data.get("summary", {})
-    snapshot["jobs_queued"] = summary.get("jobs_queued", 0)
-    snapshot["jobs_running"] = summary.get("jobs_running", 0)
-    snapshot["runs_queued"] = summary.get("runs_queued", 0)
-    snapshot["runs_in_progress"] = summary.get("runs_in_progress", 0)
+    if queue_data:
+        # Aggregate runner counts by group
+        summary = queue_data.get("summary", {})
+        snapshot["jobs_queued"] = summary.get("jobs_queued", 0)
+        snapshot["jobs_running"] = summary.get("jobs_running", 0)
+        snapshot["runs_queued"] = summary.get("runs_queued", 0)
+        snapshot["runs_in_progress"] = summary.get("runs_in_progress", 0)
 
-    # Per-group busy/total from runner data
-    groups = {}
-    for r in queue_data.get("self_hosted_runners", []):
-        g = r.get("group", "Other")
-        if g not in groups:
-            groups[g] = {"busy": 0, "total": 0}
-        if r.get("status") == "online":
-            groups[g]["total"] += 1
-            if r.get("busy"):
-                groups[g]["busy"] += 1
-    snapshot["runner_groups"] = groups
+        # Per-group busy/total from runner data
+        groups = {}
+        for r in queue_data.get("self_hosted_runners", []):
+            g = r.get("group", "Other")
+            if g not in groups:
+                groups[g] = {"busy": 0, "total": 0}
+            if r.get("status") == "online":
+                groups[g]["total"] += 1
+                if r.get("busy"):
+                    groups[g]["busy"] += 1
+        snapshot["runner_groups"] = groups
 
-    # Per-group queue depth
-    queue_groups = {}
-    for g in queue_data.get("queue_by_group", []):
-        queue_groups[g["name"]] = {
-            "queued": g.get("queued", 0),
-            "running": g.get("running", 0),
-        }
-    snapshot["queue_by_group"] = queue_groups
+        # Per-group queue depth
+        queue_groups = {}
+        for g in queue_data.get("queue_by_group", []):
+            queue_groups[g["name"]] = {
+                "queued": g.get("queued", 0),
+                "running": g.get("running", 0),
+            }
+        snapshot["queue_by_group"] = queue_groups
+
+    # GPU quota per region
+    if gpu_quota:
+        snapshot["gpu_quota"] = gpu_quota.get("regions", {})
+
+    # Merge queue summary
+    if mq_data:
+        snapshot["merge_queue"] = mq_data.get("summary", {})
 
     # Append to JSONL file (kept indefinitely, ~55KB/day)
     os.makedirs(output_dir, exist_ok=True)
@@ -215,6 +326,14 @@ def _deduplicate_snapshots(snapshots):
     return [by_window[k] for k in sorted(by_window)]
 
 
+_REGION_COLORS = ["#0d6efd", "#fd7e14", "#28a745", "#dc3545", "#6f42c1", "#20c997"]
+
+
+def _region_palette(regions):
+    """Map region names to colors."""
+    return {r: _REGION_COLORS[i % len(_REGION_COLORS)] for i, r in enumerate(regions)}
+
+
 def build_history_chart(snapshots):
     """Build Chart.js HTML for 24h runner load history."""
     if not snapshots:
@@ -240,6 +359,33 @@ def build_history_chart(snapshots):
     for g in gcp_vm_groups:
         group_series[g] = [s.get("runner_groups", {}).get(g, {}).get("total", 0) for s in snapshots]
 
+    # GPU quota per region (discover regions dynamically from snapshot data)
+    gpu_regions = sorted({
+        region
+        for s in snapshots
+        for region in s.get("gpu_quota", {})
+    })
+    gpu_region_series = {}
+    for region in gpu_regions:
+        gpu_region_series[region] = [
+            s.get("gpu_quota", {}).get(region, {}).get("usage", 0)
+            for s in snapshots
+        ]
+    # Total quota limit (use latest snapshot that has quota data)
+    gpu_quota_limit = 0
+    for s in reversed(snapshots):
+        quota = s.get("gpu_quota", {})
+        if quota:
+            gpu_quota_limit = sum(r.get("limit", 0) for r in quota.values())
+            break
+    has_gpu_quota = bool(gpu_regions)
+
+    # Merge queue cumulative success/failure from snapshots
+    # Each snapshot records the running 24h totals; we just plot them over time.
+    mq_success_data = [s.get("merge_queue", {}).get("success", 0) for s in snapshots]
+    mq_failure_data = [s.get("merge_queue", {}).get("failure", 0) for s in snapshots]
+    has_mq_snapshots = any(s.get("merge_queue") for s in snapshots)
+
     charts_html = (
         chart_section("runnerHistory", "GCP Runner VMs",
             "Number of GCP-provisioned runner VMs online per group, sampled every 15 minutes.")
@@ -248,6 +394,12 @@ def build_history_chart(snapshots):
         + chart_section("queueHistory", "Job Queue Depth",
             "Individual jobs waiting in queue vs. actively running on runners.")
     )
+    if has_gpu_quota:
+        charts_html += chart_section("gpuQuota", "T4 GPU Usage vs. Quota",
+            "T4 GPUs in use per GCP region, stacked. Dashed line shows total quota limit.")
+    if has_mq_snapshots:
+        charts_html += chart_section("mqHistory", "Merge Queue Checks (24h rolling)",
+            "Rolling 24-hour count of merge queue CI check outcomes, sampled every 15 minutes.")
 
     return f"""
 <div class="chart-section">
@@ -269,6 +421,14 @@ const allRunsInProgress = {json.dumps(runs_in_progress)};
 const allRunsQueued = {json.dumps(runs_queued)};
 const allJobsQueued = {json.dumps(queued_data)};
 const allJobsRunning = {json.dumps(running_data)};
+
+const gpuRegionData = {json.dumps(gpu_region_series)};
+const gpuQuotaLimit = {gpu_quota_limit};
+const gpuRegionColors = {json.dumps(_region_palette(gpu_regions))};
+
+const mqSuccessData = {json.dumps(mq_success_data)};
+const mqFailureData = {json.dumps(mq_failure_data)};
+const hasMqSnapshots = {json.dumps(has_mq_snapshots)};
 
 const runnerColors = {json.dumps(palette)};
 const pointsPerHour = 4; // 15-min intervals
@@ -343,6 +503,77 @@ function buildCharts(hours) {{
       scales: {{ y: {{ min: 0, title: {{ display: true, text: 'Jobs' }} }} }}
     }}
   }});
+
+  // GPU quota (stacked by region + limit line)
+  const gpuCanvas = document.getElementById('gpuQuota_canvas');
+  if (gpuCanvas && Object.keys(gpuRegionData).length > 0) {{
+    const gpuDatasets = [];
+    for (const [region, color] of Object.entries(gpuRegionColors)) {{
+      gpuDatasets.push({{
+        label: region,
+        data: sliceLast(gpuRegionData[region] || [], n),
+        borderColor: color,
+        backgroundColor: color + '55',
+        fill: 'stack',
+        stack: 'usage',
+        tension: 0.3,
+      }});
+    }}
+    // Quota limit as a dashed line (not stacked)
+    gpuDatasets.push({{
+      label: 'Quota Limit',
+      data: Array(labels.length).fill(gpuQuotaLimit),
+      borderColor: '#dc3545',
+      borderDash: [6, 3],
+      borderWidth: 2,
+      pointRadius: 0,
+      fill: false,
+    }});
+    charts.gpu = new Chart(gpuCanvas.getContext('2d'), {{
+      type: 'line',
+      data: {{ labels: displayLabels, datasets: gpuDatasets }},
+      options: {{
+        responsive: true,
+        scales: {{
+          y: {{ min: 0, stacked: true, title: {{ display: true, text: 'T4 GPUs' }} }}
+        }},
+        plugins: {{
+          tooltip: {{
+            callbacks: {{
+              afterBody: function(items) {{
+                const idx = items[0].dataIndex;
+                let total = 0;
+                for (const region of Object.keys(gpuRegionColors)) {{
+                  const ds = items[0].chart.data.datasets.find(d => d.label === region);
+                  if (ds) total += ds.data[idx] || 0;
+                }}
+                return 'Total: ' + total + ' / ' + gpuQuotaLimit;
+              }}
+            }}
+          }}
+        }}
+      }}
+    }});
+  }}
+
+  // Merge queue checks over time
+  const mqCanvas = document.getElementById('mqHistory_canvas');
+  if (mqCanvas && hasMqSnapshots) {{
+    charts.mq = new Chart(mqCanvas.getContext('2d'), {{
+      type: 'line',
+      data: {{
+        labels: displayLabels,
+        datasets: [
+          {{ label: 'Success (24h)', data: sliceLast(mqSuccessData, n), borderColor: '#28a745', fill: true, backgroundColor: 'rgba(40,167,69,0.1)', tension: 0.3 }},
+          {{ label: 'Failure (24h)', data: sliceLast(mqFailureData, n), borderColor: '#dc3545', fill: true, backgroundColor: 'rgba(220,53,69,0.1)', tension: 0.3 }},
+        ]
+      }},
+      options: {{
+        responsive: true,
+        scales: {{ y: {{ min: 0, title: {{ display: true, text: 'Merge Queue Checks' }} }} }}
+      }}
+    }});
+  }}
 }}
 
 function updateHistoryRange() {{
@@ -356,7 +587,7 @@ buildCharts(24);
 """
 
 
-def generate_health_html(queue_data, failures, output_dir):
+def generate_health_html(queue_data, failures, output_dir, mq_data=None):
     """Generate health.html from live data."""
     now = datetime.now(timezone.utc)
     fetched_at = now.strftime("%Y-%m-%d %H:%M UTC")
@@ -507,6 +738,46 @@ def generate_health_html(queue_data, failures, output_dir):
     else:
         failures_html = "<p>No recent CI failures.</p>"
 
+    # Merge queue section
+    mq_html = ""
+    if mq_data:
+        summary = mq_data.get("summary", {})
+        fail_rate = 0
+        sf_total = summary.get("success", 0) + summary.get("failure", 0)
+        if sf_total > 0:
+            fail_rate = summary.get("failure", 0) / sf_total * 100
+
+        mq_html = f"""
+<div>
+  <div class="stat-card"><div class="value">{summary.get('success', 0)}</div><div class="label">Passed (24h)</div></div>
+  <div class="stat-card"><div class="value" style="color:#dc3545">{summary.get('failure', 0)}</div><div class="label">Failed (24h)</div></div>
+  <div class="stat-card"><div class="value">{summary.get('cancelled', 0)}</div><div class="label">Cancelled (24h)</div></div>
+  <div class="stat-card"><div class="value">{summary.get('in_progress', 0)}</div><div class="label">In Progress</div></div>
+  <div class="stat-card"><div class="value">{fail_rate:.0f}%</div><div class="label">Failure Rate</div></div>
+</div>
+"""
+        # Recent failures table
+        recent_failures = [r for r in mq_data.get("recent", []) if r.get("conclusion") == "failure"]
+        if recent_failures:
+            mq_html += '\n<h3>Recent Merge Queue Failures</h3>\n'
+            mq_html += '<table><tr><th>PR</th><th>Run</th><th>Time</th></tr>\n'
+            for r in recent_failures[:10]:
+                pr_num = r.get("pr_number", "")
+                pr_url = r.get("pr_url", "")
+                run_url = r.get("url", "")
+                created = r.get("created_at", "")[:16].replace("T", " ")
+                if pr_num:
+                    pr_link = _link(pr_url, f"#{pr_num}")
+                else:
+                    pr_link = _esc(r.get("branch", "")[:50])
+                run_link = _link(run_url, "logs") if run_url else ""
+                mq_html += f"<tr><td>{pr_link}</td><td>{run_link}</td><td>{created}</td></tr>\n"
+            mq_html += "</table>\n"
+        else:
+            mq_html += "<p>No merge queue failures in the last 24 hours.</p>"
+    else:
+        mq_html = "<p>Could not fetch merge queue status.</p>"
+
     # Load snapshots and build history chart
     snapshots = load_snapshots(output_dir, hours=24)
     history_html = build_history_chart(snapshots)
@@ -517,6 +788,9 @@ def generate_health_html(queue_data, failures, output_dir):
 
 <h2>Queue Status</h2>
 {queue_html}
+
+<h2>Merge Queue</h2>
+{mq_html}
 
 <h2>Load History</h2>
 {history_html}
@@ -538,14 +812,29 @@ def main():
     print(f"Fetching queue status for {args.repo}...")
     queue_data = fetch_queue_status(args.repo)
 
+    print("Fetching GPU quota...")
+    gpu_quota = fetch_gpu_quota()
+    if gpu_quota:
+        print(f"  T4 GPUs: {gpu_quota['usage']}/{gpu_quota['limit']} in use")
+    else:
+        print("  GPU quota unavailable (gcloud not configured or not accessible)")
+
+    print("Fetching merge queue status...")
+    mq_data = fetch_merge_queue_status(args.repo)
+    if mq_data:
+        s = mq_data["summary"]
+        print(f"  24h: {s['success']} passed, {s['failure']} failed, {s['cancelled']} cancelled, {s['in_progress']} in progress")
+    else:
+        print("  Merge queue data unavailable")
+
     print("Recording snapshot...")
-    record_snapshot(queue_data, args.output)
+    record_snapshot(queue_data, args.output, gpu_quota=gpu_quota, mq_data=mq_data)
 
     print("Fetching recent CI failures...")
     failures = fetch_recent_failures(args.repo)
 
     print(f"Generating health.html in {args.output}/...")
-    generate_health_html(queue_data, failures, args.output)
+    generate_health_html(queue_data, failures, args.output, mq_data=mq_data)
 
     print("Done.")
 

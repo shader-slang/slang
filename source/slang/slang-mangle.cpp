@@ -287,6 +287,26 @@ void emitType(ManglingContext* context, Type* type)
         emitRaw(context, "Tx");
         emitType(context, expandType->getPatternType());
     }
+    else if (auto firstType = as<FirstPackElementType>(type))
+    {
+        emitRaw(context, "Tf");
+        emitType(context, firstType->getBasePack());
+    }
+    else if (auto lastType = as<LastPackElementType>(type))
+    {
+        emitRaw(context, "Tl");
+        emitType(context, lastType->getBasePack());
+    }
+    else if (auto trimHeadType = as<TrimHeadTypePack>(type))
+    {
+        emitRaw(context, "Th");
+        emitType(context, trimHeadType->getBasePack());
+    }
+    else if (auto trimTailType = as<TrimTailTypePack>(type))
+    {
+        emitRaw(context, "Tt");
+        emitType(context, trimTailType->getBasePack());
+    }
     else if (auto eachType = as<EachType>(type))
     {
         emitRaw(context, "Te");
@@ -298,6 +318,11 @@ void emitType(ManglingContext* context, Type* type)
         emit(context, typePack->getTypeCount());
         for (Index i = 0; i < typePack->getTypeCount(); i++)
             emitType(context, typePack->getElementType(i));
+    }
+    else if (auto valuePackType = as<ValuePackType>(type))
+    {
+        emitRaw(context, "TVp");
+        emitType(context, valuePackType->getElementType());
     }
     else
     {
@@ -363,17 +388,27 @@ void emitVal(ManglingContext* context, Val* val)
     else if (auto sizeOfIntVal = dynamicCast<SizeOfIntVal>(val))
     {
         emitRaw(context, "KSO");
-        emitVal(context, sizeOfIntVal->getTypeArg());
+        emitVal(context, sizeOfIntVal->getValArg());
     }
     else if (auto alignOfIntVal = dynamicCast<AlignOfIntVal>(val))
     {
         emitRaw(context, "KAO");
-        emitVal(context, alignOfIntVal->getTypeArg());
+        emitVal(context, alignOfIntVal->getValArg());
     }
     else if (auto countOfIntVal = dynamicCast<CountOfIntVal>(val))
     {
         emitRaw(context, "KCO");
-        emitVal(context, countOfIntVal->getTypeArg());
+        emitVal(context, countOfIntVal->getValArg());
+    }
+    else if (auto firstIntVal = as<FirstIntVal>(val))
+    {
+        emitRaw(context, "KPF");
+        emitVal(context, firstIntVal->getBasePack());
+    }
+    else if (auto lastIntVal = as<LastIntVal>(val))
+    {
+        emitRaw(context, "KPL");
+        emitVal(context, lastIntVal->getBasePack());
     }
     else if (const auto polynomialIntVal = dynamicCast<PolynomialIntVal>(val))
     {
@@ -400,6 +435,36 @@ void emitVal(ManglingContext* context, Val* val)
     else if (auto modifier = as<ModifierVal>(val))
     {
         emitNameImpl(context, UnownedStringSlice(modifier->getClass().getName()));
+    }
+    else if (auto concreteValPack = as<ConcreteIntValPack>(val))
+    {
+        emitRaw(context, "Vp");
+        emit(context, concreteValPack->getCount());
+        for (Index i = 0; i < concreteValPack->getCount(); i++)
+            emitVal(context, concreteValPack->getElement(i));
+    }
+    else if (auto eachIntVal = as<EachIntVal>(val))
+    {
+        emitRaw(context, "Ve");
+        emitVal(context, eachIntVal->getBasePack());
+    }
+    else if (auto expandIntValPack = as<ExpandIntValPack>(val))
+    {
+        emitRaw(context, "Vx");
+        emitVal(context, expandIntValPack->getPatternVal());
+        emit(context, expandIntValPack->getCapturedPackCount());
+        for (Index i = 0; i < expandIntValPack->getCapturedPackCount(); i++)
+            emitVal(context, expandIntValPack->getCapturedPack(i));
+    }
+    else if (auto trimHeadIntValPack = as<TrimHeadIntValPack>(val))
+    {
+        emitRaw(context, "Vh");
+        emitVal(context, trimHeadIntValPack->getBasePack());
+    }
+    else if (auto trimTailIntValPack = as<TrimTailIntValPack>(val))
+    {
+        emitRaw(context, "Vt");
+        emitVal(context, trimTailIntValPack->getBasePack());
     }
     else
     {
@@ -467,6 +532,12 @@ void emitQualifiedName(ManglingContext* context, DeclRef<Decl> declRef, bool inc
     {
         emit(context, "GP");
         emit(context, genValParamDecl->parameterIndex);
+        return;
+    }
+    if (auto genValPackParamDecl = as<GenericValuePackParamDecl>(declRef.getDecl()))
+    {
+        emit(context, "GP");
+        emit(context, genValPackParamDecl->parameterIndex);
         return;
     }
 
@@ -598,6 +669,10 @@ void emitQualifiedName(ManglingContext* context, DeclRef<Decl> declRef, bool inc
                 {
                     genericParameterCount++;
                 }
+                else if (mm.is<GenericValuePackParamDecl>())
+                {
+                    genericParameterCount++;
+                }
                 else
                 {
                 }
@@ -615,6 +690,11 @@ void emitQualifiedName(ManglingContext* context, DeclRef<Decl> declRef, bool inc
                 if (auto genericTypePackParamDecl = mm.as<GenericTypePackParamDecl>())
                 {
                     emitRaw(context, "TP");
+                }
+                else if (auto genericValuePackParamDecl = mm.as<GenericValuePackParamDecl>())
+                {
+                    emitRaw(context, "VP");
+                    emitType(context, getType(context->astBuilder, genericValuePackParamDecl));
                 }
                 else if (auto genericValueParamDecl = mm.as<GenericValueParamDecl>())
                 {

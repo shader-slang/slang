@@ -33,6 +33,7 @@ add_custom_command(
     COMMAND
         slang-fiddle -i "${SLANG_FIDDLE_INPUT_DIR}/" -o
         "${SLANG_FIDDLE_OUTPUT_DIR}/" ${SLANG_FIDDLE_INPUT_FILE_NAMES}
+        ${slang_ignore_abort_msg_arg}
     DEPENDS ${SLANG_FIDDLE_INPUTS} ${SLANG_FIDDLE_LUA_INPUTS} slang-fiddle
     WORKING_DIRECTORY ${slang_SOURCE_DIR}
     VERBATIM
@@ -54,13 +55,21 @@ target_include_directories(
 # Use /O1;/Os for MSVC, -Oz for Clang, -Os for GCC.
 # For MSVC, we must disable PCH for this file since changing optimization
 # level is incompatible with precompiled headers (warning C4653).
-# Skip optimization entirely in Debug builds to avoid /RTC1 conflicts.
+# Skip optimization in MSVC Debug builds to avoid /RTC1 conflicts.
+# GCC/Clang don't have this issue, so they get size optimization in all configs.
+string(CONCAT RICH_DIAG_SIZE_OPT_FLAGS
+    "$<$<NOT:"
+        "$<AND:$<CONFIG:Debug>,$<CXX_COMPILER_ID:MSVC>>"
+    ">:"
+        "$<IF:$<CXX_COMPILER_ID:MSVC>,/O1;/Os,"
+            "$<IF:$<CXX_COMPILER_ID:GNU>,-Os,-Oz>>"
+    ">"
+)
 set_source_files_properties(
     slang-rich-diagnostics.cpp
     PROPERTIES
         SKIP_PRECOMPILE_HEADERS ON
-        COMPILE_OPTIONS
-            "$<$<NOT:$<CONFIG:Debug>>:$<IF:$<CXX_COMPILER_ID:MSVC>,/O1;/Os,$<IF:$<CXX_COMPILER_ID:GNU>,-Os,-Oz>>>"
+        COMPILE_OPTIONS "${RICH_DIAG_SIZE_OPT_FLAGS}"
 )
 
 #
@@ -136,8 +145,8 @@ set(SLANG_LOOKUP_GENERATED_SOURCE
     "${SLANG_LOOKUP_GENERATOR_OUTPUT_DIR}/slang-lookup-GLSLstd450.cpp"
 )
 set(SLANG_RECORD_REPLAY_SYSTEM
-    "${slang_SOURCE_DIR}/source/slang-record-replay/record"
-    "${slang_SOURCE_DIR}/source/slang-record-replay/util"
+    "${slang_SOURCE_DIR}/source/slang-record-replay"
+    "${slang_SOURCE_DIR}/source/slang-record-replay/proxy"
 )
 
 add_custom_command(

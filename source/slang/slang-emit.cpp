@@ -748,11 +748,10 @@ Result linkAndOptimizeIR(
     requiredLoweringPassSet = {};
     calcRequiredLoweringPassSet(requiredLoweringPassSet, codeGenContext, irModule->getModuleInst());
 
-    // Debug info is added by the front-end, and therefore needs to be stripped out by targets
-    // that opt out of debug info.
+    // Debug info is added by the front-end. If the target cannot express debug info, or if the user
+    // specifies -g0, we need to stripped them out now to allow more optimization and cleanups.
     if (requiredLoweringPassSet.debugInfo &&
-        (targetCompilerOptions.getIntOption(CompilerOptionName::DebugInformation) ==
-         SLANG_DEBUG_INFO_LEVEL_NONE))
+        (targetCompilerOptions.getDebugInfoLevel() == DebugInfoLevel::None))
         SLANG_PASS(stripDebugInfo);
 
     if (!isKhronosTarget(targetRequest) && requiredLoweringPassSet.glslSSBO)
@@ -2099,8 +2098,7 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
     auto targetRequest = getTargetReq();
     auto targetProgram = getTargetProgram();
 
-    auto lineDirectiveMode = targetProgram->getOptionSet().getEnumOption<LineDirectiveMode>(
-        CompilerOptionName::LineDirectiveMode);
+    auto lineDirectiveMode = targetProgram->getOptionSet().getLineDirectiveMode();
     // We will generally use C-style line directives in order to give the user good
     // source locations on error messages from downstream compilers, but there are
     // a few exceptions.
@@ -2749,8 +2747,7 @@ static SlangResult createArtifactFromIR(
         downstreamOptions.sourceArtifacts = makeSlice(artifact.readRef(), 1);
         downstreamOptions.targetType = SLANG_SPIRV;
         downstreamOptions.sourceLanguage = SLANG_SOURCE_LANGUAGE_SPIRV;
-        switch (codeGenContext->getTargetProgram()->getOptionSet().getEnumOption<OptimizationLevel>(
-            CompilerOptionName::Optimization))
+        switch (codeGenContext->getTargetProgram()->getOptionSet().getOptimizationLevel())
         {
         case OptimizationLevel::None:
             downstreamOptions.optimizationLevel = DownstreamCompileOptions::OptimizationLevel::None;

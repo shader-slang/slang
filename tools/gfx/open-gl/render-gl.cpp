@@ -28,9 +28,9 @@
 #if (_MSC_VER < 1900)
 #define snprintf sprintf_s
 #endif
+#pragma comment(lib, "opengl32")
 #endif
 
-#pragma comment(lib, "opengl32")
 
 // clang-format off
 #    include <GL/GL.h>

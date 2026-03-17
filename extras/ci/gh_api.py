@@ -111,6 +111,22 @@ def gh_api_list(endpoint, key):
     return items, None
 
 
+def parse_merge_queue_pr_number(branch):
+    """Extract PR number from a merge queue branch name.
+
+    Format: gh-readonly-queue/master/pr-NNNN-SHA
+    Returns the PR number string, or "" if not a merge queue branch.
+    """
+    if not branch or not branch.startswith("gh-readonly-queue/"):
+        return ""
+    parts = branch.split("/")
+    if len(parts) >= 3 and parts[2].startswith("pr-"):
+        segments = parts[2].split("-", 2)
+        if len(segments) >= 2:
+            return segments[1]
+    return ""
+
+
 def coerce_jobs_data(data):
     """Normalize various input formats into a flat jobs list."""
     if isinstance(data, dict):

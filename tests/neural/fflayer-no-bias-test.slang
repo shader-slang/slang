@@ -10,7 +10,7 @@
 //TEST:SIMPLE(filecheck=CHECK): -target ptx -stage compute -entry computeMain -capability cuda_sm_7_0 -DTEST_TENSORVIEW=1 -DTEST_POINTER=0 -experimental-feature
 // CHECK: computeMain
 
-import neural;
+import slang.neural;
 
 // Weights only (no bias): W = [[1,2],[3,4]]
 //TEST_INPUT: set params = ubuffer(data=[1.0 2.0 3.0 4.0], stride=4)
@@ -50,13 +50,10 @@ bool testForwardPass()
     let baseAddr = Address(params);
     let layer = Layer();
 
-    let weightAddr = baseAddr.getOffset(0);
-
     float[2] xArr = {1.0, 2.0};
     let x = Vec2(xArr);
 
-    // Call eval without bias address (uses default none)
-    let y = layer.eval<Address>(x, weightAddr);
+    let y = layer.eval<Address>(x, baseAddr);
 
     // W = [[1,2],[3,4]]
     // y = W*x = [1*1+2*2, 3*1+4*2] = [5, 11]
@@ -69,11 +66,10 @@ bool testParameterCount()
     return Layer.ParameterCount == 4;
 }
 
-// Wrapper function for autodiff (no bias address needed)
 [Differentiable]
-Vec2 computeOutput(Address weightAddr, Vec2 input, Layer layer)
+Vec2 computeOutput(Address paramAddr, Vec2 input, Layer layer)
 {
-    return layer.eval<Address>(input, weightAddr);
+    return layer.eval<Address>(input, paramAddr);
 }
 
 // Test backward pass using autodiff
@@ -87,14 +83,10 @@ bool testBackwardPass()
     let gradBaseAddr = Address(gradParams);
     let layer = Layer();
 
-    let weightAddr = baseAddr.getOffset(0);
-    let dWeightAddr = gradBaseAddr.getOffset(0);
-
     float[2] xArr = {1.0, 2.0};
     let x = Vec2(xArr);
 
-    // Create DifferentialPtrPair for weight address (primal, gradient)
-    var weightAddrPair = DifferentialPtrPair<Address>(weightAddr, dWeightAddr);
+    var paramAddrPair = DifferentialPtrPair<Address>(baseAddr, gradBaseAddr);
 
     // Create diffPair for input
     var inputPair = diffPair(x);
@@ -103,7 +95,7 @@ bool testBackwardPass()
     let dOutput = Vec2(1.0);
 
     // Use bwd_diff to compute gradients
-    bwd_diff(computeOutput)(weightAddrPair, inputPair, layer, dOutput);
+    bwd_diff(computeOutput)(paramAddrPair, inputPair, layer, dOutput);
 
     // Expected weight gradients:
     // dL/dW = dy * x^T where dy = [1, 1], x = [1, 2]

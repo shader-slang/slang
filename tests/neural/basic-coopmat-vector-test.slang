@@ -8,7 +8,7 @@
 // TEST:SIMPLE(filecheck=CHECK): -target ptx -stage compute -entry computeMain -capability cuda_sm_7_0 -DTEST_HALF=0 -DTEST_TENSORVIEW=1 -DTEST_POINTER=0 -experimental-feature
 // CHECK: computeMain
 
-import neural;
+import slang.neural;
 
 #if TEST_HALF
 typealias ElementType = half;

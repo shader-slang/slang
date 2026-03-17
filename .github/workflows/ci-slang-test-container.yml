@@ -27,7 +27,7 @@ jobs:
       packages: read
 
     container:
-      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.3.0
+      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.4.0
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
@@ -46,6 +46,15 @@ jobs:
         shell: bash
 
     steps:
+      - name: GPU health check
+        run: |
+          if ! output=$(nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv,noheader 2>&1); then
+            echo "nvidia-smi output: $output"
+            echo "::error::GPU health check failed — this VM has a faulty GPU. Re-run to get a new VM."
+            exit 1
+          fi
+          echo "GPU: $output"
+
       - name: Configure Git safe directory
         run: git config --global --add safe.directory '*'
 
@@ -124,6 +133,21 @@ jobs:
             -expected-failure-list tests/expected-failure-github.txt \
             -expected-failure-list tests/expected-failure-linux-gpu.txt
 
+      - name: GPU post-test diagnostics
+        if: failure()
+        run: |
+          echo "=== GPU State ==="
+          nvidia-smi 2>&1 || echo "nvidia-smi FAILED (GPU may have crashed)"
+          echo ""
+          echo "=== GPU Memory & ECC ==="
+          nvidia-smi --query-gpu=name,driver_version,memory.used,memory.free,temperature.gpu,ecc.errors.uncorrected.volatile.total,pstate \
+            --format=csv,noheader 2>&1 || true
+          echo ""
+          echo "=== Kernel GPU Messages ==="
+          dmesg 2>/dev/null | grep -iE "nvidia|nvrm|xid|gpu|fault|segfault" | tail -50 || \
+          sudo dmesg 2>/dev/null | grep -iE "nvidia|nvrm|xid|gpu|fault|segfault" | tail -50 || \
+          echo "(dmesg not available in container)"
+
   test-slang-rhi:
     runs-on: ["Linux", "self-hosted", "GPU"]
     timeout-minutes: 30
@@ -133,7 +157,7 @@ jobs:
       packages: read
 
     container:
-      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.3.0
+      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.4.0
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
@@ -152,6 +176,15 @@ jobs:
         shell: bash
 
     steps:
+      - name: GPU health check
+        run: |
+          if ! output=$(nvidia-smi --query-gpu=name,driver_version,memory.total --format=csv,noheader 2>&1); then
+            echo "nvidia-smi output: $output"
+            echo "::error::GPU health check failed — this VM has a faulty GPU. Re-run to get a new VM."
+            exit 1
+          fi
+          echo "GPU: $output"
+
       - name: Configure Git safe directory
         run: git config --global --add safe.directory '*'
 
@@ -196,3 +229,18 @@ jobs:
       - name: Run slang-rhi tests (OptiX 8.1)
         run: |
           "$bin_dir/slang-rhi-tests" -check-devices -optix-version=80100 -tc="ray-tracing-*.cuda"
+
+      - name: GPU post-test diagnostics
+        if: failure()
+        run: |
+          echo "=== GPU State ==="
+          nvidia-smi 2>&1 || echo "nvidia-smi FAILED (GPU may have crashed)"
+          echo ""
+          echo "=== GPU Memory & ECC ==="
+          nvidia-smi --query-gpu=name,driver_version,memory.used,memory.free,temperature.gpu,ecc.errors.uncorrected.volatile.total,pstate \
+            --format=csv,noheader 2>&1 || true
+          echo ""
+          echo "=== Kernel GPU Messages ==="
+          dmesg 2>/dev/null | grep -iE "nvidia|nvrm|xid|gpu|fault|segfault" | tail -50 || \
+          sudo dmesg 2>/dev/null | grep -iE "nvidia|nvrm|xid|gpu|fault|segfault" | tail -50 || \
+          echo "(dmesg not available in container)"

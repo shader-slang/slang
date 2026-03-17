@@ -441,7 +441,7 @@ SlangResult EndToEndCompileRequest::_maybeWriteDebugArtifact(
     const String& path,
     IArtifact* artifact)
 {
-    if (targetProgram->getOptionSet().getBoolOption(CompilerOptionName::EmitSeparateDebug))
+    if (targetProgram->getOptionSet().shouldEmitSeparateDebugInfo())
     {
         const auto dbgArtifact = getSeparateDbgArtifact(artifact);
         // Check if a debug artifact was actually created (only for SPIR-V targets)
@@ -486,8 +486,7 @@ void EndToEndCompileRequest::generateOutput(TargetProgram* targetProgram)
 bool _shouldWriteSourceLocs(Linkage* linkage)
 {
     // If debug information or source manager are not avaiable we can't/shouldn't write out locs
-    if (linkage->m_optionSet.getEnumOption<DebugInfoLevel>(CompilerOptionName::DebugInformation) ==
-            DebugInfoLevel::None ||
+    if (linkage->m_optionSet.getDebugInfoLevel() == DebugInfoLevel::None ||
         linkage->getSourceManager() == nullptr)
     {
         return false;
@@ -816,7 +815,7 @@ SlangCompileFlags EndToEndCompileRequest::getCompileFlags()
         result |= SLANG_COMPILE_FLAG_NO_MANGLING;
     if (getOptionSet().getBoolOption(CompilerOptionName::SkipCodeGen))
         result |= SLANG_COMPILE_FLAG_NO_CODEGEN;
-    if (getOptionSet().getBoolOption(CompilerOptionName::Obfuscate))
+    if (getOptionSet().shouldObfuscateCode())
         result |= SLANG_COMPILE_FLAG_OBFUSCATE;
     return result;
 }
