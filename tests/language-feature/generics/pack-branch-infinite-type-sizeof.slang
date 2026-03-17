@@ -1,7 +1,7 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv
 
 // Verify an ill-formed PackBranch that forwards the same pack unchanged is
-// caught by backend layout lowering instead of overflowing the stack.
+// rejected as a cyclic type when concretely observed through `sizeof`.
 
 struct EmptyNode
 {
@@ -10,7 +10,8 @@ struct EmptyNode
 
 struct LoopNode<let each P : int>
 /*CHECK:
-       ^^^^^^^^ maximum type nesting level exceeded
+       ^^^^^^^^ type contains cyclic reference
+       ^^^^^^^^ type 'LoopNode' contains cyclic reference to itself.
 */
 {
     __packBranch(P, EmptyNode, LoopNode<P>) next = {};

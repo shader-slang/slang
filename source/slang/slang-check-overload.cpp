@@ -3001,7 +3001,9 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
     // treat it as a ctor call with {1,2,3} as the first argument.
     //
     bool typeOverloadChecked = false;
-
+    // Use a temporary sink to hold errors from coercion, and flush them to the real sink
+    // if we know the site is meant to be an explicit ctor call or coercion.
+    DiagnosticSink collectedErrorsSink(getSourceManager(), nullptr, getSink());
     if (expr->arguments.getCount() == 1 && !as<ExplicitCtorInvokeExpr>(expr) &&
         !as<InitializerListExpr>(expr->arguments[0]))
     {
@@ -3011,10 +3013,7 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
             {
                 Expr* resultExpr = nullptr;
                 ConversionCost conversionCost = kConversionCost_None;
-                // `_coerce()` is only a speculative path for the "T(expr)" explicit-coercion
-                // interpretation. Keep any diagnostics it produces isolated from the real sink so
-                // we can silently fall back to ordinary invoke resolution if coercion fails.
-                DiagnosticSink collectedErrorsSink(getSourceManager(), nullptr, getSink());
+
                 auto coerceResult = SemanticsVisitor(withSink(&collectedErrorsSink))
                                         ._coerce(
                                             CoercionSite::ExplicitCoercion,
@@ -3291,6 +3290,16 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
             // for language server to use.
             if (IsErrorExpr(outExpr))
             {
+                // Drain our error sink of "saved errors"
+                if (collectedErrorsSink.getErrorCount())
+                {
+                    Slang::ComPtr<ISlangBlob> blob;
+                    collectedErrorsSink.getBlobIfNeeded(blob.writeRef());
+                    getSink()->diagnoseRaw(
+                        Severity::Error,
+                        static_cast<char const*>(blob->getBufferPointer()));
+                }
+
                 if (auto invokeExpr = as<InvokeExpr>(outExpr))
                 {
                     invokeExpr->originalFunctionExpr = typeExpr;
