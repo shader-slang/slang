@@ -871,7 +871,14 @@ int main(int argc, const char* const* argv)
         for (; argCursor != argEnd; ++argCursor)
         {
             const auto arg = UnownedStringSlice(*argCursor);
-            if (arg == "--target-directory")
+            if (arg == "-ignore-abort-msg" || arg == "--ignore-abort-msg")
+            {
+#ifdef _MSC_VER
+                // Suppress the modal abort() dialog in unattended/LLM-driven builds.
+                _set_abort_behavior(0, _WRITE_ABORT_MSG);
+#endif
+            }
+            else if (arg == "--target-directory")
             {
                 argCursor++;
                 if (argCursor == argEnd)
