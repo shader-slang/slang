@@ -50,8 +50,13 @@ void computeOneLayer<ExecutionMode Mode, T, U, Arr:IRWArray<uint>>(T inputSize, 
 
     const int tileCSize = tileBSize * sizeof(DType) / sizeof(half);
 
-    const int maxTileBCSize = tileBSize > tileCSize ? tileBSize : tileCSize;
-    const int expectedSize = tileASize + maxTileBCSize * subgroupCount;
+    const int bytesForMMA = tileASize + tileCSize * subgroupCount;
+
+    // The backward outer product loads ALL N lanes' vectors simultaneously (2x).
+    const int bytesForOuterProduct = Mode == ExecutionMode.Training ?
+        2 * (tileASize + tileBSize) * subgroupCount : 0;
+
+    const int expectedSize = bytesForMMA > bytesForOuterProduct ? bytesForMMA : bytesForOuterProduct;
 
     result[index++] = expectedSize;
 }

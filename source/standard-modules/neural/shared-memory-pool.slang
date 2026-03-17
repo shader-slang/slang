@@ -159,10 +159,10 @@ public struct SharedMemorySize0<T, TargetEnum Target, ExecutionMode ExeMode, int
     static const uint BytesForMMA =
         (ShMemInfo.SharedMemSizeInVectorMatA + (ShMemInfo.SharedMemSizeInVectorMatC) * SubgroupCount) * sizeof(uint4);
 
-    // The backward outer product (dW = dOut * input^T) uses per-warp copies
-    // of BOTH A and B tiles, requiring more shared memory than the MMA layout.
+    // The backward outer product (dW = dOut * input^T) loads ALL N lanes'
+    // vectors simultaneously (2x the per-batch allocation) to avoid idle lanes.
     static const uint BytesForOuterProduct = !ShMemInfo.IsTraining ? 0 :
-        (ShMemInfo.SharedMemSizeInVectorMatA + ShMemInfo.SharedMemSizeInVectorMatB) * SubgroupCount * sizeof(uint4);
+        2 * (ShMemInfo.SharedMemSizeInVectorMatA + ShMemInfo.SharedMemSizeInVectorMatB) * SubgroupCount * sizeof(uint4);
 
     public static const uint Bytes = Max(BytesForMMA, BytesForOuterProduct);
 }
