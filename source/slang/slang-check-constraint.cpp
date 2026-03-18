@@ -902,7 +902,7 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
             if (!constrainedArg || !isKnownNonEmptyPack(constrainedArg))
                 return DeclRef<Decl>();
 
-            args.add(m_astBuilder->getNonEmptyPackWitness());
+            args.add(m_astBuilder->getNonEmptyPackWitness(constrainedArg));
         }
     }
 

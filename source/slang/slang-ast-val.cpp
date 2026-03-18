@@ -719,6 +719,62 @@ void TrimTailSubtypeWitness::_toTextOverride(StringBuilder& out)
     out << toSlice(")");
 }
 
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! PackBranchSubtypeWitness !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+Val* PackBranchSubtypeWitness::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    int diff = 0;
+    auto newSub = as<Type>(getSub()->substituteImpl(astBuilder, subst, &diff));
+    auto newSup = as<Type>(getSup()->substituteImpl(astBuilder, subst, &diff));
+    auto newPackOperand = getPackOperand()->substituteImpl(astBuilder, subst, &diff);
+    auto newEmptyWitness =
+        as<SubtypeWitness>(getEmptyWitness()->substituteImpl(astBuilder, subst, &diff));
+    auto newNonEmptyWitness =
+        as<SubtypeWitness>(getNonEmptyWitness()->substituteImpl(astBuilder, subst, &diff));
+    if (!diff)
+        return this;
+    (*ioDiff)++;
+    return astBuilder->getPackBranchSubtypeWitness(
+        newSub,
+        newSup,
+        newPackOperand,
+        newEmptyWitness,
+        newNonEmptyWitness);
+}
+
+Val* PackBranchSubtypeWitness::_resolveImplOverride()
+{
+    auto astBuilder = getCurrentASTBuilder();
+    auto newSub = as<Type>(getSub()->resolve());
+    auto newSup = as<Type>(getSup()->resolve());
+    auto newPackOperand = getPackOperand()->resolve();
+    auto newEmptyWitness = as<SubtypeWitness>(getEmptyWitness()->resolve());
+    auto newNonEmptyWitness = as<SubtypeWitness>(getNonEmptyWitness()->resolve());
+    if (newSub == getSub() && newSup == getSup() && newPackOperand == getPackOperand() &&
+        newEmptyWitness == getEmptyWitness() && newNonEmptyWitness == getNonEmptyWitness())
+        return this;
+    return astBuilder->getPackBranchSubtypeWitness(
+        newSub,
+        newSup,
+        newPackOperand,
+        newEmptyWitness,
+        newNonEmptyWitness);
+}
+
+void PackBranchSubtypeWitness::_toTextOverride(StringBuilder& out)
+{
+    out << toSlice("PackBranchWitness(");
+    getPackOperand()->toText(out);
+    out << toSlice(", ");
+    getEmptyWitness()->toText(out);
+    out << toSlice(", ");
+    getNonEmptyWitness()->toText(out);
+    out << toSlice(")");
+}
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DeclaredSubtypeWitness !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 Val* DeclaredSubtypeWitness::_resolveImplOverride()
@@ -1089,12 +1145,34 @@ Val* NoneWitness::_resolveImplOverride()
 
 void NonEmptyPackWitness::_toTextOverride(StringBuilder& out)
 {
-    out.append("nonempty_witness");
+    out.append("nonempty_witness(");
+    if (auto pack = getPack())
+        pack->toText(out);
+    else
+        out.append("<null>");
+    out.append(")");
 }
 
 Val* NonEmptyPackWitness::_resolveImplOverride()
 {
+    auto resolvedPack = getPack() ? getPack()->resolve() : nullptr;
+    if (resolvedPack != getPack())
+        return getCurrentASTBuilder()->getNonEmptyPackWitness(resolvedPack);
     return this;
+}
+
+Val* NonEmptyPackWitness::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    int diff = 0;
+    auto substPack = getPack() ? getPack()->substituteImpl(astBuilder, subst, &diff) : nullptr;
+    if (!diff)
+        return this;
+
+    (*ioDiff)++;
+    return astBuilder->getNonEmptyPackWitness(substPack);
 }
 
 // UNormModifierVal
@@ -2094,6 +2172,8 @@ Val* CountOfIntVal::_substituteImplOverride(
     SubstitutionSet subst,
     int* ioDiff)
 {
+    if (!getValArg())
+        return this;
     int diff = 0;
     auto newVal = getValArg()->substituteImpl(astBuilder, subst, &diff);
     if (!diff)
@@ -2105,6 +2185,8 @@ Val* CountOfIntVal::_substituteImplOverride(
 
 Val* CountOfIntVal::_resolveImplOverride()
 {
+    if (!getValArg())
+        return this;
     auto resolvedArg = getValArg()->resolve();
     if (resolvedArg == getValArg())
         return this;

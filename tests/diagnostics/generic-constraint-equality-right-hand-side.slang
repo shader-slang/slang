@@ -27,7 +27,6 @@ extension<A, C1> Logic<A, C1>
     where C1 : IGen<A>
     where C1.TB == Wrapper<int>
 //diag:            ^^^^^^^ type 'Wrapper<int>' is not a proper type to use in a generic equality constraint
-//diag:            ^^^^^^^ type 'Wrapper<int>' is not a proper type to use in a generic equality constraint
 {
     [mutating]
     void setVal(int dataIn)

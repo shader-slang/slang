@@ -432,6 +432,14 @@ struct ModifyingExprVisitor : ExprVisitor<Derived, Expr*>
         return e;
     }
 
+    Expr* visitPackBranchTypeExpr(PackBranchTypeExpr* e)
+    {
+        e->packOperand.exp = dispatchIfNotNull(e->packOperand.exp);
+        e->emptyType.exp = dispatchIfNotNull(e->emptyType.exp);
+        e->nonEmptyType.exp = dispatchIfNotNull(e->nonEmptyType.exp);
+        return e;
+    }
+
     // --- Detach ---
     Expr* visitDetachExpr(DetachExpr* e)
     {

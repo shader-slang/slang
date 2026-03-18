@@ -653,6 +653,8 @@ public:
 
     Type* getExpandType(Type* pattern, ArrayView<Val*> capturedPacks);
 
+    Type* getPackBranchType(Val* packOperand, Type* emptyType, Type* nonEmptyType);
+
     Type* getFirstElement(Type* basePack);
 
     Type* getLastElement(Type* basePack);
@@ -677,7 +679,7 @@ public:
 
     Val* getTrimTailPack(Val* basePack);
 
-    NonEmptyPackWitness* getNonEmptyPackWitness();
+    NonEmptyPackWitness* getNonEmptyPackWitness(Val* pack);
 
     /// Produce a witness that `T : T` for any type `T`
     TypeEqualityWitness* getTypeEqualityWitness(Type* type);
@@ -721,6 +723,13 @@ public:
         Type* subType,
         Type* superType,
         SubtypeWitness* patternWitness);
+
+    SubtypeWitness* getPackBranchSubtypeWitness(
+        Type* subType,
+        Type* superType,
+        Val* packOperand,
+        SubtypeWitness* emptyWitness,
+        SubtypeWitness* nonEmptyWitness);
 
     /// Produce a witness that `A <: C` given witnesses that `A <: B` and `B <: C`
     SubtypeWitness* getTransitiveSubtypeWitness(

@@ -18,6 +18,8 @@ class ShaderSymbol;
 
 class TranslationUnitRequest;
 
+constexpr UInt kMaxTypeNestingDepth = 128;
+
 bool isGlobalShaderParameter(VarDeclBase* decl);
 bool isFromCoreModule(Decl* decl);
 
