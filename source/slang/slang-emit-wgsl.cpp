@@ -143,7 +143,7 @@ void WGSLSourceEmitter::emitParameterGroupImpl(
         case LayoutResourceKind::SamplerState:
         case LayoutResourceKind::DescriptorTableSlot:
             {
-                auto kinds = LayoutResourceKindFlag::make(LayoutResourceKind::DescriptorTableSlot);
+                auto kinds = LayoutResourceKindFlag::make(kind);
                 m_writer->emit("@binding(");
                 auto index = getBindingOffsetForKinds(&containerChain, kinds);
                 m_writer->emit(index);
