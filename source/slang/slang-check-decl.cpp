@@ -6048,6 +6048,7 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
     // the call to see what happens.
     //
     auto checkedCall = subVisitor.ResolveInvoke(synCall);
+    auto checkedExpr = checkedCall;
 
     // If the function being called throws, we need to insert a `try` in front
     // of the synthesized call to re-throw.
@@ -6065,7 +6066,8 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
                 auto tryExpr = m_astBuilder->create<TryExpr>();
                 tryExpr->tryClauseType = TryClauseType::Standard;
                 tryExpr->base = checkedCall;
-                checkedCall = subVisitor.CheckExpr(tryExpr);
+                checkedExpr = subVisitor.CheckExpr(tryExpr);
+                checkedCall = tryExpr->base;
             }
         }
     }
@@ -6075,7 +6077,7 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
     // so we also need to coerce the result of the call to
     // the expected type.
     //
-    auto coercedCall = subVisitor.coerce(CoercionSite::Return, resultType, checkedCall, &tempSink);
+    auto coercedCall = subVisitor.coerce(CoercionSite::Return, resultType, checkedExpr, &tempSink);
 
     // If our overload resolution or type coercion failed,
     // then we have not been able to synthesize a witness
@@ -6090,10 +6092,10 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
             outFailureDetails->reason = WitnessSynthesisFailureReason::General;
 
         // Check if the failure was due to return type coercion
-        if (!IsErrorExpr(checkedCall) && outFailureDetails)
+        if (!IsErrorExpr(checkedExpr) && outFailureDetails)
         {
             // The call resolved - check if it's a return type mismatch
-            auto actualReturnType = checkedCall->type;
+            auto actualReturnType = checkedExpr->type;
             if (!actualReturnType->equals(resultType))
             {
                 // Find the actual implementation method that was called
