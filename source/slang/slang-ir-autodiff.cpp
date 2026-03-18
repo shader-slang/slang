@@ -1150,10 +1150,11 @@ IRInterfaceType* DifferentiableTypeConformanceContext::getConformanceTypeFromWit
             cast<IRWitnessTableType>(interfaceRequirementEntry->getRequirementVal());
         diffInterfaceType = cast<IRInterfaceType>(innerWitnessTableType->getConformanceType());
     }
-    else if (auto tupleType = as<IRTupleType>(witness->getDataType()))
+    else if (as<IRTypePack>(witness->getDataType()) || as<IRTupleType>(witness->getDataType()))
     {
-        SLANG_ASSERT(tupleType->getOperandCount() >= 1);
-        auto operand = tupleType->getOperand(0);
+        auto witnessPackType = witness->getDataType();
+        SLANG_ASSERT(witnessPackType->getOperandCount() >= 1);
+        auto operand = witnessPackType->getOperand(0);
         auto innerWitnessTableType = cast<IRWitnessTableType>(operand);
         return cast<IRInterfaceType>(innerWitnessTableType->getConformanceType());
     }
