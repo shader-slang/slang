@@ -391,7 +391,7 @@ err(
 
 err("null-component-type", 105, "componentTypes[~index:Int] is `nullptr`")
 
-standalone_note("note-failed-to-load-dynamic-library", 99999, "failed to load dynamic library '~path'")
+standalone_note("note-failed-to-load-dynamic-library", 100002, "failed to load dynamic library '~path'")
 
 --
 -- 15xxx - Preprocessing
@@ -2696,28 +2696,28 @@ err(
 
 warning(
     "for-loop-side-effect-changing-different-var",
-    30500,
+    30507,
     "for loop modifies wrong variable",
     span { loc = "sideEffect:Expr", message = "the for loop initializes and checks variable '~initVar:Decl' but the side effect expression is modifying '~modifiedVar:Decl'." }
 )
 
 warning(
     "for-loop-predicate-checking-different-var",
-    30501,
+    30508,
     "for loop predicate checks wrong variable",
     span { loc = "predicate:Expr", message = "the for loop initializes and modifies variable '~initVar:Decl' but the predicate expression is checking '~predicateVar:Decl'." }
 )
 
 warning(
     "for-loop-changing-iteration-variable-in-oppsoite-direction",
-    30502,
+    30511,
     "for loop modifies variable in wrong direction",
     span { loc = "sideEffect:Expr", message = "the for loop is modifiying variable '~var:Decl' in the opposite direction from loop exit condition." }
 )
 
 warning(
     "for-loop-not-modifying-iteration-variable",
-    30503,
+    30512,
     "for loop step is zero",
     span { loc = "sideEffect:Expr", message = "the for loop is not modifiying variable '~var:Decl' because the step size evaluates to 0." }
 )
@@ -2731,7 +2731,7 @@ warning(
 
 warning(
     "loop-runs-for-zero-iterations",
-    30505,
+    30514,
     "loop runs zero times",
     span { loc = "stmt:Stmt", message = "the loop runs for 0 iterations and will be removed." }
 )
@@ -2788,7 +2788,7 @@ warning(
 -- TODO: need to assign numbers to all these extra diagnostics...
 fatal(
     "cyclic-reference",
-    39999,
+    40002,
     "cyclic reference '~decl'",
     span { loc = "decl:Decl", message = "cyclic reference '~decl'" }
 )
@@ -2853,7 +2853,7 @@ standalone_note(
 
 standalone_note(
     "use-let-each-for-generic-value-pack-param",
-    30501,
+    30509,
     "use 'let each' to declare a variadic generic value parameter: 'let each ~paramName:Name : ~type:Type'"
 )
 
@@ -2894,7 +2894,7 @@ err(
 
 standalone_note(
     "invalid-equality-constraint-sub-type",
-    30402,
+    30406,
     "type '~type:Type' cannot be constrained by a type equality",
     span { loc = "typeExp:Expr", message = "type '~type' cannot be constrained by a type equality" }
 )
@@ -2933,7 +2933,7 @@ err(
 
 err(
     "cannot-use-initializer-list-for-type",
-    30504,
+    30513,
     "cannot use initializer list for type '~type:Type'",
     span { loc = "initList:Expr", message = "cannot use initializer list for type '~type'" }
 )
@@ -3291,21 +3291,21 @@ err(
 
 standalone_note(
     "overload-candidate",
-    39999,
+    40011,
     "candidate: ~candidate",
     span { loc = "location" }
 )
 
 standalone_note(
     "invisible-overload-candidate",
-    39999,
+    40014,
     "candidate (invisible): ~candidate",
     span { loc = "location" }
 )
 
 standalone_note(
     "more-overload-candidates",
-    39999,
+    40015,
     "~count:Int more overload candidates",
     span { loc = "location" }
 )
@@ -3420,28 +3420,28 @@ err(
 
 warning(
     "integer-literal-too-large",
-    39999,
+    40004,
     "integer literal is too large to be represented in a signed integer type, interpreting as unsigned",
     span { loc = "location", message = "integer literal is too large to be represented in a signed integer type, interpreting as unsigned" }
 )
 
 warning(
     "integer-literal-truncated",
-    39999,
+    40005,
     "integer literal truncated",
     span { loc = "location", message = "integer literal '~literal' too large for type '~type' truncated to '~truncatedValue'" }
 )
 
 warning(
     "float-literal-unrepresentable",
-    39999,
+    40009,
     "floating-point literal unrepresentable",
     span { loc = "location", message = "~type literal '~literal' unrepresentable, converted to '~convertedValue'" }
 )
 
 warning(
     "float-literal-too-small",
-    39999,
+    40010,
     "floating-point literal too small",
     span { loc = "location", message = "'~literal' is smaller than the smallest representable value for type ~type, converted to '~convertedValue'" }
 )
@@ -3754,7 +3754,7 @@ err(
 -- Note: compilationCeased is a fatal diagnostic that is locationless
 fatal(
     "compilation-ceased",
-    39999,
+    40003,
     "compilation ceased",
     span { loc = "location" }
 )
@@ -4083,7 +4083,7 @@ warning(
 
 err(
     "profile-implicitly-upgraded-restrictive",
-    41012,
+    41013,
     "entry point uses capabilities not in specified profile",
     span { loc = "location", message = "entry point '~entryPoint' uses capabilities that are not part of the specified profile '~profile'. Missing capabilities are: '~capabilities'" }
 )
@@ -4153,21 +4153,21 @@ warning(
 
 err(
     "cannot-default-initialize-resource",
-    41024,
+    41027,
     "cannot default-initialize resource type",
     span { loc = "location", message = "cannot default-initialize ~resourceName with '{}'. Resource types must be explicitly initialized" }
 )
 
 err(
     "cannot-default-initialize-struct-with-uninitialized-resource",
-    41024,
+    41028,
     "cannot default-initialize struct with uninitialized resource",
     span { loc = "location", message = "cannot default-initialize struct '~structName' with '{}' because it contains an uninitialized ~resourceName field" }
 )
 
 err(
     "cannot-default-initialize-struct-containing-resources",
-    41024,
+    41029,
     "cannot default-initialize struct containing resource fields",
     span { loc = "location", message = "cannot default-initialize struct '~structName' with '{}' because it contains resource fields" }
 )
@@ -4201,14 +4201,14 @@ err(
 
 err(
     "loss-of-derivative-due-to-call-of-non-differentiable-function",
-    41020,
+    41022,
     "derivative cannot be propagated through non-differentiable call",
     span { loc = "location", message = "derivative cannot be propagated through call to non-~diffLevel-differentiable function `~funcName:IRInst`, use 'no_diff' to clarify intention." }
 )
 
 err(
     "loss-of-derivative-assigning-to-non-differentiable-location",
-    41024,
+    41031,
     "derivative is lost during assignment",
     span { loc = "location", message = "derivative is lost during assignment to non-differentiable location, use 'detach()' to clarify intention." }
 )
@@ -4747,13 +4747,13 @@ internal(
 
 err(
     "compilation-aborted",
-    99999,
+    100000,
     "Slang compilation aborted due to internal error\\nFor assistance, file an issue on GitHub (https://github.com/shader-slang/slang/issues) or join the Slang Discord (https://khr.io/slangdiscord)"
 )
 
 err(
     "compilation-aborted-due-to-exception",
-    99999,
+    100001,
     "Slang compilation aborted due to an exception of ~exceptionType: ~exceptionMessage\\nFor assistance, file an issue on GitHub (https://github.com/shader-slang/slang/issues) or join the Slang Discord (https://khr.io/slangdiscord)"
 )
 

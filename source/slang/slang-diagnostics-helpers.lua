@@ -53,10 +53,18 @@ end
 -- See: https://github.com/shader-slang/slang/issues/6736
 local allow_duplicate_diagnostic_codes = true
 
--- Set to false to make severity conflicts a hard build error.
--- When true, conflicts are reported as warnings to stderr but don't fail the build.
--- This should be flipped to false once all existing conflicts are resolved.
-local allow_severity_conflicts = true
+-- Enforce that diagnostics sharing a numeric code have the same severity.
+--
+-- The diagnostic ID map (m_idMap) stores only one entry per numeric code.
+-- When a user passes -warnings-disable <id> or -warnings-as-errors <id>,
+-- the lookup finds that single entry and checks its severity. If an error
+-- and a warning share the same code, the lookup may find the error, reject
+-- the severity mismatch, and report "unknown diagnostic" — even though
+-- the warning is perfectly valid. See: https://github.com/shader-slang/slang/issues/10583
+--
+-- Negative codes (e.g. -1) are excluded because they are internal sentinels
+-- that are never displayed to users and cannot be referenced by command-line options.
+local allow_severity_conflicts = false
 
 -- Helper function to check if a string is valid kebab-case
 -- Valid kebab-case: lowercase letters, numbers, and hyphens only
@@ -627,7 +635,7 @@ local function process_diagnostics(diagnostics_table)
           table.insert(all_errors, diagnostic_name .. " has duplicate code " .. diag.code)
         end
         local prev = diagnostics_table[seen_codes[diag.code]]
-        if prev and prev.severity ~= diag.severity then
+        if prev and prev.severity ~= diag.severity and diag.code >= 0 then
           local msg = diagnostic_name .. " (code " .. diag.code .. ", severity '" .. diag.severity
             .. "') conflicts with '" .. prev.name .. "' (severity '" .. prev.severity
             .. "'). Diagnostics sharing a numeric code must have the same severity,"
