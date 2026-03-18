@@ -5758,6 +5758,8 @@ CallableDecl* SemanticsVisitor::synthesizeMethodSignatureForRequirementWitnessIn
     //
     auto resultType = getResultType(m_astBuilder, requiredMemberDeclRef);
     synFuncDecl->returnType.type = resultType;
+    auto errorType = getErrorCodeType(m_astBuilder, requiredMemberDeclRef);
+    synFuncDecl->errorType.type = errorType;
 
     addRequiredParamsToSynthesizedDecl(requiredMemberDeclRef, synFuncDecl, synArgs);
     addModifiersToSynthesizedDecl(context, requiredMemberDeclRef, synFuncDecl, synThis);
@@ -6046,6 +6048,27 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
     // the call to see what happens.
     //
     auto checkedCall = subVisitor.ResolveInvoke(synCall);
+
+    // If the function being called throws, we need to insert a `try` in front
+    // of the synthesized call to re-throw.
+    if (auto invokeExpr = as<InvokeExpr>(checkedCall))
+    {
+        if (auto funcType = as<FuncType>(invokeExpr->functionExpr->type))
+        {
+            if (!funcType->getErrorType()->equals(m_astBuilder->getBottomType()))
+            {
+                // Throws, so unless our interface requirement also does that,
+                // we can't call it here.
+                if (!synFuncDecl->errorType)
+                    return false;
+
+                auto tryExpr = m_astBuilder->create<TryExpr>();
+                tryExpr->tryClauseType = TryClauseType::Standard;
+                tryExpr->base = checkedCall;
+                checkedCall = subVisitor.CheckExpr(tryExpr);
+            }
+        }
+    }
 
     // Of course, it is possible that the call went through fine,
     // but the result isn't of the type we expect/require,
@@ -10803,7 +10826,7 @@ void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
     }
 
     auto errorType = decl->errorType;
-    if (errorType.exp)
+    if (errorType.type || errorType.exp)
     {
         errorType = CheckProperType(errorType);
     }
