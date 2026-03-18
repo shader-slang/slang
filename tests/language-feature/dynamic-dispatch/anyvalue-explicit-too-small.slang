@@ -1,10 +1,11 @@
-// Verify that an explicit [anyValueSize(4)] produces an error when a
-// conforming type requires more than 4 bytes of storage. LargeImpl has
-// two int fields (8 bytes total), which exceeds the 4-byte limit.
+// Verify that an explicit [anyValueSize(7)] produces an error when a
+// conforming type requires 8 bytes of storage. LargeImpl has two int
+// fields (8 bytes total), which exceeds the 7-byte limit by exactly 1
+// byte — boundary value testing for off-by-one in the size check.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv
 
-[anyValueSize(4)]
+[anyValueSize(7)]
 interface IFoo
 {
     int getValue();
@@ -20,7 +21,7 @@ struct LargeImpl : IFoo
 /*CHECK:
        ^^^^^^^^^ type does not fit in size required by interface
        ^^^^^^^^^ type 'LargeImpl' does not fit in the size required by its conforming interface.
-       ^^^^^^^^^ sizeof(LargeImpl) is 8, limit is 4
+       ^^^^^^^^^ sizeof(LargeImpl) is 8, limit is 7
 */
 {
     int a;
