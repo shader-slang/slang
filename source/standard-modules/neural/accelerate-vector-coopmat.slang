@@ -800,6 +800,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
     // 1. Uses relaxed memory ordering (less synchronization overhead)
     // 2. Single instruction for two half values
     [ForceInline]
+    [require(cuda_spirv, subgroup_basic)]
     [require(cuda_spirv, subgroup_partitioned)]
     [require(cuda_spirv, sm_6_6)]
     VISIBILITY_LEVEL static void sumReduceRows<U, Address, InArrayType>(
