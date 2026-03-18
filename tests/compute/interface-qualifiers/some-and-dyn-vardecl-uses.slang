@@ -3,13 +3,13 @@
 // The `some` qualifier is not yet implemented (SP#024, tracked by #7115).
 // Only `dyn` on var/param declarations is currently supported.
 
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -shaderobj -output-using-type
-//TEST:SIMPLE(filecheck=CHECK_COMPILE): -target spirv -stage compute -entry computeMain
-//TEST:SIMPLE(filecheck=CHECK_COMPILE): -target hlsl -stage compute -entry computeMain
-//TEST:SIMPLE(filecheck=CHECK_COMPILE): -target cuda -stage compute -entry computeMain
-//TEST:SIMPLE(filecheck=CHECK_COMPILE): -target metal -stage compute -entry computeMain
-//TEST:SIMPLE(filecheck=CHECK_COMPILE): -target wgsl -stage compute -entry computeMain
-//TEST:SIMPLE(filecheck=CHECK_COMPILE): -target cpp -stage compute -entry computeMain
+//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -shaderobj -output-using-type -xslang -lang -xslang slang -xslang -std -xslang 2025
+//TEST:SIMPLE(filecheck=CHECK_COMPILE): -target spirv -lang slang -std 2025 -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK_COMPILE): -target hlsl -lang slang -std 2025 -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK_COMPILE): -target cuda -lang slang -std 2025 -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK_COMPILE): -target metal -lang slang -std 2025 -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK_COMPILE): -target wgsl -lang slang -std 2025 -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK_COMPILE): -target cpp -lang slang -std 2025 -stage compute -entry computeMain
 
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0 0], stride=4)
 RWStructuredBuffer<int> outputBuffer;
