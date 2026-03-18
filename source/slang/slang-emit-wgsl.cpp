@@ -2,6 +2,7 @@
 
 #include "slang-ir-layout.h"
 #include "slang-ir-util.h"
+#include "slang-rich-diagnostics.h"
 
 // A note on row/column "terminology reversal".
 //
@@ -281,7 +282,7 @@ void WGSLSourceEmitter::emitSemanticsPrefixImpl(IRInst* inst)
         if (auto semanticDecoration = inst->findDecoration<IRSemanticDecoration>())
         {
             m_writer->emit("@location(");
-            m_writer->emit(semanticDecoration->getSemanticIndex());
+            m_writer->emit(semanticDecoration->getEffectiveSemanticIndex());
             m_writer->emit(")");
             return;
         }
@@ -441,12 +442,10 @@ const char* WGSLSourceEmitter::getWgslImageFormat(IRTextureTypeBase* type)
         return "rgba32float";
     default:
         const auto imageFormatInfo = getImageFormatInfo(imageFormat);
-        getSink()->diagnose(
-            SourceLoc(),
-            Diagnostics::imageFormatUnsupportedByBackend,
-            imageFormatInfo.name,
-            "WGSL",
-            "rgba32float");
+        getSink()->diagnose(Diagnostics::ImageFormatUnsupportedByBackend{
+            .format = imageFormatInfo.name,
+            .backend = "WGSL",
+            .replacement = "rgba32float"});
         return "rgba32float";
     }
 }
@@ -522,10 +521,10 @@ void WGSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             return;
         }
     case kIROp_Int16Type:
-        diagnoseOnce(SourceLoc(), Diagnostics::int16NotSupportedInWGSL, "int16_t");
+        diagnoseOnce(Diagnostics::Int16NotSupportedInWgsl{.typeName = "int16_t"});
         return;
     case kIROp_UInt16Type:
-        diagnoseOnce(SourceLoc(), Diagnostics::int16NotSupportedInWGSL, "uint16_t");
+        diagnoseOnce(Diagnostics::Int16NotSupportedInWgsl{.typeName = "uint16_t"});
         return;
     case kIROp_Int64Type:
     case kIROp_IntPtrType:
@@ -715,28 +714,35 @@ void WGSLSourceEmitter::emitLayoutQualifiersImpl(IRVarLayout* layout)
         // @binding and @group unique, so that we can pass WGSL compile tests.
         // This will have to be revisited when we actually want to supply resources to
         // shaders.
-        if (kind == LayoutResourceKind::DescriptorTableSlot)
+        switch (kind)
         {
-            m_writer->emit("@binding(");
-            m_writer->emit(attr->getOffset());
-            m_writer->emit(") ");
+        case LayoutResourceKind::DescriptorTableSlot:
+        case LayoutResourceKind::ShaderResource:
+        case LayoutResourceKind::UnorderedAccess:
+        case LayoutResourceKind::SamplerState:
+        case LayoutResourceKind::ConstantBuffer:
+            {
+                m_writer->emit("@binding(");
+                m_writer->emit(attr->getOffset());
+                m_writer->emit(") ");
 
-            EmitVarChain chain = {};
-            chain.varLayout = layout;
-            auto space = getBindingSpaceForKinds(&chain, LayoutResourceKindFlag::make(kind));
-            m_writer->emit("@group(");
-            m_writer->emit(space);
-            m_writer->emit(") ");
+                EmitVarChain chain = {};
+                chain.varLayout = layout;
+                auto space = getBindingSpaceForKinds(&chain, LayoutResourceKindFlag::make(kind));
+                m_writer->emit("@group(");
+                m_writer->emit(space);
+                m_writer->emit(") ");
 
-            return;
-        }
-        else if (kind == LayoutResourceKind::SpecializationConstant)
-        {
+                return;
+            }
+        case LayoutResourceKind::SpecializationConstant:
             m_writer->emit("@id(");
             m_writer->emit(attr->getOffset());
             m_writer->emit(") ");
 
             return;
+        default:
+            break;
         }
     }
 }
@@ -986,12 +992,12 @@ void WGSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
                     }
                 case BaseType::Int16:
                     {
-                        diagnoseOnce(SourceLoc(), Diagnostics::int16NotSupportedInWGSL, "int16_t");
+                        diagnoseOnce(Diagnostics::Int16NotSupportedInWgsl{.typeName = "int16_t"});
                         break;
                     }
                 case BaseType::UInt16:
                     {
-                        diagnoseOnce(SourceLoc(), Diagnostics::int16NotSupportedInWGSL, "uint16_t");
+                        diagnoseOnce(Diagnostics::Int16NotSupportedInWgsl{.typeName = "uint16_t"});
                         break;
                     }
                 case BaseType::Int:

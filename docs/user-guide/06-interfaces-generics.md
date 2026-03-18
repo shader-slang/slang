@@ -1015,6 +1015,10 @@ This feature is similar to extension traits in Rust.
 Variadic Generics
 -------------------------
 
+Slang supports variadic generics, allowing a generic declaration to accept a variable number of type or value arguments. There are two kinds of variadic generic parameters: *variadic type parameters* (packs of types) and *variadic value parameters* (packs of compile-time integer values). Both use the `each` keyword to declare a pack and the `expand` keyword to operate on pack elements.
+
+### Variadic Type Parameters
+
 Slang supports variadic generic type parameters:
 ```csharp
 struct MyType<each T>
@@ -1101,6 +1105,186 @@ void test()
 
 Note that a variadic type pack parameter must appear at the end of a parameter list. If a generic type contains more than one
 type pack parameters, then each type pack must contain the same number of arguments at instantiation sites.
+
+### Variadic Value Parameters
+
+In addition to variadic type parameters, Slang also supports variadic *value* parameters. A variadic value parameter declares a pack of compile-time integer values:
+
+```csharp
+struct Dims<let each D : int>
+{}
+```
+
+Here `let each D : int` defines a generic value pack parameter. Each element of the pack is a compile-time `int`. The following instantiations are valid:
+
+```
+Dims<>          // empty pack
+Dims<4>         // single element
+Dims<2, 3, 4>   // three elements
+```
+
+An equivalent traditional syntax is also supported:
+```csharp
+struct Dims<each int D>
+{}
+```
+
+The value pack parameter must appear at the end of the parameter list.
+
+#### Using `expand` and `each` with value packs
+
+The `expand` and `each` keywords work with value packs the same way they work with type packs. Use `each D` inside an `expand` expression to refer to individual elements of the value pack:
+
+```csharp
+struct Dims<let each D : int>
+{
+    void print()
+    {
+        expand printf("%d\n", each D);
+    }
+}
+```
+
+You can also use `each` to instantiate other generic types or perform arithmetic on each element:
+
+```csharp
+// Instantiate a generic type for each value in the pack.
+struct Wrapper<let N : int> { int getValue() { return N; } }
+
+struct WrapAll<let each D : int>
+{
+    void printValues()
+    {
+        expand printf("%d\n", Wrapper<each D>().getValue());
+    }
+}
+
+// Compute a sum over the value pack.
+void add(inout int a, int b) { a += b; }
+
+int sum<let each D : int>()
+{
+    int s = 0;
+    expand add(s, each D);
+    return s;
+}
+```
+
+### Using `countof` with Packs
+
+`countof` returns the number of elements in a type pack or value pack:
+
+```csharp
+struct Dims<let each D : int>
+{
+    int getDimCount() { return countof(D); }
+}
+
+int typeCount<each T>() { return countof(T); }
+```
+
+### Builtin Variadic Pack Operators
+
+Slang also supports simple pack queries and a type-level pack branch operator:
+
+- `__first(P)` returns the first element of a type pack, value pack, or tuple-like pack source.
+- `__last(P)` returns the last element.
+- `__trimHead(P)` returns the pack with the first element removed.
+- `__trimTail(P)` returns the pack with the last element removed.
+- `__packBranch(P, emptyType, nonEmptyType)` selects `emptyType` when `P` is empty and `nonEmptyType` when `P` is non-empty.
+
+For example:
+
+```csharp
+int firstValue<let each D : int>() where nonempty(D)
+{
+    return __first(D);
+}
+
+int restCount<let each D : int>()
+{
+    return countof(__trimHead(D));
+}
+
+struct FirstTypeHolder<each T> where nonempty(T)
+{
+    __first(T) value;
+}
+```
+
+`__first(...)` and `__last(...)` are only valid on packs that are known to be non-empty. For generic packs, use a `where nonempty(P)` constraint to make that guarantee explicit.
+
+`__packBranch(...)` is useful when you need a type that depends on whether a
+pack is empty. The non-empty branch is checked under the assumption that the
+tested pack is non-empty, so pack queries like `__first(P)` and `__trimHead(P)`
+are valid there even when `P` is still generic.
+
+`__packBranch(P, emptyType, nonEmptyType)` also participates in interface/facet
+computation like an ordinary type. If both `emptyType` and `nonEmptyType`
+conform to some interface `IFoo`, then the `__packBranch(...)` type also
+conforms to `IFoo`.
+
+For example:
+
+```csharp
+interface IStaticInt
+{
+    static int get();
+}
+
+struct IntConst<let N : int> : IStaticInt
+{
+    static int get() { return N; }
+}
+
+typealias HeadOrZero<let each D : int> =
+    __packBranch(
+        D,
+        IntConst<0>,          // Used when `D` is empty.
+        IntConst<__first(D)>  // Valid because this branch is checked with the
+                              // assumption that `D` is non-empty.
+    );
+```
+
+`__packBranch(...)` is especially useful for recursive pack-driven types:
+
+```csharp
+interface INode
+{
+    __init();
+    int sum();
+}
+
+struct EmptyNode : INode
+{
+    __init() {}
+    int sum() { return 0; }
+}
+
+struct EvalNode<let Head : int, let each Tail : int> : INode
+{
+    int headValue;
+
+    __init()
+    {
+        headValue = Head;
+    }
+
+    // If `Tail` is empty, recursion stops at `EmptyNode`.
+    // Otherwise we recurse on the first element of the tail.
+    __packBranch(Tail, EmptyNode, EvalNode<__first(Tail), __trimHead(Tail)>) rest = {};
+
+    int sum()
+    {
+        return headValue + rest.sum();
+    }
+}
+```
+
+In this example, `EvalNode<4, 8, 16>` recursively expands to a chain like
+`EvalNode<4, 8, 16> -> EvalNode<8, 16> -> EvalNode<16> -> EmptyNode`. Because
+both branch types conform to `INode`, the `rest` field can be used uniformly
+even before specialization has determined which branch is taken.
 
 Builtin Interfaces
 -----------------------------

@@ -61,16 +61,25 @@ bool ReachabilityContext::isInstReachable(IRInst* from, IRInst* to)
 {
     // If inst1 and inst2 are in the same block,
     // we test if inst2 appears after inst1.
-    if (getBlock(from) == getBlock(to))
+    auto fromBlock = getBlock(from);
+    auto toBlock = getBlock(to);
+    if (fromBlock == toBlock)
     {
+        // `to` may be a nested child instruction (e.g. inside a SPIRVAsm block).
+        // Walk up to find the direct child of the block that is an ancestor of `to`,
+        // so the sibling scan can find it.
+        IRInst* toInBlock = to;
+        while (toInBlock->getParent() != fromBlock)
+            toInBlock = toInBlock->getParent();
+
         for (auto inst = from->getNextInst(); inst; inst = inst->getNextInst())
         {
-            if (inst == to)
+            if (inst == toInBlock)
                 return true;
         }
     }
 
-    return isBlockReachable(getBlock(from), getBlock(to));
+    return isBlockReachable(fromBlock, toBlock);
 }
 
 bool ReachabilityContext::isBlockReachable(IRBlock* from, IRBlock* to)

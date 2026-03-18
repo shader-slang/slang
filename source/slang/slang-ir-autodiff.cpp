@@ -9,6 +9,7 @@
 #include "slang-ir-single-return.h"
 #include "slang-ir-ssa-simplification.h"
 #include "slang-ir-validate.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -1149,10 +1150,11 @@ IRInterfaceType* DifferentiableTypeConformanceContext::getConformanceTypeFromWit
             cast<IRWitnessTableType>(interfaceRequirementEntry->getRequirementVal());
         diffInterfaceType = cast<IRInterfaceType>(innerWitnessTableType->getConformanceType());
     }
-    else if (auto tupleType = as<IRTupleType>(witness->getDataType()))
+    else if (as<IRTypePack>(witness->getDataType()) || as<IRTupleType>(witness->getDataType()))
     {
-        SLANG_ASSERT(tupleType->getOperandCount() >= 1);
-        auto operand = tupleType->getOperand(0);
+        auto witnessPackType = witness->getDataType();
+        SLANG_ASSERT(witnessPackType->getOperandCount() >= 1);
+        auto operand = witnessPackType->getOperand(0);
         auto innerWitnessTableType = cast<IRWitnessTableType>(operand);
         return cast<IRInterfaceType>(innerWitnessTableType->getConformanceType());
     }
@@ -3801,9 +3803,10 @@ void checkAutodiffPatterns(IRModule* module, TargetProgram* target, DiagnosticSi
                 if (auto nameHint = func->findDecoration<IRNameHintDecoration>())
                 {
                     sink->diagnose(
-                        func,
-                        Diagnostics::potentialIssuesWithPreferRecomputeOnSideEffectMethod,
-                        nameHint->getName());
+                        Diagnostics::PotentialIssuesWithPreferRecomputeOnSideEffectMethod{
+                            .funcName = String(nameHint->getName()),
+                            .location = func->sourceLoc,
+                        });
                 }
             }
         }

@@ -1,0 +1,104 @@
+name: Trigger SlangPy CI
+
+permissions:
+  contents: read
+  pull-requests: read
+  statuses: write
+
+# Triggers SlangPy CI to test against SlangPy tip-of-tree.
+# Uses pull_request_target so secrets are available for fork PRs.
+# This workflow only dispatches metadata (PR number, SHA, fork status)
+# and never checks out or executes PR code.
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "Slang PR number to test against SlangPy"
+        required: true
+        type: string
+  pull_request_target:
+    branches: [master]
+    types: [opened, synchronize, reopened, ready_for_review]
+  merge_group:
+    branches: [master]
+    types: [checks_requested]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || inputs.pr_number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  trigger-slangpy-tests:
+    runs-on: ubuntu-latest
+    if: (github.event_name == 'pull_request_target' && github.event.pull_request.draft != true) || github.event_name == 'workflow_dispatch' || github.event_name == 'merge_group'
+
+    steps:
+      - name: Get PR info (manual trigger)
+        if: github.event_name == 'workflow_dispatch'
+        id: pr_manual
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PR_JSON=$(gh api repos/${{ github.repository }}/pulls/${{ inputs.pr_number }})
+          PR_SHA=$(echo "$PR_JSON" | jq -r '.head.sha')
+          PR_IS_FORK=$(echo "$PR_JSON" | jq -r '.head.repo.fork')
+          PR_HEAD_REPO=$(echo "$PR_JSON" | jq -r '.head.repo.full_name')
+          echo "number=${{ inputs.pr_number }}" >> "$GITHUB_OUTPUT"
+          echo "sha=$PR_SHA" >> "$GITHUB_OUTPUT"
+          echo "is_fork_pr=$PR_IS_FORK" >> "$GITHUB_OUTPUT"
+          echo "head_repo=$PR_HEAD_REPO" >> "$GITHUB_OUTPUT"
+
+      - name: Get PR info (automatic trigger)
+        if: github.event_name == 'pull_request_target'
+        id: pr_auto
+        run: |
+          echo "number=${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
+          echo "sha=${{ github.event.pull_request.head.sha }}" >> "$GITHUB_OUTPUT"
+          echo "is_fork_pr=${{ github.event.pull_request.head.repo.fork }}" >> "$GITHUB_OUTPUT"
+          echo "head_repo=${{ github.event.pull_request.head.repo.full_name }}" >> "$GITHUB_OUTPUT"
+
+      - name: Get PR info (merge queue)
+        if: github.event_name == 'merge_group'
+        id: pr_mq
+        run: |
+          QUEUE_REF="${{ github.event.merge_group.head_ref || github.ref_name }}"
+          PR_NUMBER=$(echo "$QUEUE_REF" | sed -n 's|.*/pr-\([0-9]*\)-.*|\1|p')
+          echo "number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "sha=${{ github.event.merge_group.head_sha || github.sha }}" >> "$GITHUB_OUTPUT"
+          echo "ref=$QUEUE_REF" >> "$GITHUB_OUTPUT"
+          echo "checkout_mode=ref" >> "$GITHUB_OUTPUT"
+          echo "checkout_repo=${{ github.repository }}" >> "$GITHUB_OUTPUT"
+          echo "is_fork_pr=false" >> "$GITHUB_OUTPUT"
+          echo "head_repo=${{ github.repository }}" >> "$GITHUB_OUTPUT"
+
+      - name: Post pending status
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: '${{ steps.pr_auto.outputs.sha || steps.pr_manual.outputs.sha || steps.pr_mq.outputs.sha }}',
+              state: 'pending',
+              context: 'SlangPy Tests',
+              description: 'SlangPy tests queued...',
+              target_url: 'https://github.com/shader-slang/slangpy/actions/workflows/ci-latest-slang.yml'
+            });
+
+      - name: Trigger SlangPy CI
+        uses: peter-evans/repository-dispatch@ff45666b9427631e3450c54a1bcbee4d9ff4d7c0 # v3
+        with:
+          token: ${{ secrets.SLANGPY_DISPATCH_TOKEN }}
+          repository: shader-slang/slangpy
+          event-type: slang-pr-test
+          client-payload: |
+            {
+              "slang_pr_number": "${{ steps.pr_auto.outputs.number || steps.pr_manual.outputs.number || steps.pr_mq.outputs.number }}",
+              "slang_commit_sha": "${{ steps.pr_auto.outputs.sha || steps.pr_manual.outputs.sha || steps.pr_mq.outputs.sha }}",
+              "slang_ref": "${{ steps.pr_mq.outputs.ref || steps.pr_auto.outputs.sha || steps.pr_manual.outputs.sha }}",
+              "slang_checkout_mode": "${{ steps.pr_mq.outputs.checkout_mode || 'pr' }}",
+              "slang_checkout_repo": "${{ steps.pr_mq.outputs.checkout_repo || github.repository }}",
+              "is_fork_pr": "${{ steps.pr_auto.outputs.is_fork_pr || steps.pr_manual.outputs.is_fork_pr || steps.pr_mq.outputs.is_fork_pr }}",
+              "slang_pr_head_repo": "${{ steps.pr_auto.outputs.head_repo || steps.pr_manual.outputs.head_repo || steps.pr_mq.outputs.head_repo }}",
+              "slang_trigger_source": "${{ github.event_name }}"
+            }

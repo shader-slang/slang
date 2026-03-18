@@ -18,6 +18,9 @@
 #if defined(_WIN32)
 #include <d3d12.h>
 #include <windows.h>
+#endif
+
+#if defined(_MSC_VER)
 #pragma comment(lib, "advapi32")
 #endif
 
@@ -1254,8 +1257,8 @@ Result RenderTestApp::writeBindingOutput(const String& fileName)
     // Wait until everything is complete
     m_queue->waitOnHost();
 
-    FILE* f = fopen(fileName.getBuffer(), "wb");
-    if (!f)
+    FILE* f = nullptr;
+    if (fopen_s(&f, fileName.getBuffer(), "wb") != 0 || !f)
     {
         return SLANG_FAIL;
     }
@@ -1724,6 +1727,79 @@ static SlangResult _innerMain(
     if (SLANG_FAILED(_setSessionPrelude(options, argvIn[0], session)))
     {
         return SLANG_E_NOT_AVAILABLE;
+    }
+
+    if (options.compileOnly)
+    {
+        // Use text output targets so downstream compilers are not required.
+        // This exercises Slang's emit code paths without needing DXC, FXC, NVRTC, etc.
+        switch (input.target)
+        {
+        case SLANG_DXBC:
+        case SLANG_DXIL:
+            input.target = SLANG_HLSL;
+            break;
+        case SLANG_METAL_LIB:
+            input.target = SLANG_METAL;
+            break;
+        case SLANG_PTX:
+            input.target = SLANG_CUDA_SOURCE;
+            break;
+        case SLANG_SHADER_HOST_CALLABLE:
+            input.target = SLANG_CPP_SOURCE;
+            break;
+        case SLANG_SPIRV:
+            // When not generating SPIRV directly, remap to GLSL to avoid
+            // needing glslang. This exercises the GLSL emitter rather than
+            // the SPIRV emitter for these tests.
+            if (!options.generateSPIRVDirectly)
+                input.target = SLANG_GLSL;
+            break;
+        default:
+            break;
+        }
+        input.passThrough = SLANG_PASS_THROUGH_NONE;
+
+        ShaderCompilerUtil::OutputAndLayout output;
+        SLANG_RETURN_ON_FAIL(
+            ShaderCompilerUtil::compileWithLayout(session, options, input, output));
+
+        // Force target code generation so the emit pipeline is exercised.
+        // compileWithLayout only links the program; without this call the
+        // backend emit code (slang-emit-hlsl, slang-emit-spirv, etc.) would
+        // never run and would not appear in coverage data.
+        //
+        // This is best-effort: some configurations (incomplete libraries,
+        // certain pipeline types) may fail at code generation even though
+        // compilation succeeded. We still count those as passing since the
+        // compilation itself is the authority.
+        if (output.output.slangProgram)
+        {
+            ComPtr<ISlangBlob> code;
+            ComPtr<ISlangBlob> diagnostics;
+            SlangResult codeGenResult = output.output.slangProgram->getTargetCode(
+                0,
+                code.writeRef(),
+                diagnostics.writeRef());
+            if (SLANG_FAILED(codeGenResult))
+            {
+                if (diagnostics)
+                {
+                    fprintf(
+                        stderr,
+                        "compile-only: code generation failed: %s\n",
+                        (const char*)diagnostics->getBufferPointer());
+                }
+                else
+                {
+                    fprintf(
+                        stderr,
+                        "compile-only: code generation failed (0x%08x)\n",
+                        (unsigned)codeGenResult);
+                }
+            }
+        }
+        return SLANG_OK;
     }
 
     CachedDeviceWrapper deviceWrapper;

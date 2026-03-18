@@ -46,6 +46,11 @@ void printDiagnosticArg(StringBuilder& sb, IRInst* irObject)
         sb << linkage->getMangledName();
         return;
     }
+    if (as<IRParam>(irObject))
+    {
+        sb << "unnamed parameter";
+        return;
+    }
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -2804,14 +2809,22 @@ IRExpandTypeOrVal* IRBuilder::getExpandTypeOrVal(
 
 IRRefParamType* IRBuilder::getRefParamType(IRType* valueType, AddressSpace addrSpace)
 {
-    return (IRRefParamType*)
-        getPtrType(kIROp_RefParamType, valueType, AccessQualifier::ReadWrite, addrSpace);
+    return (IRRefParamType*)getPtrType(
+        kIROp_RefParamType,
+        valueType,
+        AccessQualifier::ReadWrite,
+        addrSpace,
+        getDefaultBufferLayoutType());
 }
 
 IRBorrowInParamType* IRBuilder::getBorrowInParamType(IRType* valueType, AddressSpace addrSpace)
 {
-    return (IRBorrowInParamType*)
-        getPtrType(kIROp_BorrowInParamType, valueType, AccessQualifier::Read, addrSpace);
+    return (IRBorrowInParamType*)getPtrType(
+        kIROp_BorrowInParamType,
+        valueType,
+        AccessQualifier::Read,
+        addrSpace,
+        getDefaultBufferLayoutType());
 }
 
 
@@ -2837,7 +2850,8 @@ IRPtrTypeBase* IRBuilder::getPtrTypeWithAddressSpace(
             ptrWithAddrSpace->getOp(),
             valueType,
             ptrWithAddrSpace->getAccessQualifier(),
-            ptrWithAddrSpace->getAddressSpace());
+            ptrWithAddrSpace->getAddressSpace(),
+            ptrWithAddrSpace->getDataLayout());
     return (IRPtrTypeBase*)getPtrType(ptrWithAddrSpace->getOp(), valueType);
 }
 
@@ -2845,23 +2859,30 @@ IRPtrType* IRBuilder::getPtrType(
     IROp op,
     IRType* valueType,
     AccessQualifier accessQualifier,
-    AddressSpace addressSpace)
+    AddressSpace addressSpace,
+    IRType* dataLayoutType)
 {
     return (IRPtrType*)getPtrType(
         op,
         valueType,
         getIntValue(getUInt64Type(), static_cast<IRIntegerValue>(accessQualifier)),
-        getIntValue(getUInt64Type(), static_cast<IRIntegerValue>(addressSpace)));
+        getIntValue(getUInt64Type(), static_cast<IRIntegerValue>(addressSpace)),
+        dataLayoutType);
 }
 
 IRPtrType* IRBuilder::getPtrType(
     IROp op,
     IRType* valueType,
     IRInst* accessQualifier,
-    IRInst* addressSpace)
+    IRInst* addressSpace,
+    IRType* dataLayoutType)
 {
-    IRInst* operands[] = {valueType, accessQualifier, addressSpace};
-    return (IRPtrType*)getType(op, addressSpace ? 3 : 1, operands);
+    IRInst* operands[] = {
+        valueType,
+        accessQualifier,
+        addressSpace,
+        dataLayoutType ? dataLayoutType : getDefaultBufferLayoutType()};
+    return (IRPtrType*)getType(op, addressSpace ? (dataLayoutType ? 4 : 3) : 1, operands);
 }
 
 IRArrayTypeBase* IRBuilder::getArrayTypeBase(
@@ -3067,6 +3088,38 @@ IRInst* IRBuilder::emitByteAddressBufferStore(
 {
     IRInst* args[] = {byteAddressBuffer, offset, alignment, value};
     return emitIntrinsicInst(getVoidType(), kIROp_ByteAddressBufferStore, 4, args);
+}
+
+IRInst* IRBuilder::emitLoadDescriptorFromHeap(IRType* type, IRInst* heap, IRInst* index)
+{
+    IRInst* args[] = {heap, index};
+    return emitIntrinsicInst(type, kIROp_SPIRVLoadDescriptorFromHeap, 2, args);
+}
+
+IRInst* IRBuilder::emitSPIRVLoadTexelPointerFromHeap(
+    IRType* type,
+    IRInst* heap,
+    IRInst* index,
+    IRInst* textureType,
+    IRInst* coord,
+    IRInst* sampleIndex)
+{
+    IRInst* args[] = {heap, index, textureType, coord, sampleIndex};
+    return emitIntrinsicInst(type, kIROp_SPIRVLoadTexelPointerFromHeap, 5, args);
+}
+
+IRInst* IRBuilder::emitSPIRVResourceDescriptorHeap()
+{
+    return emitIntrinsicInst(getUIntType(), kIROp_SPIRVResourceHeap, 0, nullptr);
+}
+IRInst* IRBuilder::emitSPIRVSamplerDescriptorHeap()
+{
+    return emitIntrinsicInst(getUIntType(), kIROp_SPIRVSamplerHeap, 0, nullptr);
+}
+IRInst* IRBuilder::emitMakeCombinedTextureSampler(IRType* type, IRInst* texture, IRInst* sampler)
+{
+    IRInst* args[] = {texture, sampler};
+    return emitIntrinsicInst(type, kIROp_MakeCombinedTextureSampler, 2, args);
 }
 
 IRInst* IRBuilder::emitReinterpret(IRInst* type, IRInst* value)
@@ -3524,6 +3577,16 @@ IRInst* IRBuilder::emitEachInst(IRType* type, IRInst* base, IRInst* indexArg)
 {
     IRInst* args[] = {base, indexArg};
     return emitIntrinsicInst(type, kIROp_Each, indexArg ? 2 : 1, args);
+}
+
+IRInst* IRBuilder::emitPackBranchInst(
+    IRType* type,
+    IRInst* pack,
+    IRInst* emptyValue,
+    IRInst* nonEmptyValue)
+{
+    IRInst* args[] = {pack, emptyValue, nonEmptyValue};
+    return emitIntrinsicInst(type, kIROp_PackBranch, 3, args);
 }
 
 IRInst* IRBuilder::emitLookupInterfaceMethodInst(
@@ -4015,6 +4078,111 @@ IRInst* IRBuilder::emitCast(IRType* type, IRInst* value, bool fallbackToBuiltinC
     return result;
 }
 
+IRInst* IRBuilder::emitConstexprCast(IRType* type, IRInst* value)
+{
+    if (isTypeEqual(type, value->getDataType()))
+        return value;
+
+    auto toStyle = _getTypeStyleId(type);
+    auto fromStyle = _getTypeStyleId(value->getDataType());
+
+    // For constexpr casts, we only handle Int, Float, Bool, and Enum.
+    // Ptr and Void are not expected in IntVal contexts.
+
+    struct OpSeq
+    {
+        IROp op0, op1;
+        OpSeq(IROp op)
+        {
+            op0 = op;
+            op1 = kIROp_Nop;
+        }
+        OpSeq(IROp op, IROp inOp1)
+        {
+            op0 = op;
+            op1 = inOp1;
+        }
+    };
+
+    // Constexpr casting table for Int, Float, Bool, Enum (4x4).
+    static const OpSeq opMap[4][4] = {
+        /*      To:      Int, Float, Bool, Enum */
+        /* From Int   */
+        {kIROp_ConstexprIntCast,
+         kIROp_ConstexprCastIntToFloat,
+         kIROp_ConstexprIntCast,
+         kIROp_ConstexprCastIntToEnum},
+        /* From Float */
+        {kIROp_ConstexprCastFloatToInt,
+         kIROp_ConstexprFloatCast,
+         kIROp_ConstexprNeq,
+         {kIROp_ConstexprCastFloatToInt, kIROp_ConstexprCastIntToEnum}},
+        /* From Bool  */
+        {kIROp_ConstexprIntCast,
+         kIROp_ConstexprCastIntToFloat,
+         kIROp_Nop,
+         kIROp_ConstexprCastIntToEnum},
+        /* From Enum  */
+        {kIROp_ConstexprCastEnumToInt,
+         {kIROp_ConstexprCastEnumToInt, kIROp_ConstexprCastIntToFloat},
+         {kIROp_ConstexprCastEnumToInt, kIROp_ConstexprIntCast},
+         kIROp_ConstexprEnumCast},
+    };
+
+    // Map style to index in our 4x4 table.
+    auto styleToIndex = [](TypeCastStyle style) -> int
+    {
+        switch (style)
+        {
+        case TypeCastStyle::Int:
+            return 0;
+        case TypeCastStyle::Float:
+            return 1;
+        case TypeCastStyle::Bool:
+            return 2;
+        case TypeCastStyle::Enum:
+            return 3;
+        default:
+            return -1;
+        }
+    };
+
+    int fromIndex = styleToIndex(fromStyle);
+    int toIndex = styleToIndex(toStyle);
+
+    // Fall back to regular emitCast for unsupported types (Ptr, Void, Unknown).
+    if (fromIndex < 0 || toIndex < 0)
+        return emitCast(type, value);
+
+    auto op = opMap[fromIndex][toIndex];
+    if (op.op0 == kIROp_Nop)
+        return value;
+
+    auto t = type;
+    if (op.op1 != kIROp_Nop)
+    {
+        if (toStyle == TypeCastStyle::Bool)
+            t = getIntType();
+        else
+            t = getUInt64Type();
+        if (auto vecType = as<IRVectorType>(type))
+            t = getVectorType(t, vecType->getElementCount());
+        else if (auto matType = as<IRMatrixType>(type))
+            t = getMatrixType(
+                t,
+                matType->getRowCount(),
+                matType->getColumnCount(),
+                matType->getLayout());
+    }
+
+    auto result = emitIntrinsicInst(t, op.op0, 1, &value);
+    if (op.op1 != kIROp_Nop)
+    {
+        result = emitIntrinsicInst(type, op.op1, 1, &result);
+    }
+    return result;
+}
+
 IRInst* IRBuilder::emitVectorReshape(IRType* type, IRInst* value)
 {
     auto targetVectorType = as<IRVectorType>(type);
@@ -4193,7 +4361,17 @@ IRInst* IRBuilder::emitGetTupleElement(IRType* type, IRInst* tuple, UInt element
     case kIROp_TypePack:
         if (element < tuple->getOperandCount())
         {
-            return tuple->getOperand(element);
+            bool hasNestedPack = false;
+            for (UInt i = 0; i < tuple->getOperandCount(); i++)
+            {
+                if (as<IRMakeValuePack>(tuple->getOperand(i)) || as<IRExpand>(tuple->getOperand(i)))
+                {
+                    hasNestedPack = true;
+                    break;
+                }
+            }
+            if (!hasNestedPack)
+                return tuple->getOperand(element);
         }
         break;
     }
@@ -5083,7 +5261,8 @@ IRType* maybePropagateAddressSpace(IRBuilder* builder, IRInst* basePtr, IRType* 
                     resultPtrType->getOp(),
                     resultPtrType->getValueType(),
                     basePtrType->getAccessQualifier(),
-                    basePtrType->getAddressSpace());
+                    basePtrType->getAddressSpace(),
+                    basePtrType->getDataLayout());
             }
         }
     }
@@ -5094,12 +5273,14 @@ IRInst* IRBuilder::emitFieldAddress(IRInst* basePtr, IRInst* fieldKey)
 {
     AddressSpace addrSpace = AddressSpace::Generic;
     AccessQualifier accessQualifier = AccessQualifier::ReadWrite;
+    IRType* dataLayoutType = getDefaultBufferLayoutType();
     IRInst* valueType = nullptr;
     auto basePtrType = unwrapAttributedType(basePtr->getDataType());
     if (auto ptrType = as<IRPtrTypeBase>(basePtrType))
     {
         accessQualifier = ptrType->getAccessQualifier();
         addrSpace = ptrType->getAddressSpace();
+        dataLayoutType = ptrType->getDataLayout();
         valueType = ptrType->getValueType();
     }
     else if (auto ptrLikeType = as<IRPointerLikeType>(basePtrType))
@@ -5121,7 +5302,10 @@ IRInst* IRBuilder::emitFieldAddress(IRInst* basePtr, IRInst* fieldKey)
         }
     }
     SLANG_RELEASE_ASSERT(resultType);
-    return emitFieldAddress(getPtrType(resultType, accessQualifier, addrSpace), basePtr, fieldKey);
+    return emitFieldAddress(
+        getPtrType(resultType, accessQualifier, addrSpace, dataLayoutType),
+        basePtr,
+        fieldKey);
 }
 
 IRInst* IRBuilder::emitFieldAddress(IRType* type, IRInst* base, IRInst* field)
@@ -5229,6 +5413,7 @@ IRInst* IRBuilder::emitElementAddress(IRInst* basePtr, IRInst* index)
 {
     AddressSpace addrSpace = AddressSpace::Generic;
     AccessQualifier accessQualifier = AccessQualifier::ReadWrite;
+    IRType* dataLayoutType = getDefaultBufferLayoutType();
     IRInst* valueType = nullptr;
     auto basePtrType = unwrapAttributedType(basePtr->getDataType());
     if (auto ptrType = as<IRPtrTypeBase>(basePtrType))
@@ -5245,6 +5430,7 @@ IRInst* IRBuilder::emitElementAddress(IRInst* basePtr, IRInst* index)
         {
             addrSpace = ptrType->getAddressSpace();
         }
+        dataLayoutType = ptrType->getDataLayout();
         valueType = ptrType->getValueType();
     }
     else if (auto ptrLikeType = as<IRPointerLikeType>(basePtrType))
@@ -5272,7 +5458,7 @@ IRInst* IRBuilder::emitElementAddress(IRInst* basePtr, IRInst* index)
     auto inst = createInst<IRGetElementPtr>(
         this,
         kIROp_GetElementPtr,
-        getPtrType(type, accessQualifier, addrSpace),
+        getPtrType(type, accessQualifier, addrSpace, dataLayoutType),
         basePtr,
         index);
 
@@ -6086,6 +6272,164 @@ IRInst* IRBuilder::emitDiv(IRType* type, IRInst* numerator, IRInst* denominator)
     return inst;
 }
 
+IRInst* IRBuilder::emitConstexprAdd(IRType* type, IRInst* left, IRInst* right)
+{
+    auto inst = createInst<IRInst>(this, kIROp_ConstexprAdd, type, left, right);
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitConstexprSub(IRType* type, IRInst* left, IRInst* right)
+{
+    auto inst = createInst<IRInst>(this, kIROp_ConstexprSub, type, left, right);
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitConstexprMul(IRType* type, IRInst* left, IRInst* right)
+{
+    auto inst = createInst<IRInst>(this, kIROp_ConstexprMul, type, left, right);
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitConstexprNeg(IRType* type, IRInst* value)
+{
+    auto inst = createInst<IRInst>(this, kIROp_ConstexprNeg, type, value);
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitConstexprDiv(IRType* type, IRInst* left, IRInst* right)
+{
+    auto inst = createInst<IRInst>(this, kIROp_ConstexprDiv, type, left, right);
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitConstexprIRem(IRType* type, IRInst* left, IRInst* right)
+{
+    auto inst = createInst<IRInst>(this, kIROp_ConstexprIRem, type, left, right);
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitConstexprShl(IRType* type, IRInst* left, IRInst* right)
+{
+    auto inst = createInst<IRInst>(this, kIROp_ConstexprShl, type, left, right);
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitConstexprShr(IRType* type, IRInst* left, IRInst* right)
+{
+    auto inst = createInst<IRInst>(this, kIROp_ConstexprShr, type, left, right);
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitConstexprBitAnd(IRType* type, IRInst* left, IRInst* right)
+{
+    auto inst = createInst<IRInst>(this, kIROp_ConstexprBitAnd, type, left, right);
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitConstexprBitOr(IRType* type, IRInst* left, IRInst* right)
+{
+    auto inst = createInst<IRInst>(this, kIROp_ConstexprBitOr, type, left, right);
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitConstexprBitXor(IRType* type, IRInst* left, IRInst* right)
+{
+    auto inst = createInst<IRInst>(this, kIROp_ConstexprBitXor, type, left, right);
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitConstexprBitNot(IRType* type, IRInst* value)
+{
+    auto inst = createInst<IRInst>(this, kIROp_ConstexprBitNot, type, value);
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitConstexprNot(IRType* type, IRInst* value)
+{
+    auto inst = createInst<IRInst>(this, kIROp_ConstexprNot, type, value);
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitConstexprEql(IRType* type, IRInst* left, IRInst* right)
+{
+    auto inst = createInst<IRInst>(this, kIROp_ConstexprEql, type, left, right);
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitConstexprNeq(IRType* type, IRInst* left, IRInst* right)
+{
+    auto inst = createInst<IRInst>(this, kIROp_ConstexprNeq, type, left, right);
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitConstexprGreater(IRType* type, IRInst* left, IRInst* right)
+{
+    auto inst = createInst<IRInst>(this, kIROp_ConstexprGreater, type, left, right);
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitConstexprLess(IRType* type, IRInst* left, IRInst* right)
+{
+    auto inst = createInst<IRInst>(this, kIROp_ConstexprLess, type, left, right);
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitConstexprGeq(IRType* type, IRInst* left, IRInst* right)
+{
+    auto inst = createInst<IRInst>(this, kIROp_ConstexprGeq, type, left, right);
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitConstexprLeq(IRType* type, IRInst* left, IRInst* right)
+{
+    auto inst = createInst<IRInst>(this, kIROp_ConstexprLeq, type, left, right);
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitConstexprAnd(IRType* type, IRInst* left, IRInst* right)
+{
+    auto inst = createInst<IRInst>(this, kIROp_ConstexprAnd, type, left, right);
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitConstexprOr(IRType* type, IRInst* left, IRInst* right)
+{
+    auto inst = createInst<IRInst>(this, kIROp_ConstexprOr, type, left, right);
+    addInst(inst);
+    return inst;
+}
+
+IRInst* IRBuilder::emitConstexprSelect(
+    IRType* type,
+    IRInst* condition,
+    IRInst* ifTrue,
+    IRInst* ifFalse)
+{
+    auto inst = createInst<IRInst>(this, kIROp_ConstexprSelect, type, condition, ifTrue, ifFalse);
+    addInst(inst);
+    return inst;
+}
+
 IRInst* IRBuilder::emitShr(IRType* type, IRInst* left, IRInst* right)
 {
     auto inst = createInst<IRInst>(this, kIROp_Rsh, type, left, right);
@@ -6417,11 +6761,21 @@ IRInst* IRBuilder::emitRWStructuredBufferGetElementPtr(IRInst* structuredBuffer,
     const auto sbt = cast<IRHLSLStructuredBufferTypeBase>(structuredBuffer->getDataType());
     SLANG_ASSERT(sbt);
     const auto t = getPtrType(sbt->getElementType());
+    return emitRWStructuredBufferGetElementPtr(t->getCanonicalType(), structuredBuffer, index);
+}
+
+IRInst* IRBuilder::emitRWStructuredBufferGetElementPtr(
+    IRType* pointerType,
+    IRInst* structuredBuffer,
+    IRInst* index)
+{
+    const auto sbt = cast<IRHLSLStructuredBufferTypeBase>(structuredBuffer->getDataType());
+    SLANG_ASSERT(sbt);
     IRInst* const operands[2] = {structuredBuffer, index};
     const auto i = createInst<IRRWStructuredBufferGetElementPtr>(
         this,
         kIROp_RWStructuredBufferGetElementPtr,
-        t,
+        pointerType,
         2,
         operands);
     addInst(i);
@@ -8525,6 +8879,8 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_Block:
     case kIROp_Each:
     case kIROp_TypeEqualityWitness:
+    case kIROp_SPIRVResourceHeap:
+    case kIROp_SPIRVSamplerHeap:
         return false;
 
         /// Liveness markers have no side effects
@@ -8550,7 +8906,13 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_MakeCoopMatrixFromScalar:
     case kIROp_MatrixReshape:
     case kIROp_VectorReshape:
+    case kIROp_ExtractFirstFromPack:
+    case kIROp_ExtractLastFromPack:
+    case kIROp_TrimHeadOfPack:
+    case kIROp_TrimTailOfPack:
+    case kIROp_PackBranch:
     case kIROp_MakeWitnessPack:
+    case kIROp_NonEmptyPackWitness:
     case kIROp_MakeArray:
     case kIROp_MakeArrayFromElement:
     case kIROp_MakeStruct:
@@ -8576,6 +8938,11 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_RWStructuredBufferGetElementPtr:
     case kIROp_CombinedTextureSamplerGetSampler:
     case kIROp_CombinedTextureSamplerGetTexture:
+    case kIROp_MakeCombinedTextureSampler:
+    case kIROp_MakeCombinedTextureSamplerFromHandle:
+    case kIROp_LoadSamplerDescriptorFromHeap:
+    case kIROp_LoadResourceDescriptorFromHeap:
+    case kIROp_SPIRVLoadDescriptorFromHeap:
     case kIROp_Load: // We are ignoring the possibility of loads from bad addresses, or
                      // `volatile` loads
     case kIROp_LoadReverseGradient:
@@ -8596,6 +8963,26 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_Add:
     case kIROp_Sub:
     case kIROp_Mul:
+    case kIROp_ConstexprAdd:
+    case kIROp_ConstexprSub:
+    case kIROp_ConstexprMul:
+    case kIROp_ConstexprNeg:
+    case kIROp_ConstexprShl:
+    case kIROp_ConstexprShr:
+    case kIROp_ConstexprBitAnd:
+    case kIROp_ConstexprBitOr:
+    case kIROp_ConstexprBitXor:
+    case kIROp_ConstexprBitNot:
+    case kIROp_ConstexprNot:
+    case kIROp_ConstexprEql:
+    case kIROp_ConstexprNeq:
+    case kIROp_ConstexprGreater:
+    case kIROp_ConstexprLess:
+    case kIROp_ConstexprGeq:
+    case kIROp_ConstexprLeq:
+    case kIROp_ConstexprAnd:
+    case kIROp_ConstexprOr:
+    case kIROp_ConstexprSelect:
     case kIROp_Lsh:
     case kIROp_Rsh:
     case kIROp_Eql:
@@ -8631,6 +9018,13 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_CastEnumToInt:
     case kIROp_CastIntToEnum:
     case kIROp_EnumCast:
+    case kIROp_ConstexprIntCast:
+    case kIROp_ConstexprCastIntToFloat:
+    case kIROp_ConstexprCastFloatToInt:
+    case kIROp_ConstexprFloatCast:
+    case kIROp_ConstexprCastIntToEnum:
+    case kIROp_ConstexprCastEnumToInt:
+    case kIROp_ConstexprEnumCast:
     case kIROp_CastUInt2ToDescriptorHandle:
     case kIROp_CastDescriptorHandleToUInt2:
     case kIROp_CastUInt64ToDescriptorHandle:
@@ -8677,6 +9071,7 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_MakeDifferentialPairUserCode:
     case kIROp_MakeDifferentialPtrPair:
     case kIROp_MakeStorageTypeLoweringConfig:
+    case kIROp_SPIRVLoadTexelPointerFromHeap:
         return false;
 
     case kIROp_UnboundedFuncElement:
@@ -8697,7 +9092,9 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
         return false;
 
     case kIROp_Div:
+    case kIROp_ConstexprDiv:
     case kIROp_IRem:
+    case kIROp_ConstexprIRem:
         if (isIntegralScalarOrCompositeType(getFullType()))
         {
             if (auto intLit = as<IRIntLit>(getOperand(1)))

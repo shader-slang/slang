@@ -53,16 +53,6 @@ public:
     String render(const GenericDiagnostic& diag)
     {
         DiagnosticLayout layout = createLayout(diag);
-
-        // If we're skipping the source snippet (no valid location), ensure the span message
-        // is empty - otherwise we would be silently dropping important diagnostic information
-        bool hasValidLocation =
-            layout.primaryLoc.line > 0 || layout.primaryLoc.fileName.getLength() > 0;
-        if (!hasValidLocation)
-        {
-            SLANG_ASSERT(diag.primarySpan.message.getLength() == 0);
-        }
-
         return renderFromLayout(layout);
     }
 
@@ -108,9 +98,24 @@ private:
         // to mark filenames at the beginning of a diagnostic
         const char* arrow;
         const char* noteDash;
+        // A south-east corner to close the gutter at the end (curves from down to left)
+        const char* gutterCorner;
     };
-    constexpr static Glyphs s_unicodeGlyphs = {"━", "┯", "─", "┬", "│", "╰ ", " ╭╼", " ╭╼"};
-    constexpr static Glyphs s_asciiGlyphs = {"^", "^", "-", "-", "|", "`", "-->", "---"};
+    // Unicode box-drawing glyphs as raw UTF-8 bytes to avoid source encoding assumptions:
+    //   ━ U+2501  ┯ U+252F  ─ U+2500  ┬ U+252C  │ U+2502
+    //   ╰ U+2570  ╭ U+256D  ╼ U+257C  ╯ U+256F
+    constexpr static Glyphs s_unicodeGlyphs = {
+        "\xe2\x94\x81",
+        "\xe2\x94\xaf",
+        "\xe2\x94\x80",
+        "\xe2\x94\xac",
+        "\xe2\x94\x82",
+        "\xe2\x95\xb0 ",
+        " \xe2\x95\xad\xe2\x95\xbc",
+        " \xe2\x95\xad\xe2\x95\xbc",
+        "\xe2\x95\xaf",
+    };
+    constexpr static Glyphs s_asciiGlyphs = {"^", "^", "-", "-", "|", "`", "-->", "---", "'"};
     const Glyphs& m_glyphs;
 
     // A single highlight on a line, with an optional label to be connected
@@ -129,6 +134,7 @@ private:
         Int64 number = 0;
         UnownedStringSlice content;
         List<LineHighlight> spans;
+        bool sourceAvailable = false;
     };
 
     // A collection of nearby HighlightedLines
@@ -298,11 +304,13 @@ private:
         {
             HighlightedLine& line = grouped[span.line];
             line.number = span.line;
-            if (line.content.getLength() == 0)
+            if (line.content.getLength() == 0 && !line.sourceAvailable)
             {
-                SourceView* view = m_sourceManager->findSourceView(span.startLoc);
+                SourceView* view =
+                    m_sourceManager ? m_sourceManager->findSourceView(span.startLoc) : nullptr;
                 if (view)
                 {
+                    line.sourceAvailable = true;
                     // Get the line content and trim end-of-line characters and trailing whitespace
                     UnownedStringSlice rawLine = StringUtil::trimEndOfLine(
                         view->getSourceFile()->getLineAtIndex(span.line - 1));
@@ -339,6 +347,18 @@ private:
         section.blocks.add(currentBlock);
         section.commonIndent = findCommonIndent(section.blocks);
         return section;
+    }
+
+    // Returns true if any line in the section has source text available.
+    // When source is unavailable (e.g. built-in modules), we skip rendering
+    // the section body to avoid showing empty source lines with underlines.
+    bool sectionHasSourceAvailable(const SectionLayout& section) const
+    {
+        for (const auto& block : section.blocks)
+            for (const auto& line : block.lines)
+                if (line.sourceAvailable)
+                    return true;
+        return false;
     }
 
     Int64 findCommonIndent(const List<LayoutBlock>& blocks)
@@ -498,6 +518,24 @@ private:
         return rows;
     }
 
+    // When source text is unavailable (e.g. built-in modules), render span
+    // labels with a compact gutter structure (pipe + closing corner), using a
+    // minimal gutter width since there are no line numbers to display.
+    void renderOrphanedLabels(StringBuilder& ss, const SectionLayout& section, Int64 gutterWidth)
+    {
+        String gutter =
+            repeat(' ', gutterWidth + 1) + color(TerminalColor::Cyan, m_glyphs.vertical);
+        for (const auto& block : section.blocks)
+            for (const auto& line : block.lines)
+                for (const auto& span : line.spans)
+                    if (span.label.getLength() > 0)
+                        ss << gutter << " " << color(TerminalColor::BoldRed, span.label) << "\n";
+        ss << color(
+                  TerminalColor::Cyan,
+                  repeat(m_glyphs.secondaryUnderline, gutterWidth + 1) + m_glyphs.gutterCorner)
+           << "\n";
+    }
+
     void renderSectionBody(StringBuilder& ss, const SectionLayout& section)
     {
         for (const auto& block : section.blocks)
@@ -529,7 +567,11 @@ private:
         layout.header.code = diag.code;
         layout.header.message = diag.message;
 
-        HumaneSourceLoc humaneLoc = m_sourceManager->getHumaneLoc(diag.primarySpan.range.begin);
+        HumaneSourceLoc humaneLoc;
+        if (m_sourceManager)
+        {
+            humaneLoc = m_sourceManager->getHumaneLoc(diag.primarySpan.range.begin);
+        }
         layout.primaryLoc.fileName = humaneLoc.pathInfo.foundPath;
         layout.primaryLoc.line = humaneLoc.line;
         layout.primaryLoc.col = humaneLoc.column;
@@ -547,7 +589,11 @@ private:
         {
             DiagnosticLayout::NoteEntry noteEntry;
             noteEntry.message = note.message;
-            HumaneSourceLoc noteHumane = m_sourceManager->getHumaneLoc(note.span.range.begin);
+            HumaneSourceLoc noteHumane;
+            if (m_sourceManager)
+            {
+                noteHumane = m_sourceManager->getHumaneLoc(note.span.range.begin);
+            }
             noteEntry.loc.fileName = noteHumane.pathInfo.foundPath;
             noteEntry.loc.line = noteHumane.line;
             noteEntry.loc.col = noteHumane.column;
@@ -567,7 +613,11 @@ private:
 
     LayoutSpan makeLayoutSpan(const DiagnosticSpan& span, bool isPrimary)
     {
-        HumaneSourceLoc humane = m_sourceManager->getHumaneLoc(span.range.begin);
+        HumaneSourceLoc humane;
+        if (m_sourceManager)
+        {
+            humane = m_sourceManager->getHumaneLoc(span.range.begin);
+        }
         return {
             humane.line,
             humane.column,
@@ -625,24 +675,61 @@ private:
             layout.primaryLoc.line > 0 || layout.primaryLoc.fileName.getLength() > 0;
         if (hasValidLocation)
         {
-            renderLocation(ss, layout.primaryLoc);
-
-            if (layout.primarySection.blocks.getCount() > 0)
+            bool primaryHasSource = sectionHasSourceAvailable(layout.primarySection);
+            if (primaryHasSource)
             {
-                ss << repeat(' ', layout.primarySection.maxGutterWidth + 1)
-                   << color(TerminalColor::Cyan, m_glyphs.vertical) << "\n";
-                renderSectionBody(ss, layout.primarySection);
+                renderLocation(ss, layout.primaryLoc);
+                if (layout.primarySection.blocks.getCount() > 0)
+                {
+                    ss << repeat(' ', layout.primarySection.maxGutterWidth + 1)
+                       << color(TerminalColor::Cyan, m_glyphs.vertical) << "\n";
+                    renderSectionBody(ss, layout.primarySection);
+                    ss << color(
+                              TerminalColor::Cyan,
+                              repeat(
+                                  m_glyphs.secondaryUnderline,
+                                  layout.primarySection.maxGutterWidth + 1) +
+                                  m_glyphs.gutterCorner)
+                       << "\n";
+                }
+            }
+            else
+            {
+                constexpr Int64 kOrphanGutterWidth = 0;
+                DiagnosticLayout::Location loc = layout.primaryLoc;
+                loc.gutterIndent = kOrphanGutterWidth;
+                renderLocation(ss, loc);
+                if (layout.primarySection.blocks.getCount() > 0)
+                    renderOrphanedLabels(ss, layout.primarySection, kOrphanGutterWidth);
             }
         }
         for (const auto& note : layout.notes)
         {
             ss << "\n" << color(TerminalColor::Cyan, "note") << ": " << note.message << "\n";
-            renderNoteLocation(ss, note.loc);
-            if (note.section.blocks.getCount() > 0)
+            bool noteHasSource = sectionHasSourceAvailable(note.section);
+            if (noteHasSource)
             {
-                ss << repeat(' ', note.section.maxGutterWidth + 1)
-                   << color(TerminalColor::Cyan, m_glyphs.vertical) << "\n";
-                renderSectionBody(ss, note.section);
+                renderNoteLocation(ss, note.loc);
+                if (note.section.blocks.getCount() > 0)
+                {
+                    ss << repeat(' ', note.section.maxGutterWidth + 1)
+                       << color(TerminalColor::Cyan, m_glyphs.vertical) << "\n";
+                    renderSectionBody(ss, note.section);
+                    ss << color(
+                              TerminalColor::Cyan,
+                              repeat(m_glyphs.secondaryUnderline, note.section.maxGutterWidth + 1) +
+                                  m_glyphs.gutterCorner)
+                       << "\n";
+                }
+            }
+            else
+            {
+                constexpr Int64 kOrphanGutterWidth = 0;
+                DiagnosticLayout::Location noteLoc = note.loc;
+                noteLoc.gutterIndent = kOrphanGutterWidth;
+                renderNoteLocation(ss, noteLoc);
+                if (note.section.blocks.getCount() > 0)
+                    renderOrphanedLabels(ss, note.section, kOrphanGutterWidth);
             }
         }
         return ss.produceString();
@@ -661,7 +748,10 @@ String renderDiagnostic(
     return renderer.render(diag);
 }
 
-String renderDiagnosticMachineReadable(SourceManager* sm, const GenericDiagnostic& diag)
+String renderDiagnosticMachineReadable(
+    DiagnosticSink::SourceLocationLexer sll,
+    SourceManager* sm,
+    const GenericDiagnostic& diag)
 {
     StringBuilder sb;
 
@@ -686,17 +776,38 @@ String renderDiagnosticMachineReadable(SourceManager* sm, const GenericDiagnosti
         HumaneSourceLoc beginLoc = sm->getHumaneLoc(span.range.begin);
         HumaneSourceLoc endLoc = sm->getHumaneLoc(span.range.end);
 
+        // When span has zero length (begin == end), use the lexer to find token boundaries,
+        // mirroring the logic in buildSectionLayout for rich diagnostics
+        if (sll && span.range.begin == span.range.end && beginLoc.line > 0)
+        {
+            SourceView* view = sm->findSourceView(span.range.begin);
+            if (view)
+            {
+                UnownedStringSlice rawLine = StringUtil::trimEndOfLine(
+                    view->getSourceFile()->getLineAtIndex(beginLoc.line - 1));
+                UnownedStringSlice lineContent =
+                    UnownedStringSlice(rawLine.begin(), rawLine.trim().end());
+                if (lineContent.getLength() > 0 && beginLoc.column > 0 &&
+                    beginLoc.column - 1 < lineContent.getLength())
+                {
+                    Int64 tokenLen = sll(lineContent.tail(beginLoc.column - 1)).getLength();
+                    if (tokenLen > 0)
+                    {
+                        endLoc.line = beginLoc.line;
+                        endLoc.column = beginLoc.column + tokenLen;
+                    }
+                }
+            }
+        }
+
         // Check for locationless span (0,0)
         bool isLocationless = (beginLoc.line == 0 && beginLoc.column == 0);
         if (isLocationless)
         {
-            // Assert that locationless spans don't have span messages (primary diagnostic
-            // message is fine, but span-specific messages shouldn't appear for locationless
-            // diagnostics)
-            if (strcmp(severity, "span") == 0 || strcmp(severity, "note-span") == 0)
+            // Skip outputting 0,0 spans with no message - they provide no value
+            if ((strcmp(severity, "span") == 0 || strcmp(severity, "note-span") == 0) &&
+                message.getLength() == 0)
             {
-                SLANG_ASSERT(message.getLength() == 0);
-                // Skip outputting 0,0 spans with no message
                 return false;
             }
         }

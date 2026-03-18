@@ -11,22 +11,24 @@
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK4): -r tests/diagnostics/illegal-func-decl-module.slang-module -DTEST4 -target spirv -o illegal-func-decl.spv -skip-spirv-validation
 
 #ifdef TEST1
-// CHECK1: ([[# @LINE+1]]): error 45001: unresolved external symbol 'libraryFunction'.
+// CHECK1: error[E45001]: unresolved external symbol
+// CHECK1: 'libraryFunction'
 extern float libraryFunction(inout float a);    // invalid: 'a' is 'in'
 #endif
 
 #ifdef TEST2
-// CHECK2-NOT: ([[# @LINE+1]]): error 45001: unresolved external symbol 'libraryFunction1'.
+// CHECK2-NOT: error[E45001]
 extern float libraryFunction1(inout float b);   // valid
 #endif
 
 #ifdef TEST3
-// CHECK3: ([[# @LINE+1]]): error 45001: unresolved external symbol 'libraryFunction2'.
+// CHECK3: error[E45001]: unresolved external symbol
+// CHECK3: 'libraryFunction2'
 extern float libraryFunction2(inout float a, in float b, float c);   // valid: 'c' is 'inout'
 #endif
 
 #ifdef TEST4
-// CHECK4-NOT: ([[# @LINE+1]]): error 45001: unresolved external symbol 'libraryFunction3'.
+// CHECK4-NOT: error[E45001]
 export float libraryFunction3(float a);         // valid: 'in' is the default is not specified
 #endif
 

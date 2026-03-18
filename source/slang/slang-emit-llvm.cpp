@@ -9,6 +9,7 @@
 #include "slang-ir-lower-buffer-element-type.h"
 #include "slang-ir-util.h"
 #include "slang-llvm/slang-llvm-builder.h"
+#include "slang-rich-diagnostics.h"
 
 using namespace slang;
 
@@ -204,7 +205,7 @@ public:
             return builder->getPointerSizeInBits();
 
         default:
-            SLANG_ASSERT_FAILURE("Unexpected type in getTypeBits!");
+            SLANG_UNIMPLEMENTED_X("Unexpected type in getTypeBits!");
         }
     }
 
@@ -709,9 +710,8 @@ struct LLVMEmitter
     // they're emitted as global variables. Otherwise, we'll try to inline them.
     bool inlineGlobalInstructions = false;
 
-    // These layout rules are used for all data types when they're stored in
-    // memory, EXCEPT when contained within a buffer with an explicit type layout
-    // parameter.
+    // These layout rules are used for pointers using the DefaultDataLayout as
+    // well as stack variables.
     IRTypeLayoutRules* defaultPointerRules = nullptr;
 
     // The LLVM value class is closest to Slang's IRInst, as it can represent
@@ -781,11 +781,9 @@ struct LLVMEmitter
         ISlangSharedLibrary* library = codeGenContext->getSession()->getOrLoadSlangLLVM();
         if (!library)
         {
-            codeGenContext->getSink()->diagnose(
-                SourceLoc(),
-                Diagnostics::unableToGenerateCodeForTarget,
-                TypeTextUtil::getCompileTargetName(
-                    SlangCompileTarget(codeGenContext->getTargetFormat())));
+            codeGenContext->getSink()->diagnose(Diagnostics::UnableToGenerateCodeForTarget{
+                .target = TypeTextUtil::getCompileTargetName(
+                    SlangCompileTarget(codeGenContext->getTargetFormat()))});
             return SLANG_FAIL;
         }
 
@@ -853,15 +851,6 @@ struct LLVMEmitter
         }
 
         debug = getOptions().getDebugInfoLevel() != DebugInfoLevel::None;
-
-        if (getOptions().shouldUseCLayout())
-            defaultPointerRules = IRTypeLayoutRules::get(IRTypeLayoutRuleName::C);
-        else if (getOptions().shouldUseScalarLayout())
-            defaultPointerRules = IRTypeLayoutRules::get(IRTypeLayoutRuleName::Scalar);
-        else if (getOptions().shouldUseDXLayout())
-            defaultPointerRules = IRTypeLayoutRules::get(IRTypeLayoutRuleName::D3DConstantBuffer);
-        else
-            defaultPointerRules = IRTypeLayoutRules::get(IRTypeLayoutRuleName::LLVM);
 
         types.reset(
             new LLVMTypeTranslator(builder, codeGenContext->getTargetReq(), instToDebugLLVM));
@@ -1199,9 +1188,9 @@ struct LLVMEmitter
 
     // Allocates stack memory for given type. Returns a pointer to the start of
     // that memory.
-    LLVMInst* emitStackVariable(IRType* type, IRTypeLayoutRules* rules)
+    LLVMInst* emitStackVariable(IRType* type)
     {
-        IRSizeAndAlignment sizeAlignment = types->getSizeAndAlignment(type, rules);
+        IRSizeAndAlignment sizeAlignment = types->getSizeAndAlignment(type, defaultPointerRules);
 
         // All allocas should occur in the first block:
         // https://llvm.org/docs/Frontend/PerformanceTips.html#use-of-allocas
@@ -1400,7 +1389,7 @@ struct LLVMEmitter
             if (rules == defaultPointerRules)
             {
                 // Equal memory layout, so we can just memcpy.
-                LLVMInst* llvmVar = emitStackVariable(valType, defaultPointerRules);
+                LLVMInst* llvmVar = emitStackVariable(valType);
 
                 // Pointer-to-pointer copy, so generate inline memcpy.
                 builder->emitCopy(
@@ -1414,7 +1403,7 @@ struct LLVMEmitter
             }
             else
             {
-                LLVMInst* llvmVar = emitStackVariable(valType, defaultPointerRules);
+                LLVMInst* llvmVar = emitStackVariable(valType);
                 crossLayoutMemCpy(
                     llvmVar,
                     llvmPtr,
@@ -1555,44 +1544,9 @@ struct LLVMEmitter
         return getTypeLayoutRuleForBuffer(codeGenContext->getTargetProgram(), bufferType);
     }
 
-    // Tries to find which layout rules apply to the given pointer, based on
-    // "provenance": we track the pointer to where we got it and check if the
-    // source is a buffer with a specific layout.
-    IRTypeLayoutRules* getPtrLayoutRules(IRInst* ptr)
-    {
-        // Check if the pointer is actually based on an buffer with an explicit
-        // layout. If so, we need to take that layout into account.
-        if (auto structuredBufferInst = as<IRRWStructuredBufferGetElementPtr>(ptr))
-        {
-            auto baseType = cast<IRHLSLStructuredBufferTypeBase>(
-                structuredBufferInst->getBase()->getDataType());
-            return getBufferLayoutRules(baseType);
-        }
-        else if (auto cbufType = as<IRConstantBufferType>(ptr->getDataType()))
-        {
-            return getBufferLayoutRules(cbufType);
-        }
-        else if (auto gep = as<IRGetElementPtr>(ptr))
-        {
-            // Transitive
-            return getPtrLayoutRules(gep->getBase());
-        }
-        else if (auto off = as<IRGetOffsetPtr>(ptr))
-        {
-            // Transitive
-            return getPtrLayoutRules(off->getBase());
-        }
-        else if (auto fieldAddr = as<IRFieldAddress>(ptr))
-        {
-            // Transitive
-            return getPtrLayoutRules(fieldAddr->getBase());
-        }
-        return defaultPointerRules;
-    }
-
     static LLVMInst* _defaultOnReturnHandler(IRReturn*)
     {
-        SLANG_ASSERT_FAILURE("Unexpected terminator in global scope!");
+        SLANG_UNIMPLEMENTED_X("Unexpected terminator in global scope!");
     }
 
     // Caution! This is only for emitting things which are considered
@@ -1662,7 +1616,7 @@ struct LLVMEmitter
                 auto var = static_cast<IRVar*>(inst);
                 auto ptrType = var->getDataType();
 
-                LLVMInst* llvmVar = emitStackVariable(ptrType->getValueType(), defaultPointerRules);
+                LLVMInst* llvmVar = emitStackVariable(ptrType->getValueType());
 
                 CharSlice linkageName, prettyName;
                 if (maybeGetName(&linkageName, &prettyName, inst))
@@ -1753,7 +1707,7 @@ struct LLVMEmitter
                     findValue(ptr),
                     findValue(val),
                     val->getDataType(),
-                    getPtrLayoutRules(ptr),
+                    getBufferLayoutRules(ptr->getDataType()),
                     isPtrVolatile(ptr));
             }
             break;
@@ -1766,7 +1720,7 @@ struct LLVMEmitter
                 llvmInst = emitLoad(
                     findValue(ptr),
                     loadInst->getDataType(),
-                    getPtrLayoutRules(ptr),
+                    getBufferLayoutRules(ptr->getDataType()),
                     isPtrVolatile(ptr));
             }
             break;
@@ -1779,7 +1733,7 @@ struct LLVMEmitter
                 {
                     // Aggregates are always stack-allocated; we need to give a
                     // valid pointer even if the value is undefined.
-                    llvmInst = emitStackVariable(type, defaultPointerRules);
+                    llvmInst = emitStackVariable(type);
                 }
                 else
                 {
@@ -1805,7 +1759,7 @@ struct LLVMEmitter
             break;
 
         case kIROp_MakeArray:
-            llvmInst = emitStackVariable(inst->getDataType(), defaultPointerRules);
+            llvmInst = emitStackVariable(inst->getDataType());
             for (UInt aa = 0; aa < inst->getOperandCount(); ++aa)
             {
                 auto op = inst->getOperand(aa);
@@ -1821,7 +1775,7 @@ struct LLVMEmitter
         case kIROp_MakeStruct:
             {
                 IRStructType* type = as<IRStructType>(inst->getDataType());
-                llvmInst = emitStackVariable(type, defaultPointerRules);
+                llvmInst = emitStackVariable(type);
                 auto field = type->getFields().begin();
                 for (UInt aa = 0; aa < inst->getOperandCount(); ++aa, ++field)
                 {
@@ -1836,7 +1790,7 @@ struct LLVMEmitter
             {
                 auto arrayType = cast<IRArrayType>(inst->getDataType());
                 auto elementCount = getIntVal(arrayType->getElementCount());
-                llvmInst = emitStackVariable(inst->getDataType(), defaultPointerRules);
+                llvmInst = emitStackVariable(inst->getDataType());
                 auto element = inst->getOperand(0);
                 auto llvmElement = findValue(element);
                 for (IRIntegerValue i = 0; i < elementCount; ++i)
@@ -1965,7 +1919,7 @@ struct LLVMEmitter
 
                 auto dstType = as<IRPtrTypeBase>(dst->getDataType())->getValueType();
 
-                IRTypeLayoutRules* rules = getPtrLayoutRules(dst);
+                IRTypeLayoutRules* rules = getBufferLayoutRules(dst->getDataType());
 
                 IRType* elementType = as<IRVectorType>(dstType)->getElementType();
 
@@ -2037,7 +1991,7 @@ struct LLVMEmitter
                     baseStructType = as<IRStructType>(ptrType->getValueType());
                 }
 
-                auto rules = getPtrLayoutRules(base);
+                auto rules = getBufferLayoutRules(base->getDataType());
                 auto field = findStructField(baseStructType, key);
                 auto llvmBase = findValue(base);
 
@@ -2057,15 +2011,12 @@ struct LLVMEmitter
                     return nullptr;
                 }
 
-                auto rules = getPtrLayoutRules(base);
-
                 auto llvmBase = findValue(base);
                 auto key = as<IRStructKey>(fieldExtractInst->getField());
                 auto field = findStructField(structType, key);
 
-                LLVMInst* ptr = emitStructGetElementPtr(llvmBase, field, rules);
-
-                llvmInst = emitLoad(ptr, field->getFieldType(), rules);
+                LLVMInst* ptr = emitStructGetElementPtr(llvmBase, field, defaultPointerRules);
+                llvmInst = emitLoad(ptr, field->getFieldType(), defaultPointerRules);
             }
             break;
 
@@ -2092,7 +2043,7 @@ struct LLVMEmitter
                     findValue(baseInst),
                     findValue(indexInst),
                     baseType,
-                    getPtrLayoutRules(baseInst));
+                    getBufferLayoutRules(baseInst->getDataType()));
             }
             break;
 
@@ -2128,7 +2079,7 @@ struct LLVMEmitter
                     findValue(baseInst),
                     findValue(indexInst),
                     elemType,
-                    getPtrLayoutRules(baseInst));
+                    getBufferLayoutRules(baseInst->getDataType()));
             }
             break;
 
@@ -2155,11 +2106,13 @@ struct LLVMEmitter
                 else if (auto arrayType = as<IRArrayTypeBase>(baseTy))
                 {
                     // emitGEP + emitLoad.
-                    auto rules = getPtrLayoutRules(baseInst);
                     auto elemType = arrayType->getElementType();
-                    LLVMInst* ptr =
-                        emitArrayGetElementPtr(llvmVal, findValue(indexInst), elemType, rules);
-                    llvmInst = emitLoad(ptr, elemType, rules);
+                    LLVMInst* ptr = emitArrayGetElementPtr(
+                        llvmVal,
+                        findValue(indexInst),
+                        elemType,
+                        defaultPointerRules);
+                    llvmInst = emitLoad(ptr, elemType, defaultPointerRules);
                 }
                 else
                     SLANG_ASSERT_FAILURE("Unknown data type for GetElement!");
@@ -2220,7 +2173,7 @@ struct LLVMEmitter
                 // output parameter that is passed with a pointer.
                 if (types->isAggregateType(inst->getDataType()))
                 {
-                    allocValue = emitStackVariable(inst->getDataType(), defaultPointerRules);
+                    allocValue = emitStackVariable(inst->getDataType());
                     args.add(allocValue);
                 }
                 auto returnVal =
@@ -2404,10 +2357,9 @@ struct LLVMEmitter
                     // slang-rt or in core module. Ideally, if built-in hashing
                     // support in the core module becomes a thing, that can be
                     // used for this too.
-                    getSink()->diagnose(
-                        inst,
-                        Diagnostics::unimplemented,
-                        "unexpected string hash for non-literal string");
+                    getSink()->diagnose(Diagnostics::Unimplemented{
+                        .feature = "unexpected string hash for non-literal string",
+                        .location = inst->sourceLoc});
                 }
             }
             break;
@@ -3119,6 +3071,13 @@ struct LLVMEmitter
 
     void processModule(IRModule* irModule)
     {
+        {
+            IRBuilder irBuilder(irModule);
+            defaultPointerRules = getTypeLayoutRuleForBuffer(
+                codeGenContext->getTargetProgram(),
+                irBuilder.getPtrType(irBuilder.getVoidType()));
+        }
+
         emitGlobalDebugInfo(irModule);
         emitGlobalDeclarations(irModule);
         emitGlobalFunctions(irModule);

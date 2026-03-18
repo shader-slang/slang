@@ -5,7 +5,7 @@
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
-// CHECK: {{.*}}: error 40020: loop does not terminate within the limited number of iterations, unrolling is aborted.
+// CHECK: error[E40020]
 
 // This test checks obfuscated source map loc tracking through a round trip, and producing a location correctly from slang-module that has a source map
 
