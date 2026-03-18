@@ -1573,15 +1573,12 @@ public enum MemoryAllocationError
 
 /// Defines the interface for memory allocators.
 ///
-/// Two of the functions, `rawAllocate` and `rawFree` are not meant to be
-/// called directly by the user. Use `allocate` and `free` instead.
-///
 /// As an implementor of a memory allocator, the minimum you need to implement
-/// is `rawAllocate`, everything else has a technically valid default
-/// implementation. It's also good to implement `rawFree` or `close()` to allow
+/// is `allocate`, everything else has a technically valid default
+/// implementation. It's also good to implement `free` or `close` to allow
 /// the user some way of deallocating memory.
 ///
-/// @param addrSpace The address space of pointers which the allocator operates with.
+/// @param addrSpace The address space of pointers which the allocator operates with
 interface IAllocator<AddressSpace addrSpace>
 {
     /// Allocates a segment of memory which is large enough to store `T[count]`
@@ -1594,15 +1591,29 @@ interface IAllocator<AddressSpace addrSpace>
     /// @throws MemoryAllocationError
     [mutating]
     Ptr<T, Access.ReadWrite, addrSpace, L>
-        allocate<T, L:IBufferDataLayout = DefaultDataLayout>(size_t count = 1) throws MemoryAllocationError
+        allocate<T, L:IBufferDataLayout = DefaultDataLayout>(size_t count) throws MemoryAllocationError;
+
+    /// Allocates a segment of memory with at least the given alignment. The
+    /// resulting pointer must only be freed using `alignedFree()`, not the
+    /// normal `free()`, and it also must not be used with `reallocate()`.
+    ///
+    /// @param bytes Number of bytes to allocate.
+    /// @param alignment The desired alignment for the returned pointer.
+    /// @return pointer to at least enough memory to store the given number of
+    /// bytes that is also aligned as requested.
+    /// @throws MemoryAllocationError Can run out of memory or reject given
+    /// alignment depending on allocator.
+    /// @remarks the regular `allocate()` already returns pointers aligned
+    /// correctly for `T`, so this function only needs to be used in very
+    /// specific circumstances where e.g. cache line or page alignment is
+    /// required.
+    [mutating]
+    Ptr<void, Access.ReadWrite, addrSpace>
+        alignedAllocate(size_t bytes, uint alignment) throws MemoryAllocationError
     {
-        // Computes the amount of memory needed to store `T[count]`. Plain old
-        // sizeof(T, L) * count is actually erroneous if
-        // sizeof(T, L) % alignof(T, L) != 0, which is possible with some
-        // layouts in Slang.
-        size_t paddedSize = (sizeof(T[2], L) - sizeof(T, L)) * count;
-        return reinterpret<Ptr<T, Access.ReadWrite, addrSpace, L>>(
-            try __rawAllocate(paddedSize, uint(alignof(T, L))));
+        size_t allocCount = __alignedAllocPtrLength<addrSpace>(bytes, alignment);
+        let unalignedPtr = try allocate<Ptr<void, Access.ReadWrite, addrSpace>, DefaultDataLayout>(allocCount);
+        return __finalizeAlignedAlloc<addrSpace>(unalignedPtr, alignment);
     }
 
     /// Returns a pointer to a memory allocation that is large enough to store
@@ -1610,8 +1621,9 @@ interface IAllocator<AddressSpace addrSpace>
     /// `min(oldCount, newCount)` entries from `oldPtr`.
     ///
     /// `oldPtr` must have been allocated by this allocator instance using
-    /// `allocate()` or `reallocate()`, where the `oldCount` parameter is smaller
-    /// than or equal to `count` or `newCount` used to allocate the memory.
+    /// `allocate<T>()` or `reallocate<T>()`, where the `oldCount` parameter is
+    /// smaller than or equal to `count` or `newCount` used to allocate the
+    /// memory.
     ///
     /// The returned pointer is either `oldPtr` if the existing allocation was
     /// extended, or a new pointer to a new allocation. Either way, you must not
@@ -1632,10 +1644,6 @@ interface IAllocator<AddressSpace addrSpace>
     ) throws MemoryAllocationError {
         let newPtr = try allocate<T, L>(newCount);
         size_t copyCount = min(oldCount, newCount);
-        // Why is there no `rawReallocate`? This copy is the reason. As
-        // `rawReallocate` would operate with arbitrary alignments and sizes,
-        // there's no way to implement on GPU targets without requiring uint8_t
-        // support.
         for (size_t i = 0; i < copyCount; ++i)
             newPtr[i] = oldPtr[i];
         free(oldPtr);
@@ -1643,9 +1651,11 @@ interface IAllocator<AddressSpace addrSpace>
     }
 
     /// This function may free the given pointer. The behavior is undefined if
-    /// the pointer was not acquired via `allocate()` or `reallocate()` of the
-    /// same allocator instance. After this call, you must not dereference the
-    /// pointer.
+    /// the pointer was not acquired via `allocate<T>()` or `reallocate<T>()` of
+    /// the same allocator instance, and if the type of the given pointer has
+    /// different alignment than it was allocated with.
+    ///
+    /// After this call, you must not dereference the pointer.
     ///
     /// @param data A pointer to an allocation that should be released.
     /// @remarks It is possible that an allocator does not support this
@@ -1653,7 +1663,18 @@ interface IAllocator<AddressSpace addrSpace>
     [mutating]
     void free<T, L:IBufferDataLayout = DefaultDataLayout>(Ptr<T, Access.ReadWrite, addrSpace, L> data)
     {
-        __rawFree(reinterpret<Ptr<void, Access.ReadWrite, addrSpace>>(data));
+    }
+
+    /// This function may free the given pointer, which must have been
+    /// allocated with `alignedAllocate()`.
+    ///
+    /// @param data A pointer to an allocation that should be released.
+    [mutating]
+    void alignedFree(Ptr<void, Access.ReadWrite, addrSpace> data)
+    {
+        let ptrData = reinterpret<Ptr<Ptr<void, Access.ReadWrite, addrSpace>, Access.ReadWrite, addrSpace>>(data);
+        let prevPtr = reinterpret<Ptr<Ptr<void, Access.ReadWrite, addrSpace>, Access.ReadWrite, addrSpace>>(ptrData[-1]);
+        free<Ptr<void, Access.ReadWrite, addrSpace>, DefaultDataLayout>(prevPtr);
     }
 
     /// This function may free all prior allocations made through this
@@ -1666,99 +1687,86 @@ interface IAllocator<AddressSpace addrSpace>
     {
         // default no-op impl
     }
-
-    /// This function must be implemented by all allocators, but shouldn't
-    /// be directly called by users of the allocator. It must either return a
-    /// pointer to an allocation of at least enough memory to store the given
-    /// number of `bytes`, where the address has at least the given `alignment`.
-    ///
-    /// If that is not possible, it must throw a `MemoryAllocationError`
-    /// describing why the specified allocation is not possible.
-    ///
-    /// `alignment` must be a power of two. If it is not, behavior is undefined.
-    ///
-    /// @param bytes The number of bytes in the allocation
-    /// @param alignment The minimum alignment of the memory address
-    /// @return Pointer to the memory allocation.
-    /// @throws MemoryAllocationError
-    /// @see `allocate`
-    [mutating]
-    Ptr<void, Access.ReadWrite, addrSpace> __rawAllocate(size_t bytes, uint alignment) throws MemoryAllocationError;
-
-    /// This function may be implemented by an allocator, and has a default
-    /// implementation that does nothing. It should not be called directly by
-    /// users of the allocator.
-    ///
-    /// If implemented, it should release the memory allocation of the given
-    /// pointer. It is undefined behavior for the pointer to be from some other
-    /// source than this allocator, so the allocator does not have to attempt to
-    /// determine the validity of the pointer.
-    ///
-    /// @param data The pointer whose allocation is to be released.
-    /// @see `free`
-    [mutating]
-    void __rawFree(Ptr<void, Access.ReadWrite, addrSpace> data)
-    {
-        // default no-op impl
-    }
 }
 
 //@hidden:
 
-[ForceInline]
-[require(llvm)]
-Ptr<void> __llvm_malloc(size_t bytes)
+// Computes the size of `T[len]` (when `len` isn't known at compile-time as
+// otherwise you could simply use `sizeof<T[len]>()`), taking into account the
+// alignment requirements of `T` in the given layout. In Slang, it's possible
+// that sizeof(T) % alignof(T) != 0, so we may need to insert padding bytes
+// between entries in an array to achieve correct alignment.
+size_t __arraySizeOf<T, L:IBufferDataLayout>(size_t len)
 {
-    __intrinsic_asm "%result = call ptr @malloc($0)";
+    if (len == 0)
+        return 0;
+
+    size_t unpaddedEntrySize = sizeof(T, L);
+    size_t paddedEntrySize = sizeof(T[2], L) - unpaddedEntrySize;
+    return paddedEntrySize * (len-1) + unpaddedEntrySize;
 }
 
-[ForceInline]
-[require(llvm)]
-void __llvm_free(Ptr<void> ptr)
+// Used as part of the default implementation of alignedAllocate.
+size_t __alignedAllocPtrLength<AddressSpace addrSpace>(size_t bytes, uint alignment)
 {
-    __intrinsic_asm "%result = call ptr @free($0)";
+    size_t ptrSize = sizeof(Ptr<void, Access.ReadWrite, addrSpace>);
+    size_t ptrAlign = alignof(Ptr<void, Access.ReadWrite, addrSpace>);
+    size_t allocSize = bytes + ptrSize;
+
+    if (alignment > ptrAlign)
+    {
+        // There's a chance we may have to realign the returned pointer,
+        // so we'll need extra space for that.
+        allocSize += alignment;
+    }
+    // If this were an array of pointers, determine the count.
+    return (allocSize + ptrSize - 1) / ptrSize;
+}
+
+Ptr<void, Access.ReadWrite, addrSpace> __finalizeAlignedAlloc<AddressSpace addrSpace>(
+    Ptr<Ptr<void, Access.ReadWrite, addrSpace>, Access.ReadWrite, addrSpace> unalignedPtr,
+    uint alignment)
+{
+    size_t ptrAlign = alignof(Ptr<void, Access.ReadWrite, addrSpace>);
+
+    // Leave room to store original address in [-1].
+    uintptr_t alignedPtr = reinterpret<uintptr_t>(unalignedPtr+1);
+
+    // If we need special alignment, do that!
+    if (alignment > ptrAlign)
+        alignedPtr = (alignedPtr + alignment-1) & (~uintptr_t(alignment-1));
+
+    let alignedPtrPtr = reinterpret<Ptr<Ptr<void, Access.ReadWrite, addrSpace>, Access.ReadWrite, addrSpace>>(alignedPtr);
+    alignedPtrPtr[-1] = reinterpret<Ptr<void, Access.ReadWrite, addrSpace>>(unalignedPtr);
+
+    return reinterpret<Ptr<void, Access.ReadWrite, addrSpace>>(alignedPtrPtr);
 }
 
 [ForceInline]
 [require(cpp_cuda_llvm)]
-Ptr<void> __cpu_aligned_alloc(size_t bytes, uint alignment)
+Ptr<void> __cpu_malloc(size_t bytes)
 {
     __target_switch
     {
     case cpp:
     case cuda:
-        __intrinsic_asm "alignedAllocate($0, $1)";
+        __intrinsic_asm "malloc($0)";
     case llvm:
-        // This case is tricky. The LLVM target can't rely on platform macros
-        // to deal with all the potential combinations of _aligned_malloc,
-        // aligned_alloc etc. weirdness, so we'll just try to make do with
-        // `malloc`. We can do that by storing the original address right before
-        // the pointer we return.
-        size_t allocSize = bytes + sizeof(Ptr<void>);
+        __intrinsic_asm "%result = call ptr @malloc($0)";
+    }
+}
 
-        if (alignment > sizeof(Ptr<void>))
-        {
-            // There's a chance we may have to realign the returned pointer,
-            // so we'll need extra space for that.
-            allocSize += alignment;
-        }
-        Ptr<void> unalignedPtr = __llvm_malloc(allocSize);
-
-        if (unalignedPtr == nullptr)
-            return nullptr;
-
-        uintptr_t alignedPtr = reinterpret<uintptr_t>(unalignedPtr) + sizeof(Ptr<void>);
-
-        if (alignment > sizeof(Ptr<void>))
-            alignedPtr = (alignedPtr + alignment-1) & (~uintptr_t(alignment-1));
-
-        // We can do this because pointers from `malloc` are always aligned to
-        // at least `sizeof(Ptr<void>)` and none of the operations above can
-        // knock the pointer out of alignment.
-        let alignedPtrPtr = reinterpret<Ptr<Ptr<void>>>(unalignedPtr);
-        alignedPtrPtr[-1] = unalignedPtr;
-
-        return reinterpret<Ptr<void>>(alignedPtrPtr);
+[ForceInline]
+[require(cpp_cuda_llvm)]
+void __cpu_free(Ptr<void> ptr)
+{
+    __target_switch
+    {
+    case cpp:
+    case cuda:
+        __intrinsic_asm "free($0)";
+    case llvm:
+        __intrinsic_asm "%result = call ptr @free($0)";
     }
 }
 
@@ -1767,33 +1775,73 @@ Ptr<void> __cpu_aligned_alloc(size_t bytes, uint alignment)
 /// This allocator allocates memory in the global memory heap. Note that you do
 /// not need to form an instance of the allocator to use it, you can simply call
 /// `HeapAllocator.allocate<T>(count)`. This allocator is roughly equivalent to
-/// the `malloc`/`free` of C, although it also handles alignment.
+/// the `malloc`/`free` of C.
+/*
 [require(cpp_cuda_llvm)]
 public struct HeapAllocator: IAllocator<AddressSpace.Device>
 {
-    [ForceInline]
-    static public Ptr<void> __rawAllocate(size_t bytes, uint alignment) throws MemoryAllocationError
+    static LayoutPtr<T, L> allocate<T, L:IBufferDataLayout = DefaultDataLayout>(size_t count = 1) throws MemoryAllocationError
     {
-        Ptr<void> allocation = __cpu_aligned_alloc(bytes, alignment);
+        Ptr<void> allocation;
+        if (alignof(T, L) > alignof(Ptr<void>))
+        {
+            // malloc is only guaranteed to be aligned up to the maximum scalar
+            // size, so if our data layout requires a larger alignment for e.g.
+            // a vector, we have to do that ourselves.
+            allocation = try alignedAllocate(__arraySizeOf<T, L>(count), alignof(T, L));
+        }
+        else
+        {
+            allocation = __cpu_malloc(__arraySizeOf<T, L>(count));
+            if (allocation == nullptr)
+                throw MemoryAllocationError.OutOfMemory;
+        }
+        return reinterpret<LayoutPtr<T, L>>(allocation);
+    }
+
+    static override Ptr<void> alignedAllocate(size_t bytes, uint alignment) throws MemoryAllocationError
+    {
+        size_t allocCount = __alignedAllocPtrLength<AddressSpace.Device>(bytes, alignment);
+        Ptr<void> allocation = __cpu_malloc(bytes);
         if (allocation == nullptr)
             throw MemoryAllocationError.OutOfMemory;
-
-        return allocation;
+        return __finalizeAlignedAlloc(unalignedPtr, alignment);
     }
 
-    [ForceInline]
-    static override public void __rawFree(Ptr<void> data)
-    {
-        __target_switch
+    static override LayoutPtr<T, L> reallocate<T, L:IBufferDataLayout = DefaultDataLayout>(
+        LayoutPtr<T, L> oldPtr,
+        size_t oldCount,
+        size_t newCount
+    ) throws MemoryAllocationError {
+        if (alignof(T, L) > alignof(Ptr<void>))
         {
-        case cpp:
-        case cuda:
-            __intrinsic_asm "alignedDeallocate($0)";
-        case llvm:
-            __llvm_free(reinterpret<Ptr<Ptr<void>>>(data)[-1]);
+            let newPtr = try allocate<T, L>(newCount);
+            size_t copyCount = min(oldCount, newCount);
+            for (size_t i = 0; i < copyCount; ++i)
+                newPtr[i] = oldPtr[i];
+            free(oldPtr);
+            return newPtr;
+        }
+        else
+        {
+            return __cpu_realloc(oldPtr, __arraySizeOf<T, L>(newCount));
         }
     }
+
+    static override void free<T, L:IBufferDataLayout = DefaultDataLayout>(LayoutPtr<T, L> data)
+    {
+        if (alignof(T, L) > alignof(Ptr<void>))
+            alignedFree(reinterpret<Ptr<void>>(data));
+        else
+            __cpu_free(reinterpret<Ptr<void>>(data));
+    }
+
+    static override void alignedFree(Ptr<void> data)
+    {
+        __cpu_free(reinterpret<Ptr<Ptr<void>>>(data)[-1]);
+    }
 }
+*/
 
 //@public:
 extension bool : IRangedValue
