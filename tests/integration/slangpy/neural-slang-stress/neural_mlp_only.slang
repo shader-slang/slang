@@ -8,6 +8,7 @@
 
 import slangpy;
 import slang.neural;
+import neural_test_common;
 
 static const int INPUT_DIM = 2;
 static const int HIDDEN_DIM = 128;
@@ -21,7 +22,11 @@ static const int SUBGROUP_SIZE = 32;
 #endif
 static const int WORKGROUP_SZ = WORKGROUP_SIZE;
 static const int SUBGROUP_COUNT = WORKGROUP_SZ / SUBGROUP_SIZE;
+#ifdef USE_HALF
+typealias ElemType = half;
+#else
 typealias ElemType = float;
+#endif
 typealias ShMemSize = SharedMemorySize<ElemType, TargetEnum.CUDA, ExecutionMode.Training,
                                        SUBGROUP_SIZE, SUBGROUP_COUNT>;
 typealias ShMemSizeLayer4 = ShMemSize.OfLayer4<INPUT_DIM, HIDDEN_DIM, HIDDEN_DIM,
@@ -37,23 +42,23 @@ typealias HiddenVec = InlineVector<float, HIDDEN_DIM>;
 typealias OutputVec = InlineVector<float, OUTPUT_DIM>;
 #endif
 
+#ifdef USE_WAVE_TANGLED
+typealias Layer0 = FFLayer<ElemType, InputVec, HiddenVec, LinearLayout, LeakyReLU<ElemType>>;
+typealias Layer1 = FFLayer<ElemType, HiddenVec, HiddenVec, LinearLayout, LeakyReLU<ElemType>>;
+typealias Layer2 = FFLayer<ElemType, HiddenVec, HiddenVec, LinearLayout, LeakyReLU<ElemType>>;
+typealias Layer3 = FFLayer<ElemType, HiddenVec, OutputVec, LinearLayout, Sigmoid<ElemType>>;
+#else
 typealias Layer0 = FFLayer<float, InputVec, HiddenVec, LinearLayout, LeakyReLU<float>>;
 typealias Layer1 = FFLayer<float, HiddenVec, HiddenVec, LinearLayout, LeakyReLU<float>>;
 typealias Layer2 = FFLayer<float, HiddenVec, HiddenVec, LinearLayout, LeakyReLU<float>>;
 typealias Layer3 = FFLayer<float, HiddenVec, OutputVec, LinearLayout, Sigmoid<float>>;
+#endif
 
 static const uint TOTAL_PARAMS = Layer0.ParameterCount + Layer1.ParameterCount
                                 + Layer2.ParameterCount + Layer3.ParameterCount;
 
 int get_total_params() { return int(TOTAL_PARAMS); }
 
-struct LCG
-{
-    uint state;
-    __init(uint seed) { state = seed; }
-    [mutating] uint next_uint() { state = 1664525u * state + 1013904223u; return state; }
-    [mutating] float next_float() { return (next_uint() >> 8) * 0x1p-24; }
-};
 
 #ifdef USE_WAVE_TANGLED
 [Differentiable]
@@ -65,31 +70,19 @@ OutputVec mlp_forward_coords(
     input[0] = uv.x;
     input[1] = uv.y;
 
-    let act = LeakyReLU<float>(ALPHA);
+    let act = LeakyReLU<ElemType>(ElemType(ALPHA));
     let h0 = Layer0(act).eval<Address>(input, paramAddr);
     let a1 = paramAddr.getOffset(Layer0.ParameterCount);
     let h1 = Layer1(act).eval<Address>(h0, a1);
     let a2 = a1.getOffset(Layer1.ParameterCount);
     let h2 = Layer2(act).eval<Address>(h1, a2);
     let a3 = a2.getOffset(Layer2.ParameterCount);
-    return Layer3(Sigmoid<float>()).eval<Address>(h2, a3);
+    return Layer3(Sigmoid<ElemType>()).eval<Address>(h2, a3);
 }
 
 OutputVec forward_inference(float* params, float2 uv)
 {
-    Address paramAddr = Address(params);
-    InputVec input;
-    input[0] = uv.x;
-    input[1] = uv.y;
-
-    let act = LeakyReLU<float>(ALPHA);
-    let h0 = Layer0(act).eval<Address>(input, paramAddr);
-    let a1 = paramAddr.getOffset(Layer0.ParameterCount);
-    let h1 = Layer1(act).eval<Address>(h0, a1);
-    let a2 = a1.getOffset(Layer1.ParameterCount);
-    let h2 = Layer2(act).eval<Address>(h1, a2);
-    let a3 = a2.getOffset(Layer2.ParameterCount);
-    return Layer3(Sigmoid<float>()).eval<Address>(h2, a3);
+    return mlp_forward_coords(Address(params), uv);
 }
 
 [shader("compute")]
@@ -119,16 +112,15 @@ void compute_calculate_grads(
     float3 ref_color = float3(ref_image[ref_idx], ref_image[ref_idx + 1], ref_image[ref_idx + 2]);
 
     OutputVec out = forward_inference(params, pixel_uv);
-    float doutArr[OUTPUT_DIM];
-    doutArr[0] = 2.0f * (float(out[0]) - ref_color.x) / float(OUTPUT_DIM);
-    doutArr[1] = 2.0f * (float(out[1]) - ref_color.y) / float(OUTPUT_DIM);
-    doutArr[2] = 2.0f * (float(out[2]) - ref_color.z) / float(OUTPUT_DIM);
+    ElemType doutArr[OUTPUT_DIM];
+    doutArr[0] = ElemType(2.0f * (float(out[0]) - ref_color.x) / float(OUTPUT_DIM));
+    doutArr[1] = ElemType(2.0f * (float(out[1]) - ref_color.y) / float(OUTPUT_DIM));
+    doutArr[2] = ElemType(2.0f * (float(out[2]) - ref_color.z) / float(OUTPUT_DIM));
     OutputVec dOutput = OutputVec(doutArr);
 
     bwd_diff(mlp_forward_coords)(
         DifferentialPtrPair<Address>(Address(params), Address(params_grad)),
-        pixel_uv,
-        dOutput);
+        pixel_uv, dOutput);
 }
 
 [shader("compute")]
@@ -194,17 +186,7 @@ void compute_optimizer_step(
 {
     int idx = int(gid.x) * WORKGROUP_SZ + int(gtid);
     if (idx >= param_count) return;
-
-    const float BETA1 = 0.9f, BETA2 = 0.999f, EPSILON = 1e-8f;
-    float g = grad[idx];
-    float m = lerp(g, mean_buf[idx], BETA1);
-    float v = lerp(g * g, variance_buf[idx], BETA2);
-    float m_hat = m / (1.0f - pow(BETA1, iter));
-    float v_hat = v / (1.0f - pow(BETA2, iter));
-    primal[idx] -= lr * m_hat / (sqrt(v_hat) + EPSILON);
-    grad[idx] = 0.0f;
-    mean_buf[idx] = m;
-    variance_buf[idx] = v;
+    adam_step(primal[idx], grad[idx], mean_buf[idx], variance_buf[idx], lr, iter);
 }
 #else
 [Differentiable]
@@ -273,12 +255,6 @@ void optimizer_step(inout float primal, inout float grad,
                     inout float mean, inout float variance,
                     float lr, int iter)
 {
-    const float BETA1 = 0.9f, BETA2 = 0.999f, EPSILON = 1e-8f;
-    mean = lerp(grad, mean, BETA1);
-    variance = lerp(grad * grad, variance, BETA2);
-    float m_hat = mean / (1.0f - pow(BETA1, iter));
-    float v_hat = variance / (1.0f - pow(BETA2, iter));
-    primal -= lr * m_hat / (sqrt(v_hat) + EPSILON);
-    grad = 0.0f;
+    adam_step(primal, grad, mean, variance, lr, iter);
 }
 #endif

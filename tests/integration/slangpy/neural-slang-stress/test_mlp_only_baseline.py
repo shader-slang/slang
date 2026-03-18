@@ -26,7 +26,7 @@ from test_utils import (
 TRAIN_ITERS = 5000
 BATCH_SIZE = (64, 64)
 LEARNING_RATE = 0.0001
-VECTOR_TYPES = ("inline", "wave")
+VECTOR_TYPES = ("inline", "wave", "wave_half")
 MLP_LAYERS = [(2, 128), (128, 128), (128, 128), (128, 3)]
 ENTRY_POINTS = [
     "compute_calculate_grads",
@@ -101,18 +101,21 @@ class InlineRunner:
 
 
 class WaveRunner:
-    def __init__(self, device_type):
+    def __init__(self, device_type, use_half=False):
         defines = {
             "USE_WAVE_TANGLED": "1",
             "WORKGROUP_SIZE": str(WORKGROUP_SIZE),
         }
+        if use_half:
+            defines["USE_HALF"] = "1"
+        self.dtype = "float16" if use_half else "float32"
         self.device, self.kernels, self.module = load_compute_kernels(
             "neural_mlp_only.slang",
             ENTRY_POINTS,
             device_type=device_type,
             defines=defines,
         )
-        params_np = xavier_init(MLP_LAYERS)
+        params_np = xavier_init(MLP_LAYERS, dtype=self.dtype)
         self.param_count = len(params_np)
         self.params = create_buffer(self.device, params_np)
         self.params_grad = zeros_buffer(self.device, self.param_count)
@@ -185,6 +188,8 @@ def _create_runner(vector_type: str, device_type):
         return InlineRunner(device_type)
     if vector_type == "wave":
         return WaveRunner(device_type)
+    if vector_type == "wave_half":
+        return WaveRunner(device_type, use_half=True)
     raise AssertionError(f"Unknown vector type: {vector_type}")
 
 
