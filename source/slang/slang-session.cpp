@@ -7,6 +7,7 @@
 #include "slang-compiler.h"
 #include "slang-lower-to-ir.h"
 #include "slang-mangle.h"
+#include "slang-markdown.h"
 #include "slang-options.h"
 #include "slang-parser.h"
 #include "slang-preprocessor.h"
@@ -1422,10 +1423,13 @@ bool Linkage::isBeingImported(Module* module)
 // and then appending `.slang`.
 //
 // For example, `foo_bar` becomes `foo-bar.slang`.
+// If the name already ends with `.slang` or `.slang.md`,
+// it is returned as-is.
 String getFileNameFromModuleName(Name* name, bool translateUnderScore)
 {
     String fileName;
-    if (!getText(name).getUnownedSlice().endsWithCaseInsensitive(".slang"))
+    if (!getText(name).getUnownedSlice().endsWithCaseInsensitive(".slang") &&
+        !hasLiterateFileExtension(getText(name)))
     {
         StringBuilder sb;
         for (auto c : getText(name))
@@ -1559,7 +1563,13 @@ RefPtr<Module> Linkage::findOrImportModule(
     //
     auto defaultSourceFileName = getFileNameFromModuleName(moduleName, false);
     auto alternativeSourceFileName = getFileNameFromModuleName(moduleName, true);
-    String sourceFileNamesToTry[] = {defaultSourceFileName, alternativeSourceFileName};
+    auto defaultMDFileName = defaultSourceFileName + ".md";
+    auto alternativeMDFileName = alternativeSourceFileName + ".md";
+    String sourceFileNamesToTry[] = {
+        defaultSourceFileName,
+        alternativeSourceFileName,
+        defaultMDFileName,
+        alternativeMDFileName};
 
     // We are going to look for the candidate file using the same
     // logic that would be used for a preprocessor `#include`,
@@ -1579,9 +1589,11 @@ RefPtr<Module> Linkage::findOrImportModule(
     {
         for (auto sourceFileName : sourceFileNamesToTry)
         {
-            // The `sourceFileName` will have the `.slang` extension,
-            // so if we are looking for a binary module, we need
-            // to change the extension we will look for.
+            // The `sourceFileName` will have a `.slang` or `.slang.md`
+            // extension, so if we are looking for a binary module, we
+            // need to change the extension we will look for. For
+            // `.slang.md` files, we first strip the `.md` suffix so
+            // that `Path::replaceExt` replaces `.slang` correctly.
             //
             String fileName;
             switch (type)
@@ -1591,7 +1603,9 @@ RefPtr<Module> Linkage::findOrImportModule(
                 break;
 
             case ModuleBlobType::IR:
-                fileName = Path::replaceExt(sourceFileName, "slang-module");
+                fileName = Path::replaceExt(
+                    maybeStripLiterateFileExtension(sourceFileName),
+                    "slang-module");
                 break;
             }
 
