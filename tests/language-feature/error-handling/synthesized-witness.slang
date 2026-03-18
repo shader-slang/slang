@@ -13,7 +13,7 @@ enum MyError
 interface IFoo
 {
     [mutating]
-    int dosomething() throws MyError;
+    int dosomething<T>() throws MyError;
 }
 
 struct MyFoo: IFoo
@@ -30,9 +30,9 @@ struct MyFoo: IFoo
     //
     // This test checks that the 'try' is generated correctly in the synthesized
     // function!
-    int dosomething() throws MyError
+    int dosomething<T>() throws MyError
     {
-        return 1;
+        return sizeof(T);
     }
 }
 
@@ -40,7 +40,7 @@ int helper<T: IFoo>(T t)
 {
     do
     {
-        return try t.dosomething();
+        return try t.dosomething<int>();
     }
     catch
     {
@@ -52,7 +52,7 @@ int helper<T: IFoo>(T t)
 void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)
 {
     MyFoo f;
-    // CHECK: 1
+    // CHECK: 4
     outputBuffer[0] = helper(f);
 }
 
