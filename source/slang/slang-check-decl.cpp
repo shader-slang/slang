@@ -5990,8 +5990,11 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
     //
     DiagnosticSink tempSink(getSourceManager(), nullptr);
     ExprLocalScope localScope;
-    SemanticsVisitor subVisitor(
-        withSink(&tempSink).withParentFunc(synFuncDecl).withExprLocalScope(&localScope).withEnclosingTryClauseType(TryClauseType::Standard));
+    SemanticsVisitor subVisitor(withSink(&tempSink)
+                                    .withParentFunc(synFuncDecl)
+                                    .withExprLocalScope(&localScope)
+                                    .withEnclosingTryClauseType(TryClauseType::Standard));
+
 
     Expr* synBase = baseOverloadedExpr;
 
