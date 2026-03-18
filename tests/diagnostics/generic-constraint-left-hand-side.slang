@@ -4,5 +4,4 @@
 
 void f<T>() where int : IInteger
 //diag:           ^^^ type 'int' is not a valid left hand side of a type constraint
-//diag:           ^^^ type 'int' is not a valid left hand side of a type constraint
 {}

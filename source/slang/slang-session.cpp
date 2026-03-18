@@ -433,11 +433,24 @@ SLANG_NO_THROW slang::TypeReflection* SLANG_MCALL Linkage::specializeType(
     }
 
     DiagnosticSink sink(getSourceManager(), Lexer::sourceLocationLexer);
-    auto specializedType =
-        specializeType(unspecializedType, typeArgs.getCount(), typeArgs.getBuffer(), &sink);
-    sink.getBlobIfNeeded(outDiagnostics);
+    try
+    {
+        auto specializedType =
+            specializeType(unspecializedType, typeArgs.getCount(), typeArgs.getBuffer(), &sink);
+        sink.getBlobIfNeeded(outDiagnostics);
 
-    return asExternal(specializedType);
+        return asExternal(specializedType);
+    }
+    catch (const AbortCompilationException& e)
+    {
+        outputExceptionDiagnostic(e, sink, outDiagnostics);
+        return nullptr;
+    }
+    catch (...)
+    {
+        outputExceptionDiagnostic(sink, outDiagnostics);
+        return nullptr;
+    }
 }
 
 DeclRef<GenericDecl> getGenericParentDeclRef(
