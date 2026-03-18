@@ -359,4 +359,35 @@ protected:
     }
 };
 
+class Scope;
+class ContainerDecl;
+
+struct PreprocessedSegment
+{
+    TokenList tokens;
+    SourceLanguage sourceLanguage;
+};
+
+List<SourceFile*> extractSourceSegments(
+    SourceFile* sourceFile,
+    SourceManager* sourceManager);
+
+List<PreprocessedSegment> preprocessSourceSegments(
+    List<SourceFile*> const& segments,
+    SourceLanguage defaultSourceLanguage,
+    SlangLanguageVersion& ioLanguageVersion,
+    DiagnosticSink* sink,
+    IncludeSystem* includeSystem,
+    Dictionary<String, String> const& preprocessorDefinitions,
+    Linkage* linkage,
+    PreprocessorHandler* preprocessorHandler);
+
+void parsePreprocessedSegments(
+    List<PreprocessedSegment> const& segments,
+    ASTBuilder* astBuilder,
+    TranslationUnitRequest* translationUnit,
+    DiagnosticSink* sink,
+    Scope* outerScope,
+    ContainerDecl* parentDecl);
+
 } // namespace Slang

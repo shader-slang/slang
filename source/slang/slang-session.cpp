@@ -1866,33 +1866,34 @@ SourceFile* Linkage::findFile(Name* name, SourceLoc loc, IncludeSystem& outInclu
 {
     auto impl = [&](bool translateUnderScore) -> SourceFile*
     {
-        auto fileName = getFileNameFromModuleName(name, translateUnderScore);
+        auto baseFileName = getFileNameFromModuleName(name, translateUnderScore);
 
-        // Next, try to find the file of the given name,
-        // using our ordinary include-handling logic.
+        String fileNamesToTry[] = {baseFileName, baseFileName + ".md"};
 
         auto& searchDirs = getSearchDirectories();
         outIncludeSystem = IncludeSystem(&searchDirs, getFileSystemExt(), getSourceManager());
 
-        // Get the original path info
         PathInfo pathIncludedFromInfo = getSourceManager()->getPathInfo(loc, SourceLocType::Actual);
-        PathInfo filePathInfo;
 
-        ComPtr<ISlangBlob> fileContents;
-
-        // We have to load via the found path - as that is how file was originally loaded
-        if (SLANG_FAILED(
-                outIncludeSystem.findFile(fileName, pathIncludedFromInfo.foundPath, filePathInfo)))
+        for (auto& fileName : fileNamesToTry)
         {
-            return nullptr;
+            PathInfo filePathInfo;
+            if (SLANG_FAILED(outIncludeSystem.findFile(
+                    fileName,
+                    pathIncludedFromInfo.foundPath,
+                    filePathInfo)))
+            {
+                continue;
+            }
+            ComPtr<ISlangBlob> fileContents;
+            SourceFile* sourceFile;
+            if (SLANG_FAILED(outIncludeSystem.loadFile(filePathInfo, fileContents, sourceFile)))
+            {
+                continue;
+            }
+            return sourceFile;
         }
-        // Otherwise, try to load it.
-        SourceFile* sourceFile;
-        if (SLANG_FAILED(outIncludeSystem.loadFile(filePathInfo, fileContents, sourceFile)))
-        {
-            return nullptr;
-        }
-        return sourceFile;
+        return nullptr;
     };
     if (auto rs = impl(false))
         return rs;
@@ -1963,33 +1964,40 @@ Linkage::IncludeResult Linkage::findAndIncludeFile(
     auto combinedPreprocessorDefinitions = translationUnit->getCombinedPreprocessorDefinitions();
     SourceLanguage sourceLanguage = translationUnit->sourceLanguage;
     SlangLanguageVersion slangLanguageVersion = module->getModuleDecl()->languageVersion;
-    auto tokens = preprocessSource(
-        sourceFile,
+
+    auto segments = extractSourceSegments(sourceFile, getSourceManager());
+
+    auto preprocessed = preprocessSourceSegments(
+        segments,
+        sourceLanguage,
+        slangLanguageVersion,
         sink,
         &includeSystem,
         combinedPreprocessorDefinitions,
         this,
-        sourceLanguage,
-        slangLanguageVersion,
         &preprocessorHandler);
-
-    if (sourceLanguage == SourceLanguage::Unknown)
-        sourceLanguage = translationUnit->sourceLanguage;
 
     if (slangLanguageVersion != module->getModuleDecl()->languageVersion)
     {
+        SourceLoc diagLoc = loc;
+        for (auto& seg : preprocessed)
+        {
+            if (seg.tokens.begin() != seg.tokens.end())
+            {
+                diagLoc = seg.tokens.begin()->getLoc();
+                break;
+            }
+        }
         sink->diagnose(Diagnostics::LanguageVersionDiffersFromIncludingModule{
-            .location = tokens.begin()->getLoc()});
+            .location = diagLoc});
     }
 
-    auto outerScope = module->getModuleDecl()->ownedScope;
-    parseSourceFile(
+    parsePreprocessedSegments(
+        preprocessed,
         module->getASTBuilder(),
         translationUnit,
-        sourceLanguage,
-        tokens,
         sink,
-        outerScope,
+        module->getModuleDecl()->ownedScope,
         fileDecl);
 
     module->getModuleDecl()->addMember(fileDecl);
