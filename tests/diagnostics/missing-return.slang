@@ -7,7 +7,6 @@
 int bad(int a, int b)
 /*CHECK:
     ^^^ non-void function does not return in all cases
-    ^^^ non-void function does not return in all cases
 */
 {
 	int result = a + b;
@@ -17,7 +16,6 @@ int bad(int a, int b)
 
 int alsoBad(int a, int b)
 /*CHECK:
-    ^^^^^^^ non-void function does not return in all cases
     ^^^^^^^ non-void function does not return in all cases
 */
 {

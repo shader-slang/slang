@@ -10,7 +10,6 @@ int foo()
 	int x = 0;
 /*CHECK:
  ^^^ unreachable code detected
- ^^^ unreachable code detected
 */
 	return x;
 }

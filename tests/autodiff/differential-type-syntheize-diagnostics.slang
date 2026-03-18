@@ -26,7 +26,6 @@ void compute()
 {
     var diff = PartlyDiffable.Differential(1.0f, 2.0f);
 //CHECK:                                  ^ no overload for 'Differential' applicable to arguments of type (float, float)
-//CHECK:                                  ^ no overload for 'Differential' applicable to arguments of type (float, float)
     out[0] = func(diff);
     out[1] = func1(diff);
 }

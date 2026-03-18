@@ -883,6 +883,52 @@ Val* ExpandType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet
     }
 }
 
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! PackBranchType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+void PackBranchType::_toTextOverride(StringBuilder& out)
+{
+    out << "__packBranch(";
+    getPackOperand()->toText(out);
+    out << ", ";
+    getEmptyType()->toText(out);
+    out << ", ";
+    getNonEmptyType()->toText(out);
+    out << ")";
+}
+
+Type* PackBranchType::_createCanonicalTypeOverride()
+{
+    // `__packBranch` stores its pack operand as a `Val*`, not always a `Type*`.
+    // When the operand is a type pack we do want type canonicalization here, but
+    // term-valued symbolic packs must continue to be treated as plain `Val`s.
+    // Do not blindly call `getCanonicalType()` on the operand unless this path is
+    // updated to use a helper like `_getCanonicalValue()`.
+    auto canonicalPack = getPackOperand()->resolve();
+    auto canonicalEmptyType = getEmptyType()->getCanonicalType();
+    auto canonicalNonEmptyType = getNonEmptyType()->getCanonicalType();
+    if (canonicalPack == getPackOperand() && canonicalEmptyType == getEmptyType() &&
+        canonicalNonEmptyType == getNonEmptyType())
+        return this;
+    return getCurrentASTBuilder()->getPackBranchType(
+        canonicalPack,
+        canonicalEmptyType,
+        canonicalNonEmptyType);
+}
+
+Val* PackBranchType::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    int diff = 0;
+    auto substPackOperand = getPackOperand()->substituteImpl(astBuilder, subst, &diff);
+    auto substEmptyType = as<Type>(getEmptyType()->substituteImpl(astBuilder, subst, &diff));
+    auto substNonEmptyType = as<Type>(getNonEmptyType()->substituteImpl(astBuilder, subst, &diff));
+    if (!diff)
+        return this;
+    (*ioDiff)++;
+    return astBuilder->getPackBranchType(substPackOperand, substEmptyType, substNonEmptyType);
+}
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! FirstType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 void FirstPackElementType::_toTextOverride(StringBuilder& out)
 {
