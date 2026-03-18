@@ -92,10 +92,10 @@ void main()
     printf("%d\n", trimmedLastCount<10, 20, 30>());
     // CHECK: 2
 
-    printf("%d\n", trimmedHeadCount<>());
+    printf("%d\n", trimmedFirstCount<>());
     // CHECK: 0
 
-    printf("%d\n", trimmedTailCount<7>());
+    printf("%d\n", trimmedLastCount<7>());
     // CHECK: 0
 
     printf("%d\n", firstExpandedValue<10, 20, 30>());
