@@ -1,7 +1,6 @@
 // slang-ir-check-specialize-generic-with-existential.cpp
 #include "slang-ir-check-specialize-generic-with-existential.h"
 
-#include "core/slang-type-text-util.h"
 #include "slang-compiler.h"
 #include "slang-ir-insts.h"
 #include "slang-ir.h"
@@ -36,6 +35,7 @@ static void checkSpecializeInst(IRSpecialize* specialize, DiagnosticSink* sink)
                 builder.addDecoration(
                     specialize,
                     kIROp_DisallowSpecializationWithExistentialsDecoration);
+                // One diagnostic per Specialize inst is sufficient; stop after first bad arg.
                 return;
             }
         case kIROp_ExtractExistentialType:
