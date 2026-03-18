@@ -5991,7 +5991,7 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
     DiagnosticSink tempSink(getSourceManager(), nullptr);
     ExprLocalScope localScope;
     SemanticsVisitor subVisitor(
-        withSink(&tempSink).withParentFunc(synFuncDecl).withExprLocalScope(&localScope));
+        withSink(&tempSink).withParentFunc(synFuncDecl).withExprLocalScope(&localScope).withEnclosingTryClauseType(TryClauseType::Standard));
 
     Expr* synBase = baseOverloadedExpr;
 
@@ -6048,33 +6048,31 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
     synCall->functionExpr = synBase;
     synCall->arguments = synArgs;
 
-    Expr* checkedCall = nullptr;
-    Expr* checkedExpr = nullptr;
-
-    // If the function being called throws, we need to insert a `try` in front
-    // of the synthesized call to re-throw.
-    if (auto funcType = as<FuncType>(synBase->type))
-    {
-        if (!funcType->getErrorType()->equals(m_astBuilder->getBottomType()))
-        {
-            // Throws, so unless our interface requirement also does that,
-            // we can't call it here.
-            if (synFuncDecl->errorType->equals(m_astBuilder->getBottomType()))
-                return false;
-
-            auto tryExpr = m_astBuilder->create<TryExpr>();
-            tryExpr->tryClauseType = TryClauseType::Standard;
-            tryExpr->base = synCall;
-            checkedExpr = subVisitor.CheckExpr(tryExpr);
-            checkedCall = as<TryExpr>(checkedExpr)->base;
-        }
-    }
-
     // With our temporary diagnostic sink soaking up any messages
     // from overload resolution, we can now try to resolve
     // the call to see what happens.
-    if (!checkedExpr)
-        checkedExpr = checkedCall = subVisitor.CheckExpr(synCall);
+    //
+    auto checkedCall = subVisitor.CheckExpr(synCall);
+    auto checkedExpr = checkedCall;
+
+    if (auto invokeExpr = as<InvokeExpr>(checkedCall))
+    {
+        if (auto funcType = as<FuncType>(invokeExpr->functionExpr->type))
+        {
+            if (!funcType->getErrorType()->equals(m_astBuilder->getBottomType()))
+            {
+                // Throws, so unless our interface requirement also does that,
+                // we can't call it here.
+                if (synFuncDecl->errorType->equals(m_astBuilder->getBottomType()))
+                    return false;
+
+                auto tryExpr = m_astBuilder->create<TryExpr>();
+                tryExpr->tryClauseType = TryClauseType::Standard;
+                tryExpr->base = checkedCall;
+                checkedExpr = subVisitor.CheckExpr(tryExpr);
+            }
+        }
+    }
 
     // Of course, it is possible that the call went through fine,
     // but the result isn't of the type we expect/require,
