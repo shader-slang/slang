@@ -88,7 +88,7 @@ jobs:
           os: linux
           compiler: clang-18
           platform: x86_64
-          config: relwithdebinfo
+          config: releaseWithDebugInfo
           build-llvm: ${{ inputs.build-llvm }}
           use-cached-llvm: false
 
@@ -131,6 +131,13 @@ jobs:
             sccache --show-stats || true
           fi
 
+      - name: Save sccache cache
+        if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        uses: actions/cache/save@v4
+        with:
+          path: /tmp/.cache/sccache
+          key: sccache-linux-clang-18-x86_64-asan-${{ github.sha }}
+
       - name: Run Tests with Sanitizers
         run: |
           mkdir -p asan-logs
@@ -160,17 +167,18 @@ jobs:
           "$bin_dir/slang-test" "${slang_test_args[@]}" || true
 
           echo "=== Sanitizer Results ==="
-          asan_log_count=$(find asan-logs -name 'asan.*' 2>/dev/null | wc -l)
-          if [ "$asan_log_count" -gt 0 ]; then
-            echo "Found $asan_log_count sanitizer report(s):"
-            for f in asan-logs/asan.*; do
+          log_count=$(find asan-logs \( -name 'asan*' -o -name 'ubsan*' \) -size +0c 2>/dev/null | wc -l)
+          if [ "$log_count" -gt 0 ]; then
+            echo "Found $log_count sanitizer report(s):"
+            for f in asan-logs/asan* asan-logs/ubsan*; do
+              [ -s "$f" ] || continue
               echo "--- $f ---"
               head -50 "$f"
               echo "..."
             done
 
             echo ""
-            echo "::warning::AddressSanitizer detected $asan_log_count issue(s). See uploaded artifacts for details."
+            echo "::warning::Sanitizers detected $log_count issue(s). See uploaded artifacts for details."
           else
             echo "No sanitizer issues detected."
           fi
