@@ -17,14 +17,14 @@ float g(float x)
     return log(x);
 }
 
-//CHK: note: checkpointing context of 8 bytes associated with function: 'f'
+//CHK: note: checkpointing context of 8 bytes associated with: 'f'
 [BackwardDifferentiable]
 float f(int p, float x)
 {
     float y = 1.0;
     // Test that phi parameter can be restored.
     if (p == 0)
-        //CHK: note: 4 bytes ({{[a-zA-Z0-9_]+}}) used to checkpoint the following item:
+        //CHK: 4 bytes ({{[a-zA-Z0-9_]+}})
         y = g(x);
 
     return y * y;

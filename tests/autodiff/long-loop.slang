@@ -22,7 +22,7 @@ float sin_series(float x, int iterations)
 
 // Check that the intermediate context of sin_series does not have an array for `i`.
 
-// REPORT: checkpointing context of {{[0-9]+}} bytes associated with function: 'sin_series'
+// REPORT: checkpointing context of {{[0-9]+}} bytes associated with: 'sin_series'
 // REPORT-NOT: FixedArray<int
 
 [numthreads(1, 1, 1)]

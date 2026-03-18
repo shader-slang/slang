@@ -28,7 +28,7 @@ float sin_series(float x, int iterations)
 // This test inparticular checks that can identify induction variables with
 // more than one operation applied to them during the loop
 
-// REPORT: checkpointing context of {{[0-9]+}} bytes associated with function: 'sin_series'
+// REPORT: checkpointing context of {{[0-9]+}} bytes associated with: 'sin_series'
 // REPORT-NOT: FixedArray<int
 
 [numthreads(1, 1, 1)]

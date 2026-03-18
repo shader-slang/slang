@@ -26,7 +26,7 @@ float sin_series(float x, int iterations)
 // `i`. This test checks that the induction variable finder doesn't
 // accidentally succeed all the time
 
-// REPORT: checkpointing context of {{[0-9]+}} bytes associated with function: 'sin_series'
+// REPORT: checkpointing context of {{[0-9]+}} bytes associated with: 'sin_series'
 // REPORT: FixedArray<int
 
 [numthreads(1, 1, 1)]

@@ -2754,15 +2754,8 @@ static bool shouldStoreInst(IRInst* inst)
             // load from non-local variables. A previous data-flow pass should have already tagged
             // functions with the appropriate decorations.
             //
-            auto callee = getResolvedInstForDecorations(effectiveInst, true);
-            if (callee->findDecoration<IRReadNoneDecoration>())
+            if (isReadNoneCallee(effectiveInst))
                 return false;
-
-            // Treat 'remat' as always recomputable.
-            if (callee->getOp() == kIROp_BackwardRematFromLegacyBwdDiffFunc)
-            {
-                return false;
-            }
 
             break;
         }

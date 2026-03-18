@@ -24,7 +24,7 @@ float sin_series(float x, int iterations)
 // This test differs from ./long-loop.slang in that the loop counter is
 // relative to a multiple of the loop iteration
 
-// REPORT: checkpointing context of {{[0-9]+}} bytes associated with function: 'sin_series'
+// REPORT: checkpointing context of {{[0-9]+}} bytes associated with: 'sin_series'
 // REPORT-NOT: FixedArray<int
 
 [numthreads(1, 1, 1)]

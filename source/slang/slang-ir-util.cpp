@@ -1648,21 +1648,7 @@ void forEachAssociatedCallee(IRInst* callee, TFunc callback)
 
 bool doesCalleeHaveSideEffect(IRInst* callee)
 {
-    bool sideEffect = true;
-
-    for (auto decor : getResolvedInstForDecorations(callee)->getDecorations())
-    {
-        switch (decor->getOp())
-        {
-        case kIROp_NoSideEffectDecoration:
-        case kIROp_ReadNoneDecoration:
-        case kIROp_IgnoreSideEffectsDecoration:
-            sideEffect = false;
-            break;
-        default:
-            break;
-        }
-    }
+    bool sideEffect = !isNoSideEffectCallee(callee);
 
     // If the callee has no side effect, check if any of its associated functions have side
     // effect. If so, we want to keep the callee around.
@@ -1680,7 +1666,7 @@ bool doesCalleeHaveSideEffect(IRInst* callee)
             callee,
             [&](IRInst* associatedCallee)
             {
-                sideEffect |= doesCalleeHaveSideEffect(associatedCallee);
+                sideEffect |= !isNoSideEffectCallee(associatedCallee);
                 return;
             });
     }
@@ -3134,5 +3120,115 @@ IRType* getSamplerTypeFromCombinedTextureSampler(IRType* type)
     else
         return builder.getType(kIROp_SamplerStateType);
 }
+
+
+bool isReadNoneCallee(IRInst* callee)
+{
+    if (auto func = as<IRFunc>(callee))
+    {
+        if (func->findDecoration<IRReadNoneDecoration>())
+            return true;
+    }
+
+    if (as<IRSpecialize>(callee))
+    {
+        auto generic = as<IRGeneric>(callee->getOperand(0));
+        if (generic)
+        {
+            auto genericReturnVal = findGenericReturnVal(generic);
+            if (genericReturnVal)
+                return isReadNoneCallee(genericReturnVal);
+            else
+                return false;
+        }
+    }
+
+    if (as<IRTranslateBase>(callee))
+    {
+        switch (callee->getOp())
+        {
+        // Translations that have the same readNone property as the original function.
+        case kIROp_BackwardDifferentiatePrimal:
+        case kIROp_BackwardDifferentiatePropagate:
+        case kIROp_BackwardPrimalFromLegacyBwdDiffFunc:
+        case kIROp_ForwardDifferentiate:
+        case kIROp_TrivialForwardDifferentiate:
+        case kIROp_TrivialBackwardDifferentiatePrimal:
+        case kIROp_FunctionCopy:
+            return isReadNoneCallee(callee->getOperand(0));
+
+        case kIROp_BackwardPropagateFromLegacyBwdDiffFunc:
+            return isReadNoneCallee(callee->getOperand(1));
+
+        // Translations that produce a readNone function even if the original function
+        // is not readNone.
+        case kIROp_BackwardRemat:
+        case kIROp_BackwardRematFromLegacyBwdDiffFunc:
+        case kIROp_TrivialBackwardDifferentiatePropagate:
+        case kIROp_TrivialBackwardRemat:
+            return true;
+        }
+    }
+
+    // Default: cannot assume that unknown op-codes are read-none
+    return false;
+}
+
+
+bool isNoSideEffectCallee(IRInst* callee)
+{
+    if (auto func = as<IRFunc>(callee))
+    {
+        if (func->findDecoration<IRNoSideEffectDecoration>())
+            return true;
+    }
+
+    if (as<IRSpecialize>(callee))
+    {
+        auto generic = as<IRGeneric>(callee->getOperand(0));
+        if (generic)
+        {
+            auto genericReturnVal = findGenericReturnVal(generic);
+            if (genericReturnVal)
+                return isNoSideEffectCallee(genericReturnVal);
+            else
+                return false;
+        }
+    }
+
+    if (as<IRTranslateBase>(callee))
+    {
+        switch (callee->getOp())
+        {
+        // Translations that have the same noSideEffect property as the original function.
+        case kIROp_BackwardDifferentiatePrimal:
+        case kIROp_BackwardPrimalFromLegacyBwdDiffFunc:
+        case kIROp_ForwardDifferentiate:
+        case kIROp_TrivialForwardDifferentiate:
+        case kIROp_TrivialBackwardDifferentiatePrimal:
+        case kIROp_FunctionCopy:
+            return isNoSideEffectCallee(callee->getOperand(0));
+
+        case kIROp_BackwardPropagateFromLegacyBwdDiffFunc:
+            return isNoSideEffectCallee(callee->getOperand(1));
+
+        // Translations that are noSideEffect if the original function is readNone.
+        case kIROp_BackwardDifferentiatePropagate:
+            return isReadNoneCallee(callee->getOperand(0));
+
+        // Translations that produce a noSideEffect function even if the original function
+        // is not noSideEffect.
+        case kIROp_BackwardRemat:
+        case kIROp_BackwardRematFromLegacyBwdDiffFunc:
+        case kIROp_TrivialBackwardDifferentiatePropagate:
+        case kIROp_TrivialBackwardRemat:
+            return true;
+        }
+    }
+
+    // Default: cannot assume that unknown op-codes are read-none
+    return false;
+}
+
 
 } // namespace Slang

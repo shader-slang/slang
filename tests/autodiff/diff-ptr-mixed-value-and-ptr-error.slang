@@ -45,9 +45,11 @@ float caller(float x)
     return r;
 }
 
+RWStructuredBuffer<float> outputBuffer;
+
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void computeMain()
 {
-    fwd_diff(caller)(diffPair(1.0, 1.0));
+    outputBuffer[0] = fwd_diff(caller)(diffPair(1.0, 1.0)).d;
 }

@@ -9028,7 +9028,9 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
             // common subexpression elimination, etc.
             //
             auto call = cast<IRCall>(this);
-            return !(isSideEffectFreeFunctionalCall(call, options));
+            return !(
+                isSideEffectFreeFunctionalCall(call, options) ||
+                call->findDecoration<IRIgnoreSideEffectsDecoration>());
         }
         break;
 

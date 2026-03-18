@@ -73,11 +73,10 @@ SlangResult prepareFuncForBackwardDiff(
     {
         // The function is ill-formed and never returns (such as having an infinite loop),
         // we can't possibly reverse-differentiate such functions, so we will diagnose it here.
-        sink->diagnose(
-            Diagnostics::FunctionNeverReturnsFatal{
-                .funcName = func,
-                .location = func->sourceLoc,
-            });
+        sink->diagnose(Diagnostics::FunctionNeverReturnsFatal{
+            .funcName = func,
+            .location = func->sourceLoc,
+        });
     }
 
     eliminateContinueBlocksInFunc(func->getModule(), func);
@@ -320,7 +319,7 @@ struct BackwardDiffTranslationContext
 
         initializeLocalVariables(builder->getModule(), applyFunc);
         initializeLocalVariables(builder->getModule(), propagateFunc);
-        initializeLocalVariables(builder->getModule(), rematFuncResult);
+        // initializeLocalVariables(builder->getModule(), rematFuncResult);
 
         // Clean up block labels & other temp decorations.
         stripTempDecorations(propagateFunc);
@@ -661,6 +660,10 @@ IRInst* maybeTranslateLegacyToNewBackwardDerivative(
     generateName(&builder, primalFunc, bwdPropFunc, "s_bwdProp_");
     generateName(&builder, primalFunc, fullContextType, "s_bwdCallableCtx_");
 
+    propagatePropertiesForSingleFunc(builder.getModule(), bwdPropFunc);
+    propagatePropertiesForSingleFunc(builder.getModule(), applyFunc);
+    propagatePropertiesForSingleFunc(builder.getModule(), rematFunc);
+
     // Hoist contextType first.
     auto fullContextTypeGlobalVal = maybeHoistAndSpecialize(builder, fullContextType);
     auto minimalContextTypeGlobalVal = maybeHoistAndSpecialize(builder, minimalContextType);
@@ -669,6 +672,7 @@ IRInst* maybeTranslateLegacyToNewBackwardDerivative(
     auto applyFuncGlobalVal = maybeHoistAndSpecialize(builder, applyFunc);
     auto rematFuncGlobalVal = maybeHoistAndSpecialize(builder, rematFunc);
     auto bwdPropFuncGlobalVal = maybeHoistAndSpecialize(builder, bwdPropFunc);
+
     builder.setInsertInto(builder.getModule());
 
     // For the legacy case, minimalContextType is empty.
@@ -870,6 +874,7 @@ IRInst* maybeTranslateLegacyBackwardDerivative(
         applyBwdFunc,
         applyBwdFuncArgs.getCount(),
         applyBwdFuncArgs.getBuffer());
+    builder.addDecoration(applyResult, kIROp_IgnoreSideEffectsDecoration);
 
     bool isContextTypeInTuple = false;
     if (auto tupleType = as<IRTupleType>(applyResult->getDataType()))

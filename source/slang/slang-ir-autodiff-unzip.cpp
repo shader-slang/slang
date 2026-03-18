@@ -172,7 +172,7 @@ struct UnzippingContext
         if (getCheckpointPreference(callable) == CheckpointPreference::PreferCheckpoint)
             return false;
 
-        if (callable->findDecoration<IRReadNoneDecoration>())
+        if (isReadNoneCallee(callable))
             return true;
 
         switch (callable->getOp())
@@ -282,15 +282,18 @@ struct UnzippingContext
                 applyResult,
                 1);
 
+            primalBuilder->markInstAsPrimal(primalReturnVal);
+            primalBuilder->markInstAsPrimal(minCtxVal);
+
             // Minor optimization..
             if (!isRecomputable(applyBwdFunc))
             {
                 primalReturnVal = primalBuilder->emitCheckpointObject(primalReturnVal);
                 primalBuilder->markInstAsPrimal(primalReturnVal);
-            }
 
-            primalBuilder->markInstAsPrimal(primalReturnVal);
-            primalBuilder->markInstAsPrimal(minCtxVal);
+                minCtxVal = primalBuilder->emitCheckpointObject(minCtxVal);
+                primalBuilder->markInstAsPrimal(minCtxVal);
+            }
         }
         else
         {
@@ -746,7 +749,7 @@ struct UnzippingContext
             return InstPair(primalBuilder->emitUnreachable(), diffBuilder->emitUnreachable());
 
         default:
-            SLANG_ASSERT_FAILURE("Unhandled mixed diff inst");
+            SLANG_UNEXPECTED("Unhandled mixed diff inst");
         }
     }
 
@@ -970,20 +973,20 @@ struct ExtractPrimalFuncContext
 
     IRInst* generatePrimalFuncType(
         IRGlobalValueWithCode* destFunc,
-        IRGlobalValueWithCode* originalFunc,
+        IRGlobalValueWithCode* origFunc,
         IRInst*& outMinimalContextType)
     {
         IRBuilder builder(module);
         builder.setInsertBefore(destFunc);
-        IRFuncType* originalFuncType = nullptr;
+        IRFuncType* origFuncType = nullptr;
 
         outMinimalContextType = builder.createStructType();
         builder.addDecoration(outMinimalContextType, kIROp_OptimizableTypeDecoration);
-        outMinimalContextType->sourceLoc = originalFunc->sourceLoc;
+        outMinimalContextType->sourceLoc = origFunc->sourceLoc;
 
-        originalFuncType = as<IRFuncType>(originalFunc->getDataType());
+        origFuncType = as<IRFuncType>(origFunc->getDataType());
 
-        IRInst* args[] = {originalFuncType, outMinimalContextType};
+        IRInst* args[] = {origFuncType, outMinimalContextType};
         auto applyFuncType = diffTypeContext.resolveType(
             &builder,
             builder.emitIntrinsicInst(builder.getTypeKind(), kIROp_ApplyForBwdFuncType, 2, args));
@@ -994,21 +997,21 @@ struct ExtractPrimalFuncContext
 
     IRInst* generateRematFuncType(
         IRGlobalValueWithCode* destFunc,
-        IRGlobalValueWithCode* originalFunc,
+        IRGlobalValueWithCode* origFunc,
         IRInst* minimalContextType,
         IRInst*& outFullContextType)
     {
         IRBuilder builder(module);
         builder.setInsertBefore(destFunc);
-        IRFuncType* originalFuncType = nullptr;
+        IRFuncType* origFuncType = nullptr;
 
         outFullContextType = builder.createStructType();
         builder.addDecoration(outFullContextType, kIROp_OptimizableTypeDecoration);
-        outFullContextType->sourceLoc = originalFunc->sourceLoc;
+        outFullContextType->sourceLoc = origFunc->sourceLoc;
 
-        originalFuncType = as<IRFuncType>(originalFunc->getDataType());
+        origFuncType = as<IRFuncType>(origFunc->getDataType());
 
-        IRInst* args[] = {originalFuncType, minimalContextType, outFullContextType};
+        IRInst* args[] = {origFuncType, minimalContextType, outFullContextType};
         auto rematFuncType = diffTypeContext.resolveType(
             &builder,
             builder.emitIntrinsicInst(builder.getTypeKind(), kIROp_RematFuncType, 3, args));
@@ -1050,13 +1053,8 @@ struct ExtractPrimalFuncContext
         auto ptrStructType = as<IRPtrTypeBase>(intermediateOutput->getDataType());
         SLANG_RELEASE_ASSERT(ptrStructType);
         auto structType = as<IRStructType>(ptrStructType->getValueType());
-        if (auto outerGen = findOuterGeneric(structType))
-        {
-            SLANG_UNEXPECTED("should never happen");
-            genTypeBuilder.setInsertBefore(outerGen);
-        }
-        else
-            genTypeBuilder.setInsertBefore(structType);
+
+        genTypeBuilder.setInsertBefore(structType);
 
         auto fieldType = type;
         SLANG_RELEASE_ASSERT(structType);
@@ -1101,74 +1099,6 @@ struct ExtractPrimalFuncContext
         }
     }
 
-    // Creates a function that takes the intermediate context type as input
-    // and returns just the return value that was stored into the context type.
-    //
-    IRFunc* createGetValFunc(IRFunc*, IRInst* intermediateType, IRInst* returnValueKey)
-    {
-        IRBuilder builder(module);
-        builder.setInsertAfter(intermediateType);
-
-        IRFunc* getValFunc = builder.createFunc();
-        IRType* returnType = nullptr;
-        // Create the function type
-        {
-            List<IRType*> paramTypes;
-            paramTypes.add(
-                (IRType*)intermediateType); // Take the intermediate type as value, not pointer
-
-            if (returnValueKey)
-            {
-                // Get the return type by looking up the field type
-                auto structType = as<IRStructType>(intermediateType);
-                for (auto field : structType->getFields())
-                {
-                    if (field->getKey() == returnValueKey)
-                    {
-                        returnType = field->getFieldType();
-                        break;
-                    }
-                }
-
-                SLANG_RELEASE_ASSERT(returnType);
-            }
-            else
-            {
-                returnType = builder.getVoidType();
-            }
-
-            auto funcType = builder.getFuncType(paramTypes, returnType);
-            getValFunc->setFullType(funcType);
-        }
-
-        // Create parameter block
-        builder.setInsertInto(getValFunc);
-        auto paramBlock = builder.emitBlock();
-        builder.setInsertInto(paramBlock);
-        auto intermediateParam = builder.emitParam((IRType*)intermediateType);
-
-        // Create function body block
-        auto bodyBlock = builder.emitBlock();
-        builder.setInsertInto(paramBlock);
-
-        builder.emitBranch(bodyBlock);
-        builder.setInsertInto(bodyBlock);
-
-        // Extract the return value from the intermediate structure
-        if (returnValueKey)
-        {
-            auto returnVal =
-                builder.emitFieldExtract(returnType, intermediateParam, returnValueKey);
-            builder.emitReturn(returnVal);
-        }
-        else
-        {
-            builder.emitReturn();
-        }
-
-        return getValFunc;
-    }
-
     void setInsertOrdinaryInstIntoBlock(IRBuilder& builder, IRBlock* block)
     {
         auto firstOrdinaryInst = block->getFirstOrdinaryInst();
@@ -1177,7 +1107,6 @@ struct ExtractPrimalFuncContext
         else
             builder.setInsertInto(block);
     }
-
 
     IRFunc* turnUnzippedFuncIntoPrimalFunc(
         IRFunc* unzippedFunc,
@@ -1188,7 +1117,6 @@ struct ExtractPrimalFuncContext
         IRInst*& outParamsContextType,
         IRFunc*& rematFunc,
         // TODO(sai): cleanup. temporary extra value
-        IRInst*& returnValueKey,
         IRInst*& outParamsContextKey,
         IRInst*& outMinimalContextKey)
     {
@@ -1498,7 +1426,6 @@ IRFunc* splitApplyAndPropFuncs(
 
     fullContextType = nullptr;
     minimalContextType = nullptr;
-    IRInst* returnValueKey = nullptr;
     IRInst* paramsContextKey = nullptr;
     IRInst* minimalContextKey = nullptr;
     IRInst* paramsContextType = nullptr;
@@ -1510,7 +1437,6 @@ IRFunc* splitApplyAndPropFuncs(
         minimalContextType,
         paramsContextType,
         rematFunc,
-        returnValueKey,
         paramsContextKey,
         minimalContextKey);
 

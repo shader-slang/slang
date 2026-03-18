@@ -4843,6 +4843,26 @@ bool SemanticsVisitor::doesPropertyMatchRequirement(
     {
         witnessTable->add(key.getDecl(), RequirementWitness(value));
     }
+
+    // After setting the accessor entries in the witness table, we can then
+    // go ahead and try to lower any type constraints on the accessors
+    //
+    for (const auto& [requirement, satisfying] : mapRequiredToSatisfyingAccessorDeclRef)
+    {
+        if (!doesTypeSatisfyConstraintRequirements(
+                DeclRefType::create(getCurrentASTBuilder(), satisfying),
+                requirement,
+                witnessTable))
+        {
+            // Diagnose.
+            getSink()->diagnose(Diagnostics::AccessorDoesNotSatisfyTypeConstraintRequirements{
+                .requirementDecl = requirement.getDecl(),
+                .accessorDecl = satisfying.getDecl(),
+            });
+            return false;
+        }
+    }
+
     //
     // Note: the property declaration itself isn't something that
     // has a useful value/representation in downstream passes, so
@@ -4935,6 +4955,26 @@ bool SemanticsVisitor::doesSubscriptMatchRequirement(
     {
         witnessTable->add(key.getDecl(), RequirementWitness(value));
     }
+
+    // Once things are done, we will install the satisfying values
+    // into the witness table for the requirements.
+    //
+    for (const auto& [requirement, satisfying] : mapRequiredToSatisfyingAccessorDeclRef)
+    {
+        if (!doesTypeSatisfyConstraintRequirements(
+                DeclRefType::create(getCurrentASTBuilder(), satisfying),
+                requirement,
+                witnessTable))
+        {
+            // Diagnose.
+            getSink()->diagnose(Diagnostics::AccessorDoesNotSatisfyTypeConstraintRequirements{
+                .requirementDecl = requirement.getDecl(),
+                .accessorDecl = satisfying.getDecl(),
+            });
+            return false;
+        }
+    }
+
     //
     // Note: the subscript declaration itself isn't something that
     // has a useful value/representation in downstream passes, so
@@ -8772,8 +8812,17 @@ static bool doesWitnessLookupPathContainDecl(SubtypeWitness* witness, Decl* targ
     {
         if (auto declaredSubtypeWitness = as<DeclaredSubtypeWitness>(currentWitness))
         {
+
+            if (auto memberDeclRef =
+                    as<MemberDeclRef>(declaredSubtypeWitness->getDeclRef().declRefBase))
+            {
+                if (memberDeclRef->getDecl() == targetDecl)
+                    return true;
+            }
+
             if (auto lookupDeclRef =
-                    as<LookupDeclRef>(declaredSubtypeWitness->getDeclRef().declRefBase))
+                    SubstitutionSet(declaredSubtypeWitness->getDeclRef().declRefBase)
+                        .findLookupDeclRef())
             {
                 if (lookupDeclRef->getDecl() == targetDecl)
                     return true;

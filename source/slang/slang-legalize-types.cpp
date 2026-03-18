@@ -556,7 +556,7 @@ struct TupleTypeBuilder
                 //
                 IRType* fieldType = ee.type;
                 if (!fieldType)
-                    fieldType = context->getBuilder()->getVoidType();
+                    continue;
 
                 // TODO: shallow clone of modifiers, etc.
                 IRStructField* originalField = findStructField(originalStructType, ee.fieldKey);

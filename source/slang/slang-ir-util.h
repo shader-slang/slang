@@ -520,6 +520,10 @@ bool canInstBeStored(IRInst* inst);
 IRType* getTextureTypeFromCombinedTextureSampler(IRType* type);
 IRType* getSamplerTypeFromCombinedTextureSampler(IRType* type);
 
+bool isReadNoneCallee(IRInst* callee);
+bool isNoSideEffectCallee(IRInst* callee);
+
+
 } // namespace Slang
 
 #endif

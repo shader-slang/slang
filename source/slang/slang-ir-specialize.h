@@ -5,6 +5,7 @@ namespace Slang
 {
 struct IRModule;
 struct IRInst;
+struct IRFunc;
 struct IRSpecialize;
 class DiagnosticSink;
 class TargetProgram;

@@ -754,6 +754,22 @@ struct InliningPassBase
                 ptrArgList.add(arg);
         }
 
+        if (debugInlineInfo.calleeDebugFunc && callSite.specialize)
+        {
+            auto debugFunc = as<IRDebugFunction>(debugInlineInfo.calleeDebugFunc);
+            auto newType = cloneInst(env, builder, debugFunc->getDebugType());
+            if (newType != debugFunc->getDebugType())
+            {
+                auto newDebugFunc = builder->emitDebugFunction(
+                    debugFunc->getName(),
+                    debugFunc->getLine(),
+                    debugFunc->getCol(),
+                    debugFunc->getFile(),
+                    newType);
+                debugInlineInfo.calleeDebugFunc = newDebugFunc;
+            }
+        }
+
         // If the callee consists of a single basic block *and* that block
         // ends with a `return` instruction, then we can apply a simple approach
         // to inlining that is compatible with any call site (including those
@@ -1186,6 +1202,18 @@ struct PreAutoDiffForceInliningPass : InliningPassBase
                 if (annotation->getTarget() == info.callee)
                     allowPreTranslationInlining = false;
             });
+
+        // If we're inlining a specialized version, then check the specialize inst,
+        // since that is what will have the annotations.
+        //
+        if (info.specialize)
+            traverseUsers<IRAnnotation>(
+                info.specialize,
+                [&](IRAnnotation* annotation)
+                {
+                    if (annotation->getTarget() == info.specialize)
+                        allowPreTranslationInlining = false;
+                });
 
         for (auto decor : info.callee->getDecorations())
         {

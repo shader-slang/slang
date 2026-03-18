@@ -26,7 +26,7 @@ float sin_series(float x, int iterations)
 // This differs from ./long-loop.slang in that it uses an equivalent do/while
 // loop, this tests checks that induction variables are still correctly identified.
 
-// REPORT: checkpointing context of {{[0-9]+}} bytes associated with function: 'sin_series'
+// REPORT: checkpointing context of {{[0-9]+}} bytes associated with: 'sin_series'
 // REPORT-NOT: FixedArray<int
 
 [numthreads(1, 1, 1)]

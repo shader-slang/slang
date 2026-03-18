@@ -302,12 +302,33 @@ static void reportCheckpointIntermediates(
         if (totalSize.size == 0)
             continue;
 
-        sink->diagnose(
-            Diagnostics::ReportCheckpointIntermediates{
-                .size = (int64_t)totalSize.size,
-                .func = originalFunc,
-                .location = originalFunc->sourceLoc});
-        nonEmptyFuncs++;
+        Diagnostics::ReportCheckpointIntermediates diagnostic;
+        diagnostic.size = (int64_t)totalSize.size;
+        diagnostic.func = originalFunc;
+        diagnostic.location = originalFunc->sourceLoc;
+
+        // Group entries by (sourceLoc, typeName) to deduplicate repeats from
+        // loop unrolling etc.
+        struct GroupKey
+        {
+            SourceLoc loc;
+            String typeName;
+            bool operator==(const GroupKey& other) const
+            {
+                return loc == other.loc && typeName == other.typeName;
+            }
+            HashCode getHashCode() const
+            {
+                return combineHash(Slang::getHashCode(loc.getRaw()), Slang::getHashCode(typeName));
+            }
+        };
+        struct GroupValue
+        {
+            int64_t varSize;
+            int64_t count;
+        };
+        Dictionary<GroupKey, GroupValue> grouped;
+        List<GroupKey> groupOrder;
 
         for (auto& entry : nonZeroEntries)
         {
@@ -317,12 +338,45 @@ static void reportCheckpointIntermediates(
             typeWriter.clearContent();
             emitter.emitType(entry.storedType);
 
-            sink->diagnose(
-                Diagnostics::ReportCheckpointVariable{
-                    .size = (int64_t)entrySize.size,
-                    .typeName = typeWriter.getContent(),
-                    .location = entry.sourceLoc});
+            GroupKey key;
+            key.loc = entry.sourceLoc;
+            key.typeName = typeWriter.getContent();
+
+            if (auto* existing = grouped.tryGetValue(key))
+            {
+                existing->count++;
+            }
+            else
+            {
+                grouped[key] = GroupValue{(int64_t)entrySize.size, 1};
+                groupOrder.add(key);
+            }
         }
+
+        for (auto& key : groupOrder)
+        {
+            auto& val = grouped[key];
+            if (val.count == 1)
+            {
+                Diagnostics::ReportCheckpointIntermediates::Single s;
+                s.singleSize = val.varSize;
+                s.singleTypeName = key.typeName;
+                s.singleLocation = key.loc;
+                diagnostic.singles.add(s);
+            }
+            else
+            {
+                Diagnostics::ReportCheckpointIntermediates::Multi m;
+                m.multiCount = val.count;
+                m.multiSize = val.varSize;
+                m.multiTypeName = key.typeName;
+                m.multiLocation = key.loc;
+                diagnostic.multis.add(m);
+            }
+        }
+
+        sink->diagnose(diagnostic);
+        nonEmptyFuncs++;
     }
 
     if (nonEmptyFuncs == 0)
@@ -550,28 +604,25 @@ bool checkStaticAssert(IRInst* inst, DiagnosticSink* sink)
                     IRInst* msg = inst->getOperand(1);
                     if (auto msgLit = as<IRStringLit>(msg))
                     {
-                        sink->diagnose(
-                            Diagnostics::StaticAssertionFailure{
-                                .message = String(msgLit->getStringSlice()),
-                                .location = inst->sourceLoc,
-                            });
+                        sink->diagnose(Diagnostics::StaticAssertionFailure{
+                            .message = String(msgLit->getStringSlice()),
+                            .location = inst->sourceLoc,
+                        });
                     }
                     else
                     {
-                        sink->diagnose(
-                            Diagnostics::StaticAssertionFailureWithoutMessage{
-                                .location = inst->sourceLoc,
-                            });
+                        sink->diagnose(Diagnostics::StaticAssertionFailureWithoutMessage{
+                            .location = inst->sourceLoc,
+                        });
                     }
                     diagnoseCallStack(inst, sink);
                 }
             }
             else
             {
-                sink->diagnose(
-                    Diagnostics::StaticAssertionConditionNotConstant{
-                        .location = condi->sourceLoc,
-                    });
+                sink->diagnose(Diagnostics::StaticAssertionConditionNotConstant{
+                    .location = condi->sourceLoc,
+                });
             }
 
             return true;
@@ -2353,9 +2404,8 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
 
     if (!sourceEmitter)
     {
-        sink->diagnose(
-            Diagnostics::UnableToGenerateCodeForTarget{
-                .target = TypeTextUtil::getCompileTargetName(SlangCompileTarget(target))});
+        sink->diagnose(Diagnostics::UnableToGenerateCodeForTarget{
+            .target = TypeTextUtil::getCompileTargetName(SlangCompileTarget(target))});
         return SLANG_FAIL;
     }
 
@@ -2468,11 +2518,10 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
 
     if (sourceMap)
     {
-        auto sourceMapArtifact = ArtifactUtil::createArtifact(
-            ArtifactDesc::make(
-                ArtifactKind::Json,
-                ArtifactPayload::SourceMap,
-                ArtifactStyle::None));
+        auto sourceMapArtifact = ArtifactUtil::createArtifact(ArtifactDesc::make(
+            ArtifactKind::Json,
+            ArtifactPayload::SourceMap,
+            ArtifactStyle::None));
 
         sourceMapArtifact->addRepresentation(sourceMap);
 
@@ -3041,9 +3090,8 @@ SlangResult emitLLVMForEntryPoints(CodeGenContext* codeGenContext, ComPtr<IArtif
     ISlangSharedLibrary* library = codeGenContext->getSession()->getOrLoadSlangLLVM();
     if (!library)
     {
-        codeGenContext->getSink()->diagnose(
-            Diagnostics::UnableToGenerateCodeForTarget{
-                .target = TypeTextUtil::getCompileTargetName(SlangCompileTarget(target))});
+        codeGenContext->getSink()->diagnose(Diagnostics::UnableToGenerateCodeForTarget{
+            .target = TypeTextUtil::getCompileTargetName(SlangCompileTarget(target))});
         return SLANG_FAIL;
     }
 

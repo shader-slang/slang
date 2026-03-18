@@ -17,7 +17,7 @@ struct A : IDifferentiable
 // loop state.
 // 
 
-// REPORT: checkpointing context of {{[0-9]+}} bytes associated with function: '{{.*}}eval'
+// REPORT: checkpointing context of {{[0-9]+}} bytes associated with: '{{.*}}eval'
 // REPORT-NOT: FixedArray<int
 
 __generic<let TBsdfCount : int>

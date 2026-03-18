@@ -2538,6 +2538,35 @@ struct TypeFlowSpecializationContext
         return none();
     }
 
+    IRInst* analyzeTupleType(IRInst* context, IRTupleType* inst)
+    {
+        // A TupleType in a block context may have non-concrete element types.
+        // We need to propagate the info from each element type,
+        // constructing a new tuple type with the element infos.
+        //
+        bool anyInfo = false;
+        List<IRType*> elementInfos;
+        for (UInt i = 0; i < inst->getOperandCount(); i++)
+        {
+            auto elementType = inst->getOperand(i);
+            if (auto elemInfo = tryGetInfo(context, elementType))
+            {
+                elementInfos.add((IRType*)elemInfo);
+                anyInfo = true;
+            }
+            else
+            {
+                elementInfos.add((IRType*)elementType);
+            }
+        }
+
+        if (!anyInfo)
+            return none();
+
+        IRBuilder builder(module);
+        return builder.getTupleType(elementInfos);
+    }
+
     IRInst* analyzePtrType(IRInst* context, IRPtrType* inst)
     {
         // A PtrType wraps a value type. If the value type is non-concrete,
@@ -3184,6 +3213,40 @@ struct TypeFlowSpecializationContext
         return none();
     }
 
+    IRInst* substituteSets(IRInst* context, IRInst* type)
+    {
+        if (auto info = tryGetInfo(context, type))
+        {
+            if (auto elementOfSetType = as<IRElementOfSetType>(info))
+            {
+                if (elementOfSetType->getSet()->isSingleton())
+                    return elementOfSetType->getSet()->getElement(0);
+                else if (
+                    auto unboundedElement = elementOfSetType->getSet()->tryGetUnboundedElement())
+                {
+                    IRBuilder builder(module);
+                    return makeUntaggedUnionType(
+                        cast<IRTypeSet>(builder.getSingletonSet(kIROp_TypeSet, unboundedElement)));
+                }
+                else
+                    return makeUntaggedUnionType(cast<IRTypeSet>(elementOfSetType->getSet()));
+            }
+            else
+                return none();
+        }
+        else if (auto tupleType = as<IRTupleType>(type)) // TODO: this is temp.. merge with the
+                                                         // general union logic
+        {
+            List<IRType*> newElementTypes;
+            for (UInt i = 0; i < tupleType->getOperandCount(); i++)
+                newElementTypes.add((IRType*)substituteSets(context, tupleType->getOperand(i)));
+            IRBuilder builder(module);
+            return builder.getTupleType(newElementTypes);
+        }
+        else
+            return type;
+    }
+
     IRInst* analyzeSpecialize(IRInst* context, IRSpecialize* inst)
     {
         // Analyzing an IRSpecialize inst is an interesting case.
@@ -3303,42 +3366,15 @@ struct TypeFlowSpecializationContext
                 typeOfSpecialization = inst->getDataType();
             else if (auto funcType = as<IRFuncType>(inst->getDataType()))
             {
-                auto substituteSets = [&](IRInst* type) -> IRInst*
-                {
-                    if (auto info = tryGetInfo(context, type))
-                    {
-                        if (auto elementOfSetType = as<IRElementOfSetType>(info))
-                        {
-                            if (elementOfSetType->getSet()->isSingleton())
-                                return elementOfSetType->getSet()->getElement(0);
-                            else if (
-                                auto unboundedElement =
-                                    elementOfSetType->getSet()->tryGetUnboundedElement())
-                            {
-                                IRBuilder builder(module);
-                                return makeUntaggedUnionType(cast<IRTypeSet>(
-                                    builder.getSingletonSet(kIROp_TypeSet, unboundedElement)));
-                            }
-                            else
-                                return makeUntaggedUnionType(
-                                    cast<IRTypeSet>(elementOfSetType->getSet()));
-                        }
-                        else
-                            return type;
-                    }
-                    else
-                        return type;
-                };
-
                 List<IRType*>& newParamTypes = *module->getContainerPool().getList<IRType>();
                 for (auto paramType : funcType->getParamTypes())
-                    newParamTypes.add((IRType*)substituteSets(paramType));
+                    newParamTypes.add((IRType*)substituteSets(context, paramType));
                 IRBuilder builder(module);
                 builder.setInsertInto(module);
                 typeOfSpecialization = builder.getFuncType(
                     newParamTypes.getCount(),
                     newParamTypes.getBuffer(),
-                    (IRType*)substituteSets(funcType->getResultType()));
+                    (IRType*)substituteSets(context, funcType->getResultType()));
                 module->getContainerPool().free(&newParamTypes);
             }
             else if (auto witnessTableType = as<IRWitnessTableType>(inst->getDataType()))
@@ -3683,8 +3719,10 @@ struct TypeFlowSpecializationContext
             builder.getFuncType(newArgTypes.getArrayView(), funcType->getResultType()));
     }
 
-    void expandArgPacksInFunc(IRFunc* func)
+    void expandPacksInFunc(IRFunc* func)
     {
+        tryExpandParameterPack(func);
+
         // Go through any IRCall insts in func and expand any argument packs.
         List<IRCall*> callsToConsider;
         for (auto block = func->getFirstBlock(); block; block = block->getNextBlock())
@@ -3702,6 +3740,49 @@ struct TypeFlowSpecializationContext
         {
             tryExpandArgPack(call);
         }
+    }
+
+    bool tryExpandParameterPack(IRFunc* func)
+    {
+        if (!func)
+            return false;
+
+        ShortList<IRInst*> params;
+        for (auto param : func->getParams())
+        {
+            if (as<IRTypePack>(param->getDataType()))
+                params.add(param);
+            if (as<IRExpand>(param->getDataType()))
+            {
+                return false;
+            }
+        }
+        if (params.getCount() == 0)
+            return false;
+
+        IRBuilder builder(func);
+        for (auto param : params)
+        {
+            builder.setInsertBefore(param);
+            auto typePack = as<IRTypePack>(param->getDataType());
+            ShortList<IRInst*> newParams;
+            for (UInt i = 0; i < typePack->getOperandCount(); i++)
+            {
+                auto newParam = builder.createParam((IRType*)typePack->getOperand(i));
+                newParam->insertBefore(param);
+                newParams.add(newParam);
+            }
+            setInsertBeforeOrdinaryInst(&builder, param);
+            auto val = builder.emitMakeValuePack(
+                typePack,
+                (UInt)newParams.getCount(),
+                newParams.getArrayView().getBuffer());
+            param->replaceUsesWith(val);
+            param->removeAndDeallocate();
+        }
+
+        fixUpFuncType(func);
+        return true;
     }
 
     void discoverContext(IRInst* context, WorkQueue<WorkItem>& workQueue)
@@ -3734,7 +3815,7 @@ struct TypeFlowSpecializationContext
                         workQueue.enqueue(WorkItem(context, block));
 
                     if (this->uniqueDefs.add(func))
-                        expandArgPacksInFunc(func);
+                        expandPacksInFunc(func);
 
                     break;
                 }
@@ -3818,7 +3899,7 @@ struct TypeFlowSpecializationContext
                     func = getContextFunc(context);
 
                     if (this->uniqueDefs.add(func))
-                        expandArgPacksInFunc(func);
+                        expandPacksInFunc(func);
 
                     // Initialize parameter infos from the bindings
                     initializeBindingsForFuncWithBindings(funcWithBindings, func, workQueue);

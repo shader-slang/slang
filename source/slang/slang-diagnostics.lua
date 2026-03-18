@@ -3233,6 +3233,13 @@ err(
     span { loc = "param:Decl", message = "'set' parameter '~param' has type '~actualType:Type' which does not match the expected type '~expectedType:Type'" }
 )
 
+err(
+    "accessor-does-not-satisfy-type-constraint-requirements",
+    31103,
+    "accessor does not satisfy type constraint requirements",
+    span { loc = "accessorDecl:Decl", message = "an accessor declaration does not satisfy type constraint requirements for ~requirementDecl:Decl" }
+)
+
 --
 -- 313xx: bit fields
 --
@@ -4674,22 +4681,10 @@ err(
 standalone_note(
     "report-checkpoint-intermediates",
     -1,
-    "checkpointing context of ~size:Int bytes associated with function: '~func:IRInst'",
-    span { loc = "location" }
-)
-
-standalone_note(
-    "report-checkpoint-variable",
-    -1,
-    "~size:Int bytes (~typeName) used to checkpoint the following item:",
-    span { loc = "location" }
-)
-
-standalone_note(
-    "report-checkpoint-counter",
-    -1,
-    "~size:Int bytes (~typeName) used for a loop counter here:",
-    span { loc = "location" }
+    "checkpointing context of ~size:Int bytes associated with: '~func:IRInst'",
+    span { loc = "location" },
+    variadic_span { cpp_name = "Single", loc = "singleLocation", message = "~singleSize:Int bytes (~singleTypeName)" },
+    variadic_span { cpp_name = "Multi", loc = "multiLocation", message = "~multiCount:Int instances of ~multiSize:Int bytes (~multiTypeName)" }
 )
 
 standalone_note(

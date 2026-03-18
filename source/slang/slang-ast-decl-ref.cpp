@@ -67,6 +67,26 @@ DeclRefBase* MemberDeclRef::_substituteImplOverride(
     if (diff)
     {
         (*ioDiff)++;
+
+        // We'll special case one specific pattern.
+        if (auto origGenericAppParent = as<GenericAppDeclRef>(substParent))
+        {
+            if (auto origGenericLookedupVal = as<LookupDeclRef>(origGenericAppParent->getBase()))
+            {
+                auto resolvedWitness =
+                    as<SubtypeWitness>(origGenericLookedupVal->getWitness()->resolve());
+                // Otherwise, we need to get the effective inner decl-ref for the generic
+                // app.
+                auto resolvedTargetDecl =
+                    getUnspecializedLookupRec(getCurrentASTBuilder(), getDecl(), resolvedWitness);
+
+                if (resolvedTargetDecl.m_flavor == RequirementWitness::Flavor::declRef)
+                {
+                    return resolvedTargetDecl.getDeclRef();
+                }
+            }
+        }
+
         return astBuilder->getMemberDeclRef(substParent, getDecl());
     }
     return this;
@@ -88,7 +108,40 @@ Val* MemberDeclRef::_resolveImplOverride()
     auto resolvedParent = _resolveAsDeclRef(getParentOperand());
     if (resolvedParent != getParentOperand())
     {
-        return getCurrentASTBuilder()->getMemberDeclRef(resolvedParent, getDecl());
+        auto newChild = getDecl();
+
+        if (newChild->parentDecl != resolvedParent->getDecl())
+        {
+            // We'll special case one specific pattern.
+            if (auto origGenericAppParent = as<GenericAppDeclRef>(getParentOperand()))
+            {
+                if (auto origGenericLookedupVal =
+                        as<LookupDeclRef>(origGenericAppParent->getBase()))
+                {
+                    auto resolvedWitness =
+                        as<SubtypeWitness>(origGenericLookedupVal->getWitness()->resolve());
+                    // Otherwise, we need to get the effective inner decl-ref for the generic
+                    // app.
+                    auto resolvedTargetDecl = getUnspecializedLookupRec(
+                        getCurrentASTBuilder(),
+                        getDecl(),
+                        resolvedWitness);
+
+                    if (resolvedTargetDecl.m_flavor == RequirementWitness::Flavor::declRef)
+                    {
+                        newChild = resolvedTargetDecl.getDeclRef().getDecl();
+                    }
+                    else if (resolvedTargetDecl.m_flavor == RequirementWitness::Flavor::val)
+                    {
+                        return resolvedTargetDecl.getVal()->substitute(
+                            getCurrentASTBuilder(),
+                            getParentOperand());
+                    }
+                }
+            }
+        }
+
+        return getCurrentASTBuilder()->getMemberDeclRef(resolvedParent, newChild);
     }
     return this;
 }
