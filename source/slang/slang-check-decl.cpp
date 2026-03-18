@@ -6067,7 +6067,6 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
                 tryExpr->tryClauseType = TryClauseType::Standard;
                 tryExpr->base = checkedCall;
                 checkedExpr = subVisitor.CheckExpr(tryExpr);
-                checkedCall = tryExpr->base;
             }
         }
     }
