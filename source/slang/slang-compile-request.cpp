@@ -349,14 +349,6 @@ void FrontEndCompileRequest::parseTranslationUnit(TranslationUnitRequest* transl
             segments.add(sourceFile);
         }
 
-        if (optionSet.getBoolOption(CompilerOptionName::OutputIncludes))
-        {
-            _outputIncludes(
-                translationUnit->getSourceFiles(),
-                getSink()->getSourceManager(),
-                getSink());
-        }
-
         for (auto segmentFile : segments)
         {
             SourceLanguage sourceLanguage = translationUnit->sourceLanguage;
@@ -411,6 +403,14 @@ void FrontEndCompileRequest::parseTranslationUnit(TranslationUnitRequest* transl
                 getSink(),
                 languageScope,
                 translationUnitSyntax);
+        }
+
+        if (optionSet.getBoolOption(CompilerOptionName::OutputIncludes))
+        {
+            _outputIncludes(
+                translationUnit->getSourceFiles(),
+                getSink()->getSourceManager(),
+                getSink());
         }
 
         // If we are only outputting preprocessor tokens, skip AST work.
