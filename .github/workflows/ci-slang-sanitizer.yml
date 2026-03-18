@@ -42,10 +42,12 @@ jobs:
 
       - name: Install Clang 18 and LLVM Tools
         run: |
-          wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
-          sudo add-apt-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-18 main"
+          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key \
+            | sudo gpg --dearmor -o /usr/share/keyrings/llvm.gpg
+          echo "deb [signed-by=/usr/share/keyrings/llvm.gpg] http://apt.llvm.org/jammy/ llvm-toolchain-jammy-18 main" \
+            | sudo tee /etc/apt/sources.list.d/llvm-18.list
           sudo apt-get update
-          sudo apt-get install -y clang-18 clang++-18 llvm-18
+          sudo apt-get install -y clang-18 llvm-18
 
           clang-18 --version
           clang++-18 --version
@@ -92,15 +94,20 @@ jobs:
           build-llvm: ${{ inputs.build-llvm }}
           use-cached-llvm: false
 
+      - name: Create sanitizer log directory
+        run: mkdir -p asan-logs
+
       - name: Build Slang with Sanitizers
         run: |
           echo "cmake version: $(cmake --version)"
           echo "Building with AddressSanitizer and UndefinedBehaviorSanitizer"
 
-          # Build-time generators are compiled with -shared-libsan and need
-          # the ASan runtime library in LD_LIBRARY_PATH when cmake runs them.
+          # Binaries built with -shared-libsan dynamically link libclang_rt.asan.
+          # Persist LD_LIBRARY_PATH so both build-time generators and test steps
+          # can locate the sanitizer runtime.
           CLANG_RUNTIME_DIR=$(clang-18 -print-runtime-dir)
           export LD_LIBRARY_PATH="${CLANG_RUNTIME_DIR}:${LD_LIBRARY_PATH:-}"
+          echo "LD_LIBRARY_PATH=${LD_LIBRARY_PATH}" >> "$GITHUB_ENV"
           echo "Clang runtime dir: $CLANG_RUNTIME_DIR"
 
           # Disable leak detection during build: generators are short-lived
@@ -122,6 +129,7 @@ jobs:
           cmake --preset default --fresh \
             -DSLANG_ENABLE_ASAN=ON \
             -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
+            -DSLANG_ENABLE_EXAMPLES=OFF \
             "${cmake_launcher_defines[@]}"
 
           cmake --build --preset releaseWithDebugInfo -j$(nproc)
@@ -140,8 +148,6 @@ jobs:
 
       - name: Run Tests with Sanitizers
         run: |
-          mkdir -p asan-logs
-
           export ASAN_OPTIONS="detect_leaks=1:print_scariness=1:log_path=$PWD/asan-logs/asan"
           export UBSAN_OPTIONS="print_stacktrace=1:log_path=$PWD/asan-logs/ubsan"
           export LSAN_OPTIONS="suppressions=$PWD/cmake/lsan-suppressions.txt"
@@ -164,10 +170,13 @@ jobs:
             slang_test_args+=("-server-count" "${{ inputs.server-count }}")
           fi
 
-          "$bin_dir/slang-test" "${slang_test_args[@]}" || true
+          "$bin_dir/slang-test" "${slang_test_args[@]}" && slang_test_exit=0 || slang_test_exit=$?
+          if [ "$slang_test_exit" -ne 0 ]; then
+            echo "::warning::slang-test exited with code $slang_test_exit"
+          fi
 
           echo "=== Sanitizer Results ==="
-          log_count=$(find asan-logs \( -name 'asan*' -o -name 'ubsan*' \) -size +0c 2>/dev/null | wc -l)
+          log_count=$(find asan-logs \( -name 'asan*' -o -name 'ubsan*' \) -size +0c 2>/dev/null | wc -l || echo 0)
           if [ "$log_count" -gt 0 ]; then
             echo "Found $log_count sanitizer report(s):"
             for f in asan-logs/asan* asan-logs/ubsan*; do
@@ -189,12 +198,15 @@ jobs:
           export UBSAN_OPTIONS="print_stacktrace=1:log_path=$PWD/asan-logs/ubsan-slangc"
           export LSAN_OPTIONS="suppressions=$PWD/cmake/lsan-suppressions.txt"
 
-          PATH=$bin_dir:$PATH tools/slangc-test/test.sh || true
+          PATH=$bin_dir:$PATH tools/slangc-test/test.sh && slangc_test_exit=0 || slangc_test_exit=$?
+          if [ "$slangc_test_exit" -ne 0 ]; then
+            echo "::warning::slangc tests exited with code $slangc_test_exit"
+          fi
 
       - name: Sanitizer Summary
         if: always()
         run: |
-          total_logs=$(find asan-logs \( -name 'asan*' -o -name 'ubsan*' \) -size +0c 2>/dev/null | wc -l)
+          total_logs=$(find asan-logs \( -name 'asan*' -o -name 'ubsan*' \) -size +0c 2>/dev/null | wc -l || echo 0)
           if [ "$total_logs" -gt 0 ]; then
             echo "## Sanitizer Report" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
