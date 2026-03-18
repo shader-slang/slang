@@ -43,22 +43,32 @@ static void _insertBinding(
     ranges.add(newRange);
 }
 
-void collectMetadataFromInst(IRInst* param, ArtifactPostEmitMetadata& outMetadata)
-{
-    auto layoutDecoration = param->findDecoration<IRLayoutDecoration>();
-    if (!layoutDecoration)
-        return;
+// Forward declaration for mutual recursion.
+static void collectMetadataFromTypeLayout(
+    IRTypeLayout* typeLayout,
+    UInt spaceOffset,
+    ArtifactPostEmitMetadata& outMetadata);
 
-    auto varLayout = as<IRVarLayout>(layoutDecoration->getLayout());
+// Collect metadata from an IRVarLayout (parameter or struct field)
+// and recursively process any nested struct fields.
+static void collectMetadataFromVarLayout(
+    IRVarLayout* varLayout,
+    UInt parentSpaceOffset,
+    ArtifactPostEmitMetadata& outMetadata)
+{
     if (!varLayout)
         return;
 
-    UInt spaceOffset = 0;
+    UInt spaceOffset = parentSpaceOffset;
     if (auto spaceAttr = varLayout->findOffsetAttr(LayoutResourceKind::RegisterSpace))
     {
-        spaceOffset = spaceAttr->getOffset();
+        spaceOffset += spaceAttr->getOffset();
     }
-    for (auto sizeAttr : varLayout->getTypeLayout()->getSizeAttrs())
+    auto typeLayout = varLayout->getTypeLayout();
+    if (!typeLayout)
+        return;
+
+    for (auto sizeAttr : typeLayout->getSizeAttrs())
     {
         auto kind = sizeAttr->getResourceKind();
 
@@ -78,6 +88,46 @@ void collectMetadataFromInst(IRInst* param, ArtifactPostEmitMetadata& outMetadat
         }
     }
 
+    // Recursively process the type layout to handle nested struct fields.
+    // This is needed for targets like WGSL/Metal where varying inputs are packed
+    // into a struct parameter, and the field layouts contain the binding information.
+    collectMetadataFromTypeLayout(typeLayout, spaceOffset, outMetadata);
+}
+
+// Collect metadata from an IRTypeLayout, processing struct fields recursively.
+static void collectMetadataFromTypeLayout(
+    IRTypeLayout* typeLayout,
+    UInt spaceOffset,
+    ArtifactPostEmitMetadata& outMetadata)
+{
+    if (!typeLayout)
+        return;
+
+    // Handle struct type layouts by processing each field's layout.
+    if (auto structTypeLayout = as<IRStructTypeLayout>(typeLayout))
+    {
+        for (auto fieldLayoutAttr : structTypeLayout->getFieldLayoutAttrs())
+        {
+            auto fieldLayout = fieldLayoutAttr->getLayout();
+            collectMetadataFromVarLayout(fieldLayout, spaceOffset, outMetadata);
+        }
+    }
+}
+
+void collectMetadataFromInst(IRInst* param, ArtifactPostEmitMetadata& outMetadata)
+{
+    auto layoutDecoration = param->findDecoration<IRLayoutDecoration>();
+    if (!layoutDecoration)
+        return;
+
+    auto varLayout = as<IRVarLayout>(layoutDecoration->getLayout());
+    if (!varLayout)
+        return;
+
+    // Collect metadata from the parameter's layout (handles both direct bindings
+    // and recursively processes struct field layouts for targets like WGSL/Metal).
+    collectMetadataFromVarLayout(varLayout, 0, outMetadata);
+
     // If the global parameter is a parameter block, make sure to collect bindings for its
     // default constant buffer, if there is one.
     // The default constant buffer binding will be represented in the container var layout.
@@ -92,7 +142,7 @@ void collectMetadataFromInst(IRInst* param, ArtifactPostEmitMetadata& outMetadat
         varLayout->findOffsetAttr(LayoutResourceKind::SubElementRegisterSpace);
     if (!containerSpaceOffset)
         return;
-    spaceOffset += containerSpaceOffset->getOffset();
+    UInt spaceOffset = containerSpaceOffset->getOffset();
     for (auto sizeAttr : containerVarLayout->getTypeLayout()->getSizeAttrs())
     {
         auto kind = sizeAttr->getResourceKind();
