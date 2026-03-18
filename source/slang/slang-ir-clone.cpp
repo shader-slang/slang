@@ -48,10 +48,7 @@ IRInst* findCloneForOperand(IRCloneEnv* env, IRInst* oldOperand)
     return oldOperand;
 }
 
-static bool shouldHaveSpecConstRate(
-    IRInst* oldInst,
-    IRInst* const* newOperands,
-    UInt operandCount)
+static bool shouldHaveSpecConstRate(IRInst* oldInst, IRInst* const* newOperands, UInt operandCount)
 {
     if (operandCount == 0)
         return false;
@@ -82,6 +79,7 @@ static bool shouldHaveSpecConstRate(
 
 static IRType* maybeAddSpecConstRate(IRBuilder* builder, IRType* type)
 {
+    // Do not add a spec-const rate if the type already carries a rate.
     if (as<IRRateQualifiedType>(type))
         return type;
     return builder->getRateQualifiedType(builder->getSpecConstRate(), type);
@@ -130,7 +128,6 @@ IRInst* cloneInstAndOperands(IRCloneEnv* env, IRBuilder* builder, IRInst* oldIns
 
     ShortList<IRInst*> newOperands;
     newOperands.setCount(operandCount);
-
     for (UInt ii = 0; ii < operandCount; ++ii)
     {
         auto oldOperand = oldInst->getOperand(ii);
