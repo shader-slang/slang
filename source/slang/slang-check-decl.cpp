@@ -4434,6 +4434,11 @@ bool SemanticsVisitor::doesSignatureMatchRequirement(
     if (!requiredResultType->equals(satisfyingResultType))
         return false;
 
+    auto requiredErrorType = getErrorCodeType(m_astBuilder, requiredMemberDeclRef);
+    auto satisfyingErrorType = getErrorCodeType(m_astBuilder, satisfyingMemberDeclRef);
+    if (!requiredErrorType->equals(satisfyingErrorType))
+        return false;
+
     if (hasForwardDerivative || hasBackwardDerivative)
     {
         auto parentInterfaceDecl =
