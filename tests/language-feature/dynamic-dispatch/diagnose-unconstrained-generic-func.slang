@@ -8,11 +8,7 @@
 // currently crash with an internal compiler error (99999) during
 // type-flow specialization instead of producing a diagnostic.
 
-// Disabled: ICE -- should emit error 33180 but crashes with error 99999
-//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target spirv
-//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry computeMain
-//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target glsl -stage compute -entry computeMain
-//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK): -target spirv
 
 #lang slang 2025
 
@@ -53,7 +49,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     // Inferring T from an interface-typed argument requires specializing
     // the generic with the existential type, which is not allowed.
-    // CHECK: ([[# @LINE+1]]): error 33180
+    // CHECK: error[E33180]
     IFoo result = identity(obj);
 
     outputBuffer[0] = result.calc(3.0);

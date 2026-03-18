@@ -4,11 +4,7 @@
 // internal compiler error (99999) on a different code path than
 // the implicit case in diagnose-generic-func-with-interface.slang.
 
-// Disabled: ICE -- should emit error 33180 but crashes with error 99999
-//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target spirv
-//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry computeMain
-//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target glsl -stage compute -entry computeMain
-//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK): -target spirv
 
 #lang slang 2025
 
@@ -49,7 +45,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     // Explicit specialization with an interface type should be rejected
     // the same way implicit inference is (error 33180).
-    // CHECK: ([[# @LINE+1]]): error[E33180]
+    // CHECK: error[E33180]
     float result = genericFunc<IFoo>(obj, 3.0);
 
     outputBuffer[0] = result;

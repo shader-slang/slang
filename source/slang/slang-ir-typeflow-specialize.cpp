@@ -3036,6 +3036,15 @@ struct TypeFlowSpecializationContext
                                 true,
                                 workQueue);
                         }
+                        else if (arg->getDataType() && as<IRWitnessTableType>(arg->getDataType()))
+                        {
+                            // Some witness-like insts (e.g. TypeEqualityWitness) carry a
+                            // witness-table type but are not concrete IRWitnessTables.
+                            // They arise when a generic is specialized with an interface type
+                            // itself (e.g. genericFunc<IFoo>(v)), which is invalid — the call
+                            // site will emit a diagnostic.  Skip this param to avoid
+                            // propagating unusable info into the analysis.
+                        }
                         else
                         {
                             SLANG_UNEXPECTED("Unexpected argument type in specialization");
@@ -3328,8 +3337,9 @@ struct TypeFlowSpecializationContext
         }
         else
         {
-            // If it's not a function or a specialization, we can't get parameter info
-            SLANG_UNEXPECTED("Unexpected context type for parameter info retrieval");
+            // If it's not a function or a specialization, we can't get parameter info.
+            // Return an empty list; the caller will handle the unresolvable callee.
+            return {};
         }
 
         for (auto param : func->getParams())
@@ -3366,8 +3376,9 @@ struct TypeFlowSpecializationContext
         }
         else
         {
-            // If it's not a function or a specialization, we can't get parameter info
-            SLANG_UNEXPECTED("Unexpected context type for parameter info retrieval");
+            // If it's not a function or a specialization, we can't get parameter info.
+            // Return an empty list; the caller will handle the unresolvable callee.
+            return {};
         }
 
         return infos;
@@ -3401,8 +3412,9 @@ struct TypeFlowSpecializationContext
         }
         else
         {
-            // If it's not a function or a specialization, we can't get parameter info
-            SLANG_UNEXPECTED("Unexpected context type for parameter info retrieval");
+            // If it's not a function or a specialization, we can't get parameter info.
+            // Return an empty list; the caller will handle the unresolvable callee.
+            return {};
         }
 
         return directions;
@@ -4568,13 +4580,23 @@ struct TypeFlowSpecializationContext
             }
             else
             {
-                // If we reach here, then something is wrong. If our callee is an inst of tag-type,
-                // we expect it to either be a `GetTagForMappedSet`, `Specialize` or
-                // `GetTagForSpecializedSet`.
-                // Any other case should never occur (in the current design of the compiler)
+                // The singleton callee is a specialization with existential/dynamic type args
+                // that cannot be dispatched statically. Emit a diagnostic instead of crashing.
                 //
-                SLANG_UNEXPECTED(
-                    "Unexpected operand type for type-flow specialization of Call inst");
+                String genericName = "<unknown>";
+                if (auto specialize = as<IRSpecialize>(setTag->getSet()->getElement(0)))
+                {
+                    auto genericBase = specialize->getBase();
+                    if (auto nameHint = genericBase->findDecoration<IRNameHintDecoration>())
+                        genericName = nameHint->getName();
+                    else
+                        genericName = "<generic>";
+                }
+                sink->diagnose(Diagnostics::CannotSpecializeGenericWithExistential{
+                    .generic = genericName,
+                    .location = inst->sourceLoc});
+                module->getContainerPool().free(&callArgs);
+                return false;
             }
         }
         else if (as<IRPoison>(callee))
@@ -4635,6 +4657,21 @@ struct TypeFlowSpecializationContext
         // This needs to be done even if the callee is not a set.
         //
         UCount extraArgCount = callArgs.getCount();
+
+        // Guard: if the callee's param count doesn't match the expected arg count, the
+        // callee was produced from an invalid specialization (e.g. a generic specialized
+        // with an interface type that created a malformed dispatch stub).  The diagnostic
+        // for this has already been emitted earlier; just bail out here to prevent an
+        // assertion failure inside getParamType().
+        {
+            auto* calleeFuncTy = cast<IRFuncType>(callee->getFullType());
+            if (inst->getArgCount() + extraArgCount > (UCount)calleeFuncTy->getParamCount())
+            {
+                module->getContainerPool().free(&callArgs);
+                return false;
+            }
+        }
+
         for (UInt i = 0; i < inst->getArgCount(); i++)
         {
             auto arg = inst->getArg(i);
