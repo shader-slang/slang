@@ -31,4 +31,6 @@ void test()
     Other o;
     bool b = o is Impl;
     //CHECK: ^ 'is'/'as' operator requires an interface-typed expression
+    Impl c = o as Impl;
+    //CHECK: ^ 'is'/'as' operator requires an interface-typed expression
 }
