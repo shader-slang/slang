@@ -6060,7 +6060,7 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
             {
                 // Throws, so unless our interface requirement also does that,
                 // we can't call it here.
-                if (!synFuncDecl->errorType)
+                if (synFuncDecl->errorType->equals(m_astBuilder->getBottomType()))
                     return false;
 
                 auto tryExpr = m_astBuilder->create<TryExpr>();

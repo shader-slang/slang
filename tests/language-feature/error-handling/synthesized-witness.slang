@@ -22,7 +22,7 @@ struct MyFoo: IFoo
     // attempt to synthesize a function that is like:
     //
     // [mutating]
-    // void dosomething() throws MyError
+    // int dosomething() throws MyError
     // {
     //     // calls the non-mutating variant
     //     return try dosomething();
