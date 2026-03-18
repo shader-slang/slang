@@ -502,6 +502,37 @@ class CountOfExpr : public SizeOfLikeExpr
     FIDDLE(...)
 };
 
+FIDDLE(abstract)
+class PackQueryExpr : public Expr
+{
+    FIDDLE(...)
+    FIDDLE() Expr* value = nullptr;
+};
+
+FIDDLE()
+class FirstExpr : public PackQueryExpr
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class LastExpr : public PackQueryExpr
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class TrimHeadExpr : public PackQueryExpr
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class TrimTailExpr : public PackQueryExpr
+{
+    FIDDLE(...)
+};
+
 /// Expression for compile-time bit casting from floating-point to integer.
 /// __floatAsInt(expr) reinterprets the bits of a floating-point value as an integer.
 /// The input can be:
@@ -816,6 +847,15 @@ class TupleTypeExpr : public Expr
 {
     FIDDLE(...)
     FIDDLE() List<TypeExp> members;
+};
+
+FIDDLE()
+class PackBranchTypeExpr : public Expr
+{
+    FIDDLE(...)
+    FIDDLE() TypeExp packOperand;
+    FIDDLE() TypeExp emptyType;
+    FIDDLE() TypeExp nonEmptyType;
 };
 
 /// An expression that applies a generic to arguments for some,

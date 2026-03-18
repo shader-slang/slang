@@ -162,23 +162,26 @@ struct RayTracing : public WindowedAppBase
         if (!module)
             return SLANG_FAIL;
 
+        ComPtr<slang::IEntryPoint> computeEntryPoint;
+        ComPtr<slang::IEntryPoint> vertexEntryPoint;
+        ComPtr<slang::IEntryPoint> fragmentEntryPoint;
+
         Slang::List<slang::IComponentType*> componentTypes;
         componentTypes.add(module);
         if (isComputePipeline)
         {
-            ComPtr<slang::IEntryPoint> computeEntryPoint;
             SLANG_RETURN_ON_FAIL(
                 module->findEntryPointByName("computeMain", computeEntryPoint.writeRef()));
             componentTypes.add(computeEntryPoint);
         }
         else
         {
-            ComPtr<slang::IEntryPoint> entryPoint;
-            SLANG_RETURN_ON_FAIL(module->findEntryPointByName("vertexMain", entryPoint.writeRef()));
-            componentTypes.add(entryPoint);
             SLANG_RETURN_ON_FAIL(
-                module->findEntryPointByName("fragmentMain", entryPoint.writeRef()));
-            componentTypes.add(entryPoint);
+                module->findEntryPointByName("vertexMain", vertexEntryPoint.writeRef()));
+            componentTypes.add(vertexEntryPoint);
+            SLANG_RETURN_ON_FAIL(
+                module->findEntryPointByName("fragmentMain", fragmentEntryPoint.writeRef()));
+            componentTypes.add(fragmentEntryPoint);
         }
 
         ComPtr<slang::IComponentType> linkedProgram;

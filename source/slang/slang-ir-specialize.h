@@ -6,6 +6,7 @@ namespace Slang
 struct IRModule;
 struct IRInst;
 struct IRSpecialize;
+struct SpecializationContext;
 class DiagnosticSink;
 class TargetProgram;
 
@@ -29,6 +30,7 @@ bool specializeModule(
 
 void finalizeSpecialization(IRModule* module);
 
+IRInst* specializeGeneric(SpecializationContext* context, IRSpecialize* specInst);
 IRInst* specializeGeneric(IRSpecialize* specInst);
 
 // Specialize a generic with one or more arguments that are collections rather

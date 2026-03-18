@@ -301,6 +301,11 @@ static Expr* _parseGenericArg(Parser* parser);
 
 static Expr* parsePrefixExpr(Parser* parser);
 
+static NodeBase* parseFirstExpr(Parser* parser, void* userData);
+static NodeBase* parseLastExpr(Parser* parser, void* userData);
+static NodeBase* parseTrimHeadExpr(Parser* parser, void* userData);
+static NodeBase* parseTrimTailExpr(Parser* parser, void* userData);
+
 //
 
 static void Unexpected(Parser* parser)
@@ -1744,6 +1749,23 @@ static void maybeParseGenericConstraints(Parser* parser, ContainerDecl* genericP
     {
         bool optional = AdvanceIf(parser, "optional", &whereToken);
 
+        Token nonEmptyToken;
+        if (AdvanceIf(parser, "nonempty", &nonEmptyToken))
+        {
+            auto constraint = parser->astBuilder->create<NonEmptyPackConstraintDecl>();
+            constraint->whereTokenLoc = whereToken.loc;
+            constraint->loc = nonEmptyToken.loc;
+            parser->ReadMatchingToken(TokenType::LParent);
+            constraint->packExpr = parser->ParseExpression();
+            parser->ReadMatchingToken(TokenType::RParent);
+            if (optional)
+            {
+                addModifier(constraint, parser->astBuilder->create<OptionalConstraintModifier>());
+            }
+            AddMember(genericParent, constraint);
+            continue;
+        }
+
         auto subType = parser->ParseTypeExp();
         Token constraintToken;
         if (AdvanceIf(parser, TokenType::Colon, &constraintToken))
@@ -1857,6 +1879,10 @@ public:
     }
     void visitExpandExpr(ExpandExpr* expr) { dispatch(expr->baseExpr); }
     void visitEachExpr(EachExpr* expr) { dispatch(expr->baseExpr); }
+    void visitFirstExpr(FirstExpr* expr) { dispatch(expr->value); }
+    void visitLastExpr(LastExpr* expr) { dispatch(expr->value); }
+    void visitTrimHeadExpr(TrimHeadExpr* expr) { dispatch(expr->value); }
+    void visitTrimTailExpr(TrimTailExpr* expr) { dispatch(expr->value); }
     void visitParenExpr(ParenExpr* expr) { dispatch(expr->base); }
     void visitTupleExpr(TupleExpr* expr)
     {
@@ -1891,6 +1917,15 @@ public:
         for (auto& member : expr->members)
             if (member.exp)
                 dispatch(member.exp);
+    }
+    void visitPackBranchTypeExpr(PackBranchTypeExpr* expr)
+    {
+        if (expr->packOperand.exp)
+            dispatch(expr->packOperand.exp);
+        if (expr->emptyType.exp)
+            dispatch(expr->emptyType.exp);
+        if (expr->nonEmptyType.exp)
+            dispatch(expr->nonEmptyType.exp);
     }
     void visitMemberExpr(MemberExpr* expr)
     {
@@ -2931,6 +2966,7 @@ static TypeSpec _applyModifiersToTypeSpec(Parser* parser, TypeSpec typeSpec, Mod
 static TypeSpec _parseSimpleTypeSpec(Parser* parser)
 {
     TypeSpec typeSpec;
+    Expr* typeExpr = nullptr;
 
     // We may see a `struct` (or `enum` or `class`) tag specified here, and need to act accordingly
     //
@@ -2971,10 +3007,13 @@ static TypeSpec _parseSimpleTypeSpec(Parser* parser)
         typeSpec.expr = createDeclRefType(parser, decl);
         return typeSpec;
     }
-    else if (parser->LookAheadToken("expand") || parser->LookAheadToken("each"))
+    else if (
+        parser->LookAheadToken("expand") || parser->LookAheadToken("each") ||
+        parser->LookAheadToken("__first") || parser->LookAheadToken("__last") ||
+        parser->LookAheadToken("__trimHead") || parser->LookAheadToken("__trimTail") ||
+        parser->LookAheadToken("__packBranch"))
     {
-        typeSpec.expr = parsePrefixExpr(parser);
-        return typeSpec;
+        typeExpr = parsePrefixExpr(parser);
     }
     // Uncomment should we decide to enable (a,b,c) tuple types
     // else if(parser->LookAheadToken(TokenType::LParent))
@@ -2987,24 +3026,26 @@ static TypeSpec _parseSimpleTypeSpec(Parser* parser)
         typeSpec.expr = parseFuncTypeExpr(parser);
         return typeSpec;
     }
-
-    bool inGlobalScope = false;
-    if (AdvanceIf(parser, TokenType::Scope))
-    {
-        inGlobalScope = true;
-    }
-
-    Token typeName = parser->ReadToken(TokenType::Identifier);
-
-    auto basicType = parser->astBuilder->create<VarExpr>();
-    if (inGlobalScope)
-        basicType->scope = parser->currentModule->ownedScope;
     else
-        basicType->scope = parser->currentLookupScope;
-    basicType->loc = typeName.loc;
-    basicType->name = typeName.getNameOrNull();
+    {
+        bool inGlobalScope = false;
+        if (AdvanceIf(parser, TokenType::Scope))
+        {
+            inGlobalScope = true;
+        }
 
-    Expr* typeExpr = basicType;
+        Token typeName = parser->ReadToken(TokenType::Identifier);
+
+        auto basicType = parser->astBuilder->create<VarExpr>();
+        if (inGlobalScope)
+            basicType->scope = parser->currentModule->ownedScope;
+        else
+            basicType->scope = parser->currentLookupScope;
+        basicType->loc = typeName.loc;
+        basicType->name = typeName.getNameOrNull();
+
+        typeExpr = basicType;
+    }
 
     bool shouldLoop = true;
     while (shouldLoop)
@@ -7316,6 +7357,49 @@ static NodeBase* parseCountOfExpr(Parser* parser, void* /*userData*/)
     return countOfExpr;
 }
 
+template<typename TExpr>
+static NodeBase* parsePackQueryExprImpl(Parser* parser)
+{
+    TExpr* expr = parser->astBuilder->create<TExpr>();
+    parser->ReadMatchingToken(TokenType::LParent);
+    expr->value = parser->ParseExpression();
+    parser->ReadMatchingToken(TokenType::RParent);
+    return expr;
+}
+
+static NodeBase* parseFirstExpr(Parser* parser, void* /*userData*/)
+{
+    return parsePackQueryExprImpl<FirstExpr>(parser);
+}
+
+static NodeBase* parseLastExpr(Parser* parser, void* /*userData*/)
+{
+    return parsePackQueryExprImpl<LastExpr>(parser);
+}
+
+static NodeBase* parseTrimHeadExpr(Parser* parser, void* /*userData*/)
+{
+    return parsePackQueryExprImpl<TrimHeadExpr>(parser);
+}
+
+static NodeBase* parseTrimTailExpr(Parser* parser, void* /*userData*/)
+{
+    return parsePackQueryExprImpl<TrimTailExpr>(parser);
+}
+
+static NodeBase* parsePackBranchTypeExpr(Parser* parser, void* /*userData*/)
+{
+    auto expr = parser->astBuilder->create<PackBranchTypeExpr>();
+    parser->ReadMatchingToken(TokenType::LParent);
+    expr->packOperand = parser->ParseTypeExp();
+    parser->ReadMatchingToken(TokenType::Comma);
+    expr->emptyType = parser->ParseTypeExp();
+    parser->ReadMatchingToken(TokenType::Comma);
+    expr->nonEmptyType = parser->ParseTypeExp();
+    parser->ReadMatchingToken(TokenType::RParent);
+    return expr;
+}
+
 static NodeBase* parseFloatAsIntExpr(Parser* parser, void* /*userData*/)
 {
     FloatBitCastExpr* expr = parser->astBuilder->create<FloatBitCastExpr>();
@@ -8967,6 +9051,34 @@ static Expr* parsePrefixExpr(Parser* parser)
             {
                 return parseEachExpr(parser, tokenLoc);
             }
+            else if (AdvanceIf(parser, "__first"))
+            {
+                auto expr = as<Expr>(parseFirstExpr(parser, nullptr));
+                if (expr && !expr->loc.isValid())
+                    expr->loc = tokenLoc;
+                return expr;
+            }
+            else if (AdvanceIf(parser, "__last"))
+            {
+                auto expr = as<Expr>(parseLastExpr(parser, nullptr));
+                if (expr && !expr->loc.isValid())
+                    expr->loc = tokenLoc;
+                return expr;
+            }
+            else if (AdvanceIf(parser, "__trimHead"))
+            {
+                auto expr = as<Expr>(parseTrimHeadExpr(parser, nullptr));
+                if (expr && !expr->loc.isValid())
+                    expr->loc = tokenLoc;
+                return expr;
+            }
+            else if (AdvanceIf(parser, "__trimTail"))
+            {
+                auto expr = as<Expr>(parseTrimTailExpr(parser, nullptr));
+                if (expr && !expr->loc.isValid())
+                    expr->loc = tokenLoc;
+                return expr;
+            }
             return parsePostfixExpr(parser);
         }
     default:
@@ -9972,6 +10084,11 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseExpr("sizeof", parseSizeOfExpr),
     _makeParseExpr("alignof", parseAlignOfExpr),
     _makeParseExpr("countof", parseCountOfExpr),
+    _makeParseExpr("__first", parseFirstExpr),
+    _makeParseExpr("__last", parseLastExpr),
+    _makeParseExpr("__trimHead", parseTrimHeadExpr),
+    _makeParseExpr("__trimTail", parseTrimTailExpr),
+    _makeParseExpr("__packBranch", parsePackBranchTypeExpr),
     _makeParseExpr("__getAddress", parseAddressOfExpr),
     _makeParseExpr("__floatAsInt", parseFloatAsIntExpr),
 };

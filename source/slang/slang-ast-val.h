@@ -319,6 +319,28 @@ class CountOfIntVal : public SizeOfLikeIntVal
     static Val* tryFold(ASTBuilder* astBuilder, Type* intType, Val* newVal);
 };
 
+FIDDLE()
+class FirstIntVal : public IntVal
+{
+    FIDDLE(...)
+    FirstIntVal(Type* inType, Val* basePack) { setOperands(inType, basePack); }
+    Val* getBasePack() const { return getOperand(1); }
+    void _toTextOverride(StringBuilder& out);
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    Val* _resolveImplOverride();
+};
+
+FIDDLE()
+class LastIntVal : public IntVal
+{
+    FIDDLE(...)
+    LastIntVal(Type* inType, Val* basePack) { setOperands(inType, basePack); }
+    Val* getBasePack() const { return getOperand(1); }
+    void _toTextOverride(StringBuilder& out);
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    Val* _resolveImplOverride();
+};
+
 // A concrete pack of integer values, analogous to ConcreteTypePack for types.
 FIDDLE()
 class ConcreteIntValPack : public IntVal
@@ -332,6 +354,28 @@ class ConcreteIntValPack : public IntVal
     }
     Index getCount() { return getOperandCount() - 1; }
     IntVal* getElement(Index i) { return as<IntVal>(getOperand(i + 1)); }
+    void _toTextOverride(StringBuilder& out);
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    Val* _resolveImplOverride();
+};
+
+FIDDLE()
+class TrimHeadIntValPack : public IntVal
+{
+    FIDDLE(...)
+    TrimHeadIntValPack(Type* inType, Val* basePack) { setOperands(inType, basePack); }
+    Val* getBasePack() const { return getOperand(1); }
+    void _toTextOverride(StringBuilder& out);
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    Val* _resolveImplOverride();
+};
+
+FIDDLE()
+class TrimTailIntValPack : public IntVal
+{
+    FIDDLE(...)
+    TrimTailIntValPack(Type* inType, Val* basePack) { setOperands(inType, basePack); }
+    Val* getBasePack() const { return getOperand(1); }
     void _toTextOverride(StringBuilder& out);
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
     Val* _resolveImplOverride();
@@ -693,6 +737,93 @@ class EachSubtypeWitness : public SubtypeWitness
 };
 
 FIDDLE()
+class FirstSubtypeWitness : public SubtypeWitness
+{
+    FIDDLE(...)
+    FirstSubtypeWitness(Type* sub, Type* sup, SubtypeWitness* patternWitness)
+    {
+        setOperands(sub, sup, patternWitness);
+    }
+    Type* getSub() { return as<Type>(getOperand(0)); }
+    Type* getSup() { return as<Type>(getOperand(1)); }
+    SubtypeWitness* getPatternTypeWitness() { return as<SubtypeWitness>(getOperand(2)); }
+    void _toTextOverride(StringBuilder& out);
+    Val* _resolveImplOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
+FIDDLE()
+class LastSubtypeWitness : public SubtypeWitness
+{
+    FIDDLE(...)
+    LastSubtypeWitness(Type* sub, Type* sup, SubtypeWitness* patternWitness)
+    {
+        setOperands(sub, sup, patternWitness);
+    }
+    Type* getSub() { return as<Type>(getOperand(0)); }
+    Type* getSup() { return as<Type>(getOperand(1)); }
+    SubtypeWitness* getPatternTypeWitness() { return as<SubtypeWitness>(getOperand(2)); }
+    void _toTextOverride(StringBuilder& out);
+    Val* _resolveImplOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
+FIDDLE()
+class TrimHeadSubtypeWitness : public SubtypeWitness
+{
+    FIDDLE(...)
+    TrimHeadSubtypeWitness(Type* sub, Type* sup, SubtypeWitness* patternWitness)
+    {
+        setOperands(sub, sup, patternWitness);
+    }
+    Type* getSub() { return as<Type>(getOperand(0)); }
+    Type* getSup() { return as<Type>(getOperand(1)); }
+    SubtypeWitness* getPatternTypeWitness() { return as<SubtypeWitness>(getOperand(2)); }
+    void _toTextOverride(StringBuilder& out);
+    Val* _resolveImplOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
+FIDDLE()
+class TrimTailSubtypeWitness : public SubtypeWitness
+{
+    FIDDLE(...)
+    TrimTailSubtypeWitness(Type* sub, Type* sup, SubtypeWitness* patternWitness)
+    {
+        setOperands(sub, sup, patternWitness);
+    }
+    Type* getSub() { return as<Type>(getOperand(0)); }
+    Type* getSup() { return as<Type>(getOperand(1)); }
+    SubtypeWitness* getPatternTypeWitness() { return as<SubtypeWitness>(getOperand(2)); }
+    void _toTextOverride(StringBuilder& out);
+    Val* _resolveImplOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
+FIDDLE()
+class PackBranchSubtypeWitness : public SubtypeWitness
+{
+    FIDDLE(...)
+    PackBranchSubtypeWitness(
+        Type* sub,
+        Type* sup,
+        Val* packOperand,
+        SubtypeWitness* emptyWitness,
+        SubtypeWitness* nonEmptyWitness)
+    {
+        setOperands(sub, sup, packOperand, emptyWitness, nonEmptyWitness);
+    }
+    Type* getSub() { return as<Type>(getOperand(0)); }
+    Type* getSup() { return as<Type>(getOperand(1)); }
+    Val* getPackOperand() { return getOperand(2); }
+    SubtypeWitness* getEmptyWitness() { return as<SubtypeWitness>(getOperand(3)); }
+    SubtypeWitness* getNonEmptyWitness() { return as<SubtypeWitness>(getOperand(4)); }
+    void _toTextOverride(StringBuilder& out);
+    Val* _resolveImplOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
+FIDDLE()
 class ExpandSubtypeWitness : public SubtypeWitness
 {
     FIDDLE(...)
@@ -855,6 +986,18 @@ class NoneWitness : public Witness
 
     void _toTextOverride(StringBuilder& out);
     Val* _resolveImplOverride();
+};
+
+FIDDLE()
+class NonEmptyPackWitness : public Witness
+{
+    FIDDLE(...)
+    NonEmptyPackWitness(Val* pack) { setOperands(pack); }
+    Val* getPack() const { return getOperand(0); }
+
+    void _toTextOverride(StringBuilder& out);
+    Val* _resolveImplOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
 /// A value that represents a modifier attached to some other value
@@ -1059,6 +1202,14 @@ inline bool isTypeEqualityWitness(Val* witness)
     else if (auto expandWitness = as<ExpandSubtypeWitness>(witness))
     {
         return isTypeEqualityWitness(expandWitness->getPatternTypeWitness());
+    }
+    else if (auto trimHeadWitness = as<TrimHeadSubtypeWitness>(witness))
+    {
+        return isTypeEqualityWitness(trimHeadWitness->getPatternTypeWitness());
+    }
+    else if (auto trimTailWitness = as<TrimTailSubtypeWitness>(witness))
+    {
+        return isTypeEqualityWitness(trimTailWitness->getPatternTypeWitness());
     }
     return false;
 }

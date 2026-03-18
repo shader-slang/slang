@@ -1183,6 +1183,109 @@ struct Dims<let each D : int>
 int typeCount<each T>() { return countof(T); }
 ```
 
+### Builtin Variadic Pack Operators
+
+Slang also supports simple pack queries and a type-level pack branch operator:
+
+- `__first(P)` returns the first element of a type pack, value pack, or tuple-like pack source.
+- `__last(P)` returns the last element.
+- `__trimHead(P)` returns the pack with the first element removed.
+- `__trimTail(P)` returns the pack with the last element removed.
+- `__packBranch(P, emptyType, nonEmptyType)` selects `emptyType` when `P` is empty and `nonEmptyType` when `P` is non-empty.
+
+For example:
+
+```csharp
+int firstValue<let each D : int>() where nonempty(D)
+{
+    return __first(D);
+}
+
+int restCount<let each D : int>()
+{
+    return countof(__trimHead(D));
+}
+
+struct FirstTypeHolder<each T> where nonempty(T)
+{
+    __first(T) value;
+}
+```
+
+`__first(...)` and `__last(...)` are only valid on packs that are known to be non-empty. For generic packs, use a `where nonempty(P)` constraint to make that guarantee explicit.
+
+`__packBranch(...)` is useful when you need a type that depends on whether a
+pack is empty. The non-empty branch is checked under the assumption that the
+tested pack is non-empty, so pack queries like `__first(P)` and `__trimHead(P)`
+are valid there even when `P` is still generic.
+
+`__packBranch(P, emptyType, nonEmptyType)` also participates in interface/facet
+computation like an ordinary type. If both `emptyType` and `nonEmptyType`
+conform to some interface `IFoo`, then the `__packBranch(...)` type also
+conforms to `IFoo`.
+
+For example:
+
+```csharp
+interface IStaticInt
+{
+    static int get();
+}
+
+struct IntConst<let N : int> : IStaticInt
+{
+    static int get() { return N; }
+}
+
+typealias HeadOrZero<let each D : int> =
+    __packBranch(
+        D,
+        IntConst<0>,          // Used when `D` is empty.
+        IntConst<__first(D)>  // Valid because this branch is checked with the
+                              // assumption that `D` is non-empty.
+    );
+```
+
+`__packBranch(...)` is especially useful for recursive pack-driven types:
+
+```csharp
+interface INode
+{
+    __init();
+    int sum();
+}
+
+struct EmptyNode : INode
+{
+    __init() {}
+    int sum() { return 0; }
+}
+
+struct EvalNode<let Head : int, let each Tail : int> : INode
+{
+    int headValue;
+
+    __init()
+    {
+        headValue = Head;
+    }
+
+    // If `Tail` is empty, recursion stops at `EmptyNode`.
+    // Otherwise we recurse on the first element of the tail.
+    __packBranch(Tail, EmptyNode, EvalNode<__first(Tail), __trimHead(Tail)>) rest = {};
+
+    int sum()
+    {
+        return headValue + rest.sum();
+    }
+}
+```
+
+In this example, `EvalNode<4, 8, 16>` recursively expands to a chain like
+`EvalNode<4, 8, 16> -> EvalNode<8, 16> -> EvalNode<16> -> EmptyNode`. Because
+both branch types conform to `INode`, the `rest` field can be used uniformly
+even before specialization has determined which branch is taken.
+
 Builtin Interfaces
 -----------------------------
 
