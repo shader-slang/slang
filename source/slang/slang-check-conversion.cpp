@@ -2057,15 +2057,22 @@ bool SemanticsVisitor::_coerce(
                 {
                     IntegerLiteralValue v = val->getValue();
                     bool overflow = false;
-                    // For negative values, overflow if magnitude exceeds 2^(N-1)
-                    // (the two's complement minimum). For positive values, use
-                    // bit-width comparison to avoid false positives on hex
-                    // bit-pattern idioms like int x = 0xFF030206.
                     if (v < 0)
-                        overflow = (0ULL - static_cast<uint64_t>(v)) >
-                                   (static_cast<uint64_t>(1) << (maxBitSize - 1));
+                    {
+                        // Two's complement minimum for N bits is -(2^(N-1)).
+                        // For 64-bit targets, any int64_t value fits by definition.
+                        if (maxBitSize < 64)
+                        {
+                            int64_t minValue = -(INT64_C(1) << (maxBitSize - 1));
+                            overflow = v < minValue;
+                        }
+                    }
                     else
+                    {
+                        // Positive: bit-width comparison to avoid false positives
+                        // on hex bit-pattern idioms like int x = 0xFF030206.
                         overflow = getIntValueBitSize(v) > maxBitSize;
+                    }
 
                     if (overflow)
                     {
