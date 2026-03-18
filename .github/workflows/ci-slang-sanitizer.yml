@@ -107,8 +107,12 @@ jobs:
           # can locate the sanitizer runtime.
           CLANG_RUNTIME_DIR=$(clang-18 -print-runtime-dir)
           export LD_LIBRARY_PATH="${CLANG_RUNTIME_DIR}:${LD_LIBRARY_PATH:-}"
-          echo "LD_LIBRARY_PATH=${LD_LIBRARY_PATH}" >> "$GITHUB_ENV"
           echo "Clang runtime dir: $CLANG_RUNTIME_DIR"
+
+          # Also include the build lib directory so that dlopen() can find
+          # sibling modules like libslang-llvm.so at test time.
+          export LD_LIBRARY_PATH="${lib_dir}:${LD_LIBRARY_PATH}"
+          echo "LD_LIBRARY_PATH=${LD_LIBRARY_PATH}" >> "$GITHUB_ENV"
 
           # Disable leak detection during build: generators are short-lived
           # build tools and LSan's non-zero exit code would break the build.
@@ -155,6 +159,11 @@ jobs:
           export SLANG_RUN_SPIRV_VALIDATION=1
           export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
 
+          echo "=== Pre-flight checks ==="
+          echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
+          ls "$bin_dir/slang-test" "$lib_dir/"libslang* 2>/dev/null || true
+          ldd "$bin_dir/slang-test" 2>&1 | head -30 || true
+
           slang_test_args=(
             "-category" "${{ inputs.test-category }}"
             "-expected-failure-list" "tests/expected-failure-github.txt"
@@ -176,7 +185,7 @@ jobs:
           fi
 
           echo "=== Sanitizer Results ==="
-          log_count=$(find asan-logs \( -name 'asan*' -o -name 'ubsan*' \) -size +0c 2>/dev/null | wc -l || echo 0)
+          log_count=$(find asan-logs -type f \( -name 'asan*' -o -name 'ubsan*' \) -size +0c 2>/dev/null | wc -l || echo 0)
           if [ "$log_count" -gt 0 ]; then
             echo "Found $log_count sanitizer report(s):"
             for f in asan-logs/asan* asan-logs/ubsan*; do
@@ -206,7 +215,7 @@ jobs:
       - name: Sanitizer Summary
         if: always()
         run: |
-          total_logs=$(find asan-logs \( -name 'asan*' -o -name 'ubsan*' \) -size +0c 2>/dev/null | wc -l || echo 0)
+          total_logs=$(find asan-logs -type f \( -name 'asan*' -o -name 'ubsan*' \) -size +0c 2>/dev/null | wc -l || echo 0)
           if [ "$total_logs" -gt 0 ]; then
             echo "## Sanitizer Report" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
