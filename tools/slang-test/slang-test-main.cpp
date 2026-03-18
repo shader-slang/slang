@@ -5019,6 +5019,10 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
     // We have found a test to run!
     for (Index orderIdx = 0; orderIdx < testOrder.getCount(); orderIdx++)
     {
+        // Stop scheduling new tests if too many consecutive failures suggest a systemic issue.
+        if (context->stopSchedulingTests.load())
+            return SLANG_OK;
+
         Index subTestIndex = testOrder[orderIdx];
         auto& testDetails = testList.tests[subTestIndex];
 
@@ -5183,10 +5187,13 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
                 {
                     context->getTestReporter()->addResult(testResult);
                 }
+
+                // Track consecutive failures for early abort on systemic issues
+                if (testResult == TestResult::Fail || testResult == TestResult::PendingRetry)
+                    context->reportTestFailure();
+                else if (testResult == TestResult::Pass)
+                    context->reportTestPass();
             }
-
-
-            // Could determine if to continue or not here... based on result
         }
     }
 
@@ -5331,6 +5338,8 @@ void runTestsInParallel(TestContext* context, int count, const F& f)
         context->setTestReporter(&reporter);
         do
         {
+            if (context->stopSchedulingTests.load())
+                break;
             int index = consumePtr.fetch_add(1);
             if (index >= count)
                 break;
@@ -5655,6 +5664,7 @@ static SlangResult runUnitTestModule(
 
             try
             {
+                slang_replayMarker(test.testName.getBuffer());
                 test.testFunc(&unitTestContext);
 
                 // Check for VVL errors after test completion
@@ -6016,7 +6026,18 @@ SlangResult innerMain(int argc, char** argv)
         // If we have a couple failed tests, they maybe intermittent failures due to parallel
         // excution or driver instability. We can try running them again. Debug build has more
         // instability at this moment, so we allow more retries.
-        if (!context.options.disableRetries)
+        if (context.stopSchedulingTests.load())
+        {
+            fprintf(
+                stderr,
+                "\n*** Stopped scheduling new tests after too many consecutive failures.\n"
+                "*** This usually indicates a systemic issue such as a GPU driver crash.\n"
+                "*** Skipping retries for %d failed tests.\n\n",
+                (int)context.failedFileTests.getCount());
+            fflush(stderr);
+        }
+
+        if (!context.options.disableRetries && !context.stopSchedulingTests.load())
         {
 #if _DEBUG
             static constexpr int kFailedTestLimitForRetry = 100;

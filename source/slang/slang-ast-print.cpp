@@ -627,6 +627,19 @@ void ASTPrinter::addExpr(Expr* expr)
             addExpr(packQueryExpr->value);
         sb << ")";
     }
+    else if (const auto packBranchExpr = as<PackBranchTypeExpr>(expr))
+    {
+        sb << "__packBranch(";
+        if (packBranchExpr->packOperand.exp)
+            addExpr(packBranchExpr->packOperand.exp);
+        sb << ", ";
+        if (packBranchExpr->emptyType.exp)
+            addExpr(packBranchExpr->emptyType.exp);
+        sb << ", ";
+        if (packBranchExpr->nonEmptyType.exp)
+            addExpr(packBranchExpr->nonEmptyType.exp);
+        sb << ")";
+    }
     else if (const auto floatBitCastExpr = as<FloatBitCastExpr>(expr))
     {
         sb << "__floatAsInt(";

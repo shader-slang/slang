@@ -801,6 +801,29 @@ class TrimTailSubtypeWitness : public SubtypeWitness
 };
 
 FIDDLE()
+class PackBranchSubtypeWitness : public SubtypeWitness
+{
+    FIDDLE(...)
+    PackBranchSubtypeWitness(
+        Type* sub,
+        Type* sup,
+        Val* packOperand,
+        SubtypeWitness* emptyWitness,
+        SubtypeWitness* nonEmptyWitness)
+    {
+        setOperands(sub, sup, packOperand, emptyWitness, nonEmptyWitness);
+    }
+    Type* getSub() { return as<Type>(getOperand(0)); }
+    Type* getSup() { return as<Type>(getOperand(1)); }
+    Val* getPackOperand() { return getOperand(2); }
+    SubtypeWitness* getEmptyWitness() { return as<SubtypeWitness>(getOperand(3)); }
+    SubtypeWitness* getNonEmptyWitness() { return as<SubtypeWitness>(getOperand(4)); }
+    void _toTextOverride(StringBuilder& out);
+    Val* _resolveImplOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
+FIDDLE()
 class ExpandSubtypeWitness : public SubtypeWitness
 {
     FIDDLE(...)
@@ -969,9 +992,12 @@ FIDDLE()
 class NonEmptyPackWitness : public Witness
 {
     FIDDLE(...)
+    NonEmptyPackWitness(Val* pack) { setOperands(pack); }
+    Val* getPack() const { return getOperand(0); }
 
     void _toTextOverride(StringBuilder& out);
     Val* _resolveImplOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
 /// A value that represents a modifier attached to some other value
