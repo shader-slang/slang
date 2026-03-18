@@ -8,6 +8,8 @@
 #
 # Skip vptr checks for COM interfaces whose implementation lives in slang-llvm.
 # The type: pattern suppresses checks at all call sites regardless of which
-# source file the virtual call is in (e.g. slang-emit-llvm.cpp, slang-emit.cpp).
+# source file the virtual call is in (e.g. slang-emit-llvm.cpp,
+# slang-downstream-compiler-set.cpp).
 [vptr]
 type:*ILLVMBuilder*
+type:*IDownstreamCompiler*
