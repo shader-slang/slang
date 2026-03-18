@@ -34,5 +34,5 @@ RWStructuredBuffer<int> outputBuffer;
 void computeMain()
 {
     IFoo v = createDynamicObject<IFoo>(0, 0);
-    genericFunc(v); // ERROR: should not be allowed - passing existential to generic
+    genericFunc(v); // compiles via dynamic dispatch in legacy mode (no #lang slang 2025)
 }

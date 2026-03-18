@@ -4658,14 +4658,15 @@ struct TypeFlowSpecializationContext
         //
         UCount extraArgCount = callArgs.getCount();
 
-        // Guard: if the callee's param count doesn't match the expected arg count, the
-        // callee was produced from an invalid specialization (e.g. a generic specialized
-        // with an interface type that created a malformed dispatch stub).  The diagnostic
-        // for this has already been emitted earlier; just bail out here to prevent an
-        // assertion failure inside getParamType().
+        // Guard: if the callee's param count doesn't match the expected arg count (or the
+        // callee's type is not a function type), the callee was produced from an invalid
+        // specialization (e.g. a generic specialized with an interface type that created a
+        // malformed dispatch stub).  The diagnostic has already been emitted; bail out here
+        // to prevent an assertion failure inside getParamType().
         {
-            auto* calleeFuncTy = cast<IRFuncType>(callee->getFullType());
-            if (inst->getArgCount() + extraArgCount > (UCount)calleeFuncTy->getParamCount())
+            auto* calleeFuncTy = as<IRFuncType>(callee->getFullType());
+            if (!calleeFuncTy ||
+                inst->getArgCount() + extraArgCount > (UCount)calleeFuncTy->getParamCount())
             {
                 module->getContainerPool().free(&callArgs);
                 return false;

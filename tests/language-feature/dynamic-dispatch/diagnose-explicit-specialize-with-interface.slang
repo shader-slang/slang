@@ -5,6 +5,9 @@
 // the implicit case in diagnose-generic-func-with-interface.slang.
 
 //TEST:SIMPLE(filecheck=CHECK): -target spirv
+//TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK): -target glsl -stage compute -entry computeMain
+//TEST:SIMPLE(filecheck=CHECK): -target metal -stage compute -entry computeMain
 
 #lang slang 2025
 

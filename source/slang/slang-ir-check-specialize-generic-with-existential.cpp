@@ -10,10 +10,7 @@
 namespace Slang
 {
 
-class DiagnosticSink;
-struct IRModule;
-
-static void checkSpecializeInst(IRSpecialize* specialize, IRInst* contextInst, DiagnosticSink* sink)
+static void checkSpecializeInst(IRSpecialize* specialize, DiagnosticSink* sink)
 {
     for (UInt i = 0; i < specialize->getArgCount(); i++)
     {
@@ -35,7 +32,7 @@ static void checkSpecializeInst(IRSpecialize* specialize, IRInst* contextInst, D
                 sink->diagnose(Diagnostics::CannotSpecializeGenericWithExistential{
                     .generic = genericName,
                     .location = specialize->sourceLoc});
-                IRBuilder builder(contextInst->getModule());
+                IRBuilder builder(specialize->getModule());
                 builder.addDecoration(
                     specialize,
                     kIROp_DisallowSpecializationWithExistentialsDecoration);
@@ -45,7 +42,7 @@ static void checkSpecializeInst(IRSpecialize* specialize, IRInst* contextInst, D
         case kIROp_ExtractExistentialWitnessTable:
         case kIROp_MakeExistential:
             {
-                IRBuilder builder(contextInst->getModule());
+                IRBuilder builder(specialize->getModule());
                 builder.addDecoration(
                     specialize,
                     kIROp_DisallowSpecializationWithExistentialsDecoration);
@@ -55,30 +52,17 @@ static void checkSpecializeInst(IRSpecialize* specialize, IRInst* contextInst, D
     }
 }
 
-// Recursively visit the entire module, and diagnose an error whenever an ExtractExistentialType is
+// Recursively visit the entire module, and diagnose an error whenever an existential type is
 // being used as a specialization argument to a generic function or type.
+// IRSpecialize insts can appear either inside function blocks (normal case) or at module scope
+// (hoisted when all operands are global insts); both are handled by the recursive traversal.
 void addDecorationsForGenericsSpecializedWithExistentialsRec(IRInst* parent, DiagnosticSink* sink)
 {
-    // Handle module-level (hoisted) Specialize insts: when all operands are global,
-    // the Specialize inst is placed at module scope rather than inside a function block.
     if (auto specialize = as<IRSpecialize>(parent))
     {
-        checkSpecializeInst(specialize, parent, sink);
+        checkSpecializeInst(specialize, sink);
+        // Do not recurse into the operands of a Specialize inst.
         return;
-    }
-
-    if (auto code = as<IRGlobalValueWithCode>(parent))
-    {
-        for (auto block : code->getBlocks())
-        {
-            for (auto inst : block->getChildren())
-            {
-                auto specialize = as<IRSpecialize>(inst);
-                if (!specialize)
-                    continue;
-                checkSpecializeInst(specialize, parent, sink);
-            }
-        }
     }
 
     for (auto childInst : parent->getDecorationsAndChildren())
