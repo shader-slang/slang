@@ -3,6 +3,10 @@
 
 #include "slang-fiddle-diagnostics.h"
 
+#ifdef _MSC_VER
+#include <stdlib.h>
+#endif
+
 namespace fiddle
 {
 using namespace Slang;
@@ -45,6 +49,15 @@ public:
             else if (arg == UnownedTerminatedStringSlice("-o"))
             {
                 outputPathPrefix = expectArg(argCursor, argEnd);
+            }
+            else if (
+                arg == UnownedTerminatedStringSlice("-ignore-abort-msg") ||
+                arg == UnownedTerminatedStringSlice("--ignore-abort-msg"))
+            {
+#ifdef _MSC_VER
+                // Suppress the modal abort() dialog in unattended/LLM-driven builds.
+                _set_abort_behavior(0, _WRITE_ABORT_MSG);
+#endif
             }
             else
             {

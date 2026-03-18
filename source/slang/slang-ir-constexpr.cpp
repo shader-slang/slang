@@ -153,6 +153,11 @@ bool opCanBeConstExpr(IROp op)
     case kIROp_DifferentialPairGetPrimal:
     case kIROp_LookupWitnessMethod:
     case kIROp_Specialize:
+    case kIROp_ExtractFirstFromPack:
+    case kIROp_ExtractLastFromPack:
+    case kIROp_TrimHeadOfPack:
+    case kIROp_TrimTailOfPack:
+    case kIROp_PackBranch:
         // TODO: more cases
         return true;
 

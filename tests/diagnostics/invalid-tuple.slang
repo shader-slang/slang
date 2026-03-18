@@ -3,7 +3,6 @@
 Tuple t0;
 /*diag:
 ^^^^^ generic type 'Tuple' used without argument
-^^^^^ generic type 'Tuple' used without argument
 */
 
 // This should be OK, compiling down to a zero-sized type

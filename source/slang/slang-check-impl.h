@@ -685,16 +685,6 @@ private:
     Dictionary<int, int64_t> bindingToByteOffset;
 };
 
-/// Represents what the compiler can currently prove about a variadic pack's cardinality.
-/// This is intentionally coarse-grained: we only track whether a pack is known to be empty,
-/// known to be non-empty, or still unknown.
-enum class VariadicPackCardinality
-{
-    Unknown,
-    Empty,
-    NonEmpty,
-};
-
 /// Shared state for a semantics-checking session.
 struct SharedSemanticsContext : public RefObject
 {
@@ -1052,6 +1042,31 @@ public:
         return result;
     }
 
+    UInt getDefaultCtorRecursionDepth() const { return m_defaultCtorRecursionDepth; }
+    void pushDefaultCtorRecursionDepth() { ++m_defaultCtorRecursionDepth; }
+    void popDefaultCtorRecursionDepth() { --m_defaultCtorRecursionDepth; }
+
+    /// Tracks a temporary local assumption that a specific pack is non-empty.
+    ///
+    /// This is needed when checking the non-empty branch operand of a
+    /// `__packBranch(...)` type expression: inside that branch we want pack
+    /// queries like `__first(...)` / `__trimHead(...)` on the tested pack to
+    /// type-check as if the pack had already been proven non-empty, without
+    /// turning that fact into a global constraint or caching it in shared
+    /// pack-cardinality state.
+    struct AssumedNonEmptyPackInfo
+    {
+        Val* pack = nullptr;
+        AssumedNonEmptyPackInfo* next = nullptr;
+    };
+
+    SemanticsContext withAssumedNonEmptyPack(AssumedNonEmptyPackInfo* assumedNonEmptyPack)
+    {
+        SemanticsContext result(*this);
+        result.m_assumedNonEmptyPack = assumedNonEmptyPack;
+        return result;
+    }
+
     /// Information for tracking one or more outer statements.
     ///
     /// During checking of statements, we need to track what
@@ -1251,6 +1266,9 @@ protected:
     // allowed
     bool m_inForLoopSideEffect = false;
 
+    // Recursion depth for synthesizing nested default-constructor/default-init expressions.
+    UInt m_defaultCtorRecursionDepth = 0;
+
 
     ExpandExpr* m_parentExpandExpr = nullptr;
 
@@ -1262,6 +1280,7 @@ protected:
     LambdaExpr* m_parentLambdaExpr = nullptr;
     LambdaDecl* m_parentLambdaDecl = nullptr;
     Dictionary<Decl*, VarDeclBase*>* m_mapSrcDeclToCapturedLambdaDecl = nullptr;
+    AssumedNonEmptyPackInfo* m_assumedNonEmptyPack = nullptr;
 };
 
 struct OuterScopeContextRAII
@@ -1556,14 +1575,17 @@ public:
         SpecializationConstant
     };
 
+    struct ConstantFoldingCircularityInfo;
+
     IntVal* ExtractGenericArgInteger(
         Expr* exp,
         Type* genericParamType,
         ConstantFoldingKind kind,
-        DiagnosticSink* sink);
+        DiagnosticSink* sink,
+        ConstantFoldingCircularityInfo* circularityInfo = nullptr);
     IntVal* ExtractGenericArgInteger(Expr* exp, Type* genericParamType);
 
-    Val* ExtractGenericArgVal(Expr* exp);
+    Val* ExtractGenericArgVal(Expr* exp, ConstantFoldingCircularityInfo* circularityInfo = nullptr);
 
     // Construct a type representing the instantiation of
     // the given generic declaration for the given arguments.
@@ -2197,7 +2219,10 @@ public:
     List<DifferentiableMemberInfo> collectDifferentiableMemberInfo(ContainerDecl* decl);
 
     // Check and register a type if it is differentiable.
-    void maybeRegisterDifferentiableType(ASTBuilder* builder, Type* type);
+    void maybeRegisterDifferentiableType(
+        ASTBuilder* builder,
+        Type* type,
+        SourceLoc diagnosticLoc = SourceLoc());
 
     void maybeCheckMissingNoDiffThis(Expr* expr);
 
@@ -2346,16 +2371,19 @@ public:
     /// to prevent the compiler from going into infinite loops or overflowing the stack.
     struct ConstantFoldingCircularityInfo
     {
-        ConstantFoldingCircularityInfo(Decl* decl, ConstantFoldingCircularityInfo* next)
-            : decl(decl), next(next)
+        ConstantFoldingCircularityInfo(DeclRefBase* declRef, ConstantFoldingCircularityInfo* next)
+            : declRef(declRef), next(next), depth(next ? next->depth + 1 : 1)
         {
         }
 
-        /// A declaration whose value is contributing to the constant being folded
-        Decl* decl = nullptr;
+        /// A declaration reference whose value is contributing to the constant being folded.
+        DeclRefBase* declRef = nullptr;
 
         /// The rest of the links in the chain of declarations being folded
         ConstantFoldingCircularityInfo* next = nullptr;
+
+        /// Current recursion depth of constant folding/evaluation.
+        UInt depth = 0;
     };
     /// Try to apply front-end constant folding to determine the value of `invokeExpr`.
     IntVal* tryConstantFoldExpr(
@@ -2370,7 +2398,7 @@ public:
         ConstantFoldingCircularityInfo* circularityInfo);
 
     bool _checkForCircularityInConstantFolding(
-        Decl* decl,
+        DeclRefBase* declRef,
         ConstantFoldingCircularityInfo* circularityInfo);
 
     /// Try to resolve a compile-time constant `IntVal` from the given `declRef`.
@@ -2410,6 +2438,13 @@ public:
         Type* expectedType,
         ConstantFoldingKind kind,
         DiagnosticSink* sink);
+    IntVal* CheckIntegerConstantExpression(
+        Expr* inExpr,
+        IntegerConstantExpressionCoercionType coercionType,
+        Type* expectedType,
+        ConstantFoldingKind kind,
+        DiagnosticSink* sink,
+        ConstantFoldingCircularityInfo* circularityInfo);
 
     IntVal* CheckEnumConstantExpression(Expr* expr, ConstantFoldingKind kind);
 
@@ -3080,6 +3115,11 @@ public:
         InitializerListExpr* fromInitializerListExpr,
         Expr** outExpr);
 
+    bool createCtorInvokeExprForAbstractType(
+        Type* toType,
+        InitializerListExpr* fromInitializerListExpr,
+        Expr** outExpr);
+
     bool createInvokeExprForSynthesizedCtor(
         Type* toType,
         InitializerListExpr* fromInitializerListExpr,
@@ -3209,6 +3249,7 @@ public:
     Expr* visitModifiedTypeExpr(ModifiedTypeExpr* expr);
     Expr* visitFuncTypeExpr(FuncTypeExpr* expr);
     Expr* visitTupleTypeExpr(TupleTypeExpr* expr);
+    Expr* visitPackBranchTypeExpr(PackBranchTypeExpr* expr);
 
     Expr* visitForwardDifferentiateExpr(ForwardDifferentiateExpr* expr);
     Expr* visitBackwardDifferentiateExpr(BackwardDifferentiateExpr* expr);
@@ -3423,5 +3464,7 @@ bool addTypeCoercionWitnessToArgs(
     HashSet<Decl*>* maybeConstrainedGenericParams,
     ShortList<Val*>& args,
     bool shouldEmitError);
+
+SourceLoc _getTypeNestingDiagnosticPosForDecl(Decl* decl);
 
 } // namespace Slang

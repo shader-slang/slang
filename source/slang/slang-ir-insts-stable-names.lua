@@ -771,5 +771,7 @@ return {
 	["TrimHeadOfPack"] = 769,
 	["TrimTailOfPack"] = 770,
 	["NonEmptyPackWitness"] = 771,
-	["LateRequireCapability"] = 772,
+	["PackBranch"] = 772,
+	["Decoration.SpecializationDepthDecoration"] = 773,
+	["LateRequireCapability"] = 774,
 }
