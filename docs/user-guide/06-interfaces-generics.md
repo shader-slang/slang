@@ -1189,8 +1189,8 @@ Slang also supports simple pack queries and a type-level pack branch operator:
 
 - `__first(P)` returns the first element of a type pack, value pack, or tuple-like pack source.
 - `__last(P)` returns the last element.
-- `__trimHead(P)` returns the pack with the first element removed.
-- `__trimTail(P)` returns the pack with the last element removed.
+- `__trimFirst(P)` returns the pack with the first element removed.
+- `__trimLast(P)` returns the pack with the last element removed.
 - `__packBranch(P, emptyType, nonEmptyType)` selects `emptyType` when `P` is empty and `nonEmptyType` when `P` is non-empty.
 
 For example:
@@ -1203,7 +1203,7 @@ int firstValue<let each D : int>() where nonempty(D)
 
 int restCount<let each D : int>()
 {
-    return countof(__trimHead(D));
+    return countof(__trimFirst(D));
 }
 
 struct FirstTypeHolder<each T> where nonempty(T)
@@ -1216,7 +1216,7 @@ struct FirstTypeHolder<each T> where nonempty(T)
 
 `__packBranch(...)` is useful when you need a type that depends on whether a
 pack is empty. The non-empty branch is checked under the assumption that the
-tested pack is non-empty, so pack queries like `__first(P)` and `__trimHead(P)`
+tested pack is non-empty, so pack queries like `__first(P)` and `__trimFirst(P)`
 are valid there even when `P` is still generic.
 
 `__packBranch(P, emptyType, nonEmptyType)` also participates in interface/facet
@@ -1272,7 +1272,7 @@ struct EvalNode<let Head : int, let each Tail : int> : INode
 
     // If `Tail` is empty, recursion stops at `EmptyNode`.
     // Otherwise we recurse on the first element of the tail.
-    __packBranch(Tail, EmptyNode, EvalNode<__first(Tail), __trimHead(Tail)>) rest = {};
+    __packBranch(Tail, EmptyNode, EvalNode<__first(Tail), __trimFirst(Tail)>) rest = {};
 
     int sum()
     {

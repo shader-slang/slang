@@ -1954,18 +1954,18 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         return LoweredValInfo::simple(irMakeValuePack);
     }
 
-    LoweredValInfo visitTrimHeadIntValPack(TrimHeadIntValPack* valPack)
+    LoweredValInfo visitTrimFirstIntValPack(TrimFirstIntValPack* valPack)
     {
         auto type = lowerType(context, valPack->getType());
         auto basePack = lowerSimpleVal(context, valPack->getBasePack());
-        return emitWitnessedPackQuery(type, kIROp_TrimHeadOfPack, basePack);
+        return emitWitnessedPackQuery(type, kIROp_TrimFirstOfPack, basePack);
     }
 
-    LoweredValInfo visitTrimTailIntValPack(TrimTailIntValPack* valPack)
+    LoweredValInfo visitTrimLastIntValPack(TrimLastIntValPack* valPack)
     {
         auto type = lowerType(context, valPack->getType());
         auto basePack = lowerSimpleVal(context, valPack->getBasePack());
-        return emitWitnessedPackQuery(type, kIROp_TrimTailOfPack, basePack);
+        return emitWitnessedPackQuery(type, kIROp_TrimLastOfPack, basePack);
     }
 
     LoweredValInfo visitExpandIntValPack(ExpandIntValPack* expandVal)
@@ -2047,18 +2047,18 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         return emitWitnessedPackQuery(type, kIROp_ExtractLastFromPack, basePack);
     }
 
-    LoweredValInfo visitTrimHeadTypePack(TrimHeadTypePack* trimHeadType)
+    LoweredValInfo visitTrimFirstTypePack(TrimFirstTypePack* trimFirstType)
     {
         auto type = getBuilder()->getTypeKind();
-        IRInst* basePack = lowerType(context, trimHeadType->getBasePack());
-        return emitWitnessedPackQuery(type, kIROp_TrimHeadOfPack, basePack);
+        IRInst* basePack = lowerType(context, trimFirstType->getBasePack());
+        return emitWitnessedPackQuery(type, kIROp_TrimFirstOfPack, basePack);
     }
 
-    LoweredValInfo visitTrimTailTypePack(TrimTailTypePack* trimTailType)
+    LoweredValInfo visitTrimLastTypePack(TrimLastTypePack* trimLastType)
     {
         auto type = getBuilder()->getTypeKind();
-        IRInst* basePack = lowerType(context, trimTailType->getBasePack());
-        return emitWitnessedPackQuery(type, kIROp_TrimTailOfPack, basePack);
+        IRInst* basePack = lowerType(context, trimLastType->getBasePack());
+        return emitWitnessedPackQuery(type, kIROp_TrimLastOfPack, basePack);
     }
 
     LoweredValInfo visitTypePackSubtypeWitness(TypePackSubtypeWitness* witnessPack)
@@ -2130,7 +2130,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         return emitWitnessedPackQuery(witnessTableType, kIROp_ExtractLastFromPack, basePack);
     }
 
-    LoweredValInfo visitTrimHeadSubtypeWitness(TrimHeadSubtypeWitness* witness)
+    LoweredValInfo visitTrimFirstSubtypeWitness(TrimFirstSubtypeWitness* witness)
     {
         auto patternWitness = lowerVal(context, witness->getPatternTypeWitness());
         auto irBuilder = getBuilder();
@@ -2138,11 +2138,11 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         IRInst* basePackType = basePack->getDataType();
         auto resultType = getSimpleVal(
             context,
-            emitWitnessedPackQuery(irBuilder->getTypeKind(), kIROp_TrimHeadOfPack, basePackType));
-        return emitWitnessedPackQuery(as<IRType>(resultType), kIROp_TrimHeadOfPack, basePack);
+            emitWitnessedPackQuery(irBuilder->getTypeKind(), kIROp_TrimFirstOfPack, basePackType));
+        return emitWitnessedPackQuery(as<IRType>(resultType), kIROp_TrimFirstOfPack, basePack);
     }
 
-    LoweredValInfo visitTrimTailSubtypeWitness(TrimTailSubtypeWitness* witness)
+    LoweredValInfo visitTrimLastSubtypeWitness(TrimLastSubtypeWitness* witness)
     {
         auto patternWitness = lowerVal(context, witness->getPatternTypeWitness());
         auto irBuilder = getBuilder();
@@ -2150,8 +2150,8 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         IRInst* basePackType = basePack->getDataType();
         auto resultType = getSimpleVal(
             context,
-            emitWitnessedPackQuery(irBuilder->getTypeKind(), kIROp_TrimTailOfPack, basePackType));
-        return emitWitnessedPackQuery(as<IRType>(resultType), kIROp_TrimTailOfPack, basePack);
+            emitWitnessedPackQuery(irBuilder->getTypeKind(), kIROp_TrimLastOfPack, basePackType));
+        return emitWitnessedPackQuery(as<IRType>(resultType), kIROp_TrimLastOfPack, basePack);
     }
 
     LoweredValInfo visitPackBranchSubtypeWitness(PackBranchSubtypeWitness* witness)
@@ -5099,10 +5099,10 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         IROp op = kIROp_ExtractFirstFromPack;
         if (as<LastExpr>(packQueryExpr))
             op = kIROp_ExtractLastFromPack;
-        else if (as<TrimHeadExpr>(packQueryExpr))
-            op = kIROp_TrimHeadOfPack;
-        else if (as<TrimTailExpr>(packQueryExpr))
-            op = kIROp_TrimTailOfPack;
+        else if (as<TrimFirstExpr>(packQueryExpr))
+            op = kIROp_TrimFirstOfPack;
+        else if (as<TrimLastExpr>(packQueryExpr))
+            op = kIROp_TrimLastOfPack;
 
         auto witnessType = builder->getWitnessTableType(builder->getVoidType());
         IRInst* witnessArg[] = {packVal};
