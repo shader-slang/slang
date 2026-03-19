@@ -1878,10 +1878,8 @@ SourceFile* Linkage::findFile(Name* name, SourceLoc loc, IncludeSystem& outInclu
         for (auto& fileName : fileNamesToTry)
         {
             PathInfo filePathInfo;
-            if (SLANG_FAILED(outIncludeSystem.findFile(
-                    fileName,
-                    pathIncludedFromInfo.foundPath,
-                    filePathInfo)))
+            if (SLANG_FAILED(outIncludeSystem
+                                 .findFile(fileName, pathIncludedFromInfo.foundPath, filePathInfo)))
             {
                 continue;
             }
@@ -1988,8 +1986,7 @@ Linkage::IncludeResult Linkage::findAndIncludeFile(
                 break;
             }
         }
-        sink->diagnose(Diagnostics::LanguageVersionDiffersFromIncludingModule{
-            .location = diagLoc});
+        sink->diagnose(Diagnostics::LanguageVersionDiffersFromIncludingModule{.location = diagLoc});
     }
 
     parsePreprocessedSegments(
