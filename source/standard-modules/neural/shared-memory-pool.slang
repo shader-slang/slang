@@ -154,6 +154,7 @@ public struct SharedMemorySize0<T, TargetEnum Target, ExecutionMode ExeMode, int
     where T.Differential == T
 {
     typealias ShMemInfo = SharedMemoryUsage<T, Target, ExeMode, InputSize, OutputSize, SubgroupSize>;
+    typealias CMShape = CoopMatShape<T, Target>;
 
     // The MMA forward/backward uses: shared A tiles + per-warp B/C tiles.
     static const uint BytesForMMA =
@@ -164,7 +165,21 @@ public struct SharedMemorySize0<T, TargetEnum Target, ExecutionMode ExeMode, int
     static const uint BytesForOuterProduct = !ShMemInfo.IsTraining ? 0 :
         2 * (ShMemInfo.SharedMemSizeInVectorMatA + ShMemInfo.SharedMemSizeInVectorMatB) * SubgroupCount * sizeof(uint4);
 
-    public static const uint Bytes = Max(BytesForMMA, BytesForOuterProduct);
+    // Cross-warp all-at-once reduction for sumReduceTilesAllAtOnce().
+    // Stores ALL tiles at once instead of row-by-row to minimize barriers.
+    // Memory = NTileRows * NTileCols * TileStride * sizeof(uint4)
+    // where TileStride = (ElementsPerLane * sizeof(T) / 4) * SubgroupSize * 4 / sizeof(uint4)
+    //                  = (CMShape.SizeCInElements / SubgroupSize * sizeof(T) / 4) * SubgroupSize * 4 / 16
+    //                  = CMShape.SizeCInElements * sizeof(T) / 16 = 256 * 2 / 16 = 32 uint4 for half 16x16 tiles
+    static const int NTileRows = (OutputSize + CMShape.ROW_A - 1) / CMShape.ROW_A;
+    static const int NTileCols = (InputSize + CMShape.COLUMN_A - 1) / CMShape.COLUMN_A;
+    static const int ElementsPerLane = CMShape.SizeCInElements / SubgroupSize;
+    static const int RegsPerLane = (ElementsPerLane * sizeof(T) + 3) / 4;
+    static const int TileStride = (RegsPerLane * SubgroupSize * 4 + sizeof(uint4) - 1) / sizeof(uint4);
+    static const uint BytesForCrossWarpReduction = !ShMemInfo.IsTraining ? 0 :
+        NTileRows * NTileCols * TileStride * sizeof(uint4);
+
+    public static const uint Bytes = Max(Max(BytesForMMA, BytesForOuterProduct), BytesForCrossWarpReduction);
 }
 
 // The following code is a macro-based implementation of the shared memory size calculation.
