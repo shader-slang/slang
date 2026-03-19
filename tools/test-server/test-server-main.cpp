@@ -634,6 +634,21 @@ SlangResult _execute(int argc, const char* const* argv)
     TestServer server;
     SLANG_RETURN_ON_FAIL(server.init(argc, argv));
     SLANG_RETURN_ON_FAIL(server.execute());
+
+    // Clean up cached GPU devices before shutdown. The DeviceCache is a static
+    // singleton in render-test-tool that holds Vulkan/CUDA devices. If not cleaned
+    // up explicitly, its destructor runs during process exit (__run_exit_handlers)
+    // after the GPU driver's own static destructors, causing segfaults from
+    // corrupted vtables.
+    typedef void (*CleanDeviceCacheFunc)();
+    ISlangSharedLibrary* renderTestLib = server.loadSharedLibrary("render-test");
+    if (renderTestLib)
+    {
+        auto cleanFunc = (CleanDeviceCacheFunc)renderTestLib->findFuncByName("cleanDeviceCache");
+        if (cleanFunc)
+            cleanFunc();
+    }
+
     slang::shutdown();
     return SLANG_OK;
 }
