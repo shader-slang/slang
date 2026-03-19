@@ -354,10 +354,12 @@ struct TupleTypeBuilder
                     specialType = legalFieldType;
                 }
 
-                // `void` is currently legalized to simple, but we don't want to add a
-                // `void` field to the struct.
+                // Void fields don't contribute to ordinary or special data.
+                // We clear ordinaryType so the field won't be emitted, but
+                // fall through to register a PairInfo entry (flags=0) so
+                // that downstream code can identify the field as void.
                 if (legalLeafType.getSimple()->getOp() == kIROp_VoidType)
-                    return;
+                    ordinaryType = LegalType();
             }
             break;
 
@@ -1447,8 +1449,12 @@ LegalType legalizeTypeImpl(TypeLegalizationContext* context, IRType* type)
 
         if (legalElementType.flavor == LegalType::Flavor::simple)
         {
+            // An array of void (e.g. from a zero-length array whose element
+            // was legalized away) legalizes to simple void so that it gets
+            // an entry in the special-side tuple when inside a pair-split
+            // struct. This prevents "didn't find tuple element" crashes.
             if (legalElementType.getSimple()->getOp() == kIROp_VoidType)
-                return LegalType();
+                return LegalType::simple(legalElementType.getSimple());
 
             // If element type hasn't change, return original type.
             if (legalElementType.getSimple() == arrayType->getElementType())
