@@ -13,7 +13,7 @@ on:
       server-count:
         required: false
         type: number
-        default: 1
+        default: 8
       test-category:
         required: false
         type: string
@@ -98,6 +98,7 @@ jobs:
         run: mkdir -p asan-logs
 
       - name: Build Slang with Sanitizers
+        id: build
         run: |
           echo "cmake version: $(cmake --version)"
           echo "Building with AddressSanitizer and UndefinedBehaviorSanitizer"
@@ -151,8 +152,16 @@ jobs:
           key: sccache-linux-clang-18-x86_64-asan-${{ github.sha }}
 
       - name: Run Tests with Sanitizers
+        if: steps.build.outcome == 'success'
+        env:
+          TEST_CATEGORY: ${{ inputs.test-category }}
+          SERVER_COUNT: ${{ inputs.server-count }}
         run: |
-          # halt_on_error=0: continue after the first error to find more issues per run.
+          # halt_on_error=0: continue after the first error to find more issues
+          # per run. Note: UBSan is compiled with -fno-sanitize-recover=undefined
+          # so it always aborts on the first UBSan error per process. Using
+          # server-count > 1 isolates tests in separate processes to work around
+          # this.
           export ASAN_OPTIONS="detect_leaks=1:halt_on_error=0:print_scariness=1:log_path=$PWD/asan-logs/asan"
           export UBSAN_OPTIONS="print_stacktrace=1:halt_on_error=0:log_path=$PWD/asan-logs/ubsan"
           export LSAN_OPTIONS="suppressions=$PWD/cmake/lsan-suppressions.txt"
@@ -166,7 +175,7 @@ jobs:
           ldd "$bin_dir/slang-test" 2>&1 | head -30 || true
 
           slang_test_args=(
-            "-category" "${{ inputs.test-category }}"
+            "-category" "$TEST_CATEGORY"
             "-expected-failure-list" "tests/expected-failure-github.txt"
             "-expected-failure-list" "tests/expected-failure-no-gpu.txt"
             "-skip-reference-image-generation"
@@ -175,9 +184,9 @@ jobs:
             "-enable-debug-layers" "false"
           )
 
-          if [ "${{ inputs.server-count }}" -gt 1 ]; then
+          if [ "$SERVER_COUNT" -gt 1 ]; then
             slang_test_args+=("-use-test-server")
-            slang_test_args+=("-server-count" "${{ inputs.server-count }}")
+            slang_test_args+=("-server-count" "$SERVER_COUNT")
           fi
 
           # Non-zero exits are expected (sanitizer errors, test failures); this
@@ -188,7 +197,7 @@ jobs:
           fi
 
       - name: Run slangc tests with Sanitizers
-        if: always()
+        if: steps.build.outcome == 'success'
         run: |
           export ASAN_OPTIONS="detect_leaks=1:halt_on_error=0:print_scariness=1:log_path=$PWD/asan-logs/asan-slangc"
           export UBSAN_OPTIONS="print_stacktrace=1:halt_on_error=0:log_path=$PWD/asan-logs/ubsan-slangc"
@@ -263,11 +272,19 @@ jobs:
 
             exit 1
           else
-            echo "No sanitizer issues detected."
-            echo ""
-            echo "## Sanitizer Report" >> "$GITHUB_STEP_SUMMARY"
-            echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "No sanitizer issues detected." >> "$GITHUB_STEP_SUMMARY"
+            if [ "${{ steps.build.outcome }}" != "success" ]; then
+              echo "Build failed -- sanitizer results unavailable."
+              echo ""
+              echo "## Sanitizer Report" >> "$GITHUB_STEP_SUMMARY"
+              echo "" >> "$GITHUB_STEP_SUMMARY"
+              echo "Build failed -- sanitizer results unavailable." >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "No sanitizer issues detected."
+              echo ""
+              echo "## Sanitizer Report" >> "$GITHUB_STEP_SUMMARY"
+              echo "" >> "$GITHUB_STEP_SUMMARY"
+              echo "No sanitizer issues detected." >> "$GITHUB_STEP_SUMMARY"
+            fi
           fi
 
       - name: Upload Sanitizer Logs
