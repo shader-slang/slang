@@ -124,7 +124,7 @@ struct ProcessLateRequireCapabilityInstsContext
                     for (auto entryPoint : *entryPoints)
                     {
                         if (IREntryPointDecoration* entryPointDecor =
-                            entryPoint->findDecoration<IREntryPointDecoration>())
+                                entryPoint->findDecoration<IREntryPointDecoration>())
                         {
                             IRCapabilitySet* capSet = lateRequireCap->getCapabilitySet();
                             checkCapability(
