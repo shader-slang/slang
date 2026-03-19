@@ -120,14 +120,6 @@ bindings and pointer address spaces would have to be accounted for to expand
 support to GPU targets. Slang already has native emitters for GPU targets, so
 you can use those instead of going through LLVM.
 
-### Pointer size
-
-Currently, the Slang compiler assumes that the size of pointers matches the
-compiler's host platform. This means that on a 64-bit PC, only target triples
-with 64-bit pointers generate correct code. This can be a difficulty if one
-wants to build Slang programs for a 32-bit microcontroller, and should
-hopefully be fixed eventually.
-
 ### Missing compute shader features
 
 * No `groupshared`
@@ -174,10 +166,3 @@ and may be added later.
 Attempting to index past the end of any buffer type is undefined behaviour. It
 is not guaranteed to return zero as in HLSL; segmentation faults and memory
 corruption are more than likely to occur!
-
-### `sizeof`
-
-Slang's `sizeof` may appear to "lie" to you about structs that contain padding,
-unless you specify `-fvk-use-scalar-layout`. That's because it queries layout
-information without knowing about the actual layout being used. Use `__sizeOf`
-instead to get accurate sizes from LLVM, e.g. for memory allocation purposes.
