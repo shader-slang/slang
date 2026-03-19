@@ -19,3 +19,4 @@ type:*IDownstreamCompiler*
 # the addRef() call site, so suppressing only derived interfaces is not enough.
 # Narrowing this (e.g. via src: patterns) is a future goal.
 type:*ISlangUnknown*
+type:*ISlangCastable*

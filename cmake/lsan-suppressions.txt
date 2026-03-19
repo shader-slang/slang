@@ -8,3 +8,9 @@
 #   leak:<function_or_module_pattern>
 #
 # See https://clang.llvm.org/docs/AddressSanitizer.html#suppressing-memory-leaks
+
+# The prebuilt slang-llvm shared library is not compiled with sanitizers.
+# LSan cannot track allocations inside non-instrumented code, producing
+# false-positive leak reports. LLVM also intentionally never frees certain
+# singleton caches.
+leak:libslang-llvm
