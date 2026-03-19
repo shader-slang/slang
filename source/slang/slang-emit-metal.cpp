@@ -2,8 +2,6 @@
 #include "slang-emit-metal.h"
 
 #include "../core/slang-writer.h"
-#include "core/slang-dictionary.h"
-#include "slang-emit-c-like.h"
 #include "slang-emit-source-writer.h"
 #include "slang-ir-entry-point-decorations.h"
 #include "slang-ir-util.h"
