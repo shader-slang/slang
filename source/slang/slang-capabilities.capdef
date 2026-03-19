@@ -198,9 +198,13 @@ def metallib_3_0 : metallib_2_4;
 /// [Version]
 def metallib_3_1 : metallib_3_0;
 
+/// Represents MetalLib 4.0
+/// [Version]
+def metallib_4_0 : metallib_3_1;
+
 /// Represents the latest MetalLib version.
 /// [Version]
-alias metallib_latest = metallib_3_1;
+alias metallib_latest = metallib_4_0;
 
 // HLSL versions
 
@@ -2172,6 +2176,10 @@ alias METAL_3_0 = metallib_3_0;
 /// Use `metallib_3_1` instead
 /// [Other]
 alias METAL_3_1 = metallib_3_1;
+
+/// Use `metallib_4_0` instead
+/// [Other]
+alias METAL_4_0 = metallib_4_0;
 
 // Capabilities of convenience
 //
