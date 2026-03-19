@@ -17,6 +17,10 @@
 RWStructuredBuffer<uint> outputBuffer;
 
 // CHECK: OpEntryPoint
+// CHECK-DAG: OpConstant %uint 771
+// CHECK-DAG: OpConstant %uint 192
+// CHECK-DAG: OpConstant %uint 193
+// CHECK-DAG: OpConstant %uint 20
 
 interface IVec
 {
@@ -38,6 +42,7 @@ struct Layer<InputVec : IVec, OutputVec : IVec, let HasBias : bool = true>
 
 typealias L1 = Layer<Vec<2>, Vec<128>>;
 typealias L2 = Layer<Vec<128>, Vec<3>>;
+typealias L3 = Layer<Vec<4>, Vec<5>, false>;
 
 static const int TotalParams = L1.ParameterCount + L2.ParameterCount;
 
@@ -55,7 +60,7 @@ void computeMain()
     // L2.HalfParams = 387/2 = 193
     // BUF-NEXT: 193
     outputBuffer[2] = L2.HalfParams;
-    // L1.ParameterCount = 384
-    // BUF-NEXT: 384
-    outputBuffer[3] = L1.ParameterCount;
+    // L3: 5*4 + 0 = 20 (HasBias = false)
+    // BUF-NEXT: 20
+    outputBuffer[3] = L3.ParameterCount;
 }
