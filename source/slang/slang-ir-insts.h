@@ -3558,6 +3558,11 @@ $(type_info.return_type) $(type_info.method_name)(
 
     IRInst* emitExpandInst(IRType* type, UInt capturedArgCount, IRInst* const* capturedArgs);
     IRInst* emitEachInst(IRType* type, IRInst* base, IRInst* indexArg = nullptr);
+    IRInst* emitPackBranchInst(
+        IRType* type,
+        IRInst* pack,
+        IRInst* emptyValue,
+        IRInst* nonEmptyValue);
 
     IRInst* emitLookupInterfaceMethodInst(
         IRType* type,

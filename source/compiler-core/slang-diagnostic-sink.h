@@ -345,6 +345,20 @@ public:
     {
         init(sourceManager, sourceLocationLexer);
     }
+    /// Ctor that also copies display/settings state from an optional parent sink.
+    DiagnosticSink(
+        SourceManager* sourceManager,
+        SourceLocationLexer sourceLocationLexer,
+        DiagnosticSink* parentSink)
+    {
+        init(sourceManager, sourceLocationLexer);
+        if (parentSink)
+        {
+            setFlags(parentSink->getFlags());
+            setDiagnosticColorMode(parentSink->getDiagnosticColorMode());
+            setEnableUnicode(parentSink->getEnableUnicode());
+        }
+    }
     /// Default Ctor
     DiagnosticSink()
         : m_sourceManager(nullptr), m_sourceLocationLexer(nullptr)

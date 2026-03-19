@@ -522,13 +522,13 @@ class LastExpr : public PackQueryExpr
 };
 
 FIDDLE()
-class TrimHeadExpr : public PackQueryExpr
+class TrimFirstExpr : public PackQueryExpr
 {
     FIDDLE(...)
 };
 
 FIDDLE()
-class TrimTailExpr : public PackQueryExpr
+class TrimLastExpr : public PackQueryExpr
 {
     FIDDLE(...)
 };
@@ -847,6 +847,15 @@ class TupleTypeExpr : public Expr
 {
     FIDDLE(...)
     FIDDLE() List<TypeExp> members;
+};
+
+FIDDLE()
+class PackBranchTypeExpr : public Expr
+{
+    FIDDLE(...)
+    FIDDLE() TypeExp packOperand;
+    FIDDLE() TypeExp emptyType;
+    FIDDLE() TypeExp nonEmptyType;
 };
 
 /// An expression that applies a generic to arguments for some,

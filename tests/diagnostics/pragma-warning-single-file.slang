@@ -9,7 +9,6 @@ namespace test1
     // This SHOULD produce warning 30856 because it's not disabled
     extension<From : __BuiltinIntegerType, To : IConvertibleFrom<From>, let N : int>
 //CHECK:      ^^^^ the extension is non-standard and may not work as intended because the generic parameter 'From' is not referenced by extension target type 'vector<To,N>'
-//CHECK:      ^^^^ the extension is non-standard and may not work as intended because the generic parameter 'From' is not referenced by extension target type 'vector<To,N>'
     vector<To, N> : IConvertibleFrom<vector<From, N>> {}
 }
 

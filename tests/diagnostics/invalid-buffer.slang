@@ -3,7 +3,6 @@
 Buffer b0;
 /*diag:
 ^^^^^^ generic type 'Buffer' used without argument
-^^^^^^ generic type 'Buffer' used without argument
 */
 
 Buffer<> b1;
