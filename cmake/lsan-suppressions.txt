@@ -13,4 +13,13 @@
 # LSan cannot track allocations inside non-instrumented code, producing
 # false-positive leak reports. LLVM also intentionally never frees certain
 # singleton caches.
+#
+# The pattern "libslang-llvm" matches when LSan can resolve the module name.
+# When LSan cannot identify the non-instrumented module, it reports frames
+# as "<unknown module>"; the second pattern catches those.
 leak:libslang-llvm
+leak:<unknown module>
+
+# Minor leak (665 bytes) of ArtifactPostEmitMetadata in linkAndOptimizeIR.
+# TODO: Fix the ownership so metadata is properly freed.
+leak:linkAndOptimizeIR

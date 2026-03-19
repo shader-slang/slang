@@ -20,4 +20,5 @@ type:*IDownstreamCompiler*
 # Narrowing this (e.g. via src: patterns) is a future goal.
 type:*ISlangUnknown*
 type:*ISlangCastable*
+type:*ISlangSharedLibrary*
 type:*IFileCheck*
