@@ -368,9 +368,7 @@ struct PreprocessedSegment
     SourceLanguage sourceLanguage;
 };
 
-List<SourceFile*> extractSourceSegments(
-    SourceFile* sourceFile,
-    SourceManager* sourceManager);
+List<SourceFile*> extractSourceSegments(SourceFile* sourceFile, SourceManager* sourceManager);
 
 List<PreprocessedSegment> preprocessSourceSegments(
     List<SourceFile*> const& segments,
