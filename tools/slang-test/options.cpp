@@ -528,6 +528,7 @@ static bool _isSubCommand(const char* arg)
             File::readAllText(fileName, text);
             List<UnownedStringSlice> lines;
             StringUtil::split(text.getUnownedSlice(), '\n', lines);
+            int fileEntryCount = 0;
             for (auto line : lines)
             {
                 // Remove comments (everything after '#' character)
@@ -543,8 +544,13 @@ static bool _isSubCommand(const char* arg)
                 if (trimmedLine.getLength() > 0)
                 {
                     optionsOut->expectedFailureList.add(trimmedLine);
+                    fileEntryCount++;
                 }
             }
+            Options::ExpectedFailureFileInfo fileInfo;
+            fileInfo.fileName = fileName;
+            fileInfo.count = fileEntryCount;
+            optionsOut->expectedFailureFiles.add(fileInfo);
         }
         else if (strcmp(arg, "-skip-list") == 0)
         {
@@ -694,6 +700,16 @@ static bool _isSubCommand(const char* arg)
     {
         // If the test directory isn't set, use the "tests" directory
         optionsOut->testDir = String("tests/");
+    }
+
+    if (optionsOut->verbosity >= VerbosityLevel::Info &&
+        optionsOut->expectedFailureFiles.getCount() > 0)
+    {
+        stdOut.print("Expected failure lists:\n");
+        for (const auto& fileInfo : optionsOut->expectedFailureFiles)
+        {
+            stdOut.print(" - %s : %d tests\n", fileInfo.fileName.getBuffer(), fileInfo.count);
+        }
     }
 
     return SLANG_OK;
