@@ -3,13 +3,16 @@
 # The prebuilt libslang-llvm is not compiled with sanitizers, so UBSan's
 # vptr checker cannot validate vtables from objects created inside it.
 # This causes false-positive "invalid vptr" aborts when sanitized code
-# calls virtual methods on ILLVMBuilder (a COM interface returned by the
-# non-instrumented library).
+# calls virtual methods on COM interfaces returned by the non-instrumented
+# library.
 #
 # Skip vptr checks for COM interfaces whose implementation lives in slang-llvm.
 # The type: pattern suppresses checks at all call sites regardless of which
-# source file the virtual call is in (e.g. slang-emit-llvm.cpp,
-# slang-downstream-compiler-set.cpp).
+# source file the virtual call is in.
 [vptr]
 type:*ILLVMBuilder*
 type:*IDownstreamCompiler*
+# ISlangUnknown is the base COM interface; addRef()/release()/queryInterface()
+# calls on any object returned from slang-llvm trigger invalid-vptr false
+# positives (e.g. IDownstreamCompiler from LLVMDownstreamCompilerUtil).
+type:*ISlangUnknown*

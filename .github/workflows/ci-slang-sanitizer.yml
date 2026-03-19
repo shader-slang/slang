@@ -184,23 +184,6 @@ jobs:
             echo "::warning::slang-test exited with code $slang_test_exit"
           fi
 
-          echo "=== Sanitizer Results ==="
-          log_count=$(find asan-logs -type f \( -name 'asan*' -o -name 'ubsan*' \) -size +0c 2>/dev/null | wc -l || echo 0)
-          if [ "$log_count" -gt 0 ]; then
-            echo "Found $log_count sanitizer report(s):"
-            for f in asan-logs/asan* asan-logs/ubsan*; do
-              [ -s "$f" ] || continue
-              echo "--- $f ---"
-              head -50 "$f"
-              echo "..."
-            done
-
-            echo ""
-            echo "::warning::Sanitizers detected $log_count issue(s). See uploaded artifacts for details."
-          else
-            echo "No sanitizer issues detected."
-          fi
-
       - name: Run slangc tests with Sanitizers
         run: |
           export ASAN_OPTIONS="detect_leaks=1:print_scariness=1:log_path=$PWD/asan-logs/asan-slangc"
@@ -215,26 +198,66 @@ jobs:
       - name: Sanitizer Summary
         if: always()
         run: |
-          total_logs=$(find asan-logs -type f \( -name 'asan*' -o -name 'ubsan*' \) -size +0c 2>/dev/null | wc -l || echo 0)
-          if [ "$total_logs" -gt 0 ]; then
-            echo "## Sanitizer Report" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "Found **$total_logs** sanitizer issue(s)." >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "Download the \`sanitizer-logs\` artifact for full reports." >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
+          echo ""
+          echo "========================================"
+          echo "       SANITIZER REPORT"
+          echo "========================================"
+          echo ""
 
+          log_files=$(find asan-logs \( -name 'asan*' -o -name 'ubsan*' \) -size +0c 2>/dev/null || true)
+          total_logs=$(echo "$log_files" | grep -c . 2>/dev/null || echo 0)
+
+          if [ "$total_logs" -gt 0 ]; then
             unique_issues=$(grep -rh 'SUMMARY:' asan-logs/ 2>/dev/null | sort -u | head -20)
+
+            echo "FOUND $total_logs SANITIZER LOG(S)"
+            echo ""
+
             if [ -n "$unique_issues" ]; then
-              echo "### Unique Issues" >> $GITHUB_STEP_SUMMARY
-              echo '```' >> $GITHUB_STEP_SUMMARY
-              echo "$unique_issues" >> $GITHUB_STEP_SUMMARY
-              echo '```' >> $GITHUB_STEP_SUMMARY
+              echo "Unique issues:"
+              echo "$unique_issues"
+              echo ""
             fi
 
-            echo "::error::AddressSanitizer/UBSan detected $total_logs issue(s). See the sanitizer-logs artifact."
+            for f in $log_files; do
+              echo "::group::$(basename "$f")"
+              head -100 "$f"
+              echo "::endgroup::"
+            done
+
+            echo ""
+            echo "========================================"
+            echo ""
+
+            # Job summary (visible on the PR checks page)
+            {
+              echo "## Sanitizer Report"
+              echo ""
+              echo "Found **$total_logs** sanitizer log(s)."
+              echo ""
+              if [ -n "$unique_issues" ]; then
+                echo "### Unique Issues"
+                echo '```'
+                echo "$unique_issues"
+                echo '```'
+                echo ""
+              fi
+              echo "Download the \`sanitizer-logs\` artifact for full stack traces."
+            } >> $GITHUB_STEP_SUMMARY
+
+            # Emit each unique issue as a separate error annotation
+            if [ -n "$unique_issues" ]; then
+              while IFS= read -r line; do
+                echo "::error::$line"
+              done <<< "$unique_issues"
+            else
+              echo "::error::Sanitizers detected $total_logs issue(s). See the sanitizer-logs artifact."
+            fi
+
             exit 1
           else
+            echo "No sanitizer issues detected."
+            echo ""
             echo "## Sanitizer Report" >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "No sanitizer issues detected." >> $GITHUB_STEP_SUMMARY
