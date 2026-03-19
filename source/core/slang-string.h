@@ -16,6 +16,17 @@
 
 namespace Slang
 {
+
+// Returns a pointer to a shared zero-initialized buffer used as the
+// empty-string fallback. Using a dedicated buffer avoids returning a bare ""
+// literal whose 1-byte global gets tight ASan redzones, causing
+// global-buffer-overflow reports on off-by-one reads.
+inline const char* getEmptyStringBuffer()
+{
+    static const char kEmpty[2] = {0, 0};
+    return kEmpty;
+}
+
 class _EndLine
 {
 };
@@ -298,7 +309,7 @@ public:
 
     static const char* getData(const StringRepresentation* stringRep)
     {
-        return stringRep ? stringRep->getData() : "";
+        return stringRep ? stringRep->getData() : getEmptyStringBuffer();
     }
 
     static UnownedStringSlice asSlice(const StringRepresentation* rep)
@@ -467,7 +478,7 @@ class SLANG_RT_API String
     friend class StringBuilder;
 
 private:
-    const char* getData() const { return m_buffer ? m_buffer->getData() : ""; }
+    const char* getData() const { return m_buffer ? m_buffer->getData() : getEmptyStringBuffer(); }
 
     // Note: This is not a non-const version of getData(), since this method
     // assumes that the buffer always exists.
