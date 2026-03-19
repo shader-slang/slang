@@ -766,7 +766,7 @@ Slang supports generating higher order forward and backward derivative propagati
 DifferentialPair<DifferentialPair<float>> sin_diff2(DifferentialPair<DifferentialPair<float>> x);
 ```
 
-The input parameter `x` contains four fields: `x.p.p`, `x.p.d`, `x.d.p`, `x.d.d`, where `x.p.p` specifies the original input value, both `x.p.d` and `x.d.p` store the first order derivative of `x`, and `x.d.d` stores the second order derivative of `x`. Calling `fwd_diff(fwd_diff(sin))` with `diffPair(diffPair(pi/2, 1.0), DiffPair(1.0, 0.0))` will result in `{ { 1.0, 0.0 }, { 0.0, -1.0 } }`.
+The input parameter `x` contains four fields: `x.p.p`, `x.p.d`, `x.d.p`, `x.d.d`, where `x.p.p` specifies the original input value, both `x.p.d` and `x.d.p` store the first-order derivative of `x`, and `x.d.d` stores the second-order derivative of `x`. Calling `fwd_diff(fwd_diff(sin))` with `diffPair(diffPair(pi/2, 1.0), diffPair(1.0, 0.0))` will result in `{ { 1.0, 0.0 }, { 0.0, -1.0 } }`.
 
 User-defined higher-order derivative functions can be specified by using `[ForwardDerivative]` or `[BackwardDerivative]` attribute on the derivative function, or by using `[ForwardDerivativeOf]` or `[BackwardDerivativeOf]` attribute on the higher-order derivative function.
 
