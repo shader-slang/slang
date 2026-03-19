@@ -223,9 +223,9 @@ Versions
 
 `metallib_3_1`
 > Represents MetalLib 3.1.
-> Represents MetalLib 4.0.
+
 `metallib_4_0`
-> Represents MetalLib 4.0
+> Represents MetalLib 4.0.
 
 `metallib_latest`
 > Represents the latest MetalLib version.

@@ -2,6 +2,8 @@
 #include "slang-emit-metal.h"
 
 #include "../core/slang-writer.h"
+#include "core/slang-dictionary.h"
+#include "slang-emit-c-like.h"
 #include "slang-emit-source-writer.h"
 #include "slang-ir-entry-point-decorations.h"
 #include "slang-ir-util.h"
@@ -249,21 +251,20 @@ void MetalSourceEmitter::emitEntryPointAttributesImpl(
 {
     auto stage = entryPointDecor->getProfile().getStage();
 
-    switch (stage)
+    const auto emitRequiredThreadsPerThreadgroup = [&]()
     {
-    case Stage::Fragment:
-        m_writer->emit("[[fragment]] ");
-        break;
-    case Stage::Vertex:
-        m_writer->emit("[[vertex]] ");
-        break;
-    case Stage::Compute:
+        if (getTargetCaps().implies(CapabilityAtom::metallib_4_0))
         {
-            if (getTargetCaps().implies(CapabilityAtom::metallib_4_0))
-            if (getTargetCaps().implies(CapabilityAtom::metallib_4_0))
+            Int sizeAlongAxis[kThreadGroupAxisCount];
+            Int specializationConstantIds[kThreadGroupAxisCount];
+            getComputeThreadGroupSize(irFunc, sizeAlongAxis, specializationConstantIds);
+
+            bool hasSpecializedAxis = false;
+            for (int ii = 0; ii < kThreadGroupAxisCount; ++ii)
+                hasSpecializedAxis |= specializationConstantIds[ii] >= 0;
+
+            if (!hasSpecializedAxis)
             {
-                Int sizeAlongAxis[kThreadGroupAxisCount];
-                getComputeThreadGroupSize(irFunc, sizeAlongAxis);
                 m_writer->emit("[[required_threads_per_threadgroup(");
                 for (int ii = 0; ii < kThreadGroupAxisCount; ++ii)
                 {
@@ -273,13 +274,27 @@ void MetalSourceEmitter::emitEntryPointAttributesImpl(
                 }
                 m_writer->emit(")]]\n");
             }
-            m_writer->emit("[[kernel]] ");
         }
+    };
+
+    switch (stage)
+    {
+    case Stage::Fragment:
+        m_writer->emit("[[fragment]] ");
+        break;
+    case Stage::Vertex:
+        m_writer->emit("[[vertex]] ");
+        break;
+    case Stage::Compute:
+        emitRequiredThreadsPerThreadgroup();
+        m_writer->emit("[[kernel]] ");
         break;
     case Stage::Mesh:
+        emitRequiredThreadsPerThreadgroup();
         m_writer->emit("[[mesh]] ");
         break;
     case Stage::Amplification:
+        emitRequiredThreadsPerThreadgroup();
         m_writer->emit("[[object]] ");
         break;
     default:
