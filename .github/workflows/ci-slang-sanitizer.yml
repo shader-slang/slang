@@ -152,8 +152,9 @@ jobs:
 
       - name: Run Tests with Sanitizers
         run: |
-          export ASAN_OPTIONS="detect_leaks=1:print_scariness=1:log_path=$PWD/asan-logs/asan"
-          export UBSAN_OPTIONS="print_stacktrace=1:log_path=$PWD/asan-logs/ubsan"
+          # halt_on_error=0: continue after the first error to find more issues per run.
+          export ASAN_OPTIONS="detect_leaks=1:halt_on_error=0:print_scariness=1:log_path=$PWD/asan-logs/asan"
+          export UBSAN_OPTIONS="print_stacktrace=1:halt_on_error=0:log_path=$PWD/asan-logs/ubsan"
           export LSAN_OPTIONS="suppressions=$PWD/cmake/lsan-suppressions.txt"
 
           export SLANG_RUN_SPIRV_VALIDATION=1
@@ -179,15 +180,18 @@ jobs:
             slang_test_args+=("-server-count" "${{ inputs.server-count }}")
           fi
 
+          # Non-zero exits are expected (sanitizer errors, test failures); this
+          # job gates only on sanitizer log output in the Summary step.
           "$bin_dir/slang-test" "${slang_test_args[@]}" && slang_test_exit=0 || slang_test_exit=$?
           if [ "$slang_test_exit" -ne 0 ]; then
             echo "::warning::slang-test exited with code $slang_test_exit"
           fi
 
       - name: Run slangc tests with Sanitizers
+        if: always()
         run: |
-          export ASAN_OPTIONS="detect_leaks=1:print_scariness=1:log_path=$PWD/asan-logs/asan-slangc"
-          export UBSAN_OPTIONS="print_stacktrace=1:log_path=$PWD/asan-logs/ubsan-slangc"
+          export ASAN_OPTIONS="detect_leaks=1:halt_on_error=0:print_scariness=1:log_path=$PWD/asan-logs/asan-slangc"
+          export UBSAN_OPTIONS="print_stacktrace=1:halt_on_error=0:log_path=$PWD/asan-logs/ubsan-slangc"
           export LSAN_OPTIONS="suppressions=$PWD/cmake/lsan-suppressions.txt"
 
           PATH=$bin_dir:$PATH tools/slangc-test/test.sh && slangc_test_exit=0 || slangc_test_exit=$?
@@ -204,8 +208,11 @@ jobs:
           echo "========================================"
           echo ""
 
-          log_files=$(find asan-logs \( -name 'asan*' -o -name 'ubsan*' \) -size +0c 2>/dev/null || true)
-          total_logs=$(echo "$log_files" | grep -c . 2>/dev/null || echo 0)
+          log_files=$(find asan-logs -type f \( -name 'asan*' -o -name 'ubsan*' \) -size +0c 2>/dev/null || true)
+          total_logs=0
+          if [ -n "$log_files" ]; then
+            total_logs=$(echo "$log_files" | wc -l)
+          fi
 
           if [ "$total_logs" -gt 0 ]; then
             unique_issues=$(grep -rh 'SUMMARY:' asan-logs/ 2>/dev/null | sort -u | head -20)
@@ -219,7 +226,7 @@ jobs:
               echo ""
             fi
 
-            for f in $log_files; do
+            echo "$log_files" | while IFS= read -r f; do
               echo "::group::$(basename "$f")"
               head -100 "$f"
               echo "::endgroup::"
@@ -243,7 +250,7 @@ jobs:
                 echo ""
               fi
               echo "Download the \`sanitizer-logs\` artifact for full stack traces."
-            } >> $GITHUB_STEP_SUMMARY
+            } >> "$GITHUB_STEP_SUMMARY"
 
             # Emit each unique issue as a separate error annotation
             if [ -n "$unique_issues" ]; then
@@ -258,9 +265,9 @@ jobs:
           else
             echo "No sanitizer issues detected."
             echo ""
-            echo "## Sanitizer Report" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "No sanitizer issues detected." >> $GITHUB_STEP_SUMMARY
+            echo "## Sanitizer Report" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "No sanitizer issues detected." >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Upload Sanitizer Logs
