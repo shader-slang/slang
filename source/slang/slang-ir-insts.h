@@ -804,14 +804,6 @@ struct IRGetSequentialID : IRInst
     FIDDLE(leafInst())
 };
 
-/// Allocates space from local stack.
-///
-FIDDLE()
-struct IRAlloca : IRInst
-{
-    FIDDLE(leafInst())
-};
-
 /// A non-hoistable inst used to "pin" a global value inside a function body so any insts dependent
 /// on `value` can be emitted as local insts instead of global insts, as required by targets (e.g.
 /// spirv) that doesn't allow the dependent computation in the global scope.
@@ -3570,8 +3562,6 @@ $(type_info.return_type) $(type_info.method_name)(
         IRInst* interfaceMethodVal);
 
     IRInst* emitGetSequentialIDInst(IRInst* rttiObj);
-
-    IRInst* emitAlloca(IRInst* type, IRInst* rttiObjPtr);
 
     IRInst* emitGlobalValueRef(IRInst* globalInst);
 

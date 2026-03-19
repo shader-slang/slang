@@ -1730,9 +1730,16 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
         }
     case kIROp_Alloca:
         {
+            auto ptrType = cast<IRPtrType>(inst->getDataType());
+
+            m_writer->emit("(");
+            emitType(ptrType);
+            m_writer->emit(")");
             m_writer->emit("alloca(");
-            emitOperand(inst->getOperand(0), EmitOpInfo::get(EmitOp::Postfix));
-            m_writer->emit("->typeSize)");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(" * sizeof(");
+            emitType(ptrType->getValueType());
+            m_writer->emit("))");
             return true;
         }
     case kIROp_BitCast:

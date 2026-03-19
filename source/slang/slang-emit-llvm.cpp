@@ -787,13 +787,13 @@ struct LLVMEmitter
             return SLANG_FAIL;
         }
 
-        using BuilderFuncV2 = SlangResult (*)(
+        using BuilderFuncV3 = SlangResult (*)(
             const SlangUUID& intfGuid,
             Slang::ILLVMBuilder** out,
             Slang::LLVMBuilderOptions options,
             Slang::IArtifact** outErrorArtifact);
 
-        auto builderFunc = (BuilderFuncV2)library->findFuncByName("createLLVMBuilder_V2");
+        auto builderFunc = (BuilderFuncV3)library->findFuncByName("createLLVMBuilder_V3");
         if (!builderFunc)
             return SLANG_FAIL;
 
@@ -2368,6 +2368,37 @@ struct LLVMEmitter
         case kIROp_MakeString:
             // For now, String == NativeString on the LLVM target.
             llvmInst = findValue(inst->getOperand(0));
+            break;
+
+        case kIROp_Alloca:
+            {
+                auto ptrType = cast<IRPtrType>(inst->getDataType());
+                auto count = findValue(inst->getOperand(0));
+
+                IRSizeAndAlignment sizeAndAlignment = types->getSizeAndAlignment(
+                    ptrType->getValueType(),
+                    getBufferLayoutRules(ptrType));
+
+                auto intType = builder->getIntType(types->getTypeBits(inst->getOperand(0)->getDataType()));
+                auto allocSize = builder->getConstantInt(intType, sizeAndAlignment.getStride());
+                allocSize = builder->emitBinaryOp(LLVMBinaryOp::Mul, allocSize, count);
+
+                // This is a runtime alloca, which the user can assume to
+                // _always_ reserve more memory. Hence, we can't always hoist
+                // it into the header block.
+                //
+                // TODO: We _could_ hoist it when it isn't in a loop (no
+                // transitive successor is a transitive predecessor of this
+                // block) AND the count is a constant. Left for future
+                // improvement.
+                //
+                // The TODO isn't a vital, because it mostly helps mem2reg, but
+                // the cases where language users need this feature are when
+                // they explicitly need to get a stack pointer, preventing
+                // mem2reg anyway.
+
+                llvmInst = builder->emitAlloca(allocSize, sizeAndAlignment.alignment);
+            }
             break;
 
         case kIROp_DebugVar:

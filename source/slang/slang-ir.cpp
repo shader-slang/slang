@@ -3609,7 +3609,7 @@ IRInst* IRBuilder::emitLookupInterfaceMethodInst(
 
 IRInst* IRBuilder::emitGetSequentialIDInst(IRInst* rttiObj)
 {
-    auto inst = createInst<IRAlloca>(this, kIROp_GetSequentialID, getUIntType(), rttiObj);
+    auto inst = createInst<IRGetSequentialID>(this, kIROp_GetSequentialID, getUIntType(), rttiObj);
     addInst(inst);
     return inst;
 }
@@ -3629,14 +3629,6 @@ IRInst* IRBuilder::emitBitfieldInsert(
     IRInst* bits)
 {
     auto inst = createInst<IRInst>(this, kIROp_BitfieldInsert, type, base, insert, offset, bits);
-    addInst(inst);
-    return inst;
-}
-
-IRInst* IRBuilder::emitAlloca(IRInst* type, IRInst* rttiObjPtr)
-{
-    auto inst = createInst<IRAlloca>(this, kIROp_Alloca, (IRType*)type, rttiObjPtr);
-
     addInst(inst);
     return inst;
 }

@@ -1613,7 +1613,9 @@ interface IAllocator<AddressSpace addrSpace>
     {
         size_t allocCount = __alignedAllocPtrLength<addrSpace>(bytes, alignment);
         let unalignedPtr = try allocate<Ptr<void, Access.ReadWrite, addrSpace>, DefaultDataLayout>(allocCount);
-        return __finalizeAlignedAlloc<addrSpace>(unalignedPtr, alignment);
+        return __finalizeAlignedAlloc<addrSpace>(
+            reinterpret<Ptr<void, Access.ReadWrite, addrSpace>>(unalignedPtr),
+            alignment);
     }
 
     /// Returns a pointer to a memory allocation that is large enough to store
@@ -1696,6 +1698,7 @@ interface IAllocator<AddressSpace addrSpace>
 // alignment requirements of `T` in the given layout. In Slang, it's possible
 // that sizeof(T) % alignof(T) != 0, so we may need to insert padding bytes
 // between entries in an array to achieve correct alignment.
+[ForceInline]
 size_t __arraySizeOf<T, L:IBufferDataLayout>(size_t len)
 {
     if (len == 0)
@@ -1724,7 +1727,7 @@ size_t __alignedAllocPtrLength<AddressSpace addrSpace>(size_t bytes, uint alignm
 }
 
 Ptr<void, Access.ReadWrite, addrSpace> __finalizeAlignedAlloc<AddressSpace addrSpace>(
-    Ptr<Ptr<void, Access.ReadWrite, addrSpace>, Access.ReadWrite, addrSpace> unalignedPtr,
+    Ptr<void, Access.ReadWrite, addrSpace> unalignedPtr,
     uint alignment)
 {
     size_t ptrAlign = alignof(Ptr<void, Access.ReadWrite, addrSpace>);
@@ -1758,6 +1761,20 @@ Ptr<void> __cpu_malloc(size_t bytes)
 
 [ForceInline]
 [require(cpp_cuda_llvm)]
+Ptr<void> __cpu_realloc(Ptr<void> oldPtr, size_t bytes)
+{
+    __target_switch
+    {
+    case cpp:
+    case cuda:
+        __intrinsic_asm "realloc($0, $1)";
+    case llvm:
+        __intrinsic_asm "%result = call ptr @realloc($0, $1)";
+    }
+}
+
+[ForceInline]
+[require(cpp_cuda_llvm)]
 void __cpu_free(Ptr<void> ptr)
 {
     __target_switch
@@ -1772,11 +1789,11 @@ void __cpu_free(Ptr<void> ptr)
 
 //@public:
 
-/// This allocator allocates memory in the global memory heap. Note that you do
-/// not need to form an instance of the allocator to use it, you can simply call
-/// `HeapAllocator.allocate<T>(count)`. This allocator is roughly equivalent to
-/// the `malloc`/`free` of C.
-/*
+/// This allocator allocates memory in the global memory heap. It provides
+/// functionality that is roughly equivalent to the `malloc`/`free` of C.
+///
+/// @remarks You do not need to form an instance of the allocator to use it, you
+/// can simply call `HeapAllocator.allocate<T>(count)`.
 [require(cpp_cuda_llvm)]
 public struct HeapAllocator: IAllocator<AddressSpace.Device>
 {
@@ -1805,7 +1822,7 @@ public struct HeapAllocator: IAllocator<AddressSpace.Device>
         Ptr<void> allocation = __cpu_malloc(bytes);
         if (allocation == nullptr)
             throw MemoryAllocationError.OutOfMemory;
-        return __finalizeAlignedAlloc(unalignedPtr, alignment);
+        return __finalizeAlignedAlloc(allocation, alignment);
     }
 
     static override LayoutPtr<T, L> reallocate<T, L:IBufferDataLayout = DefaultDataLayout>(
@@ -1816,7 +1833,7 @@ public struct HeapAllocator: IAllocator<AddressSpace.Device>
         if (alignof(T, L) > alignof(Ptr<void>))
         {
             let newPtr = try allocate<T, L>(newCount);
-            size_t copyCount = min(oldCount, newCount);
+            size_t copyCount = oldCount < newCount ? oldCount : newCount;
             for (size_t i = 0; i < copyCount; ++i)
                 newPtr[i] = oldPtr[i];
             free(oldPtr);
@@ -1824,8 +1841,9 @@ public struct HeapAllocator: IAllocator<AddressSpace.Device>
         }
         else
         {
-            return __cpu_realloc(oldPtr, __arraySizeOf<T, L>(newCount));
+            return reinterpret<LayoutPtr<T, L>>(__cpu_realloc(Ptr<void>(oldPtr), __arraySizeOf<T, L>(newCount)));
         }
+        return nullptr;
     }
 
     static override void free<T, L:IBufferDataLayout = DefaultDataLayout>(LayoutPtr<T, L> data)
@@ -1841,7 +1859,35 @@ public struct HeapAllocator: IAllocator<AddressSpace.Device>
         __cpu_free(reinterpret<Ptr<Ptr<void>>>(data)[-1]);
     }
 }
-*/
+
+/// This allocator allocates memory in the calling function's stack frame.
+/// It is effectively equivalent to `alloca()` in C and comes with the same
+/// caveats: Unnecessary use can hinder optimization and excessively large
+/// or looped allocations can easily cause stack overflows.
+///
+/// Ideally, you should only use it when you absolutely need a pointer to a
+/// stack-allocated object, and call it outside of loops.
+///
+/// @remarks you should not form an instance of the allocator to use it, you
+/// can simply call `StackAllocator.allocate<T>(count)`.
+///
+/// @remarks all allocated memory is released automatically when the calling
+/// function returns, so you don't need to manually free it in any way, but you
+/// do need to avoid leaking the pointer outside of the function.
+[require(cpp_llvm)]
+public struct StackAllocator: IAllocator<AddressSpace.Device>
+{
+    [ForceInline]
+    __intrinsic_op($(kIROp_Alloca))
+    static LayoutPtr<T, L> allocate<T, L:IBufferDataLayout = DefaultDataLayout>(size_t count = 1);
+
+    static override Ptr<void> alignedAllocate(size_t bytes, uint alignment) throws MemoryAllocationError
+    {
+        // Arbitrary-alignment allocas aren't really supported by C++, Cuda or
+        // LLVM IR (alignment needs to be compile-time for LLVM IR).
+        throw MemoryAllocationError.AlignmentIsTooLarge;
+    }
+}
 
 //@public:
 extension bool : IRangedValue
