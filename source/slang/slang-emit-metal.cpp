@@ -2,6 +2,7 @@
 #include "slang-emit-metal.h"
 
 #include "../core/slang-writer.h"
+#include "slang-emit-c-like.h"
 #include "slang-emit-source-writer.h"
 #include "slang-ir-entry-point-decorations.h"
 #include "slang-ir-util.h"
@@ -258,7 +259,20 @@ void MetalSourceEmitter::emitEntryPointAttributesImpl(
         m_writer->emit("[[vertex]] ");
         break;
     case Stage::Compute:
-        m_writer->emit("[[kernel]] ");
+        {
+            if (getTargetCaps().implies(CapabilityAtom::metallib_4_0)) {
+
+                Int sizeAlongAxis[kThreadGroupAxisCount];
+                getComputeThreadGroupSize(irFunc, sizeAlongAxis);
+                m_writer->emit("[[required_threads_per_threadgroup(");
+                for (int ii=0; ii < kThreadGroupAxisCount; ++ii) {
+                    if (ii != 0) m_writer->emit(", ");
+                    m_writer->emit(sizeAlongAxis[ii]);
+                }
+                m_writer->emit(")]]\n");
+            }
+            m_writer->emit("[[kernel]] ");
+        }
         break;
     case Stage::Mesh:
         m_writer->emit("[[mesh]] ");
