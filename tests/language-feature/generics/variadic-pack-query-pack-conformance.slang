@@ -49,26 +49,26 @@ Wrapper<T> makeWrapper<T : IBar>(T value)
     return result;
 }
 
-int trimHeadExplicit<each U : IBar>(expand each U values) where nonempty(U)
+int trimFirstExplicit<each U : IBar>(expand each U values) where nonempty(U)
 {
-    acceptPack<__trimHead(U)>();
-    return sumBars<__trimHead(U)>(expand each __trimHead(values));
+    acceptPack<__trimFirst(U)>();
+    return sumBars<__trimFirst(U)>(expand each __trimFirst(values));
 }
 
-int trimHeadInferred<each U : IBar>(expand each U values) where nonempty(U)
+int trimFirstInferred<each U : IBar>(expand each U values) where nonempty(U)
 {
-    return sumBars(expand each __trimHead(values));
+    return sumBars(expand each __trimFirst(values));
 }
 
-int trimTailExplicit<each U : IBar>(expand each U values) where nonempty(U)
+int trimLastExplicit<each U : IBar>(expand each U values) where nonempty(U)
 {
-    acceptPack<__trimTail(U)>();
-    return sumBars<__trimTail(U)>(expand each __trimTail(values));
+    acceptPack<__trimLast(U)>();
+    return sumBars<__trimLast(U)>(expand each __trimLast(values));
 }
 
-int trimTailInferred<each U : IBar>(expand each U values) where nonempty(U)
+int trimLastInferred<each U : IBar>(expand each U values) where nonempty(U)
 {
-    return sumBars(expand each __trimTail(values));
+    return sumBars(expand each __trimLast(values));
 }
 
 int expandExplicit<each U : IBar>(expand each U values)
@@ -82,16 +82,16 @@ int expandExplicit<each U : IBar>(expand each U values)
 void computeMain()
 {
     // CHECK: 8
-    outputBuffer[0] = trimHeadExplicit(BarA(2), BarB(3), BarC(5));
+    outputBuffer[0] = trimFirstExplicit(BarA(2), BarB(3), BarC(5));
 
     // CHECK: 8
-    outputBuffer[1] = trimHeadInferred(BarA(2), BarB(3), BarC(5));
+    outputBuffer[1] = trimFirstInferred(BarA(2), BarB(3), BarC(5));
 
     // CHECK: 5
-    outputBuffer[2] = trimTailExplicit(BarA(2), BarB(3), BarC(5));
+    outputBuffer[2] = trimLastExplicit(BarA(2), BarB(3), BarC(5));
 
     // CHECK: 5
-    outputBuffer[3] = trimTailInferred(BarA(2), BarB(3), BarC(5));
+    outputBuffer[3] = trimLastInferred(BarA(2), BarB(3), BarC(5));
 
     // CHECK: 10
     outputBuffer[4] = expandExplicit(BarA(2), BarB(3), BarC(5));

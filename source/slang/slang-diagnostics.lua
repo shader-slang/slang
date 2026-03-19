@@ -1647,6 +1647,13 @@ err(
 )
 
 err(
+    "size-of-data-layout-is-invalid",
+    30086,
+    "invalid data layout for sizeof/alignof",
+    span { loc = "expr:Expr", message = "argument does not conform to IBufferDataLayout" }
+)
+
+err(
     "count-of-argument-is-invalid",
     30083,
     "invalid countof argument",
@@ -2477,6 +2484,20 @@ err(
     31203,
     "cannot export incomplete type",
     span { loc = "decl:Decl", message = "cannot export incomplete type '~decl'" }
+)
+
+warning(
+    "deprecated-bracket-attributes-placement",
+    31204,
+    "deprecated bracketed attribute list placement. Bracketed attributes should be placed before 'struct'.",
+    span { loc = "location", message = "deprecated placement of bracketed attributes list." }
+)
+
+err(
+    "invalid-bracket-attributes-placement",
+    31205,
+    "invalid bracketed attribute list placement. Bracketed attributes must be placed before 'struct'.",
+    span { loc = "location", message = "invalid placement of bracketed attributes list." }
 )
 
 err(

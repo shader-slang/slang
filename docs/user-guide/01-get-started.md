@@ -5,11 +5,11 @@ permalink: /user-guide/get-started
 
 # Getting Started with Slang
 
-Slang enables you to do many powerful things with shader code, including compiling shader code to many different platforms, obtaining reflection information, organizing your shader library in a modern modular fashion, controlling specialization and more. The following sections help you get started with the basics of Slang in a simple example. We will assume Windows as the operating system, but the steps performed here are similar for other platforms.
+Slang enables you to do many powerful things with shader code, including compiling shader code to many different platforms, obtaining reflection information, organizing your shader library in a modern modular fashion, controlling specialization, and more. The following sections help you get started with the basics of Slang in a simple example. We will assume Windows as the operating system, but the steps performed here are similar for other platforms.
 
 ## Installation
 
-The easiest way to start using Slang is to download a [binary release](https://github.com/shader-slang/slang/releases/) from the GitHub repository. Once you have downloaded and extracted the files from a release package, you can find the `slangc.exe` or `slangc` executable under `/bin`. In this tutorial we will use the `slangc` standalone Slang compiler included in a release package.
+The easiest way to start using Slang is to download a [binary release](https://github.com/shader-slang/slang/releases/) from the GitHub repository. Once you have downloaded and extracted the files from a release package, you can find the `slangc.exe` or `slangc` executable in the `bin/` directory. In this tutorial, we will use the `slangc` standalone Slang compiler included in a release package.
 
 > #### Note: Required Dependencies ####
 > For Windows, `slang-compiler.dll` and `slang-glslang.dll` must be placed in the same directory as `slangc.exe` as they are required by the standalone executable.
@@ -17,11 +17,11 @@ The easiest way to start using Slang is to download a [binary release](https://g
 > #### Note: Multiple Slang Installations ####
 > If you have multiple versions of Slang installed on your system (such as Slang from the Vulkan SDK), ensure that the correct dynamic libraries are being loaded. On Linux, the `LD_LIBRARY_PATH` environment variable will override the `RUNPATH` embedded in the `slangc` executable, causing it to load `libslang-compiler.so` from the path specified in `LD_LIBRARY_PATH` first. This can lead to version mismatches and unexpected behavior.
 
-If you are interested in building from source, please refer to the [documentation on building Slang](../building.md). 
+If you are interested in building from source, please refer to the [documentation on building Slang](../building.md).
 
 ## Your first Slang shader
 
-In this section we demonstrate how to write a simple compute shader in Slang that adds numbers from two buffers and writes the results into a third buffer. To start, create a text file named `hello-world.slang` in any directory, and paste the following content in the newly created file:
+In this section, we demonstrate how to write a simple compute shader in Slang that adds numbers from two buffers and writes the results into a third buffer. To start, create a text file named `hello-world.slang` in any directory, and paste the following content in the newly created file:
 
 ```hlsl
 // hello-world.slang
@@ -40,17 +40,18 @@ void computeMain(uint3 threadId : SV_DispatchThreadID)
 
 > #### Note ####
 > Slang has official language extension support for both [Visual Studio](https://marketplace.visualstudio.com/items?itemName=shader-slang.slang-vs-extension) and [Visual Studio Code](https://marketplace.visualstudio.com/items?itemName=shader-slang.slang-language-extension). The extensions are powered by the Slang compiler to support a wide range of
-> assisting features including auto-completion, function signature hinting, semantic highlighting and more.
+> features including autocompletion, function signature hinting, semantic highlighting, and more.
 
-As you can see, `hello-world.slang` is no different from a normal HLSL shader file. In fact, Slang is compatible with most HLSL code you would write. On top of HLSL, Slang has added many new language and compiler features that simplifies various tasks with shader code, which we will cover in future chapters. For now we will demonstrate one key feature of Slang: cross-compiling to different platforms.
+As you can see, `hello-world.slang` is no different from a normal HLSL shader file. In fact, Slang is compatible with most HLSL code you would write. On top of HLSL, Slang has added many new language and compiler features that simplify various tasks with shader code, which we will cover in future chapters. For now, we will demonstrate one key feature of Slang: cross-compiling to different platforms.
 
-Slang supports compiling shaders into many different targets including Direct3D 11, Direct3D 12, Vulkan, CUDA and C++ (for execution on CPU). You can run `slangc` with the following command line to compile `hello-world.slang` into Vulkan SPIRV:
+Slang supports compiling shaders into many different targets including Direct3D 11, Direct3D 12, Vulkan, CUDA, and C++ (for execution on CPU). You can run `slangc` with the following command line to compile `hello-world.slang` into Vulkan SPIR-V:
 
 ```bat
 .\slangc.exe hello-world.slang -profile glsl_450 -target spirv -o hello-world.spv -entry computeMain
 ```
 
-If you would like to see the equivalent GLSL of the generated SPIRV code, simply change the `-target` argument to `glsl`:
+If you would like to see the equivalent GLSL of the generated SPIR-V code, simply change the `-target` argument to `glsl`:
+
 ```bat
 .\slangc.exe hello-world.slang -profile glsl_450 -target glsl -o hello-world.glsl -entry computeMain
 ```
@@ -99,10 +100,10 @@ void main()
 }
 ```
 
-As you can see, things are being translated just as expected to GLSL: the HLSL `StructuredBuffer` and `RWStructuredBuffer` types are mapped to shader storage objects and the `[numthreads]` attribute are translated into proper `layout(...) in` qualifier on the `main` entry-point.
+As you can see, things are being translated just as expected to GLSL: the HLSL `StructuredBuffer` and `RWStructuredBuffer` types are mapped to shader storage objects and the `[numthreads]` attribute is translated into the proper `layout(...) in` qualifier on the `main` entry point.
 
-Note that in the generated GLSL code, all shader parameters are qualified with explicit binding layouts. This is because Slang provides a guarantee that all parameters will have fixed bindings regardless of shader optimization. Without generating explicit binding layout qualifiers, the downstream compiler in the driver may change the binding of a parameter depending on whether any preceding parameters are eliminated during optimization passes. In practice this causes a pain in application code, where developers will need to rely on run-time reflection to determine the binding location of a compiled shader kernel. The issue gets harder to manage when the application also needs to deal with shader specializations. Since Slang will always generate explicit binding locations in its output on all targets as if no parameters are eliminated, the user is assured that parameters always gets a deterministic binding location without having to write any manual binding qualifiers in the Slang code themselves. In fact, we strongly encourage users not to qualify their Slang code with explicit binding qualifiers and let the Slang compiler do its work to properly lay out parameters. This is best practice to maintain code modularity and avoid potential binding location conflicts between different shader modules.
+Note that in the generated GLSL code, all shader parameters are qualified with explicit binding layouts. This is because Slang provides a guarantee that all parameters will have fixed bindings regardless of shader optimization. Without generating explicit binding layout qualifiers, the downstream compiler in the driver may change the binding of a parameter depending on whether any preceding parameters are eliminated during optimization passes. In practice, this causes pain in application code, where developers will need to rely on runtime reflection to determine the binding location of a compiled shader kernel. The issue gets harder to manage when the application also needs to deal with shader specializations. Since Slang will always generate explicit binding locations in its output on all targets as if no parameters are eliminated, the user is assured that parameters always get a deterministic binding location without having to write any manual binding qualifiers in the Slang code. In fact, we strongly encourage users to avoid explicit binding qualifiers in their Slang code and let the Slang compiler properly lay out parameters. This is a best practice to maintain code modularity and avoid potential binding location conflicts between different shader modules.
 
 ## The full example
 
-The full Vulkan example that sets up and runs the `hello-world.slang` shader is located in the [/examples/hello-world](https://github.com/shader-slang/slang/tree/master/examples/hello-world) directory of the Slang repository. The example code initializes a Vulkan context and runs the compiled SPIRV code. The example code demonstrates how to use the Slang API to load and compile shaders.
+The full Vulkan example that sets up and runs the `hello-world.slang` shader is located in the [/examples/hello-world](https://github.com/shader-slang/slang/tree/master/examples/hello-world) directory of the Slang repository. The example initializes a Vulkan context, uses the Slang API to load and compile shaders, and runs the compiled SPIR-V code.

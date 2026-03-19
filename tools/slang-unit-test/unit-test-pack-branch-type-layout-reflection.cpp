@@ -27,7 +27,7 @@ SLANG_UNIT_TEST(packBranchTypeLayoutReflection)
         {
             Texture2D tex;
             uint value;
-            __packBranch(Tail, EmptyNode, Params<__first(Tail), __trimHead(Tail)>) next;
+            __packBranch(Tail, EmptyNode, Params<__first(Tail), __trimFirst(Tail)>) next;
         }
 
         ParameterBlock<Params<1, 2, 3>> gParams;
