@@ -90,7 +90,8 @@ void JSONRPCConnection::disconnect()
 
             if (!m_process->isTerminated())
             {
-                // Okay, just try terminating
+                // Send SIGTERM and wait for graceful shutdown
+                m_process->terminate(0);
                 m_process->waitForTermination(m_terminationTimeOutInMs);
             }
 

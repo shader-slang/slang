@@ -1608,6 +1608,9 @@ class DifferentiableAttribute : public Attribute
     const OrderedDictionary<Type*, SubtypeWitness*>& getMapTypeToIDifferentiableWitness();
 
     ValSet m_typeRegistrationWorkingSet;
+    UInt m_typeRegistrationRecursionDepth = 0;
+    bool m_typeRegistrationDepthExceeded = false;
+    SourceLoc m_typeRegistrationDiagnosticLoc;
 
 private:
     OrderedDictionary<Type*, SubtypeWitness*> m_mapToIDifferentiableWitness;

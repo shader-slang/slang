@@ -303,8 +303,8 @@ static Expr* parsePrefixExpr(Parser* parser);
 
 static NodeBase* parseFirstExpr(Parser* parser, void* userData);
 static NodeBase* parseLastExpr(Parser* parser, void* userData);
-static NodeBase* parseTrimHeadExpr(Parser* parser, void* userData);
-static NodeBase* parseTrimTailExpr(Parser* parser, void* userData);
+static NodeBase* parseTrimFirstExpr(Parser* parser, void* userData);
+static NodeBase* parseTrimLastExpr(Parser* parser, void* userData);
 
 //
 
@@ -1881,8 +1881,8 @@ public:
     void visitEachExpr(EachExpr* expr) { dispatch(expr->baseExpr); }
     void visitFirstExpr(FirstExpr* expr) { dispatch(expr->value); }
     void visitLastExpr(LastExpr* expr) { dispatch(expr->value); }
-    void visitTrimHeadExpr(TrimHeadExpr* expr) { dispatch(expr->value); }
-    void visitTrimTailExpr(TrimTailExpr* expr) { dispatch(expr->value); }
+    void visitTrimFirstExpr(TrimFirstExpr* expr) { dispatch(expr->value); }
+    void visitTrimLastExpr(TrimLastExpr* expr) { dispatch(expr->value); }
     void visitParenExpr(ParenExpr* expr) { dispatch(expr->base); }
     void visitTupleExpr(TupleExpr* expr)
     {
@@ -1917,6 +1917,15 @@ public:
         for (auto& member : expr->members)
             if (member.exp)
                 dispatch(member.exp);
+    }
+    void visitPackBranchTypeExpr(PackBranchTypeExpr* expr)
+    {
+        if (expr->packOperand.exp)
+            dispatch(expr->packOperand.exp);
+        if (expr->emptyType.exp)
+            dispatch(expr->emptyType.exp);
+        if (expr->nonEmptyType.exp)
+            dispatch(expr->nonEmptyType.exp);
     }
     void visitMemberExpr(MemberExpr* expr)
     {
@@ -3001,7 +3010,8 @@ static TypeSpec _parseSimpleTypeSpec(Parser* parser)
     else if (
         parser->LookAheadToken("expand") || parser->LookAheadToken("each") ||
         parser->LookAheadToken("__first") || parser->LookAheadToken("__last") ||
-        parser->LookAheadToken("__trimHead") || parser->LookAheadToken("__trimTail"))
+        parser->LookAheadToken("__trimFirst") || parser->LookAheadToken("__trimLast") ||
+        parser->LookAheadToken("__packBranch"))
     {
         typeExpr = parsePrefixExpr(parser);
     }
@@ -7367,14 +7377,27 @@ static NodeBase* parseLastExpr(Parser* parser, void* /*userData*/)
     return parsePackQueryExprImpl<LastExpr>(parser);
 }
 
-static NodeBase* parseTrimHeadExpr(Parser* parser, void* /*userData*/)
+static NodeBase* parseTrimFirstExpr(Parser* parser, void* /*userData*/)
 {
-    return parsePackQueryExprImpl<TrimHeadExpr>(parser);
+    return parsePackQueryExprImpl<TrimFirstExpr>(parser);
 }
 
-static NodeBase* parseTrimTailExpr(Parser* parser, void* /*userData*/)
+static NodeBase* parseTrimLastExpr(Parser* parser, void* /*userData*/)
 {
-    return parsePackQueryExprImpl<TrimTailExpr>(parser);
+    return parsePackQueryExprImpl<TrimLastExpr>(parser);
+}
+
+static NodeBase* parsePackBranchTypeExpr(Parser* parser, void* /*userData*/)
+{
+    auto expr = parser->astBuilder->create<PackBranchTypeExpr>();
+    parser->ReadMatchingToken(TokenType::LParent);
+    expr->packOperand = parser->ParseTypeExp();
+    parser->ReadMatchingToken(TokenType::Comma);
+    expr->emptyType = parser->ParseTypeExp();
+    parser->ReadMatchingToken(TokenType::Comma);
+    expr->nonEmptyType = parser->ParseTypeExp();
+    parser->ReadMatchingToken(TokenType::RParent);
+    return expr;
 }
 
 static NodeBase* parseFloatAsIntExpr(Parser* parser, void* /*userData*/)
@@ -9042,16 +9065,16 @@ static Expr* parsePrefixExpr(Parser* parser)
                     expr->loc = tokenLoc;
                 return expr;
             }
-            else if (AdvanceIf(parser, "__trimHead"))
+            else if (AdvanceIf(parser, "__trimFirst"))
             {
-                auto expr = as<Expr>(parseTrimHeadExpr(parser, nullptr));
+                auto expr = as<Expr>(parseTrimFirstExpr(parser, nullptr));
                 if (expr && !expr->loc.isValid())
                     expr->loc = tokenLoc;
                 return expr;
             }
-            else if (AdvanceIf(parser, "__trimTail"))
+            else if (AdvanceIf(parser, "__trimLast"))
             {
-                auto expr = as<Expr>(parseTrimTailExpr(parser, nullptr));
+                auto expr = as<Expr>(parseTrimLastExpr(parser, nullptr));
                 if (expr && !expr->loc.isValid())
                     expr->loc = tokenLoc;
                 return expr;
@@ -10063,8 +10086,9 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseExpr("countof", parseCountOfExpr),
     _makeParseExpr("__first", parseFirstExpr),
     _makeParseExpr("__last", parseLastExpr),
-    _makeParseExpr("__trimHead", parseTrimHeadExpr),
-    _makeParseExpr("__trimTail", parseTrimTailExpr),
+    _makeParseExpr("__trimFirst", parseTrimFirstExpr),
+    _makeParseExpr("__trimLast", parseTrimLastExpr),
+    _makeParseExpr("__packBranch", parsePackBranchTypeExpr),
     _makeParseExpr("__getAddress", parseAddressOfExpr),
     _makeParseExpr("__floatAsInt", parseFloatAsIntExpr),
 };
