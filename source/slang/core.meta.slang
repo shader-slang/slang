@@ -1783,7 +1783,7 @@ void __cpu_free(Ptr<void> ptr)
     case cuda:
         __intrinsic_asm "free($0)";
     case llvm:
-        __intrinsic_asm "%result = call ptr @free($0)";
+        __intrinsic_asm "call void @free($0)";
     }
 }
 
@@ -1819,7 +1819,7 @@ public struct HeapAllocator: IAllocator<AddressSpace.Device>
     static override Ptr<void> alignedAllocate(size_t bytes, uint alignment) throws MemoryAllocationError
     {
         size_t allocCount = __alignedAllocPtrLength<AddressSpace.Device>(bytes, alignment);
-        Ptr<void> allocation = __cpu_malloc(bytes);
+        Ptr<void> allocation = __cpu_malloc(allocCount);
         if (allocation == nullptr)
             throw MemoryAllocationError.OutOfMemory;
         return __finalizeAlignedAlloc(allocation, alignment);
@@ -1843,7 +1843,6 @@ public struct HeapAllocator: IAllocator<AddressSpace.Device>
         {
             return reinterpret<LayoutPtr<T, L>>(__cpu_realloc(Ptr<void>(oldPtr), __arraySizeOf<T, L>(newCount)));
         }
-        return nullptr;
     }
 
     static override void free<T, L:IBufferDataLayout = DefaultDataLayout>(LayoutPtr<T, L> data)

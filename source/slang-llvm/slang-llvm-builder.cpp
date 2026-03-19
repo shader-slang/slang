@@ -807,7 +807,7 @@ llvm::Function* LLVMBuilder::getExternalBuiltin(ExternalFunc extFunc)
         {
             func = emitDecl(
                 "realloc",
-                llvmBuilder->getVoidTy(),
+                llvmBuilder->getPtrTy(),
                 {llvmBuilder->getPtrTy(), llvmBuilder->getIntPtrTy(targetDataLayout)},
                 false);
             llvm::AttrBuilder attrs(*llvmContext);
