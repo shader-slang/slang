@@ -616,10 +616,10 @@ void ASTPrinter::addExpr(Expr* expr)
             sb << "__first(";
         else if (as<LastExpr>(packQueryExpr))
             sb << "__last(";
-        else if (as<TrimHeadExpr>(packQueryExpr))
-            sb << "__trimHead(";
-        else if (as<TrimTailExpr>(packQueryExpr))
-            sb << "__trimTail(";
+        else if (as<TrimFirstExpr>(packQueryExpr))
+            sb << "__trimFirst(";
+        else if (as<TrimLastExpr>(packQueryExpr))
+            sb << "__trimLast(";
         else
             SLANG_UNEXPECTED("unknown PackQueryExpr subtype");
 
