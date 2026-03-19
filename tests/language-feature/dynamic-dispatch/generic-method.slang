@@ -36,7 +36,7 @@ float f(uint id, float x)
         obj = C();
 
     return obj.calc(x);
-    // REPORT: ([[# @LINE-1]]): {{.*}} generated specialized dynamic dispatch code{{.*}} 3 possible types:
+    // REPORT: note[E50103]: generated specialized dynamic dispatch code
 }
 
 

@@ -595,6 +595,14 @@ RefPtr<ComponentType> SpecializedComponentType::getRequirement(Index index)
 
 String SpecializedComponentType::getEntryPointMangledName(Index index)
 {
+    if (auto specializationInfo =
+            as<EntryPoint::EntryPointSpecializationInfo>(m_specializationInfo))
+    {
+        auto specializedFuncDeclRef = specializationInfo->specializedFuncDeclRef;
+        if (specializedFuncDeclRef)
+            return getMangledName(getLinkage()->getASTBuilder(), specializedFuncDeclRef);
+    }
+
     return m_entryPointMangledNames[index];
 }
 
@@ -660,16 +668,6 @@ void TypeConformance::addDepedencyFromWitness(SubtypeWitness* witness)
     {
         addDepedencyFromWitness(transitiveWitness->getMidToSup());
         addDepedencyFromWitness(transitiveWitness->getSubToMid());
-    }
-    else if (auto conjunctionWitness = as<ConjunctionSubtypeWitness>(witness))
-    {
-        auto componentCount = conjunctionWitness->getComponentCount();
-        for (Index i = 0; i < componentCount; ++i)
-        {
-            auto w = as<SubtypeWitness>(conjunctionWitness->getComponentWitness(i));
-            if (w)
-                addDepedencyFromWitness(w);
-        }
     }
 }
 

@@ -1,11 +1,10 @@
-//TEST:SIMPLE(filecheck=HLSL): -target hlsl -stage compute -entry computeMain
-//TEST:SIMPLE(filecheck=GLSL): -target glsl -stage compute -entry computeMain
+//DIAGNOSTIC_TEST:SIMPLE(diag=diag): -target hlsl -stage compute -entry computeMain
+//DIAGNOSTIC_TEST:SIMPLE(diag=diag): -target glsl -stage compute -entry computeMain
 
 RWStructuredBuffer<uint> outputBuffer;
 
-// GLSL: error 30623
-// HLSL: error 30623
 groupshared uint globalMem = 1;
+//diag:          ^^^^^^^^^ 'globalMem' cannot have an initializer because it is groupshared
 
 [numthreads(1, 1, 1)]
 void computeMain(int3 dispatchThreadID: SV_DispatchThreadID)

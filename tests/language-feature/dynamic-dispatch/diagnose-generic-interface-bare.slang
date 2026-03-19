@@ -1,7 +1,7 @@
 // A generic interface requires all type arguments to be specified.
 // Using a generic interface without type arguments is an error.
 
-//TEST:SIMPLE(filecheck=CHECK):-target hlsl -stage compute -entry computeMain
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target hlsl -stage compute -entry computeMain
 
 interface IProcessor<T : IArithmetic>
 {
@@ -15,10 +15,12 @@ struct Doubler : IProcessor<float>
 
 RWStructuredBuffer<float> outputBuffer;
 
-// CHECK: ([[# @LINE+4]]): error 30400
 [numthreads(1, 1, 1)]
 void computeMain()
 {
     IProcessor obj = Doubler();
+/*CHECK:
+    ^^^^^^^^^^ generic type 'IProcessor' used without argument
+*/
     outputBuffer[0] = obj.process(5.0);
 }

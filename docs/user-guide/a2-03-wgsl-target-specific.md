@@ -109,8 +109,15 @@ Entry Point Parameter Handling
 Slang performs several transformations on entry point parameters when targeting WGSL:
 
 - Struct parameters and returned structs are flattened to eliminate nested structures.
+- Varying input parameters are packed into a single struct type.
 - System value semantics are translated to WGSL built-ins. (See the `@builtin` attribute, and the table above.)
 - Parameters without semantics are given automatic location indices. (See the `@location` attribute.)
+
+### Limitation: `isParameterLocationUsed` for varying inputs
+
+Because WGSL entry point varying inputs are packed into a single struct parameter during legalization, `IMetadata::isParameterLocationUsed` cannot distinguish between used and unused individual varying inputs. The metadata is recorded at the struct level, so if any varying input is used, all varying input locations covered by the struct will be reported as used. This differs from SPIR-V, where each varying input becomes a separate global parameter that can be individually tracked.
+
+This limitation does not affect non-varying resource types (e.g. descriptor table slots), which are tracked individually.
 
 
 Parameter blocks

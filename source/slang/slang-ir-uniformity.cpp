@@ -4,6 +4,7 @@
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -303,10 +304,9 @@ struct ValidateUniformityContext
                                 addToWorkList(ptr);
                                 if (isDynamicUniformLocation(ptr))
                                 {
-                                    sink->diagnose(
-                                        user->sourceLoc,
-                                        Diagnostics::expectDynamicUniformValue,
-                                        ptr);
+                                    sink->diagnose(Diagnostics::ExpectDynamicUniformValue{
+                                        .location = user->sourceLoc,
+                                    });
                                 }
                                 else
                                 {
@@ -359,9 +359,10 @@ struct ValidateUniformityContext
                                             if (param->findDecoration<IRDynamicUniformDecoration>())
                                             {
                                                 sink->diagnose(
-                                                    callInst->sourceLoc,
-                                                    Diagnostics::expectDynamicUniformArgument,
-                                                    param);
+                                                    Diagnostics::ExpectDynamicUniformArgument{
+                                                        .param = param,
+                                                        .location = callInst->sourceLoc,
+                                                    });
                                             }
                                             else
                                             {

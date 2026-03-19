@@ -18,7 +18,7 @@
 - *`type-expr`* is the type to extend.
 - *`generic-params-decl`* are the generic parameters for a [generic struct extension](#generic-struct).
 - *`bases-clause`* is an optional list of [interface](types-interface.md) conformance specifications to be added.
-- *`where-clause`* is an optional generic constraint expression. See [Generics (TODO)](TODO).
+- *`where-clause`* is an optional [generic constraint expression](generics.md).
 - *`member-list`* is a list of struct members to be added. A member is one of:
   - *`var-decl`* is a member static variable declaration. See [Variables (TODO)](TODO)
   - *`type-decl`* is a nested [type declaration](types.md).
@@ -174,4 +174,4 @@ extension<T : IBase> T
 }
 ```
 
-See [Generics (TODO)](TODO) for further information on generics.
+See [Generics](generics.md) for further information on generics.

@@ -1,5 +1,5 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target hlsl
 
 // Test that __ref and __constref parameters with struct types
 // containing interface members produce diagnostic errors in
@@ -29,15 +29,17 @@ struct Container
 }
 
 // Scenario 1: Struct containing interface passed by __ref
-// CHECK: ([[# @LINE+1]]): error 52010: '__ref' parameter of type 'Container' cannot be used in a dynamic dispatch context.
 float processContainerRef(__ref Container c)
+//CHECK:                                  ^ ref parameter incompatible with dynamic dispatch
+//CHECK:                                  ^ '__ref' parameter of type 'Container' cannot be used in a dynamic dispatch context.
 {
     return c.member.getValue();
 }
 
 // Scenario 2: Struct containing interface passed by __constref
-// CHECK: ([[# @LINE+1]]): error 52010: '__constref' parameter of type 'Container' cannot be used in a dynamic dispatch context.
 float processContainerConstref(__constref Container c)
+//CHECK:                                            ^ ref parameter incompatible with dynamic dispatch
+//CHECK:                                            ^ '__constref' parameter of type 'Container' cannot be used in a dynamic dispatch context.
 {
     return c.member.getValue();
 }
@@ -53,15 +55,17 @@ struct Outer
     Inner inner;
 }
 
-// CHECK: ([[# @LINE+1]]): error 52010: '__ref' parameter of type 'Outer' cannot be used in a dynamic dispatch context.
 float processNested(__ref Outer o)
+//CHECK:                        ^ ref parameter incompatible with dynamic dispatch
+//CHECK:                        ^ '__ref' parameter of type 'Outer' cannot be used in a dynamic dispatch context.
 {
     return o.inner.iface.getValue();
 }
 
 // Scenario 4: Nested struct containing interface passed by __constref
-// CHECK: ([[# @LINE+1]]): error 52010: '__constref' parameter of type 'Outer' cannot be used in a dynamic dispatch context.
 float processNestedConst(__constref Outer o)
+//CHECK:                                  ^ ref parameter incompatible with dynamic dispatch
+//CHECK:                                  ^ '__constref' parameter of type 'Outer' cannot be used in a dynamic dispatch context.
 {
     return o.inner.iface.getValue();
 }

@@ -47,6 +47,28 @@ void SyntaxClassBase::destructInstanceImpl(void* instance) const
 
 /* static */ const TypeExp TypeExp::empty;
 
+VariadicPackCardinality getKnownPackCardinality(Val* packOperand)
+{
+    if (!packOperand)
+        return VariadicPackCardinality::Unknown;
+
+    if (auto modifiedType = as<ModifiedType>(packOperand))
+        return getKnownPackCardinality(modifiedType->getBase());
+
+    if (auto tupleType = as<TupleType>(packOperand))
+        return getKnownPackCardinality(tupleType->getTypePack());
+
+    if (auto concreteTypePack = as<ConcreteTypePack>(packOperand))
+        return concreteTypePack->getTypeCount() > 0 ? VariadicPackCardinality::NonEmpty
+                                                    : VariadicPackCardinality::Empty;
+
+    if (auto concreteIntValPack = as<ConcreteIntValPack>(packOperand))
+        return concreteIntValPack->getCount() > 0 ? VariadicPackCardinality::NonEmpty
+                                                  : VariadicPackCardinality::Empty;
+
+    return VariadicPackCardinality::Unknown;
+}
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!! DiagnosticSink impls !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 void printDiagnosticArg(StringBuilder& sb, Decl* decl)
@@ -212,6 +234,9 @@ void printDiagnosticArg(StringBuilder& sb, ASTNodeType nodeType)
         break;
     case ASTNodeType::GenericTypeConstraintDecl:
         sb << "GenericTypeConstraintDecl";
+        break;
+    case ASTNodeType::NonEmptyPackConstraintDecl:
+        sb << "NonEmptyPackConstraintDecl";
         break;
     case ASTNodeType::SimpleTypeDecl:
         sb << "SimpleTypeDecl";
@@ -587,6 +612,25 @@ RequirementWitness tryLookUpRequirementWitness(
     SubtypeWitness* subtypeWitness,
     Decl* requirementKey)
 {
+    if (auto packBranchWitness = as<PackBranchSubtypeWitness>(subtypeWitness))
+    {
+        switch (getKnownPackCardinality(packBranchWitness->getPackOperand()))
+        {
+        case VariadicPackCardinality::Empty:
+            return tryLookUpRequirementWitness(
+                astBuilder,
+                packBranchWitness->getEmptyWitness(),
+                requirementKey);
+        case VariadicPackCardinality::NonEmpty:
+            return tryLookUpRequirementWitness(
+                astBuilder,
+                packBranchWitness->getNonEmptyWitness(),
+                requirementKey);
+        default:
+            return RequirementWitness();
+        }
+    }
+
     if (auto declaredSubtypeWitness = as<DeclaredSubtypeWitness>(subtypeWitness))
     {
         if (auto inheritanceDeclRef = declaredSubtypeWitness->getDeclRef().as<InheritanceDecl>())
@@ -672,19 +716,6 @@ RequirementWitness tryLookUpRequirementWitness(
                 }
                 return result;
             }
-        }
-    }
-    else if (
-        auto extractFromConjunctionTypeWitness =
-            as<ExtractFromConjunctionSubtypeWitness>(subtypeWitness))
-    {
-        if (auto conjunctionTypeWitness = as<ConjunctionSubtypeWitness>(
-                extractFromConjunctionTypeWitness->getConjunctionWitness()))
-        {
-            auto componentWitness = as<SubtypeWitness>(conjunctionTypeWitness->getComponentWitness(
-                extractFromConjunctionTypeWitness->getIndexInConjunction()));
-
-            return tryLookUpRequirementWitness(astBuilder, componentWitness, requirementKey);
         }
     }
 
