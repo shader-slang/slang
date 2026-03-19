@@ -4,7 +4,7 @@
 a 'linked list' of different related types. 
 
 tests/current-bugs/generic/byte-address-ptr-2.slang(75): note 99999: an internal error threw an exception while working on code near this location
-(0): error 100001: Slang compilation aborted due to an exception of class Slang::InternalError: assert failure: witnessTableVal->getOp() != kIROp_StructKey
+(0): error 99997: Slang compilation aborted due to an exception of class Slang::InternalError: assert failure: witnessTableVal->getOp() != kIROp_StructKey
 */
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer

@@ -391,7 +391,8 @@ err(
 
 err("null-component-type", 105, "componentTypes[~index:Int] is `nullptr`")
 
-standalone_note("note-failed-to-load-dynamic-library", 100002, "failed to load dynamic library '~path'")
+-- Code 99996: moved from 99999 to avoid severity conflict with internal-severity diagnostics at that code.
+standalone_note("note-failed-to-load-dynamic-library", 99996, "failed to load dynamic library '~path'")
 
 --
 -- 15xxx - Preprocessing
@@ -4747,13 +4748,13 @@ internal(
 
 err(
     "compilation-aborted",
-    100000,
+    99998,
     "Slang compilation aborted due to internal error\\nFor assistance, file an issue on GitHub (https://github.com/shader-slang/slang/issues) or join the Slang Discord (https://khr.io/slangdiscord)"
 )
 
 err(
     "compilation-aborted-due-to-exception",
-    100001,
+    99997,
     "Slang compilation aborted due to an exception of ~exceptionType: ~exceptionMessage\\nFor assistance, file an issue on GitHub (https://github.com/shader-slang/slang/issues) or join the Slang Discord (https://khr.io/slangdiscord)"
 )
 

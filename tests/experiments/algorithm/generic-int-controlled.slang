@@ -3,7 +3,7 @@
 /* Test to control altering of an algorithm via generic compile time values.
 
 slang(28): note 99999: an internal error threw an exception while working on code near this location
-(0): error 100001: Slang compilation aborted due to an exception of class Slang::InternalError: unexpected: could not resolve target declaration for call
+(0): error 99997: Slang compilation aborted due to an exception of class Slang::InternalError: unexpected: could not resolve target declaration for call
 
 Seems like it's the default value (=1) that leads to this crash. If we explicitly specify it's ok.
  */

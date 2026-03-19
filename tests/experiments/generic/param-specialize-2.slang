@@ -10,7 +10,7 @@ Here (with 1 == 1) it's testing if a compile time knowable expression can be use
 Does not work because
 
 .slang(25): note 99999: an internal error threw an exception while working on code near this location
-(0): error 100001: Slang compilation aborted due to an exception of class Slang::InternalError: unexpected: ErrorType
+(0): error 99997: Slang compilation aborted due to an exception of class Slang::InternalError: unexpected: ErrorType
 */
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name outputBuffer
