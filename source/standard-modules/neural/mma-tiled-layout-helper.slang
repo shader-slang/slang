@@ -273,7 +273,7 @@ VISIBILITY_LEVEL struct TiledMMAHelper<T, int InputSize, int OutputSize, int Sub
 
             MatA matA[TileInfoT.NCoopMatRow];
 
-            if (U is half)
+            if (sizeof(U) == 2)
             {
                 // Fast path: each warp loads weight tiles directly from global memory,
                 // then loads its input vector into per-warp shared memory B.
@@ -420,7 +420,9 @@ VISIBILITY_LEVEL struct TiledMMAHelper<T, int InputSize, int OutputSize, int Sub
             sharedMemoryAOffset, sharedMemoryBOffset, subgroupIndex, inputVectorA, inputVectorB, matC);
 
         GroupMemoryBarrierWithGroupSync();
-        BaseMMA.sumReduceTiles<CoopMatCRows, CoopMatCColumns>(matC, subgroupIndex, sharedMemoryBOffset);
+        // Use all-at-once reduction: 2 barriers instead of 2*CoopMatCRows barriers.
+        // Start at offset 0 since the vector data is no longer needed after outerProduct.
+        BaseMMA.sumReduceTilesAllAtOnce<CoopMatCRows, CoopMatCColumns>(matC, subgroupIndex, 0);
 
         // Store result in tiled layout. Row-at-a-time; write-back uses direct atomicAdd.
         if (subgroupIndex == 0)

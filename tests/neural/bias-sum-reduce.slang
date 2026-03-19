@@ -43,9 +43,11 @@ void TestBiasSumReduce<int OutputSize, TargetEnum Target>(uint tid)
 
     DType dOutVector[OutSize] = {};
 
+    // Use 1/128 = 0.0078125 which is exactly representable in half precision (2^-7)
+    // This avoids float->half conversion errors in the MMA path
     for (int i = 0; i < OutputSize; i++)
     {
-        dOutVector[i] = DType((i + 1) * 0.01);
+        dOutVector[i] = DType((i + 1) * 0.0078125);
     }
 
     uint subgroupId = tid / SubgroupSize;
@@ -133,8 +135,10 @@ void test<int OutputSize>(uint tid, uint resIndex)
         for (int i = 0; i < OutputSize; i++)
         {
             DType value = outputBuffer[i];
-            DType expected = DType((i + 1) * 0.01 * WorkgroupSize);
-            if (abs(value - expected) > DType(0.001))
+            // Expected = (i+1) * 0.0078125 * 128 = (i+1) * 1.0
+            DType expected = DType(i + 1);
+            DType tolerance = DType(0.001);
+            if (abs(value - expected) > tolerance)
             {
                 isPassed = false;
                 break;
