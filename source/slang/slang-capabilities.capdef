@@ -198,7 +198,7 @@ def metallib_3_0 : metallib_2_4;
 /// [Version]
 def metallib_3_1 : metallib_3_0;
 
-/// Represents MetalLib 4.0
+/// Represents MetalLib 4.0.
 /// [Version]
 def metallib_4_0 : metallib_3_1;
 
