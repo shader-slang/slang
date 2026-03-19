@@ -4,14 +4,14 @@
 // CHECK609-DAG: RWByteAddressBuffer outerProductOutput_0 : register
 // CHECK609-DAG: RWByteAddressBuffer reduceSumOutput_0 : register
 // CHECK609-DAG: __builtin_OuterProductAccumulate(
-// CHECK609-DAG: __slang_coopvec_OuterProductAccumulate<
+// CHECK609-DAG: __slang_linalg_OuterProductAccumulate<
 // CHECK609-DAG: __builtin_VectorAccumulate(
-// CHECK609-DAG: __slang_coopvec_VectorAccumulate<
+// CHECK609-DAG: __slang_linalg_VectorAccumulate<
 
-// CHECK610-DAG: dx::linalg::OuterProductAccumulate(
-// CHECK610-DAG: __slang_coopvec_OuterProductAccumulate<
-// CHECK610-DAG: dx::linalg::VectorAccumulate(
-// CHECK610-DAG: __slang_coopvec_VectorAccumulate<
+// CHECK610-DAG: dx::linalg::OuterProduct<
+// CHECK610-DAG: InterlockedAccumulate(
+// CHECK610-DAG: __slang_linalg_OuterProductAccumulate<
+// CHECK610-DAG: __slang_linalg_VectorAccumulate<
 
 RWByteAddressBuffer outerProductOutput;
 RWByteAddressBuffer reduceSumOutput;
