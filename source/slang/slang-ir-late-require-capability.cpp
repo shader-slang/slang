@@ -112,23 +112,26 @@ struct ProcessLateRequireCapabilityInstsContext
                 {
                     instsToRemove.add(lateRequireCap);
 
+                    if (m_optionSet.getBoolOption(CompilerOptionName::IgnoreCapabilities))
+                        continue;
+
                     const HashSet<IRFunc*>* entryPoints =
                         m_mapInstToReferencingEntryPoints.tryGetValue(func);
 
-                    if (entryPoints)
+                    if (!entryPoints)
+                        continue;
+
+                    for (auto entryPoint : *entryPoints)
                     {
-                        for (auto entryPoint : *entryPoints)
+                        if (IREntryPointDecoration* entryPointDecor =
+                            entryPoint->findDecoration<IREntryPointDecoration>())
                         {
-                            if (IREntryPointDecoration* entryPointDecor =
-                                    entryPoint->findDecoration<IREntryPointDecoration>())
-                            {
-                                IRCapabilitySet* capSet = lateRequireCap->getCapabilitySet();
-                                checkCapability(
-                                    entryPoint,
-                                    entryPointDecor->getProfile(),
-                                    lateRequireCap,
-                                    capSet);
-                            }
+                            IRCapabilitySet* capSet = lateRequireCap->getCapabilitySet();
+                            checkCapability(
+                                entryPoint,
+                                entryPointDecor->getProfile(),
+                                lateRequireCap,
+                                capSet);
                         }
                     }
                 }
