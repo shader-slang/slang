@@ -9754,6 +9754,26 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return paramVal;
     }
 
+    static bool _intValReferencesSpecConst(IntVal* val)
+    {
+        if (auto declRefIntVal = as<DeclRefIntVal>(val))
+        {
+            auto decl = declRefIntVal->getDeclRef().getDecl();
+            if (decl->hasModifier<SpecializationConstantAttribute>() ||
+                decl->hasModifier<VkConstantIdAttribute>())
+                return true;
+        }
+        for (Index i = 0; i < val->getOperandCount(); i++)
+        {
+            if (val->m_operands[i].kind != ValNodeOperandKind::ValNode)
+                continue;
+            if (auto childIntVal = as<IntVal>(val->m_operands[i].getVal()))
+                if (_intValReferencesSpecConst(childIntVal))
+                    return true;
+        }
+        return false;
+    }
+
     LoweredValInfo lowerConstantDeclCommon(VarDeclBase* decl)
     {
         // It's constant, so shoul dhave this modifier
@@ -9825,14 +9845,22 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // with the value `5`, then we might have only a single
             // instruction to represent `5`.
             //
-            // FuncCallIntVal means the initializer was symbolically folded but
-            // not fully evaluated (operands are spec constants or generic value
-            // params). Lower via visitFuncCallIntVal which emits constexpr IR
-            // ops and propagates @SpecConst rate when any operand carries it.
-            // The raw initExpr path would emit plain ops without that rate.
+            // When the initializer was symbolically folded to a FuncCallIntVal
+            // whose leaf operands include specialization constants, lower via
+            // visitFuncCallIntVal to emit constexpr IR ops that propagate the
+            // @SpecConst rate type. The raw initExpr path emits plain ops
+            // without that rate, causing SPIR-V emission failures.
+            //
+            // We must NOT take this path when the FuncCallIntVal comes from a
+            // generic context (e.g. 4 / sizeof(U)), because the constexpr ops
+            // are hoistable/deduplicated at module level and their operands
+            // would reference generic params that become invalid after
+            // specialization. For non-spec-const expressions the regular
+            // lowerRValueExpr path works correctly.
             //
             IRInst* irInitVal;
-            if (auto funcCallIntVal = as<FuncCallIntVal>(decl->val))
+            auto funcCallIntVal = as<FuncCallIntVal>(decl->val);
+            if (funcCallIntVal && _intValReferencesSpecConst(funcCallIntVal))
                 irInitVal = lowerSimpleVal(subContext, funcCallIntVal);
             else
                 irInitVal = getSimpleVal(subContext, lowerRValueExpr(subContext, initExpr));
