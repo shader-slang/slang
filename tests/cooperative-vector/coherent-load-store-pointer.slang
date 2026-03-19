@@ -1,6 +1,4 @@
 //TEST:SIMPLE(filecheck=SPIRV):-stage compute -entry computeMain -target spirv
-
-// coherent CoopVec operations crash the Nvidia driver.
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -render-feature cooperative-vector -emit-spirv-directly
 
 // Ensure SPIRV emits coherent operations here

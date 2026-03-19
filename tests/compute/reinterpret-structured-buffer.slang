@@ -4,8 +4,7 @@
 
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -shaderobj -output-using-type
 
-// Input buffer: 4 half values = [1.0, 2.0, 3.0, 4.0]
-//TEST_INPUT: ubuffer(data=[0x40003C00 0x44004200], stride=2, count=4):name=inputBuffer
+//TEST_INPUT: ubuffer(data=[1.0h 2.0h 3.0h 4.0h], stride=2, count=4):name=inputBuffer
 uniform RWStructuredBuffer<half>.Handle inputBuffer;
 
 //TEST_INPUT: ubuffer(data=[0 0 0 0], stride=2, count=4):out,name=outputBuffer
@@ -18,7 +17,7 @@ void computeMain()
     RWStructuredBuffer<half2> vecBuffer = reinterpret<RWStructuredBuffer<half2>>(*inputBuffer);
 
     __atomic_reduce_add(vecBuffer[0], half2(1.0h, 2.0h));
-    
+
     half2 v0 = vecBuffer[0];
     half2 v1 = vecBuffer[1];
 

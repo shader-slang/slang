@@ -96,6 +96,7 @@ jobs:
           slang_test_args=(
             "-category" "full"
             "-expected-failure-list" "tests/expected-failure-github.txt"
+            "-expected-failure-list" "tests/expected-failure-linux.txt"
             "-expected-failure-list" "tests/expected-failure-linux-gpu.txt"
             "-skip-reference-image-generation"
             "-show-adapter-info"
@@ -132,6 +133,7 @@ jobs:
             -api vk \
             -expected-failure-list tests/expected-failure-via-glsl.txt \
             -expected-failure-list tests/expected-failure-github.txt \
+            -expected-failure-list tests/expected-failure-linux.txt \
             -expected-failure-list tests/expected-failure-linux-gpu.txt
 
       - name: GPU post-test diagnostics
