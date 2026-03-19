@@ -641,7 +641,7 @@ SlangResult _execute(int argc, const char* const* argv)
     // after the GPU driver's own static destructors, causing segfaults from
     // corrupted vtables.
     typedef void (*CleanDeviceCacheFunc)();
-    ISlangSharedLibrary* renderTestLib = server.loadSharedLibrary("render-test");
+    ISlangSharedLibrary* renderTestLib = server.loadSharedLibrary("render-test-tool");
     if (renderTestLib)
     {
         auto cleanFunc = (CleanDeviceCacheFunc)renderTestLib->findFuncByName("cleanDeviceCache");
