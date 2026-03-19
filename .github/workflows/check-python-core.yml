@@ -54,15 +54,15 @@ jobs:
           for p in extras.rglob('__init__.py'):
               project_modules.add(p.parent.name)
 
-          failed = False
+          errors = []
           for filepath in sorted(extras.rglob('*.py')):
               with open(filepath) as f:
                   tree = ast.parse(f.read(), str(filepath))
               def check_module(top, desc):
-                  nonlocal failed
                   if top not in stdlib and top not in project_modules:
-                      print(f'{filepath}: non-stdlib import: {desc}')
-                      failed = True
+                      msg = f'{filepath}: non-stdlib import: {desc}'
+                      print(msg)
+                      errors.append(msg)
 
               for node in ast.walk(tree):
                   if isinstance(node, ast.Import):
@@ -91,7 +91,7 @@ jobs:
                       and isinstance(node.args[0].value, str)
                   ):
                       check_module(node.args[0].value.split('.')[0], f'importlib.import_module({node.args[0].value!r})')
-          if failed:
+          if errors:
               sys.exit(1)
           print('All imports are stdlib-only (local sibling modules allowed).')
           "
