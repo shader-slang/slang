@@ -2472,8 +2472,8 @@ local insts = {
 	{ countOf = { operands = { { "type" } } } },
 	{ ExtractFirstFromPack = { operands = { { "pack" }, { "witness" } }, hoistable = true } },
 	{ ExtractLastFromPack = { operands = { { "pack" }, { "witness" } }, hoistable = true } },
-	{ TrimHeadOfPack = { operands = { { "pack" }, { "witness" } }, hoistable = true } },
-	{ TrimTailOfPack = { operands = { { "pack" }, { "witness" } }, hoistable = true } },
+	{ TrimFirstOfPack = { operands = { { "pack" }, { "witness" } }, hoistable = true } },
+	{ TrimLastOfPack = { operands = { { "pack" }, { "witness" } }, hoistable = true } },
 	{ NonEmptyPackWitness = { operands = { { "pack" } }, hoistable = true } },
 	{ GetArrayLength = { operands = { { "array" } } } },
 	{

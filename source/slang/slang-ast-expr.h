@@ -522,13 +522,13 @@ class LastExpr : public PackQueryExpr
 };
 
 FIDDLE()
-class TrimHeadExpr : public PackQueryExpr
+class TrimFirstExpr : public PackQueryExpr
 {
     FIDDLE(...)
 };
 
 FIDDLE()
-class TrimTailExpr : public PackQueryExpr
+class TrimLastExpr : public PackQueryExpr
 {
     FIDDLE(...)
 };

@@ -304,8 +304,8 @@ static Expr* parsePrefixExpr(Parser* parser);
 
 static NodeBase* parseFirstExpr(Parser* parser, void* userData);
 static NodeBase* parseLastExpr(Parser* parser, void* userData);
-static NodeBase* parseTrimHeadExpr(Parser* parser, void* userData);
-static NodeBase* parseTrimTailExpr(Parser* parser, void* userData);
+static NodeBase* parseTrimFirstExpr(Parser* parser, void* userData);
+static NodeBase* parseTrimLastExpr(Parser* parser, void* userData);
 
 //
 
@@ -1882,8 +1882,8 @@ public:
     void visitEachExpr(EachExpr* expr) { dispatch(expr->baseExpr); }
     void visitFirstExpr(FirstExpr* expr) { dispatch(expr->value); }
     void visitLastExpr(LastExpr* expr) { dispatch(expr->value); }
-    void visitTrimHeadExpr(TrimHeadExpr* expr) { dispatch(expr->value); }
-    void visitTrimTailExpr(TrimTailExpr* expr) { dispatch(expr->value); }
+    void visitTrimFirstExpr(TrimFirstExpr* expr) { dispatch(expr->value); }
+    void visitTrimLastExpr(TrimLastExpr* expr) { dispatch(expr->value); }
     void visitParenExpr(ParenExpr* expr) { dispatch(expr->base); }
     void visitTupleExpr(TupleExpr* expr)
     {
@@ -3011,7 +3011,7 @@ static TypeSpec _parseSimpleTypeSpec(Parser* parser)
     else if (
         parser->LookAheadToken("expand") || parser->LookAheadToken("each") ||
         parser->LookAheadToken("__first") || parser->LookAheadToken("__last") ||
-        parser->LookAheadToken("__trimHead") || parser->LookAheadToken("__trimTail") ||
+        parser->LookAheadToken("__trimFirst") || parser->LookAheadToken("__trimLast") ||
         parser->LookAheadToken("__packBranch"))
     {
         typeExpr = parsePrefixExpr(parser);
@@ -5733,18 +5733,24 @@ Decl* Parser::ParseStruct()
     ReadToken("struct");
     FillPosition(rs);
 
-    // The `struct` keyword may optionally be followed by
-    // attributes that appertain to the struct declaration
-    // itself, and not to any variables declared using this
-    // type specifier.
-    //
-    // TODO: We don't yet correctly associate attributes with
-    // a variable decarlation vs. a struct type when a variable
-    // is declared with a struct type specified.
-    //
     if (LookAheadToken(TokenType::LBracket))
     {
+        if (currentModule->languageVersion >= SLANG_LANGUAGE_VERSION_2026)
+        {
+            sink->diagnose(
+                Diagnostics::InvalidBracketAttributesPlacement{.location = tokenReader.peekLoc()});
+        }
+        else if (currentModule->languageVersion >= SLANG_LANGUAGE_VERSION_2025)
+        {
+            sink->diagnose(Diagnostics::DeprecatedBracketAttributesPlacement{
+                .location = tokenReader.peekLoc()});
+        }
+        // note: no diagnostics before Slang version 2025
+
         Modifier** modifierLink = &rs->modifiers.first;
+
+        // Even if this syntax is now removed in Slang 2026, we'll still parse
+        // it to keep the diagnostics output sane.
         ParseSquareBracketAttributes(this, &modifierLink);
     }
 
@@ -7415,14 +7421,14 @@ static NodeBase* parseLastExpr(Parser* parser, void* /*userData*/)
     return parsePackQueryExprImpl<LastExpr>(parser);
 }
 
-static NodeBase* parseTrimHeadExpr(Parser* parser, void* /*userData*/)
+static NodeBase* parseTrimFirstExpr(Parser* parser, void* /*userData*/)
 {
-    return parsePackQueryExprImpl<TrimHeadExpr>(parser);
+    return parsePackQueryExprImpl<TrimFirstExpr>(parser);
 }
 
-static NodeBase* parseTrimTailExpr(Parser* parser, void* /*userData*/)
+static NodeBase* parseTrimLastExpr(Parser* parser, void* /*userData*/)
 {
-    return parsePackQueryExprImpl<TrimTailExpr>(parser);
+    return parsePackQueryExprImpl<TrimLastExpr>(parser);
 }
 
 static NodeBase* parsePackBranchTypeExpr(Parser* parser, void* /*userData*/)
@@ -9103,16 +9109,16 @@ static Expr* parsePrefixExpr(Parser* parser)
                     expr->loc = tokenLoc;
                 return expr;
             }
-            else if (AdvanceIf(parser, "__trimHead"))
+            else if (AdvanceIf(parser, "__trimFirst"))
             {
-                auto expr = as<Expr>(parseTrimHeadExpr(parser, nullptr));
+                auto expr = as<Expr>(parseTrimFirstExpr(parser, nullptr));
                 if (expr && !expr->loc.isValid())
                     expr->loc = tokenLoc;
                 return expr;
             }
-            else if (AdvanceIf(parser, "__trimTail"))
+            else if (AdvanceIf(parser, "__trimLast"))
             {
-                auto expr = as<Expr>(parseTrimTailExpr(parser, nullptr));
+                auto expr = as<Expr>(parseTrimLastExpr(parser, nullptr));
                 if (expr && !expr->loc.isValid())
                     expr->loc = tokenLoc;
                 return expr;
@@ -10124,8 +10130,8 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseExpr("countof", parseCountOfExpr),
     _makeParseExpr("__first", parseFirstExpr),
     _makeParseExpr("__last", parseLastExpr),
-    _makeParseExpr("__trimHead", parseTrimHeadExpr),
-    _makeParseExpr("__trimTail", parseTrimTailExpr),
+    _makeParseExpr("__trimFirst", parseTrimFirstExpr),
+    _makeParseExpr("__trimLast", parseTrimLastExpr),
     _makeParseExpr("__packBranch", parsePackBranchTypeExpr),
     _makeParseExpr("__getAddress", parseAddressOfExpr),
     _makeParseExpr("__floatAsInt", parseFloatAsIntExpr),

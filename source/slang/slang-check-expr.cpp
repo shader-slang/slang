@@ -2452,9 +2452,9 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
             return as<IntVal>(m_astBuilder->getFirstElement(foldedOperand));
         if (as<LastExpr>(packQueryExpr.getExpr()))
             return as<IntVal>(m_astBuilder->getLastElement(foldedOperand));
-        if (as<TrimHeadExpr>(packQueryExpr.getExpr()))
-            return as<IntVal>(m_astBuilder->getTrimHeadPack(foldedOperand));
-        return as<IntVal>(m_astBuilder->getTrimTailPack(foldedOperand));
+        if (as<TrimFirstExpr>(packQueryExpr.getExpr()))
+            return as<IntVal>(m_astBuilder->getTrimFirstPack(foldedOperand));
+        return as<IntVal>(m_astBuilder->getTrimLastPack(foldedOperand));
     }
 
     // `each D` where D is a value pack parameter produces an EachIntVal.
@@ -4469,9 +4469,9 @@ static const char* _getPackQueryName(PackQueryExpr* expr)
         return "__first";
     if (as<LastExpr>(expr))
         return "__last";
-    if (as<TrimHeadExpr>(expr))
-        return "__trimHead";
-    return "__trimTail";
+    if (as<TrimFirstExpr>(expr))
+        return "__trimFirst";
+    return "__trimLast";
 }
 
 bool SemanticsVisitor::hasNonEmptyPackConstraint(Decl* decl)
@@ -4565,8 +4565,8 @@ VariadicPackCardinality SemanticsVisitor::getPackCardinality(Val* packVal)
         return result;
     }
 
-    if (as<TrimHeadTypePack>(packVal) || as<TrimTailTypePack>(packVal) ||
-        as<TrimHeadIntValPack>(packVal) || as<TrimTailIntValPack>(packVal))
+    if (as<TrimFirstTypePack>(packVal) || as<TrimLastTypePack>(packVal) ||
+        as<TrimFirstIntValPack>(packVal) || as<TrimLastIntValPack>(packVal))
     {
         result = VariadicPackCardinality::Unknown;
         getShared()->m_packCardinalityCache[packVal] = result;
@@ -4708,9 +4708,9 @@ Expr* SemanticsExprVisitor::visitPackQueryExpr(PackQueryExpr* packQueryExpr)
             return m_astBuilder->getFirstElement(type);
         if (as<LastExpr>(packQueryExpr))
             return m_astBuilder->getLastElement(type);
-        if (as<TrimHeadExpr>(packQueryExpr))
-            return m_astBuilder->getTrimHeadPack(type);
-        return m_astBuilder->getTrimTailPack(type);
+        if (as<TrimFirstExpr>(packQueryExpr))
+            return m_astBuilder->getTrimFirstPack(type);
+        return m_astBuilder->getTrimLastPack(type);
     };
 
     if (isFirstOrLastQuery())

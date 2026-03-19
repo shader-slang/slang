@@ -6,7 +6,7 @@ struct Layer<int InSize, int OutSize>
 
 int layerCount<let each LayerSize : int>()
 {
-    return countof(Tuple<expand Layer<each __trimTail(LayerSize), each __trimHead(LayerSize)>>);
+    return countof(Tuple<expand Layer<each __trimLast(LayerSize), each __trimFirst(LayerSize)>>);
 }
 
 void main()

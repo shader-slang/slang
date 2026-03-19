@@ -1050,7 +1050,7 @@ public:
     ///
     /// This is needed when checking the non-empty branch operand of a
     /// `__packBranch(...)` type expression: inside that branch we want pack
-    /// queries like `__first(...)` / `__trimHead(...)` on the tested pack to
+    /// queries like `__first(...)` / `__trimFirst(...)` on the tested pack to
     /// type-check as if the pack had already been proven non-empty, without
     /// turning that fact into a global constraint or caching it in shared
     /// pack-cardinality state.
