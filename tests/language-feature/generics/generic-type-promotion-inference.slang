@@ -1,6 +1,8 @@
 // Test that generic type inference picks the wider type when arguments
 // have different scalar widths (e.g., int8_t and int32_t both map to
 // T = int32_t). Also exercises mixed signed/unsigned inference.
+// Note: no default (DX) test line because sub-word integer types
+// (int8_t, int16_t, uint8_t) have limited DX backend support.
 
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -vk -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK): -cpu -shaderobj -output-using-type
