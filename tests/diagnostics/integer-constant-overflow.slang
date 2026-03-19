@@ -81,9 +81,7 @@ void computeMain()
     // reinterpreted as unsigned, so no integer-constant-overflow fires.
     funcInt64(9223372036854775808);
 //CHECK:      ^^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in a signed integer type, interpreting as unsigned
-//CHECK:      ^^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in a signed integer type, interpreting as unsigned
     funcUint64(9223372036854775808);
-//CHECK:       ^^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in a signed integer type, interpreting as unsigned
 //CHECK:       ^^^^^^^^^^^^^^^^^^^ integer literal is too large to be represented in a signed integer type, interpreting as unsigned
 
     // Function arguments that fit - should NOT warn
