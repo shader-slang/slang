@@ -137,8 +137,8 @@ struct PeepholeContext : InstPassBase
             case kIROp_Expand:
             case kIROp_TypePack:
             case kIROp_ExpandTypeOrVal:
-            case kIROp_TrimHeadOfPack:
-            case kIROp_TrimTailOfPack:
+            case kIROp_TrimFirstOfPack:
+            case kIROp_TrimLastOfPack:
                 return true;
             default:
                 break;
@@ -472,11 +472,11 @@ struct PeepholeContext : InstPassBase
                 }
             }
             break;
-        case kIROp_TrimHeadOfPack:
-        case kIROp_TrimTailOfPack:
+        case kIROp_TrimFirstOfPack:
+        case kIROp_TrimLastOfPack:
             {
                 auto base = inst->getOperand(0);
-                bool trimTail = inst->getOp() == kIROp_TrimTailOfPack;
+                bool trimLast = inst->getOp() == kIROp_TrimLastOfPack;
 
                 auto buildSlicedPack = [&](IRInst* packInst, IROp typeOp, IROp packOp) -> IRInst*
                 {
@@ -484,8 +484,8 @@ struct PeepholeContext : InstPassBase
                         return nullptr;
 
                     UInt operandCount = packInst->getOperandCount();
-                    UInt start = trimTail ? 0u : (operandCount > 0 ? 1u : 0u);
-                    UInt end = trimTail && operandCount > 0 ? operandCount - 1 : operandCount;
+                    UInt start = trimLast ? 0u : (operandCount > 0 ? 1u : 0u);
+                    UInt end = trimLast && operandCount > 0 ? operandCount - 1 : operandCount;
                     IRBuilder builder(module);
                     IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
                     builder.setInsertBefore(inst);

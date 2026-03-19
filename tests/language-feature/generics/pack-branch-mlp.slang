@@ -48,9 +48,9 @@ struct EvalNode<let Head : int, let each Tail : int> : ILayerChain<Head>
     where nonempty(Tail)
 {
     typealias Rest = __packBranch(
-        __trimHead(Tail),
+        __trimFirst(Tail),
         EmptyNode<__first(Tail)>,
-        EvalNode<__first(Tail), __trimHead(Tail)>);
+        EvalNode<__first(Tail), __trimFirst(Tail)>);
     typealias Output = Rest::Output;
 
     Layer<Head, __first(Tail)> firstLayer = {};

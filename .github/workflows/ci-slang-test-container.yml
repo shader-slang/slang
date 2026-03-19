@@ -34,6 +34,7 @@ jobs:
       options: >-
         --gpus all
         --user root
+        --cap-add SYSLOG
         --device /dev/nvidia-modeset:/dev/nvidia-modeset
         --device /dev/dri:/dev/dri
         -e NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics
@@ -164,6 +165,7 @@ jobs:
       options: >-
         --gpus all
         --user root
+        --cap-add SYSLOG
         --device /dev/nvidia-modeset:/dev/nvidia-modeset
         --device /dev/dri:/dev/dri
         -e NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics

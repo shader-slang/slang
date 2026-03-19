@@ -176,8 +176,8 @@ struct SpecializationContext
         case kIROp_GetTupleElement:
         case kIROp_ExtractFirstFromPack:
         case kIROp_ExtractLastFromPack:
-        case kIROp_TrimHeadOfPack:
-        case kIROp_TrimTailOfPack:
+        case kIROp_TrimFirstOfPack:
+        case kIROp_TrimLastOfPack:
         case kIROp_PackBranch:
             return false;
         case kIROp_NonEmptyPackWitness:
@@ -797,8 +797,8 @@ struct SpecializationContext
 
         case kIROp_ExtractFirstFromPack:
         case kIROp_ExtractLastFromPack:
-        case kIROp_TrimHeadOfPack:
-        case kIROp_TrimTailOfPack:
+        case kIROp_TrimFirstOfPack:
+        case kIROp_TrimLastOfPack:
             return maybeSpecializeFoldableInst(inst);
 
         case kIROp_TypePack:
@@ -956,11 +956,13 @@ struct SpecializationContext
                 case kIROp_Param:
                 case kIROp_TypePack:
                 case kIROp_ExpandTypeOrVal:
-                case kIROp_TrimHeadOfPack:
-                case kIROp_TrimTailOfPack:
+                case kIROp_TrimFirstOfPack:
+                case kIROp_TrimLastOfPack:
                 case kIROp_PackBranch:
                     return PackBranchCardinality::Unknown;
                 case kIROp_MakeValuePack:
+                    // A nested MakeValuePack inside another value-level pack container
+                    // may represent a symbolic sub-pack whose cardinality is not yet known.
                     if (pack->getOp() == kIROp_MakeValuePack || pack->getOp() == kIROp_MakeTuple)
                         return PackBranchCardinality::Unknown;
                     break;
@@ -1029,8 +1031,8 @@ struct SpecializationContext
             case kIROp_Param:
             case kIROp_TypePack:
             case kIROp_ExpandTypeOrVal:
-            case kIROp_TrimHeadOfPack:
-            case kIROp_TrimTailOfPack:
+            case kIROp_TrimFirstOfPack:
+            case kIROp_TrimLastOfPack:
                 return false;
             }
         }
@@ -3562,12 +3564,6 @@ IRInst* specializeGenericWithSetArgs(
                     builder.setInsertAfter(loweredFunc->getFirstBlock()->getLastParam());
 
                 auto newParam = cloneInst(&staticCloningEnv, &builder, param);
-                if (context)
-                {
-                    context->addSpecializationDepthDecorationsToClonedSpecializeInsts(
-                        newParam,
-                        specializationDepth);
-                }
                 cloneEnv.mapOldValToNew[param] = newParam; // Transfer the param to the dynamic env
             }
 
