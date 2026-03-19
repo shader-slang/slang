@@ -136,11 +136,10 @@ int wmain(int argc, wchar_t** argv)
         for (int ii = 0; ii < argc; ++ii)
         {
             String arg = String::fromWString(argv[ii]);
-            if (arg == "-ignore-abort-msg")
+            if (arg == "-ignore-abort-msg" || arg == "--ignore-abort-msg")
             {
 #ifdef _MSC_VER
-                // Suppress the modal dialog when
-                // an exception is thrown.
+                // Suppress the modal abort() dialog in unattended/LLM-driven builds.
                 _set_abort_behavior(0, _WRITE_ABORT_MSG);
 #endif
             }
