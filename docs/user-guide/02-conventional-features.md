@@ -18,7 +18,7 @@ Types
 Slang supports conventional shading language types including scalars, vectors, matrices, arrays, structures, enumerations, and resources.
 
 > #### Note ####
-> Slang has limited support for pointers when targeting platforms with native pointer support, including SPIRV, C++, and CUDA.
+> Slang has limited support for pointers when targeting platforms with native pointer support, including SPIR-V, C++, and CUDA.
 
 ### Scalar Types
 
@@ -39,11 +39,11 @@ The following integer types are provided:
 
 All targets support the 32-bit `int` and `uint` types, but support for the other types depends on the capabilities of each target platform.
 
-Integer literals can be both decimal and hexadecimal. An integer literal can be explicitly made unsigned 
+Integer literals can be both decimal and hexadecimal. An integer literal can be explicitly made unsigned
 with a `u` suffix, and explicitly made 64-bit with the `ll` suffix. The type of a decimal non-suffixed integer literal is the first integer type from
-the list [`int`, `int64_t`] which can represent the specified literal value. If the value cannot fit, the literal is represented as 
-an `uint64_t` and a warning is given. The type of hexadecimal non-suffixed integer literal is the first type from the list 
-[`int`, `uint`, `int64_t`, `uint64_t`] that can represent the specified literal value. For more information on 64 bit integer literals see the documentation on [64 bit type support](../64bit-type-support.md).
+the list [`int`, `int64_t`] which can represent the specified literal value. If the value cannot fit, the literal is represented as
+a `uint64_t` and a warning is given. The type of a hexadecimal non-suffixed integer literal is the first type from the list
+[`int`, `uint`, `int64_t`, `uint64_t`] that can represent the specified literal value. For more information on 64-bit integer literals, see the documentation on [64-bit type support](../64bit-type-support.md).
 
 The following floating-point types are provided:
 
@@ -57,18 +57,18 @@ All targets support the 32-bit `float`, but support for the other types depends 
 
 ### Boolean Type
 
-The type `bool` is used to represent Boolean truth values: `true` and `false`. 
+The type `bool` is used to represent Boolean truth values: `true` and `false`.
 
-For compatibility reasons, the `sizeof(bool)` depends on the target. 
+For compatibility reasons, the `sizeof(bool)` depends on the target.
 
 | Target |      sizeof(bool)      |
 |--------| ---------------------- |
 | GLSL   | 4 bytes / 32-bit value |
 | HLSL   | 4 bytes / 32-bit value |
-| CUDA   | 1 bytes /  8-bit value |
+| CUDA   | 1 byte  /  8-bit value |
 
 > #### Note ####
-> When storing bool types in structures, make sure to either pad host-side data structures accordingly, or store booleans as, eg, `uint8_t`, to guarantee
+> When storing bool types in structures, make sure to either pad host-side data structures accordingly, or store booleans as, e.g., `uint8_t`, to guarantee
 > consistency with the host language's boolean type.
 
 #### The Void Type
@@ -96,7 +96,7 @@ For example, a `float3x4` is a convenient name for `matrix<float,3,4>`.
 > #### Note ####
 > Readers familiar with GLSL should be aware that a Slang `float3x4` represents a matrix with three rows and four columns, while a GLSL `mat3x4` represents a matrix with three *columns* and four *rows*.
 > In most cases, this difference is immaterial because the subscript expression `m[i]` returns a `float4` (`vec4`) in either language.
-> For now it is enough to be aware that there is a difference in convention between Slang/HLSL/D3D and GLSL/OpenGL.
+> For now, it is enough to be aware that there is a difference in convention between Slang/HLSL/D3D and GLSL/OpenGL.
 
 ### Array Types
 
@@ -116,7 +116,7 @@ In some cases the element count is then inferred from the initial value of a var
 int a[] = { 1, 2, 3 };
 ```
 
-In other cases, the result is a _unsized_ array, where the actual element count will be determined later:
+In other cases, the result is an _unsized_ array, where the actual element count will be determined later:
 
 ```hlsl
 // the type of `b` is `int[]`
@@ -126,7 +126,7 @@ void f( int b[] )
 
 It is allowed to pass a sized array as argument to an unsized array parameter when calling a function.
 
-Array types has a `getCount()` member function that returns the length of the array.
+Array types have a `getCount()` member function that returns the length of the array.
 
 ```hlsl
 int f( int b[] )
@@ -167,8 +167,8 @@ void test()
 There are more limits on how runtime-sized arrays can be used than on arrays of statically-known element count.
 
 > #### Note ####
-> In Slang arrays are _value types_, meaning that assignment, parameter passing, etc. semantically copy values of array type.
-> In some languages -- notably C, C++, C#, and Java -- assignment and parameter passing for treat arrays as _reference types_,
+> In Slang, arrays are _value types_, meaning that assignment, parameter passing, etc. semantically copy values of array type.
+> In some languages -- notably C, C++, C#, and Java -- assignment and parameter passing treat arrays as _reference types_,
 > meaning that these operations assign/pass a reference to the same underlying storage.
 
 ### Structure Types
@@ -210,7 +210,7 @@ void test()
 
 ### Default Values for Struct Members
 
-Alternatively, you can specify default values of members in the struct like so: 
+Alternatively, you can specify default values of members in the struct like so:
 
 ```hlsl
 struct MyData
@@ -222,7 +222,7 @@ void test()
 {
      MyData data = {}; // will initialize data.a to 1 and data.b to {0.5, 0.5, 0.5}
      MyData data2 = MyData(); // equivalent to MyData data2 = {};
-     MyData data3; // data3.a and data3.b will be undefined !    
+     MyData data3; // data3.a and data3.b will be undefined!
 }
 ```
 
@@ -239,7 +239,8 @@ enum Channel
 }
 ```
 
-Unlike C/C++, `enum` types in Slang are always scoped by default (like `enum class` in C++). You can write `enum class` in Slang if it makes you happy, but it isn't required. If you want a `enum` type to be unscoped, you can use the `[UnscopedEnum]` attribute:
+Unlike C/C++, `enum` types in Slang are always scoped by default (like `enum class` in C++). You can write `enum class` in Slang if it makes you happy, but it isn't required. If you want an `enum` type to be unscoped, you can use the `[UnscopedEnum]` attribute:
+
 ```csharp
 [UnscopedEnum]
 enum Channel
@@ -253,6 +254,7 @@ void test(Channel c)
 ```
 
 You can specify an explicit underlying integer type for `enum` types:
+
 ```csharp
 enum Channel : uint16_t
 {
@@ -278,7 +280,7 @@ enum Channel
     Blue     // = 7
 }
 ```
-Slang automatically assigns integer values to enum cases without an explicit value. By default, the value starts from 0 and is increment by 1 for each
+Slang automatically assigns integer values to enum cases without an explicit value. By default, the value starts from 0 and is incremented by 1 for each
 enum case.
 
 You can override the implicit value assignment behavior with the `[Flags]` attribute, which will make value assignment start from 1 and increment by power of 2, making it suitable for enums that represent bit flags. For example:
@@ -316,8 +318,8 @@ where:
 
 * The _access_ can be read-only (no prefix), read-write (`RW`), or read-write with a guarantee of rasterization order for operations on the given resource (`RasterizerOrdered`).
 * The _base shape_ can be `1D`, `2D`, `3D`, or `Cube`.
-* The _multisample-ness_ can be non-multiple-sample, or multi-sampled (`MS`).
-* The _array-ness_  can either be non-arrayed, or arrayed (`Array`).
+* The _multisample-ness_ can be non-multisampled, or multisampled (`MS`).
+* The _array-ness_ can either be non-arrayed, or arrayed (`Array`).
 * The _element type_ can either be explicitly specified (`<T>`) or left as the default of `float4`
 
 Not all combinations of these options are supported, and some combinations may be unsupported on some targets.
@@ -370,7 +372,7 @@ Slang supports the following expression forms with nearly identical syntax to HL
 * Literals: `123`, `4.56`, `false`
 
 > #### Note ####
-> Unlike C/C++, but like HLSL/GLSL, an unsuffixed floating-point literal has the `float` type in Slang, rather than `double`
+> Unlike C/C++, but like HLSL/GLSL, an unsuffixed floating-point literal has the `float` type in Slang, rather than `double`.
 
 * Member lookup: `structValue.someField`, `MyEnumType.FirstCase`
 
@@ -389,8 +391,8 @@ Slang supports the following expression forms with nearly identical syntax to HL
 * Operators: `-a`, `b + c`, `d++`, `e %= f`
 
 > #### Note ####
-> Like HLSL but unlike most other C-family languages, the `&&` and `||` operators do *not* currently perform "short-circuiting". 
-> they evaluate all of their operands unconditionally.
+> Like HLSL but unlike most other C-family languages, the `&&` and `||` operators do *not* currently perform "short-circuiting".
+> They evaluate all of their operands unconditionally.
 > However, the `?:` operator does perform short-circuiting if the condition is a scalar. Use of `?:` where the condition is a vector is deprecated in Slang. The vector version of `?:` operator does *not* perform short-circuiting, and the user is advised to call `select` instead.
 > The default behavior of these operators is likely to change in a future Slang release.
 
@@ -503,7 +505,7 @@ Function parameters may be marked with a _direction_ qualifier:
 Preprocessor
 ------------
 
-Slang supports a C-style preprocessor with the following directives;
+Slang supports a C-style preprocessor with the following directives:
 
 * `#include`
 * `#define`
@@ -526,7 +528,7 @@ Variadic macros are supported by the Slang preprocessor.
 Attributes
 ----------
 
-_Attributes_ are a general syntax for decorating declarations and statements with additional semantic information or meta-data.
+_Attributes_ are a general syntax for decorating declarations and statements with additional semantic information or metadata.
 Attributes are surrounded with square brackets (`[]`) and prefix the declaration or statement they apply to.
 
 For example, an attribute can indicate the programmer's desire that a loop be unrolled as much as possible:
@@ -540,7 +542,7 @@ for(int i = 0; i < n; i++)
 > #### Note ####
 > Traditionally, all attributes in HLSL used a single layer of `[]` brackets, matching C#.
 > Later, C++ borrowed the idea from C# but used two layers of brackets (`[[]]`).
-> Some recent extensions to HLSL have used the C++-style double brackets instead of the existing single brackets syntax.
+> Some recent extensions to HLSL have used the C++-style double brackets instead of the existing single-bracket syntax.
 > Slang tries to support both alternatives uniformly.
 
 Global Variables and Shader Parameters
@@ -569,7 +571,7 @@ A global-scope `static const` variable defines a compile-time constant for use i
 
 ### Global-Scope Static Variables
 
-A non-`const` global-scope  `static` variable is conceptually similar to a global variable in C/C++, with the key difference that it has distinct storage per *thread* rather than being truly global.
+A non-`const` global-scope `static` variable is conceptually similar to a global variable in C/C++, with the key difference that it has distinct storage per *thread* rather than being truly global.
 Each logical thread of shader execution initiated by the GPU will be allocated fresh storage for these `static` variables, and values written to those variables will be lost when a shader thread terminates.
 
 > #### Note ####
@@ -633,7 +635,7 @@ Texture2D a : register(t0);
 Texture2D b : register(t1, space0);
 ```
 
-Binding information for Vulkan (and OpenGL) may be specified using `[[vk::binding(...)]]` attributes
+Binding information for Vulkan (and OpenGL) may be specified using `[[vk::binding(...)]]` attributes:
 
 ```hlsl
 [[vk::binding(0)]]
@@ -667,7 +669,7 @@ float4 vertexMain(
 { /* ... */ }
 ```
 
-In the following sections we will use this example to explain important facets of entry point declarations in Slang.
+In the following sections, we will use this example to explain important facets of entry point declarations in Slang.
 
 ### Entry Point Attribute and Stages
 
@@ -685,7 +687,7 @@ It is recommended that new codebases always use `[shader(...)]` attributes both 
 
 ### Parameters
 
-The parameter of an entry-point function represent either _varying_ or _uniform_ inputs.
+The parameters of an entry-point function represent either _varying_ or _uniform_ inputs.
 Varying inputs are those that may vary over threads invoked as part of the same batch (a draw call, compute dispatch, etc.), while uniform inputs are those that are guaranteed to be the same for all threads in a batch.
 Entry-point parameters in Slang default to varying, but may be explicitly marked `uniform`.
 
@@ -750,9 +752,9 @@ Entry-point uniform parameters are semantically similar to global-scope shader p
 Mixed Shader Entry Points
 --------------------------
 
-Through the `[shader(...)]` syntax, users of slang can freely combine multiple entry points into the same file. This can be especially convenient for reuse between entry points which have a logical connection.
+Through the `[shader(...)]` syntax, users of Slang can freely combine multiple entry points into the same file. This can be especially convenient for reuse between entry points which have a logical connection.
 
-For example, mixed entry points offer a convenient way for ray tracing applications to concisely define a complete pipeline in one source file, while also providing users with additional opportunities to improve type safety of 
+For example, mixed entry points offer a convenient way for ray tracing applications to concisely define a complete pipeline in one source file, while also providing users with additional opportunities to improve type safety of
 shared structure definitions:
 
 ```hlsl
@@ -762,22 +764,22 @@ struct Payload { float3 color; };
 void rayGenerationProgram() {
     Payload payload;
     TraceRay(/*...*/, payload);
-    /* ... */ 
+    /* ... */
 }
 
 [shader("closesthit")]
-void closestHitProgram(out Payload payload) { 
+void closestHitProgram(out Payload payload) {
     payload.color = {1.0};
 }
 
 [shader("miss")]
-void missProgram(out Payload payload) { 
+void missProgram(out Payload payload) {
     payload.color = {1.0};
 }
 ```
 
 > #### Note ####
-> GLSL does not support multiple entry-points; however, SPIR-V does. Vulkan users wanting to take advantage of Slang mixed entry points must pass `-fvk-use-entrypoint-name` and `-emit-spirv-directly` as compiler arguments.
+> GLSL does not support multiple entry points; however, SPIR-V does. Vulkan users wanting to take advantage of Slang mixed entry points must pass `-fvk-use-entrypoint-name` and `-emit-spirv-directly` as compiler arguments.
 
 ### Mixed Entry-Point Uniform Parameters
 
@@ -785,13 +787,13 @@ Like with the previous `vertexMain` example, mixed entry point setups also suppo
 
 However, because of certain systematic differences between entry point types, a uniform being _global_ or _local_ will have very important consequences on the underlying layout and behavior.
 
-For most all entry point types, D3D12 will use one common root signature to define both global and local uniform parameters. 
-Likewise, Vulkan descriptors will bind to a common pipeline layout. For both of these cases, Slang maps uniforms to the common root signature / pipeline layout. 
+For almost all entry point types, D3D12 will use one common root signature to define both global and local uniform parameters.
+Likewise, Vulkan descriptors will bind to a common pipeline layout. For both of these cases, Slang maps uniforms to the common root signature / pipeline layout.
 
 However, for ray tracing entry points and D3D12, these parameters map to either _global_ root signatures or to _local_ root signatures, with the latter being stored in the shader binding table.
-In Vulkan, D3D12's global root signatures translate to a shared ray tracing pipeline layout, while local root signatures map again to shader binding table records. 
+In Vulkan, D3D12's global root signatures translate to a shared ray tracing pipeline layout, while local root signatures map again to shader binding table records.
 
-When entry points match a "ray tracing" type, we bind uniforms which are in the _global_ scope to the _global_ root signature (or ray tracing pipeline layout), while uniforms which are _local_ are bound to shader binding table records, which depend on the underlying runtime record indexing. 
+When entry points match a "ray tracing" type, we bind uniforms which are in the _global_ scope to the _global_ root signature (or ray tracing pipeline layout), while uniforms which are _local_ are bound to shader binding table records, which depend on the underlying runtime record indexing.
 
 Consider the following:
 
@@ -799,26 +801,26 @@ Consider the following:
 uniform float3 globalUniform;
 
 [shader("compute")][numThreads(1,2,3)]
-void computeMain1(uniform float3 localUniform1) 
+void computeMain1(uniform float3 localUniform1)
 { /* ... */ }
 
 [shader("compute")][numThreads(1,2,3)]
-void computeMain2(uniform float3 localUniform2) 
+void computeMain2(uniform float3 localUniform2)
 { /* ... */ }
 
 [shader("raygeneration")]
-void rayGenerationMain(uniform float3 localUniform3) 
+void rayGenerationMain(uniform float3 localUniform3)
 { /* ... */ }
 
 [shader("closesthit")]
-void closestHitMain(uniform float3 localUniform4) 
+void closestHitMain(uniform float3 localUniform4)
 { /* ... */ }
 ```
 
-In this example, `globalUniform` is appended to the global root signature / pipeline layouts for _both_ compute _and_ ray generation stages for all four entry points. 
-Compute entry points lack "local root signatures" in D3D12, and likewise Vulkan has no concept of "local" vs "global" compute pipeline layouts, so `localUniform1` is "pushed" to the stack of reserved global uniform parameters for use in `computeMain1`. 
+In this example, `globalUniform` is appended to the global root signature / pipeline layouts for _both_ compute _and_ ray generation stages for all four entry points.
+Compute entry points lack "local root signatures" in D3D12, and likewise Vulkan has no concept of "local" vs "global" compute pipeline layouts, so `localUniform1` is "pushed" to the stack of reserved global uniform parameters for use in `computeMain1`.
 Leaving that entry point scope "pops" that global uniform parameter such that `localUniform2` can reuse the same binding location for `computeMain2`.
-However, local uniforms for ray tracing shaders map to the corresponding "local" hit records in the shader binding table, and so no "push" or "pop" to the global root signature / pipeline layouts occurs for these parameters. 
+However, local uniforms for ray tracing shaders map to the corresponding "local" hit records in the shader binding table, and so no "push" or "pop" to the global root signature / pipeline layouts occurs for these parameters.
 
 Auto-Generated Constructors
 ----------
@@ -859,7 +861,7 @@ Slang has the following rules:
    };
    ```
 
-2. If all members have equal visibility, auto-generate a 'member-wise constructor' if not conflicting with a user defined constructor.
+2. If all members have equal visibility, auto-generate a 'member-wise constructor' if it does not conflict with a user-defined constructor.
    ```csharp
    struct GenerateCtorInner
    {
@@ -889,9 +891,9 @@ Slang has the following rules:
    };
    ```
 
-3. If not all members have equal visibility, auto-generate a 'member-wise constructor' based on member visibility if not conflicting with a user defined constructor. 
+3. If not all members have equal visibility, auto-generate a 'member-wise constructor' based on member visibility if it does not conflict with a user-defined constructor.
 
-   We generate 3 different visibilities of 'member-wise constructor's in order:
+   We generate 3 different visibilities of 'member-wise constructors' in order:
       1. `public` 'member-wise constructor'
          - Contains members of visibility: `public`
          - Do not generate if `internal` or `private` member lacks an init expression
@@ -999,13 +1001,13 @@ float3 a = {1, 2, 3};
 
 ```csharp
 // Equivalent to `int[2] a; a[0] = 1; a[1] = 2;`
-int a[2] = {1, 2}
+int a[2] = {1, 2};
 ```
 
 #### Array Of Aggregates
 
 ```csharp
-// Equivalent to `float3 a[2]; a[0] = {1,2,3}; b[1] = {4,5,6};`
+// Equivalent to `float3 a[2]; a[0] = {1,2,3}; a[1] = {4,5,6};`
 float3 a[2] = { {1,2,3}, {4,5,6} };
 ```
 
@@ -1013,7 +1015,7 @@ float3 a[2] = { {1,2,3}, {4,5,6} };
 
 ```csharp
 // Equivalent to `float3 a[2] = { {1,2,3}, {4,5,6} };`
-float3 a[3] = {1,2,3, 4,5,6}; 
+float3 a[2] = {1,2,3, 4,5,6};
 ```
 
 ### Initializer Lists - Struct
@@ -1070,7 +1072,7 @@ struct GenerateCtor1 : GenerateCtorInner1
     static GenerateCtorInner1 callPublicGenerateCtor()
     {
         // Calls `GenerateCtor1::__init(1);`
-        return {1}; 
+        return {1};
     }
 };
 
@@ -1080,13 +1082,13 @@ struct GenerateCtor1 : GenerateCtorInner1
 GenerateCtor1 val[2] = { { 3 }, { 2 } };
 ```
 
-In addition, Slang also provides compatibility support for C-style initializer lists with `struct`s. C-style initializer lists can use [Partial Initializer List's](#Partial-Initializer-Lists) and [Flattened Array Initializer With Struct's](#Flattened-Array-Initializer-With-Structs)
+In addition, Slang also provides compatibility support for C-style initializer lists with `struct`s. C-style initializer lists can use [Partial Initializer Lists](#Partial-Initializer-Lists) and [Flattened Array Initializer With Structs](#Flattened-Array-Initializer-With-Structs).
 
 A struct is considered a C-style struct if:
 1. User never defines a custom constructor with **more than** 0 parameters
 2. All member variables in a `struct` have the same visibility (`public` or `internal` or `private`).
 
-#### Partial Initializer List's
+#### Partial Initializer Lists
 
 ```csharp
 struct Foo
@@ -1099,13 +1101,13 @@ struct Foo
 ...
 
 // Equivalent to `Foo val; val.a = 1; val.b = 0; val.c = 0;`
-Foo val = {1}; 
+Foo val = {1};
 
 // Equivalent to `Foo val; val.a = 2; val.b = 3; val.c = 0;`
 Foo val = {2, 3};
 ```
 
-#### Flattened Array Initializer With Struct's
+#### Flattened Array Initializer With Structs
 
 ```csharp
 struct Foo
@@ -1170,7 +1172,7 @@ float3 val2 = {};
 
    ...
 
-   // Equivalent to `Foo val; val.a = 0; val.b = 0;` 
+   // Equivalent to `Foo val; val.a = 0; val.b = 0;`
    Foo val = {};
    ```
 
