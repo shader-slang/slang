@@ -5732,18 +5732,24 @@ Decl* Parser::ParseStruct()
     ReadToken("struct");
     FillPosition(rs);
 
-    // The `struct` keyword may optionally be followed by
-    // attributes that appertain to the struct declaration
-    // itself, and not to any variables declared using this
-    // type specifier.
-    //
-    // TODO: We don't yet correctly associate attributes with
-    // a variable decarlation vs. a struct type when a variable
-    // is declared with a struct type specified.
-    //
     if (LookAheadToken(TokenType::LBracket))
     {
+        if (currentModule->languageVersion >= SLANG_LANGUAGE_VERSION_2026)
+        {
+            sink->diagnose(
+                Diagnostics::InvalidBracketAttributesPlacement{.location = tokenReader.peekLoc()});
+        }
+        else if (currentModule->languageVersion >= SLANG_LANGUAGE_VERSION_2025)
+        {
+            sink->diagnose(Diagnostics::DeprecatedBracketAttributesPlacement{
+                .location = tokenReader.peekLoc()});
+        }
+        // note: no diagnostics before Slang version 2025
+
         Modifier** modifierLink = &rs->modifiers.first;
+
+        // Even if this syntax is now removed in Slang 2026, we'll still parse
+        // it to keep the diagnostics output sane.
         ParseSquareBracketAttributes(this, &modifierLink);
     }
 
