@@ -6,7 +6,7 @@ struct VertexIn
     float3 color;
 }
 
-//METAL: [position]]
+//METAL: {{\[\[}}position{{\]\]}}
 //METALLIB: @vertexMain
 struct VertexOut
 {
