@@ -3377,11 +3377,35 @@ static LegalVal declareVars(
             for (auto ee : tupleType->elements)
             {
                 auto fieldLayout = getFieldLayout(typeLayout, ee.key);
+
+                // If the parent type layout doesn't have field-level info for this key,
+                // fall back to the struct type that declares the key. This handles the
+                // case where a type was lowered (e.g., combined texture sampler lowered
+                // to a struct) but the enclosing type's layout wasn't updated to reflect
+                // the lowered type's internal structure.
+                if (!fieldLayout && typeLayout)
+                {
+                    for (auto use = ee.key->firstUse; use; use = use->nextUse)
+                    {
+                        auto field = as<IRStructField>(use->getUser());
+                        if (!field)
+                            continue;
+                        auto structType = as<IRStructType>(field->getParent());
+                        if (!structType)
+                            continue;
+                        auto layoutDecor = structType->findDecoration<IRLayoutDecoration>();
+                        if (!layoutDecor)
+                            continue;
+                        fieldLayout =
+                            getFieldLayout(cast<IRTypeLayout>(layoutDecor->getLayout()), ee.key);
+                        if (fieldLayout)
+                            break;
+                    }
+                }
+
                 IRTypeLayout* fieldTypeLayout =
                     fieldLayout ? fieldLayout->getTypeLayout() : nullptr;
 
-                // If we have a type layout coming in, we really expect to have a layout for each
-                // field.
                 SLANG_ASSERT(fieldLayout || !typeLayout);
 
                 // If we are processing layout information, then
