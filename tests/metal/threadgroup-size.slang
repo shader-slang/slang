@@ -1,7 +1,6 @@
 // TEST:SIMPLE(filecheck=METAL4): -target metal -capability metallib_4_0
 // TEST:SIMPLE(filecheck=METAL3): -target metal -capability metallib_3_1
 
-// TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
 // Ensure that metal4 compilation includes the required_threads_per_threadgroup annotation.
