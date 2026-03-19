@@ -329,7 +329,7 @@ int test()
     return rs.val; // returns 3.
 }
 ```
-Slang currently supports overloading the following operators: `+`, `-`, `*`, `/`, `%`, `&`, `|`, `<`, `>`, `<=`, `>=`, `==`, `!=`, unary `-`, `~`, and `!`. Please note that overloading the `&&` and `||` operators are not supported.
+Slang currently supports overloading the following operators: `+`, `-`, `*`, `/`, `%`, `&`, `|`, `<`, `>`, `<=`, `>=`, `==`, `!=`, unary `-`, `~`, and `!`. Please note that overloading the `&&` and `||` operators is not supported.
 
 In addition, you can overload operator `()` as a member method:
 ```csharp
@@ -940,7 +940,7 @@ You can chain multiple catch statements for different types of errors.
 
 Special Scoping Syntax
 -------------------
-Slang supports three special scoping syntax to allow users to mix in custom decorators and content in the shader code. These constructs allow a rendering engine to define custom metadata in the shader, or map engine-specific block syntax to a meaningful block that is understood by the compiler via proper `#define`s.
+Slang supports three special scoping constructs to allow users to mix in custom decorators and content in the shader code. These constructs allow a rendering engine to define custom metadata in the shader, or map engine-specific block syntax to a meaningful block that is understood by the compiler via proper `#define`s.
 
 ### `__ignored_block`
 An ignored block will be parsed and ignored by the compiler:

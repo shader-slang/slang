@@ -42,7 +42,7 @@ Each `[require]` attribute declares a conjunction of capability atoms, and all `
 (spvShaderClockKHR | glsl + GL_EXT_shader_realtime_clock | hlsl_nvapi)
 ```
 
-A capability can __imply__ other capabilities. Here `spvShaderClockKHR` is a capability that implies `SPV_KHR_shader_clock`, which represents the SPIR-V `SPV_KHR_shader_clock` extension, and the `SPV_KHR_shader_clock` capability implies `spirv_1_0`, which stands for the SPIR-V code generation target.
+A capability can **imply** other capabilities. Here `spvShaderClockKHR` is a capability that implies `SPV_KHR_shader_clock`, which represents the SPIR-V `SPV_KHR_shader_clock` extension, and the `SPV_KHR_shader_clock` capability implies `spirv_1_0`, which stands for the SPIR-V code generation target.
 
 When evaluating capability requirements, Slang will expand all implications. Therefore the final capability requirement for `getClock` is:
 ```
@@ -50,7 +50,7 @@ When evaluating capability requirements, Slang will expand all implications. The
 | glsl + _GL_EXT_shader_realtime_clock
 | hlsl + hlsl_nvapi
 ```
-Which means the function can be called from locations where the `spvShaderClockKHR` capability is available (when targeting SPIR-V), or where the `GL_EXT_shader_realtime_clock` extension is available when targeting GLSL,
+This means the function can be called from locations where the `spvShaderClockKHR` capability is available (when targeting SPIR-V), or where the `GL_EXT_shader_realtime_clock` extension is available when targeting GLSL,
 or where `nvapi` is available when targeting HLSL.
 
 ## Conflicting Capabilities
@@ -58,7 +58,7 @@ or where `nvapi` is available when targeting HLSL.
 Certain groups of capabilities are mutually exclusive such that only one capability in the group is allowed to exist. For example, all stage capabilities are mutually exclusive: a requirement for both `fragment` and `vertex` is impossible to satisfy. Currently, capabilities that model different code generation targets (e.g. `hlsl`, `glsl`) or different shader stages (`vertex`, `fragment`, etc.) are mutually exclusive within
 their corresponding group.
 
-If two capability requirements contain different atoms that are conflicting with each other, these two requirements are considered __incompatible__.
+If two capability requirements contain different atoms that are conflicting with each other, these two requirements are considered **incompatible**.
 For example, requirement `spvShaderClockKHR + fragment` and requirement `spvShaderClockKHR + vertex` are incompatible, because `fragment` conflicts with `vertex`.
 
 ## Capabilities Between Parent and Members
@@ -94,7 +94,7 @@ public void myFunc()
 ## Capabilities Between Subtype and Supertype
 
 For inheritance/implementing-interfaces, the story is a bit different.
-We require that the subtype (`Foo1`) have capabilities that are a subset of the supertype's (`IFoo1`).
+We require that the subtype's (`Foo1`) capabilities are a subset of the supertype's (`IFoo1`) capabilities.
 
 For example:
 ```csharp

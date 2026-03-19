@@ -41,7 +41,8 @@ implementing scene;
 The files being included into a module must start with `implementing <module-name>` declaration.
 
 Note that the `__include` syntax here has a different meaning than the preprocessor `#include`. `__include` has the following semantics:
-1. The preprocessor state at which a file inclusion does not apply to the file being included, and the preprocessor state after parsing the included file will not be visible to the outer "includer" file. For example, `#define`s before a `__include` are not visible to the included file, and `#define`s in the included file are not visible to the file that includes it.
+
+1. The preprocessor state does not propagate to the file being included. Similarly, the preprocessor state after parsing the included file will not be visible to the outer "includer" file. For example, `#define`s before a `__include` are not visible to the included file, and `#define`s in the included file are not visible to the file that includes it.
 2. A file will be included into the current module exactly once, no matter how many times a `__include` of that file is encountered.
 3. Circular `__include`s are allowed, given (2).
 4. All files that become part of a module via `__include` can access all other entities defined in the same module, regardless of the order of `__include`s.

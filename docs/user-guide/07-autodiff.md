@@ -19,7 +19,7 @@ An overview:
 In Slang, `fwd_diff` and `bwd_diff` are higher-order functions used to transform Slang functions into their forward or backward derivative methods. To better understand what these methods do, here is a small refresher on differentiable calculus:
 ### Mathematical overview: Jacobian and its vector products
 Forward and backward derivative methods are two different ways of computing a dot product with the Jacobian of a given function.
-Parts of this overview are based on JAX's excellent auto-diff cookbook [here](https://jax.readthedocs.io/en/latest/notebooks/autodiff_cookbook.html#how-it-s-made-two-foundational-autodiff-functions). The relevant [Wikipedia article](https://en.wikipedia.org/wiki/Automatic_differentiation) is also a great resource for understanding auto-diff.
+Parts of this overview are based on [JAX's auto-diff cookbook](https://jax.readthedocs.io/en/latest/notebooks/autodiff_cookbook.html#how-it-s-made-two-foundational-autodiff-functions). The relevant [Wikipedia article](https://en.wikipedia.org/wiki/Automatic_differentiation) is also a great resource for understanding auto-diff.
 
 The [Jacobian](https://en.wikipedia.org/wiki/Jacobian_matrix_and_determinant) (also called the total derivative) of a function $$\mathbf{f}(\mathbf{x})$$ is represented by $$D\mathbf{f}(\mathbf{x})$$.
 
@@ -824,7 +824,7 @@ More specifically, the signature of its backward propagation function is determi
 - A non-differentiable `in` parameter of type `ND` will remain unchanged in the backward propagation function.
 - A non-differentiable `out` parameter of type `ND` will be removed from the parameter list of the backward propagation function.
 - A non-differentiable `inout` parameter of type `ND` will become an `in ND` parameter.
-- Types implemented `IDifferentiablePtrType` work the same way as the forward-mode case. They can only be used with `in` parameters, and are converted into `DifferentialPtrPair` types. Their directions are **not** affected.
+- Types implementing `IDifferentiablePtrType` work the same way as the forward-mode case. They can only be used with `in` parameters, and are converted into `DifferentialPtrPair` types. Their directions are **not** affected.
 
 For example consider the following original function:
 ```csharp
