@@ -611,6 +611,12 @@ List<Token> TokenizeText(const String& fileName, const String& text)
                 }
                 pos++;
             }
+            else if (curChar == 'h')
+            {
+                pos++;
+                InsertToken(TokenType::HalfLiteral);
+                state = State::Start;
+            }
             else
             {
                 if (curChar == 'f')
@@ -624,6 +630,12 @@ List<Token> TokenizeText(const String& fileName, const String& text)
             {
                 tokenBuilder.append(curChar);
                 pos++;
+            }
+            else if (curChar == 'h')
+            {
+                pos++;
+                InsertToken(TokenType::HalfLiteral);
+                state = State::Start;
             }
             else
             {
