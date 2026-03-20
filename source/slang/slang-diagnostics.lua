@@ -3454,6 +3454,13 @@ warning(
 )
 
 warning(
+    "integer-constant-overflow",
+    39999,
+    "integer constant overflow in conversion",
+    span { loc = "expr:Expr", message = "integer value '~value' does not fit in type '~toType:Type'" }
+)
+
+warning(
     "float-literal-unrepresentable",
     39999,
     "floating-point literal unrepresentable",
