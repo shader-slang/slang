@@ -224,7 +224,7 @@ jobs:
           fi
 
           if [ "$total_logs" -gt 0 ]; then
-            unique_issues=$(grep -rh 'SUMMARY:' asan-logs/ 2>/dev/null | sort -u | head -20)
+            unique_issues=$(grep -rh 'SUMMARY:' asan-logs/ 2>/dev/null | sort -u | head -20 || true)
 
             echo "FOUND $total_logs SANITIZER LOG(S)"
             echo ""
