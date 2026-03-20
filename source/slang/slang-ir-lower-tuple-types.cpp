@@ -128,14 +128,14 @@ struct TupleLoweringContext
         builder.setInsertBefore(inst);
 
         auto base = inst->getOperand(0);
-        bool trimTail = inst->getOp() == kIROp_TrimTailOfPack;
+        bool trimLast = inst->getOp() == kIROp_TrimLastOfPack;
 
         if (auto baseTupleInfo = getLoweredTupleType(&builder, base))
         {
             ShortList<IRType*> slicedTypes;
             UInt operandCount = (UInt)baseTupleInfo->fields.getCount();
-            UInt start = trimTail ? 0u : (operandCount > 0 ? 1u : 0u);
-            UInt end = trimTail && operandCount > 0 ? operandCount - 1 : operandCount;
+            UInt start = trimLast ? 0u : (operandCount > 0 ? 1u : 0u);
+            UInt end = trimLast && operandCount > 0 ? operandCount - 1 : operandCount;
             for (UInt i = start; i < end; ++i)
                 slicedTypes.add(baseTupleInfo->fields[i]->getFieldType());
             auto replacement = builder.getTupleType(
@@ -153,8 +153,8 @@ struct TupleLoweringContext
 
         ShortList<IRInst*> elements;
         UInt operandCount = (UInt)baseTupleInfo->fields.getCount();
-        UInt start = trimTail ? 0u : (operandCount > 0 ? 1u : 0u);
-        UInt end = trimTail && operandCount > 0 ? operandCount - 1 : operandCount;
+        UInt start = trimLast ? 0u : (operandCount > 0 ? 1u : 0u);
+        UInt end = trimLast && operandCount > 0 ? operandCount - 1 : operandCount;
         auto baseTupleType = as<IRTupleType>(base->getDataType());
         for (UInt i = start; i < end; ++i)
         {
@@ -423,8 +423,8 @@ struct TupleLoweringContext
         case kIROp_SwizzledStore:
             processSwizzledStore((IRSwizzledStore*)inst);
             break;
-        case kIROp_TrimHeadOfPack:
-        case kIROp_TrimTailOfPack:
+        case kIROp_TrimFirstOfPack:
+        case kIROp_TrimLastOfPack:
             processTrimOfPack(inst);
             break;
         case kIROp_TupleType:

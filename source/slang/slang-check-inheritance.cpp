@@ -1263,27 +1263,28 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                     patternWitness);
             });
     }
-    else if (auto trimHeadType = as<TrimHeadTypePack>(type))
+    else if (auto trimFirstType = as<TrimFirstTypePack>(type))
     {
-        auto packInheritanceInfo = getInheritanceInfo(trimHeadType->getBasePack(), circularityInfo);
+        auto packInheritanceInfo =
+            getInheritanceInfo(trimFirstType->getBasePack(), circularityInfo);
         return projectBaseFacets(
             type,
             packInheritanceInfo,
             [&](SubtypeWitness* patternWitness) {
-                return astBuilder->getTrimHeadSubtypeWitness(
+                return astBuilder->getTrimFirstSubtypeWitness(
                     type,
                     patternWitness->getSup(),
                     patternWitness);
             });
     }
-    else if (auto trimTailType = as<TrimTailTypePack>(type))
+    else if (auto trimLastType = as<TrimLastTypePack>(type))
     {
-        auto packInheritanceInfo = getInheritanceInfo(trimTailType->getBasePack(), circularityInfo);
+        auto packInheritanceInfo = getInheritanceInfo(trimLastType->getBasePack(), circularityInfo);
         return projectBaseFacets(
             type,
             packInheritanceInfo,
             [&](SubtypeWitness* patternWitness) {
-                return astBuilder->getTrimTailSubtypeWitness(
+                return astBuilder->getTrimLastSubtypeWitness(
                     type,
                     patternWitness->getSup(),
                     patternWitness);

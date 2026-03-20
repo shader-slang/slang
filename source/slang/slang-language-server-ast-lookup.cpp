@@ -144,7 +144,14 @@ public:
             context->results.add(result);
             return true;
         }
-        return dispatchIfNotNull(expr->value);
+
+        if (dispatchIfNotNull(expr->value))
+            return true;
+
+        if (dispatchIfNotNull(expr->dataLayout))
+            return true;
+
+        return false;
     }
 
     bool visitFloatBitCastExpr(FloatBitCastExpr* expr)
