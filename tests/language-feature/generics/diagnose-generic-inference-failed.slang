@@ -2,8 +2,6 @@
 
 // When generic argument inference fails because the call arguments
 // don't match any viable specialization, error 39999 is emitted.
-// The message appears twice: once for the error and once for the
-// rich diagnostics span annotation.
 
 struct Wrapper<T>
 {
@@ -21,6 +19,5 @@ T unwrap<T>(Wrapper<T> w)
 void test()
 {
     int x = unwrap(42);
-//CHECK:          ^ could not specialize generic for arguments of type (int)
 //CHECK:          ^ could not specialize generic for arguments of type (int)
 }
