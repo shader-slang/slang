@@ -5,16 +5,16 @@ permalink: /user-guide/spirv-target-specific
 
 # SPIR-V-Specific Functionalities
 
-This chapter provides information for SPIR-V specific functionalities and behaviors.
+This chapter provides information for SPIR-V-specific functionalities and behaviors.
 
 ## Experimental support for the older versions of SPIR-V
 
-Slang's SPIR-V backend is stable when emitting SPIR-V 1.3 and later, however, support for SPIR-V 1.0, 1.1 and 1.2 is still experimental.
+Slang's SPIR-V backend is stable when emitting SPIR-V 1.3 and later; however, support for SPIR-V 1.0, 1.1 and 1.2 is still experimental.
 When targeting the older SPIR-V profiles, Slang may produce SPIR-V that uses the instructions and keywords that were introduced in the later versions of SPIR-V.
 
 ## Memory model
 
-By default, the Slang compiler produces the SPIRV code using GLSL450 memory model. The user can opt-in to Vulkan Memory Model by specifying `-capability vk_mem_model`. For using APIs, the following lines can be added to explicitly specify the capability.
+By default, the Slang compiler produces SPIR-V code using the GLSL450 memory model. The user can opt in to the Vulkan Memory Model by specifying `-capability vk_mem_model`. When using the API, the following lines can be added to explicitly specify the capability.
 
 ```
     slang::CompilerOptionEntry entry;
@@ -31,7 +31,7 @@ If the shader uses `CoopVec` or `CoopMat` intrinsics, then the Slang compiler wi
 
 ## Combined texture sampler
 
-Slang supports Combined texture sampler such as `Sampler2D`.
+Slang supports combined texture samplers such as `Sampler2D`.
 Slang emits SPIR-V code with `OpTypeSampledImage` instruction.
 
 For SPIR-V targets, explicit bindings may be provided through a single `vk::binding` decoration.
@@ -98,14 +98,14 @@ The system-value semantics are translated to the following SPIR-V code.
 | `SV_VulkanVertexID`            | `BuiltIn VertexIndex`                            |
 
 _Note_ that `SV_DrawIndex`, `SV_FragInvocationCount`, `SV_FragSize`, `SV_PointSize`, `SV_PointCoord` and `SV_VulkanSamplePosition` are Slang-specific semantics that are not defined in HLSL.
-Also _Note_ that `SV_InstanceID`/`SV_VertexID` counts all instances/vertices in a draw call, unlike how `InstanceIndex`/`VertexIndex` is relative to `BaseInstance`/`BaseVertex`.
+Also _note_ that `SV_InstanceID`/`SV_VertexID` counts all instances/vertices in a draw call, unlike how `InstanceIndex`/`VertexIndex` is relative to `BaseInstance`/`BaseVertex`.
 See [Using SV_InstanceID/SV_VertexID with SPIR-V target](#using-sv_instanceid-and-sv_vertexid-with-spir-v-target)
 
 ## Using SV_InstanceID and SV_VertexID with SPIR-V target
 
 When using `SV_InstanceID` and `SV_VertexID` with SPIR-V target, it is equivalent to the difference between the index and base builtins.
-This matches the behavior of D3D where `SV_InstanceID` and `SV_VertexID` starts from zero for each draw call, while in SPIR-V,
-`InstanceIndex` and `VertexIndex` includes the base instance.
+This matches the behavior of D3D where `SV_InstanceID` and `SV_VertexID` start from zero for each draw call, while in SPIR-V,
+`InstanceIndex` and `VertexIndex` include the base instance.
 
 If you need direct access to `InstanceIndex` and `VertexIndex` values, use `SV_VulkanInstanceID` and `SV_VulkanVertexID` semantic names. These are supported for all targets except HLSL.
 Alternatively you can use parameters with `SV_InstanceID`(or `SV_VertexID`) and `SV_StartInstanceLocation`(or `SV_StartVertexLocation`) semantics:
@@ -197,24 +197,24 @@ In contrast to `ConstantBuffer`, a `ParameterBlock<T>` introduces a new descript
 
 `ParameterBlock` is designed specifically for D3D12/Vulkan/Metal/WebGPU, so that parameters defined in `T` can be placed into an independent descriptor table/descriptor set/argument buffer/binding group.
 
-For example, when targeting Vulkan, when a ParameterBlock doesn't contain nested parameter block fields, it will always map to a single descriptor set, with a dedicated set number and every resources is placed into the set with binding index starting from 0. This allows the user application to create and pre-populate the descriptor set and reuse it during command encoding, without explicitly specifying the binding index for each individual parameter.
+For example, when targeting Vulkan, when a ParameterBlock doesn't contain nested parameter block fields, it will always map to a single descriptor set, with a dedicated set number and every resource is placed into the set with binding index starting from 0. This allows the user application to create and pre-populate the descriptor set and reuse it during command encoding, without explicitly specifying the binding index for each individual parameter.
 
 When both ordinary data fields and resource typed fields exist in a parameter block, all ordinary data fields will be grouped together into a uniform buffer and appear as a binding 0 of the resulting descriptor set.
 
 ## Push Constants
 
-By default, a `uniform` parameter defined in the parameter list of an entrypoint function is translated to a push constant in SPIRV, if the type of the parameter is ordinary data type (no resources/textures).
+By default, a `uniform` parameter defined in the parameter list of an entrypoint function is translated to a push constant in SPIR-V, if the type of the parameter is ordinary data type (no resources/textures).
 All `uniform` parameters defined in global scope are grouped together and placed in a default constant buffer. You can make a global uniform parameter laid out as a push constant by using the `[vk::push_constant]` attribute
 on the uniform parameter. All push constants follow the std430 layout by default.
 
 ## Specialization Constants
 
-You can specify a global constant to translate into a SPIRV specialization constant with the `[SpecializationConstant]` attribute.
+You can specify a global constant to translate into a SPIR-V specialization constant with the `[SpecializationConstant]` attribute.
 For example:
 
 ```csharp
 [SpecializationConstant]
-const int myConst = 1; // Maps to a SPIRV specialization constant
+const int myConst = 1; // Maps to a SPIR-V specialization constant
 ```
 
 By default, Slang will automatically assign `constant_id` number for specialization constants. If you wish to explicitly specify them, use `[vk::constant_id]` attribute:
@@ -232,7 +232,7 @@ layout(constant_id = 1) const int MyConst = 1;
 
 ## SPIR-V specific Attributes
 
-DXC supports a few attributes and command-line arguments for targeting SPIR-V. Similar to DXC, Slang supports a few of the attributes as following:
+DXC supports a few attributes and command-line arguments for targeting SPIR-V. Similar to DXC, Slang supports a few of the attributes as follows:
 
 ### [[vk::binding(binding: int, set: int = 0)]]
 
@@ -252,7 +252,7 @@ Same as `input_attachment_index` layout qualifier in Vulkan. It selects which su
 
 ### [[vk::push_constant]]
 
-Same as `push_constant` layout qualifier in Vulkan. It is applicable only to a uniform block and it will be copied to a special memory location where GPU may have a more direct access to.
+Same as `push_constant` layout qualifier in Vulkan. It is applicable only to a uniform block and it will be copied to a special memory location where the GPU may have more direct access.
 
 ### [vk::image_format(format : String)]
 
@@ -287,14 +287,14 @@ To generate a valid SPIR-V with multiple entry points, use `-fvk-use-entrypoint-
 
 ## Global memory pointers
 
-Slang supports global memory pointers when targeting SPIRV. See [an example and explanation](03-convenience-features.md#pointers-limited).
+Slang supports global memory pointers when targeting SPIR-V. See [an example and explanation](03-convenience-features.md#pointers-limited).
 
-`float4*` in user code will be translated to a pointer in PhysicalStorageBuffer storage class in SPIRV.
-When a slang module uses a pointer type, the resulting SPIRV will be using the SpvAddressingModelPhysicalStorageBuffer64 addressing mode. Modules without use of pointers will use SpvAddressingModelLogical addressing mode.
+`float4*` in user code will be translated to a pointer in PhysicalStorageBuffer storage class in SPIR-V.
+When a Slang module uses a pointer type, the resulting SPIR-V will use the SpvAddressingModelPhysicalStorageBuffer64 addressing mode. Modules that do not use pointers will use SpvAddressingModelLogical addressing mode.
 
 ## Matrix type translation
 
-A m-row-by-n-column matrix in Slang, represented as float`m`x`n` or matrix<T, m, n>, is translated to OpTypeMatrix (OpTypeVector(T, n), m) in SPIRV. Note that in SPIR-V terminology, this type is referred to a m-column-by-n-row matrix.
+An m-row-by-n-column matrix in Slang, represented as float`m`x`n` or matrix<T, m, n>, is translated to OpTypeMatrix (OpTypeVector(T, n), m) in SPIR-V. Note that in SPIR-V terminology, this type is referred to as an m-column-by-n-row matrix.
 
 The swap of row and column terminology may seem to be confusing at first, but this is the only translation without needing extra operations that may have negative performance consequences. For example, consider the following Slang code:
 
@@ -311,7 +311,7 @@ for (int i = 0; i < 3; ++i)
 
 The Slang shader above can iterate each element of a `float3x4` matrix. This is similar to how a multi-dimensional array is handled in C and HLSL. When a matrix type is `float3x4`, the first dimension indexing, `i`, corresponds to the first value specified in the matrix type `3`. And the second dimension indexing, `j`, corresponds to the second value specified in the matrix type `4`.
 
-A matrix in Slang can be also seen as an array of a vector type. And the following code is same as above.
+A matrix in Slang can also be seen as an array of a vector type. And the following code is same as above.
 
 ```
 float3x4 v;
@@ -330,7 +330,7 @@ For the given example above, when targeting SPIR-V, Slang emits a matrix that co
 %mat3v4float = OpTypeMatrix %v4float 3 ; <= three of float4
 ```
 
-An alternative way to emit SPIR-V code is to emit four vectors and each vector has three elements. Slang doesn't do this but this is a more direct translation because SPIR-V spec defines OpTypeMatrix to take "Column Count" not row.
+An alternative way to emit SPIR-V code is to emit four vectors, each with three elements. Slang doesn't do this, but it is a more direct translation because SPIR-V spec defines OpTypeMatrix to take "Column Count" not row.
 
 ```
 ; NOT SLANG EMITTED CODE
@@ -340,24 +340,24 @@ An alternative way to emit SPIR-V code is to emit four vectors and each vector h
 
 However, this results in a more complicated access pattern to the elements in a matrix, because `v[i]` will no longer correspond to a vector natively when emitted to SPIR-V.
 
-Another way to put, Slang treats column as row and row as column when targeting GLSL or SPIR-V. This is same to [how DXC handles a matrix when emitting SPIR-V](https://github.com/Microsoft/DirectXShaderCompiler/blob/main/docs/SPIR-V.rst#appendix-a-matrix-representation).
+Another way to put it, Slang treats column as row and row as column when targeting GLSL or SPIR-V. This is the same as [how DXC handles a matrix when emitting SPIR-V](https://github.com/Microsoft/DirectXShaderCompiler/blob/main/docs/SPIR-V.rst#appendix-a-matrix-representation).
 
-Due to the swap of row and column in terminology, the matrix multiplication needs to be performed little differently. Slang translates a matrix multiplication, `mul(mat1, mat2)`, to `transpose(mul(transpose(mat2), transpose(mat1)))` when targeting SPIR-V.
+Due to the swap of row and column in terminology, the matrix multiplication needs to be performed a little differently. Slang translates a matrix multiplication, `mul(mat1, mat2)`, to `transpose(mul(transpose(mat2), transpose(mat1)))` when targeting SPIR-V.
 
 Note that the matrix translation explained above is orthogonal to the memory layout of a matrix. The memory layout is related to how CPU places matrix values in the memory and how GPU reads them. It is like how `std140` or `std430` works. DXC by default uses `column_major` memory layout and Slang uses row-major memory layout. For more information about the matrix memory layout, please see [a1-01-matrix-layout](a1-01-matrix-layout.md).
 
 ## Legalization
 
-Legalization is a process where Slang applies slightly different approach to translate the input Slang shader to the target.
+Legalization is a process where Slang applies a slightly different approach to translate the input Slang shader to the target.
 This process allows Slang shaders to be written in a syntax that SPIR-V may not be able to achieve natively.
 
-Slang allows to use opaque resource types as members of a struct. These members will be hoisted out of struct types and become global variables.
+Slang allows using opaque resource types as members of a struct. These members will be hoisted out of struct types and become global variables.
 
-Slang allows functions that return any resource types as return type or `out` parameter as long as things are statically resolvable.
+Slang allows functions that return any resource types as a return type or `out` parameter as long as things are statically resolvable.
 
-Slang allows functions that return arrays. These functions will be converted to return the array via an out parameter in SPIRV.
+Slang allows functions that return arrays. These functions will be converted to return the array via an out parameter in SPIR-V.
 
-Slang allows putting scalar/vector/matrix/array types directly as element type of a constant buffer or structured buffers. Such element types will be wrapped in a struct type when emitting to SPIRV.
+Slang allows putting scalar/vector/matrix/array types directly as element type of a constant buffer or structured buffers. Such element types will be wrapped in a struct type when emitting to SPIR-V.
 
 When RasterizerOrder resources are used, the order of the rasterization is guaranteed by the instructions from `SPV_EXT_fragment_shader_interlock` extension.
 
@@ -384,10 +384,10 @@ HSC_OUT constants(InputPatch<VS_OUT, 4> patch)
 }
 ```
 
-When targeting SPIR-V, the patch function is merged as a part of the Hull shader, because SPIR-V doesn't have a same concept as `patchconstantfunc`.
+When targeting SPIR-V, the patch function is merged as a part of the Hull shader, because SPIR-V doesn't have the same concept as `patchconstantfunc`.
 The function used for `patchconstantfunc` should be called only once for each patch.
 
-As an example, the Hull shader above will be emitted as following,
+As an example, the Hull shader above will be emitted as follows,
 
 ```
 void main() {
@@ -401,7 +401,7 @@ void main() {
 }
 ```
 
-This behavior is same to [how DXC translates Hull shader from HLSL to SPIR-V](https://github.com/Microsoft/DirectXShaderCompiler/blob/main/docs/SPIR-V.rst#patch-constant-function).
+This behavior is the same as [how DXC translates Hull shader from HLSL to SPIR-V](https://github.com/Microsoft/DirectXShaderCompiler/blob/main/docs/SPIR-V.rst#patch-constant-function).
 
 ## SPIR-V specific Compiler options
 
@@ -414,7 +414,7 @@ It cannot be used with -emit-spirv-via-glsl
 
 ### -emit-spirv-via-glsl
 
-Generate SPIR-V output by compiling to glsl source first, then use glslang compiler to produce SPIRV from the glsl.
+Generate SPIR-V output by compiling to GLSL source first, then using the glslang compiler to produce SPIR-V from the GLSL.
 It cannot be used with -emit-spirv-directly
 
 ### -g
@@ -425,7 +425,7 @@ When targeting SPIR-V, this option emits [SPIR-V NonSemantic Shader DebugInfo In
 ### -O<optimization-level>
 
 Set the optimization level.
-Under `-O0` option, Slang will not perform extensive inlining for all functions calls, instead it will preserve the call graph as much as possible to help with understanding the SPIRV structure and diagnosing any downstream toolchain issues.
+Under `-O0` option, Slang will not perform extensive inlining for all function calls, instead it will preserve the call graph as much as possible to help with understanding the SPIR-V structure and diagnosing any downstream toolchain issues.
 
 ### -fvk-{b|s|t|u}-shift <N> <space>
 
@@ -452,7 +452,7 @@ For more information, see the following pages:
 
 ### -fvk-use-scalar-layout, -force-glsl-scalar-layout
 
-Make data accessed through ConstantBuffer, ParameterBlock, StructuredBuffer, ByteAddressBuffer and general pointers follow the 'scalar' layout when targeting GLSL or SPIRV.
+Make data accessed through ConstantBuffer, ParameterBlock, StructuredBuffer, ByteAddressBuffer and general pointers follow the 'scalar' layout when targeting GLSL or SPIR-V.
 
 ### -fvk-use-gl-layout
 
@@ -460,15 +460,15 @@ Use std430 layout instead of D3D buffer layout for raw buffer load/stores.
 
 ### -fvk-use-dx-layout
 
-Pack members using FXCs member packing rules when targeting GLSL or SPIRV.
+Pack members using FXC's member packing rules when targeting GLSL or SPIR-V.
 
 ### -fvk-use-c-layout
 
-Make data accessed through ConstantBuffer, ParameterBlock, StructuredBuffer, ByteAddressBuffer and general pointers follow the C/C++ structure layout rules when targeting SPIRV.
+Make data accessed through ConstantBuffer, ParameterBlock, StructuredBuffer, ByteAddressBuffer and general pointers follow the C/C++ structure layout rules when targeting SPIR-V.
 
 ### -fvk-use-entrypoint-name
 
-Uses the entrypoint name from the source instead of 'main' in the spirv output.
+Uses the entrypoint name from the source instead of 'main' in the SPIR-V output.
 
 ### -fspv-reflect
 

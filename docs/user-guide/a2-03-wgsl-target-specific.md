@@ -94,7 +94,7 @@ ConstantBuffer, (RW/RasterizerOrdered)StructuredBuffer, (RW/RasterizerOrdered)By
 
 ConstantBuffer translates to the `uniform` address space with `read` access mode in WGSL.
 ByteAddressBuffer and RWByteAddressBuffer translate to `array<u32>` in the `storage` address space, with the `read` and `read_write` access modes in WGSL, respectively.
-StructuredBuffer and RWStructuredBuffer with struct type T translate to `array<T>` in the `storage` address space, with with the `read` and `read_write` access modes in WGSL, respectively.
+StructuredBuffer and RWStructuredBuffer with struct type T translate to `array<T>` in the `storage` address space, with the `read` and `read_write` access modes in WGSL, respectively.
 
 Interlocked operations
 ----------------------
@@ -129,8 +129,8 @@ Each `ParameterBlock` is assigned its own bind group in WGSL.
 Write-only Textures
 ---------------
 
-Many image formats supported by WebGPU can only be accessed in compute shader as a write-only image.
-Use `WTexture2D` type (similar to `RWTexture2D`) to write to an image when possible.
+Many image formats supported by WebGPU can only be accessed in a compute shader as a write-only image.
+Use the `WTexture2D` type (similar to `RWTexture2D`) to write to an image when possible.
 The write-only texture types are also supported when targeting HLSL/GLSL/SPIR-V/Metal and CUDA.
 
 
@@ -162,7 +162,7 @@ WGSL requires explicit address space qualifiers. Slang automatically assigns app
 Matrix type translation
 -----------------------
 
-A m-row-by-n-column matrix in Slang, represented as float`m`x`n` or matrix<T, m, n>, is translated to `mat[n]x[m]` in WGSL, i.e. a matrix with `n` columns and `m` rows.
+An m-row-by-n-column matrix in Slang, represented as float`m`x`n` or matrix<T, m, n>, is translated to `mat[n]x[m]` in WGSL, i.e. a matrix with `n` columns and `m` rows.
 The rationale for this inversion of terminology is the same as [the rationale for SPIR-V](a2-01-spirv-target-specific.md#matrix-type-translation).
 Since the WGSL matrix multiplication convention is the normal one, where inner products of rows of the matrix on the left are taken with columns of the matrix on the right, the order of matrix products is also reversed in WGSL. This is relying on the fact that the transpose of a matrix product equals the product of the transposed matrix operands in reverse order.
 
