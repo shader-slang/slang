@@ -214,6 +214,9 @@ function(set_default_compile_options target)
     )
 
     if(SLANG_ENABLE_ASAN)
+        # -fno-sanitize-recover=undefined is intentionally omitted so that
+        # halt_on_error can be controlled at runtime via UBSAN_OPTIONS.
+        # For abort-on-first-UB locally, set UBSAN_OPTIONS=halt_on_error=1.
         if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
             target_compile_options(
                 ${target}
