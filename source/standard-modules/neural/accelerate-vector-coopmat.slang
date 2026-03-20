@@ -569,7 +569,12 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
         }
     }
 
-    // Cross-warp reduction for ALL tiles at once (Tin2-style).
+    // Cross-warp reduction for ALL tiles at once.
+    // Uses more shared memory (ROW * COLUMN * TileStride) but only 2 barriers per reduction step
+    // instead of 2 * ROW barriers. For 128x128 with 8x8 tiles:
+    //   - Row-by-row: 8 rows * 2 barriers = 16 barriers
+    //   - All-at-once: 1 step * 2 barriers = 2 barriers
+    // Shared memory required: ROW * COLUMN * TileStride uint4 = 8 * 8 * 32 * 16 = 32KB for 128x128.
     [require(cooperative_matrix, subgroup_basic, cuda_spirv)]
     internal static void sumReduceTilesAllAtOnce<int ROW, int COLUMN>(inout MatC matC[ROW*COLUMN], in int subgroupId, uint sharedMemoryOffset)
     {
@@ -727,76 +732,13 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
     }
 
     // Scalar warp-level reduction using WaveMaskSum/WaveActiveSum.
-    // Fallback for targets without cooperative_matrix support.
-    [ForceInline]
-    [require(cuda_spirv, subgroup_partitioned, subgroup_basic)]
-    [require(cuda_spirv, sm_6_6)]
-    internal static void sumReduceRowsScalar<U, Address, InArrayType>(
-        uint sharedMemoryOffset,
-        in InArrayType dOut,
-        in int subgroupId,
-        Address biasAddress)
-        where U : __BuiltinFloatingPointType
-        where U.Differential == U
-        where Address : IPointerLikeAddress<U>
-        where InArrayType : IArrayAccessor<U>
-    {
-        const uint laneId = WaveGetLaneIndex();
-        const int subgroupCount = SubgroupCount;
-
-        static const int MPadded = (M + 1) & ~1;
-        static const int ColsPacked = MPadded / 2;
-
-        InArrayType localResult = {};
-        if (sizeof(U) == 2)
-        {
-            [ForceUnroll]
-            for (int i = 0; i < MPadded; i += 2)
-            {
-                vector<U, 2> packed = vector<U, 2>(dOut[i], dOut[i + 1]);
-                vector<U, 2> reduced = WaveMaskSum(0xFFFFFFFFu, packed);
-                localResult[i] = reduced[0];
-                localResult[i + 1] = reduced[1];
-            }
-        }
-        else
-        {
-            for (int i = 0; i < M; i++)
-            {
-                localResult[i] = WaveActiveSum(dOut[i]);
-            }
-        }
-
-        if (sizeof(U) == 2)
-        {
-            for (int i = int(laneId) * 2; i < MPadded; i += N * 2)
-            {
-                vector<U, 2> v2 = vector<U, 2>(localResult[i], localResult[i + 1]);
-                ShMemPool.smemStore(sharedMemoryOffset, subgroupId * ColsPacked + i / 2, v2);
-            }
-        }
-        else
-        {
-            for (int i = laneId; i < MPadded; i += N)
-            {
-                U val = (i < M) ? localResult[i] : U(0);
-                ShMemPool.smemStore(sharedMemoryOffset, subgroupId * MPadded + i, val);
-            }
-        }
-
-        GroupMemoryBarrierWithGroupSync();
-
-        crossWarpReduceAndAtomicWrite<U, Address, MPadded, ColsPacked>(
-            sharedMemoryOffset, subgroupId, subgroupCount, biasAddress);
-    }
-
     // MMA-based warp reduction for bias gradient.
     // Uses MMA: A=all-ones × B=dOut_data → C=column-sums across lanes.
     // This eliminates all shuffles and dramatically reduces instruction count.
     [ForceInline]
-    [require(cooperative_matrix, subgroup_basic)]
+    [require(cooperative_matrix, subgroup_basic, cuda_spirv)]
     [require(cuda_spirv, sm_6_6)]
-    internal static void sumReduceRowsMMA<U, Address, InArrayType>(
+    VISIBILITY_LEVEL static void sumReduceRows<U, Address, InArrayType>(
         uint sharedMemoryOffset,
         in InArrayType dOut,
         in int subgroupId,
@@ -822,12 +764,12 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
         // 2. Per-warp matC temp areas: SubgroupCount * TileStrideVec * ROW_C uint4s
         // 3. Cross-warp reduction area (written after all tiles processed)
         uint warpVecBase = sharedMemoryOffset + subgroupId * N * HeightInVecB;
-
+        
         // Temp area for matC store (one tile worth per warp to avoid race conditions)
         static const int TempAreaPerWarp = TileStrideVec * CMShape.ROW_C;
         static const int AllWarpsTempOffset = SubgroupCount * N * HeightInVecB;
         uint tempBase = sharedMemoryOffset + AllWarpsTempOffset + subgroupId * TempAreaPerWarp;
-
+        
         // Cross-warp reduction area comes after all temp areas
         static const int CrossWarpOffset = AllWarpsTempOffset + SubgroupCount * TempAreaPerWarp;
         uint crossWarpBase = sharedMemoryOffset + CrossWarpOffset;
@@ -925,35 +867,11 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
             crossWarpBase, subgroupId, subgroupCount, biasAddress);
     }
 
-    // Public dispatcher: uses MMA path for CUDA (best performance),
-    // falls back to scalar path for other targets (Vulkan, etc.)
-    [ForceInline]
-    [require(cuda_spirv, subgroup_partitioned, subgroup_basic)]
-    [require(cuda_spirv, sm_6_6)]
-    VISIBILITY_LEVEL static void sumReduceRows<U, Address, InArrayType>(
-        uint sharedMemoryOffset,
-        in InArrayType dOut,
-        in int subgroupId,
-        Address biasAddress)
-        where U : __BuiltinFloatingPointType
-        where U.Differential == U
-        where Address : IPointerLikeAddress<U>
-        where InArrayType : IArrayAccessor<U>
-    {
-        __target_switch
-        {
-        case cuda:
-            sumReduceRowsMMA<U, Address, InArrayType>(sharedMemoryOffset, dOut, subgroupId, biasAddress);
-        default:
-            sumReduceRowsScalar<U, Address, InArrayType>(sharedMemoryOffset, dOut, subgroupId, biasAddress);
-        }
-    }
-
     // Load ALL lanes' vectors to shmem in one shot (no idle lanes).
     // All N lanes write simultaneously; lane i writes at offset i * TileStrideInVector.
     // Requires N * TileStrideInVector uint4 per warp (2x the per-batch allocation).
     [ForceInline]
-    [require(cooperative_matrix, subgroup_basic)]
+    [require(cooperative_matrix, subgroup_basic, cuda_spirv)]
     VISIBILITY_LEVEL static void loadAllVectorsForOuterProduct<int ArraySizeInVector, int TileStrideInVector, U, InputArray>(
         uint sharedMemoryOffset,
         InputArray inputVector)
@@ -1058,6 +976,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
     // Concrete outer product using WaveTangledVector's loadToSharedMemoryForOuterProduct.
     [ForceInline]
     [require(cooperative_matrix, subgroup_basic, cuda_spirv)]
+    [require(spvAtomicFloat16AddEXT)]
     VISIBILITY_LEVEL static void outerProductAccumulate<U, Address, TypeA, InArrayTypeA, TypeB, InArrayTypeB>(
         uint sharedMemoryAOffset,
         uint sharedMemoryBOffset,
