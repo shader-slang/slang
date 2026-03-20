@@ -23,8 +23,3 @@ leak:<unknown module>
 # Minor leak (665 bytes) of ArtifactPostEmitMetadata in linkAndOptimizeIR.
 # TODO: Fix the ownership so metadata is properly freed.
 leak:linkAndOptimizeIR
-
-# Blobs created via slang_createBlob that callers don't release before
-# process exit. These are small exit-time leaks, not functional issues.
-# TODO: Fix callers to properly release their ISlangBlob references.
-leak:slang_createBlob
