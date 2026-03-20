@@ -157,11 +157,9 @@ jobs:
           TEST_CATEGORY: ${{ inputs.test-category }}
           SERVER_COUNT: ${{ inputs.server-count }}
         run: |
-          # halt_on_error=0: continue after the first error to find more issues
-          # per run. Note: UBSan is compiled with -fno-sanitize-recover=undefined
-          # so it always aborts on the first UBSan error per process. Using
-          # server-count > 1 isolates tests in separate processes to work around
-          # this.
+          # halt_on_error=0: continue after each error to find more issues
+          # per run. Using server-count > 1 isolates tests in separate
+          # processes for better coverage.
           export ASAN_OPTIONS="detect_leaks=1:halt_on_error=0:print_scariness=1:log_path=$PWD/asan-logs/asan"
           export UBSAN_OPTIONS="print_stacktrace=1:halt_on_error=0:log_path=$PWD/asan-logs/ubsan"
           export LSAN_OPTIONS="suppressions=$PWD/cmake/lsan-suppressions.txt"
