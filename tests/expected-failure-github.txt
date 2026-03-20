@@ -20,3 +20,6 @@ tests/bugs/array-size-groupshared.slang.1 syn (wgpu)
 tests/bugs/generic-groupshared.slang.2 syn (wgpu)
 tests/compute/groupshared.slang.4 syn (wgpu)
 tests/metal/groupshared-threadlocal-same-parameter.slang.4 syn (wgpu)
+
+# SPIRV structured control flow violation with switch-continue, tracking on github #10198
+tests/bugs/gh-7748-switch-continue-bug.slang.1
