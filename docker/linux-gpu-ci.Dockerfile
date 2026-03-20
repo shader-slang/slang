@@ -68,7 +68,9 @@ RUN wget -q https://sdk.lunarg.com/sdk/download/1.4.341.1/linux/vulkansdk-linux-
     tar -xf vulkansdk-linux-x86_64-1.4.341.1.tar.xz && \
     mkdir -p /opt/vulkan-sdk && \
     mv 1.4.341.1 /opt/vulkan-sdk/ && \
-    rm -rf vulkansdk-linux-x86_64-1.4.341.1.tar.xz
+    rm -rf vulkansdk-linux-x86_64-1.4.341.1.tar.xz && \
+    echo "${VULKAN_SDK}/lib" > /etc/ld.so.conf.d/vulkan-sdk.conf && \
+    ldconfig
 
 # Install runtime libraries for test execution
 RUN apt-get update && apt-get install -y \
@@ -77,6 +79,13 @@ RUN apt-get update && apt-get install -y \
     libegl1 \
     libvulkan1 \
     && rm -rf /var/lib/apt/lists/*
+
+# Remove Mesa Vulkan drivers and system LLVM. The Mesa device_select implicit
+# Vulkan layer loads libLLVM-15.so.1 which crashes (null deref in
+# UpgradeOperandBundles) when multiple test-servers initialize Vulkan
+# concurrently. Mesa drivers are not needed — we always use the NVIDIA ICD.
+RUN apt-get purge -y --auto-remove mesa-vulkan-drivers libllvm15 && \
+    rm -f /usr/share/vulkan/implicit_layer.d/VkLayer_MESA_device_select.json
 
 # Install CMake 3.30 (required for CMakePresets.json version 6)
 RUN wget -q https://github.com/Kitware/CMake/releases/download/v3.30.0/cmake-3.30.0-linux-x86_64.tar.gz && \
