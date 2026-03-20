@@ -6069,16 +6069,16 @@ IRInst* IRBuilder::emitExtractTaggedUnionPayload(IRType* type, IRInst* val, IRIn
 }
 
 
-IRInst* IRBuilder::emitSizeOf(IRInst* sizedType)
+IRInst* IRBuilder::emitSizeOf(IRInst* sizedType, IRType* dataLayoutType)
 {
-    auto inst = createInst<IRInst>(this, kIROp_SizeOf, getIntType(), sizedType);
+    auto inst = createInst<IRInst>(this, kIROp_SizeOf, getIntType(), sizedType, dataLayoutType);
     addInst(inst);
     return inst;
 }
 
-IRInst* IRBuilder::emitAlignOf(IRInst* sizedType)
+IRInst* IRBuilder::emitAlignOf(IRInst* sizedType, IRType* dataLayoutType)
 {
-    auto inst = createInst<IRInst>(this, kIROp_AlignOf, getIntType(), sizedType);
+    auto inst = createInst<IRInst>(this, kIROp_AlignOf, getIntType(), sizedType, dataLayoutType);
     addInst(inst);
     return inst;
 }
@@ -8908,8 +8908,8 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_VectorReshape:
     case kIROp_ExtractFirstFromPack:
     case kIROp_ExtractLastFromPack:
-    case kIROp_TrimHeadOfPack:
-    case kIROp_TrimTailOfPack:
+    case kIROp_TrimFirstOfPack:
+    case kIROp_TrimLastOfPack:
     case kIROp_PackBranch:
     case kIROp_MakeWitnessPack:
     case kIROp_NonEmptyPackWitness:

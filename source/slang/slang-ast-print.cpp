@@ -582,6 +582,17 @@ void ASTPrinter::addExpr(Expr* expr)
         {
             addExpr(sizeOfExpr->value);
         }
+
+        if (sizeOfExpr->dataLayoutType)
+        {
+            sb << ", ";
+            addType(sizeOfExpr->dataLayoutType);
+        }
+        else if (sizeOfExpr->dataLayout)
+        {
+            sb << ", ";
+            addExpr(sizeOfExpr->dataLayout);
+        }
         sb << ")";
     }
     else if (const auto alignOfExpr = as<AlignOfExpr>(expr))
@@ -594,6 +605,17 @@ void ASTPrinter::addExpr(Expr* expr)
         else if (alignOfExpr->value)
         {
             addExpr(alignOfExpr->value);
+        }
+
+        if (alignOfExpr->dataLayoutType)
+        {
+            sb << ", ";
+            addType(alignOfExpr->dataLayoutType);
+        }
+        else if (alignOfExpr->dataLayout)
+        {
+            sb << ", ";
+            addExpr(alignOfExpr->dataLayout);
         }
         sb << ")";
     }
@@ -616,10 +638,10 @@ void ASTPrinter::addExpr(Expr* expr)
             sb << "__first(";
         else if (as<LastExpr>(packQueryExpr))
             sb << "__last(";
-        else if (as<TrimHeadExpr>(packQueryExpr))
-            sb << "__trimHead(";
-        else if (as<TrimTailExpr>(packQueryExpr))
-            sb << "__trimTail(";
+        else if (as<TrimFirstExpr>(packQueryExpr))
+            sb << "__trimFirst(";
+        else if (as<TrimLastExpr>(packQueryExpr))
+            sb << "__trimLast(";
         else
             SLANG_UNEXPECTED("unknown PackQueryExpr subtype");
 

@@ -4138,9 +4138,9 @@ $(type_info.return_type) $(type_info.method_name)(
 
     IRInst* emitBitCast(IRType* type, IRInst* val);
 
-    IRInst* emitSizeOf(IRInst* sizedType);
+    IRInst* emitSizeOf(IRInst* sizedType, IRType* dataLayoutType);
 
-    IRInst* emitAlignOf(IRInst* sizedType);
+    IRInst* emitAlignOf(IRInst* sizedType, IRType* dataLayoutType);
 
     IRInst* emitCountOf(IRType* type, IRInst* sizedType);
 

@@ -9,6 +9,7 @@
 #include "slang-compiler.h"
 #include "slang-emit-source-writer.h"
 #include "slang-lower-to-ir.h"
+#include "slang-markdown.h"
 #include "slang-parser.h"
 #include "slang-rich-diagnostics.h"
 #include "slang-serialize-container.h"
@@ -322,20 +323,32 @@ void FrontEndCompileRequest::parseTranslationUnit(TranslationUnitRequest* transl
         SourceLanguage sourceLanguage = translationUnit->sourceLanguage;
         SlangLanguageVersion languageVersion =
             translationUnit->compileRequest->optionSet.getLanguageVersion();
-        auto tokens = preprocessSource(
-            sourceFile,
+
+        auto segments = extractSourceSegments(sourceFile, getSourceManager());
+
+        auto preprocessed = preprocessSourceSegments(
+            segments,
+            sourceLanguage,
+            languageVersion,
             getSink(),
             &includeSystem,
             combinedPreprocessorDefinitions,
             getLinkage(),
-            sourceLanguage,
-            languageVersion,
             &preprocessorHandler);
 
         translationUnitSyntax->languageVersion = languageVersion;
 
-        if (sourceLanguage == SourceLanguage::Unknown)
-            sourceLanguage = translationUnit->sourceLanguage;
+        if (optionSet.getBoolOption(CompilerOptionName::PreprocessorOutput))
+        {
+            if (m_writers)
+            {
+                for (auto& seg : preprocessed)
+                    _outputPreprocessorTokens(
+                        seg.tokens,
+                        m_writers->getWriter(SLANG_WRITER_CHANNEL_STD_OUTPUT));
+            }
+            continue;
+        }
 
         Scope* languageScope = nullptr;
         switch (sourceLanguage)
@@ -352,6 +365,14 @@ void FrontEndCompileRequest::parseTranslationUnit(TranslationUnitRequest* transl
             break;
         }
 
+        parsePreprocessedSegments(
+            preprocessed,
+            astBuilder,
+            translationUnit,
+            getSink(),
+            languageScope,
+            translationUnitSyntax);
+
         if (optionSet.getBoolOption(CompilerOptionName::OutputIncludes))
         {
             _outputIncludes(
@@ -359,29 +380,6 @@ void FrontEndCompileRequest::parseTranslationUnit(TranslationUnitRequest* transl
                 getSink()->getSourceManager(),
                 getSink());
         }
-
-        if (optionSet.getBoolOption(CompilerOptionName::PreprocessorOutput))
-        {
-            if (m_writers)
-            {
-                _outputPreprocessorTokens(
-                    tokens,
-                    m_writers->getWriter(SLANG_WRITER_CHANNEL_STD_OUTPUT));
-            }
-            // If we output the preprocessor output then we are done doing anything else
-            return;
-        }
-
-        parseSourceFile(
-            astBuilder,
-            translationUnit,
-            sourceLanguage,
-            tokens,
-            getSink(),
-            languageScope,
-            translationUnitSyntax);
-
-        // Let's try dumping
 
         if (optionSet.getBoolOption(CompilerOptionName::DumpAst))
         {
@@ -410,6 +408,90 @@ void FrontEndCompileRequest::parseTranslationUnit(TranslationUnitRequest* transl
                 ASTSerialTestUtil::testSerialize(translationUnit->getModuleDecl(), getSession()->getNamePool(), getLinkage()->getASTBuilder()->getSharedASTBuilder(), getSourceManager());
             }
 #endif
+    }
+}
+
+List<SourceFile*> extractSourceSegments(SourceFile* sourceFile, SourceManager* sourceManager)
+{
+    List<SourceFile*> segments;
+
+    if (!hasLiterateFileExtension(sourceFile->getPathInfo().foundPath))
+    {
+        segments.add(sourceFile);
+        return segments;
+    }
+
+    auto content = sourceFile->getContent();
+    auto codeBlocks = extractSlangCodeBlocks(content.begin(), content.getLength());
+
+    for (auto& block : codeBlocks)
+    {
+        StringBuilder syntheticContent;
+        syntheticContent << "#line " << block.startLine << "\n";
+        syntheticContent << block.content;
+
+        segments.add(sourceManager->createSourceFileWithString(
+            sourceFile->getPathInfo(),
+            syntheticContent.produceString()));
+    }
+
+    return segments;
+}
+
+List<PreprocessedSegment> preprocessSourceSegments(
+    List<SourceFile*> const& segments,
+    SourceLanguage defaultSourceLanguage,
+    SlangLanguageVersion& ioLanguageVersion,
+    DiagnosticSink* sink,
+    IncludeSystem* includeSystem,
+    Dictionary<String, String> const& preprocessorDefinitions,
+    Linkage* linkage,
+    PreprocessorHandler* preprocessorHandler)
+{
+    List<PreprocessedSegment> result;
+
+    for (auto segmentFile : segments)
+    {
+        PreprocessedSegment seg;
+        seg.sourceLanguage = defaultSourceLanguage;
+
+        seg.tokens = preprocessSource(
+            segmentFile,
+            sink,
+            includeSystem,
+            preprocessorDefinitions,
+            linkage,
+            seg.sourceLanguage,
+            ioLanguageVersion,
+            preprocessorHandler);
+
+        if (seg.sourceLanguage == SourceLanguage::Unknown)
+            seg.sourceLanguage = defaultSourceLanguage;
+
+        result.add(_Move(seg));
+    }
+
+    return result;
+}
+
+void parsePreprocessedSegments(
+    List<PreprocessedSegment> const& segments,
+    ASTBuilder* astBuilder,
+    TranslationUnitRequest* translationUnit,
+    DiagnosticSink* sink,
+    Scope* outerScope,
+    ContainerDecl* parentDecl)
+{
+    for (auto& seg : segments)
+    {
+        parseSourceFile(
+            astBuilder,
+            translationUnit,
+            seg.sourceLanguage,
+            seg.tokens,
+            sink,
+            outerScope,
+            parentDecl);
     }
 }
 
@@ -597,8 +679,9 @@ void FrontEndCompileRequest::addTranslationUnitSourceArtifact(
 
     if (!translationUnit->moduleName)
     {
+        String artifactName = maybeStripLiterateFileExtension(sourceArtifact->getName());
         translationUnit->setModuleName(
-            getNamePool()->getName(Path::getFileNameWithoutExt(sourceArtifact->getName())));
+            getNamePool()->getName(Path::getFileNameWithoutExt(artifactName)));
     }
     if (translationUnit->module->getFilePath() == nullptr)
         translationUnit->module->setPathInfo(PathInfo::makePath(sourceArtifact->getName()));

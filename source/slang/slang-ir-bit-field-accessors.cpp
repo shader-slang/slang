@@ -90,7 +90,8 @@ static void synthesizeBitFieldGetter(IRFunc* func, IRBitFieldAccessorDecoration*
         // Backing width is not yet know, so we need to express width with
         // sizeof(backingType)*8 and let peephole optimization deal with this
         // later on.
-        const auto backingWidthSizeOf = builder.emitSizeOf(backingType);
+        const auto backingWidthSizeOf =
+            builder.emitSizeOf(backingType, builder.getScalarBufferLayoutType());
         const auto intType = builder.getIntType();
         const auto backingBitWidth =
             builder.emitMul(intType, builder.getIntValue(intType, 8), backingWidthSizeOf);
