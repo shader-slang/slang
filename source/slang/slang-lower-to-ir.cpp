@@ -619,6 +619,9 @@ struct IRGenContext
     // The current scope end for use with `defer`.
     IRBlock* scopeEndBlock = nullptr;
 
+    // Recursion depth for lowering nested invoke/default-construction chains.
+    UInt invokeLoweringRecursionDepth = 0;
+
     // A chain of nested `catch` handlers for `try` and `throw.
     CatchHandler* catchHandler = nullptr;
 
@@ -627,7 +630,7 @@ struct IRGenContext
         nullptr;
 
     explicit IRGenContext(SharedIRGenContext* inShared, ASTBuilder* inAstBuilder)
-        : shared(inShared), astBuilder(inAstBuilder), env(&inShared->globalEnv), irBuilder(nullptr)
+        : astBuilder(inAstBuilder), shared(inShared), env(&inShared->globalEnv), irBuilder(nullptr)
     {
     }
 
@@ -1661,11 +1664,10 @@ IRStructKey* getInterfaceRequirementKey(IRGenContext* context, Decl* requirement
     // this requirement in the IR, and to allow lookup
     // into the declaration.
     requirementKey = builder->createStructKey();
+    context->shared->interfaceRequirementKeys.add(requirementDecl, requirementKey);
 
     addLinkageDecoration(context, requirementKey, requirementDecl);
     addNameHint(context, requirementKey, requirementDecl);
-
-    context->shared->interfaceRequirementKeys.add(requirementDecl, requirementKey);
 
     return requirementKey;
 }
@@ -1870,7 +1872,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     {
         auto irBuilder = getBuilder();
         auto typeArg = lowerType(context, as<Type>(val->getValArg()));
-        auto count = irBuilder->emitSizeOf(typeArg);
+        auto count = irBuilder->emitSizeOf(typeArg, irBuilder->getScalarBufferLayoutType());
         return LoweredValInfo::simple(count);
     }
 
@@ -1878,7 +1880,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     {
         auto irBuilder = getBuilder();
         auto typeArg = lowerType(context, as<Type>(val->getValArg()));
-        auto count = irBuilder->emitAlignOf(typeArg);
+        auto count = irBuilder->emitAlignOf(typeArg, irBuilder->getScalarBufferLayoutType());
         return LoweredValInfo::simple(count);
     }
 
@@ -1896,22 +1898,31 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         return LoweredValInfo::simple(count);
     }
 
+    IRInst* emitNonEmptyPackWitness(IRInst* pack)
+    {
+        auto builder = getBuilder();
+        auto witnessType = builder->getWitnessTableType(builder->getVoidType());
+        return builder->emitIntrinsicInst(witnessType, kIROp_NonEmptyPackWitness, 1, &pack);
+    }
+
+    LoweredValInfo emitWitnessedPackQuery(IRType* resultType, IROp op, IRInst* pack)
+    {
+        IRInst* args[] = {pack, emitNonEmptyPackWitness(pack)};
+        return LoweredValInfo::simple(getBuilder()->emitIntrinsicInst(resultType, op, 2, args));
+    }
+
     LoweredValInfo visitFirstIntVal(FirstIntVal* val)
     {
-        auto irBuilder = getBuilder();
         auto type = lowerType(context, val->getType());
         auto basePack = lowerSimpleVal(context, val->getBasePack());
-        return LoweredValInfo::simple(
-            irBuilder->emitIntrinsicInst(type, kIROp_ExtractFirstFromPack, 1, &basePack));
+        return emitWitnessedPackQuery(type, kIROp_ExtractFirstFromPack, basePack);
     }
 
     LoweredValInfo visitLastIntVal(LastIntVal* val)
     {
-        auto irBuilder = getBuilder();
         auto type = lowerType(context, val->getType());
         auto basePack = lowerSimpleVal(context, val->getBasePack());
-        return LoweredValInfo::simple(
-            irBuilder->emitIntrinsicInst(type, kIROp_ExtractLastFromPack, 1, &basePack));
+        return emitWitnessedPackQuery(type, kIROp_ExtractLastFromPack, basePack);
     }
 
     LoweredValInfo visitConcreteTypePack(ConcreteTypePack* typePack)
@@ -1943,22 +1954,18 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         return LoweredValInfo::simple(irMakeValuePack);
     }
 
-    LoweredValInfo visitTrimHeadIntValPack(TrimHeadIntValPack* valPack)
+    LoweredValInfo visitTrimFirstIntValPack(TrimFirstIntValPack* valPack)
     {
-        auto irBuilder = getBuilder();
         auto type = lowerType(context, valPack->getType());
         auto basePack = lowerSimpleVal(context, valPack->getBasePack());
-        return LoweredValInfo::simple(
-            irBuilder->emitIntrinsicInst(type, kIROp_TrimHeadOfPack, 1, &basePack));
+        return emitWitnessedPackQuery(type, kIROp_TrimFirstOfPack, basePack);
     }
 
-    LoweredValInfo visitTrimTailIntValPack(TrimTailIntValPack* valPack)
+    LoweredValInfo visitTrimLastIntValPack(TrimLastIntValPack* valPack)
     {
-        auto irBuilder = getBuilder();
         auto type = lowerType(context, valPack->getType());
         auto basePack = lowerSimpleVal(context, valPack->getBasePack());
-        return LoweredValInfo::simple(
-            irBuilder->emitIntrinsicInst(type, kIROp_TrimTailOfPack, 1, &basePack));
+        return emitWitnessedPackQuery(type, kIROp_TrimLastOfPack, basePack);
     }
 
     LoweredValInfo visitExpandIntValPack(ExpandIntValPack* expandVal)
@@ -2011,40 +2018,47 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             capturedPacks.getArrayView().arrayView));
     }
 
-    LoweredValInfo visitFirstPackElementType(FirstPackElementType* firstType)
+    LoweredValInfo visitPackBranchType(PackBranchType* packBranchType)
     {
         auto irBuilder = getBuilder();
-        auto type = irBuilder->getTypeKind();
+        auto loweredPack = as<Type>(packBranchType->getPackOperand())
+                               ? lowerType(context, as<Type>(packBranchType->getPackOperand()))
+                               : lowerSimpleVal(context, packBranchType->getPackOperand());
+        auto irEmptyType = lowerType(context, packBranchType->getEmptyType());
+        auto irNonEmptyType = lowerType(context, packBranchType->getNonEmptyType());
+        return LoweredValInfo::simple(irBuilder->emitPackBranchInst(
+            irBuilder->getTypeKind(),
+            loweredPack,
+            irEmptyType,
+            irNonEmptyType));
+    }
+
+    LoweredValInfo visitFirstPackElementType(FirstPackElementType* firstType)
+    {
+        auto type = getBuilder()->getTypeKind();
         IRInst* basePack = lowerType(context, firstType->getBasePack());
-        return LoweredValInfo::simple(
-            irBuilder->emitIntrinsicInst(type, kIROp_ExtractFirstFromPack, 1, &basePack));
+        return emitWitnessedPackQuery(type, kIROp_ExtractFirstFromPack, basePack);
     }
 
     LoweredValInfo visitLastPackElementType(LastPackElementType* lastType)
     {
-        auto irBuilder = getBuilder();
-        auto type = irBuilder->getTypeKind();
+        auto type = getBuilder()->getTypeKind();
         IRInst* basePack = lowerType(context, lastType->getBasePack());
-        return LoweredValInfo::simple(
-            irBuilder->emitIntrinsicInst(type, kIROp_ExtractLastFromPack, 1, &basePack));
+        return emitWitnessedPackQuery(type, kIROp_ExtractLastFromPack, basePack);
     }
 
-    LoweredValInfo visitTrimHeadTypePack(TrimHeadTypePack* trimHeadType)
+    LoweredValInfo visitTrimFirstTypePack(TrimFirstTypePack* trimFirstType)
     {
-        auto irBuilder = getBuilder();
-        auto type = irBuilder->getTypeKind();
-        IRInst* basePack = lowerType(context, trimHeadType->getBasePack());
-        return LoweredValInfo::simple(
-            irBuilder->emitIntrinsicInst(type, kIROp_TrimHeadOfPack, 1, &basePack));
+        auto type = getBuilder()->getTypeKind();
+        IRInst* basePack = lowerType(context, trimFirstType->getBasePack());
+        return emitWitnessedPackQuery(type, kIROp_TrimFirstOfPack, basePack);
     }
 
-    LoweredValInfo visitTrimTailTypePack(TrimTailTypePack* trimTailType)
+    LoweredValInfo visitTrimLastTypePack(TrimLastTypePack* trimLastType)
     {
-        auto irBuilder = getBuilder();
-        auto type = irBuilder->getTypeKind();
-        IRInst* basePack = lowerType(context, trimTailType->getBasePack());
-        return LoweredValInfo::simple(
-            irBuilder->emitIntrinsicInst(type, kIROp_TrimTailOfPack, 1, &basePack));
+        auto type = getBuilder()->getTypeKind();
+        IRInst* basePack = lowerType(context, trimLastType->getBasePack());
+        return emitWitnessedPackQuery(type, kIROp_TrimLastOfPack, basePack);
     }
 
     LoweredValInfo visitTypePackSubtypeWitness(TypePackSubtypeWitness* witnessPack)
@@ -2101,59 +2115,61 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     LoweredValInfo visitFirstSubtypeWitness(FirstSubtypeWitness* witness)
     {
         auto patternWitness = lowerVal(context, witness->getPatternTypeWitness());
-        auto irBuilder = getBuilder();
         auto supType = lowerType(context, witness->getSup());
-        auto witnessTableType = irBuilder->getWitnessTableType(supType);
+        auto witnessTableType = getBuilder()->getWitnessTableType(supType);
         auto basePack = getSimpleVal(context, patternWitness);
-        return LoweredValInfo::simple(irBuilder->emitIntrinsicInst(
-            witnessTableType,
-            kIROp_ExtractFirstFromPack,
-            1,
-            &basePack));
+        return emitWitnessedPackQuery(witnessTableType, kIROp_ExtractFirstFromPack, basePack);
     }
 
     LoweredValInfo visitLastSubtypeWitness(LastSubtypeWitness* witness)
     {
         auto patternWitness = lowerVal(context, witness->getPatternTypeWitness());
+        auto supType = lowerType(context, witness->getSup());
+        auto witnessTableType = getBuilder()->getWitnessTableType(supType);
+        auto basePack = getSimpleVal(context, patternWitness);
+        return emitWitnessedPackQuery(witnessTableType, kIROp_ExtractLastFromPack, basePack);
+    }
+
+    LoweredValInfo visitTrimFirstSubtypeWitness(TrimFirstSubtypeWitness* witness)
+    {
+        auto patternWitness = lowerVal(context, witness->getPatternTypeWitness());
         auto irBuilder = getBuilder();
+        auto basePack = getSimpleVal(context, patternWitness);
+        IRInst* basePackType = basePack->getDataType();
+        auto resultType = getSimpleVal(
+            context,
+            emitWitnessedPackQuery(irBuilder->getTypeKind(), kIROp_TrimFirstOfPack, basePackType));
+        return emitWitnessedPackQuery(as<IRType>(resultType), kIROp_TrimFirstOfPack, basePack);
+    }
+
+    LoweredValInfo visitTrimLastSubtypeWitness(TrimLastSubtypeWitness* witness)
+    {
+        auto patternWitness = lowerVal(context, witness->getPatternTypeWitness());
+        auto irBuilder = getBuilder();
+        auto basePack = getSimpleVal(context, patternWitness);
+        IRInst* basePackType = basePack->getDataType();
+        auto resultType = getSimpleVal(
+            context,
+            emitWitnessedPackQuery(irBuilder->getTypeKind(), kIROp_TrimLastOfPack, basePackType));
+        return emitWitnessedPackQuery(as<IRType>(resultType), kIROp_TrimLastOfPack, basePack);
+    }
+
+    LoweredValInfo visitPackBranchSubtypeWitness(PackBranchSubtypeWitness* witness)
+    {
+        auto irBuilder = getBuilder();
+        auto loweredPack = as<Type>(witness->getPackOperand())
+                               ? lowerType(context, as<Type>(witness->getPackOperand()))
+                               : lowerSimpleVal(context, witness->getPackOperand());
+        auto emptyWitness = getSimpleVal(context, lowerVal(context, witness->getEmptyWitness()));
+        auto nonEmptyWitness =
+            getSimpleVal(context, lowerVal(context, witness->getNonEmptyWitness()));
         auto supType = lowerType(context, witness->getSup());
         auto witnessTableType = irBuilder->getWitnessTableType(supType);
-        auto basePack = getSimpleVal(context, patternWitness);
-        return LoweredValInfo::simple(irBuilder->emitIntrinsicInst(
+        return LoweredValInfo::simple(irBuilder->emitPackBranchInst(
             witnessTableType,
-            kIROp_ExtractLastFromPack,
-            1,
-            &basePack));
-    }
-
-    LoweredValInfo visitTrimHeadSubtypeWitness(TrimHeadSubtypeWitness* witness)
-    {
-        auto patternWitness = lowerVal(context, witness->getPatternTypeWitness());
-        auto irBuilder = getBuilder();
-        auto basePack = getSimpleVal(context, patternWitness);
-        IRInst* basePackType = basePack->getDataType();
-        auto resultType = as<IRType>(irBuilder->emitIntrinsicInst(
-            irBuilder->getTypeKind(),
-            kIROp_TrimHeadOfPack,
-            1,
-            &basePackType));
-        return LoweredValInfo::simple(
-            irBuilder->emitIntrinsicInst(resultType, kIROp_TrimHeadOfPack, 1, &basePack));
-    }
-
-    LoweredValInfo visitTrimTailSubtypeWitness(TrimTailSubtypeWitness* witness)
-    {
-        auto patternWitness = lowerVal(context, witness->getPatternTypeWitness());
-        auto irBuilder = getBuilder();
-        auto basePack = getSimpleVal(context, patternWitness);
-        IRInst* basePackType = basePack->getDataType();
-        auto resultType = as<IRType>(irBuilder->emitIntrinsicInst(
-            irBuilder->getTypeKind(),
-            kIROp_TrimTailOfPack,
-            1,
-            &basePackType));
-        return LoweredValInfo::simple(
-            irBuilder->emitIntrinsicInst(resultType, kIROp_TrimTailOfPack, 1, &basePack));
+            loweredPack,
+            emptyWitness,
+            nonEmptyWitness));
     }
 
     LoweredValInfo visitDeclaredSubtypeWitness(DeclaredSubtypeWitness* val)
@@ -2315,12 +2331,12 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         return LoweredValInfo::simple(builder->createWitnessTable(voidType, voidType));
     }
 
-    LoweredValInfo visitNonEmptyPackWitness(NonEmptyPackWitness*)
+    LoweredValInfo visitNonEmptyPackWitness(NonEmptyPackWitness* witness)
     {
-        auto builder = getBuilder();
-        auto witnessType = builder->getWitnessTableType(builder->getVoidType());
-        return LoweredValInfo::simple(
-            builder->emitIntrinsicInst(witnessType, kIROp_NonEmptyPackWitness, 0, nullptr));
+        auto pack = witness->getPack();
+        IRInst* loweredPack =
+            as<Type>(pack) ? lowerType(context, as<Type>(pack)) : lowerSimpleVal(context, pack);
+        return LoweredValInfo::simple(emitNonEmptyPackWitness(loweredPack));
     }
 
     LoweredValInfo visitConstantIntVal(ConstantIntVal* val)
@@ -4600,6 +4616,24 @@ struct ExprLoweringContext
         LoweredValInfo destination,
         const TryClauseEnvironment& tryEnv)
     {
+        // Guard recursive invoke lowering so an infinitely nesting type that keeps
+        // synthesizing constructor calls diagnoses cleanly instead of overflowing
+        // the native stack while lowering the ctor call tree.
+        static constexpr UInt kMaxIRInvokeLoweringRecursionDepth = 128;
+        if (context->invokeLoweringRecursionDepth >= kMaxIRInvokeLoweringRecursionDepth)
+        {
+            if (context->getSink())
+            {
+                Diagnostics::MaximumTypeNestingLevelExceeded loweringDiag = {};
+                loweringDiag.location = expr->loc;
+                context->getSink()->diagnose(loweringDiag);
+            }
+            auto irType = lowerType(context, expr->type);
+            return LoweredValInfo::simple(getBuilder()->emitPoison(irType));
+        }
+        context->invokeLoweringRecursionDepth++;
+        SLANG_DEFER(context->invokeLoweringRecursionDepth--);
+
         auto type = lowerType(context, expr->type);
 
         // We are going to look at the syntactic form of
@@ -5013,10 +5047,16 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
 
     LoweredValInfo visitSizeOfLikeExpr(SizeOfLikeExpr* sizeOfLikeExpr)
     {
-        // Lets try and lower to a constant
-        ASTNaturalLayoutContext naturalLayoutContext(getASTBuilder(), nullptr);
 
-        const auto size = naturalLayoutContext.calcSize(sizeOfLikeExpr->sizedType);
+        NaturalSize size{0, NaturalSize::kInvalidAlignment};
+        if (!sizeOfLikeExpr->dataLayoutType ||
+            as<ScalarDataLayoutType>(sizeOfLikeExpr->dataLayoutType))
+        {
+            // The layout should be the scalar data layout, so lets try and
+            // lower to a constant already.
+            ASTNaturalLayoutContext naturalLayoutContext(getASTBuilder(), nullptr);
+            size = naturalLayoutContext.calcSize(sizeOfLikeExpr->sizedType);
+        }
 
         auto builder = getBuilder();
         auto resultType = lowerType(context, sizeOfLikeExpr->type);
@@ -5031,11 +5071,15 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
 
             if (as<AlignOfExpr>(sizeOfLikeExpr))
             {
-                inst = builder->emitAlignOf(sizedType);
+                SLANG_ASSERT(sizeOfLikeExpr->dataLayoutType);
+                auto dataLayoutType = lowerType(context, sizeOfLikeExpr->dataLayoutType);
+                inst = builder->emitAlignOf(sizedType, dataLayoutType);
             }
             else if (as<SizeOfExpr>(sizeOfLikeExpr))
             {
-                inst = builder->emitSizeOf(sizedType);
+                SLANG_ASSERT(sizeOfLikeExpr->dataLayoutType);
+                auto dataLayoutType = lowerType(context, sizeOfLikeExpr->dataLayoutType);
+                inst = builder->emitSizeOf(sizedType, dataLayoutType);
             }
             else
             {
@@ -5065,12 +5109,17 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         IROp op = kIROp_ExtractFirstFromPack;
         if (as<LastExpr>(packQueryExpr))
             op = kIROp_ExtractLastFromPack;
-        else if (as<TrimHeadExpr>(packQueryExpr))
-            op = kIROp_TrimHeadOfPack;
-        else if (as<TrimTailExpr>(packQueryExpr))
-            op = kIROp_TrimTailOfPack;
+        else if (as<TrimFirstExpr>(packQueryExpr))
+            op = kIROp_TrimFirstOfPack;
+        else if (as<TrimLastExpr>(packQueryExpr))
+            op = kIROp_TrimLastOfPack;
 
-        return LoweredValInfo::simple(builder->emitIntrinsicInst(resultType, op, 1, &packVal));
+        auto witnessType = builder->getWitnessTableType(builder->getVoidType());
+        IRInst* witnessArg[] = {packVal};
+        auto witness =
+            builder->emitIntrinsicInst(witnessType, kIROp_NonEmptyPackWitness, 1, witnessArg);
+        IRInst* args[] = {packVal, witness};
+        return LoweredValInfo::simple(builder->emitIntrinsicInst(resultType, op, 2, args));
     }
 
     LoweredValInfo visitFloatBitCastExpr(FloatBitCastExpr* /*expr*/)
@@ -6385,6 +6434,12 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
     LoweredValInfo visitTupleTypeExpr(TupleTypeExpr* /*expr*/)
     {
         SLANG_UNIMPLEMENTED_X("type expression during code generation");
+        UNREACHABLE_RETURN(LoweredValInfo());
+    }
+
+    LoweredValInfo visitPackBranchTypeExpr(PackBranchTypeExpr* /*expr*/)
+    {
+        SLANG_UNIMPLEMENTED_X("__packBranch type expression during code generation");
         UNREACHABLE_RETURN(LoweredValInfo());
     }
 
@@ -13246,7 +13301,7 @@ RefPtr<IRModule> generateIRForTranslationUnit(
                 (context->debugInfoLevel >= DebugInfoLevel::Standard) ? source->getContent()
                                                                       : UnownedStringSlice(),
                 source->isIncludedFile());
-            context->shared->mapSourceFileToDebugSourceInst.add(source, debugSource);
+            context->shared->mapSourceFileToDebugSourceInst[source] = debugSource;
         }
     }
 
@@ -13788,6 +13843,7 @@ struct IRLayoutGenContext : IRGenContext
 
     /// Cache for custom key instructions used for entry-point parameter layout information.
     Dictionary<ParamDecl*, IRInst*> mapEntryPointParamToKey;
+    UInt layoutLoweringRecursionDepth = 0;
 };
 
 /// Lower an AST-level type layout to an IR-level type layout.
@@ -13811,8 +13867,39 @@ static IRTypeLayout* _lowerTypeLayoutCommon(IRTypeLayout::Builder* builder, Type
     return builder->build();
 }
 
+static SourceLoc _getTypeNestingDiagnosticPos(TypeLayout* typeLayout)
+{
+    if (!typeLayout)
+        return SourceLoc();
+
+    if (auto type = typeLayout->getType())
+    {
+        if (auto declRefType = as<DeclRefType>(type))
+            return declRefType->getDeclRef().getLoc();
+    }
+
+    return SourceLoc();
+}
+
 IRTypeLayout* lowerTypeLayout(IRLayoutGenContext* context, TypeLayout* typeLayout)
 {
+    static constexpr UInt kMaxIRLayoutLoweringRecursionDepth = 128;
+    if (context->layoutLoweringRecursionDepth >= kMaxIRLayoutLoweringRecursionDepth)
+    {
+        if (context->getSink())
+        {
+            Diagnostics::MaximumTypeNestingLevelExceeded diag = {};
+            diag.location = _getTypeNestingDiagnosticPos(typeLayout);
+            context->getSink()->diagnose(diag);
+        }
+
+        IRTypeLayout::Builder builder(context->irBuilder);
+        return builder.build();
+    }
+
+    context->layoutLoweringRecursionDepth++;
+    SLANG_DEFER(context->layoutLoweringRecursionDepth--);
+
     // TODO: We chould consider caching the layouts we create based on `typeLayout`
     // and re-using them. This isn't strictly necessary because we emit the
     // instructions as "hoistable" which should give us de-duplication, and it wouldn't

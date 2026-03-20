@@ -360,10 +360,10 @@ class ConcreteIntValPack : public IntVal
 };
 
 FIDDLE()
-class TrimHeadIntValPack : public IntVal
+class TrimFirstIntValPack : public IntVal
 {
     FIDDLE(...)
-    TrimHeadIntValPack(Type* inType, Val* basePack) { setOperands(inType, basePack); }
+    TrimFirstIntValPack(Type* inType, Val* basePack) { setOperands(inType, basePack); }
     Val* getBasePack() const { return getOperand(1); }
     void _toTextOverride(StringBuilder& out);
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
@@ -371,10 +371,10 @@ class TrimHeadIntValPack : public IntVal
 };
 
 FIDDLE()
-class TrimTailIntValPack : public IntVal
+class TrimLastIntValPack : public IntVal
 {
     FIDDLE(...)
-    TrimTailIntValPack(Type* inType, Val* basePack) { setOperands(inType, basePack); }
+    TrimLastIntValPack(Type* inType, Val* basePack) { setOperands(inType, basePack); }
     Val* getBasePack() const { return getOperand(1); }
     void _toTextOverride(StringBuilder& out);
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
@@ -769,10 +769,10 @@ class LastSubtypeWitness : public SubtypeWitness
 };
 
 FIDDLE()
-class TrimHeadSubtypeWitness : public SubtypeWitness
+class TrimFirstSubtypeWitness : public SubtypeWitness
 {
     FIDDLE(...)
-    TrimHeadSubtypeWitness(Type* sub, Type* sup, SubtypeWitness* patternWitness)
+    TrimFirstSubtypeWitness(Type* sub, Type* sup, SubtypeWitness* patternWitness)
     {
         setOperands(sub, sup, patternWitness);
     }
@@ -785,16 +785,39 @@ class TrimHeadSubtypeWitness : public SubtypeWitness
 };
 
 FIDDLE()
-class TrimTailSubtypeWitness : public SubtypeWitness
+class TrimLastSubtypeWitness : public SubtypeWitness
 {
     FIDDLE(...)
-    TrimTailSubtypeWitness(Type* sub, Type* sup, SubtypeWitness* patternWitness)
+    TrimLastSubtypeWitness(Type* sub, Type* sup, SubtypeWitness* patternWitness)
     {
         setOperands(sub, sup, patternWitness);
     }
     Type* getSub() { return as<Type>(getOperand(0)); }
     Type* getSup() { return as<Type>(getOperand(1)); }
     SubtypeWitness* getPatternTypeWitness() { return as<SubtypeWitness>(getOperand(2)); }
+    void _toTextOverride(StringBuilder& out);
+    Val* _resolveImplOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
+FIDDLE()
+class PackBranchSubtypeWitness : public SubtypeWitness
+{
+    FIDDLE(...)
+    PackBranchSubtypeWitness(
+        Type* sub,
+        Type* sup,
+        Val* packOperand,
+        SubtypeWitness* emptyWitness,
+        SubtypeWitness* nonEmptyWitness)
+    {
+        setOperands(sub, sup, packOperand, emptyWitness, nonEmptyWitness);
+    }
+    Type* getSub() { return as<Type>(getOperand(0)); }
+    Type* getSup() { return as<Type>(getOperand(1)); }
+    Val* getPackOperand() { return getOperand(2); }
+    SubtypeWitness* getEmptyWitness() { return as<SubtypeWitness>(getOperand(3)); }
+    SubtypeWitness* getNonEmptyWitness() { return as<SubtypeWitness>(getOperand(4)); }
     void _toTextOverride(StringBuilder& out);
     Val* _resolveImplOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
@@ -969,9 +992,12 @@ FIDDLE()
 class NonEmptyPackWitness : public Witness
 {
     FIDDLE(...)
+    NonEmptyPackWitness(Val* pack) { setOperands(pack); }
+    Val* getPack() const { return getOperand(0); }
 
     void _toTextOverride(StringBuilder& out);
     Val* _resolveImplOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
 /// A value that represents a modifier attached to some other value
@@ -1177,13 +1203,13 @@ inline bool isTypeEqualityWitness(Val* witness)
     {
         return isTypeEqualityWitness(expandWitness->getPatternTypeWitness());
     }
-    else if (auto trimHeadWitness = as<TrimHeadSubtypeWitness>(witness))
+    else if (auto trimFirstWitness = as<TrimFirstSubtypeWitness>(witness))
     {
-        return isTypeEqualityWitness(trimHeadWitness->getPatternTypeWitness());
+        return isTypeEqualityWitness(trimFirstWitness->getPatternTypeWitness());
     }
-    else if (auto trimTailWitness = as<TrimTailSubtypeWitness>(witness))
+    else if (auto trimLastWitness = as<TrimLastSubtypeWitness>(witness))
     {
-        return isTypeEqualityWitness(trimTailWitness->getPatternTypeWitness());
+        return isTypeEqualityWitness(trimLastWitness->getPatternTypeWitness());
     }
     return false;
 }

@@ -55,9 +55,9 @@ Member list:
   - *`subscript-op-decl`* is a [subscript operator declaration](#subscript-op).
   - *`function-call-op-decl`* is a [function call operator declaration](#function-call-op).
 
-> ⚠️ **Warning:** `Slangc` currently accepts bracketed attributes right after the **`'struct'`** keyword. This
-> is deprecated syntax and expected to be removed. Bracketed attributes should be added in *`modifier-list`*,
-> instead. ([Issue #9691](https://github.com/shader-slang/slang/issues/9691))
+> ⚠️ **Warning:** The syntax for bracketed attributes list after **`'struct'`** was deprecated in Slang 2025,
+> and it has been removed in Slang 2026. Add bracketed attributes in *`modifier-list`* before the
+> **`'struct'`** keyword, instead. ([Issue #9691](https://github.com/shader-slang/slang/issues/9691))
 
 
 ## Description
