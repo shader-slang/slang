@@ -28,7 +28,7 @@ jobs:
           config: release
           build-llvm: false
 
-      - name: Build slang-cmdline-help
+      - name: Build slang-help
         run: |
           cmake --preset default --fresh \
             -DSLANG_SLANG_LLVM_FLAVOR=DISABLE \
