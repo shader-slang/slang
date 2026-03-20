@@ -1,13 +1,17 @@
 // Same to gh-4874.slang, but defining the global resource typed variables
 // without the "const" modifier. This should lead to a compile time error.
 //
-//TEST:SIMPLE(filecheck=CHECK): -target spirv
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv
 RWStructuredBuffer<uint> outputBuffer;
 
 RWStructuredBuffer<uint> inputBuffer;
 
-// CHECK: ([[# @LINE+1]]): error 30076:
 static RWStructuredBuffer<uint> gBuffer = inputBuffer;
+/*CHECK:
+                                ^^^^^^^ global variable cannot have opaque type
+                                ^^^^^^^ global variable cannot have opaque type.
+                                ^^^^^^^ do you intend to define a `static const` instead?
+*/
 
 struct Stuff
 {
@@ -21,8 +25,12 @@ struct Stuff
     RWStructuredBuffer<uint> b;
 }
 
-// CHECK: ([[# @LINE+1]]): error 30076:
 static Stuff gStuff = Stuff( inputBuffer, inputBuffer );
+/*CHECK:
+             ^^^^^^ global variable cannot have opaque type
+             ^^^^^^ global variable cannot have opaque type.
+             ^^^^^^ do you intend to define a `static const` instead?
+*/
 
 uint test(uint x)
 {

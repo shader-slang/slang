@@ -12,7 +12,7 @@ public struct PermutoEncoder<T,
     uint MaxLevels,
     InArray,
     OutArray
-    > :ITrainableEncoder<T, InArray, OutArray>
+    > : ITrainableEncoder<T, InArray, OutArray>
     where T : __BuiltinFloatingPointType
     where T.Differential == T
     where InArray : IArrayAccessor<T>, IDifferentiable
@@ -190,46 +190,43 @@ public struct PermutoEncoder<T,
     // =========================================================================
 
     /// Reads feature values at a given lattice position from the feature table.
+    /// @param levelBaseOffset Base offset into the feature table for this level (in number of elements).
     [BackwardDerivative(readFeatureValueBwd)]
-    static void readFeatureValue<Storage>(
-        Storage featureTable,
-        no_diff in Storage.Address featureTableAddress,
+    static void readFeatureValue<Address>(
+        Address featureTableAddress,
+        uint levelBaseOffset,
         uint hashmapSize,
         uvec<Dimensions> key,
         out T result[FeatureDimensionPerEntry])
-            where Storage : IStorage<T>
-            where Storage.Differential : IStorage<T.Differential>
-            where Storage.Address == Storage.Differential.Address
+            where Address : IPointerLikeAddress<T>
+            where Address.Differential : IPointerLikeAddress<T.Differential>
     {
-        uint index = permutoIndex(key, hashmapSize) * FeatureDimensionPerEntry;
+        uint index = levelBaseOffset + permutoIndex(key, hashmapSize) * FeatureDimensionPerEntry;
 
         [ForceUnroll]
         for (uint f = 0; f < FeatureDimensionPerEntry; ++f)
         {
-            result[f] = featureTable.read(Storage.getOffset(featureTableAddress, int(index + f)));
+            result[f] = featureTableAddress[index + f];
         }
     }
 
-    static void readFeatureValueBwd<Storage>(
-        DifferentialPtrPair<Storage> featureTable,
-        no_diff in Storage.Address featureTableAddress,
+    static void readFeatureValueBwd<Address>(
+        DifferentialPtrPair<Address> featureTableAddress,
+        uint levelBaseOffset,
         uint hashmapSize,
         uvec<Dimensions> key,
         T.Differential[FeatureDimensionPerEntry] result)
-            where Storage : IStorage<T>
-            where Storage.Differential : IStorage<T.Differential>
-            where Storage.Address == Storage.Differential.Address
+            where Address : IPointerLikeAddress<T>
+            where Address.Differential : IPointerLikeAddress<T.Differential>
     {
-        uint index = permutoIndex(key, hashmapSize) * FeatureDimensionPerEntry;
+        uint index = levelBaseOffset + permutoIndex(key, hashmapSize) * FeatureDimensionPerEntry;
 
         [ForceUnroll]
         for (uint f = 0; f < FeatureDimensionPerEntry; ++f)
         {
-            let offset = Storage.getOffset(featureTableAddress, int(index + f));
-            featureTable.d.atomicAdd(offset, result[f]);
+            featureTableAddress.d.atomicAdd(index + f, result[f]);
         }
     }
-
 
     /// Main forward pass: encodes positions using the permutohedral lattice for a single level.
     /// Writes results to the appropriate offset in the full output array.
@@ -238,19 +235,16 @@ public struct PermutoEncoder<T,
     ///   - maxLevel: Maximum level to use (maxLevelRatio * MaxLevels)
     ///   - levelInfo: Per-level info (currentLevelIndex, offsetOfFeatureTable, featureTableSize, scale, scalesPerDim, shiftsPerDim)
     /// @param position Input position (Dimensions floats)
-    /// @param featureTable Storage containing feature vectors for all levels
-    /// @param featureTableAddress Base address for feature table storage
+    /// @param featureTableAddress Pointer-like address to the feature table for all levels
     /// @param encodedFeatures Output array of size MaxLevels * FeatureDimensionPerEntry. Results are written at offset currentLevelIndex * FeatureDimensionPerEntry.
     [Differentiable]
-    VISIBILITY_LEVEL static void encodePerLevel<Storage>(
+    VISIBILITY_LEVEL static void encodePerLevel<Address>(
         no_diff in Params params,
         InArray position,
-        Storage featureTable,
-        no_diff in Storage.Address featureTableAddress,
+        Address featureTableAddress,
         inout OutArray encodedFeatures)
-            where Storage : IStorage<T>
-            where Storage.Differential : IStorage<T.Differential>
-            where Storage.Address == Storage.Differential.Address
+            where Address : IPointerLikeAddress<T>
+            where Address.Differential : IPointerLikeAddress<T.Differential>
     {
         // Compute offset into output array for this level
         uint outputOffset = params.levelInfo.currentLevelIndex * FeatureDimensionPerEntry;
@@ -272,8 +266,10 @@ public struct PermutoEncoder<T,
         uint levelOffset = params.levelInfo.offsetOfFeatureTable;
         uint hashmapSize = params.levelInfo.featureTableSize;
 
-        // Offset feature table address to the start of this level
-        Storage.Address levelFeatureAddress = Storage.getOffset(featureTableAddress, int(levelOffset * FeatureDimensionPerEntry));
+        // Compute the base offset for this level's features (as integer, not address offset).
+        // We pass this as an integer to readFeatureValue so that the DifferentialPtrPair
+        // stays at the base address — both .p and .d remain correctly paired.
+        uint levelBaseOffset = levelOffset * FeatureDimensionPerEntry;
 
         // Elevate D-dimension vector to (D+1)-dimension homogeneous vector on hyperplane H_d
         float elevated[Dimensions + 1];
@@ -306,7 +302,7 @@ public struct PermutoEncoder<T,
 
             // Read feature value at this vertex
             T featureVal[FeatureDimensionPerEntry];
-            readFeatureValue(featureTable, levelFeatureAddress, hashmapSize, key, featureVal);
+            readFeatureValue(featureTableAddress, levelBaseOffset, hashmapSize, key, featureVal);
 
             // Accumulate with barycentric weight
             float weight = barycentric[k];
@@ -319,10 +315,9 @@ public struct PermutoEncoder<T,
     }
 
     [Differentiable]
-    public OutArray encode<Storage>(in InArray input, Storage parameters, no_diff in Storage.Address parametersAddress)
-        where Storage : IStorage<T>
-        where Storage.Differential : IStorage<T.Differential>
-        where Storage.Address == Storage.Differential.Address
+    public OutArray encode<Address>(in InArray input, Address parametersAddress)
+        where Address : IPointerLikeAddress<T>
+        where Address.Differential : IPointerLikeAddress<T.Differential>
     {
         OutArray encodedFeatures = OutArray();
 
@@ -333,18 +328,9 @@ public struct PermutoEncoder<T,
         for (uint level = 0; level < MaxLevels; ++level)
         {
             levelParams.levelInfo = params.levelInfo[level];
-            encodePerLevel<Storage>(levelParams, input, parameters, parametersAddress, encodedFeatures);
+            encodePerLevel<Address>(levelParams, input, parametersAddress, encodedFeatures);
         }
 
-        return encodedFeatures;
-    }
-
-    [Differentiable]
-    public OutArray encode<Address>(in InArray input, Address parametersAddress)
-        where Address : IPointerLikeAddress<T>
-    {
-        OutArray encodedFeatures = OutArray();
-        static_assert(false, "Not implemented");
         return encodedFeatures;
     }
 

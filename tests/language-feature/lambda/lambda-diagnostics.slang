@@ -1,23 +1,29 @@
-//TEST:SIMPLE(filecheck=CHECK): -target spirv
+//DIAGNOSTIC_TEST:SIMPLE(diag=diag,non-exhaustive): -target spirv
 
 [numthreads(1,1,1)]
 void test()
 {
     int c = 0;
     let lam = (int a) => {
-        //CHECK:([[# @LINE+1]]): error 30011:
         c = a + 1;
+//diag: ^ attempting to assign to a const variable or immutable member; use '[mutating]' attribute on the containing method to allow modification
+//diag:   ^ left of '=' is not an l-value
+//diag:   ^ left of '=' is not an l-value.
     };
     let lam1 = (int a) => {
         if (a > 0)
             return 1;
         else
-            //CHECK:([[# @LINE+1]]): error 30111:
             return 3.0;
+//diag:     ^^^^^^ lambda return type mismatch
+//diag:     ^^^^^^ returned values must have the same type among all 'return' statements inside a lambda expression: returned 'float' here, but 'int' previously.
+//diag:            ^^^ implicit conversion not recommended
+//diag:            ^^^ implicit conversion from 'float' to 'int' is not recommended
     };
     RayQuery q;
     let lam2 = (int a) => {
-        //CHECK:([[# @LINE+1]]): error 30112:
         q.Abort();
+//diag: ^ non-copyable type captured
+//diag: ^ cannot capture non-copyable type 'RayQuery<0>' in a lambda expression.
     };
 }

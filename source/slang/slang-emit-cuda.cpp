@@ -4,6 +4,7 @@
 #include "../core/slang-writer.h"
 #include "slang-emit-source-writer.h"
 #include "slang-mangled-lexer.h"
+#include "slang-rich-diagnostics.h"
 
 #include <assert.h>
 
@@ -215,6 +216,18 @@ SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, 
 
     switch (type->getOp())
     {
+    case kIROp_PtrType:
+    case kIROp_NativePtrType:
+        {
+            auto ptrType = cast<IRPtrTypeBase>(type);
+            if (auto unsizedArrayType = as<IRUnsizedArrayType>(ptrType->getValueType()))
+            {
+                SLANG_RETURN_ON_FAIL(calcTypeName(unsizedArrayType->getElementType(), target, out));
+                out << "**";
+                return SLANG_OK;
+            }
+            break;
+        }
     case kIROp_VectorType:
         {
             auto vecType = static_cast<IRVectorType*>(type);
@@ -1015,6 +1028,14 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             m_writer->emit(")");
         }
         return true;
+    case kIROp_GetStructuredBufferPtr:
+    case kIROp_GetUntypedBufferPtr:
+        {
+            m_writer->emit("(&(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(").data)");
+            return true;
+        }
     default:
         break;
     }
@@ -1041,6 +1062,26 @@ void CUDASourceEmitter::emitVectorTypeNameImpl(IRType* elementType, IRIntegerVal
 {
     m_writer->emit(getVectorPrefix(elementType->getOp()));
     m_writer->emit(elementCount);
+}
+
+void CUDASourceEmitter::_emitType(IRType* type, DeclaratorInfo* declarator)
+{
+    // Handle Ptr<T[]> on CUDA, we shouldn't emit it as Array<T>*.
+    // Instead, we should emit it as T**.
+    // e.g. Array<T>* a;    a[1] == a + sizeof(Array<T>)
+    // but T** b;    b[1] == b + sizeof(T*)
+    if (type->getOp() == kIROp_PtrType || type->getOp() == kIROp_NativePtrType)
+    {
+        auto ptrType = cast<IRPtrTypeBase>(type);
+        if (auto unsizedArrayType = as<IRUnsizedArrayType>(ptrType->getValueType()))
+        {
+            PtrDeclaratorInfo outerPtr(declarator);
+            PtrDeclaratorInfo innerPtr(&outerPtr);
+            _emitType(unsizedArrayType->getElementType(), &innerPtr);
+            return;
+        }
+    }
+    Super::_emitType(type, declarator);
 }
 
 void CUDASourceEmitter::emitSimpleTypeImpl(IRType* type)
@@ -1276,12 +1317,9 @@ SlangResult CUDASourceEmitter::emitWMMAFragmentType(
     // we can provide better diagnostic messages here.
     if (!typeCheck(elementType->getOp(), matrixUse))
     {
-        StringBuilder msg;
-        getSink()->diagnose(
-            SourceLoc(),
-            Diagnostics::cooperativeMatrixUnsupportedElementType,
-            typeName,
-            matrixUse == 0 ? "A" : (matrixUse == 1 ? "B" : "C"));
+        getSink()->diagnose(Diagnostics::CooperativeMatrixUnsupportedElementType{
+            .elementType = typeName,
+            .matrixUse = matrixUse == 0 ? "A" : (matrixUse == 1 ? "B" : "C")});
         SLANG_RELEASE_ASSERT(false);
         return SLANG_FAIL;
     }
@@ -1291,12 +1329,10 @@ SlangResult CUDASourceEmitter::emitWMMAFragmentType(
     FragmentShape shape = computeShapeCombination(matrixUse, rowCount, colCount);
     if (!shape.isValid())
     {
-        getSink()->diagnose(
-            SourceLoc(),
-            Diagnostics::cooperativeMatrixInvalidShape,
-            rowCount,
-            colCount,
-            matrixUse == 0 ? "A" : (matrixUse == 1 ? "B" : "C"));
+        getSink()->diagnose(Diagnostics::CooperativeMatrixInvalidShape{
+            .rowCount = String(rowCount),
+            .colCount = String(colCount),
+            .matrixUse = matrixUse == 0 ? "A" : (matrixUse == 1 ? "B" : "C")});
         SLANG_RELEASE_ASSERT(false);
         return SLANG_FAIL;
     }

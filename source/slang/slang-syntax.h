@@ -16,6 +16,15 @@ inline Type* getSup(ASTBuilder* astBuilder, DeclRef<TypeConstraintDecl> const& d
     return declRef.substitute(astBuilder, declRef.getDecl()->getSup().type);
 }
 
+inline Type* getFromType(ASTBuilder* astBuilder, DeclRef<TypeCoercionConstraintDecl> const& declRef)
+{
+    return declRef.substitute(astBuilder, declRef.getDecl()->fromType.Ptr());
+}
+
+inline Type* getToType(ASTBuilder* astBuilder, DeclRef<TypeCoercionConstraintDecl> const& declRef)
+{
+    return declRef.substitute(astBuilder, declRef.getDecl()->toType);
+}
 
 // `Val`
 
@@ -42,6 +51,18 @@ inline int getVectorSize(VectorExpressionType* vecType)
     // TODO: what to do in this case?
     return 0;
 }
+
+/// Represents what the compiler can currently prove about a variadic pack's cardinality.
+/// This is intentionally coarse-grained: we only track whether a pack is known to be empty,
+/// known to be non-empty, or still unknown.
+enum class VariadicPackCardinality
+{
+    Unknown,
+    Empty,
+    NonEmpty,
+};
+
+VariadicPackCardinality getKnownPackCardinality(Val* packOperand);
 
 //
 // Declarations

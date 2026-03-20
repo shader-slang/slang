@@ -1,10 +1,9 @@
-//TEST:SIMPLE(filecheck=CHECK): -stage compute -entry computeMain -target spirv
-
-//CHECK: error 30623
+//DIAGNOSTIC_TEST:SIMPLE(diag=diag): -stage compute -entry computeMain -target spirv
 
 interface Bug
 {
     static const int badVar = 0;
+//diag:              ^^^^^^ 'badVar' cannot have an initializer because it is an interface requirement
 }
 
 RWStructuredBuffer<int> b;

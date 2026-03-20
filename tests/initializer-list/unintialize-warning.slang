@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 struct CLike
 {
@@ -64,22 +64,27 @@ void func5(PartialInit2 p)
 void test()
 {
     CLike c; // `c` is uninitialized.
-    // CHECK: warning 41016: use of uninitialized variable 'c'
     func1(c);
+//CHECK: ^ use of uninitialized variable
+//CHECK: ^ use of uninitialized variable 'c'
 
     ExplicitCtor e; // `e` is uninitialized.
-    // CHECK: warning 41016: use of uninitialized variable 'e'
     func2(e);
+//CHECK: ^ use of uninitialized variable
+//CHECK: ^ use of uninitialized variable 'e'
 
     DefaultMember d; // `d` is uninitialized.
-    // CHECK: warning 41016: use of uninitialized variable 'd'
     func3(d);
+//CHECK: ^ use of uninitialized variable
+//CHECK: ^ use of uninitialized variable 'd'
 
     PartialInit1 p1; // `p` is uninitialized.
-    // CHECK: warning 41016: use of uninitialized variable 'p1'
     func4(p1);
+//CHECK: ^ use of uninitialized variable
+//CHECK: ^ use of uninitialized variable 'p1'
 
     PartialInit2 p2; // `p` is uninitialized.
-    // CHECK: warning 41016: use of uninitialized variable 'p2'
     func5(p2);
+//CHECK: ^ use of uninitialized variable
+//CHECK: ^ use of uninitialized variable 'p2'
 }

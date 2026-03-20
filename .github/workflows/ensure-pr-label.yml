@@ -1,7 +1,7 @@
 name: Verify PR Labels
 on:
   pull_request:
-    types: [opened, labeled, unlabeled, synchronize]
+    types: [opened, labeled, unlabeled, synchronize, ready_for_review]
     paths-ignore:
       - "docs/**"
       - "LICENSES/**"
@@ -10,6 +10,7 @@ on:
       - "README.md"
 jobs:
   label:
+    if: github.event.pull_request.draft != true
     runs-on: ubuntu-latest
     permissions:
       issues: write

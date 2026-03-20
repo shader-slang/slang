@@ -242,6 +242,7 @@ local insts = {
 								{ "valueType", "IRType" },
 								{ "accessQualifierOperand", "IRIntLit", optional = true },
 								{ "addressSpaceOperand", "IRIntLit", optional = true },
+								{ "dataLayout", "IRType", optional = true },
 							},
 						},
 					},
@@ -252,6 +253,7 @@ local insts = {
 								{ "valueType", "IRType" },
 								{ "accessQualifierOperand", "IRIntLit", optional = true },
 								{ "addressSpaceOperand", "IRIntLit", optional = true },
+								{ "dataLayout", "IRType", optional = true },
 							},
 						},
 					},
@@ -262,6 +264,7 @@ local insts = {
 								{ "valueType", "IRType" },
 								{ "accessQualifierOperand", "IRIntLit", optional = true },
 								{ "addressSpaceOperand", "IRIntLit", optional = true },
+								{ "dataLayout", "IRType", optional = true },
 							},
 						},
 					},
@@ -276,6 +279,7 @@ local insts = {
 								{ "valueType", "IRType" },
 								{ "accessQualifierOperand", "IRIntLit", optional = true },
 								{ "addressSpaceOperand", "IRIntLit", optional = true },
+								{ "dataLayout", "IRType", optional = true },
 							},
 						},
 					},
@@ -331,10 +335,15 @@ local insts = {
 				},
 			},
 			{ DefaultLayout = { struct_name = "DefaultBufferLayoutType", hoistable = true } },
+			{ DefaultPushConstantLayout = { struct_name = "DefaultPushConstantBufferLayoutType", hoistable = true } },
 			{ Std140Layout = { struct_name = "Std140BufferLayoutType", hoistable = true } },
 			{ Std430Layout = { struct_name = "Std430BufferLayoutType", hoistable = true } },
 			{ ScalarLayout = { struct_name = "ScalarBufferLayoutType", hoistable = true } },
 			{ CLayout = { struct_name = "CBufferLayoutType", hoistable = true } },
+			{ D3DConstantBufferLayout = { struct_name = "D3DConstantBufferLayoutType", hoistable = true } },
+			{ MetalParameterBlockLayout = { struct_name = "MetalParameterBlockLayoutType", hoistable = true } },
+			{ CUDALayout = { struct_name = "CUDABufferLayoutType", hoistable = true } },
+			{ LLVMLayout = { struct_name = "LLVMBufferLayoutType", hoistable = true } },
 			{
 				SubpassInputType = {
 					operands = { { "elementType", "IRType" }, { "isMultisampleInst" } },
@@ -646,6 +655,9 @@ local insts = {
 					hoistable = true,
 				},
 			},
+			-- Represents the type of a generic value pack parameter.
+			-- e.g. `let each D : int` lowers to a param of type ValuePackType(int).
+			{ ValuePackType = { operands = { { "elementType", "IRType" } }, hoistable = true } },
 			{ ExpandTypeOrVal = { operands = { { "type" } }, hoistable = true } },
 			{
 				spirvLiteralType = {
@@ -891,6 +903,12 @@ local insts = {
 	},
 	{ specialize = { operands = { { "base" }, { "arg" } }, hoistable = true } },
 	{ lookupWitness = { struct_name = "LookupWitnessMethod", min_operands = 2, hoistable = true } },
+	{
+		PackBranch = {
+			operands = { { "pack" }, { "emptyValue" }, { "nonEmptyValue" } },
+			hoistable = true,
+		},
+	},
 	{ GetSequentialID = { operands = { { "RTTIOperand" } }, hoistable = true } },
 	{
 		bind_global_generic_param = {
@@ -921,7 +939,8 @@ local insts = {
 	{ makeStruct = {} },
 	{ makeTuple = {} },
 	{ makeTargetTuple = { struct_name = "MakeTargetTuple" } },
-	{ makeValuePack = {} },
+	{ makeValuePack = { hoistable=true } },
+	{ makeCombinedTextureSampler = { operands = { {"texture"}, {"sampler"} } } },
 	{ getTargetTupleElement = {} },
 	{
 		getTupleElement = {
@@ -933,6 +952,22 @@ local insts = {
 		LoadSamplerDescriptorFromHeap = {
 			operands = { { "index" } },
 		},
+	},
+	{
+		SPIRVLoadDescriptorFromHeap = {
+			operands = { { "heap" }, { "index" } },
+		},
+	},
+	{
+		SPIRVLoadTexelPointerFromHeap = {
+			operands = { { "heap" }, { "index" }, { "textureType" }, { "coord" }, { "sampleIndex" } },
+		},
+	},
+	{
+		SPIRVResourceHeap = { hoistable = true }
+	},
+	{
+		SPIRVSamplerHeap = { hoistable = true }
 	},
 	{ MakeCombinedTextureSamplerFromHandle = { operands = { { "handle" } } } },
 	{
@@ -1904,6 +1939,7 @@ local insts = {
 				AnyValueSize = { struct_name = "AnyValueSizeDecoration", operands = { { "sizeOperand", "IRIntLit" } } },
 			},
 			{ SpecializeDecoration = {} },
+			{ SpecializationDepthDecoration = { operands = { { "specializationDepthOperand", "IRIntLit" } } } },
 			{ SequentialIDDecoration = { operands = { { "sequentialIdOperand", "IRIntLit" } } } },
 			{ DynamicDispatchWitnessDecoration = {} },
 			{ StaticRequirementDecoration = {} },
@@ -2431,9 +2467,14 @@ local insts = {
 	{ CastDescriptorHandleToResource = { operands = { { "handle" } } } },
 	{ CastResourceToDescriptorHandle = { operands = { { "resource" } } } },
 	{ TreatAsDynamicUniform = { operands = { { "value" } } } },
-	{ sizeOf = { operands = { { "type" } } } },
-	{ alignOf = { operands = { { "baseOp" } } } },
+	{ sizeOf = { operands = { { "type" }, { "dataLayout", "IRType", optional = true } } } },
+	{ alignOf = { operands = { { "baseOp" }, { "dataLayout", "IRType", optional = true } } } },
 	{ countOf = { operands = { { "type" } } } },
+	{ ExtractFirstFromPack = { operands = { { "pack" }, { "witness" } }, hoistable = true } },
+	{ ExtractLastFromPack = { operands = { { "pack" }, { "witness" } }, hoistable = true } },
+	{ TrimFirstOfPack = { operands = { { "pack" }, { "witness" } }, hoistable = true } },
+	{ TrimLastOfPack = { operands = { { "pack" }, { "witness" } }, hoistable = true } },
+	{ NonEmptyPackWitness = { operands = { { "pack" } }, hoistable = true } },
 	{ GetArrayLength = { operands = { { "array" } } } },
 	{
 		IsType = {
@@ -2958,6 +2999,39 @@ local insts = {
 		--
 		hoistable = true
 	} },
+	-- Constexpr arithmetic ops. These are hoistable variants of the regular
+	-- arithmetic ops, used for lowering compile-time integer expressions
+	-- (IntVal subclasses like PolynomialIntVal) so that they get deduplicated.
+	{ constexprAdd = { operands = { { "left" }, { "right" } }, hoistable = true } },
+	{ constexprSub = { operands = { { "left" }, { "right" } }, hoistable = true } },
+	{ constexprMul = { operands = { { "left" }, { "right" } }, hoistable = true } },
+	{ constexprNeg = { operands = { { "value" } }, hoistable = true } },
+	{ constexprDiv = { operands = { { "left" }, { "right" } }, hoistable = true } },
+	{ constexprIRem = { operands = { { "left" }, { "right" } }, hoistable = true } },
+	{ constexprShl = { operands = { { "left" }, { "right" } }, hoistable = true } },
+	{ constexprShr = { operands = { { "left" }, { "right" } }, hoistable = true } },
+	{ constexprBitAnd = { operands = { { "left" }, { "right" } }, hoistable = true } },
+	{ constexprBitOr = { operands = { { "left" }, { "right" } }, hoistable = true } },
+	{ constexprBitXor = { operands = { { "left" }, { "right" } }, hoistable = true } },
+	{ constexprBitNot = { operands = { { "value" } }, hoistable = true } },
+	{ constexprNot = { operands = { { "value" } }, hoistable = true } },
+	{ constexprEql = { operands = { { "left" }, { "right" } }, hoistable = true } },
+	{ constexprNeq = { operands = { { "left" }, { "right" } }, hoistable = true } },
+	{ constexprGreater = { operands = { { "left" }, { "right" } }, hoistable = true } },
+	{ constexprLess = { operands = { { "left" }, { "right" } }, hoistable = true } },
+	{ constexprGeq = { operands = { { "left" }, { "right" } }, hoistable = true } },
+	{ constexprLeq = { operands = { { "left" }, { "right" } }, hoistable = true } },
+	{ constexprAnd = { operands = { { "left" }, { "right" } }, hoistable = true } },
+	{ constexprOr = { operands = { { "left" }, { "right" } }, hoistable = true } },
+	{ constexprSelect = { operands = { { "condition" }, { "ifTrue" }, { "ifFalse" } }, hoistable = true } },
+	-- Constexpr cast ops. Hoistable variants of casting ops used for IntVal lowering.
+	{ constexprIntCast = { operands = { { "value" } }, hoistable = true } },
+	{ constexprCastIntToFloat = { operands = { { "value" } }, hoistable = true } },
+	{ constexprCastFloatToInt = { operands = { { "value" } }, hoistable = true } },
+	{ constexprFloatCast = { operands = { { "value" } }, hoistable = true } },
+	{ constexprCastIntToEnum = { operands = { { "value" } }, hoistable = true } },
+	{ constexprCastEnumToInt = { operands = { { "value" } }, hoistable = true } },
+	{ constexprEnumCast = { operands = { { "value" } }, hoistable = true } },
 }
 
 -- A function to calculate some useful properties and put it in the table,

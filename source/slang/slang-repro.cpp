@@ -10,6 +10,7 @@
 #include "../core/slang-text-io.h"
 #include "../core/slang-type-text-util.h"
 #include "slang-options.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -374,19 +375,16 @@ static String _scrubName(const String& in)
         RequestState* dst = base[requestState];
 
         dst->compileFlags = 0;
-        dst->shouldDumpIntermediates =
-            linkage->m_optionSet.getBoolOption(CompilerOptionName::DumpIntermediates);
-        dst->debugInfoLevel = linkage->m_optionSet.getEnumOption<DebugInfoLevel>(
-            CompilerOptionName::DebugInformation);
-        dst->optimizationLevel =
-            linkage->m_optionSet.getEnumOption<OptimizationLevel>(CompilerOptionName::Optimization);
+        dst->shouldDumpIntermediates = linkage->m_optionSet.shouldDumpIntermediates();
+        dst->debugInfoLevel = linkage->m_optionSet.getDebugInfoLevel();
+        dst->optimizationLevel = linkage->m_optionSet.getOptimizationLevel();
         dst->containerFormat = request->m_containerFormat;
         dst->passThroughMode = request->m_passThrough;
 
         dst->useUnknownImageFormatAsDefault =
             linkage->m_optionSet.getBoolOption(CompilerOptionName::DefaultImageFormatUnknown);
         ;
-        dst->obfuscateCode = linkage->m_optionSet.getBoolOption(CompilerOptionName::Obfuscate);
+        dst->obfuscateCode = linkage->m_optionSet.shouldObfuscateCode();
 
         dst->defaultMatrixLayoutMode =
             (SlangMatrixLayoutMode)linkage->m_optionSet.getMatrixLayoutMode();
@@ -453,9 +451,7 @@ static String _scrubName(const String& in)
                 dst.target = srcTargetRequest->getTarget();
                 dst.profile = srcTargetRequest->getOptionSet().getProfile();
                 dst.targetFlags = srcTargetRequest->getOptionSet().getTargetFlags();
-                dst.floatingPointMode =
-                    srcTargetRequest->getOptionSet().getEnumOption<FloatingPointMode>(
-                        CompilerOptionName::FloatingPointMode);
+                dst.floatingPointMode = srcTargetRequest->getOptionSet().getFloatingPointMode();
             }
 
             // Copy the entry point/target output names
@@ -1218,7 +1214,7 @@ struct LoadContext
         auto result = StreamUtil::readAll(stream, streamData);
         if (SLANG_FAILED(result))
         {
-            sink->diagnose(SourceLoc(), Diagnostics::unableToReadRiff);
+            sink->diagnose(Diagnostics::UnableToReadRiff{});
             return result;
         }
     }
@@ -1235,19 +1231,19 @@ struct LoadContext
     auto rootChunk = RIFF::RootChunk::getFromBlob(data, dataSize);
     if (!rootChunk)
     {
-        sink->diagnose(SourceLoc(), Diagnostics::unableToReadRiff);
+        sink->diagnose(Diagnostics::UnableToReadRiff{});
         return SLANG_FAIL;
     }
     if (rootChunk->getType() != kSlangStateFileFourCC)
     {
-        sink->diagnose(SourceLoc(), Diagnostics::expectingSlangRiffContainer);
+        sink->diagnose(Diagnostics::ExpectingSlangRiffContainer{});
         return SLANG_FAIL;
     }
 
     auto dataChunk = rootChunk->findDataChunk(kSlangStateDataFourCC);
     if (!dataChunk)
     {
-        sink->diagnose(SourceLoc(), Diagnostics::expectingSlangRiffContainer);
+        sink->diagnose(Diagnostics::ExpectingSlangRiffContainer{});
         return SLANG_FAIL;
     }
 
@@ -1258,7 +1254,7 @@ struct LoadContext
         auto result = reader.read(header);
         if (SLANG_FAILED(result))
         {
-            sink->diagnose(SourceLoc(), Diagnostics::expectingSlangRiffContainer);
+            sink->diagnose(Diagnostics::ExpectingSlangRiffContainer{});
             return result;
         }
     }
@@ -1269,17 +1265,15 @@ struct LoadContext
         header.m_semanticVersion.append(headerBuf);
         g_semanticVersion.append(currentBuf);
 
-        sink->diagnose(
-            SourceLoc(),
-            Diagnostics::incompatibleRiffSemanticVersion,
-            headerBuf,
-            currentBuf);
+        sink->diagnose(Diagnostics::IncompatibleRiffSemanticVersion{
+            .actualVersion = headerBuf,
+            .expectedVersion = currentBuf});
         return SLANG_FAIL;
     }
 
     if (header.m_typeHash != _getTypeHash())
     {
-        sink->diagnose(SourceLoc(), Diagnostics::riffHashMismatch);
+        sink->diagnose(Diagnostics::RiffHashMismatch{});
         return SLANG_FAIL;
     }
 
@@ -1290,7 +1284,7 @@ struct LoadContext
         auto result = reader.read(&outBuffer[0], remainingSize);
         if (SLANG_FAILED(result))
         {
-            sink->diagnose(SourceLoc(), Diagnostics::expectingSlangRiffContainer);
+            sink->diagnose(Diagnostics::ExpectingSlangRiffContainer{});
             return result;
         }
     }
@@ -1343,7 +1337,7 @@ struct LoadContext
 
     if (!Path::createDirectory(dirPath))
     {
-        sink->diagnose(SourceLoc(), Diagnostics::unableToCreateDirectory, dirPath);
+        sink->diagnose(Diagnostics::UnableToCreateDirectory{.path = dirPath});
         return SLANG_FAIL;
     }
 
