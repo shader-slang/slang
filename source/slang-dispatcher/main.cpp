@@ -10,9 +10,9 @@
 #endif
 #include <windows.h>
 #else
+#include <spawn.h>
 #include <sys/wait.h>
 #include <unistd.h>
-#include <spawn.h>
 extern char** environ;
 #endif
 
@@ -62,8 +62,14 @@ static int handleVersion(
     void* extra);
 
 static const SubcommandEntry kBuiltinSubcommands[] = {
-    {"compile", "Compile Slang source (delegates to slangc)", delegateToExecutable, (void*)"slangc"},
-    {"interpret", "Interpret Slang source (delegates to slangi)", delegateToExecutable, (void*)"slangi"},
+    {"compile",
+     "Compile Slang source (delegates to slangc)",
+     delegateToExecutable,
+     (void*)"slangc"},
+    {"interpret",
+     "Interpret Slang source (delegates to slangi)",
+     delegateToExecutable,
+     (void*)"slangi"},
     {"help", "Show this help message", handleHelp, nullptr},
     {"version", "Show version information", handleVersion, nullptr},
 };
@@ -275,23 +281,21 @@ static int handleHelp(
     (void)argv;
     (void)extra;
 
-    printf(
-        "Usage: slang [flags] <command> [args...]\n"
-        "       slang [args...] <file.slang> [args...]\n"
-        "\n"
-        "Commands:\n");
+    printf("Usage: slang [flags] <command> [args...]\n"
+           "       slang [args...] <file.slang> [args...]\n"
+           "\n"
+           "Commands:\n");
     for (const auto& entry : kBuiltinSubcommands)
         printf("  %-12s%s\n", entry.name, entry.description);
-    printf(
-        "\n"
-        "Flags (before <command> only):\n"
-        "  --verbose   Print the command before executing\n"
-        "  --dry-run   Print the command without executing\n"
-        "\n"
-        "Run 'slang <command> --help' for more information on a command.\n"
-        "\n"
-        "When invoked without a command, or with a file path as the first\n"
-        "argument, slang delegates to slangi (the Slang interpreter).\n");
+    printf("\n"
+           "Flags (before <command> only):\n"
+           "  --verbose   Print the command before executing\n"
+           "  --dry-run   Print the command without executing\n"
+           "\n"
+           "Run 'slang <command> --help' for more information on a command.\n"
+           "\n"
+           "When invoked without a command, or with a file path as the first\n"
+           "argument, slang delegates to slangi (the Slang interpreter).\n");
     return 0;
 }
 
