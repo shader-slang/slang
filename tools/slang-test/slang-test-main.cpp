@@ -1930,6 +1930,12 @@ static SlangResult _initSlangInterpreter(TestContext* context, CommandLine& ioCm
     return SLANG_OK;
 }
 
+static SlangResult _initSlangDispatcher(TestContext* context, CommandLine& ioCmdLine)
+{
+    ioCmdLine.setExecutableLocation(ExecutableLocation(context->options.binDir, "slang"));
+    return SLANG_OK;
+}
+
 static SlangResult _initSlangCompiler(TestContext* context, CommandLine& ioCmdLine)
 {
     ioCmdLine.setExecutableLocation(ExecutableLocation(context->options.binDir, "slangc"));
@@ -2815,6 +2821,41 @@ TestResult runInterpreterTest(TestContext* context, TestInput& input)
 
     ExecuteResult exeRes;
     TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));
+
+    if (context->isCollectingRequirements())
+    {
+        return TestResult::Pass;
+    }
+
+    String actualOutput = getOutput(exeRes);
+
+    return _validateOutput(
+        context,
+        input,
+        actualOutput,
+        false,
+        "result code = 0\nstandard error = {\n}\nstandard output = {\n}\n",
+        [&input](auto e, auto a) { return _areResultsEqual(input.testOptions->type, e, a); });
+}
+
+TestResult runDispatcherTest(TestContext* context, TestInput& input)
+{
+    auto outputStem = input.outputStem;
+
+    CommandLine cmdLine;
+
+    for (auto arg : input.testOptions->args)
+    {
+        cmdLine.addArg(arg);
+    }
+
+    if (SLANG_FAILED(_initSlangDispatcher(context, cmdLine)))
+    {
+        return TestResult::Ignored;
+    }
+
+    ExecuteResult exeRes;
+    TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, SpawnType::UseExe, cmdLine, exeRes));
 
     if (context->isCollectingRequirements())
     {
@@ -4489,6 +4530,7 @@ static const TestCommandInfo s_testCommandInfos[] = {
     {"SIMPLE_EX", &runSimpleTest, 0},
     {"SIMPLE_LINE", &runSimpleLineTest, 0},
     {"INTERPRET", &runInterpreterTest, 0},
+    {"DISPATCHER", &runDispatcherTest, 0},
     {"REFLECTION", &runReflectionTest, 0},
     {"CPU_REFLECTION", &runReflectionTest, 0},
     {"COMMAND_LINE_SIMPLE", &runSimpleCompareCommandLineTest, 0},

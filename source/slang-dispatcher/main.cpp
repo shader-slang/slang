@@ -273,37 +273,46 @@ static void printCommand(const String& executable, const List<String>& args)
     fprintf(stderr, "\n");
 }
 
-static int launchTool(
+enum class LaunchResult
+{
+    Success,
+    NotFound,
+    FailedToLaunch,
+};
+
+static LaunchResult launchTool(
     DispatchContext* ctx,
     const String& toolName,
     const char* argv0,
     int argc,
     const char* const* argv,
-    const char* errorContext)
+    int& outExitCode)
 {
     List<String> args;
     args.add(argv0);
     for (int i = 0; i < argc; ++i)
         args.add(argv[i]);
 
-    int exitCode = 1;
+    outExitCode = 1;
 
-    // Search the sibling directory (where the dispatcher itself lives).
     String path = findExecutableInDir(ctx->binDir, toolName);
-    if (path.getLength() > 0)
+    if (path.getLength() == 0)
+        return LaunchResult::NotFound;
+
+    if (ctx->verbose || ctx->dryRun)
     {
-        if (ctx->verbose || ctx->dryRun)
+        printCommand(path, args);
+        if (ctx->dryRun)
         {
-            printCommand(path, args);
-            if (ctx->dryRun)
-                return 0;
+            outExitCode = 0;
+            return LaunchResult::Success;
         }
-        if (spawnInherited(path, args, exitCode))
-            return exitCode;
     }
 
-    fprintf(stderr, "slang: %s\n", errorContext);
-    return 1;
+    if (spawnInherited(path, args, outExitCode))
+        return LaunchResult::Success;
+
+    return LaunchResult::FailedToLaunch;
 }
 
 static int delegateToExecutable(
@@ -313,20 +322,49 @@ static int delegateToExecutable(
     const char* const* argv,
     void* extra)
 {
-    const char* executableName = extra ? (const char*)extra : name;
-    String toolName(executableName);
+    const char* executableName = extra ? (const char*)extra : nullptr;
+    String toolName = executableName ? String(executableName) : (String("slang-") + name);
     String argv0 = String("slang-") + name;
 
-    StringBuilder errMsg;
-    errMsg << "unknown command '" << name << "'. See 'slang help'.";
-    String errString = errMsg.toString();
-
-    return launchTool(ctx, toolName, argv0.getBuffer(), argc, argv, errString.getBuffer());
+    int exitCode = 1;
+    LaunchResult result = launchTool(ctx, toolName, argv0.getBuffer(), argc, argv, exitCode);
+    switch (result)
+    {
+    case LaunchResult::Success:
+        return exitCode;
+    case LaunchResult::NotFound:
+        if (executableName)
+            fprintf(
+                stderr,
+                "slang: could not find '%s' for command '%s'\n",
+                toolName.getBuffer(),
+                name);
+        else
+            fprintf(stderr, "slang: unknown command '%s'. See 'slang help'.\n", name);
+        return 1;
+    case LaunchResult::FailedToLaunch:
+        fprintf(stderr, "slang: failed to launch '%s'\n", toolName.getBuffer());
+        return 1;
+    }
+    return 1;
 }
 
 static int delegateToInterpreter(DispatchContext* ctx, int argc, const char* const* argv)
 {
-    return launchTool(ctx, String("slangi"), "slangi", argc, argv, "failed to launch 'slangi'");
+    int exitCode = 1;
+    LaunchResult result = launchTool(ctx, String("slangi"), "slangi", argc, argv, exitCode);
+    switch (result)
+    {
+    case LaunchResult::Success:
+        return exitCode;
+    case LaunchResult::NotFound:
+        fprintf(stderr, "slang: could not find 'slangi'\n");
+        return 1;
+    case LaunchResult::FailedToLaunch:
+        fprintf(stderr, "slang: failed to launch 'slangi'\n");
+        return 1;
+    }
+    return 1;
 }
 
 static int handleHelp(
@@ -343,7 +381,8 @@ static int handleHelp(
     (void)extra;
 
     printf("Usage: slang [flags] <command> [args...]\n"
-           "       slang [args...] <file.slang> [args...]\n"
+           "       slang <file.slang> [args...]\n"
+           "       slang [args...]\n"
            "\n"
            "Commands:\n");
     for (const auto& entry : kBuiltinSubcommands)
