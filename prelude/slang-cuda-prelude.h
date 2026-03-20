@@ -6602,7 +6602,8 @@ enum ShapeCombination : int
 {
     m16n16k16 = 0,
     m8n32k16 = 1,
-    m32n8k16 = 2
+    m32n8k16 = 2,
+    m16n8k16 = 3
 };
 
 // ====================================================================================
@@ -6626,6 +6627,11 @@ template<>
 struct PtxShapeName<32, 8, 16>
 {
     static constexpr const char name[] = "m32n8k16";
+};
+template<>
+struct PtxShapeName<16, 8, 16>
+{
+    static constexpr const char name[] = "m16n8k16";
 };
 
 // Matrix role names
@@ -6929,6 +6935,68 @@ struct RegisterCount<__nv_fp8_e5m2, 32, 8, 16, MatrixUse::MatrixB>
 
 
 // ====================================================================================
+// MMA m16n8k16 Register Counts (override generic WMMA counts)
+// A: 16x16 → 4 f16x2 regs, B: 16x8 → 2 f16x2 regs, C/D: 16x8 → 4 f32 or 2 f16x2
+// ====================================================================================
+
+#if SLANG_CUDA_ENABLE_HALF
+template<>
+struct RegisterCount<half, 16, 8, 16, MatrixUse::MatrixA>
+{
+    static constexpr int value = 4;
+};
+template<>
+struct RegisterCount<half, 16, 8, 16, MatrixUse::MatrixB>
+{
+    static constexpr int value = 2;
+};
+template<>
+struct RegisterCount<half, 16, 8, 16, MatrixUse::MatrixC>
+{
+    static constexpr int value = 2;
+};
+template<>
+struct RegisterCount<half, 16, 8, 16, MatrixUse::MatrixD>
+{
+    static constexpr int value = 2;
+};
+#endif // #if SLANG_CUDA_ENABLE_HALF
+
+#if SLANG_CUDA_ENABLE_BF16
+template<>
+struct RegisterCount<__nv_bfloat16, 16, 8, 16, MatrixUse::MatrixA>
+{
+    static constexpr int value = 4;
+};
+template<>
+struct RegisterCount<__nv_bfloat16, 16, 8, 16, MatrixUse::MatrixB>
+{
+    static constexpr int value = 2;
+};
+template<>
+struct RegisterCount<__nv_bfloat16, 16, 8, 16, MatrixUse::MatrixC>
+{
+    static constexpr int value = 2;
+};
+template<>
+struct RegisterCount<__nv_bfloat16, 16, 8, 16, MatrixUse::MatrixD>
+{
+    static constexpr int value = 2;
+};
+#endif // #if SLANG_CUDA_ENABLE_BF16
+
+template<>
+struct RegisterCount<float, 16, 8, 16, MatrixUse::MatrixC>
+{
+    static constexpr int value = 4;
+};
+template<>
+struct RegisterCount<float, 16, 8, 16, MatrixUse::MatrixD>
+{
+    static constexpr int value = 4;
+};
+
+// ====================================================================================
 // Saturation at the output for integer MMA
 // ====================================================================================
 template<bool saturatingAccumulation>
@@ -7057,6 +7125,722 @@ __device__ inline void wmmaStore(void* ptr, const uint32_t* regs, int stride)
     }
 }
 
+// ====================================================================================
+// MMA m16n8k16 Load/Store
+// Uses 128-bit vectorized loads with warp shuffle redistribution for Matrix A,
+// 64-bit paired loads for f32 C/D, and 32-bit coalesced loads for B.
+// Falls back to element-wise access for column-major layouts where data is non-contiguous.
+// ====================================================================================
+
+__device__ inline uint32_t mmaPack2x16(const void* lo, const void* hi)
+{
+    uint16_t u0, u1;
+    memcpy(&u0, lo, 2);
+    memcpy(&u1, hi, 2);
+    return (uint32_t)u0 | ((uint32_t)u1 << 16);
+}
+
+__device__ inline void mmaUnpack2x16(uint32_t packed, void* lo, void* hi)
+{
+    uint16_t u0 = (uint16_t)(packed & 0xFFFF);
+    uint16_t u1 = (uint16_t)(packed >> 16);
+    memcpy(lo, &u0, 2);
+    memcpy(hi, &u1, 2);
+}
+
+template<Layout layout>
+__device__ inline int mmaAddr(int row, int col, int stride)
+{
+    if constexpr (layout == Layout::RowMajor)
+        return row * stride + col;
+    else
+        return col * stride + row;
+}
+
+// ====================================================================================
+// MMA m16n8k16 Matrix A Load (f16, 16x16)
+//
+// Uses 128-bit vectorized load + warp shuffle redistribution.
+// Each thread loads one 128-bit row-half, then 4 rounds of shuffles redistribute
+// the data so each thread ends up with the correct MMA fragment registers.
+//
+// Target MMA fragment layout:
+//
+//          |<----------- columns 0-7 ----------->|<---------- columns 8-15 ----------->|
+// R\C      |  c0,1    |  c2,3    |  c4,5    |  c6,7    ||  c8,9    | c10,11   | c12,13   | c14,15   |
+// ---------+----------+----------+----------+----------++----------+----------+----------+----------+
+// row  0   |  T0:a0a1 |  T1:a0a1 |  T2:a0a1 |  T3:a0a1 ||  T0:a4a5 |  T1:a4a5 |  T2:a4a5 |  T3:a4a5 |
+// row  1   |  T4:a0a1 |  T5:a0a1 |  T6:a0a1 |  T7:a0a1 ||  T4:a4a5 |  T5:a4a5 |  T6:a4a5 |  T7:a4a5 |
+//   ..     |    ..    |    ..    |    ..    |    ..    ||    ..    |    ..    |    ..    |    ..    |
+// row  7   | T28:a0a1 | T29:a0a1 | T30:a0a1 | T31:a0a1 || T28:a4a5 | T29:a4a5 | T30:a4a5 | T31:a4a5 |
+// ---------+----------+----------+----------+----------++----------+----------+----------+----------+
+// row  8   |  T0:a2a3 |  T1:a2a3 |  T2:a2a3 |  T3:a2a3 ||  T0:a6a7 |  T1:a6a7 |  T2:a6a7 |  T3:a6a7 |
+// row  9   |  T4:a2a3 |  T5:a2a3 |  T6:a2a3 |  T7:a2a3 ||  T4:a6a7 |  T5:a6a7 |  T6:a6a7 |  T7:a6a7 |
+//   ..     |    ..    |    ..    |    ..    |    ..    ||    ..    |    ..    |    ..    |    ..    |
+// row 15   | T28:a2a3 | T29:a2a3 | T30:a2a3 | T31:a2a3 || T28:a6a7 | T29:a6a7 | T30:a6a7 | T31:a6a7 |
+// ---------+----------+----------+----------+----------++----------+----------+----------+----------+
+//
+// Initial state after 128-bit load (each thread holds one row-half):
+//
+//          |<----------- columns 0-7 ----------->|<---------- columns 8-15 ----------->|
+// R\C      |  c0,1    |  c2,3    |  c4,5    |  c6,7    ||  c8,9    | c10,11   | c12,13   | c14,15   |
+// ---------+----------+----------+----------+----------++----------+----------+----------+----------+
+// row  0   |  T0:a0a1 |  T0:a2a3 |  T0:a4a5 |  T0:a6a7 ||  T1:a0a1 |  T1:a2a3 |  T1:a4a5 |  T1:a6a7 |
+// row  1   |  T2:a0a1 |  T2:a2a3 |  T2:a4a5 |  T2:a6a7 ||  T3:a0a1 |  T3:a2a3 |  T3:a4a5 |  T3:a6a7 |
+//   ..     |    ..    |    ..    |    ..    |    ..    ||    ..    |    ..    |    ..    |    ..    |
+// row  7   | T14:a0a1 | T14:a2a3 | T14:a4a5 | T14:a6a7 || T15:a0a1 | T15:a2a3 | T15:a4a5 | T15:a6a7 |
+// ---------+----------+----------+----------+----------++----------+----------+----------+----------+
+// row  8   | T16:a0a1 | T16:a2a3 | T16:a4a5 | T16:a6a7 || T17:a0a1 | T17:a2a3 | T17:a4a5 | T17:a6a7 |
+// row  9   | T18:a0a1 | T18:a2a3 | T18:a4a5 | T18:a6a7 || T19:a0a1 | T19:a2a3 | T19:a4a5 | T19:a6a7 |
+//   ..     |    ..    |    ..    |    ..    |    ..    ||    ..    |    ..    |    ..    |    ..    |
+// row 15   | T30:a0a1 | T30:a2a3 | T30:a4a5 | T30:a6a7 || T31:a0a1 | T31:a2a3 | T31:a4a5 | T31:a6a7 |
+// ---------+----------+----------+----------+----------++----------+----------+----------+----------+
+//
+// After Round k=0 (shuffle loaded[0] -- captures col pairs 0,1 and 8,9):
+//
+//          |<----------- columns 0-7 ----------->|<---------- columns 8-15 ----------->|
+// R\C      |  c0,1    |  c2,3    |  c4,5    |  c6,7    ||  c8,9    | c10,11   | c12,13   | c14,15   |
+// ---------+----------+----------+----------+----------++----------+----------+----------+----------+
+// row  0   |  T0:a0a1 |          |          |          ||  T0:a4a5 |          |          |          |
+// row  1   |  T4:a0a1 |          |          |          ||  T4:a4a5 |          |          |          |
+//   ..     |    ..    |          |          |          ||    ..    |          |          |          |
+// row  7   | T28:a0a1 |          |          |          || T28:a4a5 |          |          |          |
+// ---------+----------+----------+----------+----------++----------+----------+----------+----------+
+// row  8   |  T0:a2a3 |          |          |          ||  T0:a6a7 |          |          |          |
+// row  9   |  T4:a2a3 |          |          |          ||  T4:a6a7 |          |          |          |
+//   ..     |    ..    |          |          |          ||    ..    |          |          |          |
+// row 15   | T28:a2a3 |          |          |          || T28:a6a7 |          |          |          |
+// ---------+----------+----------+----------+----------++----------+----------+----------+----------+
+//
+// After Round k=1 (shuffle loaded[1] -- adds col pairs 2,3 and 10,11):
+//
+//          |<----------- columns 0-7 ----------->|<---------- columns 8-15 ----------->|
+// R\C      |  c0,1    |  c2,3    |  c4,5    |  c6,7    ||  c8,9    | c10,11   | c12,13   | c14,15   |
+// ---------+----------+----------+----------+----------++----------+----------+----------+----------+
+// row  0   |  T0:a0a1 |  T1:a0a1 |          |          ||  T0:a4a5 |  T1:a4a5 |          |          |
+// row  1   |  T4:a0a1 |  T5:a0a1 |          |          ||  T4:a4a5 |  T5:a4a5 |          |          |
+//   ..     |    ..    |    ..    |          |          ||    ..    |    ..    |          |          |
+// row  7   | T28:a0a1 | T29:a0a1 |          |          || T28:a4a5 | T29:a4a5 |          |          |
+// ---------+----------+----------+----------+----------++----------+----------+----------+----------+
+// row  8   |  T0:a2a3 |  T1:a2a3 |          |          ||  T0:a6a7 |  T1:a6a7 |          |          |
+// row  9   |  T4:a2a3 |  T5:a2a3 |          |          ||  T4:a6a7 |  T5:a6a7 |          |          |
+//   ..     |    ..    |    ..    |          |          ||    ..    |    ..    |          |          |
+// row 15   | T28:a2a3 | T29:a2a3 |          |          || T28:a6a7 | T29:a6a7 |          |          |
+// ---------+----------+----------+----------+----------++----------+----------+----------+----------+
+//
+// After Round k=2 (shuffle loaded[2] -- adds col pairs 4,5 and 12,13):
+//
+//          |<----------- columns 0-7 ----------->|<---------- columns 8-15 ----------->|
+// R\C      |  c0,1    |  c2,3    |  c4,5    |  c6,7    ||  c8,9    | c10,11   | c12,13   | c14,15   |
+// ---------+----------+----------+----------+----------++----------+----------+----------+----------+
+// row  0   |  T0:a0a1 |  T1:a0a1 |  T2:a0a1 |          ||  T0:a4a5 |  T1:a4a5 |  T2:a4a5 |          |
+// row  1   |  T4:a0a1 |  T5:a0a1 |  T6:a0a1 |          ||  T4:a4a5 |  T5:a4a5 |  T6:a4a5 |          |
+//   ..     |    ..    |    ..    |    ..    |          ||    ..    |    ..    |    ..    |          |
+// row  7   | T28:a0a1 | T29:a0a1 | T30:a0a1 |          || T28:a4a5 | T29:a4a5 | T30:a4a5 |          |
+// ---------+----------+----------+----------+----------++----------+----------+----------+----------+
+// row  8   |  T0:a2a3 |  T1:a2a3 |  T2:a2a3 |          ||  T0:a6a7 |  T1:a6a7 |  T2:a6a7 |          |
+// row  9   |  T4:a2a3 |  T5:a2a3 |  T6:a2a3 |          ||  T4:a6a7 |  T5:a6a7 |  T6:a6a7 |          |
+//   ..     |    ..    |    ..    |    ..    |          ||    ..    |    ..    |    ..    |          |
+// row 15   | T28:a2a3 | T29:a2a3 | T30:a2a3 |          || T28:a6a7 | T29:a6a7 | T30:a6a7 |          |
+// ---------+----------+----------+----------+----------++----------+----------+----------+----------+
+//
+// After Round k=3 (shuffle loaded[3] -- adds col pairs 6,7 and 14,15 -- COMPLETE):
+// (matches the target layout above)
+//
+// ====================================================================================
+template<typename ElemT, Layout layout>
+__device__ inline void mmaLoadMatrixA_16x16(
+    uint32_t* regs,
+    const ElemT* buffer,
+    int stride,
+    unsigned laneid,
+    unsigned gid,
+    unsigned tid)
+{
+    unsigned row = laneid >> 1;
+    unsigned side = laneid & 1;
+    uint4 loaded_v =
+        *reinterpret_cast<const uint4*>(&buffer[row * stride + side * 8]);
+    uint32_t* loaded = reinterpret_cast<uint32_t*>(&loaded_v);
+
+    if constexpr (layout == Layout::RowMajor)
+    {
+        const uint32_t mask = 0xFFFFFFFF;
+        uint32_t s[4][4];
+        #pragma unroll
+        for (int k = 0; k < 4; k++)
+        {
+            s[k][0] = __shfl_sync(mask, loaded[k], gid * 2);
+            s[k][1] = __shfl_sync(mask, loaded[k], (gid + 8) * 2);
+            s[k][2] = __shfl_sync(mask, loaded[k], gid * 2 + 1);
+            s[k][3] = __shfl_sync(mask, loaded[k], (gid + 8) * 2 + 1);
+        }
+        regs[0] = s[tid][0];
+        regs[1] = s[tid][1];
+        regs[2] = s[tid][2];
+        regs[3] = s[tid][3];
+    }
+    else
+    {
+        const uint32_t mask = 0xFFFFFFFF;
+        unsigned k = gid >> 1;
+        unsigned half_sel = gid & 1;
+
+        uint32_t s[4][8];
+        #pragma unroll
+        for (int ki = 0; ki < 4; ki++)
+        {
+            s[ki][0] = __shfl_sync(mask, loaded[ki], tid * 4);
+            s[ki][1] = __shfl_sync(mask, loaded[ki], tid * 4 + 1);
+            s[ki][2] = __shfl_sync(mask, loaded[ki], tid * 4 + 2);
+            s[ki][3] = __shfl_sync(mask, loaded[ki], tid * 4 + 3);
+            s[ki][4] = __shfl_sync(mask, loaded[ki], tid * 4 + 16);
+            s[ki][5] = __shfl_sync(mask, loaded[ki], tid * 4 + 17);
+            s[ki][6] = __shfl_sync(mask, loaded[ki], tid * 4 + 18);
+            s[ki][7] = __shfl_sync(mask, loaded[ki], tid * 4 + 19);
+        }
+
+        unsigned shift = half_sel * 16;
+        uint16_t h0 = (uint16_t)(s[k][0] >> shift);
+        uint16_t h1 = (uint16_t)(s[k][2] >> shift);
+        regs[0] = (uint32_t)h0 | ((uint32_t)h1 << 16);
+
+        h0 = (uint16_t)(s[k][1] >> shift);
+        h1 = (uint16_t)(s[k][3] >> shift);
+        regs[1] = (uint32_t)h0 | ((uint32_t)h1 << 16);
+
+        h0 = (uint16_t)(s[k][4] >> shift);
+        h1 = (uint16_t)(s[k][6] >> shift);
+        regs[2] = (uint32_t)h0 | ((uint32_t)h1 << 16);
+
+        h0 = (uint16_t)(s[k][5] >> shift);
+        h1 = (uint16_t)(s[k][7] >> shift);
+        regs[3] = (uint32_t)h0 | ((uint32_t)h1 << 16);
+    }
+}
+
+// ====================================================================================
+// MMA m16n8k16 Matrix B Load (f16, 16x8)
+//
+// Uses 128-bit vectorized load + warp shuffle redistribution.
+// B's register packing is vertical: each reg packs 2 adjacent rows at one column.
+// Column-major aligns naturally (8 shuffles), row-major requires extraction (16 shuffles).
+//
+// Target MMA fragment layout:
+//
+//          |  col 0   |  col 1   |  col 2   |   ..   |  col 7   |
+// ---------+----------+----------+----------+--------+----------+
+// row  0,1 | T0:b0b1  | T4:b0b1  | T8:b0b1  |   ..   |T28:b0b1  |
+// row  2,3 | T1:b0b1  | T5:b0b1  | T9:b0b1  |   ..   |T29:b0b1  |
+// row  4,5 | T2:b0b1  | T6:b0b1  |T10:b0b1  |   ..   |T30:b0b1  |
+// row  6,7 | T3:b0b1  | T7:b0b1  |T11:b0b1  |   ..   |T31:b0b1  |
+// ---------+----------+----------+----------+--------+----------+
+// row  8,9 | T0:b2b3  | T4:b2b3  | T8:b2b3  |   ..   |T28:b2b3  |
+// row 10,11| T1:b2b3  | T5:b2b3  | T9:b2b3  |   ..   |T29:b2b3  |
+// row 12,13| T2:b2b3  | T6:b2b3  |T10:b2b3  |   ..   |T30:b2b3  |
+// row 14,15| T3:b2b3  | T7:b2b3  |T11:b2b3  |   ..   |T31:b2b3  |
+// ---------+----------+----------+----------+--------+----------+
+//
+// --- Column-major path (8 shuffles) ---
+//
+// Thread t loads column t/2, half t%2. loaded[k] = {B[base+2k][col], B[base+2k+1][col]}.
+// This directly matches the vertical register packing.
+//
+// Initial state (column-major):
+//
+//          |  col 0   |  col 1   |   ..   |  col 7   |
+// ---------+----------+----------+--------+----------+
+// row  0,1 | T0:b0b1  | T2:b0b1  |   ..   |T14:b0b1  |
+// row  2,3 | T0:b2b3  | T2:b2b3  |   ..   |T14:b2b3  |
+// row  4,5 | T0:b4b5  | T2:b4b5  |   ..   |T14:b4b5  |
+// row  6,7 | T0:b6b7  | T2:b6b7  |   ..   |T14:b6b7  |
+// ---------+----------+----------+--------+----------+
+// row  8,9 | T1:b0b1  | T3:b0b1  |   ..   |T15:b0b1  |
+// row 10,11| T1:b2b3  | T3:b2b3  |   ..   |T15:b2b3  |
+// row 12,13| T1:b4b5  | T3:b4b5  |   ..   |T15:b4b5  |
+// row 14,15| T1:b6b7  | T3:b6b7  |   ..   |T15:b6b7  |
+// ---------+----------+----------+--------+----------+
+//
+// After Round k=0 (captures row-pair 0,1 and 8,9):
+//
+//          |  col 0   |  col 1   |   ..   |  col 7   |
+// ---------+----------+----------+--------+----------+
+// row  0,1 | T0:b0b1  | T4:b0b1  |   ..   |T28:b0b1  |
+// row  2,3 |          |          |        |          |
+// row  4,5 |          |          |        |          |
+// row  6,7 |          |          |        |          |
+// ---------+----------+----------+--------+----------+
+// row  8,9 | T0:b2b3  | T4:b2b3  |   ..   |T28:b2b3  |
+// row 10,11|          |          |        |          |
+// row 12,13|          |          |        |          |
+// row 14,15|          |          |        |          |
+// ---------+----------+----------+--------+----------+
+//
+// After Round k=1 (adds row-pair 2,3 and 10,11):
+//
+//          |  col 0   |  col 1   |   ..   |  col 7   |
+// ---------+----------+----------+--------+----------+
+// row  0,1 | T0:b0b1  | T4:b0b1  |   ..   |T28:b0b1  |
+// row  2,3 | T1:b0b1  | T5:b0b1  |   ..   |T29:b0b1  |
+// row  4,5 |          |          |        |          |
+// row  6,7 |          |          |        |          |
+// ---------+----------+----------+--------+----------+
+// row  8,9 | T0:b2b3  | T4:b2b3  |   ..   |T28:b2b3  |
+// row 10,11| T1:b2b3  | T5:b2b3  |   ..   |T29:b2b3  |
+// row 12,13|          |          |        |          |
+// row 14,15|          |          |        |          |
+// ---------+----------+----------+--------+----------+
+//
+// After Round k=2 (adds row-pair 4,5 and 12,13):
+//
+//          |  col 0   |  col 1   |   ..   |  col 7   |
+// ---------+----------+----------+--------+----------+
+// row  0,1 | T0:b0b1  | T4:b0b1  |   ..   |T28:b0b1  |
+// row  2,3 | T1:b0b1  | T5:b0b1  |   ..   |T29:b0b1  |
+// row  4,5 | T2:b0b1  | T6:b0b1  |   ..   |T30:b0b1  |
+// row  6,7 |          |          |        |          |
+// ---------+----------+----------+--------+----------+
+// row  8,9 | T0:b2b3  | T4:b2b3  |   ..   |T28:b2b3  |
+// row 10,11| T1:b2b3  | T5:b2b3  |   ..   |T29:b2b3  |
+// row 12,13| T2:b2b3  | T6:b2b3  |   ..   |T30:b2b3  |
+// row 14,15|          |          |        |          |
+// ---------+----------+----------+--------+----------+
+//
+// After Round k=3 (COMPLETE -- matches target):
+// (same as target layout above)
+//
+// --- Row-major path (16 shuffles + extraction) ---
+//
+// Thread t loads row t%16 (128 bits = one full row of 8 halves).
+// loaded[k] = {B[row][2k], B[row][2k+1]} -- a horizontal pair.
+// Registers need vertical pairs, so we extract halves from 2 source rows.
+//
+// Source mapping for thread L (gid, tid):
+//   reg0: rows tid*2 and tid*2+1 at column gid
+//     sources: thread tid*2 and tid*2+1, loaded[gid>>1], half gid&1
+//   reg1: rows tid*2+8 and tid*2+9 at column gid
+//     sources: thread tid*2+8 and tid*2+9, loaded[gid>>1], half gid&1
+//
+// ====================================================================================
+template<typename ElemT, Layout layout>
+__device__ inline void mmaLoadMatrixB_16x8(
+    uint32_t* regs,
+    const ElemT* buffer,
+    int stride,
+    unsigned laneid,
+    unsigned gid,
+    unsigned tid)
+{
+    if constexpr (layout == Layout::ColMajor)
+    {
+        // Column-major: thread t loads column t/2, half t%2
+        // loaded[k] directly matches vertical register packing.
+        unsigned col = laneid >> 1;
+        unsigned side = laneid & 1;
+        uint4 loaded_v =
+            *reinterpret_cast<const uint4*>(&buffer[col * stride + side * 8]);
+        uint32_t* loaded = reinterpret_cast<uint32_t*>(&loaded_v);
+
+        // 4 rounds x 2 shuffles = 8 shuffles
+        const uint32_t mask = 0xFFFFFFFF;
+        uint32_t s[4][2];
+        #pragma unroll
+        for (int k = 0; k < 4; k++)
+        {
+            s[k][0] = __shfl_sync(mask, loaded[k], gid * 2);
+            s[k][1] = __shfl_sync(mask, loaded[k], gid * 2 + 1);
+        }
+        regs[0] = s[tid][0];
+        regs[1] = s[tid][1];
+    }
+    else
+    {
+        // Row-major: thread t loads row t%16 (128 bits = full row of 8 halves).
+        // loaded[k] = {B[row][2k], B[row][2k+1]} -- horizontal pair.
+        unsigned row = laneid & 15;
+        uint4 loaded_v =
+            *reinterpret_cast<const uint4*>(&buffer[row * stride]);
+        uint32_t* loaded = reinterpret_cast<uint32_t*>(&loaded_v);
+
+        // Need loaded[gid>>1] from 4 source threads, extract half at gid&1.
+        // 4 rounds x 4 sources = 16 shuffles
+        const uint32_t mask = 0xFFFFFFFF;
+        uint32_t s[4][4];
+        #pragma unroll
+        for (int ki = 0; ki < 4; ki++)
+        {
+            s[ki][0] = __shfl_sync(mask, loaded[ki], tid * 2);
+            s[ki][1] = __shfl_sync(mask, loaded[ki], tid * 2 + 1);
+            s[ki][2] = __shfl_sync(mask, loaded[ki], tid * 2 + 8);
+            s[ki][3] = __shfl_sync(mask, loaded[ki], tid * 2 + 9);
+        }
+
+        unsigned k = gid >> 1;
+        unsigned shift = (gid & 1) * 16;
+
+        // reg0: {B[tid*2][gid], B[tid*2+1][gid]}
+        uint16_t h0 = (uint16_t)(s[k][0] >> shift);
+        uint16_t h1 = (uint16_t)(s[k][1] >> shift);
+        regs[0] = (uint32_t)h0 | ((uint32_t)h1 << 16);
+
+        // reg1: {B[tid*2+8][gid], B[tid*2+9][gid]}
+        h0 = (uint16_t)(s[k][2] >> shift);
+        h1 = (uint16_t)(s[k][3] >> shift);
+        regs[1] = (uint32_t)h0 | ((uint32_t)h1 << 16);
+    }
+}
+
+// ====================================================================================
+// MMA m16n8k16 Matrix C/D Load (f32, 16x8)
+//
+// Target layout: same row-group structure as Matrix A but 8 columns.
+// regs[0]=C[gid][tid*2], regs[1]=C[gid][tid*2+1],
+// regs[2]=C[gid+8][tid*2], regs[3]=C[gid+8][tid*2+1]
+//
+// Row-major: each row = 8 floats = 32 bytes = 2 x 128 bits.
+//   Thread t loads row t/2, side t%2 (left cols 0-3, right cols 4-7).
+//   16 shuffles, select by: k_base = (tid&1)*2, src_base = (tid>>1)*2
+//
+// Column-major: each column = 16 floats = 64 bytes = 4 x 128 bits.
+//   Thread t loads column t/4, chunk t%4 (rows chunk*4 .. chunk*4+3).
+//   16 shuffles, select by: k = gid % 4
+// ====================================================================================
+template<Layout layout>
+__device__ inline void mmaLoadMatrixCD_f32_16x8(
+    uint32_t* regs,
+    const float* buffer,
+    int stride,
+    unsigned laneid,
+    unsigned gid,
+    unsigned tid)
+{
+    const uint32_t mask = 0xFFFFFFFF;
+
+    if constexpr (layout == Layout::RowMajor)
+    {
+        unsigned row = laneid >> 1;
+        unsigned side = laneid & 1;
+        uint4 loaded_v =
+            *reinterpret_cast<const uint4*>(&buffer[row * stride + side * 4]);
+        uint32_t* loaded = reinterpret_cast<uint32_t*>(&loaded_v);
+
+        uint32_t s[4][4];
+        #pragma unroll
+        for (int k = 0; k < 4; k++)
+        {
+            s[k][0] = __shfl_sync(mask, loaded[k], gid * 2);
+            s[k][1] = __shfl_sync(mask, loaded[k], (gid + 8) * 2);
+            s[k][2] = __shfl_sync(mask, loaded[k], gid * 2 + 1);
+            s[k][3] = __shfl_sync(mask, loaded[k], (gid + 8) * 2 + 1);
+        }
+
+        unsigned k_base = (tid & 1) * 2;
+        unsigned src_base = (tid >> 1) * 2;
+        regs[0] = s[k_base][src_base];
+        regs[1] = s[k_base + 1][src_base];
+        regs[2] = s[k_base][src_base + 1];
+        regs[3] = s[k_base + 1][src_base + 1];
+    }
+    else
+    {
+        unsigned col = laneid >> 2;
+        unsigned chunk = laneid & 3;
+        uint4 loaded_v =
+            *reinterpret_cast<const uint4*>(&buffer[col * stride + chunk * 4]);
+        uint32_t* loaded = reinterpret_cast<uint32_t*>(&loaded_v);
+
+        uint32_t s[4][4];
+        #pragma unroll
+        for (int ki = 0; ki < 4; ki++)
+        {
+            s[ki][0] = __shfl_sync(mask, loaded[ki], tid * 8 + gid / 4);
+            s[ki][1] = __shfl_sync(mask, loaded[ki], tid * 8 + 4 + gid / 4);
+            s[ki][2] = __shfl_sync(mask, loaded[ki], tid * 8 + 2 + gid / 4);
+            s[ki][3] = __shfl_sync(mask, loaded[ki], tid * 8 + 6 + gid / 4);
+        }
+
+        unsigned k = gid & 3;
+        regs[0] = s[k][0];
+        regs[1] = s[k][1];
+        regs[2] = s[k][2];
+        regs[3] = s[k][3];
+    }
+}
+
+// ====================================================================================
+// MMA m16n8k16 Matrix C/D Load (f16, 16x8)
+//
+// Row-major: each row = 8 halves = 16 bytes = 1 x 128 bits.
+//   Thread t loads row t%16. 8 shuffles, select by tid.
+//
+// Column-major: each column = 16 halves = 32 bytes = 2 x 128 bits.
+//   Thread t loads column (t%16)/2, side t%2.
+//   16 shuffles + half-extraction (same pattern as column-major B row-major).
+// ====================================================================================
+template<typename ElemT, Layout layout>
+__device__ inline void mmaLoadMatrixCD_f16_16x8(
+    uint32_t* regs,
+    const ElemT* buffer,
+    int stride,
+    unsigned laneid,
+    unsigned gid,
+    unsigned tid)
+{
+    const uint32_t mask = 0xFFFFFFFF;
+
+    if constexpr (layout == Layout::RowMajor)
+    {
+        unsigned row = laneid & 15;
+        uint4 loaded_v =
+            *reinterpret_cast<const uint4*>(&buffer[row * stride]);
+        uint32_t* loaded = reinterpret_cast<uint32_t*>(&loaded_v);
+
+        uint32_t s[4][2];
+        #pragma unroll
+        for (int k = 0; k < 4; k++)
+        {
+            s[k][0] = __shfl_sync(mask, loaded[k], gid);
+            s[k][1] = __shfl_sync(mask, loaded[k], gid + 8);
+        }
+        regs[0] = s[tid][0];
+        regs[1] = s[tid][1];
+    }
+    else
+    {
+        unsigned col = (laneid & 15) >> 1;
+        unsigned side = laneid & 1;
+        uint4 loaded_v =
+            *reinterpret_cast<const uint4*>(&buffer[col * stride + side * 8]);
+        uint32_t* loaded = reinterpret_cast<uint32_t*>(&loaded_v);
+
+        uint32_t s[4][4];
+        #pragma unroll
+        for (int ki = 0; ki < 4; ki++)
+        {
+            s[ki][0] = __shfl_sync(mask, loaded[ki], tid * 4);
+            s[ki][1] = __shfl_sync(mask, loaded[ki], tid * 4 + 1);
+            s[ki][2] = __shfl_sync(mask, loaded[ki], tid * 4 + 2);
+            s[ki][3] = __shfl_sync(mask, loaded[ki], tid * 4 + 3);
+        }
+
+        unsigned k = gid >> 1;
+        unsigned shift = (gid & 1) * 16;
+
+        uint16_t h0 = (uint16_t)(s[k][0] >> shift);
+        uint16_t h1 = (uint16_t)(s[k][2] >> shift);
+        regs[0] = (uint32_t)h0 | ((uint32_t)h1 << 16);
+
+        h0 = (uint16_t)(s[k][1] >> shift);
+        h1 = (uint16_t)(s[k][3] >> shift);
+        regs[1] = (uint32_t)h0 | ((uint32_t)h1 << 16);
+    }
+}
+
+template<typename ElemT, int M, int N, int K, MatrixUse use, Layout layout>
+__device__ inline void mmaLoad(uint32_t* regs, const void* ptr, int stride)
+{
+    const ElemT* buffer = static_cast<const ElemT*>(ptr);
+
+    if constexpr (M == 16 && N == 8 && K == 16)
+    {
+        unsigned laneid;
+        asm("mov.u32 %0, %%laneid;" : "=r"(laneid));
+        unsigned gid = laneid >> 2;
+        unsigned tid = laneid & 3;
+
+        if constexpr (use == MatrixUse::MatrixA && sizeof(ElemT) == 2)
+        {
+            mmaLoadMatrixA_16x16<ElemT, layout>(regs, buffer, stride, laneid, gid, tid);
+        }
+        else if constexpr (use == MatrixUse::MatrixB && sizeof(ElemT) == 2)
+        {
+            mmaLoadMatrixB_16x8<ElemT, layout>(regs, buffer, stride, laneid, gid, tid);
+        }
+        else if constexpr (
+            (use == MatrixUse::MatrixC || use == MatrixUse::MatrixD) && sizeof(ElemT) == 4)
+        {
+            mmaLoadMatrixCD_f32_16x8<layout>(
+                regs, reinterpret_cast<const float*>(buffer), stride, laneid, gid, tid);
+        }
+        else if constexpr (
+            (use == MatrixUse::MatrixC || use == MatrixUse::MatrixD) && sizeof(ElemT) == 2)
+        {
+            mmaLoadMatrixCD_f16_16x8<ElemT, layout>(regs, buffer, stride, laneid, gid, tid);
+        }
+    }
+}
+
+// ====================================================================================
+// MMA m16n8k16 Store (C/D matrix, 16x8)
+//
+// Row-major: reverse shuffle to collect contiguous row-halves, then 128-bit write.
+//   Writer thread t writes row t/2, side t%2.
+//   8 shuffles (f32) or similar for f16.
+//
+// Column-major: addresses are stride-apart (scattered), use individual element stores.
+// ====================================================================================
+
+template<typename ElemT, int M, int N, int K, Layout layout>
+__device__ inline void mmaStore(void* ptr, const uint32_t* regs, int stride)
+{
+    ElemT* buffer = static_cast<ElemT*>(ptr);
+
+    if constexpr (M == 16 && N == 8 && K == 16)
+    {
+        unsigned laneid;
+        asm("mov.u32 %0, %%laneid;" : "=r"(laneid));
+        unsigned gid = laneid >> 2;
+        unsigned tid = laneid & 3;
+
+        if constexpr (sizeof(ElemT) == 4)
+        {
+            if constexpr (layout == Layout::RowMajor)
+            {
+                // Row-major f32: reverse shuffle to collect contiguous row-half data.
+                // Writer thread t writes row t/2, side t%2 (left=cols 0-3, right=4-7).
+                // Each 128-bit write covers 4 consecutive floats in one row-half.
+                unsigned write_row = laneid >> 1;
+                unsigned write_side = laneid & 1;
+                unsigned source_gid = (write_row < 8) ? write_row : (write_row - 8);
+                unsigned src0 = source_gid * 4 + write_side * 2;
+                unsigned src1 = src0 + 1;
+
+                const uint32_t mask = 0xFFFFFFFF;
+                uint32_t r0_s0 = __shfl_sync(mask, regs[0], src0);
+                uint32_t r1_s0 = __shfl_sync(mask, regs[1], src0);
+                uint32_t r0_s1 = __shfl_sync(mask, regs[0], src1);
+                uint32_t r1_s1 = __shfl_sync(mask, regs[1], src1);
+                uint32_t r2_s0 = __shfl_sync(mask, regs[2], src0);
+                uint32_t r3_s0 = __shfl_sync(mask, regs[3], src0);
+                uint32_t r2_s1 = __shfl_sync(mask, regs[2], src1);
+                uint32_t r3_s1 = __shfl_sync(mask, regs[3], src1);
+
+                uint4 out_v;
+                uint32_t* out = reinterpret_cast<uint32_t*>(&out_v);
+                if (write_row < 8)
+                {
+                    out[0] = r0_s0; out[1] = r1_s0;
+                    out[2] = r0_s1; out[3] = r1_s1;
+                }
+                else
+                {
+                    out[0] = r2_s0; out[1] = r3_s0;
+                    out[2] = r2_s1; out[3] = r3_s1;
+                }
+
+                *reinterpret_cast<uint4*>(&buffer[write_row * stride + write_side * 4]) = out_v;
+            }
+            else
+            {
+                // Column-major f32: each column = 16 floats = 64 bytes = 4 x uint4.
+                // 8 cols x 4 chunks = 32 writers. Thread t writes col t/4, chunk t%4.
+                // All 4 stored elements need the same register index from different gids.
+                // 16 shuffles (4 regs x 4 sources) + selection by reg_idx.
+                unsigned write_col = laneid >> 2;
+                unsigned write_chunk = laneid & 3;
+                unsigned source_tid_val = write_col >> 1;
+                unsigned gid_base = (write_chunk & 1) * 4;
+                unsigned reg_idx = (write_chunk < 2) ? (write_col & 1) : (2 + (write_col & 1));
+
+                const uint32_t mask = 0xFFFFFFFF;
+                uint32_t s[4][4];
+                #pragma unroll
+                for (int r = 0; r < 4; r++)
+                {
+                    s[r][0] = __shfl_sync(mask, regs[r], (gid_base + 0) * 4 + source_tid_val);
+                    s[r][1] = __shfl_sync(mask, regs[r], (gid_base + 1) * 4 + source_tid_val);
+                    s[r][2] = __shfl_sync(mask, regs[r], (gid_base + 2) * 4 + source_tid_val);
+                    s[r][3] = __shfl_sync(mask, regs[r], (gid_base + 3) * 4 + source_tid_val);
+                }
+
+                uint4 out_v;
+                uint32_t* out = reinterpret_cast<uint32_t*>(&out_v);
+                out[0] = s[reg_idx][0];
+                out[1] = s[reg_idx][1];
+                out[2] = s[reg_idx][2];
+                out[3] = s[reg_idx][3];
+
+                *reinterpret_cast<uint4*>(&buffer[write_col * stride + write_chunk * 4]) = out_v;
+            }
+        }
+        else if constexpr (sizeof(ElemT) == 2)
+        {
+            if constexpr (layout == Layout::RowMajor)
+            {
+                // Row-major f16: reverse shuffle to collect contiguous row data.
+                // Each row = 8 halves = 16 bytes = 128 bits.
+                // Writer thread t writes row t%16.
+                unsigned write_row = laneid & 15;
+
+                const uint32_t mask = 0xFFFFFFFF;
+                // Collect reg0 (row gid) and reg1 (row gid+8) from all 4 tids
+                uint32_t s[4][2];
+                #pragma unroll
+                for (int k = 0; k < 4; k++)
+                {
+                    s[k][0] = __shfl_sync(mask, regs[0], write_row * 4 + k);
+                    s[k][1] = __shfl_sync(mask, regs[1], write_row * 4 + k);
+                }
+
+                // Select top or bottom registers based on write_row
+                uint4 out_v;
+                uint32_t* out = reinterpret_cast<uint32_t*>(&out_v);
+                if (write_row < 8)
+                {
+                    out[0] = s[0][0]; out[1] = s[1][0];
+                    out[2] = s[2][0]; out[3] = s[3][0];
+                }
+                else
+                {
+                    out[0] = s[0][1]; out[1] = s[1][1];
+                    out[2] = s[2][1]; out[3] = s[3][1];
+                }
+
+                *reinterpret_cast<uint4*>(&buffer[write_row * stride]) = out_v;
+            }
+            else
+            {
+                // Column-major f16: each column = 16 halves = 32 bytes = 2 x uint4.
+                // 8 cols x 2 sides = 16 writers. Thread t writes col (t%16)/2, side t%2.
+                // stored[k] = {C[side*8+2k][col], C[side*8+2k+1][col]} from 2 gids.
+                // 16 shuffles (2 regs x 8 sources) + half extraction + packing.
+                unsigned write_col = (laneid & 15) >> 1;
+                unsigned write_side = laneid & 1;
+                unsigned source_tid_val = write_col >> 1;
+                unsigned col_shift = (write_col & 1) * 16;
+
+                const uint32_t mask = 0xFFFFFFFF;
+                uint32_t from_r0[8], from_r1[8];
+                #pragma unroll
+                for (int k = 0; k < 4; k++)
+                {
+                    unsigned src_even = (2 * k) * 4 + source_tid_val;
+                    unsigned src_odd = (2 * k + 1) * 4 + source_tid_val;
+                    from_r0[2 * k] = __shfl_sync(mask, regs[0], src_even);
+                    from_r0[2 * k + 1] = __shfl_sync(mask, regs[0], src_odd);
+                    from_r1[2 * k] = __shfl_sync(mask, regs[1], src_even);
+                    from_r1[2 * k + 1] = __shfl_sync(mask, regs[1], src_odd);
+                }
+
+                uint4 out_v;
+                uint32_t* out = reinterpret_cast<uint32_t*>(&out_v);
+                #pragma unroll
+                for (int k = 0; k < 4; k++)
+                {
+                    uint32_t val_even = (write_side == 0) ? from_r0[2 * k] : from_r1[2 * k];
+                    uint32_t val_odd =
+                        (write_side == 0) ? from_r0[2 * k + 1] : from_r1[2 * k + 1];
+                    uint16_t h0 = (uint16_t)(val_even >> col_shift);
+                    uint16_t h1 = (uint16_t)(val_odd >> col_shift);
+                    out[k] = (uint32_t)h0 | ((uint32_t)h1 << 16);
+                }
+
+                *reinterpret_cast<uint4*>(&buffer[write_col * stride + write_side * 8]) = out_v;
+            }
+        }
+    }
+}
+
 // Helper to get M, N, K from ShapeCombination
 template<ShapeCombination shape>
 struct ShapeToMNK;
@@ -7074,6 +7858,11 @@ template<>
 struct ShapeToMNK<ShapeCombination::m32n8k16>
 {
     static constexpr int M = 32, N = 8, K = 16;
+};
+template<>
+struct ShapeToMNK<ShapeCombination::m16n8k16>
+{
+    static constexpr int M = 16, N = 8, K = 16;
 };
 
 template<typename T>
@@ -7321,7 +8110,10 @@ struct WmmaFragment
     {
         // Force compile-time check, so we know the template parameter comibination is valid.
         (void)RegisterCount<T, M, N, K, R>::value;
-        wmmaStore<T, M, N, K, layout>(buffer + element, regs, stride);
+        if constexpr (M == 16 && N == 8 && K == 16)
+            mmaStore<T, M, N, K, layout>(buffer + element, regs, stride);
+        else
+            wmmaStore<T, M, N, K, layout>(buffer + element, regs, stride);
     }
 
     template<Layout layout, typename U>
@@ -7329,7 +8121,10 @@ struct WmmaFragment
     {
         // Force compile-time check, so we know the template parameter comibination is valid.
         (void)RegisterCount<T, M, N, K, R>::value;
-        wmmaStore<T, M, N, K, layout>(buffer, regs, stride * sizeof(U) / sizeof(T));
+        if constexpr (M == 16 && N == 8 && K == 16)
+            mmaStore<T, M, N, K, layout>(buffer, regs, stride * sizeof(U) / sizeof(T));
+        else
+            wmmaStore<T, M, N, K, layout>(buffer, regs, stride * sizeof(U) / sizeof(T));
     }
 
     template<Layout layout>
@@ -7339,7 +8134,10 @@ struct WmmaFragment
 
         // Force compile-time check, so we know the template parameter comibination is valid.
         (void)RegisterCount<T, M, N, K, R>::value;
-        wmmaLoad<T, M, N, K, R, layout>(fragment.regs, buffer + element, stride);
+        if constexpr (M == 16 && N == 8 && K == 16)
+            mmaLoad<T, M, N, K, R, layout>(fragment.regs, buffer + element, stride);
+        else
+            wmmaLoad<T, M, N, K, R, layout>(fragment.regs, buffer + element, stride);
         fragment.m_layout = layout;
         return fragment;
     }
@@ -7351,7 +8149,10 @@ struct WmmaFragment
 
         // Force compile-time check, so we know the template parameter comibination is valid.
         (void)RegisterCount<T, M, N, K, R>::value;
-        wmmaLoad<T, M, N, K, R, layout>(fragment.regs, buffer, stride * sizeof(U) / sizeof(T));
+        if constexpr (M == 16 && N == 8 && K == 16)
+            mmaLoad<T, M, N, K, R, layout>(fragment.regs, buffer, stride * sizeof(U) / sizeof(T));
+        else
+            wmmaLoad<T, M, N, K, R, layout>(fragment.regs, buffer, stride * sizeof(U) / sizeof(T));
         fragment.m_layout = layout;
         return fragment;
     }
@@ -7786,6 +8587,128 @@ struct IntegerMMAHelper<
 
 
 // ====================================================================================
+// MMA m16n8k16 ChangeMajor (in-register transpose) for Matrix A (16x16, f16)
+//
+// Uses movmatrix.sync.aligned.m8n8.trans.b16 to transpose each 8x8 quadrant,
+// then swaps off-diagonal blocks for the 2x2 block-level transpose.
+//
+// Before:  reg0=A00, reg1=A10, reg2=A01, reg3=A11  (row-major fragments)
+// After:   reg0=A00^T, reg1=A01^T, reg2=A10^T, reg3=A11^T  (column-major fragments)
+// ====================================================================================
+
+#if SLANG_CUDA_ENABLE_HALF
+template<int M, int N, int K, MatrixUse R>
+__device__ inline void mmaChangeMajor(WmmaFragment<half, M, N, K, R>& frag)
+{
+    if constexpr (M == 16 && N == 8 && K == 16 && R == MatrixUse::MatrixA)
+    {
+        uint32_t t0, t1, t2, t3;
+        asm volatile("movmatrix.sync.aligned.m8n8.trans.b16 %0, %1;" : "=r"(t0) : "r"(frag.regs[0]));
+        asm volatile("movmatrix.sync.aligned.m8n8.trans.b16 %0, %1;" : "=r"(t1) : "r"(frag.regs[2]));
+        asm volatile("movmatrix.sync.aligned.m8n8.trans.b16 %0, %1;" : "=r"(t2) : "r"(frag.regs[1]));
+        asm volatile("movmatrix.sync.aligned.m8n8.trans.b16 %0, %1;" : "=r"(t3) : "r"(frag.regs[3]));
+        frag.regs[0] = t0;
+        frag.regs[1] = t1;
+        frag.regs[2] = t2;
+        frag.regs[3] = t3;
+    }
+}
+#endif // #if SLANG_CUDA_ENABLE_HALF
+
+// ====================================================================================
+// MMA m16n8k16 Multiply-Accumulate Helper
+// PTX: mma.sync.aligned.m16n8k16.row.col.dtype.f16.f16.ctype d, a, b, c
+// Layout is always row.col (handled in load/store, not here).
+// ====================================================================================
+
+#if SLANG_CUDA_ENABLE_HALF
+// f16 input, f32 accumulator
+struct Mma16n8k16_f16_f32
+{
+    __device__ static void eval(
+        WmmaFragment<float, 16, 8, 16, MatrixUse::MatrixC>& d,
+        const WmmaFragment<half, 16, 8, 16, MatrixUse::MatrixA>& a,
+        const WmmaFragment<half, 16, 8, 16, MatrixUse::MatrixB>& b,
+        const WmmaFragment<float, 16, 8, 16, MatrixUse::MatrixC>& c)
+    {
+        asm volatile("mma.sync.aligned.m16n8k16.row.col.f32.f16.f16.f32 "
+                     "{%0, %1, %2, %3}, "
+                     "{%4, %5, %6, %7}, "
+                     "{%8, %9}, "
+                     "{%10, %11, %12, %13};\n"
+                     : "=r"(d.regs[0]), "=r"(d.regs[1]), "=r"(d.regs[2]), "=r"(d.regs[3])
+                     : "r"(a.regs[0]),
+                       "r"(a.regs[1]),
+                       "r"(a.regs[2]),
+                       "r"(a.regs[3]),
+                       "r"(b.regs[0]),
+                       "r"(b.regs[1]),
+                       "r"(c.regs[0]),
+                       "r"(c.regs[1]),
+                       "r"(c.regs[2]),
+                       "r"(c.regs[3]));
+    }
+};
+
+// f16 input, f16 accumulator
+struct Mma16n8k16_f16_f16
+{
+    __device__ static void eval(
+        WmmaFragment<half, 16, 8, 16, MatrixUse::MatrixC>& d,
+        const WmmaFragment<half, 16, 8, 16, MatrixUse::MatrixA>& a,
+        const WmmaFragment<half, 16, 8, 16, MatrixUse::MatrixB>& b,
+        const WmmaFragment<half, 16, 8, 16, MatrixUse::MatrixC>& c)
+    {
+        asm volatile("mma.sync.aligned.m16n8k16.row.col.f16.f16.f16.f16 "
+                     "{%0, %1}, "
+                     "{%2, %3, %4, %5}, "
+                     "{%6, %7}, "
+                     "{%8, %9};\n"
+                     : "=r"(d.regs[0]), "=r"(d.regs[1])
+                     : "r"(a.regs[0]),
+                       "r"(a.regs[1]),
+                       "r"(a.regs[2]),
+                       "r"(a.regs[3]),
+                       "r"(b.regs[0]),
+                       "r"(b.regs[1]),
+                       "r"(c.regs[0]),
+                       "r"(c.regs[1]));
+    }
+};
+#endif // #if SLANG_CUDA_ENABLE_HALF
+
+template<typename AType, typename BType, typename CType>
+struct Mma16n8k16Helper;
+
+#if SLANG_CUDA_ENABLE_HALF
+template<>
+struct Mma16n8k16Helper<half, half, float>
+{
+    __device__ static void eval(
+        WmmaFragment<float, 16, 8, 16, MatrixUse::MatrixC>& d,
+        const WmmaFragment<half, 16, 8, 16, MatrixUse::MatrixA>& a,
+        const WmmaFragment<half, 16, 8, 16, MatrixUse::MatrixB>& b,
+        const WmmaFragment<float, 16, 8, 16, MatrixUse::MatrixC>& c)
+    {
+        Mma16n8k16_f16_f32::eval(d, a, b, c);
+    }
+};
+
+template<>
+struct Mma16n8k16Helper<half, half, half>
+{
+    __device__ static void eval(
+        WmmaFragment<half, 16, 8, 16, MatrixUse::MatrixC>& d,
+        const WmmaFragment<half, 16, 8, 16, MatrixUse::MatrixA>& a,
+        const WmmaFragment<half, 16, 8, 16, MatrixUse::MatrixB>& b,
+        const WmmaFragment<half, 16, 8, 16, MatrixUse::MatrixC>& c)
+    {
+        Mma16n8k16_f16_f16::eval(d, a, b, c);
+    }
+};
+#endif // #if SLANG_CUDA_ENABLE_HALF
+
+// ====================================================================================
 // MMA Helper - Primary Template (dispatcher)
 // ====================================================================================
 
@@ -7844,65 +8767,72 @@ WmmaFragment<DType, M, N, K, MatrixC> __device__ coopMatMulAdd(
     WmmaFragment<BType, M, N, K, MatrixUse::MatrixB> matB,
     WmmaFragment<CType, M, N, K, MatrixUse::MatrixC> matC)
 {
-    constexpr ShapeCombination shape = (M == 16 && N == 16 && K == 16) ? ShapeCombination::m16n16k16
-                                       : (M == 8 && N == 32 && K == 16)
-                                           ? ShapeCombination::m8n32k16
-                                           : ShapeCombination::m32n8k16;
-
     WmmaFragment<DType, M, N, K, MatrixC> matD;
-    uint32_t encodedLayout = (matA.m_layout == Layout::RowMajor ? 1 : 0) << 1 |
-                             (matB.m_layout == Layout::RowMajor ? 1 : 0);
 
-    switch (encodedLayout)
+    if constexpr (M == 16 && N == 8 && K == 16)
     {
-    // 00011
-    case 0x3:
-        MMAHelper<
-            AType,
-            BType,
-            CType,
-            DType,
-            shape,
-            Layout::RowMajor,
-            Layout::RowMajor,
-            saturatingAccumulation>::eval(matD, matA, matB, matC);
-        break;
-    // 00010
-    case 0x2:
-        MMAHelper<
-            AType,
-            BType,
-            CType,
-            DType,
-            shape,
-            Layout::RowMajor,
-            Layout::ColMajor,
-            saturatingAccumulation>::eval(matD, matA, matB, matC);
-        break;
-    // 0001
-    case 0x01:
-        MMAHelper<
-            AType,
-            BType,
-            CType,
-            DType,
-            shape,
-            Layout::ColMajor,
-            Layout::RowMajor,
-            saturatingAccumulation>::eval(matD, matA, matB, matC);
-        break;
-    // 0000
-    case 0x00:
-        MMAHelper<
-            AType,
-            BType,
-            CType,
-            DType,
-            shape,
-            Layout::ColMajor,
-            Layout::ColMajor,
-            saturatingAccumulation>::eval(matD, matA, matB, matC);
-        break;
+        // MMA m16n8k16: layout is always row.col in the PTX instruction.
+        // Memory layout conversion is handled in Load/Store.
+        Mma16n8k16Helper<AType, BType, CType>::eval(matD, matA, matB, matC);
+    }
+    else
+    {
+        constexpr ShapeCombination shape =
+            (M == 16 && N == 16 && K == 16)
+                ? ShapeCombination::m16n16k16
+                : (M == 8 && N == 32 && K == 16) ? ShapeCombination::m8n32k16
+                                                  : ShapeCombination::m32n8k16;
+
+        uint32_t encodedLayout = (matA.m_layout == Layout::RowMajor ? 1 : 0) << 1 |
+                                 (matB.m_layout == Layout::RowMajor ? 1 : 0);
+
+        switch (encodedLayout)
+        {
+        case 0x3:
+            MMAHelper<
+                AType,
+                BType,
+                CType,
+                DType,
+                shape,
+                Layout::RowMajor,
+                Layout::RowMajor,
+                saturatingAccumulation>::eval(matD, matA, matB, matC);
+            break;
+        case 0x2:
+            MMAHelper<
+                AType,
+                BType,
+                CType,
+                DType,
+                shape,
+                Layout::RowMajor,
+                Layout::ColMajor,
+                saturatingAccumulation>::eval(matD, matA, matB, matC);
+            break;
+        case 0x01:
+            MMAHelper<
+                AType,
+                BType,
+                CType,
+                DType,
+                shape,
+                Layout::ColMajor,
+                Layout::RowMajor,
+                saturatingAccumulation>::eval(matD, matA, matB, matC);
+            break;
+        case 0x00:
+            MMAHelper<
+                AType,
+                BType,
+                CType,
+                DType,
+                shape,
+                Layout::ColMajor,
+                Layout::ColMajor,
+                saturatingAccumulation>::eval(matD, matA, matB, matC);
+            break;
+        }
     }
 
     return matD;

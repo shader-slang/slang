@@ -27758,6 +27758,20 @@ struct CoopMat
         return N;
     }
 
+    /// Changes the majorness of the cooperative matrix in-register.
+    /// Equivalent to transpose: converts row-major fragments to column-major and vice versa.
+    /// On CUDA, uses movmatrix PTX instruction for 16x16 f16 Matrix A.
+    [require(cuda, cooperative_matrix)]
+    [mutating]
+    void ChangeMajor()
+    {
+        __target_switch
+        {
+        case cuda:
+            __intrinsic_asm R"(Slang_CUDA_WMMA::mmaChangeMajor(*$0))";
+        }
+    }
+
     /// Transposes the cooperative matrix. Requires Vulkan with SPV_NV_cooperative_matrix2 extension.
     /// @return A transposed cooperative matrix with dimensions N×M and MatrixB usage.
     [require(spirv, cooperative_matrix_conversion)]

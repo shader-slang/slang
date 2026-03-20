@@ -66,6 +66,15 @@ static UnownedStringSlice getOptixCoopVecMatrixLayoutName(int matrixLayout)
     }
 }
 
+struct FragmentShape
+{
+    int m, n, k;
+
+    bool isValid() const { return m > 0 && n > 0 && k > 0; }
+};
+
+inline FragmentShape computeShapeCombination(uint32_t matrixUse, uint32_t row, uint32_t col);
+
 static CUDAExtensionTracker::BaseTypeFlags _findBaseTypesUsed(IRModule* module)
 {
     typedef CUDAExtensionTracker::BaseTypeFlags Flags;
@@ -329,9 +338,20 @@ SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, 
         }
     case kIROp_CoopMatrixType:
         {
-            // CUDA wmma require SM 7.5+
-            m_extensionTracker->requireSMVersion(SemanticVersion(7, 5));
-            return emitWMMAFragmentType(as<IRCoopMatrixType>(type), out);
+            auto coopType = as<IRCoopMatrixType>(type);
+            auto result = emitWMMAFragmentType(coopType, out);
+            uint32_t rowCount =
+                (uint32_t)static_cast<IRIntLit*>(coopType->getRowCount())->getValue();
+            uint32_t colCount =
+                (uint32_t)static_cast<IRIntLit*>(coopType->getColumnCount())->getValue();
+            uint32_t matrixUse =
+                (uint32_t)static_cast<IRIntLit*>(coopType->getMatrixUse())->getValue();
+            FragmentShape shape = computeShapeCombination(matrixUse, rowCount, colCount);
+            if (shape.m == 16 && shape.n == 8 && shape.k == 16)
+                m_extensionTracker->requireSMVersion(SemanticVersion(8, 0));
+            else
+                m_extensionTracker->requireSMVersion(SemanticVersion(7, 5));
+            return result;
         }
     case kIROp_FloatE4M3Type:
         out << "__nv_fp8_e4m3";
@@ -1555,21 +1575,21 @@ static UnownedStringSlice getMatrixUseName(uint32_t matrixUse)
     }
 }
 
-struct FragmentShape
-{
-    int m, n, k;
-
-    bool isValid() const { return m > 0 && n > 0 && k > 0; }
-};
-
 /*
- * Strict Shape Validation Strategy:
- * Users must provide exact dimensions that match one of the allowed WMMA shapes:
- *   - m16n16k16: Matrix A (16x16), Matrix B (16x16), Matrix C/D (16x16)
- *   - m8n32k16:  Matrix A (8x16),  Matrix B (16x32), Matrix C/D (8x32)
- *   - m32n8k16:  Matrix A (32x16), Matrix B (16x8),  Matrix C/D (32x8)
+ * Shape Validation Strategy:
+ * Maps CoopMat dimensions to the canonical MMA shape (m, n, k).
+ * Supports both WMMA shapes and MMA m16n8k16.
  *
- * Note: k dimension is always 16 for all shapes.
+ * Supported shapes:
+ *   - m16n8k16:  Matrix A (16x16), Matrix B (16x8),  Matrix C/D (16x8)  [MMA]
+ *   - m16n16k16: Matrix A (16x16), Matrix B (16x16), Matrix C/D (16x16) [WMMA]
+ *   - m8n32k16:  Matrix A (8x16),  Matrix B (16x32), Matrix C/D (8x32)  [WMMA]
+ *   - m32n8k16:  Matrix A (32x16), Matrix B (16x8),  Matrix C/D (32x8)  [WMMA]
+ *
+ * TODO: Matrix A (16x16) collides between m16n8k16 and m16n16k16.
+ *       Matrix B (16x8) collides between m16n8k16 and m32n8k16.
+ *       Currently m16n8k16 takes priority for these ambiguous cases.
+ *       A proper disambiguation mechanism (e.g., capability or attribute) is needed.
  */
 inline FragmentShape computeShapeCombination(uint32_t matrixUse, uint32_t row, uint32_t col)
 {
@@ -1577,16 +1597,14 @@ inline FragmentShape computeShapeCombination(uint32_t matrixUse, uint32_t row, u
     {
     case SLANG_COOPERATIVE_MATRIX_USE_A: // Matrix A: row=m, col=k
         {
-            // k must always be 16
             if (col != 16)
             {
                 return {0, 0, 0}; // Invalid
             }
-            // Check exact m values
             switch (row)
             {
             case 16:
-                return {16, 16, 16};
+                return {16, 8, 16}; // m16n8k16 (MMA) — TODO: collides with m16n16k16
             case 8:
                 return {8, 32, 16};
             case 32:
@@ -1597,12 +1615,10 @@ inline FragmentShape computeShapeCombination(uint32_t matrixUse, uint32_t row, u
         }
     case SLANG_COOPERATIVE_MATRIX_USE_B: // Matrix B: row=k, col=n
         {
-            // k must always be 16
             if (row != 16)
             {
                 return {0, 0, 0}; // Invalid
             }
-            // Check exact n values
             switch (col)
             {
             case 16:
@@ -1610,7 +1626,7 @@ inline FragmentShape computeShapeCombination(uint32_t matrixUse, uint32_t row, u
             case 32:
                 return {8, 32, 16};
             case 8:
-                return {32, 8, 16};
+                return {16, 8, 16}; // m16n8k16 (MMA) — TODO: collides with m32n8k16
             default:
                 return {0, 0, 0}; // Invalid
             }
@@ -1618,13 +1634,14 @@ inline FragmentShape computeShapeCombination(uint32_t matrixUse, uint32_t row, u
     case SLANG_COOPERATIVE_MATRIX_USE_ACCUMULATOR: // Matrix C/D: row=m, col=n
     default:
         {
-            // Check exact (m, n) combinations
             if (row == 16 && col == 16)
                 return {16, 16, 16};
             else if (row == 8 && col == 32)
                 return {8, 32, 16};
             else if (row == 32 && col == 8)
                 return {32, 8, 16};
+            else if (row == 16 && col == 8)
+                return {16, 8, 16}; // m16n8k16 (MMA)
             else
                 return {0, 0, 0}; // Invalid
         }
