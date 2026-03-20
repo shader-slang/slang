@@ -1957,6 +1957,8 @@ public:
     {
         if (expr->value)
             dispatch(expr->value);
+        if (expr->dataLayout)
+            dispatch(expr->dataLayout);
     }
     void visitFloatBitCastExpr(FloatBitCastExpr* expr)
     {
@@ -5732,18 +5734,24 @@ Decl* Parser::ParseStruct()
     ReadToken("struct");
     FillPosition(rs);
 
-    // The `struct` keyword may optionally be followed by
-    // attributes that appertain to the struct declaration
-    // itself, and not to any variables declared using this
-    // type specifier.
-    //
-    // TODO: We don't yet correctly associate attributes with
-    // a variable decarlation vs. a struct type when a variable
-    // is declared with a struct type specified.
-    //
     if (LookAheadToken(TokenType::LBracket))
     {
+        if (currentModule->languageVersion >= SLANG_LANGUAGE_VERSION_2026)
+        {
+            sink->diagnose(
+                Diagnostics::InvalidBracketAttributesPlacement{.location = tokenReader.peekLoc()});
+        }
+        else if (currentModule->languageVersion >= SLANG_LANGUAGE_VERSION_2025)
+        {
+            sink->diagnose(Diagnostics::DeprecatedBracketAttributesPlacement{
+                .location = tokenReader.peekLoc()});
+        }
+        // note: no diagnostics before Slang version 2025
+
         Modifier** modifierLink = &rs->modifiers.first;
+
+        // Even if this syntax is now removed in Slang 2026, we'll still parse
+        // it to keep the diagnostics output sane.
         ParseSquareBracketAttributes(this, &modifierLink);
     }
 
@@ -7317,7 +7325,13 @@ static NodeBase* parseSizeOfExpr(Parser* parser, void* /*userData*/)
     // The return type is always a Int
     sizeOfExpr->type = parser->astBuilder->getIntType();
 
-    sizeOfExpr->value = parser->ParseExpression();
+    sizeOfExpr->value = parser->ParseArgExpr();
+
+    if (AdvanceIf(parser, TokenType::Comma))
+    {
+        // If there is a comma, assume we also have an explicitly specified data layout.
+        sizeOfExpr->dataLayout = parser->ParseArgExpr();
+    }
 
     parser->ReadMatchingToken(TokenType::RParent);
 
@@ -7333,7 +7347,13 @@ static NodeBase* parseAlignOfExpr(Parser* parser, void* /*userData*/)
     // The return type is always a Int
     alignOfExpr->type = parser->astBuilder->getIntType();
 
-    alignOfExpr->value = parser->ParseExpression();
+    alignOfExpr->value = parser->ParseArgExpr();
+
+    if (AdvanceIf(parser, TokenType::Comma))
+    {
+        // If there is a comma, assume we also have an explicitly specified data layout.
+        alignOfExpr->dataLayout = parser->ParseArgExpr();
+    }
 
     parser->ReadMatchingToken(TokenType::RParent);
 

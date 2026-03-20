@@ -141,6 +141,15 @@ struct Options
 
     Slang::HashSet<Slang::String> capabilities;
     Slang::HashSet<Slang::String> expectedFailureList;
+
+    // Per-file info for expected failure lists: (fileName, count) pairs, in order added.
+    struct ExpectedFailureFileInfo
+    {
+        Slang::String fileName;
+        int count;
+    };
+    Slang::List<ExpectedFailureFileInfo> expectedFailureFiles;
+
     Slang::List<Slang::String> skipList;
 
     // Ignore abort message dialog popup on Windows

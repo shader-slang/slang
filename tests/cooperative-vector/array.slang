@@ -1,5 +1,8 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -render-feature cooperative-vector -output-using-type
 
+//TEST(compute):SIMPLE(filecheck=DXIL):-target dxil -profile cs_6_9 -entry computeMain
+//DXIL: result code = 0
+
 // CHECK: type: float
 // CHECK-NEXT: 1.000000
 // CHECK-NEXT: 2.000000
