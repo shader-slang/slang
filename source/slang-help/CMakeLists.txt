@@ -1,0 +1,23 @@
+if(SLANG_ENABLE_SLANGC)
+    slang_add_target(
+        .
+        EXECUTABLE
+        USE_FEWER_WARNINGS
+        EXPLICIT_SOURCE
+            main.cpp
+            ${slang_SOURCE_DIR}/source/slang/slang-options-init.cpp
+            ${slang_SOURCE_DIR}/source/slang/slang-capability-names.cpp
+        LINK_WITH_PRIVATE
+            core
+            compiler-core
+        INCLUDE_FROM_PRIVATE
+            slang-capability-defs
+        REQUIRES
+            slang-capability-defs
+        INCLUDE_DIRECTORIES_PRIVATE
+            ${slang_SOURCE_DIR}/source
+            ${slang_SOURCE_DIR}/source/slang
+        INSTALL
+        EXPORT_SET_NAME SlangTargets
+    )
+endif()

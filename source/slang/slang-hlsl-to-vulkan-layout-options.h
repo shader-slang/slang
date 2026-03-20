@@ -178,7 +178,16 @@ public:
     HLSLToVulkanLayoutOptions();
 
     /// Get information about the different kinds
-    static ConstArrayView<NamesDescriptionValue> getKindInfos();
+    static ConstArrayView<NamesDescriptionValue> getKindInfos()
+    {
+        static NamesDescriptionValue s_infos[] = {
+            {ValueInt(Kind::ConstantBuffer), "b", "Constant buffer view"},
+            {ValueInt(Kind::Sampler), "s", "Sampler"},
+            {ValueInt(Kind::ShaderResource), "t", "Shader resource view"},
+            {ValueInt(Kind::UnorderedAccess), "u", "Unorderd access view"},
+        };
+        return makeConstArrayView(s_infos);
+    }
 
     /// Given a paramCategory get the kind. Returns Kind::Invalid if not an applicable category
     static Kind getKind(slang::ParameterCategory param);

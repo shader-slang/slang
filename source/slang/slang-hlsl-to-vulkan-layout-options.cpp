@@ -7,29 +7,6 @@
 namespace Slang
 {
 
-namespace
-{ // anonymous
-
-typedef HLSLToVulkanLayoutOptions::Kind ShiftKind;
-
-/* {b|s|t|u}
-
-https://github.com/KhronosGroup/glslang/wiki/HLSL-FAQ
-*/
-static NamesDescriptionValue s_vulkanShiftKinds[] = {
-    {ValueInt(ShiftKind::ConstantBuffer), "b", "Constant buffer view"},
-    {ValueInt(ShiftKind::Sampler), "s", "Sampler"},
-    {ValueInt(ShiftKind::ShaderResource), "t", "Shader resource view"},
-    {ValueInt(ShiftKind::UnorderedAccess), "u", "Unorderd access view"},
-};
-
-} // namespace
-
-/* static */ ConstArrayView<NamesDescriptionValue> HLSLToVulkanLayoutOptions::getKindInfos()
-{
-    return makeConstArrayView(s_vulkanShiftKinds);
-}
-
 void HLSLToVulkanLayoutOptions::loadFromOptionSet(CompilerOptionSet& optionSet)
 {
     auto allShift = optionSet.getArray(CompilerOptionName::VulkanBindShiftAll);
