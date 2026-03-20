@@ -53,7 +53,7 @@ The `__intrinsic_asm` statement in `myPrint` serves as the definition for the fu
 
 ## Defining Intrinsic Types
 
-You can use `__target_intrinsic` modifier on a `struct` type to cause the type being emitted as a specific string for a given target. For example:
+You can use the `__target_intrinsic` modifier on a `struct` type to cause the type to be emitted as a specific string for a given target. For example:
 ```
 __target_intrinsic(cpp, "std::string")
 struct CppString
@@ -90,7 +90,7 @@ void test()
         return;
 }
 ```
-In this code, `getMyEnvVariable()` is defined as an intrinsic Slang function that will translate to a call to `getEnvVarImpl()` in the target code. The first two `__requirePrelude` calls causes include directives being emitted in the resulting code, and the third `__requirePrelude` call causes a definition of `getEnvVarImpl()`, written in C++, being emitted before other Slang functions are emitted. The above code will translate to the following output:
+In this code, `getMyEnvVariable()` is defined as an intrinsic Slang function that will translate to a call to `getEnvVarImpl()` in the target code. The first two `__requirePrelude` calls cause include directives to be emitted in the resulting code, and the third `__requirePrelude` call causes a definition of `getEnvVarImpl()`, written in C++, to be emitted before other Slang functions are emitted. The above code will translate to the following output:
 ```cpp
 // ...
 #include <stdlib.h>
@@ -110,7 +110,7 @@ void test_0()
 The strings in `__requirePrelude` are deduplicated: the same prelude string will only be emitted once no matter how many times an intrinsic function is invoked. Therefore, it is good practice to put `#include` lines as separate `__requirePrelude` statements to prevent duplicate `#include`s being generated in the output code.
 
 ## Managing Cross-Platform Code
-If you are defining an intrinsic function that maps to multiple targets in different ways, you can use `__target_switch` construct to manage the target-specific definitions. For example, here is a snippet from the Slang core module that defines `getRealtimeClock`:
+If you are defining an intrinsic function that maps to multiple targets in different ways, you can use the `__target_switch` construct to manage the target-specific definitions. For example, here is a snippet from the Slang core module that defines `getRealtimeClock`:
 ```hlsl
 [__requiresNVAPI]
 __glsl_extension(GL_EXT_shader_realtime_clock)
@@ -186,7 +186,7 @@ where `<opcode>` defines a value named `identifier` of `<type>`, or simply:
 ```
 <opcode> <operand> ... ;
 ```
-When `<opcode>` does not define a return value.
+when `<opcode>` does not define a return value.
 
 When used as part of an expression, the Slang type of the `spirv_asm` construct is defined by the last instruction, which must be in the form of:
 ```
