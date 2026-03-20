@@ -9,21 +9,21 @@ The compiler toolchain, consisting of `slangc` and the target compilers, determi
 evaluated. Unless other constraints are present, the timing is implementation-defined. In general, the
 compilers attempt to move evaluation to translation time when possible, as part of optimization.
 
-An expression can be forced to be evaluated during Slang translation by assigning it to a `constexpr`
-variable, providing it as an argument to a `constexpr` parameter of a function, or providing it as an argument
-to a generic value parameter.
+An expression can be forced to be evaluated during Slang translation by assigning it to a `static const`
+global variable, assigning it to a `static const` member variable of a struct or an interface, or providing it
+as an argument to a generic value parameter.
 
 When targeting SPIR-V, a global `const` variable can be forced to be a specialization constant with the
 [\[SpecializationConstant\]](../../../core-module-reference/attributes/specializationconstant-0e.html) or
 [\[vk::specialization_constant\]](../../../core-module-reference/attributes/vk_specialization_constant.html)
-modifier.
+modifier. Specialization constants are evaluated by the target compiler before runtime.
 
 
 > 📝 **Remark 1:** Currently, only limited support exists to force an expression to be evaluated at a
 > specific translation stage. The full classification is provided here for completeness.
 
 > 📝 **Remark 2:** A value resulting from an evaluation is also an expression, and a constant value is usually
-> simply referred to as a *constant*. Hence, the expression evaluation classes are named *module constants*,
+> simply referred to as a *constant*. Hence, the expression evaluation classes are named *compile-time constants*,
 > *uniform values*, and so forth.
 
 > 📝 **Remark 3:** Translation-time constants are often referred to as compile-time constants. In Slang, there
@@ -37,8 +37,8 @@ The evaluation class of an expression determines the earliest [translation](basi
 runtime phase when an expression can be evaluated to a value. The classes are as follows:
 
 1. Translation-time constants
-   1. Module constants
-   2. Link constants
+   1. Compile-time constants
+   2. Link-time constants
    3. Codegen constants
 2. Runtime values
    1. Rate-specified values
@@ -53,21 +53,21 @@ runtime phase when an expression can be evaluated to a value. The classes are as
 
 ### Description
 
-**Module constants**
+**Compile-time constants**
 
-A module constant expression can be fully evaluated during module translation. All Slang literals belong in
-this category. Module constants do not depend on values in other modules.
+A compile-time constant expression can be fully evaluated during module translation. All Slang literals belong in
+this category. Compile-time constants do not depend on values in other modules.
 
-**Link constants**
+**Link-time constants**
 
-A link constant expression can be fully evaluated during linking. A link constant may depend on module and
-link constants in other modules.
+A link-time constant expression can be fully evaluated during linking. A link-time constant may depend on compile-time and
+link-time constants in other modules.
 
-A link constant expression can be forced to be evaluated during the specialization phase of linking. This is
-achieved by assigning the expression to a `constexpr` variable or by providing it as an argument to a
-`constexpr` function parameter. Similarly, the argument expression for a generic value parameter is always
-forced to be a link constant. If the compiler cannot evaluate the expression during linking, an error is
-raised.
+An expression can be forced to be a link-time constant, and thus, evaluated during the specialization phase of
+linking at the latest. This is achieved by assigning the expression to a `static const` global variable or a
+`static const` member variable of a struct or an interface. Similarly, the argument expression for a generic
+value parameter is always forced to be a link-time constant. If the compiler cannot evaluate the expression
+during linking, an error is raised.
 
 **Codegen constants**
 
@@ -111,18 +111,13 @@ inputs from the previous stage or system-value semantics such as `SV_Position`, 
 This class is for values that do not belong in any of the aforementioned classes. For example, a read access
 to a mutable shared variable that is not rate-specified results in a non-rate-specified value.
 
-Reading a variable marked as `volatile` always yields a non-rate-specified value.
 
+> 📝 **Remark 1:** Rate in "rate-specified" refers to the rate of change.
 
-> 📝 **Remark 1:** The semantics of Slang `constexpr` differ from C++ `constexpr`. In Slang, it is an error if
-> a `constexpr` variable cannot be evaluated as a link constant. The closest equivalent in C++ is `consteval`.
-
-> 📝 **Remark 2:** Rate in "rate-specified" refers to the rate of change.
-
-> 📝 **Remark 3:** Immutable (`const`) variables are separate from value classification. An immutable variable
+> 📝 **Remark 2:** Immutable (`const`) variables are separate from value classification. An immutable variable
 > can hold a constant, a rate-specified runtime value, or a non-rate-specified runtime value.
 
-> 📝 **Remark 4:** TODO: Add references to system-value semantics.
+> 📝 **Remark 3:** TODO: Add references to system-value semantics.
 
 
 ### Evaluation Class Hierarchy
@@ -134,10 +129,10 @@ and graphics pipeline classes.
 <table>
 <tr>
   <td rowspan=3>Constants</td>
-  <td colspan=2>Module constants</td>
+  <td colspan=2>Compile-time constants</td>
 </tr>
 <tr>
-  <td colspan=2>Link constants</td>
+  <td colspan=2>Link-time constants</td>
 </tr>
 <tr>
   <td colspan=2>Codegen constants</td>
@@ -163,7 +158,7 @@ and graphics pipeline classes.
 
 An expression of a higher class is always eligible to be evaluated as an expression of a lower class.
 
-> 📝 **Remark:** In the evaluation class hierarchy, all module constants are also link constants. All link
+> 📝 **Remark:** In the evaluation class hierarchy, all compile-time constants are also link-time constants. All link-time
 > constants are also codegen constants. All constants are also runtime values. The class of non-rate-specified
 > values encompasses all other classes.
 
@@ -183,7 +178,7 @@ expression has a lower value evaluation class.
 
 > 📝 **Remark 2:** The list of evaluation classes of functions is unspecified at this time. In general, one
 > can expect that basic built-in operations such as addition, subtraction, multiplication, and division are
-> always eligible for module constant expressions. When in doubt, use the `constexpr` keyword.
+> always eligible for compile-time constant expressions. When in doubt, use the `constexpr` keyword.
 
 > 📝 **Remark 3:** In practice, complex expressions are often evaluated both at translation time and at
 > runtime. This is a result of compiler optimizations where the subexpressions eligible for translation-time

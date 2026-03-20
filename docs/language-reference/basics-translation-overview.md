@@ -13,7 +13,7 @@ Translation phases:
       - Creates a single module that contains all entry points and their dependent intermediate representation
         code
    2. Specialization for target (incl. generics)
-      - `constexpr` constants must be resolved here at the latest
+      - `static const` constants must be resolved here at the latest
    3. Target code emission
 3. Target compilation and linking (implementation-specified)
    1. Compile target code to target intermediate representation (optional, depends on target)
