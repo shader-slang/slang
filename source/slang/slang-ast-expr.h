@@ -480,8 +480,14 @@ class SizeOfLikeExpr : public Expr
     // Set during the parse, could be an expression, a variable or a type
     FIDDLE() Expr* value = nullptr;
 
+    // The (optional) data layout expression used for the value.
+    FIDDLE() Expr* dataLayout = nullptr;
+
     // The type the size/alignment needs to operate on. Set during traversal of SemanticsExprVisitor
     FIDDLE() Type* sizedType = nullptr;
+
+    // The type of `dataLayout`.
+    FIDDLE() Type* dataLayoutType = nullptr;
 };
 
 FIDDLE()
@@ -522,13 +528,13 @@ class LastExpr : public PackQueryExpr
 };
 
 FIDDLE()
-class TrimHeadExpr : public PackQueryExpr
+class TrimFirstExpr : public PackQueryExpr
 {
     FIDDLE(...)
 };
 
 FIDDLE()
-class TrimTailExpr : public PackQueryExpr
+class TrimLastExpr : public PackQueryExpr
 {
     FIDDLE(...)
 };
@@ -847,6 +853,15 @@ class TupleTypeExpr : public Expr
 {
     FIDDLE(...)
     FIDDLE() List<TypeExp> members;
+};
+
+FIDDLE()
+class PackBranchTypeExpr : public Expr
+{
+    FIDDLE(...)
+    FIDDLE() TypeExp packOperand;
+    FIDDLE() TypeExp emptyType;
+    FIDDLE() TypeExp nonEmptyType;
 };
 
 /// An expression that applies a generic to arguments for some,
