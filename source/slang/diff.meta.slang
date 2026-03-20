@@ -2333,35 +2333,6 @@ matrix<T, N, M> __smoothstep_impl(matrix<T, N, M> minVal, matrix<T, N, M> maxVal
     return t * t * (T(3.0) - T(2.0) * t);
 }
 
-
-/*__generic<T : __BuiltinFloatingPointType>
-[BackwardDifferentiable]
-[PreferRecompute]
-T __smoothstep_impl(T minVal, T maxVal, T x)
-{
-    let t = saturate((x - minVal) / (maxVal - minVal));
-    return t * t * (T(3.0) - T(2.0) * t);
-}
-
-__generic<T : __BuiltinFloatingPointType>
-[BackwardDifferentiable]
-[ForwardDerivativeOf(smoothstep)]
-[PreferRecompute]
-DifferentialPair<T> __d_smoothstep(DifferentialPair<T> minVal, DifferentialPair<T> maxVal, DifferentialPair<T> x)
-{
-    return fwd_diff(__smoothstep_impl)(minVal, maxVal, x);
-}
-__generic<T : __BuiltinFloatingPointType>
-[BackwardDifferentiable]
-[BackwardDerivativeOf(smoothstep)]
-[PreferRecompute]
-void __d_smoothstep(inout DifferentialPair<T> minVal, inout DifferentialPair<T> maxVal, inout DifferentialPair<T> x, T.Differential dOut)
-{
-    bwd_diff(__smoothstep_impl)(minVal, maxVal, x, dOut);
-}
-*/
-// VECTOR_MATRIX_TERNARY_DIFF_IMPL(smoothstep)
-
 // Vector length
 __generic<T: __BuiltinFloatingPointType, let N : int>
 [BackwardDifferentiable]

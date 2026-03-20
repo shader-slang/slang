@@ -1725,14 +1725,6 @@ struct DiffTransposePass
         IRInst* revValue)
     {
         // (A = GetDiff(P)) -> (dP.d += dA)
-        /*
-        return TranspositionResult(
-            List<RevGradient>(RevGradient(
-                RevGradient::Flavor::Simple,
-                fwdGetDiff->getBase(),
-                revValue,
-                fwdGetDiff)));
-        */
         return TranspositionResult(List<RevGradient>(RevGradient(
             RevGradient::Flavor::DifferentialPairGetElement,
             fwdGetDiff->getBase(),
@@ -1758,26 +1750,6 @@ struct DiffTransposePass
         IRInst* fwdMakeVector,
         IRInst* revValue)
     {
-        /*
-        auto vectorType = as<IRVectorType>(revValue->getDataType());
-        SLANG_RELEASE_ASSERT(vectorType);
-        auto vectorSize = as<IRIntLit>(vectorType->getElementCount());
-        SLANG_RELEASE_ASSERT(vectorSize);
-
-        List<RevGradient> gradients;
-        for (UIndex ii = 0; ii < (UIndex)vectorSize->getValue(); ii++)
-        {
-            auto revComp = builder->emitElementExtract(
-                revValue,
-                builder->getIntValue(builder->getIntType(), ii));
-            gradients.add(RevGradient(
-                RevGradient::Flavor::Simple,
-                fwdMakeVector->getOperand(0),
-                revComp,
-                fwdMakeVector));
-        }
-        return TranspositionResult(gradients);*/
-
         return TranspositionResult(List<RevGradient>{RevGradient(
             RevGradient::Flavor::Simple,
             fwdMakeVector->getOperand(0),
@@ -1794,31 +1766,6 @@ struct DiffTransposePass
         IRInst* fwdMakeMatrix,
         IRInst* revValue)
     {
-        /*auto matrixType = as<IRMatrixType>(revValue->getDataType());
-        SLANG_RELEASE_ASSERT(matrixType);
-        auto row = as<IRIntLit>(matrixType->getRowCount());
-        auto col = as<IRIntLit>(matrixType->getColumnCount());
-        SLANG_RELEASE_ASSERT(row && col);
-
-        List<RevGradient> gradients;
-        for (UIndex r = 0; r < (UIndex)row->getValue(); r++)
-        {
-            for (UIndex c = 0; c < (UIndex)col->getValue(); c++)
-            {
-                auto revRow = builder->emitElementExtract(
-                    revValue,
-                    builder->getIntValue(builder->getIntType(), r));
-                auto revCol = builder->emitElementExtract(
-                    revRow,
-                    builder->getIntValue(builder->getIntType(), c));
-                gradients.add(RevGradient(
-                    RevGradient::Flavor::Simple,
-                    fwdMakeMatrix->getOperand(0),
-                    revCol,
-                    fwdMakeMatrix));
-            }
-        }
-        return TranspositionResult(gradients);*/
         return TranspositionResult(List<RevGradient>{RevGradient(
             RevGradient::Flavor::Simple,
             fwdMakeMatrix->getOperand(0),

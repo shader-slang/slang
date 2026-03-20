@@ -496,10 +496,6 @@ IRInst* maybeTranslateLegacyToNewBackwardDerivative(
                 contextTypeBuilder.createStructField(fullContextType, key, structFieldType);
             }
 
-            /*applyFuncBuilder.emitStore(
-                applyFuncBuilder
-                    .emitFieldAddress(builder.getPtrType(structFieldType), contextVar, key),
-                applyForBwdParam);*/
             rematFuncBuilder.emitStore(
                 rematFuncBuilder
                     .emitFieldAddress(builder.getPtrType(structFieldType), rematContextVar, key),
@@ -730,9 +726,6 @@ IRInst* maybeTranslateLegacyBackwardDerivative(
     Index bwdDiffParamIdx = 0;
     for (UIndex i = 0; i < applyBwdFuncType->getParamCount(); i++)
     {
-        // auto applyParamType = this->applyBwdFunc->getParamType(i);
-        /*auto bwdPropParamType =
-            this->bwdPropFunc->getParamType(i + 1); // +1 to skip the context param*/
         auto applyParamType = applyBwdFuncType->getParamType(i);
         auto bwdPropParamType =
             bwdPropFuncType->getParamType(i + 1); // +1 to skip the context param
@@ -923,9 +916,6 @@ IRInst* maybeTranslateBackwardDerivative(
     DiagnosticSink* sink,
     IRBackwardDifferentiate* translateInst)
 {
-    // TODO: This is a temporary redirect into the old solution.. once we
-    // know things work, we can just move the logic into this class.
-
     // Do the reverse-mode translation & return the 4-tuple result.
     BackwardDiffTranslationContext translater(sharedContext, sink);
     IRBuilder builder(sharedContext->moduleInst);
@@ -971,9 +961,6 @@ IRInst* maybeTranslateTrivialBackwardDerivative(
     DiagnosticSink* sink,
     IRTrivialBackwardDifferentiate* translateInst)
 {
-    // TODO: This is a temporary redirect into the old solution.. once we
-    // know things work, we can just move the logic into this class.
-
     // Do the reverse-mode translation & return the 4-tuple result.
     BackwardDiffTranslationContext translater(sharedContext, sink);
     IRBuilder builder(sharedContext->moduleInst);

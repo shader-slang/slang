@@ -1533,18 +1533,9 @@ struct SCCPContext
             {
                 child->replaceUsesWith(latticeVal.value);
                 child->removeAndDeallocate();
-                // instsToRemove.add(child);
             }
         }
 
-        /*
-        if (instsToRemove.getCount())
-        {
-            changed = true;
-            for (auto inst : instsToRemove)
-                inst->removeAndDeallocate();
-        }
-                */
         return changed;
     }
 

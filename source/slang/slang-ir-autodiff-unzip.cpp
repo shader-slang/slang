@@ -529,12 +529,6 @@ struct UnzippingContext
                 primalBranch,
                 lookupPrimalInst(mixedReturn->getVal()));
 
-            /*auto pairVal = diffBuilder->emitMakeDifferentialPair(
-                pairType,
-                lookupPrimalInst(mixedReturn->getVal()),
-                lookupDiffInst(mixedReturn->getVal()));
-            diffBuilder->markInstAsDifferential(pairVal, primalType);*/
-
             auto returnInst = diffBuilder->emitReturn(lookupDiffInst(mixedReturn->getVal()));
             diffBuilder->markInstAsDifferential(returnInst, primalType);
 

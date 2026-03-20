@@ -2422,8 +2422,8 @@ extension vector<T,N> : IDifferentiable
 __generic<T:__BuiltinFloatingPointType, let N : int, let M : int, let L : int>
 extension matrix<T,N,M,L> : IFloat
 {
-    // TODO(sai): wut is happening here? before this was just this <= other which is just
-    // self-recursive.
+    // TODO(sai): not sure what's going on here? With the previous commit this was (this <= other)
+    // which is just self-recursive.
     //
     [__unsafeForceInlineEarly] bool lessThan(This other) { return this[0][0] < other[0][0]; }
     [__unsafeForceInlineEarly] bool lessThanOrEquals(This other) { return this[0][0] <= other[0][0]; }

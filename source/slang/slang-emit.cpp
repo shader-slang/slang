@@ -2236,15 +2236,6 @@ Result linkAndOptimizeIR(
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
-    /*
-    if (sink->getErrorCount() != 0)
-    {
-        // If there are any errors at this point, we should bail out before
-        // doing more work.
-        return SLANG_FAIL;
-    }
-    */
-
     // Run a final round of simplifications to clean up unused things after phi-elimination.
     SLANG_PASS(simplifyNonSSAIR, targetProgram, fastIRSimplificationOptions, sink);
 

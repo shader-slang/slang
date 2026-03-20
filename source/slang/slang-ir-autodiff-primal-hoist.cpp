@@ -682,16 +682,6 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
                         usesToReplace.add(use);
                 }
             }
-            /*
-            else if (auto contextUse = as<IRContextUse>(inst))
-            {
-                auto baseCall = contextUse->getBase();
-                checkpointInfo->recomputeSet.add(baseCall);
-                checkpointInfo->storeSet.remove(baseCall);
-                if (callVarWorkListSet.add(baseCall)) // TODO: wut?
-                    callVarWorkList.add(baseCall);
-            }
-            */
         }
     }
 
@@ -2521,22 +2511,6 @@ void lowerCheckpointObjectInsts(IRGlobalValueWithCode* func)
                 loopExitValueInst->replaceUsesWith(originalVal);
                 loopExitValueInst->removeAndDeallocate();
             }
-
-            /*
-            if (auto contextUse = as<IRContextUse>(inst))
-            {
-                auto originalVal = contextUse->getBase();
-                contextUse->replaceUsesWith(originalVal);
-                contextUse->removeAndDeallocate();
-            }
-
-            if (auto valUse = as<IRValUse>(inst))
-            {
-                auto originalVal = valUse->getBase();
-                valUse->replaceUsesWith(originalVal);
-                valUse->removeAndDeallocate();
-            }
-            */
 
             inst = nextInst;
         }

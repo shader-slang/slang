@@ -89,8 +89,6 @@ struct AutoDiffSharedContext
     IRStructKey* addMethodStructKey = nullptr;
     IRFuncType* addMethodType = nullptr;
 
-    IRStructKey* mulMethodStructKey = nullptr;
-
     // Refernce to NullDifferential struct type. These are used
     // as sentinel values for uninitialized existential (interface-typed)
     // differentials.

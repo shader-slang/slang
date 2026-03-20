@@ -531,24 +531,6 @@ struct IRAutoDiffOriginalValueDecoration : IRDecoration
 };
 
 
-FIDDLE()
-struct IRForwardDerivativeDecoration : IRDecoration
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRBackwardDerivativeIntermediateTypeDecoration : IRDecoration
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRBackwardDerivativePrimalDecoration : IRDecoration
-{
-    FIDDLE(leafInst())
-};
-
 // Used to associate the restore context var to use in a call to splitted backward propgate
 // function.
 FIDDLE()
@@ -566,28 +548,9 @@ struct IRBackwardDerivativePrimalReturnDecoration : IRDecoration
 };
 
 FIDDLE()
-struct IRBackwardDerivativePropagateDecoration : IRDecoration
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
-struct IRBackwardDerivativeDecoration : IRDecoration
-{
-    FIDDLE(leafInst())
-};
-
-FIDDLE()
 struct IRCheckpointHintDecoration : public IRDecoration
 {
     FIDDLE(baseInst())
-};
-
-
-FIDDLE()
-struct IRCheckpointIntermediateDecoration : IRCheckpointHintDecoration
-{
-    FIDDLE(leafInst())
 };
 
 
@@ -638,13 +601,6 @@ struct IRPrimalElementTypeDecoration : IRDecoration
 
 FIDDLE()
 struct IRIntermediateContextFieldDifferentialTypeDecoration : IRDecoration
-{
-    FIDDLE(leafInst())
-};
-
-
-FIDDLE()
-struct IRUserDefinedBackwardDerivativeDecoration : IRDecoration
 {
     FIDDLE(leafInst())
 };
@@ -747,13 +703,6 @@ struct IRBackwardPropagateFromLegacyBwdDiffFunc : IRTranslateBase
     IRUse base;
     IRInst* getBaseFn() { return getOperand(0); }
     IRInst* getLegacyBwdDiffFunc() { return getOperand(1); }
-};
-
-// Retrieves the primal substitution function for the given function.
-FIDDLE()
-struct IRPrimalSubstitute : IRInst
-{
-    FIDDLE(leafInst())
 };
 
 FIDDLE()
@@ -3601,7 +3550,6 @@ $(type_info.return_type) $(type_info.method_name)(
     IRInst* emitBackwardDifferentiatePrimalInst(IRType* type, IRInst* baseFn);
     IRInst* emitBackwardDifferentiatePropagateInst(IRType* type, IRInst* baseFn);
     IRInst* emitForwardDifferentiatePropagateInst(IRType* type, IRInst* baseFn);
-    IRInst* emitPrimalSubstituteInst(IRType* type, IRInst* baseFn);
     IRInst* emitDetachDerivative(IRType* type, IRInst* value);
 
     IRInst* emitDispatchKernelInst(
@@ -4944,11 +4892,6 @@ $(type_info.return_type) $(type_info.method_name)(
         addDecoration(value, kIROp_BackwardDerivativePrimalReturnDecoration, retVal);
     }
 
-    void addBackwardDerivativeDecoration(IRInst* value, IRInst* jvpFn)
-    {
-        addDecoration(value, kIROp_BackwardDerivativeDecoration, jvpFn);
-    }
-
     void addBackwardDerivativePrimalContextDecoration(IRInst* value, IRInst* ctx)
     {
         addDecoration(value, kIROp_BackwardDerivativePrimalContextDecoration, ctx);
@@ -5286,11 +5229,6 @@ $(type_info.return_type) $(type_info.method_name)(
     void addMemoryQualifierSetDecoration(IRInst* inst, IRIntegerValue flags)
     {
         addDecoration(inst, kIROp_MemoryQualifierSetDecoration, getIntValue(getIntType(), flags));
-    }
-
-    void addCheckpointIntermediateDecoration(IRInst* inst, IRGlobalValueWithCode* func)
-    {
-        addDecoration(inst, kIROp_CheckpointIntermediateDecoration, func);
     }
 
     void addEntryPointParamDecoration(IRInst* inst, IRFunc* entryPointFunc)

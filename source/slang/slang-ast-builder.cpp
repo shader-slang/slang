@@ -1380,28 +1380,6 @@ top:
         }
     }
 
-    /*
-    if (auto aIsDeclaredSubtypeOfB = as<DeclaredSubtypeWitness>(aIsSubtypeOfBWitness))
-    {
-        if (auto bIsDeclaredSubtypeOfC = as<DeclaredSubtypeWitness>(bIsSubtypeOfCWitness))
-        {
-            auto subType = aIsDeclaredSubtypeOfB->getSub();
-            auto midType = aIsDeclaredSubtypeOfB->getSup();
-            auto supType = bIsDeclaredSubtypeOfC->getSup();
-
-            if (as<DeclRefType>(midType) && as<DeclRefType>(supType))
-            {
-                auto midTypeDeclRef = as<DeclRefType>(midType)->getDeclRef();
-                auto supTypeDeclRef = as<DeclRefType>(supType)->getDeclRef();
-                if (midTypeDeclRef.as<InterfaceDecl>() && supTypeDeclRef.as<InterfaceDecl>())
-                {
-                    auto lookupDeclRef = getLookupDeclRef(aIsDeclaredSubtypeOfB->get
-                }
-            }
-        }
-    }
-    */
-
     // If none of the above special cases applied, then we are just going to create
     // a `TransitiveSubtypeWitness` directly.
     //

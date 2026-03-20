@@ -2232,15 +2232,6 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             &(irType)));
         operands.add(funcTypeOperand);
 
-        /*if (includeContext)
-        {
-            operands.add(
-                getBuilder()->emitIntrinsicInst(
-                    context->irBuilder->getTypeKind(),
-                    kIROp_ContextTypeOf,
-                    1,
-                    &(irType)));
-        }*/
         if (contextType)
         {
             operands.add(lowerType(context, contextType));
@@ -5325,11 +5316,8 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
 
     LoweredValInfo visitPrimalSubstituteExpr(PrimalSubstituteExpr* expr)
     {
-        auto baseVal = lowerSubExpr(expr->baseFunction);
-        SLANG_ASSERT(baseVal.flavor == LoweredValInfo::Flavor::Simple);
-
-        return LoweredValInfo::simple(
-            getBuilder()->emitPrimalSubstituteInst(lowerType(context, expr->type), baseVal.val));
+        SLANG_UNUSED(expr);
+        SLANG_UNEXPECTED("PrimalSubstituteExpr should not appear during IR lowering");
     }
 
     LoweredValInfo visitTreatAsDifferentiableExpr(TreatAsDifferentiableExpr* expr)
@@ -9591,11 +9579,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return LoweredValInfo();
     }
 
-    /*     LoweredValInfo visitFuncTypeConstraintDecl(FuncTypeConstraintDecl* decl)
-        {
-            return LoweredValInfo();
-        } */
-
     LoweredValInfo visitGenericTypeConstraintDecl(GenericTypeConstraintDecl* decl)
     {
         // This might be a type constraint on an associated type,
@@ -11290,21 +11273,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         }
         else if (auto synStructDecl = as<SynthesizedStructDecl>(decl))
         {
-            /*FuncDeclBaseTypeInfo innerInfo;
-            _lowerFuncDeclBaseTypeInfo(subContext, synStructDecl->targetFuncDeclRef, innerInfo);
-
-            auto targetDeclRefInfo =
-                emitDeclRef(subContext, synStructDecl->targetFuncDeclRef, innerInfo.type);
-
-            SLANG_ASSERT(targetDeclRefInfo.flavor == LoweredValInfo::Flavor::Simple);
-            auto _targetIRFunc = getSimpleVal(subContext, targetDeclRefInfo);
-            auto synthOp = subBuilder->emitIntrinsicInst(
-                subBuilder->getTypeKind(),
-                (IROp)synStructDecl->irOp,
-                1,
-                &_targetIRFunc);
-
-            irAggType = (IRType*)synthOp;*/
             List<IRInst*> irOperands;
             for (auto operand : synStructDecl->operands)
             {

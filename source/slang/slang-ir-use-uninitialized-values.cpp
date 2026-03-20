@@ -81,7 +81,7 @@ static ParameterCheckType isPotentiallyUnintended(IRParam* param, Stage stage, i
     {
         // TODO: some way to check if the method
         // is actually used for autodiff
-        if (as<IRDifferentialPairUserCodeType>(inout->getValueType()))
+        if (as<IRDifferentialPairType>(inout->getValueType()))
             return Never;
 
         switch (stage)

@@ -18,8 +18,8 @@ namespace Slang
 
 
 // Helper to extract the underlying IRFunc from any context type
-// (IRFunc, IRSpecialize, or IRFuncWithBindings).
-IRFunc* getContextFunc(IRInst* context)
+// (IRFunc, IRSpecialize, or IRSpecializeExistentials).
+IRFunc* getFuncDefinitionForContext(IRInst* context)
 {
     if (auto func = as<IRFunc>(context))
         return func;
@@ -28,9 +28,9 @@ IRFunc* getContextFunc(IRInst* context)
         auto generic = cast<IRGeneric>(specialize->getBase());
         return cast<IRFunc>(findGenericReturnVal(generic));
     }
-    if (auto funcWithBindings = as<IRFuncWithBindings>(context))
+    if (auto existentialSpecializedFunc = as<IRSpecializeExistentials>(context))
     {
-        return getContextFunc(funcWithBindings->getFunc());
+        return getFuncDefinitionForContext(existentialSpecializedFunc->getFunc());
     }
     return nullptr;
 }
@@ -100,11 +100,11 @@ struct InstWithContext
                 SLANG_ASSERT(foundParent);
             }
             break;
-        case kIROp_FuncWithBindings:
+        case kIROp_SpecializeExistentials:
             {
-                // FuncWithBindings wraps an IRFunc. The inst must be inside
+                // SpecializeExistentials wraps an IRFunc. The inst must be inside
                 // the underlying function.
-                auto baseFunc = getContextFunc(context);
+                auto baseFunc = getFuncDefinitionForContext(context);
                 SLANG_ASSERT(baseFunc);
 
                 bool foundParent = false;
@@ -479,12 +479,12 @@ bool isConcreteType(IRInst* inst)
     return true;
 }
 
-// Create info for a concrete type, using `paramType` as context to determine
+// Create info for a concrete type, using `paramType` as a union mask to determine
 // how much structural decomposition to perform.
 //
 // - If `paramType` is concrete, return the bare type (no wrapping needed).
 // - If `paramType` is structural and `type` matches the same structural form,
-//   recurse into sub-components using `paramType`'s sub-types as context.
+//   recurse into sub-components using `paramType`'s sub-types as sub-masks.
 // - Otherwise (non-concrete, non-matching paramType), produce a flat UntaggedUnion.
 //
 IRInst* makeInfoForConcreteType(IRModule* module, IRInst* type, IRInst* paramType)
@@ -676,7 +676,7 @@ bool isIntrinsic(IRInst* inst)
     // an intrinsic function, so this automatically implies
     // that this is not an intrinsic.
     //
-    if (auto funcWithBindings = as<IRFuncWithBindings>(inst))
+    if (auto existentialSpecializedFunc = as<IRSpecializeExistentials>(inst))
         return false;
 
     if (!func)
@@ -1005,7 +1005,7 @@ struct TypeFlowSpecializationContext
     // Performs a flat (non-structural) union of two propagation infos that are
     // both composites of sets (TaggedUnion, UntaggedUnion, ElementOfSet, SetTag).
     //
-    // This is the leaf-level union used when the type context is non-structural
+    // This is the leaf-level union used when the union mask is non-structural
     // and non-concrete (e.g., InterfaceType, WitnessTableType, FuncType).
     //
     IRInst* flatUnionPropagationInfo(IRInst* info1, IRInst* info2)
@@ -1047,21 +1047,21 @@ struct TypeFlowSpecializationContext
         SLANG_UNEXPECTED("Incompatible propagation infos during union");
     }
 
-    // Context-aware union of two propagation infos using a three-input structural approach.
+    // Union-mask-aware union of two propagation infos using a three-input structural approach.
     //
-    // `typeContext` is the declared type of the merge point (e.g., parameter type, field type,
+    // `typeUnionMask` is the declared type of the merge point (e.g., parameter type, field type,
     // return type). It determines how much structural decomposition to perform during union:
     //
-    // - If typeContext is structural (Tuple, Array, Ptr, Optional, Attributed), and both infos
-    //   match that structure, recurse element-wise using typeContext's sub-types as sub-contexts.
+    // - If typeUnionMask is structural (Tuple, Array, Ptr, Optional, Attributed), and both infos
+    //   match that structure, recurse element-wise using typeUnionMask's sub-types as sub-masks.
     //
-    // - If typeContext is concrete, both infos should represent the same thing; return info1.
+    // - If typeUnionMask is concrete, both infos should represent the same thing; return info1.
     //
-    // - If typeContext is non-concrete and non-structural (e.g., InterfaceType, WitnessTableType,
+    // - If typeUnionMask is non-concrete and non-structural (e.g., InterfaceType, WitnessTableType,
     //   FuncType, LookupWitnessMethod result), perform a flat union without structural
     //   decomposition.
     //
-    IRInst* unionPropagationInfo(IRInst* typeContext, IRInst* info1, IRInst* info2)
+    IRInst* unionPropagationInfo(IRInst* typeUnionMask, IRInst* info1, IRInst* info2)
     {
         // Basic cases: if either info is null, it is considered "empty";
         // if they're equal, union must be the same inst.
@@ -1072,27 +1072,27 @@ struct TypeFlowSpecializationContext
         if (areInfosEqual(info1, info2))
             return info1;
 
-        // If type context is concrete, infos should be equivalent representations
+        // If union mask is concrete, infos should be equivalent representations
         // of the same concrete type. Return the existing info.
-        if (isConcreteType(typeContext))
+        if (isConcreteType(typeUnionMask))
             return info1;
 
-        // --- Structural type contexts ---
-        // If typeContext is structural and both infos match that structure,
-        // recurse element-wise using typeContext's sub-types as sub-contexts.
+        // --- Structural union masks ---
+        // If typeUnionMask is structural and both infos match that structure,
+        // recurse element-wise using typeUnionMask's sub-types as sub-masks.
 
         // Tuple
-        if (auto tupleCtx = as<IRTupleType>(typeContext))
+        if (auto tupleUnionMask = as<IRTupleType>(typeUnionMask))
         {
             auto tuple1 = as<IRTupleType>(info1);
             auto tuple2 = as<IRTupleType>(info2);
 
             IRBuilder builder(module);
             List<IRType*> elementInfos;
-            for (UInt i = 0; i < tupleCtx->getOperandCount(); i++)
+            for (UInt i = 0; i < tupleUnionMask->getOperandCount(); i++)
             {
                 elementInfos.add((IRType*)unionPropagationInfo(
-                    tupleCtx->getOperand(i),
+                    tupleUnionMask->getOperand(i),
                     tuple1->getOperand(i),
                     tuple2->getOperand(i)));
             }
@@ -1100,7 +1100,7 @@ struct TypeFlowSpecializationContext
         }
 
         // Array
-        if (auto arrayCtx = as<IRArrayType>(typeContext))
+        if (auto arrayUnionMask = as<IRArrayType>(typeUnionMask))
         {
             auto arr1 = as<IRArrayType>(info1);
             auto arr2 = as<IRArrayType>(info2);
@@ -1109,7 +1109,7 @@ struct TypeFlowSpecializationContext
                 IRBuilder builder(module);
                 return builder.getArrayType(
                     (IRType*)unionPropagationInfo(
-                        arrayCtx->getElementType(),
+                        arrayUnionMask->getElementType(),
                         arr1->getOperand(0),
                         arr2->getOperand(0)),
                     arr1->getElementCount(),
@@ -1118,7 +1118,7 @@ struct TypeFlowSpecializationContext
         }
 
         // Ptr
-        if (auto ptrCtx = as<IRPtrTypeBase>(typeContext))
+        if (auto ptrUnionMask = as<IRPtrTypeBase>(typeUnionMask))
         {
             auto ptr1 = as<IRPtrTypeBase>(info1);
             auto ptr2 = as<IRPtrTypeBase>(info2);
@@ -1127,7 +1127,7 @@ struct TypeFlowSpecializationContext
                 IRBuilder builder(module);
                 return builder.getPtrTypeWithAddressSpace(
                     (IRType*)unionPropagationInfo(
-                        ptrCtx->getValueType(),
+                        ptrUnionMask->getValueType(),
                         ptr1->getOperand(0),
                         ptr2->getOperand(0)),
                     ptr1);
@@ -1135,9 +1135,9 @@ struct TypeFlowSpecializationContext
         }
 
         // Optional (non-existential)
-        if (as<IROptionalType>(typeContext) && !isOptionalExistentialType(typeContext))
+        if (as<IROptionalType>(typeUnionMask) && !isOptionalExistentialType(typeUnionMask))
         {
-            auto optCtx = as<IROptionalType>(typeContext);
+            auto optUnionMask = as<IROptionalType>(typeUnionMask);
 
             // Handle OptionalNone + Optional cases
             if (as<IROptionalType>(info1) && as<IROptionalNoneType>(info2))
@@ -1151,14 +1151,14 @@ struct TypeFlowSpecializationContext
             {
                 IRBuilder builder(module);
                 return builder.getOptionalType((IRType*)unionPropagationInfo(
-                    optCtx->getValueType(),
+                    optUnionMask->getValueType(),
                     opt1->getOperand(0),
                     opt2->getOperand(0)));
             }
         }
 
         // AttributedType
-        if (auto attrCtx = as<IRAttributedType>(typeContext))
+        if (auto attrUnionMask = as<IRAttributedType>(typeUnionMask))
         {
             auto attr1 = as<IRAttributedType>(info1);
             auto attr2 = as<IRAttributedType>(info2);
@@ -1170,7 +1170,7 @@ struct TypeFlowSpecializationContext
                     attrs.add(attr);
                 auto result = builder.getAttributedType(
                     (IRType*)unionPropagationInfo(
-                        attrCtx->getBaseType(),
+                        attrUnionMask->getBaseType(),
                         attr1->getOperand(0),
                         attr2->getOperand(0)),
                     attrs);
@@ -1179,7 +1179,7 @@ struct TypeFlowSpecializationContext
             }
         }
 
-        if (auto diffPairCtx = as<IRDifferentialPairType>(typeContext))
+        if (auto diffPairUnionMask = as<IRDifferentialPairType>(typeUnionMask))
         {
             auto attr1 = as<IRTupleType>(info1);
             auto attr2 = as<IRTupleType>(info2);
@@ -1189,12 +1189,12 @@ struct TypeFlowSpecializationContext
                 List<IRType*> elementInfos;
 
                 elementInfos.add((IRType*)unionPropagationInfo(
-                    diffPairCtx->getValueType(),
+                    diffPairUnionMask->getValueType(),
                     attr1->getOperand(0),
                     attr2->getOperand(0)));
 
                 elementInfos.add((IRType*)unionPropagationInfo(
-                    diffPairCtx->getValueType(),
+                    diffPairUnionMask->getValueType(),
                     attr1->getOperand(1),
                     attr2->getOperand(1)));
 
@@ -1210,7 +1210,7 @@ struct TypeFlowSpecializationContext
             }
         }
 
-        // --- Non-structural, non-concrete type contexts ---
+        // --- Non-structural, non-concrete union masks ---
         // For any remaining case (InterfaceType, WitnessTableType, FuncType,
         // LookupWitnessMethod result, etc.), or when the structural match failed,
         // perform a flat union over the set-based composites.
@@ -1357,14 +1357,14 @@ struct TypeFlowSpecializationContext
     {
         // Don't update info if the callee has a concrete return type.
         IRInst* callableForType = callable;
-        if (auto fwb = as<IRFuncWithBindings>(callable))
-            callableForType = getContextFunc(fwb);
+        if (auto fwb = as<IRSpecializeExistentials>(callable))
+            callableForType = getFuncDefinitionForContext(fwb);
         auto callableFuncType = cast<IRFuncType>(callableForType->getDataType());
         if (isConcreteType(callableFuncType->getResultType()))
             return;
 
         auto existingReturnInfo = getFuncReturnInfo(callable);
-        // Use the function's declared return type as context for structural union.
+        // Use the function's declared return type as union mask for structural union.
         auto newReturnInfo =
             unionPropagationInfo(callableFuncType->getResultType(), existingReturnInfo, returnInfo);
 
@@ -1630,8 +1630,8 @@ struct TypeFlowSpecializationContext
             auto val = returnInfo->getVal();
             if (!as<IRVoidType>(val->getDataType()))
             {
-                // Get the function's declared return type as context for the arg info shape.
-                auto func = getContextFunc(context);
+                // Get the function's declared return type as union mask for the arg info shape.
+                auto func = getFuncDefinitionForContext(context);
                 SLANG_ASSERT(func);
                 IRType* returnType = cast<IRFuncType>(func->getDataType())->getResultType();
                 updateFuncReturnInfo(context, tryGetArgInfo(context, val, returnType), workQueue);
@@ -1668,7 +1668,7 @@ struct TypeFlowSpecializationContext
                 auto arg = unconditionalBranch->getArg(paramIndex);
                 if (auto argInfo = tryGetArgInfo(context, arg, param->getDataType()))
                 {
-                    // Use merge update with phi param's type as context.
+                    // Use merge update with phi param's type as union mask.
                     updateInfoForMerge(context, param, argInfo, param->getDataType(), workQueue);
                 }
             }
@@ -1727,9 +1727,10 @@ struct TypeFlowSpecializationContext
                     firstBlock = targetCallee->getFirstBlock();
                 else if (auto specInst = as<IRSpecialize>(targetCallee))
                     firstBlock = getGenericReturnVal(specInst->getBase())->getFirstBlock();
-                else if (auto funcWithBindings = as<IRFuncWithBindings>(targetCallee))
+                else if (
+                    auto existentialSpecializedFunc = as<IRSpecializeExistentials>(targetCallee))
                 {
-                    auto baseFunc = getContextFunc(funcWithBindings);
+                    auto baseFunc = getFuncDefinitionForContext(existentialSpecializedFunc);
                     if (baseFunc)
                         firstBlock = baseFunc->getFirstBlock();
                 }
@@ -1852,8 +1853,8 @@ struct TypeFlowSpecializationContext
                         // known concrete type.
                         //
                         IRInst* calleeForType = targetCallee;
-                        if (auto fwb = as<IRFuncWithBindings>(targetCallee))
-                            calleeForType = getContextFunc(fwb);
+                        if (auto fwb = as<IRSpecializeExistentials>(targetCallee))
+                            calleeForType = getFuncDefinitionForContext(fwb);
                         auto concreteReturnType =
                             cast<IRFuncType>(calleeForType->getDataType())->getResultType();
                         if (isConcreteType(concreteReturnType))
@@ -3512,11 +3513,11 @@ struct TypeFlowSpecializationContext
     }
 
     // Given a callee and information about the call arguments, determine if we need
-    // a FuncWithBindings context instead of the bare callee.
+    // a SpecializeExistentials context instead of the bare callee.
     //
     // This is the core mechanism for specializing existential calls:
     // when a function has interface-typed parameters and we know the concrete type
-    // at the call site, we create a FuncWithBindings to represent that
+    // at the call site, we create a SpecializeExistentials to represent that
     // specialized version.
     //
     // Returns nullptr if the callee has non-concrete parameters but we don't have
@@ -3535,7 +3536,7 @@ struct TypeFlowSpecializationContext
             return callee;
 
         // If our callee is a specialize, we won't create separate bound functions yet,
-        // since it's currently tricky to lower a FuncWithBindings(Specialize(...)).
+        // since it's currently tricky to lower a SpecializeExistentials(Specialize(...)).
         //
         // Most of the complexity is that that we use `specializeGeneric` which loses cloning
         // information needed to transfer our propagation analysis to the newly created function.
@@ -3600,22 +3601,22 @@ struct TypeFlowSpecializationContext
         for (auto& binding : bindings)
             operands.add(binding);
 
-        auto funcWithBindings = cast<IRFuncWithBindings>(builder.emitIntrinsicInst(
+        auto existentialSpecializedFunc = cast<IRSpecializeExistentials>(builder.emitIntrinsicInst(
             nullptr, // Copy over the original func type, we'll replace the func-type
                      // later once we have all the info.
-            kIROp_FuncWithBindings,
+            kIROp_SpecializeExistentials,
             (UInt)operands.getCount(),
             operands.getBuffer()));
 
-        funcWithBindingsCache.addIfNotExists(callee, List<IRFuncWithBindings*>());
-        funcWithBindingsCache[callee].add(funcWithBindings);
+        existentialSpecializedFuncCache.addIfNotExists(callee, List<IRSpecializeExistentials*>());
+        existentialSpecializedFuncCache[callee].add(existentialSpecializedFunc);
 
-        return funcWithBindings;
+        return existentialSpecializedFunc;
     }
 
-    // Initialize parameter info from a FuncWithBindings' binding operands.
-    void initializeBindingsForFuncWithBindings(
-        IRFuncWithBindings* funcWithBindings,
+    // Initialize parameter info from a SpecializeExistentials' binding operands.
+    void initializeBindingsForSpecializeExistentials(
+        IRSpecializeExistentials* existentialSpecializedFunc,
         IRFunc* func,
         WorkQueue<WorkItem>& workQueue)
     {
@@ -3626,13 +3627,13 @@ struct TypeFlowSpecializationContext
         UInt paramIndex = 0;
         for (auto param : firstBlock->getParams())
         {
-            if (paramIndex + 1 < funcWithBindings->getOperandCount())
+            if (paramIndex + 1 < existentialSpecializedFunc->getOperandCount())
             {
-                auto binding = funcWithBindings->getOperand(paramIndex + 1);
+                auto binding = existentialSpecializedFunc->getOperand(paramIndex + 1);
                 if (binding && !as<IRVoidLit>(binding))
                 {
                     updateInfoForMerge(
-                        funcWithBindings,
+                        existentialSpecializedFunc,
                         param,
                         binding,
                         param->getDataType(),
@@ -3893,16 +3894,19 @@ struct TypeFlowSpecializationContext
 
                     break;
                 }
-            case kIROp_FuncWithBindings:
+            case kIROp_SpecializeExistentials:
                 {
-                    auto funcWithBindings = cast<IRFuncWithBindings>(context);
-                    func = getContextFunc(context);
+                    auto existentialSpecializedFunc = cast<IRSpecializeExistentials>(context);
+                    func = getFuncDefinitionForContext(existentialSpecializedFunc);
 
                     if (this->uniqueDefs.add(func))
                         expandPacksInFunc(func);
 
                     // Initialize parameter infos from the bindings
-                    initializeBindingsForFuncWithBindings(funcWithBindings, func, workQueue);
+                    initializeBindingsForSpecializeExistentials(
+                        existentialSpecializedFunc,
+                        func,
+                        workQueue);
 
                     // Add all blocks to the work queue
                     for (auto block = func->getFirstBlock(); block; block = block->getNextBlock())
@@ -4045,6 +4049,7 @@ struct TypeFlowSpecializationContext
             {
                 // Remove ref counts for all callees in the old set, since we're replacing the set
                 // with new information.
+                //
                 forEachInSet(
                     module,
                     cast<IRElementOfSetType>(this->callSiteInfo[InstWithContext(context, inst)])
@@ -4269,9 +4274,9 @@ struct TypeFlowSpecializationContext
         }
     }
 
-    List<IRInst*> getParamInfos(IRInst* context, IRFuncType* contextFuncType)
+    List<IRInst*> getParamInfos(IRInst* context, IRFuncType* funcTypeUnionMask)
     {
-        auto baseFunc = getContextFunc(context);
+        auto baseFunc = getFuncDefinitionForContext(context);
         List<IRInst*> paramInfos;
         UInt index = 0;
         for (auto param : baseFunc->getParams())
@@ -4283,7 +4288,7 @@ struct TypeFlowSpecializationContext
                 paramInfos.add(makeInfoForConcreteType(
                     module,
                     param->getDataType(),
-                    contextFuncType->getParamType(index)));
+                    funcTypeUnionMask->getParamType(index)));
             }
             else
             {
@@ -4320,9 +4325,9 @@ struct TypeFlowSpecializationContext
             auto innerFunc = getGenericReturnVal(generic);
             func = cast<IRFunc>(innerFunc);
         }
-        else if (auto funcWithBindings = as<IRFuncWithBindings>(context))
+        else if (auto existentialSpecializedFunc = as<IRSpecializeExistentials>(context))
         {
-            func = getContextFunc(funcWithBindings);
+            func = getFuncDefinitionForContext(existentialSpecializedFunc);
         }
         else
         {
@@ -4362,9 +4367,9 @@ struct TypeFlowSpecializationContext
             for (auto param : as<IRFunc>(innerFunc)->getParams())
                 infos.add(tryGetArgInfo(context, param, param->getDataType()));
         }
-        else if (auto funcWithBindings = as<IRFuncWithBindings>(context))
+        else if (auto existentialSpecializedFunc = as<IRSpecializeExistentials>(context))
         {
-            auto baseFunc = getContextFunc(funcWithBindings);
+            auto baseFunc = getFuncDefinitionForContext(existentialSpecializedFunc);
             for (auto param : baseFunc->getParams())
                 infos.add(tryGetArgInfo(context, param, param->getDataType()));
         }
@@ -4403,9 +4408,9 @@ struct TypeFlowSpecializationContext
                 directions.add(direction);
             }
         }
-        else if (auto funcWithBindings = as<IRFuncWithBindings>(context))
+        else if (auto existentialSpecializedFunc = as<IRSpecializeExistentials>(context))
         {
-            auto baseFunc = getContextFunc(funcWithBindings);
+            auto baseFunc = getFuncDefinitionForContext(existentialSpecializedFunc);
             for (auto param : baseFunc->getParams())
             {
                 const auto [direction, type] = splitParameterDirectionAndType(param->getDataType());
@@ -4683,21 +4688,22 @@ struct TypeFlowSpecializationContext
     //      insts (e.g. `GetTagForMappedSet`, `GetTagForSpecializedSet`, etc.)
     //
 
-    // Lower a FuncWithBindings context by cloning the base function
+    // Lower a SpecializeExistentials context by cloning the base function
     // and transferring propagation info to the clone.
     //
     // Returns the cloned function, or nullptr if the base function is not found.
     //
-    IRFunc* lowerFuncWithBindings(IRFuncWithBindings* funcWithBindings)
+    IRFunc* lowerSpecializeExistentials(IRSpecializeExistentials* existentialSpecializedFunc)
     {
         IRBuilder builder(module);
-        auto entry =
-            builder.fetchCompilerDictionaryEntry(module->getTranslationDict(), funcWithBindings);
+        auto entry = builder.fetchCompilerDictionaryEntry(
+            module->getTranslationDict(),
+            existentialSpecializedFunc);
 
         if (auto existingVal = entry->getValue())
             return as<IRFunc>(existingVal);
 
-        auto baseFunc = funcWithBindings->getOperand(0);
+        auto baseFunc = existentialSpecializedFunc->getOperand(0);
         SLANG_ASSERT(baseFunc);
 
         if (as<IRSpecialize>(baseFunc))
@@ -4706,13 +4712,13 @@ struct TypeFlowSpecializationContext
             // before cloning, since the clone will be used as the new context for looking up
             // propagation info.
             //
-            // But then this may change the funcWithBindings inst itself, and we won't have the
-            // right key to find the propagation info..
+            // But then this may change the existentialSpecializedFunc inst itself, and we won't
+            // have the right key to find the propagation info..
             //
             // translationContext.resolveInst(baseFunc);
             // For now, assert out.
-            SLANG_UNEXPECTED(
-                "FuncWithBindings with a specialization as the base function is not supported yet");
+            SLANG_UNEXPECTED("SpecializeExistentials with a specialization as the base function is "
+                             "not supported yet");
         }
 
         // Clone the base function
@@ -4721,7 +4727,7 @@ struct TypeFlowSpecializationContext
         builder.setInsertBefore(baseFunc);
         auto clonedFunc = cast<IRFunc>(cloneInst(&cloneEnv, &builder, baseFunc));
 
-        // Transfer propagation info from the FuncWithBindings context
+        // Transfer propagation info from the SpecializeExistentials context
         // to the cloned function (using the cloned func as the new context).
         //
         for (auto& kv : cloneEnv.mapOldValToNew)
@@ -4729,7 +4735,7 @@ struct TypeFlowSpecializationContext
             if (isGlobalInst(kv.first))
                 continue;
 
-            if (auto info = _tryGetInfo(InstWithContext(funcWithBindings, kv.first)))
+            if (auto info = _tryGetInfo(InstWithContext(existentialSpecializedFunc, kv.first)))
             {
                 IRBuilder infoBuilder(module);
                 propagationMap[InstWithContext(clonedFunc, kv.second)] =
@@ -4739,21 +4745,25 @@ struct TypeFlowSpecializationContext
             if (as<IRCall>(kv.first))
             {
                 // If the call had recorded call-site info, transfer that as well.
-                if (this->callSiteInfo.containsKey(InstWithContext(funcWithBindings, kv.first)))
+                if (this->callSiteInfo.containsKey(
+                        InstWithContext(existentialSpecializedFunc, kv.first)))
                 {
                     this->callSiteInfo[InstWithContext(clonedFunc, kv.second)] =
-                        this->callSiteInfo[InstWithContext(funcWithBindings, kv.first)];
+                        this->callSiteInfo[InstWithContext(existentialSpecializedFunc, kv.first)];
                 }
-                if (this->callSiteFuncType.containsKey(InstWithContext(funcWithBindings, kv.first)))
+                if (this->callSiteFuncType.containsKey(
+                        InstWithContext(existentialSpecializedFunc, kv.first)))
                 {
                     this->callSiteFuncType[InstWithContext(clonedFunc, kv.second)] =
-                        this->callSiteFuncType[InstWithContext(funcWithBindings, kv.first)];
+                        this->callSiteFuncType[InstWithContext(
+                            existentialSpecializedFunc,
+                            kv.first)];
                 }
             }
         }
 
         // Transfer return info
-        auto returnInfoPtr = funcReturnInfo.tryGetValue(funcWithBindings);
+        auto returnInfoPtr = funcReturnInfo.tryGetValue(existentialSpecializedFunc);
         if (returnInfoPtr)
             funcReturnInfo[clonedFunc] = *returnInfoPtr;
 
@@ -5275,38 +5285,35 @@ struct TypeFlowSpecializationContext
 
     bool isTaggedUnionType(IRInst* type) { return as<IRTaggedUnionType>(type) != nullptr; }
 
-    // Union two lowered types using a context type for structural decomposition.
+    // Union two lowered types using a union mask for structural decomposition.
     //
-    // `typeContext` is the declared type of the position being aggregated
+    // `typeUnionMask` is the declared type of the position being aggregated
     // (e.g., the declared parameter type from the interface's func type).
     // Concrete lowered types are first wrapped via makeInfoForConcreteType so
     // that unionPropagationInfo can decompose them structurally.
     //
-    IRType* updateType(IRType* typeContext, IRType* currentType, IRType* newType)
+    IRType* updateType(IRType* typeUnionMask, IRType* currentType, IRType* newType)
     {
         // If our context doesn't allow any specialization.. then it should serve as
         // the final type.
         //
-        if (isConcreteType(typeContext))
-            return typeContext;
+        if (isConcreteType(typeUnionMask))
+            return typeUnionMask;
 
-        // if (isConcreteType(newType))
-        //     newType = (IRType*)makeInfoForConcreteType(module, newType, typeContext);
-
-        return (IRType*)unionPropagationInfo(typeContext, currentType, (IRType*)newType);
+        return (IRType*)unionPropagationInfo(typeUnionMask, currentType, (IRType*)newType);
     }
 
     IRFuncType* getEffectiveFuncTypeForDispatcher(
         IRWitnessTableSet* tableSet,
         IRFuncSet* resultFuncSet,
-        IRFuncType* contextFuncType)
+        IRFuncType* funcTypeUnionMask)
     {
-        SLANG_ASSERT(contextFuncType);
+        SLANG_ASSERT(funcTypeUnionMask);
 
         List<IRType*>& extraParamTypes = *module->getContainerPool().getList<IRType>();
         extraParamTypes.add((IRType*)makeTagType(tableSet));
 
-        auto innerFuncType = getEffectiveFuncTypeForSet(resultFuncSet, contextFuncType);
+        auto innerFuncType = getEffectiveFuncTypeForSet(resultFuncSet, funcTypeUnionMask);
         List<IRType*>& allParamTypes = *module->getContainerPool().getList<IRType>();
         allParamTypes.addRange(extraParamTypes);
         for (auto paramType : innerFuncType->getParamTypes())
@@ -5324,7 +5331,7 @@ struct TypeFlowSpecializationContext
     // Get an effective func type to use for the callee.
     // The callee may be a set, in which case, this returns a union-ed functype.
     //
-    IRFuncType* getEffectiveFuncTypeForSet(IRFuncSet* calleeSet, IRFuncType* contextFuncType)
+    IRFuncType* getEffectiveFuncTypeForSet(IRFuncSet* calleeSet, IRFuncType* funcTypeUnionMask)
     {
         // The effective func type for a callee set is calculated as follows:
         //
@@ -5343,7 +5350,7 @@ struct TypeFlowSpecializationContext
         //        table-set argument, a tag is required as input.
         //
 
-        SLANG_ASSERT(contextFuncType);
+        SLANG_ASSERT(funcTypeUnionMask);
 
         if (calleeSet->isUnbounded())
         {
@@ -5360,13 +5367,13 @@ struct TypeFlowSpecializationContext
         List<IRInst*>& calleesToProcess = *module->getContainerPool().getList<IRInst>();
         forEachInSet(module, calleeSet, [&](IRInst* func) { calleesToProcess.add(func); });
 
-        // Helper to get the context base type for a given parameter index.
-        auto getContextBaseType = [&](Index index) -> IRType*
+        // Helper to get the union mask base type for a given parameter index.
+        auto getMaskBaseType = [&](Index index) -> IRType*
         {
-            if ((UInt)index < contextFuncType->getParamCount())
+            if ((UInt)index < funcTypeUnionMask->getParamCount())
             {
                 auto [ctxDir, ctxBase] =
-                    splitParameterDirectionAndType(contextFuncType->getParamType((UInt)index));
+                    splitParameterDirectionAndType(funcTypeUnionMask->getParamType((UInt)index));
                 SLANG_UNUSED(ctxDir);
                 return ctxBase;
             }
@@ -5375,7 +5382,7 @@ struct TypeFlowSpecializationContext
 
         auto updateParamType = [&](Index index, IRInst* paramInfo) -> IRType*
         {
-            auto contextParamType = contextFuncType->getParamType((UInt)index);
+            auto paramTypeUnionMask = funcTypeUnionMask->getParamType((UInt)index);
 
             if (paramTypes.getCount() <= index)
             {
@@ -5387,9 +5394,9 @@ struct TypeFlowSpecializationContext
             }
 
             {
-                // Then, update the existing type using context-aware union.
-                auto [contextDirection, contextBaseType] =
-                    splitParameterDirectionAndType(contextParamType);
+                // Then, update the existing type using structural union.
+                auto [maskDirection, baseTypeUnionMask] =
+                    splitParameterDirectionAndType(paramTypeUnionMask);
                 auto [newDirection, newType] = splitParameterDirectionAndType((IRType*)paramInfo);
 
                 IRType* currentBaseType = nullptr;
@@ -5399,49 +5406,49 @@ struct TypeFlowSpecializationContext
                     currentBaseType = _currentBaseType;
                 }
 
-                auto updatedType = updateType(contextBaseType, currentBaseType, newType);
-                SLANG_ASSERT(contextDirection == newDirection);
-                paramTypes[index] = fromDirectionAndType(&builder, contextDirection, updatedType);
+                auto updatedType = updateType(baseTypeUnionMask, currentBaseType, newType);
+                SLANG_ASSERT(maskDirection == newDirection);
+                paramTypes[index] = fromDirectionAndType(&builder, maskDirection, updatedType);
                 return updatedType;
             }
         };
 
-        IRType* contextResultType = contextFuncType->getResultType();
+        IRType* resultTypeUnionMask = funcTypeUnionMask->getResultType();
 
         for (auto context : calleesToProcess)
         {
-            auto paramInfos = getParamInfos(context, maybeExpandFuncType(contextFuncType));
+            auto paramInfos = getParamInfos(context, maybeExpandFuncType(funcTypeUnionMask));
 
             for (Index i = 0; i < paramInfos.getCount(); i++)
                 updateParamType(i, paramInfos[i]);
 
             if (auto resultInfo = getFuncReturnInfo(context))
             {
-                resultType = updateType(contextResultType, resultType, (IRType*)resultInfo);
+                resultType = updateType(resultTypeUnionMask, resultType, (IRType*)resultInfo);
             }
             else if (auto funcType = as<IRFuncType>(context->getDataType()))
             {
                 SLANG_ASSERT(isGlobalInst(funcType->getResultType()));
                 resultType = updateType(
-                    contextResultType,
+                    resultTypeUnionMask,
                     resultType,
                     (IRType*)makeInfoForConcreteType(
                         module,
                         funcType->getResultType(),
-                        contextResultType));
+                        resultTypeUnionMask));
             }
-            else if (auto boundFuncContext = as<IRFuncWithBindings>(context))
+            else if (auto boundFuncContext = as<IRSpecializeExistentials>(context))
             {
-                auto baseFuncForType = getContextFunc(boundFuncContext);
+                auto baseFuncForType = getFuncDefinitionForContext(boundFuncContext);
                 auto funcType2 = cast<IRFuncType>(baseFuncForType->getDataType());
                 SLANG_ASSERT(isGlobalInst(funcType2->getResultType()));
                 resultType = updateType(
-                    contextResultType,
+                    resultTypeUnionMask,
                     resultType,
                     (IRType*)makeInfoForConcreteType(
                         module,
                         funcType2->getResultType(),
-                        contextResultType));
+                        resultTypeUnionMask));
             }
             else
             {
@@ -5497,9 +5504,9 @@ struct TypeFlowSpecializationContext
         return resultFuncType;
     }
 
-    // Get the effective func type for a single callee (func, specialize, or funcWithBindings).
-    // This directly reads the parameter and return info without any union logic,
-    // since there is only one callee.
+    // Get the effective func type for a single callee (func, specialize, or
+    // existentialSpecializedFunc). This directly reads the parameter and return info without any
+    // union logic, since there is only one callee.
     //
     IRFuncType* getEffectiveFuncType(IRInst* callee)
     {
@@ -5527,9 +5534,9 @@ struct TypeFlowSpecializationContext
         {
             resultType = funcType->getResultType();
         }
-        else if (auto boundFunc = as<IRFuncWithBindings>(callee))
+        else if (auto boundFunc = as<IRSpecializeExistentials>(callee))
         {
-            auto baseFunc = getContextFunc(boundFunc);
+            auto baseFunc = getFuncDefinitionForContext(boundFunc);
             resultType = cast<IRFuncType>(baseFunc->getDataType())->getResultType();
         }
         else
@@ -5659,7 +5666,7 @@ struct TypeFlowSpecializationContext
     // Walk the callee operand chain backward, collecting DispatchActions
     // and returning the base tag operand (whose type is SetTagType(witnessTableSet)).
     //
-    // Also inspects the calleeSet for IRFuncWithBindings and appends a
+    // Also inspects the calleeSet for IRSpecializeExistentials and appends a
     // BindExistentials action if any are found.
     //
     // Additionally, any spec args that are tags of witness table sets are
@@ -5721,7 +5728,7 @@ struct TypeFlowSpecializationContext
 
         actions.reverse();
 
-        // Check calleeSet for bindings (IRFuncWithBindings).
+        // Check calleeSet for bindings (IRSpecializeExistentials).
         IRBuilder builder(module);
         List<IRInst*> bindings;
         for (UInt i = 0; i < inst->getOperandCount() - 1; i++)
@@ -5733,17 +5740,18 @@ struct TypeFlowSpecializationContext
             calleeSet,
             [&](IRInst* element)
             {
-                if (auto funcWithBindings = as<IRFuncWithBindings>(element))
+                if (auto existentialSpecializedFunc = as<IRSpecializeExistentials>(element))
                 {
-                    for (UInt i = 1; i < funcWithBindings->getOperandCount(); i++)
+                    for (UInt i = 1; i < existentialSpecializedFunc->getOperandCount(); i++)
                     {
                         if (!as<IRVoidLit>(bindings[i - 1]))
                         {
-                            SLANG_ASSERT(bindings[i - 1] == funcWithBindings->getOperand(i));
+                            SLANG_ASSERT(
+                                bindings[i - 1] == existentialSpecializedFunc->getOperand(i));
                         }
                         else
                         {
-                            bindings[i - 1] = funcWithBindings->getOperand(i);
+                            bindings[i - 1] = existentialSpecializedFunc->getOperand(i);
                         }
                     }
                 }
@@ -5860,14 +5868,15 @@ struct TypeFlowSpecializationContext
                             for (auto binding : action.bindings)
                                 boundFuncOperands.add(binding);
 
-                            auto funcWithBindings =
-                                cast<IRFuncWithBindings>(builder.emitIntrinsicInst(
+                            auto existentialSpecializedFunc =
+                                cast<IRSpecializeExistentials>(builder.emitIntrinsicInst(
                                     nullptr,
-                                    kIROp_FuncWithBindings,
+                                    kIROp_SpecializeExistentials,
                                     (UInt)boundFuncOperands.getCount(),
                                     boundFuncOperands.getBuffer()));
 
-                            auto loweredFunc = lowerFuncWithBindings(funcWithBindings);
+                            auto loweredFunc =
+                                lowerSpecializeExistentials(existentialSpecializedFunc);
                             if (loweredFunc)
                                 val = loweredFunc;
                             break;
@@ -6017,16 +6026,15 @@ struct TypeFlowSpecializationContext
                     return false;
                 }
 
-                // Use the callee's declared func type recorded during analysis.
                 auto contextFuncTypePtr =
                     this->callSiteFuncType.tryGetValue(InstWithContext(context, inst));
                 SLANG_ASSERT(contextFuncTypePtr);
-                auto contextFuncType = *contextFuncTypePtr;
+                auto funcTypeUnionMask = *contextFuncTypePtr;
 
                 effectiveFuncType = getEffectiveFuncTypeForDispatcher(
                     tableSet,
                     cast<IRFuncSet>(calleeSet),
-                    maybeExpandFuncType(contextFuncType));
+                    maybeExpandFuncType(funcTypeUnionMask));
 
                 callee = getDispatcher(tableSet, effectiveFuncType, actions, globalsWorkList);
 
@@ -6135,11 +6143,12 @@ struct TypeFlowSpecializationContext
                 effectiveFuncType = getEffectiveFuncType(calleeSet->getElement(0));
 
             // If we're dealing with bindings, materialize a new function now.
-            if (as<IRFuncWithBindings>(calleeSet->getElement(0)))
+            if (as<IRSpecializeExistentials>(calleeSet->getElement(0)))
             {
-                // If our callee is a FuncWithBindings, we need to lower it to get a concrete
+                // If our callee is a SpecializeExistentials, we need to lower it to get a concrete
                 // function.
-                callee = lowerFuncWithBindings(as<IRFuncWithBindings>(calleeSet->getElement(0)));
+                callee = lowerSpecializeExistentials(
+                    as<IRSpecializeExistentials>(calleeSet->getElement(0)));
             }
             else
             {
@@ -6159,7 +6168,7 @@ struct TypeFlowSpecializationContext
         }
 
         SLANG_ASSERT(effectiveFuncType);
-        auto contextFuncType = maybeExpandFuncType(*contextFuncTypePtr);
+        auto funcTypeUnionMask = maybeExpandFuncType(*contextFuncTypePtr);
 
         // First, we'll legalize all operands by upcasting if necessary.
         // This needs to be done even if the callee is not a set.
@@ -6170,7 +6179,7 @@ struct TypeFlowSpecializationContext
             auto arg = inst->getArg(i);
             const auto [paramDirection, paramType] =
                 splitParameterDirectionAndType(effectiveFuncType->getParamType(i + extraArgCount));
-            if (isConcreteType(contextFuncType->getParamType(i)))
+            if (isConcreteType(funcTypeUnionMask->getParamType(i)))
             {
                 callArgs.add(arg);
                 continue;
@@ -7426,11 +7435,11 @@ struct TypeFlowSpecializationContext
     // Set of already discovered contexts.
     HashSet<IRInst*> availableContexts;
 
-    // Cache for FuncWithBindings: maps from base function to all FuncWithBindings
+    // Cache for SpecializeExistentials: maps from base function to all SpecializeExistentials
     // created for it. This is used to oppourtunistically merge variants of the same function
     // depending on policy (i.e. as-few-variants-as-possible vs. aggressive specialization).
     //
-    Dictionary<IRInst*, List<IRFuncWithBindings*>> funcWithBindingsCache;
+    Dictionary<IRInst*, List<IRSpecializeExistentials*>> existentialSpecializedFuncCache;
 
     // Information on the call-site. Note that this may be different from the information
     // on the inst used by the call-site, since it may carry bindings from call arguments.
@@ -7451,7 +7460,8 @@ struct TypeFlowSpecializationContext
     TranslationContext translationContext;
 
     // Unique definitions (independent of bindings/specializations)
-    // Used when applying simplifications as definitions are generated, to avoid
+    //
+    // Used when applying simplifications to function bodies, specifically to avoid
     // re-processing the same definition.
     //
     HashSet<IRFunc*> uniqueDefs;

@@ -3121,6 +3121,13 @@ IRType* getSamplerTypeFromCombinedTextureSampler(IRType* type)
         return builder.getType(kIROp_SamplerStateType);
 }
 
+IRInst* getInnerMostGenericReturnVal(IRGeneric* generic)
+{
+    auto returnVal = findGenericReturnVal(generic);
+    if (auto innerGeneric = as<IRGeneric>(returnVal))
+        return getInnerMostGenericReturnVal(innerGeneric);
+    return returnVal;
+}
 
 bool isReadNoneCallee(IRInst* callee)
 {
@@ -3132,10 +3139,14 @@ bool isReadNoneCallee(IRInst* callee)
 
     if (as<IRSpecialize>(callee))
     {
-        auto generic = as<IRGeneric>(callee->getOperand(0));
-        if (generic)
+        if (auto specialize = as<IRSpecialize>(callee->getOperand(0)))
         {
-            auto genericReturnVal = findGenericReturnVal(generic);
+            return isReadNoneCallee(specialize);
+        }
+        else if (auto generic = as<IRGeneric>(callee->getOperand(0)))
+        {
+            auto genericReturnVal = getInnerMostGenericReturnVal(generic);
+
             if (genericReturnVal)
                 return isReadNoneCallee(genericReturnVal);
             else
@@ -3179,16 +3190,21 @@ bool isNoSideEffectCallee(IRInst* callee)
 {
     if (auto func = as<IRFunc>(callee))
     {
-        if (func->findDecoration<IRNoSideEffectDecoration>())
+        if (func->findDecoration<IRNoSideEffectDecoration>() ||
+            func->findDecoration<IRReadNoneDecoration>())
             return true;
     }
 
     if (as<IRSpecialize>(callee))
     {
-        auto generic = as<IRGeneric>(callee->getOperand(0));
-        if (generic)
+        if (auto specialize = as<IRSpecialize>(callee->getOperand(0)))
         {
-            auto genericReturnVal = findGenericReturnVal(generic);
+            return isNoSideEffectCallee(specialize);
+        }
+        else if (auto generic = as<IRGeneric>(callee->getOperand(0)))
+        {
+            auto genericReturnVal = getInnerMostGenericReturnVal(generic);
+
             if (genericReturnVal)
                 return isNoSideEffectCallee(genericReturnVal);
             else

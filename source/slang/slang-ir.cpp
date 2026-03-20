@@ -3474,13 +3474,6 @@ IRInst* IRBuilder::emitForwardDifferentiateInst(IRType* type, IRInst* baseFn)
     return inst;
 }
 
-IRInst* IRBuilder::emitPrimalSubstituteInst(IRType* type, IRInst* baseFn)
-{
-    auto inst = createInst<IRPrimalSubstitute>(this, kIROp_PrimalSubstitute, type, baseFn);
-    addInst(inst);
-    return inst;
-}
-
 IRInst* IRBuilder::emitDetachDerivative(IRType* type, IRInst* value)
 {
     auto inst = createInst<IRDetachDerivative>(this, kIROp_DetachDerivative, type, value);
@@ -9259,7 +9252,7 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_DetachDerivative:
     case kIROp_FuncTypeOf:
     case kIROp_MakeIDifferentiableWitness:
-    case kIROp_FuncWithBindings:
+    case kIROp_SpecializeExistentials:
         return false;
 
     case kIROp_Div:

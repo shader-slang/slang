@@ -4608,9 +4608,8 @@ bool SemanticsVisitor::doesSignatureMatchRequirement(
         return false;
     }
 
-    // TODO: This is definitely going to cause issues..
-    // What we need is to check that the static modifier is irrelevant
-    // if the satisfying member decl has no `this` parameter.
+    // TODO: This could cause issues later. FuncAliasDecl should be resolved
+    // _before_ the static-ness check, but we're currently doing it after.
     //
     if (auto aliasDecl = satisfyingMemberDeclRef.as<FuncAliasDecl>())
     {
@@ -7575,7 +7574,7 @@ bool SemanticsVisitor::synthesizeAccessorRequirements(
 
         synAccessorDecl->body = synBodyStmt;
 
-        // TODO: this might not be the best way to do this..
+        // TODO: This a slight workaround for accessor differentiability being tricky to handle
         addModifier(synAccessorDecl, m_astBuilder->create<ForceInlineAttribute>());
 
         synAccesorContainer->addMember(synAccessorDecl);
@@ -8120,9 +8119,14 @@ bool SemanticsVisitor::trySynthesizeDiffFuncRequirementWitness(
             // If we find a regular struct decl, we'll need to diagnose, since
             // either everything is synthesized, or everything is user defined.
             //
-            // TODO: turn into a diagnostic
             auto synStructDecl = as<SynthesizedStructDecl>(context->parentDecl);
-            SLANG_ASSERT(synStructDecl);
+            if (!synStructDecl)
+            {
+                getSink()->diagnose(Diagnostics::Unexpected{
+                    .message = "expected SynthesizedStructDecl as parent of BwdCallablePropFunc",
+                    .location = context->parentDecl->loc});
+                return false;
+            }
             synFunc->operands.addRange(synStructDecl->operands);
             if (synStructDecl->irOp == kIROp_BackwardContextFromLegacyBwdDiffFunc)
             {
@@ -8138,9 +8142,11 @@ bool SemanticsVisitor::trySynthesizeDiffFuncRequirementWitness(
             }
             else
             {
-                // TODO: turn into a diagnostic
-                SLANG_UNEXPECTED(
-                    "unexpected synthesized struct IR op for backward callable propagation.");
+                getSink()->diagnose(Diagnostics::Unexpected{
+                    .message =
+                        "unexpected synthesized struct IR op for backward callable propagation",
+                    .location = context->parentDecl->loc});
+                return false;
             }
             break;
         }
@@ -13234,8 +13240,9 @@ void SemanticsDeclHeaderVisitor::checkCallableConstraints(CallableDecl* decl)
         }
         else
         {
-            // TODO: Diagnose properly.
-            SLANG_ASSERT(!"GenericTypeConstraintDecl on a non-interface function.");
+            getSink()->diagnose(Diagnostics::Unexpected{
+                .message = "GenericTypeConstraintDecl on a non-interface function",
+                .location = decl->loc});
         }
     }
 }

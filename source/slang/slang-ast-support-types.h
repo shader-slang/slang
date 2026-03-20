@@ -1798,7 +1798,6 @@ FIDDLE() namespace Slang
                                  ///< requirement
         DZeroFunc,               ///< The `IDifferentiable.dzero` function requirement
         DAddFunc,                ///< The `IDifferentiable.dadd` function requirement
-        DMulFunc,                ///< The `IDifferentiable.dmul` function requirement
 
         InitLogicalFromInt, ///< The `ILogical.__init` method.
         Equals,             ///< The `ILogical.equals` method.

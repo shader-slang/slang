@@ -1740,12 +1740,6 @@ static bool isFunctionDefinedOrImported(IRInst* inst)
         case kIROp_IntrinsicOpDecoration:
         case kIROp_TargetIntrinsicDecoration:
         case kIROp_SPIRVOpDecoration:
-        // Autodiff decorations - the function's implementation is provided by the derivative
-        // function
-        case kIROp_ForwardDerivativeDecoration:
-        case kIROp_BackwardDerivativeDecoration:
-        case kIROp_UserDefinedBackwardDerivativeDecoration:
-        case kIROp_PrimalSubstituteDecoration:
         // Explicitly external functions
         case kIROp_ExternCDecoration:
         case kIROp_ExternCppDecoration:
