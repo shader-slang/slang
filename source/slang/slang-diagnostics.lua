@@ -4200,6 +4200,13 @@ err(
     span { loc = "location", message = "cannot default-initialize struct '~structName' with '{}' because it contains resource fields" }
 )
 
+err(
+    "accessing-value-of-none-optional",
+    41027,
+    "accessing .value on an Optional that is always none",
+    span { loc = "location", message = "accessing .value on an Optional<~type:IRInst> that is always 'none'" }
+)
+
 
 -- Load semantic checking diagnostics (part 13) - AnyValue, Autodiff, Static assertions, Atomics, etc.
 -- (inlined from slang-diagnostics-semantic-checking-13.lua)
