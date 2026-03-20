@@ -1793,17 +1793,17 @@ Result linkAndOptimizeIR(
         break;
     }
 
+    if (isMetalTarget(targetRequest))
+    {
+        // We need to legalize Metal IR after introducing the explicit global context,
+        // as introduceExplicitGlobalContext depends on entry points which can change during legalization
+        SLANG_PASS(legalizeIRForMetal, targetProgram, sink);
+    }
+
     // TODO: our current dynamic dispatch pass will remove all uses of witness tables.
     // If we are going to support function-pointer based, "real" modular dynamic dispatch,
     // we will need to disable this pass.
     SLANG_PASS(stripLegalizationOnlyInstructions);
-
-    if (isMetalTarget(targetRequest))
-    {
-        // We need to legalize Metal IR after introducing the explicit global context,
-        // as it depends on entry points which can change during legalization
-        SLANG_PASS(legalizeIRForMetal, targetProgram, sink);
-    }
 
     switch (target)
     {
