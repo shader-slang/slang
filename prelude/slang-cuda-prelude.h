@@ -7539,7 +7539,7 @@ struct WmmaFragment
 
     static constexpr uint32_t elements_per_thread = RegsCount * (4 / sizeof(T));
 
-    // Tin2-style store_native / load_native for efficient shared memory reductions.
+    // Native store/load for efficient shared memory reductions.
     // Each lane stores/loads its raw registers as a contiguous block at shmem[offset + laneId].
 
     // Number of uint4s per lane needed to store all registers.

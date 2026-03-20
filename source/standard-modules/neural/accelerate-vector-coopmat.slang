@@ -569,7 +569,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
         }
     }
 
-    // Cross-warp reduction for ALL tiles at once (Tin2-style).
+    // Cross-warp reduction for ALL tiles at once.
     // Uses more shared memory (ROW * COLUMN * TileStride) but only 2 barriers per reduction step
     // instead of 2 * ROW barriers. For 128x128 with 8x8 tiles:
     //   - Row-by-row: 8 rows * 2 barriers = 16 barriers

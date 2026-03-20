@@ -27560,13 +27560,13 @@ struct CoopMat
     }
 
     //
-    // Native register store/load for efficient shmem reductions (Tin2 store_native pattern).
+    // Native register store/load for efficient shmem reductions.
     // Stores/loads raw CoopMat registers to/from groupshared memory.
     // On CUDA: direct register copy via reinterpret_cast in prelude.
     // On Vulkan: element-by-element via subscript.
     //
 
-    /// Stores raw registers to groupshared memory in native layout (Tin2 store_native pattern).
+    /// Stores raw registers to groupshared memory in native layout.
     /// Each lane writes its registers contiguously at data[offset + laneId * RegsPerLane].
     [ForceInline]
     [require(cooperative_matrix, subgroup_basic)]
@@ -27583,7 +27583,7 @@ struct CoopMat
         }
     }
 
-    /// Loads raw registers from groupshared memory in native layout (Tin2 load_native pattern).
+    /// Loads raw registers from groupshared memory in native layout.
     [ForceInline]
     [mutating]
     [require(cooperative_matrix, subgroup_basic)]
