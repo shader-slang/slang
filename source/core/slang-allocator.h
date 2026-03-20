@@ -18,8 +18,9 @@ inline void* alignedAllocate(size_t size, size_t alignment)
     return _aligned_malloc(size, alignment);
 #elif defined(__CYGWIN__)
     // On POSIX, aligned_alloc & posix_memalign require a minimum alignment of
-    // sizeof(void*). If the requested alignment is less than that, we can just
-    // use malloc.
+    // sizeof(void*). malloc is required to have a minimum alignment of
+    // alignof(max_align_t) >= sizeof(void*), so we can just use malloc if
+    // the requested alignment is low enough.
     if (alignment < alignof(max_align_t))
         return malloc(size);
     else

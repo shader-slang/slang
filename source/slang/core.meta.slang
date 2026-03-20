@@ -1819,7 +1819,7 @@ public struct HeapAllocator: IAllocator<AddressSpace.Device>
     static override Ptr<void> alignedAllocate(size_t bytes, uint alignment) throws MemoryAllocationError
     {
         size_t allocCount = __alignedAllocPtrLength<AddressSpace.Device>(bytes, alignment);
-        Ptr<void> allocation = __cpu_malloc(allocCount);
+        Ptr<void> allocation = __cpu_malloc(allocCount * sizeof(Ptr<void>));
         if (allocation == nullptr)
             throw MemoryAllocationError.OutOfMemory;
         return __finalizeAlignedAlloc(allocation, alignment);
@@ -1841,7 +1841,10 @@ public struct HeapAllocator: IAllocator<AddressSpace.Device>
         }
         else
         {
-            return reinterpret<LayoutPtr<T, L>>(__cpu_realloc(Ptr<void>(oldPtr), __arraySizeOf<T, L>(newCount)));
+            let newPtr = __cpu_realloc(Ptr<void>(oldPtr), __arraySizeOf<T, L>(newCount));
+            if (newPtr == nullptr)
+                throw MemoryAllocationError.OutOfMemory;
+            return reinterpret<LayoutPtr<T, L>>(newPtr);
         }
     }
 
