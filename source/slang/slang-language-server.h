@@ -31,6 +31,15 @@ struct Command
             value = new T(val);
             return *this;
         }
+        Optional& operator=(const Optional& other)
+        {
+            if (this != &other)
+            {
+                delete value;
+                value = other.isValid() ? new T(other.get()) : nullptr;
+            }
+            return *this;
+        }
         Optional& operator=(Optional&& other)
         {
             if (this != &other)
