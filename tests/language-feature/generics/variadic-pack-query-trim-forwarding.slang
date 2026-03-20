@@ -15,8 +15,8 @@ struct CountHolder<let N : int>
 void computeMain()
 {
     // CHECK: 2
-    outputBuffer[0] = CountHolder<countof(__trimHead(Tuple<int, float, bool>))>.get();
+    outputBuffer[0] = CountHolder<countof(__trimFirst(Tuple<int, float, bool>))>.get();
 
     // CHECK: 0
-    outputBuffer[1] = CountHolder<countof(__trimHead(Tuple<int>))>.get();
+    outputBuffer[1] = CountHolder<countof(__trimFirst(Tuple<int>))>.get();
 }

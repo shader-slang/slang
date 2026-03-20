@@ -1024,6 +1024,24 @@ class ExpandType : public Type
 };
 
 FIDDLE()
+class PackBranchType : public Type
+{
+    FIDDLE(...)
+    Val* getPackOperand() const { return getOperand(0); }
+    Type* getEmptyType() const { return as<Type>(getOperand(1)); }
+    Type* getNonEmptyType() const { return as<Type>(getOperand(2)); }
+    PackBranchType(Val* packOperand, Type* emptyType, Type* nonEmptyType)
+    {
+        m_operands.add(ValNodeOperand(packOperand));
+        m_operands.add(ValNodeOperand(emptyType));
+        m_operands.add(ValNodeOperand(nonEmptyType));
+    }
+    void _toTextOverride(StringBuilder& out);
+    Type* _createCanonicalTypeOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
+FIDDLE()
 class FirstPackElementType : public Type
 {
     FIDDLE(...)
@@ -1046,22 +1064,22 @@ class LastPackElementType : public Type
 };
 
 FIDDLE()
-class TrimHeadTypePack : public Type
+class TrimFirstTypePack : public Type
 {
     FIDDLE(...)
     Type* getBasePack() const { return as<Type>(getOperand(0)); }
-    TrimHeadTypePack(Type* basePack) { m_operands.add(ValNodeOperand(basePack)); }
+    TrimFirstTypePack(Type* basePack) { m_operands.add(ValNodeOperand(basePack)); }
     void _toTextOverride(StringBuilder& out);
     Type* _createCanonicalTypeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
 FIDDLE()
-class TrimTailTypePack : public Type
+class TrimLastTypePack : public Type
 {
     FIDDLE(...)
     Type* getBasePack() const { return as<Type>(getOperand(0)); }
-    TrimTailTypePack(Type* basePack) { m_operands.add(ValNodeOperand(basePack)); }
+    TrimLastTypePack(Type* basePack) { m_operands.add(ValNodeOperand(basePack)); }
     void _toTextOverride(StringBuilder& out);
     Type* _createCanonicalTypeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);

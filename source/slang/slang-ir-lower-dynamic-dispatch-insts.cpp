@@ -759,12 +759,12 @@ public:
                 auto generic =
                     cast<IRGeneric>(findWitnessTableEntry(cast<IRWitnessTable>(table), key));
 
-                auto specializedFuncType =
-                    (IRType*)specializeGeneric(cast<IRSpecialize>(builder.emitSpecializeInst(
-                        builder.getTypeKind(),
-                        generic->getDataType(),
-                        specArgs.getCount(),
-                        specArgs.getBuffer())));
+                auto specializeInst = cast<IRSpecialize>(builder.emitSpecializeInst(
+                    builder.getTypeKind(),
+                    generic->getDataType(),
+                    specArgs.getCount(),
+                    specArgs.getBuffer()));
+                auto specializedFuncType = (IRType*)specializeGeneric(specializeInst);
 
                 auto specializedFunc = builder.emitSpecializeInst(
                     specializedFuncType,

@@ -23,6 +23,7 @@
 #include "slang-compiler-options.h"
 #include "slang-compiler.h"
 #include "slang-hlsl-to-vulkan-layout-options.h"
+#include "slang-markdown.h"
 #include "slang-profile.h"
 #include "slang-repro.h"
 #include "slang-rich-diagnostics.h"
@@ -1478,6 +1479,7 @@ SlangSourceLanguage findSourceLanguageFromPath(const String& path, Stage& outImp
     };
 
     static const Entry entries[] = {
+        {".slang.md", SLANG_SOURCE_LANGUAGE_SLANG, SLANG_STAGE_NONE},
         {".slang", SLANG_SOURCE_LANGUAGE_SLANG, SLANG_STAGE_NONE},
 
         {".hlsl", SLANG_SOURCE_LANGUAGE_HLSL, SLANG_STAGE_NONE},
@@ -1528,7 +1530,9 @@ SlangResult OptionsParser::addInputPath(char const* inPath, SourceLanguage langO
     {
         return addReferencedModule(path, SourceLoc(), false);
     }
-    else if (path.endsWith(".slang") || langOverride == SourceLanguage::Slang)
+    else if (
+        path.endsWith(".slang") || hasLiterateFileExtension(path) ||
+        langOverride == SourceLanguage::Slang)
     {
         // Plain old slang code
         addInputSlangPath(path);

@@ -46,7 +46,7 @@ runs:
           gcloud storage cp "${GCS_PATH}" /tmp/llvm-prebuilt.tar.gz
         elif curl -f -s -I "${PUBLIC_URL}" >/dev/null 2>&1; then
           echo "✅ Found LLVM prebuilt in GCS (public access), downloading..."
-          curl -L -o /tmp/llvm-prebuilt.tar.gz "${PUBLIC_URL}"
+          curl -fL --retry 3 --retry-delay 5 -o /tmp/llvm-prebuilt.tar.gz "${PUBLIC_URL}"
         else
           echo "⚠️  LLVM prebuilt not found in GCS"
           echo "cache-hit=false" >> $GITHUB_OUTPUT

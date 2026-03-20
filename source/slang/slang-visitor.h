@@ -422,6 +422,7 @@ struct ModifyingExprVisitor : ExprVisitor<Derived, Expr*>
     Expr* visitSizeOfLikeExpr(SizeOfLikeExpr* e)
     {
         e->value = dispatchIfNotNull(e->value);
+        e->dataLayout = dispatchIfNotNull(e->dataLayout);
         return e;
     }
 
@@ -429,6 +430,14 @@ struct ModifyingExprVisitor : ExprVisitor<Derived, Expr*>
     Expr* visitPackQueryExpr(PackQueryExpr* e)
     {
         e->value = dispatchIfNotNull(e->value);
+        return e;
+    }
+
+    Expr* visitPackBranchTypeExpr(PackBranchTypeExpr* e)
+    {
+        e->packOperand.exp = dispatchIfNotNull(e->packOperand.exp);
+        e->emptyType.exp = dispatchIfNotNull(e->emptyType.exp);
+        e->nonEmptyType.exp = dispatchIfNotNull(e->nonEmptyType.exp);
         return e;
     }
 

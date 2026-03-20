@@ -24,7 +24,6 @@ SamplerState c : register(s0, s1);
 SamplerState d : register(s2, space);
 /*CHECK:
                               ^^^^^ expected a register space index after 'space'
-                              ^^^^^ expected a register space index after 'space'
 */
 
 
