@@ -19,7 +19,7 @@ struct Primitive
     float3 getColor() { return color.xyz; }
 };
 
-struct [raypayload] RayPayload
+[raypayload] struct RayPayload
 {
     float4 color : read(caller) : write(caller, closesthit, miss);
 };

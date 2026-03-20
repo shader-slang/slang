@@ -3606,6 +3606,11 @@ $(type_info.return_type) $(type_info.method_name)(
 
     IRInst* emitExpandInst(IRType* type, UInt capturedArgCount, IRInst* const* capturedArgs);
     IRInst* emitEachInst(IRType* type, IRInst* base, IRInst* indexArg = nullptr);
+    IRInst* emitPackBranchInst(
+        IRType* type,
+        IRInst* pack,
+        IRInst* emptyValue,
+        IRInst* nonEmptyValue);
 
     IRInst* emitLookupInterfaceMethodInst(
         IRType* type,
@@ -4187,9 +4192,9 @@ $(type_info.return_type) $(type_info.method_name)(
 
     IRInst* emitBitCast(IRType* type, IRInst* val);
 
-    IRInst* emitSizeOf(IRInst* sizedType);
+    IRInst* emitSizeOf(IRInst* sizedType, IRType* dataLayoutType);
 
-    IRInst* emitAlignOf(IRInst* sizedType);
+    IRInst* emitAlignOf(IRInst* sizedType, IRType* dataLayoutType);
 
     IRInst* emitCountOf(IRType* type, IRInst* sizedType);
 

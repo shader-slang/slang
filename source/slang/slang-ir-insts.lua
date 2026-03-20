@@ -929,6 +929,12 @@ local insts = {
 	},
 	{ specialize = { operands = { { "base" }, { "arg" } }, hoistable = true } },
 	{ lookupWitness = { struct_name = "LookupWitnessMethod", min_operands = 2, hoistable = true } },
+	{
+		PackBranch = {
+			operands = { { "pack" }, { "emptyValue" }, { "nonEmptyValue" } },
+			hoistable = true,
+		},
+	},
 	{ GetSequentialID = { operands = { { "RTTIOperand" } }, hoistable = true } },
 	{
 		bind_global_generic_param = {
@@ -2003,6 +2009,7 @@ local insts = {
 				AnyValueSize = { struct_name = "AnyValueSizeDecoration", operands = { { "sizeOperand", "IRIntLit" } } },
 			},
 			{ SpecializeDecoration = {} },
+			{ SpecializationDepthDecoration = { operands = { { "specializationDepthOperand", "IRIntLit" } } } },
 			{ SequentialIDDecoration = { operands = { { "sequentialIdOperand", "IRIntLit" } } } },
 			{ DynamicDispatchWitnessDecoration = {} },
 			{ StaticRequirementDecoration = {} },
@@ -2462,14 +2469,14 @@ local insts = {
 	{ CastDescriptorHandleToResource = { operands = { { "handle" } } } },
 	{ CastResourceToDescriptorHandle = { operands = { { "resource" } } } },
 	{ TreatAsDynamicUniform = { operands = { { "value" } } } },
-	{ sizeOf = { operands = { { "type" } }, hoistable = true } },
-	{ alignOf = { operands = { { "baseOp" } }, hoistable = true } },
+	{ sizeOf = { operands = { { "type" }, { "dataLayout", "IRType", optional = true } }, hoistable = true } },
+	{ alignOf = { operands = { { "baseOp" }, { "dataLayout", "IRType", optional = true } }, hoistable = true } },
 	{ countOf = { operands = { { "type" } } } },
-	{ ExtractFirstFromPack = { operands = { { "pack" } }, hoistable = true } },
-	{ ExtractLastFromPack = { operands = { { "pack" } }, hoistable = true } },
-	{ TrimHeadOfPack = { operands = { { "pack" } }, hoistable = true } },
-	{ TrimTailOfPack = { operands = { { "pack" } }, hoistable = true } },
-	{ NonEmptyPackWitness = { hoistable = true } },
+	{ ExtractFirstFromPack = { operands = { { "pack" }, { "witness" } }, hoistable = true } },
+	{ ExtractLastFromPack = { operands = { { "pack" }, { "witness" } }, hoistable = true } },
+	{ TrimFirstOfPack = { operands = { { "pack" }, { "witness" } }, hoistable = true } },
+	{ TrimLastOfPack = { operands = { { "pack" }, { "witness" } }, hoistable = true } },
+	{ NonEmptyPackWitness = { operands = { { "pack" } }, hoistable = true } },
 	{ GetArrayLength = { operands = { { "array" } } } },
 	{
 		IsType = {

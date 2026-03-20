@@ -3293,16 +3293,36 @@ static LegalVal declareVars(
             auto unwrappedTypeLayout = typeLayout;
             IRVarLayout* elementVarLayout = nullptr;
 
-            // If the type layout is a ParameterGroupTypeLayout wrapping a non-struct
-            // element, unwrap to the element layout so resource bindings (e.g.
-            // DescriptorTableSlot) propagate to the declared variable.
-            // Struct elements get pair-decomposed, and the element
-            // layout refers to the full struct rather than the ordinary-only part.
+            // If the type layout is a ParameterGroupTypeLayout whose element
+            // is a resource type (not a struct, and not plain data), unwrap to
+            // the element layout so resource bindings propagate to the declared
+            // variable.
+            //
+            // We must NOT unwrap when the element is a plain data type (e.g.
+            // uint inside ConstantBuffer<uint>), because its type layout only
+            // has Uniform size attributes and createVarLayout would never apply
+            // binding/set offsets from the var chain.
+            //
+            // Struct elements are excluded because they get pair-decomposed, and
+            // the element layout refers to the full struct rather than the
+            // ordinary-only part.
             if (auto paramGroupLayout = as<IRParameterGroupTypeLayout>(typeLayout))
             {
                 auto paramGroupElementVarLayout = paramGroupLayout->getElementVarLayout();
                 auto paramGroupElementTypeLayout = paramGroupElementVarLayout->getTypeLayout();
+                bool elementHasNonUniformResourceSize = false;
                 if (!as<IRStructTypeLayout>(paramGroupElementTypeLayout))
+                {
+                    for (auto sizeAttr : paramGroupElementTypeLayout->getSizeAttrs())
+                    {
+                        if (sizeAttr->getResourceKind() != LayoutResourceKind::Uniform)
+                        {
+                            elementHasNonUniformResourceSize = true;
+                            break;
+                        }
+                    }
+                }
+                if (elementHasNonUniformResourceSize)
                 {
                     elementVarLayout = paramGroupElementVarLayout;
                     unwrappedTypeLayout = paramGroupElementTypeLayout;

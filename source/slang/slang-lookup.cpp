@@ -658,6 +658,22 @@ static void _lookUpMembersInSuperTypeImpl(
             ioResult,
             inBreadcrumbs);
     }
+    else if (as<PackBranchType>(superType))
+    {
+        if (!request.semantics)
+            return;
+        auto canBranchType = superType->getCanonicalType();
+        InheritanceInfo inheritanceInfo =
+            request.semantics->getShared()->getInheritanceInfo(canBranchType);
+        _lookupMembersInSuperTypeFacets(
+            astBuilder,
+            name,
+            canBranchType,
+            inheritanceInfo,
+            request,
+            ioResult,
+            inBreadcrumbs);
+    }
     else if (auto extractExistentialType = as<ExtractExistentialType>(superType))
     {
         // We want lookup to be performed on the underlying interface type of the existential,

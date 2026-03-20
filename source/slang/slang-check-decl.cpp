@@ -27,6 +27,10 @@
 namespace Slang
 {
 
+static Val* _getNonEmptyConstraintPackVal(
+    ASTBuilder* astBuilder,
+    DeclRef<NonEmptyPackConstraintDecl> const& constraintDeclRef);
+
 static bool isAssociatedTypeDecl(Decl* decl)
 {
     auto d = decl;
@@ -856,6 +860,12 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
         {
             dispatchIfNotNull(t.type);
         }
+    }
+    void visitPackBranchTypeExpr(PackBranchTypeExpr* expr)
+    {
+        dispatchIfNotNull(expr->packOperand.type);
+        dispatchIfNotNull(expr->emptyType.type);
+        dispatchIfNotNull(expr->nonEmptyType.type);
     }
     void visitTryExpr(TryExpr* expr) { dispatchIfNotNull(expr->base); }
     void visitHigherOrderInvokeExpr(HigherOrderInvokeExpr* expr)
@@ -1840,7 +1850,7 @@ IntVal* SemanticsVisitor::_validateCircularVarDefinition(VarDeclBase* varDecl)
         return nullptr;
     return tryConstantFoldDeclRef(
         DeclRef<VarDeclBase>(varDecl),
-        ConstantFoldingKind::LinkTime,
+        ConstantFoldingKind::SpecializationConstant,
         nullptr);
 }
 
@@ -2752,6 +2762,20 @@ static Expr* constructDefaultConstructorForType(
     Type* type,
     SourceLoc loc)
 {
+    if (visitor->getDefaultCtorRecursionDepth() >= kMaxTypeNestingDepth)
+    {
+        if (visitor->getSink())
+        {
+            Diagnostics::MaximumTypeNestingLevelExceeded diag = {};
+            diag.location = loc;
+            visitor->getSink()->diagnose(diag);
+        }
+        return nullptr;
+    }
+
+    visitor->pushDefaultCtorRecursionDepth();
+    SLANG_DEFER(visitor->popDefaultCtorRecursionDepth());
+
     ConstructorDecl* defaultCtor = nullptr;
     auto declRefType = as<DeclRefType>(type);
     if (declRefType)
@@ -2804,8 +2828,10 @@ static Expr* constructDefaultInitExprForType(SemanticsVisitor* visitor, VarDeclB
     if (!isDefaultInitializable(varDecl))
         return nullptr;
 
-    if (auto defaultInitExpr =
-            constructDefaultConstructorForType(visitor, varDecl->type.type, varDecl->loc))
+    if (auto defaultInitExpr = constructDefaultConstructorForType(
+            visitor,
+            varDecl->type.type,
+            getDiagnosticPos(varDecl->type)))
     {
         return defaultInitExpr;
     }
@@ -4668,6 +4694,11 @@ bool SemanticsVisitor::doesSignatureMatchRequirement(
         auto satisfyingResultType = getResultType(m_astBuilder, satisfyingMemberDeclRef);
         if (!requiredResultType->equals(satisfyingResultType))
             return false;
+
+        auto requiredErrorType = getErrorCodeType(m_astBuilder, requiredMemberDeclRef);
+        auto satisfyingErrorType = getErrorCodeType(m_astBuilder, satisfyingMemberDeclRef);
+        if (!requiredErrorType->equals(satisfyingErrorType))
+            return false;
     }
 
 
@@ -5314,10 +5345,15 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
             auto requiredNonEmptyConstraintDeclRef =
                 requiredMemberDeclRef.as<NonEmptyPackConstraintDecl>())
         {
-            [[maybe_unused]] auto satisfyingConstraintDeclRef =
+            auto satisfyingConstraintDeclRef =
                 satisfyingMemberDeclRef.as<NonEmptyPackConstraintDecl>();
             SLANG_ASSERT(satisfyingConstraintDeclRef);
-            requiredSubstArgs.add(m_astBuilder->getNonEmptyPackWitness());
+            auto satisfyingPackVal =
+                _getNonEmptyConstraintPackVal(m_astBuilder, satisfyingConstraintDeclRef);
+            SLANG_ASSERT(satisfyingPackVal);
+            if (!satisfyingPackVal)
+                satisfyingPackVal = m_astBuilder->getErrorType();
+            requiredSubstArgs.add(m_astBuilder->getNonEmptyPackWitness(satisfyingPackVal));
         }
     }
 
@@ -6530,6 +6566,8 @@ CallableDecl* SemanticsVisitor::synthesizeMethodSignatureForRequirementWitnessIn
     //
     auto resultType = getResultType(m_astBuilder, requiredMemberDeclRef);
     synFuncDecl->returnType.type = resultType;
+    auto errorType = getErrorCodeType(m_astBuilder, requiredMemberDeclRef);
+    synFuncDecl->errorType.type = errorType;
 
     addRequiredParamsToSynthesizedDecl(requiredMemberDeclRef, synFuncDecl, synArgs);
     addModifiersToSynthesizedDecl(context, requiredMemberDeclRef, synFuncDecl, synThis);
@@ -6794,8 +6832,11 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
     //
     DiagnosticSink tempSink(getSourceManager(), nullptr);
     ExprLocalScope localScope;
-    SemanticsVisitor subVisitor(
-        withSink(&tempSink).withParentFunc(synFuncDecl).withExprLocalScope(&localScope));
+    SemanticsVisitor subVisitor(withSink(&tempSink)
+                                    .withParentFunc(synFuncDecl)
+                                    .withExprLocalScope(&localScope)
+                                    .withEnclosingTryClauseType(TryClauseType::Standard));
+
 
     Expr* synBase = baseOverloadedExpr;
 
@@ -6832,7 +6873,7 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
                 genericAppExpr->arguments.add(synValPackParamDeclRefExpr);
             }
         }
-        synBase = subVisitor.checkGenericAppWithCheckedArgs(genericAppExpr);
+        synBase = subVisitor.CheckExpr(genericAppExpr);
 
         // If checking the generic app failed, we can't synthesize the witness.
         //
@@ -6856,7 +6897,27 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
     // from overload resolution, we can now try to resolve
     // the call to see what happens.
     //
-    auto checkedCall = subVisitor.ResolveInvoke(synCall);
+    auto checkedCall = subVisitor.CheckExpr(synCall);
+    auto checkedExpr = checkedCall;
+
+    if (auto invokeExpr = as<InvokeExpr>(checkedCall))
+    {
+        if (auto funcType = as<FuncType>(invokeExpr->functionExpr->type))
+        {
+            if (!funcType->getErrorType()->equals(m_astBuilder->getBottomType()))
+            {
+                // Throws, so unless our interface requirement also does that,
+                // we can't call it here.
+                if (synFuncDecl->errorType->equals(m_astBuilder->getBottomType()))
+                    return false;
+
+                auto tryExpr = m_astBuilder->create<TryExpr>();
+                tryExpr->tryClauseType = TryClauseType::Standard;
+                tryExpr->base = checkedCall;
+                checkedExpr = subVisitor.CheckExpr(tryExpr);
+            }
+        }
+    }
 
     // Of course, it is possible that the call went through fine,
     // but the result isn't of the type we expect/require,
@@ -6865,7 +6926,8 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
     //
     SemanticsVisitor coercionContext = subVisitor.allowDroppingDerivatives();
     auto coercedCall =
-        coercionContext.coerce(CoercionSite::Return, resultType, checkedCall, &tempSink);
+        coercionContext.coerce(CoercionSite::Return, resultType, checkedExpr, &tempSink);
+
 
     // If our overload resolution or type coercion failed,
     // then we have not been able to synthesize a witness
@@ -6880,10 +6942,10 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
             outFailureDetails->reason = WitnessSynthesisFailureReason::General;
 
         // Check if the failure was due to return type coercion
-        if (!IsErrorExpr(checkedCall) && outFailureDetails)
+        if (!IsErrorExpr(checkedExpr) && outFailureDetails)
         {
             // The call resolved - check if it's a return type mismatch
-            auto actualReturnType = checkedCall->type;
+            auto actualReturnType = checkedExpr->type;
             if (!actualReturnType->equals(resultType))
             {
                 // Find the actual implementation method that was called
@@ -10882,15 +10944,21 @@ SemanticsContext SemanticsDeclBodyVisitor::registerDifferentiableTypesForFunc(
         auto oldAttr = m_parentDifferentiableAttr;
         m_parentDifferentiableAttr = newContext.getParentDifferentiableAttribute();
         for (auto param : decl->getParameters())
-            maybeRegisterDifferentiableType(m_astBuilder, param->type.type);
-        maybeRegisterDifferentiableType(m_astBuilder, decl->returnType.type);
+            maybeRegisterDifferentiableType(
+                m_astBuilder,
+                param->type.type,
+                getDiagnosticPos(param->type));
+        maybeRegisterDifferentiableType(
+            m_astBuilder,
+            decl->returnType.type,
+            getDiagnosticPos(decl->returnType));
         if (as<ConstructorDecl>(decl) || !isEffectivelyStatic(decl))
         {
             auto parentDecl = getParentDecl(decl);
             auto parentDeclRef =
                 createDefaultSubstitutionsIfNeeded(m_astBuilder, this, makeDeclRef(parentDecl));
             auto thisType = calcThisType(parentDeclRef);
-            maybeRegisterDifferentiableType(m_astBuilder, thisType);
+            maybeRegisterDifferentiableType(m_astBuilder, thisType, parentDeclRef.getLoc());
         }
         m_parentDifferentiableAttr = oldAttr;
     }
@@ -11339,6 +11407,26 @@ bool SemanticsVisitor::doFunctionSignaturesMatch(DeclRef<FuncDecl> fst, DeclRef<
     return true;
 }
 
+static Val* _getNonEmptyConstraintPackVal(
+    ASTBuilder* astBuilder,
+    DeclRef<NonEmptyPackConstraintDecl> const& constraintDeclRef)
+{
+    auto packExpr = constraintDeclRef.substitute(astBuilder, constraintDeclRef.getDecl()->packExpr);
+    if (auto declRefExpr = packExpr.as<DeclRefExpr>())
+    {
+        auto packDeclRef = getDeclRef(astBuilder, declRefExpr);
+        if (auto typePackDeclRef = packDeclRef.as<GenericTypePackParamDecl>())
+            return DeclRefType::create(astBuilder, typePackDeclRef);
+        if (auto valuePackDeclRef = packDeclRef.as<GenericValuePackParamDecl>())
+        {
+            return astBuilder->getOrCreate<DeclRefIntVal>(
+                valuePackDeclRef.getDecl()->getType(),
+                valuePackDeclRef);
+        }
+    }
+    return nullptr;
+}
+
 List<Val*> getDefaultSubstitutionArgs(
     ASTBuilder* astBuilder,
     SemanticsVisitor* semantics,
@@ -11467,9 +11555,18 @@ List<Val*> getDefaultSubstitutionArgs(
             }
             args.add(astBuilder->getBuiltinTypeCoercionWitness(fromType, toType));
         }
-        else if (as<NonEmptyPackConstraintDecl>(decl))
+        else if (auto nonEmptyConstraintDecl = as<NonEmptyPackConstraintDecl>(member))
         {
-            args.add(astBuilder->getNonEmptyPackWitness());
+            auto constraintDeclRef =
+                astBuilder->getDirectDeclRef<NonEmptyPackConstraintDecl>(nonEmptyConstraintDecl);
+            auto packVal = _getNonEmptyConstraintPackVal(astBuilder, constraintDeclRef);
+            if (!packVal)
+            {
+                args.add(astBuilder->getErrorType());
+                shouldCache = false;
+                continue;
+            }
+            args.add(astBuilder->getNonEmptyPackWitness(packVal));
         }
     }
 
@@ -13302,7 +13399,7 @@ void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
     }
 
     auto errorType = decl->errorType;
-    if (errorType.exp)
+    if (errorType.type || errorType.exp)
     {
         errorType = CheckProperType(errorType);
     }
@@ -17004,7 +17101,10 @@ static Expr* _getParamDefaultValue(SemanticsVisitor* visitor, VarDeclBase* varDe
     if (!isDefaultInitializable(varDecl))
         return nullptr;
 
-    if (auto expr = constructDefaultConstructorForType(visitor, varDecl->type.type, varDecl->loc))
+    if (auto expr = constructDefaultConstructorForType(
+            visitor,
+            varDecl->type.type,
+            getDiagnosticPos(varDecl->type)))
     {
         return expr;
     }

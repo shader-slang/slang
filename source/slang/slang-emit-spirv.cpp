@@ -797,9 +797,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         {
             switch (irOpCode)
             {
-            case kIROp_IntCast:
-            case kIROp_ConstexprIntCast:
-                return SpvOpUConvert;
             case kIROp_FloatCast:
             case kIROp_ConstexprFloatCast:
                 return SpvOpFConvert;
@@ -3498,6 +3495,47 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return result;
     }
 
+    SpvInst* emitSpecConstantUConvert(IRInst* inst, IRType* resultType, SpvInst* operand)
+    {
+        return emitInst(
+            getSection(SpvLogicalSectionID::ConstantsAndTypes),
+            inst,
+            SpvOpSpecConstantOp,
+            resultType,
+            kResultID,
+            SpvOpUConvert,
+            operand);
+    }
+
+    SpvInst* emitSpecConstantSConvert(IRInst* inst, IRType* resultType, SpvInst* operand)
+    {
+        return emitInst(
+            getSection(SpvLogicalSectionID::ConstantsAndTypes),
+            inst,
+            SpvOpSpecConstantOp,
+            resultType,
+            kResultID,
+            SpvOpSConvert,
+            operand);
+    }
+
+    // Emit IAdd-by-zero wrapped in OpSpecConstantOp to reinterpret signedness.
+    // OpBitcast is not in the set of opcodes allowed by OpSpecConstantOp, so
+    // we use IAdd-by-zero instead (same approach as glslang's GlslangToSpv.cpp).
+    SpvInst* emitSpecConstantSignReinterpret(IRInst* inst, IRType* resultType, SpvInst* operand)
+    {
+        auto zero = emitIntConstant(0, resultType);
+        return emitInst(
+            getSection(SpvLogicalSectionID::ConstantsAndTypes),
+            inst,
+            SpvOpSpecConstantOp,
+            resultType,
+            kResultID,
+            SpvOpIAdd,
+            operand,
+            zero);
+    }
+
     SpvInst* emitSpecializationConstantOp(IRInst* inst)
     {
         SpvInst* spv = nullptr;
@@ -3527,6 +3565,52 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         {
             // We need to emit the constant as a specialization constant
             return emitLit(inst);
+        }
+
+        // Handle integer casts in spec constant context.
+        // Inside OpSpecConstantOp, UConvert/SConvert require different bit widths
+        // and matching signedness on the result type, and OpBitcast is not in the
+        // set of allowed opcodes. See emitSpecConstantSignReinterpret for the
+        // workaround used for signedness changes.
+        auto irOp = inst->getOp();
+        if (irOp == kIROp_IntCast || irOp == kIROp_ConstexprIntCast)
+        {
+            auto srcType = inst->getOperand(0)->getDataType();
+            auto dstType = inst->getDataType();
+            if (isIntegralType(srcType) && isIntegralType(dstType))
+            {
+                auto srcInfo = getIntTypeInfo(m_targetRequest, srcType);
+                auto dstInfo = getIntTypeInfo(m_targetRequest, dstType);
+
+                if (srcInfo == dstInfo)
+                {
+                    auto operand = emitSpecializationConstantOp(inst->getOperand(0));
+                    registerInst(inst, operand);
+                    return operand;
+                }
+
+                auto operand = emitSpecializationConstantOp(inst->getOperand(0));
+                bool needsWidthChange = srcInfo.width != dstInfo.width;
+                bool needsSignReinterpret = srcInfo.isSigned != dstInfo.isSigned;
+
+                if (needsWidthChange)
+                {
+                    IRBuilder builder(m_irModule);
+                    auto convertType = needsSignReinterpret
+                                           ? builder.getType(getIntTypeOpFromInfo(
+                                                 {dstInfo.width, srcInfo.isSigned}))
+                                           : inst->getFullType();
+                    auto convertInst = needsSignReinterpret ? nullptr : inst;
+                    operand = srcInfo.isSigned
+                                  ? emitSpecConstantSConvert(convertInst, convertType, operand)
+                                  : emitSpecConstantUConvert(convertInst, convertType, operand);
+                }
+
+                if (needsSignReinterpret)
+                    operand = emitSpecConstantSignReinterpret(inst, inst->getFullType(), operand);
+
+                return operand;
+            }
         }
 
         IRType* type = inst->getOperand(0)->getDataType();

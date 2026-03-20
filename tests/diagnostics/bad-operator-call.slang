@@ -21,11 +21,9 @@ void test()
     a = a + b;
 /*CHECK:
           ^ no overload for '+' applicable to arguments of type (int, S)
-          ^ no overload for '+' applicable to arguments of type (int, S)
 */
 	a = ~b;
 /*CHECK:
-     ^ no overload for '~' applicable to arguments of type (S)
      ^ no overload for '~' applicable to arguments of type (S)
 */
 
@@ -42,11 +40,9 @@ void test()
     d += c;
 /*CHECK:
       ^^ no overload for '+=' applicable to arguments of type (vector<float,3>, vector<int,4>)
-      ^^ no overload for '+=' applicable to arguments of type (vector<float,3>, vector<int,4>)
 */
 	d = c + d;
 /*CHECK:
-       ^ no overload for '+' applicable to arguments of type (vector<int,4>, vector<float,3>)
        ^ no overload for '+' applicable to arguments of type (vector<int,4>, vector<float,3>)
 */
 }

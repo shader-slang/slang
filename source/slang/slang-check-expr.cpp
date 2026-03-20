@@ -327,11 +327,10 @@ void SemanticsVisitor::diagnoseDeprecatedDeclRefUsage(
     }
     if (auto deprecatedAttr = declRef.getDecl()->findModifier<DeprecatedAttribute>())
     {
-        getSink()->diagnose(
-            Diagnostics::DeprecatedUsage{
-                .declName = declRef.getName(),
-                .message = deprecatedAttr->message,
-                .location = loc});
+        getSink()->diagnose(Diagnostics::DeprecatedUsage{
+            .declName = declRef.getName(),
+            .message = deprecatedAttr->message,
+            .location = loc});
     }
 }
 
@@ -416,11 +415,10 @@ DeclRefExpr* SemanticsVisitor::ConstructDeclRefExpr(
             expr->type = type;
             if (getSink() && !isDeclUsableAsStaticMember(declRef.getDecl()))
             {
-                getSink()->diagnose(
-                    Diagnostics::StaticRefToNonStaticMember{
-                        .type = typeType->getType(),
-                        .member = declRef.getName(),
-                        .location = loc});
+                getSink()->diagnose(Diagnostics::StaticRefToNonStaticMember{
+                    .type = typeType->getType(),
+                    .member = declRef.getName(),
+                    .location = loc});
                 expr->type = m_astBuilder->getErrorType();
             }
 
@@ -1071,10 +1069,9 @@ LookupResult SemanticsVisitor::filterLookupResultByVisibilityAndDiagnose(
     auto result = filterLookupResultByVisibility(lookupResult);
     if (lookupResult.isValid() && !result.isValid())
     {
-        getSink()->diagnose(
-            Diagnostics::DeclIsNotVisible{
-                .decl = lookupResult.item.declRef.getDecl(),
-                .location = loc});
+        getSink()->diagnose(Diagnostics::DeclIsNotVisible{
+            .decl = lookupResult.item.declRef.getDecl(),
+            .location = loc});
         outDiagnosed = true;
 
         if (getShared()->isInLanguageServer())
@@ -1167,10 +1164,9 @@ LookupResult SemanticsVisitor::filterLookupResultByCheckedOptionalAndDiagnose(
     auto result = filterLookupResultByCheckedOptional(lookupResult);
     if (lookupResult.isValid() && !result.isValid())
     {
-        getSink()->diagnose(
-            Diagnostics::RequiredConstraintIsNotChecked{
-                .decl = lookupResult.item.declRef.getDecl(),
-                .location = loc});
+        getSink()->diagnose(Diagnostics::RequiredConstraintIsNotChecked{
+            .decl = lookupResult.item.declRef.getDecl(),
+            .location = loc});
         outDiagnosed = true;
 
         if (getShared()->isInLanguageServer())
@@ -1278,18 +1274,16 @@ void SemanticsVisitor::diagnoseAmbiguousReference(
     OverloadedExpr* overloadedExpr,
     LookupResult const& lookupResult)
 {
-    getSink()->diagnose(
-        Diagnostics::AmbiguousReference{
-            .name = getText(lookupResult.items[0].declRef.getName()),
-            .location = overloadedExpr->loc});
+    getSink()->diagnose(Diagnostics::AmbiguousReference{
+        .name = getText(lookupResult.items[0].declRef.getName()),
+        .location = overloadedExpr->loc});
 
     for (auto item : lookupResult.items)
     {
         String declString = ASTPrinter::getDeclSignatureString(item, m_astBuilder);
-        getSink()->diagnose(
-            Diagnostics::OverloadCandidate{
-                .candidate = declString,
-                .location = item.declRef.getLoc()});
+        getSink()->diagnose(Diagnostics::OverloadCandidate{
+            .candidate = declString,
+            .location = item.declRef.getLoc()});
     }
 }
 
@@ -1683,18 +1677,16 @@ void SemanticsVisitor::checkDerivativeMemberAttributeReferences(
         derivativeMemberAttr->memberDeclRef = declRefExpr;
         if (!diffType->equals(declRefExpr->type))
         {
-            getSink()->diagnose(
-                Diagnostics::TypeMismatch{
-                    .expectedType = diffType,
-                    .actualType = declRefExpr->type,
-                    .expr = declRefExpr});
+            getSink()->diagnose(Diagnostics::TypeMismatch{
+                .expectedType = diffType,
+                .actualType = declRefExpr->type,
+                .expr = declRefExpr});
         }
         if (!varDecl->parentDecl)
         {
-            getSink()->diagnose(
-                Diagnostics::AttributeNotApplicable{
-                    .attrName = derivativeMemberAttr->getKeywordName(),
-                    .attr = derivativeMemberAttr});
+            getSink()->diagnose(Diagnostics::AttributeNotApplicable{
+                .attrName = derivativeMemberAttr->getKeywordName(),
+                .attr = derivativeMemberAttr});
         }
         if (auto memberExpr = as<StaticMemberExpr>(declRefExpr))
         {
@@ -1719,17 +1711,20 @@ Type* SemanticsVisitor::getDifferentialType(ASTBuilder* builder, Type* type, Sou
     auto result = tryGetDifferentialType(builder, type);
     if (!result)
     {
-        getSink()->diagnose(
-            Diagnostics::TypeDoesntImplementInterfaceRequirement{
-                .type = type,
-                .member = "Differential",
-                .location = loc});
+        getSink()->diagnose(Diagnostics::TypeDoesntImplementInterfaceRequirement{
+            .type = type,
+            .member = "Differential",
+            .location = loc});
         return m_astBuilder->getErrorType();
     }
     return result;
 }
 
-void SemanticsVisitor::maybeRegisterDifferentiableType(ASTBuilder* builder, Type* type)
+
+void SemanticsVisitor::maybeRegisterDifferentiableType(
+    ASTBuilder* builder,
+    Type* type,
+    SourceLoc diagnosticLoc)
 {
     if (!builder->isDifferentiableInterfaceAvailable())
     {
@@ -1739,6 +1734,11 @@ void SemanticsVisitor::maybeRegisterDifferentiableType(ASTBuilder* builder, Type
     if (!m_parentDifferentiableAttr)
     {
         return;
+    }
+
+    if (diagnosticLoc.isValid())
+    {
+        m_parentDifferentiableAttr->m_typeRegistrationDiagnosticLoc = diagnosticLoc;
     }
 
     maybeRegisterDifferentiableTypeImplRecursive(builder, type);
@@ -1800,6 +1800,22 @@ void SemanticsVisitor::maybeRegisterDifferentiableTypeImplRecursive(ASTBuilder* 
         return;
     if (!type)
         return;
+
+    if (m_parentDifferentiableAttr->m_typeRegistrationRecursionDepth >= kMaxTypeNestingDepth)
+    {
+        if (!m_parentDifferentiableAttr->m_typeRegistrationDepthExceeded && getSink())
+        {
+            Diagnostics::MaximumTypeNestingLevelExceeded diag = {};
+            diag.location = m_parentDifferentiableAttr->m_typeRegistrationDiagnosticLoc.isValid()
+                                ? m_parentDifferentiableAttr->m_typeRegistrationDiagnosticLoc
+                                : m_parentDifferentiableAttr->loc;
+            getSink()->diagnose(diag);
+            m_parentDifferentiableAttr->m_typeRegistrationDepthExceeded = true;
+        }
+        return;
+    }
+    m_parentDifferentiableAttr->m_typeRegistrationRecursionDepth++;
+    SLANG_DEFER(m_parentDifferentiableAttr->m_typeRegistrationRecursionDepth--);
 
     // Have we already registered this type? If so we can exit now.
     if (m_parentDifferentiableAttr->m_typeRegistrationWorkingSet.contains(type))
@@ -1982,11 +1998,10 @@ void SemanticsVisitor::maybeCheckMissingNoDiffThis(Expr* expr)
                 return;
             }
 
-            getSink()->diagnose(
-                Diagnostics::NoDerivativeOnNonDifferentiableThisType{
-                    .memberDecl = memberExpr->declRef.getDecl(),
-                    .func = this->m_parentFunc,
-                    .member = memberExpr});
+            getSink()->diagnose(Diagnostics::NoDerivativeOnNonDifferentiableThisType{
+                .memberDecl = memberExpr->declRef.getDecl(),
+                .func = this->m_parentFunc,
+                .member = memberExpr});
         }
     }
 }
@@ -2006,7 +2021,7 @@ Expr* SemanticsVisitor::CheckTerm(Expr* term)
     // TODO: This can be super slow.
     if (this->m_parentFunc && this->m_parentFunc->findModifier<DifferentiableAttribute>())
     {
-        maybeRegisterDifferentiableType(getASTBuilder(), checkedTerm->type.type);
+        maybeRegisterDifferentiableType(getASTBuilder(), checkedTerm->type.type, checkedTerm->loc);
 
         if (!this->m_parentFunc->findModifier<TreatAsDifferentiableAttribute>())
         {
@@ -2472,17 +2487,22 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
 }
 
 bool SemanticsVisitor::_checkForCircularityInConstantFolding(
-    Decl* decl,
+    DeclRefBase* declRef,
     ConstantFoldingCircularityInfo* circularityInfo)
 {
-    // TODO: If the `decl` is already on the chain of `circularityInfo`,
-    // then we know that we are trying to recursively fold the
-    // same declaration as part of its own definition, and we need
-    // to diagnose that as an error.
-    //
+    auto decl = declRef ? declRef->getDecl() : nullptr;
+    if (circularityInfo && circularityInfo->depth >= kMaxTypeNestingDepth)
+    {
+        Diagnostics::GenericEvaluationRecursionLimitExceeded diag = {};
+        diag.decl = decl;
+        diag.budget = int(kMaxTypeNestingDepth);
+        getSink()->diagnose(diag);
+        return true;
+    }
+
     for (auto info = circularityInfo; info; info = info->next)
     {
-        if (decl == info->decl)
+        if (declRef == info->declRef)
         {
             getSink()->diagnose(Diagnostics::VariableUsedInItsOwnDefinition{.decl = decl});
             return true;
@@ -2499,7 +2519,7 @@ IntVal* SemanticsVisitor::tryConstantFoldDeclRef(
 {
     auto decl = declRef.getDecl();
 
-    if (_checkForCircularityInConstantFolding(decl, circularityInfo))
+    if (_checkForCircularityInConstantFolding(declRef, circularityInfo))
         return nullptr;
 
     // In HLSL, `const` is used to mark compile-time constant expressions.
@@ -2522,9 +2542,8 @@ IntVal* SemanticsVisitor::tryConstantFoldDeclRef(
             // Note that float-to-inst casts for non-`IntVal`s are allowed.
             if (!isValidCompileTimeConstantType(decl->getType()))
             {
-                getSink()->diagnose(
-                    Diagnostics::IntValFromNonIntSpecConstEncountered{
-                        .location = declRef.getLoc()});
+                getSink()->diagnose(Diagnostics::IntValFromNonIntSpecConstEncountered{
+                    .location = declRef.getLoc()});
                 return nullptr;
             }
 
@@ -2566,7 +2585,7 @@ IntVal* SemanticsVisitor::tryConstantFoldDeclRef(
         return nullptr;
 
     ensureDecl(declRef.getDecl(), DeclCheckState::DefinitionChecked);
-    ConstantFoldingCircularityInfo newCircularityInfo(decl, circularityInfo);
+    ConstantFoldingCircularityInfo newCircularityInfo(declRef, circularityInfo);
     return tryConstantFoldExpr(getInitExpr(m_astBuilder, declRef), kind, &newCircularityInfo);
 }
 
@@ -2614,8 +2633,28 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
 
     if (auto sizeOfLikeExpr = expr.as<SizeOfLikeExpr>())
     {
+        // sizedType is populated by visitSizeOfLikeExpr during expression visiting,
+        // which may not have run yet if we are constant-folding during header checking.
+        // Check the expression now to ensure it is populated.
+        if (!sizeOfLikeExpr.getExpr()->sizedType)
+            CheckTerm(sizeOfLikeExpr.getExpr());
+
+        if (!sizeOfLikeExpr.getExpr()->sizedType)
+            return nullptr;
+
         auto type = as<Type>(
             sizeOfLikeExpr.getExpr()->sizedType->substitute(m_astBuilder, expr.getSubsts()));
+
+        if (sizeOfLikeExpr.getExpr()->dataLayoutType)
+        {
+            auto dataLayoutType = as<Type>(sizeOfLikeExpr.getExpr()->dataLayoutType->substitute(
+                m_astBuilder,
+                expr.getSubsts()));
+            // we can only constant-fold sizeof-like expressions when in
+            // natural/scalar data layout.
+            if (!as<ScalarDataLayoutType>(dataLayoutType))
+                return nullptr;
+        }
 
         if (auto sizeOfExpr = expr.as<SizeOfExpr>())
         {
@@ -2658,9 +2697,9 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
             return as<IntVal>(m_astBuilder->getFirstElement(foldedOperand));
         if (as<LastExpr>(packQueryExpr.getExpr()))
             return as<IntVal>(m_astBuilder->getLastElement(foldedOperand));
-        if (as<TrimHeadExpr>(packQueryExpr.getExpr()))
-            return as<IntVal>(m_astBuilder->getTrimHeadPack(foldedOperand));
-        return as<IntVal>(m_astBuilder->getTrimTailPack(foldedOperand));
+        if (as<TrimFirstExpr>(packQueryExpr.getExpr()))
+            return as<IntVal>(m_astBuilder->getTrimFirstPack(foldedOperand));
+        return as<IntVal>(m_astBuilder->getTrimLastPack(foldedOperand));
     }
 
     // `each D` where D is a value pack parameter produces an EachIntVal.
@@ -2781,10 +2820,10 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
             if (auto tagExpr = getTagExpr(m_astBuilder, enumRef))
             {
                 auto enumCaseDecl = enumRef.getDecl();
-                if (_checkForCircularityInConstantFolding(enumCaseDecl, circularityInfo))
+                if (_checkForCircularityInConstantFolding(enumRef, circularityInfo))
                     return nullptr;
 
-                ConstantFoldingCircularityInfo newCircularityInfo(enumCaseDecl, circularityInfo);
+                ConstantFoldingCircularityInfo newCircularityInfo(enumRef, circularityInfo);
                 auto intVal = as<IntVal>(tryConstantFoldExpr(tagExpr, kind, &newCircularityInfo));
                 if (!intVal)
                     return nullptr;
@@ -2917,6 +2956,17 @@ IntVal* SemanticsVisitor::CheckIntegerConstantExpression(
     ConstantFoldingKind kind,
     DiagnosticSink* sink)
 {
+    return CheckIntegerConstantExpression(inExpr, coercionType, expectedType, kind, sink, nullptr);
+}
+
+IntVal* SemanticsVisitor::CheckIntegerConstantExpression(
+    Expr* inExpr,
+    IntegerConstantExpressionCoercionType coercionType,
+    Type* expectedType,
+    ConstantFoldingKind kind,
+    DiagnosticSink* sink,
+    ConstantFoldingCircularityInfo* circularityInfo)
+{
     // No need to issue further errors if the expression didn't even type-check.
     if (IsErrorExpr(inExpr))
         return nullptr;
@@ -2944,7 +2994,7 @@ IntVal* SemanticsVisitor::CheckIntegerConstantExpression(
     if (IsErrorExpr(expr))
         return nullptr;
 
-    auto result = tryFoldIntegerConstantExpression(expr, kind, nullptr);
+    auto result = tryFoldIntegerConstantExpression(expr, kind, circularityInfo);
     if (!result && sink)
     {
         sink->diagnose(Diagnostics::ExpectedIntegerConstantNotConstant{.location = expr->loc});
@@ -2984,20 +3034,18 @@ Expr* SemanticsVisitor::CheckSimpleSubscriptExpr(IndexExpr* subscriptExpr, Type*
     auto baseExpr = subscriptExpr->baseExpression;
     if (subscriptExpr->indexExprs.getCount() < 1)
     {
-        getSink()->diagnose(
-            Diagnostics::NotEnoughArguments{
-                .got = subscriptExpr->indexExprs.getCount(),
-                .expected = 1,
-                .location = subscriptExpr->loc});
+        getSink()->diagnose(Diagnostics::NotEnoughArguments{
+            .got = subscriptExpr->indexExprs.getCount(),
+            .expected = 1,
+            .location = subscriptExpr->loc});
         return CreateErrorExpr(subscriptExpr);
     }
     else if (subscriptExpr->indexExprs.getCount() > 1)
     {
-        getSink()->diagnose(
-            Diagnostics::TooManyArguments{
-                .got = subscriptExpr->indexExprs.getCount(),
-                .expected = 1,
-                .location = subscriptExpr->loc});
+        getSink()->diagnose(Diagnostics::TooManyArguments{
+            .got = subscriptExpr->indexExprs.getCount(),
+            .expected = 1,
+            .location = subscriptExpr->loc});
         return CreateErrorExpr(subscriptExpr);
     }
 
@@ -3139,9 +3187,8 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
             {
                 if (constElementCount->getValue() < 0)
                 {
-                    getSink()->diagnose(
-                        Diagnostics::InvalidArraySize{
-                            .location = subscriptExpr->indexExprs[0]->loc});
+                    getSink()->diagnose(Diagnostics::InvalidArraySize{
+                        .location = subscriptExpr->indexExprs[0]->loc});
                     return CreateErrorExpr(subscriptExpr);
                 }
             }
@@ -3446,28 +3493,24 @@ void SemanticsVisitor::compareMemoryQualifierOfParamToArgument(ParamDecl* paramI
 
     if (argQualifiers & MemoryQualifierSetModifier::Flags::kCoherent &&
         !(paramQualifiers & MemoryQualifierSetModifier::Flags::kCoherent))
-        getSink()->diagnose(
-            Diagnostics::ArgumentHasMoreMemoryQualifiersThanParam{
-                .qualifier = "coherent",
-                .arg = arg});
+        getSink()->diagnose(Diagnostics::ArgumentHasMoreMemoryQualifiersThanParam{
+            .qualifier = "coherent",
+            .arg = arg});
     if (argQualifiers & MemoryQualifierSetModifier::Flags::kReadOnly &&
         !(paramQualifiers & MemoryQualifierSetModifier::Flags::kReadOnly))
-        getSink()->diagnose(
-            Diagnostics::ArgumentHasMoreMemoryQualifiersThanParam{
-                .qualifier = "readonly",
-                .arg = arg});
+        getSink()->diagnose(Diagnostics::ArgumentHasMoreMemoryQualifiersThanParam{
+            .qualifier = "readonly",
+            .arg = arg});
     if (argQualifiers & MemoryQualifierSetModifier::Flags::kWriteOnly &&
         !(paramQualifiers & MemoryQualifierSetModifier::Flags::kWriteOnly))
-        getSink()->diagnose(
-            Diagnostics::ArgumentHasMoreMemoryQualifiersThanParam{
-                .qualifier = "writeonly",
-                .arg = arg});
+        getSink()->diagnose(Diagnostics::ArgumentHasMoreMemoryQualifiersThanParam{
+            .qualifier = "writeonly",
+            .arg = arg});
     if (argQualifiers & MemoryQualifierSetModifier::Flags::kVolatile &&
         !(paramQualifiers & MemoryQualifierSetModifier::Flags::kVolatile))
-        getSink()->diagnose(
-            Diagnostics::ArgumentHasMoreMemoryQualifiersThanParam{
-                .qualifier = "volatile",
-                .arg = arg});
+        getSink()->diagnose(Diagnostics::ArgumentHasMoreMemoryQualifiersThanParam{
+            .qualifier = "volatile",
+            .arg = arg});
     // dropping a `restrict` qualifier from arguments is allowed in GLSL with memory qualifiers
 }
 
@@ -3723,10 +3766,9 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                                     }
                                 }
 
-                                getSink()->diagnose(
-                                    Diagnostics::ArgumentExpectedLvalue{
-                                        .param = String(pp),
-                                        .arg = argExpr});
+                                getSink()->diagnose(Diagnostics::ArgumentExpectedLvalue{
+                                    .param = String(pp),
+                                    .arg = argExpr});
 
 
                                 if (implicitCastExpr)
@@ -3758,11 +3800,10 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                                     else
                                     {
                                         // Fall back, in case there are other reasons...
-                                        getSink()->diagnose(
-                                            Diagnostics::ImplicitCastUsedAsLvalue{
-                                                .from = implicitCastExpr->arguments[0]->type.type,
-                                                .to = implicitCastExpr->type.type,
-                                                .expr = argExpr});
+                                        getSink()->diagnose(Diagnostics::ImplicitCastUsedAsLvalue{
+                                            .from = implicitCastExpr->arguments[0]->type.type,
+                                            .to = implicitCastExpr->type.type,
+                                            .expr = argExpr});
                                     }
                                 }
 
@@ -4001,7 +4042,7 @@ Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
     {
         for (auto& arg : expr->arguments)
         {
-            maybeRegisterDifferentiableType(m_astBuilder, arg->type.type);
+            maybeRegisterDifferentiableType(m_astBuilder, arg->type.type, arg->loc);
         }
     }
 
@@ -4017,7 +4058,7 @@ Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
             // Register types for final resolved invoke arguments again.
             for (auto& arg : expr->arguments)
             {
-                maybeRegisterDifferentiableType(m_astBuilder, arg->type.type);
+                maybeRegisterDifferentiableType(m_astBuilder, arg->type.type, arg->loc);
             }
 
             if (auto fnExpr = as<DeclRefExpr>(checkedInvokeExpr->functionExpr))
@@ -4026,7 +4067,7 @@ Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
                     registerAssociatedMethods(this, getDeclRef(m_astBuilder, fnExpr));
             }
         }
-        maybeRegisterDifferentiableType(m_astBuilder, checkedExpr->type.type);
+        maybeRegisterDifferentiableType(m_astBuilder, checkedExpr->type.type, checkedExpr->loc);
     }
     return checkedExpr;
 }
@@ -4147,10 +4188,9 @@ struct LambdaCaptureVisitor : ModifyingExprVisitor<LambdaCaptureVisitor>
             {
                 if (sink)
                 {
-                    sink->diagnose(
-                        Diagnostics::NonCopyableTypeCapturedInLambda{
-                            .type = capturedVarDecl->type.type,
-                            .expr = exprIn});
+                    sink->diagnose(Diagnostics::NonCopyableTypeCapturedInLambda{
+                        .type = capturedVarDecl->type.type,
+                        .expr = exprIn});
                 }
             }
         }
@@ -4784,11 +4824,10 @@ Expr* SemanticsExprVisitor::visitDispatchKernelExpr(DispatchKernelExpr* expr)
         auto uint3Type = m_astBuilder->getVectorType(
             m_astBuilder->getUIntType(),
             m_astBuilder->getIntVal(m_astBuilder->getIntType(), 3));
-        getSink()->diagnose(
-            Diagnostics::TypeMismatch{
-                .expectedType = uint3Type,
-                .actualType = expr->threadGroupSize->type,
-                .expr = expr->threadGroupSize});
+        getSink()->diagnose(Diagnostics::TypeMismatch{
+            .expectedType = uint3Type,
+            .actualType = expr->threadGroupSize->type,
+            .expr = expr->threadGroupSize});
     }
     expr->dispatchSize = dispatchExpr(expr->dispatchSize, *this);
     if (!isInt3Type(expr->dispatchSize->type.type))
@@ -4796,11 +4835,10 @@ Expr* SemanticsExprVisitor::visitDispatchKernelExpr(DispatchKernelExpr* expr)
         auto uint3Type = m_astBuilder->getVectorType(
             m_astBuilder->getUIntType(),
             m_astBuilder->getIntVal(m_astBuilder->getIntType(), 3));
-        getSink()->diagnose(
-            Diagnostics::TypeMismatch{
-                .expectedType = uint3Type,
-                .actualType = expr->dispatchSize->type,
-                .expr = expr->dispatchSize});
+        getSink()->diagnose(Diagnostics::TypeMismatch{
+            .expectedType = uint3Type,
+            .actualType = expr->dispatchSize->type,
+            .expr = expr->dispatchSize});
     }
     PassthroughHighOrderExprCheckingActionsBase<DispatchKernelExpr> actions;
     return _checkHigherOrderInvokeExpr(this, expr, &actions);
@@ -4842,10 +4880,9 @@ Expr* SemanticsExprVisitor::visitGetArrayLengthExpr(GetArrayLengthExpr* expr)
     {
         if (!as<ErrorType>(expr->arrayExpr->type))
         {
-            getSink()->diagnose(
-                Diagnostics::ExpectedArrayExpression{
-                    .actualType = expr->arrayExpr->type,
-                    .expr = expr->arrayExpr});
+            getSink()->diagnose(Diagnostics::ExpectedArrayExpression{
+                .actualType = expr->arrayExpr->type,
+                .expr = expr->arrayExpr});
         }
         expr->type = m_astBuilder->getErrorType();
     }
@@ -4935,15 +4972,20 @@ static bool _isTypeOrValValidForPackQuery(Type* type)
     return false;
 }
 
+static bool _isTypeOrValValidForPackBranch(Type* type)
+{
+    return _isTypeOrValValidForPackQuery(type);
+}
+
 static const char* _getPackQueryName(PackQueryExpr* expr)
 {
     if (as<FirstExpr>(expr))
         return "__first";
     if (as<LastExpr>(expr))
         return "__last";
-    if (as<TrimHeadExpr>(expr))
-        return "__trimHead";
-    return "__trimTail";
+    if (as<TrimFirstExpr>(expr))
+        return "__trimFirst";
+    return "__trimLast";
 }
 
 bool SemanticsVisitor::hasNonEmptyPackConstraint(Decl* decl)
@@ -4973,6 +5015,12 @@ VariadicPackCardinality SemanticsVisitor::getPackCardinality(Val* packVal)
 
     if (auto packType = as<Type>(packVal))
         packVal = unwrapModifiedType(packType);
+
+    for (auto assumedInfo = m_assumedNonEmptyPack; assumedInfo; assumedInfo = assumedInfo->next)
+    {
+        if (assumedInfo->pack == packVal)
+            return VariadicPackCardinality::NonEmpty;
+    }
 
     if (auto cached = getShared()->m_packCardinalityCache.tryGetValue(packVal))
         return *cached;
@@ -5031,8 +5079,8 @@ VariadicPackCardinality SemanticsVisitor::getPackCardinality(Val* packVal)
         return result;
     }
 
-    if (as<TrimHeadTypePack>(packVal) || as<TrimTailTypePack>(packVal) ||
-        as<TrimHeadIntValPack>(packVal) || as<TrimTailIntValPack>(packVal))
+    if (as<TrimFirstTypePack>(packVal) || as<TrimLastTypePack>(packVal) ||
+        as<TrimFirstIntValPack>(packVal) || as<TrimLastIntValPack>(packVal))
     {
         result = VariadicPackCardinality::Unknown;
         getShared()->m_packCardinalityCache[packVal] = result;
@@ -5118,6 +5166,40 @@ Expr* SemanticsExprVisitor::visitSizeOfLikeExpr(SizeOfLikeExpr* sizeOfLikeExpr)
             return sizeOfLikeExpr;
         }
 
+        Type* dataLayoutType = nullptr;
+        if (sizeOfLikeExpr->dataLayout)
+        {
+            auto dataLayoutExpr = dispatch(sizeOfLikeExpr->dataLayout);
+            sizeOfLikeExpr->dataLayout = dataLayoutExpr;
+            if (as<TypeType>(dataLayoutExpr->type))
+            {
+                TypeExp typeExp;
+                typeExp.exp = dataLayoutExpr;
+                auto properTypeExpr = CoerceToProperType(typeExp);
+                dataLayoutType = properTypeExpr.type;
+            }
+        }
+        else
+        {
+            dataLayoutType = m_astBuilder->getScalarLayoutType();
+        }
+
+        SubtypeWitness* witness =
+            dataLayoutType ? as<SubtypeWitness>(tryGetInterfaceConformanceWitness(
+                                 dataLayoutType,
+                                 m_astBuilder->getSharedASTBuilder()->getIBufferDataLayoutType()))
+                           : nullptr;
+        if (!dataLayoutType || !witness)
+        {
+            getSink()->diagnose(
+                Diagnostics::SizeOfDataLayoutIsInvalid{.expr = sizeOfLikeExpr->dataLayout});
+
+            sizeOfLikeExpr->type = m_astBuilder->getErrorType();
+            return sizeOfLikeExpr;
+        }
+
+        sizeOfLikeExpr->dataLayoutType = dataLayoutType;
+
         // Note: DescriptorHandle size is target-dependent (uint64_t for spvBindlessTextureNV,
         // uint2 otherwise). The size calculation is deferred to IR level where target
         // capabilities are available. See slang-ir-peephole.cpp for the resolution logic.
@@ -5174,29 +5256,27 @@ Expr* SemanticsExprVisitor::visitPackQueryExpr(PackQueryExpr* packQueryExpr)
             return m_astBuilder->getFirstElement(type);
         if (as<LastExpr>(packQueryExpr))
             return m_astBuilder->getLastElement(type);
-        if (as<TrimHeadExpr>(packQueryExpr))
-            return m_astBuilder->getTrimHeadPack(type);
-        return m_astBuilder->getTrimTailPack(type);
+        if (as<TrimFirstExpr>(packQueryExpr))
+            return m_astBuilder->getTrimFirstPack(type);
+        return m_astBuilder->getTrimLastPack(type);
     };
 
     if (isFirstOrLastQuery())
     {
         if (packCardinality == VariadicPackCardinality::Empty)
         {
-            getSink()->diagnose(
-                Diagnostics::EmptyPackQueryIsInvalid{
-                    .queryName = queryName,
-                    .expr = packQueryExpr});
+            getSink()->diagnose(Diagnostics::EmptyPackQueryIsInvalid{
+                .queryName = queryName,
+                .expr = packQueryExpr});
             packQueryExpr->type = m_astBuilder->getErrorType();
             return packQueryExpr;
         }
 
         if (packCardinality != VariadicPackCardinality::NonEmpty)
         {
-            getSink()->diagnose(
-                Diagnostics::PackQueryRequiresNonEmptyPack{
-                    .queryName = queryName,
-                    .expr = packQueryExpr});
+            getSink()->diagnose(Diagnostics::PackQueryRequiresNonEmptyPack{
+                .queryName = queryName,
+                .expr = packQueryExpr});
             packQueryExpr->type = m_astBuilder->getErrorType();
             return packQueryExpr;
         }
@@ -5273,11 +5353,10 @@ Expr* SemanticsExprVisitor::visitFloatBitCastExpr(FloatBitCastExpr* expr)
 
     if (floatBaseType == BaseType::Void)
     {
-        getSink()->diagnose(
-            Diagnostics::FloatBitCastTypeMismatch{
-                .intrinsic = "__floatAsInt",
-                .expectedType = "half, float, or double",
-                .expr = expr});
+        getSink()->diagnose(Diagnostics::FloatBitCastTypeMismatch{
+            .intrinsic = "__floatAsInt",
+            .expectedType = "half, float, or double",
+            .expr = expr});
         expr->type = m_astBuilder->getErrorType();
         return expr;
     }
@@ -5719,12 +5798,11 @@ Expr* SemanticsExprVisitor::visitTryExpr(TryExpr* expr)
         }
         if (funcCallee && !parentFunc->errorType->equals(funcCallee->errorType))
         {
-            getSink()->diagnose(
-                Diagnostics::ErrorTypeOfCalleeIncompatibleWithCaller{
-                    .calleeErrorType = funcCallee->errorType,
-                    .callee = funcCallee,
-                    .callerErrorType = parentFunc->errorType,
-                    .expr = expr});
+            getSink()->diagnose(Diagnostics::ErrorTypeOfCalleeIncompatibleWithCaller{
+                .calleeErrorType = funcCallee->errorType,
+                .callee = funcCallee,
+                .callerErrorType = parentFunc->errorType,
+                .expr = expr});
             return expr;
         }
     }
@@ -6090,9 +6168,8 @@ void SemanticsExprVisitor::maybeCheckKnownBuiltinInvocation(Expr* invokeExpr)
             auto vertexAttributeArgDeclRefExpr = as<DeclRefExpr>(vertexAttributeArg);
             if (!vertexAttributeArgDeclRefExpr)
             {
-                getSink()->diagnose(
-                    Diagnostics::GetAttributeAtVertexMustReferToPerVertexInput{
-                        .location = invokeExpr->loc});
+                getSink()->diagnose(Diagnostics::GetAttributeAtVertexMustReferToPerVertexInput{
+                    .location = invokeExpr->loc});
                 return;
             }
             auto vertexAttributeArgDecl = vertexAttributeArgDeclRefExpr->declRef.getDecl();
@@ -6101,9 +6178,8 @@ void SemanticsExprVisitor::maybeCheckKnownBuiltinInvocation(Expr* invokeExpr)
             if (!vertexAttributeArgDecl->findModifier<PerVertexModifier>() &&
                 !vertexAttributeArgDecl->findModifier<HLSLNoInterpolationModifier>())
             {
-                getSink()->diagnose(
-                    Diagnostics::GetAttributeAtVertexMustReferToPerVertexInput{
-                        .location = vertexAttributeArgDeclRefExpr->loc});
+                getSink()->diagnose(Diagnostics::GetAttributeAtVertexMustReferToPerVertexInput{
+                    .location = vertexAttributeArgDeclRefExpr->loc});
                 return;
             }
         }
@@ -6330,11 +6406,10 @@ Expr* SemanticsVisitor::checkTupleSwizzleExpr(MemberExpr* memberExpr, TupleType*
 
         if (elementCoord >= tupleElementCount)
         {
-            getSink()->diagnose(
-                Diagnostics::InvalidSwizzleExpr{
-                    .pattern = swizzleText,
-                    .type = baseTupleType,
-                    .expr = memberExpr});
+            getSink()->diagnose(Diagnostics::InvalidSwizzleExpr{
+                .pattern = swizzleText,
+                .type = baseTupleType,
+                .expr = memberExpr});
             return CreateErrorExpr(memberExpr);
         }
 
@@ -6651,11 +6726,10 @@ Expr* SemanticsVisitor::_lookupStaticMember(DeclRefExpr* expr, Expr* baseExpress
                     else
                     {
                         // Otherwise, it is time to report an error.
-                        getSink()->diagnose(
-                            Diagnostics::StaticRefToNonStaticMember{
-                                .type = type,
-                                .member = expr->name,
-                                .location = expr->loc});
+                        getSink()->diagnose(Diagnostics::StaticRefToNonStaticMember{
+                            .type = type,
+                            .member = expr->name,
+                            .location = expr->loc});
                         hasErrors = true;
                         return;
                     }
@@ -6774,11 +6848,10 @@ Expr* SemanticsVisitor::lookupMemberResultFailure(
     if (!supressDiagnostic)
     {
         if (!maybeDiagnoseAmbiguousReference(GetBaseExpr(expr)))
-            getSink()->diagnose(
-                Diagnostics::NoMemberOfNameInType{
-                    .name = expr->name,
-                    .type = baseType.type,
-                    .expr = expr});
+            getSink()->diagnose(Diagnostics::NoMemberOfNameInType{
+                .name = expr->name,
+                .type = baseType.type,
+                .expr = expr});
     }
     return expr;
 }
@@ -6857,7 +6930,10 @@ Expr* SemanticsVisitor::checkBaseForMemberExpr(
 
     // We might want to register differentiability on any implicit ops that we add in.
     if (this->m_parentFunc && this->m_parentFunc->findModifier<DifferentiableAttribute>())
-        maybeRegisterDifferentiableType(getASTBuilder(), resultBaseExpr->type.type);
+        maybeRegisterDifferentiableType(
+            getASTBuilder(),
+            resultBaseExpr->type.type,
+            resultBaseExpr->loc);
 
     return resultBaseExpr;
 }
@@ -6935,10 +7011,9 @@ Expr* SemanticsExprVisitor::visitMemberExpr(MemberExpr* expr)
         // The user is trying to use the `->` operator on something that can't be
         // dereferenced, so we should diagnose that.
         if (!as<ErrorType>(expr->baseExpression->type))
-            getSink()->diagnose(
-                Diagnostics::CannotDereferenceType{
-                    .type = expr->baseExpression->type.type,
-                    .location = expr->memberOperatorLoc});
+            getSink()->diagnose(Diagnostics::CannotDereferenceType{
+                .type = expr->baseExpression->type.type,
+                .location = expr->memberOperatorLoc});
     }
 
     auto baseType = expr->baseExpression->type;
@@ -7298,10 +7373,9 @@ Expr* SemanticsExprVisitor::visitModifiedTypeExpr(ModifiedTypeExpr* expr)
             }
             else
             {
-                getSink()->diagnose(
-                    Diagnostics::MatrixLayoutModifierOnNonMatrixType{
-                        .type = baseType,
-                        .location = matrixLayoutModifier->loc});
+                getSink()->diagnose(Diagnostics::MatrixLayoutModifierOnNonMatrixType{
+                    .type = baseType,
+                    .location = matrixLayoutModifier->loc});
             }
             continue;
         }
@@ -7345,10 +7419,9 @@ Val* SemanticsExprVisitor::checkTypeModifier(Modifier* modifier, Type* type)
     else
     {
         // TODO: more complete error message here
-        getSink()->diagnose(
-            Diagnostics::Unexpected{
-                .message = "unknown type modifier in semantic checking",
-                .location = modifier->loc});
+        getSink()->diagnose(Diagnostics::Unexpected{
+            .message = "unknown type modifier in semantic checking",
+            .location = modifier->loc});
         return nullptr;
     }
 }
@@ -7393,6 +7466,95 @@ Expr* SemanticsExprVisitor::visitTupleTypeExpr(TupleTypeExpr* expr)
     return expr;
 }
 
+Expr* SemanticsExprVisitor::visitPackBranchTypeExpr(PackBranchTypeExpr* expr)
+{
+    expr->packOperand.exp = CheckTerm(expr->packOperand.exp);
+
+    bool isTypeExpr = false;
+    Type* operandType = nullptr;
+    if (auto typeType = as<TypeType>(expr->packOperand.exp->type))
+    {
+        isTypeExpr = true;
+        operandType = CoerceToProperType(expr->packOperand).type;
+    }
+    else
+    {
+        operandType = expr->packOperand.exp->type.type;
+    }
+
+    if (!_isTypeOrValValidForPackBranch(operandType))
+    {
+        getSink()->diagnose(
+            Diagnostics::PackQueryArgumentIsInvalid{.queryName = "__packBranch", .expr = expr});
+        expr->type = m_astBuilder->getErrorType();
+        return expr;
+    }
+
+    Val* packOperandVal = tryConstantFoldExpr(
+        SubstExpr<Expr>(expr->packOperand.exp),
+        ConstantFoldingKind::CompileTime,
+        nullptr);
+    if (!packOperandVal && isTypeExpr)
+        packOperandVal = operandType;
+
+    if (!packOperandVal)
+    {
+        // For term-valued packs we need an actual symbolic pack `Val`, not just the
+        // pack's type. Falling back to `ValuePackType` (or a tuple value's `TupleType`)
+        // would erase which pack expression we branched on, so distinct packs with the
+        // same element type/shape could alias to the same `PackBranchType`.
+        if (as<ValuePackType>(operandType) || as<TupleType>(operandType))
+        {
+            getSink()->diagnose(
+                Diagnostics::PackQueryArgumentIsInvalid{.queryName = "__packBranch", .expr = expr});
+            expr->type = m_astBuilder->getErrorType();
+            return expr;
+        }
+
+        packOperandVal = operandType;
+    }
+
+    auto packCardinality = getPackCardinality(packOperandVal);
+
+    auto checkNonEmptyBranchType = [&]() -> TypeExp
+    {
+        AssumedNonEmptyPackInfo assumedNonEmptyPackInfo;
+        assumedNonEmptyPackInfo.pack = packOperandVal;
+        assumedNonEmptyPackInfo.next = m_assumedNonEmptyPack;
+        SemanticsVisitor subVisitor(this->withAssumedNonEmptyPack(&assumedNonEmptyPackInfo));
+        return subVisitor.CheckProperType(expr->nonEmptyType);
+    };
+
+    if (packCardinality == VariadicPackCardinality::Empty)
+    {
+        expr->emptyType = CheckProperType(expr->emptyType);
+        expr->type = m_astBuilder->getTypeType(expr->emptyType.type);
+        return expr;
+    }
+
+    if (packCardinality == VariadicPackCardinality::NonEmpty)
+    {
+        expr->nonEmptyType = checkNonEmptyBranchType();
+        expr->type = m_astBuilder->getTypeType(expr->nonEmptyType.type);
+        return expr;
+    }
+
+    expr->emptyType = CheckProperType(expr->emptyType);
+    expr->nonEmptyType = checkNonEmptyBranchType();
+    if (as<ErrorType>(expr->emptyType.type) || as<ErrorType>(expr->nonEmptyType.type))
+    {
+        expr->type = m_astBuilder->getErrorType();
+        return expr;
+    }
+
+    auto packBranchType = m_astBuilder->getPackBranchType(
+        packOperandVal,
+        expr->emptyType.type,
+        expr->nonEmptyType.type);
+    expr->type = m_astBuilder->getTypeType(packBranchType);
+    return expr;
+}
+
 Expr* SemanticsExprVisitor::visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
 {
     //
@@ -7417,11 +7579,10 @@ Expr* SemanticsExprVisitor::visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
         if (opInfo && opInfo->numOperandTypes == 0 && inst.operands.getCount())
         {
             failed = true;
-            getSink()->diagnose(
-                Diagnostics::SpirvInstructionWithTooManyOperands{
-                    .opcode = inst.opcode.token.getContent(),
-                    .maxOperands = 0,
-                    .location = inst.opcode.token.loc});
+            getSink()->diagnose(Diagnostics::SpirvInstructionWithTooManyOperands{
+                .opcode = inst.opcode.token.getContent(),
+                .maxOperands = 0,
+                .location = inst.opcode.token.loc});
             continue;
         }
         int resultIdIndex = -1;
@@ -7452,10 +7613,9 @@ Expr* SemanticsExprVisitor::visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
             if (inst.operands.getCount() <= resultIdIndex)
             {
                 failed = true;
-                getSink()->diagnose(
-                    Diagnostics::SpirvInstructionWithNotEnoughOperands{
-                        .opcode = inst.opcode.token.getContent(),
-                        .location = inst.opcode.token.loc});
+                getSink()->diagnose(Diagnostics::SpirvInstructionWithNotEnoughOperands{
+                    .opcode = inst.opcode.token.getContent(),
+                    .location = inst.opcode.token.loc});
                 continue;
             }
             auto& resultIdOperand = inst.operands[resultIdIndex];
@@ -7463,10 +7623,9 @@ Expr* SemanticsExprVisitor::visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
             if (!definedIds.add(resultIdOperand.token.getName()))
             {
                 failed = true;
-                getSink()->diagnose(
-                    Diagnostics::SpirvIdRedefinition{
-                        .id = resultIdOperand.token.getContent(),
-                        .location = inst.opcode.token.loc});
+                getSink()->diagnose(Diagnostics::SpirvIdRedefinition{
+                    .id = resultIdOperand.token.getContent(),
+                    .location = inst.opcode.token.loc});
                 continue;
             }
         }
@@ -7552,10 +7711,9 @@ Expr* SemanticsExprVisitor::visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
                     if (!enumValue)
                     {
                         failed = true;
-                        getSink()->diagnose(
-                            Diagnostics::SpirvUnableToResolveName{
-                                .name = operand.token.getContent(),
-                                .location = operand.token.loc});
+                        getSink()->diagnose(Diagnostics::SpirvUnableToResolveName{
+                            .name = operand.token.getContent(),
+                            .location = operand.token.loc});
                         return;
                     }
 
@@ -7565,17 +7723,16 @@ Expr* SemanticsExprVisitor::visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
                 else if (operand.flavor == SPIRVAsmOperand::BuiltinVar)
                 {
                     operand.type = CheckProperType(operand.type);
-                    auto builtinVarKind = spirvInfo->allEnums.lookup(
-                        SPIRVCoreGrammarInfo::QualifiedEnumName{
+                    auto builtinVarKind =
+                        spirvInfo->allEnums.lookup(SPIRVCoreGrammarInfo::QualifiedEnumName{
                             spirvInfo->operandKinds.lookup(UnownedStringSlice("BuiltIn")).value(),
                             operand.token.getContent()});
                     if (!builtinVarKind)
                     {
                         failed = true;
-                        getSink()->diagnose(
-                            Diagnostics::SpirvUnableToResolveName{
-                                .name = operand.token.getContent(),
-                                .location = operand.token.loc});
+                        getSink()->diagnose(Diagnostics::SpirvUnableToResolveName{
+                            .name = operand.token.getContent(),
+                            .location = operand.token.loc});
                         return;
                     }
                     operand.knownValue = builtinVarKind.value();
@@ -7585,10 +7742,9 @@ Expr* SemanticsExprVisitor::visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
                     if (!definedIds.contains(operand.token.getName()))
                     {
                         failed = true;
-                        getSink()->diagnose(
-                            Diagnostics::SpirvUndefinedId{
-                                .id = operand.token.getContent(),
-                                .location = operand.token.loc});
+                        getSink()->diagnose(Diagnostics::SpirvUndefinedId{
+                            .id = operand.token.getContent(),
+                            .location = operand.token.loc});
                         return;
                     }
                 }

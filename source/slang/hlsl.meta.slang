@@ -31882,10 +31882,11 @@ ${
 static const struct {
     bool isRW;
     char const* type;
+    char const* biasType;
 } kStructuredBufferCases_[] =
 {
-    {true, "RWStructuredBuffer<IgnoredBufferElementType>"},
-    {false, "StructuredBuffer<IgnoredBufferElementType>"},
+    {true, "RWStructuredBuffer<IgnoredBufferElementType>", "RWStructuredBuffer<IgnoredBiasBufferElementType>"},
+    {false, "StructuredBuffer<IgnoredBufferElementType>", "StructuredBuffer<IgnoredBiasBufferElementType>"},
 };
 for(auto buffer : kStructuredBufferCases_) {
 $}
@@ -31894,7 +31895,7 @@ $}
 [ForceInline]
 [require(spirv, cooperative_vector)]
 [require(optix_coopvec)]
-__generic<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType,IgnoredBufferElementType>
+__generic<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType, IgnoredBufferElementType>
 CoopVec<T, M> __coopVecMatMulPacked_impl(
     CoopVec<U, PackedK> input,
     constexpr CoopVecComponentType inputInterpretation,
@@ -31941,7 +31942,7 @@ CoopVec<T, M> __coopVecMatMulPacked_impl(
 [ForceInline]
 [require(spirv, cooperative_vector)]
 [require(optix_coopvec)]
-__generic<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType,IgnoredBufferElementType>
+__generic<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType, IgnoredBufferElementType>
 CoopVec<T, M> coopVecMatMulPacked(
     CoopVec<U, PackedK> input,
     constexpr CoopVecComponentType inputInterpretation,
@@ -31965,7 +31966,7 @@ CoopVec<T, M> coopVecMatMulPacked(
 // specialized coopVecMatMul for non-packed inputs
 [require(spirv, cooperative_vector)]
 [require(optix_coopvec)]
-__generic<T : __BuiltinArithmeticType, let M : int, let K : int, U : __BuiltinArithmeticType,IgnoredBufferElementType>
+__generic<T : __BuiltinArithmeticType, let M : int, let K : int, U : __BuiltinArithmeticType, IgnoredBufferElementType>
 CoopVec<T, M> coopVecMatMul(
     CoopVec<U, K> input,
     constexpr CoopVecComponentType inputInterpretation,
@@ -31996,14 +31997,14 @@ CoopVec<T, M> coopVecMatMul(
 [ForceInline]
 [require(spirv, cooperative_vector)]
 [require(optix_coopvec)]
-CoopVec<T, M> __coopVecMatMulAddPacked_impl<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType, IgnoredBufferElementType>(
+CoopVec<T, M> __coopVecMatMulAddPacked_impl<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType, IgnoredBufferElementType, IgnoredBiasBufferElementType>(
     CoopVec<U, PackedK> input,
     constexpr CoopVecComponentType inputInterpretation,
     constexpr int k,
     $(buffer.type) matrix,
     int32_t matrixOffset,
     constexpr CoopVecComponentType matrixInterpretation,
-    $(buffer.type) bias,
+    $(buffer.biasType) bias,
     int32_t biasOffset,
     constexpr CoopVecComponentType biasInterpretation,
     constexpr CoopVecMatrixLayout memoryLayout,
@@ -32035,9 +32036,11 @@ CoopVec<T, M> __coopVecMatMulAddPacked_impl<T : __BuiltinArithmeticType, let M :
         return spirv_asm
         {
             %runtimeArrayType = OpTypeRuntimeArray $$IgnoredBufferElementType;
+            %runtimeBiasArrayType = OpTypeRuntimeArray $$IgnoredBiasBufferElementType;
             %storagePointerType = OpTypePointer StorageBuffer %runtimeArrayType;
+            %storageBiasPointerType = OpTypePointer StorageBuffer %runtimeBiasArrayType;
             %matrixPointer:%storagePointerType = OpAccessChain $matrix $zero;
-            %biasPointer:%storagePointerType = OpAccessChain $bias $zero;
+            %biasPointer:%storageBiasPointerType = OpAccessChain $bias $zero;
             result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulAddNV $input $inputInterpretationSpirv %matrixPointer $matrixOffset $matrixInterpretationSpirv %biasPointer $biasOffset $biasInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride !operands;
         };
     case optix_coopvec:
@@ -32048,14 +32051,14 @@ CoopVec<T, M> __coopVecMatMulAddPacked_impl<T : __BuiltinArithmeticType, let M :
 [ForceInline]
 [require(spirv, cooperative_vector)]
 [require(optix_coopvec)]
-CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType, IgnoredBufferElementType>(
+CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType, IgnoredBufferElementType, IgnoredBiasBufferElementType>(
     CoopVec<U, PackedK> input,
     constexpr CoopVecComponentType inputInterpretation,
     constexpr int k,
     $(buffer.type) matrix,
     int32_t matrixOffset,
     constexpr CoopVecComponentType matrixInterpretation,
-    $(buffer.type) bias,
+    $(buffer.biasType) bias,
     int32_t biasOffset,
     constexpr CoopVecComponentType biasInterpretation,
     constexpr CoopVecMatrixLayout memoryLayout,
@@ -32068,18 +32071,18 @@ CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, l
     static_assert(!__isPackedInputInterpretation(inputInterpretation)
                 || k <= __inputInterpretationPackingFactor(inputInterpretation)*PackedK
                  , "for packed inputInterpretation values k must be less than or equal to the input vector length times the packing factor");
-    return __coopVecMatMulAddPacked_impl<T, M, PackedK, U, IgnoredBufferElementType>(input, inputInterpretation, k, matrix, matrixOffset, matrixInterpretation, bias, biasOffset, biasInterpretation, memoryLayout, transpose, matrixStride);
+    return __coopVecMatMulAddPacked_impl<T, M, PackedK, U, IgnoredBufferElementType, IgnoredBiasBufferElementType>(input, inputInterpretation, k, matrix, matrixOffset, matrixInterpretation, bias, biasOffset, biasInterpretation, memoryLayout, transpose, matrixStride);
 }
 
 [require(spirv, cooperative_vector)]
 [require(optix_coopvec)]
-CoopVec<T, M> coopVecMatMulAdd<T : __BuiltinArithmeticType, let M : int, let K : int, U : __BuiltinArithmeticType, IgnoredBufferElementType>(
+CoopVec<T, M> coopVecMatMulAdd<T : __BuiltinArithmeticType, let M : int, let K : int, U : __BuiltinArithmeticType, IgnoredBufferElementType, IgnoredBiasBufferElementType>(
     CoopVec<U, K> input,
     constexpr CoopVecComponentType inputInterpretation,
     $(buffer.type) matrix,
     int32_t matrixOffset,
     constexpr CoopVecComponentType matrixInterpretation,
-    $(buffer.type) bias,
+    $(buffer.biasType) bias,
     int32_t biasOffset,
     constexpr CoopVecComponentType biasInterpretation,
     constexpr CoopVecMatrixLayout memoryLayout,
@@ -32090,7 +32093,7 @@ CoopVec<T, M> coopVecMatMulAdd<T : __BuiltinArithmeticType, let M : int, let K :
     static_assert(!__isPackedInputInterpretation(inputInterpretation)
                  , "for packed inputInterpretation values please use coopVecMatMulPacked and specify k manually");
     return coopVecMatMulAddPacked<
-        T, M, K, U, IgnoredBufferElementType>(
+        T, M, K, U, IgnoredBufferElementType, IgnoredBiasBufferElementType>(
         input,
         inputInterpretation,
         K,

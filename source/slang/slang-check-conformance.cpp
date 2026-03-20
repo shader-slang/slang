@@ -290,59 +290,16 @@ SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
         // during visitGenericTypeConstraintDecl. If we get here, something is wrong.
         SLANG_UNEXPECTED("AndType should have been flattened before reaching isSubtype");
     }
-    else if (auto extractExistentialType = as<ExtractExistentialType>(subType))
-    {
-        // An ExtractExistentialType from an existential value of type I
-        // is a subtype of I.
-        // We need to check and make sure the interface type of the `ExtractExistentialType`
-        // is equal to `superType`.
-        //
-        // TODO(tfoley): We could add support for `ExtractExistentialType` to
-        // the inheritance linearization logic, and eliminate this case.
-        //
-        auto interfaceDeclRef = extractExistentialType->getOriginalInterfaceDeclRef();
-        if (interfaceDeclRef.equals(superTypeDeclRef))
-        {
-            auto witness = extractExistentialType->getSubtypeWitness();
-            return witness;
-        }
-        return nullptr;
-    }
     else if (auto subTypePack = as<ConcreteTypePack>(subType))
     {
-        // A type pack (T0, T1, ...) is a subtype of supType, if each of its elements
-        // is a subtype of the supType.
-        ShortList<SubtypeWitness*> elementWitnesses;
-        for (Index i = 0; i < subTypePack->getTypeCount(); i++)
+        // An empty type pack vacuously satisfies any element-wise subtype constraint.
+        if (subTypePack->getTypeCount() == 0)
         {
-            auto elementWitness =
-                isSubtype(subTypePack->getElementType(i), superType, IsSubTypeOptions::None);
-            if (!elementWitness)
-                return nullptr;
-            elementWitnesses.add(elementWitness);
+            return m_astBuilder->getSubtypeWitnessPack(
+                subType,
+                superType,
+                ArrayView<SubtypeWitness*>());
         }
-        return m_astBuilder->getSubtypeWitnessPack(
-            subType,
-            superType,
-            elementWitnesses.getArrayView().arrayView);
-    }
-    else if (auto expandType = as<ExpandType>(subType))
-    {
-        // A expand type `expand patternType, captureList` is a subtype of supType, if patternType
-        // is a subtype of supType.
-        auto elementWitness =
-            isSubtype(expandType->getPatternType(), superType, IsSubTypeOptions::None);
-        if (!elementWitness)
-            return nullptr;
-        return m_astBuilder->getExpandSubtypeWitness(subType, superType, elementWitness);
-    }
-    else if (auto eachType = as<EachType>(subType))
-    {
-        auto elementWitness =
-            isSubtype(eachType->getElementType(), superType, IsSubTypeOptions::None);
-        if (!elementWitness)
-            return nullptr;
-        return m_astBuilder->getEachSubtypeWitness(subType, superType, elementWitness);
     }
     // default is failure
     return failureWitness;

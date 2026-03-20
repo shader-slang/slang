@@ -5,6 +5,7 @@
 
 namespace Slang
 {
+struct SpecializationContext;
 
 // Convert dynamic insts such as `LookupWitnessMethod`, `ExtractExistentialValue`,
 // `ExtractExistentialType`, `ExtractExistentialWitnessTable` and more into specialized versions

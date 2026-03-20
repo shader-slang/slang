@@ -52,6 +52,18 @@ inline int getVectorSize(VectorExpressionType* vecType)
     return 0;
 }
 
+/// Represents what the compiler can currently prove about a variadic pack's cardinality.
+/// This is intentionally coarse-grained: we only track whether a pack is known to be empty,
+/// known to be non-empty, or still unknown.
+enum class VariadicPackCardinality
+{
+    Unknown,
+    Empty,
+    NonEmpty,
+};
+
+VariadicPackCardinality getKnownPackCardinality(Val* packOperand);
+
 //
 // Declarations
 //
