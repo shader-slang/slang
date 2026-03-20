@@ -68,7 +68,9 @@ RUN wget -q https://sdk.lunarg.com/sdk/download/1.4.341.1/linux/vulkansdk-linux-
     tar -xf vulkansdk-linux-x86_64-1.4.341.1.tar.xz && \
     mkdir -p /opt/vulkan-sdk && \
     mv 1.4.341.1 /opt/vulkan-sdk/ && \
-    rm -rf vulkansdk-linux-x86_64-1.4.341.1.tar.xz
+    rm -rf vulkansdk-linux-x86_64-1.4.341.1.tar.xz && \
+    echo "${VULKAN_SDK}/lib" > /etc/ld.so.conf.d/vulkan-sdk.conf && \
+    ldconfig
 
 # Install runtime libraries for test execution
 RUN apt-get update && apt-get install -y \
