@@ -399,7 +399,7 @@ public:
 
     char const* begin() const
     {
-        return representation ? representation->getData() + beginIndex : "";
+        return representation ? representation->getData() + beginIndex : getEmptyStringBuffer();
     }
 
     char const* end() const { return begin() + getLength(); }
