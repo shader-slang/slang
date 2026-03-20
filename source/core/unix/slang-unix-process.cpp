@@ -196,6 +196,11 @@ void UnixProcess::kill(int32_t returnValue)
         // We waited, lets just terminate with kill
         ::kill(m_pid, SIGKILL);
 
+        // Reap the child process to prevent zombie accumulation.
+        // SIGKILL cannot be caught, so waitpid will return promptly.
+        int childStatus = 0;
+        ::waitpid(m_pid, &childStatus, 0);
+
         // Set the return value
         m_returnValue = returnValue;
         // Mark as terminated

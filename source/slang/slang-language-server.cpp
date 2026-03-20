@@ -865,6 +865,35 @@ LanguageServerResult<LanguageServerProtocol::Hover> LanguageServerCore::hover(
                 }
             }
         }
+        else if (auto packQueryExpr = as<PackQueryExpr>(expr))
+        {
+            String queryName = "__trimLast";
+            if (as<FirstExpr>(packQueryExpr))
+                queryName = "__first";
+            else if (as<LastExpr>(packQueryExpr))
+                queryName = "__last";
+            else if (as<TrimFirstExpr>(packQueryExpr))
+                queryName = "__trimFirst";
+
+            sb << "```\n" << queryName << "(";
+            if (packQueryExpr->value && packQueryExpr->value->type)
+            {
+                ASTPrinter printer(version->linkage->getASTBuilder());
+                printer.addExpr(packQueryExpr->value);
+                sb << printer.getString();
+            }
+            sb << ")";
+            if (expr->type)
+            {
+                sb << " : ";
+                if (auto typeType = as<TypeType>(expr->type))
+                    typeType->getType()->toText(sb);
+                else
+                    expr->type.type->toText(sb);
+            }
+            sb << "\n```\n";
+            fillLoc(expr->loc);
+        }
         if (const auto higherOrderExpr = as<HigherOrderInvokeExpr>(expr))
         {
             String documentation;
@@ -906,6 +935,10 @@ LanguageServerResult<LanguageServerProtocol::Hover> LanguageServerCore::hover(
     else if (auto countOfExpr = as<CountOfExpr>(leafNode))
     {
         fillExprHoverInfo(countOfExpr);
+    }
+    else if (auto packQueryExpr = as<PackQueryExpr>(leafNode))
+    {
+        fillExprHoverInfo(packQueryExpr);
     }
     else if (auto swizzleExpr = as<SwizzleExpr>(leafNode))
     {

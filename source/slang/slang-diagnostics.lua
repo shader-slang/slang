@@ -1646,10 +1646,66 @@ err(
 )
 
 err(
+    "size-of-data-layout-is-invalid",
+    30086,
+    "invalid data layout for sizeof/alignof",
+    span { loc = "expr:Expr", message = "argument does not conform to IBufferDataLayout" }
+)
+
+err(
     "count-of-argument-is-invalid",
     30083,
     "invalid countof argument",
     span { loc = "expr:Expr", message = "argument to countof can only be a type pack or tuple" }
+)
+
+err(
+    "pack-query-argument-is-invalid",
+    30410,
+    "invalid ~queryName argument",
+    span { loc = "expr:Expr", message = "argument to ~queryName is invalid" }
+)
+
+err(
+    "empty-pack-query-is-invalid",
+    30411,
+    "cannot apply ~queryName to an empty pack",
+    span { loc = "expr:Expr", message = "~queryName requires a non-empty pack" }
+)
+
+err(
+    "pack-query-requires-non-empty-pack",
+    30412,
+    "cannot apply ~queryName to a pack that may be empty",
+    span { loc = "expr:Expr", message = "~queryName requires a non-empty pack; add a `where nonempty(...)` constraint or use a structurally non-empty pack" }
+)
+
+err(
+    "invalid-non-empty-pack-constraint-target",
+    30413,
+    "`nonempty(...)` requires a generic type pack or value pack parameter",
+    span { loc = "expr:Expr", message = "expected a direct reference to a generic pack parameter here" }
+)
+
+err(
+    "empty-pack-does-not-satisfy-non-empty-constraint",
+    30414,
+    "empty pack does not satisfy `nonempty(...)` constraint",
+    span { loc = "location", message = "pack argument here is empty" }
+)
+
+err(
+    "optional-non-empty-pack-constraint-is-invalid",
+    30415,
+    "`optional nonempty(...)` is not meaningful",
+    span { loc = "expr:Expr", message = "remove `optional` from this `nonempty(...)` constraint" }
+)
+
+err(
+    "non-empty-pack-constraint-target-must-be-from-current-generic",
+    30416,
+    "`nonempty(...)` target must be a generic pack parameter declared in the current generic",
+    span { loc = "expr:Expr", message = "this pack parameter is declared outside the current generic" }
 )
 
 -- Float bit cast diagnostics
@@ -1797,6 +1853,13 @@ err(
     30117,
     "forward reference in generic constraint",
     span { loc = "expr:Expr", message = "generic constraint for parameter '~param:Type' references type parameter '~referenced:Decl' before it is declared" }
+)
+
+err(
+    "cannot-mix-differentiable-value-and-ptr-outputs",
+    30118,
+    "cannot mix differentiable value types with differentiable pointer outputs",
+    span { loc = "location", message = "function has both IDifferentiable value types and IDifferentiablePtrType outputs, which is not currently supported. Please split the function so that differentiable value parameters and pointer differentiable outputs are in separate functions." }
 )
 
 
@@ -2422,6 +2485,20 @@ err(
     span { loc = "decl:Decl", message = "cannot export incomplete type '~decl'" }
 )
 
+warning(
+    "deprecated-bracket-attributes-placement",
+    31204,
+    "deprecated bracketed attribute list placement. Bracketed attributes should be placed before 'struct'.",
+    span { loc = "location", message = "deprecated placement of bracketed attributes list." }
+)
+
+err(
+    "invalid-bracket-attributes-placement",
+    31205,
+    "invalid bracketed attribute list placement. Bracketed attributes must be placed before 'struct'.",
+    span { loc = "location", message = "invalid placement of bracketed attributes list." }
+)
+
 err(
     "memory-qualifier-not-allowed-on-a-non-image-type-parameter",
     31206,
@@ -2749,6 +2826,20 @@ err(
     39999,
     "the initial-value expression for variable '~decl' depends on the value of the variable itself",
     span { loc = "decl:Decl", message = "the initial-value expression for variable '~decl' depends on the value of the variable itself" }
+)
+
+err(
+    "generic-evaluation-recursion-limit-exceeded",
+    39998,
+    "recursive generic evaluation exceeded maximum depth",
+    span { loc = "decl:Decl", message = "evaluation of '~decl' exceeded the recursive generic evaluation budget (~budget:int)" }
+)
+
+fatal(
+    "maximum-type-nesting-level-exceeded",
+    39997,
+    "maximum type nesting level exceeded",
+    span { loc = "location", message = "maximum type nesting level exceeded" }
 )
 
 fatal(
@@ -4102,6 +4193,13 @@ err(
     span { loc = "location", message = "cannot default-initialize struct '~structName' with '{}' because it contains resource fields" }
 )
 
+err(
+    "accessing-value-of-none-optional",
+    41027,
+    "accessing .value on an Optional that is always none",
+    span { loc = "location", message = "accessing .value on an Optional<~type:IRInst> that is always 'none'" }
+)
+
 
 -- Load semantic checking diagnostics (part 13) - AnyValue, Autodiff, Static assertions, Atomics, etc.
 -- (inlined from slang-diagnostics-semantic-checking-13.lua)
@@ -4468,6 +4566,20 @@ err(
     55205,
     "specialization constants not supported for numthreads",
     span { loc = "location", message = "Specialization constants are not supported in the 'numthreads' attribute for the current target." }
+)
+
+fatal(
+    "generic-specialization-recursion-cycle",
+    55206,
+    "recursive generic specialization detected",
+    span { loc = "location", message = "generic specialization for '~generic:IRInst' recursively re-entered the same specialization key." }
+)
+
+fatal(
+    "generic-specialization-budget-exceeded",
+    55207,
+    "generic specialization exceeded maximum depth",
+    span { loc = "location", message = "generic specialization for '~generic:IRInst' exceeded the recursive specialization budget (~budget:int)." }
 )
 
 err(

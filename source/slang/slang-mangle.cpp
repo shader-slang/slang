@@ -287,6 +287,33 @@ void emitType(ManglingContext* context, Type* type)
         emitRaw(context, "Tx");
         emitType(context, expandType->getPatternType());
     }
+    else if (auto packBranchType = as<PackBranchType>(type))
+    {
+        emitRaw(context, "Tb");
+        emitVal(context, packBranchType->getPackOperand());
+        emitType(context, packBranchType->getEmptyType());
+        emitType(context, packBranchType->getNonEmptyType());
+    }
+    else if (auto firstType = as<FirstPackElementType>(type))
+    {
+        emitRaw(context, "Tf");
+        emitType(context, firstType->getBasePack());
+    }
+    else if (auto lastType = as<LastPackElementType>(type))
+    {
+        emitRaw(context, "Tl");
+        emitType(context, lastType->getBasePack());
+    }
+    else if (auto trimFirstType = as<TrimFirstTypePack>(type))
+    {
+        emitRaw(context, "Th");
+        emitType(context, trimFirstType->getBasePack());
+    }
+    else if (auto trimLastType = as<TrimLastTypePack>(type))
+    {
+        emitRaw(context, "Tt");
+        emitType(context, trimLastType->getBasePack());
+    }
     else if (auto eachType = as<EachType>(type))
     {
         emitRaw(context, "Te");
@@ -380,6 +407,16 @@ void emitVal(ManglingContext* context, Val* val)
         emitRaw(context, "KCO");
         emitVal(context, countOfIntVal->getValArg());
     }
+    else if (auto firstIntVal = as<FirstIntVal>(val))
+    {
+        emitRaw(context, "KPF");
+        emitVal(context, firstIntVal->getBasePack());
+    }
+    else if (auto lastIntVal = as<LastIntVal>(val))
+    {
+        emitRaw(context, "KPL");
+        emitVal(context, lastIntVal->getBasePack());
+    }
     else if (const auto polynomialIntVal = dynamicCast<PolynomialIntVal>(val))
     {
         emitRaw(context, "KX");
@@ -425,6 +462,16 @@ void emitVal(ManglingContext* context, Val* val)
         emit(context, expandIntValPack->getCapturedPackCount());
         for (Index i = 0; i < expandIntValPack->getCapturedPackCount(); i++)
             emitVal(context, expandIntValPack->getCapturedPack(i));
+    }
+    else if (auto trimFirstIntValPack = as<TrimFirstIntValPack>(val))
+    {
+        emitRaw(context, "Vh");
+        emitVal(context, trimFirstIntValPack->getBasePack());
+    }
+    else if (auto trimLastIntValPack = as<TrimLastIntValPack>(val))
+    {
+        emitRaw(context, "Vt");
+        emitVal(context, trimLastIntValPack->getBasePack());
     }
     else
     {

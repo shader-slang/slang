@@ -486,9 +486,7 @@ bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
                     // Otherwise, the generic decl had better provide a default value
                     // or this reference is ill-formed.
                     ensureDecl(valParamRef, DeclCheckState::DefinitionChecked);
-                    ConstantFoldingCircularityInfo newCircularityInfo(
-                        valParamRef.getDecl(),
-                        nullptr);
+                    ConstantFoldingCircularityInfo newCircularityInfo(valParamRef, nullptr);
                     auto defaultVal = tryConstantFoldExpr(
                         valParamRef.substitute(m_astBuilder, valParamRef.getDecl()->initExpr),
                         ConstantFoldingKind::CompileTime,
@@ -1148,6 +1146,51 @@ bool SemanticsVisitor::TryCheckOverloadCandidateConstraints(
                     newArgs,
                     context.mode != OverloadResolveContext::Mode::JustTrying))
                 return false;
+        }
+        else if (auto nonEmptyConstraintDecl = as<NonEmptyPackConstraintDecl>(constraintDecl))
+        {
+            Decl* constrainedPackDecl = nullptr;
+            if (auto declRefExpr = as<DeclRefExpr>(nonEmptyConstraintDecl->packExpr))
+            {
+                constrainedPackDecl = getDeclRef(m_astBuilder, declRefExpr).getDecl();
+            }
+
+            Val* constrainedArg = nullptr;
+            if (auto typePackDecl = as<GenericTypePackParamDecl>(constrainedPackDecl))
+            {
+                if (typePackDecl->parameterIndex < newArgs.getCount())
+                    constrainedArg = newArgs[typePackDecl->parameterIndex];
+            }
+            else if (auto valuePackDecl = as<GenericValuePackParamDecl>(constrainedPackDecl))
+            {
+                if (valuePackDecl->parameterIndex < newArgs.getCount())
+                    constrainedArg = newArgs[valuePackDecl->parameterIndex];
+            }
+
+            auto packCardinality = constrainedArg ? getPackCardinality(constrainedArg)
+                                                  : VariadicPackCardinality::Unknown;
+            if (packCardinality != VariadicPackCardinality::NonEmpty)
+            {
+                if (context.mode != OverloadResolveContext::Mode::JustTrying)
+                {
+                    if (packCardinality == VariadicPackCardinality::Empty)
+                    {
+                        getSink()->diagnose(Diagnostics::EmptyPackDoesNotSatisfyNonEmptyConstraint{
+                            .location = context.loc});
+                    }
+                    else
+                    {
+                        auto diagExpr =
+                            context.originalExpr ? context.originalExpr : context.baseExpr;
+                        getSink()->diagnose(Diagnostics::PackQueryRequiresNonEmptyPack{
+                            .queryName = "nonempty(...)",
+                            .expr = diagExpr});
+                    }
+                }
+                return false;
+            }
+
+            newArgs.add(m_astBuilder->getNonEmptyPackWitness(constrainedArg));
         }
     }
 
@@ -2958,14 +3001,9 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
     // treat it as a ctor call with {1,2,3} as the first argument.
     //
     bool typeOverloadChecked = false;
-
-    DiagnosticSink collectedErrorsSink(getSourceManager(), nullptr);
-    if (auto parentSink = getSink())
-    {
-        collectedErrorsSink.setFlags(parentSink->getFlags());
-        collectedErrorsSink.setDiagnosticColorMode(parentSink->getDiagnosticColorMode());
-        collectedErrorsSink.setEnableUnicode(parentSink->getEnableUnicode());
-    }
+    // Use a temporary sink to hold errors from coercion, and flush them to the real sink
+    // if we know the site is meant to be an explicit ctor call or coercion.
+    DiagnosticSink collectedErrorsSink(getSourceManager(), nullptr, getSink());
     if (expr->arguments.getCount() == 1 && !as<ExplicitCtorInvokeExpr>(expr) &&
         !as<InitializerListExpr>(expr->arguments[0]))
     {
@@ -2975,6 +3013,7 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
             {
                 Expr* resultExpr = nullptr;
                 ConversionCost conversionCost = kConversionCost_None;
+
                 auto coerceResult = SemanticsVisitor(withSink(&collectedErrorsSink))
                                         ._coerce(
                                             CoercionSite::ExplicitCoercion,

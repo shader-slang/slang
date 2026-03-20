@@ -30,7 +30,6 @@ int test()
 	//
 	return util<Stuff>()
 //diag:      ^^^^^ ambiguous reference to 'Stuff'
-//diag:      ^^^^^ ambiguous reference to 'Stuff'
 
 	// Adding an extra call to also test the
 	// case of trying to speicalize something

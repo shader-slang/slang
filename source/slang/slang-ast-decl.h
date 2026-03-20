@@ -958,6 +958,14 @@ class TypeCoercionConstraintDecl : public Decl
 };
 
 FIDDLE()
+class NonEmptyPackConstraintDecl : public Decl
+{
+    FIDDLE(...)
+    SourceLoc whereTokenLoc = SourceLoc();
+    FIDDLE() Expr* packExpr = nullptr;
+};
+
+FIDDLE()
 class GenericValueParamDecl : public VarDeclBase
 {
     FIDDLE(...)

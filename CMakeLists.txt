@@ -128,6 +128,16 @@ option(SLANG_ENABLE_DXIL "Enable generating DXIL with DXC" ON)
 option(SLANG_ENABLE_FULL_IR_VALIDATION "Enable full IR validation (SLOW!)")
 option(SLANG_ENABLE_IR_BREAK_ALLOC "Enable _debugUID on IR allocation")
 option(
+    SLANG_IGNORE_ABORT_MSG
+    "Ignore the system modal assert dialog while running build tools to help LLM workflow."
+    OFF
+)
+if(SLANG_IGNORE_ABORT_MSG)
+    set(slang_ignore_abort_msg_arg -ignore-abort-msg)
+else()
+    set(slang_ignore_abort_msg_arg)
+endif()
+option(
     SLANG_ENABLE_ASAN
     "Enable AddressSanitizer (ASan), and UndefinedBehaviorSanitizer (UBSan) if available as well"
 )
@@ -288,6 +298,11 @@ advanced_option(
 advanced_option(
     SLANG_OVERRIDE_MIMALLOC_PATH
     "Build using user defined path for mimalloc"
+    OFF
+)
+advanced_option(
+    SLANG_OVERRIDE_CMARK_PATH
+    "Build using user defined path for cmark"
     OFF
 )
 

@@ -653,6 +653,16 @@ public:
 
     Type* getExpandType(Type* pattern, ArrayView<Val*> capturedPacks);
 
+    Type* getPackBranchType(Val* packOperand, Type* emptyType, Type* nonEmptyType);
+
+    Type* getFirstElement(Type* basePack);
+
+    Type* getLastElement(Type* basePack);
+
+    Type* getTrimFirstPack(Type* basePack);
+
+    Type* getTrimLastPack(Type* basePack);
+
     ConcreteTypePack* getTypePack(ArrayView<Type*> types);
 
     ConcreteIntValPack* getIntValPack(ArrayView<IntVal*> vals);
@@ -660,6 +670,16 @@ public:
     IntVal* getEachIntVal(Type* elementType, Val* basePack);
 
     Val* getExpandIntValPack(Val* patternVal, ArrayView<Val*> capturedPacks);
+
+    Val* getFirstElement(Val* basePack);
+
+    Val* getLastElement(Val* basePack);
+
+    Val* getTrimFirstPack(Val* basePack);
+
+    Val* getTrimLastPack(Val* basePack);
+
+    NonEmptyPackWitness* getNonEmptyPackWitness(Val* pack);
 
     /// Produce a witness that `T : T` for any type `T`
     TypeEqualityWitness* getTypeEqualityWitness(Type* type);
@@ -683,6 +703,33 @@ public:
         Type* subType,
         Type* superType,
         SubtypeWitness* patternWitness);
+
+    SubtypeWitness* getFirstSubtypeWitness(
+        Type* subType,
+        Type* superType,
+        SubtypeWitness* patternWitness);
+
+    SubtypeWitness* getLastSubtypeWitness(
+        Type* subType,
+        Type* superType,
+        SubtypeWitness* patternWitness);
+
+    SubtypeWitness* getTrimFirstSubtypeWitness(
+        Type* subType,
+        Type* superType,
+        SubtypeWitness* patternWitness);
+
+    SubtypeWitness* getTrimLastSubtypeWitness(
+        Type* subType,
+        Type* superType,
+        SubtypeWitness* patternWitness);
+
+    SubtypeWitness* getPackBranchSubtypeWitness(
+        Type* subType,
+        Type* superType,
+        Val* packOperand,
+        SubtypeWitness* emptyWitness,
+        SubtypeWitness* nonEmptyWitness);
 
     /// Produce a witness that `A <: C` given witnesses that `A <: B` and `B <: C`
     SubtypeWitness* getTransitiveSubtypeWitness(

@@ -74,7 +74,9 @@ Generic parameters declaration:
 >
 > *`generic-param-decl`* =<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;*`generic-value-param-decl`* |<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;*`generic-value-param-pack-decl`* |<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;*`generic-value-param-trad-decl`* |<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;*`generic-value-param-pack-trad-decl`* |<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;*`generic-type-param-decl`* |<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;*`generic-type-param-pack-decl`*
 >
@@ -83,10 +85,18 @@ Generic parameters declaration:
 > &nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** *`simple-type-spec`*]<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;[**`'='`** *`init-expr`*]<br>
 >
+> *`generic-value-param-pack-decl`* =<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;**`'let'`** **`'each'`** *`identifier`*<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;[**`':'`** *`simple-type-spec`*]<br>
+>
 > *`generic-value-param-trad-decl`* =<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;*`simple-type-spec`* <br>
 > &nbsp;&nbsp;&nbsp;&nbsp;*`identifier`*<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;[**`'='`** *`init-expr`*]<br>
+>
+> *`generic-value-param-pack-trad-decl`* =<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;**`'each'`** *`simple-type-spec`*<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;*`identifier`*<br>
 >
 > *`generic-type-param-decl`* =<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;[**`'typename'`**] *`identifier`*<br>
@@ -101,10 +111,17 @@ Generic parameters declaration:
 Generic parameter constraint clause:
 > *`where-clause`* =<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;[**`'optional'`**]<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;*`simple-type-spec`*<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;(*`generic-type-constraint-decl`*<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;*`where-clause-body`*<br>
+>
+> *`where-clause-body`* =<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;*`generic-non-empty-pack-constraint-decl`*<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|(*`simple-type-spec`*<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(*`generic-type-constraint-decl`*<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|*`generic-type-constraint-eq-decl`*<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|*`generic-type-constraint-coercion-decl`*)<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|*`generic-type-constraint-coercion-decl`*))<br>
+>
+> *`generic-non-empty-pack-constraint-decl`* =<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;**`'nonempty'`** **`'('`** *`identifier`* **`')'`**<br>
 >
 > *`generic-type-constraint-decl`* =<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;**`':'`**<br>
@@ -129,10 +146,13 @@ Generic parameter constraint clause:
 - *`generic-params-decl`* declares a list of generic parameters.
 - *`generic-param-decl`* declares a generic value parameter, type parameter, or type parameter pack.
 - *`generic-value-param-decl`* declares a generic value parameter.
+- *`generic-value-param-pack-decl`* declares a generic value parameter pack using `let each` syntax.
 - *`generic-value-param-trad-decl`* declares a generic value parameter using traditional syntax.
+- *`generic-value-param-pack-trad-decl`* declares a generic value parameter pack using traditional syntax.
 - *`generic-type-param-decl`* declares a generic type parameter.
 - *`generic-type-param-pack-decl`* declares a generic type parameter pack.
 - *`where-clause`* is a generic parameter constraint clause.
+- *`generic-non-empty-pack-constraint-decl`* declares a non-emptiness requirement on a generic type pack or value pack parameter.
 - *`generic-type-constraint-decl`* declares a generic type conformance constraint, requiring the left-hand-side
   type expression to conform to one or more constraining type expressions.
 - *`generic-type-constraint-eq-decl`* declares a generic type equality constraint, requiring the left-hand-side
@@ -161,6 +181,9 @@ A generic parameter declaration is one of:
 - Generic value parameter declaration *`generic-value-param-decl`* or *`generic-value-param-trad-decl`*, which
   adds a value parameter with an optional default value. The value type must be a [Boolean](types-fundamental.md#boolean),
   an [integer](types-fundamental.md#integer), or an [enumeration (TODO)](TODO.md).
+- Generic value parameter pack declaration *`generic-value-param-pack-decl`* or *`generic-value-param-pack-trad-decl`*,
+  which adds a variadic value parameter pack. A value parameter pack is a variable-length list of generic
+  value parameters of a single declared type.
 - Generic type parameter declaration *`generic-type-param-decl`*, which adds a type parameter with an optional
   type constraint and an optional default type. The keyword `typename` is optional.
 - Generic type parameter pack declaration *`generic-type-param-pack-decl`*, which adds a type parameter
@@ -189,7 +212,10 @@ The coercion requirement is usable only in generic extensions.
 
 A constraint on a type parameter pack applies to every type in the pack.
 
-Value parameters cannot be constrained.
+Type and value parameter packs may also be constrained with `where nonempty(P)`, which requires the pack `P`
+to be non-empty at specialization time.
+
+Value parameters that are not packs cannot be constrained.
 
 > 📝 **Remark 1:** In Slang, a conformance requirement `TypeParam : ConstrainingType` means that `TypeParam` must
 > have `ConstrainingType` as a base (either directly or transitively), and `ConstrainingType` must be an interface.
@@ -239,6 +265,44 @@ expr  // every each-expr is substituted by pack element N-1
 
 In function parameter lists, expand/each constructs must come after all other parameters. There may be
 multiple declared expand/each parameters, in which case the type parameter packs must have equal lengths.
+
+### Pack queries
+
+Slang provides the following pack-query operations for type packs, value packs, and tuple-like pack sources:
+
+> *`pack-query-expr`* =<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;*`pack-first-expr`* | *`pack-last-expr`* | *`pack-trim-head-expr`* | *`pack-trim-tail-expr`*<br>
+>
+> *`pack-first-expr`* =<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;**`'__first'`** **`'('`** *`expr`* **`')'`**<br>
+>
+> *`pack-last-expr`* =<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;**`'__last'`** **`'('`** *`expr`* **`')'`**<br>
+>
+> *`pack-trim-first-expr`* =<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;**`'__trimFirst'`** **`'('`** *`expr`* **`')'`**<br>
+>
+> *`pack-trim-last-expr`* =<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;**`'__trimLast'`** **`'('`** *`expr`* **`')'`**<br>
+
+- `__first(P)`
+- `__last(P)`
+- `__trimFirst(P)`
+- `__trimLast(P)`
+
+`__first(P)` and `__last(P)` are partial operations and require `P` to be known non-empty. For generic pack parameters, non-emptiness can be expressed with:
+
+```hlsl
+void foo<each T>() where nonempty(T)
+{
+    // `__first(T)` is well-formed here.
+}
+```
+
+`__trimFirst(P)` and `__trimLast(P)` are total operations and yield an empty pack when applied to an empty pack.
+
+> 📝 **Remark:** The operand of `nonempty(...)` must be a direct reference to a generic type pack or value pack
+> parameter declared in the current generic declaration. `optional nonempty(...)` is parsed but rejected as invalid.
 
 
 ## Type Checking

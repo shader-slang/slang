@@ -61,7 +61,9 @@ jobs:
         shell: bash
         run: |
           # Add LLVM APT repository
-          wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
+          curl -fsSL --retry 3 --retry-delay 5 -o /tmp/llvm-snapshot.gpg.key https://apt.llvm.org/llvm-snapshot.gpg.key
+          sudo apt-key add /tmp/llvm-snapshot.gpg.key
+          rm /tmp/llvm-snapshot.gpg.key
           sudo add-apt-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-18 main"
           sudo apt-get update
 
@@ -195,8 +197,10 @@ jobs:
             test_args+=("-server-count" "${{ inputs.server-count }}")
           fi
 
-          # Run coverage with standard CI options
-          ./tools/coverage/run-coverage.sh "${test_args[@]}"
+          # --with-synthesis runs a second pass with -only-synthesized to
+          # exercise backend emit paths without a GPU. The main pass is strict
+          # (test failures are reported); the synthesis pass is tolerant.
+          ./tools/coverage/run-coverage.sh --with-synthesis "${test_args[@]}"
 
       - name: Generate Coverage Summary
         id: coverage-summary
