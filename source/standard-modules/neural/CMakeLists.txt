@@ -56,7 +56,9 @@ endif()
 # Build neural.slang-module and output to the output directory
 add_custom_command(
     OUTPUT ${neural_module_file}
-    COMMAND ${SLANG_COMPILER} ${NEURAL_MODULE_DEFINES} neural.slang -o ${SLANG_NEURAL_MODULE_FILE_NAME}
+    COMMAND
+        ${SLANG_COMPILER} ${NEURAL_MODULE_DEFINES} neural.slang -o
+        ${SLANG_NEURAL_MODULE_FILE_NAME} ${slang_ignore_abort_msg_arg}
     DEPENDS ${neural_copied_files} ${SLANG_COMPILER_DEPENDENCY}
     WORKING_DIRECTORY ${neural_output_dir}
     VERBATIM
