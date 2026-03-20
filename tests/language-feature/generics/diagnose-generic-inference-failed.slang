@@ -2,7 +2,8 @@
 
 // When generic argument inference fails because the call arguments
 // don't match any viable specialization, error 39999 is emitted.
-// The error is emitted twice (initial check + re-check phase).
+// The message appears twice: once for the error and once for the
+// rich diagnostics span annotation.
 
 struct Wrapper<T>
 {
