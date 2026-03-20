@@ -6,15 +6,19 @@
 
 // Defensive null guard for Val operand accessors (getValArg, getBasePack, etc.).
 // These should not be null in well-formed AST, but can be transiently null during
-// variadic pack resolution. Assert in debug to catch upstream bugs, return `this`
-// in release to avoid crashes. See #10561.
-#define SLANG_NULL_OPERAND_GUARD(operand)                                    \
-    do                                                                       \
-    {                                                                        \
-        SLANG_ASSERT(operand && "unexpected null Val operand — see #10561"); \
-        if (!(operand))                                                      \
-            return this;                                                     \
+// variadic pack resolution. Fires the assert handler to catch upstream bugs, then
+// returns `this` as a safe fallback to avoid crashes. See #10561.
+// Note: operand is evaluated twice; all call sites use trivial inline getters.
+#define SLANG_NULL_OPERAND_GUARD(operand)                                      \
+    do                                                                         \
+    {                                                                          \
+        if (!(operand))                                                        \
+        {                                                                      \
+            SLANG_ASSERT_FAILURE("unexpected null Val operand -- see #10561"); \
+            return this;                                                       \
+        }                                                                      \
     } while (0)
+
 #include "slang-ast-dispatch.h"
 #include "slang-ast-natural-layout.h"
 #include "slang-check-impl.h"
