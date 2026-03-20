@@ -3780,15 +3780,6 @@ int __naturalStrideOf()
     return __naturalStrideOf_impl(__declVal<T>());
 }
 
-__intrinsic_op($(kIROp_AlignOf))
-int __alignOf_intrinsic_impl<T>(T t);
-
-[ForceInline]
-int __alignOf_intrinsic<T>()
-{
-    return __alignOf_intrinsic_impl<T>(__default<T>());
-}
-
 [__unsafeForceInlineEarly]
 int32_t __elemToByteOffset<T>(int32_t elemOffset)
 {
