@@ -419,6 +419,12 @@ struct GLSLBaseLayoutRulesImpl : DefaultLayoutRulesImpl
         size_t elementCount) override
     {
         SLANG_UNUSED(elementType);
+        if (elementInfo.kind != LayoutResourceKind::Uniform)
+        {
+            auto arrayInfo = GetArrayLayout(elementInfo, LayoutSize(elementCount));
+            return SimpleLayoutInfo(arrayInfo.kind, arrayInfo.size, arrayInfo.alignment);
+        }
+
         // The `std140` and `std430` rules require vectors to be aligned to the next power of
         // two up from their size (so a `float2` is 8-byte aligned, and a `float3` is
         // 16-byte aligned).
@@ -4439,6 +4445,8 @@ static TypeLayoutResult _createTypeLayout(
     Decl* declForModifiers)
 {
     TypeLayoutContext subContext = context;
+    if (!subContext.layoutDeclForDiagnostics)
+        subContext.layoutDeclForDiagnostics = declForModifiers;
 
     if (declForModifiers)
     {
@@ -5257,6 +5265,27 @@ static TypeLayoutResult _updateLayout(
 
 static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type)
 {
+    if (context.recursionDepth >= kMaxTypeNestingDepth)
+    {
+        if (context.sink)
+        {
+            Diagnostics::MaximumTypeNestingLevelExceeded diag = {};
+            diag.location =
+                context.layoutDeclForDiagnostics
+                    ? _getTypeNestingDiagnosticPosForDecl(context.layoutDeclForDiagnostics)
+                    : SourceLoc();
+            context.sink->diagnose(diag);
+        }
+        // Return a layout with unknown size, if we run out of recursion depth.
+        ObjectLayoutInfo info;
+        info.layoutInfos.add(
+            SimpleLayoutInfo(UniformLayoutInfo(LayoutSize::invalid(), LayoutOffset(1))));
+        return createSimpleTypeLayout(info, type, context.rules);
+    }
+
+    context.recursionDepth++;
+    SLANG_DEFER(context.recursionDepth--);
+
     if (auto layoutResultPtr = context.layoutMap.tryGetValue(type))
     {
         return *layoutResultPtr;
@@ -5396,14 +5425,14 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
             type,
             rules);
     }
-    else if (auto fp8Type = as<Fp8Type>(type))
+    else if (as<Fp8Type>(type))
     {
         return createSimpleTypeLayout(
             rules->GetScalarLayout(BaseType::UInt8, context),
             type,
             rules);
     }
-    else if (auto bf168Type = as<BFloat16Type>(type))
+    else if (as<BFloat16Type>(type))
     {
         return createSimpleTypeLayout(
             rules->GetScalarLayout(BaseType::UInt16, context),
@@ -5426,9 +5455,9 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
 
         // Handle conditionally-sized vectors (e.g., 0-length vectors or non-constant sizes)
         auto elementCountVal = context.tryResolveLinkTimeVal(vecType->getElementCount());
-        if (!as<ConstantIntVal>(elementCountVal))
+        if (!as<ConstantIntVal>(elementCountVal) || getIntVal(elementCountVal) == 0)
         {
-            // If the vector size is not a compile-time constant, fall back to default layout
+            // Fall back to default layout
             auto element = _createTypeLayout(context, elementType);
             RefPtr<TypeLayout> typeLayout = new TypeLayout();
             typeLayout->type = type;
@@ -6147,7 +6176,7 @@ RefPtr<TypeLayout> getSimpleVaryingParameterTypeLayout(
 
         // Handle conditionally-sized vectors (e.g., 0-length vectors or non-constant sizes)
         auto elementCountVal = context.tryResolveLinkTimeVal(vecType->getElementCount());
-        if (!as<ConstantIntVal>(elementCountVal))
+        if (!as<ConstantIntVal>(elementCountVal) || getIntVal(elementCountVal) == 0)
         {
             // If the vector size is not a compile-time constant, we cannot
             // compute a fixed layout for it. Treat it as having zero size.

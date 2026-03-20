@@ -31,7 +31,7 @@ on:
         type: number
         default: 8
       save-sccache:
-        description: "Save sccache to GitHub Actions cache (for populate-fork-cache on master)"
+        description: "Save sccache to GitHub Actions cache (for populate-sccache on master)"
         required: false
         type: boolean
         default: false
@@ -52,6 +52,15 @@ jobs:
         shell: bash
 
     steps:
+      # Ensure Git Bash tools (gzip, tar) are in PATH for Windows
+      # Needed by actions/cache before common-setup adds them
+      - name: Add Git Bash to PATH (Windows)
+        if: inputs.os == 'windows'
+        shell: pwsh
+        run: |
+          Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\bin"
+          Add-Content -Path $env:GITHUB_PATH -Value "C:\\Program Files\\Git\\usr\\bin"
+
       - uses: actions/checkout@v4
         with:
           submodules: "recursive"
@@ -65,7 +74,6 @@ jobs:
           key: sccache-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ inputs.config }}-${{ github.sha }}
           restore-keys: |
             sccache-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-${{ inputs.config }}-
-            sccache-${{ inputs.os }}-${{ inputs.compiler }}-${{ inputs.platform }}-
 
       # Authenticate to Google Cloud for LLVM downloads (skip for fork PRs)
       - name: Authenticate to Google Cloud
@@ -75,7 +83,7 @@ jobs:
           workload_identity_provider: "projects/125098404903/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider"
           service_account: "github-ci@slang-runners.iam.gserviceaccount.com"
 
-      # Setup sccache with local disk backend
+      # Setup sccache
       - name: Setup sccache
         uses: ./.github/actions/setup-sccache
         with:
@@ -284,7 +292,7 @@ jobs:
           path: artifacts-staging/
           retention-days: 1
 
-      # Save sccache cache (only when explicitly requested, e.g. from populate-fork-cache on master)
+      # Save sccache cache (only when explicitly requested, e.g. from populate-sccache on master)
       - name: Save sccache cache
         if: inputs.save-sccache && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
         uses: actions/cache/save@v4

@@ -9,6 +9,7 @@
 #include "slang-ir-lower-buffer-element-type.h"
 #include "slang-ir-util.h"
 #include "slang-llvm/slang-llvm-builder.h"
+#include "slang-rich-diagnostics.h"
 
 using namespace slang;
 
@@ -204,7 +205,7 @@ public:
             return builder->getPointerSizeInBits();
 
         default:
-            SLANG_ASSERT_FAILURE("Unexpected type in getTypeBits!");
+            SLANG_UNIMPLEMENTED_X("Unexpected type in getTypeBits!");
         }
     }
 
@@ -780,11 +781,9 @@ struct LLVMEmitter
         ISlangSharedLibrary* library = codeGenContext->getSession()->getOrLoadSlangLLVM();
         if (!library)
         {
-            codeGenContext->getSink()->diagnose(
-                SourceLoc(),
-                Diagnostics::unableToGenerateCodeForTarget,
-                TypeTextUtil::getCompileTargetName(
-                    SlangCompileTarget(codeGenContext->getTargetFormat())));
+            codeGenContext->getSink()->diagnose(Diagnostics::UnableToGenerateCodeForTarget{
+                .target = TypeTextUtil::getCompileTargetName(
+                    SlangCompileTarget(codeGenContext->getTargetFormat()))});
             return SLANG_FAIL;
         }
 
@@ -1547,7 +1546,7 @@ struct LLVMEmitter
 
     static LLVMInst* _defaultOnReturnHandler(IRReturn*)
     {
-        SLANG_ASSERT_FAILURE("Unexpected terminator in global scope!");
+        SLANG_UNIMPLEMENTED_X("Unexpected terminator in global scope!");
     }
 
     // Caution! This is only for emitting things which are considered
@@ -2358,10 +2357,9 @@ struct LLVMEmitter
                     // slang-rt or in core module. Ideally, if built-in hashing
                     // support in the core module becomes a thing, that can be
                     // used for this too.
-                    getSink()->diagnose(
-                        inst,
-                        Diagnostics::unimplemented,
-                        "unexpected string hash for non-literal string");
+                    getSink()->diagnose(Diagnostics::Unimplemented{
+                        .feature = "unexpected string hash for non-literal string",
+                        .location = inst->sourceLoc});
                 }
             }
             break;

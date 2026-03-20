@@ -27,6 +27,7 @@
 #include "slang-ir-validate.h"
 #include "slang-ir.h"
 #include "slang-legalize-types.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -760,10 +761,12 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                         if (addressSpace == AddressSpace::Generic)
                             addressSpace = argPtrType->getAddressSpace();
                         else if (addressSpace != argPtrType->getAddressSpace())
+                        {
                             m_sharedContext->m_sink->diagnose(
-                                inst,
-                                Diagnostics::inconsistentPointerAddressSpace,
-                                inst);
+                                Diagnostics::InconsistentPointerAddressSpace{
+                                    .inst = inst,
+                                    .location = inst->sourceLoc});
+                        }
                     }
                 }
             }
@@ -1777,7 +1780,19 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
     {
         bool isLegalGlobalInstForTarget(IRInst* inst) override
         {
-            return as<IRSPIRVAsmOperand>(inst);
+            switch (inst->getOp())
+            {
+            case kIROp_MakeStruct:
+            case kIROp_MakeArray:
+            case kIROp_MakeArrayFromElement:
+            case kIROp_MakeVector:
+            case kIROp_MakeMatrix:
+            case kIROp_MakeMatrixFromScalar:
+            case kIROp_MakeVectorFromScalar:
+                return true;
+            default:
+                return as<IRSPIRVAsmOperand>(inst);
+            };
         }
 
         bool isInlinableGlobalInstForTarget(IRInst* inst) override
@@ -2169,7 +2184,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         {
             // Direct SPIRV backend does not support generating SPIRV before 1.3,
             // we will issue an error message here.
-            m_sharedContext->m_sink->diagnose(SourceLoc(), Diagnostics::spirvVersionNotSupported);
+            m_sharedContext->m_sink->diagnose(Diagnostics::SpirvVersionNotSupported{});
         }
     }
 
@@ -2626,7 +2641,9 @@ SpvSnippet* SPIRVEmitSharedContext::getParsedSpvSnippet(IRTargetIntrinsicDecorat
     snippet = SpvSnippet::parse(*m_grammarInfo, intrinsic->getDefinition());
     if (!snippet)
     {
-        m_sink->diagnose(intrinsic, Diagnostics::snippetParsingFailed, intrinsic->getDefinition());
+        m_sink->diagnose(Diagnostics::SnippetParsingFailed{
+            .snippet = intrinsic->getDefinition(),
+            .location = intrinsic->sourceLoc});
         return nullptr;
     }
     m_parsedSpvSnippets[intrinsic] = snippet;

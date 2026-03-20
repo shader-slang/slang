@@ -41,10 +41,11 @@ implementing scene;
 The files being included into a module must start with `implementing <module-name>` declaration.
 
 Note that the `__include` syntax here has a different meaning than the preprocessor `#include`. `__include` has the following semantics:
-1. The preprocessor state at which a file inclusion does not apply to the file being included, and the preprocessor state after parsing the included file will not be visible to the outer "includer" file. For example, `#define`s before a `__include` is not visible to the included file, and `#define`s in the included file is not visible to the file that includes it.
+
+1. The preprocessor state does not propagate to the file being included. Similarly, the preprocessor state after parsing the included file will not be visible to the outer "includer" file. For example, `#define`s before a `__include` are not visible to the included file, and `#define`s in the included file are not visible to the file that includes it.
 2. A file will be included into the current module exactly once, no matter how many times a `__include` of that file is encountered.
 3. Circular `__include`s are allowed, given (2).
-4. All files that become part of a module via `__include` can access all other entities defined in the same module, regardless the order of `__include`s.
+4. All files that become part of a module via `__include` can access all other entities defined in the same module, regardless of the order of `__include`s.
 
 This means that the following code is valid:
 
@@ -76,7 +77,7 @@ __include "c.slang"; // Pulls in file c, specifying the full file name.
 void test() { f_a(); f_b(); f_c(); }
 ```
 
-Note that both `module`, `implementing` and `__include` support two flavors of syntax to refer to a module or a file: either via 
+Note that `module`, `implementing`, and `__include` all support two flavors of syntax to refer to a module or a file: either via
 normal identifier tokens or via string literals. For example, the following flavors are equivalent and will resolve to the same file:
 ```
 __include dir.file_name; // `file_name` is translated to "file-name".
@@ -88,10 +89,10 @@ Also note that a file is considered a part of a module only if the file can be d
 via transitive `__include`s from the primary module file. It is possible to have a dangling
 file with the `implementing` declaration that is not `__include`'d by any other files in
 the module. Such dangling files will not be considered as part of the module and will not
-be compiled. The `implementing` declaration is for the purpose of verification and language server code assisting, and does not carry any other semantics that affect compilation.
+be compiled. The `implementing` declaration is for the purpose of verification and language server code assistance, and does not carry any other semantics that affect compilation.
 
 > #### Note ####
-> When using the identifier token syntax, Slang will translate any underscores(`_`) to hyphens("-") to obtain the file name.
+> When using the identifier token syntax, Slang will translate any underscores (`_`) to hyphens (`-`) to obtain the file name.
 
 ## Importing a Module
 
@@ -115,16 +116,16 @@ __include helper;
 implementing m;
 // ...
 ```
-It is only valid for the user code to `import m`. Attempting to `import helper` will result a compile-time error. 
+It is only valid for the user code to `import m`. Attempting to `import helper` will result in a compile-time error.
 
 Multiple `import`s of the same module from different input files will only cause the module to be loaded once (there is no need for "include guards" or `#pragma once`).
-Note that preprocessor definitions in the current file will not affect the compilation of `import`ed code, and the preprocessor definitions in the imported code is not visible to the current file.
+Note that preprocessor definitions in the current file will not affect the compilation of `import`ed code, and the preprocessor definitions in the imported code are not visible to the current file.
 
 ## Access Control
 
-Slang supports access control modifiers: `public`, `internal` and `private`. The module boundary plays an important role in access control.
+Slang supports access control modifiers: `public`, `internal`, and `private`. The module boundary plays an important role in access control.
 
-`public` symbols are accessible everywhere: from within the different types, different files or different modules.
+`public` symbols are accessible everywhere: from within different types, different files, or different modules.
 
 `private` symbols are only visible to other symbols in the same type. The following example shows the scope of `private` visibility:
 ```csharp
@@ -149,7 +150,7 @@ void outerFunc(MyType t)
 }
 ```
 
-`internal` symbols are visible throughout the same module, regardless if it is referenced from the same type or same file. But they are not visible to other modules. The following example shows the scope of `internal` visibility:
+`internal` symbols are visible throughout the same module, regardless of whether they are referenced from the same type or same file. But they are not visible to other modules. The following example shows the scope of `internal` visibility:
 
 ```csharp
 // a.slang
@@ -180,14 +181,14 @@ void main()
 }
 ```
 
-`internal` is the default visibility if no other access modifiers are specified, an exception is for `interface` members, where the default visibility is the visibility of the interface.
+`internal` is the default visibility if no other access modifiers are specified. An exception is `interface` members, where the default visibility is the visibility of the interface.
 
 ### Additional Validation Rules
 
 The Slang compiler enforces the following rules regarding access control:
 - A more visible entity should not expose less visible entities through its signature. For example, a `public` function cannot have a return type that is `internal`.
-- A member of a `struct`, `interface` and other aggregate types cannot have a higher visibility than its parent.
-- If a `struct` type has visibility `Vs`, and one of its member has visibility `Vm`, and the member is used to satisfy an interface requirement that has visibility `Vr`, then `Vm` must not be lower (less visible) than `min(Vs, Vr)`.
+- A member of a `struct`, `interface`, or other aggregate type cannot have a higher visibility than its parent.
+- If a `struct` type has visibility `Vs`, and one of its members has visibility `Vm`, and the member is used to satisfy an interface requirement that has visibility `Vr`, then `Vm` must not be lower (less visible) than `min(Vs, Vr)`.
 - Type definitions themselves cannot be `private`, for example, `private struct S {}` is not valid code.
 - `interface` requirements cannot be `private`.
 
@@ -218,20 +219,20 @@ Modules like `utils.slang` needn't contain anything more than a module declarati
 module utils;
 import slangpy;
 
-__include "utils/accumlator.slang";
+__include "utils/accumulator.slang";
 __include "utils/tonemap.slang";
 __include "utils/fill.slang";
 ```
 
-Here, all the public symbols defined in `accumlator.slang`, `tonemap.slang`, and `fill.slang` are visible to the user of the `utils` module, and these constituent helper files do not need to clutter the top-level file hierarchy.
+Here, all the public symbols defined in `accumulator.slang`, `tonemap.slang`, and `fill.slang` are visible to the user of the `utils` module, and these constituent helper files do not need to clutter the top-level file hierarchy.
 
 ## Legacy Modules
 
 Slang used to not have support for access control, and all symbols were treated as having `public` visibility. To provide compatibility with existing code, the Slang compiler will detect if the module is written in the legacy language, and treat all symbols as `public` if so.
 
 A module is determined to be written in legacy language if all the following conditions are met:
-- The module is lacking `module` declaration at the beginning.
+- The module lacks a `module` declaration at the beginning.
 - There is no use of `__include`.
-- There is no use of any visibility modifiers -- `public`, `private` or `internal`.
+- There is no use of any visibility modifiers -- `public`, `private`, or `internal`.
 
 The user is advised that this legacy mode is for compatibility only. This mode may be deprecated in the future, and it is strongly recommended that new code should not rely on this compiler behavior.

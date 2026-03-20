@@ -80,6 +80,7 @@ static bool _isSubCommand(const char* arg)
         "  -api <expr>                    Enable specific APIs (e.g., 'vk+dx12' or '+dx11')\n"
         "  -synthesizedTestApi <expr>     Set APIs for synthesized tests\n"
         "  -skip-api-detection            Skip API availability detection\n"
+        "  -only-api-detection            Only run API detection and print results, then exit\n"
         "  -server-count <n>              Set number of test servers (default: 1)\n"
         "  -show-adapter-info             Show detailed adapter information\n"
         "  -generate-hlsl-baselines       Generate HLSL test baselines\n"
@@ -97,6 +98,11 @@ static bool _isSubCommand(const char* arg)
         "                                 (alphabetical for prefixes matching multiple tests)\n"
         "  -dry-run                       List tests that would be run without running them\n"
         "  -disable-retries               Disable automatic retries of failed tests\n"
+        "  -synthesize-compile-targets    Synthesize compile-only tests for all available\n"
+        "                                 backends from GPU-requiring tests, exercising\n"
+        "                                 emit paths without needing a GPU\n"
+        "  -only-synthesized             Only run synthesized compile-target tests\n"
+        "                                 (implies -synthesize-compile-targets)\n"
 
         // Recent Windows runtime versions started opening a dialog popup window when
         // `abort()` is called, which breaks the CI workflow and some scripts that
@@ -295,6 +301,15 @@ static bool _isSubCommand(const char* arg)
         {
             optionsOut->disableRetries = true;
         }
+        else if (strcmp(arg, "-synthesize-compile-targets") == 0)
+        {
+            optionsOut->synthesizeCompileTargets = true;
+        }
+        else if (strcmp(arg, "-only-synthesized") == 0)
+        {
+            optionsOut->onlySynthesized = true;
+            optionsOut->synthesizeCompileTargets = true;
+        }
         else if (strcmp(arg, "-shuffle-seed") == 0)
         {
             if (argCursor == argEnd)
@@ -461,7 +476,23 @@ static bool _isSubCommand(const char* arg)
         }
         else if (strcmp(arg, "-skip-api-detection") == 0)
         {
+            if (optionsOut->apiDetectionOnly)
+            {
+                stdError.print(
+                    "error: -only-api-detection and -skip-api-detection are mutually exclusive\n");
+                return SLANG_FAIL;
+            }
             optionsOut->skipApiDetection = true;
+        }
+        else if (strcmp(arg, "-only-api-detection") == 0)
+        {
+            if (optionsOut->skipApiDetection)
+            {
+                stdError.print(
+                    "error: -only-api-detection and -skip-api-detection are mutually exclusive\n");
+                return SLANG_FAIL;
+            }
+            optionsOut->apiDetectionOnly = true;
         }
         else if (strcmp(arg, "-emit-spirv-via-glsl") == 0)
         {
@@ -497,6 +528,7 @@ static bool _isSubCommand(const char* arg)
             File::readAllText(fileName, text);
             List<UnownedStringSlice> lines;
             StringUtil::split(text.getUnownedSlice(), '\n', lines);
+            int fileEntryCount = 0;
             for (auto line : lines)
             {
                 // Remove comments (everything after '#' character)
@@ -512,8 +544,13 @@ static bool _isSubCommand(const char* arg)
                 if (trimmedLine.getLength() > 0)
                 {
                     optionsOut->expectedFailureList.add(trimmedLine);
+                    fileEntryCount++;
                 }
             }
+            Options::ExpectedFailureFileInfo fileInfo;
+            fileInfo.fileName = fileName;
+            fileInfo.count = fileEntryCount;
+            optionsOut->expectedFailureFiles.add(fileInfo);
         }
         else if (strcmp(arg, "-skip-list") == 0)
         {
@@ -663,6 +700,16 @@ static bool _isSubCommand(const char* arg)
     {
         // If the test directory isn't set, use the "tests" directory
         optionsOut->testDir = String("tests/");
+    }
+
+    if (optionsOut->verbosity >= VerbosityLevel::Info &&
+        optionsOut->expectedFailureFiles.getCount() > 0)
+    {
+        stdOut.print("Expected failure lists:\n");
+        for (const auto& fileInfo : optionsOut->expectedFailureFiles)
+        {
+            stdOut.print(" - %s : %d tests\n", fileInfo.fileName.getBuffer(), fileInfo.count);
+        }
     }
 
     return SLANG_OK;

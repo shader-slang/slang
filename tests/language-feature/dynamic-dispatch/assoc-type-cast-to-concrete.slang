@@ -56,6 +56,6 @@ void computeMain(uint3 threadId: SV_DispatchThreadID)
     obj.Element x = obj.get();
 
     // Cannot cast associated type value to float directly
-    // CHECK: ([[# @LINE+1]]): error 30019
+    // CHECK: error[E30019]
     outputBuffer[0] = float(x);
 }

@@ -21,6 +21,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#if SLANG_UNIX_FAMILY
+#include <signal.h>
+#endif
+
 #if defined(_WIN32)
 #include <slang-rhi/agility-sdk.h>
 SLANG_RHI_EXPORT_AGILITY_SDK
@@ -630,6 +634,21 @@ SlangResult _execute(int argc, const char* const* argv)
     TestServer server;
     SLANG_RETURN_ON_FAIL(server.init(argc, argv));
     SLANG_RETURN_ON_FAIL(server.execute());
+
+    // Clean up cached GPU devices before shutdown. The DeviceCache is a static
+    // singleton in render-test-tool that holds Vulkan/CUDA devices. If not cleaned
+    // up explicitly, its destructor runs during process exit (__run_exit_handlers)
+    // after the GPU driver's own static destructors, causing segfaults from
+    // corrupted vtables.
+    typedef void (*CleanDeviceCacheFunc)();
+    ISlangSharedLibrary* renderTestLib = server.loadSharedLibrary("render-test-tool");
+    if (renderTestLib)
+    {
+        auto cleanFunc = (CleanDeviceCacheFunc)renderTestLib->findFuncByName("cleanDeviceCache");
+        if (cleanFunc)
+            cleanFunc();
+    }
+
     slang::shutdown();
     return SLANG_OK;
 }
@@ -638,5 +657,11 @@ SlangResult _execute(int argc, const char* const* argv)
 
 int main(int argc, const char* const* argv)
 {
+#if SLANG_UNIX_FAMILY
+    // Ignore SIGPIPE so that writing to a broken pipe returns EPIPE
+    // instead of killing this process.
+    signal(SIGPIPE, SIG_IGN);
+#endif
+
     return (int)Slang::TestToolUtil::getReturnCode(TestServer::_execute(argc, argv));
 }

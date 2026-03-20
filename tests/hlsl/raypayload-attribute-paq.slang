@@ -6,7 +6,7 @@
 // DXIL: define void @
 // DXIL: !dx.dxrPayloadAnnotations
 
-struct [raypayload] RayPayload
+[raypayload] struct RayPayload
 {
     float4 color : read(caller, anyhit) : write(caller);
 };

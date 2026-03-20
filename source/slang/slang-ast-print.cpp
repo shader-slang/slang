@@ -582,6 +582,17 @@ void ASTPrinter::addExpr(Expr* expr)
         {
             addExpr(sizeOfExpr->value);
         }
+
+        if (sizeOfExpr->dataLayoutType)
+        {
+            sb << ", ";
+            addType(sizeOfExpr->dataLayoutType);
+        }
+        else if (sizeOfExpr->dataLayout)
+        {
+            sb << ", ";
+            addExpr(sizeOfExpr->dataLayout);
+        }
         sb << ")";
     }
     else if (const auto alignOfExpr = as<AlignOfExpr>(expr))
@@ -594,6 +605,17 @@ void ASTPrinter::addExpr(Expr* expr)
         else if (alignOfExpr->value)
         {
             addExpr(alignOfExpr->value);
+        }
+
+        if (alignOfExpr->dataLayoutType)
+        {
+            sb << ", ";
+            addType(alignOfExpr->dataLayoutType);
+        }
+        else if (alignOfExpr->dataLayout)
+        {
+            sb << ", ";
+            addExpr(alignOfExpr->dataLayout);
         }
         sb << ")";
     }
@@ -608,6 +630,36 @@ void ASTPrinter::addExpr(Expr* expr)
         {
             addExpr(countOfExpr->value);
         }
+        sb << ")";
+    }
+    else if (const auto packQueryExpr = as<PackQueryExpr>(expr))
+    {
+        if (as<FirstExpr>(packQueryExpr))
+            sb << "__first(";
+        else if (as<LastExpr>(packQueryExpr))
+            sb << "__last(";
+        else if (as<TrimFirstExpr>(packQueryExpr))
+            sb << "__trimFirst(";
+        else if (as<TrimLastExpr>(packQueryExpr))
+            sb << "__trimLast(";
+        else
+            SLANG_UNEXPECTED("unknown PackQueryExpr subtype");
+
+        if (packQueryExpr->value)
+            addExpr(packQueryExpr->value);
+        sb << ")";
+    }
+    else if (const auto packBranchExpr = as<PackBranchTypeExpr>(expr))
+    {
+        sb << "__packBranch(";
+        if (packBranchExpr->packOperand.exp)
+            addExpr(packBranchExpr->packOperand.exp);
+        sb << ", ";
+        if (packBranchExpr->emptyType.exp)
+            addExpr(packBranchExpr->emptyType.exp);
+        sb << ", ";
+        if (packBranchExpr->nonEmptyType.exp)
+            addExpr(packBranchExpr->nonEmptyType.exp);
         sb << ")";
     }
     else if (const auto floatBitCastExpr = as<FloatBitCastExpr>(expr))
@@ -1296,8 +1348,7 @@ void ASTPrinter::_addDeclPathRec(const DeclRef<Decl>& declRef, Index depth)
 
     // If the parent declaration is a generic, then we need to print out its
     // signature
-    if (parentGenericDeclRef && !declRef.as<GenericValueParamDecl>() &&
-        !declRef.as<GenericTypeParamDeclBase>())
+    if (parentGenericDeclRef && !isGenericParam(declRef))
     {
         auto substArgs =
             tryGetGenericArguments(SubstitutionSet(declRef), parentGenericDeclRef.getDecl());
@@ -1411,6 +1462,25 @@ void ASTPrinter::addGenericParams(
                 ScopePart scopePart(this, Part::Type::GenericParamType);
                 sb << "each ";
                 sb << getText(genericTypePackParam.getName());
+            }
+        }
+        else if (auto genericValuePackParam = paramDeclRef.as<GenericValuePackParamDecl>())
+        {
+            if (!first)
+                sb << ", ";
+            first = false;
+            ParamScope paramScope(&sb, outParamRanges);
+            {
+                ScopePart scopePart(this, Part::Type::GenericParamValue);
+                sb << "let each ";
+                sb << getText(genericValuePackParam.getName());
+                sb << " : ";
+                auto type = getType(m_astBuilder, genericValuePackParam);
+                if (auto valuePackType = as<ValuePackType>(type))
+                {
+                    type = valuePackType->getElementType();
+                }
+                addType(type);
             }
         }
         else

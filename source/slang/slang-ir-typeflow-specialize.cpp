@@ -8,6 +8,7 @@
 #include "slang-ir-typeflow-set.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
+#include "slang-rich-diagnostics.h"
 
 
 namespace Slang
@@ -752,10 +753,9 @@ struct TypeFlowSpecializationContext
 
         if (conformanceType)
         {
-            sink->diagnose(
-                callSiteLoc,
-                Diagnostics::dynamicDispatchOnSpecializeOnlyInterface,
-                conformanceType);
+            sink->diagnose(Diagnostics::DynamicDispatchOnSpecializeOnlyInterface{
+                .conformanceType = conformanceType,
+                .location = callSiteLoc});
             return SLANG_FAIL;
         }
         return SLANG_OK;
@@ -1466,12 +1466,13 @@ struct TypeFlowSpecializationContext
                             {
                                 diagnosedRefParams.add(param);
                                 sink->diagnose(
-                                    param->sourceLoc,
-                                    Diagnostics::refParamWithInterfaceTypeInDynamicDispatch,
-                                    paramDirection.kind == ParameterDirectionInfo::Kind::Ref
-                                        ? UnownedStringSlice("__ref")
-                                        : UnownedStringSlice("__constref"),
-                                    paramType);
+                                    Diagnostics::RefParamWithInterfaceTypeInDynamicDispatch{
+                                        .paramKind =
+                                            paramDirection.kind == ParameterDirectionInfo::Kind::Ref
+                                                ? String("__ref")
+                                                : String("__constref"),
+                                        .paramType = paramType,
+                                        .location = param->sourceLoc});
                             }
                             argIndex++;
                             continue;
@@ -1621,10 +1622,11 @@ struct TypeFlowSpecializationContext
             }
             else
             {
-                sink->diagnose(
-                    inst,
-                    Diagnostics::noTypeConformancesFoundForInterface,
-                    interfaceType);
+                StringBuilder typeStr;
+                printDiagnosticArg(typeStr, interfaceType);
+                sink->diagnose(Diagnostics::NoTypeConformancesFoundForInterface{
+                    .interfaceType = typeStr.produceString(),
+                    .location = inst->sourceLoc});
                 module->getContainerPool().free(&tables);
                 return none();
             }
@@ -1867,10 +1869,11 @@ struct TypeFlowSpecializationContext
                         }
                         else
                         {
-                            sink->diagnose(
-                                loadInst,
-                                Diagnostics::noTypeConformancesFoundForInterface,
-                                interfaceType);
+                            StringBuilder typeStr;
+                            printDiagnosticArg(typeStr, interfaceType);
+                            sink->diagnose(Diagnostics::NoTypeConformancesFoundForInterface{
+                                .interfaceType = typeStr.produceString(),
+                                .location = loadInst->sourceLoc});
                             module->getContainerPool().free(&tables);
                             return none();
                         }
@@ -2406,7 +2409,7 @@ struct TypeFlowSpecializationContext
             IRBuilder builder(module);
             return builder.getTupleType(elementInfos);
         }
-        else if (auto arrayType = as<IRArrayType>(oldValueType))
+        else if (as<IRArrayType>(oldValueType))
         {
             // For arrays, we can't track per-element info, so just return the old value's info.
             auto oldValueInfo = tryGetInfo(context, oldValue);
@@ -2626,10 +2629,11 @@ struct TypeFlowSpecializationContext
             auto tableSet = taggedUnion->getWitnessTableSet();
             if (auto uninitElement = tableSet->tryGetUninitializedElement())
             {
-                sink->diagnose(
-                    inst->sourceLoc,
-                    Diagnostics::dynamicDispatchOnPotentiallyUninitializedExistential,
-                    uninitElement->getOperand(0));
+                StringBuilder sb;
+                printDiagnosticArg(sb, uninitElement->getOperand(0));
+                sink->diagnose(Diagnostics::DynamicDispatchOnPotentiallyUninitializedExistential{
+                    .object = sb.produceString(),
+                    .location = inst->sourceLoc});
 
                 return none(); // We'll return none so that the analysis doesn't
                                // crash early, before we can detect the error count
@@ -2856,7 +2860,8 @@ struct TypeFlowSpecializationContext
                     SLANG_ASSERT(elementOfSetType->getSet()->isSingleton());
                     auto specializeInst =
                         cast<IRSpecialize>(elementOfSetType->getSet()->getElement(0));
-                    auto specializedFuncType = cast<IRFuncType>(specializeGeneric(specializeInst));
+                    auto specializedFuncType =
+                        cast<IRFuncType>(specializeGeneric(specializationContext, specializeInst));
                     typeOfSpecialization = specializedFuncType;
                 }
                 else
@@ -4278,9 +4283,12 @@ struct TypeFlowSpecializationContext
         {
             if (isGlobalInst(specializeInst))
             {
-                // callee->setFullType((IRType*)specializeGeneric(specializeInst));
+                // callee->setFullType((IRType*)specializeGeneric(specializationContext,
+                // specializeInst));
                 IRBuilder builder(module);
-                return builder.replaceOperand(&callee->typeUse, specializeGeneric(specializeInst));
+                return builder.replaceOperand(
+                    &callee->typeUse,
+                    specializeGeneric(specializationContext, specializeInst));
             }
         }
 
@@ -4540,10 +4548,15 @@ struct TypeFlowSpecializationContext
                     // In Slang 2025 and later, specializing a generic with multiple types is not
                     // allowed, so we'll throw a diagnostic message.
                     //
-                    sink->diagnose(
-                        inst->sourceLoc,
-                        Diagnostics::cannotSpecializeGenericWithExistential,
-                        as<IRSpecialize>(callee)->getBase());
+                    auto genericBase = as<IRSpecialize>(callee)->getBase();
+                    String genericName;
+                    if (auto nameHint = genericBase->findDecoration<IRNameHintDecoration>())
+                        genericName = nameHint->getName();
+                    else
+                        genericName = "<generic>";
+                    sink->diagnose(Diagnostics::CannotSpecializeGenericWithExistential{
+                        .generic = genericName,
+                        .location = inst->sourceLoc});
                     return false;
                 }
                 else
@@ -5736,8 +5749,11 @@ struct TypeFlowSpecializationContext
         return hasChanges;
     }
 
-    TypeFlowSpecializationContext(IRModule* module, DiagnosticSink* sink)
-        : module(module), sink(sink)
+    TypeFlowSpecializationContext(
+        IRModule* module,
+        DiagnosticSink* sink,
+        SpecializationContext* specializationContext)
+        : module(module), sink(sink), specializationContext(specializationContext)
     {
     }
 
@@ -5745,6 +5761,7 @@ struct TypeFlowSpecializationContext
     // Basic context
     IRModule* module;
     DiagnosticSink* sink;
+    SpecializationContext* specializationContext = nullptr;
 
     // Set of parameters already diagnosed for ref/constref interface issues,
     // to avoid emitting duplicate diagnostics per call edge.
@@ -5778,9 +5795,12 @@ struct TypeFlowSpecializationContext
 };
 
 // Main entry point
-bool specializeDynamicInsts(IRModule* module, DiagnosticSink* sink)
+bool specializeDynamicInsts(
+    IRModule* module,
+    DiagnosticSink* sink,
+    SpecializationContext* specializationContext)
 {
-    TypeFlowSpecializationContext context(module, sink);
+    TypeFlowSpecializationContext context(module, sink, specializationContext);
     return context.processModule();
 }
 

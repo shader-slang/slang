@@ -8,6 +8,7 @@
 #include "slang-ir-insts.h"
 #include "slang-ir.h"
 #include "slang-options.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -82,12 +83,11 @@ private:
         IROutputTopologyDecoration* decoration,
         String validTopologies)
     {
-        m_sink->diagnose(
-            decoration,
-            Diagnostics::invalidMeshStageOutputTopology,
-            decoration->getTopology()->getStringSlice(),
-            TypeTextUtil::getCompileTargetName(SlangCompileTarget(m_target)),
-            validTopologies);
+        m_sink->diagnose(Diagnostics::InvalidMeshStageOutputTopology{
+            .topology = String(decoration->getTopology()->getStringSlice()),
+            .target = String(TypeTextUtil::getCompileTargetName(SlangCompileTarget(m_target))),
+            .validTopologies = validTopologies,
+            .location = decoration->sourceLoc});
     }
 
     bool isTargetHLSL() const { return m_target == CodeGenTarget::HLSL; }

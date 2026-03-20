@@ -572,6 +572,22 @@ Allow generating code from incomplete libraries with unresolved external functio
 Specify the space index for the system defined global bindless resource array. 
 
 
+<a id="spirv-resource-heap-stride"></a>
+### -spirv-resource-heap-stride
+
+**-spirv-resource-heap-stride &lt;stride&gt;**
+
+Specify the byte stride for the resource descriptor heap when generating SPIRV with spvDescriptorHeapEXT. Defaults to 0, which will use OpConstantSizeOfEXT(ResourceType). 
+
+
+<a id="spirv-sampler-heap-stride"></a>
+### -spirv-sampler-heap-stride
+
+**-spirv-sampler-heap-stride &lt;stride&gt;**
+
+Specify the byte stride for the sampler descriptor heap when generating SPIRV with spvDescriptorHeapEXT. Defaults to 0, which will use OpConstantSizeOfEXT(OpTypeSampler). 
+
+
 <a id="separate-debug-info"></a>
 ### -separate-debug-info
 Emit debug data to a separate file, and strip it from the main output file. 
@@ -1122,7 +1138,7 @@ Help Style
 Optimization Level 
 
 * `0`, `none` : Disable all optimizations 
-* `1`, `default` : Enable a default level of optimization.This is the default if no [-o](#o) options are used. 
+* `1`, `default` : Enable a default level of optimization.This is the default if no [-O](#o-1) options are used. 
 * `2`, `high` : Enable aggressive optimizations for speed. 
 * `3`, `maximal` : Enable further optimizations, which might have a significant impact on compile time, or involve unwanted tradeoffs in terms of code size. 
 

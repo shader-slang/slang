@@ -98,9 +98,24 @@ private:
         // to mark filenames at the beginning of a diagnostic
         const char* arrow;
         const char* noteDash;
+        // A south-east corner to close the gutter at the end (curves from down to left)
+        const char* gutterCorner;
     };
-    constexpr static Glyphs s_unicodeGlyphs = {"━", "┯", "─", "┬", "│", "╰ ", " ╭╼", " ╭╼"};
-    constexpr static Glyphs s_asciiGlyphs = {"^", "^", "-", "-", "|", "`", "-->", "---"};
+    // Unicode box-drawing glyphs as raw UTF-8 bytes to avoid source encoding assumptions:
+    //   ━ U+2501  ┯ U+252F  ─ U+2500  ┬ U+252C  │ U+2502
+    //   ╰ U+2570  ╭ U+256D  ╼ U+257C  ╯ U+256F
+    constexpr static Glyphs s_unicodeGlyphs = {
+        "\xe2\x94\x81",
+        "\xe2\x94\xaf",
+        "\xe2\x94\x80",
+        "\xe2\x94\xac",
+        "\xe2\x94\x82",
+        "\xe2\x95\xb0 ",
+        " \xe2\x95\xad\xe2\x95\xbc",
+        " \xe2\x95\xad\xe2\x95\xbc",
+        "\xe2\x95\xaf",
+    };
+    constexpr static Glyphs s_asciiGlyphs = {"^", "^", "-", "-", "|", "`", "-->", "---", "'"};
     const Glyphs& m_glyphs;
 
     // A single highlight on a line, with an optional label to be connected
@@ -119,6 +134,7 @@ private:
         Int64 number = 0;
         UnownedStringSlice content;
         List<LineHighlight> spans;
+        bool sourceAvailable = false;
     };
 
     // A collection of nearby HighlightedLines
@@ -288,12 +304,13 @@ private:
         {
             HighlightedLine& line = grouped[span.line];
             line.number = span.line;
-            if (line.content.getLength() == 0)
+            if (line.content.getLength() == 0 && !line.sourceAvailable)
             {
                 SourceView* view =
                     m_sourceManager ? m_sourceManager->findSourceView(span.startLoc) : nullptr;
                 if (view)
                 {
+                    line.sourceAvailable = true;
                     // Get the line content and trim end-of-line characters and trailing whitespace
                     UnownedStringSlice rawLine = StringUtil::trimEndOfLine(
                         view->getSourceFile()->getLineAtIndex(span.line - 1));
@@ -330,6 +347,18 @@ private:
         section.blocks.add(currentBlock);
         section.commonIndent = findCommonIndent(section.blocks);
         return section;
+    }
+
+    // Returns true if any line in the section has source text available.
+    // When source is unavailable (e.g. built-in modules), we skip rendering
+    // the section body to avoid showing empty source lines with underlines.
+    bool sectionHasSourceAvailable(const SectionLayout& section) const
+    {
+        for (const auto& block : section.blocks)
+            for (const auto& line : block.lines)
+                if (line.sourceAvailable)
+                    return true;
+        return false;
     }
 
     Int64 findCommonIndent(const List<LayoutBlock>& blocks)
@@ -489,6 +518,24 @@ private:
         return rows;
     }
 
+    // When source text is unavailable (e.g. built-in modules), render span
+    // labels with a compact gutter structure (pipe + closing corner), using a
+    // minimal gutter width since there are no line numbers to display.
+    void renderOrphanedLabels(StringBuilder& ss, const SectionLayout& section, Int64 gutterWidth)
+    {
+        String gutter =
+            repeat(' ', gutterWidth + 1) + color(TerminalColor::Cyan, m_glyphs.vertical);
+        for (const auto& block : section.blocks)
+            for (const auto& line : block.lines)
+                for (const auto& span : line.spans)
+                    if (span.label.getLength() > 0)
+                        ss << gutter << " " << color(TerminalColor::BoldRed, span.label) << "\n";
+        ss << color(
+                  TerminalColor::Cyan,
+                  repeat(m_glyphs.secondaryUnderline, gutterWidth + 1) + m_glyphs.gutterCorner)
+           << "\n";
+    }
+
     void renderSectionBody(StringBuilder& ss, const SectionLayout& section)
     {
         for (const auto& block : section.blocks)
@@ -628,24 +675,61 @@ private:
             layout.primaryLoc.line > 0 || layout.primaryLoc.fileName.getLength() > 0;
         if (hasValidLocation)
         {
-            renderLocation(ss, layout.primaryLoc);
-
-            if (layout.primarySection.blocks.getCount() > 0)
+            bool primaryHasSource = sectionHasSourceAvailable(layout.primarySection);
+            if (primaryHasSource)
             {
-                ss << repeat(' ', layout.primarySection.maxGutterWidth + 1)
-                   << color(TerminalColor::Cyan, m_glyphs.vertical) << "\n";
-                renderSectionBody(ss, layout.primarySection);
+                renderLocation(ss, layout.primaryLoc);
+                if (layout.primarySection.blocks.getCount() > 0)
+                {
+                    ss << repeat(' ', layout.primarySection.maxGutterWidth + 1)
+                       << color(TerminalColor::Cyan, m_glyphs.vertical) << "\n";
+                    renderSectionBody(ss, layout.primarySection);
+                    ss << color(
+                              TerminalColor::Cyan,
+                              repeat(
+                                  m_glyphs.secondaryUnderline,
+                                  layout.primarySection.maxGutterWidth + 1) +
+                                  m_glyphs.gutterCorner)
+                       << "\n";
+                }
+            }
+            else
+            {
+                constexpr Int64 kOrphanGutterWidth = 0;
+                DiagnosticLayout::Location loc = layout.primaryLoc;
+                loc.gutterIndent = kOrphanGutterWidth;
+                renderLocation(ss, loc);
+                if (layout.primarySection.blocks.getCount() > 0)
+                    renderOrphanedLabels(ss, layout.primarySection, kOrphanGutterWidth);
             }
         }
         for (const auto& note : layout.notes)
         {
             ss << "\n" << color(TerminalColor::Cyan, "note") << ": " << note.message << "\n";
-            renderNoteLocation(ss, note.loc);
-            if (note.section.blocks.getCount() > 0)
+            bool noteHasSource = sectionHasSourceAvailable(note.section);
+            if (noteHasSource)
             {
-                ss << repeat(' ', note.section.maxGutterWidth + 1)
-                   << color(TerminalColor::Cyan, m_glyphs.vertical) << "\n";
-                renderSectionBody(ss, note.section);
+                renderNoteLocation(ss, note.loc);
+                if (note.section.blocks.getCount() > 0)
+                {
+                    ss << repeat(' ', note.section.maxGutterWidth + 1)
+                       << color(TerminalColor::Cyan, m_glyphs.vertical) << "\n";
+                    renderSectionBody(ss, note.section);
+                    ss << color(
+                              TerminalColor::Cyan,
+                              repeat(m_glyphs.secondaryUnderline, note.section.maxGutterWidth + 1) +
+                                  m_glyphs.gutterCorner)
+                       << "\n";
+                }
+            }
+            else
+            {
+                constexpr Int64 kOrphanGutterWidth = 0;
+                DiagnosticLayout::Location noteLoc = note.loc;
+                noteLoc.gutterIndent = kOrphanGutterWidth;
+                renderNoteLocation(ss, noteLoc);
+                if (note.section.blocks.getCount() > 0)
+                    renderOrphanedLabels(ss, note.section, kOrphanGutterWidth);
             }
         }
         return ss.produceString();

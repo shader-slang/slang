@@ -8,12 +8,59 @@ correctly for GitHub's concatenated JSON output format.
 import json
 import subprocess
 import sys
+import time
+
+MAX_RETRIES = 3
+RETRY_BACKOFF_SECONDS = 2
+GH_COMMAND_TIMEOUT = 120  # seconds per attempt
+
+
+def _is_retryable_error(stderr):
+    text = (stderr or "").lower()
+    retry_markers = [
+        "timed out",
+        "timeout",
+        "connection reset",
+        "temporary failure",
+        "service unavailable",
+        "bad gateway",
+        "gateway timeout",
+        "secondary rate limit",
+        "api rate limit exceeded",
+    ]
+    return any(marker in text for marker in retry_markers)
+
+
+def _run_gh_command(cmd):
+    """Run a gh command with retry for transient failures."""
+    last_result = None
+    for attempt in range(MAX_RETRIES):
+        try:
+            result = subprocess.run(
+                cmd, capture_output=True, text=True, timeout=GH_COMMAND_TIMEOUT
+            )
+        except subprocess.TimeoutExpired:
+            # Treat timeout as retryable
+            if attempt == MAX_RETRIES - 1:
+                # Return a fake failed result
+                return subprocess.CompletedProcess(
+                    cmd, 1, stdout="", stderr="Command timed out"
+                )
+            time.sleep(RETRY_BACKOFF_SECONDS * (attempt + 1))
+            continue
+        last_result = result
+        if result.returncode == 0:
+            return result
+        if not _is_retryable_error(result.stderr) or attempt == MAX_RETRIES - 1:
+            return result
+        time.sleep(RETRY_BACKOFF_SECONDS * (attempt + 1))
+    return last_result
 
 
 def gh_api(endpoint):
     """Call gh api (single request) and return (parsed_json, error_string)."""
     cmd = ["gh", "api", endpoint]
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    result = _run_gh_command(cmd)
     if result.returncode != 0:
         return None, result.stderr.strip()
     try:
@@ -48,7 +95,7 @@ def gh_api_list(endpoint, key):
     (e.g. "jobs", "workflow_runs", "runners").
     """
     cmd = ["gh", "api", "--paginate", endpoint]
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    result = _run_gh_command(cmd)
     if result.returncode != 0:
         return None, result.stderr.strip()
 
@@ -62,6 +109,22 @@ def gh_api_list(endpoint, key):
     except json.JSONDecodeError as e:
         return None, f"JSON parse error: {e}"
     return items, None
+
+
+def parse_merge_queue_pr_number(branch):
+    """Extract PR number from a merge queue branch name.
+
+    Format: gh-readonly-queue/master/pr-NNNN-SHA
+    Returns the PR number string, or "" if not a merge queue branch.
+    """
+    if not branch or not branch.startswith("gh-readonly-queue/"):
+        return ""
+    parts = branch.split("/")
+    if len(parts) >= 3 and parts[2].startswith("pr-"):
+        segments = parts[2].split("-", 2)
+        if len(segments) >= 2:
+            return segments[1]
+    return ""
 
 
 def coerce_jobs_data(data):

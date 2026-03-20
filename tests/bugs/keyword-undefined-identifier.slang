@@ -1,6 +1,6 @@
 // keyword-undeclared-identifier.slang
 
-//DIAGNOSTIC_TEST:SIMPLE:
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 // Test that using a contextual keyword in
 // a context where it is an underfined
@@ -27,9 +27,13 @@
 int instanceTest()
 {
 	return instance;
+//CHECK:^^^^^^^^ undefined identifier
+//CHECK:^^^^^^^^ undefined identifier 'instance'.
 }
 
 int triangleTest()
 {
 	return triangle;
+//CHECK:^^^^^^^^ undefined identifier
+//CHECK:^^^^^^^^ undefined identifier 'triangle'.
 }

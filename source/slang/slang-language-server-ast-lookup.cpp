@@ -144,7 +144,14 @@ public:
             context->results.add(result);
             return true;
         }
-        return dispatchIfNotNull(expr->value);
+
+        if (dispatchIfNotNull(expr->value))
+            return true;
+
+        if (dispatchIfNotNull(expr->dataLayout))
+            return true;
+
+        return false;
     }
 
     bool visitFloatBitCastExpr(FloatBitCastExpr* expr)
@@ -516,6 +523,14 @@ public:
         }
         return false;
     }
+    bool visitPackBranchTypeExpr(PackBranchTypeExpr* expr)
+    {
+        if (dispatchIfNotNull(expr->packOperand.exp))
+            return true;
+        if (dispatchIfNotNull(expr->emptyType.exp))
+            return true;
+        return dispatchIfNotNull(expr->nonEmptyType.exp);
+    }
     bool visitTryExpr(TryExpr* expr) { return dispatchIfNotNull(expr->base); }
     bool visitPackExpr(PackExpr* expr)
     {
@@ -551,6 +566,12 @@ public:
         if (reportLookupResultIfInExprLeadingIdentifierRange(expr))
             return true;
         return dispatchIfNotNull(expr->baseExpr);
+    }
+    bool visitPackQueryExpr(PackQueryExpr* expr)
+    {
+        if (reportLookupResultIfInExprLeadingIdentifierRange(expr))
+            return true;
+        return dispatchIfNotNull(expr->value);
     }
     bool visitHigherOrderInvokeExpr(HigherOrderInvokeExpr* expr)
     {
