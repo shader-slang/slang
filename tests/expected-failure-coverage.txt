@@ -1,0 +1,6 @@
+# macOS only: tests that throw and catch C++ exceptions across shared library
+# boundaries fail when running in-process (server-count=1) due to cross-dylib
+# exception RTTI mismatch. Coverage CI uses server-count=1 for profiling.
+slang-unit-test-tool/replayContextSyncModeMismatch.internal
+slang-unit-test-tool/replayContextPlaybackOutputMismatch.internal
+slang-unit-test-tool/replayContextTypeMismatch.internal
