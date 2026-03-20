@@ -3,8 +3,7 @@
 // dynamic dispatch code (witness table switch), it must reject the program with
 // error 52008 rather than silently producing dynamic dispatch for such interfaces.
 
-// Disabled: requires compiler fix to emit error 52008 for [Specialize] interfaces
-//DISABLE_TEST:SIMPLE(filecheck=CHECK): -target spirv -gnone
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -gnone
 
 #lang slang 2025
 
@@ -37,6 +36,7 @@ RWStructuredBuffer<float> outputBuffer;
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
     IFoo obj = makeInterface(dispatchThreadID.x);
-    // CHECK: ([[# @LINE+1]]): error 52008
     outputBuffer[0] = obj.calc(3.0);
+//CHECK:                      ^ dynamic dispatch on specialize-only type
+//CHECK:                      ^ type 'IFoo' is marked for specialization only, but dynamic dispatch is needed for the call.
 }

@@ -1,68 +1,39 @@
-# CodeRabbit configuration for Slang shader compiler
-# Complements the existing Claude PR review (claude-pr-review.yml) by adding
-# static analysis, linting, and automated PR summaries.
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
 
-language: en-US
-tone_instructions: >-
-  Be direct and technical. This is a compiler project — prioritize correctness,
-  performance, and cross-platform consistency over style preferences.
-early_access: false
+language: "en-US"
+
 reviews:
   profile: assertive
-  request_changes_workflow: false
-  high_level_summary: true
-  high_level_summary_instructions: >-
-    Summarize what this PR changes in the Slang shader compiler. Highlight:
-    which compiler stages are affected (lexer, parser, semantic, IR, codegen),
-    which target backends may be impacted (SPIRV, HLSL, GLSL, Metal, CUDA, WGSL),
-    and whether public API headers (include/slang.h, slang-com-helper.h) are modified.
+  high_level_summary: false
+  auto_title_placeholder: ""
   poem: false
-  review_status: true
-  commit_status: true
+  in_progress_fortune: false
   collapse_walkthrough: true
   sequence_diagrams: false
-  estimate_code_review_effort: true
+  estimate_code_review_effort: false
   assess_linked_issues: true
-  related_issues: true
-  related_prs: true
-  suggested_labels: true
-  auto_apply_labels: false
+  related_issues: false
+  related_prs: false
+  suggested_labels: false
+  auto_label: false
   suggested_reviewers: true
-  auto_assign_reviewers: false
-  abort_on_close: true
+  auto_assign_reviewers: true
 
-  auto_review:
-    enabled: true
-    auto_incremental_review: true
-    drafts: false
-    ignore_title_keywords:
-      - "WIP"
-      - "DO NOT MERGE"
-      - "wip"
-    base_branches:
-      - master
-    ignore_usernames:
-      - "dependabot[bot]"
-      - "github-actions[bot]"
-
-  # Exclude generated/vendored/build files from review
   path_filters:
     - "!build/**"
     - "!external/**"
-    - "!docs/stdlib-reference/**"
-    - "!**/generated/**"
-    - "!**/*.gen.*"
 
-  # Path-specific review instructions
   path_instructions:
     - path: "source/slang/**"
       instructions: >-
-        This is the core compiler. Review for:
+        This is the core compiler AND all target emitters (slang-emit-*.cpp).
+        Review for:
         (1) IR pass correctness — ensure SSA form and type invariants are maintained.
         (2) Proper use of FIDDLE macros for AST/IR node definitions.
         (3) Emit logic should stay simple; heavy transforms belong in IR passes.
         (4) Check that new IR instructions are registered in slang-ir-insts.lua.
         (5) Null pointer safety and proper error handling via diagnostics.
+        (6) Cross-backend consistency — changes to one emitter may need parallel changes in others.
 
     - path: "source/core/**"
       instructions: >-
@@ -116,49 +87,54 @@ reviews:
         Development tools (slang-test, slangd LSP, render-test, etc.).
         Ensure command-line interface changes are backward compatible.
 
-  # Static analysis tools
+  auto_review:
+    enabled: true
+    drafts: false
+    base_branches:
+      - "master"
+    ignore_title_keywords:
+      - "WIP"
+      - "wip"
+      - "DO NOT MERGE"
+
+  enable_prompt_for_ai_agents: false
+
+  finishing_touches:
+    docstrings:
+      enabled: false
+    unit_tests:
+      enabled: false
+
   tools:
-    # C++ analysis
+    # C++ — relevant
     cppcheck:
       enabled: true
     clang:
       enabled: true
-
-    # Script and config linting
+    # Scripts/config — relevant
     shellcheck:
       enabled: true
     yamllint:
       enabled: true
     luacheck:
       enabled: true
-
-    # Security
-    gitleaks:
-      enabled: true
-
-    # CI linting
     actionlint:
       enabled: true
-
-    # GitHub checks integration (see CI results in review)
-    github-checks:
+    # Security — relevant
+    gitleaks:
       enabled: true
-      timeout_ms: 600000
-
-    # General static analysis
-    semgrep:
-      enabled: true
-
-    # Disable irrelevant tools
+    # Everything else — not applicable to a C++ compiler project
     ruff:
       enabled: false
     markdownlint:
+      enabled: false
+    languagetool:
       enabled: false
     biome:
       enabled: false
     hadolint:
       enabled: false
-    eslint:
+    swiftlint:
       enabled: false
     phpstan:
       enabled: false
@@ -168,13 +144,33 @@ reviews:
       enabled: false
     golangci-lint:
       enabled: false
+    trufflehog:
+      enabled: false
+    checkov:
+      enabled: false
     tflint:
       enabled: false
     detekt:
       enabled: false
+    eslint:
+      enabled: false
     flake8:
       enabled: false
+    fortitudeLint:
+      enabled: false
     rubocop:
+      enabled: false
+    buf:
+      enabled: false
+    regal:
+      enabled: false
+    pmd:
+      enabled: false
+    opengrep:
+      enabled: false
+    semgrep:
+      enabled: false
+    circleci:
       enabled: false
     clippy:
       enabled: false
@@ -182,33 +178,38 @@ reviews:
       enabled: false
     trivy:
       enabled: false
+    prismaLint:
+      enabled: false
     pylint:
       enabled: false
     oxc:
       enabled: false
-    checkov:
+    shopifyThemeCheck:
       enabled: false
-    swiftlint:
+    brakeman:
       enabled: false
-    buf:
+    dotenvLint:
       enabled: false
-
-  finishing_touches:
-    docstrings:
+    htmlhint:
       enabled: false
-    unit_tests:
+    stylelint:
+      enabled: false
+    checkmake:
+      enabled: false
+    osvScanner:
+      enabled: false
+    blinter:
+      enabled: false
+    smartyLint:
+      enabled: false
+    emberTemplateLint:
+      enabled: false
+    psscriptanalyzer:
       enabled: false
 
 chat:
-  auto_reply: true
+  auto_reply: false
+  art: false
 
 knowledge_base:
-  opt_out: false
-  web_search:
-    enabled: true
-  learnings:
-    scope: auto
-  issues:
-    scope: auto
-  pull_requests:
-    scope: auto
+  opt_out: true

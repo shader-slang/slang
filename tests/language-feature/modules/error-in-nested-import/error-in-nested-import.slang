@@ -1,7 +1,7 @@
 // error-in-nested-import.slang
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK):
 
-// CHECK: ([[#@LINE+1]]): error
+// CHECK: error
 import a;
 
 int main()

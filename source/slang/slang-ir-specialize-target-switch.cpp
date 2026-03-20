@@ -5,6 +5,7 @@
 #include "slang-ir-dce.h"
 #include "slang-ir-insts.h"
 #include "slang-ir.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -75,10 +76,14 @@ void specializeTargetSwitch(
                 // due to incompatability within same `target` atom. Otherwise we will have an issue
                 // when we process a `__target_switch() { case metal: return; }` for glsl targets.
                 if (failedImplies)
-                    sink->diagnose(
-                        targetSwitch->sourceLoc,
-                        Diagnostics::profileIncompatibleWithTargetSwitch,
-                        target->getTargetCaps());
+                {
+                    StringBuilder profileSb;
+                    printDiagnosticArg(profileSb, target->getTargetCaps());
+                    sink->diagnose(Diagnostics::ProfileIncompatibleWithTargetSwitch{
+                        .profile = profileSb.produceString(),
+                        .location = targetSwitch->sourceLoc,
+                    });
+                }
                 builder.emitMissingReturn();
             }
             targetSwitch->removeAndDeallocate();

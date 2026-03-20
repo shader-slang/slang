@@ -1,8 +1,5 @@
-// Tests disabled: diagnostic 52010 not yet implemented (see #9906).
-// Enable when __ref/__constref dynamic dispatch diagnostic is added.
-//DISABLED_TEST:SIMPLE(filecheck=CHECK): -target spirv
-//DISABLED_TEST:SIMPLE(filecheck=CHECK): -target hlsl
-//DISABLED_TEST:SIMPLE(filecheck=CHECK): -target cuda
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target spirv
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK,non-exhaustive): -target hlsl
 
 // Regular (non-COM) interfaces and structs containing both COM and regular
 // interface members must still be rejected for __ref/__constref in dynamic
@@ -31,8 +28,9 @@ struct RegularImpl : IRegular
     float getValue() { return v; }
 }
 
-// CHECK: ([[# @LINE+1]]): error 52010: '__ref' parameter of type 'IRegular' cannot be used in dynamic dispatch context.
 float processRegularRef(__ref IRegular obj)
+//CHECK:                               ^^^ ref parameter incompatible with dynamic dispatch
+//CHECK:                               ^^^ '__ref' parameter of type 'IRegular' cannot be used in a dynamic dispatch context.
 {
     return obj.getValue();
 }
@@ -45,14 +43,12 @@ struct MixedContainer
     IRegular regularObj;
 }
 
-// CHECK: ([[# @LINE+1]]): error 52010: '__ref' parameter of type 'MixedContainer' cannot be used in dynamic dispatch context.
 float processMixedRef(__ref MixedContainer c)
+//CHECK:                                   ^ ref parameter incompatible with dynamic dispatch
+//CHECK:                                   ^ '__ref' parameter of type 'MixedContainer' cannot be used in a dynamic dispatch context.
 {
     return c.comObj.getValue() + c.regularObj.getValue();
 }
-
-// Verify no spurious errors after the expected diagnostics.
-// CHECK-NOT: error 52010
 
 RWStructuredBuffer<float> outputBuffer;
 

@@ -218,7 +218,8 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
     case kIROp_AtomicType:
         {
             auto atomicType = cast<IRAtomicType>(type);
-            calcSizeAndAlignment(targetReq, atomicType->getElementType(), outSizeAndAlignment);
+            SLANG_RETURN_ON_FAIL(
+                calcSizeAndAlignment(targetReq, atomicType->getElementType(), outSizeAndAlignment));
             return SLANG_OK;
         }
         break;
@@ -240,7 +241,11 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
         {
             auto vecType = cast<IRVectorType>(type);
             IRSizeAndAlignment elementTypeLayout;
-            getSizeAndAlignment(targetReq, this, vecType->getElementType(), &elementTypeLayout);
+            SLANG_RETURN_ON_FAIL(getSizeAndAlignment(
+                targetReq,
+                this,
+                vecType->getElementType(),
+                &elementTypeLayout));
             *outSizeAndAlignment = getVectorSizeAndAlignment(
                 elementTypeLayout,
                 getIntegerValueFromInst(vecType->getElementCount()));
@@ -925,6 +930,60 @@ IRTypeLayoutRules* IRTypeLayoutRules::get(IRTypeLayoutRuleName name)
         return getLLVM();
     default:
         return nullptr;
+    }
+}
+
+std::optional<IRTypeLayoutRuleName> getTypeLayoutRuleNameFromOp(
+    IROp layoutTypeOp,
+    IRTypeLayoutRuleName defaultLayout)
+{
+    switch (layoutTypeOp)
+    {
+    case kIROp_DefaultBufferLayoutType:
+    case kIROp_DefaultPushConstantBufferLayoutType:
+        return defaultLayout;
+    case kIROp_Std140BufferLayoutType:
+        return IRTypeLayoutRuleName::Std140;
+    case kIROp_Std430BufferLayoutType:
+        return IRTypeLayoutRuleName::Std430;
+    case kIROp_ScalarBufferLayoutType:
+        return IRTypeLayoutRuleName::Natural;
+    case kIROp_CBufferLayoutType:
+        return IRTypeLayoutRuleName::C;
+    case kIROp_D3DConstantBufferLayoutType:
+        return IRTypeLayoutRuleName::D3DConstantBuffer;
+    case kIROp_MetalParameterBlockLayoutType:
+        return IRTypeLayoutRuleName::MetalParameterBlock;
+    case kIROp_CUDABufferLayoutType:
+        return IRTypeLayoutRuleName::CUDA;
+    case kIROp_LLVMBufferLayoutType:
+        return IRTypeLayoutRuleName::LLVM;
+    }
+    return {};
+}
+
+IROp getOpFromTypeLayoutRuleName(IRTypeLayoutRuleName ruleName)
+{
+    switch (ruleName)
+    {
+    case IRTypeLayoutRuleName::Std140:
+        return kIROp_Std140BufferLayoutType;
+    case IRTypeLayoutRuleName::Std430:
+        return kIROp_Std430BufferLayoutType;
+    case IRTypeLayoutRuleName::Natural:
+        return kIROp_ScalarBufferLayoutType;
+    case IRTypeLayoutRuleName::C:
+        return kIROp_CBufferLayoutType;
+    case IRTypeLayoutRuleName::D3DConstantBuffer:
+        return kIROp_D3DConstantBufferLayoutType;
+    case IRTypeLayoutRuleName::MetalParameterBlock:
+        return kIROp_MetalParameterBlockLayoutType;
+    case IRTypeLayoutRuleName::CUDA:
+        return kIROp_CUDABufferLayoutType;
+    case IRTypeLayoutRuleName::LLVM:
+        return kIROp_LLVMBufferLayoutType;
+    default:
+        return kIROp_DefaultBufferLayoutType;
     }
 }
 

@@ -1,0 +1,22 @@
+name: Retry Failed CI Jobs
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: "The run ID to retry after it completes"
+        required: true
+
+jobs:
+  rerun:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for run to complete and rerun failed jobs
+        env:
+          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "Waiting for run ${{ inputs.run_id }} to complete..."
+          gh run watch ${{ inputs.run_id }} > /dev/null 2>&1
+          echo "Run completed. Rerunning failed jobs..."
+          gh run rerun ${{ inputs.run_id }} --failed

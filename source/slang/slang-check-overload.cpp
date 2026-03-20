@@ -92,6 +92,10 @@ SemanticsVisitor::ParamCounts SemanticsVisitor::CountParameters(DeclRef<GenericD
                 counts.required++;
             }
         }
+        else if (as<GenericValuePackParamDecl>(m))
+        {
+            counts.allowed = -1;
+        }
         else if (as<GenericTypePackParamDecl>(m))
         {
             counts.allowed = -1;
@@ -125,12 +129,14 @@ bool SemanticsVisitor::TryCheckOverloadCandidateClassNewMatchUp(
 
     if (isNewExpr && !isClassType)
     {
-        getSink()->diagnose(context.originalExpr, Diagnostics::newCanOnlyBeUsedToInitializeAClass);
+        getSink()->diagnose(
+            Diagnostics::NewCanOnlyBeUsedToInitializeAClass{.expr = context.originalExpr});
         return false;
     }
     if (!isNewExpr && isClassType && context.originalExpr)
     {
-        getSink()->diagnose(context.originalExpr, Diagnostics::classCanOnlyBeInitializedWithNew);
+        getSink()->diagnose(
+            Diagnostics::ClassCanOnlyBeInitializedWithNew{.expr = context.originalExpr});
         return false;
     }
     return true;
@@ -182,32 +188,34 @@ bool SemanticsVisitor::TryCheckOverloadCandidateArity(
     {
         if (argCount < paramCounts.required)
         {
-            getSink()->diagnose(
-                context.loc,
-                Diagnostics::notEnoughArguments,
-                argCount,
-                paramCounts.required);
+            getSink()->diagnose(Diagnostics::NotEnoughArguments{
+                .got = argCount,
+                .expected = paramCounts.required,
+                .location = context.loc});
         }
         else
         {
             SLANG_ASSERT(argCount > paramCounts.allowed);
-            getSink()->diagnose(
-                context.loc,
-                Diagnostics::tooManyArguments,
-                argCount,
-                paramCounts.allowed);
+            getSink()->diagnose(Diagnostics::TooManyArguments{
+                .got = argCount,
+                .expected = paramCounts.allowed,
+                .location = context.loc});
         }
 
         // Add a note showing the candidate signature for context
         if (candidate.item.declRef.getDecl())
         {
             String declString = ASTPrinter::getDeclSignatureString(candidate.item, m_astBuilder);
-            getSink()->diagnose(candidate.item.declRef, Diagnostics::overloadCandidate, declString);
+            getSink()->diagnose(Diagnostics::OverloadCandidate{
+                .candidate = declString,
+                .location = candidate.item.declRef.getLoc()});
         }
         else if (candidate.funcType)
         {
             // For Flavor::Expr cases where there's no decl, show the function type
-            getSink()->diagnose(context.loc, Diagnostics::overloadCandidate, candidate.funcType);
+            getSink()->diagnose(Diagnostics::OverloadCandidate{
+                .candidate = candidate.funcType->toString(),
+                .location = context.loc});
         }
     }
 
@@ -229,8 +237,8 @@ bool SemanticsVisitor::TryCheckOverloadCandidateFixity(
 
         if (context.mode != OverloadResolveContext::Mode::JustTrying)
         {
-            getSink()->diagnose(context.loc, Diagnostics::expectedPrefixOperator);
-            getSink()->diagnose(decl, Diagnostics::seeDefinitionOf, decl->getName());
+            getSink()->diagnose(
+                Diagnostics::ExpectedPrefixOperator{.callLoc = context.loc, .decl = decl});
         }
 
         return false;
@@ -242,8 +250,8 @@ bool SemanticsVisitor::TryCheckOverloadCandidateFixity(
 
         if (context.mode != OverloadResolveContext::Mode::JustTrying)
         {
-            getSink()->diagnose(context.loc, Diagnostics::expectedPostfixOperator);
-            getSink()->diagnose(decl, Diagnostics::seeDefinitionOf, decl->getName());
+            getSink()->diagnose(
+                Diagnostics::ExpectedPostfixOperator{.callLoc = context.loc, .decl = decl});
         }
 
         return false;
@@ -268,7 +276,9 @@ bool SemanticsVisitor::TryCheckOverloadCandidateVisibility(
     {
         if (context.mode == OverloadResolveContext::Mode::ForReal)
         {
-            getSink()->diagnose(context.loc, Diagnostics::declIsNotVisible, candidate.item.declRef);
+            getSink()->diagnose(Diagnostics::DeclIsNotVisible{
+                .decl = candidate.item.declRef.getDecl(),
+                .location = context.loc});
         }
         return false;
     }
@@ -345,10 +355,9 @@ bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
     {
         if (context.mode != OverloadResolveContext::Mode::JustTrying)
         {
-            getSink()->diagnose(
-                context.loc,
-                Diagnostics::cannotSpecializeGeneric,
-                candidate.item.declRef);
+            getSink()->diagnose(Diagnostics::CannotSpecializeGeneric{
+                .generic = candidate.item.declRef.getDecl(),
+                .location = context.loc});
         }
     };
     List<QualType> paramTypes;
@@ -357,6 +366,10 @@ bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
         if (auto typeParamRef = memberRef.as<GenericTypeParamDecl>())
         {
             paramTypes.add(DeclRefType::create(m_astBuilder, typeParamRef));
+        }
+        else if (auto valPackParam = memberRef.as<GenericValuePackParamDecl>())
+        {
+            paramTypes.add(getType(m_astBuilder, valPackParam));
         }
         else if (auto valParamRef = memberRef.as<GenericValueParamDecl>())
         {
@@ -395,8 +408,13 @@ bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
                 else
                 {
                     // Otherwise, the generic decl had better provide a default value
-                    // or this reference is ill-formed.
-                    auto substType = typeParamRef.substitute(
+                    // or this reference is ill-formed. Because the default value
+                    // may depend on prior generic args, we need to resolve it
+                    // with a substitution set that includes the prior args.
+                    auto genSubst = m_astBuilder->getGenericAppDeclRef(
+                        genericDeclRef,
+                        checkedArgs.getArrayView());
+                    auto substType = SubstitutionSet(genSubst).applyToType(
                         m_astBuilder,
                         typeParamRef.getDecl()->initType.type);
                     if (!substType)
@@ -468,9 +486,7 @@ bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
                     // Otherwise, the generic decl had better provide a default value
                     // or this reference is ill-formed.
                     ensureDecl(valParamRef, DeclCheckState::DefinitionChecked);
-                    ConstantFoldingCircularityInfo newCircularityInfo(
-                        valParamRef.getDecl(),
-                        nullptr);
+                    ConstantFoldingCircularityInfo newCircularityInfo(valParamRef, nullptr);
                     auto defaultVal = tryConstantFoldExpr(
                         valParamRef.substitute(m_astBuilder, valParamRef.getDecl()->initExpr),
                         ConstantFoldingKind::CompileTime,
@@ -619,6 +635,45 @@ bool SemanticsVisitor::TryCheckGenericOverloadCandidateTypes(
             {
                 maybeReportGeneralError();
                 return false;
+            }
+            checkedArgs.add(val);
+        }
+        else if (auto valPackParam = memberRef.as<GenericValuePackParamDecl>())
+        {
+            auto packType = as<ValuePackType>(getType(m_astBuilder, valPackParam));
+            SLANG_ASSERT(packType);
+
+            IntVal* val = nullptr;
+            if (aa >= matchedArgs.getCount())
+            {
+                if (allowPartialGenericApp)
+                {
+                    candidate.flags |= OverloadCandidate::Flag::IsPartiallyAppliedGeneric;
+                    break;
+                }
+                else
+                {
+                    val = m_astBuilder->getIntValPack(ArrayView<IntVal*>());
+                }
+            }
+            else
+            {
+                auto matchedArg = matchedArgs[aa++];
+                if (matchedArg.argExpr)
+                {
+                    val = tryConstantFoldExpr(matchedArg.argExpr, argFoldingKind, nullptr);
+                    if (val && !isValuePack(val))
+                    {
+                        ShortList<IntVal*> singleValList;
+                        singleValList.add(val);
+                        val = m_astBuilder->getIntValPack(singleValList.getArrayView().arrayView);
+                    }
+                }
+            }
+            if (val == nullptr)
+            {
+                val = m_astBuilder->getIntValPack(ArrayView<IntVal*>());
+                success = false;
             }
             checkedArgs.add(val);
         }
@@ -784,12 +839,11 @@ bool SemanticsVisitor::TryCheckOverloadCandidateTypes(
                     else
                         name.append(paramIndex, 10);
 
-                    getSink()->diagnose(
-                        context.loc,
-                        Diagnostics::concreteArgumentToOutputInterface,
-                        name,
-                        arg.type,
-                        paramType.type);
+                    getSink()->diagnose(Diagnostics::ConcreteArgumentToOutputInterface{
+                        .paramName = name,
+                        .argType = arg.type,
+                        .paramType = paramType.type,
+                        .location = context.loc});
                 }
                 return {nullptr, nullptr};
             }
@@ -959,10 +1013,9 @@ bool SemanticsVisitor::TryCheckOverloadCandidateDirections(
             {
                 if (context.mode == OverloadResolveContext::Mode::ForReal)
                 {
-                    getSink()->diagnose(
-                        context.loc,
-                        Diagnostics::mutatingMethodOnImmutableValue,
-                        funcDeclRef.getName());
+                    getSink()->diagnose(Diagnostics::MutatingMethodOnImmutableValue{
+                        .methodName = funcDeclRef.getName(),
+                        .location = context.loc});
                     maybeDiagnoseConstVariableAssignment(context.baseExpr);
                 }
                 return false;
@@ -983,15 +1036,22 @@ bool SemanticsVisitor::TryCheckOverloadCandidateDirections(
                 {
                     const bool isNonCopyable = isNonCopyableType(paramDecl->getType());
 
-                    const auto& diagnotic =
-                        isNonCopyable ? Diagnostics::mutatingMethodOnFunctionInputParameterError
-                                      : Diagnostics::mutatingMethodOnFunctionInputParameterWarning;
-
-                    getSink()->diagnose(
-                        context.loc,
-                        diagnotic,
-                        funcDeclRef.getName(),
-                        paramDecl->getName());
+                    if (isNonCopyable)
+                    {
+                        getSink()->diagnose(
+                            Diagnostics::MutatingMethodOnFunctionInputParameterError{
+                                .method = funcDeclRef.getName(),
+                                .param = paramDecl->getName(),
+                                .location = context.loc});
+                    }
+                    else
+                    {
+                        getSink()->diagnose(
+                            Diagnostics::MutatingMethodOnFunctionInputParameterWarning{
+                                .method = funcDeclRef.getName(),
+                                .param = paramDecl->getName(),
+                                .location = context.loc});
+                    }
                 }
             }
         }
@@ -1028,51 +1088,114 @@ bool SemanticsVisitor::TryCheckOverloadCandidateConstraints(
     auto substArgs = tryGetGenericArguments(candidate.subst, genericDeclRef.getDecl());
     SLANG_ASSERT(substArgs.getCount());
 
-    List<Val*> newArgs;
+    ShortList<Val*> newArgs;
     for (auto arg : substArgs)
         newArgs.add(arg);
 
-    for (auto constraintDecl :
-         genericDeclRef.getDecl()->getMembersOfType<GenericTypeConstraintDecl>())
+    for (auto constraintDecl : genericDeclRef.getDecl()->getMembers())
     {
-        DeclRef<GenericTypeConstraintDecl> constraintDeclRef =
-            m_astBuilder
-                ->getGenericAppDeclRef(genericDeclRef, newArgs.getArrayView(), constraintDecl)
-                .as<GenericTypeConstraintDecl>();
-
-        auto sub = getSub(m_astBuilder, constraintDeclRef);
-        auto sup = getSup(m_astBuilder, constraintDeclRef);
-
-        auto subTypeWitness = tryGetSubtypeWitness(sub, sup);
-
-        bool witnessIsOptional = isWitnessUncheckedOptional(subTypeWitness);
-        bool constraintIsOptional = constraintDecl->hasModifier<OptionalConstraintModifier>();
-
-        if (subTypeWitness && (!witnessIsOptional || constraintIsOptional))
+        if (auto genericTypeConstraintDecl = as<GenericTypeConstraintDecl>(constraintDecl))
         {
-            newArgs.add(subTypeWitness);
-        }
-        else if (!subTypeWitness && constraintIsOptional)
-        {
-            newArgs.add(m_astBuilder->getOrCreate<NoneWitness>());
-        }
-        else
-        {
-            if (context.mode != OverloadResolveContext::Mode::JustTrying)
+            DeclRef<GenericTypeConstraintDecl> constraintDeclRef =
+                m_astBuilder
+                    ->getGenericAppDeclRef(
+                        genericDeclRef,
+                        newArgs.getArrayView().arrayView,
+                        genericTypeConstraintDecl)
+                    .as<GenericTypeConstraintDecl>();
+
+            auto sub = getSub(m_astBuilder, constraintDeclRef);
+            auto sup = getSup(m_astBuilder, constraintDeclRef);
+
+            auto subTypeWitness = tryGetSubtypeWitness(sub, sup);
+
+            bool witnessIsOptional = isWitnessUncheckedOptional(subTypeWitness);
+            bool constraintIsOptional =
+                genericTypeConstraintDecl->hasModifier<OptionalConstraintModifier>();
+
+            if (subTypeWitness && (!witnessIsOptional || constraintIsOptional))
             {
-                subTypeWitness = isSubtype(sub, sup, IsSubTypeOptions::None);
-                getSink()->diagnose(
-                    context.loc,
-                    Diagnostics::typeArgumentDoesNotConformToInterface,
-                    sub,
-                    sup);
+                newArgs.add(subTypeWitness);
             }
-            return false;
+            else if (!subTypeWitness && constraintIsOptional)
+            {
+                newArgs.add(m_astBuilder->getOrCreate<NoneWitness>());
+            }
+            else
+            {
+                if (context.mode != OverloadResolveContext::Mode::JustTrying)
+                {
+                    subTypeWitness = isSubtype(sub, sup, IsSubTypeOptions::None);
+                    getSink()->diagnose(Diagnostics::TypeArgumentDoesNotConformToInterface{
+                        .typeArg = sub,
+                        .interface = sup,
+                        .location = context.loc});
+                }
+                return false;
+            }
+        }
+        else if (auto typeCoercionConstraintDecl = as<TypeCoercionConstraintDecl>(constraintDecl))
+        {
+            if (!addTypeCoercionWitnessToArgs(
+                    getASTBuilder(),
+                    this,
+                    typeCoercionConstraintDecl,
+                    genericDeclRef,
+                    &context,
+                    nullptr,
+                    newArgs,
+                    context.mode != OverloadResolveContext::Mode::JustTrying))
+                return false;
+        }
+        else if (auto nonEmptyConstraintDecl = as<NonEmptyPackConstraintDecl>(constraintDecl))
+        {
+            Decl* constrainedPackDecl = nullptr;
+            if (auto declRefExpr = as<DeclRefExpr>(nonEmptyConstraintDecl->packExpr))
+            {
+                constrainedPackDecl = getDeclRef(m_astBuilder, declRefExpr).getDecl();
+            }
+
+            Val* constrainedArg = nullptr;
+            if (auto typePackDecl = as<GenericTypePackParamDecl>(constrainedPackDecl))
+            {
+                if (typePackDecl->parameterIndex < newArgs.getCount())
+                    constrainedArg = newArgs[typePackDecl->parameterIndex];
+            }
+            else if (auto valuePackDecl = as<GenericValuePackParamDecl>(constrainedPackDecl))
+            {
+                if (valuePackDecl->parameterIndex < newArgs.getCount())
+                    constrainedArg = newArgs[valuePackDecl->parameterIndex];
+            }
+
+            auto packCardinality = constrainedArg ? getPackCardinality(constrainedArg)
+                                                  : VariadicPackCardinality::Unknown;
+            if (packCardinality != VariadicPackCardinality::NonEmpty)
+            {
+                if (context.mode != OverloadResolveContext::Mode::JustTrying)
+                {
+                    if (packCardinality == VariadicPackCardinality::Empty)
+                    {
+                        getSink()->diagnose(Diagnostics::EmptyPackDoesNotSatisfyNonEmptyConstraint{
+                            .location = context.loc});
+                    }
+                    else
+                    {
+                        auto diagExpr =
+                            context.originalExpr ? context.originalExpr : context.baseExpr;
+                        getSink()->diagnose(Diagnostics::PackQueryRequiresNonEmptyPack{
+                            .queryName = "nonempty(...)",
+                            .expr = diagExpr});
+                    }
+                }
+                return false;
+            }
+
+            newArgs.add(m_astBuilder->getNonEmptyPackWitness(constrainedArg));
         }
     }
 
-    candidate.subst =
-        SubstitutionSet(m_astBuilder->getGenericAppDeclRef(genericDeclRef, newArgs.getArrayView()));
+    candidate.subst = SubstitutionSet(
+        m_astBuilder->getGenericAppDeclRef(genericDeclRef, newArgs.getArrayView().arrayView));
 
     // Done checking all the constraints, hooray.
     return true;
@@ -1156,10 +1279,14 @@ Expr* SemanticsVisitor::CompleteOverloadCandidate(
     if (candidate.status == OverloadCandidate::Status::GenericArgumentInferenceFailed)
     {
         String callString = getCallSignatureString(context);
-        getSink()->diagnose(context.loc, Diagnostics::genericArgumentInferenceFailed, callString);
+        getSink()->diagnose(Diagnostics::GenericArgumentInferenceFailed{
+            .args = callString,
+            .location = context.loc});
 
         String declString = ASTPrinter::getDeclSignatureString(candidate.item, m_astBuilder);
-        getSink()->diagnose(candidate.item.declRef, Diagnostics::genericSignatureTried, declString);
+        getSink()->diagnose(Diagnostics::GenericSignatureTried{
+            .signature = declString,
+            .location = candidate.item.declRef.getLoc()});
         goto error;
     }
 
@@ -2214,11 +2341,11 @@ bool SemanticsVisitor::OverloadResolveContext::matchArgumentsToParams(
     ShortList<MatchedArg>& outMatchedArgs)
 {
     // We allow params to end with one or more variadic packs.
-    // We will first find out how many type packs there are.
+    // We will first find out how many packs there are (type packs and value packs).
     Index typePackCount = 0;
     for (Index i = params.getCount() - 1; i >= 0; --i)
     {
-        if (isTypePack(params[i].type))
+        if (isPackType(params[i].type))
             typePackCount++;
         else
             break;
@@ -2271,7 +2398,7 @@ bool SemanticsVisitor::OverloadResolveContext::matchArgumentsToParams(
             {
                 argType = typeType->getType();
             }
-            if (isTypePack(argType))
+            if (isPackType(argType))
             {
                 MatchedArg arg;
                 arg.argExpr = getArg(fixedParamCount + i);
@@ -2760,7 +2887,7 @@ void SemanticsVisitor::AddHigherOrderOverloadCandidates(
         else
         {
             // Unhandled case for the inner expr.
-            getSink()->diagnose(funcExpr->loc, Diagnostics::expectedFunction, funcExpr->type);
+            getSink()->diagnose(Diagnostics::ExpectedFunction{.expr = funcExpr});
             funcExpr->type = this->getASTBuilder()->getErrorType();
         }
     }
@@ -2874,8 +3001,9 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
     // treat it as a ctor call with {1,2,3} as the first argument.
     //
     bool typeOverloadChecked = false;
-
-    DiagnosticSink collectedErrorsSink(getSourceManager(), nullptr);
+    // Use a temporary sink to hold errors from coercion, and flush them to the real sink
+    // if we know the site is meant to be an explicit ctor call or coercion.
+    DiagnosticSink collectedErrorsSink(getSourceManager(), nullptr, getSink());
     if (expr->arguments.getCount() == 1 && !as<ExplicitCtorInvokeExpr>(expr) &&
         !as<InitializerListExpr>(expr->arguments[0]))
     {
@@ -2885,6 +3013,7 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
             {
                 Expr* resultExpr = nullptr;
                 ConversionCost conversionCost = kConversionCost_None;
+
                 auto coerceResult = SemanticsVisitor(withSink(&collectedErrorsSink))
                                         ._coerce(
                                             CoercionSite::ExplicitCoercion,
@@ -2893,7 +3022,8 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
                                             expr->arguments[0]->type,
                                             expr->arguments[0],
                                             &collectedErrorsSink,
-                                            &conversionCost);
+                                            &conversionCost,
+                                            nullptr);
                 if (auto resultInvokeExpr = as<InvokeExpr>(resultExpr))
                 {
                     resultInvokeExpr->originalFunctionExpr = expr->functionExpr;
@@ -2953,15 +3083,15 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
 
             if (funcName)
             {
-                getSink()->diagnose(
-                    expr,
-                    Diagnostics::noApplicableOverloadForNameWithArgs,
-                    funcName,
-                    argsList);
+                getSink()->diagnose(Diagnostics::NoApplicableOverloadForNameWithArgs{
+                    .name = funcName,
+                    .args = argsList,
+                    .expr = expr});
             }
             else
             {
-                getSink()->diagnose(expr, Diagnostics::noApplicableWithArgs, argsList);
+                getSink()->diagnose(
+                    Diagnostics::NoApplicableWithArgs{.args = argsList, .expr = expr});
             }
         }
         else
@@ -2993,7 +3123,7 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
                             ASTPrinter::getDeclSignatureString(candidate.item, m_astBuilder);
                         Diagnostics::AmbiguousOverloadForNameWithArgs::Candidate c;
                         c.candidate = candidate.item.declRef.getDecl();
-                        c.candidate_signature = declString;
+                        c.candidateSignature = declString;
                         diagnostic.candidates.add(c);
                     }
 
@@ -3007,10 +3137,9 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
                 // Emit additional note for remaining candidates if needed
                 if (candidateIndex != candidateCount)
                 {
-                    getSink()->diagnose(
-                        expr,
-                        Diagnostics::moreOverloadCandidates,
-                        candidateCount - candidateIndex);
+                    getSink()->diagnose(Diagnostics::MoreOverloadCandidates{
+                        .count = (int64_t)(candidateCount - candidateIndex),
+                        .location = expr->loc});
                 }
             }
             else
@@ -3018,15 +3147,18 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
                 // Use old diagnostic system
                 if (funcName)
                 {
-                    getSink()->diagnose(
-                        expr,
-                        Diagnostics::ambiguousOverloadForNameWithArgs,
-                        funcName,
-                        argsList);
+                    // Use the rich diagnostic AmbiguousOverloadForNameWithArgs
+                    // but without the variadic notes (they'll be added below)
+                    Diagnostics::AmbiguousOverloadForNameWithArgs diagnostic;
+                    diagnostic.name = funcName->text;
+                    diagnostic.args = argsList;
+                    diagnostic.expr = expr;
+                    getSink()->diagnose(diagnostic);
                 }
                 else
                 {
-                    getSink()->diagnose(expr, Diagnostics::ambiguousOverloadWithArgs, argsList);
+                    getSink()->diagnose(
+                        Diagnostics::AmbiguousOverloadWithArgs{.args = argsList, .expr = expr});
                 }
 
                 {
@@ -3043,15 +3175,13 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
                             ASTPrinter::getDeclSignatureString(candidate.item, m_astBuilder);
 
                         if (candidate.status == OverloadCandidate::Status::VisibilityChecked)
-                            getSink()->diagnose(
-                                candidate.item.declRef,
-                                Diagnostics::invisibleOverloadCandidate,
-                                declString);
+                            getSink()->diagnose(Diagnostics::InvisibleOverloadCandidate{
+                                .candidate = declString,
+                                .location = candidate.item.declRef.getLoc()});
                         else
-                            getSink()->diagnose(
-                                candidate.item.declRef,
-                                Diagnostics::overloadCandidate,
-                                declString);
+                            getSink()->diagnose(Diagnostics::OverloadCandidate{
+                                .candidate = declString,
+                                .location = candidate.item.declRef.getLoc()});
 
                         candidateIndex++;
                         if (candidateIndex == maxCandidatesToPrint)
@@ -3059,10 +3189,9 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
                     }
                     if (candidateIndex != candidateCount)
                     {
-                        getSink()->diagnose(
-                            expr,
-                            Diagnostics::moreOverloadCandidates,
-                            candidateCount - candidateIndex);
+                        getSink()->diagnose(Diagnostics::MoreOverloadCandidates{
+                            .count = (int64_t)(candidateCount - candidateIndex),
+                            .location = expr->loc});
                     }
                 }
             }
@@ -3192,7 +3321,7 @@ Expr* SemanticsVisitor::ResolveInvoke(InvokeExpr* expr)
             return CreateErrorExpr(expr);
         }
     }
-    getSink()->diagnose(expr->functionExpr, Diagnostics::expectedFunction, funcExpr->type);
+    getSink()->diagnose(Diagnostics::ExpectedFunction{.expr = funcExpr});
     expr->type = QualType(m_astBuilder->getErrorType());
     return expr;
 }
@@ -3306,10 +3435,9 @@ Expr* SemanticsVisitor::checkGenericAppWithCheckedArgs(GenericAppExpr* genericAp
 
             // TODO(tfoley): print a reasonable message here...
 
-            getSink()->diagnose(
-                genericAppExpr,
-                Diagnostics::unimplemented,
-                "no applicable generic");
+            getSink()->diagnose(Diagnostics::Unimplemented{
+                .feature = "no applicable generic",
+                .location = genericAppExpr->loc});
 
             return CreateErrorExpr(genericAppExpr);
         }
@@ -3326,6 +3454,17 @@ Expr* SemanticsVisitor::checkGenericAppWithCheckedArgs(GenericAppExpr* genericAp
                 auto candidateExpr = CompleteOverloadCandidate(context, candidate);
                 overloadedExpr->candidateExprs.add(candidateExpr);
             }
+            if (!overloadedExpr->base)
+            {
+                for (auto candidateExpr : overloadedExpr->candidateExprs)
+                {
+                    if (auto baseFromCandidate = GetBaseExpr(candidateExpr))
+                    {
+                        overloadedExpr->base = baseFromCandidate;
+                        break;
+                    }
+                }
+            }
             return overloadedExpr;
         }
     }
@@ -3340,7 +3479,8 @@ Expr* SemanticsVisitor::checkGenericAppWithCheckedArgs(GenericAppExpr* genericAp
     else
     {
         // Nothing at all was found that we could even consider invoking
-        getSink()->diagnose(genericAppExpr, Diagnostics::expectedAGeneric, baseExpr->type);
+        getSink()->diagnose(
+            Diagnostics::ExpectedAGeneric{.found = baseExpr->type, .expr = genericAppExpr});
         return CreateErrorExpr(genericAppExpr);
     }
 }

@@ -127,8 +127,26 @@ option(SLANG_ENABLE_DXIL "Enable generating DXIL with DXC" ON)
 
 option(SLANG_ENABLE_FULL_IR_VALIDATION "Enable full IR validation (SLOW!)")
 option(SLANG_ENABLE_IR_BREAK_ALLOC "Enable _debugUID on IR allocation")
-option(SLANG_ENABLE_ASAN "Enable ASAN (address sanitizer)")
+option(
+    SLANG_IGNORE_ABORT_MSG
+    "Ignore the system modal assert dialog while running build tools to help LLM workflow."
+    OFF
+)
+if(SLANG_IGNORE_ABORT_MSG)
+    set(slang_ignore_abort_msg_arg -ignore-abort-msg)
+else()
+    set(slang_ignore_abort_msg_arg)
+endif()
+option(
+    SLANG_ENABLE_ASAN
+    "Enable AddressSanitizer (ASan), and UndefinedBehaviorSanitizer (UBSan) if available as well"
+)
 option(SLANG_ENABLE_COVERAGE "Enable code coverage instrumentation")
+option(
+    SLANG_ENABLE_TIME_TRACE
+    "Enable Clang time trace profiling for build analysis"
+)
+option(SLANG_ENABLE_PCH "Enable precompiled headers for faster builds" ON)
 
 option(
     SLANG_STANDARD_MODULE_DEVELOP_BUILD
@@ -282,6 +300,11 @@ advanced_option(
     "Build using user defined path for mimalloc"
     OFF
 )
+advanced_option(
+    SLANG_OVERRIDE_CMARK_PATH
+    "Build using user defined path for cmark"
+    OFF
+)
 
 advanced_option(
     SLANG_EXCLUDE_DAWN
@@ -389,6 +412,52 @@ if(NOT SLANG_EXCLUDE_TINT)
         set(SLANG_SLANG_TINT_BINARY_URL
             "https://github.com/shader-slang/dawn/releases/download/${slang_tint_release_tag}/slang-tint-windows-x64.zip"
         )
+    endif()
+endif()
+
+#
+# sccache support
+#
+# Enable sccache as the compiler launcher for faster rebuilds. Can be activated
+# via -DSLANG_USE_SCCACHE=ON or by setting the SLANG_USE_SCCACHE environment
+# variable to a truthy value. When enabled, precompiled headers are automatically
+# disabled due to a known incompatibility that causes linker errors.
+#
+option(
+    SLANG_USE_SCCACHE
+    "Use sccache as compiler launcher for faster rebuilds"
+    OFF
+)
+if(NOT CMAKE_C_COMPILER_LAUNCHER AND NOT CMAKE_CXX_COMPILER_LAUNCHER)
+    if(
+        NOT SLANG_USE_SCCACHE
+        AND DEFINED ENV{SLANG_USE_SCCACHE}
+        AND "$ENV{SLANG_USE_SCCACHE}"
+    )
+        set(SLANG_USE_SCCACHE ON CACHE BOOL "" FORCE)
+    endif()
+    if(SLANG_USE_SCCACHE)
+        find_program(SCCACHE_PROGRAM sccache)
+        if(SCCACHE_PROGRAM)
+            message(STATUS "Using sccache: ${SCCACHE_PROGRAM}")
+            set(CMAKE_C_COMPILER_LAUNCHER "${SCCACHE_PROGRAM}")
+            set(CMAKE_CXX_COMPILER_LAUNCHER "${SCCACHE_PROGRAM}")
+            # Re-run the MSVC debug-info workaround now that the launcher is set
+            include(CCacheDebugInfoWorkaround)
+            # Disable PCH: sccache + PCH causes linker errors
+            if(SLANG_ENABLE_PCH)
+                message(
+                    STATUS
+                    "Disabling precompiled headers (incompatible with sccache)"
+                )
+                set(SLANG_ENABLE_PCH OFF CACHE BOOL "" FORCE)
+            endif()
+        else()
+            message(
+                WARNING
+                "SLANG_USE_SCCACHE is ON but sccache was not found in PATH"
+            )
+        endif()
     endif()
 endif()
 

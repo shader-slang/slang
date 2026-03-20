@@ -8,11 +8,13 @@
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
 #include "slang-ir-specialize-target-switch.h"
+#include "slang-ir-specialize.h"
 #include "slang-ir-string-hash.h"
 #include "slang-ir.h"
 #include "slang-legalize-types.h"
 #include "slang-mangle.h"
 #include "slang-module-library.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -993,8 +995,6 @@ void cloneFunctionCommon(
 // needs to perform this operation even though it is logically part of
 // the later generic specialization pass.
 //
-IRInst* specializeGeneric(IRSpecialize* specializeInst);
-
 /// Copy layout information for an entry-point function to its parameters.
 ///
 /// When layout information is initially attached to an IR entry point,
@@ -1565,15 +1565,15 @@ IRInst* cloneGlobalValueWithLinkage(
     {
         if (auto sink = context->shared->sink)
         {
-            sink->diagnose(bestVal->sourceLoc, Diagnostics::unresolvedSymbol, bestVal);
+            sink->diagnose(Diagnostics::UnresolvedSymbol{
+                .symbol = bestVal,
+                .location = bestVal->sourceLoc,
+            });
 
             // Emit notes for all available declarations of this symbol
             for (IRSpecSymbol* ss = sym; ss; ss = ss->nextWithSameName)
             {
-                sink->diagnose(
-                    ss->irGlobalValue->sourceLoc,
-                    Diagnostics::seeDeclarationOf,
-                    ss->irGlobalValue);
+                sink->diagnose(Diagnostics::SeeDeclarationOfIr{.inst = ss->irGlobalValue});
             }
         }
     }
@@ -1841,10 +1841,12 @@ static void diagnoseUnresolvedSymbols(TargetRequest* req, DiagnosticSink* sink, 
                 if (auto constant = as<IRGlobalConstant>(globalSym))
                 {
                     if (constant->getOperandCount() == 0)
-                        sink->diagnose(
-                            globalSym->sourceLoc,
-                            Diagnostics::unresolvedSymbol,
-                            globalSym);
+                    {
+                        sink->diagnose(Diagnostics::UnresolvedSymbol{
+                            .symbol = globalSym,
+                            .location = globalSym->sourceLoc,
+                        });
+                    }
                 }
                 else if (auto genericSym = as<IRGeneric>(globalSym))
                 {
@@ -1855,24 +1857,25 @@ static void diagnoseUnresolvedSymbols(TargetRequest* req, DiagnosticSink* sink, 
                 {
                     if (!doesFuncHaveDefinition(funcSym) &&
                         !doesTargetAllowUnresolvedFuncSymbol(req))
-                        sink->diagnose(
-                            globalSym->sourceLoc,
-                            Diagnostics::unresolvedSymbol,
-                            globalSym);
+                    {
+                        sink->diagnose(Diagnostics::UnresolvedSymbol{
+                            .symbol = globalSym,
+                            .location = globalSym->sourceLoc,
+                        });
+                    }
                 }
                 else if (auto witnessSym = as<IRWitnessTable>(globalSym))
                 {
                     if (!doesWitnessTableHaveDefinition(witnessSym))
                     {
-                        sink->diagnose(
-                            globalSym->sourceLoc,
-                            Diagnostics::unresolvedSymbol,
-                            witnessSym);
+                        sink->diagnose(Diagnostics::UnresolvedSymbol{
+                            .symbol = witnessSym,
+                            .location = globalSym->sourceLoc,
+                        });
                         if (auto concreteType = witnessSym->getConcreteType())
-                            sink->diagnose(
-                                concreteType->sourceLoc,
-                                Diagnostics::seeDeclarationOf,
-                                concreteType);
+                        {
+                            sink->diagnose(Diagnostics::SeeDeclarationOfIr{.inst = concreteType});
+                        }
                     }
                 }
                 break;

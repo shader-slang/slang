@@ -11,6 +11,7 @@ Contents
 * [Lexical Structure](lexical-structure.md)
 * [Preprocessor](preprocessor.md)
 * [Types](types.md)
+* [Generics](generics.md)
 * [Expressions](expressions.md)
 * [Statements](statements.md)
 * [Declarations](declarations.md)

@@ -49,6 +49,10 @@
 #include <atomic>
 #include <thread>
 
+#if SLANG_UNIX_FAMILY
+#include <signal.h>
+#endif
+
 #if defined(_WIN32)
 #include <slang-rhi/agility-sdk.h>
 SLANG_RHI_EXPORT_AGILITY_SDK
@@ -1049,7 +1053,9 @@ Result spawnAndWaitSharedLibrary(
         rhiDebugBridge.setCoreCallback(&coreDebugCallback);
 
         // Say static so not released
-        StringWriter stdError(&stdErrorString, WriterFlag::IsConsole | WriterFlag::IsStatic);
+        StringWriter stdError(&stdErrorString, WriterFlag::IsStatic);
+        // Use IsConsole on stdout because we have tests which output spirv
+        // which we want to have disassembled
         StringWriter stdOut(&stdOutString, WriterFlag::IsConsole | WriterFlag::IsStatic);
 
         StdWriters* prevStdWriters = StdWriters::getSingleton();
@@ -1476,18 +1482,24 @@ static SlangResult _extractRenderTestRequirements(
         passThru = SLANG_PASS_THROUGH_NONE;
     }
 
-    if (passThru == SLANG_PASS_THROUGH_NONE)
+    // In compile-only mode, we need neither the GPU API nor downstream compilers.
+    // render-test will use text output targets (HLSL, GLSL, MSL, CUDA source)
+    // that only exercise Slang's own emit code.
+    bool isCompileOnly =
+        cmdLine.findArgIndex(UnownedStringSlice::fromLiteral("-compile-only")) >= 0;
+    if (!isCompileOnly)
     {
-        // Work out backends needed based on the target
-        ioRequirements->addUsedBackends(_getPassThroughFlagsForTarget(target));
-    }
-    else
-    {
-        ioRequirements->addUsedBackEnd(passThru);
-    }
+        if (passThru == SLANG_PASS_THROUGH_NONE)
+        {
+            ioRequirements->addUsedBackends(_getPassThroughFlagsForTarget(target));
+        }
+        else
+        {
+            ioRequirements->addUsedBackEnd(passThru);
+        }
 
-    // Add the render api used
-    ioRequirements->addUsedRenderApi(renderApiType);
+        ioRequirements->addUsedRenderApi(renderApiType);
+    }
 
     return SLANG_OK;
 }
@@ -1581,6 +1593,15 @@ static RenderApiFlags _getAvailableRenderApiFlags(TestContext* context)
                         SLANG_PASS_THROUGH_GENERIC_C_CPP)))
                 {
                     availableRenderApiFlags |= RenderApiFlags(1) << int(apiType);
+                    StdWriters::getOut().print(
+                        "Check %s: Supported\n",
+                        RenderApiUtil::getApiName(apiType).begin());
+                }
+                else
+                {
+                    StdWriters::getOut().print(
+                        "Check %s: Not Supported\n",
+                        RenderApiUtil::getApiName(apiType).begin());
                 }
                 continue;
             }
@@ -2627,19 +2648,21 @@ TestResult runSimpleTest(TestContext* context, TestInput& input)
         cmdLine.addArg(input.filePath);
     }
 
+    // Enable machine-readable diagnostics if diag option is specified
+    // This must come BEFORE other test options so that diagnostics emitted
+    // during option parsing are properly formatted
+    String diagPrefix;
+    if (input.testOptions->getDiagTestPrefix(diagPrefix))
+    {
+        cmdLine.addArg("-enable-machine-readable-diagnostics");
+    }
+
     for (auto arg : input.testOptions->args)
     {
         // Filter out slang-test specific options that shouldn't be passed to slangc
         if (arg == kPreserveEmbeddedSourceOption)
             continue;
         cmdLine.addArg(arg);
-    }
-
-    // Enable machine-readable diagnostics if diag option is specified
-    String diagPrefix;
-    if (input.testOptions->getDiagTestPrefix(diagPrefix))
-    {
-        cmdLine.addArg("-enable-machine-readable-diagnostics");
     }
 
     // If we can't set up for simple compilation, it's because some external resource isn't
@@ -2833,6 +2856,44 @@ TestResult runCompile(TestContext* context, TestInput& input)
             cmdLine.addArg(arg);
         }
     }
+
+    ExecuteResult exeRes;
+    TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));
+    if (context->isCollectingRequirements())
+    {
+        return TestResult::Pass;
+    }
+
+    if (exeRes.resultCode != 0)
+    {
+        auto reporter = context->getTestReporter();
+        if (reporter)
+        {
+            auto output = getOutput(exeRes);
+            reporter->message(TestMessageType::TestFailure, output);
+        }
+
+        return TestResult::Fail;
+    }
+
+    return TestResult::Pass;
+}
+
+TestResult runCompileTarget(TestContext* context, TestInput& input)
+{
+    auto outputStem = input.outputStem;
+
+    CommandLine cmdLine;
+    cmdLine.setExecutableLocation(ExecutableLocation(context->options.binDir, "render-test"));
+    cmdLine.addArg(input.filePath);
+    _addRenderTestOptions(context->options, cmdLine);
+
+    for (auto arg : input.testOptions->args)
+    {
+        cmdLine.addArg(arg);
+    }
+
+    cmdLine.addArg("-compile-only");
 
     ExecuteResult exeRes;
     TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));
@@ -3105,17 +3166,15 @@ static TestResult runCPPCompilerSharedLibrary(TestContext* context, TestInput& i
     options.modulePath = SliceUtil::asTerminatedCharSlice(modulePath);
 
     ComPtr<IArtifact> artifact;
-    if (SLANG_FAILED(compiler->compile(options, artifact.writeRef())))
-    {
-        return TestResult::Fail;
-    }
+    const SlangResult compileRes = compiler->compile(options, artifact.writeRef());
 
-    auto diagnostics = findAssociatedRepresentation<IArtifactDiagnostics>(artifact);
+    auto diagnostics =
+        artifact ? findAssociatedRepresentation<IArtifactDiagnostics>(artifact) : nullptr;
 
-    if (diagnostics && SLANG_FAILED(diagnostics->getResult()))
+    if (SLANG_FAILED(compileRes) || (diagnostics && SLANG_FAILED(diagnostics->getResult())))
     {
         // Compilation failed
-        String actualOutput = _calcSummary(diagnostics);
+        String actualOutput = diagnostics ? _calcSummary(diagnostics) : String("Compile: Error\n");
 
         // Write the output
         Slang::File::writeAllText(actualOutputPath, actualOutput);
@@ -4449,6 +4508,7 @@ static const TestCommandInfo s_testCommandInfos[] = {
     {"CPP_COMPILER_COMPILE", &runCPPCompilerCompile, RenderApiFlag::CPU},
     {"PERFORMANCE_PROFILE", &runPerformanceProfile, 0},
     {"COMPILE", &runCompile, 0},
+    {"COMPILE_TARGET", &runCompileTarget, 0},
     {"DOC", &runDocTest, 0},
     {"LANG_SERVER", &runLanguageServerTest, 0},
     {"EXECUTABLE", &runExecutableTest, RenderApiFlag::CPU}};
@@ -4660,6 +4720,93 @@ static void _calcSynthesizedTests(
     }
 }
 
+static bool _isGpuComputeCommand(const String& command)
+{
+    return command == "COMPARE_COMPUTE" || command == "COMPARE_COMPUTE_EX" ||
+           command == "COMPARE_RENDER_COMPUTE" || command == "HLSL_COMPUTE";
+}
+
+static RenderApiType _getRenderApiFromArgs(const List<String>& args)
+{
+    for (const auto& arg : args)
+    {
+        if (arg.getLength() > 1 && arg[0] == '-')
+        {
+            UnownedStringSlice name(arg.getUnownedSlice().begin() + 1, arg.getUnownedSlice().end());
+            RenderApiType apiType = RenderApiUtil::findApiTypeByName(name);
+            if (apiType != RenderApiType::Unknown)
+                return apiType;
+        }
+    }
+    return RenderApiType::Unknown;
+}
+
+static void _calcSynthesizedCompileTargetTests(
+    TestContext* context,
+    const String& filePath,
+    const List<TestDetails>& srcTests,
+    List<TestDetails>& ioSynthTests)
+{
+    SLANG_UNUSED(filePath);
+
+    HashSet<String> synthesizedKeys;
+
+    for (const auto& srcTest : srcTests)
+    {
+        if (!srcTest.options.isEnabled || srcTest.options.isSynthesized ||
+            !_isGpuComputeCommand(srcTest.options.command))
+            continue;
+
+        RenderApiType renderApi = _getRenderApiFromArgs(srcTest.options.args);
+        if (renderApi == RenderApiType::Unknown)
+            continue;
+
+        StringBuilder keyBuilder;
+        keyBuilder << RenderApiUtil::getApiName(renderApi) << "|" << srcTest.options.command;
+        String synthKey = keyBuilder.produceString();
+        if (synthesizedKeys.contains(synthKey))
+            continue;
+
+        TestDetails synthDetails;
+        TestOptions& synthOptions = synthDetails.options;
+        synthOptions.command = "COMPILE_TARGET";
+        synthOptions.isSynthesized = true;
+
+        if (auto c = context->categorySet.find("compile-target"))
+        {
+            synthOptions.categories.add(c);
+        }
+
+        synthOptions.args = srcTest.options.args;
+
+        // Add the implicit args that each command handler normally appends.
+        // COMPARE_COMPUTE_EX adds no implicit args (passes nullptr, 0 to
+        // runComputeComparisonImpl), so no branch is needed for it.
+        if (srcTest.options.command == "COMPARE_COMPUTE")
+        {
+            synthOptions.args.add("-slang");
+            synthOptions.args.add("-compute");
+        }
+        else if (srcTest.options.command == "COMPARE_RENDER_COMPUTE")
+        {
+            synthOptions.args.add("-slang");
+            synthOptions.args.add("-gcompute");
+        }
+        else if (srcTest.options.command == "HLSL_COMPUTE")
+        {
+            synthOptions.args.add("--hlsl-rewrite");
+            synthOptions.args.add("-compute");
+        }
+
+        context->setTestRequirements(&synthDetails.requirements);
+        runTest(context, "", "", "", synthOptions);
+        context->setTestRequirements(nullptr);
+
+        ioSynthTests.add(synthDetails);
+        synthesizedKeys.add(synthKey);
+    }
+}
+
 static bool _canIgnore(TestContext* context, const TestDetails& details)
 {
     if (details.options.isEnabled == false)
@@ -4701,6 +4848,48 @@ static bool _canIgnore(TestContext* context, const TestDetails& details)
     }
 
     return false;
+}
+
+// Insert a subtest index into a test name, after the file path but before any suffix.
+// e.g., "foo.slang (vk)" with index 0 -> "foo.slang.0 (vk)"
+static String insertSubtestIndex(const String& testName, int index)
+{
+    Index spacePos = testName.indexOf(' ');
+    StringBuilder result;
+    if (spacePos >= 0)
+    {
+        result << testName.subString(0, spacePos) << "." << index
+               << testName.subString(spacePos, testName.getLength() - spacePos);
+    }
+    else
+    {
+        result << testName << "." << index;
+    }
+    return result.produceString();
+}
+
+// Check if a prefix specifies a subtest index (e.g., "foo.slang.1" or "foo.slang.0")
+// Returns the subtest index if found, or -1 if not a subtest prefix.
+static int getSubtestIndex(const String& prefix, const String& filePath)
+{
+    if (prefix.getLength() <= filePath.getLength() || !prefix.startsWith(filePath))
+        return -1;
+
+    auto suffix = prefix.getUnownedSlice().tail(filePath.getLength());
+    if (suffix.getLength() < 2 || suffix[0] != '.')
+        return -1;
+
+    // Check all remaining chars are digits
+    int index = 0;
+    for (Index i = 1; i < suffix.getLength(); i++)
+    {
+        char c = suffix[i];
+        if (c < '0' || c > '9')
+            return -1;
+        index = index * 10 + (c - '0');
+    }
+
+    return index;
 }
 
 static SlangResult _runTestsOnFile(TestContext* context, String filePath)
@@ -4747,17 +4936,15 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
 
     SLANG_ASSERT((apiUsedFlags & explictUsedApiFlags) == explictUsedApiFlags);
 
-    const RenderApiFlags availableRenderApiFlags =
-        apiUsedFlags ? _getAvailableRenderApiFlags(context) : 0;
-
     // If synthesized tests are wanted look into adding them
-    if (context->options.synthesizedTestApis && availableRenderApiFlags)
+    // We synthesize for all configured APIs, not just available ones - _canIgnore will
+    // report unavailable ones as "Ignored" so users see why a test didn't run.
+    if (context->options.synthesizedTestApis)
     {
         List<TestDetails> synthesizedTests;
 
         // What render options do we want to synthesize
-        RenderApiFlags missingApis =
-            (~apiUsedFlags) & (context->options.synthesizedTestApis & availableRenderApiFlags);
+        RenderApiFlags missingApis = (~apiUsedFlags) & context->options.synthesizedTestApis;
 
         // const Index numInitialTests = testList.tests.getCount();
 
@@ -4778,11 +4965,73 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
         testList.tests.addRange(synthesizedTests);
     }
 
-    // We have found a test to run!
-    int subTestCount = 0;
-    for (auto& testDetails : testList.tests)
+    if (context->options.synthesizeCompileTargets)
     {
-        int subTestIndex = subTestCount++;
+        List<TestDetails> compileTargetTests;
+        _calcSynthesizedCompileTargetTests(context, filePath, testList.tests, compileTargetTests);
+        testList.tests.addRange(compileTargetTests);
+    }
+
+    // If explicit test order is requested, reorder subtests by prefix order
+    List<Index> testOrder;
+    for (Index i = 0; i < testList.tests.getCount(); i++)
+        testOrder.add(i);
+
+    if (context->options.explicitTestOrder && context->options.testPrefixes.getCount() > 0)
+    {
+        auto& prefixes = context->options.testPrefixes;
+        auto getTestPrefixIndex = [&](Index testIdx) -> Index
+        {
+            // Build the outputStem for this test
+            StringBuilder stem;
+            stem << filePath;
+            if (testIdx != 0)
+                stem << "." << testIdx;
+            String outputStem = stem.produceString();
+
+            for (Index i = 0; i < prefixes.getCount(); i++)
+            {
+                // Check if prefix matches this specific subtest
+                int prefixSubtest = getSubtestIndex(prefixes[i], filePath);
+                if (prefixSubtest >= 0)
+                {
+                    // Prefix specifies a subtest - check for exact match
+                    if (prefixSubtest == 0 && testIdx == 0)
+                        return i;
+                    if (outputStem == prefixes[i])
+                        return i;
+                }
+                else if (filePath.startsWith(prefixes[i]))
+                {
+                    // Non-specific prefix - matches all subtests in file
+                    return i;
+                }
+            }
+            return prefixes.getCount();
+        };
+
+        std::stable_sort(
+            testOrder.begin(),
+            testOrder.end(),
+            [&](Index a, Index b) { return getTestPrefixIndex(a) < getTestPrefixIndex(b); });
+    }
+
+    // We have found a test to run!
+    for (Index orderIdx = 0; orderIdx < testOrder.getCount(); orderIdx++)
+    {
+        // Stop scheduling new tests if too many consecutive failures suggest a systemic issue.
+        if (context->stopSchedulingTests.load())
+            return SLANG_OK;
+
+        Index subTestIndex = testOrder[orderIdx];
+        auto& testDetails = testList.tests[subTestIndex];
+
+        // When -only-synthesized is set, only run synthesized compile-target tests
+        if (context->options.onlySynthesized &&
+            !(testDetails.options.isSynthesized && testDetails.options.command == "COMPILE_TARGET"))
+        {
+            continue;
+        }
 
         // Check that the test passes our current category mask
         if (!testPassesCategoryMask(context, testDetails.options))
@@ -4809,6 +5058,16 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
 
         const auto& requirements = testDetails.requirements;
 
+        // For synthesized compile-target tests, show the render API name
+        if (testDetails.options.isSynthesized && testDetails.options.command == "COMPILE_TARGET")
+        {
+            RenderApiType renderApi = _getRenderApiFromArgs(testDetails.options.args);
+            if (renderApi != RenderApiType::Unknown)
+            {
+                testName << " (" << RenderApiUtil::getApiName(renderApi) << ")";
+            }
+        }
+
         // Display list of used apis on render test
         if (requirements.usedRenderApiFlags)
         {
@@ -4832,6 +5091,68 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
             testName << ")";
         }
 
+        // Check if any prefix is more specific than the file path (has subtest index).
+        // If so, filter to only run tests whose outputStem matches the prefix.
+        if (context->options.testPrefixes.getCount() > 0)
+        {
+            bool matchesSpecificPrefix = false;
+            bool hasSpecificPrefix = false;
+
+            for (auto& p : context->options.testPrefixes)
+            {
+                int prefixSubtestIndex = getSubtestIndex(p, filePath);
+                if (prefixSubtestIndex >= 0)
+                {
+                    hasSpecificPrefix = true;
+                    // Handle .0 specially - it refers to the first test (no suffix in outputStem)
+                    if (prefixSubtestIndex == 0)
+                    {
+                        if (outputStem == filePath)
+                        {
+                            matchesSpecificPrefix = true;
+                            break;
+                        }
+                    }
+                    else
+                    {
+                        // outputStem must match exactly (e.g., .10 shouldn't match .100)
+                        if (outputStem == p)
+                        {
+                            matchesSpecificPrefix = true;
+                            break;
+                        }
+                    }
+                }
+                else if (filePath.startsWith(p))
+                {
+                    // Non-specific prefix that matches the file - always run
+                    matchesSpecificPrefix = true;
+                    break;
+                }
+            }
+
+            if (hasSpecificPrefix && !matchesSpecificPrefix)
+            {
+                continue;
+            }
+        }
+
+        // In dry-run mode, just print the test name without running
+        if (context->options.dryRun)
+        {
+            // For the first test, show .0 suffix only if there are multiple tests
+            // so users know what to type to select just this test
+            if (subTestIndex == 0 && testList.tests.getCount() > 1)
+            {
+                printf("%s\n", insertSubtestIndex(testName, 0).getBuffer());
+            }
+            else
+            {
+                printf("%s\n", testName.getBuffer());
+            }
+            continue;
+        }
+
         // Report the test and run/ignore
         {
             TestReporter::TestScope scope(context->getTestReporter(), testName);
@@ -4847,7 +5168,7 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
             else
             {
                 testResult = runTest(context, filePath, outputStem, testName, testDetails.options);
-                if (testResult == TestResult::Fail &&
+                if (testResult == TestResult::Fail && !context->options.disableRetries &&
                     !context->getTestReporter()->m_expectedFailureList.contains(testName))
                 {
                     RefPtr<FileTestInfoImpl> fileTestInfo = new FileTestInfoImpl();
@@ -4866,10 +5187,13 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
                 {
                     context->getTestReporter()->addResult(testResult);
                 }
+
+                // Track consecutive failures for early abort on systemic issues
+                if (testResult == TestResult::Fail || testResult == TestResult::PendingRetry)
+                    context->reportTestFailure();
+                else if (testResult == TestResult::Pass)
+                    context->reportTestPass();
             }
-
-
-            // Could determine if to continue or not here... based on result
         }
     }
 
@@ -4880,24 +5204,9 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
 static bool endsWithAllowedExtension(TestContext* /*context*/, String filePath)
 {
     char const* allowedExtensions[] = {
-        ".slang",
-        ".hlsl",
-        ".fx",
-        ".glsl",
-        ".vert",
-        ".frag",
-        ".geom",
-        ".tesc",
-        ".tese",
-        ".comp",
-        ".internal",
-        ".ahit",
-        ".chit",
-        ".miss",
-        ".rgen",
-        ".c",
-        ".cpp",
-        ".cu",
+        ".slang.md", ".slang", ".hlsl", ".fx",   ".glsl",     ".vert", ".frag",
+        ".geom",     ".tesc",  ".tese", ".comp", ".internal", ".ahit", ".chit",
+        ".miss",     ".rgen",  ".c",    ".cpp",  ".cu",
     };
 
     for (auto allowedExtension : allowedExtensions)
@@ -4959,6 +5268,12 @@ static bool shouldRunTest(TestContext* context, String filePath)
         {
             return true;
         }
+        // Also match if the prefix specifies a subtest index
+        // (e.g., prefix "foo.slang.1" should include file "foo.slang")
+        if (getSubtestIndex(p, filePath) >= 0)
+        {
+            return true;
+        }
     }
     return false;
 }
@@ -5008,6 +5323,8 @@ void runTestsInParallel(TestContext* context, int count, const F& f)
         context->setTestReporter(&reporter);
         do
         {
+            if (context->stopSchedulingTests.load())
+                break;
             int index = consumePtr.fetch_add(1);
             if (index >= count)
                 break;
@@ -5060,6 +5377,37 @@ void runTestsInDirectory(TestContext* context)
     {
         std::mt19937 mt(context->options.shuffleSeed);
         std::shuffle(files.begin(), files.end(), mt);
+    }
+
+    // If explicit test order is requested, reorder tests by the order of their matching prefixes.
+    // Tests matching the same prefix maintain alphabetical order (from the sort above).
+    // Tests not matching any prefix appear at the end in alphabetical order.
+    if (context->options.explicitTestOrder && context->options.testPrefixes.getCount() > 0)
+    {
+        auto& prefixes = context->options.testPrefixes;
+        auto getPrefixIndex = [&](const String& filePath) -> Index
+        {
+            for (Index i = 0; i < prefixes.getCount(); i++)
+            {
+                if (filePath.startsWith(prefixes[i]))
+                {
+                    return i;
+                }
+                // Also match subtest prefixes (e.g., "foo.slang.1" matches file "foo.slang")
+                if (getSubtestIndex(prefixes[i], filePath) >= 0)
+                {
+                    return i;
+                }
+            }
+            return prefixes.getCount(); // No match - put at end
+        };
+
+        // Use stable sort to preserve alphabetical order within same prefix
+        std::stable_sort(
+            files.begin(),
+            files.end(),
+            [&](const String& a, const String& b)
+            { return getPrefixIndex(a) < getPrefixIndex(b); });
     }
 
     auto processFile = [&](String file)
@@ -5214,6 +5562,12 @@ static SlangResult runUnitTestModule(
 
     auto runUnitTest = [&](TestItem test)
     {
+        if (context->options.dryRun)
+        {
+            printf("%s\n", test.command.getBuffer());
+            return;
+        }
+
         auto reporter = context->getTestReporter();
         TestOptions options = testOptions;
         options.command = test.command;
@@ -5267,7 +5621,7 @@ static SlangResult runUnitTestModule(
 
                 // If the test failed and it is not an expected failure, add it to the list of
                 // failed unit tests so that we can retry.
-                if (isFailed && !context->isRetry &&
+                if (isFailed && !context->isRetry && !context->options.disableRetries &&
                     !context->getTestReporter()->m_expectedFailureList.contains(test.testName))
                 {
                     std::lock_guard lock(context->mutexFailedTests);
@@ -5295,6 +5649,7 @@ static SlangResult runUnitTestModule(
 
             try
             {
+                slang_replayMarker(test.testName.getBuffer());
                 test.testFunc(&unitTestContext);
 
                 // Check for VVL errors after test completion
@@ -5360,7 +5715,7 @@ SlangResult innerMain(int argc, char** argv)
 
     // The context holds useful things used during testing
     TestContext context;
-    SLANG_RETURN_ON_FAIL(SLANG_FAILED(context.init(argv[0])))
+    SLANG_RETURN_ON_FAIL(context.init(argv[0]))
 
     auto& categorySet = context.categorySet;
 
@@ -5382,6 +5737,8 @@ SlangResult innerMain(int argc, char** argv)
     auto compatibilityIssueCategory = categorySet.add("compatibility-issue", fullTestCategory);
 
     auto sharedLibraryCategory = categorySet.add("shared-library", fullTestCategory);
+
+    categorySet.add("compile-target", fullTestCategory);
 
 #if SLANG_WINDOWS_FAMILY
     auto windowsCategory = categorySet.add("windows", fullTestCategory);
@@ -5505,6 +5862,52 @@ SlangResult innerMain(int argc, char** argv)
     _disableD3D12Backend(&context);
 #endif
 
+    // If -only-api-detection mode, run API detection and exit
+    if (options.apiDetectionOnly)
+    {
+        // Create a TestReporter since _getAvailableRenderApiFlags may use it in verbose mode
+        TestReporter reporter;
+        SLANG_RETURN_ON_FAIL(reporter.init(options.outputMode, options.expectedFailureList));
+        context.setTestReporter(&reporter);
+        reporter.m_verbosity = options.verbosity;
+
+        _getAvailableRenderApiFlags(&context);
+
+        // Print which APIs were not checked
+        printf("Not checked:");
+        bool anyNotChecked = false;
+        for (int i = 0; i < int(RenderApiType::CountOf); ++i)
+        {
+            const RenderApiType apiType = RenderApiType(i);
+
+            // An API was "not checked" if it's not available on this platform
+            bool wasChecked = false;
+            if (apiType == RenderApiType::CPU)
+            {
+                wasChecked = (context.availableBackendFlags & PassThroughFlag::Generic_C_CPP) != 0;
+            }
+            else
+            {
+                wasChecked = RenderApiUtil::calcHasApi(apiType);
+            }
+
+            if (!wasChecked)
+            {
+                auto name = RenderApiUtil::getApiName(apiType);
+                printf(" %.*s", (int)name.getLength(), name.begin());
+                anyNotChecked = true;
+            }
+        }
+        if (!anyNotChecked)
+        {
+            printf(" (none)");
+        }
+        printf("\n");
+        fflush(stdout);
+
+        return SLANG_OK;
+    }
+
     if (options.subCommand.getLength())
     {
         // Get the function from the tool
@@ -5579,7 +5982,7 @@ SlangResult innerMain(int argc, char** argv)
                 context.isRetry = isRetry;
                 if (isRetry)
                 {
-                    if (context.failedUnitTests.getCount() == 0)
+                    if (context.options.disableRetries || context.failedUnitTests.getCount() == 0)
                         break;
 
                     printf("Retrying unit tests...\n");
@@ -5608,43 +6011,59 @@ SlangResult innerMain(int argc, char** argv)
         // If we have a couple failed tests, they maybe intermittent failures due to parallel
         // excution or driver instability. We can try running them again. Debug build has more
         // instability at this moment, so we allow more retries.
-#if _DEBUG
-        static constexpr int kFailedTestLimitForRetry = 100;
-#else
-        static constexpr int kFailedTestLimitForRetry = 16;
-#endif
-        if (context.failedFileTests.getCount() <= kFailedTestLimitForRetry)
+        if (context.stopSchedulingTests.load())
         {
-            if (context.failedFileTests.getCount() > 0)
-                printf("Retrying %d failed tests...\n", (int)context.failedFileTests.getCount());
-            for (auto& test : context.failedFileTests)
-            {
-                context.isRetry = true;
-                FileTestInfoImpl* fileTestInfo = static_cast<FileTestInfoImpl*>(test.Ptr());
-                TestReporter::SuiteScope suiteScope(&reporter, "tests");
-                TestReporter::TestScope scope(&reporter, fileTestInfo->testName);
-                auto newResult = runTest(
-                    &context,
-                    fileTestInfo->filePath,
-                    fileTestInfo->outputStem,
-                    fileTestInfo->testName,
-                    fileTestInfo->options);
-                reporter.addResult(newResult);
-            }
-        }
-        else
-        {
-            // If there are too many failed tests, don't bother retrying.
-            printf(
-                "Too many failed tests for retry(%d) - setting all to failed\n",
+            fprintf(
+                stderr,
+                "\n*** Stopped scheduling new tests after too many consecutive failures.\n"
+                "*** This usually indicates a systemic issue such as a GPU driver crash.\n"
+                "*** Skipping retries for %d failed tests.\n\n",
                 (int)context.failedFileTests.getCount());
-            fflush(stdout);
-            for (auto& test : context.failedFileTests)
+            fflush(stderr);
+        }
+
+        if (!context.options.disableRetries && !context.stopSchedulingTests.load())
+        {
+#if _DEBUG
+            static constexpr int kFailedTestLimitForRetry = 100;
+#else
+            static constexpr int kFailedTestLimitForRetry = 16;
+#endif
+            if (context.failedFileTests.getCount() <= kFailedTestLimitForRetry)
             {
-                FileTestInfoImpl* fileTestInfo = static_cast<FileTestInfoImpl*>(test.Ptr());
-                TestReporter::SuiteScope suiteScope(&reporter, "tests");
-                TestReporter::TestScope scope(&reporter, fileTestInfo->testName);
-                reporter.addResult(TestResult::Fail);
+                if (context.failedFileTests.getCount() > 0)
+                    printf(
+                        "Retrying %d failed tests...\n",
+                        (int)context.failedFileTests.getCount());
+                for (auto& test : context.failedFileTests)
+                {
+                    context.isRetry = true;
+                    FileTestInfoImpl* fileTestInfo = static_cast<FileTestInfoImpl*>(test.Ptr());
+                    TestReporter::SuiteScope suiteScope(&reporter, "tests");
+                    TestReporter::TestScope scope(&reporter, fileTestInfo->testName);
+                    auto newResult = runTest(
+                        &context,
+                        fileTestInfo->filePath,
+                        fileTestInfo->outputStem,
+                        fileTestInfo->testName,
+                        fileTestInfo->options);
+                    reporter.addResult(newResult);
+                }
+            }
+            else
+            {
+                // If there are too many failed tests, don't bother retrying.
+                printf(
+                    "Too many failed tests for retry(%d) - setting all to failed\n",
+                    (int)context.failedFileTests.getCount());
+                fflush(stdout);
+                for (auto& test : context.failedFileTests)
+                {
+                    FileTestInfoImpl* fileTestInfo = static_cast<FileTestInfoImpl*>(test.Ptr());
+                    TestReporter::SuiteScope suiteScope(&reporter, "tests");
+                    TestReporter::TestScope scope(&reporter, fileTestInfo->testName);
+                    reporter.addResult(TestResult::Fail);
+                }
             }
         }
 
@@ -5657,6 +6076,12 @@ SlangResult innerMain(int argc, char** argv)
 
 int main(int argc, char** argv)
 {
+#if SLANG_UNIX_FAMILY
+    // Ignore SIGPIPE so that writing to a broken pipe (e.g. a crashed test-server)
+    // returns EPIPE instead of killing this process (exit code 141).
+    signal(SIGPIPE, SIG_IGN);
+#endif
+
     // Fallback: run without cleanup if context initialization fails
     SlangResult res = innerMain(argc, argv);
     slang::shutdown();

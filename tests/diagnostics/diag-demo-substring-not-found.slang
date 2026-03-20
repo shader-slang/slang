@@ -8,6 +8,6 @@ struct S {};
 void test()
 {
     if (1);
-//CHECK this substring doesn't exist
+//CHECK: this substring doesn't exist
     // This substring doesn't appear in any diagnostic
 }

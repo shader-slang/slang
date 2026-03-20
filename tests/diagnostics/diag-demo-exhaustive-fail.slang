@@ -8,7 +8,7 @@ struct S {};
 void test()
 {
     if (1);
-//CHECK   ^ empty statement
+//CHECK:  ^ empty statement
     // This test only annotates one diagnostic but two are produced
     // In exhaustive mode (default), this fails
 }
