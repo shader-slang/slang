@@ -4,7 +4,7 @@
 Texture2D<float4> tex1;
 SamplerState samp;
 
-//TEST_INPUT: ubuffer(data=[0 0 0 0], stride=1, count=4):out,name outputBuffer
+//TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4, count=4):out,name outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 struct S {

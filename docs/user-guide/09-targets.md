@@ -11,7 +11,7 @@ This chapter provides a brief overview of the compilation targets supported by S
 
 ### Code Formats
 
-When Slang compiles for a target platform one of the most important distinctions is the _format_ of code for that platform.
+When Slang compiles for a target platform, one of the most important distinctions is the _format_ of code for that platform.
 For a native CPU target, the format is typically the executable machine-code format for the processor family (for example, x86-64).
 In contrast, GPUs are typically programmed through APIs that abstract over multiple GPU processor families and versions.
 GPU APIs usually define an _intermediate language_ that sits between a high-level-language compiler like Slang and GPU-specific compilers that live in drivers for the API.
@@ -32,7 +32,7 @@ The rasterization pipeline is named after its most important fixed-function stag
 #### Compute
 
 The _compute_ pipeline is a simple pipeline with only one stage: a programmable `compute` stage.
-As a result of being a single-stage pipeline the compute pipeline doesn't need to deal with many issues around inter-stage dataflow that other pipelines do.
+As a result of being a single-stage pipeline, the compute pipeline doesn't need to deal with many issues around inter-stage dataflow that other pipelines do.
 
 #### Ray Tracing
 
@@ -44,7 +44,7 @@ Just as applications can do computation outside of the dedicated compute pipelin
 
 ### Shader Parameter Bindings
 
-The kernels that execute within a pipeline typically has access to four different kinds of data:
+The kernels that execute within a pipeline typically have access to four different kinds of data:
 
 - _Varying inputs_ coming from the system or from a preceding pipeline stage
 
@@ -63,7 +63,7 @@ Current graphics APIs provide far more complicated and less uniform mechanisms f
 A high-level language compiler like Slang handles the task of _binding_ each user-defined shader parameter to one or more of the parameter-passing resources defined by a target platform.
 For example, the Slang compiler might bind a global `Texture2D` parameter called `gDiffuse` to the `t1` register defined by the Direct3D 11 API.
 
-An application is responsible for passing the argument data for a parameter using the using the corresponding platform-specific resource it was bound to.
+An application is responsible for passing the argument data for a parameter using the corresponding platform-specific resource it was bound to.
 For example, an application should set the texture they want to use for `gDiffuse` to the `t1` register using Direct3D 11 API calls.
 
 #### Slots
@@ -73,12 +73,12 @@ Each slot can store a single argument value of an allowed type.
 Depending on the platform slots might be called "registers," "locations," "bindings," "texture units," or other similar names.
 
 Slots almost exclusively use opaque types: textures, buffers, etc.
-On platforms that use slots for passing shader parameters, value of ordinary types like `float` or `int` need to be stored into a buffer, and then that buffer is passed via an appropriate slot.
+On platforms that use slots for passing shader parameters, values of ordinary types like `float` or `int` need to be stored into a buffer, and then that buffer is passed via an appropriate slot.
 
 Although many graphics APIs use slots as an abstraction, the details vary greatly across APIs.
 Different APIs define different kinds of slots, and the types of arguments that may be stored in those slots vary.
 For example, one API might use two different kinds of slots for textures and buffers, while another uses a single kind of slot for both.
-On some APIs each pipeline stage gets is own dedicated slots, while on others slots are shared across all stages in a pipeline.
+On some APIs each pipeline stage gets its own dedicated slots, while on others slots are shared across all stages in a pipeline.
 
 #### Blocks
 
@@ -88,7 +88,7 @@ Each block comprises one or more slots (often called "descriptors") that can be 
 
 Blocks are in turn set into appropriate slots provided by a pipeline.
 Because a block can contain many different slots for textures or buffers, switching a pipeline argument from one block to another can effectively swap out a large number of shader parameters in one operation.
-Thus, while blocks introduce a level of indirection to parameter setting, then can also enable greater efficiency when parameters are grouped into blocks according to frequency of change.
+Thus, while blocks introduce a level of indirection to parameter setting, they can also enable greater efficiency when parameters are grouped into blocks according to frequency of change.
 
 #### Root Constants
 
@@ -101,7 +101,7 @@ More importantly, though, using a root constant can avoid application code havin
 ## Direct3D 11
 
 Direct3D 11 (D3D11) is an older graphics API, but remains popular because it is much simpler to learn and use than some more recent APIs.
-In this section we will give an overview of the relevant features of D3D11 when used as a target platform for Slang.
+In this section, we will give an overview of the relevant features of D3D11 when used as a target platform for Slang.
 Subsequent sections about other APIs may describe them by comparison to D3D11.
 
 D3D11 kernels must be compiled to the DirectX Bytecode (DXBC) intermediate language.
@@ -131,7 +131,7 @@ Each stage has its own slots of the following types:
 
 - **Constant buffers** are used for passing relatively small (4KB or less) amounts of data that will be read by GPU code. Constant buffers are passed via `b` registers.
 
-- **Shader resource views** (SRVs) include most textures, buffers, and other opaque resource types there are read or sampled by GPU code. SRVs use `t` registers.
+- **Shader resource views** (SRVs) include most textures, buffers, and other opaque resource types that are read or sampled by GPU code. SRVs use `t` registers.
 
 - **Unordered access views** (UAVs) include textures, buffers, and other opaque resource types used for write or read-write operations in GPU code. UAVs use `u` registers.
 
@@ -151,7 +151,7 @@ For example, a fragment kernel cannot use both `u0` and `SV_Target0` at once.
 Direct3D 12 (D3D12) is the current major version of the Direct3D API.
 
 D3D12 kernels must be compiled to the DirectX Intermediate Language (DXIL).
-DXIL is a layered encoding based off of LLVM bitcode; it introduces additional formatting rules and constraints which are loosely documented.
+DXIL is a layered encoding based on LLVM bitcode; it introduces additional formatting rules and constraints which are loosely documented.
 A DXIL binary may be signed, and the runtime API only accepts appropriately signed binaries (unless a developer mode is enabled on the host machine).
 A DXIL validator `dxil.dll` is included in SDK releases, and this validator can sign binaries that pass validation.
 While DXIL can in principle be generated from multiple compiler front-ends, support for other compilers is not prioritized.
@@ -169,7 +169,7 @@ Revisions to D3D12 have added additional stages to the rasterization pipeline, a
 
 The D3D12 rasterization pipeline provides alternative geometry processing stages that may be used as an alternative to the `vertex`, `hull`, `domain`, and `geometry` stages:
 
-- The `mesh` stage runs groups of threads which are responsible cooperating to produce both the vertex and index data for a _meshlet_ a bounded-size chunk of geometry.
+- The `mesh` stage runs groups of threads which are responsible for cooperating to produce both the vertex and index data for a _meshlet_, a bounded-size chunk of geometry.
 
 - The optional `amplification` stage precedes the mesh stage and is responsible for determining how many mesh shader invocations should be run.
 
@@ -194,7 +194,7 @@ The D3D12 ray tracing pipeline exposes the following programmable stages:
 
 - The `callable` stage allows user-defined kernels to be invoked like subroutines in the context of the ray tracing pipeline.
 
-Compared to existing rasterization and compute pipelines, an important difference in the design of the D3D12 ray tracing pipeline is that multiple kernels can be loaded into the pipeline for each of the programming stages.
+Compared to existing rasterization and compute pipelines, an important difference in the design of the D3D12 ray tracing pipeline is that multiple kernels can be loaded into the pipeline for each of the programmable stages.
 The specific closest-hit, miss, or other kernel that runs for a given hit or ray is determined by indexing into an appropriate _shader table_, which is effectively an array of kernels.
 The indexing into a shader table can depend on many factors including the type of ray, the type of geometry hit, etc.
 
@@ -208,9 +208,9 @@ Most opaque types (texture, resources, samplers) must be set into blocks (D3D12 
 Each pipeline supports a fixed amount of storage for "root parameters," and allows those root parameters to be configured as root constants, slots for blocks, or slots for a limited number of opaque types (primarily just flat buffers).
 
 Shader parameters are still grouped and bound to registers as in D3D11; for example, a `Texture2D` parameter is considered as an SRV and uses a `t` register.
-D3D12 additionally associates binds shader parameters to "spaces" which are expressed similarly to registers (e.g., `space2`), but represent an orthogonal "axis" of binding.
+D3D12 additionally binds shader parameters to "spaces" which are expressed similarly to registers (e.g., `space2`), but represent an orthogonal "axis" of binding.
 
-While shader parameters are bound registers and spaces, those registers and spaces do not directly correspond to slots provided by the D3D12 API the way registers do in D3D11.
+While shader parameters are bound to registers and spaces, those registers and spaces do not directly correspond to slots provided by the D3D12 API the way registers do in D3D11.
 Instead, the configuration of the root parameters and the correspondence of registers/spaces to root parameters, blocks, and/or slots are defined by a _pipeline layout_ that D3D12 calls a "root signature."
 
 Unlike D3D11, all of the stages in a D3D12 pipeline share the same root parameters.
@@ -269,7 +269,7 @@ Unlike D3D12, each shader table entry in Vulkan can only be used to pass ordinar
 
 OpenGL has existed for many years, and predates programmable GPU pipelines of the kind this chapter discusses; we will focus solely on use of OpenGL as an API for programmable GPU pipelines.
 
-OpenGL is a cross-platform GPU API for graphics and compute with a detailed specification produced by a multi-vendor standard body.
+OpenGL is a cross-platform GPU API for graphics and compute with a detailed specification produced by a multi-vendor standards body.
 In contrast with Vulkan, OpenGL provides many convenience and safety features that can simplify GPU programming.
 
 OpenGL allows kernels to be loaded as SPIR-V binaries, vendor-specific binaries, or using GLSL source code.
@@ -285,7 +285,7 @@ The OpenGL rasterization pipeline also supports the same mesh shader stages that
 OpenGL uses slots for binding.
 There are distinct kinds of slots for buffers and textures/images, and each set of slots is shared by all pipeline stages.
 
-High-level-language shader parameters are bounding to a "binding" index for OpenGL.
+High-level-language shader parameters are bound to a "binding" index for OpenGL.
 The binding index of a parameter is the zero-based index of the slot (of the appropriate kind) that must be used to pass an argument value.
 
 Note that while OpenGL and Vulkan both use binding indices for shader parameters like textures, the semantics of those are different because OpenGL uses distinct slots for passing buffers and textures.
@@ -416,13 +416,13 @@ Because CPU target support flexible pointer-based addressing and large low-laten
 
 > #### Note
 >
-> Slang support for WebGPU is work in progress.
+> Slang support for WebGPU is a work in progress.
 
 WebGPU is a graphics and compute API.
-It is similar in spirit to modern APIs, like Metal, Direct3D 12 and Vulkan, but with concessions to portability and privacy.
+It is similar in spirit to modern APIs, like Metal, Direct3D 12, and Vulkan, but with concessions to portability and privacy.
 
 WebGPU is available both in browsers as a JavaScript API, and natively as a C/C++ API.
-[Dawn](https://github.com/google/dawn), is a native WebGPU implementation used by the Chrome browser.
+[Dawn](https://github.com/google/dawn) is a native WebGPU implementation used by the Chrome browser.
 
 By combining Slang, [Dawn](https://github.com/google/dawn) and [Emscripten](https://emscripten.org/),
 an application can easily target any native API, and the web, with a single codebase consisting of C++ and Slang code.
