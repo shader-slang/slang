@@ -178,7 +178,9 @@ expression has a lower value evaluation class.
 
 > 📝 **Remark 2:** The list of evaluation classes of functions is unspecified at this time. In general, one
 > can expect that basic built-in operations such as addition, subtraction, multiplication, and division are
-> always eligible for compile-time constant expressions. When in doubt, use the `constexpr` keyword.
+> always eligible for compile-time constant expressions. When in doubt, assign the expression containing a
+> function call to a `static const` global variable or to a `static const` member variable of a struct or an
+> interface.
 
 > 📝 **Remark 3:** In practice, complex expressions are often evaluated both at translation time and at
 > runtime. This is a result of compiler optimizations where the subexpressions eligible for translation-time
