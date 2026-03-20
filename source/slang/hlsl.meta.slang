@@ -27560,10 +27560,10 @@ struct CoopMat
     }
 
     //
-    // Native register store/load for efficient shmem reductions.
-    // Stores/loads raw CoopMat registers to/from groupshared memory.
-    // On CUDA: direct register copy via reinterpret_cast in prelude.
-    // On Vulkan: element-by-element via subscript.
+    // Native register store/load for shared memory.
+    // Dumps/restores raw CoopMat registers without preserving matrix layout,
+    // so the stored data is only usable for element-wise operations (e.g.
+    // cross-warp reduction), not for subsequent MMA.
     //
 
     /// Stores raw registers to groupshared memory in native layout.
