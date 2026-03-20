@@ -60,6 +60,9 @@ void computeMain()
 //CHECK:         ^ integer constant overflow in conversion
 //CHECK:         ^ integer value '300' does not fit in type 'int8_t'
 
+    // Folded constant expression that stays in range - should NOT warn
+    funcInt8(300 - 200);
+
     // 65536 needs 17 bits, exceeding 16-bit types
     funcInt16(65536);
 //CHECK:      ^^^^^ integer constant overflow in conversion
@@ -117,6 +120,10 @@ void computeMain()
     funcInt32(0xFFFFFFFFu);
     funcInt8(128);
     funcInt16(40000);
+
+    // Negative boundary for unsigned: -128 fits in 8 bits (two's complement),
+    // so no overflow warning fires despite not being representable in [0, 255].
+    funcUint8(-128);
 
     // -2 to unsigned: bit-width fits and getImplicitConversionCostWithKnownArg
     // reduces cost below kConversionCost_Default, so no warning from either check.
