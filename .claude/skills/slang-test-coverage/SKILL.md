@@ -119,9 +119,39 @@ Document overlap analysis in test-coverage.md:
 
 **For each capability, check**:
 - [ ] Positive case tested?
-- [ ] Negative/error case tested?
+- [ ] Negative/error case tested? (see Negative Testing Rule below)
 - [ ] Edge cases tested?
 - [ ] All targets tested? (cpu, cuda, vk, hlsl, metal, wgsl)
+
+### Negative Testing Rule (mandatory)
+
+Every positive functional test that exercises a **constrained feature** MUST
+have a companion negative diagnostic test that verifies the constraint is
+enforced. Without the negative test, the constraint could be silently
+ignored and the positive test would still pass.
+
+**Constrained features** include:
+- Interface conformance (`T : IMyInterface`)
+- Where clauses (`where T : ISomething`)
+- Generic type parameter constraints
+- Typealias constraints
+- Access control / visibility restrictions
+- Type compatibility requirements
+
+**What the negative test must do**:
+1. Use `DIAGNOSTIC_TEST` (not a compute test)
+2. Provide a type/value that violates the constraint
+3. Verify the compiler emits the expected error diagnostic
+4. Use exhaustive mode (no `non-exhaustive` unless justified)
+
+**Example**: If a positive test verifies `WrappedProvider<ConstantProvider>`
+works (where `ConstantProvider : IValueProvider`), the companion negative
+test must verify `WrappedProvider<NotAProvider>` is rejected with
+"type argument does not conform to the required interface".
+
+**Naming**: Name negative tests with a `-negative` suffix:
+`generic-typealias-with-constraints.slang` (positive) +
+`generic-typealias-with-constraints-negative.slang` (negative)
 
 **For interface-typed variables/parameters/return-values**:
 - [ ] Direct interface type
@@ -294,6 +324,7 @@ Create `tmp/feature-name/SUMMARY.md`:
 - Reference describes behavior but no test exists (score ≥6)
 - Error case should trigger but untested
 - Existing tests unclear + your test notably better
+- Positive test exists for a constrained feature but no negative test verifies enforcement
 
 ### SKIP test if:
 - Code unreachable (dead code)
@@ -321,6 +352,11 @@ Create `tmp/feature-name/SUMMARY.md`:
 6. **Misleading comments**: Comments referencing wrong interface names,
    wrong error codes, or describing behavior that does not match the
    actual code. Always cross-check comment text against the real code.
+7. **Positive-only constraint tests**: Writing a functional test that
+   exercises a constrained feature (e.g., generic typealias with
+   `where T : IFoo`) but omitting the negative diagnostic test that
+   verifies the compiler rejects constraint violations. Without the
+   negative test, the constraint may be unenforced.
 
 ---
 

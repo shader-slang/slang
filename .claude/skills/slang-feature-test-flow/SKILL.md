@@ -112,6 +112,14 @@ Feature: generics
 - Keep sub-plans small enough for a single reviewable PR (aim for 5-8 test files, ~100-200 lines)
 - Related sub-plans can be combined into a single PR if the total stays under ~500 lines (e.g., all diagnostic tests for a feature, or all functional tests). Use judgement to group by theme.
 
+**Negative testing requirement**: Every sub-plan that includes positive
+functional tests for constrained features (interface conformance, where
+clauses, generic constraints, typealias constraints) MUST also include
+companion negative diagnostic tests that verify the constraints are
+enforced. A positive-only test for a constrained feature will be flagged
+in code review. Plan the negative companion at sub-plan time, not as an
+afterthought.
+
 ### Sub-plan Format
 
 Write each to `tmp/<feature>/sub-plans/sub-plan-<letter>.md`:
@@ -142,6 +150,7 @@ Add tests for [feature]: [dimension]
 - **Type**: compute | diagnostic | interpret
 - **Validates**: [specific behavior from spec]
 - **Key assertion**: [what the CHECK verifies]
+- **Negative companion**: [yes/no — if yes, list the -negative.slang file]
 - **Priority**: HIGH | MEDIUM | LOW
 - **Score**: N/10
 
@@ -245,6 +254,10 @@ Before formatting or committing, verify EVERY test file:
      with a quick slangc invocation before writing the full test
   f. DIAGNOSTIC_TEST uses exhaustive mode unless there is a documented
      reason for non-exhaustive; never use non-exhaustive "just in case"
+  g. Negative companion: if any functional test exercises a constrained
+     feature (interface conformance, where clause, generic constraint),
+     verify a companion -negative.slang diagnostic test exists that
+     proves the constraint is enforced by rejecting invalid types
 
 ### Step 3: Format
 Run ./extras/formatting.sh on changed files.

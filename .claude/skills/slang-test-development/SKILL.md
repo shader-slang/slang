@@ -38,6 +38,7 @@ Place tests under `tests/` directory, organized by category:
 - **"Does this code produce the right error/warning?"** → `DIAGNOSTIC_TEST:SIMPLE(diag=CHECK)`
 - **"Does this code run correctly without GPU?"** → `INTERPRET`
 - **"Does this code work on multiple backends?"** → Multiple `COMPARE_COMPUTE` lines with different targets
+- **"Does this constraint/restriction actually reject invalid code?"** → `DIAGNOSTIC_TEST` companion (see Negative Testing below)
 
 ## Test Types
 
@@ -124,6 +125,43 @@ if (x == y);
 ```
 
 See `docs/diagnostics.md` for full details on the diagnostic annotation system.
+
+### Negative Testing for Constrained Features
+
+When a positive test exercises a **constrained feature** (interface
+conformance, where clauses, generic constraints, typealias constraints),
+always create a companion negative diagnostic test that verifies the
+compiler **rejects** constraint violations.
+
+Without the negative test, the constraint could be silently ignored and
+the positive test would still pass. This was flagged in PR review for
+generic typealias tests that only tested valid types but never verified
+that invalid types were rejected.
+
+**Pattern**: Create a `-negative` companion file:
+
+```slang
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
+
+interface IMyInterface { int getValue(); }
+struct Wrapper<T : IMyInterface> { T inner; }
+typealias Wrapped<T : IMyInterface> = Wrapper<T>;
+
+struct NotConforming { int data; }
+
+void test()
+{
+    Wrapped<NotConforming> w;
+/*CHECK:
+    ^^^^^^^^^^^^^^ type argument doesn't conform to interface
+    ^^^^^^^^^^^^^^ type argument 'NotConforming' does not conform to the required interface 'IMyInterface'
+*/
+}
+```
+
+**Naming convention**:
+- `feature-scenario.slang` (positive functional test)
+- `feature-scenario-negative.slang` (negative diagnostic companion)
 
 ### 4. Interpreter Tests (No GPU)
 For testing without any GPU backend.
@@ -243,7 +281,12 @@ Before committing any test file, verify:
    compiles before writing the full test. Run a quick `slangc` check.
    Do not write tests for unsupported or unimplemented features.
 
-6. **Run the test**: Every test must pass locally before committing.
+6. **Negative companion exists**: If the test exercises a constrained
+   feature (interface conformance, where clause, generic constraint),
+   verify a companion `-negative` diagnostic test exists that proves
+   the constraint is enforced by rejecting invalid types/values.
+
+7. **Run the test**: Every test must pass locally before committing.
 
 ## Troubleshooting
 
