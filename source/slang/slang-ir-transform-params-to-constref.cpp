@@ -313,6 +313,11 @@ struct TransformParamsToConstRefContext
             auto user = use->getUser();
             if (as<IRDecoration>(user))
                 continue;
+            // Specialization dictionary entries are transient bookkeeping for later
+            // specialization/finalization and should not block borrow-in rewriting
+            // of entry-point parameters.
+            if (as<IRSpecializationDictionaryItem>(user))
+                continue;
             if (auto call = as<IRCall>(user))
             {
                 if (call->getCalleeUse() == use)

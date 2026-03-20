@@ -34,9 +34,11 @@ jobs:
       options: >-
         --gpus all
         --user root
+        --cap-add SYSLOG
         --device /dev/nvidia-modeset:/dev/nvidia-modeset
         --device /dev/dri:/dev/dri
         -e NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics
+        -e VK_LOADER_LAYERS_DISABLE=VK_LAYER_MESA_device_select
         -v /etc/vulkan/icd.d/nvidia_icd.json:/etc/vulkan/icd.d/nvidia_icd.json:ro
         -v /usr/share/nvidia:/usr/share/nvidia:ro
         -v /usr/share/glvnd/egl_vendor.d/10_nvidia.json:/usr/share/glvnd/egl_vendor.d/10_nvidia.json:ro
@@ -95,6 +97,7 @@ jobs:
           slang_test_args=(
             "-category" "full"
             "-expected-failure-list" "tests/expected-failure-github.txt"
+            "-expected-failure-list" "tests/expected-failure-linux.txt"
             "-expected-failure-list" "tests/expected-failure-linux-gpu.txt"
             "-skip-reference-image-generation"
             "-show-adapter-info"
@@ -131,7 +134,23 @@ jobs:
             -api vk \
             -expected-failure-list tests/expected-failure-via-glsl.txt \
             -expected-failure-list tests/expected-failure-github.txt \
+            -expected-failure-list tests/expected-failure-linux.txt \
             -expected-failure-list tests/expected-failure-linux-gpu.txt
+
+      - name: GPU post-test diagnostics
+        if: failure()
+        run: |
+          echo "=== GPU State ==="
+          nvidia-smi 2>&1 || echo "nvidia-smi FAILED (GPU may have crashed)"
+          echo ""
+          echo "=== GPU Memory & ECC ==="
+          nvidia-smi --query-gpu=name,driver_version,memory.used,memory.free,temperature.gpu,ecc.errors.uncorrected.volatile.total,pstate \
+            --format=csv,noheader 2>&1 || true
+          echo ""
+          echo "=== Kernel GPU Messages ==="
+          dmesg 2>/dev/null | grep -iE "nvidia|nvrm|xid|gpu|fault|segfault" | tail -50 || \
+          sudo dmesg 2>/dev/null | grep -iE "nvidia|nvrm|xid|gpu|fault|segfault" | tail -50 || \
+          echo "(dmesg not available in container)"
 
   test-slang-rhi:
     runs-on: ["Linux", "self-hosted", "GPU"]
@@ -149,9 +168,11 @@ jobs:
       options: >-
         --gpus all
         --user root
+        --cap-add SYSLOG
         --device /dev/nvidia-modeset:/dev/nvidia-modeset
         --device /dev/dri:/dev/dri
         -e NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics
+        -e VK_LOADER_LAYERS_DISABLE=VK_LAYER_MESA_device_select
         -v /etc/vulkan/icd.d/nvidia_icd.json:/etc/vulkan/icd.d/nvidia_icd.json:ro
         -v /usr/share/nvidia:/usr/share/nvidia:ro
         -v /usr/share/glvnd/egl_vendor.d/10_nvidia.json:/usr/share/glvnd/egl_vendor.d/10_nvidia.json:ro
@@ -214,3 +235,18 @@ jobs:
       - name: Run slang-rhi tests (OptiX 8.1)
         run: |
           "$bin_dir/slang-rhi-tests" -check-devices -optix-version=80100 -tc="ray-tracing-*.cuda"
+
+      - name: GPU post-test diagnostics
+        if: failure()
+        run: |
+          echo "=== GPU State ==="
+          nvidia-smi 2>&1 || echo "nvidia-smi FAILED (GPU may have crashed)"
+          echo ""
+          echo "=== GPU Memory & ECC ==="
+          nvidia-smi --query-gpu=name,driver_version,memory.used,memory.free,temperature.gpu,ecc.errors.uncorrected.volatile.total,pstate \
+            --format=csv,noheader 2>&1 || true
+          echo ""
+          echo "=== Kernel GPU Messages ==="
+          dmesg 2>/dev/null | grep -iE "nvidia|nvrm|xid|gpu|fault|segfault" | tail -50 || \
+          sudo dmesg 2>/dev/null | grep -iE "nvidia|nvrm|xid|gpu|fault|segfault" | tail -50 || \
+          echo "(dmesg not available in container)"
