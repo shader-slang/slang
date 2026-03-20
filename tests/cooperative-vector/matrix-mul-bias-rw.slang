@@ -3,7 +3,7 @@
 
 // Disabled because HLSL can't multiply from *RW*ByteAddressBuffers
 //DISABLE_TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-dx12 -render-feature cooperative-vector -dx12-experimental -output-using-type -profile cs_6_9 -Xslang... -Xdxc -Vd -X.
-//DISABLE_TEST(compute):SIMPLE(filecheck=DXIL):-target dxil -profile cs_6_9 -entry computeMain
+//DISABLE_DISABLE_TEST(compute):SIMPLE(filecheck=):-target dxil -profile cs_6_9 -entry computeMain
 //DXIL: result code = 0
 
 // CHECK: type: half
