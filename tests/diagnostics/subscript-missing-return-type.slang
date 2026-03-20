@@ -8,7 +8,6 @@ struct MyType
 
     __subscript(int x, int y)
 //CHECK:       ^ __subscript declaration must have a return type specified after '->'
-//CHECK:       ^ __subscript declaration must have a return type specified after '->'
     {
         get { return val[x*3 + y]; }
     }

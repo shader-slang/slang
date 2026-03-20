@@ -2,16 +2,25 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-dx12 -render-feature cooperative-vector -dx12-experimental -output-using-type -profile cs_6_9 -Xslang... -Xdxc -Vd -X.
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 
+//TEST(compute):SIMPLE(filecheck=DXIL):-target dxil -profile cs_6_9 -entry computeMain
+//TEST(compute):SIMPLE(filecheck=DXIL):-target dxil -profile cs_6_9 -entry computeMain -DRWBAB
+//DXIL: result code = 0
+
 // CHECK: type: uint32_t
 // CHECK-NEXT: 0
 // CHECK-NEXT: 1
 // CHECK-NEXT: 1
 
 //TEST_INPUT:ubuffer(data=[1.0 2.0 3.0 4.0], stride=4),name=input1
-ByteAddressBuffer input1;
-
 //TEST_INPUT:ubuffer(data=[1.0 3.0 2.0 4.0], stride=4),name=input2
+
+#if defined(RWBAB)
+RWByteAddressBuffer input1;
+RWByteAddressBuffer input2;
+#else
+ByteAddressBuffer input1;
 ByteAddressBuffer input2;
+#endif
 
 //TEST_INPUT:ubuffer(data=[0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;

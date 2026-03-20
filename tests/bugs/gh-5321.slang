@@ -12,7 +12,6 @@ float cs(uniform uint x)
     {
     case FillType_Solid:
 //CHECK: ^^^^^^^^^^^^^^ expression does not evaluate to a compile-time constant
-//CHECK: ^^^^^^^^^^^^^^ expression does not evaluate to a compile-time constant
         return 0.0;
     }
     return 0.0;

@@ -8,4 +8,3 @@ struct Base {}
 
 struct Derived : Base {}
 //CHECK:         ^^^^ struct 'Derived' cannot inherit from non-interface type 'Base'
-//CHECK:         ^^^^ struct 'Derived' cannot inherit from non-interface type 'Base'

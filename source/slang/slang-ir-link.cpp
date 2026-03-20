@@ -8,6 +8,7 @@
 #include "slang-ir-insts.h"
 #include "slang-ir-layout.h"
 #include "slang-ir-specialize-target-switch.h"
+#include "slang-ir-specialize.h"
 #include "slang-ir-string-hash.h"
 #include "slang-ir.h"
 #include "slang-legalize-types.h"
@@ -994,8 +995,6 @@ void cloneFunctionCommon(
 // needs to perform this operation even though it is logically part of
 // the later generic specialization pass.
 //
-IRInst* specializeGeneric(IRSpecialize* specializeInst);
-
 /// Copy layout information for an entry-point function to its parameters.
 ///
 /// When layout information is initially attached to an IR entry point,

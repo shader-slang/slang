@@ -1646,6 +1646,13 @@ err(
 )
 
 err(
+    "size-of-data-layout-is-invalid",
+    30086,
+    "invalid data layout for sizeof/alignof",
+    span { loc = "expr:Expr", message = "argument does not conform to IBufferDataLayout" }
+)
+
+err(
     "count-of-argument-is-invalid",
     30083,
     "invalid countof argument",
@@ -2478,6 +2485,20 @@ err(
     span { loc = "decl:Decl", message = "cannot export incomplete type '~decl'" }
 )
 
+warning(
+    "deprecated-bracket-attributes-placement",
+    31204,
+    "deprecated bracketed attribute list placement. Bracketed attributes should be placed before 'struct'.",
+    span { loc = "location", message = "deprecated placement of bracketed attributes list." }
+)
+
+err(
+    "invalid-bracket-attributes-placement",
+    31205,
+    "invalid bracketed attribute list placement. Bracketed attributes must be placed before 'struct'.",
+    span { loc = "location", message = "invalid placement of bracketed attributes list." }
+)
+
 err(
     "memory-qualifier-not-allowed-on-a-non-image-type-parameter",
     31206,
@@ -2805,6 +2826,20 @@ err(
     39999,
     "the initial-value expression for variable '~decl' depends on the value of the variable itself",
     span { loc = "decl:Decl", message = "the initial-value expression for variable '~decl' depends on the value of the variable itself" }
+)
+
+err(
+    "generic-evaluation-recursion-limit-exceeded",
+    39998,
+    "recursive generic evaluation exceeded maximum depth",
+    span { loc = "decl:Decl", message = "evaluation of '~decl' exceeded the recursive generic evaluation budget (~budget:int)" }
+)
+
+fatal(
+    "maximum-type-nesting-level-exceeded",
+    39997,
+    "maximum type nesting level exceeded",
+    span { loc = "location", message = "maximum type nesting level exceeded" }
 )
 
 fatal(
@@ -3416,6 +3451,13 @@ warning(
     39999,
     "integer literal truncated",
     span { loc = "location", message = "integer literal '~literal' too large for type '~type' truncated to '~truncatedValue'" }
+)
+
+warning(
+    "integer-constant-overflow",
+    39999,
+    "integer constant overflow in conversion",
+    span { loc = "expr:Expr", message = "integer value '~value' does not fit in type '~toType:Type'" }
 )
 
 warning(
@@ -4158,6 +4200,13 @@ err(
     span { loc = "location", message = "cannot default-initialize struct '~structName' with '{}' because it contains resource fields" }
 )
 
+err(
+    "accessing-value-of-none-optional",
+    41027,
+    "accessing .value on an Optional that is always none",
+    span { loc = "location", message = "accessing .value on an Optional<~type:IRInst> that is always 'none'" }
+)
+
 
 -- Load semantic checking diagnostics (part 13) - AnyValue, Autodiff, Static assertions, Atomics, etc.
 -- (inlined from slang-diagnostics-semantic-checking-13.lua)
@@ -4524,6 +4573,20 @@ err(
     55205,
     "specialization constants not supported for numthreads",
     span { loc = "location", message = "Specialization constants are not supported in the 'numthreads' attribute for the current target." }
+)
+
+fatal(
+    "generic-specialization-recursion-cycle",
+    55206,
+    "recursive generic specialization detected",
+    span { loc = "location", message = "generic specialization for '~generic:IRInst' recursively re-entered the same specialization key." }
+)
+
+fatal(
+    "generic-specialization-budget-exceeded",
+    55207,
+    "generic specialization exceeded maximum depth",
+    span { loc = "location", message = "generic specialization for '~generic:IRInst' exceeded the recursive specialization budget (~budget:int)." }
 )
 
 err(
