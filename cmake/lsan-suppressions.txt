@@ -17,6 +17,10 @@
 # The pattern "libslang-llvm" matches when LSan can resolve the module name.
 # When LSan cannot identify the non-instrumented module, it reports frames
 # as "<unknown module>"; the second pattern catches those.
+# WARNING: "leak:<unknown module>" is broad -- it suppresses leaks from ANY
+# module where LSan cannot resolve symbols (not just slang-llvm). This is a
+# known trade-off; narrowing it requires LSan to reliably resolve module
+# names for non-instrumented shared libraries.
 leak:libslang-llvm
 leak:<unknown module>
 
