@@ -10,6 +10,8 @@
 #endif
 #include <windows.h>
 #else
+#include <errno.h>
+#include <signal.h>
 #include <spawn.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -116,6 +118,58 @@ static String findExecutableInDir(const String& dir, const String& name)
     return String();
 }
 
+// Append a single argument to `builder` using Windows command-line escaping rules
+// compatible with CommandLineToArgvW / the MSVC CRT argument parser.
+#ifdef _WIN32
+static void appendQuotedArg(StringBuilder& builder, const String& arg)
+{
+    builder << "\"";
+    Index len = arg.getLength();
+    for (Index i = 0; i < len; ++i)
+    {
+        // Count consecutive backslashes.
+        Index numBackslashes = 0;
+        while (i + numBackslashes < len && arg[i + (int)numBackslashes] == '\\')
+            ++numBackslashes;
+
+        if (numBackslashes > 0)
+        {
+            i += (int)numBackslashes - 1; // loop ++i will advance past the last one
+
+            if (i + 1 >= len)
+            {
+                // Backslashes at end of argument: double them (they precede the closing quote).
+                for (Index j = 0; j < numBackslashes * 2; ++j)
+                    builder << "\\";
+            }
+            else if (arg[i + 1] == '"')
+            {
+                // Backslashes followed by a double quote: double them and escape the quote.
+                for (Index j = 0; j < numBackslashes * 2; ++j)
+                    builder << "\\";
+                builder << "\\\"";
+                ++i; // skip the quote
+            }
+            else
+            {
+                // Backslashes not followed by a quote: emit them literally.
+                for (Index j = 0; j < numBackslashes; ++j)
+                    builder << "\\";
+            }
+        }
+        else if (arg[i] == '"')
+        {
+            builder << "\\\"";
+        }
+        else
+        {
+            builder.appendChar(arg[i]);
+        }
+    }
+    builder << "\"";
+}
+#endif
+
 // Spawn a child process that inherits our stdin/stdout/stderr,
 // wait for it to exit, and return its exit code via outExitCode.
 // Returns true if the process was launched successfully (even if it
@@ -133,7 +187,7 @@ static bool spawnInherited(const String& execPath, const List<String>& args, int
     {
         if (i > 0)
             cmdBuilder << " ";
-        cmdBuilder << "\"" << args[i] << "\"";
+        appendQuotedArg(cmdBuilder, args[i]);
     }
     OSString cmdWide = cmdBuilder.toString().toWString();
 
@@ -195,7 +249,14 @@ static bool spawnInherited(const String& execPath, const List<String>& args, int
         return false;
 
     int status;
-    waitpid(pid, &status, 0);
+    while (waitpid(pid, &status, 0) == -1)
+    {
+        if (errno != EINTR)
+        {
+            outExitCode = 1;
+            return true;
+        }
+    }
     if (WIFEXITED(status))
         outExitCode = WEXITSTATUS(status);
     else
@@ -329,7 +390,10 @@ static int handleVersion(
 int MAIN(int argc, const char* const* argv)
 {
     DispatchContext ctx;
-    ctx.binDir = Path::getParentDirectory(Path::getExecutablePath());
+    String execPath = Path::getExecutablePath();
+    if (execPath.getLength() == 0)
+        fprintf(stderr, "slang: warning: could not determine executable path\n");
+    ctx.binDir = Path::getParentDirectory(execPath);
     ctx.verbose = false;
     ctx.dryRun = false;
 

@@ -5,6 +5,7 @@ slang_add_target(
     LINK_WITH_PRIVATE
         core
     INSTALL
+    EXPORT_SET_NAME SlangTargets
 )
 
 target_compile_definitions(slang-dispatcher PRIVATE "SLANG_VERSION_STRING=\"${PROJECT_VERSION}\"")
