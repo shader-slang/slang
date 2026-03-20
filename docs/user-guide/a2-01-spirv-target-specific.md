@@ -64,17 +64,17 @@ The system-value semantics are translated to the following SPIR-V code.
 | `SV_DepthLessEqual`            | `BuiltIn FragDepth`                              |
 | `SV_DispatchThreadID`          | `BuiltIn GlobalInvocationId`                     |
 | `SV_DomainLocation`            | `BuiltIn TessCoord`                              |
-| `SV_DrawIndex`<sup>\*</sup>    | `Builtin DrawIndex`                              |
-| `SV_DeviceIndex`               | `Builtin DeviceIndex`                            |
-| `SV_FragInvocationCount`       | `Builtin FragInvocationCountExt`                 |
-| `SV_FragSize`                  | `Builtin FragSizeExt`                            |
+| `SV_DrawIndex`<sup>\*</sup>    | `BuiltIn DrawIndex`                              |
+| `SV_DeviceIndex`               | `BuiltIn DeviceIndex`                            |
+| `SV_FragInvocationCount`       | `BuiltIn FragInvocationCountEXT`                 |
+| `SV_FragSize`                  | `BuiltIn FragSizeEXT`                            |
 | `SV_GSInstanceID`              | `BuiltIn InvocationId`                           |
 | `SV_GroupID`                   | `BuiltIn WorkgroupId`                            |
 | `SV_GroupIndex`                | `BuiltIn LocalInvocationIndex`                   |
 | `SV_GroupThreadID`             | `BuiltIn LocalInvocationId`                      |
 | `SV_InnerCoverage`             | `BuiltIn FullyCoveredEXT`                        |
 | `SV_InsideTessFactor`          | `BuiltIn TessLevelInner`                         |
-| `SV_InstanceID`<sup>\*\*</sup> | `BuiltIn InstanceIndex` - `Builtin BaseInstance` |
+| `SV_InstanceID`<sup>\*\*</sup> | `BuiltIn InstanceIndex` - `BuiltIn BaseInstance` |
 | `SV_IntersectionAttributes`    | _Not supported_                                  |
 | `SV_IsFrontFace`               | `BuiltIn FrontFacing`                            |
 | `SV_OutputControlPointID`      | `BuiltIn InvocationId`                           |
@@ -90,7 +90,7 @@ The system-value semantics are translated to the following SPIR-V code.
 | `SV_StencilRef`                | `BuiltIn FragStencilRefEXT`                      |
 | `SV_Target<N>`                 | `Location`                                       |
 | `SV_TessFactor`                | `BuiltIn TessLevelOuter`                         |
-| `SV_VertexID`<sup>\*\*</sup>   | `BuiltIn VertexIndex` - `Builtin BaseVertex`     |
+| `SV_VertexID`<sup>\*\*</sup>   | `BuiltIn VertexIndex` - `BuiltIn BaseVertex`     |
 | `SV_ViewID`                    | `BuiltIn ViewIndex`                              |
 | `SV_ViewportArrayIndex`        | `BuiltIn ViewportIndex`                          |
 | `SV_VulkanInstanceID`          | `BuiltIn InstanceIndex`                          |
@@ -98,7 +98,7 @@ The system-value semantics are translated to the following SPIR-V code.
 | `SV_VulkanVertexID`            | `BuiltIn VertexIndex`                            |
 
 _Note_ that `SV_DrawIndex`, `SV_FragInvocationCount`, `SV_FragSize`, `SV_PointSize`, `SV_PointCoord` and `SV_VulkanSamplePosition` are Slang-specific semantics that are not defined in HLSL.
-Also _note_ that `SV_InstanceID`/`SV_VertexID` counts all instances/vertices in a draw call, unlike how `InstanceIndex`/`VertexIndex` is relative to `BaseInstance`/`BaseVertex`.
+Also _note_ that `SV_InstanceID`/`SV_VertexID` count all instances/vertices in a draw call, unlike how `InstanceIndex`/`VertexIndex` is relative to `BaseInstance`/`BaseVertex`.
 See [Using SV_InstanceID/SV_VertexID with SPIR-V target](#using-sv_instanceid-and-sv_vertexid-with-spir-v-target)
 
 ## Using SV_InstanceID and SV_VertexID with SPIR-V target
@@ -151,7 +151,7 @@ Slang supports the following HLSL feature sets when targeting SPIR-V.
 
 ## Unsupported GLSL keywords when targeting SPIR-V
 
-Slang doesn't support the following Precision qualifiers in Vulkan.
+Slang doesn't support the following precision qualifiers in Vulkan.
 
 - lowp : RelaxedPrecision, on storage variable and operation
 - mediump : RelaxedPrecision, on storage variable and operation
@@ -344,7 +344,7 @@ Another way to put it, Slang treats column as row and row as column when targeti
 
 Due to the swap of row and column in terminology, the matrix multiplication needs to be performed a little differently. Slang translates a matrix multiplication, `mul(mat1, mat2)`, to `transpose(mul(transpose(mat2), transpose(mat1)))` when targeting SPIR-V.
 
-Note that the matrix translation explained above is orthogonal to the memory layout of a matrix. The memory layout is related to how CPU places matrix values in the memory and how GPU reads them. It is like how `std140` or `std430` works. DXC by default uses `column_major` memory layout and Slang uses row-major memory layout. For more information about the matrix memory layout, please see [a1-01-matrix-layout](a1-01-matrix-layout.md).
+Note that the matrix translation explained above is orthogonal to the memory layout of a matrix. The memory layout is related to how CPU places matrix values in the memory and how GPU reads them. It is like how `std140` or `std430` works. DXC by default uses `column_major` memory layout, and Slang uses row-major memory layout. For more information about the matrix memory layout, please see [a1-01-matrix-layout](a1-01-matrix-layout.md).
 
 ## Legalization
 
@@ -387,7 +387,7 @@ HSC_OUT constants(InputPatch<VS_OUT, 4> patch)
 When targeting SPIR-V, the patch function is merged as a part of the Hull shader, because SPIR-V doesn't have the same concept as `patchconstantfunc`.
 The function used for `patchconstantfunc` should be called only once for each patch.
 
-As an example, the Hull shader above will be emitted as follows,
+As an example, the Hull shader above will be emitted as follows:
 
 ```
 void main() {
@@ -396,7 +396,7 @@ void main() {
     barrier(); // OpControlBarrier
     if (gl_InvocationID == 0)
     {
-        constants(path);
+        constants(patch);
     }
 }
 ```

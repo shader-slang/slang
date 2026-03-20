@@ -19,7 +19,7 @@ float f(dynamic_uniform float v)
     return v + 1.0;
 }
 
-[numthread(1,1,1)]
+[numthreads(1,1,1)]
 [shader("compute")]
 void main(int tid : SV_DispatchThreadID)
 {

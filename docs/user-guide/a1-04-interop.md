@@ -9,7 +9,7 @@ Slang provides low-level interoperation mechanisms to allow developers to use ta
 - `__intrinsic_asm` construct to map a function invocation to specific textual target code.
 - `__require_prelude` construct to inject arbitrary text to the generated textual target code. 
 - `__target_switch` construct to use different implementations for different targets.
-- `spirv_asm` construct to define inline SPIRV assembly blocks.
+- `spirv_asm` construct to define inline SPIR-V assembly blocks.
 
 > #### Note
 > The language mechanisms described in this chapter are considered internal compiler features.
@@ -135,7 +135,7 @@ uint2 getRealtimeClock()
 }
 ```
 This definition causes `getRealtimeClock()` to translate to a call to NVAPI when targeting HLSL, to `clockRealtime2x32EXT()` when targeting
-GLSL, and to the `OpReadClockKHR` instruction when compiling directly to SPIRV through the inline SPIRV assembly block.
+GLSL, and to the `OpReadClockKHR` instruction when compiling directly to SPIR-V through the inline SPIR-V assembly block.
 
 A `case` label may be a target base capability atom or a capability atom inheriting the target base. The latter allows targeting for a specific target capability or capability level. Note that aliases or compound capabilities are not allowed as `case` labels.
 
@@ -164,9 +164,9 @@ In this example, case `hlsl` is required, since capability `_sm_6_6` inherits th
 
 Currently, the following targets are supported in a `case` statement: `cpp`, `cuda`, `glsl`, `hlsl`, `metal`, `spirv`, and `wgsl`.
 
-## Inline SPIRV Assembly
+## Inline SPIR-V Assembly
 
-When targeting SPIRV, Slang allows you to directly write a SPIRV assembly block and use it as part of an expression. For example:
+When targeting SPIRV, Slang allows you to directly write a SPIR-V assembly block and use it as part of an expression. For example:
 ```cpp
 int test()
 {
@@ -178,7 +178,7 @@ int test()
     // returns 21
 }
 ```
-A SPIRV assembly block contains one or more SPIRV instructions, separated by semicolons. Each SPIRV instruction has the form:
+A SPIR-V assembly block contains one or more SPIR-V instructions, separated by semicolons. Each SPIR-V instruction has the form:
 ```
 %identifier : <type> = <opcode> <operand> ... ;
 ```
@@ -193,7 +193,7 @@ When used as part of an expression, the Slang type of the `spirv_asm` construct 
 result: <type> = ...
 ```
 
-You can use the `$` prefix to begin an anti-quote of a Slang expression inside a `spirv_asm` block. This is commonly used to refer to a Slang variable, such as `localVar` in the example, as an operand. Additionally, the `$$` prefix is used to reference a Slang type, such as the `$$uint` references in the example. 
+You can use the `$` prefix to begin an anti-quote of a Slang expression inside a `spirv_asm` block. This is commonly used to refer to a Slang variable, such as `localVar` in the example, as an operand. Additionally, the `$$` prefix is used to reference a Slang type, such as the `$$int` references in the example. 
 
 You can also use the `&` prefix to refer to an l-value as a pointer-typed value in SPIRV, for example:
 ```cpp
@@ -206,7 +206,7 @@ float modf(float x, out float ip)
 }
 ```
 
-Opcodes such as `OpCapability`, `OpExtension` and type definitions are allowed inside a `spirv_asm` block. These instructions will be deduplicated and inserted into the correct sections defined by the SPIRV specification, for example:
+Opcodes such as `OpCapability`, `OpExtension` and type definitions are allowed inside a `spirv_asm` block. These instructions will be deduplicated and inserted into the correct sections defined by the SPIR-V specification, for example:
 ```cpp
 uint4 WaveMatch(T value)
 {
@@ -219,7 +219,7 @@ uint4 WaveMatch(T value)
 }
 ```
 
-You may use SPIRV enum values directly as operands, for example:
+You may use SPIR-V enum values directly as operands, for example:
 ```cpp
 void memoryBarrierImage()
 {
@@ -230,7 +230,7 @@ void memoryBarrierImage()
 }
 ```
 
-To access SPIRV builtin variables, you can use the `builtin(VarName:type)` syntax as an operand:
+To access SPIR-V builtin variables, you can use the `builtin(VarName:type)` syntax as an operand:
 ```cpp
 uint InstanceIndex()
 {

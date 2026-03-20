@@ -140,7 +140,7 @@ Pointers
 `out` and `inout` parameters in Slang are translated to pointer-typed parameters in WGSL.
 At callsites, a pointer value is formed and passed as argument using the `&` operator in WGSL.
 
-Since WGSL cannot form pointers to fields of structs (or fields of fields of structs, etc...), the described transformation cannot be done in a direct way when a function argument expression is an "access chain" like `myStruct.myField` or `myStruct.myStructField.someField`.
+Since WGSL cannot form pointers to fields of structs (or fields of fields of structs, etc.), the described transformation cannot be done in a direct way when a function argument expression is an "access chain" like `myStruct.myField` or `myStruct.myStructField.someField`.
 In those cases, the argument is copied to a local variable, the address of the local variable is passed to the function, and then the local
 variable is written back to the struct field after the function call.
 
