@@ -774,4 +774,12 @@ return {
 	["PackBranch"] = 772,
 	["Decoration.SpecializationDepthDecoration"] = 773,
 	["LateRequireCapability"] = 774,
+	["Type.MatrixRef"] = 775,
+	["makeMatrixRef"] = 776,
+	["Type.RWMatrixRef"] = 777,
+	["makeRWMatrixRef"] = 778,
+	["Type.VectorRef"] = 779,
+	["makeVectorRef"] = 780,
+	["Type.RWVectorRef"] = 781,
+	["makeRWVectorRef"] = 782,
 }

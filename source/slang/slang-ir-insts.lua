@@ -568,6 +568,10 @@ local insts = {
 				},
 			},
 			{ CoopVectorType = { operands = { { "elementType", "IRType" }, { "elementCount" } }, hoistable = true } },
+		{ MatrixRef = { operands = { { "elementType", "IRType" } }, hoistable = true } },
+		{ RWMatrixRef = { operands = { { "elementType", "IRType" } }, hoistable = true } },
+		{ VectorRef = { operands = { { "elementType", "IRType" } }, hoistable = true } },
+		{ RWVectorRef = { operands = { { "elementType", "IRType" } }, hoistable = true } },
 			{
 				CoopMatrixType = {
 					operands = {
@@ -935,6 +939,10 @@ local insts = {
 	{ makeArrayFromElement = { operands = { { "element" } } } },
 	{ makeCoopVector = {} },
 	{ makeCoopVectorFromValuePack = { operands = { { "valuePack" } } } },
+	{ makeMatrixRef = {} },
+	{ makeRWMatrixRef = {} },
+	{ makeVectorRef = {} },
+	{ makeRWVectorRef = {} },
 	{ makeCoopMatrixFromScalar = {} },
 	{ makeStruct = {} },
 	{ makeTuple = {} },

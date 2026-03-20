@@ -732,6 +732,32 @@ SlangResult CodeGenContext::emitWithDownstreamForEntryPoints(ComPtr<IArtifact>& 
             // Set the matrix layout
             options.matrixLayout =
                 (SlangMatrixLayoutMode)getTargetProgram()->getOptionSet().getMatrixLayoutMode();
+
+            // SM6.9 cooperative vector support is deprecated in DXC 1.9: the availability
+            // checker and DXIL validator both reject the opcodes even though SM6.9 hardware
+            // supports them. Automatically suppress these false-positive errors so that
+            // shaders compiled against sm_6_9 with cooperative vector types continue to work.
+            if (profile.getVersion() == ProfileVersion::DX_6_9)
+            {
+                bool hasCoopVector = false;
+                getProgram()->enumerateIRModules(
+                    [&](IRModule* irModule)
+                    {
+                        for (auto globalInst : irModule->getModuleInst()->getChildren())
+                        {
+                            if (globalInst->getOp() == kIROp_CoopVectorType)
+                            {
+                                hasCoopVector = true;
+                                break;
+                            }
+                        }
+                    });
+                if (hasCoopVector)
+                {
+                    compilerSpecificArguments.add("-Wno-hlsl-availability");
+                    compilerSpecificArguments.add("-Vd");
+                }
+            }
         }
 
         // Set the profile

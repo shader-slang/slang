@@ -373,6 +373,10 @@ const char* IntrinsicExpandContext::_emitSpecial(const char* cursor)
             {
                 underlyingType = as<IRBasicType>(matrixType->getElementType());
             }
+            else if (auto coopVecType = as<IRCoopVectorType>(type))
+            {
+                underlyingType = as<IRBasicType>(coopVecType->getElementType());
+            }
 
             SLANG_ASSERT(underlyingType);
 

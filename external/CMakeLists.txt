@@ -336,6 +336,18 @@ if(SLANG_ENABLE_SLANG_RHI)
         slang-rhi-tests
         PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/$<CONFIG>/bin
     )
+
+    # Copy DXC shader headers (dx/linalg.h etc.) to build/dxc/include/dx/ so that
+    # slang-test can compile shaders that use #include "dx/linalg.h" without requiring
+    # the user to manually specify the include path. For release builds, users must pass
+    # -Xdxc -I<dxc_include_dir> themselves since these headers are not shipped with Slang.
+    FetchContent_GetProperties(dxc)
+    if(dxc_POPULATED AND EXISTS "${dxc_SOURCE_DIR}/inc/hlsl/dx")
+        file(
+            COPY "${dxc_SOURCE_DIR}/inc/hlsl/dx"
+            DESTINATION "${CMAKE_BINARY_DIR}/dxc/include"
+        )
+    endif()
 endif()
 
 # Tidy things up:

@@ -780,6 +780,55 @@ bool HLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             m_writer->emit(");");
             return true;
         }
+    case kIROp_MakeMatrixRef:
+    case kIROp_MakeRWMatrixRef:
+        {
+            // Emit matrix ref declarations for SM6.9 dx::linalg API.
+            // Operand layout: [0]=buffer, [1]=startOffset, [2]=stride,
+            //                 [3]=matDataType, [4]=M, [5]=K, [6]=ML, [7]=transpose
+            bool isRW = inst->getOp() == kIROp_MakeRWMatrixRef;
+            m_writer->emit(isRW ? "dx::linalg::RWMatrixRef<" : "dx::linalg::MatrixRef<");
+            m_writer->emit("(dx::linalg::DataType)");
+            emitOperand(inst->getOperand(3), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(inst->getOperand(4), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(inst->getOperand(5), getInfo(EmitOp::General));
+            m_writer->emit(", (dx::linalg::MatrixLayout)");
+            emitOperand(inst->getOperand(6), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(inst->getOperand(7), getInfo(EmitOp::General));
+            m_writer->emit("> ");
+            m_writer->emit(getName(inst));
+            m_writer->emit(" = {");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(inst->getOperand(2), getInfo(EmitOp::General));
+            m_writer->emit("};\n");
+            return true;
+        }
+    case kIROp_MakeVectorRef:
+    case kIROp_MakeRWVectorRef:
+        {
+            // Emit vector ref declarations for SM6.9 dx::linalg MulAdd bias API.
+            // Operand layout: [0]=buffer, [1]=startOffset, [2]=dataType
+            // Uses VectorRefImpl<BufTy, DT> to avoid DXC 1.9 issues with template aliases.
+            bool isRW = inst->getOp() == kIROp_MakeRWVectorRef;
+            m_writer->emit(isRW ? "dx::linalg::VectorRefImpl<RWByteAddressBuffer, "
+                                : "dx::linalg::VectorRefImpl<ByteAddressBuffer, ");
+            m_writer->emit("(dx::linalg::DataType)");
+            emitOperand(inst->getOperand(2), getInfo(EmitOp::General));
+            m_writer->emit("> ");
+            m_writer->emit(getName(inst));
+            m_writer->emit(" = {");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+            m_writer->emit("};\n");
+            return true;
+        }
     default:
         return false;
     }

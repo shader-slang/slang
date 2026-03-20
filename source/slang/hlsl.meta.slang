@@ -29390,6 +29390,40 @@ linalg.CoopMat<T, S, M, N, R> operator *<
 // Cooperative Vector
 //
 
+[require(hlsl, byteaddressbuffer)]
+__intrinsic_type($(kIROp_MatrixRef))
+struct __MatrixRef<DT: __BuiltinArithmeticType>
+{
+    __intrinsic_op($(kIROp_MakeMatrixRef))
+    __init(ByteAddressBuffer buffer, uint startOffset, uint stride,
+           uint matDataType, uint M, uint K, uint ML, bool transpose);
+};
+
+[require(hlsl, byteaddressbuffer_rw)]
+__intrinsic_type($(kIROp_RWMatrixRef))
+struct __RWMatrixRef<DT: __BuiltinArithmeticType>
+{
+    __intrinsic_op($(kIROp_MakeRWMatrixRef))
+    __init(RWByteAddressBuffer buffer, uint startOffset, uint stride,
+           uint matDataType, uint M, uint K, uint ML, bool transpose);
+};
+
+[require(hlsl, byteaddressbuffer)]
+__intrinsic_type($(kIROp_VectorRef))
+struct __VectorRef<DT: __BuiltinArithmeticType>
+{
+    __intrinsic_op($(kIROp_MakeVectorRef))
+    __init(ByteAddressBuffer buffer, uint startOffset, uint dataType);
+};
+
+[require(hlsl, byteaddressbuffer_rw)]
+__intrinsic_type($(kIROp_RWVectorRef))
+struct __RWVectorRef<DT: __BuiltinArithmeticType>
+{
+    __intrinsic_op($(kIROp_MakeRWVectorRef))
+    __init(RWByteAddressBuffer buffer, uint startOffset, uint dataType);
+};
+
 /// Represents a Cooperative Vector type that is for matrix-vector multiplication that
 /// can take an advantage of the hardware acceleration. It can be used for evaluations
 /// of neural network in graphics and compute pipeline.
@@ -30221,67 +30255,45 @@ ${
 static const struct {
     bool isRW;
     char const* type;
+    char const* matrixRefType;
+    char const* vectorRefType;
 } kByteAddressBufferCases[] =
 {
-    {true, "RWByteAddressBuffer"},
-    {false, "ByteAddressBuffer"}
+    {true, "RWByteAddressBuffer", "__RWMatrixRef", "__RWVectorRef"},
+    {false, "ByteAddressBuffer", "__MatrixRef", "__VectorRef"}
 };
 for(auto buffer : kByteAddressBufferCases) {
 $}
-    [mutating]
     [ForceInline]
     [require(hlsl, byteaddressbuffer_rw)]
-    void __mutMatMul<U : __BuiltinArithmeticType, let K : int>(
-        CoopVec<U, K> input, uint inputInterpretationHLSL,
-        $(buffer.type) matrix, uint matrixOffset, uint matrixInterpretationHLSL,
-        uint m, uint k, uint memoryLayoutHLSL, bool transpose, uint matrixStride)
+    static This __MatMul_linalg<U : __BuiltinArithmeticType, let K : int>(
+        $(buffer.matrixRefType)<T> matrixRef,
+        CoopVec<U, K> input,
+        uint inputCompType)
     {
         __target_switch
         {
         case hlsl:
-            if (__isFloat<T>() || __isSignedInt<T>())
-            {
-                if (__isFloat<U>() || __isSignedInt<U>())
-                    __intrinsic_asm "__builtin_MatVecMul($0, false,  $1, false, $2,  $3, $4, $5,  $6, $7, $8, $9, $10)";
-                else
-                    __intrinsic_asm "__builtin_MatVecMul($0, false,  $1,  true, $2,  $3, $4, $5,  $6, $7, $8, $9, $10)";
-            }
-            else
-            {
-                if (__isFloat<U>() || __isSignedInt<U>())
-                    __intrinsic_asm "__builtin_MatVecMul($0, true,  $1, false, $2,  $3, $4, $5,  $6, $7, $8, $9, $10)";
-                else
-                    __intrinsic_asm "__builtin_MatVecMul($0, true,  $1,  true, $2,  $3, $4, $5,  $6, $7, $8, $9, $10)";
-            }
+        case _sm_6_9:
+            __requirePrelude("#include \"dx/linalg.h\"");
+            __intrinsic_asm "dx::linalg::Mul<$[0]>($0, dx::linalg::MakeInterpretedVector<(dx::linalg::DataType)$2>($1))", T;
         }
     }
 
-    [mutating]
     [ForceInline]
     [require(hlsl, byteaddressbuffer_rw)]
-    void __mutMatMulAdd<U : __BuiltinArithmeticType, let K : int>(
-        CoopVec<U, K> input, uint inputInterpretationHLSL,
-        $(buffer.type) matrix, uint matrixOffset, uint matrixInterpretationHLSL,
-        $(buffer.type) bias, uint biasOffset, uint biasInterpretationHLSL,
-        uint m, uint k, uint memoryLayoutHLSL, bool transpose, uint matrixStride)
+    static This __MatMulAdd_linalg<U : __BuiltinArithmeticType, let K : int>(
+        $(buffer.matrixRefType)<T> matrixRef,
+        CoopVec<U, K> input,
+        uint inputCompType,
+        $(buffer.vectorRefType)<T> biasRef)
     {
         __target_switch
         {
         case hlsl:
-            if (__isFloat<T>() || __isSignedInt<T>())
-            {
-                if (__isFloat<U>() || __isSignedInt<U>())
-                    __intrinsic_asm "__builtin_MatVecMulAdd($0, false,  $1, false, $2,  $3, $4, $5,  $9, $10, $11, $12, $13,  $6, $7, $8)";
-                else
-                    __intrinsic_asm "__builtin_MatVecMulAdd($0, false,  $1,  true, $2,  $3, $4, $5,  $9, $10, $11, $12, $13,  $6, $7, $8)";
-            }
-            else
-            {
-                if (__isFloat<U>() || __isSignedInt<U>())
-                    __intrinsic_asm "__builtin_MatVecMulAdd($0, true,  $1, false, $2,  $3, $4, $5,  $9, $10, $11, $12, $13,  $6, $7, $8)";
-                else
-                    __intrinsic_asm "__builtin_MatVecMulAdd($0, true,  $1,  true, $2,  $3, $4, $5,  $9, $10, $11, $12, $13,  $6, $7, $8)";
-            }
+        case _sm_6_9:
+            __requirePrelude("#include \"dx/linalg.h\"");
+            __intrinsic_asm "dx::linalg::MulAdd<$[0]>($0, dx::linalg::MakeInterpretedVector<(dx::linalg::DataType)$2>($1), $3)", T;
         }
     }
 
@@ -30322,23 +30334,16 @@ $}
         __target_switch
         {
         case hlsl:
-            let inputInterpretationHLSL = __getHLSLCoopVecComponentType(inputInterpretation);
-            let matrixInterpretationHLSL = __getHLSLCoopVecComponentType(matrixInterpretation);
-            let memoryLayoutHLSL = __getHLSLCoopVecMatrixLayout(memoryLayout);
-            This temp = this;
-            temp.__mutMatMul(
-                input,
-                inputInterpretationHLSL,
-                matrix,
-                matrixOffset,
-                matrixInterpretationHLSL,
-                N,
-                k,
-                memoryLayoutHLSL,
-                transpose,
-                matrixStride
-            );
-            this.__mutAdd(temp);
+        case _sm_6_9:
+        {
+            __requirePrelude("#include \"dx/linalg.h\"");
+            let inputCompType = __getHLSLCoopVecComponentType(inputInterpretation);
+            let matCompType = __getHLSLCoopVecComponentType(matrixInterpretation);
+            let layoutType = __getHLSLCoopVecMatrixLayout(memoryLayout);
+            let matRef = $(buffer.matrixRefType)<T>(matrix, uint(matrixOffset), matrixStride, uint(matCompType), uint(N), uint(k), uint(layoutType), transpose);
+            let mul = This.__MatMul_linalg(matRef, input, uint(inputCompType));
+            this.__mutAdd(mul);
+        }
         default: this = this + coopVecMatMulPacked<T, N, PackedK, U>(
                 input,
                 inputInterpretation,
@@ -30419,27 +30424,18 @@ $}
         __target_switch
         {
         case hlsl:
-            let inputInterpretationHLSL = __getHLSLCoopVecComponentType(inputInterpretation);
-            let matrixInterpretationHLSL = __getHLSLCoopVecComponentType(matrixInterpretation);
-            let biasInterpretationHLSL = __getHLSLCoopVecComponentType(biasInterpretation);
-            let memoryLayoutHLSL = __getHLSLCoopVecMatrixLayout(memoryLayout);
-            This temp = this;
-            temp.__mutMatMulAdd(
-                input,
-                inputInterpretationHLSL,
-                matrix,
-                matrixOffset,
-                matrixInterpretationHLSL,
-                bias,
-                biasOffset,
-                biasInterpretationHLSL,
-                N,
-                k,
-                memoryLayoutHLSL,
-                transpose,
-                matrixStride
-            );
-            this.__mutAdd(temp);
+        case _sm_6_9:
+        {
+            __requirePrelude("#include \"dx/linalg.h\"");
+            let inputCompType = __getHLSLCoopVecComponentType(inputInterpretation);
+            let matCompType = __getHLSLCoopVecComponentType(matrixInterpretation);
+            let biasCompType = __getHLSLCoopVecComponentType(biasInterpretation);
+            let layoutType = __getHLSLCoopVecMatrixLayout(memoryLayout);
+            let matRef = $(buffer.matrixRefType)<T>(matrix, uint(matrixOffset), matrixStride, uint(matCompType), uint(N), uint(k), uint(layoutType), transpose);
+            let biasRef = $(buffer.vectorRefType)<T>(bias, uint(biasOffset), uint(biasCompType));
+            let muladd = This.__MatMulAdd_linalg(matRef, input, uint(inputCompType), biasRef);
+            this.__mutAdd(muladd);
+        }
         default: this = this + coopVecMatMulAddPacked<T, N, PackedK, U>(
             input,
             inputInterpretation,
@@ -30521,7 +30517,9 @@ $}
         __target_switch
         {
         case hlsl:
-            __intrinsic_asm "__builtin_OuterProductAccumulate($0, $1, $2, $3, $6, $5, $4)";
+        case _sm_6_9:
+            __requirePrelude("#include \"dx/linalg.h\"");
+            __intrinsic_asm "dx::linalg::OuterProductAccumulate($0, $1, dx::linalg::RWMatrixRef<(dx::linalg::DataType)$6, $[0], $[1], (dx::linalg::MatrixLayout)$5, false>{$2, (uint)$3, $4})", N, K;
         }
     }
 
@@ -31273,10 +31271,12 @@ ${
 static const struct {
     bool isRW;
     char const* type;
+    char const* matrixRefType;
+    char const* vectorRefType;
 } kByteAddressBufferCases_[] =
 {
-    {true, "RWByteAddressBuffer"},
-    {false, "ByteAddressBuffer"},
+    {true, "RWByteAddressBuffer", "__RWMatrixRef", "__RWVectorRef"},
+    {false, "ByteAddressBuffer", "__MatrixRef", "__VectorRef"},
 };
 for(auto buffer : kByteAddressBufferCases_) {
 $}
@@ -31326,23 +31326,15 @@ CoopVec<T, M> __coopVecMatMulPacked_impl(
         };
 
     case hlsl:
-        var ret = CoopVec<T, M>(0);
-        let inputInterpretationHLSL = __getHLSLCoopVecComponentType(inputInterpretation);
-        let matrixInterpretationHLSL = __getHLSLCoopVecComponentType(matrixInterpretation);
-        let memoryLayoutHLSL = __getHLSLCoopVecMatrixLayout(memoryLayout);
-        ret.__mutMatMul(
-             input,
-             inputInterpretationHLSL,
-             matrix,
-             matrixOffset,
-             matrixInterpretationHLSL,
-             M,
-             k,
-             memoryLayoutHLSL,
-             transpose,
-             matrixStride
-        );
-        return ret;
+    case _sm_6_9:
+    {
+        __requirePrelude("#include \"dx/linalg.h\"");
+        let inputCompType = __getHLSLCoopVecComponentType(inputInterpretation);
+        let matCompType = __getHLSLCoopVecComponentType(matrixInterpretation);
+        let layoutType = __getHLSLCoopVecMatrixLayout(memoryLayout);
+        let matRef = $(buffer.matrixRefType)<T>(matrix, uint(matrixOffset), matrixStride, uint(matCompType), uint(M), uint(k), uint(layoutType), transpose);
+        return CoopVec<T, M>.__MatMul_linalg(matRef, input, uint(inputCompType));
+    }
 
     case optix_coopvec:
         __intrinsic_asm "slangOptixCoopVecMatMul<OptixCoopVec<$[0], $[1]>, OptixCoopVec<$[2], $[3]>, $1, $5, $6>($0, (CUdeviceptr)(&($3)), $4, $7, $8)", T, M, U, PackedK;
@@ -31578,27 +31570,17 @@ CoopVec<T, M> __coopVecMatMulAddPacked_impl<T : __BuiltinArithmeticType, let M :
         };
 
     case hlsl:
-        var ret = CoopVec<T, M>(0);
-        let inputInterpretationHLSL = __getHLSLCoopVecComponentType(inputInterpretation);
-        let matrixInterpretationHLSL = __getHLSLCoopVecComponentType(matrixInterpretation);
-        let biasInterpretationHLSL = __getHLSLCoopVecComponentType(biasInterpretation);
-        let memoryLayoutHLSL = __getHLSLCoopVecMatrixLayout(memoryLayout);
-        ret.__mutMatMulAdd(
-             input,
-             inputInterpretationHLSL,
-             matrix,
-             matrixOffset,
-             matrixInterpretationHLSL,
-             bias,
-             biasOffset,
-             biasInterpretationHLSL,
-             M,
-             k,
-             memoryLayoutHLSL,
-             transpose,
-             matrixStride
-        );
-        return ret;
+    case _sm_6_9:
+    {
+        __requirePrelude("#include \"dx/linalg.h\"");
+        let inputCompType = __getHLSLCoopVecComponentType(inputInterpretation);
+        let matCompType = __getHLSLCoopVecComponentType(matrixInterpretation);
+        let biasCompType = __getHLSLCoopVecComponentType(biasInterpretation);
+        let layoutType = __getHLSLCoopVecMatrixLayout(memoryLayout);
+        let matRef = $(buffer.matrixRefType)<T>(matrix, uint(matrixOffset), matrixStride, uint(matCompType), uint(M), uint(k), uint(layoutType), transpose);
+        let biasRef = $(buffer.vectorRefType)<T>(bias, uint(biasOffset), uint(biasCompType));
+        return CoopVec<T, M>.__MatMulAdd_linalg(matRef, input, uint(inputCompType), biasRef);
+    }
 
     case optix_coopvec:
         __intrinsic_asm "slangOptixCoopVecMatMul<OptixCoopVec<$[0], $[1]>, OptixCoopVec<$[2], $[3]>, $1, $5, $9, $8>($0, (CUdeviceptr)(&($3)), $4, (CUdeviceptr)(&($6)), $7, $11)", T, M, U, PackedK;
@@ -31825,6 +31807,7 @@ void coopVecOuterProductAccumulate<T : __BuiltinArithmeticType, let M : int, let
     __target_switch
     {
     case hlsl:
+    case _sm_6_9:
         uint matrixInterpretationHLSL = __getHLSLCoopVecComponentType(matrixInterpretation);
         uint memoryLayoutHLSL = __getHLSLCoopVecMatrixLayout(memoryLayout);
         return a.__OuterProductAccumulate(b, matrix, matrixOffset, matrixStride, memoryLayoutHLSL, matrixInterpretationHLSL);
@@ -31919,8 +31902,14 @@ void coopVecReduceSumAccumulate<T : __BuiltinArithmeticType, let N : int>(
 {
     __target_switch
     {
+${    if (buffer.isRW) {
+$}
     case hlsl:
-        __intrinsic_asm "__builtin_VectorAccumulate($0, $1, $2)";
+    case _sm_6_9:
+        __requirePrelude("#include \"dx/linalg.h\"");
+        __intrinsic_asm "dx::linalg::VectorAccumulate($0, $1, (uint)$2)";
+${    }
+$}
     case spirv:
         let bufBuf = __getEquivalentStructuredBuffer<uint32_t>(buffer);
         let zero = 0;
