@@ -83,18 +83,6 @@ static CapabilityAtomInfo const& _getInfo(CapabilityAtom atom)
     return kCapabilityNameInfos[Int(atom)];
 }
 
-void getCapabilityNames(List<UnownedStringSlice>& ioNames)
-{
-    ioNames.reserve(Count(CapabilityName::Count));
-    for (Index i = 0; i < Count(CapabilityName::Count); ++i)
-    {
-        if (_getInfo(CapabilityName(i)).flavor != CapabilityNameFlavor::Abstract)
-        {
-            ioNames.add(_getInfo(CapabilityName(i)).name);
-        }
-    }
-}
-
 UnownedStringSlice capabilityNameToString(CapabilityName name)
 {
     return _getInfo(name).name;
