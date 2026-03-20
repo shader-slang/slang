@@ -27,7 +27,7 @@ jobs:
       packages: read
 
     container:
-      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.4.0
+      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.5.0
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
@@ -161,7 +161,7 @@ jobs:
       packages: read
 
     container:
-      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.4.0
+      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.5.0
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
