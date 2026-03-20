@@ -27,16 +27,18 @@ struct Command
         bool isValid() const { return value != nullptr; }
         Optional& operator=(const T& val)
         {
+            T* newValue = new T(val);
             delete value;
-            value = new T(val);
+            value = newValue;
             return *this;
         }
         Optional& operator=(const Optional& other)
         {
             if (this != &other)
             {
+                T* newValue = other.isValid() ? new T(other.get()) : nullptr;
                 delete value;
-                value = other.isValid() ? new T(other.get()) : nullptr;
+                value = newValue;
             }
             return *this;
         }
