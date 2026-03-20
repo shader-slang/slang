@@ -42,7 +42,7 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E make_directory ${core_module_meta_output_dir}
     COMMAND
         slang-generate ${core_module_meta_source} --target-directory
-        ${core_module_meta_output_dir}
+        ${core_module_meta_output_dir} ${slang_ignore_abort_msg_arg}
     DEPENDS ${core_module_meta_source} slang-generate
     WORKING_DIRECTORY "${core_module_meta_source_dir}"
     VERBATIM
@@ -113,18 +113,12 @@ set(glsl_module_generated_header_dir
 )
 set(glsl_module_generated_header ${glsl_module_generated_header} PARENT_SCOPE)
 
-if(SLANG_BOOTSTRAP_IGNORE_ABORT_MSG)
-    set(slang_bootstrap_ignore_abort_msg_arg -ignore-abort-msg)
-else()
-    set(slang_bootstrap_ignore_abort_msg_arg)
-endif()
-
 add_custom_command(
     OUTPUT ${core_module_generated_header} ${glsl_module_generated_header}
     COMMAND
         slang-bootstrap -archive-type riff-lz4 -save-core-module-bin-source
         ${core_module_generated_header} -save-glsl-module-bin-source
-        ${glsl_module_generated_header} ${slang_bootstrap_ignore_abort_msg_arg}
+        ${glsl_module_generated_header} ${slang_ignore_abort_msg_arg}
     DEPENDS slang-bootstrap slang-without-embedded-core-module
     VERBATIM
 )

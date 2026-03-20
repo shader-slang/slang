@@ -331,6 +331,10 @@ static rhi::DeviceType _toRenderType(Slang::RenderApiType apiType)
         {
             outOptions.cacheRhiDevice = true;
         }
+        else if (argValue == "-compile-only")
+        {
+            outOptions.compileOnly = true;
+        }
         else
         {
             // Lookup

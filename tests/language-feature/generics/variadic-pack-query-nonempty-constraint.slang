@@ -75,6 +75,11 @@ int goodValueUse<let each D : int>() where nonempty(D)
 
 void consumeNonEmpty<let each D : int>() where nonempty(D) {}
 
+void goodForward<let each D : int>() where nonempty(D)
+{
+    consumeNonEmpty<D>();
+}
+
 void badForward<let each D : int>()
 {
     consumeNonEmpty<D>();
@@ -86,10 +91,21 @@ void badForward<let each D : int>()
 
 void badTrimmedForward<let each D : int>() where nonempty(D)
 {
-    consumeNonEmpty<__trimHead(D)>();
+    consumeNonEmpty<__trimFirst(D)>();
 /*CHECK:
     ^^^^^^^^^^^^^^^ cannot apply nonempty(...) to a pack that may be empty
     ^^^^^^^^^^^^^^^ nonempty(...) requires a non-empty pack; add a `where nonempty(...)` constraint or use a structurally non-empty pack
+*/
+}
+
+void consumeOtherNonEmpty<let each Q : int>() where nonempty(Q) {}
+
+void badMismatchedForward<let each P : int, let each Q : int>() where nonempty(P)
+{
+    consumeOtherNonEmpty<Q>();
+/*CHECK:
+    ^^^^^^^^^^^^^^^^^^^^ cannot apply nonempty(...) to a pack that may be empty
+    ^^^^^^^^^^^^^^^^^^^^ nonempty(...) requires a non-empty pack; add a `where nonempty(...)` constraint or use a structurally non-empty pack
 */
 }
 
@@ -98,6 +114,5 @@ int badSpecialization = goodValueUse<>();
 
 interface IMarker {}
 
-struct BadEachConstraint<each T> where expand each __trimHead(T) : IMarker {}
-//CHECK:                               ^^^^^^ type '__trimHead(T)' is not a valid left hand side of a type constraint
-//CHECK:                               ^^^^^^ type '__trimHead(T)' is not a valid left hand side of a type constraint
+struct BadEachConstraint<each T> where expand each __trimFirst(T) : IMarker {}
+//CHECK:                               ^^^^^^ type '__trimFirst(T)' is not a valid left hand side of a type constraint
