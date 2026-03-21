@@ -4050,6 +4050,9 @@ static SlangResult _compareWithType(
         case ScalarType::Float16:
         case ScalarType::Float32:
         case ScalarType::Float64:
+        case ScalarType::BFloat16:
+        case ScalarType::FloatE4M3:
+        case ScalarType::FloatE5M2:
             {
 
                 // Compare as double

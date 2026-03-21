@@ -1964,7 +1964,10 @@ public:                                                              \
         SLANG_SCALAR_TYPE_INT16,
         SLANG_SCALAR_TYPE_UINT16,
         SLANG_SCALAR_TYPE_INTPTR,
-        SLANG_SCALAR_TYPE_UINTPTR
+        SLANG_SCALAR_TYPE_UINTPTR,
+        SLANG_SCALAR_TYPE_BFLOAT16,
+        SLANG_SCALAR_TYPE_FLOAT_E4M3,
+        SLANG_SCALAR_TYPE_FLOAT_E5M2,
     };
 
     // abstract decl reflection
@@ -2349,6 +2352,11 @@ struct TypeReflection
         UInt8 = SLANG_SCALAR_TYPE_UINT8,
         Int16 = SLANG_SCALAR_TYPE_INT16,
         UInt16 = SLANG_SCALAR_TYPE_UINT16,
+        IntPtr = SLANG_SCALAR_TYPE_INTPTR,
+        UIntPtr = SLANG_SCALAR_TYPE_UINTPTR,
+        BFloat16 = SLANG_SCALAR_TYPE_BFLOAT16,
+        FloatE4M3 = SLANG_SCALAR_TYPE_FLOAT_E4M3,
+        FloatE5M2 = SLANG_SCALAR_TYPE_FLOAT_E5M2,
     };
 
     Kind getKind() { return (Kind)spReflectionType_GetKind((SlangReflectionType*)this); }
