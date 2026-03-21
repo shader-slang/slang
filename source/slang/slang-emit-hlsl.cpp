@@ -794,8 +794,35 @@ bool HLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             emitOperand(inst->getOperand(4), getInfo(EmitOp::General));
             m_writer->emit(", ");
             emitOperand(inst->getOperand(5), getInfo(EmitOp::General));
-            m_writer->emit(", (dx::linalg::MatrixLayout)");
-            emitOperand(inst->getOperand(6), getInfo(EmitOp::General));
+            // Emit matrix layout as a named dx::linalg::MatrixLayout enum string
+            // rather than an integer cast, so the output is resilient to enum value changes
+            // in future dx/linalg.h versions.
+            static const char* const kMatrixLayoutNames[] = {
+                "dx::linalg::MATRIX_LAYOUT_ROW_MAJOR",
+                "dx::linalg::MATRIX_LAYOUT_COLUMN_MAJOR",
+                "dx::linalg::MATRIX_LAYOUT_MUL_OPTIMAL",
+                "dx::linalg::MATRIX_LAYOUT_OUTER_PRODUCT_OPTIMAL",
+            };
+            auto mlInst = inst->getOperand(6);
+            m_writer->emit(", ");
+            if (auto intLit = as<IRIntLit>(mlInst))
+            {
+                IRIntegerValue v = intLit->getValue();
+                if (v >= 0 && v < (IRIntegerValue)SLANG_COUNT_OF(kMatrixLayoutNames))
+                {
+                    m_writer->emit(kMatrixLayoutNames[v]);
+                }
+                else
+                {
+                    m_writer->emit("(dx::linalg::MatrixLayout)");
+                    m_writer->emit(v);
+                }
+            }
+            else
+            {
+                m_writer->emit("(dx::linalg::MatrixLayout)");
+                emitOperand(mlInst, getInfo(EmitOp::General));
+            }
             m_writer->emit(", ");
             emitOperand(inst->getOperand(7), getInfo(EmitOp::General));
             m_writer->emit("> ");
