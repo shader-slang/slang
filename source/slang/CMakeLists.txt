@@ -33,7 +33,6 @@ add_custom_command(
     COMMAND
         slang-fiddle -i "${SLANG_FIDDLE_INPUT_DIR}/" -o
         "${SLANG_FIDDLE_OUTPUT_DIR}/" ${SLANG_FIDDLE_INPUT_FILE_NAMES}
-        ${slang_ignore_abort_msg_arg}
     DEPENDS ${SLANG_FIDDLE_INPUTS} ${SLANG_FIDDLE_LUA_INPUTS} slang-fiddle
     WORKING_DIRECTORY ${slang_SOURCE_DIR}
     VERBATIM

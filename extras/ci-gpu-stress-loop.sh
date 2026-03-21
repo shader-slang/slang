@@ -192,7 +192,6 @@ docker run --rm \
             -expected-failure-list tests/expected-failure-linux-gpu.txt \
             -skip-reference-image-generation \
             -show-adapter-info \
-            -ignore-abort-msg \
             -use-test-server \
             -server-count 4 \
             2>&1
