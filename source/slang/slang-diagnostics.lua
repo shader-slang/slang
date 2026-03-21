@@ -4590,6 +4590,20 @@ fatal(
 )
 
 err(
+    "unsupported-coop-mat-element-type-for-hlsl",
+    55208,
+    "unsupported cooperative matrix element type for HLSL",
+    span { loc = "location", message = "element type '~typeName' is not supported for cooperative matrix in HLSL." }
+)
+
+err(
+    "unsupported-coop-mat-scope-for-hlsl",
+    55209,
+    "unsupported cooperative matrix scope for HLSL",
+    span { loc = "location", message = "memory scope value '~scopeVal:int' is not supported for cooperative matrix in HLSL." }
+)
+
+err(
     "unable-to-auto-map-cuda-type-to-host-type",
     56001,
     "CUDA type mapping failed",

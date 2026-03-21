@@ -1,7 +1,10 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -emit-spirv-directly -output-using-type
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type
 
-// CHECK: type: uint32_t
-// CHECK-NEXT: 0
+//TEST(compute):SIMPLE(filecheck=DXIL):-target dxil -profile cs_6_10 -entry computeMain -dxc-path dxc-sm610/ -Xdxc -Idxc-sm610/include -DBAB
+//DXIL: result code = 0
+
+// CHECK: 0
 // CHECK-NEXT: 1
 // CHECK-NEXT: 1
 

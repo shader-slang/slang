@@ -1,14 +1,22 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -emit-spirv-directly
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -emit-spirv-directly -Xslang -DBAB
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -Xslang -DBAB
 
-// CHECK: type: int32_t
-// CHECK-NEXT: 1
+//TEST(compute):SIMPLE(filecheck=DXIL):-target dxil -profile cs_6_10 -entry computeMain -dxc-path dxc-sm610/ -Xdxc -Idxc-sm610/include -DBAB
+//DXIL: result code = 0
+
+// CHECK: 1
 // CHECK-NEXT: 3
 // CHECK-NEXT: 5
 // CHECK-NEXT: 7
 
 //TEST_INPUT:ubuffer(stride=4, count=256):out,name=outputBuffer
+#if defined(BAB)
+RWByteAddressBuffer outputBuffer;
+#else
 RWStructuredBuffer<int32_t> outputBuffer;
+#endif
 
 //TEST_INPUT:ubuffer(data=[1 2 3 4], stride=4, count=256),name=input1
 ByteAddressBuffer input1;
