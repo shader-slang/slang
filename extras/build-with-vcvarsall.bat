@@ -64,6 +64,16 @@ if errorlevel 1 (
     exit /b 1
 )
 
+rem If using the default configure preset, ensure Ninja is available since it uses
+rem the Ninja Multi-Config generator.
+if /I "%CONFIGURE_PRESET%"=="%DEFAULT_CONFIGURE_PRESET%" (
+    where ninja.exe >nul 2>&1
+    if errorlevel 1 (
+        echo The "%CONFIGURE_PRESET%" CMake preset requires ninja.exe, but it was not found in PATH.
+        echo Install Ninja or select a Visual Studio-based CMake preset instead.
+        exit /b 1
+    )
+)
 echo Loading MSVC environment from:
 echo   %VCVARSALL%
 call "%VCVARSALL%" %TARGET_ARCH%
