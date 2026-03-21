@@ -21,7 +21,7 @@ User-specific instructions for Slang (optional, may not exist):
 If you are running on Windows, run extras\build-with-vcvarsall.bat to produce a build in debug
 configuration. This script will discover Visual Studio installation and run vcvarsall.bat to setup the environment before running cmake.
 
-On Linux, run cmake directly to build:
+On non-Windows platforms (Linux/macOS), run cmake directly to build:
 
 ```bash
 # Configure with default settings (Ninja Multi-Config)
