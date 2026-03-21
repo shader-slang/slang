@@ -843,8 +843,9 @@ bool HLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             // Operand layout: [0]=buffer, [1]=startOffset, [2]=dataType
             // Uses VectorRefImpl<BufTy, DT> to avoid DXC 1.9 issues with template aliases.
             bool isRW = inst->getOp() == kIROp_MakeRWVectorRef;
-            m_writer->emit(isRW ? "dx::linalg::VectorRefImpl<RWByteAddressBuffer, "
-                                : "dx::linalg::VectorRefImpl<ByteAddressBuffer, ");
+            m_writer->emit(
+                isRW ? "dx::linalg::VectorRefImpl<RWByteAddressBuffer, "
+                     : "dx::linalg::VectorRefImpl<ByteAddressBuffer, ");
             m_writer->emit("(dx::linalg::DataType)");
             emitOperand(inst->getOperand(2), getInfo(EmitOp::General));
             m_writer->emit("> ");

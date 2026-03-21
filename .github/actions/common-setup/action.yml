@@ -113,6 +113,5 @@ runs:
           echo "Clang_DIR=${{ github.workspace }}/build/llvm-project-install" >> "$GITHUB_ENV"
         fi
 
-
       # Note: ccache for Windows self-hosted has been replaced by sccache
       # sccache is set up in ci-slang-build.yml for all platforms
