@@ -1036,6 +1036,20 @@ bool CUDASourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             m_writer->emit(").data)");
             return true;
         }
+    case kIROp_Alloca:
+        {
+            auto ptrType = cast<IRPtrType>(inst->getDataType());
+
+            m_writer->emit("(");
+            emitType(ptrType);
+            m_writer->emit(")");
+            m_writer->emit("alloca(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            m_writer->emit(" * sizeof(");
+            emitType(ptrType->getValueType());
+            m_writer->emit("))");
+            return true;
+        }
     default:
         break;
     }

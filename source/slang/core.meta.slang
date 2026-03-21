@@ -1793,9 +1793,9 @@ void __cpu_free(Ptr<void> ptr)
 /// functionality that is roughly equivalent to the `malloc`/`free` of C.
 ///
 /// @remarks You do not need to form an instance of the allocator to use it, you
-/// can simply call `HeapAllocator.allocate<T>(count)`.
+/// can simply call `SystemHeapAllocator.allocate<T>(count)`.
 [require(cpp_cuda_llvm)]
-public struct HeapAllocator: IAllocator<AddressSpace.Device>
+public struct SystemHeapAllocator: IAllocator<AddressSpace.Device>
 {
     static LayoutPtr<T, L> allocate<T, L:IBufferDataLayout = DefaultDataLayout>(size_t count = 1) throws MemoryAllocationError
     {
@@ -1871,13 +1871,14 @@ public struct HeapAllocator: IAllocator<AddressSpace.Device>
 /// stack-allocated object, and call it outside of loops.
 ///
 /// @remarks you should not form an instance of the allocator to use it, you
-/// can simply call `StackAllocator.allocate<T>(count)`.
+/// can simply call `StackFrameAllocator.allocate<T>(count)`.
 ///
 /// @remarks all allocated memory is released automatically when the calling
 /// function returns, so you don't need to manually free it in any way, but you
 /// do need to avoid leaking the pointer outside of the function.
 [require(cpp_llvm)]
-public struct StackAllocator: IAllocator<AddressSpace.Device>
+[require(cuda, cuda_sm_6_0)]
+public struct StackFrameAllocator: IAllocator<AddressSpace.Device>
 {
     [ForceInline]
     __intrinsic_op($(kIROp_Alloca))
