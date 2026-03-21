@@ -12,6 +12,113 @@
 namespace Slang
 {
 
+static const char* kHLSLBuiltInPreludeCoopMat = R"(
+template<
+    dx::linalg::ComponentEnum CT,
+    int M,
+    int N,
+    dx::linalg::MatrixUseEnum U,
+    dx::linalg::MatrixScopeEnum S>
+dx::linalg::Matrix<CT, M, N, U, S> __slang_cm_add(
+    dx::linalg::Matrix<CT, M, N, U, S> a,
+    dx::linalg::Matrix<CT, M, N, U, S> b)
+{
+    dx::linalg::Matrix<CT, M, N, U, S> c;
+    int len = a.Length();
+    for (int i = 0; i < len; i++)
+        c.Set(i, a.Get(i) + b.Get(i));
+    return c;
+}
+
+template<
+    dx::linalg::ComponentEnum CT,
+    int M,
+    int N,
+    dx::linalg::MatrixUseEnum U,
+    dx::linalg::MatrixScopeEnum S>
+dx::linalg::Matrix<CT, M, N, U, S> __slang_cm_sub(
+    dx::linalg::Matrix<CT, M, N, U, S> a,
+    dx::linalg::Matrix<CT, M, N, U, S> b)
+{
+    dx::linalg::Matrix<CT, M, N, U, S> c;
+    int len = a.Length();
+    for (int i = 0; i < len; i++)
+        c.Set(i, a.Get(i) - b.Get(i));
+    return c;
+}
+
+template<
+    dx::linalg::ComponentEnum CT,
+    int M,
+    int N,
+    dx::linalg::MatrixUseEnum U,
+    dx::linalg::MatrixScopeEnum S>
+dx::linalg::Matrix<CT, M, N, U, S> __slang_cm_mul(
+    dx::linalg::Matrix<CT, M, N, U, S> a,
+    dx::linalg::Matrix<CT, M, N, U, S> b)
+{
+    dx::linalg::Matrix<CT, M, N, U, S> c;
+    int len = a.Length();
+    for (int i = 0; i < len; i++)
+        c.Set(i, a.Get(i) * b.Get(i));
+    return c;
+}
+
+template<
+    dx::linalg::ComponentEnum CT,
+    int M,
+    int N,
+    dx::linalg::MatrixUseEnum U,
+    dx::linalg::MatrixScopeEnum S>
+dx::linalg::Matrix<CT, M, N, U, S> __slang_cm_div(
+    dx::linalg::Matrix<CT, M, N, U, S> a,
+    dx::linalg::Matrix<CT, M, N, U, S> b)
+{
+    dx::linalg::Matrix<CT, M, N, U, S> c;
+    int len = a.Length();
+    for (int i = 0; i < len; i++)
+        c.Set(i, a.Get(i) / b.Get(i));
+    return c;
+}
+
+template<
+    dx::linalg::ComponentEnum CT,
+    int M,
+    int N,
+    dx::linalg::MatrixUseEnum U,
+    dx::linalg::MatrixScopeEnum S>
+dx::linalg::Matrix<CT, M, N, U, S> __slang_cm_neg(dx::linalg::Matrix<CT, M, N, U, S> a)
+{
+    dx::linalg::Matrix<CT, M, N, U, S> c;
+    int len = a.Length();
+    for (int i = 0; i < len; i++)
+        c.Set(i, -a.Get(i));
+    return c;
+}
+
+// dx::linalg::Matrix::MultiplyAccumulate() is a void mutating method, but kIROp_CoopMatMulAdd
+// is a value-producing IR instruction whose result may be consumed by subsequent instructions.
+// This wrapper adapts the void mutation into a value-returning function so the emitter can
+// treat the operation as a single expression.
+template<
+    dx::linalg::ComponentEnum CT_A,
+    dx::linalg::ComponentEnum CT_B,
+    dx::linalg::ComponentEnum CT_D,
+    int RM,
+    int RK,
+    int RN,
+    dx::linalg::MatrixScopeEnum RS>
+dx::linalg::Matrix<CT_D, RM, RN, dx::linalg::MatrixUse::Accumulator, RS>
+__slang_cm_muladd(
+    dx::linalg::Matrix<CT_A, RM, RK, dx::linalg::MatrixUse::A, RS> a,
+    dx::linalg::Matrix<CT_B, RK, RN, dx::linalg::MatrixUse::B, RS> b,
+    dx::linalg::Matrix<CT_D, RM, RN, dx::linalg::MatrixUse::Accumulator, RS> c)
+{
+    c.MultiplyAccumulate(a, b);
+    return c;
+}
+)";
+
 static const char* kHLSLBuiltInPrelude64BitCast = R"(
 uint64_t _slang_asuint64(double x)
 {
@@ -94,6 +201,87 @@ static UnownedStringSlice _mapSlangCoopVecMatrixLayoutToHLSL(int32_t slangValue)
         return UnownedStringSlice("TrainingOptimal");
     default:
         SLANG_UNEXPECTED("Unsupported cooperative vector matrix layout for HLSL emission");
+    }
+}
+
+static const char* _getCoopMatComponentTypeName(
+    IROp elementTypeOp,
+    DiagnosticSink* sink,
+    SourceLoc loc)
+{
+    switch (elementTypeOp)
+    {
+    case kIROp_Int8Type:
+        return "dx::linalg::ComponentType::I8";
+    case kIROp_UInt8Type:
+        return "dx::linalg::ComponentType::U8";
+    case kIROp_Int16Type:
+        return "dx::linalg::ComponentType::I16";
+    case kIROp_UInt16Type:
+        return "dx::linalg::ComponentType::U16";
+    case kIROp_IntType:
+        return "dx::linalg::ComponentType::I32";
+    case kIROp_UIntType:
+        return "dx::linalg::ComponentType::U32";
+    case kIROp_Int64Type:
+        return "dx::linalg::ComponentType::I64";
+    case kIROp_UInt64Type:
+        return "dx::linalg::ComponentType::U64";
+    case kIROp_HalfType:
+        return "dx::linalg::ComponentType::F16";
+    case kIROp_FloatType:
+        return "dx::linalg::ComponentType::F32";
+    case kIROp_DoubleType:
+        return "dx::linalg::ComponentType::F64";
+    case kIROp_FloatE4M3Type:
+        return "dx::linalg::ComponentType::F8_E4M3";
+    case kIROp_FloatE5M2Type:
+        return "dx::linalg::ComponentType::F8_E5M2";
+    case kIROp_BFloat16Type:
+        sink->diagnose(Diagnostics::UnsupportedCoopMatElementTypeForHlsl{
+            .typeName = String(getIROpInfo(elementTypeOp).name),
+            .location = loc});
+        return nullptr;
+    default:
+        SLANG_UNEXPECTED("Unexpected element type opcode for cooperative matrix.");
+    }
+}
+
+static const char* _getCoopMatMatrixUseName(IRIntegerValue useVal)
+{
+    switch (useVal)
+    {
+    case SLANG_COOPERATIVE_MATRIX_USE_A:
+        return "dx::linalg::MatrixUse::A";
+    case SLANG_COOPERATIVE_MATRIX_USE_B:
+        return "dx::linalg::MatrixUse::B";
+    case SLANG_COOPERATIVE_MATRIX_USE_ACCUMULATOR:
+        return "dx::linalg::MatrixUse::Accumulator";
+    default:
+        SLANG_UNEXPECTED("Unexpected matrix use value for cooperative matrix.");
+    }
+}
+
+static const char* _getCoopMatMatrixScopeName(
+    IRIntegerValue scopeVal,
+    DiagnosticSink* sink,
+    SourceLoc loc)
+{
+    // SM6.10 dx::linalg only supports Wave (subgroup), ThreadGroup (workgroup), and Thread
+    // (invocation) scopes. Device-wide and cross-device scopes have no dx::linalg equivalent
+    // and are intentionally not handled here.
+    switch ((Slang::MemoryScope)scopeVal)
+    {
+    case Slang::MemoryScope::Subgroup:
+        return "dx::linalg::MatrixScope::Wave";
+    case Slang::MemoryScope::Workgroup:
+        return "dx::linalg::MatrixScope::ThreadGroup";
+    case Slang::MemoryScope::Invocation:
+        return "dx::linalg::MatrixScope::Thread";
+    default:
+        sink->diagnose(
+            Diagnostics::UnsupportedCoopMatScopeForHlsl{.scopeVal = scopeVal, .location = loc});
+        return nullptr;
     }
 }
 
@@ -882,6 +1070,13 @@ bool HLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             m_writer->emit(");");
             return true;
         }
+    case kIROp_CoopMatMulAdd:
+        {
+            emitInstResultDecl(inst);
+            emitInstExpr(inst, getInfo(EmitOp::General));
+            m_writer->emit(";\n");
+            return true;
+        }
     case kIROp_CoopVecMatMulAdd:
         {
             auto coopVecMatMulAdd = cast<IRCoopVecMatMulAdd>(inst);
@@ -1041,6 +1236,49 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             }
             break;
         }
+    case kIROp_Add:
+    case kIROp_Sub:
+    case kIROp_Mul:
+    case kIROp_Div:
+    case kIROp_Neg:
+        if (as<IRCoopMatrixType>(inst->getDataType()))
+        {
+            ensurePrelude("#include \"dx/linalg.h\"");
+            ensurePrelude(kHLSLBuiltInPreludeCoopMat);
+            const char* funcName = nullptr;
+            switch (inst->getOp())
+            {
+            case kIROp_Add:
+                funcName = "__slang_cm_add";
+                break;
+            case kIROp_Sub:
+                funcName = "__slang_cm_sub";
+                break;
+            case kIROp_Mul:
+                funcName = "__slang_cm_mul";
+                break;
+            case kIROp_Div:
+                funcName = "__slang_cm_div";
+                break;
+            case kIROp_Neg:
+                funcName = "__slang_cm_neg";
+                break;
+            default:
+                SLANG_UNEXPECTED("Unhandled CoopMat arithmetic op");
+                break;
+            }
+            m_writer->emit(funcName);
+            m_writer->emit("(");
+            emitOperand(inst->getOperand(0), getInfo(EmitOp::General));
+            if (inst->getOp() != kIROp_Neg)
+            {
+                m_writer->emit(", ");
+                emitOperand(inst->getOperand(1), getInfo(EmitOp::General));
+            }
+            m_writer->emit(")");
+            return true;
+        }
+        break;
     case kIROp_And:
     case kIROp_Or:
         {
@@ -1343,6 +1581,59 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
             return true;
         }
         break;
+    case kIROp_CastFloatToInt:
+    case kIROp_CastIntToFloat:
+    case kIROp_IntCast:
+    case kIROp_FloatCast:
+        {
+            auto dataType = inst->getDataType();
+            if (auto coopMatType = as<IRCoopMatrixType>(dataType))
+            {
+                const char* componentType = _getCoopMatComponentTypeName(
+                    coopMatType->getElementType()->getOp(),
+                    getSink(),
+                    inst->sourceLoc);
+
+                auto useInst = as<IRIntLit>(coopMatType->getMatrixUse());
+                SLANG_RELEASE_ASSERT(useInst && "CoopMat type operands must be literals.");
+                const char* matrixUse = _getCoopMatMatrixUseName(useInst->getValue());
+
+                if (!componentType || !matrixUse)
+                {
+                    // A diagnostic was already emitted; return true to claim the
+                    // instruction as handled and prevent further processing.
+                    return true;
+                }
+
+                emitInstExpr(inst->getOperand(0), inOuterPrec);
+                m_writer->emit(".Cast<");
+                m_writer->emit(componentType);
+                m_writer->emit(",");
+                m_writer->emit(matrixUse);
+                m_writer->emit(">()");
+                return true;
+            }
+        }
+        return false;
+    case kIROp_CoopMatMulAdd:
+        {
+            auto coopMatMulAdd = cast<IRCoopMatMulAdd>(inst);
+            auto saturatingAccumulation =
+                cast<IRBoolLit>(coopMatMulAdd->getSaturatingAccumulation())->getValue();
+            SLANG_RELEASE_ASSERT(
+                !saturatingAccumulation &&
+                "Saturating accumulation is not supported for HLSL cooperative matrix.");
+            ensurePrelude("#include \"dx/linalg.h\"");
+            ensurePrelude(kHLSLBuiltInPreludeCoopMat);
+            m_writer->emit("__slang_cm_muladd(");
+            emitOperand(coopMatMulAdd->getMatA(), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(coopMatMulAdd->getMatB(), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(coopMatMulAdd->getMatC(), getInfo(EmitOp::General));
+            m_writer->emit(")");
+            return true;
+        }
     default:
         break;
     }
@@ -1711,6 +2002,48 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             emitType(coopVecType->getElementType());
             m_writer->emit(",");
             m_writer->emit(getIntVal(coopVecType->getElementCount()));
+            m_writer->emit(">");
+            return;
+        }
+    case kIROp_CoopMatrixType:
+        {
+            ensurePrelude("#include \"dx/linalg.h\"");
+            ensurePrelude(kHLSLBuiltInPreludeCoopMat);
+
+            auto coopMatType = (IRCoopMatrixType*)type;
+            auto scopeInst = as<IRIntLit>(coopMatType->getScope());
+            auto useInst = as<IRIntLit>(coopMatType->getMatrixUse());
+            auto rowInst = as<IRIntLit>(coopMatType->getRowCount());
+            auto colInst = as<IRIntLit>(coopMatType->getColumnCount());
+            SLANG_RELEASE_ASSERT(
+                scopeInst && useInst && rowInst && colInst &&
+                "CoopMat type operands must be literals.");
+
+            const char* componentType = _getCoopMatComponentTypeName(
+                coopMatType->getElementType()->getOp(),
+                getSink(),
+                type->sourceLoc);
+            SLANG_RELEASE_ASSERT(componentType);
+
+            const char* matrixScope =
+                _getCoopMatMatrixScopeName(scopeInst->getValue(), getSink(), type->sourceLoc);
+            SLANG_RELEASE_ASSERT(matrixScope);
+
+            const char* matrixUse = _getCoopMatMatrixUseName(useInst->getValue());
+            SLANG_RELEASE_ASSERT(matrixUse);
+
+            IRIntegerValue rowCount = rowInst->getValue();
+            IRIntegerValue colCount = colInst->getValue();
+            m_writer->emit("dx::linalg::Matrix<");
+            m_writer->emit(componentType);
+            m_writer->emit(", ");
+            m_writer->emitInt64(rowCount);
+            m_writer->emit(", ");
+            m_writer->emitInt64(colCount);
+            m_writer->emit(", ");
+            m_writer->emit(matrixUse);
+            m_writer->emit(", ");
+            m_writer->emit(matrixScope);
             m_writer->emit(">");
             return;
         }
