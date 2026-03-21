@@ -56,6 +56,8 @@ cmake --preset default
 cmake --build --preset releaseWithDebugInfo # or --preset debug, or --preset release
 ```
 
+> Note: when using Ninja (default preset) on Windows, you need to make sure the `cmake` command is run from the Visual Studio Developer Command Prompt. If you are a coding agent trying to build Slang on Windows, run `extras/build-with-vcvarsall.bat [debug|release]` directly to build.
+
 For Visual Studio run:
 
 ```bash
