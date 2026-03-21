@@ -30513,7 +30513,7 @@ $}
         case hlsl:
         case _sm_6_9:
             __requirePrelude("#include \"dx/linalg.h\"");
-            __intrinsic_asm "dx::linalg::OuterProductAccumulate($0, $1, $2)", N, K;
+            __intrinsic_asm "dx::linalg::OuterProductAccumulate($0, $1, $2)";
         }
     }
 
