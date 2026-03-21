@@ -8,3 +8,5 @@ tests/cooperative-vector/matrix-mul-mut.slang.3
 tests/cooperative-vector/matrix-mul-packed-mut.slang.3
 tests/cooperative-vector/matrix-mul-packed.slang.3
 tests/cooperative-vector/matrix-mul.slang.3
+tests/cooperative-vector/outer-product.slang.3
+tests/cooperative-vector/reduce-sum-accumulate.slang.3
