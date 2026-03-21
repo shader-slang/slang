@@ -738,9 +738,8 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
                     typeList.add(t);
                     isLVal = isLVal && t.isLeftValue;
                 }
-                args.add(QualType(
-                    m_astBuilder->getTypePack(typeList.getArrayView().arrayView),
-                    isLVal));
+                args.add(
+                    QualType(m_astBuilder->getTypePack(typeList.getArrayView().arrayView), isLVal));
             }
         }
         else if (auto valPackParam = as<GenericValuePackParamDecl>(member))
