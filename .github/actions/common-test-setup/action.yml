@@ -36,6 +36,16 @@ runs:
         name: slang-tests-${{ inputs.os }}-${{ inputs.platform }}-${{ inputs.compiler }}-${{ inputs.config }}${{ inputs.artifact-suffix }}
         path: github_artifact
 
+    - name: Restore DXC shader headers
+      shell: bash
+      run: |
+        # Restore dx/linalg.h headers from the artifact so that cooperative vector
+        # DXIL tests (-Xdxc -Ibuild/dxc/include) can find them at the expected path.
+        if [ -d "github_artifact/dxc/include" ]; then
+          mkdir -p build/dxc
+          cp -r github_artifact/dxc/include build/dxc/
+        fi
+
     - name: Setup environment
       shell: bash
       run: |

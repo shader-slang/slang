@@ -273,6 +273,13 @@ jobs:
               cp -r "build/examples" "artifacts-staging/" || echo "Failed to copy examples directory"
             fi
 
+            # Copy DXC shader headers needed for cooperative vector DXIL tests
+            # (dx/linalg.h is not shipped with Slang; tests use -Xdxc -Ibuild/dxc/include)
+            if [ -d "build/dxc/include" ]; then
+              mkdir -p "artifacts-staging/dxc"
+              cp -r "build/dxc/include" "artifacts-staging/dxc/" || echo "Failed to copy dxc/include directory"
+            fi
+
           echo "Artifacts staging directory contents (recursive):"
           ls -laR artifacts-staging/
           else
