@@ -672,61 +672,75 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
     // them into final argument list.
     for (auto member : genericDeclRef.getDecl()->getDirectMemberDecls())
     {
-        if (auto typeParam = as<GenericTypeParamDeclBase>(member))
+        if (auto typeParam = as<GenericTypeParamDecl>(member))
         {
             SLANG_ASSERT(typeParam->parameterIndex != -1);
 
             if (typeParam->parameterIndex < knownGenericArgCount)
                 continue;
-            bool isPack = as<GenericTypePackParamDecl>(typeParam) != nullptr;
+
+            // If we don't have an arg for this parameter, we can check if we
+            // have a default value.
             if (typeParam->parameterIndex >= solvedArgs.getCount())
             {
-                // If the parameter is not a type pack and we don't have a
-                // resolved type for it, we should fail.
-                if (!isPack)
+                if (typeParam->initType)
+                {
+                    // Yes we do, so we can use it and continue as if
+                    // everything's fine.
+                    args.add(typeParam->initType);
+                    continue;
+                }
+                else
+                {
                     return DeclRef<Decl>();
-                // If the parameter is a type pack, we should add an empty
-                // type list to solvedTypes.
-                solvedArgs.setCount(typeParam->parameterIndex + 1);
+                }
             }
+
             auto& types = solvedArgs[typeParam->parameterIndex].types;
+
+            // Should only have one type because this isn't a pack.
+            if (types.getCount() != 1 || !types[0])
+                return DeclRef<Decl>();
+
+            args.add(types[0]);
+        }
+        else if (auto typePackParam = as<GenericTypePackParamDecl>(member))
+        {
+            SLANG_ASSERT(typePackParam->parameterIndex != -1);
+
+            if (typePackParam->parameterIndex < knownGenericArgCount)
+                continue;
+            if (typePackParam->parameterIndex >= solvedArgs.getCount())
+            {
+                // We should add an empty type list to solvedTypes.
+                solvedArgs.setCount(typePackParam->parameterIndex + 1);
+            }
+            auto& types = solvedArgs[typePackParam->parameterIndex].types;
             // Fail if any of the resolved type element is empty.
             for (auto t : types)
             {
                 if (!t)
                     return DeclRef<Decl>();
             }
-            if (!isPack)
+            // If we are supplying one single pack argument, we can use it as is.
+            if (types.getCount() == 1 && isTypePack(types[0]))
             {
-                // If the generic parameter is not a pack, we can simply add the first type.
-                if (types.getCount() != 1)
-                    return DeclRef<Decl>();
-
                 args.add(types[0]);
             }
             else
             {
-                // If the generic parameter is a pack, and we are supplying one single pack
-                // argument, we can use it as is.
-                if (types.getCount() == 1 && isTypePack(types[0]))
+                // If we are supplying 0 or multiple arguments for the pack, we need to create a
+                // type pack and add it to the argument list.
+                ShortList<Type*> typeList;
+                bool isLVal = true;
+                for (auto t : types)
                 {
-                    args.add(types[0]);
+                    typeList.add(t);
+                    isLVal = isLVal && t.isLeftValue;
                 }
-                else
-                {
-                    // If we are supplying 0 or multiple arguments for the pack, we need to create a
-                    // type pack and add it to the argument list.
-                    ShortList<Type*> typeList;
-                    bool isLVal = true;
-                    for (auto t : types)
-                    {
-                        typeList.add(t);
-                        isLVal = isLVal && t.isLeftValue;
-                    }
-                    args.add(QualType(
-                        m_astBuilder->getTypePack(typeList.getArrayView().arrayView),
-                        isLVal));
-                }
+                args.add(QualType(
+                    m_astBuilder->getTypePack(typeList.getArrayView().arrayView),
+                    isLVal));
             }
         }
         else if (auto valPackParam = as<GenericValuePackParamDecl>(member))
@@ -761,7 +775,20 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
                 continue;
 
             if (valParam->parameterIndex >= solvedArgs.getCount())
-                return DeclRef<Decl>();
+            {
+                if (valParam->initExpr)
+                {
+                    ConstantFoldingCircularityInfo newCircularityInfo(
+                        makeDeclRef(valParam),
+                        nullptr);
+                    args.add(ExtractGenericArgVal(valParam->initExpr, &newCircularityInfo));
+                    continue;
+                }
+                else
+                {
+                    return DeclRef<Decl>();
+                }
+            }
 
             auto val = solvedArgs[valParam->parameterIndex].val;
             if (!val)
