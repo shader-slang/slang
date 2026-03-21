@@ -1,3 +1,5 @@
+//TEST:SIMPLE(filecheck=HLSL): -target hlsl -profile cs_6_9 -entry computeMain
+
 // Test that CoopVecMatrixLayout enum values are emitted as named dx::linalg
 // constants in HLSL output rather than integer casts.
 //
@@ -6,8 +8,6 @@
 //   ColumnMajor         -> MATRIX_LAYOUT_COLUMN_MAJOR
 //   InferencingOptimal  -> MATRIX_LAYOUT_MUL_OPTIMAL
 //   TrainingOptimal     -> MATRIX_LAYOUT_OUTER_PRODUCT_OPTIMAL
-
-//TEST:SIMPLE(filecheck=HLSL): -target hlsl -profile cs_6_9 -entry computeMain
 
 //HLSL: MATRIX_LAYOUT_ROW_MAJOR
 //HLSL: MATRIX_LAYOUT_COLUMN_MAJOR

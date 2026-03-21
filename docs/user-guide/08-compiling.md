@@ -366,6 +366,26 @@ For example to specify an include path "somePath" to DXC you can use...
 -Xdxc -IsomePath
 ```
 
+#### Cooperative Vector on DXIL (SM6.9)
+
+When targeting DXIL with cooperative vector operations on SM6.9, Slang emits
+HLSL that includes `dx/linalg.h` from the DXC SDK. This header is **not**
+shipped with Slang, so you must provide DXC's include directory explicitly:
+
+```
+-Xdxc -I<path_to_dxc_includes>
+```
+
+For example, if DXC is installed at `/opt/dxc`:
+
+```
+slangc myshader.slang -target dxil -profile cs_6_9 -entry main -Xdxc -I/opt/dxc/include
+```
+
+When building Slang from source, the DXC headers are automatically copied to
+`build/dxc/include/` during the build, so you can use `-Xdxc -Ibuild/dxc/include`
+for local development and testing.
+
 
 ### Convenience Features
 
