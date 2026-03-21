@@ -148,6 +148,20 @@ struct ASTIterator
                 dispatchIfNotNull(arg);
         }
 
+        void visitPackQueryExpr(PackQueryExpr* expr)
+        {
+            iterator->maybeDispatchCallback(expr);
+            dispatchIfNotNull(expr->value);
+        }
+
+        void visitPackBranchTypeExpr(PackBranchTypeExpr* expr)
+        {
+            iterator->maybeDispatchCallback(expr);
+            dispatchIfNotNull(expr->packOperand.exp);
+            dispatchIfNotNull(expr->emptyType.exp);
+            dispatchIfNotNull(expr->nonEmptyType.exp);
+        }
+
         void visitExpandExpr(ExpandExpr* expr)
         {
             iterator->maybeDispatchCallback(expr);
