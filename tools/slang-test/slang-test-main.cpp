@@ -1552,7 +1552,7 @@ static SlangResult _extractTestRequirements(const CommandLine& cmdLine, TestRequ
     {
         return _extractSlangCTestRequirements(cmdLine, ioInfo);
     }
-    else if (exeName == "slangi")
+    else if (exeName == "slangi" || exeName == "slang")
     {
         return SLANG_OK;
     }
