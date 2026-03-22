@@ -694,9 +694,8 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
                 auto genSubst = m_astBuilder->getGenericAppDeclRef(
                     genericDeclRef,
                     args.getArrayView().arrayView);
-                auto defaultType = SubstitutionSet(genSubst).applyToType(
-                    m_astBuilder,
-                    typeParam->initType.type);
+                auto defaultType =
+                    SubstitutionSet(genSubst).applyToType(m_astBuilder, typeParam->initType.type);
 
                 if (type)
                 {
@@ -797,9 +796,7 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
                 auto genSubst = m_astBuilder->getGenericAppDeclRef(
                     genericDeclRef,
                     args.getArrayView().arrayView);
-                ConstantFoldingCircularityInfo newCircularityInfo(
-                    makeDeclRef(valParam),
-                    nullptr);
+                ConstantFoldingCircularityInfo newCircularityInfo(makeDeclRef(valParam), nullptr);
                 val = tryConstantFoldExpr(
                     applySubstitutionToExpr(SubstitutionSet(genSubst), valParam->initExpr),
                     ConstantFoldingKind::CompileTime,
