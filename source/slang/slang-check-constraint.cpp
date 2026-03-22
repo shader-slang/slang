@@ -443,11 +443,6 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
 
     outBaseCost = kConversionCost_None;
 
-    // Keep track of constraints imposed from the outside, as opposed to
-    // constraints of the generic itself (which are added below). Default
-    // parameters take precedence over the latter but not the former.
-    auto externalConstraintCount = system->constraints.getCount();
-
     // The generic itself will have some constraints, and for now we add these
     // to the system of constrains we will use for solving for the type variables.
     //
@@ -510,7 +505,6 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
     {
         Val* val = nullptr;
         bool isOptional = true;
-        bool isExternal = false;
         ShortList<QualType, 8> types;
     };
     ShortList<SolvedArg> solvedArgs;
@@ -561,10 +555,6 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
                 types.setCount(1);
 
             bool& typeConstraintOptional = solvedArgs[typeParam->parameterIndex].isOptional;
-            bool& isExternal = solvedArgs[typeParam->parameterIndex].isExternal;
-
-            if (constraintIndex < externalConstraintCount)
-                isExternal = true;
 
             QualType* ptype = nullptr;
             if (isPack)
@@ -688,28 +678,37 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
                 continue;
 
             Type* type = nullptr;
-            bool external = false;
             if (typeParam->parameterIndex < solvedArgs.getCount())
             {
                 auto& arg = solvedArgs[typeParam->parameterIndex];
                 // Should only have one type because this isn't a pack.
                 if (arg.types.getCount() == 1)
-                {
                     type = arg.types[0];
-                    external = arg.isExternal;
-                }
             }
 
-            if (typeParam->initType && (!type || !external))
+            if (typeParam->initType)
             {
-                // If we have a default arg for this parameter, we should use
-                // it over whatever placeholders `solvedArgs` might have.
+                // If we have a default arg for this parameter, we can try to
+                // use it if it's more specific than whatever we got from the
+                // above `solvedArgs` loop.
                 auto genSubst = m_astBuilder->getGenericAppDeclRef(
                     genericDeclRef,
                     args.getArrayView().arrayView);
-                type = SubstitutionSet(genSubst).applyToType(
+                auto defaultType = SubstitutionSet(genSubst).applyToType(
                     m_astBuilder,
                     typeParam->initType.type);
+
+                if (type)
+                {
+                    // If `TryJoinTypes` fails here, that means that whatever
+                    // we got from the constraint solving above is more specific
+                    // than the default arg, so we can ignore it.
+                    auto joinType = TryJoinTypes(system, defaultType, type);
+                    if (joinType)
+                        type = joinType;
+                }
+                else
+                    type = defaultType;
             }
 
             if (!type)
