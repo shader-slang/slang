@@ -443,7 +443,10 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
 
     outBaseCost = kConversionCost_None;
 
-    // For now the "solver" is going to be ridiculously simplistic.
+    // Keep track of constraints imposed from the outside, as opposed to
+    // constraints of the generic itself (which are added below). Default
+    // parameters take precedence over the latter but not the former.
+    auto externalConstraintCount = system->constraints.getCount();
 
     // The generic itself will have some constraints, and for now we add these
     // to the system of constrains we will use for solving for the type variables.
@@ -507,6 +510,7 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
     {
         Val* val = nullptr;
         bool isOptional = true;
+        bool isExternal = false;
         ShortList<QualType, 8> types;
     };
     ShortList<SolvedArg> solvedArgs;
@@ -557,6 +561,10 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
                 types.setCount(1);
 
             bool& typeConstraintOptional = solvedArgs[typeParam->parameterIndex].isOptional;
+            bool& isExternal = solvedArgs[typeParam->parameterIndex].isExternal;
+
+            if (constraintIndex < externalConstraintCount)
+                isExternal = true;
 
             QualType* ptype = nullptr;
             if (isPack)
@@ -679,33 +687,35 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
             if (typeParam->parameterIndex < knownGenericArgCount)
                 continue;
 
-            if (typeParam->initType)
+            Type* type = nullptr;
+            bool external = false;
+            if (typeParam->parameterIndex < solvedArgs.getCount())
+            {
+                auto& arg = solvedArgs[typeParam->parameterIndex];
+                // Should only have one type because this isn't a pack.
+                if (arg.types.getCount() == 1)
+                {
+                    type = arg.types[0];
+                    external = arg.isExternal;
+                }
+            }
+
+            if (typeParam->initType && (!type || !external))
             {
                 // If we have a default arg for this parameter, we should use
                 // it over whatever placeholders `solvedArgs` might have.
                 auto genSubst = m_astBuilder->getGenericAppDeclRef(
                     genericDeclRef,
                     args.getArrayView().arrayView);
-                auto substType = SubstitutionSet(genSubst).applyToType(
+                type = SubstitutionSet(genSubst).applyToType(
                     m_astBuilder,
                     typeParam->initType.type);
-                if (substType)
-                {
-                    args.add(substType);
-                    continue;
-                }
             }
 
-            if (typeParam->parameterIndex >= solvedArgs.getCount())
+            if (!type)
                 return DeclRef<Decl>();
 
-            auto& types = solvedArgs[typeParam->parameterIndex].types;
-
-            // Should only have one type because this isn't a pack.
-            if (types.getCount() != 1 || !types[0])
-                return DeclRef<Decl>();
-
-            args.add(types[0]);
+            args.add(type);
         }
         else if (auto typePackParam = as<GenericTypePackParamDecl>(member))
         {
@@ -776,32 +786,27 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
             if (valParam->parameterIndex < knownGenericArgCount)
                 continue;
 
-            if (valParam->parameterIndex >= solvedArgs.getCount())
+            Val* val = nullptr;
+            if (valParam->parameterIndex < solvedArgs.getCount())
             {
-                if (valParam->initExpr)
-                {
-                    auto genSubst = m_astBuilder->getGenericAppDeclRef(
-                        genericDeclRef,
-                        args.getArrayView().arrayView);
-                    ConstantFoldingCircularityInfo newCircularityInfo(
-                        makeDeclRef(valParam),
-                        nullptr);
-                    auto defaultVal = tryConstantFoldExpr(
-                        applySubstitutionToExpr(SubstitutionSet(genSubst), valParam->initExpr),
-                        ConstantFoldingKind::CompileTime,
-                        &newCircularityInfo);
-                    if (!defaultVal)
-                        return DeclRef<Decl>();
-                    args.add(defaultVal);
-                    continue;
-                }
-                else
-                {
-                    return DeclRef<Decl>();
-                }
+                auto arg = solvedArgs[valParam->parameterIndex];
+                val = arg.val;
             }
 
-            auto val = solvedArgs[valParam->parameterIndex].val;
+            if (valParam->initExpr && !val)
+            {
+                auto genSubst = m_astBuilder->getGenericAppDeclRef(
+                    genericDeclRef,
+                    args.getArrayView().arrayView);
+                ConstantFoldingCircularityInfo newCircularityInfo(
+                    makeDeclRef(valParam),
+                    nullptr);
+                val = tryConstantFoldExpr(
+                    applySubstitutionToExpr(SubstitutionSet(genSubst), valParam->initExpr),
+                    ConstantFoldingKind::CompileTime,
+                    &newCircularityInfo);
+            }
+
             if (!val)
             {
                 // failure!
