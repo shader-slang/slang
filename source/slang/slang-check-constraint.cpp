@@ -688,9 +688,11 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
                     // Yes we do, so we can use it and continue as if
                     // everything's fine.
                     auto genSubst = m_astBuilder->getGenericAppDeclRef(
-                        genericDeclRef, args.getArrayView().arrayView);
+                        genericDeclRef,
+                        args.getArrayView().arrayView);
                     auto substType = SubstitutionSet(genSubst).applyToType(
-                        m_astBuilder, typeParam->initType.type);
+                        m_astBuilder,
+                        typeParam->initType.type);
                     if (!substType)
                         return DeclRef<Decl>();
                     args.add(substType);
@@ -784,7 +786,8 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
                 if (valParam->initExpr)
                 {
                     auto genSubst = m_astBuilder->getGenericAppDeclRef(
-                        genericDeclRef, args.getArrayView().arrayView);
+                        genericDeclRef,
+                        args.getArrayView().arrayView);
                     ConstantFoldingCircularityInfo newCircularityInfo(
                         makeDeclRef(valParam),
                         nullptr);
