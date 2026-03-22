@@ -679,30 +679,25 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
             if (typeParam->parameterIndex < knownGenericArgCount)
                 continue;
 
-            // If we don't have an arg for this parameter, we can check if we
-            // have a default value.
-            if (typeParam->parameterIndex >= solvedArgs.getCount())
+            if (typeParam->initType)
             {
-                if (typeParam->initType)
+                // If we have a default arg for this parameter, we should use
+                // it over whatever placeholders `solvedArgs` might have.
+                auto genSubst = m_astBuilder->getGenericAppDeclRef(
+                    genericDeclRef,
+                    args.getArrayView().arrayView);
+                auto substType = SubstitutionSet(genSubst).applyToType(
+                    m_astBuilder,
+                    typeParam->initType.type);
+                if (substType)
                 {
-                    // Yes we do, so we can use it and continue as if
-                    // everything's fine.
-                    auto genSubst = m_astBuilder->getGenericAppDeclRef(
-                        genericDeclRef,
-                        args.getArrayView().arrayView);
-                    auto substType = SubstitutionSet(genSubst).applyToType(
-                        m_astBuilder,
-                        typeParam->initType.type);
-                    if (!substType)
-                        return DeclRef<Decl>();
                     args.add(substType);
                     continue;
                 }
-                else
-                {
-                    return DeclRef<Decl>();
-                }
             }
+
+            if (typeParam->parameterIndex >= solvedArgs.getCount())
+                return DeclRef<Decl>();
 
             auto& types = solvedArgs[typeParam->parameterIndex].types;
 
