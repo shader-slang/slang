@@ -710,10 +710,10 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
                 auto genSubst = m_astBuilder->getGenericAppDeclRef(
                     genericDeclRef,
                     args.getArrayView().arrayView);
-                auto defaulType =
+                auto defaultType =
                     SubstitutionSet(genSubst).applyToType(m_astBuilder, typeParam->initType.type);
-                if (defaulType)
-                    type = defaulType;
+                if (defaultType)
+                    type = defaultType;
             }
 
             if (!type)
