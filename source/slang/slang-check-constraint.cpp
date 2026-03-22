@@ -481,7 +481,8 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
     ShortList<SolvedArg> solvedArgs;
 
     Index constraintIndex = 0;
-    auto solveConstraints = [&](bool fromGenericDecl){
+    auto solveConstraints = [&](bool fromGenericDecl)
+    {
         // We will then iterate over the constraints trying to solve all generic parameters.
         // Note that we do not use ranged for here, because processing one constraint may lead to
         // new constraints being discovered.
@@ -527,7 +528,8 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
                     types.setCount(1);
 
                 bool& typeConstraintOptional = solvedArgs[typeParam->parameterIndex].isOptional;
-                bool& onlyConstrainedByGenericDecl = solvedArgs[typeParam->parameterIndex].onlyConstrainedByGenericDecl;
+                bool& onlyConstrainedByGenericDecl =
+                    solvedArgs[typeParam->parameterIndex].onlyConstrainedByGenericDecl;
 
                 onlyConstrainedByGenericDecl = onlyConstrainedByGenericDecl && fromGenericDecl;
 
@@ -708,7 +710,8 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
                 auto genSubst = m_astBuilder->getGenericAppDeclRef(
                     genericDeclRef,
                     args.getArrayView().arrayView);
-                auto defaulType = SubstitutionSet(genSubst).applyToType(m_astBuilder, typeParam->initType.type);
+                auto defaulType =
+                    SubstitutionSet(genSubst).applyToType(m_astBuilder, typeParam->initType.type);
                 if (defaulType)
                     type = defaulType;
             }
