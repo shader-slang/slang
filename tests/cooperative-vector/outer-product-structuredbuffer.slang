@@ -38,15 +38,14 @@
 // CHECK-NEXT: 28.000000
 // CHECK-NEXT: 32.000000
 
-//TEST_INPUT:ubuffer(data=[ 0x40003C00 0x44004200 ], stride=4),name=inputA
-// [1,2,3,4]
+//TEST_INPUT:ubuffer(data=[1.0h 2.0h 3.0h 4.0h], stride=2),name=inputA
 StructuredBuffer<half> inputA;
 
-//TEST_INPUT:ubuffer(data=[ 0x40003C00 0x44004200 0x46004500 0x48004700 ], stride=4),name=inputB
+//TEST_INPUT:ubuffer(data=[1.0h 2.0h 3.0h 4.0h 5.0h 6.0h 7.0h 8.0h], stride=2),name=inputB
 // [1,2,3,4,5,6,7,8]
 StructuredBuffer<half> inputB;
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name=output
+//TEST_INPUT:ubuffer(data=[0], count=32, stride=2):out,name=output
 RWStructuredBuffer<half> output;
 
 [numthreads(1, 1, 1)]

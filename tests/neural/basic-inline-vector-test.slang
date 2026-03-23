@@ -24,7 +24,7 @@ RWStructuredBuffer<uint> testResult;
 // bias = {9.0, 10.0}
 uniform RWStructuredBuffer<float> parametersFloat;
 
-//TEST_INPUT: set parameters = ubuffer(data=[0 0 0 0 0 0 0 0 0 0], stride=2)
+//TEST_INPUT: set parameters = ubuffer(data=[0 0 0 0 0 0 0 0 0 0], stride=4)
 uniform RWStructuredBuffer<ElementType>.Handle parameters;
 
 // set up a 2x4 matrix for derivative of parameters, the last 2 elements are for derivative of bias

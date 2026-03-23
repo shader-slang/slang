@@ -3838,11 +3838,6 @@ static void _addRenderTestOptions(const Options& options, CommandLine& ioCmdLine
         ioCmdLine.addArg("-enable-debug-layers");
     }
 
-    if (options.ignoreAbortMsg)
-    {
-        ioCmdLine.addArg("-ignore-abort-msg");
-    }
-
     if (options.cacheRhiDevice)
     {
         ioCmdLine.addArg("-cache-rhi-device");
@@ -5204,24 +5199,9 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
 static bool endsWithAllowedExtension(TestContext* /*context*/, String filePath)
 {
     char const* allowedExtensions[] = {
-        ".slang",
-        ".hlsl",
-        ".fx",
-        ".glsl",
-        ".vert",
-        ".frag",
-        ".geom",
-        ".tesc",
-        ".tese",
-        ".comp",
-        ".internal",
-        ".ahit",
-        ".chit",
-        ".miss",
-        ".rgen",
-        ".c",
-        ".cpp",
-        ".cu",
+        ".slang.md", ".slang", ".hlsl", ".fx",   ".glsl",     ".vert", ".frag",
+        ".geom",     ".tesc",  ".tese", ".comp", ".internal", ".ahit", ".chit",
+        ".miss",     ".rgen",  ".c",    ".cpp",  ".cu",
     };
 
     for (auto allowedExtension : allowedExtensions)
@@ -6095,6 +6075,11 @@ int main(int argc, char** argv)
     // Ignore SIGPIPE so that writing to a broken pipe (e.g. a crashed test-server)
     // returns EPIPE instead of killing this process (exit code 141).
     signal(SIGPIPE, SIG_IGN);
+#endif
+
+#if SLANG_IGNORE_ABORT_MSG && defined(_MSC_VER)
+    // Suppress the modal abort() dialog in unattended/LLM-driven builds.
+    _set_abort_behavior(0, _WRITE_ABORT_MSG);
 #endif
 
     // Fallback: run without cleanup if context initialization fails
