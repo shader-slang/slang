@@ -607,10 +607,13 @@ public:
     /// Return the number of registered playback handlers.
     SLANG_API size_t getHandlerCount() const;
 
-    /// Clear the handler dictionary.
+    /// Clear the handler dictionary and deallocate its backing storage.
     /// Called from slang_shutdown() to free heap-allocated handler strings
     /// before _CrtDumpMemoryLeaks() runs.
     SLANG_API void resetHandlers();
+
+    /// Swap the handler dictionary with another, allowing save/restore in tests.
+    SLANG_API void swapHandlers(Dictionary<String, PlaybackHandler>& other);
 
     /// Execute the next recorded call from the stream.
     /// Reads the function signature, looks up the handler, and calls it.

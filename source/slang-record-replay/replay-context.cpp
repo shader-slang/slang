@@ -771,7 +771,13 @@ size_t ReplayContext::getHandlerCount() const
 
 void ReplayContext::resetHandlers()
 {
-    m_handlers.clear();
+    Dictionary<String, PlaybackHandler> empty;
+    m_handlers.swapWith(empty);
+}
+
+void ReplayContext::swapHandlers(Dictionary<String, PlaybackHandler>& other)
+{
+    m_handlers.swapWith(other);
 }
 
 bool ReplayContext::executeNextCall()
