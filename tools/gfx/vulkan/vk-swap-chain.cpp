@@ -38,6 +38,7 @@ void SwapchainImpl::destroySwapchainAndImages()
     // Mark that it is no longer used
     m_images.clear();
     m_nextImageSemaphores.clear();
+    m_currentSemaphoreIndex = 0;
 }
 
 void SwapchainImpl::getWindowSize(int* widthOut, int* heightOut) const
