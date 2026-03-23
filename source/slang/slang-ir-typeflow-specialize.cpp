@@ -4548,26 +4548,67 @@ struct TypeFlowSpecializationContext
                     SLANG_UNEXPECTED("Cannot specialize call with non-singleton set tag callee");
                 }
             }
-            else if (isSetSpecializedGeneric(setTag->getSet()->getElement(0)))
+            else
             {
-                IRBuilder builder(module);
-                builder.setInsertInto(module);
-
-                // Check if the original callee inst has a dis-allow existential specialization
-                // decoration.
+                // Singleton (or empty) set callee.
                 //
-                if (inst->getCallee()
-                        ->findDecoration<IRDisallowSpecializationWithExistentialsDecoration>())
+                // Guard against an empty set before calling getElement(0).
+                //
+                auto* set = setTag->getSet();
+                if (!set || set->isEmpty())
                 {
-                    // In Slang 2025 and later, specializing a generic with multiple types is not
-                    // allowed, so we'll throw a diagnostic message.
+                    module->getContainerPool().free(&callArgs);
+                    return false;
+                }
+
+                auto* singletonCallee = set->getElement(0);
+                if (isSetSpecializedGeneric(singletonCallee))
+                {
+                    IRBuilder builder(module);
+                    builder.setInsertInto(module);
+
+                    // Only diagnose E33180 when the callee was flagged by the check-specialize
+                    // pass.  A valid narrowed call can also have a singleton set-specialized
+                    // generic callee and must not be rejected here.
                     //
-                    auto genericBase = as<IRSpecialize>(callee)->getBase();
-                    String genericName;
-                    if (auto nameHint = genericBase->findDecoration<IRNameHintDecoration>())
-                        genericName = nameHint->getName();
-                    else
-                        genericName = "<generic>";
+                    if (inst->getCallee()
+                            ->findDecoration<IRDisallowSpecializationWithExistentialsDecoration>())
+                    {
+                        String genericName = "<generic>";
+                        if (auto specialize = as<IRSpecialize>(callee))
+                        {
+                            auto genericBase = specialize->getBase();
+                            if (auto nameHint = genericBase->findDecoration<IRNameHintDecoration>())
+                                genericName = nameHint->getName();
+                        }
+                        sink->diagnose(Diagnostics::CannotSpecializeGenericWithExistential{
+                            .generic = genericName,
+                            .location = inst->sourceLoc});
+                        module->getContainerPool().free(&callArgs);
+                        return false;
+                    }
+
+                    // Otherwise, we have a single element which is a set specialized generic.
+                    // Add in the arguments for the set specialization.
+                    //
+                    addArgsForSetSpecializedGeneric(cast<IRSpecialize>(callee), callArgs);
+                    callee = singletonCallee;
+                    auto funcType = getEffectiveFuncType(callee);
+                    callee = builder.replaceOperand(&callee->typeUse, funcType);
+                }
+                else if (inst->getCallee()
+                             ->findDecoration<IRDisallowSpecializationWithExistentialsDecoration>())
+                {
+                    // The singleton callee is a specialization flagged with existential/dynamic
+                    // type args that cannot be dispatched statically.
+                    //
+                    String genericName = "<generic>";
+                    if (auto specialize = as<IRSpecialize>(callee))
+                    {
+                        auto genericBase = specialize->getBase();
+                        if (auto nameHint = genericBase->findDecoration<IRNameHintDecoration>())
+                            genericName = nameHint->getName();
+                    }
                     sink->diagnose(Diagnostics::CannotSpecializeGenericWithExistential{
                         .generic = genericName,
                         .location = inst->sourceLoc});
@@ -4576,38 +4617,15 @@ struct TypeFlowSpecializationContext
                 }
                 else
                 {
-                    // Otherwise, we have a single element which is a set specialized generic.
-                    // Add in the arguments for the set specialization.
+                    // Valid singleton callee (e.g. narrowed via typeflow to one concrete
+                    // implementation).  Use it directly.
                     //
-                    addArgsForSetSpecializedGeneric(cast<IRSpecialize>(callee), callArgs);
-                    callee = setTag->getSet()->getElement(0);
+                    IRBuilder builder(module);
+                    builder.setInsertInto(module);
+                    callee = singletonCallee;
                     auto funcType = getEffectiveFuncType(callee);
                     callee = builder.replaceOperand(&callee->typeUse, funcType);
                 }
-            }
-            else
-            {
-                // The singleton callee is a specialization with existential/dynamic type args
-                // that cannot be dispatched statically. Emit a diagnostic instead of crashing.
-                //
-                String genericName = "<unknown>";
-                auto* set = setTag->getSet();
-                if (set && set->getCount() > 0)
-                {
-                    if (auto specialize = as<IRSpecialize>(set->getElement(0)))
-                    {
-                        auto genericBase = specialize->getBase();
-                        if (auto nameHint = genericBase->findDecoration<IRNameHintDecoration>())
-                            genericName = nameHint->getName();
-                        else
-                            genericName = "<generic>";
-                    }
-                }
-                sink->diagnose(Diagnostics::CannotSpecializeGenericWithExistential{
-                    .generic = genericName,
-                    .location = inst->sourceLoc});
-                module->getContainerPool().free(&callArgs);
-                return false;
             }
         }
         else if (as<IRPoison>(callee))

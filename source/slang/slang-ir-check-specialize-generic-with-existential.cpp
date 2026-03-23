@@ -11,50 +11,52 @@ namespace Slang
 
 static void checkSpecializeInst(IRSpecialize* specialize, DiagnosticSink* sink)
 {
+    // Scan all args to determine if any existential-type args are present.
+    // We must scan the whole list (not early-return) because a later arg may be
+    // kIROp_InterfaceType even if an earlier arg is an Extract/MakeExistential.
+    // kIROp_InterfaceType requires an eager E33180 diagnostic because specializeModule
+    // may consume this Specialize inst before typeflow-specialize can check the
+    // decoration.  Extract/MakeExistential args only need the decoration; typeflow-
+    // specialize will emit E33180 for those cases as a safety net.
+    bool shouldDecorate = false;
+    bool shouldDiagnoseInterface = false;
+
     for (UInt i = 0; i < specialize->getArgCount(); i++)
     {
         auto specArg = specialize->getArg(i);
         switch (specArg->getOp())
         {
         case kIROp_InterfaceType:
-            {
-                // Explicit specialization with an interface type (e.g.
-                // genericFunc<IFoo>(...)).  Emit E33180 eagerly here because
-                // specializeModule may consume this Specialize inst before
-                // typeflow-specialize can check the decoration.
-                // The DisallowSpecializationWithExistentialsDecoration is also added
-                // so that typeflow-specialize acts as a safety net if the inst
-                // somehow survives (e.g. in the Extract/MakeExistential cases below,
-                // only the decoration is added and typeflow-specialize emits E33180).
-                IRInst* specializationBase = specialize->getBase();
-                if (auto generic = as<IRGeneric>(specializationBase))
-                    specializationBase = findInnerMostGenericReturnVal(generic);
-                if (auto lookupWitness = as<IRLookupWitnessMethod>(specializationBase))
-                    specializationBase = lookupWitness->getRequirementKey();
-                String genericName = "<generic>";
-                if (auto nameHint = specializationBase->findDecoration<IRNameHintDecoration>())
-                    genericName = nameHint->getName();
-                sink->diagnose(Diagnostics::CannotSpecializeGenericWithExistential{
-                    .generic = genericName,
-                    .location = specialize->sourceLoc});
-                IRBuilder builder(specialize->getModule());
-                builder.addDecoration(
-                    specialize,
-                    kIROp_DisallowSpecializationWithExistentialsDecoration);
-                // One diagnostic per Specialize inst is sufficient; stop after first bad arg.
-                return;
-            }
+            shouldDecorate = true;
+            shouldDiagnoseInterface = true;
+            break;
         case kIROp_ExtractExistentialType:
         case kIROp_ExtractExistentialWitnessTable:
         case kIROp_MakeExistential:
-            {
-                IRBuilder builder(specialize->getModule());
-                builder.addDecoration(
-                    specialize,
-                    kIROp_DisallowSpecializationWithExistentialsDecoration);
-                return;
-            }
+            shouldDecorate = true;
+            break;
         }
+    }
+
+    if (!shouldDecorate)
+        return;
+
+    IRBuilder builder(specialize->getModule());
+    builder.addDecoration(specialize, kIROp_DisallowSpecializationWithExistentialsDecoration);
+
+    if (shouldDiagnoseInterface)
+    {
+        IRInst* specializationBase = specialize->getBase();
+        if (auto generic = as<IRGeneric>(specializationBase))
+            specializationBase = findInnerMostGenericReturnVal(generic);
+        if (auto lookupWitness = as<IRLookupWitnessMethod>(specializationBase))
+            specializationBase = lookupWitness->getRequirementKey();
+        String genericName = "<generic>";
+        if (auto nameHint = specializationBase->findDecoration<IRNameHintDecoration>())
+            genericName = nameHint->getName();
+        sink->diagnose(Diagnostics::CannotSpecializeGenericWithExistential{
+            .generic = genericName,
+            .location = specialize->sourceLoc});
     }
 }
 
