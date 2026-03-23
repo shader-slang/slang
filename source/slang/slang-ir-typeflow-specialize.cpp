@@ -3338,7 +3338,10 @@ struct TypeFlowSpecializationContext
         else
         {
             // If it's not a function or a specialization, we can't get parameter info.
-            // Return an empty list; the caller will handle the unresolvable callee.
+            // Return an empty list. Callers that iterate the list (e.g. propagation update,
+            // getEffectiveFuncTypeForSet) will produce a zero-param signature, which the
+            // arity-mismatch guard (inst->getArgCount() + extraArgCount != paramCount) will
+            // then reject before any malformed IR is emitted.
             return {};
         }
 
@@ -3377,7 +3380,8 @@ struct TypeFlowSpecializationContext
         else
         {
             // If it's not a function or a specialization, we can't get parameter info.
-            // Return an empty list; the caller will handle the unresolvable callee.
+            // Return an empty list. The propagation update loop iterates these infos; an empty
+            // list means no out-parameter info is propagated back, which is safe.
             return {};
         }
 
@@ -3412,8 +3416,10 @@ struct TypeFlowSpecializationContext
         }
         else
         {
-            // If it's not a function or a specialization, we can't get parameter info.
-            // Return an empty list; the caller will handle the unresolvable callee.
+            // If it's not a function or a specialization, we can't get parameter directions.
+            // Return an empty list. The propagation update loop uses paramDirections only when
+            // paramInfos is also non-empty; since getParamInfos returns {} for the same invalid
+            // context, the loop body is never reached, so this is safe.
             return {};
         }
 
@@ -4584,13 +4590,17 @@ struct TypeFlowSpecializationContext
                 // that cannot be dispatched statically. Emit a diagnostic instead of crashing.
                 //
                 String genericName = "<unknown>";
-                if (auto specialize = as<IRSpecialize>(setTag->getSet()->getElement(0)))
+                auto* set = setTag->getSet();
+                if (set && set->getCount() > 0)
                 {
-                    auto genericBase = specialize->getBase();
-                    if (auto nameHint = genericBase->findDecoration<IRNameHintDecoration>())
-                        genericName = nameHint->getName();
-                    else
-                        genericName = "<generic>";
+                    if (auto specialize = as<IRSpecialize>(set->getElement(0)))
+                    {
+                        auto genericBase = specialize->getBase();
+                        if (auto nameHint = genericBase->findDecoration<IRNameHintDecoration>())
+                            genericName = nameHint->getName();
+                        else
+                            genericName = "<generic>";
+                    }
                 }
                 sink->diagnose(Diagnostics::CannotSpecializeGenericWithExistential{
                     .generic = genericName,
@@ -4663,10 +4673,13 @@ struct TypeFlowSpecializationContext
         // specialization (e.g. a generic specialized with an interface type that created a
         // malformed dispatch stub).  The diagnostic has already been emitted; bail out here
         // to prevent an assertion failure inside getParamType().
+        // Use != rather than > to also reject the case where the callee type has *more*
+        // parameters than the call site provides (which would leave malformed IR for later
+        // passes if allowed through).
         {
             auto* calleeFuncTy = as<IRFuncType>(callee->getFullType());
             if (!calleeFuncTy ||
-                inst->getArgCount() + extraArgCount > (UCount)calleeFuncTy->getParamCount())
+                inst->getArgCount() + extraArgCount != (UCount)calleeFuncTy->getParamCount())
             {
                 module->getContainerPool().free(&callArgs);
                 return false;

@@ -23,9 +23,9 @@ export struct FooImpl2 : IFoo
     int getValue() { return value * 2; }
 }
 
-void genericFunc<T : IFoo>(T v)
+int genericFunc<T : IFoo>(T v)
 {
-    int x = v.getValue();
+    return v.getValue();
 }
 
 RWStructuredBuffer<int> outputBuffer;
@@ -34,5 +34,5 @@ RWStructuredBuffer<int> outputBuffer;
 void computeMain()
 {
     IFoo v = createDynamicObject<IFoo>(0, 0);
-    genericFunc(v); // compiles via dynamic dispatch in legacy mode (no #lang slang 2025)
+    outputBuffer[0] = genericFunc(v); // compiles via dynamic dispatch in legacy mode (no #lang slang 2025)
 }

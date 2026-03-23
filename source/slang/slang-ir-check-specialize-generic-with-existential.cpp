@@ -19,9 +19,13 @@ static void checkSpecializeInst(IRSpecialize* specialize, DiagnosticSink* sink)
         case kIROp_InterfaceType:
             {
                 // Explicit specialization with an interface type (e.g.
-                // genericFunc<IFoo>(...)).  Emit E33180 here because
-                // specializeModule will otherwise consume this Specialize inst
-                // before typeflow-specialize can check the decoration.
+                // genericFunc<IFoo>(...)).  Emit E33180 eagerly here because
+                // specializeModule may consume this Specialize inst before
+                // typeflow-specialize can check the decoration.
+                // The DisallowSpecializationWithExistentialsDecoration is also added
+                // so that typeflow-specialize acts as a safety net if the inst
+                // somehow survives (e.g. in the Extract/MakeExistential cases below,
+                // only the decoration is added and typeflow-specialize emits E33180).
                 IRInst* specializationBase = specialize->getBase();
                 if (auto generic = as<IRGeneric>(specializationBase))
                     specializationBase = findInnerMostGenericReturnVal(generic);
