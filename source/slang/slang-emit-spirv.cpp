@@ -6311,10 +6311,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         decoration,
                         dstID,
                         SpvDecorationUserTypeGOOGLE,
-                        legalizeUserTypeName(
-                            cast<IRUserTypeNameDecoration>(decoration)
-                                ->getUserTypeName()
-                                ->getStringSlice())
+                        legalizeUserTypeName(cast<IRUserTypeNameDecoration>(decoration)
+                                                 ->getUserTypeName()
+                                                 ->getStringSlice())
                             .getUnownedSlice());
                 }
                 break;

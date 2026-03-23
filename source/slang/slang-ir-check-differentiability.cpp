@@ -366,10 +366,9 @@ public:
                     auto loc = inst->sourceLoc;
                     if (!loc.isValid())
                         loc = funcInst->sourceLoc;
-                    sink->diagnose(
-                        Diagnostics::InvalidUseOfTorchTensorTypeInDeviceFunc{
-                            .location = loc,
-                        });
+                    sink->diagnose(Diagnostics::InvalidUseOfTorchTensorTypeInDeviceFunc{
+                        .location = loc,
+                    });
                     return;
                 }
             }
@@ -711,9 +710,8 @@ public:
             }
             else
             {
-                sink->diagnose(
-                    Diagnostics::LoopInDiffFuncRequireUnrollOrMaxIters{
-                        .location = loop->sourceLoc});
+                sink->diagnose(Diagnostics::LoopInDiffFuncRequireUnrollOrMaxIters{
+                    .location = loop->sourceLoc});
             }
         }
 
