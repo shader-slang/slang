@@ -9883,23 +9883,14 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // with the value `5`, then we might have only a single
             // instruction to represent `5`.
             //
-            // When the initializer was symbolically folded to a FuncCallIntVal
-            // whose leaf operands include specialization constants, lower via
-            // visitFuncCallIntVal to emit constexpr IR ops that propagate the
-            // @SpecConst rate type. The raw initExpr path emits plain ops
-            // without that rate, causing SPIR-V emission failures.
-            //
-            // We must NOT take this path inside a generic context (outerGeneric
-            // != nullptr), because the constexpr ops are hoistable/deduplicated
-            // at module level and their operands would reference generic params
-            // that become invalid after specialization. This also guards against
-            // mixed expressions (e.g. SpecConst / sizeof(U)) where a spec
-            // constant coexists with generic-dependent operands.
+            // FuncCallIntVal means the initializer was symbolically folded but
+            // not fully evaluated (operands are spec constants or generic value
+            // params). Lower via visitFuncCallIntVal which emits constexpr IR
+            // ops and propagates @SpecConst rate when any operand carries it.
+            // The raw initExpr path would emit plain ops without that rate.
             //
             IRInst* irInitVal;
-            auto funcCallIntVal = as<FuncCallIntVal>(decl->val);
-            if (funcCallIntVal && !outerGeneric &&
-                _intValReferencesSpecConst(funcCallIntVal))
+            if (auto funcCallIntVal = as<FuncCallIntVal>(decl->val))
                 irInitVal = lowerSimpleVal(subContext, funcCallIntVal);
             else
                 irInitVal = getSimpleVal(subContext, lowerRValueExpr(subContext, initExpr));
