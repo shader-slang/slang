@@ -1,4 +1,6 @@
 //TEST:SIMPLE(filecheck=CHECK): -target spirv
+//TEST:COMPILE: -target hlsl
+//TEST:COMPILE: -target glsl
 // Regression test for https://github.com/shader-slang/slang/issues/8635
 // Passing a dynamic dispatch object (existential type) to a generic function
 // should compile successfully (via dynamic dispatch) rather than producing

@@ -4545,6 +4545,7 @@ struct TypeFlowSpecializationContext
                 }
                 else
                 {
+                    module->getContainerPool().free(&callArgs);
                     SLANG_UNEXPECTED("Cannot specialize call with non-singleton set tag callee");
                 }
             }
