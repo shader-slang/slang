@@ -29,6 +29,8 @@ static void checkSpecializeInst(IRSpecialize* specialize, DiagnosticSink* sink)
                 IRInst* specializationBase = specialize->getBase();
                 if (auto generic = as<IRGeneric>(specializationBase))
                     specializationBase = findInnerMostGenericReturnVal(generic);
+                if (auto lookupWitness = as<IRLookupWitnessMethod>(specializationBase))
+                    specializationBase = lookupWitness->getRequirementKey();
                 String genericName = "<generic>";
                 if (auto nameHint = specializationBase->findDecoration<IRNameHintDecoration>())
                     genericName = nameHint->getName();

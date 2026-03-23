@@ -4571,6 +4571,7 @@ struct TypeFlowSpecializationContext
                     sink->diagnose(Diagnostics::CannotSpecializeGenericWithExistential{
                         .generic = genericName,
                         .location = inst->sourceLoc});
+                    module->getContainerPool().free(&callArgs);
                     return false;
                 }
                 else
