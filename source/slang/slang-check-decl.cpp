@@ -948,6 +948,8 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
 
     void visitExpressionStmt(ExpressionStmt* stmt) { dispatchIfNotNull(stmt->expression); }
 
+    void visitRequireCapabilityStmt(RequireCapabilityStmt*) { return; }
+
     // Val Visitor
 
     void visitDirectDeclRef(DirectDeclRef* declRef)
