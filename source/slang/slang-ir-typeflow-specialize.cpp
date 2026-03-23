@@ -4026,6 +4026,12 @@ struct TypeFlowSpecializationContext
             for (auto func : funcs)
             {
                 auto resolvedFunc = translationContext.resolveInst(func);
+                if (!resolvedFunc)
+                {
+                    // This usually indicates an error. We'll fail gracefully here.
+                    module->getContainerPool().free(&funcs);
+                    return none();
+                }
                 auto paramInfos =
                     convertArgInfosToParamInfos(cast<IRFuncType>(resolvedFunc->getDataType()));
                 if (auto boundCallee = maybeGetBoundFunc(resolvedFunc, paramInfos, workQueue))
@@ -4037,6 +4043,9 @@ struct TypeFlowSpecializationContext
         else if (isGlobalInst(callee))
         {
             auto resolvedCallee = translationContext.resolveInst(callee);
+            if (!resolvedCallee)
+                return none();
+
             auto paramInfos =
                 convertArgInfosToParamInfos(cast<IRFuncType>(resolvedCallee->getDataType()));
             if (auto boundCallee = maybeGetBoundFunc(resolvedCallee, paramInfos, workQueue))
@@ -7391,11 +7400,13 @@ struct TypeFlowSpecializationContext
         IRModule* module,
         TargetProgram* target,
         DiagnosticSink* sink,
+        SpecializationContext* specContext,
         bool shouldReportDynamicDispatchSites)
         : module(module)
         , sink(sink)
         , shouldReportDynamicDispatchSites(shouldReportDynamicDispatchSites)
-        , translationContext(target, module, sink)
+        , specContext(specContext)
+        , translationContext(target, module, specContext, sink)
     {
     }
 
@@ -7465,6 +7476,8 @@ struct TypeFlowSpecializationContext
     // re-processing the same definition.
     //
     HashSet<IRFunc*> uniqueDefs;
+
+    SpecializationContext* specContext;
 };
 
 // Main entry point
@@ -7472,9 +7485,11 @@ bool specializeDynamicInsts(
     IRModule* module,
     TargetProgram* target,
     DiagnosticSink* sink,
+    SpecializationContext* outerContext,
     bool shouldReportDynamicDispatchSites)
 {
-    TypeFlowSpecializationContext context(module, target, sink, shouldReportDynamicDispatchSites);
+    TypeFlowSpecializationContext
+        context(module, target, sink, outerContext, shouldReportDynamicDispatchSites);
     return context.processModule();
 }
 

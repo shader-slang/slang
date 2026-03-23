@@ -22,6 +22,7 @@ bool specializeDynamicInsts(
     IRModule* module,
     TargetProgram* target,
     DiagnosticSink* sink,
+    SpecializationContext* context,
     bool shouldReportDynamicDispatchSites);
 
 bool isSetSpecializedGeneric(IRInst* callee);

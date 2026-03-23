@@ -1492,6 +1492,7 @@ struct SpecializationContext
                     module,
                     targetProgram,
                     sink,
+                    this,
                     options.reportDynamicDispatchSites);
 
                 if (dynPassChanged)

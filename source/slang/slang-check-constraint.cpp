@@ -650,11 +650,15 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
                 solvedArgs[valPackParam->parentDecl].setCount(valPackParam->parameterIndex + 1);
             Val*& val = solvedArgs[valPackParam->parentDecl][valPackParam->parameterIndex].val;
 
-            auto cValPack = as<ConcreteIntValPack>(c.val);
-            if (cValPack)
+            if (auto cValPack = as<ConcreteIntValPack>(c.val))
             {
                 if (!val)
                     val = cValPack;
+            }
+            else if (auto declRefIntVal = as<DeclRefIntVal>(c.val))
+            {
+                if (!val)
+                    val = declRefIntVal;
             }
             c.satisfied = true;
         }
@@ -767,7 +771,7 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
                 if (valPackParam->parameterIndex < knownGenericArgCount)
                     continue;
 
-                if (valPackParam->parameterIndex >= solvedArgs.getCount())
+                if (valPackParam->parameterIndex >= solvedArgs[_genericDecl].getCount())
                 {
                     // Empty pack.
                     args[_genericDecl].add(m_astBuilder->getIntValPack(ArrayView<IntVal*>()));

@@ -22,10 +22,15 @@ struct TranslationContext
 {
 
 public:
-    TranslationContext(TargetProgram* target, IRModule* module, DiagnosticSink* inSink)
+    TranslationContext(
+        TargetProgram* target,
+        IRModule* module,
+        SpecializationContext* specContext,
+        DiagnosticSink* inSink)
         : irModule(module)
         , sink(inSink)
         , targetProgram(target)
+        , specContext(specContext)
         , autodiffContext(target, module->getModuleInst())
     {
         initializeTranslationDictionary(module);
@@ -41,6 +46,8 @@ public:
 
     DiagnosticSink* getSink() const { return sink; }
 
+    SpecializationContext* getSpecializationContext() const { return specContext; }
+
 private:
     IRModule* irModule;
 
@@ -52,6 +59,7 @@ private:
 
     // Shared context.
     AutoDiffSharedContext autodiffContext;
+    SpecializationContext* specContext;
 };
 
 }; // namespace Slang

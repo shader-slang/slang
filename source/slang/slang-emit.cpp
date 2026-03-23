@@ -1177,8 +1177,6 @@ Result linkAndOptimizeIR(
     // single pass that looks for all simplification opportunities.
     //
 
-    initializeTranslationDictionary(irModule);
-
     if (!codeGenContext->isSpecializationDisabled())
     {
         SpecializationOptions specOptions;

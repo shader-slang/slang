@@ -5820,9 +5820,6 @@ DeclRef<Decl> SemanticsVisitor::liftDeclFromGenericContainers(
         synGenericDecl->ownedScope->parent = parentScope;
         newGenericDecls.add(synGenericDecl);
 
-        // Dictionary to map from the original type parameters to the synthesized ones.
-        // Dictionary<Decl*, Decl*> mapOrigToSynTypeParams;
-
         // Our synthesized method will have parameters matching the names
         // and types of those on the requirement, and it will use expressions
         // that reference those parametesr as arguments for the call expresison
@@ -5847,7 +5844,6 @@ DeclRef<Decl> SemanticsVisitor::liftDeclFromGenericContainers(
                 //
                 synGenericDecl->addDirectMemberDecl(synTypeParamDeclBase);
 
-                // mapOrigToSynTypeParams.add(typeParamDeclBase, synTypeParamDeclBase);
                 mapSynToOrigTypeParams.add(synTypeParamDeclBase, typeParamDeclBase);
 
                 // Construct a DeclRefExpr from the type parameter.
@@ -5857,8 +5853,6 @@ DeclRef<Decl> SemanticsVisitor::liftDeclFromGenericContainers(
                 synTypeParamDeclRefExpr->declRef = synTypeParamDeclRef;
                 synTypeParamDeclRefExpr->type =
                     getTypeForDeclRef(m_astBuilder, synTypeParamDeclRef, SourceLoc());
-
-                // synGenericArgs.add(synTypeParamDeclRefExpr);
             }
             else if (auto valParamDecl = as<GenericValueParamDecl>(member))
             {
@@ -5868,12 +5862,6 @@ DeclRef<Decl> SemanticsVisitor::liftDeclFromGenericContainers(
                 synValParamDecl->parameterIndex = valParamDecl->parameterIndex;
                 synValParamDecl->type = valParamDecl->type;
 
-                // Note: we intentionally do not copy GenericValueParamDecl::initExpr here,
-                // because initType maybe dependent on the original type/value parameters,
-                // and if we copy we must also substitute all the original type parameters with the
-                // synthesized ones. It shouldn't be required for the implementing declaration to
-                // define initType anyways, so we'll just save ourselves from the trouble.
-                //
                 synGenericDecl->addDirectMemberDecl(synValParamDecl);
 
                 // mapOrigToSynTypeParams.add(valParamDecl, synGenericDecl);
@@ -5885,8 +5873,25 @@ DeclRef<Decl> SemanticsVisitor::liftDeclFromGenericContainers(
                 auto synValParamDeclRefExpr = m_astBuilder->create<VarExpr>();
                 synValParamDeclRefExpr->declRef = synValParamDeclRef;
                 synValParamDeclRefExpr->type = synValParamDecl->type.type;
+            }
+            else if (auto valPackParamDecl = as<GenericValuePackParamDecl>(member))
+            {
+                auto synValPackParamDecl = m_astBuilder->create<GenericValuePackParamDecl>();
+                synValPackParamDecl->nameAndLoc = valPackParamDecl->nameAndLoc;
+                synValPackParamDecl->parentDecl = synGenericDecl;
+                synValPackParamDecl->parameterIndex = valPackParamDecl->parameterIndex;
+                synValPackParamDecl->type = valPackParamDecl->type;
 
-                // synGenericArgs.add(synValParamDeclRefExpr);
+                synGenericDecl->addDirectMemberDecl(synValPackParamDecl);
+
+                mapSynToOrigTypeParams.add(synValPackParamDecl, valPackParamDecl);
+
+                // Construct a DeclRefExpr from the value pack parameter.
+                auto synValPackParamDeclRef = makeDeclRef(synValPackParamDecl);
+
+                auto synValPackParamDeclRefExpr = m_astBuilder->create<VarExpr>();
+                synValPackParamDeclRefExpr->declRef = synValPackParamDeclRef;
+                synValPackParamDeclRefExpr->type = synValPackParamDecl->type.type;
             }
         }
 
@@ -6390,6 +6395,17 @@ void SemanticsVisitor::addModifiersToSynthesizedDecl(
             auto noDiffThisAttr = m_astBuilder->create<NoDiffThisAttribute>();
             addModifier(synthesized, noDiffThisAttr);
         }
+    }
+
+    if (requiredMemberDeclRef.getDecl()->hasModifier<ForwardDifferentiableAttribute>())
+    {
+        auto forwardDifferentiableAttr = m_astBuilder->create<ForwardDifferentiableAttribute>();
+        addModifier(synthesized, forwardDifferentiableAttr);
+    }
+    if (requiredMemberDeclRef.getDecl()->hasModifier<BackwardDifferentiableAttribute>())
+    {
+        auto backwardDifferentiableAttr = m_astBuilder->create<BackwardDifferentiableAttribute>();
+        addModifier(synthesized, backwardDifferentiableAttr);
     }
 
     // The visibility of synthesized decl should be the min of the parent decl and the requirement.
@@ -7029,6 +7045,7 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
 
                 // If our method has associated functions, we need to add some decorators to
                 // materialize those conformances.
+                /*
                 {
                     bool hasFwdDerivative = false;
                     auto fwdDiffLookupResult = lookUpMember(
@@ -7070,6 +7087,7 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
                         addModifier(synFuncDecl, bwdDerivativeModifier);
                     }
                 }
+                */
             }
         }
     }
@@ -11555,7 +11573,7 @@ List<Val*> getDefaultSubstitutionArgs(
             }
             args.add(astBuilder->getBuiltinTypeCoercionWitness(fromType, toType));
         }
-        else if (auto nonEmptyConstraintDecl = as<NonEmptyPackConstraintDecl>(member))
+        else if (auto nonEmptyConstraintDecl = as<NonEmptyPackConstraintDecl>(decl))
         {
             auto constraintDeclRef =
                 astBuilder->getDirectDeclRef<NonEmptyPackConstraintDecl>(nonEmptyConstraintDecl);

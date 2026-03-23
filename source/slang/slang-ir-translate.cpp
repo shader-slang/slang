@@ -404,16 +404,20 @@ IRInst* _resolveInstRec(TranslationContext* ctx, IRInst* inst)
             if (!isSetSpecializedGeneric(instWithCanonicalOperands))
             {
                 auto specInst = cast<IRSpecialize>(instWithCanonicalOperands);
-                auto specResult = specializeGeneric(specInst);
+                auto specResult = specializeGeneric(ctx->getSpecializationContext(), specInst);
 
-                // TODO: We might need to do other things like loop-unrolling...
-                applySparseConditionalConstantPropagation(
-                    specResult,
-                    ctx->getTargetProgram(),
-                    ctx->getSink());
+                if (specResult)
+                {
+                    // TODO: We might need to do other things like loop-unrolling...
+                    applySparseConditionalConstantPropagation(
+                        specResult,
+                        ctx->getTargetProgram(),
+                        ctx->getSink());
 
-                specInst->replaceUsesWith(specResult);
-                return memoize(specResult);
+                    specInst->replaceUsesWith(specResult);
+                }
+                // No need to memoize since specializeGeneric will already have memoized this.
+                return specResult;
             }
             break;
         }

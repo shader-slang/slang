@@ -10,11 +10,13 @@
 #include "slang-ir-specialize-target-switch.h"
 #include "slang-ir-specialize.h"
 #include "slang-ir-string-hash.h"
+#include "slang-ir-translate.h"
 #include "slang-ir.h"
 #include "slang-legalize-types.h"
 #include "slang-mangle.h"
 #include "slang-module-library.h"
 #include "slang-rich-diagnostics.h"
+
 
 namespace Slang
 {
@@ -2160,6 +2162,8 @@ LinkedIR linkIR(CodeGenContext* codeGenContext)
     // arguments which might end up affecting the mangled
     // entry point name.
     //
+
+    initializeTranslationDictionary(context->getModule());
 
     List<IRFunc*> irEntryPoints;
     for (auto entryPointIndex : codeGenContext->getEntryPointIndices())
