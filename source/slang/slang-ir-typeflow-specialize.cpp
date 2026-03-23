@@ -4627,6 +4627,7 @@ struct TypeFlowSpecializationContext
             auto defaultVal = builder.emitDefaultConstruct(inst->getDataType());
             inst->replaceUsesWith(defaultVal);
             inst->removeAndDeallocate();
+            module->getContainerPool().free(&callArgs);
             return true;
         }
         else if (isGlobalInst(callee) && !isIntrinsic(callee))
