@@ -3055,6 +3055,14 @@ local insts = {
 	{ CompilerDictionaryValue = { operands = { {"value"} } } },
 	{ CompilerDictionary = { parent = true } },
 	{ CompilerDictionaryScope = { parent = true } },
+	{ LateRequireCapability = {
+		-- A capability requirement that is checked after linking, specialization, and IR-level dead
+		-- code elimination passes.
+		--
+		-- Parameters: IRCapabilitySet
+		operands = { { "capabilitySet", "IRCapabilitySet" } },
+	} },
+
 	-- Constexpr arithmetic ops. These are hoistable variants of the regular
 	-- arithmetic ops, used for lowering compile-time integer expressions
 	-- (IntVal subclasses like PolynomialIntVal) so that they get deduplicated.

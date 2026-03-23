@@ -2585,10 +2585,10 @@ err(
 -- Specialization and push constants
 
 err(
-    "specialization-constant-must-be-scalar",
+    "specialization-constant-must-be-scalar-or-enum",
     31218,
     "specialization constant type error",
-    span { loc = "modifier:Modifier", message = "specialization constant must be a scalar." }
+    span { loc = "modifier:Modifier", message = "specialization constant must be a scalar or enum type." }
 )
 
 err(
@@ -3486,6 +3486,13 @@ warning(
     39999,
     "integer literal truncated",
     span { loc = "location", message = "integer literal '~literal' too large for type '~type' truncated to '~truncatedValue'" }
+)
+
+warning(
+    "integer-constant-overflow",
+    39999,
+    "integer constant overflow in conversion",
+    span { loc = "expr:Expr", message = "integer value '~value' does not fit in type '~toType:Type'" }
 )
 
 warning(

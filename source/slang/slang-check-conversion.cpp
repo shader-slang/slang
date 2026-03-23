@@ -2122,6 +2122,70 @@ bool SemanticsVisitor::_coerce(
         //
         if (outToExpr && site != CoercionSite::ExplicitCoercion)
         {
+            bool overflowWarningDetected = false;
+            bool isCoreModule = false;
+            if (auto module = getShared()->getModule())
+                if (auto moduleDecl = module->getModuleDecl())
+                    isCoreModule = moduleDecl->hasModifier<FromCoreModuleModifier>();
+
+            // Cache the constant-fold result so both the overflow check and
+            // the UnrecommendedImplicitConversion check can reuse it.
+            ConstantIntVal* cachedFoldedVal = nullptr;
+            bool hasFolded = false;
+            auto getFoldedIntVal = [&]() -> ConstantIntVal*
+            {
+                if (!hasFolded)
+                {
+                    cachedFoldedVal = as<ConstantIntVal>(tryFoldIntegerConstantExpression(
+                        fromExpr,
+                        ConstantFoldingKind::CompileTime,
+                        nullptr));
+                    hasFolded = true;
+                }
+                return cachedFoldedVal;
+            };
+
+            int maxBitSize = getMaximumTypeBitSize(toType);
+            if (!isCoreModule && maxBitSize > 0 && cost < kConversionCost_Explicit)
+            {
+                if (auto val = getFoldedIntVal())
+                {
+                    IntegerLiteralValue v = val->getValue();
+                    bool overflow = false;
+                    if (v < 0)
+                    {
+                        // Two's complement minimum for N bits is -(2^(N-1)).
+                        // For 64-bit targets, any int64_t value fits by definition.
+                        if (maxBitSize < 64)
+                        {
+                            int64_t minValue = -(INT64_C(1) << (maxBitSize - 1));
+                            overflow = v < minValue;
+                        }
+                    }
+                    else
+                    {
+                        // Positive: bit-width comparison to avoid false positives
+                        // on hex bit-pattern idioms like int x = 0xFF030206.
+                        overflow = getIntValueBitSize(v) > maxBitSize;
+                    }
+
+                    if (overflow)
+                    {
+                        // Set even when sink is null so that the
+                        // UnrecommendedImplicitConversion path below is
+                        // consistently suppressed for overflow cases.
+                        overflowWarningDetected = true;
+                        if (sink)
+                        {
+                            sink->diagnose(Diagnostics::IntegerConstantOverflow{
+                                .value = String(val->getValue()),
+                                .toType = toType,
+                                .expr = fromExpr});
+                        }
+                    }
+                }
+            }
+
             if (cost >= kConversionCost_Explicit)
             {
                 if (sink)
@@ -2136,25 +2200,19 @@ bool SemanticsVisitor::_coerce(
                         .location = fromExpr->loc});
                 }
             }
-            else if (cost >= kConversionCost_Default)
+            // For general implicit conversions with high cost, emit a warning
+            // unless the value is a known constant within the target type's
+            // range. Skip if the overflow check already covered this case.
+            else if (cost >= kConversionCost_Default && !overflowWarningDetected)
             {
-                // For general types of implicit conversions, we issue a warning, unless `fromExpr`
-                // is a known constant and we know it won't cause a problem.
                 bool shouldEmitGeneralWarning = true;
                 if (isScalarIntegerType(toType) || isHalfType(toType))
                 {
-                    if (auto intVal = tryFoldIntegerConstantExpression(
-                            fromExpr,
-                            ConstantFoldingKind::CompileTime,
-                            nullptr))
+                    if (auto val = getFoldedIntVal())
                     {
-                        if (auto val = as<ConstantIntVal>(intVal))
+                        if (isIntValueInRangeOfType(val->getValue(), toType))
                         {
-                            if (isIntValueInRangeOfType(val->getValue(), toType))
-                            {
-                                // OK.
-                                shouldEmitGeneralWarning = false;
-                            }
+                            shouldEmitGeneralWarning = false;
                         }
                     }
                 }
