@@ -54,13 +54,21 @@ jobs:
             CREATED=$(echo "$RUN_LIST" | jq -r ".[$i].createdAt")
 
             echo "Trying CI run $RUN_ID (commit: ${COMMIT:0:12}, created: $CREATED)..."
+            ERR_FILE=$(mktemp)
             if gh run download "$RUN_ID" --repo ${{ github.repository }} \
-                --name "$ARTIFACT_NAME" --dir slang-build/ 2>/dev/null; then
+                --name "$ARTIFACT_NAME" --dir slang-build/ 2>"$ERR_FILE"; then
               echo "Downloaded artifact from CI run $RUN_ID"
+              rm -f "$ERR_FILE"
               FOUND=true
               break
-            else
+            elif grep -qi "artifact" "$ERR_FILE"; then
               echo "  No artifact '$ARTIFACT_NAME' in this run, trying next..."
+              rm -f "$ERR_FILE"
+            else
+              echo "  Artifact download failed for run $RUN_ID:"
+              cat "$ERR_FILE"
+              rm -f "$ERR_FILE"
+              exit 1
             fi
           done
 
