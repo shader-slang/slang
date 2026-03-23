@@ -1,9 +1,8 @@
 // replay-handlers.cpp
 //
 // This file registers all replay handlers for proxy methods.
-// Handlers are registered lazily on first playback via
-// ReplayContext::ensureHandlersRegistered(), avoiding heap allocations
-// during static initialization.
+// It is included in the slang library to enable automatic registration
+// of handlers when the library is loaded.
 //
 // To add a new handler:
 // 1. Implement the proxy method with RECORD_CALL(), RECORD_INPUT(), etc.
@@ -63,8 +62,8 @@ static void handle_slang_createGlobalSession2(ReplayContext& ctx)
 }
 
 /// Register all replay handlers.
-/// Called lazily on first playback via ReplayContext::ensureHandlersRegistered().
-void registerAllHandlers()
+/// This function is called during static initialization.
+static void registerAllHandlers()
 {
     // =========================================================================
     // Static/Free Function handlers
@@ -308,5 +307,15 @@ void registerAllHandlers()
     REPLAY_REGISTER(MutableFileSystemProxy, remove);
     REPLAY_REGISTER(MutableFileSystemProxy, createDirectory);
 }
+
+// Static initialization - register handlers when library loads
+namespace
+{
+struct HandlerRegistrar
+{
+    HandlerRegistrar() { registerAllHandlers(); }
+};
+static HandlerRegistrar s_registrar;
+} // namespace
 
 } // namespace SlangRecord

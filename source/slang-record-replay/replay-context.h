@@ -607,9 +607,10 @@ public:
     /// Return the number of registered playback handlers.
     SLANG_API size_t getHandlerCount() const;
 
-    /// Lazily register all built-in playback handlers if not already done.
-    /// Called automatically before any playback operation.
-    SLANG_API void ensureHandlersRegistered();
+    /// Clear the handler dictionary.
+    /// Called from slang_shutdown() to free heap-allocated handler strings
+    /// before _CrtDumpMemoryLeaks() runs.
+    SLANG_API void resetHandlers();
 
     /// Execute the next recorded call from the stream.
     /// Reads the function signature, looks up the handler, and calls it.
@@ -699,9 +700,8 @@ private:
     // Deferred initialization (to avoid global init order issues with CharEncoding)
     bool m_initialized = false; ///< True after ensureInitialized() has run
 
-    // Map from function signature to handler (populated lazily on first playback)
+    // Map from function signature to handler
     Dictionary<String, PlaybackHandler> m_handlers;
-    bool m_handlersRegistered = false;
 
     // Current 'this' handle during playback execution
     uint64_t m_currentThisHandle = kNullHandle;
