@@ -771,8 +771,7 @@ size_t ReplayContext::getHandlerCount() const
 
 void ReplayContext::resetHandlers()
 {
-    decltype(m_handlers) empty;
-    m_handlers.swap(empty);
+    m_handlers.clear();
 }
 
 bool ReplayContext::executeNextCall()
