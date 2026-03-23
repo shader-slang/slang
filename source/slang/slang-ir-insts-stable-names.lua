@@ -773,4 +773,5 @@ return {
 	["NonEmptyPackWitness"] = 771,
 	["PackBranch"] = 772,
 	["Decoration.SpecializationDepthDecoration"] = 773,
+	["LateRequireCapability"] = 774,
 }

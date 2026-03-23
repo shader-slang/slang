@@ -80,6 +80,13 @@ RUN apt-get update && apt-get install -y \
     libvulkan1 \
     && rm -rf /var/lib/apt/lists/*
 
+# Remove Mesa Vulkan drivers and system LLVM. The Mesa device_select implicit
+# Vulkan layer loads libLLVM-15.so.1 which crashes (null deref in
+# UpgradeOperandBundles) when multiple test-servers initialize Vulkan
+# concurrently. Mesa drivers are not needed — we always use the NVIDIA ICD.
+RUN apt-get purge -y --auto-remove mesa-vulkan-drivers libllvm15 && \
+    rm -f /usr/share/vulkan/implicit_layer.d/VkLayer_MESA_device_select.json
+
 # Install CMake 3.30 (required for CMakePresets.json version 6)
 RUN wget -q https://github.com/Kitware/CMake/releases/download/v3.30.0/cmake-3.30.0-linux-x86_64.tar.gz && \
     tar -xzf cmake-3.30.0-linux-x86_64.tar.gz -C /opt && \
