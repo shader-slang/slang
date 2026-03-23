@@ -3,22 +3,6 @@
 
 #include "core/slang-uint-set.h"
 #include "slang-ast-builder.h"
-
-// Defensive null guard for Val operand accessors (getValArg, getBasePack, etc.).
-// These should not be null in well-formed AST, but can be transiently null during
-// variadic pack resolution. Fires the assert handler to catch upstream bugs, then
-// returns `this` as a safe fallback to avoid crashes. See #10561.
-// Note: operand is evaluated twice; all call sites use trivial inline getters.
-#define SLANG_NULL_OPERAND_GUARD(operand)                                      \
-    do                                                                         \
-    {                                                                          \
-        if (!(operand))                                                        \
-        {                                                                      \
-            SLANG_ASSERT_FAILURE("unexpected null Val operand -- see #10561"); \
-            return this;                                                       \
-        }                                                                      \
-    } while (0)
-
 #include "slang-ast-dispatch.h"
 #include "slang-ast-natural-layout.h"
 #include "slang-check-impl.h"
@@ -29,6 +13,23 @@
 
 #include <assert.h>
 #include <typeinfo>
+
+// Defensive null guard for Val operand accessors (getValArg, getBasePack, etc.).
+// These should not be null in well-formed AST, but can be transiently null during
+// variadic pack resolution. Returns `this` as a graceful no-op in release;
+// fires a debug assert to catch upstream bugs. See #10561.
+// The null check must come before SLANG_ASSERT because SLANG_ASSERT expands to
+// SLANG_ASSUME in release, which would let the optimizer remove the null check.
+// Note: operand is evaluated twice; all call sites use trivial inline getters.
+#define SLANG_NULL_OPERAND_GUARD(operand) \
+    do                                    \
+    {                                     \
+        if (!(operand))                   \
+        {                                 \
+            SLANG_ASSERT(false);          \
+            return this;                  \
+        }                                 \
+    } while (0)
 
 namespace Slang
 {
@@ -2043,7 +2044,10 @@ Val* FuncCallIntVal::_substituteImplOverride(
 void SizeOfIntVal::_toTextOverride(StringBuilder& out)
 {
     out << "sizeof(";
-    getValArg()->toText(out);
+    if (getValArg())
+        getValArg()->toText(out);
+    else
+        out << "<null>";
     out << ")";
 }
 
@@ -2095,7 +2099,10 @@ Val* SizeOfIntVal::_resolveImplOverride()
 void AlignOfIntVal::_toTextOverride(StringBuilder& out)
 {
     out << "alignof(";
-    getValArg()->toText(out);
+    if (getValArg())
+        getValArg()->toText(out);
+    else
+        out << "<null>";
     out << ")";
 }
 
@@ -2147,7 +2154,10 @@ Val* AlignOfIntVal::_resolveImplOverride()
 void CountOfIntVal::_toTextOverride(StringBuilder& out)
 {
     out << "countof(";
-    getValArg()->toText(out);
+    if (getValArg())
+        getValArg()->toText(out);
+    else
+        out << "<null>";
     out << ")";
 }
 
@@ -2216,7 +2226,10 @@ Val* CountOfIntVal::_resolveImplOverride()
 void FirstIntVal::_toTextOverride(StringBuilder& out)
 {
     out << "__first(";
-    getBasePack()->toText(out);
+    if (getBasePack())
+        getBasePack()->toText(out);
+    else
+        out << "<null>";
     out << ")";
 }
 
@@ -2248,7 +2261,10 @@ Val* FirstIntVal::_resolveImplOverride()
 void LastIntVal::_toTextOverride(StringBuilder& out)
 {
     out << "__last(";
-    getBasePack()->toText(out);
+    if (getBasePack())
+        getBasePack()->toText(out);
+    else
+        out << "<null>";
     out << ")";
 }
 
@@ -2320,7 +2336,10 @@ Val* ConcreteIntValPack::_resolveImplOverride()
 void TrimFirstIntValPack::_toTextOverride(StringBuilder& out)
 {
     out << "__trimFirst(";
-    getBasePack()->toText(out);
+    if (getBasePack())
+        getBasePack()->toText(out);
+    else
+        out << "<null>";
     out << ")";
 }
 
@@ -2352,7 +2371,10 @@ Val* TrimFirstIntValPack::_resolveImplOverride()
 void TrimLastIntValPack::_toTextOverride(StringBuilder& out)
 {
     out << "__trimLast(";
-    getBasePack()->toText(out);
+    if (getBasePack())
+        getBasePack()->toText(out);
+    else
+        out << "<null>";
     out << ")";
 }
 
@@ -2441,7 +2463,10 @@ Val* ExpandIntValPack::_resolveImplOverride()
 void EachIntVal::_toTextOverride(StringBuilder& out)
 {
     out << "each ";
-    getBasePack()->toText(out);
+    if (getBasePack())
+        getBasePack()->toText(out);
+    else
+        out << "<null>";
 }
 
 Val* EachIntVal::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff)
