@@ -799,6 +799,7 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
 
             if (valParam->initExpr && !val)
             {
+                ensureDecl(makeDeclRef(valParam), DeclCheckState::DefinitionChecked);
                 auto genSubst = m_astBuilder->getGenericAppDeclRef(
                     genericDeclRef,
                     args.getArrayView().arrayView);
