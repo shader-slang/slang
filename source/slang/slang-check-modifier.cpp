@@ -117,7 +117,7 @@ void SemanticsVisitor::visitModifier(Modifier*)
     // Do nothing with modifiers for now
 }
 
-DeclRef<VarDeclBase> SemanticsVisitor::tryGetIntSpecializationConstant(Expr* expr)
+DeclRef<VarDeclBase> SemanticsVisitor::tryGetIntOrEnumSpecializationConstant(Expr* expr)
 {
     // First type-check the expression as normal
     expr = CheckExpr(expr);
@@ -125,7 +125,7 @@ DeclRef<VarDeclBase> SemanticsVisitor::tryGetIntSpecializationConstant(Expr* exp
     if (IsErrorExpr(expr))
         return DeclRef<VarDeclBase>();
 
-    if (!isScalarIntegerType(expr->type))
+    if (!isValidCompileTimeConstantType(expr->type))
         return DeclRef<VarDeclBase>();
 
     auto specConstVar = as<VarExpr>(expr);
@@ -404,7 +404,7 @@ Modifier* SemanticsVisitor::validateAttribute(
             auto arg = attr->args[i];
             if (arg)
             {
-                auto specConstDecl = tryGetIntSpecializationConstant(arg);
+                auto specConstDecl = tryGetIntOrEnumSpecializationConstant(arg);
                 if (specConstDecl)
                 {
                     numThreadsAttr->extents[i] = nullptr;
@@ -1989,7 +1989,7 @@ Modifier* SemanticsVisitor::checkModifier(
             auto arg = attr->args[i];
             if (arg)
             {
-                auto specConstDecl = tryGetIntSpecializationConstant(arg);
+                auto specConstDecl = tryGetIntOrEnumSpecializationConstant(arg);
                 if (specConstDecl)
                 {
                     attr->specConstExtents[i] = specConstDecl;

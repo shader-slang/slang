@@ -4716,7 +4716,7 @@ Expr* SemanticsExprVisitor::visitPackQueryExpr(PackQueryExpr* packQueryExpr)
     bool isTypeExpr = false;
     Type* operandType = nullptr;
 
-    if (auto typeType = as<TypeType>(valueExpr->type))
+    if ([[maybe_unused]] auto typeType = as<TypeType>(valueExpr->type))
     {
         isTypeExpr = true;
         TypeExp typeExp;
@@ -6913,7 +6913,7 @@ Expr* SemanticsExprVisitor::visitPackBranchTypeExpr(PackBranchTypeExpr* expr)
 
     bool isTypeExpr = false;
     Type* operandType = nullptr;
-    if (auto typeType = as<TypeType>(expr->packOperand.exp->type))
+    if ([[maybe_unused]] auto typeType = as<TypeType>(expr->packOperand.exp->type))
     {
         isTypeExpr = true;
         operandType = CoerceToProperType(expr->packOperand).type;
