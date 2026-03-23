@@ -613,6 +613,8 @@ public:
     SLANG_API void resetHandlers();
 
     /// Re-register the default set of playback handlers.
+    /// Call after resetHandlers() to restore replay functionality.
+    /// Normal initialization happens automatically via static HandlerRegistrar.
     SLANG_API void registerDefaultHandlers();
 
     /// Execute the next recorded call from the stream.
