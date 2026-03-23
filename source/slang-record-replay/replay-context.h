@@ -604,6 +604,13 @@ public:
     /// The signature should match what __FUNCSIG__ or __PRETTY_FUNCTION__ produces.
     SLANG_API void registerHandler(const char* signature, PlaybackHandler handler);
 
+    /// Return the number of registered playback handlers.
+    SLANG_API size_t getHandlerCount() const;
+
+    /// Lazily register all built-in playback handlers if not already done.
+    /// Called automatically before any playback operation.
+    SLANG_API void ensureHandlersRegistered();
+
     /// Execute the next recorded call from the stream.
     /// Reads the function signature, looks up the handler, and calls it.
     /// Returns true if a call was executed, false if at end of stream.
@@ -692,8 +699,9 @@ private:
     // Deferred initialization (to avoid global init order issues with CharEncoding)
     bool m_initialized = false; ///< True after ensureInitialized() has run
 
-    // Map from function signature to handler
+    // Map from function signature to handler (populated lazily on first playback)
     Dictionary<String, PlaybackHandler> m_handlers;
+    bool m_handlersRegistered = false;
 
     // Current 'this' handle during playback execution
     uint64_t m_currentThisHandle = kNullHandle;

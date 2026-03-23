@@ -20,6 +20,9 @@
 namespace SlangRecord
 {
 
+// Defined in replay-handlers.cpp; called lazily by ensureHandlersRegistered().
+void registerAllHandlers();
+
 using Slang::File;
 using Slang::Path;
 
@@ -764,10 +767,26 @@ void ReplayContext::registerHandler(const char* signature, PlaybackHandler handl
     m_handlers[String(signature)] = handler;
 }
 
+size_t ReplayContext::getHandlerCount() const
+{
+    return m_handlers.getCount();
+}
+
+void ReplayContext::ensureHandlersRegistered()
+{
+    if (!m_handlersRegistered)
+    {
+        registerAllHandlers();
+        m_handlersRegistered = true;
+    }
+}
+
 bool ReplayContext::executeNextCall()
 {
     if (m_mode != Mode::Playback)
         return false;
+
+    ensureHandlersRegistered();
 
     if (m_stream.atEnd())
         return false;
