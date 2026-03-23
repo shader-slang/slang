@@ -177,6 +177,7 @@ Result SwapchainImpl::createSwapchainAndImages()
     VkSemaphoreCreateInfo semaphoreCreateInfo = {};
     semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
     m_nextImageSemaphores.setCount(numSwapChainImages);
+    memset(m_nextImageSemaphores.getBuffer(), 0, numSwapChainImages * sizeof(VkSemaphore));
     for (Index i = 0; i < m_nextImageSemaphores.getCount(); ++i)
     {
         SLANG_VK_RETURN_ON_FAIL(m_api->vkCreateSemaphore(
