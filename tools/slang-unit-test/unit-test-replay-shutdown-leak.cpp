@@ -20,21 +20,12 @@ SLANG_UNIT_TEST(replayResetHandlersClearsDictionary)
 
     SLANG_CHECK(replayCtx.getHandlerCount() > 0);
 
-    // Save the real handlers so we can restore them after the test.
-    Dictionary<String, ReplayContext::PlaybackHandler> saved;
-    replayCtx.swapHandlers(saved);
-    SLANG_CHECK(replayCtx.getHandlerCount() == 0);
-
-    // Register a dummy handler so resetHandlers() has something to clear.
-    replayCtx.registerHandler("__test__", [](ReplayContext&) {});
-    SLANG_CHECK(replayCtx.getHandlerCount() == 1);
-
     // This is what slang_shutdown() calls to free handler strings
     // before _CrtDumpMemoryLeaks() runs.
     replayCtx.resetHandlers();
     SLANG_CHECK(replayCtx.getHandlerCount() == 0);
 
-    // Restore the original handlers so subsequent tests are unaffected.
-    replayCtx.swapHandlers(saved);
+    // Restore the handlers so subsequent tests are unaffected.
+    replayCtx.registerDefaultHandlers();
     SLANG_CHECK(replayCtx.getHandlerCount() > 0);
 }

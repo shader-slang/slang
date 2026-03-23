@@ -612,8 +612,8 @@ public:
     /// before _CrtDumpMemoryLeaks() runs.
     SLANG_API void resetHandlers();
 
-    /// Swap the handler dictionary with another, allowing save/restore in tests.
-    SLANG_API void swapHandlers(Dictionary<String, PlaybackHandler>& other);
+    /// Re-register the default set of playback handlers.
+    SLANG_API void registerDefaultHandlers();
 
     /// Execute the next recorded call from the stream.
     /// Reads the function signature, looks up the handler, and calls it.

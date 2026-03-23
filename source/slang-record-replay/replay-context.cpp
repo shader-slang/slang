@@ -775,11 +775,6 @@ void ReplayContext::resetHandlers()
     m_handlers.swapWith(empty);
 }
 
-void ReplayContext::swapHandlers(Dictionary<String, PlaybackHandler>& other)
-{
-    m_handlers.swapWith(other);
-}
-
 bool ReplayContext::executeNextCall()
 {
     if (m_mode != Mode::Playback)
