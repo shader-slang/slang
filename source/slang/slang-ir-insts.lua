@@ -568,10 +568,6 @@ local insts = {
 				},
 			},
 			{ CoopVectorType = { operands = { { "elementType", "IRType" }, { "elementCount" } }, hoistable = true } },
-		{ MatrixRef = { operands = { { "elementType", "IRType" } }, hoistable = true } },
-		{ RWMatrixRef = { operands = { { "elementType", "IRType" } }, hoistable = true } },
-		{ VectorRef = { operands = { { "elementType", "IRType" } }, hoistable = true } },
-		{ RWVectorRef = { operands = { { "elementType", "IRType" } }, hoistable = true } },
 			{
 				CoopMatrixType = {
 					operands = {
@@ -939,36 +935,6 @@ local insts = {
 	{ makeArrayFromElement = { operands = { { "element" } } } },
 	{ makeCoopVector = {} },
 	{ makeCoopVectorFromValuePack = { operands = { { "valuePack" } } } },
-	{
-		makeMatrixRef = {
-			operands = {
-				{ "buffer" },
-				{ "startOffset" },
-				{ "stride" },
-				{ "matDataType" },
-				{ "M" },
-				{ "K" },
-				{ "ML" },
-				{ "transpose" },
-			},
-		},
-	},
-	{
-		makeRWMatrixRef = {
-			operands = {
-				{ "buffer" },
-				{ "startOffset" },
-				{ "stride" },
-				{ "matDataType" },
-				{ "M" },
-				{ "K" },
-				{ "ML" },
-				{ "transpose" },
-			},
-		},
-	},
-	{ makeVectorRef = { operands = { { "buffer" }, { "startOffset" }, { "dataType" } } } },
-	{ makeRWVectorRef = { operands = { { "buffer" }, { "startOffset" }, { "dataType" } } } },
 	{ makeCoopMatrixFromScalar = {} },
 	{ makeStruct = {} },
 	{ makeTuple = {} },

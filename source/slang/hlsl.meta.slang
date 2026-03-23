@@ -27119,6 +27119,102 @@ internal void enableVMMDeviceScopeCapabilityIfNeeded(constexpr MemoryScope memor
 namespace linalg
 {
 
+void __requirePrelude_linalg()
+{
+        __requirePrelude(R"(
+#if ((__SHADER_TARGET_MAJOR > 6) || (__SHADER_TARGET_MAJOR == 6 && __SHADER_TARGET_MINOR >= 9)) && (__HLSL_VERSION >= 2021)
+
+#include "dx/linalg.h"
+
+// Conversion from CoopVecMatrixLayout integer values to dx::linalg::MatrixLayout named constants.
+template<uint V>
+struct __slang_matrix_layout_t
+{
+    static const dx::linalg::MatrixLayout value = (dx::linalg::MatrixLayout)V;
+};
+template<>
+struct __slang_matrix_layout_t<0> // CoopVecMatrixLayout::RowMajor(0) in Slang
+{
+    static const dx::linalg::MatrixLayout value = dx::linalg::MATRIX_LAYOUT_ROW_MAJOR;
+};
+template<>
+struct __slang_matrix_layout_t<1> // CoopVecMatrixLayout::ColumnMajor(1) in Slang
+{
+    static const dx::linalg::MatrixLayout value = dx::linalg::MATRIX_LAYOUT_COLUMN_MAJOR;
+};
+template<>
+struct __slang_matrix_layout_t<2> // CoopVecMatrixLayout::InferencingOptimal(2) in Slang
+{
+    static const dx::linalg::MatrixLayout value = dx::linalg::MATRIX_LAYOUT_MUL_OPTIMAL;
+};
+template<>
+struct __slang_matrix_layout_t<3> // CoopVecMatrixLayout::TrainingOptimal(3) in Slang
+{
+    static const dx::linalg::MatrixLayout value = dx::linalg::MATRIX_LAYOUT_OUTER_PRODUCT_OPTIMAL;
+};
+template<
+    typename OutElTy,
+    dx::linalg::DataType MatDT,
+    uint MatM,
+    uint MatK,
+    uint MatML,
+    bool MatTranspose,
+    dx::linalg::DataType InputDT,
+    typename BufTy,
+    typename InElTy>
+vector<OutElTy, MatM> __slang_coopvec_Mul(
+    BufTy matBuf,
+    uint matOff,
+    uint matStr,
+    vector<InElTy, MatK> input)
+{
+    dx::linalg::MatrixRefImpl<BufTy, MatDT, MatM, MatK, __slang_matrix_layout_t<MatML>::value, MatTranspose>
+        matRef = {matBuf, matOff, matStr};
+    return dx::linalg::Mul<OutElTy>(matRef, dx::linalg::MakeInterpretedVector<InputDT>(input));
+}
+template<
+    typename OutElTy,
+    dx::linalg::DataType MatDT,
+    uint MatM,
+    uint MatK,
+    uint MatML,
+    bool MatTranspose,
+    dx::linalg::DataType InputDT,
+    dx::linalg::DataType BiasDT,
+    typename MatBufTy,
+    typename BiasBufTy,
+    typename InElTy>
+vector<OutElTy, MatM> __slang_coopvec_MulAdd(
+    MatBufTy matBuf,
+    uint matOff,
+    uint matStr,
+    BiasBufTy biasBuf,
+    uint biasOff,
+    vector<InElTy, MatK> input)
+{
+    dx::linalg::MatrixRefImpl<MatBufTy, MatDT, MatM, MatK, __slang_matrix_layout_t<MatML>::value, MatTranspose>
+        matRef = {matBuf, matOff, matStr};
+    dx::linalg::VectorRefImpl<BiasBufTy, BiasDT> biasRef = {biasBuf, biasOff};
+    return dx::linalg::MulAdd<OutElTy>(matRef, dx::linalg::MakeInterpretedVector<InputDT>(input), biasRef);
+}
+template<typename ElTy, dx::linalg::DataType MatDT, uint MatM, uint MatN, uint MatML, typename BufTy>
+void __slang_coopvec_OuterProductAccumulate(
+    vector<ElTy, MatM> a,
+    vector<ElTy, MatN> b,
+    BufTy matBuf,
+    uint matOff,
+    uint matStr)
+{
+    dx::linalg::MatrixRefImpl<BufTy, MatDT, MatM, MatN, __slang_matrix_layout_t<MatML>::value, false> matRef = {
+        matBuf,
+        matOff,
+        matStr};
+    dx::linalg::OuterProductAccumulate(a, b, matRef);
+}
+#endif
+        )");
+}
+
 //
 // Cooperative Matrix enums
 //
@@ -29390,40 +29486,6 @@ linalg.CoopMat<T, S, M, N, R> operator *<
 // Cooperative Vector
 //
 
-[require(hlsl, byteaddressbuffer)]
-__intrinsic_type($(kIROp_MatrixRef))
-struct __MatrixRef<DT: __BuiltinArithmeticType>
-{
-    __intrinsic_op($(kIROp_MakeMatrixRef))
-    __init(ByteAddressBuffer buffer, uint startOffset, uint stride,
-           uint matDataType, uint M, uint K, CoopVecMatrixLayout ML, bool transpose);
-};
-
-[require(hlsl, byteaddressbuffer_rw)]
-__intrinsic_type($(kIROp_RWMatrixRef))
-struct __RWMatrixRef<DT: __BuiltinArithmeticType>
-{
-    __intrinsic_op($(kIROp_MakeRWMatrixRef))
-    __init(RWByteAddressBuffer buffer, uint startOffset, uint stride,
-           uint matDataType, uint M, uint K, CoopVecMatrixLayout ML, bool transpose);
-};
-
-[require(hlsl, byteaddressbuffer)]
-__intrinsic_type($(kIROp_VectorRef))
-struct __VectorRef<DT: __BuiltinArithmeticType>
-{
-    __intrinsic_op($(kIROp_MakeVectorRef))
-    __init(ByteAddressBuffer buffer, uint startOffset, uint dataType);
-};
-
-[require(hlsl, byteaddressbuffer_rw)]
-__intrinsic_type($(kIROp_RWVectorRef))
-struct __RWVectorRef<DT: __BuiltinArithmeticType>
-{
-    __intrinsic_op($(kIROp_MakeRWVectorRef))
-    __init(RWByteAddressBuffer buffer, uint startOffset, uint dataType);
-};
-
 /// Represents a Cooperative Vector type that is for matrix-vector multiplication that
 /// can take an advantage of the hardware acceleration. It can be used for evaluations
 /// of neural network in graphics and compute pipeline.
@@ -30255,19 +30317,22 @@ ${
 static const struct {
     bool isRW;
     char const* type;
-    char const* matrixRefType;
-    char const* vectorRefType;
 } kByteAddressBufferCases[] =
 {
-    {true, "RWByteAddressBuffer", "__RWMatrixRef", "__RWVectorRef"},
-    {false, "ByteAddressBuffer", "__MatrixRef", "__VectorRef"}
+    {true, "RWByteAddressBuffer"},
+    {false, "ByteAddressBuffer"}
 };
 for(auto buffer : kByteAddressBufferCases) {
 $}
     [ForceInline]
     [require(hlsl, byteaddressbuffer_rw)]
     static This __MatMul_linalg<U : __BuiltinArithmeticType, let K : int>(
-        $(buffer.matrixRefType)<T> matrixRef,
+        $(buffer.type) matBuf,
+        uint matOffset,
+        uint matStride,
+        uint matCompType,
+        uint matLayout,
+        bool transpose,
         CoopVec<U, K> input,
         uint inputCompType)
     {
@@ -30275,25 +30340,32 @@ $}
         {
         case hlsl:
         case _sm_6_9:
-            __requirePrelude("#include \"dx/linalg.h\"");
-            __intrinsic_asm "dx::linalg::Mul<$[0]>($0, dx::linalg::MakeInterpretedVector<(dx::linalg::DataType)$2>($1))", T;
+            linalg::__requirePrelude_linalg();
+            __intrinsic_asm "__slang_coopvec_Mul<$[0], (dx::linalg::DataType)$3, $[1], $[2], $4, (bool)$5, (dx::linalg::DataType)$7>($0, $1, $2, $6)", T, N, K;
         }
     }
 
     [ForceInline]
     [require(hlsl, byteaddressbuffer_rw)]
     static This __MatMulAdd_linalg<U : __BuiltinArithmeticType, let K : int>(
-        $(buffer.matrixRefType)<T> matrixRef,
+        $(buffer.type) matBuf,
+        uint matOffset,
+        uint matStride,
+        uint matCompType,
+        uint matLayout,
+        bool transpose,
         CoopVec<U, K> input,
         uint inputCompType,
-        $(buffer.vectorRefType)<T> biasRef)
+        $(buffer.type) biasBuf,
+        uint biasOffset,
+        uint biasCompType)
     {
         __target_switch
         {
         case hlsl:
         case _sm_6_9:
-            __requirePrelude("#include \"dx/linalg.h\"");
-            __intrinsic_asm "dx::linalg::MulAdd<$[0]>($0, dx::linalg::MakeInterpretedVector<(dx::linalg::DataType)$2>($1), $3)", T;
+            linalg::__requirePrelude_linalg();
+            __intrinsic_asm "__slang_coopvec_MulAdd<$[0], (dx::linalg::DataType)$3, $[1], $[2], $4, (bool)$5, (dx::linalg::DataType)$7, (dx::linalg::DataType)$10>($0, $1, $2, $8, $9, $6)", T, N, K;
         }
     }
 
@@ -30336,11 +30408,10 @@ $}
         case hlsl:
         case _sm_6_9:
         {
-            __requirePrelude("#include \"dx/linalg.h\"");
             let inputCompType = __getHLSLCoopVecComponentType(inputInterpretation);
             let matCompType = __getHLSLCoopVecComponentType(matrixInterpretation);
-            let matRef = $(buffer.matrixRefType)<T>(matrix, uint(matrixOffset), matrixStride, uint(matCompType), uint(N), uint(k), memoryLayout, transpose);
-            let mul = This.__MatMul_linalg(matRef, input, uint(inputCompType));
+            let matLayout = uint(memoryLayout);
+            let mul = This.__MatMul_linalg(matrix, uint(matrixOffset), matrixStride, uint(matCompType), matLayout, transpose, input, uint(inputCompType));
             this.__mutAdd(mul);
         }
         default: this = this + coopVecMatMulPacked<T, N, PackedK, U>(
@@ -30425,13 +30496,11 @@ $}
         case hlsl:
         case _sm_6_9:
         {
-            __requirePrelude("#include \"dx/linalg.h\"");
             let inputCompType = __getHLSLCoopVecComponentType(inputInterpretation);
             let matCompType = __getHLSLCoopVecComponentType(matrixInterpretation);
             let biasCompType = __getHLSLCoopVecComponentType(biasInterpretation);
-            let matRef = $(buffer.matrixRefType)<T>(matrix, uint(matrixOffset), matrixStride, uint(matCompType), uint(N), uint(k), memoryLayout, transpose);
-            let biasRef = $(buffer.vectorRefType)<T>(bias, uint(biasOffset), uint(biasCompType));
-            let muladd = This.__MatMulAdd_linalg(matRef, input, uint(inputCompType), biasRef);
+            let matLayout = uint(memoryLayout);
+            let muladd = This.__MatMulAdd_linalg(matrix, uint(matrixOffset), matrixStride, uint(matCompType), matLayout, transpose, input, uint(inputCompType), bias, uint(biasOffset), uint(biasCompType));
             this.__mutAdd(muladd);
         }
         default: this = this + coopVecMatMulAddPacked<T, N, PackedK, U>(
@@ -30505,15 +30574,18 @@ $}
     [require(hlsl, byteaddressbuffer_rw)]
     void __OuterProductAccumulate<let K : int>(
         CoopVec<T, K> b,
-        $(buffer.matrixRefType)<T> matRef,
-    )
+        $(buffer.type) matBuf,
+        uint matOffset,
+        uint matStride,
+        uint matCompType,
+        uint matLayout)
     {
         __target_switch
         {
         case hlsl:
         case _sm_6_9:
-            __requirePrelude("#include \"dx/linalg.h\"");
-            __intrinsic_asm "dx::linalg::OuterProductAccumulate($0, $1, $2)";
+            linalg::__requirePrelude_linalg();
+            __intrinsic_asm "__slang_coopvec_OuterProductAccumulate<$[0], (dx::linalg::DataType)$5, $[1], $[2], $6>($0, $1, $2, $3, $4)", T, N, K;
         }
     }
 
@@ -31246,12 +31318,10 @@ ${
 static const struct {
     bool isRW;
     char const* type;
-    char const* matrixRefType;
-    char const* vectorRefType;
 } kByteAddressBufferCases_[] =
 {
-    {true, "RWByteAddressBuffer", "__RWMatrixRef", "__RWVectorRef"},
-    {false, "ByteAddressBuffer", "__MatrixRef", "__VectorRef"},
+    {true, "RWByteAddressBuffer"},
+    {false, "ByteAddressBuffer"},
 };
 for(auto buffer : kByteAddressBufferCases_) {
 $}
@@ -31303,11 +31373,10 @@ CoopVec<T, M> __coopVecMatMulPacked_impl(
     case hlsl:
     case _sm_6_9:
     {
-        __requirePrelude("#include \"dx/linalg.h\"");
         let inputCompType = __getHLSLCoopVecComponentType(inputInterpretation);
         let matCompType = __getHLSLCoopVecComponentType(matrixInterpretation);
-        let matRef = $(buffer.matrixRefType)<T>(matrix, uint(matrixOffset), matrixStride, uint(matCompType), uint(M), uint(k), memoryLayout, transpose);
-        return CoopVec<T, M>.__MatMul_linalg(matRef, input, uint(inputCompType));
+        let matLayout = uint(memoryLayout);
+        return CoopVec<T, M>.__MatMul_linalg(matrix, uint(matrixOffset), matrixStride, uint(matCompType), matLayout, transpose, input, uint(inputCompType));
     }
 
     case optix_coopvec:
@@ -31546,13 +31615,11 @@ CoopVec<T, M> __coopVecMatMulAddPacked_impl<T : __BuiltinArithmeticType, let M :
     case hlsl:
     case _sm_6_9:
     {
-        __requirePrelude("#include \"dx/linalg.h\"");
         let inputCompType = __getHLSLCoopVecComponentType(inputInterpretation);
         let matCompType = __getHLSLCoopVecComponentType(matrixInterpretation);
         let biasCompType = __getHLSLCoopVecComponentType(biasInterpretation);
-        let matRef = $(buffer.matrixRefType)<T>(matrix, uint(matrixOffset), matrixStride, uint(matCompType), uint(M), uint(k), memoryLayout, transpose);
-        let biasRef = $(buffer.vectorRefType)<T>(bias, uint(biasOffset), uint(biasCompType));
-        return CoopVec<T, M>.__MatMulAdd_linalg(matRef, input, uint(inputCompType), biasRef);
+        let matLayout = uint(memoryLayout);
+        return CoopVec<T, M>.__MatMulAdd_linalg(matrix, uint(matrixOffset), matrixStride, uint(matCompType), matLayout, transpose, input, uint(inputCompType), bias, uint(biasOffset), uint(biasCompType));
     }
 
     case optix_coopvec:
@@ -31782,8 +31849,7 @@ void coopVecOuterProductAccumulate<T : __BuiltinArithmeticType, let M : int, let
     case hlsl:
     case _sm_6_9:
         uint matrixInterpretationHLSL = __getHLSLCoopVecComponentType(matrixInterpretation);
-        let matRef = $(buffer.matrixRefType)<T>(matrix, uint(matrixOffset), matrixStride, matrixInterpretationHLSL, uint(M), uint(N), memoryLayout, false);
-        return a.__OuterProductAccumulate(b, matRef);
+        return a.__OuterProductAccumulate(b, matrix, uint(matrixOffset), matrixStride, matrixInterpretationHLSL, uint(memoryLayout));
     case spirv:
         let matrixInterpretationSpirv : int = __getSpvCoopVecComponentType(matrixInterpretation);
         let memoryLayoutSpirv : int = __getSpvCoopVecMatrixLayout(memoryLayout);
@@ -31879,7 +31945,7 @@ ${    if (buffer.isRW) {
 $}
     case hlsl:
     case _sm_6_9:
-        __requirePrelude("#include \"dx/linalg.h\"");
+        linalg::__requirePrelude_linalg();
         __intrinsic_asm "dx::linalg::VectorAccumulate($0, $1, (uint)$2)";
 ${    }
 $}

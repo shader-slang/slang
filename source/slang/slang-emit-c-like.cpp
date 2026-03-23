@@ -1520,10 +1520,6 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     case kIROp_SwizzleSet:
     case kIROp_MakeArrayFromElement:
     case kIROp_MakeCoopVector:
-    case kIROp_MakeMatrixRef:
-    case kIROp_MakeRWMatrixRef:
-    case kIROp_MakeVectorRef:
-    case kIROp_MakeRWVectorRef:
 
         return false;
     }
@@ -3245,10 +3241,6 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
     case kIROp_MetalAtomicCast:
     case kIROp_MetalCastToDepthTexture:
     case kIROp_SetOptiXPayloadRegister:
-    case kIROp_MakeMatrixRef:
-    case kIROp_MakeRWMatrixRef:
-    case kIROp_MakeVectorRef:
-    case kIROp_MakeRWVectorRef:
         emitInstStmt(inst);
         break;
 
