@@ -4662,7 +4662,10 @@ struct TypeFlowSpecializationContext
         // either a set or a single function), then we can't specialize it (likely unbounded)
         //
         if (!isGlobalInst(callee))
+        {
+            module->getContainerPool().free(&callArgs);
             return false;
+        }
 
         // First, we'll legalize all operands by upcasting if necessary.
         // This needs to be done even if the callee is not a set.
