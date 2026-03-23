@@ -33,6 +33,7 @@ static void checkSpecializeInst(IRSpecialize* specialize, DiagnosticSink* sink)
         case kIROp_ExtractExistentialType:
         case kIROp_ExtractExistentialWitnessTable:
         case kIROp_MakeExistential:
+        case kIROp_MakeExistentialWithRTTI:
             shouldDecorate = true;
             break;
         }
