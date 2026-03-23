@@ -217,6 +217,7 @@ public:
     ReturnStmt* ParseReturnStatement();
     DeferStmt* ParseDeferStatement();
     ThrowStmt* ParseThrowStatement();
+    RequireCapabilityStmt* ParseRequireCapabilityStatement();
     ExpressionStmt* ParseExpressionStatement();
     Expr* ParseExpression(Precedence level = Precedence::Comma);
 
@@ -1957,6 +1958,8 @@ public:
     {
         if (expr->value)
             dispatch(expr->value);
+        if (expr->dataLayout)
+            dispatch(expr->dataLayout);
     }
     void visitFloatBitCastExpr(FloatBitCastExpr* expr)
     {
@@ -6322,6 +6325,10 @@ Stmt* Parser::ParseStatement(Stmt* parentStmt)
     {
         statement = ParseThrowStatement();
     }
+    else if (LookAheadToken("__requireCapability"))
+    {
+        statement = ParseRequireCapabilityStatement();
+    }
     else if (LookAheadToken(TokenType::Identifier) || LookAheadToken(TokenType::Scope))
     {
         if (LookAheadToken(TokenType::Identifier) && LookAheadToken(TokenType::Colon, 1))
@@ -6935,6 +6942,39 @@ ExpressionStmt* Parser::ParseExpressionStatement()
     return statement;
 }
 
+// '__requireCapability' '(' identifier (',' identifier)* ')' ';'
+RequireCapabilityStmt* Parser::ParseRequireCapabilityStatement()
+{
+    RequireCapabilityStmt* statement = astBuilder->create<RequireCapabilityStmt>();
+    FillPosition(statement);
+    ReadToken("__requireCapability");
+
+    ReadToken(TokenType::LParent);
+
+    while (true)
+    {
+        Token capToken = ReadToken(TokenType::Identifier);
+        if (capToken.type != TokenType::Identifier)
+            break;
+
+        UnownedStringSlice capNameStr = capToken.getContent();
+        CapabilityName capName = findCapabilityName(capNameStr);
+        if (capName != CapabilityName::Invalid)
+            statement->requiredCaps.add(capToken);
+        else
+            sink->diagnose(
+                Diagnostics::UnknownCapability{.capability = capNameStr, .location = capToken.loc});
+
+        if (!AdvanceIf(this, TokenType::Comma))
+            break;
+    }
+
+    ReadToken(TokenType::RParent);
+    ReadToken(TokenType::Semicolon);
+
+    return statement;
+}
+
 ParamDecl* Parser::ParseParameter()
 {
     ParamDecl* parameter = astBuilder->create<ParamDecl>();
@@ -7323,7 +7363,13 @@ static NodeBase* parseSizeOfExpr(Parser* parser, void* /*userData*/)
     // The return type is always a Int
     sizeOfExpr->type = parser->astBuilder->getIntType();
 
-    sizeOfExpr->value = parser->ParseExpression();
+    sizeOfExpr->value = parser->ParseArgExpr();
+
+    if (AdvanceIf(parser, TokenType::Comma))
+    {
+        // If there is a comma, assume we also have an explicitly specified data layout.
+        sizeOfExpr->dataLayout = parser->ParseArgExpr();
+    }
 
     parser->ReadMatchingToken(TokenType::RParent);
 
@@ -7339,7 +7385,13 @@ static NodeBase* parseAlignOfExpr(Parser* parser, void* /*userData*/)
     // The return type is always a Int
     alignOfExpr->type = parser->astBuilder->getIntType();
 
-    alignOfExpr->value = parser->ParseExpression();
+    alignOfExpr->value = parser->ParseArgExpr();
+
+    if (AdvanceIf(parser, TokenType::Comma))
+    {
+        // If there is a comma, assume we also have an explicitly specified data layout.
+        alignOfExpr->dataLayout = parser->ParseArgExpr();
+    }
 
     parser->ReadMatchingToken(TokenType::RParent);
 

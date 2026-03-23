@@ -1872,7 +1872,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     {
         auto irBuilder = getBuilder();
         auto typeArg = lowerType(context, as<Type>(val->getValArg()));
-        auto count = irBuilder->emitSizeOf(typeArg);
+        auto count = irBuilder->emitSizeOf(typeArg, irBuilder->getScalarBufferLayoutType());
         return LoweredValInfo::simple(count);
     }
 
@@ -1880,7 +1880,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
     {
         auto irBuilder = getBuilder();
         auto typeArg = lowerType(context, as<Type>(val->getValArg()));
-        auto count = irBuilder->emitAlignOf(typeArg);
+        auto count = irBuilder->emitAlignOf(typeArg, irBuilder->getScalarBufferLayoutType());
         return LoweredValInfo::simple(count);
     }
 
@@ -5047,10 +5047,16 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
 
     LoweredValInfo visitSizeOfLikeExpr(SizeOfLikeExpr* sizeOfLikeExpr)
     {
-        // Lets try and lower to a constant
-        ASTNaturalLayoutContext naturalLayoutContext(getASTBuilder(), nullptr);
 
-        const auto size = naturalLayoutContext.calcSize(sizeOfLikeExpr->sizedType);
+        NaturalSize size{0, NaturalSize::kInvalidAlignment};
+        if (!sizeOfLikeExpr->dataLayoutType ||
+            as<ScalarDataLayoutType>(sizeOfLikeExpr->dataLayoutType))
+        {
+            // The layout should be the scalar data layout, so lets try and
+            // lower to a constant already.
+            ASTNaturalLayoutContext naturalLayoutContext(getASTBuilder(), nullptr);
+            size = naturalLayoutContext.calcSize(sizeOfLikeExpr->sizedType);
+        }
 
         auto builder = getBuilder();
         auto resultType = lowerType(context, sizeOfLikeExpr->type);
@@ -5065,11 +5071,15 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
 
             if (as<AlignOfExpr>(sizeOfLikeExpr))
             {
-                inst = builder->emitAlignOf(sizedType);
+                SLANG_ASSERT(sizeOfLikeExpr->dataLayoutType);
+                auto dataLayoutType = lowerType(context, sizeOfLikeExpr->dataLayoutType);
+                inst = builder->emitAlignOf(sizedType, dataLayoutType);
             }
             else if (as<SizeOfExpr>(sizeOfLikeExpr))
             {
-                inst = builder->emitSizeOf(sizedType);
+                SLANG_ASSERT(sizeOfLikeExpr->dataLayoutType);
+                auto dataLayoutType = lowerType(context, sizeOfLikeExpr->dataLayoutType);
+                inst = builder->emitSizeOf(sizedType, dataLayoutType);
             }
             else
             {
@@ -8239,6 +8249,34 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
         {
             builder->addDecoration(switchInst, kIROp_BranchDecoration);
         }
+    }
+
+    void visitRequireCapabilityStmt(RequireCapabilityStmt* stmt)
+    {
+        auto builder = getBuilder();
+        startBlockIfNeeded(stmt);
+
+        List<CapabilityName> capNames;
+        for (const Token& t : stmt->requiredCaps)
+        {
+            CapabilityName capName = findCapabilityName(t.getContent());
+
+            // Note: capability names have already been validated, so we'll
+            // just do a quick assert here
+            SLANG_ASSERT(capName != CapabilityName::Invalid);
+
+            capNames.add(capName);
+        }
+
+        CapabilitySet capabilitySet(capNames);
+
+        IRInst* capSetInst = builder->getCapabilityValue(capabilitySet);
+
+        builder->emitIntrinsicInst(
+            builder->getVoidType(),
+            kIROp_LateRequireCapability,
+            1,
+            &capSetInst);
     }
 };
 

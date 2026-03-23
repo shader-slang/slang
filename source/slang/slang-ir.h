@@ -2371,6 +2371,11 @@ void _debugSetInstBeingCloned(uint32_t uid);
 void _debugResetInstBeingCloned();
 #endif
 
+// Print a call stack leading to 'inst' as a series of
+// Diagnostics::seeCallOfFunc diagnostic messages.
+void diagnoseCallStack(IRInst* inst, DiagnosticSink* sink);
+
+
 // TODO: Ellie, comment and move somewhere more appropriate?
 
 template<typename I = IRInst, typename F>

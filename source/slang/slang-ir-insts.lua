@@ -2467,8 +2467,8 @@ local insts = {
 	{ CastDescriptorHandleToResource = { operands = { { "handle" } } } },
 	{ CastResourceToDescriptorHandle = { operands = { { "resource" } } } },
 	{ TreatAsDynamicUniform = { operands = { { "value" } } } },
-	{ sizeOf = { operands = { { "type" } } } },
-	{ alignOf = { operands = { { "baseOp" } } } },
+	{ sizeOf = { operands = { { "type" }, { "dataLayout", "IRType", optional = true } } } },
+	{ alignOf = { operands = { { "baseOp" }, { "dataLayout", "IRType", optional = true } } } },
 	{ countOf = { operands = { { "type" } } } },
 	{ ExtractFirstFromPack = { operands = { { "pack" }, { "witness" } }, hoistable = true } },
 	{ ExtractLastFromPack = { operands = { { "pack" }, { "witness" } }, hoistable = true } },
@@ -2999,6 +2999,14 @@ local insts = {
 		--
 		hoistable = true
 	} },
+	{ LateRequireCapability = {
+		-- A capability requirement that is checked after linking, specialization, and IR-level dead
+		-- code elimination passes.
+		--
+		-- Parameters: IRCapabilitySet
+		operands = { { "capabilitySet", "IRCapabilitySet" } },
+	} },
+
 	-- Constexpr arithmetic ops. These are hoistable variants of the regular
 	-- arithmetic ops, used for lowering compile-time integer expressions
 	-- (IntVal subclasses like PolynomialIntVal) so that they get deduplicated.

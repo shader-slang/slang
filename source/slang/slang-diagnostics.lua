@@ -1646,6 +1646,13 @@ err(
 )
 
 err(
+    "size-of-data-layout-is-invalid",
+    30086,
+    "invalid data layout for sizeof/alignof",
+    span { loc = "expr:Expr", message = "argument does not conform to IBufferDataLayout" }
+)
+
+err(
     "count-of-argument-is-invalid",
     30083,
     "invalid countof argument",
@@ -2571,10 +2578,10 @@ err(
 -- Specialization and push constants
 
 err(
-    "specialization-constant-must-be-scalar",
+    "specialization-constant-must-be-scalar-or-enum",
     31218,
     "specialization constant type error",
-    span { loc = "modifier:Modifier", message = "specialization constant must be a scalar." }
+    span { loc = "modifier:Modifier", message = "specialization constant must be a scalar or enum type." }
 )
 
 err(
@@ -3447,6 +3454,13 @@ warning(
 )
 
 warning(
+    "integer-constant-overflow",
+    39999,
+    "integer constant overflow in conversion",
+    span { loc = "expr:Expr", message = "integer value '~value' does not fit in type '~toType:Type'" }
+)
+
+warning(
     "float-literal-unrepresentable",
     39999,
     "floating-point literal unrepresentable",
@@ -4184,6 +4198,13 @@ err(
     41024,
     "cannot default-initialize struct containing resource fields",
     span { loc = "location", message = "cannot default-initialize struct '~structName' with '{}' because it contains resource fields" }
+)
+
+err(
+    "accessing-value-of-none-optional",
+    41027,
+    "accessing .value on an Optional that is always none",
+    span { loc = "location", message = "accessing .value on an Optional<~type:IRInst> that is always 'none'" }
 )
 
 

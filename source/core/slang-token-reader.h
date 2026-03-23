@@ -20,6 +20,7 @@ enum class TokenType
     // constant
     IntLiteral,
     DoubleLiteral,
+    HalfLiteral,
     StringLiteral,
     CharLiteral,
     // operators

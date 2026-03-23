@@ -2411,6 +2411,17 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
         auto type = as<Type>(
             sizeOfLikeExpr.getExpr()->sizedType->substitute(m_astBuilder, expr.getSubsts()));
 
+        if (sizeOfLikeExpr.getExpr()->dataLayoutType)
+        {
+            auto dataLayoutType = as<Type>(sizeOfLikeExpr.getExpr()->dataLayoutType->substitute(
+                m_astBuilder,
+                expr.getSubsts()));
+            // we can only constant-fold sizeof-like expressions when in
+            // natural/scalar data layout.
+            if (!as<ScalarDataLayoutType>(dataLayoutType))
+                return nullptr;
+        }
+
         if (auto sizeOfExpr = expr.as<SizeOfExpr>())
         {
             return as<IntVal>(SizeOfIntVal::tryFold(m_astBuilder, expr.getExpr()->type.type, type));
@@ -4652,6 +4663,40 @@ Expr* SemanticsExprVisitor::visitSizeOfLikeExpr(SizeOfLikeExpr* sizeOfLikeExpr)
             return sizeOfLikeExpr;
         }
 
+        Type* dataLayoutType = nullptr;
+        if (sizeOfLikeExpr->dataLayout)
+        {
+            auto dataLayoutExpr = dispatch(sizeOfLikeExpr->dataLayout);
+            sizeOfLikeExpr->dataLayout = dataLayoutExpr;
+            if (as<TypeType>(dataLayoutExpr->type))
+            {
+                TypeExp typeExp;
+                typeExp.exp = dataLayoutExpr;
+                auto properTypeExpr = CoerceToProperType(typeExp);
+                dataLayoutType = properTypeExpr.type;
+            }
+        }
+        else
+        {
+            dataLayoutType = m_astBuilder->getScalarLayoutType();
+        }
+
+        SubtypeWitness* witness =
+            dataLayoutType ? as<SubtypeWitness>(tryGetInterfaceConformanceWitness(
+                                 dataLayoutType,
+                                 m_astBuilder->getSharedASTBuilder()->getIBufferDataLayoutType()))
+                           : nullptr;
+        if (!dataLayoutType || !witness)
+        {
+            getSink()->diagnose(
+                Diagnostics::SizeOfDataLayoutIsInvalid{.expr = sizeOfLikeExpr->dataLayout});
+
+            sizeOfLikeExpr->type = m_astBuilder->getErrorType();
+            return sizeOfLikeExpr;
+        }
+
+        sizeOfLikeExpr->dataLayoutType = dataLayoutType;
+
         // Note: DescriptorHandle size is target-dependent (uint64_t for spvBindlessTextureNV,
         // uint2 otherwise). The size calculation is deferred to IR level where target
         // capabilities are available. See slang-ir-peephole.cpp for the resolution logic.
@@ -4671,7 +4716,7 @@ Expr* SemanticsExprVisitor::visitPackQueryExpr(PackQueryExpr* packQueryExpr)
     bool isTypeExpr = false;
     Type* operandType = nullptr;
 
-    if (auto typeType = as<TypeType>(valueExpr->type))
+    if ([[maybe_unused]] auto typeType = as<TypeType>(valueExpr->type))
     {
         isTypeExpr = true;
         TypeExp typeExp;
@@ -6868,7 +6913,7 @@ Expr* SemanticsExprVisitor::visitPackBranchTypeExpr(PackBranchTypeExpr* expr)
 
     bool isTypeExpr = false;
     Type* operandType = nullptr;
-    if (auto typeType = as<TypeType>(expr->packOperand.exp->type))
+    if ([[maybe_unused]] auto typeType = as<TypeType>(expr->packOperand.exp->type))
     {
         isTypeExpr = true;
         operandType = CoerceToProperType(expr->packOperand).type;
