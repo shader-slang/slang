@@ -18,8 +18,11 @@ User-specific instructions for Slang (optional, may not exist):
 
 ### Building the Project
 
-If you are running on Windows, run extras\build-with-vcvarsall.bat to produce a build in debug
-configuration. This script will discover Visual Studio installation and run vcvarsall.bat to setup the environment before running cmake.
+If you are running in a Windows sandbox, run extras\win-sandbox-build.bat to produce a build in
+debug configuration. This script discovers Visual Studio, runs vcvarsall.bat, configures with the
+`vs2022-dev` preset, prefers locally cached dependencies instead of fetching them over the network,
+and defaults to building `slangc`, `slang-test`, and `slangi`. Pass extra target names if you need
+something other than that default target set.
 
 On non-Windows platforms (Linux/macOS), run cmake directly to build:
 
