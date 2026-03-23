@@ -5017,8 +5017,9 @@ Expr* SemanticsExprVisitor::visitShapePackTransformExpr(ShapePackTransformExpr* 
     auto opName = _getShapePackTransformName(shapePackExpr);
     auto diagnoseInvalidArguments = [&]()
     {
-        getSink()->diagnose(
-            Diagnostics::ShapePackArgumentIsInvalid{.opName = opName, .location = shapePackExpr->loc});
+        getSink()->diagnose(Diagnostics::ShapePackArgumentIsInvalid{
+            .opName = opName,
+            .location = shapePackExpr->loc});
         shapePackExpr->type = m_astBuilder->getErrorType();
         return shapePackExpr;
     };
@@ -5036,8 +5037,8 @@ Expr* SemanticsExprVisitor::visitShapePackTransformExpr(ShapePackTransformExpr* 
         auto leftInfo = _getShapePackOperandInfo(concatExpr->getArg(0)->type.type);
         auto rightInfo = _getShapePackOperandInfo(concatExpr->getArg(1)->type.type);
         if (leftInfo.kind == ShapePackOperandKind::Invalid ||
-            rightInfo.kind == ShapePackOperandKind::Invalid ||
-            leftInfo.kind != rightInfo.kind || !_isExactIntType(concatExpr->getArg(2)->type.type))
+            rightInfo.kind == ShapePackOperandKind::Invalid || leftInfo.kind != rightInfo.kind ||
+            !_isExactIntType(concatExpr->getArg(2)->type.type))
         {
             return diagnoseInvalidArguments();
         }
@@ -5086,8 +5087,8 @@ Expr* SemanticsExprVisitor::visitShapePackTransformExpr(ShapePackTransformExpr* 
                 {
                     for (Index i = 0; i < leftConcretePack->getCount(); ++i)
                     {
-                        if (i != axisValue &&
-                            !leftConcretePack->getElement(i)->equals(rightConcretePack->getElement(i)))
+                        if (i != axisValue && !leftConcretePack->getElement(i)->equals(
+                                                  rightConcretePack->getElement(i)))
                         {
                             getSink()->diagnose(Diagnostics::ConcatValsNonAxisMismatch{
                                 .axis = (int)axisValue,
@@ -5183,7 +5184,8 @@ Expr* SemanticsExprVisitor::visitShapePackTransformExpr(ShapePackTransformExpr* 
     SLANG_ASSERT(swapExpr);
 
     auto valueInfo = _getShapePackOperandInfo(swapExpr->getArg(0)->type.type);
-    if (valueInfo.kind == ShapePackOperandKind::Invalid || !_isExactIntType(swapExpr->getArg(1)->type.type) ||
+    if (valueInfo.kind == ShapePackOperandKind::Invalid ||
+        !_isExactIntType(swapExpr->getArg(1)->type.type) ||
         !_isExactIntType(swapExpr->getArg(2)->type.type))
     {
         return diagnoseInvalidArguments();

@@ -1383,9 +1383,8 @@ struct SpecializationContext
                     }
                 }
 
-                return replaceWith(emitShapePackLike(
-                    inst,
-                    resultElements.getArrayView().arrayView));
+                return replaceWith(
+                    emitShapePackLike(inst, resultElements.getArrayView().arrayView));
             }
 
         case kIROp_PermuteVals:
@@ -1439,9 +1438,8 @@ struct SpecializationContext
                     resultElements.add(valuePack->getOperand((UInt)orderIndex));
                 }
 
-                return replaceWith(emitShapePackLike(
-                    inst,
-                    resultElements.getArrayView().arrayView));
+                return replaceWith(
+                    emitShapePackLike(inst, resultElements.getArrayView().arrayView));
             }
 
         case kIROp_SwapVals:
@@ -1458,7 +1456,8 @@ struct SpecializationContext
 
                 Int64 dim0Value = 0;
                 Int64 dim1Value = 0;
-                if (!tryGetConstantIntLit(dim0, dim0Value) || !tryGetConstantIntLit(dim1, dim1Value))
+                if (!tryGetConstantIntLit(dim0, dim0Value) ||
+                    !tryGetConstantIntLit(dim1, dim1Value))
                     return maybeSpecializeFoldableInst(inst);
 
                 auto valueRank = valuePack->getOperandCount();
@@ -1496,9 +1495,8 @@ struct SpecializationContext
                         resultElements.add(valuePack->getOperand(i));
                 }
 
-                return replaceWith(emitShapePackLike(
-                    inst,
-                    resultElements.getArrayView().arrayView));
+                return replaceWith(
+                    emitShapePackLike(inst, resultElements.getArrayView().arrayView));
             }
 
         default:

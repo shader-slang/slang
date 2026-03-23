@@ -658,14 +658,14 @@ struct PeepholeContext : InstPassBase
 
                         if (canFold)
                         {
-                                if (auto replacement = emitShapePackLike(
-                                        inst,
-                                        resultElements.getArrayView().arrayView))
-                                {
-                                    inst->replaceUsesWith(replacement);
-                                    maybeRemoveOldInst(inst);
-                                    changed = true;
-                                }
+                            if (auto replacement = emitShapePackLike(
+                                    inst,
+                                    resultElements.getArrayView().arrayView))
+                            {
+                                inst->replaceUsesWith(replacement);
+                                maybeRemoveOldInst(inst);
+                                changed = true;
+                            }
                         }
                     }
                 }
@@ -702,9 +702,8 @@ struct PeepholeContext : InstPassBase
 
                     if (canFold)
                     {
-                        if (auto replacement = emitShapePackLike(
-                                inst,
-                                resultElements.getArrayView().arrayView))
+                        if (auto replacement =
+                                emitShapePackLike(inst, resultElements.getArrayView().arrayView))
                         {
                             inst->replaceUsesWith(replacement);
                             maybeRemoveOldInst(inst);
@@ -732,7 +731,8 @@ struct PeepholeContext : InstPassBase
                 {
                     Int64 dim0Value = 0;
                     Int64 dim1Value = 0;
-                    if (tryGetConstantIntLit(dim0, dim0Value) && tryGetConstantIntLit(dim1, dim1Value))
+                    if (tryGetConstantIntLit(dim0, dim0Value) &&
+                        tryGetConstantIntLit(dim1, dim1Value))
                     {
                         if (dim0Value == dim1Value)
                         {

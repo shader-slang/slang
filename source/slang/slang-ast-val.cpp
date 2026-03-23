@@ -2465,10 +2465,7 @@ Val* SwapIntValPack::_resolveImplOverride()
     if (resolvedValuePack == getValuePack() && resolvedDim0 == getDim0() &&
         resolvedDim1 == getDim1())
         return this;
-    return getCurrentASTBuilder()->getSwapIntValPack(
-        resolvedValuePack,
-        resolvedDim0,
-        resolvedDim1);
+    return getCurrentASTBuilder()->getSwapIntValPack(resolvedValuePack, resolvedDim0, resolvedDim1);
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ExpandIntValPack !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

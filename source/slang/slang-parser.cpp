@@ -3024,8 +3024,7 @@ static TypeSpec _parseSimpleTypeSpec(Parser* parser)
         parser->LookAheadToken("__first") || parser->LookAheadToken("__last") ||
         parser->LookAheadToken("__trimFirst") || parser->LookAheadToken("__trimLast") ||
         parser->LookAheadToken("__concatVals") || parser->LookAheadToken("__permuteVals") ||
-        parser->LookAheadToken("__swapVals") ||
-        parser->LookAheadToken("__packBranch"))
+        parser->LookAheadToken("__swapVals") || parser->LookAheadToken("__packBranch"))
     {
         typeExpr = parsePrefixExpr(parser);
     }

@@ -5175,12 +5175,11 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         for (auto arg : shapePackExpr->args)
             args.add(getSimpleVal(context, lowerSubExpr(arg)));
 
-        return LoweredValInfo::simple(
-            builder->emitIntrinsicInst(
-                resultType,
-                op,
-                args.getCount(),
-                args.getArrayView().getBuffer()));
+        return LoweredValInfo::simple(builder->emitIntrinsicInst(
+            resultType,
+            op,
+            args.getCount(),
+            args.getArrayView().getBuffer()));
     }
 
     LoweredValInfo visitFloatBitCastExpr(FloatBitCastExpr* /*expr*/)

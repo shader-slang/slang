@@ -190,7 +190,8 @@ static bool _diagnoseKnownInvalidShapePackTransforms(
 
     auto toArgs = toGenApp->getArgs();
     auto fromArgs = fromGenApp->getArgs();
-    auto argCount = toArgs.getCount() < fromArgs.getCount() ? toArgs.getCount() : fromArgs.getCount();
+    auto argCount =
+        toArgs.getCount() < fromArgs.getCount() ? toArgs.getCount() : fromArgs.getCount();
     for (Index i = 0; i < argCount; ++i)
     {
         if (_diagnoseKnownInvalidShapePackTransformArg(toArgs[i], loc, sink))

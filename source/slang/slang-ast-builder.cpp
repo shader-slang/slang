@@ -1200,8 +1200,9 @@ Val* ASTBuilder::getConcatIntValPack(Val* leftPack, Val* rightPack, IntVal* axis
     {
         if (auto rightValPack = as<ConcreteIntValPack>(rightPack))
         {
-            if (_tryGetConstantIntVal(axis, axisValue) && leftValPack->getCount() == rightValPack->getCount() &&
-                axisValue >= 0 && axisValue < leftValPack->getCount())
+            if (_tryGetConstantIntVal(axis, axisValue) &&
+                leftValPack->getCount() == rightValPack->getCount() && axisValue >= 0 &&
+                axisValue < leftValPack->getCount())
             {
                 ShortList<IntVal*> resultVals;
                 bool canFold = true;
