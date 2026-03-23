@@ -115,6 +115,10 @@ bool tryFindProvableDuplicateOrderIndices(
     IntegerLiteralValue& outConcreteIndex,
     bool& outHasConcreteIndex);
 
+bool areProvablyDifferentShapeElements(Val* left, Val* right);
+
+bool hasAnyPotentialConcatAxis(ConcreteIntValPack* leftPack, ConcreteIntValPack* rightPack);
+
 bool hasAnyValidConcatAxis(ConcreteIntValPack* leftPack, ConcreteIntValPack* rightPack);
 
 VariadicPackCardinality getKnownPackCardinality(Val* packOperand);

@@ -1071,6 +1071,15 @@ static Type* _getIntPackTypeForVal(ASTBuilder* astBuilder, Val* pack)
 
 static Type* _getIntPackTypeForVals(ASTBuilder* astBuilder, Val* pack0, Val* pack1 = nullptr)
 {
+    for (auto pack : {pack0, pack1})
+    {
+        if (auto intVal = as<IntVal>(pack))
+        {
+            if (auto valuePackType = as<ValuePackType>(intVal->getType()))
+                return valuePackType;
+        }
+    }
+
     if (auto intVal = as<IntVal>(pack0))
     {
         if (auto type = as<Type>(intVal->getType()))

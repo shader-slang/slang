@@ -81,6 +81,36 @@ bool tryFindProvableDuplicateOrderIndices(
     return false;
 }
 
+bool areProvablyDifferentShapeElements(Val* left, Val* right)
+{
+    IntegerLiteralValue leftValue = 0;
+    IntegerLiteralValue rightValue = 0;
+    return tryGetConstantIntVal(left, leftValue) && tryGetConstantIntVal(right, rightValue) &&
+           leftValue != rightValue;
+}
+
+bool hasAnyPotentialConcatAxis(ConcreteIntValPack* leftPack, ConcreteIntValPack* rightPack)
+{
+    SLANG_ASSERT(leftPack->getCount() == rightPack->getCount());
+    for (Index axis = 0; axis < leftPack->getCount(); ++axis)
+    {
+        bool isPossibleAxis = true;
+        for (Index i = 0; i < leftPack->getCount(); ++i)
+        {
+            if (i != axis && areProvablyDifferentShapeElements(
+                                 leftPack->getElement(i),
+                                 rightPack->getElement(i)))
+            {
+                isPossibleAxis = false;
+                break;
+            }
+        }
+        if (isPossibleAxis)
+            return true;
+    }
+    return false;
+}
+
 bool hasAnyValidConcatAxis(ConcreteIntValPack* leftPack, ConcreteIntValPack* rightPack)
 {
     SLANG_ASSERT(leftPack->getCount() == rightPack->getCount());

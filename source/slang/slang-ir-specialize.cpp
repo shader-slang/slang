@@ -1230,6 +1230,7 @@ struct SpecializationContext
             switch (packLikeInst->getOperand(i)->getOp())
             {
             case kIROp_MakeValuePack:
+            case kIROp_MakeTuple:
             case kIROp_Expand:
             case kIROp_TypePack:
             case kIROp_ExpandTypeOrVal:

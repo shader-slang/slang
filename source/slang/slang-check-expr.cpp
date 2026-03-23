@@ -4980,7 +4980,7 @@ Expr* SemanticsExprVisitor::visitShapePackTransformExpr(ShapePackTransformExpr* 
         auto leftInfo = _getShapePackOperandInfo(shapeConcatExpr->getArg(0)->type.type);
         auto rightInfo = _getShapePackOperandInfo(shapeConcatExpr->getArg(1)->type.type);
         if (leftInfo.kind == ShapePackOperandKind::Invalid ||
-            rightInfo.kind == ShapePackOperandKind::Invalid || leftInfo.kind != rightInfo.kind ||
+            rightInfo.kind == ShapePackOperandKind::Invalid ||
             !_isExactIntType(shapeConcatExpr->getArg(2)->type.type))
         {
             return diagnoseInvalidArguments();
@@ -5045,7 +5045,8 @@ Expr* SemanticsExprVisitor::visitShapePackTransformExpr(ShapePackTransformExpr* 
                 {
                     for (Index i = 0; i < leftConcretePack->getCount(); ++i)
                     {
-                        if (i != axisValue && !leftConcretePack->getElement(i)->equals(
+                        if (i != axisValue && areProvablyDifferentShapeElements(
+                                                  leftConcretePack->getElement(i),
                                                   rightConcretePack->getElement(i)))
                         {
                             getSink()->diagnose(Diagnostics::ShapeConcatNonAxisMismatch{
@@ -5057,7 +5058,7 @@ Expr* SemanticsExprVisitor::visitShapePackTransformExpr(ShapePackTransformExpr* 
                         }
                     }
                 }
-                else if (!hasAnyValidConcatAxis(leftConcretePack, rightConcretePack))
+                else if (!hasAnyPotentialConcatAxis(leftConcretePack, rightConcretePack))
                 {
                     getSink()->diagnose(Diagnostics::ShapeConcatNoValidAxis{
                         .rank = (int)leftConcretePack->getCount(),
@@ -5068,10 +5069,12 @@ Expr* SemanticsExprVisitor::visitShapePackTransformExpr(ShapePackTransformExpr* 
             }
         }
 
-        if (leftInfo.kind == ShapePackOperandKind::Tuple)
+        if (leftInfo.kind == ShapePackOperandKind::Tuple &&
+            rightInfo.kind == ShapePackOperandKind::Tuple)
             shapeConcatExpr->type = QualType(_createIntTupleType(m_astBuilder, leftInfo.rank));
         else
-            shapeConcatExpr->type = QualType(leftInfo.valuePackType);
+            shapeConcatExpr->type =
+                QualType(leftInfo.valuePackType ? leftInfo.valuePackType : rightInfo.valuePackType);
         return shapeConcatExpr;
     }
 

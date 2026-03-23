@@ -38,6 +38,24 @@ MockTile<T, __shapeSwap(D, I, J)> transpose<
     return result;
 }
 
+MockTile<T, __shapeConcat(D, (__first(D), 1), 1)> appendUnitColumn<
+    T : ICoopElement,
+    let each D : int>
+    (MockTile<T, D> tile) where nonempty(D)
+{
+    MockTile<T, __shapeConcat(D, (__first(D), 1), 1)> result;
+    return result;
+}
+
+MockTile<T, __shapeConcat((1, __last(D)), D, 0)> prependUnitRow<
+    T : ICoopElement,
+    let each D : int>
+    (MockTile<T, D> tile) where nonempty(D)
+{
+    MockTile<T, __shapeConcat((1, __last(D)), D, 0)> result;
+    return result;
+}
+
 struct ShapeInfo<let each D : int>
 {
     static void print()
@@ -54,6 +72,8 @@ void printShape<T : ICoopElement, let each D : int>(MockTile<T, D> tile)
 void expect16x64(MockTile<float, 16, 64> tile) {}
 void expect64x16(MockTile<float, 64, 16> tile) {}
 void expect16x1(MockTile<float, 16, 1> tile) {}
+void expect16x33(MockTile<float, 16, 33> tile) {}
+void expect17x32(MockTile<float, 17, 32> tile) {}
 void expect16x32x8(MockTile<float, 16, 32, 8> tile) {}
 void expect16x1x8(MockTile<float, 16, 1, 8> tile) {}
 void expect8x32x16(MockTile<float, 8, 32, 16> tile) {}
@@ -79,6 +99,18 @@ void main()
     printShape(reduced2D);
     // CHECK: 16
     // CHECK: 1
+
+    let widened2D = appendUnitColumn(lhs);
+    expect16x33(widened2D);
+    printShape(widened2D);
+    // CHECK: 16
+    // CHECK: 33
+
+    let padded2D = prependUnitRow(lhs);
+    expect17x32(padded2D);
+    printShape(padded2D);
+    // CHECK: 17
+    // CHECK: 32
 
     let volume = MockTile<float, 8, 16, 32>();
     let permuted3D = volume.permute<1, 2, 0>();

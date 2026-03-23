@@ -81,8 +81,9 @@ static bool _diagnoseKnownInvalidShapePackTransformArg(
 
                 for (Index i = 0; i < leftPack->getCount(); ++i)
                 {
-                    if (i != axisValue &&
-                        !leftPack->getElement(i)->equals(rightPack->getElement(i)))
+                    if (i != axisValue && areProvablyDifferentShapeElements(
+                                              leftPack->getElement(i),
+                                              rightPack->getElement(i)))
                     {
                         sink->diagnose(Diagnostics::ShapeConcatNonAxisMismatch{
                             .axis = (int)axisValue,
@@ -100,7 +101,7 @@ static bool _diagnoseKnownInvalidShapePackTransformArg(
                     .location = loc});
                 return true;
             }
-            else if (!hasAnyValidConcatAxis(leftPack, rightPack))
+            else if (!hasAnyPotentialConcatAxis(leftPack, rightPack))
             {
                 sink->diagnose(Diagnostics::ShapeConcatNoValidAxis{
                     .rank = (int)leftPack->getCount(),
