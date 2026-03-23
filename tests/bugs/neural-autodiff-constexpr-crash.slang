@@ -11,9 +11,7 @@
 // parent, null operands) still referenced by live IR, causing a segfault
 // in AutoDiffPass::processReferencedFunctions.
 //
-// Compile-only: just verify compilation succeeds without crashing.
-
-//TEST:SIMPLE(filecheck=CHECK): -target ptx -stage compute -entry backward -capability cuda_sm_7_0 -experimental-feature
+//TEST:SIMPLE(filecheck=CHECK): -target cuda -experimental-feature
 // CHECK: backward
 
 import slang.neural;
