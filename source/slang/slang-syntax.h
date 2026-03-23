@@ -62,7 +62,65 @@ enum class VariadicPackCardinality
     NonEmpty,
 };
 
+template<typename F>
+inline VariadicPackCardinality getPackCardinalityFromStructure(Val* packOperand, const F& recurse)
+{
+    if (!packOperand)
+        return VariadicPackCardinality::Unknown;
+
+    if (auto modifiedType = as<ModifiedType>(packOperand))
+        return recurse(modifiedType->getBase());
+
+    if (auto tupleType = as<TupleType>(packOperand))
+        return recurse(tupleType->getTypePack());
+
+    if (auto concreteTypePack = as<ConcreteTypePack>(packOperand))
+        return concreteTypePack->getTypeCount() > 0 ? VariadicPackCardinality::NonEmpty
+                                                    : VariadicPackCardinality::Empty;
+
+    if (auto concreteIntValPack = as<ConcreteIntValPack>(packOperand))
+        return concreteIntValPack->getCount() > 0 ? VariadicPackCardinality::NonEmpty
+                                                  : VariadicPackCardinality::Empty;
+
+    if (auto shapePermuteIntValPack = as<ShapePermuteIntValPack>(packOperand))
+        return recurse(shapePermuteIntValPack->getValuePack());
+
+    if (auto shapeSwapIntValPack = as<ShapeSwapIntValPack>(packOperand))
+        return recurse(shapeSwapIntValPack->getValuePack());
+
+    if (auto shapeReduceIntValPack = as<ShapeReduceIntValPack>(packOperand))
+        return recurse(shapeReduceIntValPack->getValuePack());
+
+    if (auto shapeConcatIntValPack = as<ShapeConcatIntValPack>(packOperand))
+    {
+        auto leftCardinality = recurse(shapeConcatIntValPack->getLeftPack());
+        auto rightCardinality = recurse(shapeConcatIntValPack->getRightPack());
+        if (leftCardinality == VariadicPackCardinality::Empty &&
+            rightCardinality == VariadicPackCardinality::Empty)
+            return VariadicPackCardinality::Empty;
+        if (leftCardinality == VariadicPackCardinality::NonEmpty ||
+            rightCardinality == VariadicPackCardinality::NonEmpty)
+            return VariadicPackCardinality::NonEmpty;
+    }
+
+    return VariadicPackCardinality::Unknown;
+}
+
+bool tryGetConstantIntVal(Val* val, IntegerLiteralValue& outValue);
+
+bool tryFindProvableDuplicateOrderIndices(
+    ConcreteIntValPack* orderPack,
+    Index& outFirstPosition,
+    Index& outSecondPosition,
+    IntegerLiteralValue& outConcreteIndex,
+    bool& outHasConcreteIndex);
+
+bool hasAnyValidConcatAxis(ConcreteIntValPack* leftPack, ConcreteIntValPack* rightPack);
+
 VariadicPackCardinality getKnownPackCardinality(Val* packOperand);
+
+const char* getPackQueryName(PackQueryExpr* expr);
+const char* getShapePackTransformName(ShapePackTransformExpr* expr);
 
 //
 // Declarations

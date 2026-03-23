@@ -4559,16 +4559,6 @@ static bool _isExactIntType(Type* type)
     return false;
 }
 
-static bool _tryGetConstantIntVal(IntVal* val, IntegerLiteralValue& outValue)
-{
-    if (auto constantIntVal = as<ConstantIntVal>(val))
-    {
-        outValue = constantIntVal->getValue();
-        return true;
-    }
-    return false;
-}
-
 static bool _isTupleOfExactInt(TupleType* tupleType)
 {
     if (!tupleType)
@@ -4651,71 +4641,6 @@ static Type* _createIntTupleType(ASTBuilder* astBuilder, Index rank)
     return astBuilder->getTupleType(elementTypes.getArrayView().arrayView);
 }
 
-static const char* _getShapePackTransformName(ShapePackTransformExpr* expr)
-{
-    if (as<ShapeConcatExpr>(expr))
-        return "__shapeConcat";
-    if (as<ShapePermuteExpr>(expr))
-        return "__shapePermute";
-    if (as<ShapeSwapExpr>(expr))
-        return "__shapeSwap";
-    return "__shapeReduce";
-}
-
-static bool _tryFindProvableDuplicateOrderIndices(
-    ConcreteIntValPack* orderPack,
-    Index& outFirstPosition,
-    Index& outSecondPosition,
-    IntegerLiteralValue& outConcreteIndex,
-    bool& outHasConcreteIndex)
-{
-    for (Index i = 0; i < orderPack->getCount(); ++i)
-    {
-        for (Index j = 0; j < i; ++j)
-        {
-            if (!orderPack->getElement(i)->equals(orderPack->getElement(j)))
-                continue;
-
-            outFirstPosition = j;
-            outSecondPosition = i;
-            outHasConcreteIndex = _tryGetConstantIntVal(orderPack->getElement(i), outConcreteIndex);
-            return true;
-        }
-    }
-    return false;
-}
-
-static bool _hasAnyValidConcatAxis(ConcreteIntValPack* leftPack, ConcreteIntValPack* rightPack)
-{
-    SLANG_ASSERT(leftPack->getCount() == rightPack->getCount());
-    for (Index axis = 0; axis < leftPack->getCount(); ++axis)
-    {
-        bool isValidAxis = true;
-        for (Index i = 0; i < leftPack->getCount(); ++i)
-        {
-            if (i != axis && !leftPack->getElement(i)->equals(rightPack->getElement(i)))
-            {
-                isValidAxis = false;
-                break;
-            }
-        }
-        if (isValidAxis)
-            return true;
-    }
-    return false;
-}
-
-static const char* _getPackQueryName(PackQueryExpr* expr)
-{
-    if (as<FirstExpr>(expr))
-        return "__first";
-    if (as<LastExpr>(expr))
-        return "__last";
-    if (as<TrimFirstExpr>(expr))
-        return "__trimFirst";
-    return "__trimLast";
-}
-
 bool SemanticsVisitor::hasNonEmptyPackConstraint(Decl* decl)
 {
     auto genericDecl = decl ? as<GenericDecl>(decl->parentDecl) : nullptr;
@@ -4770,25 +4695,11 @@ VariadicPackCardinality SemanticsVisitor::getPackCardinality(Val* packVal)
 
     VariadicPackCardinality result = VariadicPackCardinality::Unknown;
 
-    if (auto tupleType = as<TupleType>(packVal))
+    result = getPackCardinalityFromStructure(
+        packVal,
+        [&](Val* operand) { return getPackCardinality(operand); });
+    if (result != VariadicPackCardinality::Unknown)
     {
-        result = getPackCardinality(tupleType->getTypePack());
-        getShared()->m_packCardinalityCache[packVal] = result;
-        return result;
-    }
-
-    if (auto concreteTypePack = as<ConcreteTypePack>(packVal))
-    {
-        result = concreteTypePack->getTypeCount() > 0 ? VariadicPackCardinality::NonEmpty
-                                                      : VariadicPackCardinality::Empty;
-        getShared()->m_packCardinalityCache[packVal] = result;
-        return result;
-    }
-
-    if (auto concreteIntValPack = as<ConcreteIntValPack>(packVal))
-    {
-        result = concreteIntValPack->getCount() > 0 ? VariadicPackCardinality::NonEmpty
-                                                    : VariadicPackCardinality::Empty;
         getShared()->m_packCardinalityCache[packVal] = result;
         return result;
     }
@@ -4803,42 +4714,6 @@ VariadicPackCardinality SemanticsVisitor::getPackCardinality(Val* packVal)
     if (auto expandIntValPack = as<ExpandIntValPack>(packVal))
     {
         result = mergeCaptureCardinality(expandIntValPack);
-        getShared()->m_packCardinalityCache[packVal] = result;
-        return result;
-    }
-
-    if (auto shapePermuteIntValPack = as<ShapePermuteIntValPack>(packVal))
-    {
-        result = getPackCardinality(shapePermuteIntValPack->getValuePack());
-        getShared()->m_packCardinalityCache[packVal] = result;
-        return result;
-    }
-
-    if (auto shapeSwapIntValPack = as<ShapeSwapIntValPack>(packVal))
-    {
-        result = getPackCardinality(shapeSwapIntValPack->getValuePack());
-        getShared()->m_packCardinalityCache[packVal] = result;
-        return result;
-    }
-
-    if (auto shapeReduceIntValPack = as<ShapeReduceIntValPack>(packVal))
-    {
-        result = getPackCardinality(shapeReduceIntValPack->getValuePack());
-        getShared()->m_packCardinalityCache[packVal] = result;
-        return result;
-    }
-
-    if (auto shapeConcatIntValPack = as<ShapeConcatIntValPack>(packVal))
-    {
-        auto leftCardinality = getPackCardinality(shapeConcatIntValPack->getLeftPack());
-        auto rightCardinality = getPackCardinality(shapeConcatIntValPack->getRightPack());
-        if (leftCardinality == VariadicPackCardinality::Empty &&
-            rightCardinality == VariadicPackCardinality::Empty)
-            result = VariadicPackCardinality::Empty;
-        else if (
-            leftCardinality == VariadicPackCardinality::NonEmpty ||
-            rightCardinality == VariadicPackCardinality::NonEmpty)
-            result = VariadicPackCardinality::NonEmpty;
         getShared()->m_packCardinalityCache[packVal] = result;
         return result;
     }
@@ -4979,7 +4854,7 @@ Expr* SemanticsExprVisitor::visitPackQueryExpr(PackQueryExpr* packQueryExpr)
     auto valueExpr = dispatch(packQueryExpr->value);
     packQueryExpr->value = valueExpr;
 
-    auto queryName = _getPackQueryName(packQueryExpr);
+    auto queryName = getPackQueryName(packQueryExpr);
     bool isTypeExpr = false;
     Type* operandType = nullptr;
 
@@ -5082,7 +4957,7 @@ Expr* SemanticsExprVisitor::visitShapePackTransformExpr(ShapePackTransformExpr* 
     for (auto& arg : shapePackExpr->args)
         arg = dispatch(arg);
 
-    auto opName = _getShapePackTransformName(shapePackExpr);
+    auto opName = getShapePackTransformName(shapePackExpr);
     auto diagnoseInvalidArguments = [&]()
     {
         getSink()->diagnose(Diagnostics::ShapePackArgumentIsInvalid{
@@ -5138,7 +5013,7 @@ Expr* SemanticsExprVisitor::visitShapePackTransformExpr(ShapePackTransformExpr* 
             knownRank = leftRank;
         else if (hasRightRank)
             knownRank = rightRank;
-        if ((hasLeftRank || hasRightRank) && _tryGetConstantIntVal(axisVal, axisValue) &&
+        if ((hasLeftRank || hasRightRank) && tryGetConstantIntVal(axisVal, axisValue) &&
             (axisValue < 0 || axisValue >= knownRank))
         {
             getSink()->diagnose(Diagnostics::ShapePackAxisOutOfRange{
@@ -5164,7 +5039,7 @@ Expr* SemanticsExprVisitor::visitShapePackTransformExpr(ShapePackTransformExpr* 
         {
             if (auto rightConcretePack = as<ConcreteIntValPack>(rightVal))
             {
-                if (_tryGetConstantIntVal(axisVal, axisValue) &&
+                if (tryGetConstantIntVal(axisVal, axisValue) &&
                     leftConcretePack->getCount() == rightConcretePack->getCount() &&
                     axisValue >= 0 && axisValue < leftConcretePack->getCount())
                 {
@@ -5182,7 +5057,7 @@ Expr* SemanticsExprVisitor::visitShapePackTransformExpr(ShapePackTransformExpr* 
                         }
                     }
                 }
-                else if (!_hasAnyValidConcatAxis(leftConcretePack, rightConcretePack))
+                else if (!hasAnyValidConcatAxis(leftConcretePack, rightConcretePack))
                 {
                     getSink()->diagnose(Diagnostics::ShapeConcatNoValidAxis{
                         .rank = (int)leftConcretePack->getCount(),
@@ -5235,7 +5110,7 @@ Expr* SemanticsExprVisitor::visitShapePackTransformExpr(ShapePackTransformExpr* 
             Index secondPosition = 0;
             IntegerLiteralValue orderIndex = 0;
             bool hasConcreteIndex = false;
-            if (_tryFindProvableDuplicateOrderIndices(
+            if (tryFindProvableDuplicateOrderIndices(
                     concreteOrderPack,
                     firstPosition,
                     secondPosition,
@@ -5264,7 +5139,7 @@ Expr* SemanticsExprVisitor::visitShapePackTransformExpr(ShapePackTransformExpr* 
             for (Index i = 0; i < concreteOrderPack->getCount(); ++i)
             {
                 orderIndex = 0;
-                if (!_tryGetConstantIntVal(concreteOrderPack->getElement(i), orderIndex))
+                if (!tryGetConstantIntVal(concreteOrderPack->getElement(i), orderIndex))
                     continue;
 
                 if (hasValueRank && (orderIndex < 0 || orderIndex >= valueRank))
@@ -5306,7 +5181,7 @@ Expr* SemanticsExprVisitor::visitShapePackTransformExpr(ShapePackTransformExpr* 
         Index valueRank = 0;
         auto hasValueRank = _tryGetShapePackRank(valueInfo.type, valuePack, valueRank);
         IntegerLiteralValue dimValue = 0;
-        if (hasValueRank && _tryGetConstantIntVal(dim0, dimValue) &&
+        if (hasValueRank && tryGetConstantIntVal(dim0, dimValue) &&
             (dimValue < 0 || dimValue >= valueRank))
         {
             getSink()->diagnose(Diagnostics::ShapePackAxisOutOfRange{
@@ -5318,7 +5193,7 @@ Expr* SemanticsExprVisitor::visitShapePackTransformExpr(ShapePackTransformExpr* 
             return shapeSwapExpr;
         }
 
-        if (hasValueRank && _tryGetConstantIntVal(dim1, dimValue) &&
+        if (hasValueRank && tryGetConstantIntVal(dim1, dimValue) &&
             (dimValue < 0 || dimValue >= valueRank))
         {
             getSink()->diagnose(Diagnostics::ShapePackAxisOutOfRange{
@@ -5365,7 +5240,7 @@ Expr* SemanticsExprVisitor::visitShapePackTransformExpr(ShapePackTransformExpr* 
     Index valueRank = 0;
     auto hasValueRank = _tryGetShapePackRank(valueInfo.type, valuePack, valueRank);
     IntegerLiteralValue axisValue = 0;
-    if (hasValueRank && _tryGetConstantIntVal(axis, axisValue) &&
+    if (hasValueRank && tryGetConstantIntVal(axis, axisValue) &&
         (axisValue < 0 || axisValue >= valueRank))
     {
         getSink()->diagnose(Diagnostics::ShapePackAxisOutOfRange{

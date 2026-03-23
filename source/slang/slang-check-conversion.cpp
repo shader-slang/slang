@@ -17,60 +17,6 @@ namespace Slang
 namespace
 {
 
-static bool _tryGetConstantIntVal(Val* val, IntegerLiteralValue& outValue)
-{
-    auto intVal = as<IntVal>(val);
-    if (auto constantIntVal = intVal ? as<ConstantIntVal>(intVal->resolve()) : nullptr)
-    {
-        outValue = constantIntVal->getValue();
-        return true;
-    }
-    return false;
-}
-
-static bool _tryFindProvableDuplicateOrderIndices(
-    ConcreteIntValPack* orderPack,
-    Index& outFirstPosition,
-    Index& outSecondPosition,
-    IntegerLiteralValue& outConcreteIndex,
-    bool& outHasConcreteIndex)
-{
-    for (Index i = 0; i < orderPack->getCount(); ++i)
-    {
-        for (Index j = 0; j < i; ++j)
-        {
-            if (!orderPack->getElement(i)->equals(orderPack->getElement(j)))
-                continue;
-
-            outFirstPosition = j;
-            outSecondPosition = i;
-            outHasConcreteIndex = _tryGetConstantIntVal(orderPack->getElement(i), outConcreteIndex);
-            return true;
-        }
-    }
-    return false;
-}
-
-static bool _hasAnyValidConcatAxis(ConcreteIntValPack* leftPack, ConcreteIntValPack* rightPack)
-{
-    SLANG_ASSERT(leftPack->getCount() == rightPack->getCount());
-    for (Index axis = 0; axis < leftPack->getCount(); ++axis)
-    {
-        bool isValidAxis = true;
-        for (Index i = 0; i < leftPack->getCount(); ++i)
-        {
-            if (i != axis && !leftPack->getElement(i)->equals(rightPack->getElement(i)))
-            {
-                isValidAxis = false;
-                break;
-            }
-        }
-        if (isValidAxis)
-            return true;
-    }
-    return false;
-}
-
 static bool _diagnoseKnownInvalidShapePackTransformArg(
     Val* val,
     SourceLoc loc,
@@ -87,7 +33,7 @@ static bool _diagnoseKnownInvalidShapePackTransformArg(
         auto knownRankPack = leftPack ? leftPack : rightPack;
         if (knownRankPack && (!leftPack || !rightPack))
         {
-            if (_tryGetConstantIntVal(shapeConcatPack->getAxis(), axisValue))
+            if (tryGetConstantIntVal(shapeConcatPack->getAxis(), axisValue))
             {
                 if (axisValue < 0 || axisValue >= knownRankPack->getCount())
                 {
@@ -121,7 +67,7 @@ static bool _diagnoseKnownInvalidShapePackTransformArg(
                 return true;
             }
 
-            if (_tryGetConstantIntVal(shapeConcatPack->getAxis(), axisValue))
+            if (tryGetConstantIntVal(shapeConcatPack->getAxis(), axisValue))
             {
                 if (axisValue < 0 || axisValue >= leftPack->getCount())
                 {
@@ -154,7 +100,7 @@ static bool _diagnoseKnownInvalidShapePackTransformArg(
                     .location = loc});
                 return true;
             }
-            else if (!_hasAnyValidConcatAxis(leftPack, rightPack))
+            else if (!hasAnyValidConcatAxis(leftPack, rightPack))
             {
                 sink->diagnose(Diagnostics::ShapeConcatNoValidAxis{
                     .rank = (int)leftPack->getCount(),
@@ -189,7 +135,7 @@ static bool _diagnoseKnownInvalidShapePackTransformArg(
             Index secondPosition = 0;
             IntegerLiteralValue orderIndex = 0;
             bool hasConcreteIndex = false;
-            if (_tryFindProvableDuplicateOrderIndices(
+            if (tryFindProvableDuplicateOrderIndices(
                     orderPack,
                     firstPosition,
                     secondPosition,
@@ -217,7 +163,7 @@ static bool _diagnoseKnownInvalidShapePackTransformArg(
             for (Index i = 0; i < orderPack->getCount(); ++i)
             {
                 orderIndex = 0;
-                if (!_tryGetConstantIntVal(orderPack->getElement(i), orderIndex))
+                if (!tryGetConstantIntVal(orderPack->getElement(i), orderIndex))
                     continue;
 
                 if (orderIndex < 0 || orderIndex >= valuePack->getCount())
@@ -241,7 +187,7 @@ static bool _diagnoseKnownInvalidShapePackTransformArg(
     {
         auto valuePack = as<ConcreteIntValPack>(shapeSwapPack->getValuePack()->resolve());
         IntegerLiteralValue dimValue = 0;
-        if (valuePack && _tryGetConstantIntVal(shapeSwapPack->getDim0(), dimValue) &&
+        if (valuePack && tryGetConstantIntVal(shapeSwapPack->getDim0(), dimValue) &&
             (dimValue < 0 || dimValue >= valuePack->getCount()))
         {
             sink->diagnose(Diagnostics::ShapePackAxisOutOfRange{
@@ -252,7 +198,7 @@ static bool _diagnoseKnownInvalidShapePackTransformArg(
             return true;
         }
 
-        if (valuePack && _tryGetConstantIntVal(shapeSwapPack->getDim1(), dimValue) &&
+        if (valuePack && tryGetConstantIntVal(shapeSwapPack->getDim1(), dimValue) &&
             (dimValue < 0 || dimValue >= valuePack->getCount()))
         {
             sink->diagnose(Diagnostics::ShapePackAxisOutOfRange{
@@ -283,7 +229,7 @@ static bool _diagnoseKnownInvalidShapePackTransformArg(
     {
         auto valuePack = as<ConcreteIntValPack>(shapeReducePack->getValuePack()->resolve());
         IntegerLiteralValue axisValue = 0;
-        if (valuePack && _tryGetConstantIntVal(shapeReducePack->getAxis(), axisValue) &&
+        if (valuePack && tryGetConstantIntVal(shapeReducePack->getAxis(), axisValue) &&
             (axisValue < 0 || axisValue >= valuePack->getCount()))
         {
             sink->diagnose(Diagnostics::ShapePackAxisOutOfRange{

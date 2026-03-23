@@ -896,18 +896,7 @@ LanguageServerResult<LanguageServerProtocol::Hover> LanguageServerCore::hover(
         }
         else if (auto shapePackExpr = as<ShapePackTransformExpr>(expr))
         {
-            String opName;
-            if (as<ShapeConcatExpr>(shapePackExpr))
-                opName = "__shapeConcat";
-            else if (as<ShapePermuteExpr>(shapePackExpr))
-                opName = "__shapePermute";
-            else if (as<ShapeSwapExpr>(shapePackExpr))
-                opName = "__shapeSwap";
-            else if (as<ShapeReduceExpr>(shapePackExpr))
-                opName = "__shapeReduce";
-            else
-                SLANG_UNEXPECTED("unknown ShapePackTransformExpr subtype");
-
+            auto opName = getShapePackTransformName(shapePackExpr);
             sb << "```\n" << opName << "(";
             bool isFirst = true;
             ASTPrinter printer(version->linkage->getASTBuilder());

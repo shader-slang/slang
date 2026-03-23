@@ -163,42 +163,6 @@ struct PeepholeContext : InstPassBase
         }
     }
 
-    bool tryGetConstantIntLit(IRInst* inst, Int64& outValue)
-    {
-        if (auto intLit = as<IRIntLit>(inst))
-        {
-            outValue = intLit->getValue();
-            return true;
-        }
-        return false;
-    }
-
-    bool areKnownEqualShapeElements(IRInst* left, IRInst* right)
-    {
-        if (left == right)
-            return true;
-
-        auto leftInt = as<IRIntLit>(left);
-        auto rightInt = as<IRIntLit>(right);
-        return leftInt && rightInt && leftInt->getValue() == rightInt->getValue();
-    }
-
-    IRInst* emitShapePackLike(IRInst* inst, ArrayView<IRInst*> elements)
-    {
-        auto resultType = as<IRType>(inst->getDataType());
-        if (!resultType)
-            return nullptr;
-
-        IRBuilder builder(module);
-        IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
-        builder.setInsertBefore(inst);
-
-        if (resultType->getOp() == kIROp_TupleType)
-            return builder.emitMakeTuple(resultType, elements.getCount(), elements.getBuffer());
-
-        return builder.emitMakeValuePack(resultType, elements.getCount(), elements.getBuffer());
-    }
-
     bool tryOptimizeArithmeticInst(IRInst* inst)
     {
         bool allowUnsafeOptimizations =
@@ -659,7 +623,8 @@ struct PeepholeContext : InstPassBase
 
                         if (canFold)
                         {
-                            if (auto replacement = emitShapePackLike(
+                            if (auto replacement = emitPackLike(
+                                    module,
                                     inst,
                                     resultElements.getArrayView().arrayView))
                             {
@@ -704,7 +669,7 @@ struct PeepholeContext : InstPassBase
                     if (canFold)
                     {
                         if (auto replacement =
-                                emitShapePackLike(inst, resultElements.getArrayView().arrayView))
+                                emitPackLike(module, inst, resultElements.getArrayView().arrayView))
                         {
                             inst->replaceUsesWith(replacement);
                             maybeRemoveOldInst(inst);
@@ -750,7 +715,8 @@ struct PeepholeContext : InstPassBase
                                     resultElements.add(valuePack->getOperand(i));
                             }
 
-                            if (auto replacement = emitShapePackLike(
+                            if (auto replacement = emitPackLike(
+                                    module,
                                     inst,
                                     resultElements.getArrayView().arrayView))
                             {
@@ -794,7 +760,7 @@ struct PeepholeContext : InstPassBase
                         }
 
                         if (auto replacement =
-                                emitShapePackLike(inst, resultElements.getArrayView().arrayView))
+                                emitPackLike(module, inst, resultElements.getArrayView().arrayView))
                         {
                             inst->replaceUsesWith(replacement);
                             maybeRemoveOldInst(inst);

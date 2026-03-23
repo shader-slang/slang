@@ -634,16 +634,7 @@ void ASTPrinter::addExpr(Expr* expr)
     }
     else if (const auto packQueryExpr = as<PackQueryExpr>(expr))
     {
-        if (as<FirstExpr>(packQueryExpr))
-            sb << "__first(";
-        else if (as<LastExpr>(packQueryExpr))
-            sb << "__last(";
-        else if (as<TrimFirstExpr>(packQueryExpr))
-            sb << "__trimFirst(";
-        else if (as<TrimLastExpr>(packQueryExpr))
-            sb << "__trimLast(";
-        else
-            SLANG_UNEXPECTED("unknown PackQueryExpr subtype");
+        sb << getPackQueryName(packQueryExpr) << "(";
 
         if (packQueryExpr->value)
             addExpr(packQueryExpr->value);
@@ -651,16 +642,7 @@ void ASTPrinter::addExpr(Expr* expr)
     }
     else if (const auto shapePackExpr = as<ShapePackTransformExpr>(expr))
     {
-        if (as<ShapeConcatExpr>(shapePackExpr))
-            sb << "__shapeConcat(";
-        else if (as<ShapePermuteExpr>(shapePackExpr))
-            sb << "__shapePermute(";
-        else if (as<ShapeSwapExpr>(shapePackExpr))
-            sb << "__shapeSwap(";
-        else if (as<ShapeReduceExpr>(shapePackExpr))
-            sb << "__shapeReduce(";
-        else
-            SLANG_UNEXPECTED("unknown ShapePackTransformExpr subtype");
+        sb << getShapePackTransformName(shapePackExpr) << "(";
 
         bool isFirst = true;
         for (auto arg : shapePackExpr->args)

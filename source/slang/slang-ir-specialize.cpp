@@ -1259,26 +1259,6 @@ struct SpecializationContext
         }
     }
 
-    bool tryGetConstantIntLit(IRInst* inst, Int64& outValue)
-    {
-        if (auto intLit = as<IRIntLit>(inst))
-        {
-            outValue = intLit->getValue();
-            return true;
-        }
-        return false;
-    }
-
-    bool areKnownEqualShapeElements(IRInst* left, IRInst* right)
-    {
-        if (left == right)
-            return true;
-
-        auto leftInt = as<IRIntLit>(left);
-        auto rightInt = as<IRIntLit>(right);
-        return leftInt && rightInt && leftInt->getValue() == rightInt->getValue();
-    }
-
     bool areProvablyDifferentShapeElements(IRInst* left, IRInst* right)
     {
         Int64 leftValue = 0;
@@ -1308,22 +1288,6 @@ struct SpecializationContext
                 return true;
         }
         return false;
-    }
-
-    IRInst* emitShapePackLike(IRInst* oldInst, ArrayView<IRInst*> elements)
-    {
-        auto resultType = as<IRType>(oldInst->getDataType());
-        if (!resultType)
-            return nullptr;
-
-        IRBuilder builder(module);
-        IRBuilderSourceLocRAII srcLocRAII(&builder, oldInst->sourceLoc);
-        builder.setInsertBefore(oldInst);
-
-        if (resultType->getOp() == kIROp_TupleType)
-            return builder.emitMakeTuple(resultType, elements.getCount(), elements.getBuffer());
-
-        return builder.emitMakeValuePack(resultType, elements.getCount(), elements.getBuffer());
     }
 
     bool maybeSpecializeShapePackTransformInst(IRInst* inst)
@@ -1438,7 +1402,7 @@ struct SpecializationContext
                 }
 
                 return replaceWith(
-                    emitShapePackLike(inst, resultElements.getArrayView().arrayView));
+                    emitPackLike(module, inst, resultElements.getArrayView().arrayView));
             }
 
         case kIROp_ShapePermute:
@@ -1515,7 +1479,7 @@ struct SpecializationContext
                 }
 
                 return replaceWith(
-                    emitShapePackLike(inst, resultElements.getArrayView().arrayView));
+                    emitPackLike(module, inst, resultElements.getArrayView().arrayView));
             }
 
         case kIROp_ShapeSwap:
@@ -1579,7 +1543,7 @@ struct SpecializationContext
                 }
 
                 return replaceWith(
-                    emitShapePackLike(inst, resultElements.getArrayView().arrayView));
+                    emitPackLike(module, inst, resultElements.getArrayView().arrayView));
             }
 
         case kIROp_ShapeReduce:
@@ -1635,7 +1599,7 @@ struct SpecializationContext
                 }
 
                 return replaceWith(
-                    emitShapePackLike(inst, resultElements.getArrayView().arrayView));
+                    emitPackLike(module, inst, resultElements.getArrayView().arrayView));
             }
 
         default:

@@ -47,47 +47,93 @@ void SyntaxClassBase::destructInstanceImpl(void* instance) const
 
 /* static */ const TypeExp TypeExp::empty;
 
+bool tryGetConstantIntVal(Val* val, IntegerLiteralValue& outValue)
+{
+    auto intVal = as<IntVal>(val);
+    if (auto constantIntVal = intVal ? as<ConstantIntVal>(intVal->resolve()) : nullptr)
+    {
+        outValue = constantIntVal->getValue();
+        return true;
+    }
+    return false;
+}
+
+bool tryFindProvableDuplicateOrderIndices(
+    ConcreteIntValPack* orderPack,
+    Index& outFirstPosition,
+    Index& outSecondPosition,
+    IntegerLiteralValue& outConcreteIndex,
+    bool& outHasConcreteIndex)
+{
+    for (Index i = 0; i < orderPack->getCount(); ++i)
+    {
+        for (Index j = 0; j < i; ++j)
+        {
+            if (!orderPack->getElement(i)->equals(orderPack->getElement(j)))
+                continue;
+
+            outFirstPosition = j;
+            outSecondPosition = i;
+            outHasConcreteIndex = tryGetConstantIntVal(orderPack->getElement(i), outConcreteIndex);
+            return true;
+        }
+    }
+    return false;
+}
+
+bool hasAnyValidConcatAxis(ConcreteIntValPack* leftPack, ConcreteIntValPack* rightPack)
+{
+    SLANG_ASSERT(leftPack->getCount() == rightPack->getCount());
+    for (Index axis = 0; axis < leftPack->getCount(); ++axis)
+    {
+        bool isValidAxis = true;
+        for (Index i = 0; i < leftPack->getCount(); ++i)
+        {
+            if (i != axis && !leftPack->getElement(i)->equals(rightPack->getElement(i)))
+            {
+                isValidAxis = false;
+                break;
+            }
+        }
+        if (isValidAxis)
+            return true;
+    }
+    return false;
+}
+
+const char* getPackQueryName(PackQueryExpr* expr)
+{
+    if (as<FirstExpr>(expr))
+        return "__first";
+    if (as<LastExpr>(expr))
+        return "__last";
+    if (as<TrimFirstExpr>(expr))
+        return "__trimFirst";
+    if (as<TrimLastExpr>(expr))
+        return "__trimLast";
+    SLANG_UNEXPECTED("unknown PackQueryExpr subtype");
+    return "";
+}
+
+const char* getShapePackTransformName(ShapePackTransformExpr* expr)
+{
+    if (as<ShapeConcatExpr>(expr))
+        return "__shapeConcat";
+    if (as<ShapePermuteExpr>(expr))
+        return "__shapePermute";
+    if (as<ShapeSwapExpr>(expr))
+        return "__shapeSwap";
+    if (as<ShapeReduceExpr>(expr))
+        return "__shapeReduce";
+    SLANG_UNEXPECTED("unknown ShapePackTransformExpr subtype");
+    return "";
+}
+
 VariadicPackCardinality getKnownPackCardinality(Val* packOperand)
 {
-    if (!packOperand)
-        return VariadicPackCardinality::Unknown;
-
-    if (auto modifiedType = as<ModifiedType>(packOperand))
-        return getKnownPackCardinality(modifiedType->getBase());
-
-    if (auto tupleType = as<TupleType>(packOperand))
-        return getKnownPackCardinality(tupleType->getTypePack());
-
-    if (auto concreteTypePack = as<ConcreteTypePack>(packOperand))
-        return concreteTypePack->getTypeCount() > 0 ? VariadicPackCardinality::NonEmpty
-                                                    : VariadicPackCardinality::Empty;
-
-    if (auto concreteIntValPack = as<ConcreteIntValPack>(packOperand))
-        return concreteIntValPack->getCount() > 0 ? VariadicPackCardinality::NonEmpty
-                                                  : VariadicPackCardinality::Empty;
-
-    if (auto shapePermuteIntValPack = as<ShapePermuteIntValPack>(packOperand))
-        return getKnownPackCardinality(shapePermuteIntValPack->getValuePack());
-
-    if (auto shapeSwapIntValPack = as<ShapeSwapIntValPack>(packOperand))
-        return getKnownPackCardinality(shapeSwapIntValPack->getValuePack());
-
-    if (auto shapeReduceIntValPack = as<ShapeReduceIntValPack>(packOperand))
-        return getKnownPackCardinality(shapeReduceIntValPack->getValuePack());
-
-    if (auto shapeConcatIntValPack = as<ShapeConcatIntValPack>(packOperand))
-    {
-        auto leftCardinality = getKnownPackCardinality(shapeConcatIntValPack->getLeftPack());
-        auto rightCardinality = getKnownPackCardinality(shapeConcatIntValPack->getRightPack());
-        if (leftCardinality == VariadicPackCardinality::Empty &&
-            rightCardinality == VariadicPackCardinality::Empty)
-            return VariadicPackCardinality::Empty;
-        if (leftCardinality == VariadicPackCardinality::NonEmpty ||
-            rightCardinality == VariadicPackCardinality::NonEmpty)
-            return VariadicPackCardinality::NonEmpty;
-    }
-
-    return VariadicPackCardinality::Unknown;
+    return getPackCardinalityFromStructure(
+        packOperand,
+        [](Val* operand) { return getKnownPackCardinality(operand); });
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!! DiagnosticSink impls !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

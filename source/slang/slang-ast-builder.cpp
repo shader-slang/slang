@@ -3,6 +3,7 @@
 
 #include "slang-check.h"
 #include "slang-compiler.h"
+#include "slang-syntax.h"
 
 #include <assert.h>
 
@@ -1080,16 +1081,6 @@ static Type* _getIntPackTypeForVals(ASTBuilder* astBuilder, Val* pack0, Val* pac
     return astBuilder->getOrCreate<ValuePackType>(astBuilder->getIntType());
 }
 
-static bool _tryGetConstantIntVal(IntVal* val, IntegerLiteralValue& outValue)
-{
-    if (auto constantIntVal = as<ConstantIntVal>(val ? val->resolve() : nullptr))
-    {
-        outValue = constantIntVal->getValue();
-        return true;
-    }
-    return false;
-}
-
 ConcreteIntValPack* ASTBuilder::getIntValPack(ArrayView<IntVal*> vals)
 {
     ShortList<IntVal*> flattenedVals;
@@ -1200,7 +1191,7 @@ Val* ASTBuilder::getShapeConcatIntValPack(Val* leftPack, Val* rightPack, IntVal*
     {
         if (auto rightValPack = as<ConcreteIntValPack>(rightPack))
         {
-            if (_tryGetConstantIntVal(axis, axisValue) &&
+            if (tryGetConstantIntVal(axis, axisValue) &&
                 leftValPack->getCount() == rightValPack->getCount() && axisValue >= 0 &&
                 axisValue < leftValPack->getCount())
             {
@@ -1253,7 +1244,7 @@ Val* ASTBuilder::getShapePermuteIntValPack(Val* valuePack, Val* orderPack)
                 for (Index i = 0; i < concreteOrderPack->getCount(); ++i)
                 {
                     IntegerLiteralValue orderIndex = 0;
-                    if (!_tryGetConstantIntVal(concreteOrderPack->getElement(i), orderIndex) ||
+                    if (!tryGetConstantIntVal(concreteOrderPack->getElement(i), orderIndex) ||
                         orderIndex < 0 || orderIndex >= concreteValuePack->getCount() ||
                         seen[orderIndex])
                     {
@@ -1281,7 +1272,7 @@ Val* ASTBuilder::getShapeSwapIntValPack(Val* valuePack, IntVal* dim0, IntVal* di
     IntegerLiteralValue dim1Value = 0;
     if (auto concreteValuePack = as<ConcreteIntValPack>(valuePack))
     {
-        if (_tryGetConstantIntVal(dim0, dim0Value) && _tryGetConstantIntVal(dim1, dim1Value) &&
+        if (tryGetConstantIntVal(dim0, dim0Value) && tryGetConstantIntVal(dim1, dim1Value) &&
             dim0Value >= 0 && dim1Value >= 0 && dim0Value < concreteValuePack->getCount() &&
             dim1Value < concreteValuePack->getCount())
         {
@@ -1311,7 +1302,7 @@ Val* ASTBuilder::getShapeReduceIntValPack(Val* valuePack, IntVal* axis)
     IntegerLiteralValue axisValue = 0;
     if (auto concreteValuePack = as<ConcreteIntValPack>(valuePack))
     {
-        if (_tryGetConstantIntVal(axis, axisValue) && axisValue >= 0 &&
+        if (tryGetConstantIntVal(axis, axisValue) && axisValue >= 0 &&
             axisValue < concreteValuePack->getCount())
         {
             ShortList<IntVal*> resultVals;
