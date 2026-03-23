@@ -16,10 +16,11 @@ SLANG_UNIT_TEST(replayResetHandlersClearsDictionary)
     REPLAY_TEST;
     SLANG_UNUSED(unitTestContext);
 
-    auto& replayCtx = ctx();
-
-    SLANG_CHECK(replayCtx.getHandlerCount() > 0);
-
+    SlangRecord::ReplayContext replayCtx;
+    replayCtx.registerHandler(
+        "__unit_test__",
+        [](SlangRecord::ReplayContext&) {});
+    SLANG_CHECK(replayCtx.getHandlerCount() == 1);
     replayCtx.resetHandlers();
     SLANG_CHECK(replayCtx.getHandlerCount() == 0);
 }
