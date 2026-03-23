@@ -3036,14 +3036,12 @@ struct TypeFlowSpecializationContext
                                 true,
                                 workQueue);
                         }
-                        else if (arg->getDataType() && as<IRWitnessTableType>(arg->getDataType()))
+                        else if (arg->getOp() == kIROp_TypeEqualityWitness)
                         {
-                            // Some witness-like insts (e.g. TypeEqualityWitness) carry a
-                            // witness-table type but are not concrete IRWitnessTables.
-                            // They arise when a generic is specialized with an interface type
-                            // itself (e.g. genericFunc<IFoo>(v)), which is invalid — the call
-                            // site will emit a diagnostic.  Skip this param to avoid
-                            // propagating unusable info into the analysis.
+                            // TypeEqualityWitness arises when a generic is specialized with an
+                            // interface type itself (e.g. genericFunc<IFoo>(v)), which is
+                            // invalid — the call site will emit a diagnostic.  Skip this param
+                            // to avoid propagating unusable info into the analysis.
                         }
                         else
                         {
