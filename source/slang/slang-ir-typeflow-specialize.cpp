@@ -4695,13 +4695,14 @@ struct TypeFlowSpecializationContext
         // specialization (e.g. a generic specialized with an interface type that created a
         // malformed dispatch stub).  The diagnostic has already been emitted; bail out here
         // to prevent an assertion failure inside getParamType().
-        // Use != rather than > to also reject the case where the callee type has *more*
-        // parameters than the call site provides (which would leave malformed IR for later
-        // passes if allowed through).
+        // Use > (not !=) so that valid variadic-generic dispatch stubs — where the effective
+        // callee type may have more parameters than the direct call provides — are not
+        // incorrectly rejected.  The only dangerous case is actual args > param count, which
+        // would OOB-index getParamType(); that is what we guard against here.
         {
             auto* calleeFuncTy = as<IRFuncType>(callee->getFullType());
             if (!calleeFuncTy ||
-                inst->getArgCount() + extraArgCount != (UCount)calleeFuncTy->getParamCount())
+                inst->getArgCount() + extraArgCount > (UCount)calleeFuncTy->getParamCount())
             {
                 module->getContainerPool().free(&callArgs);
                 return false;
