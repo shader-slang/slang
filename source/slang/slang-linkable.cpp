@@ -493,7 +493,7 @@ ComponentType::link(slang::IComponentType** outLinkedComponentType, ISlangBlob**
 SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::linkWithOptions(
     slang::IComponentType** outLinkedComponentType,
     uint32_t count,
-    slang::CompilerOptionEntry* entries,
+    slang::CompilerOptionEntry const* entries,
     ISlangBlob** outDiagnostics)
 {
     SLANG_RETURN_ON_FAIL(link(outLinkedComponentType, outDiagnostics));

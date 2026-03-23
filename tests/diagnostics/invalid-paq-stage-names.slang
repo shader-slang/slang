@@ -1,6 +1,6 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target hlsl
 
-struct [raypayload] ValidRayPayload
+[raypayload] struct ValidRayPayload
 {
     float4 color : read(anyht, closesthit, miss) : write(caller);
 //CHECK:                ^^^^^ invalid stage name in ray payload access qualifier

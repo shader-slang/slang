@@ -19,7 +19,7 @@ float f(dynamic_uniform float v)
     return v + 1.0;
 }
 
-[numthread(1,1,1)]
+[numthreads(1,1,1)]
 [shader("compute")]
 void main(int tid : SV_DispatchThreadID)
 {
@@ -44,7 +44,7 @@ void main(int tid : SV_DispatchThreadID)
     t.a = tid;
     t.b = 0;
 
-    // Generates a warning here despite t.b is non-uniform, because
+    // Generates a warning here despite t.b being uniform, because
     // t.a is non-uniform and that assignment makes `t` non-uniform.
     expectUniform(t.b);
 }
@@ -78,7 +78,7 @@ void main(int tid : SV_DispatchThreadID)
 
 ## Treat Values as Uniform
 
-In some cases, the compiler might not be able to deduce a value to be non-uniform. If you are certain that a value can
+In some cases, the compiler might not be able to deduce a value to be uniform. If you are certain that a value can
 be treated as dynamic uniform, you can call `asDynamicUniform()` function to force the compiler to treat the value as
 dynamic uniform. For example:
 ```csharp

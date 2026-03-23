@@ -1877,6 +1877,44 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         }
     }
 
+    void emitPerMemberDebugValue(IRBuilder& builder, IRInst* debugVar, IRInst* value)
+    {
+        auto valueType = as<IRType>(unwrapAttributedType(value->getDataType()));
+        if (auto structType = as<IRStructType>(valueType))
+        {
+            for (auto field : structType->getFields())
+            {
+                auto fieldDebugVar = builder.emitFieldAddress(debugVar, field->getKey());
+                auto fieldValue =
+                    builder.emitFieldExtract(field->getFieldType(), value, field->getKey());
+                emitPerMemberDebugValue(builder, fieldDebugVar, fieldValue);
+            }
+            return;
+        }
+
+        auto debugValue = builder.emitDebugValue(debugVar, value);
+        addToWorkList(debugValue);
+    }
+
+    void processDebugValue(IRDebugValue* inst)
+    {
+        auto valueType = as<IRType>(unwrapAttributedType(inst->getValue()->getDataType()));
+        if (as<IRStructType>(valueType))
+        {
+            // Decompose the struct into per-member DebugValue updates to help
+            // shader debuggers resolve the struct value.
+            IRBuilder builder(inst);
+            builder.setInsertBefore(inst);
+            emitPerMemberDebugValue(builder, inst->getDebugVar(), inst->getValue());
+            inst->removeAndDeallocate();
+            return;
+        }
+
+        // Unsupported type, remove the DebugValue.
+        if (!isSimpleDataType(valueType))
+            inst->removeAndDeallocate();
+    }
+
     List<IRInst*> m_instsToRemove;
     void processWorkList()
     {
@@ -2009,8 +2047,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                 break;
 
             case kIROp_DebugValue:
-                if (!isSimpleDataType(as<IRDebugValue>(inst)->getDebugVar()->getDataType()))
-                    inst->removeAndDeallocate();
+                processDebugValue(as<IRDebugValue>(inst));
                 break;
             case kIROp_DebugVar:
                 if (!isSimpleDataType(as<IRDebugVar>(inst)->getDataType()))

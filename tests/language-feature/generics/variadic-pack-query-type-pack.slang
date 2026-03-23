@@ -10,14 +10,14 @@ struct CountHolder<let N : int>
     static int get() { return N; }
 }
 
-int countTrimHeadTypePack<each T>()
+int countTrimFirstTypePack<each T>()
 {
-    return countof(__trimHead(T));
+    return countof(__trimFirst(T));
 }
 
-int countTrimTailTypePack<each T>()
+int countTrimLastTypePack<each T>()
 {
-    return countof(__trimTail(T));
+    return countof(__trimLast(T));
 }
 
 struct FirstHolder<each T> where nonempty(T)
@@ -30,25 +30,25 @@ struct LastHolder<each T> where nonempty(T)
     __last(T) value;
 }
 
-int countTrimHeadExpandedTypePack<each T>()
+int countTrimFirstExpandedTypePack<each T>()
 {
-    return countof(__trimHead(expand Wrapper<each T>));
+    return countof(__trimFirst(expand Wrapper<each T>));
 }
 
 int countReconstructedTuple<each T>() where nonempty(T)
 {
-    return CountHolder<countof(Tuple<__first(T), expand each __trimHead(T)>)>.get();
+    return CountHolder<countof(Tuple<__first(T), expand each __trimFirst(T)>)>.get();
 }
 
 void main()
 {
-    printf("%d\n", countTrimHeadTypePack<int, int, int>());
+    printf("%d\n", countTrimFirstTypePack<int, int, int>());
     // CHECK: 2
 
-    printf("%d\n", countTrimTailTypePack<int, int, int>());
+    printf("%d\n", countTrimLastTypePack<int, int, int>());
     // CHECK: 2
 
-    printf("%d\n", countTrimHeadTypePack<>());
+    printf("%d\n", countTrimFirstTypePack<>());
     // CHECK: 0
 
     FirstHolder<int, int, int> firstHolder = {11};
@@ -59,7 +59,7 @@ void main()
     printf("%d\n", lastHolder.value);
     // CHECK: 22
 
-    printf("%d\n", countTrimHeadExpandedTypePack<int, float, bool>());
+    printf("%d\n", countTrimFirstExpandedTypePack<int, float, bool>());
     // CHECK: 2
 
     printf("%d\n", countReconstructedTuple<int, float, bool>());
