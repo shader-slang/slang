@@ -918,9 +918,13 @@ static LegalVal legalizeDebugValue(
         return LegalVal();
     case LegalType::Flavor::pair:
         {
+            // The var should be legalized as a simple value, because we discard the special part
+            // for debug info insts.
+            //
+            SLANG_ASSERT(debugVar.flavor == LegalVal::Flavor::simple);
             auto ordinaryVal = legalizeDebugValue(
                 context,
-                debugVar.getPair()->ordinaryVal,
+                debugVar,
                 debugValue.getPair()->ordinaryVal,
                 originalInst);
             return ordinaryVal;
