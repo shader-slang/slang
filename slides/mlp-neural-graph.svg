@@ -1,0 +1,216 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 575" font-family="'Segoe UI', system-ui, Arial, sans-serif">
+  <defs>
+    <marker id="arrowGray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 9 5 L 0 9 z" fill="#9CA3AF"/>
+    </marker>
+    <filter id="neuronShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="1" stdDeviation="2" flood-color="#000" flood-opacity="0.1"/>
+    </filter>
+  </defs>
+
+  <rect width="1080" height="575" fill="white" rx="8"/>
+
+  <!-- TITLE -->
+  <text x="540" y="30" text-anchor="middle" font-size="20" font-weight="700" fill="#111827">MLP as Neural Network Graph</text>
+  <text x="540" y="50" text-anchor="middle" font-size="11" fill="#6B7280">IEncoder &#x2192; IVector (neurons) &#x2192; ILayer (connections) &#x2192; IPointerLikeAddress (weights)</text>
+
+  <!-- ================================================================ -->
+  <!-- NEURAL NETWORK GRAPH                                             -->
+  <!-- Column positions: raw=55, encoded=210, hidden=470, output=720   -->
+  <!-- Neuron radius = 22                                               -->
+  <!-- ================================================================ -->
+
+  <!-- ======= ENCODER CONNECTION LINES (raw to encoded) ======= -->
+  <line x1="77" y1="205" x2="188" y2="130" stroke="#FDBA74" stroke-width="1"/>
+  <line x1="77" y1="205" x2="188" y2="200" stroke="#FDBA74" stroke-width="1"/>
+  <line x1="77" y1="205" x2="188" y2="270" stroke="#FDBA74" stroke-width="1"/>
+  <line x1="77" y1="205" x2="188" y2="340" stroke="#FDBA74" stroke-width="1"/>
+  <line x1="77" y1="275" x2="188" y2="130" stroke="#FDBA74" stroke-width="1"/>
+  <line x1="77" y1="275" x2="188" y2="200" stroke="#FDBA74" stroke-width="1"/>
+  <line x1="77" y1="275" x2="188" y2="270" stroke="#FDBA74" stroke-width="1"/>
+  <line x1="77" y1="275" x2="188" y2="340" stroke="#FDBA74" stroke-width="1"/>
+
+  <!-- ======= INPUT to HIDDEN CONNECTION LINES (W1) ======= -->
+  <line x1="232" y1="130" x2="448" y2="200" stroke="#BFDBFE" stroke-width="1.2"/>
+  <line x1="232" y1="130" x2="448" y2="280" stroke="#BFDBFE" stroke-width="1.2"/>
+  <line x1="232" y1="130" x2="448" y2="360" stroke="#BFDBFE" stroke-width="1.2"/>
+  <line x1="232" y1="200" x2="448" y2="200" stroke="#BFDBFE" stroke-width="1.2"/>
+  <line x1="232" y1="200" x2="448" y2="280" stroke="#BFDBFE" stroke-width="1.2"/>
+  <line x1="232" y1="200" x2="448" y2="360" stroke="#BFDBFE" stroke-width="1.2"/>
+  <line x1="232" y1="270" x2="448" y2="200" stroke="#BFDBFE" stroke-width="1.2"/>
+  <line x1="232" y1="270" x2="448" y2="280" stroke="#BFDBFE" stroke-width="1.2"/>
+  <line x1="232" y1="270" x2="448" y2="360" stroke="#BFDBFE" stroke-width="1.2"/>
+  <line x1="232" y1="340" x2="448" y2="200" stroke="#BFDBFE" stroke-width="1.2"/>
+  <line x1="232" y1="340" x2="448" y2="280" stroke="#BFDBFE" stroke-width="1.2"/>
+  <line x1="232" y1="340" x2="448" y2="360" stroke="#BFDBFE" stroke-width="1.2"/>
+
+  <!-- ======= HIDDEN to OUTPUT CONNECTION LINES (W2) ======= -->
+  <line x1="492" y1="200" x2="698" y2="250" stroke="#DDD6FE" stroke-width="1.2"/>
+  <line x1="492" y1="200" x2="698" y2="330" stroke="#DDD6FE" stroke-width="1.2"/>
+  <line x1="492" y1="280" x2="698" y2="250" stroke="#DDD6FE" stroke-width="1.2"/>
+  <line x1="492" y1="280" x2="698" y2="330" stroke="#DDD6FE" stroke-width="1.2"/>
+  <line x1="492" y1="360" x2="698" y2="250" stroke="#DDD6FE" stroke-width="1.2"/>
+  <line x1="492" y1="360" x2="698" y2="330" stroke="#DDD6FE" stroke-width="1.2"/>
+
+  <!-- ======= WEIGHT LABELS on select edges ======= -->
+  <text x="322" y="158" text-anchor="middle" font-size="8" fill="#3B82F6" font-weight="600" transform="rotate(-10,322,158)">w0</text>
+  <text x="330" y="210" text-anchor="middle" font-size="8" fill="#3B82F6" font-weight="600">w1</text>
+  <text x="318" y="260" text-anchor="middle" font-size="8" fill="#3B82F6" font-weight="600" transform="rotate(8,318,260)">w2</text>
+  <text x="300" y="296" text-anchor="middle" font-size="8" fill="#9CA3AF">...</text>
+  <text x="588" y="218" text-anchor="middle" font-size="8" fill="#8B5CF6" font-weight="600" transform="rotate(7,588,218)">w0</text>
+  <text x="596" y="310" text-anchor="middle" font-size="8" fill="#8B5CF6" font-weight="600" transform="rotate(15,596,310)">w1</text>
+  <text x="596" y="345" text-anchor="middle" font-size="8" fill="#9CA3AF">...</text>
+
+  <!-- ======= RAW INPUT NEURONS (amber/orange, 2 neurons) ======= -->
+  <g transform="translate(55, 205)">
+    <circle cx="0" cy="0" r="22" fill="#FEF3C7" stroke="#F59E0B" stroke-width="2" filter="url(#neuronShadow)"/>
+    <text x="0" y="5" text-anchor="middle" font-size="10" font-weight="700" fill="#92400E">p0</text>
+  </g>
+  <g transform="translate(55, 275)">
+    <circle cx="0" cy="0" r="22" fill="#FEF3C7" stroke="#F59E0B" stroke-width="2" filter="url(#neuronShadow)"/>
+    <text x="0" y="5" text-anchor="middle" font-size="10" font-weight="700" fill="#92400E">p1</text>
+  </g>
+  <text x="55" y="152" text-anchor="middle" font-size="11" font-weight="700" fill="#92400E">Input</text>
+  <text x="55" y="166" text-anchor="middle" font-size="9" fill="#B45309">D = 2</text>
+
+  <!-- ======= ENCODER BOX between raw and encoded ======= -->
+  <g transform="translate(130, 390)">
+    <rect x="-5" y="0" width="118" height="32" rx="6" fill="#FEF3C7" stroke="#F59E0B" stroke-width="1.2" stroke-dasharray="4,2"/>
+    <text x="54" y="14" text-anchor="middle" font-size="9" font-weight="700" fill="#92400E">IEncoder (optional)</text>
+    <text x="54" y="26" text-anchor="middle" font-size="8" fill="#B45309">2 &#x2192; 4 features</text>
+  </g>
+
+  <!-- ======= ENCODED INPUT NEURONS (green, 4 neurons) ======= -->
+  <g transform="translate(210, 130)">
+    <circle cx="0" cy="0" r="22" fill="#D1FAE5" stroke="#10B981" stroke-width="2" filter="url(#neuronShadow)"/>
+    <text x="0" y="5" text-anchor="middle" font-size="10" font-weight="700" fill="#065F46">x0</text>
+  </g>
+  <g transform="translate(210, 200)">
+    <circle cx="0" cy="0" r="22" fill="#D1FAE5" stroke="#10B981" stroke-width="2" filter="url(#neuronShadow)"/>
+    <text x="0" y="5" text-anchor="middle" font-size="10" font-weight="700" fill="#065F46">x1</text>
+  </g>
+  <g transform="translate(210, 270)">
+    <circle cx="0" cy="0" r="22" fill="#D1FAE5" stroke="#10B981" stroke-width="2" filter="url(#neuronShadow)"/>
+    <text x="0" y="5" text-anchor="middle" font-size="10" font-weight="700" fill="#065F46">x2</text>
+  </g>
+  <g transform="translate(210, 340)">
+    <circle cx="0" cy="0" r="22" fill="#D1FAE5" stroke="#10B981" stroke-width="2" filter="url(#neuronShadow)"/>
+    <text x="0" y="5" text-anchor="middle" font-size="10" font-weight="700" fill="#065F46">x3</text>
+  </g>
+  <text x="210" y="90" text-anchor="middle" font-size="12" font-weight="700" fill="#065F46">Encoded</text>
+  <text x="210" y="104" text-anchor="middle" font-size="9" fill="#10B981">IVector&lt;N=4&gt;</text>
+
+  <!-- ======= HIDDEN NEURONS (blue) with ReLU ======= -->
+  <g transform="translate(470, 200)">
+    <circle cx="0" cy="0" r="22" fill="#DBEAFE" stroke="#3B82F6" stroke-width="2" filter="url(#neuronShadow)"/>
+    <text x="0" y="-2" text-anchor="middle" font-size="10" font-weight="700" fill="#1E40AF">h0</text>
+    <polyline points="-8,12 0,12 8,4" fill="none" stroke="#F59E0B" stroke-width="1.8" stroke-linecap="round"/>
+  </g>
+  <g transform="translate(470, 280)">
+    <circle cx="0" cy="0" r="22" fill="#DBEAFE" stroke="#3B82F6" stroke-width="2" filter="url(#neuronShadow)"/>
+    <text x="0" y="-2" text-anchor="middle" font-size="10" font-weight="700" fill="#1E40AF">h1</text>
+    <polyline points="-8,12 0,12 8,4" fill="none" stroke="#F59E0B" stroke-width="1.8" stroke-linecap="round"/>
+  </g>
+  <g transform="translate(470, 360)">
+    <circle cx="0" cy="0" r="22" fill="#DBEAFE" stroke="#3B82F6" stroke-width="2" filter="url(#neuronShadow)"/>
+    <text x="0" y="-2" text-anchor="middle" font-size="10" font-weight="700" fill="#1E40AF">h2</text>
+    <polyline points="-8,12 0,12 8,4" fill="none" stroke="#F59E0B" stroke-width="1.8" stroke-linecap="round"/>
+  </g>
+  <text x="470" y="148" text-anchor="middle" font-size="12" font-weight="700" fill="#1E40AF">Hidden</text>
+  <text x="470" y="162" text-anchor="middle" font-size="9" fill="#3B82F6">IVector&lt;N=3&gt;</text>
+  <rect x="440" y="166" width="60" height="14" rx="3" fill="#FEF3C7" stroke="#F59E0B" stroke-width="0.8"/>
+  <text x="470" y="176" text-anchor="middle" font-size="7.5" fill="#92400E" font-weight="600">ReLU</text>
+
+  <!-- ======= OUTPUT NEURONS (purple) with Identity ======= -->
+  <g transform="translate(720, 250)">
+    <circle cx="0" cy="0" r="22" fill="#EDE9FE" stroke="#8B5CF6" stroke-width="2" filter="url(#neuronShadow)"/>
+    <text x="0" y="-2" text-anchor="middle" font-size="10" font-weight="700" fill="#5B21B6">y0</text>
+    <line x1="-8" y1="12" x2="8" y2="4" stroke="#F59E0B" stroke-width="1.8" stroke-linecap="round"/>
+  </g>
+  <g transform="translate(720, 330)">
+    <circle cx="0" cy="0" r="22" fill="#EDE9FE" stroke="#8B5CF6" stroke-width="2" filter="url(#neuronShadow)"/>
+    <text x="0" y="-2" text-anchor="middle" font-size="10" font-weight="700" fill="#5B21B6">y1</text>
+    <line x1="-8" y1="12" x2="8" y2="4" stroke="#F59E0B" stroke-width="1.8" stroke-linecap="round"/>
+  </g>
+  <text x="720" y="193" text-anchor="middle" font-size="12" font-weight="700" fill="#5B21B6">Output</text>
+  <text x="720" y="207" text-anchor="middle" font-size="9" fill="#8B5CF6">IVector&lt;N=2&gt;</text>
+  <rect x="685" y="211" width="70" height="14" rx="3" fill="#FEF3C7" stroke="#F59E0B" stroke-width="0.8"/>
+  <text x="720" y="221" text-anchor="middle" font-size="7.5" fill="#92400E" font-weight="600">Identity</text>
+
+  <!-- ======= LAYER BRACKETS ======= -->
+  <g transform="translate(340, 390)">
+    <rect x="-5" y="0" width="130" height="32" rx="6" fill="#DBEAFE" stroke="#3B82F6" stroke-width="1.2"/>
+    <text x="60" y="14" text-anchor="middle" font-size="9" font-weight="700" fill="#1E40AF">ILayer 1</text>
+    <text x="60" y="26" text-anchor="middle" font-size="8" fill="#3B82F6">h = ReLU(W1*x + b1)</text>
+  </g>
+  <g transform="translate(598, 390)">
+    <rect x="-5" y="0" width="130" height="32" rx="6" fill="#EDE9FE" stroke="#8B5CF6" stroke-width="1.2"/>
+    <text x="60" y="14" text-anchor="middle" font-size="9" font-weight="700" fill="#5B21B6">ILayer 2</text>
+    <text x="60" y="26" text-anchor="middle" font-size="8" fill="#8B5CF6">y = W2*h + b2</text>
+  </g>
+
+  <!-- ================================================================ -->
+  <!-- ANNOTATIONS (right side)                                         -->
+  <!-- ================================================================ -->
+  <g transform="translate(810, 80)">
+    <rect x="0" y="0" width="250" height="370" rx="8" fill="#F9FAFB" stroke="#E5E7EB" stroke-width="1"/>
+    <text x="125" y="22" text-anchor="middle" font-size="11" font-weight="700" fill="#374151">Mapping to Interfaces</text>
+    <line x1="10" y1="30" x2="240" y2="30" stroke="#E5E7EB" stroke-width="0.8"/>
+
+    <!-- IEncoder -->
+    <line x1="12" y1="54" x2="32" y2="54" stroke="#FDBA74" stroke-width="2"/>
+    <text x="40" y="50" text-anchor="start" font-size="9.5" font-weight="600" fill="#92400E">Encoder = IEncoder (optional)</text>
+    <text x="40" y="64" text-anchor="start" font-size="8" fill="#6B7280">Maps input to features</text>
+    <text x="40" y="78" text-anchor="start" font-size="8" fill="#6B7280">HashGrid, Permuto, etc.</text>
+
+    <!-- Neurons = IVector -->
+    <circle cx="22" cy="100" r="10" fill="#D1FAE5" stroke="#10B981" stroke-width="1.2"/>
+    <text x="40" y="100" text-anchor="start" font-size="9.5" font-weight="600" fill="#065F46">Neurons = IVector&lt;T&gt;</text>
+    <text x="40" y="114" text-anchor="start" font-size="8" fill="#6B7280">Each layer's data vector</text>
+    <text x="40" y="128" text-anchor="start" font-size="8" fill="#6B7280">InlineVector or WaveTangled</text>
+
+    <!-- Connections = ILayer -->
+    <line x1="12" y1="150" x2="32" y2="150" stroke="#BFDBFE" stroke-width="2.5"/>
+    <text x="40" y="150" text-anchor="start" font-size="9.5" font-weight="600" fill="#1E40AF">Connections = ILayer</text>
+    <text x="40" y="164" text-anchor="start" font-size="8" fill="#6B7280">FFLayer.eval() computes</text>
+    <text x="40" y="178" text-anchor="start" font-size="8" fill="#6B7280">y = Activation(W*x + b)</text>
+
+    <!-- Weights = IPointerLikeAddress -->
+    <text x="16" y="204" text-anchor="middle" font-size="9" fill="#3B82F6" font-weight="700">w</text>
+    <text x="40" y="204" text-anchor="start" font-size="9.5" font-weight="600" fill="#8B5CF6">Weights = IPointerLikeAddress</text>
+    <text x="40" y="218" text-anchor="start" font-size="8" fill="#6B7280">w0, w1, ... on each edge</text>
+    <text x="40" y="232" text-anchor="start" font-size="8" fill="#6B7280">BindlessAddr or PointerAddr</text>
+
+    <!-- Activation -->
+    <rect x="10" y="248" width="18" height="12" rx="3" fill="#FEF3C7" stroke="#F59E0B" stroke-width="0.8"/>
+    <text x="40" y="258" text-anchor="start" font-size="9.5" font-weight="600" fill="#92400E">Activation = IActivation</text>
+    <text x="40" y="272" text-anchor="start" font-size="8" fill="#6B7280">Applied at each neuron</text>
+    <text x="40" y="286" text-anchor="start" font-size="8" fill="#6B7280">ReLU, Sigmoid, etc.</text>
+
+    <line x1="10" y1="300" x2="240" y2="300" stroke="#E5E7EB" stroke-width="0.8"/>
+
+    <text x="125" y="318" text-anchor="middle" font-size="9" font-weight="600" fill="#374151">Key Insight:</text>
+    <text x="125" y="334" text-anchor="middle" font-size="8.5" fill="#6B7280">Same graph structure,</text>
+    <text x="125" y="348" text-anchor="middle" font-size="8.5" fill="#6B7280">swap implementations</text>
+    <text x="125" y="362" text-anchor="middle" font-size="8.5" fill="#6B7280">for different HW targets</text>
+  </g>
+
+  <!-- ================================================================ -->
+  <!-- BOTTOM: Backward pass note                                       -->
+  <!-- ================================================================ -->
+  <g transform="translate(30, 445)">
+    <rect x="0" y="0" width="750" height="110" rx="8" fill="#FFF7ED" stroke="#FDBA74" stroke-width="1"/>
+    <text x="375" y="20" text-anchor="middle" font-size="11" font-weight="700" fill="#9A3412">Backward Pass (auto-differentiated via [Differentiable])</text>
+    <line x1="15" y1="28" x2="735" y2="28" stroke="#FDBA74" stroke-width="0.6"/>
+    <text x="20" y="46" text-anchor="start" font-size="9" fill="#78350F">For each layer, backward computes 3 gradients using the same building blocks:</text>
+    <text x="40" y="62" text-anchor="start" font-size="9" fill="#1E40AF" font-weight="600">dInput  = W&#x1D40; * dOut</text>
+    <text x="240" y="62" text-anchor="start" font-size="9" fill="#6B7280">&#x2192;  MMA (transposed weights)</text>
+    <text x="40" y="78" text-anchor="start" font-size="9" fill="#EF4444" font-weight="600">dW      = dOut * input&#x1D40;</text>
+    <text x="240" y="78" text-anchor="start" font-size="9" fill="#6B7280">&#x2192;  outerProductAccumulate</text>
+    <text x="40" y="92" text-anchor="start" font-size="9" fill="#8B5CF6" font-weight="600">dBias   = &#x3A3; dOut</text>
+    <text x="240" y="92" text-anchor="start" font-size="9" fill="#6B7280">&#x2192;  sumReduceRows</text>
+    <text x="40" y="106" text-anchor="start" font-size="9" fill="#92400E" font-weight="600">dEncoder = Layer1.dInput flows back through IEncoder</text>
+    <text x="440" y="106" text-anchor="start" font-size="9" fill="#6B7280">&#x2192;  gradients reach encoder's trainable params (e.g. feature table)</text>
+  </g>
+</svg>

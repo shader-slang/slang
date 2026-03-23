@@ -1,0 +1,271 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 530" font-family="'Segoe UI', system-ui, Arial, sans-serif">
+  <defs>
+    <marker id="arrowGray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 1 L 9 5 L 0 9 z" fill="#6B7280"/>
+    </marker>
+    <marker id="arrowBlue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 1 L 9 5 L 0 9 z" fill="#3B82F6"/>
+    </marker>
+    <marker id="arrowGreen" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 1 L 9 5 L 0 9 z" fill="#10B981"/>
+    </marker>
+    <marker id="arrowPurple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 1 L 9 5 L 0 9 z" fill="#A855F7"/>
+    </marker>
+  </defs>
+
+  <rect width="960" height="530" fill="white" rx="8"/>
+
+  <!-- TITLE -->
+  <text x="480" y="30" text-anchor="middle" font-size="20" font-weight="700" fill="#111827">Multi-Resolution Hash Grid Encoder</text>
+  <text x="480" y="50" text-anchor="middle" font-size="11" fill="#6B7280">Encode input position by interpolating feature vectors from hashed grid vertices, at multiple resolution levels</text>
+
+  <!-- ================================================================ -->
+  <!-- LEFT: Input position                                             -->
+  <!-- ================================================================ -->
+  <g transform="translate(40, 90)">
+    <rect x="0" y="0" width="100" height="70" rx="8" fill="#D1FAE5" stroke="#10B981" stroke-width="1.5"/>
+    <text x="50" y="22" text-anchor="middle" font-size="11" font-weight="700" fill="#065F46">Input</text>
+    <text x="50" y="40" text-anchor="middle" font-size="10" fill="#059669">position p</text>
+    <text x="50" y="54" text-anchor="middle" font-size="9" fill="#6B7280">(x, y)</text>
+  </g>
+
+  <!-- Arrow from input to levels -->
+  <line x1="145" y1="125" x2="185" y2="125" stroke="#6B7280" stroke-width="1.5" marker-end="url(#arrowGray)"/>
+
+  <!-- ================================================================ -->
+  <!-- CENTER: Multi-level grids                                        -->
+  <!-- ================================================================ -->
+
+  <!-- Level 0 (coarse) -->
+  <g transform="translate(195, 68)">
+    <rect x="0" y="0" width="270" height="135" rx="8" fill="#EFF6FF" stroke="#3B82F6" stroke-width="1.2"/>
+    <rect x="6" y="4" width="70" height="16" rx="8" fill="#3B82F6"/>
+    <text x="41" y="15" text-anchor="middle" font-size="8" fill="white" font-weight="700">Level 0</text>
+    <text x="120" y="15" text-anchor="start" font-size="9" fill="#3B82F6" font-weight="600">Coarse resolution</text>
+
+    <!-- Grid visual: sparse grid with position dot -->
+    <g transform="translate(12, 26)">
+      <!-- Grid lines -->
+      <line x1="0" y1="0" x2="0" y2="90" stroke="#BFDBFE" stroke-width="0.8"/>
+      <line x1="45" y1="0" x2="45" y2="90" stroke="#BFDBFE" stroke-width="0.8"/>
+      <line x1="90" y1="0" x2="90" y2="90" stroke="#BFDBFE" stroke-width="0.8"/>
+      <line x1="0" y1="0" x2="90" y2="0" stroke="#BFDBFE" stroke-width="0.8"/>
+      <line x1="0" y1="45" x2="90" y2="45" stroke="#BFDBFE" stroke-width="0.8"/>
+      <line x1="0" y1="90" x2="90" y2="90" stroke="#BFDBFE" stroke-width="0.8"/>
+      <!-- Only the 4 surrounding vertices of p -->
+      <circle cx="45" cy="0" r="4" fill="#93C5FD" stroke="#3B82F6" stroke-width="1"/>
+      <circle cx="90" cy="0" r="4" fill="#93C5FD" stroke="#3B82F6" stroke-width="1"/>
+      <circle cx="45" cy="45" r="4" fill="#93C5FD" stroke="#3B82F6" stroke-width="1"/>
+      <circle cx="90" cy="45" r="4" fill="#93C5FD" stroke="#3B82F6" stroke-width="1"/>
+      <!-- Input position p (small red dot, no label) -->
+      <circle cx="62" cy="28" r="3.5" fill="#EF4444" stroke="#DC2626" stroke-width="1.2"/>
+    </g>
+
+    <!-- Hash arrow from grid to feature table -->
+    <text x="118" y="56" text-anchor="middle" font-size="8" fill="#6B7280">hash</text>
+    <line x1="105" y1="62" x2="130" y2="62" stroke="#6B7280" stroke-width="0.8" marker-end="url(#arrowGray)"/>
+
+    <!-- Feature table (4 highlighted = 4 neighbors in 2D) -->
+    <g transform="translate(135, 24)">
+      <rect x="0" y="0" width="40" height="90" rx="3" fill="#EFF6FF" stroke="#93C5FD" stroke-width="0.8"/>
+      <text x="20" y="-4" text-anchor="middle" font-size="6.5" fill="#3B82F6" font-weight="600">Feature Table</text>
+      <rect x="2" y="3" width="36" height="10" rx="1" fill="#F9FAFB" stroke="#D1D5DB" stroke-width="0.3"/>
+      <rect x="2" y="15" width="36" height="10" rx="1" fill="#93C5FD" stroke="#1D4ED8" stroke-width="0.8"/>
+      <rect x="2" y="27" width="36" height="10" rx="1" fill="#F9FAFB" stroke="#D1D5DB" stroke-width="0.3"/>
+      <rect x="2" y="39" width="36" height="10" rx="1" fill="#93C5FD" stroke="#1D4ED8" stroke-width="0.8"/>
+      <rect x="2" y="51" width="36" height="10" rx="1" fill="#F9FAFB" stroke="#D1D5DB" stroke-width="0.3"/>
+      <rect x="2" y="63" width="36" height="10" rx="1" fill="#93C5FD" stroke="#1D4ED8" stroke-width="0.8"/>
+      <rect x="2" y="75" width="36" height="10" rx="1" fill="#93C5FD" stroke="#1D4ED8" stroke-width="0.8"/>
+    </g>
+
+    <!-- Arrow: interpolate -->
+    <text x="193" y="56" text-anchor="middle" font-size="7" fill="#6B7280">interp</text>
+    <line x1="180" y1="62" x2="205" y2="62" stroke="#6B7280" stroke-width="0.8" marker-end="url(#arrowGray)"/>
+
+    <!-- Feature vector result -->
+    <text x="228" y="50" text-anchor="middle" font-size="8" font-weight="700" fill="#1E40AF">feat_L0</text>
+    <rect x="210" y="56" width="36" height="10" rx="2" fill="#DBEAFE" stroke="#3B82F6" stroke-width="1.2"/>
+  </g>
+
+  <!-- Level 1 (medium) -->
+  <g transform="translate(195, 218)">
+    <rect x="0" y="0" width="270" height="135" rx="8" fill="#F0FDF4" stroke="#10B981" stroke-width="1.2"/>
+    <rect x="6" y="4" width="70" height="16" rx="8" fill="#10B981"/>
+    <text x="41" y="15" text-anchor="middle" font-size="8" fill="white" font-weight="700">Level 1</text>
+    <text x="120" y="15" text-anchor="start" font-size="9" fill="#10B981" font-weight="600">Medium resolution</text>
+
+    <!-- Grid visual: denser grid -->
+    <g transform="translate(12, 26)">
+      <line x1="0" y1="0" x2="0" y2="90" stroke="#BBF7D0" stroke-width="0.8"/>
+      <line x1="22.5" y1="0" x2="22.5" y2="90" stroke="#BBF7D0" stroke-width="0.8"/>
+      <line x1="45" y1="0" x2="45" y2="90" stroke="#BBF7D0" stroke-width="0.8"/>
+      <line x1="67.5" y1="0" x2="67.5" y2="90" stroke="#BBF7D0" stroke-width="0.8"/>
+      <line x1="90" y1="0" x2="90" y2="90" stroke="#BBF7D0" stroke-width="0.8"/>
+      <line x1="0" y1="0" x2="90" y2="0" stroke="#BBF7D0" stroke-width="0.8"/>
+      <line x1="0" y1="22.5" x2="90" y2="22.5" stroke="#BBF7D0" stroke-width="0.8"/>
+      <line x1="0" y1="45" x2="90" y2="45" stroke="#BBF7D0" stroke-width="0.8"/>
+      <line x1="0" y1="67.5" x2="90" y2="67.5" stroke="#BBF7D0" stroke-width="0.8"/>
+      <line x1="0" y1="90" x2="90" y2="90" stroke="#BBF7D0" stroke-width="0.8"/>
+      <!-- Surrounding vertices highlighted -->
+      <circle cx="45" cy="22.5" r="4" fill="#6EE7B7" stroke="#10B981" stroke-width="0.8"/>
+      <circle cx="67.5" cy="22.5" r="4" fill="#6EE7B7" stroke="#10B981" stroke-width="0.8"/>
+      <circle cx="45" cy="45" r="4" fill="#6EE7B7" stroke="#10B981" stroke-width="0.8"/>
+      <circle cx="67.5" cy="45" r="4" fill="#6EE7B7" stroke="#10B981" stroke-width="0.8"/>
+      <!-- Same position p (small red dot) -->
+      <circle cx="62" cy="28" r="3.5" fill="#EF4444" stroke="#DC2626" stroke-width="1.2"/>
+    </g>
+
+    <!-- Hash arrow -->
+    <text x="118" y="56" text-anchor="middle" font-size="8" fill="#6B7280">hash</text>
+    <line x1="105" y1="62" x2="130" y2="62" stroke="#6B7280" stroke-width="0.8" marker-end="url(#arrowGray)"/>
+
+    <!-- Feature table (4 highlighted = 4 neighbors) -->
+    <g transform="translate(135, 24)">
+      <rect x="0" y="0" width="40" height="90" rx="3" fill="#ECFDF5" stroke="#A7F3D0" stroke-width="0.8"/>
+      <text x="20" y="-4" text-anchor="middle" font-size="6.5" fill="#10B981" font-weight="600">Feature Table</text>
+      <rect x="2" y="3" width="36" height="10" rx="1" fill="#6EE7B7" stroke="#047857" stroke-width="0.8"/>
+      <rect x="2" y="15" width="36" height="10" rx="1" fill="#F9FAFB" stroke="#D1D5DB" stroke-width="0.3"/>
+      <rect x="2" y="27" width="36" height="10" rx="1" fill="#6EE7B7" stroke="#047857" stroke-width="0.8"/>
+      <rect x="2" y="39" width="36" height="10" rx="1" fill="#F9FAFB" stroke="#D1D5DB" stroke-width="0.3"/>
+      <rect x="2" y="51" width="36" height="10" rx="1" fill="#6EE7B7" stroke="#047857" stroke-width="0.8"/>
+      <rect x="2" y="63" width="36" height="10" rx="1" fill="#F9FAFB" stroke="#D1D5DB" stroke-width="0.3"/>
+      <rect x="2" y="75" width="36" height="10" rx="1" fill="#6EE7B7" stroke="#047857" stroke-width="0.8"/>
+    </g>
+
+    <!-- Arrow: interpolate -->
+    <text x="193" y="56" text-anchor="middle" font-size="7" fill="#6B7280">interp</text>
+    <line x1="180" y1="62" x2="205" y2="62" stroke="#6B7280" stroke-width="0.8" marker-end="url(#arrowGray)"/>
+
+    <!-- Feature vector result -->
+    <text x="228" y="50" text-anchor="middle" font-size="8" font-weight="700" fill="#065F46">feat_L1</text>
+    <rect x="210" y="56" width="36" height="10" rx="2" fill="#D1FAE5" stroke="#10B981" stroke-width="1.2"/>
+  </g>
+
+  <!-- Vertical dots between levels -->
+  <text x="330" y="375" text-anchor="middle" font-size="16" fill="#9CA3AF">:</text>
+
+  <!-- Level L-1 (fine) -->
+  <g transform="translate(195, 388)">
+    <rect x="0" y="0" width="270" height="135" rx="8" fill="#FDF4FF" stroke="#A855F7" stroke-width="1.2"/>
+    <rect x="6" y="4" width="70" height="16" rx="8" fill="#A855F7"/>
+    <text x="41" y="15" text-anchor="middle" font-size="8" fill="white" font-weight="700">Level L-1</text>
+    <text x="120" y="15" text-anchor="start" font-size="9" fill="#A855F7" font-weight="600">Finest resolution</text>
+
+    <!-- Grid visual: fine grid (7x7) -->
+    <g transform="translate(12, 26)">
+      <line x1="0" y1="0" x2="0" y2="90" stroke="#E9D5FF" stroke-width="0.6"/>
+      <line x1="15" y1="0" x2="15" y2="90" stroke="#E9D5FF" stroke-width="0.6"/>
+      <line x1="30" y1="0" x2="30" y2="90" stroke="#E9D5FF" stroke-width="0.6"/>
+      <line x1="45" y1="0" x2="45" y2="90" stroke="#E9D5FF" stroke-width="0.6"/>
+      <line x1="60" y1="0" x2="60" y2="90" stroke="#E9D5FF" stroke-width="0.6"/>
+      <line x1="75" y1="0" x2="75" y2="90" stroke="#E9D5FF" stroke-width="0.6"/>
+      <line x1="90" y1="0" x2="90" y2="90" stroke="#E9D5FF" stroke-width="0.6"/>
+      <line x1="0" y1="0" x2="90" y2="0" stroke="#E9D5FF" stroke-width="0.6"/>
+      <line x1="0" y1="15" x2="90" y2="15" stroke="#E9D5FF" stroke-width="0.6"/>
+      <line x1="0" y1="30" x2="90" y2="30" stroke="#E9D5FF" stroke-width="0.6"/>
+      <line x1="0" y1="45" x2="90" y2="45" stroke="#E9D5FF" stroke-width="0.6"/>
+      <line x1="0" y1="60" x2="90" y2="60" stroke="#E9D5FF" stroke-width="0.6"/>
+      <line x1="0" y1="75" x2="90" y2="75" stroke="#E9D5FF" stroke-width="0.6"/>
+      <line x1="0" y1="90" x2="90" y2="90" stroke="#E9D5FF" stroke-width="0.6"/>
+      <!-- 4 surrounding vertices highlighted -->
+      <circle cx="60" cy="15" r="3.5" fill="#D8B4FE" stroke="#A855F7" stroke-width="0.8"/>
+      <circle cx="75" cy="15" r="3.5" fill="#D8B4FE" stroke="#A855F7" stroke-width="0.8"/>
+      <circle cx="60" cy="30" r="3.5" fill="#D8B4FE" stroke="#A855F7" stroke-width="0.8"/>
+      <circle cx="75" cy="30" r="3.5" fill="#D8B4FE" stroke="#A855F7" stroke-width="0.8"/>
+      <!-- Same position p (small red dot) -->
+      <circle cx="65" cy="22" r="3.5" fill="#EF4444" stroke="#DC2626" stroke-width="1.2"/>
+    </g>
+
+    <!-- Hash arrow -->
+    <text x="118" y="56" text-anchor="middle" font-size="8" fill="#6B7280">hash</text>
+    <line x1="105" y1="62" x2="130" y2="62" stroke="#6B7280" stroke-width="0.8" marker-end="url(#arrowGray)"/>
+
+    <!-- Feature table (4 highlighted = 4 neighbors) -->
+    <g transform="translate(135, 24)">
+      <rect x="0" y="0" width="40" height="90" rx="3" fill="#FDF4FF" stroke="#E9D5FF" stroke-width="0.8"/>
+      <text x="20" y="-4" text-anchor="middle" font-size="6.5" fill="#A855F7" font-weight="600">Feature Table</text>
+      <rect x="2" y="3" width="36" height="10" rx="1" fill="#F9FAFB" stroke="#D1D5DB" stroke-width="0.3"/>
+      <rect x="2" y="15" width="36" height="10" rx="1" fill="#D8B4FE" stroke="#9333EA" stroke-width="0.8"/>
+      <rect x="2" y="27" width="36" height="10" rx="1" fill="#D8B4FE" stroke="#9333EA" stroke-width="0.8"/>
+      <rect x="2" y="39" width="36" height="10" rx="1" fill="#F9FAFB" stroke="#D1D5DB" stroke-width="0.3"/>
+      <rect x="2" y="51" width="36" height="10" rx="1" fill="#F9FAFB" stroke="#D1D5DB" stroke-width="0.3"/>
+      <rect x="2" y="63" width="36" height="10" rx="1" fill="#D8B4FE" stroke="#9333EA" stroke-width="0.8"/>
+      <rect x="2" y="75" width="36" height="10" rx="1" fill="#D8B4FE" stroke="#9333EA" stroke-width="0.8"/>
+    </g>
+
+    <!-- Arrow: interpolate -->
+    <text x="193" y="56" text-anchor="middle" font-size="7" fill="#6B7280">interp</text>
+    <line x1="180" y1="62" x2="205" y2="62" stroke="#6B7280" stroke-width="0.8" marker-end="url(#arrowGray)"/>
+
+    <!-- Feature vector result -->
+    <text x="228" y="50" text-anchor="middle" font-size="8" font-weight="700" fill="#7E22CE">feat_L-1</text>
+    <rect x="210" y="56" width="36" height="10" rx="2" fill="#F3E8FF" stroke="#A855F7" stroke-width="1.2"/>
+  </g>
+
+  <!-- ================================================================ -->
+  <!-- RIGHT: Concatenate and output                                    -->
+  <!-- ================================================================ -->
+
+  <!-- Arrows from features to concat -->
+  <line x1="450" y1="130" x2="518" y2="210" stroke="#3B82F6" stroke-width="1.2" marker-end="url(#arrowBlue)"/>
+  <line x1="450" y1="280" x2="518" y2="252" stroke="#10B981" stroke-width="1.2" marker-end="url(#arrowGreen)"/>
+  <line x1="450" y1="450" x2="518" y2="302" stroke="#A855F7" stroke-width="1.2" marker-end="url(#arrowPurple)"/>
+
+  <!-- Concat: feat boxes rotated 90deg (tall thin), side by side -->
+  <g transform="translate(520, 195)">
+    <!-- Surrounding box -->
+    <rect x="-6" y="-4" width="40" height="134" rx="4" fill="none" stroke="#F59E0B" stroke-width="1.5"/>
+    <text x="14" y="-10" text-anchor="middle" font-size="9" font-weight="700" fill="#92400E">Concat</text>
+    <!-- Each box is 10 wide x 36 tall (upright), stacked top to bottom -->
+    <rect x="0" y="0" width="10" height="36" rx="2" fill="#DBEAFE" stroke="#3B82F6" stroke-width="1"/>
+    <text x="18" y="20" text-anchor="start" font-size="6.5" fill="#1E40AF">L0</text>
+    <rect x="0" y="38" width="10" height="36" rx="2" fill="#D1FAE5" stroke="#10B981" stroke-width="1"/>
+    <text x="18" y="58" text-anchor="start" font-size="6.5" fill="#065F46">L1</text>
+    <text x="5" y="84" text-anchor="middle" font-size="7" fill="#9CA3AF">:</text>
+    <rect x="0" y="88" width="10" height="36" rx="2" fill="#F3E8FF" stroke="#A855F7" stroke-width="1"/>
+    <text x="18" y="108" text-anchor="start" font-size="6" fill="#7E22CE">L-1</text>
+    <!-- Size label -->
+    <text x="14" y="144" text-anchor="middle" font-size="7" fill="#92400E">[L&#xD7;F]</text>
+  </g>
+
+  <!-- Arrow to output -->
+  <line x1="545" y1="260" x2="583" y2="260" stroke="#6B7280" stroke-width="1.5" marker-end="url(#arrowGray)"/>
+
+  <!-- Output -->
+  <g transform="translate(588, 225)">
+    <rect x="0" y="0" width="110" height="70" rx="8" fill="#FFE4E6" stroke="#EF4444" stroke-width="1.5"/>
+    <text x="55" y="22" text-anchor="middle" font-size="11" font-weight="700" fill="#9F1239">Encoded</text>
+    <text x="55" y="40" text-anchor="middle" font-size="10" fill="#EF4444">output</text>
+    <text x="55" y="56" text-anchor="middle" font-size="9" fill="#6B7280">[L &#xD7; F elements]</text>
+  </g>
+
+  <!-- Annotation: Feature table explanation -->
+  <g transform="translate(775, 80)">
+    <rect x="0" y="0" width="170" height="232" rx="6" fill="#F9FAFB" stroke="#E5E7EB" stroke-width="1"/>
+    <text x="85" y="18" text-anchor="middle" font-size="10" font-weight="700" fill="#374151">Feature Table</text>
+    <line x1="10" y1="24" x2="160" y2="24" stroke="#E5E7EB" stroke-width="0.8"/>
+
+    <text x="10" y="42" text-anchor="start" font-size="8.5" fill="#6B7280">Each level has its own</text>
+    <text x="10" y="55" text-anchor="start" font-size="8.5" fill="#6B7280">hash table of F-dim</text>
+    <text x="10" y="68" text-anchor="start" font-size="8.5" fill="#6B7280">feature vectors.</text>
+
+    <text x="10" y="88" text-anchor="start" font-size="8.5" fill="#374151" font-weight="600">2D: 4 surrounding vertices</text>
+    <text x="10" y="101" text-anchor="start" font-size="8.5" fill="#6B7280">hash(vertex_index)</text>
+    <text x="10" y="114" text-anchor="start" font-size="8.5" fill="#6B7280">&#x2192; 4 table slots</text>
+    <text x="10" y="127" text-anchor="start" font-size="8.5" fill="#6B7280">&#x2192; 4 F-dim features</text>
+
+    <!-- Mini legend -->
+    <rect x="10" y="142" width="14" height="8" rx="1" fill="#93C5FD" stroke="#1D4ED8" stroke-width="0.6"/>
+    <text x="30" y="150" text-anchor="start" font-size="8" fill="#6B7280">= looked up slot</text>
+    <rect x="10" y="158" width="14" height="8" rx="1" fill="#F9FAFB" stroke="#D1D5DB" stroke-width="0.4"/>
+    <text x="30" y="166" text-anchor="start" font-size="8" fill="#6B7280">= unused slot</text>
+
+    <text x="10" y="186" text-anchor="start" font-size="8.5" fill="#374151" font-weight="600">Different levels:</text>
+    <text x="10" y="199" text-anchor="start" font-size="8" fill="#6B7280">Same p, different grids</text>
+    <text x="10" y="212" text-anchor="start" font-size="8" fill="#6B7280">&#x2192; different vertices</text>
+    <text x="10" y="225" text-anchor="start" font-size="8" fill="#6B7280">&#x2192; different hash slots</text>
+  </g>
+
+</svg>

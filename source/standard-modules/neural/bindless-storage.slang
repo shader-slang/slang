@@ -10,8 +10,16 @@ public struct BindlessAddress<T> : IPointerLikeAddress<T>
 {
     public typealias Differential = BindlessAddress<T>;
 
+    typealias BufferType = RWStructuredBuffer<T>;
+
     internal RWStructuredBuffer<T>.Handle handle;
     internal uint baseIndex;
+
+    [ForceInline]
+    internal RWStructuredBuffer<T> getBuffer() { return *handle; }
+
+    [ForceInline]
+    internal uint getBaseIndex() { return baseIndex; }
 
     public __init(RWStructuredBuffer<T>.Handle handle)
     {
@@ -121,7 +129,15 @@ public struct PointerAddress<T> : IPointerLikeAddress<T>
 {
     public typealias Differential = PointerAddress<T>;
 
+    typealias BufferType = T*;
+
     T* ptr;
+
+    [ForceInline]
+    internal T* getBuffer() { return ptr; }
+
+    [ForceInline]
+    internal uint getBaseIndex() { return 0; }
 
     public __init(T* ptr)
     {
@@ -229,7 +245,15 @@ public struct TorchTensorViewAddress<T> : IPointerLikeAddress<T>
 {
     public typealias Differential = TorchTensorViewAddress<T>;
 
+    typealias BufferType = T*;
+
     internal PointerAddress<T> inner;
+
+    [ForceInline]
+    internal T* getBuffer() { return inner.getBuffer(); }
+
+    [ForceInline]
+    internal uint getBaseIndex() { return inner.getBaseIndex(); }
 
     [require(cuda)]
     public __init(TensorView<T> tensor, uint baseAddress = 0U)
@@ -309,6 +333,14 @@ internal extension<T> Ptr<T, Access.ReadWrite, AddressSpace.Device> : IPointerLi
     where T.Differential == T
 {
     internal typealias Differential = Ptr<T, Access.ReadWrite, AddressSpace.Device>;
+
+    typealias BufferType = T*;
+
+    [ForceInline]
+    internal T* getBuffer() { return this; }
+
+    [ForceInline]
+    internal uint getBaseIndex() { return 0; }
 
     internal __init(Ptr<T, Access.ReadWrite, AddressSpace.Device> ptr)
     {

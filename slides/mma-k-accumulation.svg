@@ -1,0 +1,271 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 700" font-family="'Segoe UI', system-ui, Arial, sans-serif">
+  <defs>
+    <marker id="arrowGray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 1 L 9 5 L 0 9 z" fill="#6B7280"/>
+    </marker>
+    <filter id="glowBlue" x="-15%" y="-15%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="0" stdDeviation="2.5" flood-color="#3B82F6" flood-opacity="0.45"/>
+    </filter>
+    <filter id="glowRose" x="-15%" y="-15%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="0" stdDeviation="2.5" flood-color="#F43F5E" flood-opacity="0.45"/>
+    </filter>
+    <filter id="glowGold" x="-15%" y="-15%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="0" stdDeviation="3" flood-color="#F59E0B" flood-opacity="0.5"/>
+    </filter>
+    <!-- Diagonal stripe pattern for blended result -->
+    <pattern id="blendStripes" patternUnits="userSpaceOnUse" width="8" height="8" patternTransform="rotate(45)">
+      <rect width="4" height="8" fill="#BFDBFE"/>
+      <rect x="4" width="4" height="8" fill="#FECDD3"/>
+    </pattern>
+    <linearGradient id="blendGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#93C5FD" stop-opacity="0.6"/>
+      <stop offset="50%" stop-color="#C4B5FD" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#FDA4AF" stop-opacity="0.6"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="960" height="700" fill="white" rx="8"/>
+
+  <!-- TITLE -->
+  <text x="480" y="32" text-anchor="middle" font-size="21" font-weight="700" fill="#111827">Outer-Product Style Accumulation</text>
+  <text x="480" y="56" text-anchor="middle" font-size="14" fill="#6B7280" font-family="'Courier New', monospace">C = &#x3A3;  A[:,k:k+16] &#xD7; B[k:k+16,:]     (sum of rank-16 partial products)</text>
+
+  <!-- ============================================================ -->
+  <!-- k=0 ROW (BLUE)                                               -->
+  <!-- ============================================================ -->
+  <g transform="translate(0, 80)">
+    <!-- Row label -->
+    <rect x="18" y="22" width="20" height="110" rx="4" fill="#3B82F6"/>
+    <text x="28" y="82" text-anchor="middle" font-size="11" fill="white" font-weight="700" transform="rotate(-90,28,82)">k = 0</text>
+
+    <!-- W matrix with col 0 highlighted -->
+    <g transform="translate(55, 10)">
+      <!-- Dimmed col 1 -->
+      <rect x="52" y="0" width="52" height="52" rx="2" fill="#EFF6FF" stroke="#BFDBFE" stroke-width="0.8" opacity="0.45"/>
+      <rect x="52" y="52" width="52" height="52" rx="2" fill="#EFF6FF" stroke="#BFDBFE" stroke-width="0.8" opacity="0.45"/>
+      <text x="78" y="30" text-anchor="middle" font-size="8" fill="#BFDBFE">A01</text>
+      <text x="78" y="82" text-anchor="middle" font-size="8" fill="#BFDBFE">A11</text>
+      <!-- Highlighted col 0 (BLUE) -->
+      <rect x="-2" y="-2" width="56" height="108" rx="4" fill="#93C5FD" stroke="#1D4ED8" stroke-width="2.5" filter="url(#glowBlue)"/>
+      <line x1="-2" y1="52" x2="54" y2="52" stroke="#1D4ED8" stroke-width="0.8" stroke-dasharray="3,2"/>
+      <text x="26" y="30" text-anchor="middle" font-size="9" fill="#1E3A8A" font-weight="700">A00</text>
+      <text x="26" y="82" text-anchor="middle" font-size="9" fill="#1E3A8A" font-weight="700">A10</text>
+      <!-- Frame -->
+      <rect x="-2" y="-2" width="108" height="108" rx="4" fill="none" stroke="#3B82F6" stroke-width="1"/>
+      <!-- Labels -->
+      <text x="52" y="-10" text-anchor="middle" font-size="9" fill="#1E40AF" font-weight="600">W [M&#xD7;K]</text>
+      <text x="-10" y="55" text-anchor="middle" font-size="8" fill="#3B82F6" transform="rotate(-90,-10,55)">M</text>
+    </g>
+
+    <!-- x symbol -->
+    <text x="178" y="72" text-anchor="middle" font-size="22" fill="#3B82F6" font-weight="600">&#xD7;</text>
+
+    <!-- Input matrix with row 0 highlighted -->
+    <g transform="translate(200, 10)">
+      <!-- Dimmed row 1 -->
+      <rect x="0" y="52" width="52" height="52" rx="2" fill="#EFF6FF" stroke="#BFDBFE" stroke-width="0.8" opacity="0.45"/>
+      <rect x="52" y="52" width="52" height="52" rx="2" fill="#EFF6FF" stroke="#BFDBFE" stroke-width="0.8" opacity="0.45"/>
+      <text x="26" y="82" text-anchor="middle" font-size="8" fill="#BFDBFE">B10</text>
+      <text x="78" y="82" text-anchor="middle" font-size="8" fill="#BFDBFE">B11</text>
+      <!-- Highlighted row 0 (BLUE) -->
+      <rect x="-2" y="-2" width="108" height="56" rx="4" fill="#93C5FD" stroke="#1D4ED8" stroke-width="2.5" filter="url(#glowBlue)"/>
+      <line x1="52" y1="-2" x2="52" y2="54" stroke="#1D4ED8" stroke-width="0.8" stroke-dasharray="3,2"/>
+      <text x="26" y="30" text-anchor="middle" font-size="9" fill="#1E3A8A" font-weight="700">B00</text>
+      <text x="78" y="30" text-anchor="middle" font-size="9" fill="#1E3A8A" font-weight="700">B01</text>
+      <!-- Frame -->
+      <rect x="-2" y="-2" width="108" height="108" rx="4" fill="none" stroke="#3B82F6" stroke-width="1"/>
+      <!-- Labels -->
+      <text x="52" y="-10" text-anchor="middle" font-size="9" fill="#1E40AF" font-weight="600">Input [K&#xD7;N]</text>
+      <text x="52" y="120" text-anchor="middle" font-size="8" fill="#3B82F6">N (threads)</text>
+    </g>
+
+    <!-- = symbol -->
+    <text x="328" y="72" text-anchor="middle" font-size="22" fill="#3B82F6" font-weight="600">=</text>
+
+    <!-- Partial result C0 (BLUE tinted) -->
+    <g transform="translate(350, 10)">
+      <rect x="-2" y="-2" width="108" height="108" rx="5" fill="#DBEAFE" stroke="#2563EB" stroke-width="2" filter="url(#glowBlue)"/>
+      <line x1="52" y1="-2" x2="52" y2="106" stroke="#2563EB" stroke-width="0.8" stroke-dasharray="3,2"/>
+      <line x1="-2" y1="52" x2="106" y2="52" stroke="#2563EB" stroke-width="0.8" stroke-dasharray="3,2"/>
+      <text x="26" y="24" text-anchor="middle" font-size="7" fill="#1D4ED8">A00&#xD7;B00</text>
+      <text x="78" y="24" text-anchor="middle" font-size="7" fill="#1D4ED8">A00&#xD7;B01</text>
+      <text x="26" y="76" text-anchor="middle" font-size="7" fill="#1D4ED8">A10&#xD7;B00</text>
+      <text x="78" y="76" text-anchor="middle" font-size="7" fill="#1D4ED8">A10&#xD7;B01</text>
+      <!-- Big label -->
+      <text x="52" y="120" text-anchor="middle" font-size="11" font-weight="700" fill="#1D4ED8">C&#x2080; (partial)</text>
+      <!-- Subscript 0 label -->
+      <rect x="30" y="38" width="44" height="16" rx="8" fill="#2563EB"/>
+      <text x="52" y="50" text-anchor="middle" font-size="9" fill="white" font-weight="700">k = 0</text>
+    </g>
+
+    <!-- Annotation -->
+    <g transform="translate(490, 20)">
+      <rect x="0" y="0" width="240" height="85" rx="6" fill="#EFF6FF" stroke="#BFDBFE" stroke-width="1"/>
+      <text x="120" y="20" text-anchor="middle" font-size="10" font-weight="600" fill="#1D4ED8">Rank-16 partial product</text>
+      <text x="120" y="38" text-anchor="middle" font-size="9" fill="#3B82F6" font-family="'Courier New', monospace">C0[i,j] = A[i, 0:16] &#xB7; B[0:16, j]</text>
+      <text x="120" y="56" text-anchor="middle" font-size="9" fill="#6B7280">Only uses first 16 elements of</text>
+      <text x="120" y="70" text-anchor="middle" font-size="9" fill="#6B7280">the K-dimension (columns 0-15)</text>
+    </g>
+  </g>
+
+  <!-- PLUS sign between k=0 and k=1 -->
+  <rect x="370" y="216" width="64" height="28" rx="14" fill="#374151"/>
+  <text x="402" y="235" text-anchor="middle" font-size="18" fill="white" font-weight="700">+</text>
+
+  <!-- ============================================================ -->
+  <!-- k=1 ROW (ROSE)                                               -->
+  <!-- ============================================================ -->
+  <g transform="translate(0, 256)">
+    <!-- Row label -->
+    <rect x="18" y="22" width="20" height="110" rx="4" fill="#F43F5E"/>
+    <text x="28" y="82" text-anchor="middle" font-size="11" fill="white" font-weight="700" transform="rotate(-90,28,82)">k = 1</text>
+
+    <!-- W matrix with col 1 highlighted -->
+    <g transform="translate(55, 10)">
+      <!-- Dimmed col 0 -->
+      <rect x="0" y="0" width="52" height="52" rx="2" fill="#FFF1F2" stroke="#FECDD3" stroke-width="0.8" opacity="0.45"/>
+      <rect x="0" y="52" width="52" height="52" rx="2" fill="#FFF1F2" stroke="#FECDD3" stroke-width="0.8" opacity="0.45"/>
+      <text x="26" y="30" text-anchor="middle" font-size="8" fill="#FECDD3">A00</text>
+      <text x="26" y="82" text-anchor="middle" font-size="8" fill="#FECDD3">A10</text>
+      <!-- Highlighted col 1 (ROSE) -->
+      <rect x="50" y="-2" width="56" height="108" rx="4" fill="#FDA4AF" stroke="#BE123C" stroke-width="2.5" filter="url(#glowRose)"/>
+      <line x1="50" y1="52" x2="106" y2="52" stroke="#BE123C" stroke-width="0.8" stroke-dasharray="3,2"/>
+      <text x="78" y="30" text-anchor="middle" font-size="9" fill="#881337" font-weight="700">A01</text>
+      <text x="78" y="82" text-anchor="middle" font-size="9" fill="#881337" font-weight="700">A11</text>
+      <!-- Frame -->
+      <rect x="-2" y="-2" width="108" height="108" rx="4" fill="none" stroke="#F43F5E" stroke-width="1"/>
+      <!-- Labels -->
+      <text x="52" y="-10" text-anchor="middle" font-size="9" fill="#BE123C" font-weight="600">W [M&#xD7;K]</text>
+      <text x="-10" y="55" text-anchor="middle" font-size="8" fill="#F43F5E" transform="rotate(-90,-10,55)">M</text>
+    </g>
+
+    <!-- x symbol -->
+    <text x="178" y="72" text-anchor="middle" font-size="22" fill="#F43F5E" font-weight="600">&#xD7;</text>
+
+    <!-- Input matrix with row 1 highlighted -->
+    <g transform="translate(200, 10)">
+      <!-- Dimmed row 0 -->
+      <rect x="0" y="0" width="52" height="52" rx="2" fill="#FFF1F2" stroke="#FECDD3" stroke-width="0.8" opacity="0.45"/>
+      <rect x="52" y="0" width="52" height="52" rx="2" fill="#FFF1F2" stroke="#FECDD3" stroke-width="0.8" opacity="0.45"/>
+      <text x="26" y="30" text-anchor="middle" font-size="8" fill="#FECDD3">B00</text>
+      <text x="78" y="30" text-anchor="middle" font-size="8" fill="#FECDD3">B01</text>
+      <!-- Highlighted row 1 (ROSE) -->
+      <rect x="-2" y="50" width="108" height="56" rx="4" fill="#FDA4AF" stroke="#BE123C" stroke-width="2.5" filter="url(#glowRose)"/>
+      <line x1="52" y1="50" x2="52" y2="106" stroke="#BE123C" stroke-width="0.8" stroke-dasharray="3,2"/>
+      <text x="26" y="82" text-anchor="middle" font-size="9" fill="#881337" font-weight="700">B10</text>
+      <text x="78" y="82" text-anchor="middle" font-size="9" fill="#881337" font-weight="700">B11</text>
+      <!-- Frame -->
+      <rect x="-2" y="-2" width="108" height="108" rx="4" fill="none" stroke="#F43F5E" stroke-width="1"/>
+      <!-- Labels -->
+      <text x="52" y="-10" text-anchor="middle" font-size="9" fill="#BE123C" font-weight="600">Input [K&#xD7;N]</text>
+      <text x="52" y="120" text-anchor="middle" font-size="8" fill="#F43F5E">N (threads)</text>
+    </g>
+
+    <!-- = symbol -->
+    <text x="328" y="72" text-anchor="middle" font-size="22" fill="#F43F5E" font-weight="600">=</text>
+
+    <!-- Partial result C1 (ROSE tinted) -->
+    <g transform="translate(350, 10)">
+      <rect x="-2" y="-2" width="108" height="108" rx="5" fill="#FFE4E6" stroke="#E11D48" stroke-width="2" filter="url(#glowRose)"/>
+      <line x1="52" y1="-2" x2="52" y2="106" stroke="#E11D48" stroke-width="0.8" stroke-dasharray="3,2"/>
+      <line x1="-2" y1="52" x2="106" y2="52" stroke="#E11D48" stroke-width="0.8" stroke-dasharray="3,2"/>
+      <text x="26" y="24" text-anchor="middle" font-size="7" fill="#BE123C">A01&#xD7;B10</text>
+      <text x="78" y="24" text-anchor="middle" font-size="7" fill="#BE123C">A01&#xD7;B11</text>
+      <text x="26" y="76" text-anchor="middle" font-size="7" fill="#BE123C">A11&#xD7;B10</text>
+      <text x="78" y="76" text-anchor="middle" font-size="7" fill="#BE123C">A11&#xD7;B11</text>
+      <!-- Big label -->
+      <text x="52" y="120" text-anchor="middle" font-size="11" font-weight="700" fill="#E11D48">C&#x2081; (partial)</text>
+      <!-- Subscript label -->
+      <rect x="30" y="38" width="44" height="16" rx="8" fill="#E11D48"/>
+      <text x="52" y="50" text-anchor="middle" font-size="9" fill="white" font-weight="700">k = 1</text>
+    </g>
+
+    <!-- Annotation -->
+    <g transform="translate(490, 20)">
+      <rect x="0" y="0" width="240" height="85" rx="6" fill="#FFF1F2" stroke="#FECDD3" stroke-width="1"/>
+      <text x="120" y="20" text-anchor="middle" font-size="10" font-weight="600" fill="#E11D48">Rank-16 partial product</text>
+      <text x="120" y="38" text-anchor="middle" font-size="9" fill="#F43F5E" font-family="'Courier New', monospace">C1[i,j] = A[i,16:32] &#xB7; B[16:32,j]</text>
+      <text x="120" y="56" text-anchor="middle" font-size="9" fill="#6B7280">Only uses last 16 elements of</text>
+      <text x="120" y="70" text-anchor="middle" font-size="9" fill="#6B7280">the K-dimension (columns 16-31)</text>
+    </g>
+  </g>
+
+  <!-- ============================================================ -->
+  <!-- DOUBLE-LINE EQUALS between rows and accumulation             -->
+  <!-- ============================================================ -->
+  <line x1="200" y1="440" x2="600" y2="440" stroke="#374151" stroke-width="2"/>
+  <line x1="200" y1="446" x2="600" y2="446" stroke="#374151" stroke-width="2"/>
+
+  <!-- ============================================================ -->
+  <!-- ACCUMULATION SECTION                                         -->
+  <!-- ============================================================ -->
+  <g transform="translate(0, 465)">
+    <text x="480" y="15" text-anchor="middle" font-size="15" font-weight="700" fill="#111827">Final Result: C = C&#x2080; + C&#x2081;</text>
+
+    <!-- Stacked / overlapping partial results -->
+    <g transform="translate(120, 35)">
+      <!-- C0 layer (blue, slight offset up-left) -->
+      <rect x="0" y="0" width="108" height="108" rx="5" fill="#DBEAFE" stroke="#2563EB" stroke-width="1.8" opacity="0.7"/>
+      <line x1="54" y1="0" x2="54" y2="108" stroke="#2563EB" stroke-width="0.6" stroke-dasharray="3,2" opacity="0.7"/>
+      <line x1="0" y1="54" x2="108" y2="54" stroke="#2563EB" stroke-width="0.6" stroke-dasharray="3,2" opacity="0.7"/>
+      <text x="54" y="58" text-anchor="middle" font-size="12" fill="#1D4ED8" font-weight="700" opacity="0.8">C&#x2080;</text>
+
+      <!-- C1 layer (rose, slight offset down-right, overlapping) -->
+      <rect x="16" y="16" width="108" height="108" rx="5" fill="#FFE4E6" stroke="#E11D48" stroke-width="1.8" opacity="0.7"/>
+      <line x1="70" y1="16" x2="70" y2="124" stroke="#E11D48" stroke-width="0.6" stroke-dasharray="3,2" opacity="0.7"/>
+      <line x1="16" y1="70" x2="124" y2="70" stroke="#E11D48" stroke-width="0.6" stroke-dasharray="3,2" opacity="0.7"/>
+      <text x="70" y="74" text-anchor="middle" font-size="12" fill="#BE123C" font-weight="700" opacity="0.8">C&#x2081;</text>
+
+      <text x="62" y="148" text-anchor="middle" font-size="10" fill="#6B7280">Partial results</text>
+      <text x="62" y="162" text-anchor="middle" font-size="10" fill="#6B7280">accumulated</text>
+    </g>
+
+    <!-- Arrow -->
+    <line x1="275" y1="90" x2="340" y2="90" stroke="#374151" stroke-width="2" marker-end="url(#arrowGray)"/>
+    <text x="308" y="82" text-anchor="middle" font-size="11" fill="#374151" font-weight="600">&#x3A3;</text>
+
+    <!-- Final C (gold with blended gradient) -->
+    <g transform="translate(360, 30)">
+      <!-- Background with blue-rose blend gradient -->
+      <rect x="-3" y="-3" width="114" height="114" rx="6" fill="url(#blendGrad)" stroke="none"/>
+      <!-- Gold overlay -->
+      <rect x="-3" y="-3" width="114" height="114" rx="6" fill="#FEF3C7" stroke="#D97706" stroke-width="2.5" filter="url(#glowGold)" opacity="0.85"/>
+      <!-- Tile grid -->
+      <line x1="54" y1="-3" x2="54" y2="111" stroke="#D97706" stroke-width="0.8" stroke-dasharray="3,2"/>
+      <line x1="-3" y1="54" x2="111" y2="54" stroke="#D97706" stroke-width="0.8" stroke-dasharray="3,2"/>
+      <!-- Content showing both contributions -->
+      <text x="27" y="18" text-anchor="middle" font-size="6.5" fill="#1D4ED8">A00&#xD7;B00</text>
+      <text x="27" y="28" text-anchor="middle" font-size="8" fill="#374151" font-weight="700">+</text>
+      <text x="27" y="38" text-anchor="middle" font-size="6.5" fill="#BE123C">A01&#xD7;B10</text>
+
+      <text x="81" y="18" text-anchor="middle" font-size="6.5" fill="#1D4ED8">A00&#xD7;B01</text>
+      <text x="81" y="28" text-anchor="middle" font-size="8" fill="#374151" font-weight="700">+</text>
+      <text x="81" y="38" text-anchor="middle" font-size="6.5" fill="#BE123C">A01&#xD7;B11</text>
+
+      <text x="27" y="70" text-anchor="middle" font-size="6.5" fill="#1D4ED8">A10&#xD7;B00</text>
+      <text x="27" y="80" text-anchor="middle" font-size="8" fill="#374151" font-weight="700">+</text>
+      <text x="27" y="90" text-anchor="middle" font-size="6.5" fill="#BE123C">A11&#xD7;B10</text>
+
+      <text x="81" y="70" text-anchor="middle" font-size="6.5" fill="#1D4ED8">A10&#xD7;B01</text>
+      <text x="81" y="80" text-anchor="middle" font-size="8" fill="#374151" font-weight="700">+</text>
+      <text x="81" y="90" text-anchor="middle" font-size="6.5" fill="#BE123C">A11&#xD7;B11</text>
+
+      <!-- Label -->
+      <text x="54" y="126" text-anchor="middle" font-size="12" font-weight="700" fill="#92400E">C = C&#x2080; + C&#x2081;</text>
+      <text x="54" y="142" text-anchor="middle" font-size="9" fill="#B45309">Final output [M &#xD7; N]</text>
+    </g>
+
+    <!-- Equation annotation -->
+    <g transform="translate(520, 35)">
+      <rect x="0" y="0" width="280" height="120" rx="8" fill="#FFFBEB" stroke="#FDE68A" stroke-width="1.2"/>
+      <text x="140" y="22" text-anchor="middle" font-size="11" font-weight="700" fill="#92400E">Full Dot Product Recovered</text>
+      <line x1="15" y1="30" x2="265" y2="30" stroke="#FDE68A" stroke-width="0.8"/>
+      <text x="140" y="48" text-anchor="middle" font-size="9.5" fill="#78350F" font-family="'Courier New', monospace">C[i,j] = C0[i,j] + C1[i,j]</text>
+      <text x="140" y="66" text-anchor="middle" font-size="9.5" fill="#78350F" font-family="'Courier New', monospace">= A[i,0:16]&#xB7;B[0:16,j]</text>
+      <text x="140" y="80" text-anchor="middle" font-size="9.5" fill="#78350F" font-family="'Courier New', monospace">+ A[i,16:32]&#xB7;B[16:32,j]</text>
+      <text x="140" y="98" text-anchor="middle" font-size="9.5" fill="#78350F" font-family="'Courier New', monospace">= A[i,:] &#xB7; B[:,j]</text>
+      <text x="140" y="114" text-anchor="middle" font-size="9" fill="#92400E" font-weight="600">= complete dot product over K</text>
+    </g>
+  </g>
+</svg>

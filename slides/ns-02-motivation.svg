@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" font-family="'Segoe UI', system-ui, Arial, sans-serif">
+  <defs>
+    <marker id="arrowPurple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 1 L 9 5 L 0 9 z" fill="#8B5CF6"/>
+    </marker>
+  </defs>
+
+  <rect width="960" height="540" fill="white" rx="8"/>
+
+  <!-- Title -->
+  <text x="480" y="40" text-anchor="middle" font-size="22" font-weight="700" fill="#111827">Motivation: Neural Graphics</text>
+  <text x="480" y="65" text-anchor="middle" font-size="14" fill="#6B7280" font-style="italic">Can we replace hand-designed functions in graphics with learned functions?</text>
+
+  <!-- ================================================================ -->
+  <!-- Traditional side                                                  -->
+  <!-- ================================================================ -->
+  <g transform="translate(40, 95)">
+    <rect x="0" y="0" width="400" height="310" rx="10" fill="#F9FAFB" stroke="#D1D5DB" stroke-width="1.5"/>
+    <text x="200" y="28" text-anchor="middle" font-size="16" font-weight="700" fill="#374151">Traditional Pipeline</text>
+    <text x="200" y="46" text-anchor="middle" font-size="11" fill="#9CA3AF">Explicit, hand-designed models</text>
+
+    <!-- Table header -->
+    <rect x="20" y="62" width="170" height="30" rx="4" fill="#E5E7EB"/>
+    <text x="105" y="82" text-anchor="middle" font-size="11" font-weight="700" fill="#374151">Task</text>
+    <rect x="195" y="62" width="185" height="30" rx="4" fill="#E5E7EB"/>
+    <text x="287" y="82" text-anchor="middle" font-size="11" font-weight="700" fill="#374151">Method</text>
+
+    <!-- Row 1: BRDF -->
+    <rect x="20" y="96" width="170" height="44" rx="0" fill="white" stroke="#E5E7EB" stroke-width="0.5"/>
+    <text x="30" y="115" font-size="12" font-weight="600" fill="#374151">BRDF</text>
+    <text x="30" y="131" font-size="9" fill="#9CA3AF">Surface reflectance</text>
+    <rect x="195" y="96" width="185" height="44" rx="0" fill="white" stroke="#E5E7EB" stroke-width="0.5"/>
+    <text x="205" y="115" font-size="11" fill="#6B7280">Analytic models</text>
+    <text x="205" y="131" font-size="9" fill="#9CA3AF">(GGX, Cook-Torrance)</text>
+
+    <!-- Row 2: Texture -->
+    <rect x="20" y="140" width="170" height="44" rx="0" fill="#FAFAFA" stroke="#E5E7EB" stroke-width="0.5"/>
+    <text x="30" y="159" font-size="12" font-weight="600" fill="#374151">Texture</text>
+    <text x="30" y="175" font-size="9" fill="#9CA3AF">Surface appearance</text>
+    <rect x="195" y="140" width="185" height="44" rx="0" fill="#FAFAFA" stroke="#E5E7EB" stroke-width="0.5"/>
+    <text x="205" y="159" font-size="11" fill="#6B7280">Stored images</text>
+    <text x="205" y="175" font-size="9" fill="#9CA3AF">(Mipmaps, BC compression)</text>
+
+    <!-- Row 3: Geometry -->
+    <rect x="20" y="184" width="170" height="44" rx="0" fill="white" stroke="#E5E7EB" stroke-width="0.5"/>
+    <text x="30" y="203" font-size="12" font-weight="600" fill="#374151">Geometry</text>
+    <text x="30" y="219" font-size="9" fill="#9CA3AF">3D shapes</text>
+    <rect x="195" y="184" width="185" height="44" rx="0" fill="white" stroke="#E5E7EB" stroke-width="0.5"/>
+    <text x="205" y="203" font-size="11" fill="#6B7280">Meshes</text>
+    <text x="205" y="219" font-size="9" fill="#9CA3AF">(Triangles, vertices)</text>
+
+    <!-- Row 4: GI -->
+    <rect x="20" y="228" width="170" height="44" rx="0" fill="#FAFAFA" stroke="#E5E7EB" stroke-width="0.5"/>
+    <text x="30" y="247" font-size="12" font-weight="600" fill="#374151">Global Illumination</text>
+    <text x="30" y="263" font-size="9" fill="#9CA3AF">Light transport</text>
+    <rect x="195" y="228" width="185" height="44" rx="0" fill="#FAFAFA" stroke="#E5E7EB" stroke-width="0.5"/>
+    <text x="205" y="247" font-size="11" fill="#6B7280">Path tracing</text>
+    <text x="205" y="263" font-size="9" fill="#9CA3AF">(Monte Carlo sampling)</text>
+
+    <!-- Limitation callout -->
+    <rect x="20" y="280" width="360" height="22" rx="4" fill="#FEF2F2" stroke="#FECACA" stroke-width="0.8"/>
+    <text x="200" y="295" text-anchor="middle" font-size="9" font-weight="600" fill="#DC2626">Fixed quality ceiling &#x2022; Manual tuning &#x2022; Cannot learn from data</text>
+  </g>
+
+  <!-- ================================================================ -->
+  <!-- Arrow in the middle                                               -->
+  <!-- ================================================================ -->
+  <g transform="translate(440, 220)">
+    <line x1="10" y1="30" x2="70" y2="30" stroke="#8B5CF6" stroke-width="3" marker-end="url(#arrowPurple)"/>
+    <text x="40" y="18" text-anchor="middle" font-size="12" font-weight="700" fill="#8B5CF6">Replace</text>
+    <text x="40" y="52" text-anchor="middle" font-size="9" fill="#8B5CF6">with learned</text>
+    <text x="40" y="64" text-anchor="middle" font-size="9" fill="#8B5CF6">functions</text>
+  </g>
+
+  <!-- ================================================================ -->
+  <!-- Neural side                                                       -->
+  <!-- ================================================================ -->
+  <g transform="translate(520, 95)">
+    <rect x="0" y="0" width="400" height="310" rx="10" fill="#F0F9FF" stroke="#3B82F6" stroke-width="1.5"/>
+    <text x="200" y="28" text-anchor="middle" font-size="16" font-weight="700" fill="#1E40AF">Neural Graphics</text>
+    <text x="200" y="46" text-anchor="middle" font-size="11" fill="#60A5FA">Learned, data-driven functions</text>
+
+    <!-- Table header -->
+    <rect x="20" y="62" width="170" height="30" rx="4" fill="#DBEAFE"/>
+    <text x="105" y="82" text-anchor="middle" font-size="11" font-weight="700" fill="#1E40AF">Task</text>
+    <rect x="195" y="62" width="185" height="30" rx="4" fill="#DBEAFE"/>
+    <text x="287" y="82" text-anchor="middle" font-size="11" font-weight="700" fill="#1E40AF">Method</text>
+
+    <!-- Row 1: BRDF -->
+    <rect x="20" y="96" width="170" height="44" rx="0" fill="white" stroke="#BFDBFE" stroke-width="0.5"/>
+    <text x="30" y="115" font-size="12" font-weight="600" fill="#1E40AF">Neural Materials</text>
+    <text x="30" y="131" font-size="9" fill="#60A5FA">Learned reflectance</text>
+    <rect x="195" y="96" width="185" height="44" rx="0" fill="white" stroke="#BFDBFE" stroke-width="0.5"/>
+    <text x="205" y="115" font-size="11" fill="#3B82F6" font-weight="600">MLP(n, v, l)</text>
+    <text x="205" y="131" font-size="9" fill="#60A5FA">Trained on measured data</text>
+
+    <!-- Row 2: Texture -->
+    <rect x="20" y="140" width="170" height="44" rx="0" fill="#F0F9FF" stroke="#BFDBFE" stroke-width="0.5"/>
+    <text x="30" y="159" font-size="12" font-weight="600" fill="#1E40AF">Neural Textures</text>
+    <text x="30" y="175" font-size="9" fill="#60A5FA">Learned compression</text>
+    <rect x="195" y="140" width="185" height="44" rx="0" fill="#F0F9FF" stroke="#BFDBFE" stroke-width="0.5"/>
+    <text x="205" y="159" font-size="11" fill="#3B82F6" font-weight="600">MLP(u, v)</text>
+    <text x="205" y="175" font-size="9" fill="#60A5FA">20x compression (NTC)</text>
+
+    <!-- Row 3: Geometry -->
+    <rect x="20" y="184" width="170" height="44" rx="0" fill="white" stroke="#BFDBFE" stroke-width="0.5"/>
+    <text x="30" y="203" font-size="12" font-weight="600" fill="#1E40AF">Neural Geometry</text>
+    <text x="30" y="219" font-size="9" fill="#60A5FA">Implicit surfaces</text>
+    <rect x="195" y="184" width="185" height="44" rx="0" fill="white" stroke="#BFDBFE" stroke-width="0.5"/>
+    <text x="205" y="203" font-size="11" fill="#3B82F6" font-weight="600">MLP(x, y, z)</text>
+    <text x="205" y="219" font-size="9" fill="#60A5FA">SDFs, NeRF, 3DGS</text>
+
+    <!-- Row 4: GI -->
+    <rect x="20" y="228" width="170" height="44" rx="0" fill="#F0F9FF" stroke="#BFDBFE" stroke-width="0.5"/>
+    <text x="30" y="247" font-size="12" font-weight="600" fill="#1E40AF">Neural Radiance Cache</text>
+    <text x="30" y="263" font-size="9" fill="#60A5FA">Learned light transport</text>
+    <rect x="195" y="228" width="185" height="44" rx="0" fill="#F0F9FF" stroke="#BFDBFE" stroke-width="0.5"/>
+    <text x="205" y="247" font-size="11" fill="#3B82F6" font-weight="600">MLP(pos, dir)</text>
+    <text x="205" y="263" font-size="9" fill="#60A5FA">Real-time GI (NRC)</text>
+
+    <!-- Benefits callout -->
+    <rect x="20" y="280" width="360" height="22" rx="4" fill="#ECFDF5" stroke="#BBF7D0" stroke-width="0.8"/>
+    <text x="200" y="295" text-anchor="middle" font-size="9" font-weight="600" fill="#059669">Quality scales with data &#x2022; Compact &#x2022; Differentiable &#x2022; HW accelerated</text>
+  </g>
+
+  <!-- Bottom insight -->
+  <rect x="160" y="430" width="640" height="60" rx="10" fill="#F5F3FF" stroke="#8B5CF6" stroke-width="1.2"/>
+  <text x="480" y="455" text-anchor="middle" font-size="13" font-weight="700" fill="#5B21B6">Key Insight</text>
+  <text x="480" y="475" text-anchor="middle" font-size="12" fill="#6B7280">The same primitive &#x2014; a small MLP &#x2014; can replace many different parts of the pipeline.</text>
+
+  <!-- Page number -->
+  <text x="930" y="525" text-anchor="end" font-size="10" fill="#D1D5DB">2</text>
+</svg>

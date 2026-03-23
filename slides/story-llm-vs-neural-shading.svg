@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 520" font-family="'Segoe UI', system-ui, Arial, sans-serif">
+  <defs>
+    <marker id="arrowGray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 1 L 9 5 L 0 9 z" fill="#6B7280"/>
+    </marker>
+  </defs>
+
+  <rect width="960" height="520" fill="white" rx="8"/>
+
+  <!-- TITLE -->
+  <text x="480" y="28" text-anchor="middle" font-size="20" font-weight="700" fill="#111827">Why Not Just Use cuBLAS / PyTorch?</text>
+  <text x="480" y="48" text-anchor="middle" font-size="11" fill="#6B7280">The execution model of neural shading is fundamentally different from large language models</text>
+
+  <!-- ================================================================ -->
+  <!-- LEFT: LLM / Large Model                                         -->
+  <!-- ================================================================ -->
+  <g transform="translate(30, 68)">
+    <rect x="0" y="0" width="430" height="300" rx="8" fill="#FEF2F2" stroke="#FECACA" stroke-width="1.5"/>
+    <text x="215" y="24" text-anchor="middle" font-size="14" font-weight="700" fill="#DC2626">LLM / Large Model Inference</text>
+
+    <!-- GPU block with one big task -->
+    <g transform="translate(20, 42)">
+      <rect x="0" y="0" width="390" height="120" rx="6" fill="#FFE4E6" stroke="#EF4444" stroke-width="1"/>
+      <text x="195" y="18" text-anchor="middle" font-size="10" font-weight="600" fill="#9F1239">GPU: One Kernel</text>
+
+      <!-- All threads working on ONE matrix multiply -->
+      <rect x="15" y="28" width="360" height="55" rx="4" fill="#FEF2F2" stroke="#FECACA" stroke-width="0.8"/>
+      <text x="195" y="46" text-anchor="middle" font-size="11" font-weight="700" fill="#DC2626">ALL threads collaborate on ONE big matmul</text>
+      <text x="195" y="62" text-anchor="middle" font-size="9" fill="#9F1239">W[4096 x 4096] x X[4096 x batch]</text>
+      <text x="195" y="76" text-anchor="middle" font-size="8" fill="#6B7280">One inference at a time, maximizing throughput</text>
+
+      <text x="195" y="104" text-anchor="middle" font-size="9" fill="#6B7280" font-style="italic">cuBLAS / cuDNN handles this perfectly</text>
+    </g>
+
+    <!-- Characteristics -->
+    <g transform="translate(20, 178)">
+      <text x="0" y="14" text-anchor="start" font-size="10" fill="#374151" font-weight="600">Characteristics:</text>
+      <text x="0" y="32" text-anchor="start" font-size="9" fill="#6B7280">&#x2022; Large matrices (4096+)</text>
+      <text x="0" y="46" text-anchor="start" font-size="9" fill="#6B7280">&#x2022; One inference per kernel launch</text>
+      <text x="0" y="60" text-anchor="start" font-size="9" fill="#6B7280">&#x2022; Batch dimension for throughput</text>
+      <text x="0" y="74" text-anchor="start" font-size="9" fill="#6B7280">&#x2022; Network is the ENTIRE workload</text>
+      <text x="0" y="92" text-anchor="start" font-size="9" fill="#10B981" font-weight="600">cuBLAS/PyTorch: perfect fit</text>
+    </g>
+  </g>
+
+  <!-- VS -->
+  <text x="480" y="225" text-anchor="middle" font-size="18" font-weight="700" fill="#374151">vs</text>
+
+  <!-- ================================================================ -->
+  <!-- RIGHT: Neural Shading                                            -->
+  <!-- ================================================================ -->
+  <g transform="translate(500, 68)">
+    <rect x="0" y="0" width="430" height="300" rx="8" fill="#F0F9FF" stroke="#BAE6FD" stroke-width="1.5"/>
+    <text x="215" y="24" text-anchor="middle" font-size="14" font-weight="700" fill="#1E40AF">Neural Shading</text>
+
+    <!-- GPU block with many tiny tasks -->
+    <g transform="translate(20, 42)">
+      <rect x="0" y="0" width="390" height="120" rx="6" fill="#EFF6FF" stroke="#93C5FD" stroke-width="1"/>
+      <text x="195" y="18" text-anchor="middle" font-size="10" font-weight="600" fill="#1E40AF">GPU: One Fused Rendering Kernel</text>
+
+      <!-- Many independent tiny inferences -->
+      <g transform="translate(10, 28)">
+        <!-- Row of pixel boxes -->
+        <rect x="0" y="0" width="50" height="44" rx="3" fill="#DBEAFE" stroke="#3B82F6" stroke-width="0.8"/>
+        <text x="25" y="14" text-anchor="middle" font-size="7" fill="#1E40AF" font-weight="600">Pixel 0</text>
+        <text x="25" y="26" text-anchor="middle" font-size="6" fill="#3B82F6">ray trace</text>
+        <text x="25" y="36" text-anchor="middle" font-size="6" fill="#3B82F6">MLP eval</text>
+        <text x="25" y="44" text-anchor="middle" font-size="6" fill="#3B82F6">shade</text>
+
+        <rect x="55" y="0" width="50" height="44" rx="3" fill="#DBEAFE" stroke="#3B82F6" stroke-width="0.8"/>
+        <text x="80" y="14" text-anchor="middle" font-size="7" fill="#1E40AF" font-weight="600">Pixel 1</text>
+        <text x="80" y="26" text-anchor="middle" font-size="6" fill="#3B82F6">ray trace</text>
+        <text x="80" y="36" text-anchor="middle" font-size="6" fill="#3B82F6">MLP eval</text>
+        <text x="80" y="44" text-anchor="middle" font-size="6" fill="#3B82F6">shade</text>
+
+        <rect x="110" y="0" width="50" height="44" rx="3" fill="#DBEAFE" stroke="#3B82F6" stroke-width="0.8"/>
+        <text x="135" y="14" text-anchor="middle" font-size="7" fill="#1E40AF" font-weight="600">Pixel 2</text>
+        <text x="135" y="26" text-anchor="middle" font-size="6" fill="#3B82F6">ray trace</text>
+        <text x="135" y="36" text-anchor="middle" font-size="6" fill="#3B82F6">MLP eval</text>
+        <text x="135" y="44" text-anchor="middle" font-size="6" fill="#3B82F6">shade</text>
+
+        <text x="175" y="26" text-anchor="middle" font-size="12" fill="#9CA3AF">...</text>
+
+        <rect x="195" y="0" width="50" height="44" rx="3" fill="#DBEAFE" stroke="#3B82F6" stroke-width="0.8"/>
+        <text x="220" y="14" text-anchor="middle" font-size="6" fill="#1E40AF" font-weight="600">Pixel 2M</text>
+        <text x="220" y="26" text-anchor="middle" font-size="6" fill="#3B82F6">ray trace</text>
+        <text x="220" y="36" text-anchor="middle" font-size="6" fill="#3B82F6">MLP eval</text>
+        <text x="220" y="44" text-anchor="middle" font-size="6" fill="#3B82F6">shade</text>
+
+        <!-- Emphasis: each is independent -->
+        <rect x="260" y="0" width="105" height="44" rx="4" fill="#FEF3C7" stroke="#F59E0B" stroke-width="0.8"/>
+        <text x="312" y="14" text-anchor="middle" font-size="7.5" font-weight="600" fill="#92400E">Each thread:</text>
+        <text x="312" y="26" text-anchor="middle" font-size="7" fill="#B45309">own input</text>
+        <text x="312" y="36" text-anchor="middle" font-size="7" fill="#B45309">own tiny MLP</text>
+        <text x="312" y="44" text-anchor="middle" font-size="7" fill="#B45309">W: 64x64</text>
+      </g>
+
+      <text x="195" y="82" text-anchor="middle" font-size="9" font-weight="600" fill="#1E40AF">Millions of independent tiny inferences</text>
+      <text x="195" y="96" text-anchor="middle" font-size="8" fill="#3B82F6">MLP fused into rendering pipeline - no kernel boundary</text>
+      <text x="195" y="110" text-anchor="middle" font-size="8" fill="#6B7280" font-style="italic">cuBLAS cannot do this - it needs a separate kernel</text>
+    </g>
+
+    <!-- Characteristics -->
+    <g transform="translate(20, 178)">
+      <text x="0" y="14" text-anchor="start" font-size="10" fill="#374151" font-weight="600">Characteristics:</text>
+      <text x="0" y="32" text-anchor="start" font-size="9" fill="#6B7280">&#x2022; Small matrices (32-256)</text>
+      <text x="0" y="46" text-anchor="start" font-size="9" fill="#6B7280">&#x2022; Millions of inferences per frame</text>
+      <text x="0" y="60" text-anchor="start" font-size="9" fill="#6B7280">&#x2022; Each pixel/ray runs its own network</text>
+      <text x="0" y="74" text-anchor="start" font-size="9" fill="#6B7280">&#x2022; Network is ONE STEP in a larger pipeline</text>
+      <text x="0" y="92" text-anchor="start" font-size="9" fill="#DC2626" font-weight="600">cuBLAS/PyTorch: wrong abstraction</text>
+    </g>
+  </g>
+
+  <!-- ================================================================ -->
+  <!-- BOTTOM: Key Insight                                              -->
+  <!-- ================================================================ -->
+  <g transform="translate(30, 390)">
+    <rect x="0" y="0" width="900" height="110" rx="8" fill="#F5F3FF" stroke="#8B5CF6" stroke-width="1.5"/>
+    <text x="450" y="22" text-anchor="middle" font-size="13" font-weight="700" fill="#5B21B6">Key Insight: Fusion is Everything</text>
+
+    <!-- Pipeline comparison -->
+    <g transform="translate(20, 36)">
+      <!-- Bad: separate kernels -->
+      <text x="0" y="14" text-anchor="start" font-size="10" fill="#DC2626" font-weight="600">With cuBLAS (separate kernels):</text>
+      <rect x="240" y="0" width="75" height="22" rx="3" fill="#E5E7EB" stroke="#9CA3AF" stroke-width="0.8"/>
+      <text x="277" y="15" text-anchor="middle" font-size="8" fill="#374151">Ray Trace</text>
+      <text x="322" y="15" text-anchor="middle" font-size="8" fill="#DC2626">&#x2192; mem</text>
+      <rect x="338" y="0" width="75" height="22" rx="3" fill="#FFE4E6" stroke="#EF4444" stroke-width="0.8"/>
+      <text x="375" y="15" text-anchor="middle" font-size="8" fill="#9F1239">cuBLAS</text>
+      <text x="420" y="15" text-anchor="middle" font-size="8" fill="#DC2626">&#x2192; mem</text>
+      <rect x="436" y="0" width="75" height="22" rx="3" fill="#E5E7EB" stroke="#9CA3AF" stroke-width="0.8"/>
+      <text x="473" y="15" text-anchor="middle" font-size="8" fill="#374151">Shade</text>
+      <text x="540" y="15" text-anchor="start" font-size="8" fill="#DC2626" font-weight="600">3 kernels + 2 memory round-trips</text>
+    </g>
+
+    <g transform="translate(20, 64)">
+      <!-- Good: fused kernel -->
+      <text x="0" y="14" text-anchor="start" font-size="10" fill="#059669" font-weight="600">With neural.slang (fused):</text>
+      <rect x="240" y="0" width="270" height="22" rx="3" fill="#D1FAE5" stroke="#10B981" stroke-width="1.2"/>
+      <text x="375" y="15" text-anchor="middle" font-size="8" fill="#065F46" font-weight="600">Ray Trace &#x2192; MLP Eval &#x2192; Shade  (all in ONE kernel)</text>
+      <text x="540" y="15" text-anchor="start" font-size="8" fill="#059669" font-weight="600">1 kernel, zero memory round-trips</text>
+    </g>
+  </g>
+</svg>

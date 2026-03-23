@@ -27579,6 +27579,66 @@ struct CoopMat
         }
     }
 
+    [ForceInline]
+    [mutating]
+    [require(cooperative_matrix)]
+    void clear()
+    {
+        __target_switch
+        {
+        case cuda:
+            __intrinsic_asm "($0)->clear()";
+        default:
+            this.fill(T(0));
+        }
+    }
+
+    [ForceInline]
+    [mutating]
+    [require(cooperative_matrix)]
+    void fragmentWrite(int regIndex, uint value)
+    {
+        __target_switch
+        {
+        case cuda:
+            __intrinsic_asm "($0)->FragmentWrite($1, $2)";
+        default:
+            let elementsPerReg = 4 / sizeof(T);
+            int base = regIndex * elementsPerReg;
+            if (sizeof(T) == 4)
+                this[base] = bit_cast<T>(value);
+            else if (sizeof(T) == 2)
+            {
+                this[base]     = bit_cast<T>(uint16_t(value & 0xFFFF));
+                this[base + 1] = bit_cast<T>(uint16_t(value >> 16));
+            }
+        }
+    }
+
+    [ForceInline]
+    [__NoSideEffect]
+    [require(cooperative_matrix)]
+    uint fragmentRead(int regIndex)
+    {
+        __target_switch
+        {
+        case cuda:
+            __intrinsic_asm "($0).FragmentRead($1)";
+        default:
+            let elementsPerReg = 4 / sizeof(T);
+            int base = regIndex * elementsPerReg;
+            if (sizeof(T) == 4)
+                return bit_cast<uint>(this[base]);
+            else if (sizeof(T) == 2)
+            {
+                uint lo = uint(bit_cast<uint16_t>(this[base]));
+                uint hi = uint(bit_cast<uint16_t>(this[base + 1]));
+                return lo | (hi << 16);
+            }
+            return 0;
+        }
+    }
+
     [require(sm_6_10)]
     [__NoSideEffect]
     internal static This __hlslLoadBAB<let matrixLayout : CoopMatMatrixLayout>(
@@ -27742,6 +27802,92 @@ struct CoopMat
         }
     }
 
+    [ForceInline]
+    [require(cooperative_matrix, subgroup_basic)]
+    void StoreRaw(RWStructuredBuffer<T> buffer, uint element)
+    {
+        __target_switch
+        {
+        case cuda:
+            __intrinsic_asm "($0).StoreRaw(($1).data + $2)";
+        default:
+            Store<CoopMatMatrixLayout.RowMajor>(buffer, element, N);
+        }
+    }
+
+    [ForceInline]
+    [require(cooperative_matrix, subgroup_basic)]
+    void StoreRaw(T* buffer, uint element)
+    {
+        __target_switch
+        {
+        case cuda:
+            __intrinsic_asm "($0).StoreRaw($1 + $2)";
+        default:
+            Store<CoopMatMatrixLayout.RowMajor>(buffer, element, N);
+        }
+    }
+
+    [ForceInline]
+    [require(cooperative_matrix, subgroup_basic)]
+    static This LoadRaw(RWStructuredBuffer<T> buffer, uint element)
+    {
+        __target_switch
+        {
+        case cuda:
+            __intrinsic_asm "$TR::LoadRaw(($0).data + $1)";
+        default:
+            return Load<CoopMatMatrixLayout.RowMajor>(buffer, element, N);
+        }
+    }
+
+    [ForceInline]
+    [require(cooperative_matrix, subgroup_basic)]
+    static This LoadRaw(StructuredBuffer<T> buffer, uint element)
+    {
+        __target_switch
+        {
+        case cuda:
+            __intrinsic_asm "$TR::LoadRaw(($0).data + $1)";
+        default:
+            return Load<CoopMatMatrixLayout.RowMajor>(buffer, element, N);
+        }
+    }
+
+    [ForceInline]
+    [require(cooperative_matrix, subgroup_basic)]
+    static This LoadRaw(T* buffer, uint element)
+    {
+        __target_switch
+        {
+        case cuda:
+            __intrinsic_asm "$TR::LoadRaw($0 + $1)";
+        default:
+            return Load<CoopMatMatrixLayout.RowMajor>(buffer, element, N);
+        }
+    }
+
+    [ForceInline]
+    [require(cooperative_matrix)]
+    [__NoSideEffect]
+    static int getPackedFragmentCount()
+    {
+        __target_switch
+        {
+        case cuda:
+            This result;
+            return int(__cuda_getPackedFragmentCount(result));
+        default:
+            return int(GetLength()) / (4 / sizeof(T));
+        }
+    }
+
+    [require(cuda_sm_8_0)]
+    internal static uint __cuda_getPackedFragmentCount(__ref This coopMat)
+    {
+        __intrinsic_asm "($0)->GetPackedFragmentCount()";
+    }
+
     /// Returns the number of rows in the matrix.
     [ForceInline]
     [__NoSideEffect]
@@ -27769,6 +27915,84 @@ struct CoopMat
         {
         case cuda:
             __intrinsic_asm R"(Slang_CUDA_WMMA::mmaChangeMajor(*$0))";
+        }
+    }
+
+    /// Constructs a cooperative matrix from per-thread local rows.
+    /// Each thread in the warp provides one full row of the matrix (N elements).
+    /// M threads form one matrix; `matIndex` selects which group of M threads contributes.
+    /// With a 32-thread warp and M=16: threads [0..15] form matrix 0, threads [16..31] form matrix 1.
+    ///
+    /// @param localRow An array of N elements representing one row of the matrix.
+    /// @param matIndex Which matrix to construct (0 or 1 for 32-thread warp with M=16).
+    /// @return A cooperative matrix assembled from M threads' local row data.
+    ///
+    /// @example
+    /// ```
+    /// half rowA[16] = ...;  // each thread has one full row of 16x16 matrix
+    /// let matA0 = CoopMat<half, Subgroup, 16, 16, MatrixA>.FromLocalRow(rowA, 0);
+    /// let matA1 = CoopMat<half, Subgroup, 16, 16, MatrixA>.FromLocalRow(rowA, 1);
+    /// ```
+    [require(cuda)]
+    static This FromLocalRow(T localRow[N], int matIndex)
+    {
+        __target_switch
+        {
+        case cuda:
+            __intrinsic_asm "$TR::FromLocalRow(($0).m_data, $1)";
+        }
+    }
+
+    /// Extracts one row per thread from the cooperative matrix.
+    /// Inverse of FromLocalRow. Each thread receives N elements representing
+    /// its row of the matrix.
+    ///
+    /// @param localRow Output array of N elements to receive the row data.
+    /// @param matIndex Which matrix to extract from (same semantics as FromLocalRow).
+    [require(cuda)]
+    void ToLocalRow(out T localRow[N], int matIndex)
+    {
+        __target_switch
+        {
+        case cuda:
+            __intrinsic_asm "$0.ToLocalRow(($1)->m_data, $2)";
+        }
+    }
+
+    /// Constructs a cooperative matrix from per-thread local columns.
+    /// Each thread in the warp provides one full column of the matrix (M elements).
+    /// N threads form one matrix; `matIndex` selects which group of N threads contributes.
+    /// For a 32-thread warp with N=8: matIndex ranges 0..3 (4 groups of 8 threads).
+    ///
+    /// This is the natural primitive for matrix-vector multiply where each thread
+    /// holds its own input vector (= one column of B).
+    ///
+    /// @param localCol An array of M elements representing one column of the matrix.
+    /// @param matIndex Which matrix to construct (0..warpSize/N - 1).
+    /// @return A cooperative matrix assembled from N threads' local column data.
+    [require(cuda)]
+    static This FromLocalColumn(T localCol[M], int matIndex)
+    {
+        __target_switch
+        {
+        case cuda:
+            __intrinsic_asm "$TR::FromLocalColumn(($0).m_data, $1)";
+        }
+    }
+
+    /// Extracts one column per thread from the cooperative matrix.
+    /// Inverse of FromLocalColumn. Each thread receives M elements representing
+    /// its column of the matrix.
+    ///
+    /// @param localCol Array of M elements to receive the column data.
+    /// @param matIndex Which matrix to extract from (same semantics as FromLocalColumn).
+    [require(cuda)]
+    void ToLocalColumn(out T localCol[M], int matIndex)
+    {
+        __target_switch
+        {
+        case cuda:
+            __intrinsic_asm "$0.ToLocalColumn(($1)->m_data, $2)";
         }
     }
 
@@ -29209,6 +29433,27 @@ CoopMat<T, S, M, N, R> coopMatLoad<
     uint stride)
 {
     return CoopMat<T, S, M, N, R>.Load<matrixLayout>(data, element, stride);
+}
+
+
+//
+// Cooperative Matrix local array operations
+//
+
+/// Constructs a cooperative matrix from per-thread local rows.
+/// Free function wrapper for CoopMat.FromLocalRow.
+/// @see CoopMat.FromLocalRow
+[ForceInline]
+[require(cuda)]
+CoopMat<T, S, M, N, R> coopMatFromLocalRow<
+    T : ICoopElement,
+    let S : MemoryScope,
+    let M : int,
+    let N : int,
+    let R : CoopMatMatrixUse
+>(T localRow[N], int matIndex)
+{
+    return CoopMat<T, S, M, N, R>.FromLocalRow(localRow, matIndex);
 }
 
 

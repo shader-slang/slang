@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 680" font-family="'Segoe UI', system-ui, Arial, sans-serif">
+  <defs>
+    <marker id="arrowGray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 1 L 9 5 L 0 9 z" fill="#6B7280"/>
+    </marker>
+    <marker id="arrowRed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 1 L 9 5 L 0 9 z" fill="#DC2626"/>
+    </marker>
+  </defs>
+
+  <rect width="960" height="680" fill="white" rx="8"/>
+
+  <!-- TITLE -->
+  <text x="480" y="28" text-anchor="middle" font-size="20" font-weight="700" fill="#111827">Interpolation: Barycentric Weights + Feature Table Lookup</text>
+  <text x="480" y="48" text-anchor="middle" font-size="11" fill="#6B7280">The final step: look up features at D+1 simplex vertices and blend with barycentric weights</text>
+
+  <!-- ================================================================ -->
+  <!-- TOP: Visual diagram of the interpolation                         -->
+  <!-- ================================================================ -->
+  <g transform="translate(10, 62)">
+    <rect x="0" y="0" width="940" height="310" rx="8" fill="#EFF6FF" stroke="#3B82F6" stroke-width="1.2"/>
+
+    <!-- LEFT: The triangle with barycentric weights -->
+    <g transform="translate(30, 18)">
+      <text x="140" y="16" text-anchor="middle" font-size="12" font-weight="700" fill="#1E40AF">Enclosing Simplex (D+1 = 3 vertices)</text>
+
+      <!-- Triangle: v0, v1, v2 -->
+      <g transform="translate(140, 160)">
+        <polygon points="-100,70 100,70 0,-80" fill="#DBEAFE" fill-opacity="0.3" stroke="#3B82F6" stroke-width="1.5"/>
+
+        <!-- Vertex dots -->
+        <circle cx="-100" cy="70" r="6" fill="#3B82F6" stroke="#1D4ED8" stroke-width="1.5"/>
+        <circle cx="100" cy="70" r="6" fill="#3B82F6" stroke="#1D4ED8" stroke-width="1.5"/>
+        <circle cx="0" cy="-80" r="6" fill="#3B82F6" stroke="#1D4ED8" stroke-width="1.5"/>
+
+        <!-- Vertex labels -->
+        <text x="-100" y="92" text-anchor="middle" font-size="10" fill="#1D4ED8" font-weight="700">v&#x2080;</text>
+        <text x="100" y="92" text-anchor="middle" font-size="10" fill="#1D4ED8" font-weight="700">v&#x2081;</text>
+        <text x="0" y="-90" text-anchor="middle" font-size="10" fill="#1D4ED8" font-weight="700">v&#x2082;</text>
+
+        <!-- Point p -->
+        <circle cx="-15" cy="15" r="5.5" fill="#EF4444" stroke="#DC2626" stroke-width="1.5"/>
+        <text x="-5" y="10" font-size="9" fill="#DC2626" font-weight="700">p</text>
+
+        <!-- Dashed lines from p to vertices -->
+        <line x1="-15" y1="15" x2="-100" y2="70" stroke="#6B7280" stroke-width="0.8" stroke-dasharray="3,3"/>
+        <line x1="-15" y1="15" x2="100" y2="70" stroke="#6B7280" stroke-width="0.8" stroke-dasharray="3,3"/>
+        <line x1="-15" y1="15" x2="0" y2="-80" stroke="#6B7280" stroke-width="0.8" stroke-dasharray="3,3"/>
+
+        <!-- Weight labels -->
+        <text x="-65" y="50" font-size="9" fill="#5B21B6" font-weight="700">w&#x2080;</text>
+        <text x="50" y="50" font-size="9" fill="#5B21B6" font-weight="700">w&#x2081;</text>
+        <text x="-12" y="-30" font-size="9" fill="#5B21B6" font-weight="700">w&#x2082;</text>
+      </g>
+
+      <text x="140" y="278" text-anchor="middle" font-size="9" fill="#3B82F6">w&#x2080; + w&#x2081; + w&#x2082; = 1 (barycentric)</text>
+    </g>
+
+    <!-- MIDDLE: Arrow and formula -->
+    <g transform="translate(310, 60)">
+      <!-- Per-vertex flow -->
+      <text x="0" y="14" font-size="11" fill="#374151" font-weight="700">For each of the D+1 vertices:</text>
+
+      <!-- v0 row -->
+      <g transform="translate(0, 30)">
+        <rect x="0" y="0" width="50" height="26" rx="4" fill="#DBEAFE" stroke="#3B82F6" stroke-width="0.8"/>
+        <text x="25" y="17" text-anchor="middle" font-size="9" fill="#1D4ED8" font-weight="700">v&#x2080;</text>
+        <text x="58" y="17" font-size="9" fill="#6B7280">&#x2192; hash &#x2192;</text>
+        <rect x="110" y="0" width="130" height="26" rx="4" fill="#FEF3C7" stroke="#F59E0B" stroke-width="0.8"/>
+        <text x="175" y="17" text-anchor="middle" font-size="9" fill="#92400E" font-weight="700">feature table[h(v&#x2080;)]</text>
+        <text x="248" y="17" font-size="9" fill="#5B21B6" font-weight="700">&#xD7; w&#x2080;</text>
+      </g>
+
+      <!-- v1 row -->
+      <g transform="translate(0, 66)">
+        <rect x="0" y="0" width="50" height="26" rx="4" fill="#DBEAFE" stroke="#3B82F6" stroke-width="0.8"/>
+        <text x="25" y="17" text-anchor="middle" font-size="9" fill="#1D4ED8" font-weight="700">v&#x2081;</text>
+        <text x="58" y="17" font-size="9" fill="#6B7280">&#x2192; hash &#x2192;</text>
+        <rect x="110" y="0" width="130" height="26" rx="4" fill="#FEF3C7" stroke="#F59E0B" stroke-width="0.8"/>
+        <text x="175" y="17" text-anchor="middle" font-size="9" fill="#92400E" font-weight="700">feature table[h(v&#x2081;)]</text>
+        <text x="248" y="17" font-size="9" fill="#5B21B6" font-weight="700">&#xD7; w&#x2081;</text>
+      </g>
+
+      <!-- v2 row -->
+      <g transform="translate(0, 102)">
+        <rect x="0" y="0" width="50" height="26" rx="4" fill="#DBEAFE" stroke="#3B82F6" stroke-width="0.8"/>
+        <text x="25" y="17" text-anchor="middle" font-size="9" fill="#1D4ED8" font-weight="700">v&#x2082;</text>
+        <text x="58" y="17" font-size="9" fill="#6B7280">&#x2192; hash &#x2192;</text>
+        <rect x="110" y="0" width="130" height="26" rx="4" fill="#FEF3C7" stroke="#F59E0B" stroke-width="0.8"/>
+        <text x="175" y="17" text-anchor="middle" font-size="9" fill="#92400E" font-weight="700">feature table[h(v&#x2082;)]</text>
+        <text x="248" y="17" font-size="9" fill="#5B21B6" font-weight="700">&#xD7; w&#x2082;</text>
+      </g>
+
+      <!-- Sum -->
+      <line x1="0" y1="140" x2="280" y2="140" stroke="#E5E7EB" stroke-width="1"/>
+      <text x="140" y="160" text-anchor="middle" font-size="12" fill="#374151" font-weight="700">output = w&#x2080;&#xB7;f(v&#x2080;) + w&#x2081;&#xB7;f(v&#x2081;) + w&#x2082;&#xB7;f(v&#x2082;)</text>
+      <text x="140" y="178" text-anchor="middle" font-size="9" fill="#059669" font-weight="600">Only D+1 = 3 lookups (not 2&#x207F; = 4 for rectangular)</text>
+    </g>
+
+    <!-- RIGHT: Feature table (trainable) -->
+    <g transform="translate(640, 30)">
+      <text x="140" y="14" text-anchor="middle" font-size="11" fill="#92400E" font-weight="700">Feature Table (TRAINABLE)</text>
+
+      <rect x="60" y="24" width="160" height="180" rx="6" fill="#FFFBEB" stroke="#F59E0B" stroke-width="1.2"/>
+      <rect x="68" y="32" width="144" height="16" rx="2" fill="#F9FAFB" stroke="#E5E7EB" stroke-width="0.4"/>
+      <rect x="68" y="52" width="144" height="16" rx="2" fill="#DBEAFE" stroke="#3B82F6" stroke-width="0.8"/>
+      <text x="220" y="65" font-size="7" fill="#3B82F6">&#x2190; h(v&#x2080;)</text>
+      <rect x="68" y="72" width="144" height="16" rx="2" fill="#F9FAFB" stroke="#E5E7EB" stroke-width="0.4"/>
+      <rect x="68" y="92" width="144" height="16" rx="2" fill="#DBEAFE" stroke="#3B82F6" stroke-width="0.8"/>
+      <text x="220" y="105" font-size="7" fill="#3B82F6">&#x2190; h(v&#x2081;)</text>
+      <rect x="68" y="112" width="144" height="16" rx="2" fill="#F9FAFB" stroke="#E5E7EB" stroke-width="0.4"/>
+      <rect x="68" y="132" width="144" height="16" rx="2" fill="#DBEAFE" stroke="#3B82F6" stroke-width="0.8"/>
+      <text x="220" y="145" font-size="7" fill="#3B82F6">&#x2190; h(v&#x2082;)</text>
+      <rect x="68" y="152" width="144" height="16" rx="2" fill="#F9FAFB" stroke="#E5E7EB" stroke-width="0.4"/>
+      <rect x="68" y="172" width="144" height="16" rx="2" fill="#F9FAFB" stroke="#E5E7EB" stroke-width="0.4"/>
+
+      <text x="140" y="216" text-anchor="middle" font-size="8.5" fill="#6B7280">Each entry: F-dim feature vector</text>
+
+      <!-- Gradient flow annotation -->
+      <g transform="translate(0, 235)">
+        <rect x="20" y="0" width="240" height="48" rx="5" fill="#FEE2E2" stroke="#EF4444" stroke-width="1"/>
+        <text x="140" y="16" text-anchor="middle" font-size="9.5" fill="#DC2626" font-weight="700">&#x2190; Gradients flow here!</text>
+        <text x="140" y="32" text-anchor="middle" font-size="8.5" fill="#9F1239">The feature table entries are the</text>
+        <text x="140" y="44" text-anchor="middle" font-size="8.5" fill="#9F1239" font-weight="600">trainable parameters of the encoder.</text>
+      </g>
+    </g>
+  </g>
+
+  <!-- ================================================================ -->
+  <!-- BOTTOM: Pseudocode + gradient flow                               -->
+  <!-- ================================================================ -->
+  <g transform="translate(10, 386)">
+    <rect x="0" y="0" width="940" height="284" rx="8" fill="#F9FAFB" stroke="#E5E7EB" stroke-width="1.2"/>
+    <text x="470" y="22" text-anchor="middle" font-size="13" font-weight="700" fill="#374151">Implementation (from permuto-encoder.slang)</text>
+    <line x1="20" y1="32" x2="920" y2="32" stroke="#E5E7EB" stroke-width="0.8"/>
+
+    <!-- Left: Forward pass pseudocode -->
+    <g transform="translate(20, 42)">
+      <rect x="0" y="0" width="440" height="230" rx="6" fill="white" stroke="#3B82F6" stroke-width="0.8"/>
+      <rect x="0" y="0" width="440" height="22" rx="6" fill="#DBEAFE"/>
+      <text x="220" y="16" text-anchor="middle" font-size="10" fill="#1E40AF" font-weight="700">Forward: Interpolation with barycentric weights</text>
+
+      <text x="12" y="42" font-size="9" fill="#6B7280" font-family="'Courier New', monospace">// Compute barycentric weights from remainders</text>
+      <text x="12" y="58" font-size="9" fill="#374151" font-family="'Courier New', monospace">permutoBarycentric(elevated, rem0, rank, bary)</text>
+
+      <text x="12" y="82" font-size="9" fill="#6B7280" font-family="'Courier New', monospace">// Weighted sum over D+1 simplex vertices</text>
+      <text x="12" y="98" font-size="9" fill="#374151" font-family="'Courier New', monospace">for k = 0 to D:</text>
+      <text x="33" y="114" font-size="9" fill="#374151" font-family="'Courier New', monospace">key = vertexCoords(rem0, rank, k)</text>
+      <text x="33" y="130" font-size="9" fill="#3B82F6" font-family="'Courier New', monospace" font-weight="600">feat = readFeatureValue(</text>
+      <text x="54" y="146" font-size="9" fill="#3B82F6" font-family="'Courier New', monospace" font-weight="600">featureTableAddr, offset, size, key)</text>
+      <text x="33" y="162" font-size="9" fill="#3B82F6" font-family="'Courier New', monospace" font-weight="600">output += bary[k] * feat</text>
+
+      <rect x="10" y="178" width="420" height="40" rx="4" fill="#EFF6FF" stroke="#93C5FD" stroke-width="0.5"/>
+      <text x="220" y="194" text-anchor="middle" font-size="8.5" fill="#1E40AF" font-weight="600">output = &#x2211; bary[k] * readFeatureValue(vertex_k)</text>
+      <text x="220" y="210" text-anchor="middle" font-size="8" fill="#3B82F6">Linear in feature table entries &#x2192; differentiable!</text>
+    </g>
+
+    <!-- Right: Backward pass + gradient -->
+    <g transform="translate(480, 42)">
+      <rect x="0" y="0" width="440" height="230" rx="6" fill="white" stroke="#EF4444" stroke-width="0.8"/>
+      <rect x="0" y="0" width="440" height="22" rx="6" fill="#FEE2E2"/>
+      <text x="220" y="16" text-anchor="middle" font-size="10" fill="#DC2626" font-weight="700">Backward: Gradients flow to the feature table</text>
+
+      <text x="12" y="42" font-size="9" fill="#6B7280" font-family="'Courier New', monospace">// d(output)/d(featureTable[index])</text>
+      <text x="12" y="58" font-size="9" fill="#6B7280" font-family="'Courier New', monospace">//   = bary[k]  (the barycentric weight)</text>
+
+      <text x="12" y="82" font-size="9" fill="#374151" font-family="'Courier New', monospace">readFeatureValueBwd(featureTableAddr,</text>
+      <text x="33" y="98" font-size="9" fill="#374151" font-family="'Courier New', monospace">levelBaseOffset, hashmapSize, key, grad):</text>
+      <text x="33" y="118" font-size="9" fill="#374151" font-family="'Courier New', monospace">index = hash(key) % hashmapSize</text>
+      <text x="33" y="134" font-size="9" fill="#DC2626" font-family="'Courier New', monospace" font-weight="600">featureTableAddr.d.atomicAdd(</text>
+      <text x="54" y="150" font-size="9" fill="#DC2626" font-family="'Courier New', monospace" font-weight="600">index, grad)</text>
+
+      <text x="12" y="174" font-size="9" fill="#6B7280" font-family="'Courier New', monospace">// grad = bary[k] * upstream_gradient</text>
+
+      <rect x="10" y="188" width="420" height="30" rx="4" fill="#FEE2E2" stroke="#EF4444" stroke-width="0.5"/>
+      <text x="220" y="208" text-anchor="middle" font-size="9" fill="#DC2626" font-weight="700">atomicAdd accumulates gradients into the feature table entries</text>
+    </g>
+  </g>
+
+</svg>

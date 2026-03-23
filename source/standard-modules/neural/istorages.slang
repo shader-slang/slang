@@ -38,6 +38,10 @@ public interface IPointerLikeAddress<T> : IDifferentiablePtrType
     @param[in] index The element index.
     @return Reference to the element at the given index.
     */
+    associatedtype BufferType;
+    internal BufferType getBuffer();
+    internal uint getBaseIndex();
+
     public __subscript(uint index) -> T { get; set; }
 
     /**

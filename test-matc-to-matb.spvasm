@@ -1,0 +1,72 @@
+; SPIR-V
+; Version: 1.5
+; Generator: Khronos Slang Compiler; 0
+; Bound: 28
+; Schema: 0
+OpCapability CooperativeMatrixKHR
+OpCapability Shader
+OpCapability VulkanMemoryModel
+OpExtension "SPV_KHR_storage_buffer_storage_class"
+OpExtension "SPV_KHR_cooperative_matrix"
+OpExtension "SPV_KHR_vulkan_memory_model"
+OpMemoryModel Logical Vulkan
+OpEntryPoint GLCompute %computeMain "main" %input %outputBuffer
+OpExecutionMode %computeMain LocalSize 32 1 1
+
+; Debug Information
+OpSource Slang 1
+OpName %StructuredBuffer "StructuredBuffer"         ; id %8
+OpMemberName %StructuredBuffer 0 "__member0"
+OpName %input "input"                               ; id %11
+OpName %storagePointerType "storagePointerType"     ; id %6
+OpName %pointer "pointer"                           ; id %7
+OpName %RWStructuredBuffer "RWStructuredBuffer"     ; id %23
+OpMemberName %RWStructuredBuffer 0 "__member0"
+OpName %outputBuffer "outputBuffer"                 ; id %25
+OpName %storagePointerType "storagePointerType"     ; id %6
+OpName %pointer_0 "pointer"                         ; id %22
+OpName %computeMain "computeMain"                   ; id %2
+
+; Annotations
+OpDecorate %_runtimearr_float ArrayStride 4
+OpDecorate %StructuredBuffer Block
+OpMemberDecorate %StructuredBuffer 0 Offset 0
+OpDecorate %input Binding 1
+OpDecorate %input DescriptorSet 0
+OpDecorate %input NonWritable
+OpDecorate %RWStructuredBuffer Block
+OpMemberDecorate %RWStructuredBuffer 0 Offset 0
+OpDecorate %outputBuffer Binding 0
+OpDecorate %outputBuffer DescriptorSet 0
+
+; Types, variables and constants
+%void = OpTypeVoid
+%3 = OpTypeFunction %void
+%float = OpTypeFloat 32
+%storagePointerType = OpTypePointer StorageBuffer %float
+%_runtimearr_float = OpTypeRuntimeArray %float      ; ArrayStride 4
+%StructuredBuffer = OpTypeStruct %_runtimearr_float     ; Block
+%_ptr_StorageBuffer_StructuredBuffer = OpTypePointer StorageBuffer %StructuredBuffer
+%int = OpTypeInt 32 1
+%int_0 = OpConstant %int 0
+%uint = OpTypeInt 32 0
+%uint_0 = OpConstant %uint 0
+%int_2 = OpConstant %int 2
+%int_16 = OpConstant %int 16
+%int_3 = OpConstant %int 3
+%19 = OpTypeCooperativeMatrixKHR %float %int_3 %int_16 %int_16 %int_2
+%uint_16 = OpConstant %uint 16
+%RWStructuredBuffer = OpTypeStruct %_runtimearr_float   ; Block
+%_ptr_StorageBuffer_RWStructuredBuffer = OpTypePointer StorageBuffer %RWStructuredBuffer
+%input = OpVariable %_ptr_StorageBuffer_StructuredBuffer StorageBuffer  ; Binding 1, DescriptorSet 0, NonWritable
+%outputBuffer = OpVariable %_ptr_StorageBuffer_RWStructuredBuffer StorageBuffer     ; Binding 0, DescriptorSet 0
+
+; Function computeMain
+%computeMain = OpFunction %void None %3
+%4 = OpLabel
+%pointer = OpAccessChain %storagePointerType %input %int_0 %uint_0
+%20 = OpCooperativeMatrixLoadKHR %19 %pointer %int_0 %uint_16 Aligned 16
+%pointer_0 = OpAccessChain %storagePointerType %outputBuffer %int_0 %uint_0
+OpCooperativeMatrixStoreKHR %pointer_0 %20 %int_0 %uint_16 Aligned 16
+OpReturn
+OpFunctionEnd

@@ -1,0 +1,377 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 600" font-family="'Segoe UI', system-ui, Arial, sans-serif">
+  <defs>
+    <marker id="arrowGray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 1 L 9 5 L 0 9 z" fill="#6B7280"/>
+    </marker>
+    <marker id="arrowGreen" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 1 L 9 5 L 0 9 z" fill="#10B981"/>
+    </marker>
+  </defs>
+
+  <rect width="960" height="600" fill="white" rx="8"/>
+
+  <!-- TITLE -->
+  <text x="480" y="28" text-anchor="middle" font-size="20" font-weight="700" fill="#111827">Permutohedral Lattice Interpolation</text>
+  <text x="480" y="48" text-anchor="middle" font-size="11" fill="#6B7280">Efficient high-dimensional interpolation: D+1 simplex vertices instead of 2&#x207F; grid vertices (shown for D = 2)</text>
+
+  <!-- ================================================================ -->
+  <!-- STEP 1: Elevate                                                   -->
+  <!-- ================================================================ -->
+  <g transform="translate(12, 65)">
+    <rect x="0" y="0" width="200" height="360" rx="8" fill="#F0FDF4" stroke="#10B981" stroke-width="1.2"/>
+    <rect x="8" y="6" width="55" height="18" rx="9" fill="#10B981"/>
+    <text x="35" y="19" text-anchor="middle" font-size="9" fill="white" font-weight="700">Step 1</text>
+    <text x="140" y="20" text-anchor="middle" font-size="13" font-weight="700" fill="#065F46">Elevate</text>
+
+    <!-- 2D input point visualization -->
+    <g transform="translate(25, 42)">
+      <text x="75" y="12" text-anchor="middle" font-size="9" fill="#059669" font-weight="600">Input position (x, y)</text>
+
+      <!-- 2D axes -->
+      <line x1="15" y1="100" x2="140" y2="100" stroke="#D1D5DB" stroke-width="0.8"/>
+      <line x1="15" y1="100" x2="15" y2="20" stroke="#D1D5DB" stroke-width="0.8"/>
+      <text x="144" y="104" font-size="7" fill="#9CA3AF">x</text>
+      <text x="10" y="18" font-size="7" fill="#9CA3AF">y</text>
+
+      <!-- Square grid (faint) -->
+      <line x1="15" y1="40" x2="140" y2="40" stroke="#E5E7EB" stroke-width="0.4"/>
+      <line x1="15" y1="60" x2="140" y2="60" stroke="#E5E7EB" stroke-width="0.4"/>
+      <line x1="15" y1="80" x2="140" y2="80" stroke="#E5E7EB" stroke-width="0.4"/>
+      <line x1="46" y1="20" x2="46" y2="100" stroke="#E5E7EB" stroke-width="0.4"/>
+      <line x1="77" y1="20" x2="77" y2="100" stroke="#E5E7EB" stroke-width="0.4"/>
+      <line x1="108" y1="20" x2="108" y2="100" stroke="#E5E7EB" stroke-width="0.4"/>
+
+      <!-- The point -->
+      <circle cx="88" cy="52" r="5" fill="#EF4444" stroke="#DC2626" stroke-width="1.2"/>
+      <text x="98" y="48" font-size="8" fill="#DC2626" font-weight="600">p</text>
+    </g>
+
+    <!-- Arrow down -->
+    <line x1="100" y1="155" x2="100" y2="188" stroke="#10B981" stroke-width="1.5" marker-end="url(#arrowGreen)"/>
+    <text x="135" y="176" font-size="8" fill="#059669" font-weight="600">&#xD7; E</text>
+
+    <!-- Elevated representation -->
+    <g transform="translate(20, 198)">
+      <text x="80" y="10" text-anchor="middle" font-size="9" fill="#059669" font-weight="600">Elevated to (D+1)-dim</text>
+
+      <!-- Parallelogram: hyperplane x_e+y_e+z_e = 0 in pseudo-3D -->
+      <polygon points="15,120 58,32 148,48 105,136" fill="#D1FAE5" fill-opacity="0.5" stroke="#10B981" stroke-width="1"/>
+
+      <!-- Lattice lines on the plane -->
+      <line x1="32" y1="88" x2="92" y2="36" stroke="#A7F3D0" stroke-width="0.5"/>
+      <line x1="55" y1="105" x2="128" y2="46" stroke="#A7F3D0" stroke-width="0.5"/>
+      <line x1="35" y1="58" x2="78" y2="120" stroke="#A7F3D0" stroke-width="0.5"/>
+      <line x1="78" y1="36" x2="122" y2="100" stroke="#A7F3D0" stroke-width="0.5"/>
+
+      <!-- Elevated point on the plane -->
+      <circle cx="82" cy="76" r="5" fill="#EF4444" stroke="#DC2626" stroke-width="1.2"/>
+      <text x="92" y="72" font-size="7" fill="#DC2626" font-weight="600">p_e</text>
+
+      <!-- 3D axis hints -->
+      <text x="6" y="128" font-size="7" fill="#9CA3AF">x_e</text>
+      <text x="50" y="28" font-size="7" fill="#9CA3AF">y_e</text>
+      <text x="152" y="53" font-size="7" fill="#9CA3AF">z_e</text>
+    </g>
+
+    <text x="100" y="348" text-anchor="middle" font-size="8" fill="#065F46" font-weight="600">x_e + y_e + z_e = 0</text>
+  </g>
+
+  <!-- Arrow Step 1  to  Step 2 -->
+  <line x1="214" y1="245" x2="233" y2="245" stroke="#6B7280" stroke-width="1.5" marker-end="url(#arrowGray)"/>
+
+  <!-- ================================================================ -->
+  <!-- STEP 2: Find Simplex                                              -->
+  <!-- ================================================================ -->
+  <g transform="translate(236, 65)">
+    <rect x="0" y="0" width="214" height="360" rx="8" fill="#EFF6FF" stroke="#3B82F6" stroke-width="1.2"/>
+    <rect x="8" y="6" width="55" height="18" rx="9" fill="#3B82F6"/>
+    <text x="35" y="19" text-anchor="middle" font-size="9" fill="white" font-weight="700">Step 2</text>
+    <text x="145" y="20" text-anchor="middle" font-size="13" font-weight="700" fill="#1E40AF">Find Simplex</text>
+
+    <text x="107" y="42" text-anchor="middle" font-size="9" fill="#3B82F6" font-weight="600">Permutohedral lattice (2D)</text>
+
+    <!-- Triangular lattice grid: side=34, heightH30 -->
+    <!-- Rows: y=0,30,60,90,120. Even rows: x=0,34,68,102,136. Odd rows: x=17,51,85,119 -->
+    <g transform="translate(25, 55)">
+      <!-- Horizontal grid lines -->
+      <path d="M0,0 L136,0 M17,30 L119,30 M0,60 L136,60 M17,90 L119,90 M0,120 L136,120" stroke="#BFDBFE" stroke-width="0.7" fill="none"/>
+
+      <!-- Diagonal grid lines (all edges connecting adjacent rows) -->
+      <!-- Row 0  to  Row 1 -->
+      <path d="M0,0 L17,30 M34,0 L51,30 M68,0 L85,30 M102,0 L119,30 M34,0 L17,30 M68,0 L51,30 M102,0 L85,30 M136,0 L119,30" stroke="#BFDBFE" stroke-width="0.7" fill="none"/>
+      <!-- Row 1  to  Row 2 -->
+      <path d="M17,30 L0,60 M17,30 L34,60 M51,30 L34,60 M51,30 L68,60 M85,30 L68,60 M85,30 L102,60 M119,30 L102,60 M119,30 L136,60" stroke="#BFDBFE" stroke-width="0.7" fill="none"/>
+      <!-- Row 2  to  Row 3 -->
+      <path d="M0,60 L17,90 M34,60 L51,90 M68,60 L85,90 M102,60 L119,90 M34,60 L17,90 M68,60 L51,90 M102,60 L85,90 M136,60 L119,90" stroke="#BFDBFE" stroke-width="0.7" fill="none"/>
+      <!-- Row 3  to  Row 4 -->
+      <path d="M17,90 L0,120 M17,90 L34,120 M51,90 L34,120 M51,90 L68,120 M85,90 L68,120 M85,90 L102,120 M119,90 L102,120 M119,90 L136,120" stroke="#BFDBFE" stroke-width="0.7" fill="none"/>
+
+      <!-- Highlighted simplex: v0=(34,60), v1=(68,60), v2=(51,30)  -  upward-pointing triangle -->
+      <polygon points="34,60 68,60 51,30" fill="#93C5FD" fill-opacity="0.4" stroke="#3B82F6" stroke-width="2"/>
+
+      <!-- Grid vertex dots -->
+      <!-- Row 0 -->
+      <circle cx="0" cy="0" r="2.5" fill="#DBEAFE" stroke="#93C5FD" stroke-width="0.6"/>
+      <circle cx="34" cy="0" r="2.5" fill="#DBEAFE" stroke="#93C5FD" stroke-width="0.6"/>
+      <circle cx="68" cy="0" r="2.5" fill="#DBEAFE" stroke="#93C5FD" stroke-width="0.6"/>
+      <circle cx="102" cy="0" r="2.5" fill="#DBEAFE" stroke="#93C5FD" stroke-width="0.6"/>
+      <circle cx="136" cy="0" r="2.5" fill="#DBEAFE" stroke="#93C5FD" stroke-width="0.6"/>
+      <!-- Row 1 -->
+      <circle cx="17" cy="30" r="2.5" fill="#DBEAFE" stroke="#93C5FD" stroke-width="0.6"/>
+      <circle cx="51" cy="30" r="3.5" fill="#3B82F6" stroke="#1D4ED8" stroke-width="1"/>
+      <circle cx="85" cy="30" r="2.5" fill="#DBEAFE" stroke="#93C5FD" stroke-width="0.6"/>
+      <circle cx="119" cy="30" r="2.5" fill="#DBEAFE" stroke="#93C5FD" stroke-width="0.6"/>
+      <!-- Row 2 -->
+      <circle cx="0" cy="60" r="2.5" fill="#DBEAFE" stroke="#93C5FD" stroke-width="0.6"/>
+      <circle cx="34" cy="60" r="3.5" fill="#3B82F6" stroke="#1D4ED8" stroke-width="1"/>
+      <circle cx="68" cy="60" r="3.5" fill="#3B82F6" stroke="#1D4ED8" stroke-width="1"/>
+      <circle cx="102" cy="60" r="2.5" fill="#DBEAFE" stroke="#93C5FD" stroke-width="0.6"/>
+      <circle cx="136" cy="60" r="2.5" fill="#DBEAFE" stroke="#93C5FD" stroke-width="0.6"/>
+      <!-- Row 3 -->
+      <circle cx="17" cy="90" r="2.5" fill="#DBEAFE" stroke="#93C5FD" stroke-width="0.6"/>
+      <circle cx="51" cy="90" r="2.5" fill="#DBEAFE" stroke="#93C5FD" stroke-width="0.6"/>
+      <circle cx="85" cy="90" r="2.5" fill="#DBEAFE" stroke="#93C5FD" stroke-width="0.6"/>
+      <circle cx="119" cy="90" r="2.5" fill="#DBEAFE" stroke="#93C5FD" stroke-width="0.6"/>
+      <!-- Row 4 -->
+      <circle cx="0" cy="120" r="2.5" fill="#DBEAFE" stroke="#93C5FD" stroke-width="0.6"/>
+      <circle cx="34" cy="120" r="2.5" fill="#DBEAFE" stroke="#93C5FD" stroke-width="0.6"/>
+      <circle cx="68" cy="120" r="2.5" fill="#DBEAFE" stroke="#93C5FD" stroke-width="0.6"/>
+      <circle cx="102" cy="120" r="2.5" fill="#DBEAFE" stroke="#93C5FD" stroke-width="0.6"/>
+      <circle cx="136" cy="120" r="2.5" fill="#DBEAFE" stroke="#93C5FD" stroke-width="0.6"/>
+
+      <!-- Point p inside highlighted triangle -->
+      <circle cx="50" cy="50" r="4" fill="#EF4444" stroke="#DC2626" stroke-width="1.2"/>
+      <text x="58" y="47" font-size="8" fill="#DC2626" font-weight="600">p</text>
+
+      <!-- Vertex labels for simplex -->
+      <text x="22" y="73" font-size="8" fill="#1D4ED8" font-weight="700">v&#x2080;</text>
+      <text x="71" y="73" font-size="8" fill="#1D4ED8" font-weight="700">v&#x2081;</text>
+      <text x="54" y="26" font-size="8" fill="#1D4ED8" font-weight="700">v&#x2082;</text>
+    </g>
+
+    <!-- Annotations -->
+    <text x="107" y="200" text-anchor="middle" font-size="8.5" fill="#374151" font-weight="600">Rank-sort elevated coords</text>
+    <text x="107" y="215" text-anchor="middle" font-size="8" fill="#6B7280">to find enclosing simplex</text>
+
+    <g transform="translate(14, 228)">
+      <rect x="0" y="0" width="186" height="55" rx="4" fill="#F9FAFB" stroke="#E5E7EB" stroke-width="0.6"/>
+      <text x="93" y="16" text-anchor="middle" font-size="8" fill="#374151" font-weight="600">D+1 = 3 vertices (not 2&#x207F; = 4)</text>
+      <text x="93" y="32" text-anchor="middle" font-size="7.5" fill="#6B7280">Sorting remainder = {r&#x2080;, r&#x2081;, r&#x2082;}</text>
+      <text x="93" y="46" text-anchor="middle" font-size="7.5" fill="#6B7280">determines which simplex</text>
+    </g>
+
+    <!-- Comparison boxes -->
+    <g transform="translate(14, 298)">
+      <rect x="0" y="0" width="84" height="44" rx="3" fill="#FEF2F2" stroke="#FECACA" stroke-width="0.6"/>
+      <text x="42" y="14" text-anchor="middle" font-size="7.5" fill="#DC2626" font-weight="600">Rect. grid</text>
+      <text x="42" y="27" text-anchor="middle" font-size="7.5" fill="#DC2626">2&#x207F; = 4 vtx</text>
+      <text x="42" y="39" text-anchor="middle" font-size="7" fill="#9CA3AF">exponential!</text>
+
+      <rect x="96" y="0" width="90" height="44" rx="3" fill="#ECFDF5" stroke="#A7F3D0" stroke-width="0.6"/>
+      <text x="141" y="14" text-anchor="middle" font-size="7.5" fill="#059669" font-weight="600">Simplex grid</text>
+      <text x="141" y="27" text-anchor="middle" font-size="7.5" fill="#059669">D+1 = 3 vtx</text>
+      <text x="141" y="39" text-anchor="middle" font-size="7" fill="#9CA3AF">linear!</text>
+    </g>
+  </g>
+
+  <!-- Arrow Step 2  to  Step 3 -->
+  <line x1="452" y1="245" x2="471" y2="245" stroke="#6B7280" stroke-width="1.5" marker-end="url(#arrowGray)"/>
+
+  <!-- ================================================================ -->
+  <!-- STEP 3: Barycentric Weights                                       -->
+  <!-- ================================================================ -->
+  <g transform="translate(474, 65)">
+    <rect x="0" y="0" width="200" height="360" rx="8" fill="#FDF4FF" stroke="#A855F7" stroke-width="1.2"/>
+    <rect x="8" y="6" width="55" height="18" rx="9" fill="#A855F7"/>
+    <text x="35" y="19" text-anchor="middle" font-size="9" fill="white" font-weight="700">Step 3</text>
+    <text x="138" y="20" text-anchor="middle" font-size="11" font-weight="700" fill="#7E22CE">Bary. Weights</text>
+
+    <text x="100" y="42" text-anchor="middle" font-size="9" fill="#A855F7" font-weight="600">Compute interpolation weights</text>
+
+    <!-- Large triangle with point and barycentric sub-regions -->
+    <g transform="translate(15, 55)">
+      <!-- Main triangle: v0=(10,180), v1=(160,180), v2=(85,40) -->
+      <polygon points="10,180 160,180 85,40" fill="#F3E8FF" fill-opacity="0.3" stroke="#A855F7" stroke-width="1.5"/>
+
+      <!-- Sub-triangle for w0: area(p, v1, v2)  -  opposite v0, right side -->
+      <polygon points="78,128 160,180 85,40" fill="#E9D5FF" fill-opacity="0.3" stroke="none"/>
+      <!-- Sub-triangle for w1: area(p, v0, v2)  -  opposite v1, left side -->
+      <polygon points="78,128 10,180 85,40" fill="#D8B4FE" fill-opacity="0.25" stroke="none"/>
+      <!-- Sub-triangle for w2: area(p, v0, v1)  -  opposite v2, bottom -->
+      <polygon points="78,128 10,180 160,180" fill="#C4B5FD" fill-opacity="0.2" stroke="none"/>
+
+      <!-- Dashed lines from point to vertices -->
+      <line x1="78" y1="128" x2="10" y2="180" stroke="#A855F7" stroke-width="0.8" stroke-dasharray="3,3"/>
+      <line x1="78" y1="128" x2="160" y2="180" stroke="#A855F7" stroke-width="0.8" stroke-dasharray="3,3"/>
+      <line x1="78" y1="128" x2="85" y2="40" stroke="#A855F7" stroke-width="0.8" stroke-dasharray="3,3"/>
+
+      <!-- Triangle edges (on top of sub-regions) -->
+      <line x1="10" y1="180" x2="160" y2="180" stroke="#A855F7" stroke-width="1.5"/>
+      <line x1="160" y1="180" x2="85" y2="40" stroke="#A855F7" stroke-width="1.5"/>
+      <line x1="85" y1="40" x2="10" y2="180" stroke="#A855F7" stroke-width="1.5"/>
+
+      <!-- Vertex dots -->
+      <circle cx="10" cy="180" r="5" fill="#C4B5FD" stroke="#7E22CE" stroke-width="1.2"/>
+      <circle cx="160" cy="180" r="5" fill="#C4B5FD" stroke="#7E22CE" stroke-width="1.2"/>
+      <circle cx="85" cy="40" r="5" fill="#C4B5FD" stroke="#7E22CE" stroke-width="1.2"/>
+
+      <!-- Vertex labels -->
+      <text x="0" y="197" text-anchor="middle" font-size="9" fill="#7E22CE" font-weight="700">v&#x2080;</text>
+      <text x="170" y="197" text-anchor="middle" font-size="9" fill="#7E22CE" font-weight="700">v&#x2081;</text>
+      <text x="85" y="33" text-anchor="middle" font-size="9" fill="#7E22CE" font-weight="700">v&#x2082;</text>
+
+      <!-- Point p -->
+      <circle cx="78" cy="128" r="5" fill="#EF4444" stroke="#DC2626" stroke-width="1.2"/>
+      <text x="88" y="124" font-size="8" fill="#DC2626" font-weight="600">p</text>
+
+      <!-- Weight labels near sub-triangle areas -->
+      <text x="118" y="115" font-size="9" fill="#5B21B6" font-weight="700">w&#x2080;</text>
+      <text x="42" y="115" font-size="9" fill="#5B21B6" font-weight="700">w&#x2081;</text>
+      <text x="72" y="168" font-size="9" fill="#5B21B6" font-weight="700">w&#x2082;</text>
+    </g>
+
+    <!-- Formula box -->
+    <g transform="translate(12, 270)">
+      <rect x="0" y="0" width="176" height="75" rx="4" fill="#F9FAFB" stroke="#E5E7EB" stroke-width="0.6"/>
+      <text x="88" y="16" text-anchor="middle" font-size="8" fill="#374151" font-weight="600">Weights from remainders:</text>
+      <text x="88" y="32" text-anchor="middle" font-size="8" fill="#6B7280">w&#x1D62; = sorted remainder diffs</text>
+      <text x="88" y="48" text-anchor="middle" font-size="8" fill="#6B7280">w&#x2080; + w&#x2081; + w&#x2082; = 1</text>
+      <text x="88" y="64" text-anchor="middle" font-size="7.5" fill="#A855F7" font-weight="600">area ratio &#x2261; barycentric coord</text>
+    </g>
+  </g>
+
+  <!-- Arrow Step 3  to  Step 4 -->
+  <line x1="676" y1="245" x2="694" y2="245" stroke="#6B7280" stroke-width="1.5" marker-end="url(#arrowGray)"/>
+
+  <!-- ================================================================ -->
+  <!-- STEP 4: Hash + Interpolate                                        -->
+  <!-- ================================================================ -->
+  <g transform="translate(697, 65)">
+    <rect x="0" y="0" width="251" height="360" rx="8" fill="#FFFBEB" stroke="#F59E0B" stroke-width="1.2"/>
+    <rect x="8" y="6" width="55" height="18" rx="9" fill="#F59E0B"/>
+    <text x="35" y="19" text-anchor="middle" font-size="9" fill="white" font-weight="700">Step 4</text>
+    <text x="165" y="20" text-anchor="middle" font-size="12" font-weight="700" fill="#92400E">Hash + Interpolate</text>
+
+    <!-- Per-vertex hash  to  feature  to  weight rows -->
+    <!-- v0 -->
+    <g transform="translate(10, 38)">
+      <circle cx="14" cy="15" r="9" fill="#C4B5FD" stroke="#7E22CE" stroke-width="1"/>
+      <text x="14" y="18" text-anchor="middle" font-size="7.5" fill="#7E22CE" font-weight="700">v&#x2080;</text>
+      <text x="36" y="18" font-size="7" fill="#6B7280">&#x2192; hash &#x2192;</text>
+      <rect x="82" y="4" width="58" height="22" rx="3" fill="#DBEAFE" stroke="#3B82F6" stroke-width="0.8"/>
+      <text x="111" y="18" text-anchor="middle" font-size="8" fill="#1E40AF" font-weight="600">f(v&#x2080;)</text>
+      <text x="150" y="18" font-size="8" fill="#92400E" font-weight="600">&#xD7; w&#x2080;</text>
+    </g>
+
+    <!-- v1 -->
+    <g transform="translate(10, 72)">
+      <circle cx="14" cy="15" r="9" fill="#C4B5FD" stroke="#7E22CE" stroke-width="1"/>
+      <text x="14" y="18" text-anchor="middle" font-size="7.5" fill="#7E22CE" font-weight="700">v&#x2081;</text>
+      <text x="36" y="18" font-size="7" fill="#6B7280">&#x2192; hash &#x2192;</text>
+      <rect x="82" y="4" width="58" height="22" rx="3" fill="#D1FAE5" stroke="#10B981" stroke-width="0.8"/>
+      <text x="111" y="18" text-anchor="middle" font-size="8" fill="#065F46" font-weight="600">f(v&#x2081;)</text>
+      <text x="150" y="18" font-size="8" fill="#92400E" font-weight="600">&#xD7; w&#x2081;</text>
+    </g>
+
+    <!-- v2 -->
+    <g transform="translate(10, 106)">
+      <circle cx="14" cy="15" r="9" fill="#C4B5FD" stroke="#7E22CE" stroke-width="1"/>
+      <text x="14" y="18" text-anchor="middle" font-size="7.5" fill="#7E22CE" font-weight="700">v&#x2082;</text>
+      <text x="36" y="18" font-size="7" fill="#6B7280">&#x2192; hash &#x2192;</text>
+      <rect x="82" y="4" width="58" height="22" rx="3" fill="#F3E8FF" stroke="#A855F7" stroke-width="0.8"/>
+      <text x="111" y="18" text-anchor="middle" font-size="8" fill="#7E22CE" font-weight="600">f(v&#x2082;)</text>
+      <text x="150" y="18" font-size="8" fill="#92400E" font-weight="600">&#xD7; w&#x2082;</text>
+    </g>
+
+    <!-- Divider -->
+    <line x1="15" y1="140" x2="236" y2="140" stroke="#FDE68A" stroke-width="0.8"/>
+
+    <!-- Hash table visualization -->
+    <g transform="translate(15, 150)">
+      <text x="111" y="12" text-anchor="middle" font-size="9" fill="#92400E" font-weight="600">Hash Table (feature store)</text>
+
+      <!-- Table frame -->
+      <rect x="20" y="20" width="185" height="88" rx="4" fill="#FFFBEB" stroke="#FDE68A" stroke-width="0.8"/>
+
+      <!-- Table rows -->
+      <rect x="25" y="24" width="175" height="12" rx="1" fill="#F9FAFB" stroke="#E5E7EB" stroke-width="0.4"/>
+      <text x="35" y="34" font-size="6.5" fill="#9CA3AF">0</text>
+
+      <rect x="25" y="38" width="175" height="12" rx="1" fill="#DBEAFE" stroke="#3B82F6" stroke-width="0.8"/>
+      <text x="35" y="48" font-size="6.5" fill="#3B82F6" font-weight="600">1</text>
+      <text x="195" y="48" text-anchor="end" font-size="6.5" fill="#3B82F6">&#x2190; h(v&#x2080;)</text>
+
+      <rect x="25" y="52" width="175" height="12" rx="1" fill="#F9FAFB" stroke="#E5E7EB" stroke-width="0.4"/>
+      <text x="35" y="62" font-size="6.5" fill="#9CA3AF">2</text>
+
+      <rect x="25" y="66" width="175" height="12" rx="1" fill="#D1FAE5" stroke="#10B981" stroke-width="0.8"/>
+      <text x="35" y="76" font-size="6.5" fill="#10B981" font-weight="600">3</text>
+      <text x="195" y="76" text-anchor="end" font-size="6.5" fill="#10B981">&#x2190; h(v&#x2081;)</text>
+
+      <rect x="25" y="80" width="175" height="12" rx="1" fill="#F3E8FF" stroke="#A855F7" stroke-width="0.8"/>
+      <text x="35" y="90" font-size="6.5" fill="#A855F7" font-weight="600">4</text>
+      <text x="195" y="90" text-anchor="end" font-size="6.5" fill="#A855F7">&#x2190; h(v&#x2082;)</text>
+
+      <rect x="25" y="94" width="175" height="12" rx="1" fill="#F9FAFB" stroke="#E5E7EB" stroke-width="0.4"/>
+      <text x="35" y="104" font-size="6.5" fill="#9CA3AF">5</text>
+    </g>
+
+    <!-- Weighted sum formula -->
+    <g transform="translate(10, 272)">
+      <rect x="0" y="0" width="231" height="78" rx="6" fill="white" stroke="#F59E0B" stroke-width="1.2"/>
+      <text x="116" y="18" text-anchor="middle" font-size="10" font-weight="700" fill="#92400E">Weighted Sum</text>
+      <text x="116" y="38" text-anchor="middle" font-size="10" fill="#374151" font-family="'Courier New', monospace" font-weight="600">out = &#x2211; w&#x1D62; &#xB7; f(v&#x1D62;)</text>
+      <line x1="12" y1="46" x2="219" y2="46" stroke="#FDE68A" stroke-width="0.6"/>
+      <text x="116" y="60" text-anchor="middle" font-size="8" fill="#6B7280">= w&#x2080;&#xB7;f(v&#x2080;) + w&#x2081;&#xB7;f(v&#x2081;) + w&#x2082;&#xB7;f(v&#x2082;)</text>
+      <text x="116" y="74" text-anchor="middle" font-size="8" fill="#059669" font-weight="600">Only D+1 = 3 lookups needed!</text>
+    </g>
+  </g>
+
+  <!-- ================================================================ -->
+  <!-- BOTTOM ANNOTATION BAR                                              -->
+  <!-- ================================================================ -->
+  <g transform="translate(30, 442)">
+    <rect x="0" y="0" width="900" height="148" rx="8" fill="#F9FAFB" stroke="#E5E7EB" stroke-width="1"/>
+
+    <text x="450" y="22" text-anchor="middle" font-size="13" font-weight="700" fill="#374151">Why Permutohedral?  Exponential Savings in High Dimensions</text>
+
+    <!-- Comparison table -->
+    <g transform="translate(60, 38)">
+      <!-- Header -->
+      <text x="100" y="14" text-anchor="middle" font-size="9" font-weight="700" fill="#6B7280">Dimension D</text>
+      <text x="270" y="14" text-anchor="middle" font-size="9" font-weight="700" fill="#DC2626">Rectangular: 2&#x207F; vertices</text>
+      <text x="470" y="14" text-anchor="middle" font-size="9" font-weight="700" fill="#059669">Simplex: D+1 vertices</text>
+      <text x="620" y="14" text-anchor="middle" font-size="9" font-weight="700" fill="#3B82F6">Savings</text>
+
+      <line x1="20" y1="20" x2="700" y2="20" stroke="#E5E7EB" stroke-width="0.6"/>
+
+      <!-- D=2 -->
+      <text x="100" y="36" text-anchor="middle" font-size="9" fill="#374151">2</text>
+      <text x="270" y="36" text-anchor="middle" font-size="9" fill="#DC2626">4</text>
+      <text x="470" y="36" text-anchor="middle" font-size="9" fill="#059669" font-weight="600">3</text>
+      <text x="620" y="36" text-anchor="middle" font-size="9" fill="#3B82F6">1.3&#xD7;</text>
+
+      <!-- D=5 -->
+      <text x="100" y="52" text-anchor="middle" font-size="9" fill="#374151">5</text>
+      <text x="270" y="52" text-anchor="middle" font-size="9" fill="#DC2626">32</text>
+      <text x="470" y="52" text-anchor="middle" font-size="9" fill="#059669" font-weight="600">6</text>
+      <text x="620" y="52" text-anchor="middle" font-size="9" fill="#3B82F6">5.3&#xD7;</text>
+
+      <!-- D=10 -->
+      <text x="100" y="68" text-anchor="middle" font-size="9" fill="#374151">10</text>
+      <text x="270" y="68" text-anchor="middle" font-size="9" fill="#DC2626">1,024</text>
+      <text x="470" y="68" text-anchor="middle" font-size="9" fill="#059669" font-weight="600">11</text>
+      <text x="620" y="68" text-anchor="middle" font-size="9" fill="#3B82F6">93&#xD7;</text>
+
+      <!-- D=64 -->
+      <text x="100" y="84" text-anchor="middle" font-size="9" fill="#374151">64</text>
+      <text x="270" y="84" text-anchor="middle" font-size="9" fill="#DC2626">1.8 &#xD7; 10&#xB9;&#x2079;</text>
+      <text x="470" y="84" text-anchor="middle" font-size="9" fill="#059669" font-weight="600">65</text>
+      <text x="620" y="84" text-anchor="middle" font-size="9" fill="#3B82F6" font-weight="700">2.8 &#xD7; 10&#xB9;&#x2077; &#xD7;</text>
+    </g>
+
+    <text x="450" y="138" text-anchor="middle" font-size="9" fill="#6B7280">Permutohedral lattice makes high-dimensional spatial hashing practical for neural graphics encoders</text>
+  </g>
+
+</svg>

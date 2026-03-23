@@ -1,0 +1,229 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 580" font-family="'Segoe UI', system-ui, Arial, sans-serif">
+  <defs>
+    <marker id="aG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 1 L 9 5 L 0 9 z" fill="#6B7280"/>
+    </marker>
+    <linearGradient id="volFace" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#DBEAFE" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#DBEAFE" stop-opacity="0.1"/>
+    </linearGradient>
+    <linearGradient id="volTop" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0%" stop-color="#93C5FD" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#93C5FD" stop-opacity="0.3"/>
+    </linearGradient>
+    <linearGradient id="volSide" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#60A5FA" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#60A5FA" stop-opacity="0.08"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="960" height="580" fill="white" rx="8"/>
+
+  <!-- Title -->
+  <text x="480" y="36" text-anchor="middle" font-size="22" font-weight="700" fill="#111827">Case Study: NeRF</text>
+  <text x="480" y="56" text-anchor="middle" font-size="13" fill="#6B7280">An MLP represents a 3D volume &#x2014; rendering queries it along camera rays</text>
+
+  <!-- ================================================================ -->
+  <!-- Main 3D scene diagram                                             -->
+  <!-- ================================================================ -->
+  <g transform="translate(0, 60)">
+
+    <!-- ============ Image plane (at back, behind volume) ============ -->
+    <!-- Drawn first so volume overlaps it -->
+    <g transform="translate(680, 30)">
+      <!-- Image frame with perspective (parallelogram) -->
+      <polygon points="40,0 240,20 240,280 40,300" fill="#F9FAFB" stroke="#9CA3AF" stroke-width="1.5"/>
+      <!-- Pixel grid -->
+      <line x1="80" y1="6" x2="80" y2="294" stroke="#E5E7EB" stroke-width="0.5"/>
+      <line x1="120" y1="12" x2="120" y2="288" stroke="#E5E7EB" stroke-width="0.5"/>
+      <line x1="160" y1="14" x2="160" y2="286" stroke="#E5E7EB" stroke-width="0.5"/>
+      <line x1="200" y1="18" x2="200" y2="282" stroke="#E5E7EB" stroke-width="0.5"/>
+      <line x1="40" y1="60" x2="240" y2="76" stroke="#E5E7EB" stroke-width="0.5"/>
+      <line x1="40" y1="120" x2="240" y2="128" stroke="#E5E7EB" stroke-width="0.5"/>
+      <line x1="40" y1="180" x2="240" y2="184" stroke="#E5E7EB" stroke-width="0.5"/>
+      <line x1="40" y1="240" x2="240" y2="236" stroke="#E5E7EB" stroke-width="0.5"/>
+
+      <!-- Some rendered "image" content - colored patches suggesting a scene -->
+      <rect x="82" y="78" width="36" height="48" rx="0" fill="#BFDBFE" opacity="0.5"/>
+      <rect x="122" y="80" width="36" height="46" rx="0" fill="#93C5FD" opacity="0.5"/>
+      <rect x="82" y="130" width="36" height="50" rx="0" fill="#DDD6FE" opacity="0.4"/>
+      <rect x="122" y="130" width="36" height="48" rx="0" fill="#C4B5FD" opacity="0.5"/>
+      <rect x="162" y="82" width="36" height="44" rx="0" fill="#A78BFA" opacity="0.3"/>
+      <rect x="162" y="130" width="36" height="48" rx="0" fill="#8B5CF6" opacity="0.3"/>
+      <ellipse cx="140" cy="140" rx="40" ry="35" fill="#8B5CF6" opacity="0.15"/>
+
+      <!-- Highlighted target pixels where rays land -->
+      <rect x="118" y="108" width="10" height="10" fill="#EF4444" opacity="0.8" stroke="#DC2626" stroke-width="1"/>
+      <rect x="148" y="160" width="10" height="10" fill="#F59E0B" opacity="0.8" stroke="#D97706" stroke-width="1"/>
+      <rect x="88" y="190" width="10" height="10" fill="#10B981" opacity="0.8" stroke="#059669" stroke-width="1"/>
+
+      <!-- Label -->
+      <text x="140" y="318" text-anchor="middle" font-size="11" font-weight="600" fill="#374151">Rendered Image</text>
+      <text x="140" y="334" text-anchor="middle" font-size="9" fill="#6B7280">each pixel = one ray integrated</text>
+    </g>
+
+    <!-- ============ 3D Volume box (the MLP) ============ -->
+    <!-- Isometric box: front face, top face, right face -->
+    <g transform="translate(250, 30)">
+      <!-- Back face (barely visible) -->
+      <polygon points="80,10 380,30 380,270 80,290" fill="#EFF6FF" opacity="0.3"/>
+
+      <!-- Bottom face -->
+      <polygon points="0,300 80,290 380,270 300,280" fill="#DBEAFE" opacity="0.1" stroke="#93C5FD" stroke-width="0.5"/>
+
+      <!-- Left face (front) -->
+      <polygon points="0,10 80,10 80,290 0,300" fill="url(#volFace)" stroke="#3B82F6" stroke-width="1.2"/>
+
+      <!-- Top face -->
+      <polygon points="0,10 80,10 380,30 300,20" fill="url(#volTop)" stroke="#3B82F6" stroke-width="1"/>
+
+      <!-- Right face -->
+      <polygon points="300,20 380,30 380,270 300,280" fill="url(#volSide)" stroke="#3B82F6" stroke-width="0.8"/>
+
+      <!-- Front face edges (to complete the wireframe look) -->
+      <line x1="0" y1="10" x2="300" y2="20" stroke="#3B82F6" stroke-width="1.2" stroke-dasharray="6,3"/>
+      <line x1="0" y1="300" x2="300" y2="280" stroke="#3B82F6" stroke-width="0.8" stroke-dasharray="6,3"/>
+
+      <!-- Object inside the volume (semi-transparent blob) -->
+      <ellipse cx="190" cy="155" rx="70" ry="55" fill="#8B5CF6" opacity="0.08"/>
+      <ellipse cx="190" cy="155" rx="50" ry="40" fill="#8B5CF6" opacity="0.12"/>
+      <ellipse cx="190" cy="150" rx="30" ry="25" fill="#8B5CF6" opacity="0.18"/>
+
+      <!-- Density field suggestion: scattered dots, denser near object -->
+      <!-- Sparse outer region -->
+      <circle cx="40" cy="60" r="2" fill="#3B82F6" opacity="0.06"/>
+      <circle cx="260" cy="50" r="2" fill="#3B82F6" opacity="0.05"/>
+      <circle cx="50" cy="240" r="2" fill="#3B82F6" opacity="0.06"/>
+      <circle cx="280" cy="240" r="2" fill="#3B82F6" opacity="0.05"/>
+      <circle cx="330" cy="100" r="2" fill="#3B82F6" opacity="0.04"/>
+      <circle cx="340" cy="200" r="2" fill="#3B82F6" opacity="0.04"/>
+
+      <!-- Dense inner region -->
+      <circle cx="160" cy="130" r="3" fill="#8B5CF6" opacity="0.35"/>
+      <circle cx="180" cy="140" r="3.5" fill="#8B5CF6" opacity="0.45"/>
+      <circle cx="200" cy="135" r="3.5" fill="#8B5CF6" opacity="0.5"/>
+      <circle cx="220" cy="145" r="3" fill="#8B5CF6" opacity="0.4"/>
+      <circle cx="175" cy="160" r="3" fill="#8B5CF6" opacity="0.45"/>
+      <circle cx="195" cy="165" r="3.5" fill="#8B5CF6" opacity="0.5"/>
+      <circle cx="215" cy="158" r="3" fill="#8B5CF6" opacity="0.4"/>
+      <circle cx="185" cy="180" r="2.5" fill="#8B5CF6" opacity="0.3"/>
+      <circle cx="205" cy="175" r="2.5" fill="#8B5CF6" opacity="0.3"/>
+
+      <!-- Label: MLP = volume -->
+      <text x="190" y="260" text-anchor="middle" font-size="14" font-weight="700" fill="#1E40AF">The MLP is this volume</text>
+      <text x="190" y="276" text-anchor="middle" font-size="10" fill="#60A5FA">MLP(x,y,z,&#x03B8;,&#x03C6;) &#x2192; &#x3C3;, rgb</text>
+    </g>
+
+    <!-- ============ Camera ============ -->
+    <g transform="translate(30, 120)">
+      <!-- Camera body (3D-ish) -->
+      <rect x="10" y="30" width="55" height="38" rx="5" fill="#374151"/>
+      <polygon points="65,34 80,28 80,72 65,68" fill="#4B5563"/>
+      <rect x="22" y="20" width="30" height="16" rx="4" fill="#4B5563"/>
+      <circle cx="37" cy="28" r="6" fill="#6B7280"/>
+      <circle cx="37" cy="28" r="3" fill="#9CA3AF"/>
+
+      <!-- Lens -->
+      <ellipse cx="82" cy="50" rx="6" ry="14" fill="#374151" stroke="#4B5563" stroke-width="1"/>
+
+      <text x="42" y="85" text-anchor="middle" font-size="11" fill="#6B7280">camera</text>
+    </g>
+
+    <!-- ============ Rays from camera through volume to image pixels ============ -->
+
+    <!-- Ray 1 (red) - hits object, lands on red pixel -->
+    <g>
+      <line x1="120" y1="170" x2="803" y2="141" stroke="#EF4444" stroke-width="1.8" opacity="0.5"/>
+      <!-- Sample dots along ray inside volume -->
+      <circle cx="300" cy="165" r="4" fill="#EF4444" opacity="0.06" stroke="#EF4444" stroke-width="0.6"/>
+      <circle cx="370" cy="161" r="4" fill="#EF4444" opacity="0.08" stroke="#EF4444" stroke-width="0.6"/>
+      <circle cx="430" cy="158" r="5.5" fill="#8B5CF6" opacity="0.4" stroke="#8B5CF6" stroke-width="1"/>
+      <circle cx="480" cy="155" r="7" fill="#8B5CF6" opacity="0.6" stroke="#8B5CF6" stroke-width="1.2"/>
+      <circle cx="530" cy="152" r="5" fill="#8B5CF6" opacity="0.35" stroke="#8B5CF6" stroke-width="0.8"/>
+      <circle cx="580" cy="149" r="3.5" fill="#EF4444" opacity="0.06" stroke="#EF4444" stroke-width="0.5"/>
+      <!-- Pixel hit -->
+      <circle cx="803" cy="141" r="5" fill="#EF4444" opacity="0.9"/>
+    </g>
+
+    <!-- Ray 2 (amber) - hits object lower, lands on amber pixel -->
+    <g>
+      <line x1="120" y1="172" x2="833" y2="193" stroke="#F59E0B" stroke-width="1.5" opacity="0.4"/>
+      <circle cx="310" cy="176" r="3.5" fill="#F59E0B" opacity="0.05" stroke="#F59E0B" stroke-width="0.5"/>
+      <circle cx="400" cy="180" r="3.5" fill="#F59E0B" opacity="0.06" stroke="#F59E0B" stroke-width="0.5"/>
+      <circle cx="460" cy="183" r="5" fill="#8B5CF6" opacity="0.3" stroke="#8B5CF6" stroke-width="0.8"/>
+      <circle cx="510" cy="186" r="6" fill="#8B5CF6" opacity="0.5" stroke="#8B5CF6" stroke-width="1"/>
+      <circle cx="560" cy="189" r="4" fill="#8B5CF6" opacity="0.2" stroke="#8B5CF6" stroke-width="0.6"/>
+      <circle cx="833" cy="193" r="5" fill="#F59E0B" opacity="0.9"/>
+    </g>
+
+    <!-- Ray 3 (green) - passes through mostly empty, lands on green pixel -->
+    <g>
+      <line x1="120" y1="174" x2="773" y2="223" stroke="#10B981" stroke-width="1.5" opacity="0.4"/>
+      <circle cx="320" cy="188" r="3.5" fill="#10B981" opacity="0.05" stroke="#10B981" stroke-width="0.5"/>
+      <circle cx="430" cy="197" r="4" fill="#8B5CF6" opacity="0.15" stroke="#8B5CF6" stroke-width="0.5"/>
+      <circle cx="520" cy="204" r="3.5" fill="#10B981" opacity="0.05" stroke="#10B981" stroke-width="0.5"/>
+      <circle cx="773" cy="223" r="5" fill="#10B981" opacity="0.9"/>
+    </g>
+
+    <!-- Ray labels -->
+    <text x="480" y="138" text-anchor="middle" font-size="8" fill="#DC2626" font-weight="600">high density &#x2192; strong color</text>
+    <text x="555" cy="200" y="210" text-anchor="middle" font-size="8" fill="#059669">low density &#x2192; faint</text>
+
+  </g>
+
+  <!-- ================================================================ -->
+  <!-- Bottom: rendering one pixel (ray integration)                     -->
+  <!-- ================================================================ -->
+  <g transform="translate(50, 430)">
+    <rect x="0" y="0" width="860" height="110" rx="10" fill="#F0F9FF" stroke="#BFDBFE" stroke-width="1"/>
+    <text x="430" y="20" text-anchor="middle" font-size="13" font-weight="700" fill="#1E40AF">Rendering one pixel: sample along ray, query MLP at each point, integrate</text>
+
+    <g transform="translate(30, 32)">
+      <!-- Ray line -->
+      <line x1="0" y1="30" x2="680" y2="30" stroke="#3B82F6" stroke-width="2" stroke-dasharray="6,4"/>
+
+      <!-- Sample 1: empty -->
+      <circle cx="40" cy="30" r="13" fill="#DBEAFE" stroke="#3B82F6" stroke-width="1.2"/>
+      <text x="40" y="34" text-anchor="middle" font-size="9" fill="#3B82F6">&#x3C3;&#x2248;0</text>
+      <text x="40" y="56" text-anchor="middle" font-size="8" fill="#9CA3AF">empty</text>
+
+      <!-- Sample 2: empty -->
+      <circle cx="130" cy="30" r="13" fill="#DBEAFE" stroke="#3B82F6" stroke-width="1.2"/>
+      <text x="130" y="34" text-anchor="middle" font-size="9" fill="#3B82F6">&#x3C3;&#x2248;0</text>
+      <text x="130" y="56" text-anchor="middle" font-size="8" fill="#9CA3AF">empty</text>
+
+      <!-- Sample 3: hitting surface -->
+      <circle cx="250" cy="30" r="17" fill="#EDE9FE" stroke="#8B5CF6" stroke-width="2"/>
+      <text x="250" y="27" text-anchor="middle" font-size="9" font-weight="600" fill="#5B21B6">&#x3C3; high</text>
+      <text x="250" y="39" text-anchor="middle" font-size="8" fill="#EF4444">c = red</text>
+
+      <!-- Sample 4: peak density -->
+      <circle cx="370" cy="30" r="21" fill="#EDE9FE" stroke="#8B5CF6" stroke-width="2.5"/>
+      <text x="370" y="27" text-anchor="middle" font-size="10" font-weight="700" fill="#5B21B6">&#x3C3; max</text>
+      <text x="370" y="40" text-anchor="middle" font-size="8" fill="#EF4444">c = red</text>
+
+      <!-- Sample 5: exiting -->
+      <circle cx="480" cy="30" r="15" fill="#EDE9FE" stroke="#8B5CF6" stroke-width="1.5"/>
+      <text x="480" y="27" text-anchor="middle" font-size="9" fill="#5B21B6">&#x3C3; med</text>
+      <text x="480" y="39" text-anchor="middle" font-size="8" fill="#EF4444">c = dark</text>
+
+      <!-- Sample 6: empty again -->
+      <circle cx="575" cy="30" r="13" fill="#DBEAFE" stroke="#3B82F6" stroke-width="1.2"/>
+      <text x="575" y="34" text-anchor="middle" font-size="9" fill="#3B82F6">&#x3C3;&#x2248;0</text>
+      <text x="575" y="56" text-anchor="middle" font-size="8" fill="#9CA3AF">empty</text>
+
+      <!-- Integration arrow -->
+      <line x1="625" y1="30" x2="700" y2="30" stroke="#374151" stroke-width="2.5" marker-end="url(#aG)"/>
+      <text x="662" y="22" text-anchor="middle" font-size="10" fill="#374151" font-weight="600">&#x2211; T&#x1D62;&#x22C5;&#x3B1;&#x1D62;&#x22C5;c&#x1D62;</text>
+
+      <!-- Result pixel -->
+      <rect x="710" y="14" width="32" height="32" rx="5" fill="#DC2626"/>
+      <text x="726" y="34" text-anchor="middle" font-size="10" font-weight="700" fill="white">pixel</text>
+      <text x="726" y="58" text-anchor="middle" font-size="8" fill="#9CA3AF">result</text>
+    </g>
+  </g>
+
+  <text x="480" y="562" text-anchor="middle" font-size="11" fill="#6B7280">The MLP defines a queryable volume &#x2014; rendering just samples and integrates along each ray</text>
+  <text x="930" y="572" text-anchor="end" font-size="10" fill="#D1D5DB">6</text>
+</svg>

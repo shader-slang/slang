@@ -1,0 +1,275 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 530" font-family="'Segoe UI', system-ui, Arial, sans-serif">
+  <defs>
+    <marker id="arrowGray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 1 L 9 5 L 0 9 z" fill="#6B7280"/>
+    </marker>
+    <marker id="arrowBlueSmall" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+      <path d="M 0 1 L 9 5 L 0 9 z" fill="#3B82F6"/>
+    </marker>
+    <marker id="arrowGreenSmall" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+      <path d="M 0 1 L 9 5 L 0 9 z" fill="#10B981"/>
+    </marker>
+    <marker id="arrowPurpleSmall" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+      <path d="M 0 1 L 9 5 L 0 9 z" fill="#8B5CF6"/>
+    </marker>
+  </defs>
+
+  <rect width="960" height="530" fill="white" rx="8"/>
+
+  <!-- TITLE -->
+  <text x="480" y="28" text-anchor="middle" font-size="20" font-weight="700" fill="#111827">Why We Need Permutohedral Coordinates</text>
+  <text x="480" y="48" text-anchor="middle" font-size="11" fill="#6B7280">The problem: finding which grid cell contains a point</text>
+
+  <!-- ================================================================ -->
+  <!-- PANEL A: Rectangular Grid (green)                                -->
+  <!-- ================================================================ -->
+  <g transform="translate(10, 62)">
+    <rect x="0" y="0" width="255" height="420" rx="8" fill="#F0FDF4" stroke="#10B981" stroke-width="1.2"/>
+    <rect x="8" y="6" width="28" height="18" rx="9" fill="#10B981"/>
+    <text x="22" y="19" text-anchor="middle" font-size="10" fill="white" font-weight="700">A</text>
+    <text x="145" y="20" text-anchor="middle" font-size="12" font-weight="700" fill="#065F46">Rectangular Grid</text>
+
+    <g transform="translate(38, 48)">
+      <line x1="0" y1="0" x2="144" y2="0" stroke="#A7F3D0" stroke-width="0.8"/>
+      <line x1="0" y1="36" x2="144" y2="36" stroke="#A7F3D0" stroke-width="0.8"/>
+      <line x1="0" y1="72" x2="144" y2="72" stroke="#A7F3D0" stroke-width="0.8"/>
+      <line x1="0" y1="108" x2="144" y2="108" stroke="#A7F3D0" stroke-width="0.8"/>
+      <line x1="0" y1="0" x2="0" y2="108" stroke="#A7F3D0" stroke-width="0.8"/>
+      <line x1="36" y1="0" x2="36" y2="108" stroke="#A7F3D0" stroke-width="0.8"/>
+      <line x1="72" y1="0" x2="72" y2="108" stroke="#A7F3D0" stroke-width="0.8"/>
+      <line x1="108" y1="0" x2="108" y2="108" stroke="#A7F3D0" stroke-width="0.8"/>
+      <line x1="144" y1="0" x2="144" y2="108" stroke="#A7F3D0" stroke-width="0.8"/>
+
+      <rect x="72" y="36" width="36" height="36" fill="#6EE7B7" fill-opacity="0.4" stroke="#10B981" stroke-width="2"/>
+      <circle cx="72" cy="36" r="4" fill="#10B981"/>
+      <circle cx="108" cy="36" r="4" fill="#10B981"/>
+      <circle cx="72" cy="72" r="4" fill="#10B981"/>
+      <circle cx="108" cy="72" r="4" fill="#10B981"/>
+      <text x="72" y="30" text-anchor="middle" font-size="7" fill="#059669" font-weight="600">(2, 2)</text>
+      <text x="108" y="30" text-anchor="middle" font-size="7" fill="#059669" font-weight="600">(3, 2)</text>
+      <text x="72" y="85" text-anchor="middle" font-size="7" fill="#059669" font-weight="600">(2, 1)</text>
+      <text x="108" y="85" text-anchor="middle" font-size="7" fill="#059669" font-weight="600">(3, 1)</text>
+
+      <circle cx="86" cy="58" r="4.5" fill="#EF4444" stroke="#DC2626" stroke-width="1.2"/>
+      <text x="95" y="54" font-size="8" fill="#DC2626" font-weight="600">p</text>
+
+      <text x="0" y="122" text-anchor="middle" font-size="7" fill="#9CA3AF">0</text>
+      <text x="36" y="122" text-anchor="middle" font-size="7" fill="#9CA3AF">1</text>
+      <text x="72" y="122" text-anchor="middle" font-size="7" fill="#9CA3AF">2</text>
+      <text x="108" y="122" text-anchor="middle" font-size="7" fill="#9CA3AF">3</text>
+      <text x="144" y="122" text-anchor="middle" font-size="7" fill="#9CA3AF">4</text>
+      <text x="-6" y="4" text-anchor="end" font-size="7" fill="#9CA3AF">3</text>
+      <text x="-6" y="40" text-anchor="end" font-size="7" fill="#9CA3AF">2</text>
+      <text x="-6" y="76" text-anchor="end" font-size="7" fill="#9CA3AF">1</text>
+      <text x="-6" y="112" text-anchor="end" font-size="7" fill="#9CA3AF">0</text>
+    </g>
+
+    <g transform="translate(15, 200)">
+      <text x="0" y="12" font-size="9" fill="#065F46" font-weight="700">All vertices at integer coords!</text>
+    </g>
+    <g transform="translate(15, 224)">
+      <rect x="0" y="0" width="225" height="40" rx="4" fill="#ECFDF5" stroke="#A7F3D0" stroke-width="0.6"/>
+      <text x="112" y="17" text-anchor="middle" font-size="10" fill="#059669" font-family="'Courier New', monospace" font-weight="600">cell = ( floor(x), floor(y) )</text>
+      <text x="112" y="32" text-anchor="middle" font-size="9" fill="#065F46" font-weight="700">Instant! O(1)</text>
+    </g>
+    <g transform="translate(15, 290)">
+      <rect x="0" y="0" width="225" height="58" rx="4" fill="#D1FAE5" stroke="#10B981" stroke-width="0.8"/>
+      <text x="112" y="16" text-anchor="middle" font-size="9" fill="#065F46" font-weight="700">floor works because vertices</text>
+      <text x="112" y="32" text-anchor="middle" font-size="9" fill="#065F46" font-weight="700">sit on integer grid lines.</text>
+      <text x="112" y="48" text-anchor="middle" font-size="8.5" fill="#059669">2 axes (x, y) with integer ticks</text>
+    </g>
+    <text x="228" y="410" font-size="20" fill="#10B981" font-weight="700">&#x2713;</text>
+  </g>
+
+
+  <!-- ================================================================ -->
+  <!-- PANEL B: Triangular Grid overlaid on rectangular (red)           -->
+  <!-- ================================================================ -->
+  <g transform="translate(292, 62)">
+    <rect x="0" y="0" width="255" height="420" rx="8" fill="#FEF2F2" stroke="#EF4444" stroke-width="1.2"/>
+    <rect x="8" y="6" width="28" height="18" rx="9" fill="#EF4444"/>
+    <text x="22" y="19" text-anchor="middle" font-size="10" fill="white" font-weight="700">B</text>
+    <text x="145" y="20" text-anchor="middle" font-size="12" font-weight="700" fill="#9F1239">Triangular Grid</text>
+
+    <g transform="translate(38, 48)">
+      <line x1="0" y1="0" x2="144" y2="0" stroke="#D1D5DB" stroke-width="0.5"/>
+      <line x1="0" y1="36" x2="144" y2="36" stroke="#D1D5DB" stroke-width="0.5"/>
+      <line x1="0" y1="72" x2="144" y2="72" stroke="#D1D5DB" stroke-width="0.5"/>
+      <line x1="0" y1="108" x2="144" y2="108" stroke="#D1D5DB" stroke-width="0.5"/>
+      <line x1="0" y1="0" x2="0" y2="108" stroke="#D1D5DB" stroke-width="0.5"/>
+      <line x1="36" y1="0" x2="36" y2="108" stroke="#D1D5DB" stroke-width="0.5"/>
+      <line x1="72" y1="0" x2="72" y2="108" stroke="#D1D5DB" stroke-width="0.5"/>
+      <line x1="108" y1="0" x2="108" y2="108" stroke="#D1D5DB" stroke-width="0.5"/>
+      <line x1="144" y1="0" x2="144" y2="108" stroke="#D1D5DB" stroke-width="0.5"/>
+
+      <text x="0" y="122" text-anchor="middle" font-size="7" fill="#9CA3AF">0</text>
+      <text x="36" y="122" text-anchor="middle" font-size="7" fill="#9CA3AF">1</text>
+      <text x="72" y="122" text-anchor="middle" font-size="7" fill="#9CA3AF">2</text>
+      <text x="108" y="122" text-anchor="middle" font-size="7" fill="#9CA3AF">3</text>
+      <text x="144" y="122" text-anchor="middle" font-size="7" fill="#9CA3AF">4</text>
+      <text x="-6" y="4" text-anchor="end" font-size="7" fill="#9CA3AF">3</text>
+      <text x="-6" y="40" text-anchor="end" font-size="7" fill="#9CA3AF">2</text>
+      <text x="-6" y="76" text-anchor="end" font-size="7" fill="#9CA3AF">1</text>
+      <text x="-6" y="112" text-anchor="end" font-size="7" fill="#9CA3AF">0</text>
+
+      <path d="M0,0 L144,0 M18,31 L126,31 M0,62 L144,62 M18,93 L126,93" stroke="#F87171" stroke-width="1" fill="none"/>
+      <path d="M0,0 L18,31 M36,0 L18,31 M36,0 L54,31 M72,0 L54,31 M72,0 L90,31 M108,0 L90,31 M108,0 L126,31 M144,0 L126,31" stroke="#F87171" stroke-width="1" fill="none"/>
+      <path d="M18,31 L0,62 M18,31 L36,62 M54,31 L36,62 M54,31 L72,62 M90,31 L72,62 M90,31 L108,62 M126,31 L108,62 M126,31 L144,62" stroke="#F87171" stroke-width="1" fill="none"/>
+      <path d="M0,62 L18,93 M36,62 L18,93 M36,62 L54,93 M72,62 L54,93 M72,62 L90,93 M108,62 L90,93 M108,62 L126,93 M144,62 L126,93" stroke="#F87171" stroke-width="1" fill="none"/>
+
+      <polygon points="72,62 108,62 90,31" fill="#FCA5A5" fill-opacity="0.3" stroke="#DC2626" stroke-width="2"/>
+      <circle cx="90" cy="31" r="3.5" fill="#DC2626"/>
+      <circle cx="72" cy="62" r="3.5" fill="#DC2626"/>
+      <circle cx="108" cy="62" r="3.5" fill="#DC2626"/>
+      <text x="90" y="25" text-anchor="middle" font-size="7" fill="#991B1B" font-weight="700">(2.5, 2.13)</text>
+      <text x="59" y="75" text-anchor="middle" font-size="7" fill="#991B1B" font-weight="700">(2, 1.27)</text>
+      <text x="121" y="75" text-anchor="middle" font-size="7" fill="#991B1B" font-weight="700">(3, 1.27)</text>
+      <text x="54" y="25" text-anchor="middle" font-size="6" fill="#DC2626">(1.5, 2.13)</text>
+      <text x="36" y="75" text-anchor="middle" font-size="6" fill="#DC2626">(1, 1.27)</text>
+
+      <circle cx="90" cy="50" r="4.5" fill="#EF4444" stroke="#DC2626" stroke-width="1.2"/>
+      <text x="98" y="47" font-size="8" fill="#DC2626" font-weight="600">p</text>
+    </g>
+
+    <g transform="translate(14, 200)">
+      <text x="0" y="12" font-size="9" fill="#9F1239" font-weight="700">Vertices at non-integer coords!</text>
+      <text x="0" y="28" font-size="8.5" fill="#DC2626">(2.5, 2.13), (2, 1.27) ...</text>
+    </g>
+    <g transform="translate(14, 244)">
+      <rect x="0" y="0" width="227" height="42" rx="4" fill="#FEF2F2" stroke="#FECACA" stroke-width="0.6"/>
+      <text x="113" y="17" text-anchor="middle" font-size="8.5" fill="#DC2626">floor gives integer boundaries,</text>
+      <text x="113" y="32" text-anchor="middle" font-size="8.5" fill="#DC2626">but edges are at 2.13, 1.27 ...</text>
+    </g>
+    <g transform="translate(14, 310)">
+      <rect x="0" y="0" width="227" height="44" rx="4" fill="#FEE2E2" stroke="#EF4444" stroke-width="0.8"/>
+      <text x="113" y="16" text-anchor="middle" font-size="9" fill="#9F1239" font-weight="700">Triangles don't align with</text>
+      <text x="113" y="32" text-anchor="middle" font-size="9" fill="#9F1239" font-weight="700">the 2-axis integer grid.</text>
+    </g>
+    <text x="228" y="410" font-size="20" fill="#EF4444" font-weight="700">&#x2717;</text>
+  </g>
+
+
+  <!-- ================================================================ -->
+  <!-- PANEL C: Permutohedral Geometry only (no algorithm)              -->
+  <!-- ================================================================ -->
+  <g transform="translate(574, 62)">
+    <rect x="0" y="0" width="376" height="420" rx="8" fill="#EFF6FF" stroke="#3B82F6" stroke-width="1.2"/>
+    <rect x="8" y="6" width="28" height="18" rx="9" fill="#3B82F6"/>
+    <text x="22" y="19" text-anchor="middle" font-size="10" fill="white" font-weight="700">C</text>
+    <text x="200" y="20" text-anchor="middle" font-size="12" font-weight="700" fill="#1E40AF">Permutohedral Coordinates</text>
+    <text x="200" y="36" text-anchor="middle" font-size="9" fill="#3B82F6">3 axes (a, b, c) at 120&#xB0;</text>
+
+    <!-- Triangular grid, S=27, origin at (95,160) in grid group -->
+    <g transform="translate(12, 42)">
+      <!-- Light grid lines -->
+      <line x1="54" y1="75" x2="54" y2="230" stroke="#BFDBFE" stroke-width="0.5"/>
+      <line x1="95" y1="66" x2="95" y2="207" stroke="#BFDBFE" stroke-width="0.5"/>
+      <line x1="136" y1="43" x2="136" y2="184" stroke="#BFDBFE" stroke-width="0.5"/>
+      <line x1="177" y1="67" x2="177" y2="161" stroke="#BFDBFE" stroke-width="0.5"/>
+      <line x1="218" y1="91" x2="218" y2="138" stroke="#BFDBFE" stroke-width="0.5"/>
+      <line x1="54" y1="230" x2="136" y2="184" stroke="#BBF7D0" stroke-width="0.5"/>
+      <line x1="54" y1="183" x2="218" y2="91" stroke="#BBF7D0" stroke-width="0.5"/>
+      <line x1="54" y1="136" x2="218" y2="44" stroke="#BBF7D0" stroke-width="0.5"/>
+      <line x1="54" y1="89" x2="177" y2="20" stroke="#BBF7D0" stroke-width="0.5"/>
+      <line x1="54" y1="183" x2="95" y2="207" stroke="#DDD6FE" stroke-width="0.5"/>
+      <line x1="54" y1="136" x2="136" y2="184" stroke="#DDD6FE" stroke-width="0.5"/>
+      <line x1="54" y1="89" x2="177" y2="161" stroke="#DDD6FE" stroke-width="0.5"/>
+      <line x1="95" y1="66" x2="218" y2="138" stroke="#DDD6FE" stroke-width="0.5"/>
+      <line x1="136" y1="43" x2="218" y2="91" stroke="#DDD6FE" stroke-width="0.5"/>
+      <line x1="177" y1="67" x2="218" y2="44" stroke="#DDD6FE" stroke-width="0.5"/>
+
+      <!-- a-AXIS (horizontal, blue) -->
+      <line x1="44" y1="160" x2="228" y2="160" stroke="#3B82F6" stroke-width="2" marker-end="url(#arrowBlueSmall)"/>
+      <text x="234" y="164" font-size="10" fill="#3B82F6" font-weight="700">a</text>
+      <line x1="54" y1="156" x2="54" y2="164" stroke="#3B82F6" stroke-width="1.2"/>
+      <text x="54" y="175" text-anchor="middle" font-size="7.5" fill="#3B82F6">-1</text>
+      <line x1="95" y1="156" x2="95" y2="164" stroke="#3B82F6" stroke-width="1.2"/>
+      <text x="95" y="175" text-anchor="middle" font-size="7.5" fill="#3B82F6" font-weight="700">0</text>
+      <line x1="136" y1="156" x2="136" y2="164" stroke="#3B82F6" stroke-width="1.2"/>
+      <text x="136" y="175" text-anchor="middle" font-size="7.5" fill="#3B82F6">1</text>
+      <line x1="177" y1="156" x2="177" y2="164" stroke="#3B82F6" stroke-width="1.2"/>
+      <text x="177" y="175" text-anchor="middle" font-size="7.5" fill="#3B82F6">2</text>
+      <line x1="218" y1="156" x2="218" y2="164" stroke="#3B82F6" stroke-width="1.2"/>
+      <text x="218" y="175" text-anchor="middle" font-size="7.5" fill="#3B82F6">3</text>
+
+      <!-- b-AXIS (upper-left, green, 120 deg) -->
+      <line x1="122" y1="208" x2="48" y2="76" stroke="#10B981" stroke-width="2" marker-end="url(#arrowGreenSmall)"/>
+      <text x="42" y="70" font-size="10" fill="#10B981" font-weight="700">b</text>
+      <line x1="111" y1="194" x2="119" y2="198" stroke="#10B981" stroke-width="1.2"/>
+      <text x="126" y="200" font-size="7.5" fill="#10B981">-1</text>
+      <line x1="71" y1="122" x2="79" y2="126" stroke="#10B981" stroke-width="1.2"/>
+      <text x="62" y="120" text-anchor="end" font-size="7.5" fill="#10B981">1</text>
+      <line x1="51" y1="86" x2="59" y2="90" stroke="#10B981" stroke-width="1.2"/>
+      <text x="42" y="84" text-anchor="end" font-size="7.5" fill="#10B981">2</text>
+
+      <!-- c-AXIS (lower-left, purple, 240 deg) -->
+      <!-- Negative end shortened (starts at c=-2), positive end extended (to c=2) -->
+      <line x1="140" y1="70" x2="48" y2="236" stroke="#8B5CF6" stroke-width="2" marker-end="url(#arrowPurpleSmall)"/>
+      <text x="42" y="246" font-size="10" fill="#8B5CF6" font-weight="700">c</text>
+      <!-- c=-2 tick -->
+      <line x1="131" y1="86" x2="139" y2="90" stroke="#8B5CF6" stroke-width="1.2"/>
+      <text x="145" y="86" font-size="7.5" fill="#8B5CF6">-2</text>
+      <!-- c=-1 tick -->
+      <line x1="111" y1="122" x2="119" y2="126" stroke="#8B5CF6" stroke-width="1.2"/>
+      <text x="125" y="122" font-size="7.5" fill="#8B5CF6">-1</text>
+      <!-- c=1 tick -->
+      <line x1="71" y1="194" x2="79" y2="198" stroke="#8B5CF6" stroke-width="1.2"/>
+      <text x="62" y="202" text-anchor="end" font-size="7.5" fill="#8B5CF6">1</text>
+      <!-- c=2 tick -->
+      <line x1="51" y1="230" x2="59" y2="234" stroke="#8B5CF6" stroke-width="1.2"/>
+      <text x="42" y="238" text-anchor="end" font-size="7.5" fill="#8B5CF6">2</text>
+
+      <!-- Origin -->
+      <circle cx="95" cy="160" r="4" fill="#374151"/>
+      <text x="83" y="190" text-anchor="middle" font-size="7" fill="#374151" font-weight="600">(0, 0, 0)</text>
+
+      <!-- Highlighted triangle -->
+      <polygon points="136,137 136,90 177,114" fill="#93C5FD" fill-opacity="0.35" stroke="#1D4ED8" stroke-width="2.5"/>
+
+      <!-- Lattice vertices -->
+      <circle cx="54" cy="89" r="2" fill="#93C5FD"/>
+      <circle cx="54" cy="136" r="2" fill="#93C5FD"/>
+      <circle cx="54" cy="183" r="2" fill="#93C5FD"/>
+      <circle cx="54" cy="230" r="2" fill="#93C5FD"/>
+      <circle cx="95" cy="66" r="2" fill="#93C5FD"/>
+      <circle cx="95" cy="113" r="2" fill="#93C5FD"/>
+      <circle cx="95" cy="207" r="2" fill="#93C5FD"/>
+      <circle cx="136" cy="43" r="2" fill="#93C5FD"/>
+      <circle cx="136" cy="90" r="3.5" fill="#1D4ED8"/>
+      <circle cx="136" cy="137" r="3.5" fill="#1D4ED8"/>
+      <circle cx="136" cy="184" r="2" fill="#93C5FD"/>
+      <circle cx="177" cy="67" r="2" fill="#93C5FD"/>
+      <circle cx="177" cy="114" r="3.5" fill="#1D4ED8"/>
+      <circle cx="177" cy="161" r="2" fill="#93C5FD"/>
+      <circle cx="218" cy="91" r="2" fill="#93C5FD"/>
+      <circle cx="218" cy="138" r="2" fill="#93C5FD"/>
+
+      <!-- Integer labels on highlighted triangle -->
+      <text x="126" y="145" text-anchor="end" font-size="7.5" fill="#1D4ED8" font-weight="700">(1, 0, -1)</text>
+      <text x="126" y="86" text-anchor="end" font-size="7.5" fill="#1D4ED8" font-weight="700">(1, 1, -2)</text>
+      <text x="183" y="110" font-size="7.5" fill="#1D4ED8" font-weight="700">(2, 0, -2)</text>
+
+      <!-- Point p -->
+      <circle cx="152" cy="114" r="5" fill="#EF4444" stroke="#DC2626" stroke-width="1.2"/>
+      <text x="160" y="110" font-size="8" fill="#DC2626" font-weight="600">p</text>
+    </g>
+
+    <!-- Geometry summary (no algorithm here) -->
+    <g transform="translate(12, 292)">
+      <rect x="0" y="0" width="352" height="48" rx="5" fill="#ECFDF5" stroke="#10B981" stroke-width="0.8"/>
+      <text x="176" y="16" text-anchor="middle" font-size="9.5" fill="#065F46" font-weight="700">All vertices at integer coordinates!</text>
+      <text x="176" y="32" text-anchor="middle" font-size="9" fill="#059669">(1,0,-1), (1,1,-2), (2,0,-2) ... all integers</text>
+      <text x="176" y="44" text-anchor="middle" font-size="8" fill="#6B7280">Compare with B: (2.5, 2.13), (2, 1.27) ...</text>
+    </g>
+    <g transform="translate(12, 352)">
+      <rect x="0" y="0" width="352" height="48" rx="5" fill="#EFF6FF" stroke="#93C5FD" stroke-width="0.8"/>
+      <text x="176" y="16" text-anchor="middle" font-size="9.5" fill="#1E40AF" font-weight="700">3 axes (a, b, c) at 120&#xB0; create a triangular grid</text>
+      <text x="176" y="32" text-anchor="middle" font-size="9" fill="#3B82F6">with all vertices at integer (a, b, c) positions.</text>
+      <text x="176" y="44" text-anchor="middle" font-size="9" fill="#3B82F6">So floor can work again!</text>
+    </g>
+    <text x="348" y="410" font-size="20" fill="#3B82F6" font-weight="700">&#x2713;</text>
+  </g>
+
+
+</svg>

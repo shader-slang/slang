@@ -1,0 +1,242 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 630" font-family="'Segoe UI', system-ui, Arial, sans-serif">
+  <defs>
+    <marker id="arrowGray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 1 L 9 5 L 0 9 z" fill="#6B7280"/>
+    </marker>
+    <marker id="arrowRose" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 1 L 9 5 L 0 9 z" fill="#EF4444"/>
+    </marker>
+    <marker id="arrowGreen" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 1 L 9 5 L 0 9 z" fill="#10B981"/>
+    </marker>
+    <marker id="arrowPurple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 1 L 9 5 L 0 9 z" fill="#8B5CF6"/>
+    </marker>
+  </defs>
+
+  <rect width="960" height="630" fill="white" rx="8"/>
+
+  <!-- TITLE -->
+  <text x="480" y="28" text-anchor="middle" font-size="18" font-weight="700" fill="#111827">sumReduceRows (Backward: Bias Gradient)</text>
+  <text x="480" y="48" text-anchor="middle" font-size="11" fill="#6B7280">dBias[i] += &#x3A3; dOut[i]  across all threads.  3 phases: intra-warp &#x2192; shared memory &#x2192; cross-warp + atomic</text>
+
+  <!-- ================================================================ -->
+  <!-- PHASE 1: INTRA-WARP REDUCTION                                    -->
+  <!-- ================================================================ -->
+  <g transform="translate(30, 65)">
+    <rect x="0" y="0" width="900" height="135" rx="8" fill="#FFF1F2" stroke="#FECDD3" stroke-width="1"/>
+    <text x="450" y="20" text-anchor="middle" font-size="13" font-weight="700" fill="#9F1239">Phase 1: Intra-Warp Reduction (WaveActiveSum)</text>
+
+    <!-- Warp 0 detailed -->
+    <g transform="translate(15, 32)">
+      <rect x="0" y="0" width="370" height="90" rx="6" fill="white" stroke="#FECDD3" stroke-width="0.8"/>
+      <text x="185" y="16" text-anchor="middle" font-size="10" font-weight="600" fill="#9F1239">Warp 0</text>
+
+      <!-- Threads -->
+      <rect x="10" y="24" width="52" height="36" rx="3" fill="#FFE4E6" stroke="#EF4444" stroke-width="0.8"/>
+      <text x="36" y="38" text-anchor="middle" font-size="7.5" fill="#9F1239" font-weight="600">Thread 0</text>
+      <text x="36" y="50" text-anchor="middle" font-size="7" fill="#BE123C">dOut[M]</text>
+
+      <rect x="68" y="24" width="52" height="36" rx="3" fill="#FFE4E6" stroke="#EF4444" stroke-width="0.8"/>
+      <text x="94" y="38" text-anchor="middle" font-size="7.5" fill="#9F1239" font-weight="600">Thread 1</text>
+      <text x="94" y="50" text-anchor="middle" font-size="7" fill="#BE123C">dOut[M]</text>
+
+      <text x="135" y="44" text-anchor="middle" font-size="11" fill="#9CA3AF">...</text>
+
+      <rect x="150" y="24" width="52" height="36" rx="3" fill="#FFE4E6" stroke="#EF4444" stroke-width="0.8"/>
+      <text x="176" y="38" text-anchor="middle" font-size="7.5" fill="#9F1239" font-weight="600">Thread 31</text>
+      <text x="176" y="50" text-anchor="middle" font-size="7" fill="#BE123C">dOut[M]</text>
+
+      <!-- Arrow -->
+      <line x1="210" y1="42" x2="238" y2="42" stroke="#EF4444" stroke-width="1.2" marker-end="url(#arrowRose)"/>
+
+      <!-- Result -->
+      <rect x="242" y="24" width="118" height="36" rx="4" fill="#FEF2F2" stroke="#EF4444" stroke-width="1.5"/>
+      <text x="301" y="38" text-anchor="middle" font-size="8" font-weight="600" fill="#9F1239">WaveActiveSum</text>
+      <text x="301" y="50" text-anchor="middle" font-size="8" fill="#BE123C">localResult[M]</text>
+
+      <text x="185" y="76" text-anchor="middle" font-size="8" fill="#9CA3AF" font-style="italic">for i in 0..M: localResult[i] = WaveActiveSum(dOut[i])</text>
+    </g>
+
+    <!-- Warp 1 condensed -->
+    <g transform="translate(400, 32)">
+      <rect x="0" y="0" width="160" height="90" rx="6" fill="white" stroke="#FECDD3" stroke-width="0.8"/>
+      <text x="80" y="16" text-anchor="middle" font-size="10" font-weight="600" fill="#9F1239">Warp 1</text>
+      <text x="80" y="42" text-anchor="middle" font-size="9" fill="#9CA3AF">32 threads &#x2192; WaveActiveSum</text>
+      <rect x="30" y="52" width="100" height="22" rx="3" fill="#FEF2F2" stroke="#EF4444" stroke-width="1"/>
+      <text x="80" y="67" text-anchor="middle" font-size="8" fill="#BE123C">localResult[M]</text>
+    </g>
+
+    <text x="575" y="80" text-anchor="middle" font-size="14" fill="#9CA3AF">...</text>
+
+    <!-- Warp W-1 condensed -->
+    <g transform="translate(600, 32)">
+      <rect x="0" y="0" width="160" height="90" rx="6" fill="white" stroke="#FECDD3" stroke-width="0.8"/>
+      <text x="80" y="16" text-anchor="middle" font-size="10" font-weight="600" fill="#9F1239">Warp W-1</text>
+      <text x="80" y="42" text-anchor="middle" font-size="9" fill="#9CA3AF">32 threads &#x2192; WaveActiveSum</text>
+      <rect x="30" y="52" width="100" height="22" rx="3" fill="#FEF2F2" stroke="#EF4444" stroke-width="1"/>
+      <text x="80" y="67" text-anchor="middle" font-size="8" fill="#BE123C">localResult[M]</text>
+    </g>
+
+    <!-- Right side annotation -->
+    <g transform="translate(780, 32)">
+      <rect x="0" y="0" width="105" height="90" rx="6" fill="#F9FAFB" stroke="#E5E7EB" stroke-width="0.8"/>
+      <text x="52" y="16" text-anchor="middle" font-size="8" font-weight="600" fill="#374151">Per warp:</text>
+      <text x="52" y="32" text-anchor="middle" font-size="8" fill="#6B7280">32 dOut vectors</text>
+      <text x="52" y="46" text-anchor="middle" font-size="8" fill="#6B7280">&#x2192; 1 sum vector</text>
+      <text x="52" y="62" text-anchor="middle" font-size="8" fill="#6B7280">Hardware</text>
+      <text x="52" y="74" text-anchor="middle" font-size="8" fill="#6B7280">wave intrinsic</text>
+    </g>
+  </g>
+
+  <!-- ================================================================ -->
+  <!-- PHASE 2: LANE 0 WRITES TO SHARED MEMORY                         -->
+  <!-- ================================================================ -->
+  <g transform="translate(30, 215)">
+    <rect x="0" y="0" width="900" height="120" rx="8" fill="#F0FDF4" stroke="#BBF7D0" stroke-width="1"/>
+    <text x="450" y="20" text-anchor="middle" font-size="13" font-weight="700" fill="#065F46">Phase 2: Lane 0 of Each Warp Writes to Shared Memory</text>
+
+    <!-- Arrows from phase 1 -->
+    <line x1="200" y1="-12" x2="200" y2="2" stroke="#10B981" stroke-width="1" marker-end="url(#arrowGreen)"/>
+    <line x1="480" y1="-12" x2="480" y2="2" stroke="#10B981" stroke-width="1" marker-end="url(#arrowGreen)"/>
+    <line x1="680" y1="-12" x2="680" y2="2" stroke="#10B981" stroke-width="1" marker-end="url(#arrowGreen)"/>
+
+    <!-- Shared memory layout -->
+    <g transform="translate(40, 38)">
+      <text x="410" y="-4" text-anchor="middle" font-size="9" fill="#065F46" font-weight="600">Shared Memory Layout (contiguous per warp, MPadded = (M+1) &amp; ~1)</text>
+      <rect x="0" y="2" width="820" height="32" rx="4" fill="#D1FAE5" stroke="#10B981" stroke-width="1.5"/>
+
+      <!-- Warp 0 slot -->
+      <rect x="4" y="5" width="190" height="26" rx="3" fill="#ECFDF5" stroke="#6EE7B7" stroke-width="0.8"/>
+      <text x="99" y="22" text-anchor="middle" font-size="8.5" font-weight="600" fill="#065F46">Warp 0: localResult[M]</text>
+
+      <!-- Warp 1 slot -->
+      <rect x="200" y="5" width="190" height="26" rx="3" fill="#ECFDF5" stroke="#6EE7B7" stroke-width="0.8"/>
+      <text x="295" y="22" text-anchor="middle" font-size="8.5" font-weight="600" fill="#065F46">Warp 1: localResult[M]</text>
+
+      <text x="425" y="22" text-anchor="middle" font-size="12" fill="#9CA3AF">...</text>
+
+      <!-- Warp W-1 slot -->
+      <rect x="460" y="5" width="190" height="26" rx="3" fill="#ECFDF5" stroke="#6EE7B7" stroke-width="0.8"/>
+      <text x="555" y="22" text-anchor="middle" font-size="8.5" font-weight="600" fill="#065F46">Warp W-1: localResult[M]</text>
+    </g>
+
+    <!-- Barrier -->
+    <rect x="310" y="98" width="280" height="16" rx="4" fill="#FEF3C7" stroke="#F59E0B" stroke-width="0.8"/>
+    <text x="450" y="110" text-anchor="middle" font-size="8" font-weight="600" fill="#92400E">GroupMemoryBarrierWithGroupSync()</text>
+  </g>
+
+  <!-- ================================================================ -->
+  <!-- PHASE 3: CROSS-WARP REDUCTION + ATOMIC WRITE                     -->
+  <!-- ================================================================ -->
+  <g transform="translate(30, 350)">
+    <rect x="0" y="0" width="900" height="260" rx="8" fill="#EDE9FE" stroke="#DDD6FE" stroke-width="1"/>
+    <text x="450" y="20" text-anchor="middle" font-size="13" font-weight="700" fill="#5B21B6">Phase 3: Spread Reduction Across All Threads + Atomic Write</text>
+
+    <line x1="450" y1="-12" x2="450" y2="2" stroke="#8B5CF6" stroke-width="1" marker-end="url(#arrowPurple)"/>
+
+    <!-- Top: the problem statement -->
+    <g transform="translate(15, 32)">
+      <rect x="0" y="0" width="870" height="30" rx="5" fill="#F5F3FF" stroke="#DDD6FE" stroke-width="0.8"/>
+      <text x="435" y="20" text-anchor="middle" font-size="10" fill="#5B21B6" font-weight="600">W vectors of M elements in shMem. Goal: reduce to 1 vector, then atomicAdd to global dBias.</text>
+    </g>
+
+    <!-- Shared memory visual: W vectors, M elements each -->
+    <g transform="translate(15, 75)">
+      <text x="0" y="0" text-anchor="start" font-size="10" font-weight="700" fill="#374151">Shared Memory (M elements per warp):</text>
+
+      <rect x="0" y="8" width="870" height="28" rx="3" fill="#D1FAE5" stroke="#10B981" stroke-width="0.8"/>
+      <text x="10" y="26" text-anchor="start" font-size="8" fill="#065F46" font-weight="600">W0:</text>
+      <rect x="38" y="11" width="36" height="22" rx="2" fill="#A7F3D0" stroke="#047857" stroke-width="0.6"/>
+      <text x="56" y="26" text-anchor="middle" font-size="7" fill="#064E3B">T0</text>
+      <rect x="78" y="11" width="36" height="22" rx="2" fill="#A7F3D0" stroke="#047857" stroke-width="0.6"/>
+      <text x="96" y="26" text-anchor="middle" font-size="7" fill="#064E3B">T1</text>
+      <rect x="118" y="11" width="36" height="22" rx="2" fill="#A7F3D0" stroke="#047857" stroke-width="0.6"/>
+      <text x="136" y="26" text-anchor="middle" font-size="7" fill="#064E3B">T2</text>
+      <text x="170" y="26" text-anchor="middle" font-size="8" fill="#9CA3AF">...</text>
+      <rect x="186" y="11" width="44" height="22" rx="2" fill="#A7F3D0" stroke="#047857" stroke-width="0.6"/>
+      <text x="208" y="26" text-anchor="middle" font-size="7" fill="#064E3B">Tm-1</text>
+
+      <line x1="238" y1="9" x2="238" y2="35" stroke="#047857" stroke-width="1.5" stroke-dasharray="4,2"/>
+      <text x="250" y="26" text-anchor="middle" font-size="9" fill="#065F46" font-weight="600">W1:</text>
+      <rect x="270" y="11" width="36" height="22" rx="2" fill="#A7F3D0" stroke="#047857" stroke-width="0.6"/>
+      <text x="288" y="26" text-anchor="middle" font-size="7" fill="#064E3B">T0</text>
+      <rect x="310" y="11" width="36" height="22" rx="2" fill="#A7F3D0" stroke="#047857" stroke-width="0.6"/>
+      <text x="328" y="26" text-anchor="middle" font-size="7" fill="#064E3B">T1</text>
+      <text x="362" y="26" text-anchor="middle" font-size="8" fill="#9CA3AF">...</text>
+
+      <text x="430" y="26" text-anchor="middle" font-size="10" fill="#9CA3AF">...</text>
+
+      <line x1="478" y1="9" x2="478" y2="35" stroke="#047857" stroke-width="1.5" stroke-dasharray="4,2"/>
+      <text x="490" y="26" text-anchor="start" font-size="8" fill="#065F46" font-weight="600">Ww-1:</text>
+      <rect x="530" y="11" width="36" height="22" rx="2" fill="#A7F3D0" stroke="#047857" stroke-width="0.6"/>
+      <text x="548" y="26" text-anchor="middle" font-size="7" fill="#064E3B">T0</text>
+      <rect x="570" y="11" width="36" height="22" rx="2" fill="#A7F3D0" stroke="#047857" stroke-width="0.6"/>
+      <text x="588" y="26" text-anchor="middle" font-size="7" fill="#064E3B">T1</text>
+      <text x="622" y="26" text-anchor="middle" font-size="8" fill="#9CA3AF">...</text>
+    </g>
+
+    <!-- Thread assignment: each thread handles one element index -->
+    <g transform="translate(15, 120)">
+      <text x="0" y="0" text-anchor="start" font-size="10" font-weight="700" fill="#374151">Thread Assignment (each thread owns one element index, reduces across W warps):</text>
+
+      <g transform="translate(0, 10)">
+        <!-- Thread 0: element 0 -->
+        <rect x="0" y="0" width="130" height="82" rx="5" fill="white" stroke="#8B5CF6" stroke-width="1"/>
+        <rect x="4" y="3" width="50" height="14" rx="7" fill="#8B5CF6"/>
+        <text x="29" y="13" text-anchor="middle" font-size="7.5" fill="white" font-weight="700">Thread 0</text>
+        <text x="65" y="13" text-anchor="start" font-size="7.5" fill="#5B21B6" font-weight="600">elem = 0</text>
+        <text x="8" y="30" text-anchor="start" font-size="7.5" fill="#10B981">sum = W0.T0</text>
+        <text x="8" y="42" text-anchor="start" font-size="7.5" fill="#10B981">    + W1.T0</text>
+        <text x="8" y="54" text-anchor="start" font-size="7.5" fill="#10B981">    + ... + Ww-1.T0</text>
+        <text x="8" y="72" text-anchor="start" font-size="7.5" fill="#8B5CF6" font-weight="600">atomicAdd(dBias[0], sum)</text>
+      </g>
+
+      <g transform="translate(140, 10)">
+        <rect x="0" y="0" width="130" height="82" rx="5" fill="white" stroke="#8B5CF6" stroke-width="1"/>
+        <rect x="4" y="3" width="50" height="14" rx="7" fill="#8B5CF6"/>
+        <text x="29" y="13" text-anchor="middle" font-size="7.5" fill="white" font-weight="700">Thread 1</text>
+        <text x="65" y="13" text-anchor="start" font-size="7.5" fill="#5B21B6" font-weight="600">elem = 1</text>
+        <text x="8" y="30" text-anchor="start" font-size="7.5" fill="#10B981">sum = W0.T1</text>
+        <text x="8" y="42" text-anchor="start" font-size="7.5" fill="#10B981">    + W1.T1</text>
+        <text x="8" y="54" text-anchor="start" font-size="7.5" fill="#10B981">    + ... + Ww-1.T1</text>
+        <text x="8" y="72" text-anchor="start" font-size="7.5" fill="#8B5CF6" font-weight="600">atomicAdd(dBias[1], sum)</text>
+      </g>
+
+      <g transform="translate(280, 10)">
+        <rect x="0" y="0" width="130" height="82" rx="5" fill="white" stroke="#8B5CF6" stroke-width="1"/>
+        <rect x="4" y="3" width="50" height="14" rx="7" fill="#8B5CF6"/>
+        <text x="29" y="13" text-anchor="middle" font-size="7.5" fill="white" font-weight="700">Thread 2</text>
+        <text x="65" y="13" text-anchor="start" font-size="7.5" fill="#5B21B6" font-weight="600">elem = 2</text>
+        <text x="8" y="30" text-anchor="start" font-size="7.5" fill="#10B981">sum = W0.T2</text>
+        <text x="8" y="42" text-anchor="start" font-size="7.5" fill="#10B981">    + W1.T2</text>
+        <text x="8" y="54" text-anchor="start" font-size="7.5" fill="#10B981">    + ... + Ww-1.T2</text>
+        <text x="8" y="72" text-anchor="start" font-size="7.5" fill="#8B5CF6" font-weight="600">atomicAdd(dBias[2], sum)</text>
+      </g>
+
+      <text x="425" y="45" text-anchor="middle" font-size="14" fill="#9CA3AF">...</text>
+
+      <g transform="translate(450, 10)">
+        <rect x="0" y="0" width="145" height="82" rx="5" fill="white" stroke="#8B5CF6" stroke-width="1"/>
+        <rect x="4" y="3" width="68" height="14" rx="7" fill="#8B5CF6"/>
+        <text x="38" y="13" text-anchor="middle" font-size="7.5" fill="white" font-weight="700">Thread M-1</text>
+        <text x="80" y="13" text-anchor="start" font-size="7" fill="#5B21B6" font-weight="600">elem = M-1</text>
+        <text x="8" y="30" text-anchor="start" font-size="7.5" fill="#10B981">sum = W0.Tm-1</text>
+        <text x="8" y="42" text-anchor="start" font-size="7.5" fill="#10B981">    + W1.Tm-1</text>
+        <text x="8" y="54" text-anchor="start" font-size="7.5" fill="#10B981">    + ... + Ww-1.Tm-1</text>
+        <text x="8" y="72" text-anchor="start" font-size="7.5" fill="#8B5CF6" font-weight="600">atomicAdd(dBias[M-1], sum)</text>
+      </g>
+
+      <!-- Summary -->
+      <g transform="translate(610, 10)">
+        <rect x="0" y="0" width="255" height="82" rx="6" fill="#F9FAFB" stroke="#E5E7EB" stroke-width="0.8"/>
+        <text x="127" y="16" text-anchor="middle" font-size="9" font-weight="700" fill="#374151">Per thread:</text>
+        <text x="10" y="34" text-anchor="start" font-size="8.5" fill="#10B981">1. Read element from W warp slots</text>
+        <text x="10" y="48" text-anchor="start" font-size="8.5" fill="#10B981">2. Sum W values (linear loop)</text>
+        <text x="10" y="62" text-anchor="start" font-size="8.5" fill="#8B5CF6">3. atomicAdd to global dBias</text>
+        <text x="10" y="78" text-anchor="start" font-size="8.5" fill="#10B981" font-weight="600">No sync needed! All independent.</text>
+      </g>
+    </g>
+  </g>
+</svg>

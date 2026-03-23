@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 470" font-family="'Segoe UI', system-ui, Arial, sans-serif">
+  <defs>
+    <marker id="arrowGray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 1 L 9 5 L 0 9 z" fill="#6B7280"/>
+    </marker>
+    <marker id="arrowDown" viewBox="0 0 10 10" refX="5" refY="9" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M 1 0 L 5 9 L 9 0 z" fill="#6B7280"/>
+    </marker>
+  </defs>
+
+  <rect width="960" height="470" fill="white" rx="8"/>
+
+  <!-- TITLE -->
+  <text x="480" y="28" text-anchor="middle" font-size="20" font-weight="700" fill="#111827">Slang Neural Module: Abstraction for Tensor Core Neural Shading</text>
+  <text x="480" y="48" text-anchor="middle" font-size="11" fill="#6B7280">Write once, run on Vulkan and CUDA. Linear layer maps to tensor core MMA automatically.</text>
+
+  <!-- ================================================================ -->
+  <!-- LAYER 1: User Code (top)                                         -->
+  <!-- ================================================================ -->
+  <g transform="translate(60, 68)">
+    <rect x="0" y="0" width="840" height="90" rx="8" fill="#D1FAE5" stroke="#10B981" stroke-width="1.5"/>
+    <text x="420" y="22" text-anchor="middle" font-size="13" font-weight="700" fill="#065F46">User Code (Write Once)</text>
+
+    <g transform="translate(20, 34)">
+      <rect x="0" y="0" width="155" height="42" rx="5" fill="#ECFDF5" stroke="#6EE7B7" stroke-width="1"/>
+      <text x="77" y="16" text-anchor="middle" font-size="9.5" font-weight="600" fill="#065F46">FFLayer.eval()</text>
+      <text x="77" y="32" text-anchor="middle" font-size="8" fill="#059669">y = Activation(W*x + b)</text>
+
+      <rect x="175" y="0" width="155" height="42" rx="5" fill="#ECFDF5" stroke="#6EE7B7" stroke-width="1"/>
+      <text x="252" y="16" text-anchor="middle" font-size="9.5" font-weight="600" fill="#065F46">IVector.linearTransform()</text>
+      <text x="252" y="32" text-anchor="middle" font-size="8" fill="#059669">output = W * input</text>
+
+      <rect x="350" y="0" width="155" height="42" rx="5" fill="#ECFDF5" stroke="#6EE7B7" stroke-width="1"/>
+      <text x="427" y="16" text-anchor="middle" font-size="9.5" font-weight="600" fill="#065F46">IPointerLikeAddress</text>
+      <text x="427" y="32" text-anchor="middle" font-size="8" fill="#059669">Cross-platform param access</text>
+
+      <rect x="525" y="0" width="155" height="42" rx="5" fill="#ECFDF5" stroke="#6EE7B7" stroke-width="1"/>
+      <text x="602" y="16" text-anchor="middle" font-size="9.5" font-weight="600" fill="#065F46">[Differentiable]</text>
+      <text x="602" y="32" text-anchor="middle" font-size="8" fill="#059669">Auto backward pass</text>
+
+      <rect x="700" y="0" width="120" height="42" rx="5" fill="#ECFDF5" stroke="#6EE7B7" stroke-width="1"/>
+      <text x="760" y="16" text-anchor="middle" font-size="9.5" font-weight="600" fill="#065F46">IActivation</text>
+      <text x="760" y="32" text-anchor="middle" font-size="8" fill="#059669">ReLU, Sigmoid, ...</text>
+    </g>
+  </g>
+
+  <!-- Arrow down -->
+  <line x1="480" y1="162" x2="480" y2="182" stroke="#6B7280" stroke-width="1.5" marker-end="url(#arrowGray)"/>
+  <text x="480" y="176" text-anchor="middle" font-size="8" fill="#6B7280">compiles to</text>
+
+  <!-- ================================================================ -->
+  <!-- LAYER 2: Slang Neural Module (middle)                            -->
+  <!-- ================================================================ -->
+  <g transform="translate(60, 188)">
+    <rect x="0" y="0" width="840" height="90" rx="8" fill="#DBEAFE" stroke="#3B82F6" stroke-width="1.5"/>
+    <text x="420" y="22" text-anchor="middle" font-size="13" font-weight="700" fill="#1E40AF">Slang Neural Module (Automatic Mapping)</text>
+
+    <g transform="translate(20, 34)">
+      <rect x="0" y="0" width="195" height="42" rx="5" fill="#EFF6FF" stroke="#93C5FD" stroke-width="1"/>
+      <text x="97" y="16" text-anchor="middle" font-size="9.5" font-weight="600" fill="#1E40AF">Mat-Vec &#x2192; Mat-Mat Batching</text>
+      <text x="97" y="32" text-anchor="middle" font-size="8" fill="#3B82F6">Warp threads batched together</text>
+
+      <rect x="215" y="0" width="195" height="42" rx="5" fill="#EFF6FF" stroke="#93C5FD" stroke-width="1"/>
+      <text x="312" y="16" text-anchor="middle" font-size="9.5" font-weight="600" fill="#1E40AF">Tiled Cooperative Matrix</text>
+      <text x="312" y="32" text-anchor="middle" font-size="8" fill="#3B82F6">16x16 tile MMA operations</text>
+
+      <rect x="430" y="0" width="195" height="42" rx="5" fill="#EFF6FF" stroke="#93C5FD" stroke-width="1"/>
+      <text x="527" y="16" text-anchor="middle" font-size="9.5" font-weight="600" fill="#1E40AF">Shared Memory Management</text>
+      <text x="527" y="32" text-anchor="middle" font-size="8" fill="#3B82F6">shA, shB, shC auto-managed</text>
+
+      <rect x="645" y="0" width="175" height="42" rx="5" fill="#EFF6FF" stroke="#93C5FD" stroke-width="1"/>
+      <text x="732" y="16" text-anchor="middle" font-size="9.5" font-weight="600" fill="#1E40AF">Backward Generation</text>
+      <text x="732" y="32" text-anchor="middle" font-size="8" fill="#3B82F6">MMA, outerProduct, reduce</text>
+    </g>
+  </g>
+
+  <!-- Arrow down -->
+  <line x1="480" y1="282" x2="480" y2="302" stroke="#6B7280" stroke-width="1.5" marker-end="url(#arrowGray)"/>
+  <text x="480" y="296" text-anchor="middle" font-size="8" fill="#6B7280">targets</text>
+
+  <!-- ================================================================ -->
+  <!-- LAYER 3: Backends (bottom) - side by side                        -->
+  <!-- ================================================================ -->
+  <g transform="translate(60, 308)">
+    <!-- Vulkan backend -->
+    <rect x="0" y="0" width="400" height="100" rx="8" fill="#EDE9FE" stroke="#8B5CF6" stroke-width="1.5"/>
+    <text x="200" y="22" text-anchor="middle" font-size="13" font-weight="700" fill="#5B21B6">Vulkan</text>
+
+    <g transform="translate(15, 34)">
+      <rect x="0" y="0" width="170" height="50" rx="5" fill="#F5F3FF" stroke="#DDD6FE" stroke-width="1"/>
+      <text x="85" y="18" text-anchor="middle" font-size="9" font-weight="600" fill="#5B21B6">VK_NV_cooperative_vector</text>
+      <text x="85" y="34" text-anchor="middle" font-size="8" fill="#7C3AED">Native HW extension</text>
+      <text x="85" y="46" text-anchor="middle" font-size="8" fill="#6B7280">Direct tensor core access</text>
+
+      <rect x="185" y="0" width="195" height="50" rx="5" fill="#F5F3FF" stroke="#DDD6FE" stroke-width="1"/>
+      <text x="282" y="18" text-anchor="middle" font-size="9" font-weight="600" fill="#5B21B6">SPV_NV_cooperative_vector</text>
+      <text x="282" y="34" text-anchor="middle" font-size="8" fill="#7C3AED">SPIR-V extension</text>
+      <text x="282" y="46" text-anchor="middle" font-size="8" fill="#6B7280">BindlessAddress for params</text>
+    </g>
+
+    <!-- OR divider -->
+    <text x="420" y="55" text-anchor="middle" font-size="12" font-weight="700" fill="#374151">+</text>
+
+    <!-- CUDA backend -->
+    <rect x="440" y="0" width="400" height="100" rx="8" fill="#FEF3C7" stroke="#F59E0B" stroke-width="1.5"/>
+    <text x="640" y="22" text-anchor="middle" font-size="13" font-weight="700" fill="#92400E">CUDA</text>
+
+    <g transform="translate(455, 34)">
+      <rect x="0" y="0" width="170" height="50" rx="5" fill="#FFFBEB" stroke="#FDE68A" stroke-width="1"/>
+      <text x="85" y="18" text-anchor="middle" font-size="9" font-weight="600" fill="#92400E">Cooperative Matrix</text>
+      <text x="85" y="34" text-anchor="middle" font-size="8" fill="#B45309">wmma / mma instructions</text>
+      <text x="85" y="46" text-anchor="middle" font-size="8" fill="#6B7280">Tensor core via PTX</text>
+
+      <rect x="185" y="0" width="195" height="50" rx="5" fill="#FFFBEB" stroke="#FDE68A" stroke-width="1"/>
+      <text x="282" y="18" text-anchor="middle" font-size="9" font-weight="600" fill="#92400E">Implemented in Slang</text>
+      <text x="282" y="34" text-anchor="middle" font-size="8" fill="#B45309">No native coop vector API</text>
+      <text x="282" y="46" text-anchor="middle" font-size="8" fill="#6B7280">PointerAddress for params</text>
+    </g>
+  </g>
+
+  <!-- Bottom message -->
+  <g transform="translate(60, 425)">
+    <rect x="0" y="0" width="840" height="30" rx="6" fill="#F0F9FF" stroke="#BAE6FD" stroke-width="1"/>
+    <text x="420" y="20" text-anchor="middle" font-size="10" font-weight="600" fill="#0369A1">Same IVector.linearTransform() call &#x2192; tensor core MMA on both platforms. User code never changes.</text>
+  </g>
+</svg>
