@@ -7042,52 +7042,6 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
                 }
 
                 markOverridingDecl(context, callee.getDecl(), requiredMemberDeclRef);
-
-                // If our method has associated functions, we need to add some decorators to
-                // materialize those conformances.
-                /*
-                {
-                    bool hasFwdDerivative = false;
-                    auto fwdDiffLookupResult = lookUpMember(
-                        getASTBuilder(),
-                        this,
-                        getName("fwd_diff"),
-                        DeclRefType::create(getASTBuilder(), callee),
-                        getOuterScope(),
-                        LookupMask::Default);
-                    fwdDiffLookupResult = resolveOverloadedLookup(fwdDiffLookupResult);
-                    if (!fwdDiffLookupResult.isOverloaded() && fwdDiffLookupResult.isValid())
-                        hasFwdDerivative = true;
-
-                    if (hasFwdDerivative)
-                    {
-                        auto fwdDerivativeModifier =
-                            m_astBuilder->create<ForwardDifferentiableAttribute>();
-                        addModifier(synFuncDecl, fwdDerivativeModifier);
-                    }
-                }
-
-                {
-                    bool hasBwdDerivative = false;
-                    auto bwdDiffLookupResult = lookUpMember(
-                        getASTBuilder(),
-                        this,
-                        getName("bwd_diff"),
-                        DeclRefType::create(getASTBuilder(), callee),
-                        getOuterScope(),
-                        LookupMask::Default);
-                    bwdDiffLookupResult = resolveOverloadedLookup(bwdDiffLookupResult);
-                    if (!bwdDiffLookupResult.isOverloaded() && bwdDiffLookupResult.isValid())
-                        hasBwdDerivative = true;
-
-                    if (hasBwdDerivative)
-                    {
-                        auto bwdDerivativeModifier =
-                            m_astBuilder->create<BackwardDifferentiableAttribute>();
-                        addModifier(synFuncDecl, bwdDerivativeModifier);
-                    }
-                }
-                */
             }
         }
     }
