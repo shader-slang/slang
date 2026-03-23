@@ -18,7 +18,8 @@ SLANG_UNIT_TEST(replayResetHandlersClearsDictionary)
 
     auto& replayCtx = ctx();
 
-    SLANG_CHECK(replayCtx.getHandlerCount() > 0);
+    size_t initialCount = replayCtx.getHandlerCount();
+    SLANG_CHECK(initialCount > 0);
 
     // This is what slang_shutdown() calls to free handler strings
     // before _CrtDumpMemoryLeaks() runs.
@@ -27,5 +28,5 @@ SLANG_UNIT_TEST(replayResetHandlersClearsDictionary)
 
     // Restore the handlers so subsequent tests are unaffected.
     replayCtx.registerDefaultHandlers();
-    SLANG_CHECK(replayCtx.getHandlerCount() > 0);
+    SLANG_CHECK(replayCtx.getHandlerCount() == initialCount);
 }
