@@ -80,7 +80,6 @@ void processNonUniformResourceIndex(
                     }
                     break;
                 case kIROp_GetElement:
-                    // Ignore when `NonUniformResourceIndex` is not on base
                     if (user->getOperand(0) == inst)
                     {
                         // Replace getElement(nonuniformRes(obj), i), into
@@ -89,6 +88,33 @@ void processNonUniformResourceIndex(
                             user->getFullType(),
                             inst->getOperand(0),
                             user->getOperand(1));
+                    }
+                    else if (
+                        floatMode == NonUniformResourceIndexFloatMode::SPIRV &&
+                        user->getOperand(1) == inst)
+                    {
+                        // Replace getElement(obj, nonUniformRes(i)), into
+                        // nonUniformRes(getElement(obj, i))
+                        newUser = builder.emitElementExtract(
+                            user->getFullType(),
+                            user->getOperand(0),
+                            inst->getOperand(0));
+                    }
+                    break;
+                case kIROp_MakeCombinedTextureSampler:
+                    {
+                        auto tex = user->getOperand(0);
+                        auto samp = user->getOperand(1);
+                        if (tex == inst)
+                            tex = inst->getOperand(0);
+                        else if (samp == inst)
+                            samp = inst->getOperand(0);
+                        else
+                            break;
+                        newUser = builder.emitMakeCombinedTextureSampler(
+                            user->getFullType(),
+                            tex,
+                            samp);
                     }
                     break;
                 case kIROp_Swizzle:
@@ -142,6 +168,7 @@ void processNonUniformResourceIndex(
                 case kIROp_CastDescriptorHandleToUInt2:
                 case kIROp_GetElement:
                 case kIROp_Swizzle:
+                case kIROp_MakeCombinedTextureSampler:
                     resWorkList.add(nonuniformUser);
                     break;
                 };

@@ -6004,6 +6004,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 ensureExtensionDeclarationBeforeSpv15(toSlice("SPV_EXT_descriptor_indexing"));
 
                 requireSPIRVCapability(SpvCapabilityShaderNonUniform);
+                requireNonUniformIndexingCapabilityForInst(decoration->getParent());
                 emitOpDecorate(
                     getSection(SpvLogicalSectionID::Annotations),
                     decoration,
@@ -10104,6 +10105,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
     SpvInst* emitSPIRVAsm(SpvInstParent* parent, IRSPIRVAsm* inst)
     {
         SpvInst* last = nullptr;
+        List<SpvWord> nonUniformSampledImageIDs;
 
         // This keeps track of the named IDs used in the asm block
         Dictionary<UnownedStringSlice, SpvWord> idMap;
@@ -10582,8 +10584,45 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                                 emitOperand(memoryScope);
                             }
                         });
+
+                    if (opcode == SpvOpSampledImage)
+                    {
+                        bool hasNonUniformOperand = false;
+                        SpvWord sampledImageID = 0;
+                        for (const auto operand : spvInst->getSPIRVOperands())
+                        {
+                            if (operand->getOp() == kIROp_SPIRVAsmOperandId && !sampledImageID)
+                            {
+                                auto idName =
+                                    cast<IRStringLit>(operand->getValue())->getStringSlice();
+                                idMap.tryGetValue(idName, sampledImageID);
+                            }
+                            if (operand->getOp() == kIROp_SPIRVAsmOperandInst)
+                            {
+                                auto irVal = operand->getValue();
+                                if (irVal &&
+                                    irVal->findDecoration<
+                                        IRSPIRVNonUniformResourceDecoration>())
+                                    hasNonUniformOperand = true;
+                            }
+                        }
+                        if (hasNonUniformOperand && sampledImageID)
+                            nonUniformSampledImageIDs.add(sampledImageID);
+                    }
                 }
             }
+        }
+
+        for (auto sampledImageID : nonUniformSampledImageIDs)
+        {
+            ensureExtensionDeclarationBeforeSpv15(toSlice("SPV_EXT_descriptor_indexing"));
+            requireSPIRVCapability(SpvCapabilityShaderNonUniform);
+            requireSPIRVCapability(SpvCapabilitySampledImageArrayNonUniformIndexing);
+            emitOpDecorate(
+                getSection(SpvLogicalSectionID::Annotations),
+                nullptr,
+                sampledImageID,
+                SpvDecorationNonUniform);
         }
 
         for (const auto& [name, id] : idMap)
@@ -10598,6 +10637,89 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         if (m_capabilities.add(capability))
         {
             emitOpCapability(getSection(SpvLogicalSectionID::Capabilities), nullptr, capability);
+        }
+    }
+
+    // Given the IR type of a NonUniform-decorated instruction, determine and emit
+    // the resource-kind-specific NonUniformIndexing capability required by Vulkan.
+    void requireNonUniformIndexingCapabilityForInst(IRInst* inst)
+    {
+        if (!inst)
+            return;
+        auto type = inst->getDataType();
+        if (!type)
+            return;
+
+        // Check address space on pointer types before unwrapping. Lowered
+        // structured/uniform buffers lose their high-level type info but retain
+        // their SPIR-V address space.
+        if (auto ptrType = as<IRPtrTypeBase>(type))
+        {
+            auto addrSpace = ptrType->getAddressSpace();
+            if (addrSpace == AddressSpace::StorageBuffer)
+            {
+                requireSPIRVCapability(SpvCapabilityStorageBufferArrayNonUniformIndexing);
+                return;
+            }
+            if (addrSpace == AddressSpace::Uniform)
+            {
+                requireSPIRVCapability(SpvCapabilityUniformBufferArrayNonUniformIndexing);
+                return;
+            }
+        }
+
+        // Unwrap pointer types to get to the underlying resource type.
+        while (auto ptrType = as<IRPtrTypeBase>(type))
+            type = ptrType->getValueType();
+
+        // Unwrap array types.
+        while (auto arrayType = as<IRArrayTypeBase>(type))
+            type = arrayType->getElementType();
+
+        if (auto texType = as<IRTextureTypeBase>(type))
+        {
+            if (texType->GetBaseShape() == SLANG_TEXTURE_BUFFER)
+            {
+                auto access = texType->getAccess();
+                if (access == SLANG_RESOURCE_ACCESS_READ_WRITE ||
+                    access == SLANG_RESOURCE_ACCESS_WRITE ||
+                    access == SLANG_RESOURCE_ACCESS_RASTER_ORDERED)
+                    requireSPIRVCapability(
+                        SpvCapabilityStorageTexelBufferArrayNonUniformIndexing);
+                else
+                    requireSPIRVCapability(
+                        SpvCapabilityUniformTexelBufferArrayNonUniformIndexing);
+            }
+            else
+            {
+                auto access = texType->getAccess();
+                if (access == SLANG_RESOURCE_ACCESS_READ_WRITE ||
+                    access == SLANG_RESOURCE_ACCESS_WRITE ||
+                    access == SLANG_RESOURCE_ACCESS_RASTER_ORDERED)
+                    requireSPIRVCapability(SpvCapabilityStorageImageArrayNonUniformIndexing);
+                else
+                    requireSPIRVCapability(SpvCapabilitySampledImageArrayNonUniformIndexing);
+            }
+        }
+        else if (as<IRSamplerStateTypeBase>(type))
+        {
+            requireSPIRVCapability(SpvCapabilitySampledImageArrayNonUniformIndexing);
+        }
+        else if (as<IRHLSLStructuredBufferTypeBase>(type))
+        {
+            requireSPIRVCapability(SpvCapabilityStorageBufferArrayNonUniformIndexing);
+        }
+        else if (as<IRSubpassInputType>(type))
+        {
+            requireSPIRVCapability(SpvCapabilityInputAttachmentArrayNonUniformIndexing);
+        }
+        else if (as<IRUniformParameterGroupType>(type))
+        {
+            requireSPIRVCapability(SpvCapabilityUniformBufferArrayNonUniformIndexing);
+        }
+        else if (as<IRGLSLShaderStorageBufferType>(type))
+        {
+            requireSPIRVCapability(SpvCapabilityStorageBufferArrayNonUniformIndexing);
         }
     }
 
