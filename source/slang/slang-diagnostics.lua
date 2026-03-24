@@ -3456,7 +3456,7 @@ warning(
 
 warning(
     "integer-constant-overflow",
-    39999,
+    40016,
     "integer constant overflow in conversion",
     span { loc = "expr:Expr", message = "integer value '~value' does not fit in type '~toType:Type'" }
 )
