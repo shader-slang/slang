@@ -948,6 +948,8 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
 
     void visitExpressionStmt(ExpressionStmt* stmt) { dispatchIfNotNull(stmt->expression); }
 
+    void visitRequireCapabilityStmt(RequireCapabilityStmt*) { return; }
+
     // Val Visitor
 
     void visitDirectDeclRef(DirectDeclRef* declRef)
@@ -3715,8 +3717,8 @@ void SemanticsDeclHeaderVisitor::checkGenericTypeEqualityConstraintSubType(
             return compareDecls(subAncestor, supAncestor);
         }
 
-        auto subIndex = ancestor->getMembers().binarySearch(subAncestor);
-        auto supIndex = ancestor->getMembers().binarySearch(supAncestor);
+        auto subIndex = ancestor->getMembers().indexOf(subAncestor);
+        auto supIndex = ancestor->getMembers().indexOf(supAncestor);
 
         return int(supIndex - subIndex);
     };
@@ -8765,6 +8767,11 @@ bool SemanticsVisitor::isHalfType(Type* type)
         return false;
     auto baseType = basicType->getBaseType();
     return baseType == BaseType::Half;
+}
+
+bool SemanticsVisitor::isValidSpecializationConstantType(Type* type)
+{
+    return as<BasicExpressionType>(type) || isEnumType(type);
 }
 
 bool SemanticsVisitor::isValidCompileTimeConstantType(Type* type)
@@ -14016,12 +14023,11 @@ void SemanticsDeclAttributesVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
     {
         if (as<SpecializationConstantAttribute>(modifier) || as<VkConstantIdAttribute>(modifier))
         {
-            // Specialization constant.
-            // Check that type is basic type.
-            if (!as<BasicExpressionType>(varDecl->getType()) && !as<ErrorType>(varDecl->getType()))
+            if (!isValidSpecializationConstantType(varDecl->getType()) &&
+                !as<ErrorType>(varDecl->getType()))
             {
                 getSink()->diagnose(
-                    Diagnostics::SpecializationConstantMustBeScalar{.modifier = modifier});
+                    Diagnostics::SpecializationConstantMustBeScalarOrEnum{.modifier = modifier});
             }
             hasSpecConstAttr = true;
         }

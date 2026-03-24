@@ -8250,6 +8250,34 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             builder->addDecoration(switchInst, kIROp_BranchDecoration);
         }
     }
+
+    void visitRequireCapabilityStmt(RequireCapabilityStmt* stmt)
+    {
+        auto builder = getBuilder();
+        startBlockIfNeeded(stmt);
+
+        List<CapabilityName> capNames;
+        for (const Token& t : stmt->requiredCaps)
+        {
+            CapabilityName capName = findCapabilityName(t.getContent());
+
+            // Note: capability names have already been validated, so we'll
+            // just do a quick assert here
+            SLANG_ASSERT(capName != CapabilityName::Invalid);
+
+            capNames.add(capName);
+        }
+
+        CapabilitySet capabilitySet(capNames);
+
+        IRInst* capSetInst = builder->getCapabilityValue(capabilitySet);
+
+        builder->emitIntrinsicInst(
+            builder->getVoidType(),
+            kIROp_LateRequireCapability,
+            1,
+            &capSetInst);
+    }
 };
 
 IRInst* getOrEmitDebugSource(IRGenContext* context, SourceLoc loc)

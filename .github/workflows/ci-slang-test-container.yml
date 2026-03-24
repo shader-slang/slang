@@ -27,7 +27,7 @@ jobs:
       packages: read
 
     container:
-      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.4.0
+      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.5.1
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
@@ -38,7 +38,6 @@ jobs:
         --device /dev/nvidia-modeset:/dev/nvidia-modeset
         --device /dev/dri:/dev/dri
         -e NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics
-        -e VK_LOADER_LAYERS_DISABLE=VK_LAYER_MESA_device_select
         -v /etc/vulkan/icd.d/nvidia_icd.json:/etc/vulkan/icd.d/nvidia_icd.json:ro
         -v /usr/share/nvidia:/usr/share/nvidia:ro
         -v /usr/share/glvnd/egl_vendor.d/10_nvidia.json:/usr/share/glvnd/egl_vendor.d/10_nvidia.json:ro
@@ -101,7 +100,6 @@ jobs:
             "-expected-failure-list" "tests/expected-failure-linux-gpu.txt"
             "-skip-reference-image-generation"
             "-show-adapter-info"
-            "-ignore-abort-msg"
           )
 
           if [ "${{ inputs.server-count }}" -gt 1 ]; then
@@ -130,7 +128,6 @@ jobs:
             -server-count ${{ inputs.server-count }} \
             -category full \
             -emit-spirv-via-glsl \
-            -ignore-abort-msg \
             -api vk \
             -expected-failure-list tests/expected-failure-via-glsl.txt \
             -expected-failure-list tests/expected-failure-github.txt \
@@ -161,7 +158,7 @@ jobs:
       packages: read
 
     container:
-      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.4.0
+      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.5.1
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
@@ -172,7 +169,6 @@ jobs:
         --device /dev/nvidia-modeset:/dev/nvidia-modeset
         --device /dev/dri:/dev/dri
         -e NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics
-        -e VK_LOADER_LAYERS_DISABLE=VK_LAYER_MESA_device_select
         -v /etc/vulkan/icd.d/nvidia_icd.json:/etc/vulkan/icd.d/nvidia_icd.json:ro
         -v /usr/share/nvidia:/usr/share/nvidia:ro
         -v /usr/share/glvnd/egl_vendor.d/10_nvidia.json:/usr/share/glvnd/egl_vendor.d/10_nvidia.json:ro
