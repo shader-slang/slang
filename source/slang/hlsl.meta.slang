@@ -28010,6 +28010,23 @@ struct CoopMat
         }
     }
 
+    /// Constructs a cooperative matrix from per-thread local rows with an offset
+    /// into a larger array. Avoids copying a sub-array when the data is already
+    /// contiguous in a bigger buffer.
+    ///
+    /// @param data The source array (larger than N elements).
+    /// @param offset Starting element index in data for this row.
+    /// @param matIndex Which group of M threads provides data.
+    [require(cuda)]
+    static This FromLocalRowOffset<int ArraySize>(T data[ArraySize], int offset, int matIndex)
+    {
+        __target_switch
+        {
+        case cuda:
+            __intrinsic_asm "$TR::FromLocalRow(&(($0).m_data[$1]), $2)";
+        }
+    }
+
     /// Extracts one row per thread from the cooperative matrix.
     /// Inverse of FromLocalRow. Each thread receives N elements representing
     /// its row of the matrix.

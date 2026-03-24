@@ -157,20 +157,17 @@ public struct SharedMemorySize0<T, TargetEnum Target, ExecutionMode ExeMode, int
     typealias CMShape = CoopMatShape<T, Target>;
 
     // The MMA forward/backward uses: shared A tiles + per-warp B/C tiles.
+    // With MMAHelperNew (CUDA + OptimalLayout), forward and backward MMA
+    // use zero shmem (LoadNative + FromLocal). This term only applies to
+    // the legacy shmem-based MMAHelper/TiledMMAHelper paths.
     static const uint BytesForMMA =
         (ShMemInfo.SharedMemSizeInVectorMatA + (ShMemInfo.SharedMemSizeInVectorMatC) * SubgroupCount) * sizeof(uint4);
-
-    // The backward outer product (dW = dOut * input^T) loads ALL N lanes'
-    // vectors simultaneously (2x the per-batch allocation) to avoid idle lanes.
-    static const uint BytesForOuterProduct = !ShMemInfo.IsTraining ? 0 :
-        2 * (ShMemInfo.SharedMemSizeInVectorMatA + ShMemInfo.SharedMemSizeInVectorMatB) * SubgroupCount * sizeof(uint4);
 
     // Cross-warp all-at-once reduction for sumReduceTilesAllAtOnce().
     // Stores ALL tiles at once instead of row-by-row to minimize barriers.
     // Memory = NTileRows * NTileCols * TileStride * sizeof(uint4)
-    // where TileStride = (ElementsPerLane * sizeof(T) / 4) * SubgroupSize * 4 / sizeof(uint4)
-    //                  = (CMShape.SizeCInElements / SubgroupSize * sizeof(T) / 4) * SubgroupSize * 4 / 16
-    //                  = CMShape.SizeCInElements * sizeof(T) / 16 = 256 * 2 / 16 = 32 uint4 for half 16x16 tiles
+    // Used by both the legacy outer product (shmem-staged) and the new
+    // MMAHelperNew outer product (FromLocal-based, shmem only for reduction).
     static const int NTileRows = (OutputSize + CMShape.ROW_A - 1) / CMShape.ROW_A;
     static const int NTileCols = (InputSize + CMShape.COLUMN_A - 1) / CMShape.COLUMN_A;
     static const int ElementsPerLane = CMShape.SizeCInElements / SubgroupSize;
@@ -179,7 +176,13 @@ public struct SharedMemorySize0<T, TargetEnum Target, ExecutionMode ExeMode, int
     static const uint BytesForCrossWarpReduction = !ShMemInfo.IsTraining ? 0 :
         NTileRows * NTileCols * TileStride * sizeof(uint4);
 
-    public static const uint Bytes = Max(Max(BytesForMMA, BytesForOuterProduct), BytesForCrossWarpReduction);
+    // Outer product store phase: one row of MatC tiles stored to shmem at a time.
+    // NTileCols MatC tiles × (ROW_C * COLUMN_C * sizeof(T)) bytes each.
+    static const int NCoopMatCColumns = (InputSize + CMShape.COLUMN_B - 1) / CMShape.COLUMN_B;
+    static const uint BytesForOuterProductStore = !ShMemInfo.IsTraining ? 0 :
+        NCoopMatCColumns * CMShape.ROW_C * CMShape.COLUMN_C * sizeof(T);
+
+    public static const uint Bytes = Max(Max(BytesForMMA, BytesForOuterProductStore), BytesForCrossWarpReduction);
 }
 
 // The following code is a macro-based implementation of the shared memory size calculation.

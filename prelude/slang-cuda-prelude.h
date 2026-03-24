@@ -8236,17 +8236,15 @@ __device__ inline void mmaFromRowMatrixA_16x16(
 
     unsigned base = matIndex * 16;
     const uint32_t mask = 0xFFFFFFFF;
-    uint32_t s[8][2];
+    regs[0] = 0; regs[1] = 0; regs[2] = 0; regs[3] = 0;
     #pragma unroll
     for (int j = 0; j < 8; j++)
     {
-        s[j][0] = __shfl_sync(mask, packedRow[j], gid + base);
-        s[j][1] = __shfl_sync(mask, packedRow[j], gid + 8 + base);
+        uint32_t v0 = __shfl_sync(mask, packedRow[j], gid + base);
+        uint32_t v1 = __shfl_sync(mask, packedRow[j], gid + 8 + base);
+        if (tid == j)     { regs[0] = v0; regs[1] = v1; }
+        if (tid + 4 == j) { regs[2] = v0; regs[3] = v1; }
     }
-    regs[0] = s[tid][0];
-    regs[1] = s[tid][1];
-    regs[2] = s[tid + 4][0];
-    regs[3] = s[tid + 4][1];
 }
 
 __device__ inline void mmaToRowMatrixA_16x16(
@@ -8289,23 +8287,28 @@ __device__ inline void mmaFromRowMatrixB_16x8(
     unsigned k = gid >> 1;
     unsigned shift = (gid & 1) * 16;
 
-    uint32_t s[4][4];
+    uint32_t r0 = 0, r1 = 0;
     #pragma unroll
     for (int ki = 0; ki < 4; ki++)
     {
-        s[ki][0] = __shfl_sync(mask, packedRow[ki], tid * 2 + base);
-        s[ki][1] = __shfl_sync(mask, packedRow[ki], tid * 2 + 1 + base);
-        s[ki][2] = __shfl_sync(mask, packedRow[ki], tid * 2 + 8 + base);
-        s[ki][3] = __shfl_sync(mask, packedRow[ki], tid * 2 + 9 + base);
+        uint32_t s0 = __shfl_sync(mask, packedRow[ki], tid * 2 + base);
+        uint32_t s1 = __shfl_sync(mask, packedRow[ki], tid * 2 + 1 + base);
+        uint32_t s2 = __shfl_sync(mask, packedRow[ki], tid * 2 + 8 + base);
+        uint32_t s3 = __shfl_sync(mask, packedRow[ki], tid * 2 + 9 + base);
+
+        if (k == ki)
+        {
+            uint16_t h0 = (uint16_t)(s0 >> shift);
+            uint16_t h1 = (uint16_t)(s1 >> shift);
+            r0 = (uint32_t)h0 | ((uint32_t)h1 << 16);
+
+            h0 = (uint16_t)(s2 >> shift);
+            h1 = (uint16_t)(s3 >> shift);
+            r1 = (uint32_t)h0 | ((uint32_t)h1 << 16);
+        }
     }
-
-    uint16_t h0 = (uint16_t)(s[k][0] >> shift);
-    uint16_t h1 = (uint16_t)(s[k][1] >> shift);
-    regs[0] = (uint32_t)h0 | ((uint32_t)h1 << 16);
-
-    h0 = (uint16_t)(s[k][2] >> shift);
-    h1 = (uint16_t)(s[k][3] >> shift);
-    regs[1] = (uint32_t)h0 | ((uint32_t)h1 << 16);
+    regs[0] = r0;
+    regs[1] = r1;
 }
 
 __device__ inline void mmaToRowMatrixB_16x8(
@@ -8349,17 +8352,15 @@ __device__ inline void mmaFromRowMatrixCD_f32_16x8(
 
     unsigned base = matIndex * 16;
     const uint32_t mask = 0xFFFFFFFF;
-    uint32_t s[8][2];
+    regs[0] = 0; regs[1] = 0; regs[2] = 0; regs[3] = 0;
     #pragma unroll
     for (int j = 0; j < 8; j++)
     {
-        s[j][0] = __shfl_sync(mask, rowU32[j], gid + base);
-        s[j][1] = __shfl_sync(mask, rowU32[j], gid + 8 + base);
+        uint32_t v0 = __shfl_sync(mask, rowU32[j], gid + base);
+        uint32_t v1 = __shfl_sync(mask, rowU32[j], gid + 8 + base);
+        if (tid * 2 == j)     { regs[0] = v0; regs[2] = v1; }
+        if (tid * 2 + 1 == j) { regs[1] = v0; regs[3] = v1; }
     }
-    regs[0] = s[tid * 2][0];
-    regs[1] = s[tid * 2 + 1][0];
-    regs[2] = s[tid * 2][1];
-    regs[3] = s[tid * 2 + 1][1];
 }
 
 __device__ inline void mmaToRowMatrixCD_f32_16x8(
@@ -8399,15 +8400,14 @@ __device__ inline void mmaFromRowMatrixCD_f16_16x8(
 
     unsigned base = matIndex * 16;
     const uint32_t mask = 0xFFFFFFFF;
-    uint32_t s[4][2];
+    regs[0] = 0; regs[1] = 0;
     #pragma unroll
     for (int j = 0; j < 4; j++)
     {
-        s[j][0] = __shfl_sync(mask, packedRow[j], gid + base);
-        s[j][1] = __shfl_sync(mask, packedRow[j], gid + 8 + base);
+        uint32_t v0 = __shfl_sync(mask, packedRow[j], gid + base);
+        uint32_t v1 = __shfl_sync(mask, packedRow[j], gid + 8 + base);
+        if (tid == j) { regs[0] = v0; regs[1] = v1; }
     }
-    regs[0] = s[tid][0];
-    regs[1] = s[tid][1];
 }
 
 __device__ inline void mmaToRowMatrixCD_f16_16x8(
@@ -8456,18 +8456,19 @@ __device__ inline void mmaFromColMatrixA_16x16(
     unsigned k = gid >> 1;
     unsigned shift = (gid & 1) * 16;
 
-    // reg[0] = packed(A[gid][tid*2], A[gid][tid*2+1]) — need row gid from col tid*2 and tid*2+1
-    // reg[2] = packed(A[gid][tid*2+8], A[gid][tid*2+9]) — need row gid from col tid*2+8 and tid*2+9
-    // Column c is held by thread (c + base). Row gid is at packedCol[gid/2], half (gid&1).
     uint32_t s[2][4];
     #pragma unroll
     for (int ko = 0; ko < 2; ko++)
     {
-        unsigned pk = k + ko * 4;
-        s[ko][0] = __shfl_sync(mask, packedCol[pk], tid * 2 + base);
-        s[ko][1] = __shfl_sync(mask, packedCol[pk], tid * 2 + 1 + base);
-        s[ko][2] = __shfl_sync(mask, packedCol[pk], tid * 2 + 8 + base);
-        s[ko][3] = __shfl_sync(mask, packedCol[pk], tid * 2 + 9 + base);
+        uint32_t val = 0;
+        #pragma unroll
+        for (int p = 0; p < 4; p++)
+            if (k == p) val = packedCol[p + ko * 4];
+
+        s[ko][0] = __shfl_sync(mask, val, tid * 2 + base);
+        s[ko][1] = __shfl_sync(mask, val, tid * 2 + 1 + base);
+        s[ko][2] = __shfl_sync(mask, val, tid * 2 + 8 + base);
+        s[ko][3] = __shfl_sync(mask, val, tid * 2 + 9 + base);
     }
 
     uint16_t h0, h1;
@@ -8592,28 +8593,16 @@ __device__ inline void mmaFromColMatrixCD_f32_16x8(
     unsigned base = matIndex * 8;
     const uint32_t mask = 0xFFFFFFFF;
 
-    // C[row][col] = thread_{col+base}'s colU32[row]
-    // reg[0] = C[gid][tid*2] = colU32[gid] from thread tid*2+base
-    // reg[1] = C[gid][tid*2+1] = colU32[gid] from thread tid*2+1+base
-    // Need to iterate over gid values since gid varies per reading thread.
-    uint32_t s0[8], s1[8];
+    regs[0] = 0; regs[1] = 0; regs[2] = 0; regs[3] = 0;
     #pragma unroll
     for (int g = 0; g < 8; g++)
     {
-        s0[g] = __shfl_sync(mask, colU32[g], tid * 2 + base);
-        s1[g] = __shfl_sync(mask, colU32[g], tid * 2 + 1 + base);
+        uint32_t v0 = __shfl_sync(mask, colU32[g], tid * 2 + base);
+        uint32_t v1 = __shfl_sync(mask, colU32[g], tid * 2 + 1 + base);
+        uint32_t v0h = __shfl_sync(mask, colU32[g + 8], tid * 2 + base);
+        uint32_t v1h = __shfl_sync(mask, colU32[g + 8], tid * 2 + 1 + base);
+        if (gid == g) { regs[0] = v0; regs[1] = v1; regs[2] = v0h; regs[3] = v1h; }
     }
-    uint32_t s0h[8], s1h[8];
-    #pragma unroll
-    for (int g = 0; g < 8; g++)
-    {
-        s0h[g] = __shfl_sync(mask, colU32[g + 8], tid * 2 + base);
-        s1h[g] = __shfl_sync(mask, colU32[g + 8], tid * 2 + 1 + base);
-    }
-    regs[0] = s0[gid];
-    regs[1] = s1[gid];
-    regs[2] = s0h[gid];
-    regs[3] = s1h[gid];
 }
 
 __device__ inline void mmaToColMatrixCD_f32_16x8(
@@ -8660,25 +8649,29 @@ __device__ inline void mmaFromColMatrixCD_f16_16x8(
     const uint32_t mask = 0xFFFFFFFF;
     unsigned k = gid >> 1;
     unsigned shift = (gid & 1) * 16;
+    unsigned k2 = (gid + 8) >> 1;
+    unsigned shift2 = ((gid + 8) & 1) * 16;
 
-    // Iterate over packed indices, shuffling from the 2 source threads
-    uint32_t s[8][2];
+    regs[0] = 0; regs[1] = 0;
     #pragma unroll
     for (int p = 0; p < 8; p++)
     {
-        s[p][0] = __shfl_sync(mask, packedCol[p], tid * 2 + base);
-        s[p][1] = __shfl_sync(mask, packedCol[p], tid * 2 + 1 + base);
+        uint32_t v0 = __shfl_sync(mask, packedCol[p], tid * 2 + base);
+        uint32_t v1 = __shfl_sync(mask, packedCol[p], tid * 2 + 1 + base);
+
+        if (k == p)
+        {
+            uint16_t h0 = (uint16_t)(v0 >> shift);
+            uint16_t h1 = (uint16_t)(v1 >> shift);
+            regs[0] = (uint32_t)h0 | ((uint32_t)h1 << 16);
+        }
+        if (k2 == p)
+        {
+            uint16_t h0 = (uint16_t)(v0 >> shift2);
+            uint16_t h1 = (uint16_t)(v1 >> shift2);
+            regs[1] = (uint32_t)h0 | ((uint32_t)h1 << 16);
+        }
     }
-
-    uint16_t h0 = (uint16_t)(s[k][0] >> shift);
-    uint16_t h1 = (uint16_t)(s[k][1] >> shift);
-    regs[0] = (uint32_t)h0 | ((uint32_t)h1 << 16);
-
-    unsigned k2 = (gid + 8) >> 1;
-    unsigned shift2 = ((gid + 8) & 1) * 16;
-    h0 = (uint16_t)(s[k2][0] >> shift2);
-    h1 = (uint16_t)(s[k2][1] >> shift2);
-    regs[1] = (uint32_t)h0 | ((uint32_t)h1 << 16);
 }
 
 __device__ inline void mmaToColMatrixCD_f16_16x8(
@@ -9664,6 +9657,16 @@ __device__ inline void mmaChangeMajor(WmmaFragment<half, M, N, K, R>& frag)
         frag.regs[1] = t1;
         frag.regs[2] = t2;
         frag.regs[3] = t3;
+    }
+    else if constexpr (M == 16 && N == 8 && K == 16 && R == MatrixUse::MatrixB)
+    {
+        // MatB (16×8): 2 registers, two stacked 8×8 sub-blocks.
+        // Transpose each sub-block independently.
+        uint32_t t0, t1;
+        asm volatile("movmatrix.sync.aligned.m8n8.trans.b16 %0, %1;" : "=r"(t0) : "r"(frag.regs[0]));
+        asm volatile("movmatrix.sync.aligned.m8n8.trans.b16 %0, %1;" : "=r"(t1) : "r"(frag.regs[1]));
+        frag.regs[0] = t0;
+        frag.regs[1] = t1;
     }
 }
 #endif // #if SLANG_CUDA_ENABLE_HALF
