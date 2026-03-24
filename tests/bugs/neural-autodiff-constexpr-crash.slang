@@ -1,5 +1,3 @@
-// generic-static-const-div.slang
-
 // Regression test for https://github.com/shader-slang/slang/issues/10605
 //
 // After PR #10391 changed constant folding to use SpecializationConstant
@@ -12,7 +10,9 @@
 // in AutoDiffPass::processReferencedFunctions.
 //
 //TEST:SIMPLE(filecheck=CHECK): -target cuda -experimental-feature
-// CHECK: backward
+
+// CHECK: __global__ void backward
+// CHECK: s_bwd_run
 
 import slang.neural;
 
