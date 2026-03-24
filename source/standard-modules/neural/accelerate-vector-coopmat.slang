@@ -1257,14 +1257,24 @@ public struct WaveTangledVector<T, ShMemSize : ISharedMemorySize, int N, int Sub
     {
         if (Layout.Layout == LayoutType.Optimal)
         {
-            typealias MMA = TiledMMAHelper<T, N, OutputVector.Size, SubgroupSize, Target, ShMemSize, false, SubgroupCount>;
-            uint shA = 0;
-            uint shB = MMA.ShMemInfo.SharedMemSizeInVectorMatA;
-            uint shC = shB;
-            const int AlignedOutSize = MMA.TileInfo.Uint4AlignedM;
-            let outputArray = MMA.mma<T, Address, T[Uint4AlignedInputSize], T[AlignedOutSize], T, Bias
-                                >( data, shA, shB, shC, weightAddress, biasAddress);
-            return OutputVector(outputArray);
+            __target_switch
+            {
+            case cuda:
+                typealias MMA = MMAHelperNew<T, N, OutputVector.Size, SubgroupSize, Target>;
+                const int AlignedOutSize = ((OutputVector.Size + int(MMA.ElementCountPerVector) - 1) / int(MMA.ElementCountPerVector)) * int(MMA.ElementCountPerVector);
+                let outputArray = MMA.mma<T, Address, T[Uint4AlignedInputSize], T[AlignedOutSize], T, Bias>(
+                    data, weightAddress, biasAddress);
+                return OutputVector(outputArray);
+            case spirv:
+                typealias MMA_spirv = TiledMMAHelper<T, N, OutputVector.Size, SubgroupSize, Target, ShMemSize, false, SubgroupCount>;
+                uint shA = 0;
+                uint shB = MMA_spirv.ShMemInfo.SharedMemSizeInVectorMatA;
+                uint shC = shB;
+                const int AlignedOutSize_spirv = MMA_spirv.TileInfo.Uint4AlignedM;
+                let outputArray_spirv = MMA_spirv.mma<T, Address, T[Uint4AlignedInputSize], T[AlignedOutSize_spirv], T, Bias
+                                    >( data, shA, shB, shC, weightAddress, biasAddress);
+                return OutputVector(outputArray_spirv);
+            }
         }
         else
         {

@@ -27957,6 +27957,34 @@ struct CoopMat
         }
     }
 
+    /// Loads a cooperative matrix from native (fragment-register) layout in memory.
+    /// The tile data must be pre-arranged so that each warp lane's fragment registers
+    /// are stored contiguously. This generates a single vectorized load per thread
+    /// with no warp shuffles — the fastest possible weight tile load.
+    ///
+    /// @param buffer The buffer containing tile data in native layout.
+    /// @param element The starting element index in the buffer.
+    /// @return A cooperative matrix loaded from native layout.
+    [require(cuda)]
+    static This LoadNative(RWStructuredBuffer<T> buffer, uint element)
+    {
+        __target_switch
+        {
+        case cuda:
+            __intrinsic_asm "$TR::LoadNative(($0).data + $1)";
+        }
+    }
+
+    [require(cuda)]
+    static This LoadNative(StructuredBuffer<T> buffer, uint element)
+    {
+        __target_switch
+        {
+        case cuda:
+            __intrinsic_asm "$TR::LoadNative(($0).data + $1)";
+        }
+    }
+
     /// Constructs a cooperative matrix from per-thread local rows.
     /// Each thread in the warp provides one full row of the matrix (N elements).
     /// M threads form one matrix; `matIndex` selects which group of M threads contributes.

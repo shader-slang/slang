@@ -7289,19 +7289,15 @@ __device__ inline void mmaShuffleMatrixA_16x16(
     if constexpr (layout == Layout::RowMajor)
     {
         const uint32_t mask = 0xFFFFFFFF;
-        uint32_t s[4][4];
+        uint32_t tmp;
         #pragma unroll
         for (int k = 0; k < 4; k++)
         {
-            s[k][0] = __shfl_sync(mask, loaded[k], gid * 2);
-            s[k][1] = __shfl_sync(mask, loaded[k], (gid + 8) * 2);
-            s[k][2] = __shfl_sync(mask, loaded[k], gid * 2 + 1);
-            s[k][3] = __shfl_sync(mask, loaded[k], (gid + 8) * 2 + 1);
+            tmp = __shfl_sync(mask, loaded[k], gid * 2);       if (tid == k) regs[0] = tmp;
+            tmp = __shfl_sync(mask, loaded[k], (gid + 8) * 2); if (tid == k) regs[1] = tmp;
+            tmp = __shfl_sync(mask, loaded[k], gid * 2 + 1);   if (tid == k) regs[2] = tmp;
+            tmp = __shfl_sync(mask, loaded[k], (gid+8)*2 + 1); if (tid == k) regs[3] = tmp;
         }
-        regs[0] = s[tid][0];
-        regs[1] = s[tid][1];
-        regs[2] = s[tid][2];
-        regs[3] = s[tid][3];
     }
     else
     {
@@ -7545,15 +7541,13 @@ __device__ inline void mmaShuffleMatrixB_16x8(
     const uint32_t mask = 0xFFFFFFFF;
     if constexpr (layout == Layout::ColMajor)
     {
-        uint32_t s[4][2];
+        uint32_t tmp;
         #pragma unroll
         for (int k = 0; k < 4; k++)
         {
-            s[k][0] = __shfl_sync(mask, loaded[k], gid * 2);
-            s[k][1] = __shfl_sync(mask, loaded[k], gid * 2 + 1);
+            tmp = __shfl_sync(mask, loaded[k], gid * 2);     if (tid == k) regs[0] = tmp;
+            tmp = __shfl_sync(mask, loaded[k], gid * 2 + 1); if (tid == k) regs[1] = tmp;
         }
-        regs[0] = s[tid][0];
-        regs[1] = s[tid][1];
     }
     else
     {
@@ -7687,40 +7681,41 @@ __device__ inline void mmaShuffleMatrixCD_f32_16x8(
 
     if constexpr (layout == Layout::RowMajor)
     {
-        uint32_t s[4][4];
+        // Original: s[k][j] where j indexes 4 source lanes.
+        // regs[0]=s[k_base][src_base], regs[1]=s[k_base+1][src_base],
+        // regs[2]=s[k_base][src_base+1], regs[3]=s[k_base+1][src_base+1]
+        // k_base=(tid&1)*2, src_base=(tid>>1)*2
+        uint32_t tmp;
+        unsigned kb = (tid & 1) * 2;
+        unsigned sb = (tid >> 1) * 2;
         #pragma unroll
         for (int k = 0; k < 4; k++)
         {
-            s[k][0] = __shfl_sync(mask, loaded[k], gid * 2);
-            s[k][1] = __shfl_sync(mask, loaded[k], (gid + 8) * 2);
-            s[k][2] = __shfl_sync(mask, loaded[k], gid * 2 + 1);
-            s[k][3] = __shfl_sync(mask, loaded[k], (gid + 8) * 2 + 1);
+            #pragma unroll
+            for (int j = 0; j < 4; j++)
+            {
+                unsigned srcLane = (j < 2) ? ((j == 0) ? gid * 2 : (gid + 8) * 2)
+                                           : ((j == 2) ? gid * 2 + 1 : (gid + 8) * 2 + 1);
+                tmp = __shfl_sync(mask, loaded[k], srcLane);
+                if (k == kb     && j == sb)     regs[0] = tmp;
+                if (k == kb + 1 && j == sb)     regs[1] = tmp;
+                if (k == kb     && j == sb + 1) regs[2] = tmp;
+                if (k == kb + 1 && j == sb + 1) regs[3] = tmp;
+            }
         }
-
-        unsigned k_base = (tid & 1) * 2;
-        unsigned src_base = (tid >> 1) * 2;
-        regs[0] = s[k_base][src_base];
-        regs[1] = s[k_base + 1][src_base];
-        regs[2] = s[k_base][src_base + 1];
-        regs[3] = s[k_base + 1][src_base + 1];
     }
     else
     {
-        uint32_t s[4][4];
+        uint32_t tmp;
+        unsigned k = gid & 3;
         #pragma unroll
         for (int ki = 0; ki < 4; ki++)
         {
-            s[ki][0] = __shfl_sync(mask, loaded[ki], tid * 8 + gid / 4);
-            s[ki][1] = __shfl_sync(mask, loaded[ki], tid * 8 + 4 + gid / 4);
-            s[ki][2] = __shfl_sync(mask, loaded[ki], tid * 8 + 2 + gid / 4);
-            s[ki][3] = __shfl_sync(mask, loaded[ki], tid * 8 + 6 + gid / 4);
+            tmp = __shfl_sync(mask, loaded[ki], tid * 8 + gid / 4);     if (ki == k) regs[0] = tmp;
+            tmp = __shfl_sync(mask, loaded[ki], tid * 8 + 4 + gid / 4); if (ki == k) regs[1] = tmp;
+            tmp = __shfl_sync(mask, loaded[ki], tid * 8 + 2 + gid / 4); if (ki == k) regs[2] = tmp;
+            tmp = __shfl_sync(mask, loaded[ki], tid * 8 + 6 + gid / 4); if (ki == k) regs[3] = tmp;
         }
-
-        unsigned k = gid & 3;
-        regs[0] = s[k][0];
-        regs[1] = s[k][1];
-        regs[2] = s[k][2];
-        regs[3] = s[k][3];
     }
 }
 
@@ -7834,15 +7829,13 @@ __device__ inline void mmaShuffleMatrixCD_f16_16x8(
 
     if constexpr (layout == Layout::RowMajor)
     {
-        uint32_t s[4][2];
+        uint32_t tmp;
         #pragma unroll
         for (int k = 0; k < 4; k++)
         {
-            s[k][0] = __shfl_sync(mask, loaded[k], gid);
-            s[k][1] = __shfl_sync(mask, loaded[k], gid + 8);
+            tmp = __shfl_sync(mask, loaded[k], gid);     if (tid == k) regs[0] = tmp;
+            tmp = __shfl_sync(mask, loaded[k], gid + 8); if (tid == k) regs[1] = tmp;
         }
-        regs[0] = s[tid][0];
-        regs[1] = s[tid][1];
     }
     else
     {
@@ -8546,18 +8539,15 @@ __device__ inline void mmaFromColMatrixB_16x8(
     unsigned base = matIndex * 8;
     const uint32_t mask = 0xFFFFFFFF;
 
-    // packedCol[j] = packed(localCol[2j], localCol[2j+1]) = packed(B[2j][myCol], B[2j+1][myCol])
-    // reg[0] = packed(B[tid*2][gid], B[tid*2+1][gid]) = packedCol[tid] from thread (gid + base)
-    // reg[1] = packed(B[tid*2+8][gid], B[tid*2+9][gid]) = packedCol[tid+4] from thread (gid + base)
-    uint32_t s[4][2];
+    // reg[0] = packedCol[tid] from thread (gid + base)
+    // reg[1] = packedCol[tid+4] from thread (gid + base)
+    uint32_t tmp;
     #pragma unroll
     for (int t = 0; t < 4; t++)
     {
-        s[t][0] = __shfl_sync(mask, packedCol[t], gid + base);
-        s[t][1] = __shfl_sync(mask, packedCol[t + 4], gid + base);
+        tmp = __shfl_sync(mask, packedCol[t], gid + base);     if (tid == t) regs[0] = tmp;
+        tmp = __shfl_sync(mask, packedCol[t + 4], gid + base); if (tid == t) regs[1] = tmp;
     }
-    regs[0] = s[tid][0];
-    regs[1] = s[tid][1];
 }
 
 __device__ inline void mmaToColMatrixB_16x8(
@@ -9051,6 +9041,36 @@ struct WmmaFragment
         else
             wmmaLoad<T, M, N, K, R, layout>(fragment.regs, buffer, stride * sizeof(U) / sizeof(T));
         fragment.m_layout = layout;
+        return fragment;
+    }
+
+    // Load a cooperative matrix from native (fragment-register) layout.
+    // The tile data must be pre-arranged so that thread laneid's RegsCount registers
+    // are stored contiguously at offset laneid * RegsCount * 4 bytes.
+    // This generates a single vectorized load per thread — no shuffles.
+    static This __device__ LoadNative(const T* tileData)
+    {
+        WmmaFragment<T, M, N, K, R> fragment;
+        unsigned laneid;
+        asm("mov.u32 %0, %%laneid;" : "=r"(laneid));
+
+        const uint32_t* src = reinterpret_cast<const uint32_t*>(tileData) + laneid * RegsCount;
+
+        if constexpr (RegsCount == 2)
+        {
+            *reinterpret_cast<uint2*>(fragment.regs) = *reinterpret_cast<const uint2*>(src);
+        }
+        else if constexpr (RegsCount == 4)
+        {
+            *reinterpret_cast<uint4*>(fragment.regs) = *reinterpret_cast<const uint4*>(src);
+        }
+        else if constexpr (RegsCount == 8)
+        {
+            *reinterpret_cast<uint4*>(fragment.regs) = *reinterpret_cast<const uint4*>(src);
+            *reinterpret_cast<uint4*>(fragment.regs + 4) = *reinterpret_cast<const uint4*>(src + 4);
+        }
+
+        fragment.m_layout = Layout::RowMajor;
         return fragment;
     }
 

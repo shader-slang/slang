@@ -9,6 +9,7 @@ implementing neural;
 //   M and K must be multiples of 16.
 //
 // MatB (input): constructed from each thread's local input vector via FromLocalColumn.
+//   Input is read directly from a StructuredBuffer per K-tile to avoid register pressure.
 //
 // MatC (output): extracted to each thread's local output vector via ToLocalColumn.
 //
@@ -66,8 +67,6 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
         return (tileRow * NTileCols + tileCol) * TileSizeInElements;
     }
 
-    // Load a single CoopMat A tile directly from tiled global memory.
-    // tileRowIdx indexes M dimension, tileColIdx indexes K dimension.
     [ForceInline]
     [require(cuda)]
     VISIBILITY_LEVEL static MatA loadTileDirect<U, Address>(
@@ -80,22 +79,14 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
     {
         int offset = tileElementOffset(tileRowIdx, tileColIdx);
         let tileAddr = weightAddress.getOffset(offset);
-        return bit_cast<MatA>(loadCoopMat<U, Address, ROW_A, COLUMN_A, linalg.CoopMatMatrixUse.MatrixA, RowMajor>(
-            tileAddr, 0u, uint(COLUMN_A)));
+        return MatA.LoadNative(bit_cast<RWStructuredBuffer<half>>(tileAddr.getBuffer()), tileAddr.getBaseIndex());
     }
 
     // =========================================================================
     // Tiled MMA: zero shared memory
     // =========================================================================
 
-    // Tiled MMA: C = A * B
-    //   A: loaded directly from tiled global memory (no shared memory)
-    //   B: constructed from thread-local columns via FromLocalColumn
-    //   C: extracted to thread-local columns via ToLocalColumn
-    //
-    // Each thread holds an input vector of length K and produces an output
-    // vector of length M. The warp collectively performs the matrix-vector
-    // multiply: output[i] = sum_k(Weight[i][k] * input[k]) for each thread.
+    // Each thread provides its input vector as a local array.
     [ForceInline]
     [require(cuda)]
     VISIBILITY_LEVEL static OutArrayType mma<U, Address, InArrayType, OutArrayType, V, bool Bias = false>(
@@ -111,38 +102,33 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
             where OutArrayType : IArrayAccessor<V>
     {
         MatC matC[NCoopMat];
+        [ForceUnroll]
         for (int i = 0; i < NCoopMat; i++)
             matC[i].fill(T(0.0f));
 
-        OutArrayType outputVector;
-        if (Bias)
-        {
-            for (int i = 0; i < M; i++)
-            {
-                U bias = biasAddress.value[uint(i)];
-                outputVector[i] = __realCast<V>(bias);
-            }
-        }
-
+        [ForceUnroll]
         for (int k = 0; k < Uint4AlignedK; k += COLUMN_A)
         {
             int tileColIdx = k / COLUMN_A;
 
             MatA matA[NCoopMatRow];
+            [ForceUnroll]
             for (uint i = 0; i < NCoopMatRow; i++)
                 matA[i] = loadTileDirect<U, Address>(int(i), tileColIdx, weightAddress);
 
+            half localColB[ROW_B];
+            [ForceUnroll]
+            for (uint r = 0; r < ROW_B; r++)
+            {
+                int srcIdx = k + int(r);
+                localColB[r] = (srcIdx < K) ? __realCast<half>(inputVector[srcIdx]) : half(0.0);
+            }
+
             for (uint j = 0; j < NCoopMatColumn; j++)
             {
-                half localColB[ROW_B];
-                for (uint r = 0; r < ROW_B; r++)
-                {
-                    int srcIdx = k + r;
-                    localColB[r] = (srcIdx < K) ? __realCast<half>(inputVector[srcIdx]) : half(0.0);
-                }
-
                 let matB = MatB.FromLocalColumn(localColB, int(j));
 
+                [ForceUnroll]
                 for (uint i = 0; i < NCoopMatRow; i++)
                 {
                     int index = i * NCoopMatColumn + int(j);
@@ -153,46 +139,31 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
             }
         }
 
+        // Extract results and add bias in one pass — no intermediate outputVector array.
+        // Each ToLocalColumn gives this thread one column (ROW_C elements).
+        // Write directly to the output array, adding bias on the fly.
+        OutArrayType outputVector;
+        [ForceUnroll]
         for (int i = 0; i < NCoopMatRow; i++)
         {
             for (int j = 0; j < NCoopMatColumn; j++)
             {
                 int index = i * NCoopMatColumn + j;
 
-                if (sizeof(T) == 4)
-                {
-                    T localColC[ROW_C];
-                    matC[index].ToLocalColumn(localColC, j);
+                T localColC[ROW_C];
+                matC[index].ToLocalColumn(localColC, j);
 
-                    int rowBase = i * ROW_C;
-                    for (int r = 0; r < ROW_C; r++)
-                    {
-                        int outIdx = rowBase + r;
-                        if (outIdx < M)
-                        {
-                            if (Bias)
-                                outputVector[outIdx] = outputVector[outIdx] + __realCast<V>(localColC[r]);
-                            else
-                                outputVector[outIdx] = __realCast<V>(localColC[r]);
-                        }
-                    }
-                }
-                else
+                int rowBase = i * ROW_C;
+                [ForceUnroll]
+                for (int r = 0; r < ROW_C; r++)
                 {
-                    T localColC[ROW_C];
-                    matC[index].ToLocalColumn(localColC, j);
-
-                    int rowBase = i * ROW_C;
-                    for (int r = 0; r < ROW_C; r++)
+                    int outIdx = rowBase + r;
+                    if (outIdx < M)
                     {
-                        int outIdx = rowBase + r;
-                        if (outIdx < M)
-                        {
-                            if (Bias)
-                                outputVector[outIdx] = outputVector[outIdx] + __realCast<V>(localColC[r]);
-                            else
-                                outputVector[outIdx] = __realCast<V>(localColC[r]);
-                        }
+                        V val = __realCast<V>(localColC[r]);
+                        if (Bias)
+                            val = val + __realCast<V>(biasAddress.value[uint(outIdx)]);
+                        outputVector[outIdx] = val;
                     }
                 }
             }
@@ -200,4 +171,5 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
 
         return outputVector;
     }
+
 }
