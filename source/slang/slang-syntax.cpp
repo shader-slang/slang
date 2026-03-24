@@ -111,26 +111,6 @@ bool hasAnyPotentialConcatAxis(ConcreteIntValPack* leftPack, ConcreteIntValPack*
     return false;
 }
 
-bool hasAnyValidConcatAxis(ConcreteIntValPack* leftPack, ConcreteIntValPack* rightPack)
-{
-    SLANG_ASSERT(leftPack->getCount() == rightPack->getCount());
-    for (Index axis = 0; axis < leftPack->getCount(); ++axis)
-    {
-        bool isValidAxis = true;
-        for (Index i = 0; i < leftPack->getCount(); ++i)
-        {
-            if (i != axis && !leftPack->getElement(i)->equals(rightPack->getElement(i)))
-            {
-                isValidAxis = false;
-                break;
-            }
-        }
-        if (isValidAxis)
-            return true;
-    }
-    return false;
-}
-
 const char* getPackQueryName(PackQueryExpr* expr)
 {
     if (as<FirstExpr>(expr))

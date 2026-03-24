@@ -987,9 +987,6 @@ struct SpecializationContext
             return pack->getOperandCount() == 0 ? PackBranchCardinality::Empty
                                                 : PackBranchCardinality::NonEmpty;
         default:
-            if (pack->getOp() == kIROp_ShapePermute || pack->getOp() == kIROp_ShapeSwap ||
-                pack->getOp() == kIROp_ShapeReduce || pack->getOp() == kIROp_ShapeConcat)
-                return PackBranchCardinality::Unknown;
             return PackBranchCardinality::Unknown;
         }
     }
