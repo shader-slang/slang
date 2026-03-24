@@ -1058,6 +1058,38 @@ static void flattenIntValList(ShortList<IntVal*>& flattenedList, IntVal* val)
     }
 }
 
+static Type* _getIntPackTypeForVal(ASTBuilder* astBuilder, Val* pack)
+{
+    if (auto intVal = as<IntVal>(pack))
+    {
+        if (auto type = as<Type>(intVal->getType()))
+            return type;
+    }
+    return astBuilder->getOrCreate<ValuePackType>(astBuilder->getIntType());
+}
+
+static Type* _getIntPackTypeForVals(ASTBuilder* astBuilder, Val* pack0, Val* pack1 = nullptr)
+{
+    if (auto intVal = as<IntVal>(pack0))
+    {
+        if (auto type = as<Type>(intVal->getType()))
+            return type;
+    }
+    if (pack1)
+        return _getIntPackTypeForVal(astBuilder, pack1);
+    return astBuilder->getOrCreate<ValuePackType>(astBuilder->getIntType());
+}
+
+static bool _tryGetConstantIntVal(IntVal* val, IntegerLiteralValue& outValue)
+{
+    if (auto constantIntVal = as<ConstantIntVal>(val ? val->resolve() : nullptr))
+    {
+        outValue = constantIntVal->getValue();
+        return true;
+    }
+    return false;
+}
+
 ConcreteIntValPack* ASTBuilder::getIntValPack(ArrayView<IntVal*> vals)
 {
     ShortList<IntVal*> flattenedVals;
@@ -1159,6 +1191,118 @@ Val* ASTBuilder::getTrimLastPack(Val* basePack)
     auto baseIntVal = as<IntVal>(basePack);
     auto packType = baseIntVal ? baseIntVal->getType() : getOrCreate<ValuePackType>(getIntType());
     return getOrCreate<TrimLastIntValPack>(packType, basePack);
+}
+
+Val* ASTBuilder::getConcatIntValPack(Val* leftPack, Val* rightPack, IntVal* axis)
+{
+    IntegerLiteralValue axisValue = 0;
+    if (auto leftValPack = as<ConcreteIntValPack>(leftPack))
+    {
+        if (auto rightValPack = as<ConcreteIntValPack>(rightPack))
+        {
+            if (_tryGetConstantIntVal(axis, axisValue) && leftValPack->getCount() == rightValPack->getCount() &&
+                axisValue >= 0 && axisValue < leftValPack->getCount())
+            {
+                ShortList<IntVal*> resultVals;
+                bool canFold = true;
+                for (Index i = 0; i < leftValPack->getCount(); ++i)
+                {
+                    if (i == axisValue)
+                    {
+                        resultVals.add(PolynomialIntVal::add(
+                            this,
+                            leftValPack->getElement(i),
+                            rightValPack->getElement(i)));
+                    }
+                    else if (leftValPack->getElement(i)->equals(rightValPack->getElement(i)))
+                    {
+                        resultVals.add(leftValPack->getElement(i));
+                    }
+                    else
+                    {
+                        canFold = false;
+                        break;
+                    }
+                }
+                if (canFold)
+                    return getIntValPack(resultVals.getArrayView().arrayView);
+            }
+        }
+    }
+
+    auto packType = _getIntPackTypeForVals(this, leftPack, rightPack);
+    return getOrCreate<ConcatIntValPack>(packType, leftPack, rightPack, axis);
+}
+
+Val* ASTBuilder::getPermuteIntValPack(Val* valuePack, Val* orderPack)
+{
+    if (auto concreteValuePack = as<ConcreteIntValPack>(valuePack))
+    {
+        if (auto concreteOrderPack = as<ConcreteIntValPack>(orderPack))
+        {
+            if (concreteValuePack->getCount() == concreteOrderPack->getCount())
+            {
+                List<bool> seen;
+                seen.setCount(concreteValuePack->getCount());
+                for (Index i = 0; i < seen.getCount(); ++i)
+                    seen[i] = false;
+
+                ShortList<IntVal*> resultVals;
+                bool canFold = true;
+                for (Index i = 0; i < concreteOrderPack->getCount(); ++i)
+                {
+                    IntegerLiteralValue orderIndex = 0;
+                    if (!_tryGetConstantIntVal(concreteOrderPack->getElement(i), orderIndex) ||
+                        orderIndex < 0 || orderIndex >= concreteValuePack->getCount() ||
+                        seen[orderIndex])
+                    {
+                        canFold = false;
+                        break;
+                    }
+
+                    seen[orderIndex] = true;
+                    resultVals.add(concreteValuePack->getElement(orderIndex));
+                }
+
+                if (canFold)
+                    return getIntValPack(resultVals.getArrayView().arrayView);
+            }
+        }
+    }
+
+    auto packType = _getIntPackTypeForVal(this, valuePack);
+    return getOrCreate<PermuteIntValPack>(packType, valuePack, orderPack);
+}
+
+Val* ASTBuilder::getSwapIntValPack(Val* valuePack, IntVal* dim0, IntVal* dim1)
+{
+    if (dim0 && dim1 && dim0->equals(dim1))
+        return valuePack;
+
+    IntegerLiteralValue dim0Value = 0;
+    IntegerLiteralValue dim1Value = 0;
+    if (auto concreteValuePack = as<ConcreteIntValPack>(valuePack))
+    {
+        if (_tryGetConstantIntVal(dim0, dim0Value) && _tryGetConstantIntVal(dim1, dim1Value) &&
+            dim0Value >= 0 && dim1Value >= 0 && dim0Value < concreteValuePack->getCount() &&
+            dim1Value < concreteValuePack->getCount())
+        {
+            ShortList<IntVal*> resultVals;
+            for (Index i = 0; i < concreteValuePack->getCount(); ++i)
+            {
+                if (i == dim0Value)
+                    resultVals.add(concreteValuePack->getElement(dim1Value));
+                else if (i == dim1Value)
+                    resultVals.add(concreteValuePack->getElement(dim0Value));
+                else
+                    resultVals.add(concreteValuePack->getElement(i));
+            }
+            return getIntValPack(resultVals.getArrayView().arrayView);
+        }
+    }
+
+    auto packType = _getIntPackTypeForVal(this, valuePack);
+    return getOrCreate<SwapIntValPack>(packType, valuePack, dim0, dim1);
 }
 
 NonEmptyPackWitness* ASTBuilder::getNonEmptyPackWitness(Val* pack)

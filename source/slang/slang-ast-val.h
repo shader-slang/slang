@@ -381,6 +381,53 @@ class TrimLastIntValPack : public IntVal
     Val* _resolveImplOverride();
 };
 
+FIDDLE()
+class ConcatIntValPack : public IntVal
+{
+    FIDDLE(...)
+    ConcatIntValPack(Type* inType, Val* leftPack, Val* rightPack, IntVal* axis)
+    {
+        setOperands(inType, leftPack, rightPack, axis);
+    }
+    Val* getLeftPack() const { return getOperand(1); }
+    Val* getRightPack() const { return getOperand(2); }
+    IntVal* getAxis() const { return as<IntVal>(getOperand(3)); }
+    void _toTextOverride(StringBuilder& out);
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    Val* _resolveImplOverride();
+};
+
+FIDDLE()
+class PermuteIntValPack : public IntVal
+{
+    FIDDLE(...)
+    PermuteIntValPack(Type* inType, Val* valuePack, Val* orderPack)
+    {
+        setOperands(inType, valuePack, orderPack);
+    }
+    Val* getValuePack() const { return getOperand(1); }
+    Val* getOrderPack() const { return getOperand(2); }
+    void _toTextOverride(StringBuilder& out);
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    Val* _resolveImplOverride();
+};
+
+FIDDLE()
+class SwapIntValPack : public IntVal
+{
+    FIDDLE(...)
+    SwapIntValPack(Type* inType, Val* valuePack, IntVal* dim0, IntVal* dim1)
+    {
+        setOperands(inType, valuePack, dim0, dim1);
+    }
+    Val* getValuePack() const { return getOperand(1); }
+    IntVal* getDim0() const { return as<IntVal>(getOperand(2)); }
+    IntVal* getDim1() const { return as<IntVal>(getOperand(3)); }
+    void _toTextOverride(StringBuilder& out);
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    Val* _resolveImplOverride();
+};
+
 // Analogous to ExpandType: represents an unexpanded value pattern over captured value packs.
 FIDDLE()
 class ExpandIntValPack : public IntVal

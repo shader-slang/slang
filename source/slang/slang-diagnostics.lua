@@ -1681,6 +1681,55 @@ err(
 )
 
 err(
+    "shape-pack-argument-is-invalid",
+    30417,
+    "invalid ~opName argument",
+    span { loc = "location", message = "arguments to ~opName must be compile-time int value packs, tuples of int values, or compile-time int indices" }
+)
+
+err(
+    "shape-pack-rank-mismatch",
+    30418,
+    "~opName requires packs of the same rank",
+    span { loc = "location", message = "~opName requires packs of the same rank, but got ranks ~leftRank:Int and ~rightRank:Int" }
+)
+
+err(
+    "shape-pack-axis-out-of-range",
+    30419,
+    "~opName axis is out of range",
+    span { loc = "location", message = "axis ~axis:Int is out of range for rank ~rank:Int in ~opName" }
+)
+
+err(
+    "concat-vals-non-axis-mismatch",
+    30420,
+    "__concatVals requires non-axis dimensions to match",
+    span { loc = "location", message = "__concatVals requires dimensions to match outside axis ~axis:Int, but dimension ~dimIndex:Int differs" }
+)
+
+err(
+    "permute-vals-order-length-mismatch",
+    30421,
+    "__permuteVals requires an order pack with matching rank",
+    span { loc = "location", message = "__permuteVals requires the order pack to have length ~orderRank:Int matching the input rank ~valueRank:Int" }
+)
+
+err(
+    "permute-vals-index-out-of-range",
+    30422,
+    "__permuteVals index is out of range",
+    span { loc = "location", message = "__permuteVals order index ~indexValue:Int at position ~indexPosition:Int is out of range for rank ~rank:Int" }
+)
+
+err(
+    "permute-vals-duplicate-index",
+    30423,
+    "__permuteVals order contains a duplicate index",
+    span { loc = "location", message = "__permuteVals order index ~indexValue:Int is duplicated at positions ~firstPosition:Int and ~secondPosition:Int" }
+)
+
+err(
     "invalid-non-empty-pack-constraint-target",
     30413,
     "`nonempty(...)` requires a generic type pack or value pack parameter",

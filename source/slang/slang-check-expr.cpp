@@ -2468,6 +2468,65 @@ IntVal* SemanticsVisitor::tryConstantFoldExpr(
         return as<IntVal>(m_astBuilder->getTrimLastPack(foldedOperand));
     }
 
+    if (auto shapePackExpr = expr.as<ShapePackTransformExpr>())
+    {
+        if (auto concatExpr = as<ConcatValsExpr>(shapePackExpr.getExpr()))
+        {
+            auto leftPack = tryConstantFoldExpr(
+                SubstExpr<Expr>(concatExpr->getArg(0), expr.getSubsts()),
+                kind,
+                circularityInfo);
+            auto rightPack = tryConstantFoldExpr(
+                SubstExpr<Expr>(concatExpr->getArg(1), expr.getSubsts()),
+                kind,
+                circularityInfo);
+            auto axis = as<IntVal>(tryConstantFoldExpr(
+                SubstExpr<Expr>(concatExpr->getArg(2), expr.getSubsts()),
+                kind,
+                circularityInfo));
+            if (!leftPack || !rightPack || !axis)
+                return nullptr;
+
+            return as<IntVal>(m_astBuilder->getConcatIntValPack(leftPack, rightPack, axis));
+        }
+
+        if (auto permuteExpr = as<PermuteValsExpr>(shapePackExpr.getExpr()))
+        {
+            auto valuePack = tryConstantFoldExpr(
+                SubstExpr<Expr>(permuteExpr->getArg(0), expr.getSubsts()),
+                kind,
+                circularityInfo);
+            auto orderPack = tryConstantFoldExpr(
+                SubstExpr<Expr>(permuteExpr->getArg(1), expr.getSubsts()),
+                kind,
+                circularityInfo);
+            if (!valuePack || !orderPack)
+                return nullptr;
+
+            return as<IntVal>(m_astBuilder->getPermuteIntValPack(valuePack, orderPack));
+        }
+
+        auto swapExpr = as<SwapValsExpr>(shapePackExpr.getExpr());
+        SLANG_ASSERT(swapExpr);
+
+        auto valuePack = tryConstantFoldExpr(
+            SubstExpr<Expr>(swapExpr->getArg(0), expr.getSubsts()),
+            kind,
+            circularityInfo);
+        auto dim0 = as<IntVal>(tryConstantFoldExpr(
+            SubstExpr<Expr>(swapExpr->getArg(1), expr.getSubsts()),
+            kind,
+            circularityInfo));
+        auto dim1 = as<IntVal>(tryConstantFoldExpr(
+            SubstExpr<Expr>(swapExpr->getArg(2), expr.getSubsts()),
+            kind,
+            circularityInfo));
+        if (!valuePack || !dim0 || !dim1)
+            return nullptr;
+
+        return as<IntVal>(m_astBuilder->getSwapIntValPack(valuePack, dim0, dim1));
+    }
+
     // `each D` where D is a value pack parameter produces an EachIntVal.
     if (auto eachExpr = expr.as<EachExpr>())
     {
@@ -4474,6 +4533,117 @@ static bool _isTypeOrValValidForPackBranch(Type* type)
     return _isTypeOrValValidForPackQuery(type);
 }
 
+static bool _isExactIntType(Type* type)
+{
+    if (!type)
+        return false;
+    type = unwrapModifiedType(type);
+    if (auto basicType = as<BasicExpressionType>(type))
+        return basicType->getBaseType() == BaseType::Int;
+    return false;
+}
+
+static bool _tryGetConstantIntVal(IntVal* val, IntegerLiteralValue& outValue)
+{
+    if (auto constantIntVal = as<ConstantIntVal>(val))
+    {
+        outValue = constantIntVal->getValue();
+        return true;
+    }
+    return false;
+}
+
+static bool _isTupleOfExactInt(TupleType* tupleType)
+{
+    if (!tupleType)
+        return false;
+    for (Index i = 0; i < tupleType->getMemberCount(); ++i)
+    {
+        if (!_isExactIntType(tupleType->getMember(i)))
+            return false;
+    }
+    return true;
+}
+
+enum class ShapePackOperandKind
+{
+    Invalid,
+    ValuePack,
+    Tuple,
+};
+
+struct ShapePackOperandInfo
+{
+    ShapePackOperandKind kind = ShapePackOperandKind::Invalid;
+    Type* type = nullptr;
+    ValuePackType* valuePackType = nullptr;
+    TupleType* tupleType = nullptr;
+    Index rank = 0;
+};
+
+static ShapePackOperandInfo _getShapePackOperandInfo(Type* type)
+{
+    ShapePackOperandInfo info;
+    info.type = type;
+
+    if (auto valuePackType = as<ValuePackType>(type))
+    {
+        if (_isExactIntType(valuePackType->getElementType()))
+        {
+            info.kind = ShapePackOperandKind::ValuePack;
+            info.valuePackType = valuePackType;
+        }
+        return info;
+    }
+
+    if (auto tupleType = as<TupleType>(type))
+    {
+        if (_isTupleOfExactInt(tupleType))
+        {
+            info.kind = ShapePackOperandKind::Tuple;
+            info.tupleType = tupleType;
+            info.rank = tupleType->getMemberCount();
+        }
+        return info;
+    }
+
+    return info;
+}
+
+static bool _tryGetShapePackRank(Type* type, Val* foldedVal, Index& outRank)
+{
+    if (auto tupleType = as<TupleType>(type))
+    {
+        outRank = tupleType->getMemberCount();
+        return true;
+    }
+
+    if (auto concreteIntValPack = as<ConcreteIntValPack>(foldedVal))
+    {
+        outRank = concreteIntValPack->getCount();
+        return true;
+    }
+
+    return false;
+}
+
+static Type* _createIntTupleType(ASTBuilder* astBuilder, Index rank)
+{
+    ShortList<Type*> elementTypes;
+    for (Index i = 0; i < rank; ++i)
+        elementTypes.add(astBuilder->getIntType());
+    return astBuilder->getTupleType(elementTypes.getArrayView().arrayView);
+}
+
+static const char* _getShapePackTransformName(ShapePackTransformExpr* expr)
+{
+    if (as<ConcatValsExpr>(expr))
+        return "__concatVals";
+    if (as<PermuteValsExpr>(expr))
+        return "__permuteVals";
+    return "__swapVals";
+}
+
 static const char* _getPackQueryName(PackQueryExpr* expr)
 {
     if (as<FirstExpr>(expr))
@@ -4572,6 +4742,35 @@ VariadicPackCardinality SemanticsVisitor::getPackCardinality(Val* packVal)
     if (auto expandIntValPack = as<ExpandIntValPack>(packVal))
     {
         result = mergeCaptureCardinality(expandIntValPack);
+        getShared()->m_packCardinalityCache[packVal] = result;
+        return result;
+    }
+
+    if (auto permuteIntValPack = as<PermuteIntValPack>(packVal))
+    {
+        result = getPackCardinality(permuteIntValPack->getValuePack());
+        getShared()->m_packCardinalityCache[packVal] = result;
+        return result;
+    }
+
+    if (auto swapIntValPack = as<SwapIntValPack>(packVal))
+    {
+        result = getPackCardinality(swapIntValPack->getValuePack());
+        getShared()->m_packCardinalityCache[packVal] = result;
+        return result;
+    }
+
+    if (auto concatIntValPack = as<ConcatIntValPack>(packVal))
+    {
+        auto leftCardinality = getPackCardinality(concatIntValPack->getLeftPack());
+        auto rightCardinality = getPackCardinality(concatIntValPack->getRightPack());
+        if (leftCardinality == VariadicPackCardinality::Empty &&
+            rightCardinality == VariadicPackCardinality::Empty)
+            result = VariadicPackCardinality::Empty;
+        else if (
+            leftCardinality == VariadicPackCardinality::NonEmpty ||
+            rightCardinality == VariadicPackCardinality::NonEmpty)
+            result = VariadicPackCardinality::NonEmpty;
         getShared()->m_packCardinalityCache[packVal] = result;
         return result;
     }
@@ -4808,6 +5007,226 @@ Expr* SemanticsExprVisitor::visitPackQueryExpr(PackQueryExpr* packQueryExpr)
     Type* resultType = applyPackQueryToType(operandType);
     packQueryExpr->type = QualType(resultType);
     return packQueryExpr;
+}
+
+Expr* SemanticsExprVisitor::visitShapePackTransformExpr(ShapePackTransformExpr* shapePackExpr)
+{
+    for (auto& arg : shapePackExpr->args)
+        arg = dispatch(arg);
+
+    auto opName = _getShapePackTransformName(shapePackExpr);
+    auto diagnoseInvalidArguments = [&]()
+    {
+        getSink()->diagnose(
+            Diagnostics::ShapePackArgumentIsInvalid{.opName = opName, .location = shapePackExpr->loc});
+        shapePackExpr->type = m_astBuilder->getErrorType();
+        return shapePackExpr;
+    };
+
+    auto tryFoldArg = [&](Index argIndex) -> Val*
+    {
+        return tryConstantFoldExpr(
+            SubstExpr<Expr>(shapePackExpr->getArg(argIndex)),
+            ConstantFoldingKind::CompileTime,
+            nullptr);
+    };
+
+    if (auto concatExpr = as<ConcatValsExpr>(shapePackExpr))
+    {
+        auto leftInfo = _getShapePackOperandInfo(concatExpr->getArg(0)->type.type);
+        auto rightInfo = _getShapePackOperandInfo(concatExpr->getArg(1)->type.type);
+        if (leftInfo.kind == ShapePackOperandKind::Invalid ||
+            rightInfo.kind == ShapePackOperandKind::Invalid ||
+            leftInfo.kind != rightInfo.kind || !_isExactIntType(concatExpr->getArg(2)->type.type))
+        {
+            return diagnoseInvalidArguments();
+        }
+
+        auto leftVal = tryFoldArg(0);
+        auto rightVal = tryFoldArg(1);
+        auto axisVal = as<IntVal>(tryFoldArg(2));
+        if (!leftVal || !rightVal || !axisVal)
+            return diagnoseInvalidArguments();
+
+        Index leftRank = 0;
+        Index rightRank = 0;
+        auto hasLeftRank = _tryGetShapePackRank(leftInfo.type, leftVal, leftRank);
+        auto hasRightRank = _tryGetShapePackRank(rightInfo.type, rightVal, rightRank);
+        if (hasLeftRank && hasRightRank && leftRank != rightRank)
+        {
+            getSink()->diagnose(Diagnostics::ShapePackRankMismatch{
+                .opName = opName,
+                .leftRank = (int)leftRank,
+                .rightRank = (int)rightRank,
+                .location = concatExpr->loc});
+            concatExpr->type = m_astBuilder->getErrorType();
+            return concatExpr;
+        }
+
+        IntegerLiteralValue axisValue = 0;
+        if (hasLeftRank && _tryGetConstantIntVal(axisVal, axisValue) &&
+            (axisValue < 0 || axisValue >= leftRank))
+        {
+            getSink()->diagnose(Diagnostics::ShapePackAxisOutOfRange{
+                .opName = opName,
+                .axis = (int)axisValue,
+                .rank = (int)leftRank,
+                .location = concatExpr->loc});
+            concatExpr->type = m_astBuilder->getErrorType();
+            return concatExpr;
+        }
+
+        if (auto leftConcretePack = as<ConcreteIntValPack>(leftVal))
+        {
+            if (auto rightConcretePack = as<ConcreteIntValPack>(rightVal))
+            {
+                if (_tryGetConstantIntVal(axisVal, axisValue) &&
+                    leftConcretePack->getCount() == rightConcretePack->getCount() &&
+                    axisValue >= 0 && axisValue < leftConcretePack->getCount())
+                {
+                    for (Index i = 0; i < leftConcretePack->getCount(); ++i)
+                    {
+                        if (i != axisValue &&
+                            !leftConcretePack->getElement(i)->equals(rightConcretePack->getElement(i)))
+                        {
+                            getSink()->diagnose(Diagnostics::ConcatValsNonAxisMismatch{
+                                .axis = (int)axisValue,
+                                .dimIndex = (int)i,
+                                .location = concatExpr->loc});
+                            concatExpr->type = m_astBuilder->getErrorType();
+                            return concatExpr;
+                        }
+                    }
+                }
+            }
+        }
+
+        if (leftInfo.kind == ShapePackOperandKind::Tuple)
+            concatExpr->type = QualType(_createIntTupleType(m_astBuilder, leftInfo.rank));
+        else
+            concatExpr->type = QualType(leftInfo.valuePackType);
+        return concatExpr;
+    }
+
+    if (auto permuteExpr = as<PermuteValsExpr>(shapePackExpr))
+    {
+        auto valueInfo = _getShapePackOperandInfo(permuteExpr->getArg(0)->type.type);
+        auto orderInfo = _getShapePackOperandInfo(permuteExpr->getArg(1)->type.type);
+        if (valueInfo.kind == ShapePackOperandKind::Invalid ||
+            orderInfo.kind == ShapePackOperandKind::Invalid)
+        {
+            return diagnoseInvalidArguments();
+        }
+
+        auto valuePack = tryFoldArg(0);
+        auto orderPack = tryFoldArg(1);
+        if (!valuePack || !orderPack)
+            return diagnoseInvalidArguments();
+
+        Index valueRank = 0;
+        Index orderRank = 0;
+        auto hasValueRank = _tryGetShapePackRank(valueInfo.type, valuePack, valueRank);
+        auto hasOrderRank = _tryGetShapePackRank(orderInfo.type, orderPack, orderRank);
+        if (hasValueRank && hasOrderRank && valueRank != orderRank)
+        {
+            getSink()->diagnose(Diagnostics::PermuteValsOrderLengthMismatch{
+                .orderRank = (int)orderRank,
+                .valueRank = (int)valueRank,
+                .location = permuteExpr->loc});
+            permuteExpr->type = m_astBuilder->getErrorType();
+            return permuteExpr;
+        }
+
+        if (auto concreteOrderPack = as<ConcreteIntValPack>(orderPack))
+        {
+            Dictionary<IntegerLiteralValue, Index> firstSeenPosition;
+            for (Index i = 0; i < concreteOrderPack->getCount(); ++i)
+            {
+                IntegerLiteralValue orderIndex = 0;
+                if (!_tryGetConstantIntVal(concreteOrderPack->getElement(i), orderIndex))
+                    continue;
+
+                Index firstPosition = 0;
+                if (firstSeenPosition.tryGetValue(orderIndex, firstPosition))
+                {
+                    getSink()->diagnose(Diagnostics::PermuteValsDuplicateIndex{
+                        .indexValue = (int)orderIndex,
+                        .firstPosition = (int)firstPosition,
+                        .secondPosition = (int)i,
+                        .location = permuteExpr->loc});
+                    permuteExpr->type = m_astBuilder->getErrorType();
+                    return permuteExpr;
+                }
+                firstSeenPosition[orderIndex] = i;
+
+                if (hasValueRank && (orderIndex < 0 || orderIndex >= valueRank))
+                {
+                    getSink()->diagnose(Diagnostics::PermuteValsIndexOutOfRange{
+                        .indexValue = (int)orderIndex,
+                        .indexPosition = (int)i,
+                        .rank = (int)valueRank,
+                        .location = permuteExpr->loc});
+                    permuteExpr->type = m_astBuilder->getErrorType();
+                    return permuteExpr;
+                }
+            }
+        }
+
+        if (valueInfo.kind == ShapePackOperandKind::Tuple)
+            permuteExpr->type = QualType(_createIntTupleType(m_astBuilder, valueInfo.rank));
+        else
+            permuteExpr->type = QualType(valueInfo.valuePackType);
+        return permuteExpr;
+    }
+
+    auto swapExpr = as<SwapValsExpr>(shapePackExpr);
+    SLANG_ASSERT(swapExpr);
+
+    auto valueInfo = _getShapePackOperandInfo(swapExpr->getArg(0)->type.type);
+    if (valueInfo.kind == ShapePackOperandKind::Invalid || !_isExactIntType(swapExpr->getArg(1)->type.type) ||
+        !_isExactIntType(swapExpr->getArg(2)->type.type))
+    {
+        return diagnoseInvalidArguments();
+    }
+
+    auto valuePack = tryFoldArg(0);
+    auto dim0 = as<IntVal>(tryFoldArg(1));
+    auto dim1 = as<IntVal>(tryFoldArg(2));
+    if (!valuePack || !dim0 || !dim1)
+        return diagnoseInvalidArguments();
+
+    Index valueRank = 0;
+    auto hasValueRank = _tryGetShapePackRank(valueInfo.type, valuePack, valueRank);
+    IntegerLiteralValue dimValue = 0;
+    if (hasValueRank && _tryGetConstantIntVal(dim0, dimValue) &&
+        (dimValue < 0 || dimValue >= valueRank))
+    {
+        getSink()->diagnose(Diagnostics::ShapePackAxisOutOfRange{
+            .opName = opName,
+            .axis = (int)dimValue,
+            .rank = (int)valueRank,
+            .location = swapExpr->loc});
+        swapExpr->type = m_astBuilder->getErrorType();
+        return swapExpr;
+    }
+
+    if (hasValueRank && _tryGetConstantIntVal(dim1, dimValue) &&
+        (dimValue < 0 || dimValue >= valueRank))
+    {
+        getSink()->diagnose(Diagnostics::ShapePackAxisOutOfRange{
+            .opName = opName,
+            .axis = (int)dimValue,
+            .rank = (int)valueRank,
+            .location = swapExpr->loc});
+        swapExpr->type = m_astBuilder->getErrorType();
+        return swapExpr;
+    }
+
+    if (valueInfo.kind == ShapePackOperandKind::Tuple)
+        swapExpr->type = QualType(_createIntTupleType(m_astBuilder, valueInfo.rank));
+    else
+        swapExpr->type = QualType(valueInfo.valuePackType);
+    return swapExpr;
 }
 
 Expr* SemanticsExprVisitor::visitFloatBitCastExpr(FloatBitCastExpr* expr)

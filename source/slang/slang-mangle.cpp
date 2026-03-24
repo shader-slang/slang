@@ -473,6 +473,26 @@ void emitVal(ManglingContext* context, Val* val)
         emitRaw(context, "Vt");
         emitVal(context, trimLastIntValPack->getBasePack());
     }
+    else if (auto concatIntValPack = as<ConcatIntValPack>(val))
+    {
+        emitRaw(context, "Vc");
+        emitVal(context, concatIntValPack->getLeftPack());
+        emitVal(context, concatIntValPack->getRightPack());
+        emitVal(context, concatIntValPack->getAxis());
+    }
+    else if (auto permuteIntValPack = as<PermuteIntValPack>(val))
+    {
+        emitRaw(context, "Vr");
+        emitVal(context, permuteIntValPack->getValuePack());
+        emitVal(context, permuteIntValPack->getOrderPack());
+    }
+    else if (auto swapIntValPack = as<SwapIntValPack>(val))
+    {
+        emitRaw(context, "Vs");
+        emitVal(context, swapIntValPack->getValuePack());
+        emitVal(context, swapIntValPack->getDim0());
+        emitVal(context, swapIntValPack->getDim1());
+    }
     else
     {
         SLANG_UNEXPECTED("unimplemented case in val mangling");

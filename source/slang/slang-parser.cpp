@@ -306,6 +306,9 @@ static NodeBase* parseFirstExpr(Parser* parser, void* userData);
 static NodeBase* parseLastExpr(Parser* parser, void* userData);
 static NodeBase* parseTrimFirstExpr(Parser* parser, void* userData);
 static NodeBase* parseTrimLastExpr(Parser* parser, void* userData);
+static NodeBase* parseConcatValsExpr(Parser* parser, void* userData);
+static NodeBase* parsePermuteValsExpr(Parser* parser, void* userData);
+static NodeBase* parseSwapValsExpr(Parser* parser, void* userData);
 
 //
 
@@ -1919,6 +1922,12 @@ public:
             if (member.exp)
                 dispatch(member.exp);
     }
+    void visitShapePackTransformExpr(ShapePackTransformExpr* expr)
+    {
+        for (auto arg : expr->args)
+            if (arg)
+                dispatch(arg);
+    }
     void visitPackBranchTypeExpr(PackBranchTypeExpr* expr)
     {
         if (expr->packOperand.exp)
@@ -3014,6 +3023,8 @@ static TypeSpec _parseSimpleTypeSpec(Parser* parser)
         parser->LookAheadToken("expand") || parser->LookAheadToken("each") ||
         parser->LookAheadToken("__first") || parser->LookAheadToken("__last") ||
         parser->LookAheadToken("__trimFirst") || parser->LookAheadToken("__trimLast") ||
+        parser->LookAheadToken("__concatVals") || parser->LookAheadToken("__permuteVals") ||
+        parser->LookAheadToken("__swapVals") ||
         parser->LookAheadToken("__packBranch"))
     {
         typeExpr = parsePrefixExpr(parser);
@@ -7425,6 +7436,21 @@ static NodeBase* parsePackQueryExprImpl(Parser* parser)
     return expr;
 }
 
+template<typename TExpr>
+static NodeBase* parseShapePackTransformExprImpl(Parser* parser, int argCount)
+{
+    TExpr* expr = parser->astBuilder->create<TExpr>();
+    parser->ReadMatchingToken(TokenType::LParent);
+    for (int i = 0; i < argCount; ++i)
+    {
+        if (i != 0)
+            parser->ReadMatchingToken(TokenType::Comma);
+        expr->args.add(parser->ParseArgExpr());
+    }
+    parser->ReadMatchingToken(TokenType::RParent);
+    return expr;
+}
+
 static NodeBase* parseFirstExpr(Parser* parser, void* /*userData*/)
 {
     return parsePackQueryExprImpl<FirstExpr>(parser);
@@ -7443,6 +7469,21 @@ static NodeBase* parseTrimFirstExpr(Parser* parser, void* /*userData*/)
 static NodeBase* parseTrimLastExpr(Parser* parser, void* /*userData*/)
 {
     return parsePackQueryExprImpl<TrimLastExpr>(parser);
+}
+
+static NodeBase* parseConcatValsExpr(Parser* parser, void* /*userData*/)
+{
+    return parseShapePackTransformExprImpl<ConcatValsExpr>(parser, 3);
+}
+
+static NodeBase* parsePermuteValsExpr(Parser* parser, void* /*userData*/)
+{
+    return parseShapePackTransformExprImpl<PermuteValsExpr>(parser, 2);
+}
+
+static NodeBase* parseSwapValsExpr(Parser* parser, void* /*userData*/)
+{
+    return parseShapePackTransformExprImpl<SwapValsExpr>(parser, 3);
 }
 
 static NodeBase* parsePackBranchTypeExpr(Parser* parser, void* /*userData*/)
@@ -9137,6 +9178,27 @@ static Expr* parsePrefixExpr(Parser* parser)
                     expr->loc = tokenLoc;
                 return expr;
             }
+            else if (AdvanceIf(parser, "__concatVals"))
+            {
+                auto expr = as<Expr>(parseConcatValsExpr(parser, nullptr));
+                if (expr && !expr->loc.isValid())
+                    expr->loc = tokenLoc;
+                return expr;
+            }
+            else if (AdvanceIf(parser, "__permuteVals"))
+            {
+                auto expr = as<Expr>(parsePermuteValsExpr(parser, nullptr));
+                if (expr && !expr->loc.isValid())
+                    expr->loc = tokenLoc;
+                return expr;
+            }
+            else if (AdvanceIf(parser, "__swapVals"))
+            {
+                auto expr = as<Expr>(parseSwapValsExpr(parser, nullptr));
+                if (expr && !expr->loc.isValid())
+                    expr->loc = tokenLoc;
+                return expr;
+            }
             return parsePostfixExpr(parser);
         }
     default:
@@ -10146,6 +10208,9 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseExpr("__last", parseLastExpr),
     _makeParseExpr("__trimFirst", parseTrimFirstExpr),
     _makeParseExpr("__trimLast", parseTrimLastExpr),
+    _makeParseExpr("__concatVals", parseConcatValsExpr),
+    _makeParseExpr("__permuteVals", parsePermuteValsExpr),
+    _makeParseExpr("__swapVals", parseSwapValsExpr),
     _makeParseExpr("__packBranch", parsePackBranchTypeExpr),
     _makeParseExpr("__getAddress", parseAddressOfExpr),
     _makeParseExpr("__floatAsInt", parseFloatAsIntExpr),

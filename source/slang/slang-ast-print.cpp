@@ -649,6 +649,27 @@ void ASTPrinter::addExpr(Expr* expr)
             addExpr(packQueryExpr->value);
         sb << ")";
     }
+    else if (const auto shapePackExpr = as<ShapePackTransformExpr>(expr))
+    {
+        if (as<ConcatValsExpr>(shapePackExpr))
+            sb << "__concatVals(";
+        else if (as<PermuteValsExpr>(shapePackExpr))
+            sb << "__permuteVals(";
+        else if (as<SwapValsExpr>(shapePackExpr))
+            sb << "__swapVals(";
+        else
+            SLANG_UNEXPECTED("unknown ShapePackTransformExpr subtype");
+
+        bool isFirst = true;
+        for (auto arg : shapePackExpr->args)
+        {
+            if (!isFirst)
+                sb << ", ";
+            addExpr(arg);
+            isFirst = false;
+        }
+        sb << ")";
+    }
     else if (const auto packBranchExpr = as<PackBranchTypeExpr>(expr))
     {
         sb << "__packBranch(";

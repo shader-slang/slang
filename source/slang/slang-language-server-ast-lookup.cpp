@@ -573,6 +573,17 @@ public:
             return true;
         return dispatchIfNotNull(expr->value);
     }
+    bool visitShapePackTransformExpr(ShapePackTransformExpr* expr)
+    {
+        if (reportLookupResultIfInExprLeadingIdentifierRange(expr))
+            return true;
+        for (auto arg : expr->args)
+        {
+            if (dispatchIfNotNull(arg))
+                return true;
+        }
+        return false;
+    }
     bool visitHigherOrderInvokeExpr(HigherOrderInvokeExpr* expr)
     {
         if (reportLookupResultIfInExprLeadingIdentifierRange(expr))

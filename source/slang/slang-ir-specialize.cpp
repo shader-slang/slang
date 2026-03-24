@@ -178,6 +178,9 @@ struct SpecializationContext
         case kIROp_ExtractLastFromPack:
         case kIROp_TrimFirstOfPack:
         case kIROp_TrimLastOfPack:
+        case kIROp_ConcatVals:
+        case kIROp_PermuteVals:
+        case kIROp_SwapVals:
         case kIROp_PackBranch:
             return false;
         case kIROp_NonEmptyPackWitness:
@@ -801,6 +804,11 @@ struct SpecializationContext
         case kIROp_TrimLastOfPack:
             return maybeSpecializeFoldableInst(inst);
 
+        case kIROp_ConcatVals:
+        case kIROp_PermuteVals:
+        case kIROp_SwapVals:
+            return maybeSpecializeShapePackTransformInst(inst);
+
         case kIROp_TypePack:
         case kIROp_TupleType:
             return maybeSpecializeTypePackOrTupleType(inst);
@@ -958,6 +966,9 @@ struct SpecializationContext
                 case kIROp_ExpandTypeOrVal:
                 case kIROp_TrimFirstOfPack:
                 case kIROp_TrimLastOfPack:
+                case kIROp_ConcatVals:
+                case kIROp_PermuteVals:
+                case kIROp_SwapVals:
                 case kIROp_PackBranch:
                     return PackBranchCardinality::Unknown;
                 case kIROp_MakeValuePack:
@@ -973,6 +984,19 @@ struct SpecializationContext
             return pack->getOperandCount() == 0 ? PackBranchCardinality::Empty
                                                 : PackBranchCardinality::NonEmpty;
         default:
+            if (pack->getOp() == kIROp_PermuteVals || pack->getOp() == kIROp_SwapVals)
+                return getPackBranchCardinality(pack->getOperand(0));
+            if (pack->getOp() == kIROp_ConcatVals)
+            {
+                auto leftCardinality = getPackBranchCardinality(pack->getOperand(0));
+                auto rightCardinality = getPackBranchCardinality(pack->getOperand(1));
+                if (leftCardinality == PackBranchCardinality::Empty &&
+                    rightCardinality == PackBranchCardinality::Empty)
+                    return PackBranchCardinality::Empty;
+                if (leftCardinality == PackBranchCardinality::NonEmpty ||
+                    rightCardinality == PackBranchCardinality::NonEmpty)
+                    return PackBranchCardinality::NonEmpty;
+            }
             return PackBranchCardinality::Unknown;
         }
     }
@@ -1204,6 +1228,282 @@ struct SpecializationContext
             addToWorkList(user);
         }
         return instChanged;
+    }
+
+    bool hasNestedShapePackOperand(IRInst* packLikeInst)
+    {
+        for (UInt i = 0; i < packLikeInst->getOperandCount(); i++)
+        {
+            switch (packLikeInst->getOperand(i)->getOp())
+            {
+            case kIROp_MakeValuePack:
+            case kIROp_Expand:
+            case kIROp_ConcatVals:
+            case kIROp_PermuteVals:
+            case kIROp_SwapVals:
+                return true;
+            default:
+                break;
+            }
+        }
+        return false;
+    }
+
+    bool isConcreteShapePack(IRInst* inst)
+    {
+        switch (inst->getOp())
+        {
+        case kIROp_MakeValuePack:
+        case kIROp_MakeTuple:
+            return !hasNestedShapePackOperand(inst);
+        default:
+            return false;
+        }
+    }
+
+    bool tryGetConstantIntLit(IRInst* inst, Int64& outValue)
+    {
+        if (auto intLit = as<IRIntLit>(inst))
+        {
+            outValue = intLit->getValue();
+            return true;
+        }
+        return false;
+    }
+
+    bool areKnownEqualShapeElements(IRInst* left, IRInst* right)
+    {
+        if (left == right)
+            return true;
+
+        auto leftInt = as<IRIntLit>(left);
+        auto rightInt = as<IRIntLit>(right);
+        return leftInt && rightInt && leftInt->getValue() == rightInt->getValue();
+    }
+
+    IRInst* emitShapePackLike(IRInst* oldInst, ArrayView<IRInst*> elements)
+    {
+        auto resultType = as<IRType>(oldInst->getDataType());
+        if (!resultType)
+            return nullptr;
+
+        IRBuilder builder(module);
+        IRBuilderSourceLocRAII srcLocRAII(&builder, oldInst->sourceLoc);
+        builder.setInsertBefore(oldInst);
+
+        if (resultType->getOp() == kIROp_TupleType)
+            return builder.emitMakeTuple(resultType, elements.getCount(), elements.getBuffer());
+
+        return builder.emitMakeValuePack(resultType, elements.getCount(), elements.getBuffer());
+    }
+
+    bool maybeSpecializeShapePackTransformInst(IRInst* inst)
+    {
+        auto diagnose = [&](auto diag) -> bool
+        {
+            if (sink)
+                sink->diagnose(diag);
+            return false;
+        };
+
+        auto replaceWith = [&](IRInst* replacement) -> bool
+        {
+            if (!replacement)
+                return false;
+            addUsersToWorkList(inst);
+            inst->replaceUsesWith(replacement);
+            inst->removeAndDeallocate();
+            addToWorkList(replacement);
+            return true;
+        };
+
+        switch (inst->getOp())
+        {
+        case kIROp_ConcatVals:
+            {
+                auto leftPack = inst->getOperand(0);
+                auto rightPack = inst->getOperand(1);
+                auto axis = inst->getOperand(2);
+                if (!isConcreteShapePack(leftPack) || !isConcreteShapePack(rightPack))
+                    return maybeSpecializeFoldableInst(inst);
+
+                auto leftRank = leftPack->getOperandCount();
+                auto rightRank = rightPack->getOperandCount();
+                if (leftRank != rightRank)
+                {
+                    Diagnostics::ShapePackRankMismatch diag = {};
+                    diag.opName = "__concatVals";
+                    diag.leftRank = (int)leftRank;
+                    diag.rightRank = (int)rightRank;
+                    diag.location = inst->sourceLoc;
+                    return diagnose(diag);
+                }
+
+                Int64 axisValue = 0;
+                if (!tryGetConstantIntLit(axis, axisValue))
+                    return maybeSpecializeFoldableInst(inst);
+
+                if (axisValue < 0 || (UInt)axisValue >= leftRank)
+                {
+                    Diagnostics::ShapePackAxisOutOfRange diag = {};
+                    diag.opName = "__concatVals";
+                    diag.axis = (int)axisValue;
+                    diag.rank = (int)leftRank;
+                    diag.location = inst->sourceLoc;
+                    return diagnose(diag);
+                }
+
+                IRBuilder builder(module);
+                IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+                builder.setInsertBefore(inst);
+
+                ShortList<IRInst*> resultElements;
+                for (UInt i = 0; i < leftRank; ++i)
+                {
+                    auto leftElement = leftPack->getOperand(i);
+                    auto rightElement = rightPack->getOperand(i);
+                    if (i == (UInt)axisValue)
+                    {
+                        resultElements.add(builder.emitAdd(
+                            as<IRType>(leftElement->getDataType()),
+                            leftElement,
+                            rightElement));
+                    }
+                    else if (areKnownEqualShapeElements(leftElement, rightElement))
+                    {
+                        resultElements.add(leftElement);
+                    }
+                    else
+                    {
+                        Diagnostics::ConcatValsNonAxisMismatch diag = {};
+                        diag.axis = (int)axisValue;
+                        diag.dimIndex = (int)i;
+                        diag.location = inst->sourceLoc;
+                        return diagnose(diag);
+                    }
+                }
+
+                return replaceWith(emitShapePackLike(
+                    inst,
+                    resultElements.getArrayView().arrayView));
+            }
+
+        case kIROp_PermuteVals:
+            {
+                auto valuePack = inst->getOperand(0);
+                auto orderPack = inst->getOperand(1);
+                if (!isConcreteShapePack(valuePack) || !isConcreteShapePack(orderPack))
+                    return maybeSpecializeFoldableInst(inst);
+
+                auto valueRank = valuePack->getOperandCount();
+                auto orderRank = orderPack->getOperandCount();
+                if (valueRank != orderRank)
+                {
+                    Diagnostics::PermuteValsOrderLengthMismatch diag = {};
+                    diag.orderRank = (int)orderRank;
+                    diag.valueRank = (int)valueRank;
+                    diag.location = inst->sourceLoc;
+                    return diagnose(diag);
+                }
+
+                Dictionary<Int64, Index> firstSeenPosition;
+                ShortList<IRInst*> resultElements;
+                for (UInt i = 0; i < orderRank; ++i)
+                {
+                    Int64 orderIndex = 0;
+                    if (!tryGetConstantIntLit(orderPack->getOperand(i), orderIndex))
+                        return maybeSpecializeFoldableInst(inst);
+
+                    Index firstPosition = 0;
+                    if (firstSeenPosition.tryGetValue(orderIndex, firstPosition))
+                    {
+                        Diagnostics::PermuteValsDuplicateIndex diag = {};
+                        diag.indexValue = (int)orderIndex;
+                        diag.firstPosition = (int)firstPosition;
+                        diag.secondPosition = (int)i;
+                        diag.location = inst->sourceLoc;
+                        return diagnose(diag);
+                    }
+                    firstSeenPosition[orderIndex] = i;
+
+                    if (orderIndex < 0 || (UInt)orderIndex >= valueRank)
+                    {
+                        Diagnostics::PermuteValsIndexOutOfRange diag = {};
+                        diag.indexValue = (int)orderIndex;
+                        diag.indexPosition = (int)i;
+                        diag.rank = (int)valueRank;
+                        diag.location = inst->sourceLoc;
+                        return diagnose(diag);
+                    }
+
+                    resultElements.add(valuePack->getOperand((UInt)orderIndex));
+                }
+
+                return replaceWith(emitShapePackLike(
+                    inst,
+                    resultElements.getArrayView().arrayView));
+            }
+
+        case kIROp_SwapVals:
+            {
+                auto valuePack = inst->getOperand(0);
+                auto dim0 = inst->getOperand(1);
+                auto dim1 = inst->getOperand(2);
+
+                if (dim0 == dim1)
+                    return replaceWith(valuePack);
+
+                if (!isConcreteShapePack(valuePack))
+                    return maybeSpecializeFoldableInst(inst);
+
+                Int64 dim0Value = 0;
+                Int64 dim1Value = 0;
+                if (!tryGetConstantIntLit(dim0, dim0Value) || !tryGetConstantIntLit(dim1, dim1Value))
+                    return maybeSpecializeFoldableInst(inst);
+
+                auto valueRank = valuePack->getOperandCount();
+                if (dim0Value < 0 || (UInt)dim0Value >= valueRank)
+                {
+                    Diagnostics::ShapePackAxisOutOfRange diag = {};
+                    diag.opName = "__swapVals";
+                    diag.axis = (int)dim0Value;
+                    diag.rank = (int)valueRank;
+                    diag.location = inst->sourceLoc;
+                    return diagnose(diag);
+                }
+
+                if (dim1Value < 0 || (UInt)dim1Value >= valueRank)
+                {
+                    Diagnostics::ShapePackAxisOutOfRange diag = {};
+                    diag.opName = "__swapVals";
+                    diag.axis = (int)dim1Value;
+                    diag.rank = (int)valueRank;
+                    diag.location = inst->sourceLoc;
+                    return diagnose(diag);
+                }
+
+                if (dim0Value == dim1Value)
+                    return replaceWith(valuePack);
+
+                ShortList<IRInst*> resultElements;
+                for (UInt i = 0; i < valueRank; ++i)
+                {
+                    if (i == (UInt)dim0Value)
+                        resultElements.add(valuePack->getOperand((UInt)dim1Value));
+                    else if (i == (UInt)dim1Value)
+                        resultElements.add(valuePack->getOperand((UInt)dim0Value));
+                    else
+                        resultElements.add(valuePack->getOperand(i));
+                }
+
+                return replaceWith(emitShapePackLike(
+                    inst,
+                    resultElements.getArrayView().arrayView));
+            }
+
+        default:
+            return maybeSpecializeFoldableInst(inst);
+        }
     }
 
     template<typename TDict>

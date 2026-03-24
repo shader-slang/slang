@@ -539,6 +539,34 @@ class TrimLastExpr : public PackQueryExpr
     FIDDLE(...)
 };
 
+FIDDLE(abstract)
+class ShapePackTransformExpr : public Expr
+{
+    FIDDLE(...)
+    FIDDLE() List<Expr*> args;
+
+    Expr* getArg(Index index) const { return args[index]; }
+    Index getArgCount() const { return args.getCount(); }
+};
+
+FIDDLE()
+class ConcatValsExpr : public ShapePackTransformExpr
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class PermuteValsExpr : public ShapePackTransformExpr
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class SwapValsExpr : public ShapePackTransformExpr
+{
+    FIDDLE(...)
+};
+
 /// Expression for compile-time bit casting from floating-point to integer.
 /// __floatAsInt(expr) reinterprets the bits of a floating-point value as an integer.
 /// The input can be:

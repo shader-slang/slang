@@ -66,6 +66,24 @@ VariadicPackCardinality getKnownPackCardinality(Val* packOperand)
         return concreteIntValPack->getCount() > 0 ? VariadicPackCardinality::NonEmpty
                                                   : VariadicPackCardinality::Empty;
 
+    if (auto permuteIntValPack = as<PermuteIntValPack>(packOperand))
+        return getKnownPackCardinality(permuteIntValPack->getValuePack());
+
+    if (auto swapIntValPack = as<SwapIntValPack>(packOperand))
+        return getKnownPackCardinality(swapIntValPack->getValuePack());
+
+    if (auto concatIntValPack = as<ConcatIntValPack>(packOperand))
+    {
+        auto leftCardinality = getKnownPackCardinality(concatIntValPack->getLeftPack());
+        auto rightCardinality = getKnownPackCardinality(concatIntValPack->getRightPack());
+        if (leftCardinality == VariadicPackCardinality::Empty &&
+            rightCardinality == VariadicPackCardinality::Empty)
+            return VariadicPackCardinality::Empty;
+        if (leftCardinality == VariadicPackCardinality::NonEmpty ||
+            rightCardinality == VariadicPackCardinality::NonEmpty)
+            return VariadicPackCardinality::NonEmpty;
+    }
+
     return VariadicPackCardinality::Unknown;
 }
 

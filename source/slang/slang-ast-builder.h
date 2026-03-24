@@ -679,6 +679,12 @@ public:
 
     Val* getTrimLastPack(Val* basePack);
 
+    Val* getConcatIntValPack(Val* leftPack, Val* rightPack, IntVal* axis);
+
+    Val* getPermuteIntValPack(Val* valuePack, Val* orderPack);
+
+    Val* getSwapIntValPack(Val* valuePack, IntVal* dim0, IntVal* dim1);
+
     NonEmptyPackWitness* getNonEmptyPackWitness(Val* pack);
 
     /// Produce a witness that `T : T` for any type `T`

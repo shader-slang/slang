@@ -2353,6 +2353,124 @@ Val* TrimLastIntValPack::_resolveImplOverride()
     return getCurrentASTBuilder()->getTrimLastPack(resolvedArg);
 }
 
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ConcatIntValPack !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+void ConcatIntValPack::_toTextOverride(StringBuilder& out)
+{
+    out << "__concatVals(";
+    getLeftPack()->toText(out);
+    out << ", ";
+    getRightPack()->toText(out);
+    out << ", ";
+    getAxis()->toText(out);
+    out << ")";
+}
+
+Val* ConcatIntValPack::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    int diff = 0;
+    auto substLeftPack = getLeftPack()->substituteImpl(astBuilder, subst, &diff);
+    auto substRightPack = getRightPack()->substituteImpl(astBuilder, subst, &diff);
+    auto substAxis = as<IntVal>(getAxis()->substituteImpl(astBuilder, subst, &diff));
+    if (!diff)
+        return this;
+    (*ioDiff)++;
+    return astBuilder->getConcatIntValPack(substLeftPack, substRightPack, substAxis);
+}
+
+Val* ConcatIntValPack::_resolveImplOverride()
+{
+    auto resolvedLeftPack = getLeftPack()->resolve();
+    auto resolvedRightPack = getRightPack()->resolve();
+    auto resolvedAxis = as<IntVal>(getAxis()->resolve());
+    if (resolvedLeftPack == getLeftPack() && resolvedRightPack == getRightPack() &&
+        resolvedAxis == getAxis())
+        return this;
+    return getCurrentASTBuilder()->getConcatIntValPack(
+        resolvedLeftPack,
+        resolvedRightPack,
+        resolvedAxis);
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! PermuteIntValPack !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+void PermuteIntValPack::_toTextOverride(StringBuilder& out)
+{
+    out << "__permuteVals(";
+    getValuePack()->toText(out);
+    out << ", ";
+    getOrderPack()->toText(out);
+    out << ")";
+}
+
+Val* PermuteIntValPack::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    int diff = 0;
+    auto substValuePack = getValuePack()->substituteImpl(astBuilder, subst, &diff);
+    auto substOrderPack = getOrderPack()->substituteImpl(astBuilder, subst, &diff);
+    if (!diff)
+        return this;
+    (*ioDiff)++;
+    return astBuilder->getPermuteIntValPack(substValuePack, substOrderPack);
+}
+
+Val* PermuteIntValPack::_resolveImplOverride()
+{
+    auto resolvedValuePack = getValuePack()->resolve();
+    auto resolvedOrderPack = getOrderPack()->resolve();
+    if (resolvedValuePack == getValuePack() && resolvedOrderPack == getOrderPack())
+        return this;
+    return getCurrentASTBuilder()->getPermuteIntValPack(resolvedValuePack, resolvedOrderPack);
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! SwapIntValPack !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+void SwapIntValPack::_toTextOverride(StringBuilder& out)
+{
+    out << "__swapVals(";
+    getValuePack()->toText(out);
+    out << ", ";
+    getDim0()->toText(out);
+    out << ", ";
+    getDim1()->toText(out);
+    out << ")";
+}
+
+Val* SwapIntValPack::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    int diff = 0;
+    auto substValuePack = getValuePack()->substituteImpl(astBuilder, subst, &diff);
+    auto substDim0 = as<IntVal>(getDim0()->substituteImpl(astBuilder, subst, &diff));
+    auto substDim1 = as<IntVal>(getDim1()->substituteImpl(astBuilder, subst, &diff));
+    if (!diff)
+        return this;
+    (*ioDiff)++;
+    return astBuilder->getSwapIntValPack(substValuePack, substDim0, substDim1);
+}
+
+Val* SwapIntValPack::_resolveImplOverride()
+{
+    auto resolvedValuePack = getValuePack()->resolve();
+    auto resolvedDim0 = as<IntVal>(getDim0()->resolve());
+    auto resolvedDim1 = as<IntVal>(getDim1()->resolve());
+    if (resolvedValuePack == getValuePack() && resolvedDim0 == getDim0() &&
+        resolvedDim1 == getDim1())
+        return this;
+    return getCurrentASTBuilder()->getSwapIntValPack(
+        resolvedValuePack,
+        resolvedDim0,
+        resolvedDim1);
+}
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ExpandIntValPack !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 void ExpandIntValPack::_toTextOverride(StringBuilder& out)
@@ -2445,6 +2563,12 @@ bool isAbstractValuePack(Val* val)
     if (as<TrimFirstIntValPack>(val))
         return true;
     if (as<TrimLastIntValPack>(val))
+        return true;
+    if (as<ConcatIntValPack>(val))
+        return true;
+    if (as<PermuteIntValPack>(val))
+        return true;
+    if (as<SwapIntValPack>(val))
         return true;
     if (auto declRefIntVal = as<DeclRefIntVal>(val))
     {

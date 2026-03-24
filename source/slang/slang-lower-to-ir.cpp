@@ -1968,6 +1968,44 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         return emitWitnessedPackQuery(type, kIROp_TrimLastOfPack, basePack);
     }
 
+    LoweredValInfo visitConcatIntValPack(ConcatIntValPack* valPack)
+    {
+        auto irBuilder = getBuilder();
+        auto type = lowerType(context, valPack->getType());
+        IRInst* args[] = {
+            lowerSimpleVal(context, valPack->getLeftPack()),
+            lowerSimpleVal(context, valPack->getRightPack()),
+            lowerSimpleVal(context, valPack->getAxis()),
+        };
+        return LoweredValInfo::simple(
+            irBuilder->emitIntrinsicInst(type, kIROp_ConcatVals, SLANG_COUNT_OF(args), args));
+    }
+
+    LoweredValInfo visitPermuteIntValPack(PermuteIntValPack* valPack)
+    {
+        auto irBuilder = getBuilder();
+        auto type = lowerType(context, valPack->getType());
+        IRInst* args[] = {
+            lowerSimpleVal(context, valPack->getValuePack()),
+            lowerSimpleVal(context, valPack->getOrderPack()),
+        };
+        return LoweredValInfo::simple(
+            irBuilder->emitIntrinsicInst(type, kIROp_PermuteVals, SLANG_COUNT_OF(args), args));
+    }
+
+    LoweredValInfo visitSwapIntValPack(SwapIntValPack* valPack)
+    {
+        auto irBuilder = getBuilder();
+        auto type = lowerType(context, valPack->getType());
+        IRInst* args[] = {
+            lowerSimpleVal(context, valPack->getValuePack()),
+            lowerSimpleVal(context, valPack->getDim0()),
+            lowerSimpleVal(context, valPack->getDim1()),
+        };
+        return LoweredValInfo::simple(
+            irBuilder->emitIntrinsicInst(type, kIROp_SwapVals, SLANG_COUNT_OF(args), args));
+    }
+
     LoweredValInfo visitExpandIntValPack(ExpandIntValPack* expandVal)
     {
         auto irBuilder = getBuilder();
@@ -5120,6 +5158,29 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
             builder->emitIntrinsicInst(witnessType, kIROp_NonEmptyPackWitness, 1, witnessArg);
         IRInst* args[] = {packVal, witness};
         return LoweredValInfo::simple(builder->emitIntrinsicInst(resultType, op, 2, args));
+    }
+
+    LoweredValInfo visitShapePackTransformExpr(ShapePackTransformExpr* shapePackExpr)
+    {
+        auto builder = getBuilder();
+        auto resultType = lowerType(context, shapePackExpr->type);
+
+        IROp op = kIROp_SwapVals;
+        if (as<ConcatValsExpr>(shapePackExpr))
+            op = kIROp_ConcatVals;
+        else if (as<PermuteValsExpr>(shapePackExpr))
+            op = kIROp_PermuteVals;
+
+        ShortList<IRInst*> args;
+        for (auto arg : shapePackExpr->args)
+            args.add(getSimpleVal(context, lowerSubExpr(arg)));
+
+        return LoweredValInfo::simple(
+            builder->emitIntrinsicInst(
+                resultType,
+                op,
+                args.getCount(),
+                args.getArrayView().getBuffer()));
     }
 
     LoweredValInfo visitFloatBitCastExpr(FloatBitCastExpr* /*expr*/)
