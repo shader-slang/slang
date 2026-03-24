@@ -9792,26 +9792,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         return paramVal;
     }
 
-    static bool _intValReferencesSpecConst(Val* val)
-    {
-        if (auto declRefIntVal = as<DeclRefIntVal>(val))
-        {
-            auto decl = declRefIntVal->getDeclRef().getDecl();
-            if (decl->hasModifier<SpecializationConstantAttribute>() ||
-                decl->hasModifier<VkConstantIdAttribute>())
-                return true;
-        }
-        for (Index i = 0; i < val->getOperandCount(); i++)
-        {
-            if (val->m_operands[i].kind != ValNodeOperandKind::ValNode)
-                continue;
-            if (auto childVal = val->m_operands[i].getVal())
-                if (_intValReferencesSpecConst(childVal))
-                    return true;
-        }
-        return false;
-    }
-
     LoweredValInfo lowerConstantDeclCommon(VarDeclBase* decl)
     {
         // It's constant, so shoul dhave this modifier
@@ -9883,7 +9863,25 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // with the value `5`, then we might have only a single
             // instruction to represent `5`.
             //
-            IRInst* irInitVal = getSimpleVal(subContext, lowerRValueExpr(subContext, initExpr));
+            // For global constants that are not inside a generic context, use the
+            // Val path when the initializer is a non-trivial Val (e.g. a
+            // FuncCallIntVal or PolynomialIntVal referencing specialization
+            // constants), so that visitFuncCallIntVal / visitPolynomialIntVal can
+            // propagate the @SpecConst rate type to the result. Plain ConstantIntVals
+            // are handled correctly by lowerRValueExpr, and their getType() may be
+            // null.
+            //
+            // Function-static and generic-context constants are excluded: they may
+            // have Vals that depend on generic parameters, and calling lowerSimpleVal
+            // there creates hoistable constexpr ops that get prematurely deallocated
+            // during generic specialization.
+            //
+            IRInst* irInitVal = nullptr;
+            if (!isFunctionStaticVarDecl(decl) && !outerGeneric && decl->val &&
+                !as<ConstantIntVal>(decl->val))
+                irInitVal = lowerSimpleVal(subContext, decl->val);
+            if (!irInitVal)
+                irInitVal = getSimpleVal(subContext, lowerRValueExpr(subContext, initExpr));
 
             // We construct a distinct IR instruction to represent the
             // constant itself, with the value as an operand.
