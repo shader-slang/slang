@@ -651,12 +651,14 @@ void ASTPrinter::addExpr(Expr* expr)
     }
     else if (const auto shapePackExpr = as<ShapePackTransformExpr>(expr))
     {
-        if (as<ConcatValsExpr>(shapePackExpr))
-            sb << "__concatVals(";
-        else if (as<PermuteValsExpr>(shapePackExpr))
-            sb << "__permuteVals(";
-        else if (as<SwapValsExpr>(shapePackExpr))
-            sb << "__swapVals(";
+        if (as<DimsConcatExpr>(shapePackExpr))
+            sb << "__dimsConcat(";
+        else if (as<DimsPermuteExpr>(shapePackExpr))
+            sb << "__dimsPermute(";
+        else if (as<DimsSwapExpr>(shapePackExpr))
+            sb << "__dimsSwap(";
+        else if (as<DimsReduceExpr>(shapePackExpr))
+            sb << "__dimsReduce(";
         else
             SLANG_UNEXPECTED("unknown ShapePackTransformExpr subtype");
 

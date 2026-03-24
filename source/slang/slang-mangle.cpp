@@ -473,25 +473,31 @@ void emitVal(ManglingContext* context, Val* val)
         emitRaw(context, "Vt");
         emitVal(context, trimLastIntValPack->getBasePack());
     }
-    else if (auto concatIntValPack = as<ConcatIntValPack>(val))
+    else if (auto dimsConcatIntValPack = as<DimsConcatIntValPack>(val))
     {
         emitRaw(context, "Vc");
-        emitVal(context, concatIntValPack->getLeftPack());
-        emitVal(context, concatIntValPack->getRightPack());
-        emitVal(context, concatIntValPack->getAxis());
+        emitVal(context, dimsConcatIntValPack->getLeftPack());
+        emitVal(context, dimsConcatIntValPack->getRightPack());
+        emitVal(context, dimsConcatIntValPack->getAxis());
     }
-    else if (auto permuteIntValPack = as<PermuteIntValPack>(val))
+    else if (auto dimsPermuteIntValPack = as<DimsPermuteIntValPack>(val))
     {
         emitRaw(context, "Vr");
-        emitVal(context, permuteIntValPack->getValuePack());
-        emitVal(context, permuteIntValPack->getOrderPack());
+        emitVal(context, dimsPermuteIntValPack->getValuePack());
+        emitVal(context, dimsPermuteIntValPack->getOrderPack());
     }
-    else if (auto swapIntValPack = as<SwapIntValPack>(val))
+    else if (auto dimsSwapIntValPack = as<DimsSwapIntValPack>(val))
     {
         emitRaw(context, "Vs");
-        emitVal(context, swapIntValPack->getValuePack());
-        emitVal(context, swapIntValPack->getDim0());
-        emitVal(context, swapIntValPack->getDim1());
+        emitVal(context, dimsSwapIntValPack->getValuePack());
+        emitVal(context, dimsSwapIntValPack->getDim0());
+        emitVal(context, dimsSwapIntValPack->getDim1());
+    }
+    else if (auto dimsReduceIntValPack = as<DimsReduceIntValPack>(val))
+    {
+        emitRaw(context, "Vd");
+        emitVal(context, dimsReduceIntValPack->getValuePack());
+        emitVal(context, dimsReduceIntValPack->getAxis());
     }
     else
     {

@@ -1702,31 +1702,31 @@ err(
 )
 
 err(
-    "concat-vals-non-axis-mismatch",
+    "dims-concat-non-axis-mismatch",
     30420,
-    "__concatVals requires non-axis dimensions to match",
-    span { loc = "location", message = "__concatVals requires dimensions to match outside axis ~axis:Int, but dimension ~dimIndex:Int differs" }
+    "__dimsConcat requires non-axis dimensions to match",
+    span { loc = "location", message = "__dimsConcat requires dimensions to match outside axis ~axis:Int, but dimension ~dimIndex:Int differs" }
 )
 
 err(
-    "permute-vals-order-length-mismatch",
+    "dims-permute-order-length-mismatch",
     30421,
-    "__permuteVals requires an order pack with matching rank",
-    span { loc = "location", message = "__permuteVals requires the order pack to have length ~orderRank:Int matching the input rank ~valueRank:Int" }
+    "__dimsPermute requires an order pack with matching rank",
+    span { loc = "location", message = "__dimsPermute requires the order pack to have length ~orderRank:Int matching the input rank ~valueRank:Int" }
 )
 
 err(
-    "permute-vals-index-out-of-range",
+    "dims-permute-index-out-of-range",
     30422,
-    "__permuteVals index is out of range",
-    span { loc = "location", message = "__permuteVals order index ~indexValue:Int at position ~indexPosition:Int is out of range for rank ~rank:Int" }
+    "__dimsPermute index is out of range",
+    span { loc = "location", message = "__dimsPermute order index ~indexValue:Int at position ~indexPosition:Int is out of range for rank ~rank:Int" }
 )
 
 err(
-    "permute-vals-duplicate-index",
+    "dims-permute-duplicate-index",
     30423,
-    "__permuteVals order contains a duplicate index",
-    span { loc = "location", message = "__permuteVals order index ~indexValue:Int is duplicated at positions ~firstPosition:Int and ~secondPosition:Int" }
+    "__dimsPermute order contains a duplicate index",
+    span { loc = "location", message = "__dimsPermute order index ~indexValue:Int is duplicated at positions ~firstPosition:Int and ~secondPosition:Int" }
 )
 
 err(

@@ -178,9 +178,10 @@ struct SpecializationContext
         case kIROp_ExtractLastFromPack:
         case kIROp_TrimFirstOfPack:
         case kIROp_TrimLastOfPack:
-        case kIROp_ConcatVals:
-        case kIROp_PermuteVals:
-        case kIROp_SwapVals:
+        case kIROp_DimsConcat:
+        case kIROp_DimsPermute:
+        case kIROp_DimsSwap:
+        case kIROp_DimsReduce:
         case kIROp_PackBranch:
             return false;
         case kIROp_NonEmptyPackWitness:
@@ -804,9 +805,10 @@ struct SpecializationContext
         case kIROp_TrimLastOfPack:
             return maybeSpecializeFoldableInst(inst);
 
-        case kIROp_ConcatVals:
-        case kIROp_PermuteVals:
-        case kIROp_SwapVals:
+        case kIROp_DimsConcat:
+        case kIROp_DimsPermute:
+        case kIROp_DimsSwap:
+        case kIROp_DimsReduce:
             return maybeSpecializeShapePackTransformInst(inst);
 
         case kIROp_TypePack:
@@ -966,9 +968,10 @@ struct SpecializationContext
                 case kIROp_ExpandTypeOrVal:
                 case kIROp_TrimFirstOfPack:
                 case kIROp_TrimLastOfPack:
-                case kIROp_ConcatVals:
-                case kIROp_PermuteVals:
-                case kIROp_SwapVals:
+                case kIROp_DimsConcat:
+                case kIROp_DimsPermute:
+                case kIROp_DimsSwap:
+                case kIROp_DimsReduce:
                 case kIROp_PackBranch:
                     return PackBranchCardinality::Unknown;
                 case kIROp_MakeValuePack:
@@ -984,9 +987,10 @@ struct SpecializationContext
             return pack->getOperandCount() == 0 ? PackBranchCardinality::Empty
                                                 : PackBranchCardinality::NonEmpty;
         default:
-            if (pack->getOp() == kIROp_PermuteVals || pack->getOp() == kIROp_SwapVals)
+            if (pack->getOp() == kIROp_DimsPermute || pack->getOp() == kIROp_DimsSwap ||
+                pack->getOp() == kIROp_DimsReduce)
                 return getPackBranchCardinality(pack->getOperand(0));
-            if (pack->getOp() == kIROp_ConcatVals)
+            if (pack->getOp() == kIROp_DimsConcat)
             {
                 auto leftCardinality = getPackBranchCardinality(pack->getOperand(0));
                 auto rightCardinality = getPackBranchCardinality(pack->getOperand(1));
@@ -1238,9 +1242,10 @@ struct SpecializationContext
             {
             case kIROp_MakeValuePack:
             case kIROp_Expand:
-            case kIROp_ConcatVals:
-            case kIROp_PermuteVals:
-            case kIROp_SwapVals:
+            case kIROp_DimsConcat:
+            case kIROp_DimsPermute:
+            case kIROp_DimsSwap:
+            case kIROp_DimsReduce:
                 return true;
             default:
                 break;
@@ -1319,7 +1324,7 @@ struct SpecializationContext
 
         switch (inst->getOp())
         {
-        case kIROp_ConcatVals:
+        case kIROp_DimsConcat:
             {
                 auto leftPack = inst->getOperand(0);
                 auto rightPack = inst->getOperand(1);
@@ -1332,7 +1337,7 @@ struct SpecializationContext
                 if (leftRank != rightRank)
                 {
                     Diagnostics::ShapePackRankMismatch diag = {};
-                    diag.opName = "__concatVals";
+                    diag.opName = "__dimsConcat";
                     diag.leftRank = (int)leftRank;
                     diag.rightRank = (int)rightRank;
                     diag.location = inst->sourceLoc;
@@ -1346,7 +1351,7 @@ struct SpecializationContext
                 if (axisValue < 0 || (UInt)axisValue >= leftRank)
                 {
                     Diagnostics::ShapePackAxisOutOfRange diag = {};
-                    diag.opName = "__concatVals";
+                    diag.opName = "__dimsConcat";
                     diag.axis = (int)axisValue;
                     diag.rank = (int)leftRank;
                     diag.location = inst->sourceLoc;
@@ -1375,7 +1380,7 @@ struct SpecializationContext
                     }
                     else
                     {
-                        Diagnostics::ConcatValsNonAxisMismatch diag = {};
+                        Diagnostics::DimsConcatNonAxisMismatch diag = {};
                         diag.axis = (int)axisValue;
                         diag.dimIndex = (int)i;
                         diag.location = inst->sourceLoc;
@@ -1387,7 +1392,7 @@ struct SpecializationContext
                     emitShapePackLike(inst, resultElements.getArrayView().arrayView));
             }
 
-        case kIROp_PermuteVals:
+        case kIROp_DimsPermute:
             {
                 auto valuePack = inst->getOperand(0);
                 auto orderPack = inst->getOperand(1);
@@ -1398,7 +1403,7 @@ struct SpecializationContext
                 auto orderRank = orderPack->getOperandCount();
                 if (valueRank != orderRank)
                 {
-                    Diagnostics::PermuteValsOrderLengthMismatch diag = {};
+                    Diagnostics::DimsPermuteOrderLengthMismatch diag = {};
                     diag.orderRank = (int)orderRank;
                     diag.valueRank = (int)valueRank;
                     diag.location = inst->sourceLoc;
@@ -1416,7 +1421,7 @@ struct SpecializationContext
                     Index firstPosition = 0;
                     if (firstSeenPosition.tryGetValue(orderIndex, firstPosition))
                     {
-                        Diagnostics::PermuteValsDuplicateIndex diag = {};
+                        Diagnostics::DimsPermuteDuplicateIndex diag = {};
                         diag.indexValue = (int)orderIndex;
                         diag.firstPosition = (int)firstPosition;
                         diag.secondPosition = (int)i;
@@ -1427,7 +1432,7 @@ struct SpecializationContext
 
                     if (orderIndex < 0 || (UInt)orderIndex >= valueRank)
                     {
-                        Diagnostics::PermuteValsIndexOutOfRange diag = {};
+                        Diagnostics::DimsPermuteIndexOutOfRange diag = {};
                         diag.indexValue = (int)orderIndex;
                         diag.indexPosition = (int)i;
                         diag.rank = (int)valueRank;
@@ -1442,7 +1447,7 @@ struct SpecializationContext
                     emitShapePackLike(inst, resultElements.getArrayView().arrayView));
             }
 
-        case kIROp_SwapVals:
+        case kIROp_DimsSwap:
             {
                 auto valuePack = inst->getOperand(0);
                 auto dim0 = inst->getOperand(1);
@@ -1464,7 +1469,7 @@ struct SpecializationContext
                 if (dim0Value < 0 || (UInt)dim0Value >= valueRank)
                 {
                     Diagnostics::ShapePackAxisOutOfRange diag = {};
-                    diag.opName = "__swapVals";
+                    diag.opName = "__dimsSwap";
                     diag.axis = (int)dim0Value;
                     diag.rank = (int)valueRank;
                     diag.location = inst->sourceLoc;
@@ -1474,7 +1479,7 @@ struct SpecializationContext
                 if (dim1Value < 0 || (UInt)dim1Value >= valueRank)
                 {
                     Diagnostics::ShapePackAxisOutOfRange diag = {};
-                    diag.opName = "__swapVals";
+                    diag.opName = "__dimsSwap";
                     diag.axis = (int)dim1Value;
                     diag.rank = (int)valueRank;
                     diag.location = inst->sourceLoc;
@@ -1493,6 +1498,52 @@ struct SpecializationContext
                         resultElements.add(valuePack->getOperand((UInt)dim0Value));
                     else
                         resultElements.add(valuePack->getOperand(i));
+                }
+
+                return replaceWith(
+                    emitShapePackLike(inst, resultElements.getArrayView().arrayView));
+            }
+
+        case kIROp_DimsReduce:
+            {
+                auto valuePack = inst->getOperand(0);
+                auto axis = inst->getOperand(1);
+
+                if (!isConcreteShapePack(valuePack))
+                    return maybeSpecializeFoldableInst(inst);
+
+                Int64 axisValue = 0;
+                if (!tryGetConstantIntLit(axis, axisValue))
+                    return maybeSpecializeFoldableInst(inst);
+
+                auto valueRank = valuePack->getOperandCount();
+                if (axisValue < 0 || (UInt)axisValue >= valueRank)
+                {
+                    Diagnostics::ShapePackAxisOutOfRange diag = {};
+                    diag.opName = "__dimsReduce";
+                    diag.axis = (int)axisValue;
+                    diag.rank = (int)valueRank;
+                    diag.location = inst->sourceLoc;
+                    return diagnose(diag);
+                }
+
+                IRBuilder builder(module);
+                IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+                builder.setInsertBefore(inst);
+
+                ShortList<IRInst*> resultElements;
+                for (UInt i = 0; i < valueRank; ++i)
+                {
+                    if (i == (UInt)axisValue)
+                    {
+                        resultElements.add(builder.getIntValue(
+                            as<IRType>(valuePack->getOperand(i)->getDataType()),
+                            1));
+                    }
+                    else
+                    {
+                        resultElements.add(valuePack->getOperand(i));
+                    }
                 }
 
                 return replaceWith(

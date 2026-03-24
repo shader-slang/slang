@@ -2474,9 +2474,10 @@ local insts = {
 	{ ExtractLastFromPack = { operands = { { "pack" }, { "witness" } }, hoistable = true } },
 	{ TrimFirstOfPack = { operands = { { "pack" }, { "witness" } }, hoistable = true } },
 	{ TrimLastOfPack = { operands = { { "pack" }, { "witness" } }, hoistable = true } },
-	{ ConcatVals = { operands = { { "leftPack" }, { "rightPack" }, { "axis" } }, hoistable = true } },
-	{ PermuteVals = { operands = { { "pack" }, { "order" } }, hoistable = true } },
-	{ SwapVals = { operands = { { "pack" }, { "dim0" }, { "dim1" } }, hoistable = true } },
+	{ DimsConcat = { operands = { { "leftPack" }, { "rightPack" }, { "axis" } }, hoistable = true } },
+	{ DimsPermute = { operands = { { "pack" }, { "order" } }, hoistable = true } },
+	{ DimsSwap = { operands = { { "pack" }, { "dim0" }, { "dim1" } }, hoistable = true } },
+	{ DimsReduce = { operands = { { "pack" }, { "axis" } }, hoistable = true } },
 	{ NonEmptyPackWitness = { operands = { { "pack" } }, hoistable = true } },
 	{ GetArrayLength = { operands = { { "array" } } } },
 	{

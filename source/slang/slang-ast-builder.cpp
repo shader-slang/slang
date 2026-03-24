@@ -1193,7 +1193,7 @@ Val* ASTBuilder::getTrimLastPack(Val* basePack)
     return getOrCreate<TrimLastIntValPack>(packType, basePack);
 }
 
-Val* ASTBuilder::getConcatIntValPack(Val* leftPack, Val* rightPack, IntVal* axis)
+Val* ASTBuilder::getDimsConcatIntValPack(Val* leftPack, Val* rightPack, IntVal* axis)
 {
     IntegerLiteralValue axisValue = 0;
     if (auto leftValPack = as<ConcreteIntValPack>(leftPack))
@@ -1232,10 +1232,10 @@ Val* ASTBuilder::getConcatIntValPack(Val* leftPack, Val* rightPack, IntVal* axis
     }
 
     auto packType = _getIntPackTypeForVals(this, leftPack, rightPack);
-    return getOrCreate<ConcatIntValPack>(packType, leftPack, rightPack, axis);
+    return getOrCreate<DimsConcatIntValPack>(packType, leftPack, rightPack, axis);
 }
 
-Val* ASTBuilder::getPermuteIntValPack(Val* valuePack, Val* orderPack)
+Val* ASTBuilder::getDimsPermuteIntValPack(Val* valuePack, Val* orderPack)
 {
     if (auto concreteValuePack = as<ConcreteIntValPack>(valuePack))
     {
@@ -1272,10 +1272,10 @@ Val* ASTBuilder::getPermuteIntValPack(Val* valuePack, Val* orderPack)
     }
 
     auto packType = _getIntPackTypeForVal(this, valuePack);
-    return getOrCreate<PermuteIntValPack>(packType, valuePack, orderPack);
+    return getOrCreate<DimsPermuteIntValPack>(packType, valuePack, orderPack);
 }
 
-Val* ASTBuilder::getSwapIntValPack(Val* valuePack, IntVal* dim0, IntVal* dim1)
+Val* ASTBuilder::getDimsSwapIntValPack(Val* valuePack, IntVal* dim0, IntVal* dim1)
 {
     if (dim0 && dim1 && dim0->equals(dim1))
         return valuePack;
@@ -1303,7 +1303,32 @@ Val* ASTBuilder::getSwapIntValPack(Val* valuePack, IntVal* dim0, IntVal* dim1)
     }
 
     auto packType = _getIntPackTypeForVal(this, valuePack);
-    return getOrCreate<SwapIntValPack>(packType, valuePack, dim0, dim1);
+    return getOrCreate<DimsSwapIntValPack>(packType, valuePack, dim0, dim1);
+}
+
+Val* ASTBuilder::getDimsReduceIntValPack(Val* valuePack, IntVal* axis)
+{
+    IntegerLiteralValue axisValue = 0;
+    if (auto concreteValuePack = as<ConcreteIntValPack>(valuePack))
+    {
+        if (_tryGetConstantIntVal(axis, axisValue) && axisValue >= 0 &&
+            axisValue < concreteValuePack->getCount())
+        {
+            ShortList<IntVal*> resultVals;
+            for (Index i = 0; i < concreteValuePack->getCount(); ++i)
+            {
+                if (i == axisValue)
+                    resultVals.add(
+                        getIntVal(as<Type>(concreteValuePack->getElement(i)->getType()), 1));
+                else
+                    resultVals.add(concreteValuePack->getElement(i));
+            }
+            return getIntValPack(resultVals.getArrayView().arrayView);
+        }
+    }
+
+    auto packType = _getIntPackTypeForVal(this, valuePack);
+    return getOrCreate<DimsReduceIntValPack>(packType, valuePack, axis);
 }
 
 NonEmptyPackWitness* ASTBuilder::getNonEmptyPackWitness(Val* pack)

@@ -774,7 +774,8 @@ return {
 	["PackBranch"] = 772,
 	["Decoration.SpecializationDepthDecoration"] = 773,
 	["LateRequireCapability"] = 774,
-	["ConcatVals"] = 775,
-	["PermuteVals"] = 776,
-	["SwapVals"] = 777,
+	["DimsConcat"] = 775,
+	["DimsPermute"] = 776,
+	["DimsSwap"] = 777,
+	["DimsReduce"] = 778,
 }

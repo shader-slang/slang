@@ -896,11 +896,13 @@ LanguageServerResult<LanguageServerProtocol::Hover> LanguageServerCore::hover(
         }
         else if (auto shapePackExpr = as<ShapePackTransformExpr>(expr))
         {
-            String opName = "__swapVals";
-            if (as<ConcatValsExpr>(shapePackExpr))
-                opName = "__concatVals";
-            else if (as<PermuteValsExpr>(shapePackExpr))
-                opName = "__permuteVals";
+            String opName = "__dimsReduce";
+            if (as<DimsConcatExpr>(shapePackExpr))
+                opName = "__dimsConcat";
+            else if (as<DimsPermuteExpr>(shapePackExpr))
+                opName = "__dimsPermute";
+            else if (as<DimsSwapExpr>(shapePackExpr))
+                opName = "__dimsSwap";
 
             sb << "```\n" << opName << "(";
             bool isFirst = true;

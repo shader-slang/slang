@@ -382,10 +382,10 @@ class TrimLastIntValPack : public IntVal
 };
 
 FIDDLE()
-class ConcatIntValPack : public IntVal
+class DimsConcatIntValPack : public IntVal
 {
     FIDDLE(...)
-    ConcatIntValPack(Type* inType, Val* leftPack, Val* rightPack, IntVal* axis)
+    DimsConcatIntValPack(Type* inType, Val* leftPack, Val* rightPack, IntVal* axis)
     {
         setOperands(inType, leftPack, rightPack, axis);
     }
@@ -398,10 +398,10 @@ class ConcatIntValPack : public IntVal
 };
 
 FIDDLE()
-class PermuteIntValPack : public IntVal
+class DimsPermuteIntValPack : public IntVal
 {
     FIDDLE(...)
-    PermuteIntValPack(Type* inType, Val* valuePack, Val* orderPack)
+    DimsPermuteIntValPack(Type* inType, Val* valuePack, Val* orderPack)
     {
         setOperands(inType, valuePack, orderPack);
     }
@@ -413,16 +413,31 @@ class PermuteIntValPack : public IntVal
 };
 
 FIDDLE()
-class SwapIntValPack : public IntVal
+class DimsSwapIntValPack : public IntVal
 {
     FIDDLE(...)
-    SwapIntValPack(Type* inType, Val* valuePack, IntVal* dim0, IntVal* dim1)
+    DimsSwapIntValPack(Type* inType, Val* valuePack, IntVal* dim0, IntVal* dim1)
     {
         setOperands(inType, valuePack, dim0, dim1);
     }
     Val* getValuePack() const { return getOperand(1); }
     IntVal* getDim0() const { return as<IntVal>(getOperand(2)); }
     IntVal* getDim1() const { return as<IntVal>(getOperand(3)); }
+    void _toTextOverride(StringBuilder& out);
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    Val* _resolveImplOverride();
+};
+
+FIDDLE()
+class DimsReduceIntValPack : public IntVal
+{
+    FIDDLE(...)
+    DimsReduceIntValPack(Type* inType, Val* valuePack, IntVal* axis)
+    {
+        setOperands(inType, valuePack, axis);
+    }
+    Val* getValuePack() const { return getOperand(1); }
+    IntVal* getAxis() const { return as<IntVal>(getOperand(2)); }
     void _toTextOverride(StringBuilder& out);
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
     Val* _resolveImplOverride();

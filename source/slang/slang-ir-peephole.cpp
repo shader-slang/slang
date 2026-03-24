@@ -139,9 +139,10 @@ struct PeepholeContext : InstPassBase
             case kIROp_ExpandTypeOrVal:
             case kIROp_TrimFirstOfPack:
             case kIROp_TrimLastOfPack:
-            case kIROp_ConcatVals:
-            case kIROp_PermuteVals:
-            case kIROp_SwapVals:
+            case kIROp_DimsConcat:
+            case kIROp_DimsPermute:
+            case kIROp_DimsSwap:
+            case kIROp_DimsReduce:
                 return true;
             default:
                 break;
@@ -615,7 +616,7 @@ struct PeepholeContext : InstPassBase
                 }
             }
             break;
-        case kIROp_ConcatVals:
+        case kIROp_DimsConcat:
             {
                 auto leftPack = inst->getOperand(0);
                 auto rightPack = inst->getOperand(1);
@@ -671,7 +672,7 @@ struct PeepholeContext : InstPassBase
                 }
             }
             break;
-        case kIROp_PermuteVals:
+        case kIROp_DimsPermute:
             {
                 auto valuePack = inst->getOperand(0);
                 auto orderPack = inst->getOperand(1);
@@ -713,7 +714,7 @@ struct PeepholeContext : InstPassBase
                 }
             }
             break;
-        case kIROp_SwapVals:
+        case kIROp_DimsSwap:
             {
                 auto valuePack = inst->getOperand(0);
                 auto dim0 = inst->getOperand(1);
@@ -765,6 +766,47 @@ struct PeepholeContext : InstPassBase
                                 maybeRemoveOldInst(inst);
                                 changed = true;
                             }
+                        }
+                    }
+                }
+            }
+            break;
+        case kIROp_DimsReduce:
+            {
+                auto valuePack = inst->getOperand(0);
+                auto axis = inst->getOperand(1);
+
+                if (isConcreteShapePack(valuePack))
+                {
+                    Int64 axisValue = 0;
+                    if (tryGetConstantIntLit(axis, axisValue) && axisValue >= 0 &&
+                        (UInt)axisValue < valuePack->getOperandCount())
+                    {
+                        IRBuilder builder(module);
+                        IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+                        builder.setInsertBefore(inst);
+
+                        ShortList<IRInst*> resultElements;
+                        for (UInt i = 0; i < valuePack->getOperandCount(); ++i)
+                        {
+                            if (i == (UInt)axisValue)
+                            {
+                                resultElements.add(builder.getIntValue(
+                                    as<IRType>(valuePack->getOperand(i)->getDataType()),
+                                    1));
+                            }
+                            else
+                            {
+                                resultElements.add(valuePack->getOperand(i));
+                            }
+                        }
+
+                        if (auto replacement =
+                                emitShapePackLike(inst, resultElements.getArrayView().arrayView))
+                        {
+                            inst->replaceUsesWith(replacement);
+                            maybeRemoveOldInst(inst);
+                            changed = true;
                         }
                     }
                 }

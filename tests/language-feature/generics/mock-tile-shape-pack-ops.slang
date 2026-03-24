@@ -3,32 +3,38 @@
 
 struct MockTile<T : ICoopElement, let each D : int>
 {
-    MockTile<T, __permuteVals(D, Order)> permute<let each Order : int>()
+    MockTile<T, __dimsPermute(D, Order)> permute<let each Order : int>()
     {
-        MockTile<T, __permuteVals(D, Order)> result;
+        MockTile<T, __dimsPermute(D, Order)> result;
+        return result;
+    }
+
+    MockTile<T, __dimsReduce(D, Axis)> reduce<let Axis : int>()
+    {
+        MockTile<T, __dimsReduce(D, Axis)> result;
         return result;
     }
 };
 
-MockTile<T, __concatVals(A, B, Axis)> concat<
+MockTile<T, __dimsConcat(A, B, Axis)> concat<
     let Axis : int,
     T : ICoopElement,
     let each A : int,
     let each B : int>
     (MockTile<T, A> lhs, MockTile<T, B> rhs)
 {
-    MockTile<T, __concatVals(A, B, Axis)> result;
+    MockTile<T, __dimsConcat(A, B, Axis)> result;
     return result;
 }
 
-MockTile<T, __swapVals(D, I, J)> transpose<
+MockTile<T, __dimsSwap(D, I, J)> transpose<
     let I : int,
     let J : int,
     T : ICoopElement,
     let each D : int>
     (MockTile<T, D> tile)
 {
-    MockTile<T, __swapVals(D, I, J)> result;
+    MockTile<T, __dimsSwap(D, I, J)> result;
     return result;
 }
 
@@ -47,7 +53,9 @@ void printShape<T : ICoopElement, let each D : int>(MockTile<T, D> tile)
 
 void expect16x64(MockTile<float, 16, 64> tile) {}
 void expect64x16(MockTile<float, 64, 16> tile) {}
+void expect16x1(MockTile<float, 16, 1> tile) {}
 void expect16x32x8(MockTile<float, 16, 32, 8> tile) {}
+void expect16x1x8(MockTile<float, 16, 1, 8> tile) {}
 void expect8x32x16(MockTile<float, 8, 32, 16> tile) {}
 
 void main()
@@ -66,12 +74,25 @@ void main()
     // CHECK: 64
     // CHECK: 16
 
+    let reduced2D = concatTile.reduce<1>();
+    expect16x1(reduced2D);
+    printShape(reduced2D);
+    // CHECK: 16
+    // CHECK: 1
+
     let volume = MockTile<float, 8, 16, 32>();
     let permuted3D = volume.permute<1, 2, 0>();
     expect16x32x8(permuted3D);
     printShape(permuted3D);
     // CHECK: 16
     // CHECK: 32
+    // CHECK: 8
+
+    let reduced3D = permuted3D.reduce<1>();
+    expect16x1x8(reduced3D);
+    printShape(reduced3D);
+    // CHECK: 16
+    // CHECK: 1
     // CHECK: 8
 
     let transposed3D = transpose<0, 2>(permuted3D);
@@ -82,4 +103,6 @@ void main()
     // CHECK: 16
 
     expect16x64(transpose<0, 1>(concat<1>(lhs, rhs).permute<1, 0>()));
+    expect16x1(reduced2D);
+    expect16x1x8(reduced3D);
 }
