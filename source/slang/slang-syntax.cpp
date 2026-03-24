@@ -66,19 +66,19 @@ VariadicPackCardinality getKnownPackCardinality(Val* packOperand)
         return concreteIntValPack->getCount() > 0 ? VariadicPackCardinality::NonEmpty
                                                   : VariadicPackCardinality::Empty;
 
-    if (auto dimsPermuteIntValPack = as<DimsPermuteIntValPack>(packOperand))
-        return getKnownPackCardinality(dimsPermuteIntValPack->getValuePack());
+    if (auto shapePermuteIntValPack = as<ShapePermuteIntValPack>(packOperand))
+        return getKnownPackCardinality(shapePermuteIntValPack->getValuePack());
 
-    if (auto dimsSwapIntValPack = as<DimsSwapIntValPack>(packOperand))
-        return getKnownPackCardinality(dimsSwapIntValPack->getValuePack());
+    if (auto shapeSwapIntValPack = as<ShapeSwapIntValPack>(packOperand))
+        return getKnownPackCardinality(shapeSwapIntValPack->getValuePack());
 
-    if (auto dimsReduceIntValPack = as<DimsReduceIntValPack>(packOperand))
-        return getKnownPackCardinality(dimsReduceIntValPack->getValuePack());
+    if (auto shapeReduceIntValPack = as<ShapeReduceIntValPack>(packOperand))
+        return getKnownPackCardinality(shapeReduceIntValPack->getValuePack());
 
-    if (auto dimsConcatIntValPack = as<DimsConcatIntValPack>(packOperand))
+    if (auto shapeConcatIntValPack = as<ShapeConcatIntValPack>(packOperand))
     {
-        auto leftCardinality = getKnownPackCardinality(dimsConcatIntValPack->getLeftPack());
-        auto rightCardinality = getKnownPackCardinality(dimsConcatIntValPack->getRightPack());
+        auto leftCardinality = getKnownPackCardinality(shapeConcatIntValPack->getLeftPack());
+        auto rightCardinality = getKnownPackCardinality(shapeConcatIntValPack->getRightPack());
         if (leftCardinality == VariadicPackCardinality::Empty &&
             rightCardinality == VariadicPackCardinality::Empty)
             return VariadicPackCardinality::Empty;

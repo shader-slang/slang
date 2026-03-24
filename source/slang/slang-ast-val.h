@@ -381,11 +381,17 @@ class TrimLastIntValPack : public IntVal
     Val* _resolveImplOverride();
 };
 
-FIDDLE()
-class DimsConcatIntValPack : public IntVal
+FIDDLE(abstract)
+class ShapeTransformIntValPack : public IntVal
 {
     FIDDLE(...)
-    DimsConcatIntValPack(Type* inType, Val* leftPack, Val* rightPack, IntVal* axis)
+};
+
+FIDDLE()
+class ShapeConcatIntValPack : public ShapeTransformIntValPack
+{
+    FIDDLE(...)
+    ShapeConcatIntValPack(Type* inType, Val* leftPack, Val* rightPack, IntVal* axis)
     {
         setOperands(inType, leftPack, rightPack, axis);
     }
@@ -398,10 +404,10 @@ class DimsConcatIntValPack : public IntVal
 };
 
 FIDDLE()
-class DimsPermuteIntValPack : public IntVal
+class ShapePermuteIntValPack : public ShapeTransformIntValPack
 {
     FIDDLE(...)
-    DimsPermuteIntValPack(Type* inType, Val* valuePack, Val* orderPack)
+    ShapePermuteIntValPack(Type* inType, Val* valuePack, Val* orderPack)
     {
         setOperands(inType, valuePack, orderPack);
     }
@@ -413,10 +419,10 @@ class DimsPermuteIntValPack : public IntVal
 };
 
 FIDDLE()
-class DimsSwapIntValPack : public IntVal
+class ShapeSwapIntValPack : public ShapeTransformIntValPack
 {
     FIDDLE(...)
-    DimsSwapIntValPack(Type* inType, Val* valuePack, IntVal* dim0, IntVal* dim1)
+    ShapeSwapIntValPack(Type* inType, Val* valuePack, IntVal* dim0, IntVal* dim1)
     {
         setOperands(inType, valuePack, dim0, dim1);
     }
@@ -429,10 +435,10 @@ class DimsSwapIntValPack : public IntVal
 };
 
 FIDDLE()
-class DimsReduceIntValPack : public IntVal
+class ShapeReduceIntValPack : public ShapeTransformIntValPack
 {
     FIDDLE(...)
-    DimsReduceIntValPack(Type* inType, Val* valuePack, IntVal* axis)
+    ShapeReduceIntValPack(Type* inType, Val* valuePack, IntVal* axis)
     {
         setOperands(inType, valuePack, axis);
     }

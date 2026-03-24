@@ -28,6 +28,49 @@ static bool _tryGetConstantIntVal(Val* val, IntegerLiteralValue& outValue)
     return false;
 }
 
+static bool _tryFindProvableDuplicateOrderIndices(
+    ConcreteIntValPack* orderPack,
+    Index& outFirstPosition,
+    Index& outSecondPosition,
+    IntegerLiteralValue& outConcreteIndex,
+    bool& outHasConcreteIndex)
+{
+    for (Index i = 0; i < orderPack->getCount(); ++i)
+    {
+        for (Index j = 0; j < i; ++j)
+        {
+            if (!orderPack->getElement(i)->equals(orderPack->getElement(j)))
+                continue;
+
+            outFirstPosition = j;
+            outSecondPosition = i;
+            outHasConcreteIndex = _tryGetConstantIntVal(orderPack->getElement(i), outConcreteIndex);
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool _hasAnyValidConcatAxis(ConcreteIntValPack* leftPack, ConcreteIntValPack* rightPack)
+{
+    SLANG_ASSERT(leftPack->getCount() == rightPack->getCount());
+    for (Index axis = 0; axis < leftPack->getCount(); ++axis)
+    {
+        bool isValidAxis = true;
+        for (Index i = 0; i < leftPack->getCount(); ++i)
+        {
+            if (i != axis && !leftPack->getElement(i)->equals(rightPack->getElement(i)))
+            {
+                isValidAxis = false;
+                break;
+            }
+        }
+        if (isValidAxis)
+            return true;
+    }
+    return false;
+}
+
 static bool _diagnoseKnownInvalidShapePackTransformArg(
     Val* val,
     SourceLoc loc,
@@ -36,29 +79,54 @@ static bool _diagnoseKnownInvalidShapePackTransformArg(
     if (!val || !sink)
         return false;
 
-    if (auto dimsConcatPack = as<DimsConcatIntValPack>(val))
+    if (auto shapeConcatPack = as<ShapeConcatIntValPack>(val))
     {
-        auto leftPack = as<ConcreteIntValPack>(dimsConcatPack->getLeftPack()->resolve());
-        auto rightPack = as<ConcreteIntValPack>(dimsConcatPack->getRightPack()->resolve());
+        auto leftPack = as<ConcreteIntValPack>(shapeConcatPack->getLeftPack()->resolve());
+        auto rightPack = as<ConcreteIntValPack>(shapeConcatPack->getRightPack()->resolve());
         IntegerLiteralValue axisValue = 0;
+        auto knownRankPack = leftPack ? leftPack : rightPack;
+        if (knownRankPack && (!leftPack || !rightPack))
+        {
+            if (_tryGetConstantIntVal(shapeConcatPack->getAxis(), axisValue))
+            {
+                if (axisValue < 0 || axisValue >= knownRankPack->getCount())
+                {
+                    sink->diagnose(Diagnostics::ShapePackAxisOutOfRange{
+                        .opName = "__shapeConcat",
+                        .axis = (int)axisValue,
+                        .rank = (int)knownRankPack->getCount(),
+                        .location = loc});
+                    return true;
+                }
+            }
+            else if (knownRankPack->getCount() == 0)
+            {
+                sink->diagnose(Diagnostics::ShapePackNoValidAxis{
+                    .opName = "__shapeConcat",
+                    .rank = 0,
+                    .location = loc});
+                return true;
+            }
+        }
+
         if (leftPack && rightPack)
         {
             if (leftPack->getCount() != rightPack->getCount())
             {
                 sink->diagnose(Diagnostics::ShapePackRankMismatch{
-                    .opName = "__dimsConcat",
+                    .opName = "__shapeConcat",
                     .leftRank = (int)leftPack->getCount(),
                     .rightRank = (int)rightPack->getCount(),
                     .location = loc});
                 return true;
             }
 
-            if (_tryGetConstantIntVal(dimsConcatPack->getAxis(), axisValue))
+            if (_tryGetConstantIntVal(shapeConcatPack->getAxis(), axisValue))
             {
                 if (axisValue < 0 || axisValue >= leftPack->getCount())
                 {
                     sink->diagnose(Diagnostics::ShapePackAxisOutOfRange{
-                        .opName = "__dimsConcat",
+                        .opName = "__shapeConcat",
                         .axis = (int)axisValue,
                         .rank = (int)leftPack->getCount(),
                         .location = loc});
@@ -70,7 +138,7 @@ static bool _diagnoseKnownInvalidShapePackTransformArg(
                     if (i != axisValue &&
                         !leftPack->getElement(i)->equals(rightPack->getElement(i)))
                     {
-                        sink->diagnose(Diagnostics::DimsConcatNonAxisMismatch{
+                        sink->diagnose(Diagnostics::ShapeConcatNonAxisMismatch{
                             .axis = (int)axisValue,
                             .dimIndex = (int)i,
                             .location = loc});
@@ -78,50 +146,83 @@ static bool _diagnoseKnownInvalidShapePackTransformArg(
                     }
                 }
             }
+            else if (leftPack->getCount() == 0)
+            {
+                sink->diagnose(Diagnostics::ShapePackNoValidAxis{
+                    .opName = "__shapeConcat",
+                    .rank = 0,
+                    .location = loc});
+                return true;
+            }
+            else if (!_hasAnyValidConcatAxis(leftPack, rightPack))
+            {
+                sink->diagnose(Diagnostics::ShapeConcatNoValidAxis{
+                    .rank = (int)leftPack->getCount(),
+                    .location = loc});
+                return true;
+            }
         }
 
-        if (_diagnoseKnownInvalidShapePackTransformArg(dimsConcatPack->getLeftPack(), loc, sink))
+        if (_diagnoseKnownInvalidShapePackTransformArg(shapeConcatPack->getLeftPack(), loc, sink))
             return true;
-        if (_diagnoseKnownInvalidShapePackTransformArg(dimsConcatPack->getRightPack(), loc, sink))
+        if (_diagnoseKnownInvalidShapePackTransformArg(shapeConcatPack->getRightPack(), loc, sink))
+            return true;
+        if (_diagnoseKnownInvalidShapePackTransformArg(shapeConcatPack->getAxis(), loc, sink))
             return true;
     }
-    else if (auto dimsPermutePack = as<DimsPermuteIntValPack>(val))
+    else if (auto shapePermutePack = as<ShapePermuteIntValPack>(val))
     {
-        auto valuePack = as<ConcreteIntValPack>(dimsPermutePack->getValuePack()->resolve());
-        auto orderPack = as<ConcreteIntValPack>(dimsPermutePack->getOrderPack()->resolve());
+        auto valuePack = as<ConcreteIntValPack>(shapePermutePack->getValuePack()->resolve());
+        auto orderPack = as<ConcreteIntValPack>(shapePermutePack->getOrderPack()->resolve());
         if (valuePack && orderPack)
         {
             if (valuePack->getCount() != orderPack->getCount())
             {
-                sink->diagnose(Diagnostics::DimsPermuteOrderLengthMismatch{
+                sink->diagnose(Diagnostics::ShapePermuteOrderLengthMismatch{
                     .orderRank = (int)orderPack->getCount(),
                     .valueRank = (int)valuePack->getCount(),
                     .location = loc});
                 return true;
             }
 
-            Dictionary<IntegerLiteralValue, Index> firstSeenPosition;
+            Index firstPosition = 0;
+            Index secondPosition = 0;
+            IntegerLiteralValue orderIndex = 0;
+            bool hasConcreteIndex = false;
+            if (_tryFindProvableDuplicateOrderIndices(
+                    orderPack,
+                    firstPosition,
+                    secondPosition,
+                    orderIndex,
+                    hasConcreteIndex))
+            {
+                if (hasConcreteIndex)
+                {
+                    sink->diagnose(Diagnostics::ShapePermuteDuplicateIndex{
+                        .indexValue = (int)orderIndex,
+                        .firstPosition = (int)firstPosition,
+                        .secondPosition = (int)secondPosition,
+                        .location = loc});
+                }
+                else
+                {
+                    sink->diagnose(Diagnostics::ShapePermuteDuplicateEquivalentIndex{
+                        .firstPosition = (int)firstPosition,
+                        .secondPosition = (int)secondPosition,
+                        .location = loc});
+                }
+                return true;
+            }
+
             for (Index i = 0; i < orderPack->getCount(); ++i)
             {
-                IntegerLiteralValue orderIndex = 0;
+                orderIndex = 0;
                 if (!_tryGetConstantIntVal(orderPack->getElement(i), orderIndex))
                     continue;
 
-                Index firstPosition = 0;
-                if (firstSeenPosition.tryGetValue(orderIndex, firstPosition))
-                {
-                    sink->diagnose(Diagnostics::DimsPermuteDuplicateIndex{
-                        .indexValue = (int)orderIndex,
-                        .firstPosition = (int)firstPosition,
-                        .secondPosition = (int)i,
-                        .location = loc});
-                    return true;
-                }
-                firstSeenPosition[orderIndex] = i;
-
                 if (orderIndex < 0 || orderIndex >= valuePack->getCount())
                 {
-                    sink->diagnose(Diagnostics::DimsPermuteIndexOutOfRange{
+                    sink->diagnose(Diagnostics::ShapePermuteIndexOutOfRange{
                         .indexValue = (int)orderIndex,
                         .indexPosition = (int)i,
                         .rank = (int)valuePack->getCount(),
@@ -131,56 +232,108 @@ static bool _diagnoseKnownInvalidShapePackTransformArg(
             }
         }
 
-        if (_diagnoseKnownInvalidShapePackTransformArg(dimsPermutePack->getValuePack(), loc, sink))
+        if (_diagnoseKnownInvalidShapePackTransformArg(shapePermutePack->getValuePack(), loc, sink))
             return true;
-        if (_diagnoseKnownInvalidShapePackTransformArg(dimsPermutePack->getOrderPack(), loc, sink))
+        if (_diagnoseKnownInvalidShapePackTransformArg(shapePermutePack->getOrderPack(), loc, sink))
             return true;
     }
-    else if (auto dimsSwapPack = as<DimsSwapIntValPack>(val))
+    else if (auto shapeSwapPack = as<ShapeSwapIntValPack>(val))
     {
-        auto valuePack = as<ConcreteIntValPack>(dimsSwapPack->getValuePack()->resolve());
+        auto valuePack = as<ConcreteIntValPack>(shapeSwapPack->getValuePack()->resolve());
         IntegerLiteralValue dimValue = 0;
-        if (valuePack && _tryGetConstantIntVal(dimsSwapPack->getDim0(), dimValue) &&
+        if (valuePack && _tryGetConstantIntVal(shapeSwapPack->getDim0(), dimValue) &&
             (dimValue < 0 || dimValue >= valuePack->getCount()))
         {
             sink->diagnose(Diagnostics::ShapePackAxisOutOfRange{
-                .opName = "__dimsSwap",
+                .opName = "__shapeSwap",
                 .axis = (int)dimValue,
                 .rank = (int)valuePack->getCount(),
                 .location = loc});
             return true;
         }
 
-        if (valuePack && _tryGetConstantIntVal(dimsSwapPack->getDim1(), dimValue) &&
+        if (valuePack && _tryGetConstantIntVal(shapeSwapPack->getDim1(), dimValue) &&
             (dimValue < 0 || dimValue >= valuePack->getCount()))
         {
             sink->diagnose(Diagnostics::ShapePackAxisOutOfRange{
-                .opName = "__dimsSwap",
+                .opName = "__shapeSwap",
                 .axis = (int)dimValue,
                 .rank = (int)valuePack->getCount(),
                 .location = loc});
             return true;
         }
 
-        if (_diagnoseKnownInvalidShapePackTransformArg(dimsSwapPack->getValuePack(), loc, sink))
+        if (valuePack && valuePack->getCount() == 0)
+        {
+            sink->diagnose(Diagnostics::ShapePackNoValidAxis{
+                .opName = "__shapeSwap",
+                .rank = 0,
+                .location = loc});
+            return true;
+        }
+
+        if (_diagnoseKnownInvalidShapePackTransformArg(shapeSwapPack->getValuePack(), loc, sink))
+            return true;
+        if (_diagnoseKnownInvalidShapePackTransformArg(shapeSwapPack->getDim0(), loc, sink))
+            return true;
+        if (_diagnoseKnownInvalidShapePackTransformArg(shapeSwapPack->getDim1(), loc, sink))
             return true;
     }
-    else if (auto dimsReducePack = as<DimsReduceIntValPack>(val))
+    else if (auto shapeReducePack = as<ShapeReduceIntValPack>(val))
     {
-        auto valuePack = as<ConcreteIntValPack>(dimsReducePack->getValuePack()->resolve());
+        auto valuePack = as<ConcreteIntValPack>(shapeReducePack->getValuePack()->resolve());
         IntegerLiteralValue axisValue = 0;
-        if (valuePack && _tryGetConstantIntVal(dimsReducePack->getAxis(), axisValue) &&
+        if (valuePack && _tryGetConstantIntVal(shapeReducePack->getAxis(), axisValue) &&
             (axisValue < 0 || axisValue >= valuePack->getCount()))
         {
             sink->diagnose(Diagnostics::ShapePackAxisOutOfRange{
-                .opName = "__dimsReduce",
+                .opName = "__shapeReduce",
                 .axis = (int)axisValue,
                 .rank = (int)valuePack->getCount(),
                 .location = loc});
             return true;
         }
 
-        if (_diagnoseKnownInvalidShapePackTransformArg(dimsReducePack->getValuePack(), loc, sink))
+        if (valuePack && valuePack->getCount() == 0)
+        {
+            sink->diagnose(Diagnostics::ShapePackNoValidAxis{
+                .opName = "__shapeReduce",
+                .rank = 0,
+                .location = loc});
+            return true;
+        }
+
+        if (_diagnoseKnownInvalidShapePackTransformArg(shapeReducePack->getValuePack(), loc, sink))
+            return true;
+        if (_diagnoseKnownInvalidShapePackTransformArg(shapeReducePack->getAxis(), loc, sink))
+            return true;
+    }
+    else if (auto concretePack = as<ConcreteIntValPack>(val))
+    {
+        for (Index i = 0; i < concretePack->getCount(); ++i)
+        {
+            if (_diagnoseKnownInvalidShapePackTransformArg(concretePack->getElement(i), loc, sink))
+                return true;
+        }
+    }
+    else if (auto firstVal = as<FirstIntVal>(val))
+    {
+        if (_diagnoseKnownInvalidShapePackTransformArg(firstVal->getBasePack(), loc, sink))
+            return true;
+    }
+    else if (auto lastVal = as<LastIntVal>(val))
+    {
+        if (_diagnoseKnownInvalidShapePackTransformArg(lastVal->getBasePack(), loc, sink))
+            return true;
+    }
+    else if (auto trimFirstPack = as<TrimFirstIntValPack>(val))
+    {
+        if (_diagnoseKnownInvalidShapePackTransformArg(trimFirstPack->getBasePack(), loc, sink))
+            return true;
+    }
+    else if (auto trimLastPack = as<TrimLastIntValPack>(val))
+    {
+        if (_diagnoseKnownInvalidShapePackTransformArg(trimLastPack->getBasePack(), loc, sink))
             return true;
     }
 
@@ -1544,8 +1697,8 @@ bool SemanticsVisitor::_coerce(
     {
         // Before falling back to generic type equality, check for fully-known invalid
         // shape-pack transforms in the generic arguments of the types being compared.
-        // This lets us report the more specific `__dimsConcat` / `__dimsPermute` /
-        // `__dimsSwap` / `__dimsReduce` diagnostics instead of a later generic
+        // This lets us report the more specific `__shapeConcat` / `__shapePermute` /
+        // `__shapeSwap` / `__shapeReduce` diagnostics instead of a later generic
         // type-mismatch error.
         bool diagnosedKnownInvalidShapePack =
             _diagnoseKnownInvalidShapePackTransforms(toType, fromType.type, fromExpr->loc, sink);

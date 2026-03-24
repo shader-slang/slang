@@ -3,38 +3,38 @@
 
 struct MockTile<T : ICoopElement, let each D : int>
 {
-    MockTile<T, __dimsPermute(D, Order)> permute<let each Order : int>()
+    MockTile<T, __shapePermute(D, Order)> permute<let each Order : int>()
     {
-        MockTile<T, __dimsPermute(D, Order)> result;
+        MockTile<T, __shapePermute(D, Order)> result;
         return result;
     }
 
-    MockTile<T, __dimsReduce(D, Axis)> reduce<let Axis : int>()
+    MockTile<T, __shapeReduce(D, Axis)> reduce<let Axis : int>()
     {
-        MockTile<T, __dimsReduce(D, Axis)> result;
+        MockTile<T, __shapeReduce(D, Axis)> result;
         return result;
     }
 };
 
-MockTile<T, __dimsConcat(A, B, Axis)> concat<
+MockTile<T, __shapeConcat(A, B, Axis)> concat<
     let Axis : int,
     T : ICoopElement,
     let each A : int,
     let each B : int>
     (MockTile<T, A> lhs, MockTile<T, B> rhs)
 {
-    MockTile<T, __dimsConcat(A, B, Axis)> result;
+    MockTile<T, __shapeConcat(A, B, Axis)> result;
     return result;
 }
 
-MockTile<T, __dimsSwap(D, I, J)> transpose<
+MockTile<T, __shapeSwap(D, I, J)> transpose<
     let I : int,
     let J : int,
     T : ICoopElement,
     let each D : int>
     (MockTile<T, D> tile)
 {
-    MockTile<T, __dimsSwap(D, I, J)> result;
+    MockTile<T, __shapeSwap(D, I, J)> result;
     return result;
 }
 

@@ -2262,6 +2262,16 @@ void ConcreteIntValPack::_toTextOverride(StringBuilder& out)
     }
 }
 
+static void _appendShapePackOperandText(StringBuilder& out, Val* val)
+{
+    auto concretePack = as<ConcreteIntValPack>(val);
+    if (concretePack)
+        out << "(";
+    val->toText(out);
+    if (concretePack)
+        out << ")";
+}
+
 Val* ConcreteIntValPack::_substituteImplOverride(
     ASTBuilder* astBuilder,
     SubstitutionSet subst,
@@ -2353,20 +2363,20 @@ Val* TrimLastIntValPack::_resolveImplOverride()
     return getCurrentASTBuilder()->getTrimLastPack(resolvedArg);
 }
 
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DimsConcatIntValPack !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ShapeConcatIntValPack !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-void DimsConcatIntValPack::_toTextOverride(StringBuilder& out)
+void ShapeConcatIntValPack::_toTextOverride(StringBuilder& out)
 {
-    out << "__dimsConcat(";
-    getLeftPack()->toText(out);
+    out << "__shapeConcat(";
+    _appendShapePackOperandText(out, getLeftPack());
     out << ", ";
-    getRightPack()->toText(out);
+    _appendShapePackOperandText(out, getRightPack());
     out << ", ";
     getAxis()->toText(out);
     out << ")";
 }
 
-Val* DimsConcatIntValPack::_substituteImplOverride(
+Val* ShapeConcatIntValPack::_substituteImplOverride(
     ASTBuilder* astBuilder,
     SubstitutionSet subst,
     int* ioDiff)
@@ -2378,10 +2388,10 @@ Val* DimsConcatIntValPack::_substituteImplOverride(
     if (!diff)
         return this;
     (*ioDiff)++;
-    return astBuilder->getDimsConcatIntValPack(substLeftPack, substRightPack, substAxis);
+    return astBuilder->getShapeConcatIntValPack(substLeftPack, substRightPack, substAxis);
 }
 
-Val* DimsConcatIntValPack::_resolveImplOverride()
+Val* ShapeConcatIntValPack::_resolveImplOverride()
 {
     auto resolvedLeftPack = getLeftPack()->resolve();
     auto resolvedRightPack = getRightPack()->resolve();
@@ -2389,24 +2399,24 @@ Val* DimsConcatIntValPack::_resolveImplOverride()
     if (resolvedLeftPack == getLeftPack() && resolvedRightPack == getRightPack() &&
         resolvedAxis == getAxis())
         return this;
-    return getCurrentASTBuilder()->getDimsConcatIntValPack(
+    return getCurrentASTBuilder()->getShapeConcatIntValPack(
         resolvedLeftPack,
         resolvedRightPack,
         resolvedAxis);
 }
 
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DimsPermuteIntValPack !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ShapePermuteIntValPack !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-void DimsPermuteIntValPack::_toTextOverride(StringBuilder& out)
+void ShapePermuteIntValPack::_toTextOverride(StringBuilder& out)
 {
-    out << "__dimsPermute(";
-    getValuePack()->toText(out);
+    out << "__shapePermute(";
+    _appendShapePackOperandText(out, getValuePack());
     out << ", ";
-    getOrderPack()->toText(out);
+    _appendShapePackOperandText(out, getOrderPack());
     out << ")";
 }
 
-Val* DimsPermuteIntValPack::_substituteImplOverride(
+Val* ShapePermuteIntValPack::_substituteImplOverride(
     ASTBuilder* astBuilder,
     SubstitutionSet subst,
     int* ioDiff)
@@ -2417,24 +2427,24 @@ Val* DimsPermuteIntValPack::_substituteImplOverride(
     if (!diff)
         return this;
     (*ioDiff)++;
-    return astBuilder->getDimsPermuteIntValPack(substValuePack, substOrderPack);
+    return astBuilder->getShapePermuteIntValPack(substValuePack, substOrderPack);
 }
 
-Val* DimsPermuteIntValPack::_resolveImplOverride()
+Val* ShapePermuteIntValPack::_resolveImplOverride()
 {
     auto resolvedValuePack = getValuePack()->resolve();
     auto resolvedOrderPack = getOrderPack()->resolve();
     if (resolvedValuePack == getValuePack() && resolvedOrderPack == getOrderPack())
         return this;
-    return getCurrentASTBuilder()->getDimsPermuteIntValPack(resolvedValuePack, resolvedOrderPack);
+    return getCurrentASTBuilder()->getShapePermuteIntValPack(resolvedValuePack, resolvedOrderPack);
 }
 
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DimsSwapIntValPack !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ShapeSwapIntValPack !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-void DimsSwapIntValPack::_toTextOverride(StringBuilder& out)
+void ShapeSwapIntValPack::_toTextOverride(StringBuilder& out)
 {
-    out << "__dimsSwap(";
-    getValuePack()->toText(out);
+    out << "__shapeSwap(";
+    _appendShapePackOperandText(out, getValuePack());
     out << ", ";
     getDim0()->toText(out);
     out << ", ";
@@ -2442,7 +2452,7 @@ void DimsSwapIntValPack::_toTextOverride(StringBuilder& out)
     out << ")";
 }
 
-Val* DimsSwapIntValPack::_substituteImplOverride(
+Val* ShapeSwapIntValPack::_substituteImplOverride(
     ASTBuilder* astBuilder,
     SubstitutionSet subst,
     int* ioDiff)
@@ -2454,10 +2464,10 @@ Val* DimsSwapIntValPack::_substituteImplOverride(
     if (!diff)
         return this;
     (*ioDiff)++;
-    return astBuilder->getDimsSwapIntValPack(substValuePack, substDim0, substDim1);
+    return astBuilder->getShapeSwapIntValPack(substValuePack, substDim0, substDim1);
 }
 
-Val* DimsSwapIntValPack::_resolveImplOverride()
+Val* ShapeSwapIntValPack::_resolveImplOverride()
 {
     auto resolvedValuePack = getValuePack()->resolve();
     auto resolvedDim0 = as<IntVal>(getDim0()->resolve());
@@ -2465,24 +2475,24 @@ Val* DimsSwapIntValPack::_resolveImplOverride()
     if (resolvedValuePack == getValuePack() && resolvedDim0 == getDim0() &&
         resolvedDim1 == getDim1())
         return this;
-    return getCurrentASTBuilder()->getDimsSwapIntValPack(
+    return getCurrentASTBuilder()->getShapeSwapIntValPack(
         resolvedValuePack,
         resolvedDim0,
         resolvedDim1);
 }
 
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DimsReduceIntValPack !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ShapeReduceIntValPack !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-void DimsReduceIntValPack::_toTextOverride(StringBuilder& out)
+void ShapeReduceIntValPack::_toTextOverride(StringBuilder& out)
 {
-    out << "__dimsReduce(";
-    getValuePack()->toText(out);
+    out << "__shapeReduce(";
+    _appendShapePackOperandText(out, getValuePack());
     out << ", ";
     getAxis()->toText(out);
     out << ")";
 }
 
-Val* DimsReduceIntValPack::_substituteImplOverride(
+Val* ShapeReduceIntValPack::_substituteImplOverride(
     ASTBuilder* astBuilder,
     SubstitutionSet subst,
     int* ioDiff)
@@ -2493,16 +2503,16 @@ Val* DimsReduceIntValPack::_substituteImplOverride(
     if (!diff)
         return this;
     (*ioDiff)++;
-    return astBuilder->getDimsReduceIntValPack(substValuePack, substAxis);
+    return astBuilder->getShapeReduceIntValPack(substValuePack, substAxis);
 }
 
-Val* DimsReduceIntValPack::_resolveImplOverride()
+Val* ShapeReduceIntValPack::_resolveImplOverride()
 {
     auto resolvedValuePack = getValuePack()->resolve();
     auto resolvedAxis = as<IntVal>(getAxis()->resolve());
     if (resolvedValuePack == getValuePack() && resolvedAxis == getAxis())
         return this;
-    return getCurrentASTBuilder()->getDimsReduceIntValPack(resolvedValuePack, resolvedAxis);
+    return getCurrentASTBuilder()->getShapeReduceIntValPack(resolvedValuePack, resolvedAxis);
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ExpandIntValPack !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -2598,13 +2608,7 @@ bool isAbstractValuePack(Val* val)
         return true;
     if (as<TrimLastIntValPack>(val))
         return true;
-    if (as<DimsConcatIntValPack>(val))
-        return true;
-    if (as<DimsPermuteIntValPack>(val))
-        return true;
-    if (as<DimsSwapIntValPack>(val))
-        return true;
-    if (as<DimsReduceIntValPack>(val))
+    if (as<ShapeTransformIntValPack>(val))
         return true;
     if (auto declRefIntVal = as<DeclRefIntVal>(val))
     {

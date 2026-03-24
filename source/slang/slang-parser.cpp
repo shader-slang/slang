@@ -306,10 +306,10 @@ static NodeBase* parseFirstExpr(Parser* parser, void* userData);
 static NodeBase* parseLastExpr(Parser* parser, void* userData);
 static NodeBase* parseTrimFirstExpr(Parser* parser, void* userData);
 static NodeBase* parseTrimLastExpr(Parser* parser, void* userData);
-static NodeBase* parseDimsConcatExpr(Parser* parser, void* userData);
-static NodeBase* parseDimsPermuteExpr(Parser* parser, void* userData);
-static NodeBase* parseDimsSwapExpr(Parser* parser, void* userData);
-static NodeBase* parseDimsReduceExpr(Parser* parser, void* userData);
+static NodeBase* parseShapeConcatExpr(Parser* parser, void* userData);
+static NodeBase* parseShapePermuteExpr(Parser* parser, void* userData);
+static NodeBase* parseShapeSwapExpr(Parser* parser, void* userData);
+static NodeBase* parseShapeReduceExpr(Parser* parser, void* userData);
 
 //
 
@@ -3024,8 +3024,8 @@ static TypeSpec _parseSimpleTypeSpec(Parser* parser)
         parser->LookAheadToken("expand") || parser->LookAheadToken("each") ||
         parser->LookAheadToken("__first") || parser->LookAheadToken("__last") ||
         parser->LookAheadToken("__trimFirst") || parser->LookAheadToken("__trimLast") ||
-        parser->LookAheadToken("__dimsConcat") || parser->LookAheadToken("__dimsPermute") ||
-        parser->LookAheadToken("__dimsSwap") || parser->LookAheadToken("__dimsReduce") ||
+        parser->LookAheadToken("__shapeConcat") || parser->LookAheadToken("__shapePermute") ||
+        parser->LookAheadToken("__shapeSwap") || parser->LookAheadToken("__shapeReduce") ||
         parser->LookAheadToken("__packBranch"))
     {
         typeExpr = parsePrefixExpr(parser);
@@ -7472,24 +7472,24 @@ static NodeBase* parseTrimLastExpr(Parser* parser, void* /*userData*/)
     return parsePackQueryExprImpl<TrimLastExpr>(parser);
 }
 
-static NodeBase* parseDimsConcatExpr(Parser* parser, void* /*userData*/)
+static NodeBase* parseShapeConcatExpr(Parser* parser, void* /*userData*/)
 {
-    return parseShapePackTransformExprImpl<DimsConcatExpr>(parser, 3);
+    return parseShapePackTransformExprImpl<ShapeConcatExpr>(parser, 3);
 }
 
-static NodeBase* parseDimsPermuteExpr(Parser* parser, void* /*userData*/)
+static NodeBase* parseShapePermuteExpr(Parser* parser, void* /*userData*/)
 {
-    return parseShapePackTransformExprImpl<DimsPermuteExpr>(parser, 2);
+    return parseShapePackTransformExprImpl<ShapePermuteExpr>(parser, 2);
 }
 
-static NodeBase* parseDimsSwapExpr(Parser* parser, void* /*userData*/)
+static NodeBase* parseShapeSwapExpr(Parser* parser, void* /*userData*/)
 {
-    return parseShapePackTransformExprImpl<DimsSwapExpr>(parser, 3);
+    return parseShapePackTransformExprImpl<ShapeSwapExpr>(parser, 3);
 }
 
-static NodeBase* parseDimsReduceExpr(Parser* parser, void* /*userData*/)
+static NodeBase* parseShapeReduceExpr(Parser* parser, void* /*userData*/)
 {
-    return parseShapePackTransformExprImpl<DimsReduceExpr>(parser, 2);
+    return parseShapePackTransformExprImpl<ShapeReduceExpr>(parser, 2);
 }
 
 static NodeBase* parsePackBranchTypeExpr(Parser* parser, void* /*userData*/)
@@ -9184,30 +9184,30 @@ static Expr* parsePrefixExpr(Parser* parser)
                     expr->loc = tokenLoc;
                 return expr;
             }
-            else if (AdvanceIf(parser, "__dimsConcat"))
+            else if (AdvanceIf(parser, "__shapeConcat"))
             {
-                auto expr = as<Expr>(parseDimsConcatExpr(parser, nullptr));
+                auto expr = as<Expr>(parseShapeConcatExpr(parser, nullptr));
                 if (expr && !expr->loc.isValid())
                     expr->loc = tokenLoc;
                 return expr;
             }
-            else if (AdvanceIf(parser, "__dimsPermute"))
+            else if (AdvanceIf(parser, "__shapePermute"))
             {
-                auto expr = as<Expr>(parseDimsPermuteExpr(parser, nullptr));
+                auto expr = as<Expr>(parseShapePermuteExpr(parser, nullptr));
                 if (expr && !expr->loc.isValid())
                     expr->loc = tokenLoc;
                 return expr;
             }
-            else if (AdvanceIf(parser, "__dimsSwap"))
+            else if (AdvanceIf(parser, "__shapeSwap"))
             {
-                auto expr = as<Expr>(parseDimsSwapExpr(parser, nullptr));
+                auto expr = as<Expr>(parseShapeSwapExpr(parser, nullptr));
                 if (expr && !expr->loc.isValid())
                     expr->loc = tokenLoc;
                 return expr;
             }
-            else if (AdvanceIf(parser, "__dimsReduce"))
+            else if (AdvanceIf(parser, "__shapeReduce"))
             {
-                auto expr = as<Expr>(parseDimsReduceExpr(parser, nullptr));
+                auto expr = as<Expr>(parseShapeReduceExpr(parser, nullptr));
                 if (expr && !expr->loc.isValid())
                     expr->loc = tokenLoc;
                 return expr;
@@ -10221,10 +10221,10 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseExpr("__last", parseLastExpr),
     _makeParseExpr("__trimFirst", parseTrimFirstExpr),
     _makeParseExpr("__trimLast", parseTrimLastExpr),
-    _makeParseExpr("__dimsConcat", parseDimsConcatExpr),
-    _makeParseExpr("__dimsPermute", parseDimsPermuteExpr),
-    _makeParseExpr("__dimsSwap", parseDimsSwapExpr),
-    _makeParseExpr("__dimsReduce", parseDimsReduceExpr),
+    _makeParseExpr("__shapeConcat", parseShapeConcatExpr),
+    _makeParseExpr("__shapePermute", parseShapePermuteExpr),
+    _makeParseExpr("__shapeSwap", parseShapeSwapExpr),
+    _makeParseExpr("__shapeReduce", parseShapeReduceExpr),
     _makeParseExpr("__packBranch", parsePackBranchTypeExpr),
     _makeParseExpr("__getAddress", parseAddressOfExpr),
     _makeParseExpr("__floatAsInt", parseFloatAsIntExpr),

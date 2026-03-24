@@ -1702,31 +1702,52 @@ err(
 )
 
 err(
-    "dims-concat-non-axis-mismatch",
+    "shape-concat-non-axis-mismatch",
     30420,
-    "__dimsConcat requires non-axis dimensions to match",
-    span { loc = "location", message = "__dimsConcat requires dimensions to match outside axis ~axis:Int, but dimension ~dimIndex:Int differs" }
+    "__shapeConcat requires non-axis dimensions to match",
+    span { loc = "location", message = "__shapeConcat requires dimensions to match outside axis ~axis:Int, but dimension ~dimIndex:Int differs" }
 )
 
 err(
-    "dims-permute-order-length-mismatch",
+    "shape-permute-order-length-mismatch",
     30421,
-    "__dimsPermute requires an order pack with matching rank",
-    span { loc = "location", message = "__dimsPermute requires the order pack to have length ~orderRank:Int matching the input rank ~valueRank:Int" }
+    "__shapePermute requires an order pack with matching rank",
+    span { loc = "location", message = "__shapePermute requires the order pack to have length ~orderRank:Int matching the input rank ~valueRank:Int" }
 )
 
 err(
-    "dims-permute-index-out-of-range",
+    "shape-permute-index-out-of-range",
     30422,
-    "__dimsPermute index is out of range",
-    span { loc = "location", message = "__dimsPermute order index ~indexValue:Int at position ~indexPosition:Int is out of range for rank ~rank:Int" }
+    "__shapePermute index is out of range",
+    span { loc = "location", message = "__shapePermute order index ~indexValue:Int at position ~indexPosition:Int is out of range for rank ~rank:Int" }
 )
 
 err(
-    "dims-permute-duplicate-index",
+    "shape-permute-duplicate-index",
     30423,
-    "__dimsPermute order contains a duplicate index",
-    span { loc = "location", message = "__dimsPermute order index ~indexValue:Int is duplicated at positions ~firstPosition:Int and ~secondPosition:Int" }
+    "__shapePermute order contains a duplicate index",
+    span { loc = "location", message = "__shapePermute order index ~indexValue:Int is duplicated at positions ~firstPosition:Int and ~secondPosition:Int" }
+)
+
+err(
+    "shape-pack-no-valid-axis",
+    30424,
+    "~opName has no valid axis",
+    span { loc = "location", message = "rank ~rank:Int provides no valid axis for ~opName" }
+)
+
+err(
+    "shape-concat-no-valid-axis",
+    30425,
+    "__shapeConcat has no valid axis",
+    span { loc = "location", message = "no axis in rank ~rank:Int can make __shapeConcat valid for these shapes" }
+)
+
+err(
+    "shape-permute-duplicate-equivalent-index",
+    30426,
+    "__shapePermute order contains a duplicate index",
+    span { loc = "location", message = "__shapePermute order positions ~firstPosition:Int and ~secondPosition:Int are provably equal, so the order contains a duplicate index" }
 )
 
 err(

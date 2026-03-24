@@ -550,25 +550,25 @@ class ShapePackTransformExpr : public Expr
 };
 
 FIDDLE()
-class DimsConcatExpr : public ShapePackTransformExpr
+class ShapeConcatExpr : public ShapePackTransformExpr
 {
     FIDDLE(...)
 };
 
 FIDDLE()
-class DimsPermuteExpr : public ShapePackTransformExpr
+class ShapePermuteExpr : public ShapePackTransformExpr
 {
     FIDDLE(...)
 };
 
 FIDDLE()
-class DimsSwapExpr : public ShapePackTransformExpr
+class ShapeSwapExpr : public ShapePackTransformExpr
 {
     FIDDLE(...)
 };
 
 FIDDLE()
-class DimsReduceExpr : public ShapePackTransformExpr
+class ShapeReduceExpr : public ShapePackTransformExpr
 {
     FIDDLE(...)
 };

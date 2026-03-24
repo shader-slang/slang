@@ -1193,7 +1193,7 @@ Val* ASTBuilder::getTrimLastPack(Val* basePack)
     return getOrCreate<TrimLastIntValPack>(packType, basePack);
 }
 
-Val* ASTBuilder::getDimsConcatIntValPack(Val* leftPack, Val* rightPack, IntVal* axis)
+Val* ASTBuilder::getShapeConcatIntValPack(Val* leftPack, Val* rightPack, IntVal* axis)
 {
     IntegerLiteralValue axisValue = 0;
     if (auto leftValPack = as<ConcreteIntValPack>(leftPack))
@@ -1232,10 +1232,10 @@ Val* ASTBuilder::getDimsConcatIntValPack(Val* leftPack, Val* rightPack, IntVal* 
     }
 
     auto packType = _getIntPackTypeForVals(this, leftPack, rightPack);
-    return getOrCreate<DimsConcatIntValPack>(packType, leftPack, rightPack, axis);
+    return getOrCreate<ShapeConcatIntValPack>(packType, leftPack, rightPack, axis);
 }
 
-Val* ASTBuilder::getDimsPermuteIntValPack(Val* valuePack, Val* orderPack)
+Val* ASTBuilder::getShapePermuteIntValPack(Val* valuePack, Val* orderPack)
 {
     if (auto concreteValuePack = as<ConcreteIntValPack>(valuePack))
     {
@@ -1272,14 +1272,11 @@ Val* ASTBuilder::getDimsPermuteIntValPack(Val* valuePack, Val* orderPack)
     }
 
     auto packType = _getIntPackTypeForVal(this, valuePack);
-    return getOrCreate<DimsPermuteIntValPack>(packType, valuePack, orderPack);
+    return getOrCreate<ShapePermuteIntValPack>(packType, valuePack, orderPack);
 }
 
-Val* ASTBuilder::getDimsSwapIntValPack(Val* valuePack, IntVal* dim0, IntVal* dim1)
+Val* ASTBuilder::getShapeSwapIntValPack(Val* valuePack, IntVal* dim0, IntVal* dim1)
 {
-    if (dim0 && dim1 && dim0->equals(dim1))
-        return valuePack;
-
     IntegerLiteralValue dim0Value = 0;
     IntegerLiteralValue dim1Value = 0;
     if (auto concreteValuePack = as<ConcreteIntValPack>(valuePack))
@@ -1288,6 +1285,9 @@ Val* ASTBuilder::getDimsSwapIntValPack(Val* valuePack, IntVal* dim0, IntVal* dim
             dim0Value >= 0 && dim1Value >= 0 && dim0Value < concreteValuePack->getCount() &&
             dim1Value < concreteValuePack->getCount())
         {
+            if (dim0Value == dim1Value)
+                return valuePack;
+
             ShortList<IntVal*> resultVals;
             for (Index i = 0; i < concreteValuePack->getCount(); ++i)
             {
@@ -1303,10 +1303,10 @@ Val* ASTBuilder::getDimsSwapIntValPack(Val* valuePack, IntVal* dim0, IntVal* dim
     }
 
     auto packType = _getIntPackTypeForVal(this, valuePack);
-    return getOrCreate<DimsSwapIntValPack>(packType, valuePack, dim0, dim1);
+    return getOrCreate<ShapeSwapIntValPack>(packType, valuePack, dim0, dim1);
 }
 
-Val* ASTBuilder::getDimsReduceIntValPack(Val* valuePack, IntVal* axis)
+Val* ASTBuilder::getShapeReduceIntValPack(Val* valuePack, IntVal* axis)
 {
     IntegerLiteralValue axisValue = 0;
     if (auto concreteValuePack = as<ConcreteIntValPack>(valuePack))
@@ -1328,7 +1328,7 @@ Val* ASTBuilder::getDimsReduceIntValPack(Val* valuePack, IntVal* axis)
     }
 
     auto packType = _getIntPackTypeForVal(this, valuePack);
-    return getOrCreate<DimsReduceIntValPack>(packType, valuePack, axis);
+    return getOrCreate<ShapeReduceIntValPack>(packType, valuePack, axis);
 }
 
 NonEmptyPackWitness* ASTBuilder::getNonEmptyPackWitness(Val* pack)

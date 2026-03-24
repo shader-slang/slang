@@ -6,6 +6,7 @@
 //DIAGNOSTIC_TEST:SIMPLE(diag=LATE_PERMUTE_RANGE,non-exhaustive): -target spirv -entry computeMain -stage compute -DLATE_PERMUTE_RANGE
 //DIAGNOSTIC_TEST:SIMPLE(diag=LATE_SWAP_AXIS,non-exhaustive): -target spirv -entry computeMain -stage compute -DLATE_SWAP_AXIS
 //DIAGNOSTIC_TEST:SIMPLE(diag=LATE_REDUCE_AXIS,non-exhaustive): -target spirv -entry computeMain -stage compute -DLATE_REDUCE_AXIS
+//DIAGNOSTIC_TEST:SIMPLE(diag=LATE_SWAP_SAME_AXIS,non-exhaustive): -target spirv -entry computeMain -stage compute -DLATE_SWAP_SAME_AXIS
 #lang slang 2026
 
 struct ShapeInfo<let each D : int>
@@ -18,15 +19,15 @@ struct ShapeInfo<let each D : int>
 
 struct MockTile<T : ICoopElement, let each D : int>
 {
-    MockTile<T, __dimsPermute(D, Order)> permute<let each Order : int>()
+    MockTile<T, __shapePermute(D, Order)> permute<let each Order : int>()
     {
-        MockTile<T, __dimsPermute(D, Order)> result;
+        MockTile<T, __shapePermute(D, Order)> result;
         return result;
     }
 
-    MockTile<T, __dimsReduce(D, Axis)> reduce<let Axis : int>()
+    MockTile<T, __shapeReduce(D, Axis)> reduce<let Axis : int>()
     {
-        MockTile<T, __dimsReduce(D, Axis)> result;
+        MockTile<T, __shapeReduce(D, Axis)> result;
         return result;
     }
 
@@ -36,25 +37,25 @@ struct MockTile<T : ICoopElement, let each D : int>
     }
 };
 
-MockTile<T, __dimsConcat(A, B, Axis)> concat<
+MockTile<T, __shapeConcat(A, B, Axis)> concat<
     let Axis : int,
     T : ICoopElement,
     let each A : int,
     let each B : int>
     (MockTile<T, A> lhs, MockTile<T, B> rhs)
 {
-    MockTile<T, __dimsConcat(A, B, Axis)> result;
+    MockTile<T, __shapeConcat(A, B, Axis)> result;
     return result;
 }
 
-MockTile<T, __dimsSwap(D, I, J)> transpose<
+MockTile<T, __shapeSwap(D, I, J)> transpose<
     let I : int,
     let J : int,
     T : ICoopElement,
     let each D : int>
     (MockTile<T, D> tile)
 {
-    MockTile<T, __dimsSwap(D, I, J)> result;
+    MockTile<T, __shapeSwap(D, I, J)> result;
     return result;
 }
 
@@ -102,49 +103,55 @@ void computeMain()
 {
 #ifdef LATE_CONCAT_NON_AXIS
     userConcat<1>(MockTile<float, 16, 32>(), MockTile<float, 8, 32>());
-    //LATE_CONCAT_NON_AXIS: __dimsConcat requires non-axis dimensions to match
-    //LATE_CONCAT_NON_AXIS: __dimsConcat requires dimensions to match outside axis 1, but dimension 0 differs
+    //LATE_CONCAT_NON_AXIS: __shapeConcat requires non-axis dimensions to match
+    //LATE_CONCAT_NON_AXIS: __shapeConcat requires dimensions to match outside axis 1, but dimension 0 differs
 #endif
 
 #ifdef LATE_CONCAT_RANK
     userConcat<1>(MockTile<float, 16, 32>(), MockTile<float, 16, 32, 64>());
-    //LATE_CONCAT_RANK: __dimsConcat requires packs of the same rank
-    //LATE_CONCAT_RANK: __dimsConcat requires packs of the same rank, but got ranks 2 and 3
+    //LATE_CONCAT_RANK: __shapeConcat requires packs of the same rank
+    //LATE_CONCAT_RANK: __shapeConcat requires packs of the same rank, but got ranks 2 and 3
 #endif
 
 #ifdef LATE_CONCAT_AXIS
     userConcat<2>(MockTile<float, 16, 32>(), MockTile<float, 16, 32>());
-    //LATE_CONCAT_AXIS: __dimsConcat axis is out of range
-    //LATE_CONCAT_AXIS: axis 2 is out of range for rank 2 in __dimsConcat
+    //LATE_CONCAT_AXIS: __shapeConcat axis is out of range
+    //LATE_CONCAT_AXIS: axis 2 is out of range for rank 2 in __shapeConcat
 #endif
 
 #ifdef LATE_PERMUTE_LENGTH
     UserPermute<1, 0, 2>::apply(MockTile<float, 16, 32>());
-    //LATE_PERMUTE_LENGTH: __dimsPermute requires an order pack with matching rank
-    //LATE_PERMUTE_LENGTH: __dimsPermute requires the order pack to have length 3 matching the input rank 2
+    //LATE_PERMUTE_LENGTH: __shapePermute requires an order pack with matching rank
+    //LATE_PERMUTE_LENGTH: __shapePermute requires the order pack to have length 3 matching the input rank 2
 #endif
 
 #ifdef LATE_PERMUTE_DUP
     UserPermute<0, 0>::apply(MockTile<float, 16, 32>());
-    //LATE_PERMUTE_DUP: __dimsPermute order contains a duplicate index
-    //LATE_PERMUTE_DUP: __dimsPermute order index 0 is duplicated at positions 0 and 1
+    //LATE_PERMUTE_DUP: __shapePermute order contains a duplicate index
+    //LATE_PERMUTE_DUP: __shapePermute order index 0 is duplicated at positions 0 and 1
 #endif
 
 #ifdef LATE_PERMUTE_RANGE
     UserPermute<0, 2>::apply(MockTile<float, 16, 32>());
-    //LATE_PERMUTE_RANGE: __dimsPermute index is out of range
-    //LATE_PERMUTE_RANGE: __dimsPermute order index 2 at position 1 is out of range for rank 2
+    //LATE_PERMUTE_RANGE: __shapePermute index is out of range
+    //LATE_PERMUTE_RANGE: __shapePermute order index 2 at position 1 is out of range for rank 2
 #endif
 
 #ifdef LATE_SWAP_AXIS
     userTranspose<0, 2>(MockTile<float, 16, 32>());
-    //LATE_SWAP_AXIS: __dimsSwap axis is out of range
-    //LATE_SWAP_AXIS: axis 2 is out of range for rank 2 in __dimsSwap
+    //LATE_SWAP_AXIS: __shapeSwap axis is out of range
+    //LATE_SWAP_AXIS: axis 2 is out of range for rank 2 in __shapeSwap
+#endif
+
+#ifdef LATE_SWAP_SAME_AXIS
+    userTranspose<2, 2>(MockTile<float, 16, 32>());
+    //LATE_SWAP_SAME_AXIS: __shapeSwap axis is out of range
+    //LATE_SWAP_SAME_AXIS: axis 2 is out of range for rank 2 in __shapeSwap
 #endif
 
 #ifdef LATE_REDUCE_AXIS
     UserReduce<2>::apply(MockTile<float, 16, 32>());
-    //LATE_REDUCE_AXIS: __dimsReduce axis is out of range
-    //LATE_REDUCE_AXIS: axis 2 is out of range for rank 2 in __dimsReduce
+    //LATE_REDUCE_AXIS: __shapeReduce axis is out of range
+    //LATE_REDUCE_AXIS: axis 2 is out of range for rank 2 in __shapeReduce
 #endif
 }

@@ -473,31 +473,31 @@ void emitVal(ManglingContext* context, Val* val)
         emitRaw(context, "Vt");
         emitVal(context, trimLastIntValPack->getBasePack());
     }
-    else if (auto dimsConcatIntValPack = as<DimsConcatIntValPack>(val))
+    else if (auto shapeConcatIntValPack = as<ShapeConcatIntValPack>(val))
     {
         emitRaw(context, "Vc");
-        emitVal(context, dimsConcatIntValPack->getLeftPack());
-        emitVal(context, dimsConcatIntValPack->getRightPack());
-        emitVal(context, dimsConcatIntValPack->getAxis());
+        emitVal(context, shapeConcatIntValPack->getLeftPack());
+        emitVal(context, shapeConcatIntValPack->getRightPack());
+        emitVal(context, shapeConcatIntValPack->getAxis());
     }
-    else if (auto dimsPermuteIntValPack = as<DimsPermuteIntValPack>(val))
+    else if (auto shapePermuteIntValPack = as<ShapePermuteIntValPack>(val))
     {
         emitRaw(context, "Vr");
-        emitVal(context, dimsPermuteIntValPack->getValuePack());
-        emitVal(context, dimsPermuteIntValPack->getOrderPack());
+        emitVal(context, shapePermuteIntValPack->getValuePack());
+        emitVal(context, shapePermuteIntValPack->getOrderPack());
     }
-    else if (auto dimsSwapIntValPack = as<DimsSwapIntValPack>(val))
+    else if (auto shapeSwapIntValPack = as<ShapeSwapIntValPack>(val))
     {
         emitRaw(context, "Vs");
-        emitVal(context, dimsSwapIntValPack->getValuePack());
-        emitVal(context, dimsSwapIntValPack->getDim0());
-        emitVal(context, dimsSwapIntValPack->getDim1());
+        emitVal(context, shapeSwapIntValPack->getValuePack());
+        emitVal(context, shapeSwapIntValPack->getDim0());
+        emitVal(context, shapeSwapIntValPack->getDim1());
     }
-    else if (auto dimsReduceIntValPack = as<DimsReduceIntValPack>(val))
+    else if (auto shapeReduceIntValPack = as<ShapeReduceIntValPack>(val))
     {
         emitRaw(context, "Vd");
-        emitVal(context, dimsReduceIntValPack->getValuePack());
-        emitVal(context, dimsReduceIntValPack->getAxis());
+        emitVal(context, shapeReduceIntValPack->getValuePack());
+        emitVal(context, shapeReduceIntValPack->getAxis());
     }
     else
     {

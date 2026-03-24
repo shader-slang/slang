@@ -1968,7 +1968,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         return emitWitnessedPackQuery(type, kIROp_TrimLastOfPack, basePack);
     }
 
-    LoweredValInfo visitDimsConcatIntValPack(DimsConcatIntValPack* valPack)
+    LoweredValInfo visitShapeConcatIntValPack(ShapeConcatIntValPack* valPack)
     {
         auto irBuilder = getBuilder();
         auto type = lowerType(context, valPack->getType());
@@ -1978,10 +1978,10 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             lowerSimpleVal(context, valPack->getAxis()),
         };
         return LoweredValInfo::simple(
-            irBuilder->emitIntrinsicInst(type, kIROp_DimsConcat, SLANG_COUNT_OF(args), args));
+            irBuilder->emitIntrinsicInst(type, kIROp_ShapeConcat, SLANG_COUNT_OF(args), args));
     }
 
-    LoweredValInfo visitDimsPermuteIntValPack(DimsPermuteIntValPack* valPack)
+    LoweredValInfo visitShapePermuteIntValPack(ShapePermuteIntValPack* valPack)
     {
         auto irBuilder = getBuilder();
         auto type = lowerType(context, valPack->getType());
@@ -1990,10 +1990,10 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             lowerSimpleVal(context, valPack->getOrderPack()),
         };
         return LoweredValInfo::simple(
-            irBuilder->emitIntrinsicInst(type, kIROp_DimsPermute, SLANG_COUNT_OF(args), args));
+            irBuilder->emitIntrinsicInst(type, kIROp_ShapePermute, SLANG_COUNT_OF(args), args));
     }
 
-    LoweredValInfo visitDimsSwapIntValPack(DimsSwapIntValPack* valPack)
+    LoweredValInfo visitShapeSwapIntValPack(ShapeSwapIntValPack* valPack)
     {
         auto irBuilder = getBuilder();
         auto type = lowerType(context, valPack->getType());
@@ -2003,10 +2003,10 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             lowerSimpleVal(context, valPack->getDim1()),
         };
         return LoweredValInfo::simple(
-            irBuilder->emitIntrinsicInst(type, kIROp_DimsSwap, SLANG_COUNT_OF(args), args));
+            irBuilder->emitIntrinsicInst(type, kIROp_ShapeSwap, SLANG_COUNT_OF(args), args));
     }
 
-    LoweredValInfo visitDimsReduceIntValPack(DimsReduceIntValPack* valPack)
+    LoweredValInfo visitShapeReduceIntValPack(ShapeReduceIntValPack* valPack)
     {
         auto irBuilder = getBuilder();
         auto type = lowerType(context, valPack->getType());
@@ -2015,7 +2015,7 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
             lowerSimpleVal(context, valPack->getAxis()),
         };
         return LoweredValInfo::simple(
-            irBuilder->emitIntrinsicInst(type, kIROp_DimsReduce, SLANG_COUNT_OF(args), args));
+            irBuilder->emitIntrinsicInst(type, kIROp_ShapeReduce, SLANG_COUNT_OF(args), args));
     }
 
     LoweredValInfo visitExpandIntValPack(ExpandIntValPack* expandVal)
@@ -5177,13 +5177,20 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         auto builder = getBuilder();
         auto resultType = lowerType(context, shapePackExpr->type);
 
-        IROp op = kIROp_DimsReduce;
-        if (as<DimsConcatExpr>(shapePackExpr))
-            op = kIROp_DimsConcat;
-        else if (as<DimsPermuteExpr>(shapePackExpr))
-            op = kIROp_DimsPermute;
-        else if (as<DimsSwapExpr>(shapePackExpr))
-            op = kIROp_DimsSwap;
+        IROp op = kIROp_Invalid;
+        if (as<ShapeConcatExpr>(shapePackExpr))
+            op = kIROp_ShapeConcat;
+        else if (as<ShapePermuteExpr>(shapePackExpr))
+            op = kIROp_ShapePermute;
+        else if (as<ShapeSwapExpr>(shapePackExpr))
+            op = kIROp_ShapeSwap;
+        else if (as<ShapeReduceExpr>(shapePackExpr))
+            op = kIROp_ShapeReduce;
+        else
+        {
+            SLANG_UNEXPECTED("unexpected ShapePackTransformExpr subtype");
+            UNREACHABLE_RETURN(LoweredValInfo());
+        }
 
         ShortList<IRInst*> args;
         for (auto arg : shapePackExpr->args)

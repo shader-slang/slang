@@ -679,13 +679,13 @@ public:
 
     Val* getTrimLastPack(Val* basePack);
 
-    Val* getDimsConcatIntValPack(Val* leftPack, Val* rightPack, IntVal* axis);
+    Val* getShapeConcatIntValPack(Val* leftPack, Val* rightPack, IntVal* axis);
 
-    Val* getDimsPermuteIntValPack(Val* valuePack, Val* orderPack);
+    Val* getShapePermuteIntValPack(Val* valuePack, Val* orderPack);
 
-    Val* getDimsSwapIntValPack(Val* valuePack, IntVal* dim0, IntVal* dim1);
+    Val* getShapeSwapIntValPack(Val* valuePack, IntVal* dim0, IntVal* dim1);
 
-    Val* getDimsReduceIntValPack(Val* valuePack, IntVal* axis);
+    Val* getShapeReduceIntValPack(Val* valuePack, IntVal* axis);
 
     NonEmptyPackWitness* getNonEmptyPackWitness(Val* pack);
 

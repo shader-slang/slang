@@ -139,10 +139,10 @@ struct PeepholeContext : InstPassBase
             case kIROp_ExpandTypeOrVal:
             case kIROp_TrimFirstOfPack:
             case kIROp_TrimLastOfPack:
-            case kIROp_DimsConcat:
-            case kIROp_DimsPermute:
-            case kIROp_DimsSwap:
-            case kIROp_DimsReduce:
+            case kIROp_ShapeConcat:
+            case kIROp_ShapePermute:
+            case kIROp_ShapeSwap:
+            case kIROp_ShapeReduce:
                 return true;
             default:
                 break;
@@ -616,7 +616,7 @@ struct PeepholeContext : InstPassBase
                 }
             }
             break;
-        case kIROp_DimsConcat:
+        case kIROp_ShapeConcat:
             {
                 auto leftPack = inst->getOperand(0);
                 auto rightPack = inst->getOperand(1);
@@ -672,7 +672,7 @@ struct PeepholeContext : InstPassBase
                 }
             }
             break;
-        case kIROp_DimsPermute:
+        case kIROp_ShapePermute:
             {
                 auto valuePack = inst->getOperand(0);
                 auto orderPack = inst->getOperand(1);
@@ -714,19 +714,11 @@ struct PeepholeContext : InstPassBase
                 }
             }
             break;
-        case kIROp_DimsSwap:
+        case kIROp_ShapeSwap:
             {
                 auto valuePack = inst->getOperand(0);
                 auto dim0 = inst->getOperand(1);
                 auto dim1 = inst->getOperand(2);
-
-                if (dim0 == dim1)
-                {
-                    inst->replaceUsesWith(valuePack);
-                    maybeRemoveOldInst(inst);
-                    changed = true;
-                    break;
-                }
 
                 if (isConcreteShapePack(valuePack))
                 {
@@ -771,7 +763,7 @@ struct PeepholeContext : InstPassBase
                 }
             }
             break;
-        case kIROp_DimsReduce:
+        case kIROp_ShapeReduce:
             {
                 auto valuePack = inst->getOperand(0);
                 auto axis = inst->getOperand(1);
