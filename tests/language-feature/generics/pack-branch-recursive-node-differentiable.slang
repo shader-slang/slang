@@ -29,7 +29,7 @@ struct EmptyNode : INode
 struct EvalNode<let Head : int, let each Tail : int> : INode
 {
     float headValue;
-    __packBranch(Tail, EmptyNode, EvalNode<__first(Tail), __trimHead(Tail)>) restLayers = {};
+    __packBranch(Tail, EmptyNode, EvalNode<__first(Tail), __trimFirst(Tail)>) restLayers = {};
 
     __init()
     {

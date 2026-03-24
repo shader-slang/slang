@@ -867,13 +867,13 @@ LanguageServerResult<LanguageServerProtocol::Hover> LanguageServerCore::hover(
         }
         else if (auto packQueryExpr = as<PackQueryExpr>(expr))
         {
-            String queryName = "__trimTail";
+            String queryName = "__trimLast";
             if (as<FirstExpr>(packQueryExpr))
                 queryName = "__first";
             else if (as<LastExpr>(packQueryExpr))
                 queryName = "__last";
-            else if (as<TrimHeadExpr>(packQueryExpr))
-                queryName = "__trimHead";
+            else if (as<TrimFirstExpr>(packQueryExpr))
+                queryName = "__trimFirst";
 
             sb << "```\n" << queryName << "(";
             if (packQueryExpr->value && packQueryExpr->value->type)

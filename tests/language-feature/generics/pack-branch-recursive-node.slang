@@ -22,7 +22,7 @@ struct EvalNode<let Head : int, let each Tail : int> : INode
 {
     int headValue;
     __init(){ headValue = Head; }
-    __packBranch(Tail, EmptyNode, EvalNode<__first(Tail), __trimHead(Tail)>) restLayers = {};
+    __packBranch(Tail, EmptyNode, EvalNode<__first(Tail), __trimFirst(Tail)>) restLayers = {};
 
     int sum()
     {

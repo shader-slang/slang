@@ -141,10 +141,16 @@ struct Options
 
     Slang::HashSet<Slang::String> capabilities;
     Slang::HashSet<Slang::String> expectedFailureList;
-    Slang::List<Slang::String> skipList;
 
-    // Ignore abort message dialog popup on Windows
-    bool ignoreAbortMsg = false;
+    // Per-file info for expected failure lists: (fileName, count) pairs, in order added.
+    struct ExpectedFailureFileInfo
+    {
+        Slang::String fileName;
+        int count;
+    };
+    Slang::List<ExpectedFailureFileInfo> expectedFailureFiles;
+
+    Slang::List<Slang::String> skipList;
 
     /// Parse the args, report any errors into stdError, and write the results into optionsOut
     static SlangResult parse(

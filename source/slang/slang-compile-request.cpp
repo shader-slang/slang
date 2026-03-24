@@ -320,90 +320,58 @@ void FrontEndCompileRequest::parseTranslationUnit(TranslationUnitRequest* transl
 
     for (auto sourceFile : translationUnit->getSourceFiles())
     {
-        // Build a list of source segments to process. A plain .slang file
-        // is treated as a single segment (the file itself). A .slang.md
-        // file is split into one segment per Slang code block, each with
-        // a #line directive so diagnostics point to the correct location
-        // in the original Markdown file.
-        List<SourceFile*> segments;
+        SourceLanguage sourceLanguage = translationUnit->sourceLanguage;
+        SlangLanguageVersion languageVersion =
+            translationUnit->compileRequest->optionSet.getLanguageVersion();
 
-        if (hasLiterateFileExtension(sourceFile->getPathInfo().foundPath))
+        auto segments = extractSourceSegments(sourceFile, getSourceManager());
+
+        auto preprocessed = preprocessSourceSegments(
+            segments,
+            sourceLanguage,
+            languageVersion,
+            getSink(),
+            &includeSystem,
+            combinedPreprocessorDefinitions,
+            getLinkage(),
+            &preprocessorHandler);
+
+        translationUnitSyntax->languageVersion = languageVersion;
+
+        if (optionSet.getBoolOption(CompilerOptionName::PreprocessorOutput))
         {
-            auto content = sourceFile->getContent();
-            auto codeBlocks = extractSlangCodeBlocks(content.begin(), content.getLength());
-            auto* sourceManager = getSourceManager();
-
-            for (auto& block : codeBlocks)
+            if (m_writers)
             {
-                StringBuilder syntheticContent;
-                syntheticContent << "#line " << block.startLine << "\n";
-                syntheticContent << block.content;
-
-                segments.add(sourceManager->createSourceFileWithString(
-                    sourceFile->getPathInfo(),
-                    syntheticContent.produceString()));
-            }
-        }
-        else
-        {
-            segments.add(sourceFile);
-        }
-
-        for (auto segmentFile : segments)
-        {
-            SourceLanguage sourceLanguage = translationUnit->sourceLanguage;
-            SlangLanguageVersion languageVersion =
-                translationUnit->compileRequest->optionSet.getLanguageVersion();
-            auto tokens = preprocessSource(
-                segmentFile,
-                getSink(),
-                &includeSystem,
-                combinedPreprocessorDefinitions,
-                getLinkage(),
-                sourceLanguage,
-                languageVersion,
-                &preprocessorHandler);
-
-            translationUnitSyntax->languageVersion = languageVersion;
-
-            if (sourceLanguage == SourceLanguage::Unknown)
-                sourceLanguage = translationUnit->sourceLanguage;
-
-            Scope* languageScope = nullptr;
-            switch (sourceLanguage)
-            {
-            case SourceLanguage::HLSL:
-                languageScope = getSession()->hlslLanguageScope;
-                break;
-            case SourceLanguage::GLSL:
-                languageScope = getSession()->glslLanguageScope;
-                break;
-            case SourceLanguage::Slang:
-            default:
-                languageScope = getSession()->slangLanguageScope;
-                break;
-            }
-
-            if (optionSet.getBoolOption(CompilerOptionName::PreprocessorOutput))
-            {
-                if (m_writers)
-                {
+                for (auto& seg : preprocessed)
                     _outputPreprocessorTokens(
-                        tokens,
+                        seg.tokens,
                         m_writers->getWriter(SLANG_WRITER_CHANNEL_STD_OUTPUT));
-                }
-                continue;
             }
-
-            parseSourceFile(
-                astBuilder,
-                translationUnit,
-                sourceLanguage,
-                tokens,
-                getSink(),
-                languageScope,
-                translationUnitSyntax);
+            continue;
         }
+
+        Scope* languageScope = nullptr;
+        switch (sourceLanguage)
+        {
+        case SourceLanguage::HLSL:
+            languageScope = getSession()->hlslLanguageScope;
+            break;
+        case SourceLanguage::GLSL:
+            languageScope = getSession()->glslLanguageScope;
+            break;
+        case SourceLanguage::Slang:
+        default:
+            languageScope = getSession()->slangLanguageScope;
+            break;
+        }
+
+        parsePreprocessedSegments(
+            preprocessed,
+            astBuilder,
+            translationUnit,
+            getSink(),
+            languageScope,
+            translationUnitSyntax);
 
         if (optionSet.getBoolOption(CompilerOptionName::OutputIncludes))
         {
@@ -412,10 +380,6 @@ void FrontEndCompileRequest::parseTranslationUnit(TranslationUnitRequest* transl
                 getSink()->getSourceManager(),
                 getSink());
         }
-
-        // If we are only outputting preprocessor tokens, skip AST work.
-        if (optionSet.getBoolOption(CompilerOptionName::PreprocessorOutput))
-            continue;
 
         if (optionSet.getBoolOption(CompilerOptionName::DumpAst))
         {
@@ -444,6 +408,90 @@ void FrontEndCompileRequest::parseTranslationUnit(TranslationUnitRequest* transl
                 ASTSerialTestUtil::testSerialize(translationUnit->getModuleDecl(), getSession()->getNamePool(), getLinkage()->getASTBuilder()->getSharedASTBuilder(), getSourceManager());
             }
 #endif
+    }
+}
+
+List<SourceFile*> extractSourceSegments(SourceFile* sourceFile, SourceManager* sourceManager)
+{
+    List<SourceFile*> segments;
+
+    if (!hasLiterateFileExtension(sourceFile->getPathInfo().foundPath))
+    {
+        segments.add(sourceFile);
+        return segments;
+    }
+
+    auto content = sourceFile->getContent();
+    auto codeBlocks = extractSlangCodeBlocks(content.begin(), content.getLength());
+
+    for (auto& block : codeBlocks)
+    {
+        StringBuilder syntheticContent;
+        syntheticContent << "#line " << block.startLine << "\n";
+        syntheticContent << block.content;
+
+        segments.add(sourceManager->createSourceFileWithString(
+            sourceFile->getPathInfo(),
+            syntheticContent.produceString()));
+    }
+
+    return segments;
+}
+
+List<PreprocessedSegment> preprocessSourceSegments(
+    List<SourceFile*> const& segments,
+    SourceLanguage defaultSourceLanguage,
+    SlangLanguageVersion& ioLanguageVersion,
+    DiagnosticSink* sink,
+    IncludeSystem* includeSystem,
+    Dictionary<String, String> const& preprocessorDefinitions,
+    Linkage* linkage,
+    PreprocessorHandler* preprocessorHandler)
+{
+    List<PreprocessedSegment> result;
+
+    for (auto segmentFile : segments)
+    {
+        PreprocessedSegment seg;
+        seg.sourceLanguage = defaultSourceLanguage;
+
+        seg.tokens = preprocessSource(
+            segmentFile,
+            sink,
+            includeSystem,
+            preprocessorDefinitions,
+            linkage,
+            seg.sourceLanguage,
+            ioLanguageVersion,
+            preprocessorHandler);
+
+        if (seg.sourceLanguage == SourceLanguage::Unknown)
+            seg.sourceLanguage = defaultSourceLanguage;
+
+        result.add(_Move(seg));
+    }
+
+    return result;
+}
+
+void parsePreprocessedSegments(
+    List<PreprocessedSegment> const& segments,
+    ASTBuilder* astBuilder,
+    TranslationUnitRequest* translationUnit,
+    DiagnosticSink* sink,
+    Scope* outerScope,
+    ContainerDecl* parentDecl)
+{
+    for (auto& seg : segments)
+    {
+        parseSourceFile(
+            astBuilder,
+            translationUnit,
+            seg.sourceLanguage,
+            seg.tokens,
+            sink,
+            outerScope,
+            parentDecl);
     }
 }
 

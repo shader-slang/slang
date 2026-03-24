@@ -10,14 +10,14 @@ int lastValue<let each D : int>() where nonempty(D)
     return __last(D);
 }
 
-int trimmedHeadCount<let each D : int>()
+int trimmedFirstCount<let each D : int>()
 {
-    return countof(__trimHead(D));
+    return countof(__trimFirst(D));
 }
 
-int trimmedTailCount<let each D : int>()
+int trimmedLastCount<let each D : int>()
 {
-    return countof(__trimTail(D));
+    return countof(__trimLast(D));
 }
 
 int firstExpandedValue<let each D : int>() where nonempty(D)
@@ -75,7 +75,7 @@ int consumeEnumPack<let each D : MyEnum>()
 
 int singletonEnumTrimKeepsPackType<let each D : MyEnum>()
 {
-    return consumeEnumPack<__trimHead(D)>();
+    return consumeEnumPack<__trimFirst(D)>();
 }
 
 void main()
@@ -86,16 +86,16 @@ void main()
     printf("%d\n", lastValue<10, 20, 30>());
     // CHECK: 30
 
-    printf("%d\n", trimmedHeadCount<10, 20, 30>());
+    printf("%d\n", trimmedFirstCount<10, 20, 30>());
     // CHECK: 2
 
-    printf("%d\n", trimmedTailCount<10, 20, 30>());
+    printf("%d\n", trimmedLastCount<10, 20, 30>());
     // CHECK: 2
 
-    printf("%d\n", trimmedHeadCount<>());
+    printf("%d\n", trimmedFirstCount<>());
     // CHECK: 0
 
-    printf("%d\n", trimmedTailCount<7>());
+    printf("%d\n", trimmedLastCount<7>());
     // CHECK: 0
 
     printf("%d\n", firstExpandedValue<10, 20, 30>());

@@ -279,16 +279,16 @@ Slang provides the following pack-query operations for type packs, value packs, 
 > *`pack-last-expr`* =<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;**`'__last'`** **`'('`** *`expr`* **`')'`**<br>
 >
-> *`pack-trim-head-expr`* =<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;**`'__trimHead'`** **`'('`** *`expr`* **`')'`**<br>
+> *`pack-trim-first-expr`* =<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;**`'__trimFirst'`** **`'('`** *`expr`* **`')'`**<br>
 >
-> *`pack-trim-tail-expr`* =<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;**`'__trimTail'`** **`'('`** *`expr`* **`')'`**<br>
+> *`pack-trim-last-expr`* =<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;**`'__trimLast'`** **`'('`** *`expr`* **`')'`**<br>
 
 - `__first(P)`
 - `__last(P)`
-- `__trimHead(P)`
-- `__trimTail(P)`
+- `__trimFirst(P)`
+- `__trimLast(P)`
 
 `__first(P)` and `__last(P)` are partial operations and require `P` to be known non-empty. For generic pack parameters, non-emptiness can be expressed with:
 
@@ -299,7 +299,7 @@ void foo<each T>() where nonempty(T)
 }
 ```
 
-`__trimHead(P)` and `__trimTail(P)` are total operations and yield an empty pack when applied to an empty pack.
+`__trimFirst(P)` and `__trimLast(P)` are total operations and yield an empty pack when applied to an empty pack.
 
 > 📝 **Remark:** The operand of `nonempty(...)` must be a direct reference to a generic type pack or value pack
 > parameter declared in the current generic declaration. `optional nonempty(...)` is parsed but rejected as invalid.

@@ -1,6 +1,6 @@
 // ray-tracing-test-shaders.slang
 
-struct [raypayload] RayPayload
+[raypayload] struct RayPayload
 {
     float4 color : read(caller) : write(caller, closesthit, miss);
 };
