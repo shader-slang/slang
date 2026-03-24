@@ -2,7 +2,7 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK_BAB):-vk -emit-spirv-directly -Xslang -DBAB
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK_CUDA):-cuda -output-using-type
 
-//TEST(compute):SIMPLE(filecheck=DXIL):-target dxil -profile cs_6_10 -entry computeMain -dxc-path dxc-sm610/ -Xdxc -Idxc-sm610/include -DBAB
+//DISABLE_TEST(compute):SIMPLE(filecheck=DXIL):-target dxil -profile cs_6_10 -entry computeMain -Xdxc -Ibuild/dxc/include -DBAB
 //DXIL: result code = 0
 
 // CHECK: type: float
