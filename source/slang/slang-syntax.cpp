@@ -122,7 +122,7 @@ const char* getPackQueryName(PackQueryExpr* expr)
     if (as<TrimLastExpr>(expr))
         return "__trimLast";
     SLANG_UNEXPECTED("unknown PackQueryExpr subtype");
-    return "";
+    UNREACHABLE_RETURN("");
 }
 
 const char* getShapePackTransformName(ShapePackTransformExpr* expr)
@@ -136,7 +136,7 @@ const char* getShapePackTransformName(ShapePackTransformExpr* expr)
     if (as<ShapeReduceExpr>(expr))
         return "__shapeReduce";
     SLANG_UNEXPECTED("unknown ShapePackTransformExpr subtype");
-    return "";
+    UNREACHABLE_RETURN("");
 }
 
 VariadicPackCardinality getKnownPackCardinality(Val* packOperand)
