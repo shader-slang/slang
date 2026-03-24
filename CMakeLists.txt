@@ -390,26 +390,30 @@ if(SLANG_SLANG_LLVM_FLAVOR MATCHES FETCH_BINARY)
 endif()
 
 if(NOT SLANG_EXCLUDE_DAWN)
-    set(webgpu_dawn_release_tag "webgpu_dawn-0")
-    if(
-        CMAKE_SYSTEM_NAME MATCHES "Windows"
-        AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64"
-    )
-        set(SLANG_WEBGPU_DAWN_BINARY_URL
-            "https://github.com/shader-slang/dawn/releases/download/${webgpu_dawn_release_tag}/webgpu_dawn-windows-x64.zip"
+    if(NOT DEFINED SLANG_WEBGPU_DAWN_BINARY_URL)
+        set(webgpu_dawn_release_tag "webgpu_dawn-0")
+        if(
+            CMAKE_SYSTEM_NAME MATCHES "Windows"
+            AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64"
         )
+            set(SLANG_WEBGPU_DAWN_BINARY_URL
+                "https://github.com/shader-slang/dawn/releases/download/${webgpu_dawn_release_tag}/webgpu_dawn-windows-x64.zip"
+            )
+        endif()
     endif()
 endif()
 
 if(NOT SLANG_EXCLUDE_TINT)
-    set(slang_tint_release_tag "slang-tint-0")
-    if(
-        CMAKE_SYSTEM_NAME MATCHES "Windows"
-        AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64"
-    )
-        set(SLANG_SLANG_TINT_BINARY_URL
-            "https://github.com/shader-slang/dawn/releases/download/${slang_tint_release_tag}/slang-tint-windows-x64.zip"
+    if(NOT DEFINED SLANG_SLANG_TINT_BINARY_URL)
+        set(slang_tint_release_tag "slang-tint-0")
+        if(
+            CMAKE_SYSTEM_NAME MATCHES "Windows"
+            AND CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|amd64|AMD64"
         )
+            set(SLANG_SLANG_TINT_BINARY_URL
+                "https://github.com/shader-slang/dawn/releases/download/${slang_tint_release_tag}/slang-tint-windows-x64.zip"
+            )
+        endif()
     endif()
 endif()
 
