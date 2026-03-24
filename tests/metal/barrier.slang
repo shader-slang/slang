@@ -7,7 +7,7 @@
 
 // METALLIB: define void @computeMain
 
-//TEST_INPUT: ubuffer(data=[0 0 0], stride=1):out,name outputBuffer
+//TEST_INPUT: ubuffer(data=[0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<float> outputBuffer;
 
 [numthreads(1,1,1)]

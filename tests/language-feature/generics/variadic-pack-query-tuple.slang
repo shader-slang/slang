@@ -16,11 +16,11 @@ void main()
     printf("%d\n", __last(tuple));
     // CHECK: 30
 
-    let head = __trimHead(tuple);
+    let head = __trimFirst(tuple);
     printf("%d\n", head._0 + head._1);
     // CHECK: 50
 
-    let tail = __trimTail(tuple);
+    let tail = __trimLast(tuple);
     printf("%d\n", tail._0 + tail._1);
     // CHECK: 30
 

@@ -133,9 +133,7 @@ option(
     OFF
 )
 if(SLANG_IGNORE_ABORT_MSG)
-    set(slang_ignore_abort_msg_arg -ignore-abort-msg)
-else()
-    set(slang_ignore_abort_msg_arg)
+    add_compile_definitions(SLANG_IGNORE_ABORT_MSG=1)
 endif()
 option(
     SLANG_ENABLE_ASAN
@@ -298,6 +296,11 @@ advanced_option(
 advanced_option(
     SLANG_OVERRIDE_MIMALLOC_PATH
     "Build using user defined path for mimalloc"
+    OFF
+)
+advanced_option(
+    SLANG_OVERRIDE_CMARK_PATH
+    "Build using user defined path for cmark"
     OFF
 )
 
@@ -578,6 +581,7 @@ add_subdirectory(source/slang-core-module)
 add_subdirectory(source/slang-glsl-module)
 add_subdirectory(source/slang)
 add_subdirectory(source/slangc)
+add_subdirectory(source/slang-dispatcher)
 add_subdirectory(source/standard-modules)
 add_subdirectory(examples)
 

@@ -215,7 +215,6 @@ struct ShaderInputLayoutParser
             parser.Read("=");
 
             parser.Read("[");
-            uint32_t offset = 0;
             while (!parser.IsEnd() && !parser.LookAhead("]"))
             {
                 bool negate = false;
@@ -225,7 +224,18 @@ struct ShaderInputLayoutParser
                     negate = true;
                 }
 
-                if (parser.NextToken().Type == Misc::TokenType::IntLiteral)
+                if (parser.NextToken().Type == Misc::TokenType::HalfLiteral)
+                {
+                    // Half float literal (e.g. 1.0h): store one half per uint32_t slot.
+                    // Packing into the final buffer layout is handled by assignBuffer()
+                    // based on the buffer's stride.
+                    auto token = parser.ReadToken();
+                    float floatNum = (float)stringToDouble(token.Content);
+                    if (negate)
+                        floatNum = -floatNum;
+                    val->bufferData.add(uint32_t(FloatToHalf(floatNum)));
+                }
+                else if (parser.NextToken().Type == Misc::TokenType::IntLiteral)
                 {
                     uint32_t value = parser.ReadUInt();
                     if (negate)
@@ -239,7 +249,6 @@ struct ShaderInputLayoutParser
                         floatNum = -floatNum;
                     val->bufferData.add(*(unsigned int*)&floatNum);
                 }
-                offset += 4;
             }
             parser.Read("]");
         }
