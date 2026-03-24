@@ -1291,8 +1291,20 @@ struct ExtractPrimalFuncContext
                 }
                 else
                 {
-                    builder.emitReturn(builder.emitMakeTuple(
-                        List<IRInst*>(returnValue, builder.emitLoad(outMinimalContextVar))));
+                    auto retVar = builder.emitVar(builder.getTupleType(
+                        List<IRType*>({returnValue->getDataType(), (IRType*)minimalContextType})));
+                    auto retValAddr = builder.emitGetElementPtr(
+                        builder.getPtrType(returnValue->getFullType()),
+                        retVar,
+                        0);
+                    builder.emitStore(retValAddr, returnValue);
+                    auto contextAddr = builder.emitGetElementPtr(
+                        builder.getPtrType((IRType*)minimalContextType),
+                        retVar,
+                        1);
+                    builder.emitStore(contextAddr, builder.emitLoad(outMinimalContextVar));
+
+                    builder.emitReturn(builder.emitLoad(retVar));
                 }
                 term->removeAndDeallocate();
             }

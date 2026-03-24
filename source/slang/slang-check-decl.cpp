@@ -4708,37 +4708,14 @@ bool SemanticsVisitor::doesSignatureMatchRequirement(
     // is differentiable)
     //
     {
-        bool hasFwdDerivative = false;
-        auto lookupResult = lookUpMember(
-            getASTBuilder(),
-            this,
-            getName("fwd_diff"),
-            DeclRefType::create(getASTBuilder(), satisfyingMemberDeclRef),
-            getOuterScope(),
-            LookupMask::Default);
-        lookupResult = resolveOverloadedLookup(lookupResult);
-        if (!lookupResult.isOverloaded() && lookupResult.isValid())
-            hasFwdDerivative = true;
-
-        bool hasBwdDerivative = false;
-        lookupResult = lookUpMember(
-            getASTBuilder(),
-            this,
-            getName("bwd_diff"),
-            DeclRefType::create(getASTBuilder(), satisfyingMemberDeclRef),
-            getOuterScope(),
-            LookupMask::Default);
-        lookupResult = resolveOverloadedLookup(lookupResult);
-        if (!lookupResult.isOverloaded() && lookupResult.isValid())
-            hasBwdDerivative = true;
-
         // A function with [NoDiffThis] has a different signature.
         auto parentInterfaceDecl =
             as<InterfaceDecl>(getParentDecl(requiredMemberDeclRef.getDecl()));
 
         if (!requiredMemberDeclRef.getDecl()->hasModifier<HLSLStaticModifier>())
         {
-            if (parentInterfaceDecl && (hasFwdDerivative || hasBwdDerivative))
+            if (parentInterfaceDecl && (doesCalleeHaveFwdDiff(satisfyingMemberDeclRef) ||
+                                        doesCalleeHaveBwdDiff(satisfyingMemberDeclRef)))
             {
                 bool noDiffThisSatisfying =
                     (!isTypeDifferentiable(witnessTable->witnessedType) ||
@@ -4783,6 +4760,32 @@ bool SemanticsVisitor::doesSignatureMatchRequirement(
     }
 
     return true;
+}
+
+bool SemanticsVisitor::doesCalleeHaveFwdDiff(DeclRef<CallableDecl> declRef)
+{
+    auto lookupResult = lookUpMember(
+        getASTBuilder(),
+        this,
+        getName("fwd_diff"),
+        DeclRefType::create(getASTBuilder(), declRef),
+        getOuterScope(),
+        LookupMask::Default);
+    lookupResult = resolveOverloadedLookup(lookupResult);
+    return !lookupResult.isOverloaded() && lookupResult.isValid();
+}
+
+bool SemanticsVisitor::doesCalleeHaveBwdDiff(DeclRef<CallableDecl> declRef)
+{
+    auto lookupResult = lookUpMember(
+        getASTBuilder(),
+        this,
+        getName("bwd_diff"),
+        DeclRefType::create(getASTBuilder(), declRef),
+        getOuterScope(),
+        LookupMask::Default);
+    lookupResult = resolveOverloadedLookup(lookupResult);
+    return !lookupResult.isOverloaded() && lookupResult.isValid();
 }
 
 bool SemanticsVisitor::doesAccessorMatchRequirement(
@@ -6410,6 +6413,23 @@ void SemanticsVisitor::addModifiersToSynthesizedDecl(
         addModifier(synthesized, backwardDifferentiableAttr);
     }
 
+    // For [MaybeDifferentiable], we'll handle in a slightly roundabout manner.
+    // We'll add the forward and backward differentiable attributes during signature synthesis,
+    // but we don't actually know if we should add them until we know the callee resolved from the
+    // invoke. However, we currently cant' defer the attribute to after callee resolution, because
+    // the resolution needs the attribute so it can store the associations on it.
+    //
+    // Thus, we'll add it here, and then remove it later as soon as the invoke expr has been
+    // checked.
+    //
+    if (requiredMemberDeclRef.getDecl()->hasModifier<MaybeDifferentiableAttribute>())
+    {
+        auto backwardDiffAttr = m_astBuilder->create<BackwardDifferentiableAttribute>();
+        addModifier(synthesized, backwardDiffAttr);
+        auto forwardDiffAttr = m_astBuilder->create<ForwardDifferentiableAttribute>();
+        addModifier(synthesized, forwardDiffAttr);
+    }
+
     // The visibility of synthesized decl should be the min of the parent decl and the requirement.
     if (requiredMemberDeclRef.getDecl()->findModifier<VisibilityModifier>())
     {
@@ -7041,6 +7061,20 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
                         }
                         return false;
                     }
+                }
+
+                if (!doesCalleeHaveFwdDiff(callee))
+                {
+                    if (auto fwdDiffModifier =
+                            synFuncDecl->findModifier<ForwardDifferentiableAttribute>())
+                        removeModifier(synFuncDecl, fwdDiffModifier);
+                }
+
+                if (!doesCalleeHaveBwdDiff(callee))
+                {
+                    if (auto bwdDiffModifier =
+                            synFuncDecl->findModifier<BackwardDifferentiableAttribute>())
+                        removeModifier(synFuncDecl, bwdDiffModifier);
                 }
 
                 markOverridingDecl(context, callee.getDecl(), requiredMemberDeclRef);

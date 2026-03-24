@@ -1638,7 +1638,11 @@ static LegalVal legalizeMakeStruct(
             {
                 // Ignore none values.
                 if (legalArgs[aa].flavor == LegalVal::Flavor::none)
+                {
+                    if (!legalType.getSimple()->findDecoration<IROptimizableTypeDecoration>())
+                        args.add(builder->getVoidValue());
                     continue;
+                }
 
                 // Note: we assume that all the arguments
                 // must be simple here, because otherwise

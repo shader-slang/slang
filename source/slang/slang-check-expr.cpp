@@ -3081,28 +3081,43 @@ void registerAssociatedMethods(SemanticsVisitor* context, DeclRef<Decl> declRef)
 
     // Revised AD 2.0 lowering.
     {
-        if (maybeRegisterVal(
+        if (auto fwdDiffVal = maybeRegisterVal(
                 context,
                 funcAsType,
                 declRef.declRefBase,
                 context->getName("fwd_diff"),
                 AnnotationKind::ForwardDerivative))
         {
-            // Lower the associated fwd_diff : IForwardDifferentiable witness table
+            auto effectiveDiffVal = fwdDiffVal;
+            auto funcAliasDeclRef = DeclRef<FuncAliasDecl>(as<DeclRefBase>(fwdDiffVal));
+            if (funcAliasDeclRef)
+            {
+                effectiveDiffVal = substituteDeclRef(
+                                       SubstitutionSet(funcAliasDeclRef),
+                                       getCurrentASTBuilder(),
+                                       funcAliasDeclRef.getDecl()->targetDeclRef)
+                                       .as<FunctionDeclBase>();
+            }
+
+            // Create a type for the fwd_diff function to look up its own conformances.
+            auto fwdDiffType =
+                DeclRefType::create(context->getASTBuilder(), as<DeclRefBase>(effectiveDiffVal));
+
+            // Lower the fwd_diff : IForwardDifferentiable witness table
             maybeRegisterWitness(
                 context,
-                funcAsType,
+                fwdDiffType,
                 declRef.declRefBase,
-                context->getForwardDiffFuncInterfaceType(funcAsType),
-                AnnotationKind::ForwardDerivativeWitnessTable);
+                context->getForwardDiffFuncInterfaceType(fwdDiffType),
+                AnnotationKind::FwdDiffForwardDerivativeWitnessTable);
 
             // Lower the fwd_diff : IBackwardDifferentiable witness table
             maybeRegisterWitness(
                 context,
-                funcAsType,
+                fwdDiffType,
                 declRef.declRefBase,
-                context->getBackwardDiffFuncInterfaceType(funcAsType),
-                AnnotationKind::BackwardDerivativeWitnessTable);
+                context->getBackwardDiffFuncInterfaceType(fwdDiffType),
+                AnnotationKind::FwdDiffBackwardDerivativeWitnessTable);
         }
 
         if (maybeRegisterVal(

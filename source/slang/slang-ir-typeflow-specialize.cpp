@@ -4016,6 +4016,18 @@ struct TypeFlowSpecializationContext
         //
         if (auto elementOfSetType = as<IRElementOfSetType>(calleeInfo))
         {
+            if (elementOfSetType->getSet()->isUnbounded())
+            {
+                // An unbounded set represents potentially infinite callees, so we won't propagate
+                // anything.
+                //
+                // Note: Currently, an unbounded set can only have an unbounded element (and nothing
+                // else), but in the future, we can allow for a mix of unbounded and known elements.
+                //
+                module->getContainerPool().free(&calleeSet);
+                return none();
+            }
+
             List<IRInst*>& funcs = *module->getContainerPool().getList<IRInst>();
 
             forEachInSet(
@@ -5375,19 +5387,6 @@ struct TypeFlowSpecializationContext
 
         List<IRInst*>& calleesToProcess = *module->getContainerPool().getList<IRInst>();
         forEachInSet(module, calleeSet, [&](IRInst* func) { calleesToProcess.add(func); });
-
-        // Helper to get the union mask base type for a given parameter index.
-        auto getMaskBaseType = [&](Index index) -> IRType*
-        {
-            if ((UInt)index < funcTypeUnionMask->getParamCount())
-            {
-                auto [ctxDir, ctxBase] =
-                    splitParameterDirectionAndType(funcTypeUnionMask->getParamType((UInt)index));
-                SLANG_UNUSED(ctxDir);
-                return ctxBase;
-            }
-            return nullptr;
-        };
 
         auto updateParamType = [&](Index index, IRInst* paramInfo) -> IRType*
         {

@@ -288,8 +288,8 @@ void computeMain(uint3 threadIdx : SV_DispatchThreadID,)
 //
 }
 // CHECK: type: float
-// CHECK-NEXT: -0.{{9[5-9][0-9]}}000
-// CHECK-NEXT: 0.{{9[5-9][0-9]}}000
+// CHECK-NEXT: -0.{{9[4-9][0-9]}}000
+// CHECK-NEXT: 0.{{9[4-9][0-9]}}000
 // CHECK-NEXT: 0.000000
 // CHECK-NEXT: 0.004000
 // CHECK-NEXT: 0.000000

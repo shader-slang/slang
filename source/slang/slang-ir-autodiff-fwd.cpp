@@ -805,33 +805,97 @@ struct ForwardDiffTranslationContext
         auto fwdDiffCallee =
             context->tryGetAssociationOfKind(primalCallee, AnnotationKind::ForwardDerivative);
 
-        // Pull up `primal : IForwardDifferentiable`
-        if (auto fwdDiffTable = context->tryGetAssociationOfKind(
-                primalCallee,
-                AnnotationKind::ForwardDerivativeWitnessTable))
+        // The FwdDiffForwardDerivativeWitnessTable annotation stores
+        // `fwd_diff : IForwardDifferentiable<fwd_diff>` directly.
+        //
+        auto fwdDiffFwdTable = context->tryGetAssociationOfKind(
+            primalCallee,
+            AnnotationKind::FwdDiffForwardDerivativeWitnessTable);
+
+        // The FwdDiffBackwardDerivativeWitnessTable annotation stores
+        // `fwd_diff : IBackwardDifferentiable<fwd_diff>` directly.
+        //
+        auto fwdDiffBwdTable = context->tryGetAssociationOfKind(
+            primalCallee,
+            AnnotationKind::FwdDiffBackwardDerivativeWitnessTable);
+
+        if (fwdDiffFwdTable)
         {
             IRInterfaceType* fwdDiffInterfaceType = cast<IRInterfaceType>(
                 getGenericReturnVal(context->sharedContext->forwardDifferentiableInterfaceType));
 
+            // Key for `fwd_diff.fwd_diff`
+            auto fwdDiffReqKey =
+                cast<IRInterfaceRequirementEntry>(fwdDiffInterfaceType->getOperand(0))
+                    ->getRequirementKey();
+            // Key for `fwd_diff.fwd_diff : IForwardDifferentiable`
+            auto fwdDiffTableReqKey =
+                cast<IRInterfaceRequirementEntry>(fwdDiffInterfaceType->getOperand(1))
+                    ->getRequirementKey();
+            // Key for `fwd_diff.fwd_diff : IBackwardDifferentiable`
+            auto bwdDiffTableReqKey =
+                cast<IRInterfaceRequirementEntry>(fwdDiffInterfaceType->getOperand(2))
+                    ->getRequirementKey();
+
+            // Lookup `fwd_diff.fwd_diff` from fwd_diff : IForwardDifferentiable
+            IRInst* operand = fwdDiffCallee->getFullType();
+            auto higherOrderFwdDiffFunc = _lookupWitness(
+                builder,
+                fwdDiffFwdTable,
+                fwdDiffReqKey,
+                (IRType*)builder->emitIntrinsicInst(
+                    builder->getTypeKind(),
+                    kIROp_ForwardDiffFuncType,
+                    1,
+                    &operand));
+
+            builder->addAnnotation(
+                fwdDiffCallee,
+                AnnotationKind::ForwardDerivative,
+                higherOrderFwdDiffFunc);
+
+            // Lookup `fwd_diff.fwd_diff : IForwardDifferentiable`
+            IRInst* higherOrderFwdTableArgs[] = {higherOrderFwdDiffFunc, builder->getVoidValue()};
+            auto higherOrderFwdDiffFwdTable = _lookupWitness(
+                builder,
+                fwdDiffFwdTable,
+                fwdDiffTableReqKey,
+                builder->getWitnessTableType((IRType*)builder->emitSpecializeInst(
+                    builder->getTypeKind(),
+                    context->sharedContext->forwardDifferentiableInterfaceType,
+                    2,
+                    higherOrderFwdTableArgs)));
+
+            builder->addAnnotation(
+                fwdDiffCallee,
+                AnnotationKind::FwdDiffForwardDerivativeWitnessTable,
+                higherOrderFwdDiffFwdTable);
+
+            // Lookup `fwd_diff.fwd_diff : IBackwardDifferentiable`
+            IRInst* higherOrderBwdTableArgs[] = {higherOrderFwdDiffFunc, builder->getVoidValue()};
+            auto higherOrderFwdDiffBwdTable = _lookupWitness(
+                builder,
+                fwdDiffFwdTable,
+                bwdDiffTableReqKey,
+                builder->getWitnessTableType((IRType*)builder->emitSpecializeInst(
+                    builder->getTypeKind(),
+                    context->sharedContext->backwardDifferentiableInterfaceType,
+                    2,
+                    higherOrderBwdTableArgs)));
+
+            builder->addAnnotation(
+                fwdDiffCallee,
+                AnnotationKind::FwdDiffBackwardDerivativeWitnessTable,
+                higherOrderFwdDiffBwdTable);
+        }
+
+        if (fwdDiffBwdTable)
+        {
             IRInterfaceType* bwdDiffInterfaceType = cast<IRInterfaceType>(
                 getGenericReturnVal(context->sharedContext->backwardDifferentiableInterfaceType));
 
             IRInterfaceType* bwdCallableInterfaceType = cast<IRInterfaceType>(
                 getGenericReturnVal(context->sharedContext->backwardCallableInterfaceType));
-
-            // Key for `primal.fwd_diff`
-            auto fwdDiffReqKey =
-                cast<IRInterfaceRequirementEntry>(fwdDiffInterfaceType->getOperand(0))
-                    ->getRequirementKey();
-            // Key for `primal.fwd_diff : IForwardDifferentiable`
-            auto fwdDiffTableReqKey =
-                cast<IRInterfaceRequirementEntry>(fwdDiffInterfaceType->getOperand(1))
-                    ->getRequirementKey();
-
-            // Key for `primal.fwd_diff : IBackwardDifferentiable`
-            auto bwdDiffTableReqKey =
-                cast<IRInterfaceRequirementEntry>(fwdDiffInterfaceType->getOperand(2))
-                    ->getRequirementKey();
 
             // Key for contextType in IBackwardDifferentiable table
             auto bwdDiffContextTypeReqKey =
@@ -863,62 +927,10 @@ struct ForwardDiffTranslationContext
                 cast<IRInterfaceRequirementEntry>(bwdCallableInterfaceType->getOperand(0))
                     ->getRequirementKey();
 
-            // Lookup primal.fwd_diff : IForwardDifferentiable
-            IRInst* higherOrderFwdDiffTableArgs[] = {fwdDiffCallee, builder->getVoidValue()};
-            auto higherOrderFwdDiffTable = _lookupWitness(
-                builder,
-                fwdDiffTable,
-                fwdDiffTableReqKey,
-                builder->getWitnessTableType((IRType*)builder->emitSpecializeInst(
-                    builder->getTypeKind(),
-                    context->sharedContext->forwardDifferentiableInterfaceType,
-                    2,
-                    higherOrderFwdDiffTableArgs)));
-
-            // Lookup `primal.fwd_diff.fwd_diff`
-            IRInst* operand = fwdDiffCallee->getFullType();
-            auto higherOrderFwdDiffFunc = _lookupWitness(
-                builder,
-                higherOrderFwdDiffTable,
-                fwdDiffReqKey,
-                (IRType*)builder->emitIntrinsicInst(
-                    builder->getTypeKind(),
-                    kIROp_ForwardDiffFuncType,
-                    1,
-                    &operand));
-
-            builder->addAnnotation(
-                fwdDiffCallee,
-                AnnotationKind::ForwardDerivative,
-                higherOrderFwdDiffFunc);
-
-            builder->addAnnotation(
-                fwdDiffCallee,
-                AnnotationKind::ForwardDerivativeWitnessTable,
-                higherOrderFwdDiffTable);
-
-            // Lookup `primal.fwd_diff : IBackwardDifferentiable`
-            IRInst* higherOrderBwdDiffTableArgs[] = {fwdDiffCallee, builder->getVoidValue()};
-            auto higherOrderBwdDiffTable = _lookupWitness(
-                builder,
-                fwdDiffTable,
-                bwdDiffTableReqKey,
-                builder->getWitnessTableType((IRType*)builder->emitSpecializeInst(
-                    builder->getTypeKind(),
-                    context->sharedContext->backwardDifferentiableInterfaceType,
-                    2,
-                    higherOrderBwdDiffTableArgs)));
-
-            builder->addAnnotation(
-                fwdDiffCallee,
-                AnnotationKind::BackwardDerivativeWitnessTable,
-                higherOrderBwdDiffTable);
-
-
             // Lookup contextType in IBackwardDifferentiable table
             auto higherOrderContextType = _lookupWitness(
                 builder,
-                higherOrderBwdDiffTable,
+                fwdDiffBwdTable,
                 bwdDiffContextTypeReqKey,
                 (IRType*)builder->getTypeKind());
 
@@ -930,7 +942,7 @@ struct ForwardDiffTranslationContext
             // Lookup minimalContextType in IBackwardDifferentiable table
             auto higherOrderMinimalContextType = _lookupWitness(
                 builder,
-                higherOrderBwdDiffTable,
+                fwdDiffBwdTable,
                 bwdDiffMinimalContextTypeReqKey,
                 (IRType*)builder->getTypeKind());
 
@@ -946,7 +958,7 @@ struct ForwardDiffTranslationContext
                 higherOrderMinimalContextType};
             auto higherOrderBwdDiffFunc = _lookupWitness(
                 builder,
-                higherOrderBwdDiffTable,
+                fwdDiffBwdTable,
                 bwdDiffApplyReqKey,
                 (IRType*)builder->emitIntrinsicInst(
                     builder->getTypeKind(),
@@ -966,7 +978,7 @@ struct ForwardDiffTranslationContext
                 higherOrderContextType};
             auto higherOrderBwdRematFunc = _lookupWitness(
                 builder,
-                higherOrderBwdDiffTable,
+                fwdDiffBwdTable,
                 bwdDiffRematReqKey,
                 (IRType*)builder->emitIntrinsicInst(
                     builder->getTypeKind(),
@@ -986,7 +998,7 @@ struct ForwardDiffTranslationContext
                 builder->getVoidValue()};
             auto higherOrderContextCallableTable = _lookupWitness(
                 builder,
-                higherOrderBwdDiffTable,
+                fwdDiffBwdTable,
                 bwdDiffContextTypeCallableConformanceReqKey,
                 builder->getWitnessTableType((IRType*)builder->emitSpecializeInst(
                     builder->getTypeKind(),
@@ -3479,6 +3491,14 @@ IRInst* maybeTranslateForwardDerivativeWitness(
         higherOrderFwdDiffBwdWitness);
 
     builder.addAnnotation(fwdDiffFunc, AnnotationKind::ForwardDerivative, higherOrderfwdDiffFn);
+    builder.addAnnotation(
+        fwdDiffFunc,
+        AnnotationKind::FwdDiffForwardDerivativeWitnessTable,
+        higherOrderFwdDiffFwdWitness);
+    builder.addAnnotation(
+        fwdDiffFunc,
+        AnnotationKind::FwdDiffBackwardDerivativeWitnessTable,
+        higherOrderFwdDiffBwdWitness);
     return newWitnessTable;
 }
 
@@ -3529,7 +3549,7 @@ IRInst* maybeTranslateBackwardDerivativeWitness(
     {
         auto callableConformanceBaseType = cast<IRInterfaceType>(
             getGenericReturnVal(sharedContext->backwardCallableInterfaceType));
-        SLANG_ASSERT(callableConformanceBaseType->getRequirementCount() == 2);
+        SLANG_ASSERT(callableConformanceBaseType->getRequirementCount() == 1);
 
         auto callableConformanceType = builder.emitSpecializeInst(
             builder.getTypeKind(),

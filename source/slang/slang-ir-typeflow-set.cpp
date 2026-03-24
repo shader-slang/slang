@@ -7,6 +7,68 @@
 namespace Slang
 {
 
+template<typename F>
+IRInst* openOptional(IRModule* module, IRInst* arg, F innerFunc)
+{
+    auto argOptionalType = as<IROptionalType>(arg->getDataType());
+    SLANG_ASSERT(argOptionalType);
+
+    // Create a helper function that performs the reinterpretation
+    IRBuilder builder(module);
+
+    auto func = builder.createFunc();
+    builder.addNameHintDecoration(func, UnownedStringSlice("openOptional"));
+
+    builder.setInsertInto(func);
+
+    // Entry block
+    auto entryBlock = builder.emitBlock();
+    auto param = builder.emitParam(argOptionalType);
+
+    // Check if the source optional has a value
+    auto hasValue = builder.emitOptionalHasValue(param);
+
+    // Create the if-else control flow blocks
+    auto trueBlock = builder.emitBlock();
+    auto falseBlock = builder.emitBlock();
+    auto unreachableBlock = builder.emitBlock();
+
+    // Go back to entry block to emit the branch
+    builder.setInsertInto(entryBlock);
+    builder.emitIfElse(hasValue, trueBlock, falseBlock, unreachableBlock);
+
+    // True branch: extract, apply F, and wrap
+    builder.setInsertInto(trueBlock);
+    auto extractedValue = builder.emitGetOptionalValue(param);
+
+    // Call the template function F.
+    IRInst* resultInst = innerFunc(&builder, extractedValue);
+
+    auto destOptionalType = builder.getOptionalType(resultInst->getDataType());
+
+    IRType* funcParamTypes[] = {argOptionalType};
+    auto funcType = builder.getFuncType(1, funcParamTypes, destOptionalType);
+    func->setFullType(funcType);
+
+    auto wrappedValue = builder.emitMakeOptionalValue(destOptionalType, resultInst);
+    builder.emitReturn(wrappedValue);
+
+    // False branch: create none and return
+    builder.setInsertInto(falseBlock);
+    auto noneValue = builder.emitMakeOptionalNone(destOptionalType);
+    builder.emitReturn(noneValue);
+
+    // Unreachable block (both branches return, so this is never reached)
+    builder.setInsertInto(unreachableBlock);
+    builder.emitUnreachable();
+
+    // Replace the ReinterpretOptional instruction with a call to the helper function
+    builder.setInsertAfter(arg);
+    auto callResult = builder.emitCallInst(destOptionalType, func, 1, &arg);
+
+    return callResult;
+}
+
 // Upcast the value in 'arg' to match the destInfo type. This method inserts
 // any necessary reinterprets or tag translation instructions.
 //
@@ -204,8 +266,11 @@ IRInst* upcastSet(IRBuilder* builder, IRInst* arg, IRType* destInfo)
             // We emit a ReinterpretOptional instruction that will be lowered
             // later in lowerReinterpret to an if-else block with proper control flow.
             //
-            return builder
-                ->emitIntrinsicInst((IRType*)destOptionalType, kIROp_ReinterpretOptional, 1, &arg);
+            return openOptional(
+                builder->getModule(),
+                arg,
+                [destValueType](IRBuilder* b, IRInst* extractedValue)
+                { return (IRInst*)upcastSet(b, extractedValue, destValueType); });
         }
     }
     else if (as<IROptionalNoneType>(argInfo) && as<IROptionalType>(destInfo))

@@ -3246,6 +3246,9 @@ public:
     DeclaredSubtypeWitness* getThisTypeWitness(
         ASTBuilder* astBuilder,
         DeclRef<InterfaceDecl> interfaceDeclRef);
+
+    bool doesCalleeHaveFwdDiff(DeclRef<CallableDecl> declRef);
+    bool doesCalleeHaveBwdDiff(DeclRef<CallableDecl> declRef);
 };
 
 

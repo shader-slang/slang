@@ -157,8 +157,8 @@ enum class AnnotationKind
 
     // Annotations for differentiable functions/callables.
     ForwardDerivative = 1,
-    ForwardDerivativeWitnessTable = 2,
-    BackwardDerivativeWitnessTable = 3,
+    FwdDiffForwardDerivativeWitnessTable = 2,
+    FwdDiffBackwardDerivativeWitnessTable = 3,
 
     BackwardDerivativeApply = 4,
     BackwardDerivativeContextRemat = 5,

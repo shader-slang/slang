@@ -72,13 +72,40 @@ SubtypeWitness* SemanticsVisitor::getDiffTypeInfoWitness(DeclRef<FunctionDeclBas
 
     auto astBuilder = getCurrentASTBuilder();
 
+    FuncType* funcType = nullptr;
     if (auto fwdDiffFuncType = as<FwdDiffFuncType>(callableDeclRef.getDecl()->funcType.type))
     {
-        auto diffTypeWitness = as<GenericAppDeclRef>(fwdDiffFuncType->getDeclRefBase())->getArg(1);
-        return astBuilder->getOrCreate<HigherOrderDiffTypeTranslationWitness>(diffTypeWitness);
+        auto substFuncType = substituteType(
+                                 SubstitutionSet(callableDeclRef),
+                                 getCurrentASTBuilder(),
+                                 fwdDiffFuncType)
+                                 ->resolve();
+        if (as<FwdDiffFuncType>(substFuncType))
+        {
+            auto diffTypeWitness =
+                as<GenericAppDeclRef>(fwdDiffFuncType->getDeclRefBase())->getArg(1);
+            return astBuilder->getOrCreate<HigherOrderDiffTypeTranslationWitness>(diffTypeWitness);
+        }
+        else if (as<FuncType>(substFuncType))
+        {
+            funcType = as<FuncType>(substFuncType);
+        }
+        else
+        {
+            SLANG_UNEXPECTED("expected FuncType or FwdDiffFuncType after substitution");
+        }
+    }
+    else
+    {
+        funcType = as<FuncType>(getFuncType(astBuilder, callableDeclRef));
     }
 
-    auto funcType = as<FuncType>(getFuncType(astBuilder, callableDeclRef));
+    if (!funcType)
+    {
+        SLANG_UNEXPECTED("expected FuncType or FwdDiffFuncType");
+        return nullptr;
+    }
+
     auto getDiffWitness = [&](Type* type) -> SubtypeWitness*
     {
         auto witness = tryGetSubtypeWitness(type, astBuilder->getDifferentiableInterfaceType());
@@ -189,6 +216,18 @@ SubtypeWitness* SemanticsVisitor::checkAndConstructSubtypeWitness(
     {
         return getDiffTypeInfoWitness(
             as<DeclRefType>(subType)->getDeclRef().as<FunctionDeclBase>());
+    }
+
+    if (isDeclRefTypeOf<FuncAliasDecl>(subType) && as<DiffTypeInfoInterfaceType>(superType))
+    {
+        auto funcAliasDeclRef = as<DeclRefType>(subType)->getDeclRef().as<FuncAliasDecl>();
+        auto targetDeclRef = substituteDeclRef(
+                                 SubstitutionSet(funcAliasDeclRef),
+                                 getCurrentASTBuilder(),
+                                 funcAliasDeclRef.getDecl()->targetDeclRef)
+                                 .as<FunctionDeclBase>();
+        if (targetDeclRef)
+            return getDiffTypeInfoWitness(targetDeclRef);
     }
 
     // First, make sure both sub type and super type decl are ready for lookup.

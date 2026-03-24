@@ -320,6 +320,7 @@ struct BackwardDiffTranslationContext
         initializeLocalVariables(builder->getModule(), applyFunc);
         initializeLocalVariables(builder->getModule(), propagateFunc);
         // initializeLocalVariables(builder->getModule(), rematFuncResult);
+        initializeOutParameters(builder->getModule(), rematFuncResult);
 
         // Clean up block labels & other temp decorations.
         stripTempDecorations(propagateFunc);
