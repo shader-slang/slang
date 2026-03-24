@@ -2107,8 +2107,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                             {
                                 // Propagate from a NonUniform base through field access.
                                 auto base = inst->getOperand(0);
-                                if (hasNonUniformDecoration(base) &&
-                                    !hasNonUniformDecoration(inst))
+                                if (hasNonUniformDecoration(base) && !hasNonUniformDecoration(inst))
                                     changed |= addNonUniformDecoration(inst);
                             }
                             break;
@@ -2118,8 +2117,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
                                 // value -- this is the key propagation that ensures the
                                 // actual resource operand gets decorated.
                                 auto ptr = inst->getOperand(0);
-                                if (hasNonUniformDecoration(ptr) &&
-                                    !hasNonUniformDecoration(inst))
+                                if (hasNonUniformDecoration(ptr) && !hasNonUniformDecoration(inst))
                                     changed |= addNonUniformDecoration(inst);
                             }
                             break;

@@ -111,10 +111,8 @@ void processNonUniformResourceIndex(
                             samp = inst->getOperand(0);
                         else
                             break;
-                        newUser = builder.emitMakeCombinedTextureSampler(
-                            user->getFullType(),
-                            tex,
-                            samp);
+                        newUser =
+                            builder.emitMakeCombinedTextureSampler(user->getFullType(), tex, samp);
                     }
                     break;
                 case kIROp_Swizzle:

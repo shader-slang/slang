@@ -10601,8 +10601,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                             {
                                 auto irVal = operand->getValue();
                                 if (irVal &&
-                                    irVal->findDecoration<
-                                        IRSPIRVNonUniformResourceDecoration>())
+                                    irVal->findDecoration<IRSPIRVNonUniformResourceDecoration>())
                                     hasNonUniformOperand = true;
                             }
                         }
@@ -10684,11 +10683,9 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 if (access == SLANG_RESOURCE_ACCESS_READ_WRITE ||
                     access == SLANG_RESOURCE_ACCESS_WRITE ||
                     access == SLANG_RESOURCE_ACCESS_RASTER_ORDERED)
-                    requireSPIRVCapability(
-                        SpvCapabilityStorageTexelBufferArrayNonUniformIndexing);
+                    requireSPIRVCapability(SpvCapabilityStorageTexelBufferArrayNonUniformIndexing);
                 else
-                    requireSPIRVCapability(
-                        SpvCapabilityUniformTexelBufferArrayNonUniformIndexing);
+                    requireSPIRVCapability(SpvCapabilityUniformTexelBufferArrayNonUniformIndexing);
             }
             else
             {
