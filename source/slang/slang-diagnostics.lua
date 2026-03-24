@@ -4182,7 +4182,7 @@ warning(
 
 err(
     "cannot-default-initialize-resource",
-    41027,
+    41032,
     "cannot default-initialize resource type",
     span { loc = "location", message = "cannot default-initialize ~resourceName with '{}'. Resource types must be explicitly initialized" }
 )
