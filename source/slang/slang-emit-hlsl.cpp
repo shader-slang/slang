@@ -1038,7 +1038,7 @@ bool HLSLSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOu
                 helperIdx = 4;
                 break;
             default:
-                break;
+                SLANG_UNEXPECTED("Unhandled CoopMat arithmetic op.");
             }
             m_writer->emit(kHelperNames[helperIdx]);
             m_writer->emit("(");

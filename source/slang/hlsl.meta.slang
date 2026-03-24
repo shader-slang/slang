@@ -27595,38 +27595,6 @@ struct CoopMat
         }
     }
 
-    [require(sm_6_10)]
-    [__NoSideEffect]
-    internal static This __hlslLoadBAB<let matrixLayout : CoopMatMatrixLayout>(
-        ByteAddressBuffer buffer, uint byteOffset, uint byteStride)
-    {
-        if (matrixLayout == CoopMatMatrixLayout.RowMajor)
-            __intrinsic_asm "$TR::Load($0, $1, $2, dx::linalg::MatrixLayout::RowMajor)";
-        else
-            __intrinsic_asm "$TR::Load($0, $1, $2, dx::linalg::MatrixLayout::ColMajor)";
-    }
-
-    [require(sm_6_10)]
-    [__NoSideEffect]
-    internal static This __hlslLoadRWBAB<let matrixLayout : CoopMatMatrixLayout>(
-        RWByteAddressBuffer buffer, uint byteOffset, uint byteStride)
-    {
-        if (matrixLayout == CoopMatMatrixLayout.RowMajor)
-            __intrinsic_asm "$TR::Load($0, $1, $2, dx::linalg::MatrixLayout::RowMajor)";
-        else
-            __intrinsic_asm "$TR::Load($0, $1, $2, dx::linalg::MatrixLayout::ColMajor)";
-    }
-
-    [require(sm_6_10)]
-    internal void __hlslStoreBAB<let matrixLayout : CoopMatMatrixLayout>(
-        RWByteAddressBuffer buffer, uint byteOffset, uint byteStride)
-    {
-        if (matrixLayout == CoopMatMatrixLayout.RowMajor)
-            __intrinsic_asm "$0.Store($1, $2, $3, dx::linalg::MatrixLayout::RowMajor)";
-        else
-            __intrinsic_asm "$0.Store($1, $2, $3, dx::linalg::MatrixLayout::ColMajor)";
-    }
-
     /// Copies the contents from another cooperative matrix into this matrix.
     /// @param U The element type of the source cooperative matrix.
     /// @param other The source cooperative matrix to copy from.
@@ -27912,12 +27880,14 @@ struct CoopMat
         __target_switch
         {
         case hlsl:
-            __hlslStoreBAB<matrixLayout>(
-                buffer,
-                element * __naturalStrideOf<T>(),
-                stride * __naturalStrideOf<T>());
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "$0.Store($1, $2, $3, dx::linalg::MatrixLayout::RowMajor)";
+            else
+                __intrinsic_asm "$0.Store($1, $2, $3, dx::linalg::MatrixLayout::ColMajor)";
+            return;
         default:
             __store<matrixLayout>(__getEquivalentStructuredBuffer<T>(buffer), element, stride);
+            return;
         }
     }
 
@@ -27958,6 +27928,7 @@ struct CoopMat
                 __intrinsic_asm "$0.Store<Slang_CUDA_WMMA::ColMajor>($1, $2, $3)";
         }
     }
+
 
     /// Stores the cooperative matrix into a pointer buffer.
     /// @param matrixLayout The memory layout (RowMajor or ColMajor) to use when storing.
@@ -28167,10 +28138,10 @@ $}
         __target_switch
         {
         case hlsl:
-            return __hlslLoad$(RW)BAB<matrixLayout>(
-                buffer,
-                element * __naturalStrideOf<T>(),
-                stride * __naturalStrideOf<T>());
+            if (matrixLayout == CoopMatMatrixLayout.RowMajor)
+                __intrinsic_asm "$TR::Load($0, $1, $2, dx::linalg::MatrixLayout::RowMajor)";
+            else
+                __intrinsic_asm "$TR::Load($0, $1, $2, dx::linalg::MatrixLayout::ColMajor)";
         default:
             return Load<matrixLayout>(__getEquivalentStructuredBuffer<T>(buffer), element, stride);
         }
