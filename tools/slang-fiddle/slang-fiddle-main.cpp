@@ -407,6 +407,11 @@ int main(int argc, char const* const* argv)
     using namespace fiddle;
     using namespace Slang;
 
+#if SLANG_IGNORE_ABORT_MSG && defined(_MSC_VER)
+    // Suppress the modal abort() dialog in unattended/LLM-driven builds.
+    _set_abort_behavior(0, _WRITE_ABORT_MSG);
+#endif
+
     ComPtr<ISlangWriter> writer(
         new FileWriter(stderr, WriterFlag::IsUnowned | WriterFlag::AutoFlush));
 

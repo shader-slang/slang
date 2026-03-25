@@ -131,7 +131,7 @@ for i in $(seq 1 "$ITERATIONS"); do
   echo "  Running tests ($CONFIG) inside container..."
   START_TIME="$(date +%s)"
 
-  CONTAINER_IMAGE="ghcr.io/shader-slang/slang-linux-gpu-ci:v1.5.0"
+  CONTAINER_IMAGE="ghcr.io/shader-slang/slang-linux-gpu-ci:v1.5.1"
 
   # Pre-authenticate docker on the VM for GHCR access
   if [ -n "$GHCR_TOKEN" ]; then
@@ -192,7 +192,6 @@ docker run --rm \
             -expected-failure-list tests/expected-failure-linux-gpu.txt \
             -skip-reference-image-generation \
             -show-adapter-info \
-            -ignore-abort-msg \
             -use-test-server \
             -server-count 4 \
             2>&1

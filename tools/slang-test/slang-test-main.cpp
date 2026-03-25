@@ -1552,7 +1552,7 @@ static SlangResult _extractTestRequirements(const CommandLine& cmdLine, TestRequ
     {
         return _extractSlangCTestRequirements(cmdLine, ioInfo);
     }
-    else if (exeName == "slangi")
+    else if (exeName == "slangi" || exeName == "slang")
     {
         return SLANG_OK;
     }
@@ -1927,6 +1927,12 @@ String findExpectedPath(const TestInput& input, const char* postFix)
 static SlangResult _initSlangInterpreter(TestContext* context, CommandLine& ioCmdLine)
 {
     ioCmdLine.setExecutableLocation(ExecutableLocation(context->options.binDir, "slangi"));
+    return SLANG_OK;
+}
+
+static SlangResult _initSlangDispatcher(TestContext* context, CommandLine& ioCmdLine)
+{
+    ioCmdLine.setExecutableLocation(ExecutableLocation(context->options.binDir, "slang"));
     return SLANG_OK;
 }
 
@@ -2815,6 +2821,41 @@ TestResult runInterpreterTest(TestContext* context, TestInput& input)
 
     ExecuteResult exeRes;
     TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));
+
+    if (context->isCollectingRequirements())
+    {
+        return TestResult::Pass;
+    }
+
+    String actualOutput = getOutput(exeRes);
+
+    return _validateOutput(
+        context,
+        input,
+        actualOutput,
+        false,
+        "result code = 0\nstandard error = {\n}\nstandard output = {\n}\n",
+        [&input](auto e, auto a) { return _areResultsEqual(input.testOptions->type, e, a); });
+}
+
+TestResult runDispatcherTest(TestContext* context, TestInput& input)
+{
+    auto outputStem = input.outputStem;
+
+    CommandLine cmdLine;
+
+    for (auto arg : input.testOptions->args)
+    {
+        cmdLine.addArg(arg);
+    }
+
+    if (SLANG_FAILED(_initSlangDispatcher(context, cmdLine)))
+    {
+        return TestResult::Ignored;
+    }
+
+    ExecuteResult exeRes;
+    TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, SpawnType::UseExe, cmdLine, exeRes));
 
     if (context->isCollectingRequirements())
     {
@@ -3838,11 +3879,6 @@ static void _addRenderTestOptions(const Options& options, CommandLine& ioCmdLine
         ioCmdLine.addArg("-enable-debug-layers");
     }
 
-    if (options.ignoreAbortMsg)
-    {
-        ioCmdLine.addArg("-ignore-abort-msg");
-    }
-
     if (options.cacheRhiDevice)
     {
         ioCmdLine.addArg("-cache-rhi-device");
@@ -4489,6 +4525,7 @@ static const TestCommandInfo s_testCommandInfos[] = {
     {"SIMPLE_EX", &runSimpleTest, 0},
     {"SIMPLE_LINE", &runSimpleLineTest, 0},
     {"INTERPRET", &runInterpreterTest, 0},
+    {"DISPATCHER", &runDispatcherTest, 0},
     {"REFLECTION", &runReflectionTest, 0},
     {"CPU_REFLECTION", &runReflectionTest, 0},
     {"COMMAND_LINE_SIMPLE", &runSimpleCompareCommandLineTest, 0},
@@ -6080,6 +6117,11 @@ int main(int argc, char** argv)
     // Ignore SIGPIPE so that writing to a broken pipe (e.g. a crashed test-server)
     // returns EPIPE instead of killing this process (exit code 141).
     signal(SIGPIPE, SIG_IGN);
+#endif
+
+#if SLANG_IGNORE_ABORT_MSG && defined(_MSC_VER)
+    // Suppress the modal abort() dialog in unattended/LLM-driven builds.
+    _set_abort_behavior(0, _WRITE_ABORT_MSG);
 #endif
 
     // Fallback: run without cleanup if context initialization fails
