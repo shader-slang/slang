@@ -12,7 +12,7 @@
 //TEST:SIMPLE(filecheck=CHECK): -target cuda -experimental-feature
 
 // CHECK: __global__ void backward
-// CHECK: s_bwd_run
+// CHECK: s_apply_run
 
 import slang.neural;
 
