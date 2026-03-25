@@ -443,208 +443,7 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
 
     outBaseCost = kConversionCost_None;
 
-    // Once have built up the initial list of constraints we are trying to satisfy,
-    // we will attempt to solve for each parameter in a way that satisfies all
-    // the constraints that apply to that parameter.
-    //
-    // Note: this is a very limited kind of solver, in that it doesn't have a
-    // way to make use of constraints between two or more parameters.
-    //
-    // As we go, we will build up a list of argument values for a possible
-    // solution for how to assign the parameters in a way that satisfies all
-    // the constraints.
-    //
-    ShortList<Val*> args;
-
-    // If the context is such that some of the arguments are already specified
-    // or known, we need to go ahead and use those arguments direclty (whether
-    // or not they are compatible with the constraints).
-    //
-    Count knownGenericArgCount = 0;
-    if (knownGenericArgs.getCount())
-    {
-        knownGenericArgCount = knownGenericArgs.getCount();
-        for (auto arg : knownGenericArgs)
-        {
-            args.add(arg);
-        }
-    }
-
-    // The state of currently solved arguments.
-    struct SolvedArg
-    {
-        Val* val = nullptr;
-        bool isOptional = true;
-        bool onlyConstrainedByGenericDecl = true;
-        ShortList<QualType, 8> types;
-    };
-    ShortList<SolvedArg> solvedArgs;
-
-    Index constraintIndex = 0;
-    auto solveConstraints = [&](bool fromGenericDecl)
-    {
-        // We will then iterate over the constraints trying to solve all generic parameters.
-        // Note that we do not use ranged for here, because processing one constraint may lead to
-        // new constraints being discovered.
-        for (; constraintIndex < system->constraints.getCount(); constraintIndex++)
-        {
-            // Note: it is important to keep a copy of the constraint here instead of
-            // using a reference, because the constraint list may be modified during the
-            // loop as we discover new constraints.
-            //
-            auto c = system->constraints[constraintIndex];
-            if (auto typeParam = as<GenericTypeParamDeclBase>(c.decl))
-            {
-                SLANG_ASSERT(typeParam->parameterIndex != -1);
-                // If the parameter is one where we already know
-                // the argument value to use, we don't bother with
-                // trying to solve for it, and treat any constraints
-                // on such a parameter as implicitly solved-for.
-                //
-                if (typeParam->parameterIndex < knownGenericArgCount)
-                {
-                    system->constraints[constraintIndex].satisfied = true;
-                    continue;
-                }
-
-                // If the parameter is a type pack, then we may have
-                // constraints that apply to invidual elements of the pack.
-                // We will need to handle the type pack case slightly differently.
-                //
-                bool isPack = as<GenericTypePackParamDecl>(typeParam) != nullptr;
-
-                // We will use a temporary list to hold the resolved types
-                // for this generic parameter.
-                // For normal type parameters, there should be only one type
-                // in the list. For type pack parameters, there can be one type
-                // for each element in the pack.
-                //
-                if (solvedArgs.getCount() <= typeParam->parameterIndex)
-                {
-                    solvedArgs.setCount(typeParam->parameterIndex + 1);
-                }
-                auto& types = solvedArgs[typeParam->parameterIndex].types;
-                if (!isPack)
-                    types.setCount(1);
-
-                bool& typeConstraintOptional = solvedArgs[typeParam->parameterIndex].isOptional;
-                bool& onlyConstrainedByGenericDecl =
-                    solvedArgs[typeParam->parameterIndex].onlyConstrainedByGenericDecl;
-
-                onlyConstrainedByGenericDecl = onlyConstrainedByGenericDecl && fromGenericDecl;
-
-                QualType* ptype = nullptr;
-                if (isPack)
-                {
-                    types.setCount(Math::Max(types.getCount(), c.indexInPack + 1));
-                    ptype = &types[c.indexInPack];
-                }
-                else
-                    ptype = &types[0];
-                QualType& type = *ptype;
-
-                auto cType = QualType(as<Type>(c.val), c.isUsedAsLValue);
-                SLANG_RELEASE_ASSERT(cType);
-
-                if (!type || (typeConstraintOptional && !c.isOptional))
-                {
-                    type = cType;
-                    typeConstraintOptional = c.isOptional;
-                }
-                else if (!typeConstraintOptional)
-                {
-                    // If the type parameter is already constrained to a known type,
-                    // we need to make sure our resolved type can satisfy both constraints.
-                    // We do so by updating the resolved type to be the "join" of the current
-                    // solution and the type in the new constraint. If such join cannot be found,
-                    // it means it is not possible to have a compatible solution that meets all
-                    // constraints and we should fail.
-                    //
-                    // Another detail here is that during type joining, we may discover
-                    // new constraints from the base types of the types being joined.
-                    // We will pass the constraint system to `TryJoinTypes` which can
-                    // add new constraints to the system, and we will process the new constraints
-                    // in the next iteration.
-                    //
-                    auto joinType = TryJoinTypes(system, type, cType);
-                    if (!joinType)
-                    {
-                        if (c.isOptional)
-                            joinType = type;
-                        else if (c.isEquality)
-                            joinType = type;
-                        else
-                            // failure!
-                            return false;
-                    }
-                    type = QualType(joinType, type.isLeftValue || cType.isLeftValue);
-                }
-
-                c.satisfied = true;
-            }
-            else if (auto valPackParam = as<GenericValuePackParamDecl>(c.decl))
-            {
-                SLANG_ASSERT(valPackParam->parameterIndex != -1);
-
-                if (valPackParam->parameterIndex < knownGenericArgCount)
-                {
-                    system->constraints[constraintIndex].satisfied = true;
-                    continue;
-                }
-
-                if (solvedArgs.getCount() <= valPackParam->parameterIndex)
-                    solvedArgs.setCount(valPackParam->parameterIndex + 1);
-                Val*& val = solvedArgs[valPackParam->parameterIndex].val;
-
-                auto cValPack = as<ConcreteIntValPack>(c.val);
-                if (cValPack)
-                {
-                    if (!val)
-                        val = cValPack;
-                }
-                c.satisfied = true;
-            }
-            else if (auto valParam = as<GenericValueParamDecl>(c.decl))
-            {
-                SLANG_ASSERT(valParam->parameterIndex != -1);
-
-                if (valParam->parameterIndex < knownGenericArgCount)
-                {
-                    system->constraints[constraintIndex].satisfied = true;
-                    continue;
-                }
-
-                if (solvedArgs.getCount() <= valParam->parameterIndex)
-                    solvedArgs.setCount(valParam->parameterIndex + 1);
-                Val*& val = solvedArgs[valParam->parameterIndex].val;
-                bool& valOptional = solvedArgs[valParam->parameterIndex].isOptional;
-
-                auto cVal = as<IntVal>(c.val);
-                SLANG_RELEASE_ASSERT(cVal);
-
-                if (!val || (valOptional && !c.isOptional))
-                {
-                    val = cVal;
-                    valOptional = c.isOptional;
-                }
-                else
-                {
-                    if (!valOptional && !val->equals(cVal))
-                    {
-                        // failure!
-                        return false;
-                    }
-                }
-
-                c.satisfied = true;
-            }
-            system->constraints[constraintIndex].satisfied = c.satisfied;
-        }
-        return true;
-    };
-
-    if (!solveConstraints(false))
-        return DeclRef<Decl>();
+    // For now the "solver" is going to be ridiculously simplistic.
 
     // The generic itself will have some constraints, and for now we add these
     // to the system of constrains we will use for solving for the type variables.
@@ -676,34 +475,41 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
             return DeclRef<Decl>();
     }
 
-    if (!solveConstraints(true))
-        return DeclRef<Decl>();
+    // Once have built up the initial list of constraints we are trying to satisfy,
+    // we will attempt to solve for each parameter in a way that satisfies all
+    // the constraints that apply to that parameter.
+    //
+    // Note: this is a very limited kind of solver, in that it doesn't have a
+    // way to make use of constraints between two or more parameters.
+    //
+    // As we go, we will build up a list of argument values for a possible
+    // solution for how to assign the parameters in a way that satisfies all
+    // the constraints.
+    //
+    ShortList<Val*> args;
 
-    // After we processed all constraints, `solvedTypes` and `solvedVals`
-    // should have been filled with the resolved types and values for the
-    // generic parameters. We can now verify if they are complete and consolidate
-    // them into final argument list.
+    // If the context is such that some of the arguments are already specified
+    // or known, we need to go ahead and use those arguments direclty (whether
+    // or not they are compatible with the constraints).
+    //
+    Count knownGenericArgCount = 0;
+    if (knownGenericArgs.getCount())
+    {
+        knownGenericArgCount = knownGenericArgs.getCount();
+        for (auto arg : knownGenericArgs)
+        {
+            args.add(arg);
+        }
+    }
+
+    // Add default values as optional constraints.
     for (auto member : genericDeclRef.getDecl()->getDirectMemberDecls())
     {
         if (auto typeParam = as<GenericTypeParamDecl>(member))
         {
             SLANG_ASSERT(typeParam->parameterIndex != -1);
 
-            if (typeParam->parameterIndex < knownGenericArgCount)
-                continue;
-
-            Type* type = nullptr;
-            bool defaultHasPriority = false;
-            if (typeParam->parameterIndex < solvedArgs.getCount())
-            {
-                auto& arg = solvedArgs[typeParam->parameterIndex];
-                defaultHasPriority = arg.onlyConstrainedByGenericDecl;
-                // Should only have one type because this isn't a pack.
-                if (arg.types.getCount() == 1)
-                    type = arg.types[0];
-            }
-
-            if (typeParam->initType && (!type || defaultHasPriority))
+            if (typeParam->initType && typeParam->parameterIndex >= knownGenericArgCount)
             {
                 // If we have a default arg for this parameter, we can try to
                 // use it.
@@ -713,50 +519,275 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
                 auto defaultType =
                     SubstitutionSet(genSubst).applyToType(m_astBuilder, typeParam->initType.type);
                 if (defaultType)
-                    type = defaultType;
+                {
+                    Constraint c;
+                    c.decl = member;
+                    c.val = defaultType;
+                    c.isOptional = true;
+                    c.isEquality = true;
+                    system->constraints.add(c);
+                }
             }
-
-            if (!type)
-                return DeclRef<Decl>();
-
-            args.add(type);
         }
-        else if (auto typePackParam = as<GenericTypePackParamDecl>(member))
+        else if (auto valParam = as<GenericValueParamDecl>(member))
         {
-            SLANG_ASSERT(typePackParam->parameterIndex != -1);
+            SLANG_ASSERT(valParam->parameterIndex != -1);
 
-            if (typePackParam->parameterIndex < knownGenericArgCount)
+            if (valParam->parameterIndex < knownGenericArgCount)
                 continue;
-            if (typePackParam->parameterIndex >= solvedArgs.getCount())
+
+            if (valParam->initExpr && valParam->parameterIndex >= knownGenericArgCount)
             {
-                // We should add an empty type list to solvedTypes.
-                solvedArgs.setCount(typePackParam->parameterIndex + 1);
+                ensureDecl(makeDeclRef(valParam), DeclCheckState::DefinitionChecked);
+                auto genSubst = m_astBuilder->getGenericAppDeclRef(
+                    genericDeclRef,
+                    args.getArrayView().arrayView);
+                ConstantFoldingCircularityInfo newCircularityInfo(makeDeclRef(valParam), nullptr);
+                auto defaultVal = tryConstantFoldExpr(
+                    applySubstitutionToExpr(SubstitutionSet(genSubst), valParam->initExpr),
+                    ConstantFoldingKind::CompileTime,
+                    &newCircularityInfo);
+
+                if (defaultVal)
+                {
+                    Constraint c;
+                    c.decl = member;
+                    c.val = defaultVal;
+                    c.isOptional = true;
+                    c.isEquality = true;
+                    system->constraints.add(c);
+                }
             }
-            auto& types = solvedArgs[typePackParam->parameterIndex].types;
+        }
+    }
+
+    // The state of currently solved arguments.
+    struct SolvedArg
+    {
+        Val* val = nullptr;
+        bool isOptional = true;
+        ShortList<QualType, 8> types;
+    };
+    ShortList<SolvedArg> solvedArgs;
+
+    // We will then iterate over the constraints trying to solve all generic parameters.
+    // Note that we do not use ranged for here, because processing one constraint may lead to
+    // new constraints being discovered.
+    for (Index constraintIndex = 0; constraintIndex < system->constraints.getCount();
+         constraintIndex++)
+    {
+        // Note: it is important to keep a copy of the constraint here instead of
+        // using a reference, because the constraint list may be modified during the
+        // loop as we discover new constraints.
+        //
+        auto c = system->constraints[constraintIndex];
+        if (auto typeParam = as<GenericTypeParamDeclBase>(c.decl))
+        {
+            SLANG_ASSERT(typeParam->parameterIndex != -1);
+            // If the parameter is one where we already know
+            // the argument value to use, we don't bother with
+            // trying to solve for it, and treat any constraints
+            // on such a parameter as implicitly solved-for.
+            //
+            if (typeParam->parameterIndex < knownGenericArgCount)
+            {
+                system->constraints[constraintIndex].satisfied = true;
+                continue;
+            }
+
+            // If the parameter is a type pack, then we may have
+            // constraints that apply to invidual elements of the pack.
+            // We will need to handle the type pack case slightly differently.
+            //
+            bool isPack = as<GenericTypePackParamDecl>(typeParam) != nullptr;
+
+            // We will use a temporary list to hold the resolved types
+            // for this generic parameter.
+            // For normal type parameters, there should be only one type
+            // in the list. For type pack parameters, there can be one type
+            // for each element in the pack.
+            //
+            if (solvedArgs.getCount() <= typeParam->parameterIndex)
+            {
+                solvedArgs.setCount(typeParam->parameterIndex + 1);
+            }
+            auto& types = solvedArgs[typeParam->parameterIndex].types;
+            if (!isPack)
+                types.setCount(1);
+
+            bool& typeConstraintOptional = solvedArgs[typeParam->parameterIndex].isOptional;
+
+            QualType* ptype = nullptr;
+            if (isPack)
+            {
+                types.setCount(Math::Max(types.getCount(), c.indexInPack + 1));
+                ptype = &types[c.indexInPack];
+            }
+            else
+                ptype = &types[0];
+            QualType& type = *ptype;
+
+            auto cType = QualType(as<Type>(c.val), c.isUsedAsLValue);
+            SLANG_RELEASE_ASSERT(cType);
+
+            if (!type || (typeConstraintOptional && !c.isOptional))
+            {
+                type = cType;
+                typeConstraintOptional = c.isOptional;
+            }
+            else if (!typeConstraintOptional)
+            {
+                // If the type parameter is already constrained to a known type,
+                // we need to make sure our resolved type can satisfy both constraints.
+                // We do so by updating the resolved type to be the "join" of the current
+                // solution and the type in the new constraint. If such join cannot be found,
+                // it means it is not possible to have a compatible solution that meets all
+                // constraints and we should fail.
+                //
+                // Another detail here is that during type joining, we may discover
+                // new constraints from the base types of the types being joined.
+                // We will pass the constraint system to `TryJoinTypes` which can
+                // add new constraints to the system, and we will process the new constraints
+                // in the next iteration.
+                //
+                auto joinType = TryJoinTypes(system, type, cType);
+                if (!joinType)
+                {
+                    if (c.isOptional)
+                        joinType = type;
+                    else if (c.isEquality)
+                        joinType = type;
+                    else
+                        // failure!
+                        return DeclRef<Decl>();
+                }
+                type = QualType(joinType, type.isLeftValue || cType.isLeftValue);
+            }
+
+            c.satisfied = true;
+        }
+        else if (auto valPackParam = as<GenericValuePackParamDecl>(c.decl))
+        {
+            SLANG_ASSERT(valPackParam->parameterIndex != -1);
+
+            if (valPackParam->parameterIndex < knownGenericArgCount)
+            {
+                system->constraints[constraintIndex].satisfied = true;
+                continue;
+            }
+
+            if (solvedArgs.getCount() <= valPackParam->parameterIndex)
+                solvedArgs.setCount(valPackParam->parameterIndex + 1);
+            Val*& val = solvedArgs[valPackParam->parameterIndex].val;
+
+            auto cValPack = as<ConcreteIntValPack>(c.val);
+            if (cValPack)
+            {
+                if (!val)
+                    val = cValPack;
+            }
+            c.satisfied = true;
+        }
+        else if (auto valParam = as<GenericValueParamDecl>(c.decl))
+        {
+            SLANG_ASSERT(valParam->parameterIndex != -1);
+
+            if (valParam->parameterIndex < knownGenericArgCount)
+            {
+                system->constraints[constraintIndex].satisfied = true;
+                continue;
+            }
+
+            if (solvedArgs.getCount() <= valParam->parameterIndex)
+                solvedArgs.setCount(valParam->parameterIndex + 1);
+            Val*& val = solvedArgs[valParam->parameterIndex].val;
+            bool& valOptional = solvedArgs[valParam->parameterIndex].isOptional;
+
+            auto cVal = as<IntVal>(c.val);
+            SLANG_RELEASE_ASSERT(cVal);
+
+            if (!val || (valOptional && !c.isOptional))
+            {
+                // Either we didn't have a value or this is a hard constraint
+                // overriding an optional constraint, so we can replace the
+                // value.
+                val = cVal;
+                valOptional = c.isOptional;
+            }
+            else if (valOptional == c.isOptional && !val->equals(cVal))
+            {
+                // Two clashing constraints, where either both are not optional
+                // or both are optional, and they have different values. We
+                // have no way to join these, so this is a failure case.
+                return DeclRef<Decl>();
+            }
+
+            c.satisfied = true;
+        }
+        system->constraints[constraintIndex].satisfied = c.satisfied;
+    }
+
+    // After we processed all constraints, `solvedTypes` and `solvedVals`
+    // should have been filled with the resolved types and values for the
+    // generic parameters. We can now verify if they are complete and consolidate
+    // them into final argument list.
+    for (auto member : genericDeclRef.getDecl()->getDirectMemberDecls())
+    {
+        if (auto typeParam = as<GenericTypeParamDeclBase>(member))
+        {
+            SLANG_ASSERT(typeParam->parameterIndex != -1);
+
+            if (typeParam->parameterIndex < knownGenericArgCount)
+                continue;
+            bool isPack = as<GenericTypePackParamDecl>(typeParam) != nullptr;
+            if (typeParam->parameterIndex >= solvedArgs.getCount())
+            {
+                // If the parameter is not a type pack and we don't have a
+                // resolved type for it, we should fail.
+                if (!isPack)
+                    return DeclRef<Decl>();
+                // If the parameter is a type pack, we should add an empty
+                // type list to solvedTypes.
+                solvedArgs.setCount(typeParam->parameterIndex + 1);
+            }
+            auto& types = solvedArgs[typeParam->parameterIndex].types;
             // Fail if any of the resolved type element is empty.
             for (auto t : types)
             {
                 if (!t)
                     return DeclRef<Decl>();
             }
-            // If we are supplying one single pack argument, we can use it as is.
-            if (types.getCount() == 1 && isTypePack(types[0]))
+            if (!isPack)
             {
+                // If the generic parameter is not a pack, we can simply add the first type.
+                if (types.getCount() != 1)
+                    return DeclRef<Decl>();
+
                 args.add(types[0]);
             }
             else
             {
-                // If we are supplying 0 or multiple arguments for the pack, we need to create a
-                // type pack and add it to the argument list.
-                ShortList<Type*> typeList;
-                bool isLVal = true;
-                for (auto t : types)
+                // If the generic parameter is a pack, and we are supplying one single pack
+                // argument, we can use it as is.
+                if (types.getCount() == 1 && isTypePack(types[0]))
                 {
-                    typeList.add(t);
-                    isLVal = isLVal && t.isLeftValue;
+                    args.add(types[0]);
                 }
-                args.add(
-                    QualType(m_astBuilder->getTypePack(typeList.getArrayView().arrayView), isLVal));
+                else
+                {
+                    // If we are supplying 0 or multiple arguments for the pack, we need to create a
+                    // type pack and add it to the argument list.
+                    ShortList<Type*> typeList;
+                    bool isLVal = true;
+                    for (auto t : types)
+                    {
+                        typeList.add(t);
+                        isLVal = isLVal && t.isLeftValue;
+                    }
+                    args.add(QualType(
+                        m_astBuilder->getTypePack(typeList.getArrayView().arrayView),
+                        isLVal));
+                }
             }
         }
         else if (auto valPackParam = as<GenericValuePackParamDecl>(member))
@@ -790,26 +821,10 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
             if (valParam->parameterIndex < knownGenericArgCount)
                 continue;
 
-            Val* val = nullptr;
-            if (valParam->parameterIndex < solvedArgs.getCount())
-            {
-                auto arg = solvedArgs[valParam->parameterIndex];
-                val = arg.val;
-            }
+            if (valParam->parameterIndex >= solvedArgs.getCount())
+                return DeclRef<Decl>();
 
-            if (valParam->initExpr && !val)
-            {
-                ensureDecl(makeDeclRef(valParam), DeclCheckState::DefinitionChecked);
-                auto genSubst = m_astBuilder->getGenericAppDeclRef(
-                    genericDeclRef,
-                    args.getArrayView().arrayView);
-                ConstantFoldingCircularityInfo newCircularityInfo(makeDeclRef(valParam), nullptr);
-                val = tryConstantFoldExpr(
-                    applySubstitutionToExpr(SubstitutionSet(genSubst), valParam->initExpr),
-                    ConstantFoldingKind::CompileTime,
-                    &newCircularityInfo);
-            }
-
+            auto val = solvedArgs[valParam->parameterIndex].val;
             if (!val)
             {
                 // failure!
