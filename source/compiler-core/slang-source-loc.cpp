@@ -520,10 +520,14 @@ UnownedStringSlice SourceFile::getLineAtIndex(Index lineIndex)
     if (range.isValid() && hasContent())
     {
         const UnownedStringSlice content = getContent();
-        SLANG_ASSERT(range.end <= uint32_t(content.getLength()));
+        const uint32_t contentLen = uint32_t(content.getLength());
+        SLANG_ASSERT(range.end <= contentLen);
+
+        const uint32_t clampedStart = (range.start <= contentLen) ? range.start : contentLen;
+        const uint32_t clampedEnd = (range.end <= contentLen) ? range.end : contentLen;
 
         const char* const text = content.begin();
-        return UnownedStringSlice(text + range.start, text + range.end);
+        return UnownedStringSlice(text + clampedStart, text + clampedEnd);
     }
 
     return UnownedStringSlice();
@@ -590,7 +594,12 @@ int SourceFile::calcColumnIndex(int lineIndex, int offset, int tabSize)
 
     const auto line = getLineAtIndex(lineIndex);
 
-    const auto head = line.head(colOffset);
+    // Clamp colOffset to [0, line.getLength()] to prevent out-of-bounds access when
+    // the offset exceeds the line (e.g., due to stale source locations or size mismatches).
+    const int clampedColOffset =
+        (colOffset < 0) ? 0 : ((colOffset > line.getLength()) ? int(line.getLength()) : colOffset);
+
+    const auto head = line.head(clampedColOffset);
 
     auto colCount = UTF8Util::calcCodePointCount(head);
 
@@ -650,6 +659,11 @@ void SourceFile::setContents(ISlangBlob* blob)
     char const* decodedContentEnd = decodedContentBegin + decodedContentSize;
 
     m_content = UnownedStringSlice(decodedContentBegin, decodedContentEnd);
+
+    // Update m_contentSize to the decoded size so that getContentSize() always reflects the
+    // actual content length. For UTF-8 without BOM this is a no-op; for BOM or non-UTF-8 files,
+    // the decoded size may differ from the raw file size.
+    m_contentSize = decodedContentSize;
 }
 
 void SourceFile::setContents(const String& content)
