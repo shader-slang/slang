@@ -10649,20 +10649,15 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         if (!type)
             return;
 
-        // Check address space on pointer types before unwrapping. Lowered
-        // structured/uniform buffers lose their high-level type info but retain
-        // their SPIR-V address space.
+        // StorageBuffer address space unambiguously identifies SSBOs even after
+        // type lowering. Uniform address space is NOT checked here because
+        // pre-SPIR-V-1.4 targets lower SSBOs to Uniform as well; fall through
+        // to the type-based checks to distinguish UBOs from SSBOs.
         if (auto ptrType = as<IRPtrTypeBase>(type))
         {
-            auto addrSpace = ptrType->getAddressSpace();
-            if (addrSpace == AddressSpace::StorageBuffer)
+            if (ptrType->getAddressSpace() == AddressSpace::StorageBuffer)
             {
                 requireSPIRVCapability(SpvCapabilityStorageBufferArrayNonUniformIndexing);
-                return;
-            }
-            if (addrSpace == AddressSpace::Uniform)
-            {
-                requireSPIRVCapability(SpvCapabilityUniformBufferArrayNonUniformIndexing);
                 return;
             }
         }
