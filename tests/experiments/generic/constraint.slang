@@ -7,7 +7,7 @@ This is a bit of a silly example.
 Fails with 
 
 .slang(23): note 99999: an internal error threw an exception while working on code near this location
-(0): error 99999: Slang compilation aborted due to an exception of class Slang::InternalError: unimplemented: value lowering
+(0): error 99997: Slang compilation aborted due to an exception of class Slang::InternalError: unimplemented: value lowering
 
 */
 
