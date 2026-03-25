@@ -56,6 +56,8 @@ cmake --preset default
 cmake --build --preset releaseWithDebugInfo # or --preset debug, or --preset release
 ```
 
+> Note: when using Ninja (default preset) on Windows, you need to make sure the `cmake` command is run from the Visual Studio Developer Command Prompt. If you are a coding agent trying to build Slang in a Windows sandbox, run `extras/win-sandbox-build.bat [debug|release|releaseWithDebugInfo|minSizeRel] [x64|arm64|Win32] [target...]` instead. It configures with the `vs2022-dev` preset, reuses locally cached dependencies to avoid network fetches, and defaults to building `slangc`, `slang-test`, and `slangi`.
+
 For Visual Studio run:
 
 ```bash
@@ -65,7 +67,7 @@ cmake --build --preset releaseWithDebugInfo # to build from the CLI, could also 
 ```
 
 There are also `*-dev` variants like `vs2022-dev` and `vs2026-dev` which turn on features to aid
-debugging.
+debugging. The `vs2022-dev` preset writes to `build/windows-vs2022-dev`.
 
 ### WebAssembly build
 
@@ -265,7 +267,7 @@ works for any given binary.
 | `SLANG_SLANG_LLVM_BINARY_URL`     | System dependent           | URL specifying the location of the slang-llvm prebuilt library                               |
 | `SLANG_USE_SCCACHE`               | `FALSE`                    | Use sccache as compiler launcher (auto-disables PCH)                                         |
 | `SLANG_GENERATORS_PATH`           | ``                         | Path to an installed `all-generators` target for cross compilation                           |
-| `SLANG_BOOTSTRAP_IGNORE_ABORT_MSG`| `FALSE`                    | Ignore the system modal assert dialog while running slang-bootstrap to help LLM workflow     |
+| `SLANG_IGNORE_ABORT_MSG`          | `FALSE`                    | Suppress the Windows modal abort dialog at compile time (baked into all built executables; recommended for unattended/LLM-driven builds) |
 
 The following options relate to optional dependencies for additional backends
 and running additional tests. Left unchanged they are auto detected, however

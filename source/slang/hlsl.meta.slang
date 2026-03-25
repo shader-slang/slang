@@ -877,33 +877,45 @@ float __glsl_texture_offset_1d_shadow<TSampler, TCoord, TOffset>(TSampler s, TCo
     }
 }
 
+[require(glsl, texture_sm_4_1)]
+float __glsl150_texture_level<TSampler, TCoord>(TSampler s, TCoord value, float level)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "textureLod($0, $1, $2)";
+    }
+}
+
+[require(glsl, texture_sm_4_1)]
+float __glsl150_texture_level_1d_shadow<TSampler, TCoord>(TSampler s, TCoord value, float level)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "textureLod($0, $1, $2)";
+    }
+}
+
 __glsl_extension(GL_EXT_texture_shadow_lod)
 [require(glsl, texture_sm_4_1)]
-float __glsl_texture_level<TSampler, TCoord>(TSampler s, TCoord value, float level)
+float __glsl_shadow_lod_texture_level<TSampler, TCoord>(TSampler s, TCoord value, float level)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "textureLod($0, $1, $2)";
+    case glsl:
+        __requireCapability(GL_EXT_texture_shadow_lod);
+        __intrinsic_asm "textureLod($0, $1, $2)";
     }
 }
 
 __glsl_extension(GL_EXT_texture_shadow_lod)
-[require(glsl, texture_shadowlod)]
-float __glsl_texture_level_1d_shadow<TSampler, TCoord>(TSampler s, TCoord value, float level)
+[require(glsl, texture_sm_4_1)]
+float __glsl_shadow_lod_texture_level_cube_array_shadow<TSampler, TCoord>(TSampler s, TCoord value, float comparison, float level)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "textureLod($0, $1, $2)";
-    }
-}
-
-__glsl_extension(GL_EXT_texture_shadow_lod)
-[require(glsl, texture_shadowlod)]
-float __glsl_texture_level_cube_array_shadow<TSampler, TCoord>(TSampler s, TCoord value, float comparison, float level)
-{
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "textureLod($0, $1, $2, $3)";
+    case glsl:
+        __requireCapability(GL_EXT_texture_shadow_lod);
+        __intrinsic_asm "textureLod($0, $1, $2, $3)";
     }
 }
 
@@ -976,7 +988,16 @@ float __glsl_texture_offset_1d_shadow<TTexture, TCoord, TOffset>(TTexture t,Samp
 }
 
 [require(glsl, texture_sm_4_1)]
-float __glsl_texture_level<TTexture, TCoord>(TTexture t,SamplerComparisonState s, TCoord value, float level)
+float __glsl150_texture_level<TTexture, TCoord>(TTexture t, SamplerComparisonState s, TCoord value, float level)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "textureLod($p, $2, $3)";
+    }
+}
+
+[require(glsl, texture_sm_4_1)]
+float __glsl150_texture_level_1d_shadow<TTexture, TCoord>(TTexture t,SamplerComparisonState s, TCoord value, float level)
 {
     __target_switch
     {
@@ -985,22 +1006,26 @@ float __glsl_texture_level<TTexture, TCoord>(TTexture t,SamplerComparisonState s
 }
 
 __glsl_extension(GL_EXT_texture_shadow_lod)
-[require(glsl, texture_shadowlod)]
-float __glsl_texture_level_1d_shadow<TTexture, TCoord>(TTexture t,SamplerComparisonState s, TCoord value, float level)
+[require(glsl, texture_sm_4_1)]
+float __glsl_shadow_lod_texture_level<TTexture, TCoord>(TTexture t, SamplerComparisonState s, TCoord value, float level)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "textureLod($p, $2, $3)";
+    case glsl:
+        __requireCapability(GL_EXT_texture_shadow_lod);
+        __intrinsic_asm "textureLod($p, $2, $3)";
     }
 }
 
 __glsl_extension(GL_EXT_texture_shadow_lod)
-[require(glsl, texture_shadowlod)]
-float __glsl_texture_level_cube_array_shadow<TTexture, TCoord>(TTexture t,SamplerComparisonState s, TCoord value, float compare, float level)
+[require(glsl, texture_sm_4_1)]
+float __glsl_shadow_lod_texture_level_cube_array_shadow<TTexture, TCoord>(TTexture t,SamplerComparisonState s, TCoord value, float compare, float level)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "textureLod($p, $2, $3, $4)";
+    case glsl:
+        __requireCapability(GL_EXT_texture_shadow_lod);
+        __intrinsic_asm "textureLod($p, $2, $3, $4)";
     }
 }
 
@@ -1616,23 +1641,47 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(glsl_hlsl_metal_spirv, texture_shadowlod)]
+    [require(glsl_hlsl_metal_spirv, texture_sm_4_1)]
     float SampleCmpLevel(vector<float, Shape.dimensions+isArray> location, float compareValue, float level)
     {
         __target_switch
         {
         case glsl:
-            if (Shape.dimensions == 1 && isArray == 0)
+            // Note: the baseline requirement texture_sm_4_1 corresponds to GLSL 1.50, which covers the following variants:
+            // - float textureLod(sampler1DShadow sampler, vec3 P, float lod)
+            // - float textureLod(sampler1DArrayShadow sampler, vec3 P, float lod)
+            // - float textureLod(sampler2DShadow sampler, vec3 P, float lod)
+            //
+            // The above list is not extended by later GLSL versions.
+            //
+            // GL_EXT_texture_shadow_lod adds the following variants:
+            // - float textureLod(sampler2DArrayShadow sampler, vec4 P, float lod)
+            // - float textureLod(samplerCubeShadow sampler, vec4 P, float lod)
+            // - float textureLod(samplerCubeArrayShadow sampler, vec4 P, float compare, float lod)
+            //
+            // Anything else requires additional capabilities
+
+            if (Shape.dimensions == 1)
             {
-                return __glsl_texture_level_1d_shadow(this, __makeVector(__makeVector(location, 0.0), compareValue), level);
+                if (isArray == 0)
+                    return __glsl150_texture_level_1d_shadow(this, __makeVector(__makeVector(location, 0.0), compareValue), level);
+                else
+                    return __glsl150_texture_level(this, __makeVector(location, compareValue), level);
             }
-            else if (Shape.dimensions == 3 && isArray == 1)
+            else if (Shape.dimensions == 2)
             {
-                return __glsl_texture_level_cube_array_shadow(this, location, compareValue, level);
+                if (isArray == 0)
+                    return __glsl150_texture_level(this, __makeVector(location, compareValue), level);
+                else
+                    return __glsl_shadow_lod_texture_level(this, __makeVector(location, compareValue), level);
             }
             else
             {
-                return __glsl_texture_level(this, __makeVector(location, compareValue), level);
+                static_assert(Shape.dimensions == 3, "_Texture::SampleCmpLevel(location, compareValue, level): Unimplemented shape dimension");
+                if (isArray == 0)
+                    return __glsl_shadow_lod_texture_level(this, __makeVector(location, compareValue), level);
+                else
+                    return __glsl_shadow_lod_texture_level_cube_array_shadow(this, location, compareValue, level);
             }
         case hlsl:
             static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
@@ -2966,17 +3015,40 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
         __target_switch
         {
         case glsl:
-            if (Shape.dimensions == 1 && isArray == 0)
+            // Note: the baseline requirement texture_sm_4_1 corresponds to GLSL 1.50, which covers the following variants:
+            // - float textureLod(sampler1DShadow sampler, vec3 P, float lod)
+            // - float textureLod(sampler1DArrayShadow sampler, vec3 P, float lod)
+            // - float textureLod(sampler2DShadow sampler, vec3 P, float lod)
+            //
+            // The above list is not extended by later GLSL versions.
+            //
+            // GL_EXT_texture_shadow_lod adds the following variants:
+            // - float textureLod(sampler2DArrayShadow sampler, vec4 P, float lod)
+            // - float textureLod(samplerCubeShadow sampler, vec4 P, float lod)
+            // - float textureLod(samplerCubeArrayShadow sampler, vec4 P, float compare, float lod)
+
+            if (Shape.dimensions == 1)
             {
-                return __glsl_texture_level_1d_shadow(this, s, __makeVector(__makeVector(location, 0.0), compareValue), level);
+                if (isArray == 0)
+                    return __glsl150_texture_level_1d_shadow(this, s, __makeVector(__makeVector(location, 0.0), compareValue), level);
+                else
+                    return __glsl150_texture_level(this, s, __makeVector(location,compareValue), level);
             }
-            else if (Shape.dimensions == 3 && isArray == 1)
+            else if (Shape.dimensions == 2)
             {
-                return __glsl_texture_level_cube_array_shadow(this, s, location, compareValue, level);
+                if (isArray == 0)
+                    return __glsl150_texture_level(this, s, __makeVector(location,compareValue), level);
+                else
+                    return __glsl_shadow_lod_texture_level(this, s, __makeVector(location, compareValue), level);
             }
             else
             {
-                return __glsl_texture_level(this, s, __makeVector(location,compareValue), level);
+                static_assert(Shape.dimensions == 3, "_Texture::SampleCmpLevel(location, compareValue, level): Unimplemented shape dimension");
+
+                if (isArray == 0)
+                    return __glsl_shadow_lod_texture_level(this, s, __makeVector(location, compareValue), level);
+                else
+                    return __glsl_shadow_lod_texture_level_cube_array_shadow(this, s, location, compareValue, level);
             }
         case hlsl:
             static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
@@ -31921,10 +31993,11 @@ ${
 static const struct {
     bool isRW;
     char const* type;
+    char const* biasType;
 } kStructuredBufferCases_[] =
 {
-    {true, "RWStructuredBuffer<IgnoredBufferElementType>"},
-    {false, "StructuredBuffer<IgnoredBufferElementType>"},
+    {true, "RWStructuredBuffer<IgnoredBufferElementType>", "RWStructuredBuffer<IgnoredBiasBufferElementType>"},
+    {false, "StructuredBuffer<IgnoredBufferElementType>", "StructuredBuffer<IgnoredBiasBufferElementType>"},
 };
 for(auto buffer : kStructuredBufferCases_) {
 $}
@@ -31933,7 +32006,7 @@ $}
 [ForceInline]
 [require(spirv, cooperative_vector)]
 [require(optix_coopvec)]
-__generic<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType,IgnoredBufferElementType>
+__generic<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType, IgnoredBufferElementType>
 CoopVec<T, M> __coopVecMatMulPacked_impl(
     CoopVec<U, PackedK> input,
     constexpr CoopVecComponentType inputInterpretation,
@@ -31980,7 +32053,7 @@ CoopVec<T, M> __coopVecMatMulPacked_impl(
 [ForceInline]
 [require(spirv, cooperative_vector)]
 [require(optix_coopvec)]
-__generic<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType,IgnoredBufferElementType>
+__generic<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType, IgnoredBufferElementType>
 CoopVec<T, M> coopVecMatMulPacked(
     CoopVec<U, PackedK> input,
     constexpr CoopVecComponentType inputInterpretation,
@@ -32004,7 +32077,7 @@ CoopVec<T, M> coopVecMatMulPacked(
 // specialized coopVecMatMul for non-packed inputs
 [require(spirv, cooperative_vector)]
 [require(optix_coopvec)]
-__generic<T : __BuiltinArithmeticType, let M : int, let K : int, U : __BuiltinArithmeticType,IgnoredBufferElementType>
+__generic<T : __BuiltinArithmeticType, let M : int, let K : int, U : __BuiltinArithmeticType, IgnoredBufferElementType>
 CoopVec<T, M> coopVecMatMul(
     CoopVec<U, K> input,
     constexpr CoopVecComponentType inputInterpretation,
@@ -32035,14 +32108,14 @@ CoopVec<T, M> coopVecMatMul(
 [ForceInline]
 [require(spirv, cooperative_vector)]
 [require(optix_coopvec)]
-CoopVec<T, M> __coopVecMatMulAddPacked_impl<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType, IgnoredBufferElementType>(
+CoopVec<T, M> __coopVecMatMulAddPacked_impl<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType, IgnoredBufferElementType, IgnoredBiasBufferElementType>(
     CoopVec<U, PackedK> input,
     constexpr CoopVecComponentType inputInterpretation,
     constexpr int k,
     $(buffer.type) matrix,
     int32_t matrixOffset,
     constexpr CoopVecComponentType matrixInterpretation,
-    $(buffer.type) bias,
+    $(buffer.biasType) bias,
     int32_t biasOffset,
     constexpr CoopVecComponentType biasInterpretation,
     constexpr CoopVecMatrixLayout memoryLayout,
@@ -32074,9 +32147,11 @@ CoopVec<T, M> __coopVecMatMulAddPacked_impl<T : __BuiltinArithmeticType, let M :
         return spirv_asm
         {
             %runtimeArrayType = OpTypeRuntimeArray $$IgnoredBufferElementType;
+            %runtimeBiasArrayType = OpTypeRuntimeArray $$IgnoredBiasBufferElementType;
             %storagePointerType = OpTypePointer StorageBuffer %runtimeArrayType;
+            %storageBiasPointerType = OpTypePointer StorageBuffer %runtimeBiasArrayType;
             %matrixPointer:%storagePointerType = OpAccessChain $matrix $zero;
-            %biasPointer:%storagePointerType = OpAccessChain $bias $zero;
+            %biasPointer:%storageBiasPointerType = OpAccessChain $bias $zero;
             result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulAddNV $input $inputInterpretationSpirv %matrixPointer $matrixOffset $matrixInterpretationSpirv %biasPointer $biasOffset $biasInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride !operands;
         };
     case optix_coopvec:
@@ -32087,14 +32162,14 @@ CoopVec<T, M> __coopVecMatMulAddPacked_impl<T : __BuiltinArithmeticType, let M :
 [ForceInline]
 [require(spirv, cooperative_vector)]
 [require(optix_coopvec)]
-CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType, IgnoredBufferElementType>(
+CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType, IgnoredBufferElementType, IgnoredBiasBufferElementType>(
     CoopVec<U, PackedK> input,
     constexpr CoopVecComponentType inputInterpretation,
     constexpr int k,
     $(buffer.type) matrix,
     int32_t matrixOffset,
     constexpr CoopVecComponentType matrixInterpretation,
-    $(buffer.type) bias,
+    $(buffer.biasType) bias,
     int32_t biasOffset,
     constexpr CoopVecComponentType biasInterpretation,
     constexpr CoopVecMatrixLayout memoryLayout,
@@ -32107,18 +32182,18 @@ CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, l
     static_assert(!__isPackedInputInterpretation(inputInterpretation)
                 || k <= __inputInterpretationPackingFactor(inputInterpretation)*PackedK
                  , "for packed inputInterpretation values k must be less than or equal to the input vector length times the packing factor");
-    return __coopVecMatMulAddPacked_impl<T, M, PackedK, U, IgnoredBufferElementType>(input, inputInterpretation, k, matrix, matrixOffset, matrixInterpretation, bias, biasOffset, biasInterpretation, memoryLayout, transpose, matrixStride);
+    return __coopVecMatMulAddPacked_impl<T, M, PackedK, U, IgnoredBufferElementType, IgnoredBiasBufferElementType>(input, inputInterpretation, k, matrix, matrixOffset, matrixInterpretation, bias, biasOffset, biasInterpretation, memoryLayout, transpose, matrixStride);
 }
 
 [require(spirv, cooperative_vector)]
 [require(optix_coopvec)]
-CoopVec<T, M> coopVecMatMulAdd<T : __BuiltinArithmeticType, let M : int, let K : int, U : __BuiltinArithmeticType, IgnoredBufferElementType>(
+CoopVec<T, M> coopVecMatMulAdd<T : __BuiltinArithmeticType, let M : int, let K : int, U : __BuiltinArithmeticType, IgnoredBufferElementType, IgnoredBiasBufferElementType>(
     CoopVec<U, K> input,
     constexpr CoopVecComponentType inputInterpretation,
     $(buffer.type) matrix,
     int32_t matrixOffset,
     constexpr CoopVecComponentType matrixInterpretation,
-    $(buffer.type) bias,
+    $(buffer.biasType) bias,
     int32_t biasOffset,
     constexpr CoopVecComponentType biasInterpretation,
     constexpr CoopVecMatrixLayout memoryLayout,
@@ -32129,7 +32204,7 @@ CoopVec<T, M> coopVecMatMulAdd<T : __BuiltinArithmeticType, let M : int, let K :
     static_assert(!__isPackedInputInterpretation(inputInterpretation)
                  , "for packed inputInterpretation values please use coopVecMatMulPacked and specify k manually");
     return coopVecMatMulAddPacked<
-        T, M, K, U, IgnoredBufferElementType>(
+        T, M, K, U, IgnoredBufferElementType, IgnoredBiasBufferElementType>(
         input,
         inputInterpretation,
         K,

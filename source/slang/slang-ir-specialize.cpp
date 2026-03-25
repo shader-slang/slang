@@ -56,6 +56,7 @@ struct SpecializationContext
     SpecializationOptions options;
     Dictionary<IROp, IRInst*> irDictionaryMap;
     bool changed = false;
+    Dictionary<IRSimpleSpecializationKey, IRSpecialize*> activeGenericSpecializations;
 
 
     SpecializationContext(IRModule* inModule, TargetProgram* target, SpecializationOptions options)
@@ -147,6 +148,13 @@ struct SpecializationContext
         }
     }
 
+    enum class PackBranchCardinality
+    {
+        Unknown,
+        Empty,
+        NonEmpty,
+    };
+
     // An instruction is then fully specialized if and only
     // if it is in our set.
     //
@@ -166,7 +174,20 @@ struct SpecializationContext
         case kIROp_GlobalGenericParam:
         case kIROp_LookupWitnessMethod:
         case kIROp_GetTupleElement:
+        case kIROp_ExtractFirstFromPack:
+        case kIROp_ExtractLastFromPack:
+        case kIROp_TrimFirstOfPack:
+        case kIROp_TrimLastOfPack:
+        case kIROp_ShapeConcat:
+        case kIROp_ShapePermute:
+        case kIROp_ShapeSwap:
+        case kIROp_ShapeReduce:
+        case kIROp_PackBranch:
             return false;
+        case kIROp_NonEmptyPackWitness:
+            return getPackBranchCardinality(inst->getOperand(0)) ==
+                       PackBranchCardinality::NonEmpty &&
+                   areAllOperandsFullySpecialized(inst);
         case kIROp_Specialize:
             // The `specialize` instruction is a bit sepcial,
             // because it is possible to have a `specialize`
@@ -262,7 +283,6 @@ struct SpecializationContext
     List<IRInst*>& workList;
     HashSet<IRInst*>& workListSet;
     HashSet<IRInst*>& cleanInsts;
-
     void addToWorkList(IRInst* inst)
     {
         if (workListSet.add(inst))
@@ -272,6 +292,83 @@ struct SpecializationContext
 
             addUsersToWorkList(inst);
         }
+    }
+
+    static constexpr UInt kMaxIRSpecializationDepthBudget = 512;
+
+    UInt getSpecializationDepth(IRSpecialize* specializeInst)
+    {
+        if (auto depthDecoration =
+                specializeInst->findDecoration<IRSpecializationDepthDecoration>())
+            return UInt(getIntVal(depthDecoration->getOperand(0)));
+
+        for (auto parent = specializeInst->getParent(); parent; parent = parent->getParent())
+        {
+            if (auto depthDecoration = parent->findDecoration<IRSpecializationDepthDecoration>())
+            {
+                return UInt(getIntVal(depthDecoration->getOperand(0)));
+            }
+        }
+        return 0;
+    }
+
+    void removeSpecializationDepthDecorations(IRInst* inst)
+    {
+        for (auto decor = inst->getFirstDecoration(); decor;)
+        {
+            auto nextDecor = decor->getNextDecoration();
+            if (decor->getOp() == kIROp_SpecializationDepthDecoration)
+                decor->removeAndDeallocate();
+            decor = nextDecor;
+        }
+    }
+
+    void addSpecializationDepthDecoration(IRSpecialize* specializeInst, UInt specializationDepth)
+    {
+        removeSpecializationDepthDecorations(specializeInst);
+        IRBuilder builder(module);
+        builder.addDecoration(
+            specializeInst,
+            kIROp_SpecializationDepthDecoration,
+            builder.getIntValue(builder.getUIntType(), specializationDepth));
+    }
+
+    void addSpecializationDepthDecorationsToClonedSpecializeInsts(
+        IRInst* inst,
+        UInt specializationDepth)
+    {
+        if (auto specializeInst = as<IRSpecialize>(inst))
+            addSpecializationDepthDecoration(specializeInst, specializationDepth);
+
+        for (auto child : inst->getDecorationsAndChildren())
+            addSpecializationDepthDecorationsToClonedSpecializeInsts(child, specializationDepth);
+    }
+
+    bool diagnoseGenericSpecializationCycle(IRSpecialize* specInst, IRInst* generic)
+    {
+        if (sink)
+        {
+            Diagnostics::GenericSpecializationRecursionCycle diag = {};
+            diag.location = specInst->sourceLoc;
+            diag.generic = generic;
+            sink->diagnose(diag);
+        }
+        cleanInsts.add(specInst);
+        return false;
+    }
+
+    bool diagnoseGenericSpecializationBudgetExceeded(IRSpecialize* specInst, IRInst* generic)
+    {
+        if (sink)
+        {
+            Diagnostics::GenericSpecializationBudgetExceeded diag = {};
+            diag.location = specInst->sourceLoc;
+            diag.generic = generic;
+            diag.budget = int(kMaxIRSpecializationDepthBudget);
+            sink->diagnose(diag);
+        }
+        cleanInsts.add(specInst);
+        return false;
     }
 
     // When a transformation makes a change to an instruction,
@@ -364,6 +461,12 @@ struct SpecializationContext
                 return specializedVal;
         }
 
+        if (activeGenericSpecializations.containsKey(key))
+        {
+            diagnoseGenericSpecializationCycle(specializeInst, genericVal);
+            return nullptr;
+        }
+
         // If no existing specialization is found, we need
         // to create the specialization instead.
         // This mostly amounts to evaluating the generic as
@@ -374,7 +477,12 @@ struct SpecializationContext
         // can be re-used in other cases that need to
         // do one-off specialization.
         //
+        activeGenericSpecializations[key] = specializeInst;
+        SLANG_DEFER(activeGenericSpecializations.remove(key));
+
         IRInst* specializedVal = specializeGenericImpl(genericVal, specializeInst, module, this);
+        if (!specializedVal)
+            return nullptr;
 
         // The body of the specialized generic may expose more specialization opportunities, so
         // we add the children to workList.
@@ -487,6 +595,9 @@ struct SpecializationContext
     //
     bool maybeSpecializeGeneric(IRSpecialize* specInst)
     {
+        if (cleanInsts.contains(specInst))
+            return false;
+
         // We will only attempt to specialize when all of the
         // operands to the `speicalize(...)` instruction are
         // themselves fully specialized.
@@ -598,6 +709,8 @@ struct SpecializationContext
         // type, function, or whatever).
         //
         auto specializedVal = specializeGeneric(genericVal, specInst);
+        if (!specializedVal)
+            return false;
 
         // Any uses of this `specialize(...)` instruction will
         // become uses of `specializeVal`, so we want to re-consider
@@ -686,6 +799,18 @@ struct SpecializationContext
         case kIROp_GetTupleElement:
             return maybeSpecializeFoldableInst(inst);
 
+        case kIROp_ExtractFirstFromPack:
+        case kIROp_ExtractLastFromPack:
+        case kIROp_TrimFirstOfPack:
+        case kIROp_TrimLastOfPack:
+            return maybeSpecializeFoldableInst(inst);
+
+        case kIROp_ShapeConcat:
+        case kIROp_ShapePermute:
+        case kIROp_ShapeSwap:
+        case kIROp_ShapeReduce:
+            return maybeSpecializeShapePackTransformInst(inst);
+
         case kIROp_TypePack:
         case kIROp_TupleType:
             return maybeSpecializeTypePackOrTupleType(inst);
@@ -693,6 +818,9 @@ struct SpecializationContext
         case kIROp_MakeValuePack:
         case kIROp_MakeTuple:
             return maybeSpecializeMakeValuePackOrTuple(inst);
+
+        case kIROp_PackBranch:
+            return maybeSpecializePackBranch(cast<IRPackBranch>(inst));
 
         case kIROp_CountOf:
             return maybeSpecializeCountOf(inst);
@@ -819,6 +947,72 @@ struct SpecializationContext
         return true;
     }
 
+    PackBranchCardinality getPackBranchCardinality(IRInst* pack)
+    {
+        if (!pack)
+            return PackBranchCardinality::Unknown;
+
+        switch (pack->getOp())
+        {
+        case kIROp_TypePack:
+        case kIROp_TupleType:
+        case kIROp_MakeValuePack:
+        case kIROp_MakeTuple:
+            for (UInt i = 0; i < pack->getOperandCount(); ++i)
+            {
+                switch (pack->getOperand(i)->getOp())
+                {
+                case kIROp_GlobalGenericParam:
+                case kIROp_Param:
+                case kIROp_TypePack:
+                case kIROp_ExpandTypeOrVal:
+                case kIROp_TrimFirstOfPack:
+                case kIROp_TrimLastOfPack:
+                case kIROp_ShapeConcat:
+                case kIROp_ShapePermute:
+                case kIROp_ShapeSwap:
+                case kIROp_ShapeReduce:
+                case kIROp_PackBranch:
+                    return PackBranchCardinality::Unknown;
+                case kIROp_MakeValuePack:
+                    // A nested MakeValuePack inside another value-level pack container
+                    // may represent a symbolic sub-pack whose cardinality is not yet known.
+                    if (pack->getOp() == kIROp_MakeValuePack || pack->getOp() == kIROp_MakeTuple)
+                        return PackBranchCardinality::Unknown;
+                    break;
+                default:
+                    break;
+                }
+            }
+            return pack->getOperandCount() == 0 ? PackBranchCardinality::Empty
+                                                : PackBranchCardinality::NonEmpty;
+        default:
+            return PackBranchCardinality::Unknown;
+        }
+    }
+
+    bool maybeSpecializePackBranch(IRPackBranch* packBranch)
+    {
+        auto cardinality = getPackBranchCardinality(packBranch->getOperand(0));
+        switch (cardinality)
+        {
+        case PackBranchCardinality::Unknown:
+            return false;
+
+        case PackBranchCardinality::Empty:
+        case PackBranchCardinality::NonEmpty:
+            break;
+        }
+
+        auto replacement = cardinality == PackBranchCardinality::Empty ? packBranch->getOperand(1)
+                                                                       : packBranch->getOperand(2);
+        packBranch->replaceUsesWith(replacement);
+        packBranch->removeAndDeallocate();
+        addToWorkList(replacement);
+        addUsersToWorkList(replacement);
+        return true;
+    }
+
     bool maybeSpecializeCountOf(IRInst* inst)
     {
         auto operand = inst->getOperand(0);
@@ -851,8 +1045,8 @@ struct SpecializationContext
             case kIROp_Param:
             case kIROp_TypePack:
             case kIROp_ExpandTypeOrVal:
-            case kIROp_TrimHeadOfPack:
-            case kIROp_TrimTailOfPack:
+            case kIROp_TrimFirstOfPack:
+            case kIROp_TrimLastOfPack:
                 return false;
             }
         }
@@ -1026,6 +1220,391 @@ struct SpecializationContext
         return instChanged;
     }
 
+    bool hasNestedShapePackOperand(IRInst* packLikeInst)
+    {
+        for (UInt i = 0; i < packLikeInst->getOperandCount(); i++)
+        {
+            switch (packLikeInst->getOperand(i)->getOp())
+            {
+            case kIROp_MakeValuePack:
+            case kIROp_MakeTuple:
+            case kIROp_Expand:
+            case kIROp_TypePack:
+            case kIROp_ExpandTypeOrVal:
+            case kIROp_TrimFirstOfPack:
+            case kIROp_TrimLastOfPack:
+            case kIROp_ShapeConcat:
+            case kIROp_ShapePermute:
+            case kIROp_ShapeSwap:
+            case kIROp_ShapeReduce:
+                return true;
+            default:
+                break;
+            }
+        }
+        return false;
+    }
+
+    bool isConcreteShapePack(IRInst* inst)
+    {
+        switch (inst->getOp())
+        {
+        case kIROp_MakeValuePack:
+        case kIROp_MakeTuple:
+            return !hasNestedShapePackOperand(inst);
+        default:
+            return false;
+        }
+    }
+
+    bool areProvablyDifferentShapeElements(IRInst* left, IRInst* right)
+    {
+        Int64 leftValue = 0;
+        Int64 rightValue = 0;
+        return tryGetConstantIntLit(left, leftValue) && tryGetConstantIntLit(right, rightValue) &&
+               leftValue != rightValue;
+    }
+
+    bool hasAnyPotentialConcatAxis(IRInst* leftPack, IRInst* rightPack)
+    {
+        auto rank = leftPack->getOperandCount();
+        SLANG_ASSERT(rank == rightPack->getOperandCount());
+        for (UInt axis = 0; axis < rank; ++axis)
+        {
+            bool isPossibleAxis = true;
+            for (UInt i = 0; i < rank; ++i)
+            {
+                if (i != axis && areProvablyDifferentShapeElements(
+                                     leftPack->getOperand(i),
+                                     rightPack->getOperand(i)))
+                {
+                    isPossibleAxis = false;
+                    break;
+                }
+            }
+            if (isPossibleAxis)
+                return true;
+        }
+        return false;
+    }
+
+    bool maybeSpecializeShapePackTransformInst(IRInst* inst)
+    {
+        auto diagnose = [&](auto diag) -> bool
+        {
+            if (sink)
+                sink->diagnose(diag);
+            return false;
+        };
+
+        auto replaceWith = [&](IRInst* replacement) -> bool
+        {
+            if (!replacement)
+                return false;
+            addUsersToWorkList(inst);
+            inst->replaceUsesWith(replacement);
+            inst->removeAndDeallocate();
+            addToWorkList(replacement);
+            return true;
+        };
+
+        switch (inst->getOp())
+        {
+        case kIROp_ShapeConcat:
+            {
+                auto leftPack = inst->getOperand(0);
+                auto rightPack = inst->getOperand(1);
+                auto axis = inst->getOperand(2);
+                if (!isConcreteShapePack(leftPack) || !isConcreteShapePack(rightPack))
+                    return maybeSpecializeFoldableInst(inst);
+
+                auto leftRank = leftPack->getOperandCount();
+                auto rightRank = rightPack->getOperandCount();
+                if (leftRank != rightRank)
+                {
+                    Diagnostics::ShapePackRankMismatch diag = {};
+                    diag.opName = "__shapeConcat";
+                    diag.leftRank = (int)leftRank;
+                    diag.rightRank = (int)rightRank;
+                    diag.location = inst->sourceLoc;
+                    return diagnose(diag);
+                }
+
+                Int64 axisValue = 0;
+                if (!tryGetConstantIntLit(axis, axisValue))
+                {
+                    if (leftRank == 0)
+                    {
+                        Diagnostics::ShapePackNoValidAxis diag = {};
+                        diag.opName = "__shapeConcat";
+                        diag.rank = 0;
+                        diag.location = inst->sourceLoc;
+                        return diagnose(diag);
+                    }
+                    if (!hasAnyPotentialConcatAxis(leftPack, rightPack))
+                    {
+                        Diagnostics::ShapeConcatNoValidAxis diag = {};
+                        diag.rank = (int)leftRank;
+                        diag.location = inst->sourceLoc;
+                        return diagnose(diag);
+                    }
+                    return maybeSpecializeFoldableInst(inst);
+                }
+
+                if (axisValue < 0 || (UInt)axisValue >= leftRank)
+                {
+                    Diagnostics::ShapePackAxisOutOfRange diag = {};
+                    diag.opName = "__shapeConcat";
+                    diag.axis = (int)axisValue;
+                    diag.rank = (int)leftRank;
+                    diag.location = inst->sourceLoc;
+                    return diagnose(diag);
+                }
+
+                IRBuilder builder(module);
+                IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+                builder.setInsertBefore(inst);
+
+                ShortList<IRInst*> resultElements;
+                for (UInt i = 0; i < leftRank; ++i)
+                {
+                    auto leftElement = leftPack->getOperand(i);
+                    auto rightElement = rightPack->getOperand(i);
+                    if (i == (UInt)axisValue)
+                    {
+                        resultElements.add(builder.emitAdd(
+                            as<IRType>(leftElement->getDataType()),
+                            leftElement,
+                            rightElement));
+                    }
+                    else if (areKnownEqualShapeElements(leftElement, rightElement))
+                    {
+                        resultElements.add(leftElement);
+                    }
+                    else
+                    {
+                        Int64 leftValue = 0;
+                        Int64 rightValue = 0;
+                        if (tryGetConstantIntLit(leftElement, leftValue) &&
+                            tryGetConstantIntLit(rightElement, rightValue) &&
+                            leftValue != rightValue)
+                        {
+                            Diagnostics::ShapeConcatNonAxisMismatch diag = {};
+                            diag.axis = (int)axisValue;
+                            diag.dimIndex = (int)i;
+                            diag.location = inst->sourceLoc;
+                            return diagnose(diag);
+                        }
+                        return maybeSpecializeFoldableInst(inst);
+                    }
+                }
+
+                return replaceWith(
+                    emitPackLike(module, inst, resultElements.getArrayView().arrayView));
+            }
+
+        case kIROp_ShapePermute:
+            {
+                auto valuePack = inst->getOperand(0);
+                auto orderPack = inst->getOperand(1);
+                if (!isConcreteShapePack(valuePack) || !isConcreteShapePack(orderPack))
+                    return maybeSpecializeFoldableInst(inst);
+
+                auto valueRank = valuePack->getOperandCount();
+                auto orderRank = orderPack->getOperandCount();
+                if (valueRank != orderRank)
+                {
+                    Diagnostics::ShapePermuteOrderLengthMismatch diag = {};
+                    diag.orderRank = (int)orderRank;
+                    diag.valueRank = (int)valueRank;
+                    diag.location = inst->sourceLoc;
+                    return diagnose(diag);
+                }
+
+                Dictionary<Int64, Index> firstSeenPosition;
+                ShortList<IRInst*> resultElements;
+                for (UInt i = 0; i < orderRank; ++i)
+                {
+                    for (UInt j = 0; j < i; ++j)
+                    {
+                        if (orderPack->getOperand(i) == orderPack->getOperand(j))
+                        {
+                            Int64 orderIndex = 0;
+                            if (tryGetConstantIntLit(orderPack->getOperand(i), orderIndex))
+                            {
+                                Diagnostics::ShapePermuteDuplicateIndex diag = {};
+                                diag.indexValue = (int)orderIndex;
+                                diag.firstPosition = (int)j;
+                                diag.secondPosition = (int)i;
+                                diag.location = inst->sourceLoc;
+                                return diagnose(diag);
+                            }
+                            Diagnostics::ShapePermuteDuplicateEquivalentIndex diag = {};
+                            diag.firstPosition = (int)j;
+                            diag.secondPosition = (int)i;
+                            diag.location = inst->sourceLoc;
+                            return diagnose(diag);
+                        }
+                    }
+
+                    Int64 orderIndex = 0;
+                    if (!tryGetConstantIntLit(orderPack->getOperand(i), orderIndex))
+                        return maybeSpecializeFoldableInst(inst);
+
+                    Index firstPosition = 0;
+                    if (firstSeenPosition.tryGetValue(orderIndex, firstPosition))
+                    {
+                        Diagnostics::ShapePermuteDuplicateIndex diag = {};
+                        diag.indexValue = (int)orderIndex;
+                        diag.firstPosition = (int)firstPosition;
+                        diag.secondPosition = (int)i;
+                        diag.location = inst->sourceLoc;
+                        return diagnose(diag);
+                    }
+                    firstSeenPosition[orderIndex] = i;
+
+                    if (orderIndex < 0 || (UInt)orderIndex >= valueRank)
+                    {
+                        Diagnostics::ShapePermuteIndexOutOfRange diag = {};
+                        diag.indexValue = (int)orderIndex;
+                        diag.indexPosition = (int)i;
+                        diag.rank = (int)valueRank;
+                        diag.location = inst->sourceLoc;
+                        return diagnose(diag);
+                    }
+
+                    resultElements.add(valuePack->getOperand((UInt)orderIndex));
+                }
+
+                return replaceWith(
+                    emitPackLike(module, inst, resultElements.getArrayView().arrayView));
+            }
+
+        case kIROp_ShapeSwap:
+            {
+                auto valuePack = inst->getOperand(0);
+                auto dim0 = inst->getOperand(1);
+                auto dim1 = inst->getOperand(2);
+
+                if (!isConcreteShapePack(valuePack))
+                    return maybeSpecializeFoldableInst(inst);
+
+                Int64 dim0Value = 0;
+                Int64 dim1Value = 0;
+                if (!tryGetConstantIntLit(dim0, dim0Value) ||
+                    !tryGetConstantIntLit(dim1, dim1Value))
+                {
+                    if (valuePack->getOperandCount() == 0)
+                    {
+                        Diagnostics::ShapePackNoValidAxis diag = {};
+                        diag.opName = "__shapeSwap";
+                        diag.rank = 0;
+                        diag.location = inst->sourceLoc;
+                        return diagnose(diag);
+                    }
+                    return maybeSpecializeFoldableInst(inst);
+                }
+
+                auto valueRank = valuePack->getOperandCount();
+                if (dim0Value < 0 || (UInt)dim0Value >= valueRank)
+                {
+                    Diagnostics::ShapePackAxisOutOfRange diag = {};
+                    diag.opName = "__shapeSwap";
+                    diag.axis = (int)dim0Value;
+                    diag.rank = (int)valueRank;
+                    diag.location = inst->sourceLoc;
+                    return diagnose(diag);
+                }
+
+                if (dim1Value < 0 || (UInt)dim1Value >= valueRank)
+                {
+                    Diagnostics::ShapePackAxisOutOfRange diag = {};
+                    diag.opName = "__shapeSwap";
+                    diag.axis = (int)dim1Value;
+                    diag.rank = (int)valueRank;
+                    diag.location = inst->sourceLoc;
+                    return diagnose(diag);
+                }
+
+                if (dim0Value == dim1Value)
+                    return replaceWith(valuePack);
+
+                ShortList<IRInst*> resultElements;
+                for (UInt i = 0; i < valueRank; ++i)
+                {
+                    if (i == (UInt)dim0Value)
+                        resultElements.add(valuePack->getOperand((UInt)dim1Value));
+                    else if (i == (UInt)dim1Value)
+                        resultElements.add(valuePack->getOperand((UInt)dim0Value));
+                    else
+                        resultElements.add(valuePack->getOperand(i));
+                }
+
+                return replaceWith(
+                    emitPackLike(module, inst, resultElements.getArrayView().arrayView));
+            }
+
+        case kIROp_ShapeReduce:
+            {
+                auto valuePack = inst->getOperand(0);
+                auto axis = inst->getOperand(1);
+
+                if (!isConcreteShapePack(valuePack))
+                    return maybeSpecializeFoldableInst(inst);
+
+                Int64 axisValue = 0;
+                if (!tryGetConstantIntLit(axis, axisValue))
+                {
+                    if (valuePack->getOperandCount() == 0)
+                    {
+                        Diagnostics::ShapePackNoValidAxis diag = {};
+                        diag.opName = "__shapeReduce";
+                        diag.rank = 0;
+                        diag.location = inst->sourceLoc;
+                        return diagnose(diag);
+                    }
+                    return maybeSpecializeFoldableInst(inst);
+                }
+
+                auto valueRank = valuePack->getOperandCount();
+                if (axisValue < 0 || (UInt)axisValue >= valueRank)
+                {
+                    Diagnostics::ShapePackAxisOutOfRange diag = {};
+                    diag.opName = "__shapeReduce";
+                    diag.axis = (int)axisValue;
+                    diag.rank = (int)valueRank;
+                    diag.location = inst->sourceLoc;
+                    return diagnose(diag);
+                }
+
+                IRBuilder builder(module);
+                IRBuilderSourceLocRAII srcLocRAII(&builder, inst->sourceLoc);
+                builder.setInsertBefore(inst);
+
+                ShortList<IRInst*> resultElements;
+                for (UInt i = 0; i < valueRank; ++i)
+                {
+                    if (i == (UInt)axisValue)
+                    {
+                        resultElements.add(builder.getIntValue(
+                            as<IRType>(valuePack->getOperand(i)->getDataType()),
+                            1));
+                    }
+                    else
+                    {
+                        resultElements.add(valuePack->getOperand(i));
+                    }
+                }
+
+                return replaceWith(
+                    emitPackLike(module, inst, resultElements.getArrayView().arrayView));
+            }
+
+        default:
+            return maybeSpecializeFoldableInst(inst);
+        }
+    }
+
     template<typename TDict>
     void _readSpecializationDictionaryImpl(TDict& dict, IRInst* dictInst)
     {
@@ -1142,13 +1721,14 @@ struct SpecializationContext
         IRSpecializationDictionaryItem* item = nullptr;
         if (dict.tryGetValue(key, item))
         {
-            if (!as<IRUndefined>(item->getOperand(0)))
-                return item->getOperand(0);
-            else
+            auto value = item ? item->getOperand(0) : nullptr;
+            if (!value || value->getParent() == nullptr || as<IRUndefined>(value))
             {
                 dict.remove(key);
                 return nullptr;
             }
+
+            return value;
         }
 
         return nullptr;
@@ -1287,7 +1867,7 @@ struct SpecializationContext
             //
             if (options.lowerWitnessLookups)
             {
-                iterChanged = specializeDynamicInsts(module, sink);
+                iterChanged = specializeDynamicInsts(module, sink, this);
                 if (iterChanged)
                 {
                     eliminateDeadCode(module->getModuleInst());
@@ -2622,7 +3202,7 @@ struct SpecializationContext
         return false;
     }
 
-    UInt calcExistentialTypeParamSlotCount(IRType* type)
+    UInt calcExistentialTypeParamSlotCount(IRType* type, HashSet<IRType*>& activeTypes)
     {
     top:
         if (as<IRInterfaceType>(type))
@@ -2646,10 +3226,14 @@ struct SpecializationContext
         }
         else if (auto structType = as<IRStructType>(type))
         {
+            if (!activeTypes.add(type))
+                return 0;
+            SLANG_DEFER(activeTypes.remove(type));
+
             UInt count = 0;
             for (auto field : structType->getFields())
             {
-                count += calcExistentialTypeParamSlotCount(field->getFieldType());
+                count += calcExistentialTypeParamSlotCount(field->getFieldType(), activeTypes);
             }
             return count;
         }
@@ -2657,6 +3241,12 @@ struct SpecializationContext
         {
             return 0;
         }
+    }
+
+    UInt calcExistentialTypeParamSlotCount(IRType* type)
+    {
+        HashSet<IRType*> activeTypes;
+        return calcExistentialTypeParamSlotCount(type, activeTypes);
     }
 
     Dictionary<IRSimpleSpecializationKey, IRSpecializationDictionaryItem*>
@@ -3210,7 +3800,10 @@ void finalizeSpecialization(IRModule* module)
 // The resulting function will therefore have additional parameters at the beginning
 // to accept this information.
 //
-IRInst* specializeGenericWithSetArgs(IRSpecialize* specializeInst)
+IRInst* specializeGenericWithSetArgs(
+    IRSpecialize* specializeInst,
+    SpecializationContext* context,
+    UInt specializationDepth)
 {
     // The high-level logic for specializing a generic to operate over collections
     // is similar to specializing a simple generic:
@@ -3335,7 +3928,13 @@ IRInst* specializeGenericWithSetArgs(IRSpecialize* specializeInst)
             builder.setInsertBefore(loweredFunc->getFirstBlock());
             for (auto decoration : returnedFunc->getDecorations())
             {
-                cloneInst(&staticCloningEnv, &builder, decoration);
+                auto clonedDecoration = cloneInst(&staticCloningEnv, &builder, decoration);
+                if (context)
+                {
+                    context->addSpecializationDepthDecorationsToClonedSpecializeInsts(
+                        clonedDecoration,
+                        specializationDepth);
+                }
             }
 
             builder.setInsertInto(loweredFunc);
@@ -3372,7 +3971,13 @@ IRInst* specializeGenericWithSetArgs(IRSpecialize* specializeInst)
                  _inst = _inst->getNextInst())
             {
                 // Clone the instructions in the first block.
-                cloneInst(&cloneEnv, &builder, _inst);
+                auto clonedInst = cloneInst(&cloneEnv, &builder, _inst);
+                if (context)
+                {
+                    context->addSpecializationDepthDecorationsToClonedSpecializeInsts(
+                        clonedInst,
+                        specializationDepth);
+                }
             }
 
             for (auto block : returnedFunc->getBlocks())
@@ -3385,6 +3990,12 @@ IRInst* specializeGenericWithSetArgs(IRSpecialize* specializeInst)
                     builder.getModule(),
                     block,
                     cloneEnv.mapOldValToNew[block]);
+                if (context)
+                {
+                    context->addSpecializationDepthDecorationsToClonedSpecializeInsts(
+                        cloneEnv.mapOldValToNew[block],
+                        specializationDepth);
+                }
             }
 
             // Add extra indices to the func-type parameters
@@ -3404,7 +4015,13 @@ IRInst* specializeGenericWithSetArgs(IRSpecialize* specializeInst)
             // Emit out into the global scope.
             IRBuilder globalBuilder(builder.getModule());
             globalBuilder.setInsertInto(builder.getModule());
-            cloneInst(&staticCloningEnv, &globalBuilder, inst);
+            auto clonedInst = cloneInst(&staticCloningEnv, &globalBuilder, inst);
+            if (context)
+            {
+                context->addSpecializationDepthDecorationsToClonedSpecializeInsts(
+                    clonedInst,
+                    specializationDepth);
+            }
         }
         else if (!as<IRReturn>(inst))
         {
@@ -3419,8 +4036,17 @@ IRInst* specializeGenericWithSetArgs(IRSpecialize* specializeInst)
             // parameter types) being cloned under the dynamic environment, but
             // a subsequent pass of dynamic-inst-lowering will convert those to the static form.
             //
-            cloneInst(&staticCloningEnv, &builder, inst);
-            cloneInst(&cloneEnv, &builder, inst);
+            auto clonedStaticInst = cloneInst(&staticCloningEnv, &builder, inst);
+            auto clonedDynamicInst = cloneInst(&cloneEnv, &builder, inst);
+            if (context)
+            {
+                context->addSpecializationDepthDecorationsToClonedSpecializeInsts(
+                    clonedStaticInst,
+                    specializationDepth);
+                context->addSpecializationDepthDecorationsToClonedSpecializeInsts(
+                    clonedDynamicInst,
+                    specializationDepth);
+            }
         }
     }
 
@@ -3433,8 +4059,19 @@ IRInst* specializeGenericImpl(
     IRModule* module,
     SpecializationContext* context)
 {
+    UInt specializationDepth = 0;
+    if (context)
+    {
+        specializationDepth = context->getSpecializationDepth(specializeInst);
+        if (specializationDepth >= context->kMaxIRSpecializationDepthBudget)
+        {
+            context->diagnoseGenericSpecializationBudgetExceeded(specializeInst, genericVal);
+            return nullptr;
+        }
+    }
+
     if (isSetSpecializedGeneric(specializeInst))
-        return specializeGenericWithSetArgs(specializeInst);
+        return specializeGenericWithSetArgs(specializeInst, context, specializationDepth + 1);
 
     // Effectively, specializing a generic amounts to "calling" the generic
     // on its concrete argument values and computing the
@@ -3513,6 +4150,8 @@ IRInst* specializeGenericImpl(
                 // Clone decorations on the orignal `specialize` inst over to the newly specialized
                 // value.
                 cloneInstDecorationsAndChildren(&env, module, specializeInst, specializedVal);
+                if (context)
+                    context->removeSpecializationDepthDecorations(specializedVal);
 
                 // Perform IR simplifications to fold constants in this specialized value if it is a
                 // function, so further specializations from the specialized function will have as
@@ -3549,6 +4188,9 @@ IRInst* specializeGenericImpl(
             //
             if (context)
             {
+                context->addSpecializationDepthDecorationsToClonedSpecializeInsts(
+                    clonedInst,
+                    specializationDepth + 1);
                 pendingWorkList.add(clonedInst);
             }
         }
@@ -3561,23 +4203,42 @@ IRInst* specializeGenericImpl(
     UNREACHABLE_RETURN(nullptr);
 }
 
-IRInst* specializeGeneric(IRSpecialize* specializeInst)
+IRInst* specializeGeneric(SpecializationContext* context, IRSpecialize* specializeInst)
 {
+    SLANG_ASSERT(context);
+    if (!context)
+        return specializeInst;
+
     auto baseGeneric = as<IRGeneric>(specializeInst->getBase());
     SLANG_ASSERT(baseGeneric);
     if (!baseGeneric)
         return specializeInst;
 
-    auto module = specializeInst->getModule();
-    SLANG_ASSERT(module);
+    if (isSetSpecializedGeneric(specializeInst))
+    {
+        auto specializationDepth = context->getSpecializationDepth(specializeInst);
+        if (specializationDepth >= context->kMaxIRSpecializationDepthBudget)
+        {
+            context->diagnoseGenericSpecializationBudgetExceeded(specializeInst, baseGeneric);
+            return nullptr;
+        }
+        return specializeGenericWithSetArgs(specializeInst, context, specializationDepth + 1);
+    }
+
+    return context->specializeGeneric(baseGeneric, specializeInst);
+}
+
+IRInst* specializeGeneric(IRSpecialize* specializeInst)
+{
+    auto module = specializeInst ? specializeInst->getModule() : nullptr;
     if (!module)
         return specializeInst;
 
-    if (isSetSpecializedGeneric(specializeInst))
-        return specializeGenericWithSetArgs(specializeInst);
-
-    // Standard static specialization of generic.
-    return specializeGenericImpl(baseGeneric, specializeInst, module, nullptr);
+    SpecializationContext context(module, nullptr, SpecializationOptions());
+    context.sink = nullptr;
+    context.readSpecializationDictionaries();
+    auto result = specializeGeneric(&context, specializeInst);
+    return result;
 }
 
 } // namespace Slang

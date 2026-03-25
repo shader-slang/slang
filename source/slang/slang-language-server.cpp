@@ -867,13 +867,13 @@ LanguageServerResult<LanguageServerProtocol::Hover> LanguageServerCore::hover(
         }
         else if (auto packQueryExpr = as<PackQueryExpr>(expr))
         {
-            String queryName = "__trimTail";
+            String queryName = "__trimLast";
             if (as<FirstExpr>(packQueryExpr))
                 queryName = "__first";
             else if (as<LastExpr>(packQueryExpr))
                 queryName = "__last";
-            else if (as<TrimHeadExpr>(packQueryExpr))
-                queryName = "__trimHead";
+            else if (as<TrimFirstExpr>(packQueryExpr))
+                queryName = "__trimFirst";
 
             sb << "```\n" << queryName << "(";
             if (packQueryExpr->value && packQueryExpr->value->type)
@@ -881,6 +881,33 @@ LanguageServerResult<LanguageServerProtocol::Hover> LanguageServerCore::hover(
                 ASTPrinter printer(version->linkage->getASTBuilder());
                 printer.addExpr(packQueryExpr->value);
                 sb << printer.getString();
+            }
+            sb << ")";
+            if (expr->type)
+            {
+                sb << " : ";
+                if (auto typeType = as<TypeType>(expr->type))
+                    typeType->getType()->toText(sb);
+                else
+                    expr->type.type->toText(sb);
+            }
+            sb << "\n```\n";
+            fillLoc(expr->loc);
+        }
+        else if (auto shapePackExpr = as<ShapePackTransformExpr>(expr))
+        {
+            auto opName = getShapePackTransformName(shapePackExpr);
+            sb << "```\n" << opName << "(";
+            bool isFirst = true;
+            ASTPrinter printer(version->linkage->getASTBuilder());
+            for (auto arg : shapePackExpr->args)
+            {
+                if (!isFirst)
+                    sb << ", ";
+                printer.reset();
+                printer.addExpr(arg);
+                sb << printer.getString();
+                isFirst = false;
             }
             sb << ")";
             if (expr->type)
@@ -939,6 +966,10 @@ LanguageServerResult<LanguageServerProtocol::Hover> LanguageServerCore::hover(
     else if (auto packQueryExpr = as<PackQueryExpr>(leafNode))
     {
         fillExprHoverInfo(packQueryExpr);
+    }
+    else if (auto shapePackExpr = as<ShapePackTransformExpr>(leafNode))
+    {
+        fillExprHoverInfo(shapePackExpr);
     }
     else if (auto swizzleExpr = as<SwizzleExpr>(leafNode))
     {

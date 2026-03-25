@@ -113,18 +113,12 @@ set(glsl_module_generated_header_dir
 )
 set(glsl_module_generated_header ${glsl_module_generated_header} PARENT_SCOPE)
 
-if(SLANG_BOOTSTRAP_IGNORE_ABORT_MSG)
-    set(slang_bootstrap_ignore_abort_msg_arg -ignore-abort-msg)
-else()
-    set(slang_bootstrap_ignore_abort_msg_arg)
-endif()
-
 add_custom_command(
     OUTPUT ${core_module_generated_header} ${glsl_module_generated_header}
     COMMAND
         slang-bootstrap -archive-type riff-lz4 -save-core-module-bin-source
         ${core_module_generated_header} -save-glsl-module-bin-source
-        ${glsl_module_generated_header} ${slang_bootstrap_ignore_abort_msg_arg}
+        ${glsl_module_generated_header}
     DEPENDS slang-bootstrap slang-without-embedded-core-module
     VERBATIM
 )

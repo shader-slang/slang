@@ -4,7 +4,7 @@
 //TEST(compute, metal):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-metal -compute -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -output-using-type
 
-//TEST_INPUT:ubuffer(data=[0 0 0], stride=1):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0], stride=4):out,name=outputBuffer
 uniform RWStructuredBuffer<float> outputBuffer;
 
 struct MyBlock

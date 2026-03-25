@@ -903,6 +903,12 @@ local insts = {
 	},
 	{ specialize = { operands = { { "base" }, { "arg" } }, hoistable = true } },
 	{ lookupWitness = { struct_name = "LookupWitnessMethod", min_operands = 2, hoistable = true } },
+	{
+		PackBranch = {
+			operands = { { "pack" }, { "emptyValue" }, { "nonEmptyValue" } },
+			hoistable = true,
+		},
+	},
 	{ GetSequentialID = { operands = { { "RTTIOperand" } }, hoistable = true } },
 	{
 		bind_global_generic_param = {
@@ -1933,6 +1939,7 @@ local insts = {
 				AnyValueSize = { struct_name = "AnyValueSizeDecoration", operands = { { "sizeOperand", "IRIntLit" } } },
 			},
 			{ SpecializeDecoration = {} },
+			{ SpecializationDepthDecoration = { operands = { { "specializationDepthOperand", "IRIntLit" } } } },
 			{ SequentialIDDecoration = { operands = { { "sequentialIdOperand", "IRIntLit" } } } },
 			{ DynamicDispatchWitnessDecoration = {} },
 			{ StaticRequirementDecoration = {} },
@@ -2460,14 +2467,18 @@ local insts = {
 	{ CastDescriptorHandleToResource = { operands = { { "handle" } } } },
 	{ CastResourceToDescriptorHandle = { operands = { { "resource" } } } },
 	{ TreatAsDynamicUniform = { operands = { { "value" } } } },
-	{ sizeOf = { operands = { { "type" } } } },
-	{ alignOf = { operands = { { "baseOp" } } } },
+	{ sizeOf = { operands = { { "type" }, { "dataLayout", "IRType", optional = true } } } },
+	{ alignOf = { operands = { { "baseOp" }, { "dataLayout", "IRType", optional = true } } } },
 	{ countOf = { operands = { { "type" } } } },
-	{ ExtractFirstFromPack = { operands = { { "pack" } }, hoistable = true } },
-	{ ExtractLastFromPack = { operands = { { "pack" } }, hoistable = true } },
-	{ TrimHeadOfPack = { operands = { { "pack" } }, hoistable = true } },
-	{ TrimTailOfPack = { operands = { { "pack" } }, hoistable = true } },
-	{ NonEmptyPackWitness = { hoistable = true } },
+	{ ExtractFirstFromPack = { operands = { { "pack" }, { "witness" } }, hoistable = true } },
+	{ ExtractLastFromPack = { operands = { { "pack" }, { "witness" } }, hoistable = true } },
+	{ TrimFirstOfPack = { operands = { { "pack" }, { "witness" } }, hoistable = true } },
+	{ TrimLastOfPack = { operands = { { "pack" }, { "witness" } }, hoistable = true } },
+	{ ShapeConcat = { operands = { { "leftPack" }, { "rightPack" }, { "axis" } }, hoistable = true } },
+	{ ShapePermute = { operands = { { "pack" }, { "order" } }, hoistable = true } },
+	{ ShapeSwap = { operands = { { "pack" }, { "dim0" }, { "dim1" } }, hoistable = true } },
+	{ ShapeReduce = { operands = { { "pack" }, { "axis" } }, hoistable = true } },
+	{ NonEmptyPackWitness = { operands = { { "pack" } }, hoistable = true } },
 	{ GetArrayLength = { operands = { { "array" } } } },
 	{
 		IsType = {
@@ -2992,6 +3003,14 @@ local insts = {
 		--
 		hoistable = true
 	} },
+	{ LateRequireCapability = {
+		-- A capability requirement that is checked after linking, specialization, and IR-level dead
+		-- code elimination passes.
+		--
+		-- Parameters: IRCapabilitySet
+		operands = { { "capabilitySet", "IRCapabilitySet" } },
+	} },
+
 	-- Constexpr arithmetic ops. These are hoistable variants of the regular
 	-- arithmetic ops, used for lowering compile-time integer expressions
 	-- (IntVal subclasses like PolynomialIntVal) so that they get deduplicated.

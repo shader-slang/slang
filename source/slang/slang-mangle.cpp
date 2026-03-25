@@ -287,6 +287,13 @@ void emitType(ManglingContext* context, Type* type)
         emitRaw(context, "Tx");
         emitType(context, expandType->getPatternType());
     }
+    else if (auto packBranchType = as<PackBranchType>(type))
+    {
+        emitRaw(context, "Tb");
+        emitVal(context, packBranchType->getPackOperand());
+        emitType(context, packBranchType->getEmptyType());
+        emitType(context, packBranchType->getNonEmptyType());
+    }
     else if (auto firstType = as<FirstPackElementType>(type))
     {
         emitRaw(context, "Tf");
@@ -297,15 +304,15 @@ void emitType(ManglingContext* context, Type* type)
         emitRaw(context, "Tl");
         emitType(context, lastType->getBasePack());
     }
-    else if (auto trimHeadType = as<TrimHeadTypePack>(type))
+    else if (auto trimFirstType = as<TrimFirstTypePack>(type))
     {
         emitRaw(context, "Th");
-        emitType(context, trimHeadType->getBasePack());
+        emitType(context, trimFirstType->getBasePack());
     }
-    else if (auto trimTailType = as<TrimTailTypePack>(type))
+    else if (auto trimLastType = as<TrimLastTypePack>(type))
     {
         emitRaw(context, "Tt");
-        emitType(context, trimTailType->getBasePack());
+        emitType(context, trimLastType->getBasePack());
     }
     else if (auto eachType = as<EachType>(type))
     {
@@ -456,15 +463,41 @@ void emitVal(ManglingContext* context, Val* val)
         for (Index i = 0; i < expandIntValPack->getCapturedPackCount(); i++)
             emitVal(context, expandIntValPack->getCapturedPack(i));
     }
-    else if (auto trimHeadIntValPack = as<TrimHeadIntValPack>(val))
+    else if (auto trimFirstIntValPack = as<TrimFirstIntValPack>(val))
     {
         emitRaw(context, "Vh");
-        emitVal(context, trimHeadIntValPack->getBasePack());
+        emitVal(context, trimFirstIntValPack->getBasePack());
     }
-    else if (auto trimTailIntValPack = as<TrimTailIntValPack>(val))
+    else if (auto trimLastIntValPack = as<TrimLastIntValPack>(val))
     {
         emitRaw(context, "Vt");
-        emitVal(context, trimTailIntValPack->getBasePack());
+        emitVal(context, trimLastIntValPack->getBasePack());
+    }
+    else if (auto shapeConcatIntValPack = as<ShapeConcatIntValPack>(val))
+    {
+        emitRaw(context, "Vc");
+        emitVal(context, shapeConcatIntValPack->getLeftPack());
+        emitVal(context, shapeConcatIntValPack->getRightPack());
+        emitVal(context, shapeConcatIntValPack->getAxis());
+    }
+    else if (auto shapePermuteIntValPack = as<ShapePermuteIntValPack>(val))
+    {
+        emitRaw(context, "Vr");
+        emitVal(context, shapePermuteIntValPack->getValuePack());
+        emitVal(context, shapePermuteIntValPack->getOrderPack());
+    }
+    else if (auto shapeSwapIntValPack = as<ShapeSwapIntValPack>(val))
+    {
+        emitRaw(context, "Vs");
+        emitVal(context, shapeSwapIntValPack->getValuePack());
+        emitVal(context, shapeSwapIntValPack->getDim0());
+        emitVal(context, shapeSwapIntValPack->getDim1());
+    }
+    else if (auto shapeReduceIntValPack = as<ShapeReduceIntValPack>(val))
+    {
+        emitRaw(context, "Vd");
+        emitVal(context, shapeReduceIntValPack->getValuePack());
+        emitVal(context, shapeReduceIntValPack->getAxis());
     }
     else
     {

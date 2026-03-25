@@ -18,14 +18,22 @@ User-specific instructions for Slang (optional, may not exist):
 
 ### Building the Project
 
+If you are running in a Windows sandbox, run extras\win-sandbox-build.bat to produce a build in
+debug configuration. This script discovers Visual Studio, runs vcvarsall.bat, configures with the
+`vs2022-dev` preset, prefers locally cached dependencies instead of fetching them over the network,
+and defaults to building `slangc`, `slang-test`, and `slangi`. Pass extra target names if you need
+something other than that default target set.
+
+On non-Windows platforms (Linux/macOS), run cmake directly to build:
+
 ```bash
 # Configure with default settings (Ninja Multi-Config)
 cmake --preset default
 
 # Configure with visual studio 2022 settings (Preferred on Windows)
-# On Windows, include -DSLANG_BOOTSTRAP_IGNORE_ABORT_MSG=ON to suppress
+# On Windows, include -DSLANG_IGNORE_ABORT_MSG=ON to suppress
 # modal abort dialogs during unattended/LLM-driven builds.
-cmake.exe --preset vs2022 -DSLANG_BOOTSTRAP_IGNORE_ABORT_MSG=ON
+cmake.exe --preset vs2022 -DSLANG_IGNORE_ABORT_MSG=ON
 
 # Build Release/Debug binaries.
 # It can take from 5 minutes to 20 minutes depending on the machine.
@@ -40,11 +48,14 @@ cmake --build --preset debug --target slangc
 cmake --build --preset debug --target slang-test
 ```
 
+**sccache**: Pass `-DSLANG_USE_SCCACHE=ON` at configure time (or set `SLANG_USE_SCCACHE=1` env var) to use sccache as the compiler launcher for faster rebuilds. This automatically disables precompiled headers due to a known incompatibility. Requires `sccache` in PATH.
+
 When building with `cmake --build`, redirect all of outputs to null-device.
 When the build failed, then, re-run the same command without the redirections.
 It is to avoid wasting the token usage of LLM.
 
 Example,
+
 ```
 # Print the build logs only when the initial attempt failed.
 cmake --build --preset debug >/dev/null 2>&1 || cmake --build --preset debug
@@ -201,6 +212,7 @@ slangc -dump-ir-before lowerGenerics -dump-ir-after lowerGenerics -target spirv-
 #### InstTrace
 
 Trace where a problematic IR instruction was created:
+
 ```bash
 python3 ./extras/insttrace.py <debugUID> ./build/Debug/bin/slangc tests/my-test.slang -target spirv
 ```
@@ -215,15 +227,15 @@ python3 ./extras/insttrace.py <debugUID> ./build/Debug/bin/slangc tests/my-test.
 
 On Windows, assertion failures normally open a modal dialog that blocks execution. Set the `SLANG_ASSERT` environment variable to control this:
 
-| Value | Behavior |
-|---|---|
-| `system` | Use the system `assert()`, which shows a modal dialog and allows the developers to attach the debugger |
-| `debugbreak` | When a debugger is already attached, it will hit a debug-break; fall back to `system` behavior when a debugger is not attached |
-| `release-assert-only` | Skip debug-only assertions (`SLANG_ASSERT`, `SLANG_ASSERT_FAILURE`) and continue; `SLANG_RELEASE_ASSERT` still fires |
-| *(unset)* | Throws an exception |
+| Value                 | Behavior                                                                                                                       |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `system`              | Use the system `assert()`, which shows a modal dialog and allows the developers to attach the debugger                         |
+| `debugbreak`          | When a debugger is already attached, it will hit a debug-break; fall back to `system` behavior when a debugger is not attached |
+| `release-assert-only` | Skip debug-only assertions (`SLANG_ASSERT`, `SLANG_ASSERT_FAILURE`) and continue; `SLANG_RELEASE_ASSERT` still fires           |
+| _(unset)_             | Throws an exception                                                                                                            |
 
-The behavior on Windows after an exception is thrown is controlled by a CMake option `SLANG_BOOTSTRAP_IGNORE_ABORT_MSG` or `-ignore-abort-msg` command-line argument.
-Both options are highly recommended for unattended automation with LLM workflow.
+The behavior on Windows after an exception is thrown is controlled by the CMake option `SLANG_IGNORE_ABORT_MSG`.
+This option is highly recommended for unattended automation with LLM workflow; it bakes the behavior into all built executables at compile time.
 
 #### RTX Remix Testing
 
@@ -275,6 +287,7 @@ Code generation supports all major APIs but runtime testing requires appropriate
 
 **WSL on Windows**:
 When running under WSL environment, try to append `.exe` to the executables to avoid using Linux binaries
+
 - Use `cmake.exe` instead of `cmake`,
 - Use `python.exe` instead of `python`,
 - Use `gh.exe` instead of `gh` and so on.

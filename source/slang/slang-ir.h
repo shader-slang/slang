@@ -2133,7 +2133,7 @@ public:
     // anything to do with serialization format
     //
     const static UInt k_minSupportedModuleVersion = 4;
-    const static UInt k_maxSupportedModuleVersion = 10;
+    const static UInt k_maxSupportedModuleVersion = 12;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
 private:
@@ -2370,6 +2370,11 @@ extern bool _slangIRPrintStackAtBreak;
 void _debugSetInstBeingCloned(uint32_t uid);
 void _debugResetInstBeingCloned();
 #endif
+
+// Print a call stack leading to 'inst' as a series of
+// Diagnostics::seeCallOfFunc diagnostic messages.
+void diagnoseCallStack(IRInst* inst, DiagnosticSink* sink);
+
 
 // TODO: Ellie, comment and move somewhere more appropriate?
 
