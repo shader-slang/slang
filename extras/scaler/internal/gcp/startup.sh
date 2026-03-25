@@ -95,6 +95,12 @@ if [ ! -e /dev/nvidia-modeset ]; then
   nvidia-modprobe -m 2>/dev/null || modprobe nvidia-modeset 2>/dev/null || true
 fi
 
+# Enable GPU persistence mode to prevent NVML state corruption in containers.
+# Without this, NVML can lose track of GPU processes when they exit inside Docker,
+# causing "Failed to initialize NVML: Unknown Error".
+log "  Enabling GPU persistence mode..."
+nvidia-smi -pm 1 2>/dev/null || true
+
 # Verify GPU devices
 log "  GPU devices:"
 ls -la /dev/nvidia* 2>&1 | while read -r line; do log "    $line"; done || true
