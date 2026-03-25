@@ -3383,18 +3383,13 @@ struct TypeFlowSpecializationContext
                 IRBuilder builder(module);
                 builder.setInsertInto(module);
 
-                if (auto info = tryGetInfo(context, witnessTableType->getConformanceType()))
+                if (!isGlobalInst(witnessTableType))
                 {
-                    if (as<IRElementOfSetType>(info))
-                    {
-                        // TODO: Does this make sense? Technically, this type isn't really important
-                        // since it's going to get removed anyway..
-                        // Should it be ElementOfSetType(WitnessTableType1, WitnessTableType2, ...)?
-                        //
-                        typeOfSpecialization = builder.getWitnessTableType((IRType*)info);
-                    }
-                    else
-                        typeOfSpecialization = inst->getDataType();
+                    // Just use a dummy sentinel type.. we don't actually care about the
+                    // structure of the witness table type, since everything is
+                    // inferred from data-flow.
+                    //
+                    typeOfSpecialization = builder.getWitnessTableType(builder.getVoidType());
                 }
                 else
                     typeOfSpecialization = inst->getDataType();

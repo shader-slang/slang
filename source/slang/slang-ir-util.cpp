@@ -3160,7 +3160,6 @@ bool isReadNoneCallee(IRInst* callee)
         {
         // Translations that have the same readNone property as the original function.
         case kIROp_BackwardDifferentiatePrimal:
-        case kIROp_BackwardDifferentiatePropagate:
         case kIROp_BackwardPrimalFromLegacyBwdDiffFunc:
         case kIROp_ForwardDifferentiate:
         case kIROp_TrivialForwardDifferentiate:
@@ -3227,10 +3226,6 @@ bool isNoSideEffectCallee(IRInst* callee)
 
         case kIROp_BackwardPropagateFromLegacyBwdDiffFunc:
             return isNoSideEffectCallee(callee->getOperand(1));
-
-        // Translations that are noSideEffect if the original function is readNone.
-        case kIROp_BackwardDifferentiatePropagate:
-            return isReadNoneCallee(callee->getOperand(0));
 
         // Translations that produce a noSideEffect function even if the original function
         // is not noSideEffect.

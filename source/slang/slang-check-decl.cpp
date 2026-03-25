@@ -6646,6 +6646,13 @@ static void removeNonStaticLookupItems(LookupResult& lookupResult)
         {
             newItems.add(item);
         }
+        else if (auto genericDecl = as<GenericDecl>(item.declRef.getDecl()))
+        {
+            if (getInner(genericDecl)->findModifier<HLSLStaticModifier>())
+            {
+                newItems.add(item);
+            }
+        }
     }
 
     lookupResult.items = newItems;
@@ -6661,7 +6668,21 @@ static void removeStaticLookupItems(LookupResult& lookupResult)
     List<LookupResultItem> newItems;
     for (auto item : lookupResult)
     {
+        bool isStatic = true;
+
         if (!item.declRef.getDecl()->findModifier<HLSLStaticModifier>())
+        {
+            isStatic = false;
+        }
+        else if (auto genericDecl = as<GenericDecl>(item.declRef.getDecl()))
+        {
+            if (!getInner(genericDecl)->findModifier<HLSLStaticModifier>())
+            {
+                isStatic = false;
+            }
+        }
+
+        if (!isStatic)
         {
             newItems.add(item);
         }
@@ -6769,18 +6790,6 @@ bool SemanticsVisitor::trySynthesizeMethodRequirementWitness(
     // With the big picture spelled out, we can settle into
     // the work of constructing our synthesized method.
     //
-    // First, we check that the differentiabliity of the method matches the requirement,
-    // and we don't attempt to synthesize a method if they don't match.
-    if (lookupResult.isValid())
-    {
-        if (getShared()->getFuncDifferentiableLevel(
-                as<FunctionDeclBase>(lookupResult.item.declRef.getDecl())) <
-            getShared()->getFuncDifferentiableLevel(
-                as<FunctionDeclBase>(requiredMemberDeclRef.getDecl())))
-        {
-            return false;
-        }
-    }
 
     ThisExpr* synThis = nullptr;
     List<Expr*> synArgs;
@@ -13275,6 +13284,34 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
             auto funcAsLookupType =
                 DeclRefType::create(getCurrentASTBuilder(), funcAsLookupDeclRef);
 
+
+            // If we have any form of differentiability on this requirement, we need to reason about
+            // the differentiability of the this type.
+            // The key issue is that even if the current this-type is non-differentiable, it does
+            // not prevent access via a lookup path from a differentiable type.
+            //
+            // To maintain consistent signatures, we add a `NoDiffThis` attribute if the type
+            // is non-differentiable, which will always
+            // cause any substituted this-type to be considered non-differentiable
+            //
+            if (decl->findModifier<ForwardDifferentiableAttribute>() ||
+                decl->findModifier<BackwardDifferentiableAttribute>() ||
+                decl->findModifier<MaybeDifferentiableAttribute>())
+            {
+                // Add type modifiers to the decl based on the differentiability.
+                auto interfaceDeclRef = createDefaultSubstitutionsIfNeeded(
+                    m_astBuilder,
+                    this,
+                    makeDeclRef(getParentInterfaceDecl(decl)));
+                auto interfaceType = DeclRefType::create(m_astBuilder, interfaceDeclRef);
+                bool noDiffThisRequirement = !isTypeDifferentiable(interfaceType);
+                if (noDiffThisRequirement)
+                {
+                    auto noDiffThisModifier = m_astBuilder->create<NoDiffThisAttribute>();
+                    addModifier(decl, noDiffThisModifier);
+                }
+            }
+
             if (decl->findModifier<ForwardDifferentiableAttribute>() ||
                 decl->findModifier<BackwardDifferentiableAttribute>() ||
                 decl->findModifier<MaybeDifferentiableAttribute>())
@@ -13309,19 +13346,6 @@ void SemanticsDeclHeaderVisitor::checkDifferentiableCallableCommon(CallableDecl*
                         bwdDiffConstraintDecl,
                         getCurrentASTBuilder()->create<OptionalConstraintModifier>());
                 decl->addMember(bwdDiffConstraintDecl);
-            }
-
-            // Add type modifiers to the decl based on the differentiability.
-            auto interfaceDeclRef = createDefaultSubstitutionsIfNeeded(
-                m_astBuilder,
-                this,
-                makeDeclRef(getParentInterfaceDecl(decl)));
-            auto interfaceType = DeclRefType::create(m_astBuilder, interfaceDeclRef);
-            bool noDiffThisRequirement = !isTypeDifferentiable(interfaceType);
-            if (noDiffThisRequirement)
-            {
-                auto noDiffThisModifier = m_astBuilder->create<NoDiffThisAttribute>();
-                addModifier(decl, noDiffThisModifier);
             }
         }
     }
