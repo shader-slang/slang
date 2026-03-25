@@ -99,7 +99,11 @@ fi
 # Without this, NVML can lose track of GPU processes when they exit inside Docker,
 # causing "Failed to initialize NVML: Unknown Error".
 log "  Enabling GPU persistence mode..."
-nvidia-smi -pm 1 2>/dev/null || true
+if pm_out="$(nvidia-smi -pm 1 2>&1)"; then
+  log "  GPU persistence mode enabled."
+else
+  log "WARNING: Failed to enable GPU persistence mode: ${pm_out}"
+fi
 
 # Verify GPU devices
 log "  GPU devices:"
