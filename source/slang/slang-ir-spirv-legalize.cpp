@@ -2067,77 +2067,90 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
     // Vulkan requires NonUniform on the resource operand of the consuming instruction,
     // not just on the index used in an access chain.
     //
-    // This runs as a fixed-point loop because decorating a Load may enable further
-    // propagation to downstream MakeCombinedTextureSampler or secondary access chains.
+    // Uses a worklist seeded with already-decorated instructions. When an
+    // instruction is newly decorated, its users are added to the worklist so
+    // propagation continues downstream without rescanning the whole module.
     void propagateNonUniformAccessChainDecorations()
     {
-        bool changed = true;
-        while (changed)
-        {
-            changed = false;
-            for (auto globalInst : m_module->getGlobalInsts())
-            {
-                auto func = as<IRFunc>(globalInst);
-                if (!func)
-                    continue;
+        List<IRInst*> worklist;
+        HashSet<IRInst*> inWorklist;
 
-                for (auto block : func->getBlocks())
+        // Seed: collect all instructions that already carry NonUniform.
+        for (auto globalInst : m_module->getGlobalInsts())
+        {
+            auto func = as<IRFunc>(globalInst);
+            if (!func)
+                continue;
+            for (auto block : func->getBlocks())
+            {
+                for (auto inst : block->getChildren())
                 {
-                    for (auto inst : block->getChildren())
+                    if (hasNonUniformDecoration(inst))
                     {
-                        switch (inst->getOp())
-                        {
-                        case kIROp_GetElement:
-                        case kIROp_GetElementPtr:
-                        case kIROp_RWStructuredBufferGetElementPtr:
-                            {
-                                auto baseOperand = inst->getOperand(0);
-                                auto indexOperand = inst->getOperand(1);
-                                bool baseDec = hasNonUniformDecoration(baseOperand);
-                                bool indexDec = hasNonUniformDecoration(indexOperand);
-                                bool instDec = hasNonUniformDecoration(inst);
-                                if (!baseDec && !indexDec && !instDec)
-                                    break;
-                                if ((indexDec || baseDec) && !instDec)
-                                    changed |= addNonUniformDecoration(inst);
-                            }
-                            break;
-                        case kIROp_FieldAddress:
-                        case kIROp_FieldExtract:
-                            {
-                                // Propagate from a NonUniform base through field access.
-                                auto base = inst->getOperand(0);
-                                if (hasNonUniformDecoration(base) && !hasNonUniformDecoration(inst))
-                                    changed |= addNonUniformDecoration(inst);
-                            }
-                            break;
-                        case kIROp_Load:
-                            {
-                                // A load from a NonUniform pointer produces a NonUniform
-                                // value -- this is the key propagation that ensures the
-                                // actual resource operand gets decorated.
-                                auto ptr = inst->getOperand(0);
-                                if (hasNonUniformDecoration(ptr) && !hasNonUniformDecoration(inst))
-                                    changed |= addNonUniformDecoration(inst);
-                            }
-                            break;
-                        case kIROp_MakeCombinedTextureSampler:
-                            {
-                                // If either the texture or sampler operand is NonUniform,
-                                // the combined sampled-image result must also be NonUniform.
-                                auto tex = inst->getOperand(0);
-                                auto samp = inst->getOperand(1);
-                                if ((hasNonUniformDecoration(tex) ||
-                                     hasNonUniformDecoration(samp)) &&
-                                    !hasNonUniformDecoration(inst))
-                                    changed |= addNonUniformDecoration(inst);
-                            }
-                            break;
-                        default:
-                            break;
-                        }
+                        worklist.add(inst);
+                        inWorklist.add(inst);
                     }
                 }
+            }
+        }
+
+        auto enqueueUsers = [&](IRInst* inst)
+        {
+            for (auto use = inst->firstUse; use; use = use->nextUse)
+            {
+                auto user = use->getUser();
+                if (!inWorklist.contains(user))
+                {
+                    worklist.add(user);
+                    inWorklist.add(user);
+                }
+            }
+        };
+
+        // Returns true if inst was newly decorated and its users should be visited.
+        auto tryPropagate = [&](IRInst* inst) -> bool
+        {
+            if (hasNonUniformDecoration(inst))
+                return false;
+            switch (inst->getOp())
+            {
+            case kIROp_GetElement:
+            case kIROp_GetElementPtr:
+            case kIROp_RWStructuredBufferGetElementPtr:
+                if (hasNonUniformDecoration(inst->getOperand(0)) ||
+                    hasNonUniformDecoration(inst->getOperand(1)))
+                    return addNonUniformDecoration(inst);
+                break;
+            case kIROp_FieldAddress:
+            case kIROp_FieldExtract:
+                if (hasNonUniformDecoration(inst->getOperand(0)))
+                    return addNonUniformDecoration(inst);
+                break;
+            case kIROp_Load:
+                if (hasNonUniformDecoration(inst->getOperand(0)))
+                    return addNonUniformDecoration(inst);
+                break;
+            case kIROp_MakeCombinedTextureSampler:
+                if (hasNonUniformDecoration(inst->getOperand(0)) ||
+                    hasNonUniformDecoration(inst->getOperand(1)))
+                    return addNonUniformDecoration(inst);
+                break;
+            default:
+                break;
+            }
+            return false;
+        };
+
+        for (Index i = 0; i < worklist.getCount(); i++)
+        {
+            auto inst = worklist[i];
+            if (hasNonUniformDecoration(inst))
+            {
+                enqueueUsers(inst);
+            }
+            else if (tryPropagate(inst))
+            {
+                enqueueUsers(inst);
             }
         }
     }
