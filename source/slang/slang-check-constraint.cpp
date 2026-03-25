@@ -640,14 +640,20 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
 
                 if (typeParam->initType && typeParam->parameterIndex >= knownGenericArgCount)
                 {
-                    constraintSystemSolverFinalizeArgs(this, genericDeclRef, knownGenericArgCount, solvedArgs, args);
+                    constraintSystemSolverFinalizeArgs(
+                        this,
+                        genericDeclRef,
+                        knownGenericArgCount,
+                        solvedArgs,
+                        args);
                     // If we have a default arg for this parameter, we can try to
                     // use it.
                     auto genSubst = m_astBuilder->getGenericAppDeclRef(
                         genericDeclRef,
                         args.getArrayView().arrayView);
-                    auto defaultType =
-                        SubstitutionSet(genSubst).applyToType(m_astBuilder, typeParam->initType.type);
+                    auto defaultType = SubstitutionSet(genSubst).applyToType(
+                        m_astBuilder,
+                        typeParam->initType.type);
                     if (defaultType)
                     {
                         Constraint c;
@@ -668,11 +674,18 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
                 if (valParam->initExpr && valParam->parameterIndex >= knownGenericArgCount)
                 {
                     ensureDecl(makeDeclRef(valParam), DeclCheckState::DefinitionChecked);
-                    constraintSystemSolverFinalizeArgs(this, genericDeclRef, knownGenericArgCount, solvedArgs, args);
+                    constraintSystemSolverFinalizeArgs(
+                        this,
+                        genericDeclRef,
+                        knownGenericArgCount,
+                        solvedArgs,
+                        args);
                     auto genSubst = m_astBuilder->getGenericAppDeclRef(
                         genericDeclRef,
                         args.getArrayView().arrayView);
-                    ConstantFoldingCircularityInfo newCircularityInfo(makeDeclRef(valParam), nullptr);
+                    ConstantFoldingCircularityInfo newCircularityInfo(
+                        makeDeclRef(valParam),
+                        nullptr);
                     auto defaultVal = tryConstantFoldExpr(
                         applySubstitutionToExpr(SubstitutionSet(genSubst), valParam->initExpr),
                         ConstantFoldingKind::CompileTime,
@@ -698,7 +711,7 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
     // We will then iterate over the constraints trying to solve all generic parameters.
     // Note that we do not use ranged for here, because processing one constraint may lead to
     // new constraints being discovered.
-    for (Index constraintIndex = 0; ; constraintIndex++)
+    for (Index constraintIndex = 0;; constraintIndex++)
     {
         if (constraintIndex == system->constraints.getCount())
         {
@@ -876,7 +889,12 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
     // with the resolved types and values for the generic parameters. We can
     // now verify if they are complete and consolidate them into final argument
     // list.
-    if (!constraintSystemSolverFinalizeArgs(this, genericDeclRef, knownGenericArgCount, solvedArgs, args))
+    if (!constraintSystemSolverFinalizeArgs(
+            this,
+            genericDeclRef,
+            knownGenericArgCount,
+            solvedArgs,
+            args))
         return DeclRef<Decl>();
 
     // After we've solved for the explicit arguments, we need to
