@@ -48,8 +48,7 @@ std::size_t DeviceCache::DeviceCacheKeyHash::operator()(const DeviceCacheKey& ke
     std::size_t h7 = std::hash<uint32_t>{}(key.nvapiExtUavSlot);
     std::size_t h8 = std::hash<bool>{}(key.dx12ExperimentalFeatures);
 
-    return h1 ^ (h2 << 1) ^ (h3 << 2) ^ (h4 << 3) ^ (h5 << 4) ^ (h6 << 5) ^ (h7 << 6) ^
-           (h8 << 7);
+    return h1 ^ (h2 << 1) ^ (h3 << 2) ^ (h4 << 3) ^ (h5 << 4) ^ (h6 << 5) ^ (h7 << 6) ^ (h8 << 7);
 }
 
 DeviceCache::CachedDevice::CachedDevice()

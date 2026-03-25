@@ -166,7 +166,10 @@ typedef TestResult (*TestCallback)(TestContext* context, TestInput& input);
 // Globals
 
 // Pre declare
-static void _addRenderTestOptions(const Options& options, CommandLine& ioCmdLine, bool allowCacheRHI);
+static void _addRenderTestOptions(
+    const Options& options,
+    CommandLine& ioCmdLine,
+    bool allowCacheRHI);
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! Functions !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
@@ -3863,7 +3866,10 @@ TestResult runGLSLComparisonTest(TestContext* context, TestInput& input)
     return TestResult::Pass;
 }
 
-static void _addRenderTestOptions(const Options& options, CommandLine& ioCmdLine, bool allowCacheRHI)
+static void _addRenderTestOptions(
+    const Options& options,
+    CommandLine& ioCmdLine,
+    bool allowCacheRHI)
 {
     if (!options.emitSPIRVDirectly)
     {
