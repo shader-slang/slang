@@ -15,7 +15,7 @@
 //WARN-NOT: error[E41012]
 
 //ERROR-NOT: warning[E41012]
-//ERROR: error[E41012]
+//ERROR: error[E41013]
 
 buffer MyBlockName
 {
