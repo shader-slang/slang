@@ -17,26 +17,26 @@ These features have been carefully implemented with an understanding of GPU perf
 
 Some of the benefits of Slang include:
 
-* Slang is backwards compatible with most existing HLSL code
+* Slang is backward compatible with most existing HLSL code.
 
-* _Parameter blocks_ allow shader parameters to be grouped by update rate in order to take advantage of Direct3D 12 descriptor tables and Vulkan descriptor sets, without verbose and error-prone per-parameter markup
+* _Parameter blocks_ allow shader parameters to be grouped by update rate in order to take advantage of Direct3D 12 descriptor tables and Vulkan descriptor sets, without verbose and error-prone per-parameter markup.
 
 * _Interfaces_ and _generics_ provide first-class alternatives to hacky preprocessor-based or string-pasting shader specialization. Preprocessor hacks can be replaced with a well-understood language feature already used in Rust, Swift, C#, Java, and more.
 
 * _Automatic differentiation_ greatly simplifies the implementation of learning-based techniques in shaders. Slang supports automatically generating both forward derivative and backward derivative propagation functions from forward computation code.
 
-* Slang supports a first-class _module_ system, which enables true separate compilation and semantic checking of shader code. 
+* Slang supports a first-class _module_ system, which enables true separate compilation and semantic checking of shader code.
 
-* Slang supports compute, rasterization, and ray-tracing shaders
+* Slang supports compute, rasterization, and ray-tracing shaders.
 
-* The same Slang compiler can generate code for DX bytecode, DXIL, SPIR-V, HLSL, GLSL, CUDA, and more
+* The same Slang compiler can generate code for DX bytecode, DXIL, SPIR-V, HLSL, GLSL, CUDA, and more.
 
-* Slang provides a robust and feature-complete reflection API, which provides binding/offset/layout information about all shader parameters in a consistent format across all the supported targets
+* Slang provides a robust and feature-complete reflection API, offering binding/offset/layout information about all shader parameters in a consistent format across all supported targets.
 
 Who is Slang for?
 -----------------
 
-Slang aims to be the best language possible for real-time graphics developers who care about code quality, portability and performance.
+Slang aims to be the best language possible for real-time graphics developers who care about code quality, portability, and performance.
 
 ### Real-Time Graphics Developers
 
@@ -66,7 +66,7 @@ Who is this guide for?
 ----------------------
 
 The content of this guide is written for real-time graphics programmers with a moderate or higher experience level.
-It assumes the reader has previously used a real-time shading language like HLSL, GLSL, or MetalSL together with an API like Direct3D 11/12, Vulkan, or Metal.
+It assumes the reader has previously used a real-time shading language like HLSL, GLSL, or MSL (Metal Shading Language) together with an API like Direct3D 11/12, Vulkan, or Metal.
 We also assume that the reader is familiar enough with C/C++ to understand code examples and API signatures in those languages.
 
 If you are new to programming entirely, this guide is unlikely to be helpful.
@@ -98,6 +98,6 @@ Before we dive into actually _using_ Slang, let us step back and highlight some 
 
 * **Predictability**: Code should do what it appears to, consistently, across as many platforms as possible. Whenever possible the compiler should conform to programmer expectation, even in the presence of "undefined behavior." Tools and optimization passes should keep their behavior as predictable as possible; simple tools empower the user to do smart things.
 
-* **Limited Scope**: The Slang system is a language, compiler, and module. It is not an engine, not a renderer, and not a "framework." The Slang system explicitly does *not* assume responsibility for interacting with GPU APIs to load code, allocate resources, bind parameters, or kick off work. While a user *may* use the Slang runtime library in their application, they are not *required* to do so.
+* **Limited Scope**: The Slang system is a language, compiler, and runtime. It is not an engine, not a renderer, and not a "framework." The Slang system explicitly does _not_ assume responsibility for interacting with GPU APIs to load code, allocate resources, bind parameters, or kick off work. While a user _may_ use the Slang runtime library in their application, they are not _required_ to do so.
 
 The ordering here is significant, with earlier goals generally being more important than later ones.

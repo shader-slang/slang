@@ -27,7 +27,7 @@ jobs:
       packages: read
 
     container:
-      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.4.0
+      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.5.1
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
@@ -96,10 +96,10 @@ jobs:
           slang_test_args=(
             "-category" "full"
             "-expected-failure-list" "tests/expected-failure-github.txt"
+            "-expected-failure-list" "tests/expected-failure-linux.txt"
             "-expected-failure-list" "tests/expected-failure-linux-gpu.txt"
             "-skip-reference-image-generation"
             "-show-adapter-info"
-            "-ignore-abort-msg"
           )
 
           if [ "${{ inputs.server-count }}" -gt 1 ]; then
@@ -128,10 +128,10 @@ jobs:
             -server-count ${{ inputs.server-count }} \
             -category full \
             -emit-spirv-via-glsl \
-            -ignore-abort-msg \
             -api vk \
             -expected-failure-list tests/expected-failure-via-glsl.txt \
             -expected-failure-list tests/expected-failure-github.txt \
+            -expected-failure-list tests/expected-failure-linux.txt \
             -expected-failure-list tests/expected-failure-linux-gpu.txt
 
       - name: GPU post-test diagnostics
@@ -143,6 +143,12 @@ jobs:
           echo "=== GPU Memory & ECC ==="
           nvidia-smi --query-gpu=name,driver_version,memory.used,memory.free,temperature.gpu,ecc.errors.uncorrected.volatile.total,pstate \
             --format=csv,noheader 2>&1 || true
+          echo ""
+          echo "=== XID Errors ==="
+          nvidia-smi -q -d XID_ERRORS 2>&1 || true
+          echo ""
+          echo "=== GPU Process State ==="
+          nvidia-smi pmon -c 1 2>&1 || true
           echo ""
           echo "=== Kernel GPU Messages ==="
           dmesg 2>/dev/null | grep -iE "nvidia|nvrm|xid|gpu|fault|segfault" | tail -50 || \
@@ -158,7 +164,7 @@ jobs:
       packages: read
 
     container:
-      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.4.0
+      image: ghcr.io/shader-slang/slang-linux-gpu-ci:v1.5.1
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
@@ -241,6 +247,12 @@ jobs:
           echo "=== GPU Memory & ECC ==="
           nvidia-smi --query-gpu=name,driver_version,memory.used,memory.free,temperature.gpu,ecc.errors.uncorrected.volatile.total,pstate \
             --format=csv,noheader 2>&1 || true
+          echo ""
+          echo "=== XID Errors ==="
+          nvidia-smi -q -d XID_ERRORS 2>&1 || true
+          echo ""
+          echo "=== GPU Process State ==="
+          nvidia-smi pmon -c 1 2>&1 || true
           echo ""
           echo "=== Kernel GPU Messages ==="
           dmesg 2>/dev/null | grep -iE "nvidia|nvrm|xid|gpu|fault|segfault" | tail -50 || \

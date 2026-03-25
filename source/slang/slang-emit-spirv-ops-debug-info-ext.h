@@ -618,7 +618,7 @@ SpvInst* emitOpDebugValue(
     IRInst* inst,
     const T& idResultType,
     SpvInst* set,
-    IRInst* localVar,
+    SpvInst* localVar,
     IRInst* value,
     SpvInst* expression,
     const Ts& indices)

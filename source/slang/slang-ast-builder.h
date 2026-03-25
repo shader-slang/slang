@@ -659,9 +659,9 @@ public:
 
     Type* getLastElement(Type* basePack);
 
-    Type* getTrimHeadPack(Type* basePack);
+    Type* getTrimFirstPack(Type* basePack);
 
-    Type* getTrimTailPack(Type* basePack);
+    Type* getTrimLastPack(Type* basePack);
 
     ConcreteTypePack* getTypePack(ArrayView<Type*> types);
 
@@ -675,9 +675,17 @@ public:
 
     Val* getLastElement(Val* basePack);
 
-    Val* getTrimHeadPack(Val* basePack);
+    Val* getTrimFirstPack(Val* basePack);
 
-    Val* getTrimTailPack(Val* basePack);
+    Val* getTrimLastPack(Val* basePack);
+
+    Val* getShapeConcatIntValPack(Val* leftPack, Val* rightPack, IntVal* axis);
+
+    Val* getShapePermuteIntValPack(Val* valuePack, Val* orderPack);
+
+    Val* getShapeSwapIntValPack(Val* valuePack, IntVal* dim0, IntVal* dim1);
+
+    Val* getShapeReduceIntValPack(Val* valuePack, IntVal* axis);
 
     NonEmptyPackWitness* getNonEmptyPackWitness(Val* pack);
 
@@ -714,12 +722,12 @@ public:
         Type* superType,
         SubtypeWitness* patternWitness);
 
-    SubtypeWitness* getTrimHeadSubtypeWitness(
+    SubtypeWitness* getTrimFirstSubtypeWitness(
         Type* subType,
         Type* superType,
         SubtypeWitness* patternWitness);
 
-    SubtypeWitness* getTrimTailSubtypeWitness(
+    SubtypeWitness* getTrimLastSubtypeWitness(
         Type* subType,
         Type* superType,
         SubtypeWitness* patternWitness);

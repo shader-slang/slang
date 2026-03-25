@@ -137,7 +137,7 @@ the translation of matrix operations to maintain correct semantics:
 
 ## Mesh Shader Support
 
-Mesh shaders can be targeted using the following types and syntax. The same as task/mesh shaders generally in Slang.
+Mesh shaders can be targeted using the following types and syntax, which is the same as for task/mesh shaders generally in Slang.
 
 ```slang
 [outputtopology("triangle")]

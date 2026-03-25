@@ -2,17 +2,26 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-dx12 -render-feature cooperative-vector -dx12-experimental -output-using-type -profile cs_6_9 -Xslang... -Xdxc -Vd -X.
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -output-using-type
 
+//TEST(compute):SIMPLE(filecheck=DXIL):-target dxil -profile cs_6_9 -entry computeMain
+//TEST(compute):SIMPLE(filecheck=DXIL):-target dxil -profile cs_6_9 -entry computeMain -DRWBAB
+//DXIL: result code = 0
+
 // CHECK: type: float
 // CHECK-NEXT: 2.000000
 // CHECK-NEXT: 4.000000
 // CHECK-NEXT: 6.000000
 // CHECK-NEXT: 8.000000
 
-//TEST_INPUT:ubuffer(data=[1.0 2.0 3.0 4.0], stride=4),name=input1
-ByteAddressBuffer input1;
-
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
+
+//TEST_INPUT:ubuffer(data=[1.0 2.0 3.0 4.0], stride=4),name=input1
+
+#if defined(RWBAB)
+RWByteAddressBuffer input1;
+#else
+ByteAddressBuffer input1;
+#endif
 
 [numthreads(1, 1, 1)]
 void computeMain()

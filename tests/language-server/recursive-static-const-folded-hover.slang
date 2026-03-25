@@ -18,12 +18,12 @@ struct SumNode<let Head : int, let each Tail : int> : IEval
     typealias Next = __packBranch(
         Tail,
         Empty,
-        SumNode<__first(Tail), __trimHead(Tail)>);
+        SumNode<__first(Tail), __trimFirst(Tail)>);
     static const int value = Head + Next.value;
 }
 
 typealias Sum<let each vals : int> =
-    __packBranch(vals, Empty, SumNode<__first(vals), __trimHead(vals)>);
+    __packBranch(vals, Empty, SumNode<__first(vals), __trimFirst(vals)>);
 
 //HOVER:30,19
 // CHECK: static const int sum = 10

@@ -1646,6 +1646,13 @@ err(
 )
 
 err(
+    "size-of-data-layout-is-invalid",
+    30086,
+    "invalid data layout for sizeof/alignof",
+    span { loc = "expr:Expr", message = "argument does not conform to IBufferDataLayout" }
+)
+
+err(
     "count-of-argument-is-invalid",
     30083,
     "invalid countof argument",
@@ -1671,6 +1678,76 @@ err(
     30412,
     "cannot apply ~queryName to a pack that may be empty",
     span { loc = "expr:Expr", message = "~queryName requires a non-empty pack; add a `where nonempty(...)` constraint or use a structurally non-empty pack" }
+)
+
+err(
+    "shape-pack-argument-is-invalid",
+    30417,
+    "invalid ~opName argument",
+    span { loc = "location", message = "arguments to ~opName must be compile-time int value packs, tuples of int values, or compile-time int indices" }
+)
+
+err(
+    "shape-pack-rank-mismatch",
+    30418,
+    "~opName requires packs of the same rank",
+    span { loc = "location", message = "~opName requires packs of the same rank, but got ranks ~leftRank:Int and ~rightRank:Int" }
+)
+
+err(
+    "shape-pack-axis-out-of-range",
+    30419,
+    "~opName axis is out of range",
+    span { loc = "location", message = "axis ~axis:Int is out of range for rank ~rank:Int in ~opName" }
+)
+
+err(
+    "shape-concat-non-axis-mismatch",
+    30420,
+    "__shapeConcat requires non-axis dimensions to match",
+    span { loc = "location", message = "__shapeConcat requires dimensions to match outside axis ~axis:Int, but dimension ~dimIndex:Int differs" }
+)
+
+err(
+    "shape-permute-order-length-mismatch",
+    30421,
+    "__shapePermute requires an order pack with matching rank",
+    span { loc = "location", message = "__shapePermute requires the order pack to have length ~orderRank:Int matching the input rank ~valueRank:Int" }
+)
+
+err(
+    "shape-permute-index-out-of-range",
+    30422,
+    "__shapePermute index is out of range",
+    span { loc = "location", message = "__shapePermute order index ~indexValue:Int at position ~indexPosition:Int is out of range for rank ~rank:Int" }
+)
+
+err(
+    "shape-permute-duplicate-index",
+    30423,
+    "__shapePermute order contains a duplicate index",
+    span { loc = "location", message = "__shapePermute order index ~indexValue:Int is duplicated at positions ~firstPosition:Int and ~secondPosition:Int" }
+)
+
+err(
+    "shape-pack-no-valid-axis",
+    30424,
+    "~opName has no valid axis",
+    span { loc = "location", message = "rank ~rank:Int provides no valid axis for ~opName" }
+)
+
+err(
+    "shape-concat-no-valid-axis",
+    30425,
+    "__shapeConcat has no valid axis",
+    span { loc = "location", message = "no axis in rank ~rank:Int can make __shapeConcat valid for these shapes" }
+)
+
+err(
+    "shape-permute-duplicate-equivalent-index",
+    30426,
+    "__shapePermute order contains a duplicate index",
+    span { loc = "location", message = "__shapePermute order positions ~firstPosition:Int and ~secondPosition:Int are provably equal, so the order contains a duplicate index" }
 )
 
 err(
@@ -2478,6 +2555,20 @@ err(
     span { loc = "decl:Decl", message = "cannot export incomplete type '~decl'" }
 )
 
+warning(
+    "deprecated-bracket-attributes-placement",
+    31204,
+    "deprecated bracketed attribute list placement. Bracketed attributes should be placed before 'struct'.",
+    span { loc = "location", message = "deprecated placement of bracketed attributes list." }
+)
+
+err(
+    "invalid-bracket-attributes-placement",
+    31205,
+    "invalid bracketed attribute list placement. Bracketed attributes must be placed before 'struct'.",
+    span { loc = "location", message = "invalid placement of bracketed attributes list." }
+)
+
 err(
     "memory-qualifier-not-allowed-on-a-non-image-type-parameter",
     31206,
@@ -2557,10 +2648,10 @@ err(
 -- Specialization and push constants
 
 err(
-    "specialization-constant-must-be-scalar",
+    "specialization-constant-must-be-scalar-or-enum",
     31218,
     "specialization constant type error",
-    span { loc = "modifier:Modifier", message = "specialization constant must be a scalar." }
+    span { loc = "modifier:Modifier", message = "specialization constant must be a scalar or enum type." }
 )
 
 err(
@@ -3433,6 +3524,13 @@ warning(
 )
 
 warning(
+    "integer-constant-overflow",
+    39999,
+    "integer constant overflow in conversion",
+    span { loc = "expr:Expr", message = "integer value '~value' does not fit in type '~toType:Type'" }
+)
+
+warning(
     "float-literal-unrepresentable",
     39999,
     "floating-point literal unrepresentable",
@@ -4170,6 +4268,13 @@ err(
     41024,
     "cannot default-initialize struct containing resource fields",
     span { loc = "location", message = "cannot default-initialize struct '~structName' with '{}' because it contains resource fields" }
+)
+
+err(
+    "accessing-value-of-none-optional",
+    41027,
+    "accessing .value on an Optional that is always none",
+    span { loc = "location", message = "accessing .value on an Optional<~type:IRInst> that is always 'none'" }
 )
 
 

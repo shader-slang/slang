@@ -360,10 +360,10 @@ class ConcreteIntValPack : public IntVal
 };
 
 FIDDLE()
-class TrimHeadIntValPack : public IntVal
+class TrimFirstIntValPack : public IntVal
 {
     FIDDLE(...)
-    TrimHeadIntValPack(Type* inType, Val* basePack) { setOperands(inType, basePack); }
+    TrimFirstIntValPack(Type* inType, Val* basePack) { setOperands(inType, basePack); }
     Val* getBasePack() const { return getOperand(1); }
     void _toTextOverride(StringBuilder& out);
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
@@ -371,11 +371,79 @@ class TrimHeadIntValPack : public IntVal
 };
 
 FIDDLE()
-class TrimTailIntValPack : public IntVal
+class TrimLastIntValPack : public IntVal
 {
     FIDDLE(...)
-    TrimTailIntValPack(Type* inType, Val* basePack) { setOperands(inType, basePack); }
+    TrimLastIntValPack(Type* inType, Val* basePack) { setOperands(inType, basePack); }
     Val* getBasePack() const { return getOperand(1); }
+    void _toTextOverride(StringBuilder& out);
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    Val* _resolveImplOverride();
+};
+
+FIDDLE(abstract)
+class ShapeTransformIntValPack : public IntVal
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class ShapeConcatIntValPack : public ShapeTransformIntValPack
+{
+    FIDDLE(...)
+    ShapeConcatIntValPack(Type* inType, Val* leftPack, Val* rightPack, IntVal* axis)
+    {
+        setOperands(inType, leftPack, rightPack, axis);
+    }
+    Val* getLeftPack() const { return getOperand(1); }
+    Val* getRightPack() const { return getOperand(2); }
+    IntVal* getAxis() const { return as<IntVal>(getOperand(3)); }
+    void _toTextOverride(StringBuilder& out);
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    Val* _resolveImplOverride();
+};
+
+FIDDLE()
+class ShapePermuteIntValPack : public ShapeTransformIntValPack
+{
+    FIDDLE(...)
+    ShapePermuteIntValPack(Type* inType, Val* valuePack, Val* orderPack)
+    {
+        setOperands(inType, valuePack, orderPack);
+    }
+    Val* getValuePack() const { return getOperand(1); }
+    Val* getOrderPack() const { return getOperand(2); }
+    void _toTextOverride(StringBuilder& out);
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    Val* _resolveImplOverride();
+};
+
+FIDDLE()
+class ShapeSwapIntValPack : public ShapeTransformIntValPack
+{
+    FIDDLE(...)
+    ShapeSwapIntValPack(Type* inType, Val* valuePack, IntVal* dim0, IntVal* dim1)
+    {
+        setOperands(inType, valuePack, dim0, dim1);
+    }
+    Val* getValuePack() const { return getOperand(1); }
+    IntVal* getDim0() const { return as<IntVal>(getOperand(2)); }
+    IntVal* getDim1() const { return as<IntVal>(getOperand(3)); }
+    void _toTextOverride(StringBuilder& out);
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    Val* _resolveImplOverride();
+};
+
+FIDDLE()
+class ShapeReduceIntValPack : public ShapeTransformIntValPack
+{
+    FIDDLE(...)
+    ShapeReduceIntValPack(Type* inType, Val* valuePack, IntVal* axis)
+    {
+        setOperands(inType, valuePack, axis);
+    }
+    Val* getValuePack() const { return getOperand(1); }
+    IntVal* getAxis() const { return as<IntVal>(getOperand(2)); }
     void _toTextOverride(StringBuilder& out);
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
     Val* _resolveImplOverride();
@@ -769,10 +837,10 @@ class LastSubtypeWitness : public SubtypeWitness
 };
 
 FIDDLE()
-class TrimHeadSubtypeWitness : public SubtypeWitness
+class TrimFirstSubtypeWitness : public SubtypeWitness
 {
     FIDDLE(...)
-    TrimHeadSubtypeWitness(Type* sub, Type* sup, SubtypeWitness* patternWitness)
+    TrimFirstSubtypeWitness(Type* sub, Type* sup, SubtypeWitness* patternWitness)
     {
         setOperands(sub, sup, patternWitness);
     }
@@ -785,10 +853,10 @@ class TrimHeadSubtypeWitness : public SubtypeWitness
 };
 
 FIDDLE()
-class TrimTailSubtypeWitness : public SubtypeWitness
+class TrimLastSubtypeWitness : public SubtypeWitness
 {
     FIDDLE(...)
-    TrimTailSubtypeWitness(Type* sub, Type* sup, SubtypeWitness* patternWitness)
+    TrimLastSubtypeWitness(Type* sub, Type* sup, SubtypeWitness* patternWitness)
     {
         setOperands(sub, sup, patternWitness);
     }
@@ -1203,13 +1271,13 @@ inline bool isTypeEqualityWitness(Val* witness)
     {
         return isTypeEqualityWitness(expandWitness->getPatternTypeWitness());
     }
-    else if (auto trimHeadWitness = as<TrimHeadSubtypeWitness>(witness))
+    else if (auto trimFirstWitness = as<TrimFirstSubtypeWitness>(witness))
     {
-        return isTypeEqualityWitness(trimHeadWitness->getPatternTypeWitness());
+        return isTypeEqualityWitness(trimFirstWitness->getPatternTypeWitness());
     }
-    else if (auto trimTailWitness = as<TrimTailSubtypeWitness>(witness))
+    else if (auto trimLastWitness = as<TrimLastSubtypeWitness>(witness))
     {
-        return isTypeEqualityWitness(trimTailWitness->getPatternTypeWitness());
+        return isTypeEqualityWitness(trimLastWitness->getPatternTypeWitness());
     }
     return false;
 }

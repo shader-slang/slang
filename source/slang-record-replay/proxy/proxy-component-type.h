@@ -311,7 +311,7 @@ public:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL linkWithOptions(
         slang::IComponentType** outLinkedComponentType,
         uint32_t compilerOptionEntryCount,
-        slang::CompilerOptionEntry* compilerOptionEntries,
+        slang::CompilerOptionEntry const* compilerOptionEntries,
         ISlangBlob** outDiagnostics) override
     {
         RECORD_CALL();
