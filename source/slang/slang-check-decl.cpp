@@ -861,6 +861,11 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
             dispatchIfNotNull(t.type);
         }
     }
+    void visitShapePackTransformExpr(ShapePackTransformExpr* expr)
+    {
+        for (auto arg : expr->args)
+            dispatchIfNotNull(arg);
+    }
     void visitPackBranchTypeExpr(PackBranchTypeExpr* expr)
     {
         dispatchIfNotNull(expr->packOperand.type);

@@ -2447,6 +2447,16 @@ void ConcreteIntValPack::_toTextOverride(StringBuilder& out)
     }
 }
 
+static void _appendShapePackOperandText(StringBuilder& out, Val* val)
+{
+    auto concretePack = as<ConcreteIntValPack>(val);
+    if (concretePack)
+        out << "(";
+    val->toText(out);
+    if (concretePack)
+        out << ")";
+}
+
 Val* ConcreteIntValPack::_substituteImplOverride(
     ASTBuilder* astBuilder,
     SubstitutionSet subst,
@@ -2536,6 +2546,158 @@ Val* TrimLastIntValPack::_resolveImplOverride()
     if (resolvedArg == getBasePack())
         return this;
     return getCurrentASTBuilder()->getTrimLastPack(resolvedArg);
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ShapeConcatIntValPack !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+void ShapeConcatIntValPack::_toTextOverride(StringBuilder& out)
+{
+    out << "__shapeConcat(";
+    _appendShapePackOperandText(out, getLeftPack());
+    out << ", ";
+    _appendShapePackOperandText(out, getRightPack());
+    out << ", ";
+    getAxis()->toText(out);
+    out << ")";
+}
+
+Val* ShapeConcatIntValPack::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    int diff = 0;
+    auto substLeftPack = getLeftPack()->substituteImpl(astBuilder, subst, &diff);
+    auto substRightPack = getRightPack()->substituteImpl(astBuilder, subst, &diff);
+    auto substAxis = as<IntVal>(getAxis()->substituteImpl(astBuilder, subst, &diff));
+    if (!diff)
+        return this;
+    (*ioDiff)++;
+    return astBuilder->getShapeConcatIntValPack(substLeftPack, substRightPack, substAxis);
+}
+
+Val* ShapeConcatIntValPack::_resolveImplOverride()
+{
+    auto resolvedLeftPack = getLeftPack()->resolve();
+    auto resolvedRightPack = getRightPack()->resolve();
+    auto resolvedAxis = as<IntVal>(getAxis()->resolve());
+    if (resolvedLeftPack == getLeftPack() && resolvedRightPack == getRightPack() &&
+        resolvedAxis == getAxis())
+        return this;
+    return getCurrentASTBuilder()->getShapeConcatIntValPack(
+        resolvedLeftPack,
+        resolvedRightPack,
+        resolvedAxis);
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ShapePermuteIntValPack !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+void ShapePermuteIntValPack::_toTextOverride(StringBuilder& out)
+{
+    out << "__shapePermute(";
+    _appendShapePackOperandText(out, getValuePack());
+    out << ", ";
+    _appendShapePackOperandText(out, getOrderPack());
+    out << ")";
+}
+
+Val* ShapePermuteIntValPack::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    int diff = 0;
+    auto substValuePack = getValuePack()->substituteImpl(astBuilder, subst, &diff);
+    auto substOrderPack = getOrderPack()->substituteImpl(astBuilder, subst, &diff);
+    if (!diff)
+        return this;
+    (*ioDiff)++;
+    return astBuilder->getShapePermuteIntValPack(substValuePack, substOrderPack);
+}
+
+Val* ShapePermuteIntValPack::_resolveImplOverride()
+{
+    auto resolvedValuePack = getValuePack()->resolve();
+    auto resolvedOrderPack = getOrderPack()->resolve();
+    if (resolvedValuePack == getValuePack() && resolvedOrderPack == getOrderPack())
+        return this;
+    return getCurrentASTBuilder()->getShapePermuteIntValPack(resolvedValuePack, resolvedOrderPack);
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ShapeSwapIntValPack !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+void ShapeSwapIntValPack::_toTextOverride(StringBuilder& out)
+{
+    out << "__shapeSwap(";
+    _appendShapePackOperandText(out, getValuePack());
+    out << ", ";
+    getDim0()->toText(out);
+    out << ", ";
+    getDim1()->toText(out);
+    out << ")";
+}
+
+Val* ShapeSwapIntValPack::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    int diff = 0;
+    auto substValuePack = getValuePack()->substituteImpl(astBuilder, subst, &diff);
+    auto substDim0 = as<IntVal>(getDim0()->substituteImpl(astBuilder, subst, &diff));
+    auto substDim1 = as<IntVal>(getDim1()->substituteImpl(astBuilder, subst, &diff));
+    if (!diff)
+        return this;
+    (*ioDiff)++;
+    return astBuilder->getShapeSwapIntValPack(substValuePack, substDim0, substDim1);
+}
+
+Val* ShapeSwapIntValPack::_resolveImplOverride()
+{
+    auto resolvedValuePack = getValuePack()->resolve();
+    auto resolvedDim0 = as<IntVal>(getDim0()->resolve());
+    auto resolvedDim1 = as<IntVal>(getDim1()->resolve());
+    if (resolvedValuePack == getValuePack() && resolvedDim0 == getDim0() &&
+        resolvedDim1 == getDim1())
+        return this;
+    return getCurrentASTBuilder()->getShapeSwapIntValPack(
+        resolvedValuePack,
+        resolvedDim0,
+        resolvedDim1);
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ShapeReduceIntValPack !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+void ShapeReduceIntValPack::_toTextOverride(StringBuilder& out)
+{
+    out << "__shapeReduce(";
+    _appendShapePackOperandText(out, getValuePack());
+    out << ", ";
+    getAxis()->toText(out);
+    out << ")";
+}
+
+Val* ShapeReduceIntValPack::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    int diff = 0;
+    auto substValuePack = getValuePack()->substituteImpl(astBuilder, subst, &diff);
+    auto substAxis = as<IntVal>(getAxis()->substituteImpl(astBuilder, subst, &diff));
+    if (!diff)
+        return this;
+    (*ioDiff)++;
+    return astBuilder->getShapeReduceIntValPack(substValuePack, substAxis);
+}
+
+Val* ShapeReduceIntValPack::_resolveImplOverride()
+{
+    auto resolvedValuePack = getValuePack()->resolve();
+    auto resolvedAxis = as<IntVal>(getAxis()->resolve());
+    if (resolvedValuePack == getValuePack() && resolvedAxis == getAxis())
+        return this;
+    return getCurrentASTBuilder()->getShapeReduceIntValPack(resolvedValuePack, resolvedAxis);
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ExpandIntValPack !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -2630,6 +2792,8 @@ bool isAbstractValuePack(Val* val)
     if (as<TrimFirstIntValPack>(val))
         return true;
     if (as<TrimLastIntValPack>(val))
+        return true;
+    if (as<ShapeTransformIntValPack>(val))
         return true;
     if (auto declRefIntVal = as<DeclRefIntVal>(val))
     {

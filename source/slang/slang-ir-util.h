@@ -523,6 +523,11 @@ IRType* getSamplerTypeFromCombinedTextureSampler(IRType* type);
 bool isReadNoneCallee(IRInst* callee);
 bool isNoSideEffectCallee(IRInst* callee);
 
+bool tryGetConstantIntLit(IRInst* inst, Int64& outValue);
+
+bool areKnownEqualShapeElements(IRInst* left, IRInst* right);
+
+IRInst* emitPackLike(IRModule* module, IRInst* oldInst, ArrayView<IRInst*> elements);
 
 } // namespace Slang
 

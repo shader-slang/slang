@@ -2476,6 +2476,10 @@ local insts = {
 	{ ExtractLastFromPack = { operands = { { "pack" }, { "witness" } }, hoistable = true } },
 	{ TrimFirstOfPack = { operands = { { "pack" }, { "witness" } }, hoistable = true } },
 	{ TrimLastOfPack = { operands = { { "pack" }, { "witness" } }, hoistable = true } },
+	{ ShapeConcat = { operands = { { "leftPack" }, { "rightPack" }, { "axis" } }, hoistable = true } },
+	{ ShapePermute = { operands = { { "pack" }, { "order" } }, hoistable = true } },
+	{ ShapeSwap = { operands = { { "pack" }, { "dim0" }, { "dim1" } }, hoistable = true } },
+	{ ShapeReduce = { operands = { { "pack" }, { "axis" } }, hoistable = true } },
 	{ NonEmptyPackWitness = { operands = { { "pack" } }, hoistable = true } },
 	{ GetArrayLength = { operands = { { "array" } } } },
 	{
