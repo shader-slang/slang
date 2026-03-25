@@ -774,4 +774,8 @@ return {
 	["PackBranch"] = 772,
 	["Decoration.SpecializationDepthDecoration"] = 773,
 	["LateRequireCapability"] = 774,
+	["ShapeConcat"] = 775,
+	["ShapePermute"] = 776,
+	["ShapeSwap"] = 777,
+	["ShapeReduce"] = 778,
 }
