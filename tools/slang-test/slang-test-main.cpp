@@ -166,7 +166,7 @@ typedef TestResult (*TestCallback)(TestContext* context, TestInput& input);
 // Globals
 
 // Pre declare
-static void _addRenderTestOptions(const Options& options, CommandLine& ioCmdLine);
+static void _addRenderTestOptions(const Options& options, CommandLine& ioCmdLine, bool allowCacheRHI);
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! Functions !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
@@ -1618,7 +1618,9 @@ static RenderApiFlags _getAvailableRenderApiFlags(TestContext* context)
                 CommandLine cmdLine;
                 cmdLine.setExecutableLocation(
                     ExecutableLocation(context->options.binDir, "render-test"));
-                _addRenderTestOptions(context->options, cmdLine);
+                // Don't cache startup devices: a cached non-experimental device would prevent
+                // D3D12EnableExperimentalFeatures from succeeding in subsequent test runs.
+                _addRenderTestOptions(context->options, cmdLine, false);
                 // We just want to see if the device can be started up
                 cmdLine.addArg("-only-startup");
 
@@ -2927,7 +2929,7 @@ TestResult runCompileTarget(TestContext* context, TestInput& input)
     CommandLine cmdLine;
     cmdLine.setExecutableLocation(ExecutableLocation(context->options.binDir, "render-test"));
     cmdLine.addArg(input.filePath);
-    _addRenderTestOptions(context->options, cmdLine);
+    _addRenderTestOptions(context->options, cmdLine, true);
 
     for (auto arg : input.testOptions->args)
     {
@@ -3861,7 +3863,7 @@ TestResult runGLSLComparisonTest(TestContext* context, TestInput& input)
     return TestResult::Pass;
 }
 
-static void _addRenderTestOptions(const Options& options, CommandLine& ioCmdLine)
+static void _addRenderTestOptions(const Options& options, CommandLine& ioCmdLine, bool allowCacheRHI)
 {
     if (!options.emitSPIRVDirectly)
     {
@@ -3879,7 +3881,7 @@ static void _addRenderTestOptions(const Options& options, CommandLine& ioCmdLine
         ioCmdLine.addArg("-enable-debug-layers");
     }
 
-    if (options.cacheRhiDevice)
+    if (allowCacheRHI && options.cacheRhiDevice)
     {
         ioCmdLine.addArg("-cache-rhi-device");
     }
@@ -3917,7 +3919,7 @@ TestResult runPerformanceProfile(TestContext* context, TestInput& input)
     cmdLine.addArg(input.filePath);
     cmdLine.addArg("-performance-profile");
 
-    _addRenderTestOptions(context->options, cmdLine);
+    _addRenderTestOptions(context->options, cmdLine, true);
 
     for (auto arg : input.testOptions->args)
     {
@@ -4076,7 +4078,7 @@ TestResult runComputeComparisonImpl(
     cmdLine.setExecutableLocation(ExecutableLocation(context->options.binDir, "render-test"));
     cmdLine.addArg(filePath999);
 
-    _addRenderTestOptions(context->options, cmdLine);
+    _addRenderTestOptions(context->options, cmdLine, true);
 
     for (auto arg : input.testOptions->args)
     {
@@ -4184,7 +4186,7 @@ TestResult doRenderComparisonTestRun(
     cmdLine.setExecutableLocation(ExecutableLocation(context->options.binDir, "render-test"));
     cmdLine.addArg(filePath);
 
-    _addRenderTestOptions(context->options, cmdLine);
+    _addRenderTestOptions(context->options, cmdLine, true);
 
     for (auto arg : input.testOptions->args)
     {
