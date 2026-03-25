@@ -3214,29 +3214,129 @@ struct TypeFlowSpecializationContext
         return none();
     }
 
+    // TODO: These substituteXYZ methods should be unified with
+    // union construction. Currently there's way too much duplication.
+
+    IRInst* substituteLeafSet(IRInst* info)
+    {
+        auto elementOfSetType = as<IRElementOfSetType>(info);
+        if (!elementOfSetType)
+            return none();
+
+        if (elementOfSetType->getSet()->isSingleton())
+            return elementOfSetType->getSet()->getElement(0);
+
+        if (auto unboundedElement = elementOfSetType->getSet()->tryGetUnboundedElement())
+        {
+            IRBuilder builder(module);
+            return makeUntaggedUnionType(
+                cast<IRTypeSet>(builder.getSingletonSet(kIROp_TypeSet, unboundedElement)));
+        }
+
+        return makeUntaggedUnionType(cast<IRTypeSet>(elementOfSetType->getSet()));
+    }
+
+    IRInst* substituteSetsInTypeLike(IRInst* typeLike)
+    {
+        if (auto substitutedLeaf = substituteLeafSet(typeLike))
+            return substitutedLeaf;
+
+        if (auto ptrType = as<IRPtrTypeBase>(typeLike))
+        {
+            IRBuilder builder(module);
+            return builder.getPtrTypeWithAddressSpace(
+                (IRType*)substituteSetsInTypeLike(ptrType->getValueType()),
+                ptrType);
+        }
+
+        if (auto arrayType = as<IRArrayType>(typeLike))
+        {
+            IRBuilder builder(module);
+            return builder.getArrayType(
+                (IRType*)substituteSetsInTypeLike(arrayType->getElementType()),
+                arrayType->getElementCount(),
+                getArrayStride(arrayType));
+        }
+
+        if (auto attributedType = as<IRAttributedType>(typeLike))
+        {
+            IRBuilder builder(module);
+            List<IRAttr*>& attrs = *module->getContainerPool().getList<IRAttr>();
+            for (auto attr : attributedType->getAllAttrs())
+                attrs.add(attr);
+
+            auto result = builder.getAttributedType(
+                (IRType*)substituteSetsInTypeLike(attributedType->getBaseType()),
+                attrs);
+            module->getContainerPool().free(&attrs);
+            return result;
+        }
+
+        if (auto tupleType = as<IRTupleType>(typeLike))
+        {
+            List<IRType*> newElementTypes;
+            for (UInt i = 0; i < tupleType->getOperandCount(); i++)
+                newElementTypes.add((IRType*)substituteSetsInTypeLike(tupleType->getOperand(i)));
+            IRBuilder builder(module);
+            return builder.getTupleType(newElementTypes);
+        }
+
+        if (auto optionalType = as<IROptionalType>(typeLike);
+            optionalType && !isOptionalExistentialType(typeLike))
+        {
+            IRBuilder builder(module);
+            return builder.getOptionalType(
+                (IRType*)substituteSetsInTypeLike(optionalType->getValueType()));
+        }
+
+        if (auto diffPairType = as<IRDifferentialPairType>(typeLike))
+        {
+            IRBuilder builder(module);
+            auto substitutedValueType =
+                (IRType*)substituteSetsInTypeLike(diffPairType->getValueType());
+            return builder.getTupleType(substitutedValueType, substitutedValueType);
+        }
+
+        return typeLike;
+    }
+
     IRInst* substituteSets(IRInst* context, IRInst* type)
     {
         if (auto info = tryGetInfo(context, type))
+            return substituteSetsInTypeLike(info);
+
+        if (auto ptrType = as<IRPtrTypeBase>(type))
         {
-            if (auto elementOfSetType = as<IRElementOfSetType>(info))
-            {
-                if (elementOfSetType->getSet()->isSingleton())
-                    return elementOfSetType->getSet()->getElement(0);
-                else if (
-                    auto unboundedElement = elementOfSetType->getSet()->tryGetUnboundedElement())
-                {
-                    IRBuilder builder(module);
-                    return makeUntaggedUnionType(
-                        cast<IRTypeSet>(builder.getSingletonSet(kIROp_TypeSet, unboundedElement)));
-                }
-                else
-                    return makeUntaggedUnionType(cast<IRTypeSet>(elementOfSetType->getSet()));
-            }
-            else
-                return none();
+            IRBuilder builder(module);
+            return builder.getPtrTypeWithAddressSpace(
+                (IRType*)substituteSets(context, ptrType->getValueType()),
+                ptrType);
         }
-        else if (auto tupleType = as<IRTupleType>(type)) // TODO: this is temp.. merge with the
-                                                         // general union logic
+
+        if (auto arrayType = as<IRArrayType>(type))
+        {
+            IRBuilder builder(module);
+            return builder.getArrayType(
+                (IRType*)substituteSets(context, arrayType->getElementType()),
+                arrayType->getElementCount(),
+                getArrayStride(arrayType));
+        }
+
+        if (auto attributedType = as<IRAttributedType>(type))
+        {
+            IRBuilder builder(module);
+            List<IRAttr*>& attrs = *module->getContainerPool().getList<IRAttr>();
+            for (auto attr : attributedType->getAllAttrs())
+                attrs.add(attr);
+
+            auto result = builder.getAttributedType(
+                (IRType*)substituteSets(context, attributedType->getBaseType()),
+                attrs);
+            module->getContainerPool().free(&attrs);
+            return result;
+        }
+
+        if (auto tupleType = as<IRTupleType>(type))
         {
             List<IRType*> newElementTypes;
             for (UInt i = 0; i < tupleType->getOperandCount(); i++)
@@ -3244,8 +3344,24 @@ struct TypeFlowSpecializationContext
             IRBuilder builder(module);
             return builder.getTupleType(newElementTypes);
         }
-        else
-            return type;
+
+        if (auto optionalType = as<IROptionalType>(type);
+            optionalType && !isOptionalExistentialType(type))
+        {
+            IRBuilder builder(module);
+            return builder.getOptionalType(
+                (IRType*)substituteSets(context, optionalType->getValueType()));
+        }
+
+        if (auto diffPairType = as<IRDifferentialPairType>(type))
+        {
+            IRBuilder builder(module);
+            auto substitutedValueType =
+                (IRType*)substituteSets(context, diffPairType->getValueType());
+            return builder.getTupleType(substitutedValueType, substitutedValueType);
+        }
+
+        return type;
     }
 
     IRInst* analyzeSpecialize(IRInst* context, IRSpecialize* inst)

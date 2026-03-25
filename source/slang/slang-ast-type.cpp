@@ -919,9 +919,21 @@ Val* FwdDiffFuncType::_resolveImplOverride()
         else if (thisParamType)
         {
             // Non-differentiable this type
-            newParamTypes.add(getCurrentASTBuilder()->getModifiedType(
-                thisParamType,
-                {getCurrentASTBuilder()->getNoDiffModifierVal()}));
+            auto noDiffThisType = getCurrentASTBuilder()->getModifiedType(
+                thisParamValueType,
+                {getCurrentASTBuilder()->getNoDiffModifierVal()});
+            switch (thisParamDirection)
+            {
+            case ParamPassingMode::In:
+                newParamTypes.add(noDiffThisType);
+                break;
+            case ParamPassingMode::BorrowInOut:
+                newParamTypes.add(getCurrentASTBuilder()->getBorrowInOutParamType(noDiffThisType));
+                break;
+            default:
+                SLANG_UNEXPECTED("Unhandled `this` param passing mode");
+                break;
+            }
         }
 
         for (Index i = 0; i < funcType->getParamCount(); ++i)

@@ -4247,8 +4247,21 @@ void _lowerInfoFromFuncType(
     if (innerMode != kParameterListCollectMode_Static)
     {
         auto thisType = getThisParamTypeForContainer(context, declRef.getParent());
+
         ParamPassingMode innerThisParamDirection =
             getActualParamPassingModeForImplicitThisParam(declRef.getDecl(), thisType);
+
+        // Hack for how this-types work for looked up function for AD 2.0..
+        if (auto lookup = as<LookupDeclRef>((declRef.declRefBase)))
+        {
+            auto lookupSource = lookup->getLookupSource();
+            if (isDeclRefTypeOf<CallableDecl>(lookupSource))
+            {
+                innerThisParamDirection = getActualParamPassingModeForImplicitThisParam(
+                    as<DeclRefType>(lookupSource)->getDeclRef().getDecl(),
+                    thisType);
+            }
+        }
 
         if (thisType)
         {

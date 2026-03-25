@@ -395,6 +395,7 @@ struct UnzippingContext
                 rematArgs.add(maybeCloneVar(arg, rematFuncType->getParamType(ii + 1)));
         }
 
+        primalBuilder->replaceOperand(&rematFunc->typeUse, rematFuncType);
         IRInst* fullContextVal =
             primalBuilder->emitCallInst(rematFuncType->getResultType(), rematFunc, rematArgs);
         primalBuilder->markInstAsPrimal(fullContextVal);
