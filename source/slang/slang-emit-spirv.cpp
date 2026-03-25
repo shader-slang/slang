@@ -10696,13 +10696,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             }
         }
 
-        // Unwrap pointer types to get to the underlying resource type.
-        while (auto ptrType = as<IRPtrTypeBase>(type))
-            type = ptrType->getValueType();
-
-        // Unwrap array types.
-        while (auto arrayType = as<IRArrayTypeBase>(type))
-            type = arrayType->getElementType();
+        type = unwrapArrayAndPointers(type);
 
         if (auto texType = as<IRTextureTypeBase>(type))
         {
