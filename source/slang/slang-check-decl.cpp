@@ -17,6 +17,7 @@
 #include "slang-ast-print.h"
 #include "slang-ast-synthesis.h"
 #include "slang-lookup.h"
+#include "slang-parameter-binding.h"
 #include "slang-parser.h"
 #include "slang-rich-diagnostics.h"
 #include "slang-syntax.h"
@@ -14977,6 +14978,115 @@ void SemanticsDeclCapabilityVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         { _propagateRequirement(this, mutableCapSet, varDecl, node, nodeCaps, refLoc); },
         [this, varDecl](DiagnosticCategory category)
         { _propagateSeeDefinitionOf(this, varDecl, category); });
+
+    // Propagate non-stage capability requirements from system value semantics.
+    //
+    // SV_ semantics in core.meta.slang declare [require()] attributes on their
+    // accessors (getters/setters). These requirements serve two purposes:
+    //   1. Stage restrictions (e.g. [require(fragment)]) — validated separately by
+    //      validateSystemValueSemantic in slang-check-shader.cpp, which produces
+    //      specific diagnostics like "SV_X cannot be used as input in Y stage."
+    //   2. Non-stage capabilities (e.g. [require(fragment, fragmentshaderbarycentric)])
+    //      — need to be propagated through the capability system so the profile
+    //      checker can detect missing capabilities and emit upgrade warnings.
+    //
+    // This block handles case (2). It looks up the SemanticDecl for SV_ modifiers,
+    // finds matching accessors, and propagates their capability requirements — but
+    // only when the accessor requires capabilities beyond what the stage alone
+    // provides. The stage-only check (pureStage.implies) prevents duplicate
+    // diagnostics with validateSystemValueSemantic.
+    //
+    // Scoped to ParamDecl only: the core/GLSL modules use SV_ semantics on
+    // internal struct fields and other declarations where propagating capabilities
+    // would conflict with the module's own capability structure. Struct fields in
+    // user code are handled separately by collectStructFieldSemanticCapabilities
+    // in slang-check-shader.cpp during entry point validation, where the direction
+    // and stage are known.
+    if (auto paramDecl = as<ParamDecl>(varDecl))
+    {
+        if (auto semantic = paramDecl->findModifier<HLSLSimpleSemantic>())
+        {
+            auto semanticNameSlice = semantic->name.getContent();
+            if (semanticNameSlice.startsWithCaseInsensitive(toSlice("sv_")))
+            {
+                UnownedStringSlice baseNameSlice, indexSlice;
+                splitNameAndIndex(semanticNameSlice, baseNameSlice, indexSlice);
+
+                auto scope = getSession()->coreLanguageScope;
+                if (scope)
+                {
+                    auto namePool = getASTBuilder()->getGlobalSession()->getNamePool();
+                    String lowerName = String(baseNameSlice).toLower();
+                    auto lookupName = namePool->getName(lowerName);
+                    auto lookupResult =
+                        lookUp(getASTBuilder(), this, lookupName, scope, LookupMask::Semantic);
+
+                    if (lookupResult.isValid())
+                    {
+                        if (auto semanticDecl =
+                                as<SemanticDecl>(lookupResult.item.declRef.getDecl()))
+                        {
+                            bool isOutput = paramDecl->hasModifier<OutModifier>();
+                            bool isInOut = paramDecl->hasModifier<InOutModifier>();
+
+                            if (auto paramType = paramDecl->getType())
+                            {
+                                if (as<MeshOutputType>(paramType) ||
+                                    as<HLSLStreamOutputType>(paramType))
+                                    isOutput = true;
+                            }
+
+                            CapabilitySet accessorCaps;
+                            for (auto member : semanticDecl->getMembers())
+                            {
+                                bool isGetter = as<SemanticGetterDecl>(member) != nullptr;
+                                bool isSetter = as<SemanticSetterDecl>(member) != nullptr;
+                                if (!isGetter && !isSetter)
+                                    continue;
+
+                                if (!isInOut)
+                                {
+                                    if (isOutput && isGetter)
+                                        continue;
+                                    if (!isOutput && isSetter)
+                                        continue;
+                                }
+
+                                auto requireAttr =
+                                    member->findModifier<RequireCapabilityAttribute>();
+                                if (!requireAttr || !requireAttr->capabilitySet)
+                                    continue;
+
+                                auto capSet = requireAttr->capabilitySet;
+                                if (capSet->getTargetSetCount() > 0)
+                                {
+                                    auto firstTarget = capSet->getTargetSet(0);
+                                    if (firstTarget->getStageSetCount() > 0)
+                                    {
+                                        auto stageAtom =
+                                            firstTarget->getStageSet(0)->getStage();
+                                        if (stageAtom != CapabilityAtom::Invalid)
+                                        {
+                                            CapabilitySet pureStage(
+                                                (CapabilityName)stageAtom);
+                                            if (pureStage.implies(CapabilitySet{capSet}))
+                                                continue;
+                                        }
+                                    }
+                                }
+
+                                accessorCaps.unionWith(requireAttr->capabilitySet);
+                            }
+
+                            if (!accessorCaps.isEmpty())
+                                mutableCapSet.join(accessorCaps);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     varDecl->inferredCapabilityRequirements = mutableCapSet.freeze(getASTBuilder());
 }
 

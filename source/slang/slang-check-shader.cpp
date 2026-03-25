@@ -282,6 +282,122 @@ static void validateSystemValueSemanticForType(
     }
 }
 
+// Collect non-stage capability requirements from SV_ semantics on struct fields.
+//
+// Direct parameters with SV_ semantics have their capabilities propagated by
+// SemanticsDeclCapabilityVisitor::checkVarDeclCommon. However, struct fields
+// cannot be handled there because the core/GLSL modules use SV_ semantics on
+// internal struct fields where propagating capabilities would conflict with the
+// module's own capability structure.
+//
+// This function handles the struct field case during entry point validation,
+// where the stage and direction are known. It recurses into struct-typed
+// parameters to find fields with SV_ semantics that have non-stage capability
+// requirements (e.g. fragmentshaderbarycentric on SV_Barycentrics).
+static void collectStructFieldSemanticCapabilities(
+    SemanticsVisitor* visitor,
+    Type* type,
+    Stage stage,
+    SemanticDirection direction,
+    Scope* scope,
+    CapabilitySet& outCaps,
+    UInt recursionDepth = 0)
+{
+    static constexpr UInt kMaxRecursionDepth = 128;
+    if (!type || recursionDepth >= kMaxRecursionDepth)
+        return;
+
+    type = unwrapConditionalType(type);
+
+    if (auto meshOutputType = as<MeshOutputType>(type))
+    {
+        type = unwrapConditionalType(meshOutputType->getElementType());
+        direction = SemanticDirection::Output;
+    }
+    else if (auto streamOutputType = as<HLSLStreamOutputType>(type))
+    {
+        type = unwrapConditionalType(streamOutputType->getElementType());
+        direction = SemanticDirection::Output;
+    }
+
+    auto astBuilder = visitor->getASTBuilder();
+
+    auto declRefType = as<DeclRefType>(type);
+    if (!declRefType)
+        return;
+    auto structDeclRef = declRefType->getDeclRef().as<StructDecl>();
+    if (!structDeclRef)
+        return;
+
+    for (auto fieldDeclRef : getFields(astBuilder, structDeclRef, MemberFilterStyle::Instance))
+    {
+        auto fieldDecl = fieldDeclRef.getDecl();
+
+        if (auto fieldType = fieldDecl->getType())
+            collectStructFieldSemanticCapabilities(
+                visitor,
+                fieldType,
+                stage,
+                direction,
+                scope,
+                outCaps,
+                recursionDepth + 1);
+
+        auto semantic = fieldDecl->findModifier<HLSLSimpleSemantic>();
+        if (!semantic)
+            continue;
+
+        auto semanticNameSlice = semantic->name.getContent();
+        if (!semanticNameSlice.startsWithCaseInsensitive(toSlice("sv_")))
+            continue;
+
+        UnownedStringSlice baseNameSlice, indexSlice;
+        splitNameAndIndex(semanticNameSlice, baseNameSlice, indexSlice);
+
+        auto semanticDecl = lookUpSemanticDecl(astBuilder, visitor, String(baseNameSlice), scope);
+        if (!semanticDecl)
+            continue;
+
+        bool isOutput = (direction == SemanticDirection::Output);
+
+        for (auto member : semanticDecl->getMembers())
+        {
+            bool isGetter = as<SemanticGetterDecl>(member) != nullptr;
+            bool isSetter = as<SemanticSetterDecl>(member) != nullptr;
+            if (!isGetter && !isSetter)
+                continue;
+            if (isSetter != isOutput)
+                continue;
+
+            auto requireAttr = member->findModifier<RequireCapabilityAttribute>();
+            if (!requireAttr || !requireAttr->capabilitySet)
+                continue;
+
+            if (requireAttr->capabilitySet->isIncompatibleWith(getAtomFromStage(stage)))
+                continue;
+
+            // Only propagate if the accessor has capabilities beyond the stage.
+            auto capSet = requireAttr->capabilitySet;
+            if (capSet->getTargetSetCount() > 0)
+            {
+                auto firstTarget = capSet->getTargetSet(0);
+                if (firstTarget->getStageSetCount() > 0)
+                {
+                    auto stageAtom = firstTarget->getStageSet(0)->getStage();
+                    if (stageAtom != CapabilityAtom::Invalid)
+                    {
+                        CapabilitySet pureStage((CapabilityName)stageAtom);
+                        if (pureStage.implies(CapabilitySet{capSet}))
+                            continue;
+                    }
+                }
+            }
+
+            outCaps.join(requireAttr->capabilitySet);
+        }
+    }
+}
+
 // Validate system value semantics on a declaration recursively.
 // and validates any SV_ semantic against the SemanticDecl definitions in core module.
 static void validateSystemValueSemantic(
@@ -943,6 +1059,49 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                 stage,
                 SemanticDirection::Output,
                 scope);
+
+            // Propagate non-stage capability requirements from SV_ semantics
+            // on struct fields. Direct parameters are handled by the capability
+            // visitor; this covers the struct-based entry point parameter case.
+            CapabilitySet structSemanticCaps;
+            for (const auto& param : entryPointFuncDecl->getParameters())
+            {
+                SemanticDirection dir = SemanticDirection::Input;
+                if (param->hasModifier<OutModifier>())
+                    dir = SemanticDirection::Output;
+
+                if (auto paramType = param->getType())
+                {
+                    collectStructFieldSemanticCapabilities(
+                        &visitor,
+                        paramType,
+                        stage,
+                        dir,
+                        scope,
+                        structSemanticCaps);
+                }
+
+                if (param->hasModifier<InOutModifier>())
+                {
+                    if (auto paramType = param->getType())
+                    {
+                        collectStructFieldSemanticCapabilities(
+                            &visitor,
+                            paramType,
+                            stage,
+                            SemanticDirection::Output,
+                            scope,
+                            structSemanticCaps);
+                    }
+                }
+            }
+            if (!structSemanticCaps.isEmpty())
+            {
+                CapabilitySet entryCaps{entryPointFuncDecl->inferredCapabilityRequirements};
+                entryCaps.join(structSemanticCaps);
+                entryPointFuncDecl->inferredCapabilityRequirements =
+                    entryCaps.freeze(getCurrentASTBuilder());
+            }
         }
     }
 

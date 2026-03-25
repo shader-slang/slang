@@ -5101,7 +5101,7 @@ semantic sv_wavelaneindex
 
 semantic sv_barycentrics
 {
-    [require(fragment)]
+    [require(fragment, fragmentshaderbarycentric)]
     get : float3;
 }
 
