@@ -5,10 +5,13 @@
 
 // CHECK-DAG: OpCapability StorageImageArrayNonUniformIndexing
 
-// The access chain and loaded image must be decorated NonUniform.
+// The index, access chain, and loaded image (consumed by OpImageWrite) must
+// all be decorated NonUniform per Vulkan VUID-RuntimeSpirv-None-10148.
 // CHECK-DAG: %[[AC:[A-Za-z0-9_]+]] = OpAccessChain %{{[A-Za-z0-9_]+}} %images %[[IDX:[A-Za-z0-9_]+]]
 // CHECK-DAG: OpDecorate %[[IDX]] NonUniform
 // CHECK-DAG: OpDecorate %[[AC]] NonUniform
+// CHECK-DAG: %[[LOAD:[A-Za-z0-9_]+]] = OpLoad %{{[A-Za-z0-9_]+}} %[[AC]]
+// CHECK-DAG: OpDecorate %[[LOAD]] NonUniform
 
 RWTexture2D<float4> images[8];
 
