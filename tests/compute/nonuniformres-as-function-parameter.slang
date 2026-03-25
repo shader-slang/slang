@@ -115,12 +115,14 @@ void main(uint3 pixelIndex : SV_DispatchThreadID)
     RWStructuredBuffer<uint> buffer3 = globalBuffer[bufferIdx3];
 
     // Test case 3: The access chain for uniform bufferIdx3 should NOT be decorated NonUniform.
-    // CHECK_SPV: %[[AC_BUF3:[a-zA-Z0-9_]+]] = OpAccessChain %_ptr_StorageBuffer_RWStructuredBuffer{{.*}} %globalBuffer %bufferIdx3
-    // CHECK_SPV-NOT: OpDecorate %[[AC_BUF3]] NonUniform
+    // The slang-test output appends "; NonUniform" to decorated instructions,
+    // so we match the access chain line and verify NonUniform does NOT appear
+    // before the next access chain.
+    // CHECK_SPV: OpAccessChain %_ptr_StorageBuffer_RWStructuredBuffer{{.*}} %globalBuffer %bufferIdx3
+    // CHECK_SPV-NOT: NonUniform
+    // CHECK_SPV: OpAccessChain
     // CHECK_CUDA: func_{{[0-9]+}}(globalParams_{{[0-9]+}}->globalBuffer_{{[0-9]+}}[{{.*}}])
     MyStruct myStruct3 = func(buffer3);
-
-    // CHECK_SPV: OpAccessChain %_ptr_StorageBuffer_RWStructuredBuffer{{.*}}
 
     // CHECK_GLSL-SPV: %[[VAR19:[a-zA-Z0-9_]+]]  = OpBitcast %int %[[VAR3]]
     // CHECK_GLSL-SPV: %[[VAR16]] = OpCopyObject %int %[[VAR19]]
