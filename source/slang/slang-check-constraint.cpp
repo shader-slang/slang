@@ -433,6 +433,127 @@ bool addTypeCoercionWitnessToArgs(
     return true;
 }
 
+struct SolvedArg
+{
+    Val* val = nullptr;
+    bool isOptional = true;
+    ShortList<QualType, 8> types;
+};
+
+bool constraintSystemSolverFinalizeArgs(
+    SemanticsVisitor* visitor,
+    DeclRef<GenericDecl> genericDeclRef,
+    Count knownGenericArgCount,
+    ShortList<SolvedArg>& solvedArgs,
+    ShortList<Val*>& args)
+{
+    ASTBuilder* astBuilder = visitor->getASTBuilder();
+    args.setCount(knownGenericArgCount);
+    for (auto member : genericDeclRef.getDecl()->getDirectMemberDecls())
+    {
+        if (auto typeParam = as<GenericTypeParamDeclBase>(member))
+        {
+            SLANG_ASSERT(typeParam->parameterIndex != -1);
+
+            if (typeParam->parameterIndex < knownGenericArgCount)
+                continue;
+            bool isPack = as<GenericTypePackParamDecl>(typeParam) != nullptr;
+            if (typeParam->parameterIndex >= solvedArgs.getCount())
+            {
+                // If the parameter is not a type pack and we don't have a
+                // resolved type for it, we should fail.
+                if (!isPack)
+                    return false;
+                // If the parameter is a type pack, we should add an empty
+                // type list to solvedTypes.
+                solvedArgs.setCount(typeParam->parameterIndex + 1);
+            }
+            auto& types = solvedArgs[typeParam->parameterIndex].types;
+            // Fail if any of the resolved type element is empty.
+            for (auto t : types)
+            {
+                if (!t)
+                    return false;
+            }
+            if (!isPack)
+            {
+                // If the generic parameter is not a pack, we can simply add the first type.
+                if (types.getCount() != 1)
+                    return false;
+
+                args.add(types[0]);
+            }
+            else
+            {
+                // If the generic parameter is a pack, and we are supplying one single pack
+                // argument, we can use it as is.
+                if (types.getCount() == 1 && isTypePack(types[0]))
+                {
+                    args.add(types[0]);
+                }
+                else
+                {
+                    // If we are supplying 0 or multiple arguments for the pack, we need to create a
+                    // type pack and add it to the argument list.
+                    ShortList<Type*> typeList;
+                    bool isLVal = true;
+                    for (auto t : types)
+                    {
+                        typeList.add(t);
+                        isLVal = isLVal && t.isLeftValue;
+                    }
+                    args.add(QualType(
+                        astBuilder->getTypePack(typeList.getArrayView().arrayView),
+                        isLVal));
+                }
+            }
+        }
+        else if (auto valPackParam = as<GenericValuePackParamDecl>(member))
+        {
+            SLANG_ASSERT(valPackParam->parameterIndex != -1);
+
+            if (valPackParam->parameterIndex < knownGenericArgCount)
+                continue;
+
+            if (valPackParam->parameterIndex >= solvedArgs.getCount())
+            {
+                // Empty pack.
+                args.add(astBuilder->getIntValPack(ArrayView<IntVal*>()));
+                continue;
+            }
+
+            auto val = solvedArgs[valPackParam->parameterIndex].val;
+            if (!val)
+            {
+                args.add(astBuilder->getIntValPack(ArrayView<IntVal*>()));
+            }
+            else
+            {
+                args.add(val);
+            }
+        }
+        else if (auto valParam = as<GenericValueParamDecl>(member))
+        {
+            SLANG_ASSERT(valParam->parameterIndex != -1);
+
+            if (valParam->parameterIndex < knownGenericArgCount)
+                continue;
+
+            if (valParam->parameterIndex >= solvedArgs.getCount())
+                return false;
+
+            auto val = solvedArgs[valParam->parameterIndex].val;
+            if (!val)
+            {
+                // failure!
+                return false;
+            }
+            args.add(val);
+        }
+    }
+    return true;
+}
+
 DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
     ConstraintSystem* system,
     DeclRef<GenericDecl> genericDeclRef,
@@ -502,85 +623,102 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
         }
     }
 
-    // Add default values as optional constraints.
-    for (auto member : genericDeclRef.getDecl()->getDirectMemberDecls())
-    {
-        if (auto typeParam = as<GenericTypeParamDecl>(member))
-        {
-            SLANG_ASSERT(typeParam->parameterIndex != -1);
-
-            if (typeParam->initType && typeParam->parameterIndex >= knownGenericArgCount)
-            {
-                // If we have a default arg for this parameter, we can try to
-                // use it.
-                auto genSubst = m_astBuilder->getGenericAppDeclRef(
-                    genericDeclRef,
-                    args.getArrayView().arrayView);
-                auto defaultType =
-                    SubstitutionSet(genSubst).applyToType(m_astBuilder, typeParam->initType.type);
-                if (defaultType)
-                {
-                    Constraint c;
-                    c.decl = member;
-                    c.val = defaultType;
-                    c.isOptional = true;
-                    c.isEquality = true;
-                    system->constraints.add(c);
-                }
-            }
-        }
-        else if (auto valParam = as<GenericValueParamDecl>(member))
-        {
-            SLANG_ASSERT(valParam->parameterIndex != -1);
-
-            if (valParam->parameterIndex < knownGenericArgCount)
-                continue;
-
-            if (valParam->initExpr && valParam->parameterIndex >= knownGenericArgCount)
-            {
-                ensureDecl(makeDeclRef(valParam), DeclCheckState::DefinitionChecked);
-                auto genSubst = m_astBuilder->getGenericAppDeclRef(
-                    genericDeclRef,
-                    args.getArrayView().arrayView);
-                ConstantFoldingCircularityInfo newCircularityInfo(makeDeclRef(valParam), nullptr);
-                auto defaultVal = tryConstantFoldExpr(
-                    applySubstitutionToExpr(SubstitutionSet(genSubst), valParam->initExpr),
-                    ConstantFoldingKind::CompileTime,
-                    &newCircularityInfo);
-
-                if (defaultVal)
-                {
-                    Constraint c;
-                    c.decl = member;
-                    c.val = defaultVal;
-                    c.isOptional = true;
-                    c.isEquality = true;
-                    system->constraints.add(c);
-                }
-            }
-        }
-    }
-
     // The state of currently solved arguments.
-    struct SolvedArg
-    {
-        Val* val = nullptr;
-        bool isOptional = true;
-        ShortList<QualType, 8> types;
-    };
     ShortList<SolvedArg> solvedArgs;
+
+    Count directMemberDeclsIndex = 0;
+    // This adds one default value constraint each time it is called.
+    auto addDefaultValueConstraint = [&]()
+    {
+        const auto& directMemberDecls = genericDeclRef.getDecl()->getDirectMemberDecls();
+        for (; directMemberDeclsIndex < directMemberDecls.getCount(); ++directMemberDeclsIndex)
+        {
+            const auto& member = directMemberDecls[directMemberDeclsIndex];
+            if (auto typeParam = as<GenericTypeParamDecl>(member))
+            {
+                SLANG_ASSERT(typeParam->parameterIndex != -1);
+
+                if (typeParam->initType && typeParam->parameterIndex >= knownGenericArgCount)
+                {
+                    constraintSystemSolverFinalizeArgs(this, genericDeclRef, knownGenericArgCount, solvedArgs, args);
+                    // If we have a default arg for this parameter, we can try to
+                    // use it.
+                    auto genSubst = m_astBuilder->getGenericAppDeclRef(
+                        genericDeclRef,
+                        args.getArrayView().arrayView);
+                    auto defaultType =
+                        SubstitutionSet(genSubst).applyToType(m_astBuilder, typeParam->initType.type);
+                    if (defaultType)
+                    {
+                        Constraint c;
+                        c.decl = member;
+                        c.val = defaultType;
+                        c.isOptional = true;
+                        c.isEquality = true;
+                        system->constraints.add(c);
+                        ++directMemberDeclsIndex;
+                        return true;
+                    }
+                }
+            }
+            else if (auto valParam = as<GenericValueParamDecl>(member))
+            {
+                SLANG_ASSERT(valParam->parameterIndex != -1);
+
+                if (valParam->initExpr && valParam->parameterIndex >= knownGenericArgCount)
+                {
+                    ensureDecl(makeDeclRef(valParam), DeclCheckState::DefinitionChecked);
+                    constraintSystemSolverFinalizeArgs(this, genericDeclRef, knownGenericArgCount, solvedArgs, args);
+                    auto genSubst = m_astBuilder->getGenericAppDeclRef(
+                        genericDeclRef,
+                        args.getArrayView().arrayView);
+                    ConstantFoldingCircularityInfo newCircularityInfo(makeDeclRef(valParam), nullptr);
+                    auto defaultVal = tryConstantFoldExpr(
+                        applySubstitutionToExpr(SubstitutionSet(genSubst), valParam->initExpr),
+                        ConstantFoldingKind::CompileTime,
+                        &newCircularityInfo);
+
+                    if (defaultVal)
+                    {
+                        Constraint c;
+                        c.decl = member;
+                        c.val = defaultVal;
+                        c.isOptional = true;
+                        c.isEquality = true;
+                        system->constraints.add(c);
+                        ++directMemberDeclsIndex;
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    };
 
     // We will then iterate over the constraints trying to solve all generic parameters.
     // Note that we do not use ranged for here, because processing one constraint may lead to
     // new constraints being discovered.
-    for (Index constraintIndex = 0; constraintIndex < system->constraints.getCount();
-         constraintIndex++)
+    for (Index constraintIndex = 0; ; constraintIndex++)
     {
+        if (constraintIndex == system->constraints.getCount())
+        {
+            // Whenever we're out of constraints, we add default value
+            // constraints until we run out of those as well. This lets the
+            // default value constraints themselves depend on all other
+            // constraints, allowing e.g. `void func<T, U = T>(T a)` to deduce
+            // `U = float` when called `func(1.0f)`. Adding them one-by-one
+            // allows them to depend on the earlier default values as well,
+            // e.g. `void func<T, U = T, V = U>()`.
+            if (!addDefaultValueConstraint())
+                break;
+        }
+
         // Note: it is important to keep a copy of the constraint here instead of
         // using a reference, because the constraint list may be modified during the
         // loop as we discover new constraints.
         //
         auto c = system->constraints[constraintIndex];
+
         if (auto typeParam = as<GenericTypeParamDeclBase>(c.decl))
         {
             SLANG_ASSERT(typeParam->parameterIndex != -1);
@@ -630,12 +768,11 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
             auto cType = QualType(as<Type>(c.val), c.isUsedAsLValue);
             SLANG_RELEASE_ASSERT(cType);
 
-            if (!type || (typeConstraintOptional && !c.isOptional))
+            if (!type)
             {
                 type = cType;
-                typeConstraintOptional = c.isOptional;
             }
-            else if (!typeConstraintOptional)
+            else
             {
                 // If the type parameter is already constrained to a known type,
                 // we need to make sure our resolved type can satisfy both constraints.
@@ -653,9 +790,14 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
                 auto joinType = TryJoinTypes(system, type, cType);
                 if (!joinType)
                 {
-                    if (c.isOptional)
-                        joinType = type;
-                    else if (c.isEquality)
+                    // Equal precedence and couldn't join, so this is a failure.
+                    if (c.isOptional == typeConstraintOptional)
+                        // failure!
+                        return DeclRef<Decl>();
+                    // Optional but previous constraints aren't, so not being
+                    // able to join just means discarding the optional
+                    // constraint.
+                    else if (c.isOptional || c.isEquality)
                         joinType = type;
                     else
                         // failure!
@@ -663,6 +805,9 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
                 }
                 type = QualType(joinType, type.isLeftValue || cType.isLeftValue);
             }
+
+            if (!c.isOptional)
+                typeConstraintOptional = false;
 
             c.satisfied = true;
         }
@@ -727,112 +872,12 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
         system->constraints[constraintIndex].satisfied = c.satisfied;
     }
 
-    // After we processed all constraints, `solvedTypes` and `solvedVals`
-    // should have been filled with the resolved types and values for the
-    // generic parameters. We can now verify if they are complete and consolidate
-    // them into final argument list.
-    for (auto member : genericDeclRef.getDecl()->getDirectMemberDecls())
-    {
-        if (auto typeParam = as<GenericTypeParamDeclBase>(member))
-        {
-            SLANG_ASSERT(typeParam->parameterIndex != -1);
-
-            if (typeParam->parameterIndex < knownGenericArgCount)
-                continue;
-            bool isPack = as<GenericTypePackParamDecl>(typeParam) != nullptr;
-            if (typeParam->parameterIndex >= solvedArgs.getCount())
-            {
-                // If the parameter is not a type pack and we don't have a
-                // resolved type for it, we should fail.
-                if (!isPack)
-                    return DeclRef<Decl>();
-                // If the parameter is a type pack, we should add an empty
-                // type list to solvedTypes.
-                solvedArgs.setCount(typeParam->parameterIndex + 1);
-            }
-            auto& types = solvedArgs[typeParam->parameterIndex].types;
-            // Fail if any of the resolved type element is empty.
-            for (auto t : types)
-            {
-                if (!t)
-                    return DeclRef<Decl>();
-            }
-            if (!isPack)
-            {
-                // If the generic parameter is not a pack, we can simply add the first type.
-                if (types.getCount() != 1)
-                    return DeclRef<Decl>();
-
-                args.add(types[0]);
-            }
-            else
-            {
-                // If the generic parameter is a pack, and we are supplying one single pack
-                // argument, we can use it as is.
-                if (types.getCount() == 1 && isTypePack(types[0]))
-                {
-                    args.add(types[0]);
-                }
-                else
-                {
-                    // If we are supplying 0 or multiple arguments for the pack, we need to create a
-                    // type pack and add it to the argument list.
-                    ShortList<Type*> typeList;
-                    bool isLVal = true;
-                    for (auto t : types)
-                    {
-                        typeList.add(t);
-                        isLVal = isLVal && t.isLeftValue;
-                    }
-                    args.add(QualType(
-                        m_astBuilder->getTypePack(typeList.getArrayView().arrayView),
-                        isLVal));
-                }
-            }
-        }
-        else if (auto valPackParam = as<GenericValuePackParamDecl>(member))
-        {
-            SLANG_ASSERT(valPackParam->parameterIndex != -1);
-
-            if (valPackParam->parameterIndex < knownGenericArgCount)
-                continue;
-
-            if (valPackParam->parameterIndex >= solvedArgs.getCount())
-            {
-                // Empty pack.
-                args.add(m_astBuilder->getIntValPack(ArrayView<IntVal*>()));
-                continue;
-            }
-
-            auto val = solvedArgs[valPackParam->parameterIndex].val;
-            if (!val)
-            {
-                args.add(m_astBuilder->getIntValPack(ArrayView<IntVal*>()));
-            }
-            else
-            {
-                args.add(val);
-            }
-        }
-        else if (auto valParam = as<GenericValueParamDecl>(member))
-        {
-            SLANG_ASSERT(valParam->parameterIndex != -1);
-
-            if (valParam->parameterIndex < knownGenericArgCount)
-                continue;
-
-            if (valParam->parameterIndex >= solvedArgs.getCount())
-                return DeclRef<Decl>();
-
-            auto val = solvedArgs[valParam->parameterIndex].val;
-            if (!val)
-            {
-                // failure!
-                return DeclRef<Decl>();
-            }
-            args.add(val);
-        }
-    }
+    // After we processed all constraints, `solvedArgs` should have been filled
+    // with the resolved types and values for the generic parameters. We can
+    // now verify if they are complete and consolidate them into final argument
+    // list.
+    if (!constraintSystemSolverFinalizeArgs(this, genericDeclRef, knownGenericArgCount, solvedArgs, args))
+        return DeclRef<Decl>();
 
     // After we've solved for the explicit arguments, we need to
     // make a second pass and consider the implicit arguments,
