@@ -3264,6 +3264,7 @@ public:
     Expr* visitGetArrayLengthExpr(GetArrayLengthExpr* expr);
 
     Expr* visitPackQueryExpr(PackQueryExpr* expr);
+    Expr* visitShapePackTransformExpr(ShapePackTransformExpr* expr);
 
     Expr* visitDefaultConstructExpr(DefaultConstructExpr* expr);
 

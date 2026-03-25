@@ -8937,6 +8937,10 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_ExtractLastFromPack:
     case kIROp_TrimFirstOfPack:
     case kIROp_TrimLastOfPack:
+    case kIROp_ShapeConcat:
+    case kIROp_ShapePermute:
+    case kIROp_ShapeSwap:
+    case kIROp_ShapeReduce:
     case kIROp_PackBranch:
     case kIROp_MakeWitnessPack:
     case kIROp_NonEmptyPackWitness:
