@@ -144,6 +144,12 @@ jobs:
           nvidia-smi --query-gpu=name,driver_version,memory.used,memory.free,temperature.gpu,ecc.errors.uncorrected.volatile.total,pstate \
             --format=csv,noheader 2>&1 || true
           echo ""
+          echo "=== XID Errors ==="
+          nvidia-smi -q -d XID_ERRORS 2>&1 || true
+          echo ""
+          echo "=== GPU Process State ==="
+          nvidia-smi pmon -c 1 2>&1 || true
+          echo ""
           echo "=== Kernel GPU Messages ==="
           dmesg 2>/dev/null | grep -iE "nvidia|nvrm|xid|gpu|fault|segfault" | tail -50 || \
           sudo dmesg 2>/dev/null | grep -iE "nvidia|nvrm|xid|gpu|fault|segfault" | tail -50 || \
@@ -241,6 +247,12 @@ jobs:
           echo "=== GPU Memory & ECC ==="
           nvidia-smi --query-gpu=name,driver_version,memory.used,memory.free,temperature.gpu,ecc.errors.uncorrected.volatile.total,pstate \
             --format=csv,noheader 2>&1 || true
+          echo ""
+          echo "=== XID Errors ==="
+          nvidia-smi -q -d XID_ERRORS 2>&1 || true
+          echo ""
+          echo "=== GPU Process State ==="
+          nvidia-smi pmon -c 1 2>&1 || true
           echo ""
           echo "=== Kernel GPU Messages ==="
           dmesg 2>/dev/null | grep -iE "nvidia|nvrm|xid|gpu|fault|segfault" | tail -50 || \
