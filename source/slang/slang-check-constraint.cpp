@@ -440,7 +440,7 @@ struct SolvedArg
     ShortList<QualType, 8> types;
 };
 
-bool constraintSystemSolverFinalizeArgs(
+bool constraintSystemSolverUnpackArgs(
     SemanticsVisitor* visitor,
     DeclRef<GenericDecl> genericDeclRef,
     Count knownGenericArgCount,
@@ -653,7 +653,7 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
 
                 Constraint c;
                 c.decl = member;
-                c.val = ExtractGenericArgVal(valParam->initExpr);
+                c.val = ExtractGenericArgVal(valParam->initExpr, &newCircularityInfo);
                 c.isOptional = true;
                 c.isEquality = true;
                 c.potentiallyDependent = true;
@@ -681,7 +681,7 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
         // try to substitute it with the currently known args.
         if (c.potentiallyDependent)
         {
-            constraintSystemSolverFinalizeArgs(
+            constraintSystemSolverUnpackArgs(
                 this,
                 genericDeclRef,
                 knownGenericArgCount,
@@ -857,7 +857,7 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
     // with the resolved types and values for the generic parameters. We can
     // now verify if they are complete and consolidate them into final argument
     // list.
-    if (!constraintSystemSolverFinalizeArgs(
+    if (!constraintSystemSolverUnpackArgs(
             this,
             genericDeclRef,
             knownGenericArgCount,
