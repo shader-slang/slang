@@ -199,6 +199,10 @@ struct NestingRule
 
 /// The nesting-rule table.  Each row reads as:
 ///   "<childName> declaration is allowed in <allowedContainers>."
+///
+/// Note: The parser restricts enum body syntax to cases and a limited set of
+/// members, so some CC::Enum entries (e.g. Constructor, Subscript, Property)
+/// only take effect when these constructs appear on an enum type via extension.
 // clang-format off
 static const NestingRule kNestingRules[] = {
 //  child category                          allowed containers                                       display name
