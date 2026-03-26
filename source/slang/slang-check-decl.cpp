@@ -280,7 +280,7 @@ static bool validateDeclNesting(SemanticsVisitor* visitor, Decl* decl)
     if (childCategory == DeclNestingCategory::Unknown)
         return false;
 
-    // Unwrap GenericDecl to find the real parent.
+    // getParentDecl unwraps GenericDecl to find the real parent container.
     auto parentContainer = getParentDecl(decl);
     if (!parentContainer)
         return false;
