@@ -1072,10 +1072,9 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
             // Propagate non-stage capability requirements from SV_ semantics
             // on struct fields. Direct parameters are handled by the capability
             // visitor; this covers the struct-based entry point parameter case.
-            // Propagate non-stage capability requirements from SV_ semantics
-            // on struct fields, matching the InOutModifier-first pattern used
-            // by validateSystemValueSemantic above (InOutModifier inherits from
-            // OutModifier, so checking OutModifier alone would misclassify
+            // We check InOutModifier before OutModifier, matching the pattern
+            // used by validateSystemValueSemantic above (InOutModifier inherits
+            // from OutModifier, so checking OutModifier alone would misclassify
             // inout params as output-only).
             CapabilitySet structSemanticCaps;
             for (const auto& param : entryPointFuncDecl->getParameters())
