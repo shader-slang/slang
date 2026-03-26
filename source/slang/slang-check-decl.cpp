@@ -155,7 +155,7 @@ static DeclNestingCategory classifyDeclForNesting(Decl* decl)
 /// Classify a container declaration into a ContainerNestingCategory.
 static ContainerNestingCategory classifyContainerForNesting(ContainerDecl* container)
 {
-    if (as<ModuleDecl>(container) || as<FileDecl>(container) || as<NamespaceDecl>(container))
+    if (as<NamespaceDeclBase>(container) || as<FileDecl>(container))
         return ContainerNestingCategory::Module;
     if (as<StructDecl>(container) || as<ClassDecl>(container))
         return ContainerNestingCategory::StructOrClass;
