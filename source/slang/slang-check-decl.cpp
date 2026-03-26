@@ -15063,12 +15063,10 @@ void SemanticsDeclCapabilityVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
                                     auto firstTarget = capSet->getTargetSet(0);
                                     if (firstTarget->getStageSetCount() > 0)
                                     {
-                                        auto stageAtom =
-                                            firstTarget->getStageSet(0)->getStage();
+                                        auto stageAtom = firstTarget->getStageSet(0)->getStage();
                                         if (stageAtom != CapabilityAtom::Invalid)
                                         {
-                                            CapabilitySet pureStage(
-                                                (CapabilityName)stageAtom);
+                                            CapabilitySet pureStage((CapabilityName)stageAtom);
                                             if (pureStage.implies(CapabilitySet{capSet}))
                                                 continue;
                                         }
