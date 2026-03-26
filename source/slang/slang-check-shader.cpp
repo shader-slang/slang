@@ -88,9 +88,7 @@ static bool isSemanticTypeCompatible(SemanticsVisitor* visitor, Type* expectedTy
     return expectedIsVector == typeIsVector;
 }
 
-// Look up a SemanticDecl by name in the given scope.
-// Semantic names in core.meta.slang are stored lowercase for case-insensitive matching.
-static SemanticDecl* lookUpSemanticDecl(
+SemanticDecl* lookUpSemanticDecl(
     ASTBuilder* astBuilder,
     SemanticsVisitor* visitor,
     const String& semanticName,
@@ -282,6 +280,23 @@ static void validateSystemValueSemanticForType(
     }
 }
 
+bool isStageOnlySemanticRequirement(const CapabilitySetVal* capSet)
+{
+    if (capSet->getTargetSetCount() == 0)
+        return false;
+
+    auto firstTarget = capSet->getTargetSet(0);
+    if (firstTarget->getStageSetCount() == 0)
+        return false;
+
+    auto stageAtom = firstTarget->getStageSet(0)->getStage();
+    if (stageAtom == CapabilityAtom::Invalid)
+        return false;
+
+    CapabilitySet pureStage((CapabilityName)stageAtom);
+    return pureStage.implies(CapabilitySet{capSet});
+}
+
 // Collect non-stage capability requirements from a SemanticDecl's accessors.
 //
 // Iterates the getters/setters of a SemanticDecl, filters by direction, skips
@@ -315,21 +330,8 @@ static void collectSemanticAccessorCaps(
         if (requireAttr->capabilitySet->isIncompatibleWith(getAtomFromStage(stage)))
             continue;
 
-        auto capSet = requireAttr->capabilitySet;
-        if (capSet->getTargetSetCount() > 0)
-        {
-            auto firstTarget = capSet->getTargetSet(0);
-            if (firstTarget->getStageSetCount() > 0)
-            {
-                auto stageAtom = firstTarget->getStageSet(0)->getStage();
-                if (stageAtom != CapabilityAtom::Invalid)
-                {
-                    CapabilitySet pureStage((CapabilityName)stageAtom);
-                    if (pureStage.implies(CapabilitySet{capSet}))
-                        continue;
-                }
-            }
-        }
+        if (isStageOnlySemanticRequirement(requireAttr->capabilitySet))
+            continue;
 
         outCaps.join(requireAttr->capabilitySet);
     }

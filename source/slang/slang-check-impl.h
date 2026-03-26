@@ -55,6 +55,30 @@ bool isUniformParameterType(Type* type);
 
 bool isSlang2026OrLater(SemanticsVisitor* visitor);
 
+/// Look up a SemanticDecl by name in the given scope.
+/// Semantic names in core.meta.slang are stored lowercase for case-insensitive matching.
+SemanticDecl* lookUpSemanticDecl(
+    ASTBuilder* astBuilder,
+    SemanticsVisitor* visitor,
+    const String& semanticName,
+    Scope* scope);
+
+/// Determine whether a semantic accessor's capability requirement is purely a
+/// stage restriction, with no additional non-stage capabilities.
+///
+/// Used to avoid propagating stage-only requirements into the inferred capability
+/// set, which would duplicate the more specific diagnostics produced by
+/// validateSystemValueSemantic (e.g. "SV_X cannot be used in Y stage").
+///
+/// Current approach: construct a CapabilitySet from the accessor's stage atom
+/// alone and check if it implies the full requirement. If so, the requirement
+/// adds nothing beyond the stage and can be skipped. This is a heuristic that
+/// only examines the first target set and first stage set of the capability —
+/// it works correctly for all current semantic declarations, which have a single
+/// stage per accessor, but may need refinement if future semantics use
+/// multi-target or multi-stage disjunctions on a single accessor.
+bool isStageOnlySemanticRequirement(const CapabilitySetVal* capSet);
+
 /// Create a new component type based on `inComponentType`, but with all its requiremetns filled.
 RefPtr<ComponentType> fillRequirements(ComponentType* inComponentType);
 

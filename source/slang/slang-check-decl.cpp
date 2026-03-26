@@ -14673,23 +14673,6 @@ static void _propagateRequirement(
     }
 };
 
-// Look up a SemanticDecl by name in the given scope.
-// Parallel to lookUpSemanticDecl in slang-check-shader.cpp.
-static SemanticDecl* _lookUpSemanticDecl(
-    ASTBuilder* astBuilder,
-    SemanticsVisitor* visitor,
-    const String& semanticName,
-    Scope* scope)
-{
-    auto namePool = astBuilder->getGlobalSession()->getNamePool();
-    String lowerName = semanticName.toLower();
-    auto name = namePool->getName(lowerName);
-    auto lookupResult = lookUp(astBuilder, visitor, name, scope, LookupMask::Semantic);
-    if (!lookupResult.isValid())
-        return nullptr;
-    return as<SemanticDecl>(lookupResult.item.declRef.getDecl());
-}
-
 // Collect non-stage capability requirements from a SemanticDecl's accessors.
 //
 // Iterates the getters/setters of a SemanticDecl, filters by direction, and
@@ -14697,9 +14680,8 @@ static SemanticDecl* _lookUpSemanticDecl(
 // prevents duplicating stage-only diagnostics produced by
 // validateSystemValueSemantic in slang-check-shader.cpp.
 //
-// Parallel to the accessor loop in collectStructFieldSemanticCapabilities
-// (slang-check-shader.cpp), which handles struct fields during entry point
-// validation.
+// Parallel to collectSemanticAccessorCaps in slang-check-shader.cpp, which
+// handles struct fields during entry point validation.
 static void _collectSemanticAccessorCaps(
     SemanticDecl* semanticDecl,
     bool isOutput,
@@ -14725,21 +14707,8 @@ static void _collectSemanticAccessorCaps(
         if (!requireAttr || !requireAttr->capabilitySet)
             continue;
 
-        auto capSet = requireAttr->capabilitySet;
-        if (capSet->getTargetSetCount() > 0)
-        {
-            auto firstTarget = capSet->getTargetSet(0);
-            if (firstTarget->getStageSetCount() > 0)
-            {
-                auto stageAtom = firstTarget->getStageSet(0)->getStage();
-                if (stageAtom != CapabilityAtom::Invalid)
-                {
-                    CapabilitySet pureStage((CapabilityName)stageAtom);
-                    if (pureStage.implies(CapabilitySet{capSet}))
-                        continue;
-                }
-            }
-        }
+        if (isStageOnlySemanticRequirement(requireAttr->capabilitySet))
+            continue;
 
         outCaps.unionWith(requireAttr->capabilitySet);
     }
@@ -14780,7 +14749,7 @@ static void _propagateSemanticCapabilities(
         return;
 
     auto semanticDecl =
-        _lookUpSemanticDecl(visitor->getASTBuilder(), visitor, String(baseNameSlice), scope);
+        lookUpSemanticDecl(visitor->getASTBuilder(), visitor, String(baseNameSlice), scope);
     if (!semanticDecl)
         return;
 
