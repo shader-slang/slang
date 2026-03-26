@@ -14708,6 +14708,9 @@ static void _collectSemanticAccessorCaps(
         if (!requireAttr || !requireAttr->capabilitySet)
             continue;
 
+        if (requireAttr->capabilitySet->isIncompatibleWith(getAtomFromStage(stage)))
+            continue;
+
         if (isStageOnlySemanticRequirement(requireAttr->capabilitySet, stage))
             continue;
 

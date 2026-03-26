@@ -77,6 +77,9 @@ SemanticDecl* lookUpSemanticDecl(
 /// single-stage accessors. For hypothetical multi-stage disjunctions (e.g.
 /// [require(fragment+capA | compute+capB)]), it conservatively returns false
 /// (non-stage-only), which is the safe direction.
+///
+/// Callers must first filter out accessors incompatible with the current stage
+/// (via isIncompatibleWith), so this only sees capSets compatible with @p stage.
 bool isStageOnlySemanticRequirement(const CapabilitySetVal* capSet, Stage stage);
 
 /// Create a new component type based on `inComponentType`, but with all its requiremetns filled.

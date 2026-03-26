@@ -282,6 +282,9 @@ static void validateSystemValueSemanticForType(
 
 bool isStageOnlySemanticRequirement(const CapabilitySetVal* capSet, Stage stage)
 {
+    if (!capSet)
+        return false;
+
     auto stageAtom = getAtomFromStage(stage);
     if (stageAtom == CapabilityAtom::Invalid)
         return false;
@@ -290,6 +293,10 @@ bool isStageOnlySemanticRequirement(const CapabilitySetVal* capSet, Stage stage)
     // implies the full requirement. CapabilitySet::implies() checks ALL target
     // sets and stage sets in capSet, so this is a comprehensive check: if the
     // stage alone can satisfy every alternative, it's stage-only.
+    //
+    // Callers must first filter out accessors incompatible with the current
+    // stage (via isIncompatibleWith), so this only ever sees capSets that are
+    // compatible with @p stage.
     CapabilitySet pureStage((CapabilityName)stageAtom);
     return pureStage.implies(CapabilitySet{capSet});
 }
