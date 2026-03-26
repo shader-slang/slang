@@ -2643,7 +2643,7 @@ struct TypeFlowSpecializationContext
             return makeElementOfSetType(tableSet);
         }
 
-        SLANG_UNEXPECTED("Unhandled info type in analyzeExtractExistentialWitnessTable");
+        return none();
     }
 
     IRInst* analyzeExtractExistentialType(IRInst* context, IRExtractExistentialType* inst)
@@ -2666,7 +2666,7 @@ struct TypeFlowSpecializationContext
         if (auto taggedUnion = as<IRTaggedUnionType>(operandInfo))
             return makeElementOfSetType(taggedUnion->getTypeSet());
 
-        SLANG_UNEXPECTED("Unhandled info type in analyzeExtractExistentialType");
+        return none();
     }
 
     IRInst* analyzeExtractExistentialValue(IRInst* context, IRExtractExistentialValue* inst)
