@@ -14673,73 +14673,39 @@ static void _propagateRequirement(
     }
 };
 
-// Propagate non-stage capability requirements from system value semantics on a
-// parameter declaration.
-//
-// SV_ semantics in core.meta.slang declare [require()] attributes on their
-// accessors (getters/setters). These requirements serve two purposes:
-//   1. Stage restrictions (e.g. [require(fragment)]) — validated separately by
-//      validateSystemValueSemantic in slang-check-shader.cpp, which produces
-//      specific diagnostics like "SV_X cannot be used as input in Y stage."
-//   2. Non-stage capabilities (e.g. [require(fragment, fragmentshaderbarycentric)])
-//      — need to be propagated through the capability system so the profile
-//      checker can detect missing capabilities and emit upgrade warnings.
-//
-// This function handles case (2). It looks up the SemanticDecl for SV_ modifiers,
-// finds matching accessors, and propagates their capability requirements — but
-// only when the accessor requires capabilities beyond what the stage alone
-// provides. The stage-only check (pureStage.implies) prevents duplicate
-// diagnostics with validateSystemValueSemantic.
-//
-// Scoped to ParamDecl only: the core/GLSL modules use SV_ semantics on
-// internal struct fields and other declarations where propagating capabilities
-// would conflict with the module's own capability structure. Struct fields in
-// user code are handled separately by collectStructFieldSemanticCapabilities
-// in slang-check-shader.cpp during entry point validation, where the direction
-// and stage are known.
-static void _propagateSemanticCapabilities(
+// Look up a SemanticDecl by name in the given scope.
+// Parallel to lookUpSemanticDecl in slang-check-shader.cpp.
+static SemanticDecl* _lookUpSemanticDecl(
+    ASTBuilder* astBuilder,
     SemanticsVisitor* visitor,
-    CapabilitySet& outCaps,
-    ParamDecl* paramDecl)
+    const String& semanticName,
+    Scope* scope)
 {
-    auto semantic = paramDecl->findModifier<HLSLSimpleSemantic>();
-    if (!semantic)
-        return;
-
-    auto semanticNameSlice = semantic->name.getContent();
-    if (!semanticNameSlice.startsWithCaseInsensitive(toSlice("sv_")))
-        return;
-
-    UnownedStringSlice baseNameSlice, indexSlice;
-    splitNameAndIndex(semanticNameSlice, baseNameSlice, indexSlice);
-
-    auto scope = visitor->getSession()->coreLanguageScope;
-    if (!scope)
-        return;
-
-    auto namePool = visitor->getASTBuilder()->getGlobalSession()->getNamePool();
-    String lowerName = String(baseNameSlice).toLower();
-    auto lookupName = namePool->getName(lowerName);
-    auto lookupResult =
-        lookUp(visitor->getASTBuilder(), visitor, lookupName, scope, LookupMask::Semantic);
-
+    auto namePool = astBuilder->getGlobalSession()->getNamePool();
+    String lowerName = semanticName.toLower();
+    auto name = namePool->getName(lowerName);
+    auto lookupResult = lookUp(astBuilder, visitor, name, scope, LookupMask::Semantic);
     if (!lookupResult.isValid())
-        return;
+        return nullptr;
+    return as<SemanticDecl>(lookupResult.item.declRef.getDecl());
+}
 
-    auto semanticDecl = as<SemanticDecl>(lookupResult.item.declRef.getDecl());
-    if (!semanticDecl)
-        return;
-
-    bool isOutput = paramDecl->hasModifier<OutModifier>();
-    bool isInOut = paramDecl->hasModifier<InOutModifier>();
-
-    if (auto paramType = paramDecl->getType())
-    {
-        if (as<MeshOutputType>(paramType) || as<HLSLStreamOutputType>(paramType))
-            isOutput = true;
-    }
-
-    CapabilitySet accessorCaps;
+// Collect non-stage capability requirements from a SemanticDecl's accessors.
+//
+// Iterates the getters/setters of a SemanticDecl, filters by direction, and
+// collects capabilities that go beyond what the stage alone requires. This
+// prevents duplicating stage-only diagnostics produced by
+// validateSystemValueSemantic in slang-check-shader.cpp.
+//
+// Parallel to the accessor loop in collectStructFieldSemanticCapabilities
+// (slang-check-shader.cpp), which handles struct fields during entry point
+// validation.
+static void _collectSemanticAccessorCaps(
+    SemanticDecl* semanticDecl,
+    bool isOutput,
+    bool isInOut,
+    CapabilitySet& outCaps)
+{
     for (auto member : semanticDecl->getMembers())
     {
         bool isGetter = as<SemanticGetterDecl>(member) != nullptr;
@@ -14775,9 +14741,60 @@ static void _propagateSemanticCapabilities(
             }
         }
 
-        accessorCaps.unionWith(requireAttr->capabilitySet);
+        outCaps.unionWith(requireAttr->capabilitySet);
+    }
+}
+
+// Propagate non-stage capability requirements from system value semantics on a
+// parameter declaration.
+//
+// SV_ semantics in core.meta.slang declare [require()] attributes on their
+// accessors (getters/setters). Stage-only requirements are validated by
+// validateSystemValueSemantic (slang-check-shader.cpp); this function
+// propagates non-stage capabilities so the profile checker can detect missing
+// capabilities and emit upgrade warnings.
+//
+// Scoped to ParamDecl only: the core/GLSL modules use SV_ semantics on
+// internal struct fields where propagating capabilities would conflict with
+// the module's capability structure. Struct fields in user entry point
+// parameters are handled by collectStructFieldSemanticCapabilities in
+// slang-check-shader.cpp.
+static void _propagateSemanticCapabilities(
+    SemanticsVisitor* visitor,
+    CapabilitySet& outCaps,
+    ParamDecl* paramDecl)
+{
+    auto semantic = paramDecl->findModifier<HLSLSimpleSemantic>();
+    if (!semantic)
+        return;
+
+    auto semanticNameSlice = semantic->name.getContent();
+    if (!semanticNameSlice.startsWithCaseInsensitive(toSlice("sv_")))
+        return;
+
+    UnownedStringSlice baseNameSlice, indexSlice;
+    splitNameAndIndex(semanticNameSlice, baseNameSlice, indexSlice);
+
+    auto scope = visitor->getSession()->coreLanguageScope;
+    if (!scope)
+        return;
+
+    auto semanticDecl =
+        _lookUpSemanticDecl(visitor->getASTBuilder(), visitor, String(baseNameSlice), scope);
+    if (!semanticDecl)
+        return;
+
+    bool isOutput = paramDecl->hasModifier<OutModifier>();
+    bool isInOut = paramDecl->hasModifier<InOutModifier>();
+
+    if (auto paramType = paramDecl->getType())
+    {
+        if (as<MeshOutputType>(paramType) || as<HLSLStreamOutputType>(paramType))
+            isOutput = true;
     }
 
+    CapabilitySet accessorCaps;
+    _collectSemanticAccessorCaps(semanticDecl, isOutput, isInOut, accessorCaps);
     if (!accessorCaps.isEmpty())
         outCaps.join(accessorCaps);
 }

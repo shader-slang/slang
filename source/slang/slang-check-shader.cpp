@@ -282,6 +282,59 @@ static void validateSystemValueSemanticForType(
     }
 }
 
+// Collect non-stage capability requirements from a SemanticDecl's accessors.
+//
+// Iterates the getters/setters of a SemanticDecl, filters by direction, skips
+// accessors incompatible with the given stage, and collects capabilities that go
+// beyond what the stage alone requires. This prevents duplicating stage-only
+// diagnostics produced by validateSystemValueSemantic.
+//
+// Parallel to _collectSemanticAccessorCaps in slang-check-decl.cpp, which handles
+// direct parameters (and additionally supports inout).
+static void collectSemanticAccessorCaps(
+    SemanticDecl* semanticDecl,
+    SemanticDirection direction,
+    Stage stage,
+    CapabilitySet& outCaps)
+{
+    bool isOutput = (direction == SemanticDirection::Output);
+
+    for (auto member : semanticDecl->getMembers())
+    {
+        bool isGetter = as<SemanticGetterDecl>(member) != nullptr;
+        bool isSetter = as<SemanticSetterDecl>(member) != nullptr;
+        if (!isGetter && !isSetter)
+            continue;
+        if (isSetter != isOutput)
+            continue;
+
+        auto requireAttr = member->findModifier<RequireCapabilityAttribute>();
+        if (!requireAttr || !requireAttr->capabilitySet)
+            continue;
+
+        if (requireAttr->capabilitySet->isIncompatibleWith(getAtomFromStage(stage)))
+            continue;
+
+        auto capSet = requireAttr->capabilitySet;
+        if (capSet->getTargetSetCount() > 0)
+        {
+            auto firstTarget = capSet->getTargetSet(0);
+            if (firstTarget->getStageSetCount() > 0)
+            {
+                auto stageAtom = firstTarget->getStageSet(0)->getStage();
+                if (stageAtom != CapabilityAtom::Invalid)
+                {
+                    CapabilitySet pureStage((CapabilityName)stageAtom);
+                    if (pureStage.implies(CapabilitySet{capSet}))
+                        continue;
+                }
+            }
+        }
+
+        outCaps.join(requireAttr->capabilitySet);
+    }
+}
+
 // Collect non-stage capability requirements from SV_ semantics on struct fields.
 //
 // Direct parameters with SV_ semantics have their capabilities propagated by
@@ -358,43 +411,7 @@ static void collectStructFieldSemanticCapabilities(
         if (!semanticDecl)
             continue;
 
-        bool isOutput = (direction == SemanticDirection::Output);
-
-        for (auto member : semanticDecl->getMembers())
-        {
-            bool isGetter = as<SemanticGetterDecl>(member) != nullptr;
-            bool isSetter = as<SemanticSetterDecl>(member) != nullptr;
-            if (!isGetter && !isSetter)
-                continue;
-            if (isSetter != isOutput)
-                continue;
-
-            auto requireAttr = member->findModifier<RequireCapabilityAttribute>();
-            if (!requireAttr || !requireAttr->capabilitySet)
-                continue;
-
-            if (requireAttr->capabilitySet->isIncompatibleWith(getAtomFromStage(stage)))
-                continue;
-
-            // Only propagate if the accessor has capabilities beyond the stage.
-            auto capSet = requireAttr->capabilitySet;
-            if (capSet->getTargetSetCount() > 0)
-            {
-                auto firstTarget = capSet->getTargetSet(0);
-                if (firstTarget->getStageSetCount() > 0)
-                {
-                    auto stageAtom = firstTarget->getStageSet(0)->getStage();
-                    if (stageAtom != CapabilityAtom::Invalid)
-                    {
-                        CapabilitySet pureStage((CapabilityName)stageAtom);
-                        if (pureStage.implies(CapabilitySet{capSet}))
-                            continue;
-                    }
-                }
-            }
-
-            outCaps.join(requireAttr->capabilitySet);
-        }
+        collectSemanticAccessorCaps(semanticDecl, direction, stage, outCaps);
     }
 }
 
