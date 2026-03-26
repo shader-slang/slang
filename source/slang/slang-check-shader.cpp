@@ -280,37 +280,16 @@ static void validateSystemValueSemanticForType(
     }
 }
 
-bool isStageOnlySemanticRequirement(const CapabilitySetVal* capSet)
+bool isStageOnlySemanticRequirement(const CapabilitySetVal* capSet, Stage stage)
 {
-    // Find a valid stage atom from any target/stage set. We search all of them
-    // rather than assuming [0][0] is valid, in case a target set is empty or
-    // degenerate.
-    CapabilityAtom stageAtom = CapabilityAtom::Invalid;
-    for (Index ti = 0; ti < capSet->getTargetSetCount() && stageAtom == CapabilityAtom::Invalid;
-         ++ti)
-    {
-        auto targetSet = capSet->getTargetSet(ti);
-        for (Index si = 0; si < targetSet->getStageSetCount(); ++si)
-        {
-            stageAtom = targetSet->getStageSet(si)->getStage();
-            if (stageAtom != CapabilityAtom::Invalid)
-                break;
-        }
-    }
-
+    auto stageAtom = getAtomFromStage(stage);
     if (stageAtom == CapabilityAtom::Invalid)
         return false;
 
     // Construct a capability set from just the stage atom and check if it
     // implies the full requirement. CapabilitySet::implies() checks ALL target
-    // sets and stage sets in capSet, not just the one we extracted the stage
-    // from, so this is a comprehensive check: if the stage alone can satisfy
-    // every alternative in the capability set, it's stage-only.
-    //
-    // If capSet has alternatives with different stages (e.g. a hypothetical
-    // [require(fragment+capA | compute+capB)]), the pure-stage set built from
-    // one stage won't imply the other-stage alternatives, so implies() returns
-    // false and we conservatively report it as non-stage-only.
+    // sets and stage sets in capSet, so this is a comprehensive check: if the
+    // stage alone can satisfy every alternative, it's stage-only.
     CapabilitySet pureStage((CapabilityName)stageAtom);
     return pureStage.implies(CapabilitySet{capSet});
 }
@@ -348,7 +327,7 @@ static void collectSemanticAccessorCaps(
         if (requireAttr->capabilitySet->isIncompatibleWith(getAtomFromStage(stage)))
             continue;
 
-        if (isStageOnlySemanticRequirement(requireAttr->capabilitySet))
+        if (isStageOnlySemanticRequirement(requireAttr->capabilitySet, stage))
             continue;
 
         outCaps.join(requireAttr->capabilitySet);

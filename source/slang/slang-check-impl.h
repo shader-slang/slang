@@ -70,14 +70,14 @@ SemanticDecl* lookUpSemanticDecl(
 /// set, which would duplicate the more specific diagnostics produced by
 /// validateSystemValueSemantic (e.g. "SV_X cannot be used in Y stage").
 ///
-/// Extracts a stage atom from the capability set and constructs a pure-stage
-/// CapabilitySet, then uses CapabilitySet::implies() to check whether the stage
-/// alone satisfies every alternative in the requirement. The implies() call
-/// checks all target sets and stage sets, so this is comprehensive for the
-/// common case of single-stage accessors. For hypothetical multi-stage
-/// disjunctions (e.g. [require(fragment+capA | compute+capB)]), it
-/// conservatively returns false (non-stage-only), which is the safe direction.
-bool isStageOnlySemanticRequirement(const CapabilitySetVal* capSet);
+/// Constructs a pure-stage CapabilitySet from @p stage, then uses
+/// CapabilitySet::implies() to check whether the stage alone satisfies every
+/// alternative in the requirement. The implies() call checks all target sets
+/// and stage sets, so this is comprehensive for the common case of
+/// single-stage accessors. For hypothetical multi-stage disjunctions (e.g.
+/// [require(fragment+capA | compute+capB)]), it conservatively returns false
+/// (non-stage-only), which is the safe direction.
+bool isStageOnlySemanticRequirement(const CapabilitySetVal* capSet, Stage stage);
 
 /// Create a new component type based on `inComponentType`, but with all its requiremetns filled.
 RefPtr<ComponentType> fillRequirements(ComponentType* inComponentType);

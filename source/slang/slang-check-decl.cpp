@@ -14686,6 +14686,7 @@ static void _collectSemanticAccessorCaps(
     SemanticDecl* semanticDecl,
     bool isOutput,
     bool isInOut,
+    Stage stage,
     CapabilitySet& outCaps)
 {
     for (auto member : semanticDecl->getMembers())
@@ -14707,7 +14708,7 @@ static void _collectSemanticAccessorCaps(
         if (!requireAttr || !requireAttr->capabilitySet)
             continue;
 
-        if (isStageOnlySemanticRequirement(requireAttr->capabilitySet))
+        if (isStageOnlySemanticRequirement(requireAttr->capabilitySet, stage))
             continue;
 
         outCaps.unionWith(requireAttr->capabilitySet);
@@ -14762,8 +14763,17 @@ static void _propagateSemanticCapabilities(
             isOutput = true;
     }
 
+    // SV_ semantics are only meaningful at entry point boundaries.
+    auto parentFunc = as<FunctionDeclBase>(paramDecl->parentDecl);
+    if (!parentFunc)
+        return;
+    auto entryPointAttr = parentFunc->findModifier<EntryPointAttribute>();
+    if (!entryPointAttr || !entryPointAttr->capabilitySet)
+        return;
+    Stage stage = getStageFromAtom(entryPointAttr->capabilitySet->getTargetStage());
+
     CapabilitySet accessorCaps;
-    _collectSemanticAccessorCaps(semanticDecl, isOutput, isInOut, accessorCaps);
+    _collectSemanticAccessorCaps(semanticDecl, isOutput, isInOut, stage, accessorCaps);
     if (!accessorCaps.isEmpty())
         outCaps.join(accessorCaps);
 }
