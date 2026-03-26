@@ -14,12 +14,7 @@
 namespace Slang
 {
 
-// Direction of a semantic value (input from previous stage, or output to next stage)
-enum class SemanticDirection
-{
-    Input,
-    Output,
-};
+// SemanticDirection is declared in slang-check-impl.h
 
 static bool isValidThreadDispatchIDType(Type* type)
 {
@@ -301,16 +296,7 @@ bool isStageOnlySemanticRequirement(const CapabilitySetVal* capSet, Stage stage)
     return pureStage.implies(CapabilitySet{capSet});
 }
 
-// Collect non-stage capability requirements from a SemanticDecl's accessors.
-//
-// Iterates the getters/setters of a SemanticDecl, filters by direction, skips
-// accessors incompatible with the given stage, and collects capabilities that go
-// beyond what the stage alone requires. This prevents duplicating stage-only
-// diagnostics produced by validateSystemValueSemantic.
-//
-// Parallel to _collectSemanticAccessorCaps in slang-check-decl.cpp, which handles
-// direct parameters (and additionally supports inout).
-static void collectSemanticAccessorCaps(
+void collectSemanticAccessorCaps(
     SemanticDecl* semanticDecl,
     SemanticDirection direction,
     Stage stage,
@@ -1086,36 +1072,54 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
             // Propagate non-stage capability requirements from SV_ semantics
             // on struct fields. Direct parameters are handled by the capability
             // visitor; this covers the struct-based entry point parameter case.
+            // Propagate non-stage capability requirements from SV_ semantics
+            // on struct fields, matching the InOutModifier-first pattern used
+            // by validateSystemValueSemantic above (InOutModifier inherits from
+            // OutModifier, so checking OutModifier alone would misclassify
+            // inout params as output-only).
             CapabilitySet structSemanticCaps;
             for (const auto& param : entryPointFuncDecl->getParameters())
             {
-                SemanticDirection dir = SemanticDirection::Input;
-                if (param->hasModifier<OutModifier>())
-                    dir = SemanticDirection::Output;
+                auto paramType = param->getType();
+                if (!paramType)
+                    continue;
 
-                if (auto paramType = param->getType())
+                if (param->hasModifier<InOutModifier>())
                 {
                     collectStructFieldSemanticCapabilities(
                         &visitor,
                         paramType,
                         stage,
-                        dir,
+                        SemanticDirection::Input,
+                        scope,
+                        structSemanticCaps);
+                    collectStructFieldSemanticCapabilities(
+                        &visitor,
+                        paramType,
+                        stage,
+                        SemanticDirection::Output,
                         scope,
                         structSemanticCaps);
                 }
-
-                if (param->hasModifier<InOutModifier>())
+                else if (param->hasModifier<OutModifier>())
                 {
-                    if (auto paramType = param->getType())
-                    {
-                        collectStructFieldSemanticCapabilities(
-                            &visitor,
-                            paramType,
-                            stage,
-                            SemanticDirection::Output,
-                            scope,
-                            structSemanticCaps);
-                    }
+                    collectStructFieldSemanticCapabilities(
+                        &visitor,
+                        paramType,
+                        stage,
+                        SemanticDirection::Output,
+                        scope,
+                        structSemanticCaps);
+                }
+                else
+                {
+                    collectStructFieldSemanticCapabilities(
+                        &visitor,
+                        paramType,
+                        stage,
+                        SemanticDirection::Input,
+                        scope,
+                        structSemanticCaps);
                 }
             }
             if (!structSemanticCaps.isEmpty())

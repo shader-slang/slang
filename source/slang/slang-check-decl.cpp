@@ -14673,51 +14673,6 @@ static void _propagateRequirement(
     }
 };
 
-// Collect non-stage capability requirements from a SemanticDecl's accessors.
-//
-// Iterates the getters/setters of a SemanticDecl, filters by direction, and
-// collects capabilities that go beyond what the stage alone requires. This
-// prevents duplicating stage-only diagnostics produced by
-// validateSystemValueSemantic in slang-check-shader.cpp.
-//
-// Parallel to collectSemanticAccessorCaps in slang-check-shader.cpp, which
-// handles struct fields during entry point validation.
-static void _collectSemanticAccessorCaps(
-    SemanticDecl* semanticDecl,
-    bool isOutput,
-    bool isInOut,
-    Stage stage,
-    CapabilitySet& outCaps)
-{
-    for (auto member : semanticDecl->getMembers())
-    {
-        bool isGetter = as<SemanticGetterDecl>(member) != nullptr;
-        bool isSetter = as<SemanticSetterDecl>(member) != nullptr;
-        if (!isGetter && !isSetter)
-            continue;
-
-        if (!isInOut)
-        {
-            if (isOutput && isGetter)
-                continue;
-            if (!isOutput && isSetter)
-                continue;
-        }
-
-        auto requireAttr = member->findModifier<RequireCapabilityAttribute>();
-        if (!requireAttr || !requireAttr->capabilitySet)
-            continue;
-
-        if (requireAttr->capabilitySet->isIncompatibleWith(getAtomFromStage(stage)))
-            continue;
-
-        if (isStageOnlySemanticRequirement(requireAttr->capabilitySet, stage))
-            continue;
-
-        outCaps.unionWith(requireAttr->capabilitySet);
-    }
-}
-
 // Propagate non-stage capability requirements from system value semantics on a
 // parameter declaration.
 //
@@ -14757,15 +14712,6 @@ static void _propagateSemanticCapabilities(
     if (!semanticDecl)
         return;
 
-    bool isOutput = paramDecl->hasModifier<OutModifier>();
-    bool isInOut = paramDecl->hasModifier<InOutModifier>();
-
-    if (auto paramType = paramDecl->getType())
-    {
-        if (as<MeshOutputType>(paramType) || as<HLSLStreamOutputType>(paramType))
-            isOutput = true;
-    }
-
     // SV_ semantics are only meaningful at entry point boundaries.
     auto parentFunc = as<FunctionDeclBase>(paramDecl->parentDecl);
     if (!parentFunc)
@@ -14775,8 +14721,29 @@ static void _propagateSemanticCapabilities(
         return;
     Stage stage = getStageFromAtom(entryPointAttr->capabilitySet->getTargetStage());
 
+    // Determine direction, matching the InOutModifier-first pattern used by
+    // validateSystemValueSemantic (InOutModifier inherits from OutModifier).
     CapabilitySet accessorCaps;
-    _collectSemanticAccessorCaps(semanticDecl, isOutput, isInOut, stage, accessorCaps);
+    if (paramDecl->hasModifier<InOutModifier>())
+    {
+        collectSemanticAccessorCaps(semanticDecl, SemanticDirection::Input, stage, accessorCaps);
+        collectSemanticAccessorCaps(semanticDecl, SemanticDirection::Output, stage, accessorCaps);
+    }
+    else
+    {
+        bool isOutput = paramDecl->hasModifier<OutModifier>();
+        if (auto paramType = paramDecl->getType())
+        {
+            if (as<MeshOutputType>(paramType) || as<HLSLStreamOutputType>(paramType))
+                isOutput = true;
+        }
+        collectSemanticAccessorCaps(
+            semanticDecl,
+            isOutput ? SemanticDirection::Output : SemanticDirection::Input,
+            stage,
+            accessorCaps);
+    }
+
     if (!accessorCaps.isEmpty())
         outCaps.join(accessorCaps);
 }
