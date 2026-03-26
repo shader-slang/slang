@@ -87,7 +87,7 @@ enum class ContainerNestingCategory : uint32_t
 static DeclNestingCategory classifyDeclForNesting(Decl* decl)
 {
     // Order matters for inheritance: check more-derived types first.
-    if (as<GetterDecl>(decl) || as<SetterDecl>(decl) || as<RefAccessorDecl>(decl))
+    if (as<AccessorDecl>(decl))
         return DeclNestingCategory::Accessor;
     if (as<ConstructorDecl>(decl))
         return DeclNestingCategory::Constructor;
