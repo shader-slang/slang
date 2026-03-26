@@ -231,6 +231,14 @@ static const NestingRule kNestingRules[] = {
 };
 // clang-format on
 
+static_assert(
+    SLANG_COUNT_OF(kNestingRules) == static_cast<SlangSSizeT>(DeclNestingCategory::Count),
+    "kNestingRules must have one entry per DeclNestingCategory");
+
+static_assert(
+    static_cast<uint32_t>(ContainerNestingCategory::Count) <= 32,
+    "Too many ContainerNestingCategory values for uint32_t bitmask");
+
 /// Return a human-readable name for a ContainerNestingCategory.
 static const char* getContainerNestingCategoryName(ContainerNestingCategory cat)
 {
