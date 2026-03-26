@@ -681,6 +681,8 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
         // try to substitute it with the currently known args.
         if (c.potentiallyDependent)
         {
+            // Return value intentionally ignored: partial args are sufficient
+            // for substituting references to already-solved parameters.
             constraintSystemSolverUnpackArgs(
                 this,
                 genericDeclRef,
@@ -778,6 +780,10 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
                     // constraint.
                     else if (c.isOptional)
                         joinType = type;
+                    // Previous constraint was optional and current is not,
+                    // so use the current type instead of failing.
+                    else if (typeConstraintOptional)
+                        joinType = cType;
                     else if (c.isEquality)
                         joinType = type;
                     else
