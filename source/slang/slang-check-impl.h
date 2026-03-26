@@ -70,13 +70,13 @@ SemanticDecl* lookUpSemanticDecl(
 /// set, which would duplicate the more specific diagnostics produced by
 /// validateSystemValueSemantic (e.g. "SV_X cannot be used in Y stage").
 ///
-/// Current approach: construct a CapabilitySet from the accessor's stage atom
-/// alone and check if it implies the full requirement. If so, the requirement
-/// adds nothing beyond the stage and can be skipped. This is a heuristic that
-/// only examines the first target set and first stage set of the capability —
-/// it works correctly for all current semantic declarations, which have a single
-/// stage per accessor, but may need refinement if future semantics use
-/// multi-target or multi-stage disjunctions on a single accessor.
+/// Extracts a stage atom from the capability set and constructs a pure-stage
+/// CapabilitySet, then uses CapabilitySet::implies() to check whether the stage
+/// alone satisfies every alternative in the requirement. The implies() call
+/// checks all target sets and stage sets, so this is comprehensive for the
+/// common case of single-stage accessors. For hypothetical multi-stage
+/// disjunctions (e.g. [require(fragment+capA | compute+capB)]), it
+/// conservatively returns false (non-stage-only), which is the safe direction.
 bool isStageOnlySemanticRequirement(const CapabilitySetVal* capSet);
 
 /// Create a new component type based on `inComponentType`, but with all its requiremetns filled.
