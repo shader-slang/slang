@@ -1,5 +1,5 @@
 // Test backward differentiation through a generic interface with [BackwardDerivative].
-// Regression test for https://github.com/shader-slang/slang/issues/639
+// Regression test for https://github.com/shader-slang/slangpy/issues/639
 // The compiler crashed in analyzeExtractExistentialWitnessTable when processing
 // auto-diff generated code for [BackwardDerivative] functions with generic interface parameters.
 
