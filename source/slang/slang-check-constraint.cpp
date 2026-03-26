@@ -623,114 +623,79 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
         }
     }
 
-    // The state of currently solved arguments.
-    ShortList<SolvedArg> solvedArgs;
-
-    Count directMemberDeclsIndex = 0;
-    // This adds one default value constraint each time it is called.
-    auto addDefaultValueConstraint = [&]()
+    // Add default args to the constraints.
+    for (auto member: genericDeclRef.getDecl()->getDirectMemberDecls())
     {
-        const auto& directMemberDecls = genericDeclRef.getDecl()->getDirectMemberDecls();
-        for (; directMemberDeclsIndex < directMemberDecls.getCount(); ++directMemberDeclsIndex)
+        if (auto typeParam = as<GenericTypeParamDecl>(member))
         {
-            const auto& member = directMemberDecls[directMemberDeclsIndex];
-            if (auto typeParam = as<GenericTypeParamDecl>(member))
+            SLANG_ASSERT(typeParam->parameterIndex != -1);
+
+            if (typeParam->initType && typeParam->parameterIndex >= knownGenericArgCount)
             {
-                SLANG_ASSERT(typeParam->parameterIndex != -1);
-
-                if (typeParam->initType && typeParam->parameterIndex >= knownGenericArgCount)
-                {
-                    constraintSystemSolverFinalizeArgs(
-                        this,
-                        genericDeclRef,
-                        knownGenericArgCount,
-                        solvedArgs,
-                        args);
-                    // If we have a default arg for this parameter, we can try to
-                    // use it.
-                    auto genSubst = m_astBuilder->getGenericAppDeclRef(
-                        genericDeclRef,
-                        args.getArrayView().arrayView);
-                    auto defaultType = SubstitutionSet(genSubst).applyToType(
-                        m_astBuilder,
-                        typeParam->initType.type);
-                    if (defaultType)
-                    {
-                        Constraint c;
-                        c.decl = member;
-                        c.val = defaultType;
-                        c.isOptional = true;
-                        c.isEquality = true;
-                        system->constraints.add(c);
-                        ++directMemberDeclsIndex;
-                        return true;
-                    }
-                }
-            }
-            else if (auto valParam = as<GenericValueParamDecl>(member))
-            {
-                SLANG_ASSERT(valParam->parameterIndex != -1);
-
-                if (valParam->initExpr && valParam->parameterIndex >= knownGenericArgCount)
-                {
-                    ensureDecl(makeDeclRef(valParam), DeclCheckState::DefinitionChecked);
-                    constraintSystemSolverFinalizeArgs(
-                        this,
-                        genericDeclRef,
-                        knownGenericArgCount,
-                        solvedArgs,
-                        args);
-                    auto genSubst = m_astBuilder->getGenericAppDeclRef(
-                        genericDeclRef,
-                        args.getArrayView().arrayView);
-                    ConstantFoldingCircularityInfo newCircularityInfo(
-                        makeDeclRef(valParam),
-                        nullptr);
-                    auto defaultVal = tryConstantFoldExpr(
-                        applySubstitutionToExpr(SubstitutionSet(genSubst), valParam->initExpr),
-                        ConstantFoldingKind::CompileTime,
-                        &newCircularityInfo);
-
-                    if (defaultVal)
-                    {
-                        Constraint c;
-                        c.decl = member;
-                        c.val = defaultVal;
-                        c.isOptional = true;
-                        c.isEquality = true;
-                        system->constraints.add(c);
-                        ++directMemberDeclsIndex;
-                        return true;
-                    }
-                }
+                Constraint c;
+                c.decl = member;
+                c.val = typeParam->initType;
+                c.isOptional = true;
+                c.isEquality = true;
+                c.potentiallyDependent = true;
+                system->constraints.add(c);
             }
         }
-        return false;
-    };
+        else if (auto valParam = as<GenericValueParamDecl>(member))
+        {
+            SLANG_ASSERT(valParam->parameterIndex != -1);
+
+            if (valParam->initExpr && valParam->parameterIndex >= knownGenericArgCount)
+            {
+                ConstantFoldingCircularityInfo newCircularityInfo(
+                    makeDeclRef(member),
+                    nullptr);
+
+                Constraint c;
+                c.decl = member;
+                c.val = ExtractGenericArgVal(valParam->initExpr);
+                c.isOptional = true;
+                c.isEquality = true;
+                c.potentiallyDependent = true;
+                system->constraints.add(c);
+            }
+        }
+    }
+
+    // The state of currently solved arguments.
+    ShortList<SolvedArg> solvedArgs;
 
     // We will then iterate over the constraints trying to solve all generic parameters.
     // Note that we do not use ranged for here, because processing one constraint may lead to
     // new constraints being discovered.
-    for (Index constraintIndex = 0;; constraintIndex++)
+    for (Index constraintIndex = 0; constraintIndex < system->constraints.getCount();
+         constraintIndex++)
     {
-        if (constraintIndex == system->constraints.getCount())
-        {
-            // Whenever we're out of constraints, we add default value
-            // constraints until we run out of those as well. This lets the
-            // default value constraints themselves depend on all other
-            // constraints, allowing e.g. `void func<T, U = T>(T a)` to deduce
-            // `U = float` when called `func(1.0f)`. Adding them one-by-one
-            // allows them to depend on the earlier default values as well,
-            // e.g. `void func<T, U = T, V = U>()`.
-            if (!addDefaultValueConstraint())
-                break;
-        }
-
         // Note: it is important to keep a copy of the constraint here instead of
         // using a reference, because the constraint list may be modified during the
         // loop as we discover new constraints.
         //
         auto c = system->constraints[constraintIndex];
+
+        // If the constraint is potentially dependent on earlier constraints,
+        // try to substitute it with the currently known args.
+        if (c.potentiallyDependent)
+        {
+            constraintSystemSolverFinalizeArgs(
+                this,
+                genericDeclRef,
+                knownGenericArgCount,
+                solvedArgs,
+                args);
+
+            auto genSubst = m_astBuilder->getGenericAppDeclRef(
+                genericDeclRef,
+                args.getArrayView().arrayView);
+
+            auto newVal = c.val->substitute(m_astBuilder, SubstitutionSet(genSubst));
+            if (newVal)
+                c.val = newVal;
+        }
 
         if (auto typeParam = as<GenericTypeParamDeclBase>(c.decl))
         {
@@ -803,14 +768,17 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
                 auto joinType = TryJoinTypes(system, type, cType);
                 if (!joinType)
                 {
-                    // Equal precedence and couldn't join, so this is a failure.
-                    if (c.isOptional == typeConstraintOptional)
+                    // Equal precedence and couldn't join optional constraints,
+                    // so this is a failure.
+                    if (c.isOptional && typeConstraintOptional)
                         // failure!
                         return DeclRef<Decl>();
                     // Optional but previous constraints aren't, so not being
                     // able to join just means discarding the optional
                     // constraint.
-                    else if (c.isOptional || c.isEquality)
+                    else if (c.isOptional)
+                        joinType = type;
+                    else if (c.isEquality)
                         joinType = type;
                     else
                         // failure!

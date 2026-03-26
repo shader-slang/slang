@@ -2506,6 +2506,9 @@ public:
         // know the result will be the sub type. If it is not, we will error once we start
         // substituting types.
         bool isEquality = false;
+
+        // Can `val` itself depend on other constraints? E.g. `<T, U = T>`
+        bool potentiallyDependent = false;
     };
 
     // A collection of constraints that will need to be satisfied (solved)
