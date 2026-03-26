@@ -119,7 +119,7 @@ static DeclNestingCategory classifyDeclForNesting(Decl* decl)
             as<GlobalGenericValueParamDecl>(decl))
             return DeclNestingCategory::Unknown;
         // `extern` vars in extensions reference existing fields, not new declarations.
-        if (varDecl->hasModifier<ExternModifier>())
+        if (varDecl->hasModifier<ExternModifier>() && as<ExtensionDecl>(varDecl->parentDecl))
             return DeclNestingCategory::Unknown;
 
         if (varDecl->hasModifier<HLSLStaticModifier>())
