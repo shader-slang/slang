@@ -9642,6 +9642,224 @@ struct IntegerMMAHelper<
 // After:   reg0=A00^T, reg1=A01^T, reg2=A10^T, reg3=A11^T  (column-major fragments)
 // ====================================================================================
 
+// ====================================================================================
+// BatchFromArray: optimized batch shuffle for constructing multiple MatA (16x16)
+// fragments from a per-thread array. Implements Tin2's OPTIMIZED_SHUFFLE algorithm.
+//
+// Produces 2 * (N_COLS/16) fragments covering a 32×N_COLS row-major matrix
+// (all 32 warp threads contribute simultaneously).
+// Uses 1 shuffle per packed column = N_COLS/2 total shuffles.
+// ====================================================================================
+
+#if SLANG_CUDA_ENABLE_HALF
+template<int N_COLS>
+__device__ inline void mmaBatchFromArray_MatA_16x16(
+    WmmaFragment<half, 16, 8, 16, MatrixUse::MatrixA>* fragments,
+    const uint32_t* ip_packed_arr)
+{
+    unsigned laneid;
+    asm("mov.u32 %0, %%laneid;" : "=r"(laneid));
+
+    static constexpr uint32_t ColsPacked = N_COLS / 2;
+    static constexpr uint32_t RegColsPacked = 4;
+    static constexpr uint32_t RegRowsPacked = 8;
+    static constexpr uint32_t RegRows = 2;
+    static constexpr uint32_t MMARows = 2;
+
+    #pragma unroll
+    for (uint32_t col_packed = 0; col_packed < ColsPacked; col_packed += RegColsPacked)
+    {
+        uint32_t regsi[RegColsPacked];
+
+        #pragma unroll
+        for (uint32_t i = 0; i < RegColsPacked; i++)
+        {
+            uint32_t src = col_packed + i;
+            regsi[i] = (src < ColsPacked) ? ip_packed_arr[src] : 0;
+
+            #pragma unroll
+            for (uint32_t j = 1; j < RegColsPacked; j++)
+            {
+                uint32_t alt_src = col_packed + (i + j) % RegColsPacked;
+                uint32_t val_packed = (alt_src < ColsPacked) ? ip_packed_arr[alt_src] : 0;
+                if (laneid / RegRowsPacked == j)
+                    regsi[i] = val_packed;
+            }
+        }
+
+        #pragma unroll
+        for (uint32_t i = 0; i < RegColsPacked; i++)
+        {
+            uint32_t shfl_idx = ((laneid + (RegColsPacked - i)) % RegColsPacked) * RegRowsPacked + laneid / RegColsPacked;
+            regsi[i] = __shfl_sync(0xFFFFFFFF, regsi[i], shfl_idx);
+        }
+
+        uint32_t mma_col = col_packed / (16 / 2);
+        uint32_t r_col = (col_packed % (16 / 2)) / RegColsPacked;
+
+        #pragma unroll
+        for (uint32_t i = 0; i < RegColsPacked; i++)
+        {
+            uint32_t r_row = i % RegRows;
+            uint32_t mma_row = i / RegRows;
+
+            uint32_t frag_idx = mma_col * MMARows + mma_row;
+            uint32_t reg_idx = r_col * RegRows + r_row;
+
+            fragments[frag_idx].regs[reg_idx] = regsi[0];
+
+            #pragma unroll
+            for (uint32_t j = 1; j < RegColsPacked; j++)
+            {
+                if (laneid % RegColsPacked == (i + j) % RegColsPacked)
+                    fragments[frag_idx].regs[reg_idx] = regsi[j];
+            }
+        }
+    }
+}
+#endif
+
+// ====================================================================================
+// Shared memory based fragment construction using ldmatrix.
+// Each thread writes its local row to shared memory, then ldmatrix loads
+// the fragment directly from shmem — zero shuffles.
+// ====================================================================================
+
+// Store a per-thread local row (16 halves = 32 bytes) to shared memory.
+// All 32 threads write their rows at base + laneId * 16 (in half units).
+// After a __syncwarp(), loadShMem can read the fragments.
+__device__ inline void mmaStoreLocalRowToShMem(
+    half* smem_base,
+    const uint32_t* local_packed,
+    int num_halves)
+{
+    unsigned laneid;
+    asm("mov.u32 %0, %%laneid;" : "=r"(laneid));
+
+    uint32_t* dst = reinterpret_cast<uint32_t*>(smem_base + laneid * num_halves);
+    int num_packed = num_halves / 2;
+    #pragma unroll
+    for (int i = 0; i < num_packed; i++)
+        dst[i] = local_packed[i];
+}
+
+// Load two 16x16 MatA fragments from a 32x16 shared memory tile using ldmatrix.
+// smem_base points to a 32-row x 16-col (half) tile in shared memory.
+// Each row is `stride` halves wide (typically 16).
+// outTiles[0] = MatA from rows 0-15, outTiles[1] = MatA from rows 16-31.
+//
+// For mma.m16n8k16, MatA (row-major, 16x16) occupies 4 regs per thread.
+// ldmatrix.sync.aligned.m8n8.x4 loads exactly these 4 regs when each
+// thread provides the address of its contribution row in the tile.
+//
+// Thread-to-address mapping for a 16x16 row-major tile:
+//   ldmatrix.x4 groups threads into 4 groups of 8.
+//   Group g (g=0..3), lane-in-group l (l=0..7):
+//     row = (g & 1) * 8 + l        (groups 0,2 -> rows 0-7; groups 1,3 -> rows 8-15)
+//     col_offset = (g >> 1) * 8     (groups 0,1 -> cols 0-7; groups 2,3 -> cols 8-15)
+//     addr = base + row * stride + col_offset
+#if SLANG_CUDA_ENABLE_HALF
+__device__ inline void mmaLoadShMemMatA_16x16(
+    WmmaFragment<half, 16, 8, 16, MatrixUse::MatrixA>* outTiles,
+    const half* smem_base,
+    int stride)
+{
+    unsigned laneid;
+    asm("mov.u32 %0, %%laneid;" : "=r"(laneid));
+
+    unsigned group = laneid / 8;        // 0,1,2,3
+    unsigned lane_in_group = laneid % 8;
+    unsigned base_row = (group & 1) * 8 + lane_in_group;
+    unsigned col_off = (group >> 1) * 8;
+
+    // Tile 0: rows 0-15
+    // Use generic addressing (no .shared) because the pointer has already
+    // been converted from .shared to generic by Slang's cvta.shared.u64.
+    {
+        const half* row_ptr = smem_base + base_row * stride + col_off;
+        uint32_t r0, r1, r2, r3;
+        asm volatile(
+            "ldmatrix.sync.aligned.m8n8.x4.b16 {%0, %1, %2, %3}, [%4];"
+            : "=r"(r0), "=r"(r1), "=r"(r2), "=r"(r3)
+            : "l"(row_ptr));
+        outTiles[0].regs[0] = r0;
+        outTiles[0].regs[1] = r1;
+        outTiles[0].regs[2] = r2;
+        outTiles[0].regs[3] = r3;
+    }
+
+    // Tile 1: rows 16-31
+    {
+        const half* row_ptr = smem_base + (16 + base_row) * stride + col_off;
+        uint32_t r0, r1, r2, r3;
+        asm volatile(
+            "ldmatrix.sync.aligned.m8n8.x4.b16 {%0, %1, %2, %3}, [%4];"
+            : "=r"(r0), "=r"(r1), "=r"(r2), "=r"(r3)
+            : "l"(row_ptr));
+        outTiles[1].regs[0] = r0;
+        outTiles[1].regs[1] = r1;
+        outTiles[1].regs[2] = r2;
+        outTiles[1].regs[3] = r3;
+    }
+}
+#endif
+
+// Load a single 16x16 MatA fragment from shared memory using ldmatrix.
+// smem_base: pointer to shmem tile start.
+// stride: number of halves per row.
+// rowOffset: starting row in shmem (0 for threads 0-15, 16 for threads 16-31).
+#if SLANG_CUDA_ENABLE_HALF
+__device__ inline void mmaLoadShMemMatA_16x16_single(
+    WmmaFragment<half, 16, 8, 16, MatrixUse::MatrixA>& outTile,
+    const half* smem_base,
+    int stride,
+    int rowOffset)
+{
+    unsigned laneid;
+    asm("mov.u32 %0, %%laneid;" : "=r"(laneid));
+
+    unsigned group = laneid / 8;
+    unsigned lane_in_group = laneid % 8;
+    unsigned base_row = rowOffset + (group & 1) * 8 + lane_in_group;
+    unsigned col_off = (group >> 1) * 8;
+
+    const half* row_ptr = smem_base + base_row * stride + col_off;
+    uint32_t r0, r1, r2, r3;
+    asm volatile(
+        "ldmatrix.sync.aligned.m8n8.x4.b16 {%0, %1, %2, %3}, [%4];"
+        : "=r"(r0), "=r"(r1), "=r"(r2), "=r"(r3)
+        : "l"(row_ptr));
+    outTile.regs[0] = r0;
+    outTile.regs[1] = r1;
+    outTile.regs[2] = r2;
+    outTile.regs[3] = r3;
+}
+#endif
+
+// Extract the lower 16x8 half (columns 0-7) of a ChangeMajor'd MatA as MatB.
+__device__ inline WmmaFragment<half, 16, 8, 16, MatrixUse::MatrixB>
+mmaExtractMatBLo(const WmmaFragment<half, 16, 8, 16, MatrixUse::MatrixA>& a)
+{
+    WmmaFragment<half, 16, 8, 16, MatrixUse::MatrixB> b;
+    b.regs[0] = a.regs[0];
+    b.regs[1] = a.regs[1];
+    return b;
+}
+
+// Extract the upper 16x8 half (columns 8-15) of a ChangeMajor'd MatA as MatB.
+__device__ inline WmmaFragment<half, 16, 8, 16, MatrixUse::MatrixB>
+mmaExtractMatBHi(const WmmaFragment<half, 16, 8, 16, MatrixUse::MatrixA>& a)
+{
+    WmmaFragment<half, 16, 8, 16, MatrixUse::MatrixB> b;
+    b.regs[0] = a.regs[2];
+    b.regs[1] = a.regs[3];
+    return b;
+}
+
+// ====================================================================================
+// MMA m16n8k16 ChangeMajor (in-register transpose) for Matrix A (16x16, f16)
+// ====================================================================================
+
 #if SLANG_CUDA_ENABLE_HALF
 template<int M, int N, int K, MatrixUse R>
 __device__ inline void mmaChangeMajor(WmmaFragment<half, M, N, K, R>& frag)

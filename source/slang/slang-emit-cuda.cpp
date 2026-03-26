@@ -348,7 +348,7 @@ SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, 
                 (uint32_t)static_cast<IRIntLit*>(coopType->getMatrixUse())->getValue();
             FragmentShape shape = computeShapeCombination(matrixUse, rowCount, colCount);
             if (shape.m == 16 && shape.n == 8 && shape.k == 16)
-                m_extensionTracker->requireSMVersion(SemanticVersion(8, 0));
+                m_extensionTracker->requireSMVersion(SemanticVersion(8, 9));
             else
                 m_extensionTracker->requireSMVersion(SemanticVersion(7, 5));
             return result;

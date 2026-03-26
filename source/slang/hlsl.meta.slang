@@ -28080,6 +28080,101 @@ struct CoopMat
         }
     }
 
+    /// Constructs MatA (16x16) fragments for both 16-thread groups simultaneously
+    /// using optimized shuffle (1 shuffle per packed column instead of 2).
+    /// No matIndex parameter — both groups are produced in one call.
+    ///
+    /// @param localRow Array of N elements representing one row per thread.
+    /// @param outTiles Output array of 2 fragments: [0] = group 0, [1] = group 1.
+    [require(cuda)]
+    static void FromLocalRowPack(T localRow[N], inout This outTiles[2])
+    {
+        __target_switch
+        {
+        case cuda:
+            __intrinsic_asm R"(Slang_CUDA_WMMA::mmaBatchFromArray_MatA_16x16<16>(&((*($1))[0]), (const uint32_t*)($0).m_data))";
+        }
+    }
+
+    /// Constructs MatA (16x16) fragments directly from a sub-array at the given
+    /// element offset, without copying to a temporary. Avoids half pack/unpack overhead.
+    ///
+    /// @param data Source array (larger than 16 elements).
+    /// @param elementOffset Starting element index (must be aligned to 2 for half packing).
+    /// @param outTiles Output array of 2 fragments.
+    [require(cuda)]
+    static void FromLocalRowPackOffset<int ArraySize>(T data[ArraySize], int elementOffset, inout This outTiles[2])
+    {
+        __target_switch
+        {
+        case cuda:
+            __intrinsic_asm R"(Slang_CUDA_WMMA::mmaBatchFromArray_MatA_16x16<16>(&((*($2))[0]), (const uint32_t*)&(($0).m_data[$1 / 2])))";
+        }
+    }
+
+    /// Extracts the lower 16x8 half (columns 0-7) of a ChangeMajor'd MatA as MatB.
+    /// Used to split a 16x16 col-major tile into two 16x8 MatB tiles for m16n8k16 MMA.
+    [require(cuda)]
+    static linalg.CoopMat<T, S, M, N / 2, linalg.CoopMatMatrixUse.MatrixB> ExtractMatBLo(This a)
+    {
+        __target_switch
+        {
+        case cuda:
+            __intrinsic_asm R"(Slang_CUDA_WMMA::mmaExtractMatBLo($0))";
+        }
+    }
+
+    /// Extracts the upper 16x8 half (columns 8-15) of a ChangeMajor'd MatA as MatB.
+    [require(cuda)]
+    static linalg.CoopMat<T, S, M, N / 2, linalg.CoopMatMatrixUse.MatrixB> ExtractMatBHi(This a)
+    {
+        __target_switch
+        {
+        case cuda:
+            __intrinsic_asm R"(Slang_CUDA_WMMA::mmaExtractMatBHi($0))";
+        }
+    }
+
+    /// Store a per-thread local row to shared memory for subsequent ldmatrix loading.
+    /// smemBase is a pointer to the shared memory tile start.
+    /// localRow is a T[numHalves] array holding this thread's row data.
+    /// numHalves is the number of T elements per row (e.g. 16).
+    [require(cuda)]
+    static void storeShMem(Ptr<T, Access.ReadWrite, AddressSpace.GroupShared> smemBase, T localRow[N], int numHalves)
+    {
+        __target_switch
+        {
+        case cuda:
+            __intrinsic_asm R"(Slang_CUDA_WMMA::mmaStoreLocalRowToShMem(($0), (const uint32_t*)($1).m_data, ($2)))";
+        }
+    }
+
+    /// Load two 16x16 MatA tiles from shared memory using ldmatrix.
+    /// smemBase points to a 32-row x stride-col shared memory tile written by storeShMem.
+    /// stride is the number of T elements per row in shared memory (typically 16).
+    /// outTiles receives 2 MatA fragments (rows 0-15 and rows 16-31).
+    [require(cuda)]
+    static void loadShMem(Ptr<T, Access.ReadWrite, AddressSpace.GroupShared> smemBase, int stride, inout This outTiles[2])
+    {
+        __target_switch
+        {
+        case cuda:
+            __intrinsic_asm R"(Slang_CUDA_WMMA::mmaLoadShMemMatA_16x16(&((*($2))[0]), ($0), ($1)))";
+        }
+    }
+
+    /// Load a single 16x16 MatA tile from shared memory using ldmatrix.
+    /// rowOffset selects which 16-row block to load (0 or 16).
+    [require(cuda)]
+    static void loadShMemSingle(Ptr<T, Access.ReadWrite, AddressSpace.GroupShared> smemBase, int stride, int rowOffset, inout This outTile)
+    {
+        __target_switch
+        {
+        case cuda:
+            __intrinsic_asm R"(Slang_CUDA_WMMA::mmaLoadShMemMatA_16x16_single((*($3)), ($0), ($1), ($2)))";
+        }
+    }
+
     /// Transposes the cooperative matrix. Requires Vulkan with SPV_NV_cooperative_matrix2 extension.
     /// @return A transposed cooperative matrix with dimensions N×M and MatrixB usage.
     [require(spirv, cooperative_matrix_conversion)]

@@ -60,17 +60,12 @@ public struct BindlessAddress<T> : IPointerLikeAddress<T>
         __target_switch
         {
         case cuda:
-            // On CUDA, use packed vector atomic for types that support it (half2, bfloat16x2).
-            // Note: Only use this on CUDA, because Ptr<T[]> is just T** on CUDA.
-
-            // *handle will be resolved to RWStructuredBuffer<T>
             let bufferPtr = __getStructuredBufferPtr(*handle);
-            let doublePtr = reinterpret<T**>(bufferPtr);
+            let doublePtr = bit_cast<T**>(bufferPtr);
             let offsetPtr = doublePtr[0] + baseIndex + index;
-            let vecPtr = reinterpret<vector<T, 2>*>(offsetPtr);
+            let vecPtr = bit_cast<vector<T, 2>*>(offsetPtr);
             __atomic_reduce_add(*vecPtr, value);
         default:
-            // On other targets, fall back to two scalar atomic adds.
             atomicAdd(index, value[0]);
             atomicAdd(index + 1, value[1]);
         }

@@ -365,7 +365,19 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
     static const int OPA_RegsPerLane = (OPA_ElementsPerLane * sizeof(T) + 3) / 4;
     static const int OPA_TileStride = (OPA_RegsPerLane * N * 4 + sizeof(uint4) - 1) / sizeof(uint4);
 
-    // Phase 1: Compute outer product into matC (passed as inout).
+    // Number of 16x16 MatA tiles for the input vector (covering K elements).
+    // Each 16x16 tile spans 16 input elements and 16 threads (one group).
+    // With 2 thread groups: 2 * (K/16) tiles total.
+    static const int OPA_InputTileCols = (K + COLUMN_A - 1) / COLUMN_A;
+    static const int OPA_TotalInputMatA = NColGroupsOPA * OPA_InputTileCols;
+
+    // Number of 16x16 MatA tiles for the dOut vector.
+    static const int OPA_TotalDOutMatA = NColGroupsOPA * OPA_CoopMatCRows;
+
+    // Outer product compute: dW[m][k] = sum_{all threads} dOut[m] * input[k]
+    //
+    // Builds 16x16 MatA tiles via FromLocalRowPackOffset (optimized batch shuffle),
+    // then splits each into two 16x8 MatB halves for m16n8k16 MMA.
     [require(cuda, subgroup_basic)]
     static void outerProductCompute<TypeA, InArrayTypeA, TypeB, InArrayTypeB>(
         InArrayTypeA inputVectorA,
@@ -378,10 +390,25 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
             where InArrayTypeA : IArrayAccessor<TypeA>
             where InArrayTypeB : IArrayAccessor<TypeB>
     {
-        [ForceUnroll]
-        for (int k = 0; k < NColGroupsOPA; k++)
+        // --- Phase 1: Build dOut as 16x16 MatA tiles + ChangeMajor ---
+        // Downcast to concrete array type to read packed data directly,
+        // avoiding element-by-element half pack/unpack overhead.
+        MatA allDOut[OPA_TotalDOutMatA];
+        if (let arrA = inputVectorA as half[M])
         {
-            MatA matAArr[OPA_CoopMatCRows];
+            [ForceUnroll]
+            for (int i = 0; i < OPA_CoopMatCRows; i++)
+            {
+                MatA tilePair[2];
+                MatA.FromLocalRowPackOffset(arrA, i * ROW_A, tilePair);
+                tilePair[0].ChangeMajor();
+                tilePair[1].ChangeMajor();
+                allDOut[i * 2 + 0] = tilePair[0];
+                allDOut[i * 2 + 1] = tilePair[1];
+            }
+        }
+        else
+        {
             [ForceUnroll]
             for (int i = 0; i < OPA_CoopMatCRows; i++)
             {
@@ -392,30 +419,77 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
                     int elemIdx = i * ROW_A + m;
                     localRowA[m] = (elemIdx < M) ? __realCast<half>(inputVectorA[elemIdx]) : half(0.0);
                 }
-                matAArr[i] = MatA.FromLocalRow(localRowA, k);
-                matAArr[i].ChangeMajor();
+                MatA tilePair[2];
+                MatA.FromLocalRowPack(localRowA, tilePair);
+                tilePair[0].ChangeMajor();
+                tilePair[1].ChangeMajor();
+                allDOut[i * 2 + 0] = tilePair[0];
+                allDOut[i * 2 + 1] = tilePair[1];
             }
+        }
 
+        // --- Phase 2: Build input as 16x16 MatA tiles + ChangeMajor ---
+        MatA allInput[OPA_TotalInputMatA];
+        if (let arrB = inputVectorB as half[K])
+        {
             [ForceUnroll]
-            for (int j = 0; j < OPA_CoopMatCColumns; j++)
+            for (int j16 = 0; j16 < OPA_InputTileCols; j16++)
             {
-                half localColB[ROW_B];
+                MatA tilePairB[2];
+                MatA.FromLocalRowPackOffset(arrB, j16 * COLUMN_A, tilePairB);
+                tilePairB[0].ChangeMajor();
+                tilePairB[1].ChangeMajor();
+                allInput[j16 * 2 + 0] = tilePairB[0];
+                allInput[j16 * 2 + 1] = tilePairB[1];
+            }
+        }
+        else
+        {
+            [ForceUnroll]
+            for (int j16 = 0; j16 < OPA_InputTileCols; j16++)
+            {
+                half localRowB[COLUMN_A];
                 [ForceUnroll]
-                for (int n = 0; n < ROW_B; n++)
+                for (int n = 0; n < COLUMN_A; n++)
                 {
-                    int elemIdx = j * COLUMN_B + n;
-                    localColB[n] = (elemIdx < K) ? __realCast<half>(inputVectorB[elemIdx]) : half(0.0);
+                    int elemIdx = j16 * COLUMN_A + n;
+                    localRowB[n] = (elemIdx < K) ? __realCast<half>(inputVectorB[elemIdx]) : half(0.0);
                 }
-                var matB = MatB.FromLocalColumn(localColB, k);
-                matB.ChangeMajor();
+                MatA tilePairB[2];
+                MatA.FromLocalRowPack(localRowB, tilePairB);
+                tilePairB[0].ChangeMajor();
+                tilePairB[1].ChangeMajor();
+                allInput[j16 * 2 + 0] = tilePairB[0];
+                allInput[j16 * 2 + 1] = tilePairB[1];
+            }
+        }
+
+        // --- Phase 3: MMA loop with 16x16 → 2x(16x8) MatB splitting ---
+        // Each input MatA tile (after ChangeMajor) splits into two MatB tiles:
+        //   regs[0:1] = columns 0-7,  regs[2:3] = columns 8-15
+        // This matches Tin2's mad() which does 2 m16n8k16 MMA calls per 16x16 pair.
+        [ForceUnroll]
+        for (int k = 0; k < NColGroupsOPA; k++)
+        {
+            [ForceUnroll]
+            for (int j16 = 0; j16 < OPA_InputTileCols; j16++)
+            {
+                let inputTile = allInput[j16 * 2 + k];
+                let matB_lo = MatA.ExtractMatBLo(inputTile);
+                let matB_hi = MatA.ExtractMatBHi(inputTile);
 
                 [ForceUnroll]
                 for (int i = 0; i < OPA_CoopMatCRows; i++)
                 {
-                    int index = i * OPA_CoopMatCColumns + j;
-                    matC[index] = linalg.coopMatMulAdd<T, false, half, half, T,
+                    int jBase = j16 * 2;
+                    matC[i * OPA_CoopMatCColumns + jBase + 0] = linalg.coopMatMulAdd<T, false, half, half, T,
                                             MemoryScope.Subgroup, ROW_A, COLUMN_A, COLUMN_B
-                                            >(matAArr[i], matB, matC[index]);
+                                            >(allDOut[i * 2 + k], matB_lo,
+                                              matC[i * OPA_CoopMatCColumns + jBase + 0]);
+                    matC[i * OPA_CoopMatCColumns + jBase + 1] = linalg.coopMatMulAdd<T, false, half, half, T,
+                                            MemoryScope.Subgroup, ROW_A, COLUMN_A, COLUMN_B
+                                            >(allDOut[i * 2 + k], matB_hi,
+                                              matC[i * OPA_CoopMatCColumns + jBase + 1]);
                 }
             }
         }
@@ -467,6 +541,9 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
 
     // Phase 3: Store matC tiles to global weight buffer via storeNative + atomicAdd.
     // Weight gradient uses native fragment layout (same as weight buffer).
+    //
+    // Iterates linearly over all half2 elements, using a single base address
+    // and incrementing offset to avoid per-element getOffset calls.
     [require(cuda, subgroup_basic)]
     static void outerProductStore<U, Address, ShMemSize : ISharedMemorySize>(
         inout MatC matC[OPA_TotalTiles],
@@ -486,37 +563,23 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
 
         GroupMemoryBarrierWithWaveSync();
 
-        // atomicAdd from shmem to global in native layout using half2.
-        // Each tile has OPA_TileStride uint4 = OPA_TileStride * 4 uint32 = OPA_TileStride * 8 half values.
-        // Per thread: OPA_RegsPerLane registers = OPA_RegsPerLane half2 pairs.
         if (sizeof(T) == 2)
         {
             static const int H2PerTile = OPA_TileStride * (sizeof(uint4) / sizeof(U)) / 2;
             static const int TotalH2 = OPA_TotalTiles * H2PerTile;
             static const int ItersPerLane = (TotalH2 + N - 1) / N;
 
+            // The shmem native layout is a 1:1 mapping to the global tiled weight layout:
+            // matC tiles are stored sequentially, and the weight buffer uses the same
+            // native fragment ordering. So globalOffset = h2Idx (no remapping needed).
             [ForceUnroll]
             for (uint p = 0; p < ItersPerLane; p++)
             {
                 int h2Idx = int(laneId) + int(p) * N;
                 if (h2Idx < TotalH2)
                 {
-                    int tileIdx = h2Idx / H2PerTile;
-                    int localH2 = h2Idx % H2PerTile;
-
-                    int i = tileIdx / OPA_CoopMatCColumns;
-                    int j = tileIdx % OPA_CoopMatCColumns;
-
-                    // Native layout: 1:1 mapping from shmem to global.
-                    // Two MatC tiles (j, j+1) fill one 16×16 weight tile.
-                    int weightTileCol = j / 2;
-                    int matcLocalOffset = (j % 2) * H2PerTile;
-
-                    int globalOffset = tileElementOffset(i, weightTileCol) / 2 + matcLocalOffset + localH2;
-
                     vector<U, 2> h2 = ShMemPool.smemLoad<vector<U, 2>>(sharedMemoryOffset, h2Idx);
-                    let addr = weightAddress.getOffset(globalOffset * 2);
-                    addr.atomicAdd(0, h2);
+                    weightAddress.atomicAdd(uint(h2Idx * 2), h2);
                 }
             }
         }

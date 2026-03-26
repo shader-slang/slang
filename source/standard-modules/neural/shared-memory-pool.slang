@@ -28,6 +28,41 @@ public struct SharedMemoryPool<ShMemSize: ISharedMemorySize>
     static void smemStore<U>(uint memOffset, int index, U value)
         where U : IArithmetic
     {
+        __target_switch
+        {
+        case cuda:
+            {
+                let basePtr = __getAddress(data[memOffset]);
+                let typedPtr = bit_cast<Ptr<U, Access.ReadWrite, AddressSpace.GroupShared>>(basePtr);
+                typedPtr[index] = value;
+            }
+        default:
+            smemStoreGeneric<U>(memOffset, index, value);
+        }
+    }
+
+    [ForceInline]
+    static U smemLoad<U>(uint memOffset, int index)
+        where U : IArithmetic
+    {
+        __target_switch
+        {
+        case cuda:
+            {
+                let basePtr = __getAddress(data[memOffset]);
+                let typedPtr = bit_cast<Ptr<U, Access.Read, AddressSpace.GroupShared>>(basePtr);
+                return typedPtr[index];
+            }
+        default:
+            return smemLoadGeneric<U>(memOffset, index);
+        }
+    }
+
+    // Generic fallback for non-CUDA targets (SPIR-V etc.)
+    [ForceInline]
+    static void smemStoreGeneric<U>(uint memOffset, int index, U value)
+        where U : IArithmetic
+    {
         switch (sizeof(U))
         {
         case 2:
@@ -66,7 +101,7 @@ public struct SharedMemoryPool<ShMemSize: ISharedMemorySize>
     }
 
     [ForceInline]
-    static U smemLoad<U>(uint memOffset, int index)
+    static U smemLoadGeneric<U>(uint memOffset, int index)
         where U : IArithmetic
     {
         switch (sizeof(U))
@@ -159,8 +194,8 @@ public struct SharedMemorySize0<T, TargetEnum Target, ExecutionMode ExeMode, int
     // The MMA forward/backward uses: shared A tiles + per-warp B/C tiles.
     // With MMAHelperNew (CUDA + OptimalLayout), forward and backward MMA
     // use zero shmem (LoadNative + FromLocal). This term only applies to
-    // the legacy shmem-based MMAHelper/TiledMMAHelper paths.
-    static const uint BytesForMMA =
+    // the legacy shmem-based MMAHelper/TiledMMAHelper paths (non-CUDA).
+    static const uint BytesForMMA = (Target == TargetEnum.CUDA) ? 0 :
         (ShMemInfo.SharedMemSizeInVectorMatA + (ShMemInfo.SharedMemSizeInVectorMatC) * SubgroupCount) * sizeof(uint4);
 
     // Cross-warp all-at-once reduction for sumReduceTilesAllAtOnce().
