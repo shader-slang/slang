@@ -347,8 +347,8 @@ SlangResult CUDASourceEmitter::calcTypeName(IRType* type, CodeGenTarget target, 
             uint32_t matrixUse =
                 (uint32_t)static_cast<IRIntLit*>(coopType->getMatrixUse())->getValue();
             FragmentShape shape = computeShapeCombination(matrixUse, rowCount, colCount);
-            if (shape.m == 16 && shape.n == 8 && shape.k == 16)
-                m_extensionTracker->requireSMVersion(SemanticVersion(8, 9));
+            if (shape.m == 16 && shape.n == 16 && shape.k == 16)
+                m_extensionTracker->requireSMVersion(SemanticVersion(8, 0));
             else
                 m_extensionTracker->requireSMVersion(SemanticVersion(7, 5));
             return result;
@@ -1578,18 +1578,15 @@ static UnownedStringSlice getMatrixUseName(uint32_t matrixUse)
 /*
  * Shape Validation Strategy:
  * Maps CoopMat dimensions to the canonical MMA shape (m, n, k).
- * Supports both WMMA shapes and MMA m16n8k16.
+ * Supports WMMA shapes and MMA m16n16k16 (internally 2x m16n8k16).
  *
  * Supported shapes:
- *   - m16n8k16:  Matrix A (16x16), Matrix B (16x8),  Matrix C/D (16x8)  [MMA]
+ *   - m16n16k16: Matrix A (16x16), Matrix B (16x16), Matrix C/D (16x16) [MMA]
  *   - m16n16k16: Matrix A (16x16), Matrix B (16x16), Matrix C/D (16x16) [WMMA]
  *   - m8n32k16:  Matrix A (8x16),  Matrix B (16x32), Matrix C/D (8x32)  [WMMA]
  *   - m32n8k16:  Matrix A (32x16), Matrix B (16x8),  Matrix C/D (32x8)  [WMMA]
  *
- * TODO: Matrix A (16x16) collides between m16n8k16 and m16n16k16.
- *       Matrix B (16x8) collides between m16n8k16 and m32n8k16.
- *       Currently m16n8k16 takes priority for these ambiguous cases.
- *       A proper disambiguation mechanism (e.g., capability or attribute) is needed.
+ * Note: m16n8k16 is not directly exposed. m16n16k16 uses 2x m16n8k16 internally.
  */
 inline FragmentShape computeShapeCombination(uint32_t matrixUse, uint32_t row, uint32_t col)
 {
@@ -1604,7 +1601,7 @@ inline FragmentShape computeShapeCombination(uint32_t matrixUse, uint32_t row, u
             switch (row)
             {
             case 16:
-                return {16, 8, 16}; // m16n8k16 (MMA) — TODO: collides with m16n16k16
+                return {16, 16, 16}; // m16n16k16 (internally 2x m16n8k16)
             case 8:
                 return {8, 32, 16};
             case 32:
@@ -1626,7 +1623,7 @@ inline FragmentShape computeShapeCombination(uint32_t matrixUse, uint32_t row, u
             case 32:
                 return {8, 32, 16};
             case 8:
-                return {16, 8, 16}; // m16n8k16 (MMA) — TODO: collides with m32n8k16
+                return {32, 8, 16};
             default:
                 return {0, 0, 0}; // Invalid
             }
@@ -1640,8 +1637,6 @@ inline FragmentShape computeShapeCombination(uint32_t matrixUse, uint32_t row, u
                 return {8, 32, 16};
             else if (row == 32 && col == 8)
                 return {32, 8, 16};
-            else if (row == 16 && col == 8)
-                return {16, 8, 16}; // m16n8k16 (MMA)
             else
                 return {0, 0, 0}; // Invalid
         }

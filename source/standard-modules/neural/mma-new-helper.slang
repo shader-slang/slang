@@ -2,7 +2,7 @@ implementing neural;
 
 #include "common-def.slang"
 
-// MMAHelperNew: Tiled MMA using m16n8k16 with no shared memory at all.
+// MMAHelperNew: Tiled MMA using m16n16k16 with no shared memory at all.
 //
 // MatA (weight): loaded directly from tiled global memory into CoopMat registers.
 //   The weight matrix must be pre-tiled into 16×16 tiles in row-major tile order.
@@ -13,12 +13,12 @@ implementing neural;
 //
 // MatC (output): extracted to each thread's local output vector via ToLocalColumn.
 //
-// MMA shape: m16n8k16
+// MMA shape: m16n16k16 (internally 2x m16n8k16)
 //   MatA: 16×16 (half)
-//   MatB: 16×8  (half)
-//   MatC: 16×8  (T)
+//   MatB: 16×16 (half)
+//   MatC: 16×16 (T)
 //
-// For a 32-thread warp with N_tile=8: 4 MatB/MatC tiles cover all 32 threads.
+// For a 32-thread warp with N_tile=16: 2 MatB/MatC tiles cover all 32 threads.
 //
 // TransposeA:
 //   When true, computes W^T × input instead of W × input.
@@ -35,13 +35,13 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
     static const int N = SubgroupSize;
     static const int K = InputSize;
 
-    // m16n8k16 shape constants
+    // m16n16k16 shape constants (internally 2x m16n8k16)
     static const int ROW_A = 16;
     static const int COLUMN_A = 16;
     static const int ROW_B = 16;
-    static const int COLUMN_B = 8;
+    static const int COLUMN_B = 16;
     static const int ROW_C = 16;
-    static const int COLUMN_C = 8;
+    static const int COLUMN_C = 16;
 
     static const uint ElementCountPerVector = sizeof(uint4) / sizeof(half);
 
@@ -131,7 +131,7 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
         MatC matC[NCoopMat];
         [ForceUnroll]
         for (int i = 0; i < NCoopMat; i++)
-            matC[i].fill(T(0.0f));
+            matC[i].clear();
 
         [ForceUnroll]
         for (int k = 0; k < SharedDimAligned; k += COLUMN_A)
@@ -166,9 +166,6 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
             }
         }
 
-        // Extract results and add bias in one pass — no intermediate outputVector array.
-        // Each ToLocalColumn gives this thread one column (ROW_C elements).
-        // Write directly to the output array, adding bias on the fly.
         OutArrayType outputVector;
         [ForceUnroll]
         for (int i = 0; i < NCoopMatRow; i++)
@@ -210,10 +207,10 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
     // Cross-warp reduction uses shared memory + atomicAdd.
     // =========================================================================
 
-    // FromLocalRow on MatB (16×8): M=16 threads per matrix → 2 groups for 32 threads.
+    // FromLocalRow on MatB (16×16): M=16 threads per matrix → 2 groups for 32 threads.
     static const int NRowGroups = (N + ROW_B - 1) / ROW_B;
 
-    // Number of output tiles: M elements in chunks of COLUMN_B (8).
+    // Number of output tiles: M elements in chunks of COLUMN_B (16).
     static const int NBiasTiles = (M + COLUMN_B - 1) / COLUMN_B;
 
     [ForceInline]
@@ -253,7 +250,7 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
             }
 
             MatC matC;
-            matC.fill(T(0));
+            matC.clear();
 
             [ForceUnroll]
             for (int g = 0; g < NRowGroups; g++)
@@ -366,8 +363,6 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
     static const int OPA_TileStride = (OPA_RegsPerLane * N * 4 + sizeof(uint4) - 1) / sizeof(uint4);
 
     // Number of 16x16 MatA tiles for the input vector (covering K elements).
-    // Each 16x16 tile spans 16 input elements and 16 threads (one group).
-    // With 2 thread groups: 2 * (K/16) tiles total.
     static const int OPA_InputTileCols = (K + COLUMN_A - 1) / COLUMN_A;
     static const int OPA_TotalInputMatA = NColGroupsOPA * OPA_InputTileCols;
 
@@ -377,7 +372,8 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
     // Outer product compute: dW[m][k] = sum_{all threads} dOut[m] * input[k]
     //
     // Builds 16x16 MatA tiles via FromLocalRowPackOffset (optimized batch shuffle),
-    // then splits each into two 16x8 MatB halves for m16n8k16 MMA.
+    // converts to MatB via FromMatA, then uses single m16n16k16 MMA per tile pair.
+    [ForceInline]
     [require(cuda, subgroup_basic)]
     static void outerProductCompute<TypeA, InArrayTypeA, TypeB, InArrayTypeB>(
         InArrayTypeA inputVectorA,
@@ -390,21 +386,16 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
             where InArrayTypeA : IArrayAccessor<TypeA>
             where InArrayTypeB : IArrayAccessor<TypeB>
     {
-        // --- Phase 1: Build dOut as 16x16 MatA tiles + ChangeMajor ---
-        // Downcast to concrete array type to read packed data directly,
-        // avoiding element-by-element half pack/unpack overhead.
+        // --- Build dOut as 16x16 MatA tiles directly into allDOut + ChangeMajor ---
         MatA allDOut[OPA_TotalDOutMatA];
         if (let arrA = inputVectorA as half[M])
         {
             [ForceUnroll]
             for (int i = 0; i < OPA_CoopMatCRows; i++)
             {
-                MatA tilePair[2];
-                MatA.FromLocalRowPackOffset(arrA, i * ROW_A, tilePair);
-                tilePair[0].ChangeMajor();
-                tilePair[1].ChangeMajor();
-                allDOut[i * 2 + 0] = tilePair[0];
-                allDOut[i * 2 + 1] = tilePair[1];
+                MatA.FromLocalRowPackOffsetInto(arrA, i * ROW_A, allDOut, i * 2);
+                allDOut[i * 2 + 0].ChangeMajor();
+                allDOut[i * 2 + 1].ChangeMajor();
             }
         }
         else
@@ -419,17 +410,14 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
                     int elemIdx = i * ROW_A + m;
                     localRowA[m] = (elemIdx < M) ? __realCast<half>(inputVectorA[elemIdx]) : half(0.0);
                 }
-                MatA tilePair[2];
-                MatA.FromLocalRowPack(localRowA, tilePair);
-                tilePair[0].ChangeMajor();
-                tilePair[1].ChangeMajor();
-                allDOut[i * 2 + 0] = tilePair[0];
-                allDOut[i * 2 + 1] = tilePair[1];
+                MatA.FromLocalRowPackInto(localRowA, allDOut, i * 2);
+                allDOut[i * 2 + 0].ChangeMajor();
+                allDOut[i * 2 + 1].ChangeMajor();
             }
         }
 
-        // --- Phase 2: Build input as 16x16 MatA tiles + ChangeMajor ---
-        MatA allInput[OPA_TotalInputMatA];
+        // --- Build input as MatB tiles (via MatA → ChangeMajor → FromMatA) ---
+        MatB allInputB[OPA_TotalInputMatA];
         if (let arrB = inputVectorB as half[K])
         {
             [ForceUnroll]
@@ -439,8 +427,8 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
                 MatA.FromLocalRowPackOffset(arrB, j16 * COLUMN_A, tilePairB);
                 tilePairB[0].ChangeMajor();
                 tilePairB[1].ChangeMajor();
-                allInput[j16 * 2 + 0] = tilePairB[0];
-                allInput[j16 * 2 + 1] = tilePairB[1];
+                allInputB[j16 * 2 + 0] = MatB.FromMatA(tilePairB[0]);
+                allInputB[j16 * 2 + 1] = MatB.FromMatA(tilePairB[1]);
             }
         }
         else
@@ -459,43 +447,32 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
                 MatA.FromLocalRowPack(localRowB, tilePairB);
                 tilePairB[0].ChangeMajor();
                 tilePairB[1].ChangeMajor();
-                allInput[j16 * 2 + 0] = tilePairB[0];
-                allInput[j16 * 2 + 1] = tilePairB[1];
+                allInputB[j16 * 2 + 0] = MatB.FromMatA(tilePairB[0]);
+                allInputB[j16 * 2 + 1] = MatB.FromMatA(tilePairB[1]);
             }
         }
 
-        // --- Phase 3: MMA loop with 16x16 → 2x(16x8) MatB splitting ---
-        // Each input MatA tile (after ChangeMajor) splits into two MatB tiles:
-        //   regs[0:1] = columns 0-7,  regs[2:3] = columns 8-15
-        // This matches Tin2's mad() which does 2 m16n8k16 MMA calls per 16x16 pair.
+        // --- MMA loop using m16n16k16 ---
         [ForceUnroll]
         for (int k = 0; k < NColGroupsOPA; k++)
         {
             [ForceUnroll]
             for (int j16 = 0; j16 < OPA_InputTileCols; j16++)
             {
-                let inputTile = allInput[j16 * 2 + k];
-                let matB_lo = MatA.ExtractMatBLo(inputTile);
-                let matB_hi = MatA.ExtractMatBHi(inputTile);
-
                 [ForceUnroll]
                 for (int i = 0; i < OPA_CoopMatCRows; i++)
                 {
-                    int jBase = j16 * 2;
-                    matC[i * OPA_CoopMatCColumns + jBase + 0] = linalg.coopMatMulAdd<T, false, half, half, T,
+                    matC[i * OPA_CoopMatCColumns + j16] = linalg.coopMatMulAdd<T, false, half, half, T,
                                             MemoryScope.Subgroup, ROW_A, COLUMN_A, COLUMN_B
-                                            >(allDOut[i * 2 + k], matB_lo,
-                                              matC[i * OPA_CoopMatCColumns + jBase + 0]);
-                    matC[i * OPA_CoopMatCColumns + jBase + 1] = linalg.coopMatMulAdd<T, false, half, half, T,
-                                            MemoryScope.Subgroup, ROW_A, COLUMN_A, COLUMN_B
-                                            >(allDOut[i * 2 + k], matB_hi,
-                                              matC[i * OPA_CoopMatCColumns + jBase + 1]);
+                                            >(allDOut[i * 2 + k], allInputB[j16 * 2 + k],
+                                              matC[i * OPA_CoopMatCColumns + j16]);
                 }
             }
         }
     }
 
     // Phase 2: Cross-warp reduction (same pattern as MMAHelper.sumReduceTilesAllAtOnce).
+    [ForceInline]
     [require(cuda, subgroup_basic)]
     static void outerProductReduce<ShMemSize : ISharedMemorySize, int SubgroupCount>(
         inout MatC matC[OPA_TotalTiles],
@@ -544,6 +521,7 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
     //
     // Iterates linearly over all half2 elements, using a single base address
     // and incrementing offset to avoid per-element getOffset calls.
+    [ForceInline]
     [require(cuda, subgroup_basic)]
     static void outerProductStore<U, Address, ShMemSize : ISharedMemorySize>(
         inout MatC matC[OPA_TotalTiles],
@@ -611,7 +589,7 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
         MatC matC[OPA_TotalTiles];
         [ForceUnroll]
         for (int idx = 0; idx < OPA_TotalTiles; idx++)
-            matC[idx].fill(T(0.0f));
+            matC[idx].clear();
 
         outerProductCompute<TypeA, InArrayTypeA, TypeB, InArrayTypeB>(
             inputVectorA, inputVectorB, matC);

@@ -6761,7 +6761,7 @@ template<typename ElemT, int M, int N, int K, MatrixUse use>
 struct RegisterCount;
 
 #if SLANG_CUDA_ENABLE_HALF
-// Half (f16) - 8 regs for A/B, 4 regs for C/D
+// Half (f16) - 8 regs for A, 4 regs for B/C/D
 template<int M, int N, int K>
 struct RegisterCount<half, M, N, K, MatrixUse::MatrixA>
 {
@@ -6770,7 +6770,7 @@ struct RegisterCount<half, M, N, K, MatrixUse::MatrixA>
 template<int M, int N, int K>
 struct RegisterCount<half, M, N, K, MatrixUse::MatrixB>
 {
-    static constexpr int value = 8;
+    static constexpr int value = 4;
 };
 template<int M, int N, int K>
 struct RegisterCount<half, M, N, K, MatrixUse::MatrixC>
@@ -8534,20 +8534,41 @@ __device__ inline void mmaFromColMatrixB_16x8(
     unsigned gid,
     unsigned tid)
 {
-    uint32_t packedCol[8];
-    memcpy(packedCol, localCol, 32);
+    const uint32_t* packedCol = reinterpret_cast<const uint32_t*>(localCol);
 
     unsigned base = matIndex * 8;
     const uint32_t mask = 0xFFFFFFFF;
 
-    // reg[0] = packedCol[tid] from thread (gid + base)
-    // reg[1] = packedCol[tid+4] from thread (gid + base)
     uint32_t tmp;
     #pragma unroll
     for (int t = 0; t < 4; t++)
     {
         tmp = __shfl_sync(mask, packedCol[t], gid + base);     if (tid == t) regs[0] = tmp;
         tmp = __shfl_sync(mask, packedCol[t + 4], gid + base); if (tid == t) regs[1] = tmp;
+    }
+}
+
+// MatrixB 16x16 f16: combined lo+hi in one call. regs[0:1] = lo, regs[2:3] = hi.
+__device__ inline void mmaFromColMatrixB_16x16(
+    uint32_t* regs,
+    const void* localCol,
+    int matIndex,
+    unsigned gid,
+    unsigned tid)
+{
+    const uint32_t* packedCol = reinterpret_cast<const uint32_t*>(localCol);
+
+    unsigned base = matIndex * 16;
+    const uint32_t mask = 0xFFFFFFFF;
+
+    uint32_t tmp;
+    #pragma unroll
+    for (int t = 0; t < 4; t++)
+    {
+        tmp = __shfl_sync(mask, packedCol[t],     gid + base);     if (tid == t) regs[0] = tmp;
+        tmp = __shfl_sync(mask, packedCol[t + 4], gid + base);     if (tid == t) regs[1] = tmp;
+        tmp = __shfl_sync(mask, packedCol[t],     gid + base + 8); if (tid == t) regs[2] = tmp;
+        tmp = __shfl_sync(mask, packedCol[t + 4], gid + base + 8); if (tid == t) regs[3] = tmp;
     }
 }
 
@@ -8711,6 +8732,142 @@ __device__ inline void mmaToColMatrixCD_f16_16x8(
     memcpy(localCol, packedCol, 32);
 }
 
+// MatrixC/D 16x16 f16: combined lo+hi extraction. regs[0:1] = lo, regs[2:3] = hi.
+__device__ inline void mmaToColMatrixCD_f16_16x16(
+    void* localCol,
+    const uint32_t* regs,
+    int matIndex,
+    unsigned laneid)
+{
+    mmaToColMatrixCD_f16_16x8(localCol, regs,     matIndex * 2,     laneid);
+    mmaToColMatrixCD_f16_16x8(localCol, regs + 2, matIndex * 2 + 1, laneid);
+}
+
+// MatrixB 16x16 FromLocalRow: combined lo+hi in one pass. regs[0:1] = lo, regs[2:3] = hi.
+__device__ inline void mmaFromRowMatrixB_16x16(
+    uint32_t* regs,
+    const void* localRow,
+    int matIndex,
+    unsigned gid,
+    unsigned tid)
+{
+    uint4 packedRow = *reinterpret_cast<const uint4*>(localRow);
+
+    unsigned baseLo = matIndex * 32;
+    unsigned baseHi = baseLo + 16;
+    const uint32_t mask = 0xFFFFFFFF;
+    unsigned k = gid >> 1;
+    unsigned shift = (gid & 1) * 16;
+
+    uint32_t r0 = 0, r1 = 0, r2 = 0, r3 = 0;
+    const uint32_t* pr = reinterpret_cast<const uint32_t*>(&packedRow);
+    #pragma unroll
+    for (int ki = 0; ki < 4; ki++)
+    {
+        uint32_t sLo0 = __shfl_sync(mask, pr[ki], tid * 2 + baseLo);
+        uint32_t sLo1 = __shfl_sync(mask, pr[ki], tid * 2 + 1 + baseLo);
+        uint32_t sLo2 = __shfl_sync(mask, pr[ki], tid * 2 + 8 + baseLo);
+        uint32_t sLo3 = __shfl_sync(mask, pr[ki], tid * 2 + 9 + baseLo);
+        uint32_t sHi0 = __shfl_sync(mask, pr[ki], tid * 2 + baseHi);
+        uint32_t sHi1 = __shfl_sync(mask, pr[ki], tid * 2 + 1 + baseHi);
+        uint32_t sHi2 = __shfl_sync(mask, pr[ki], tid * 2 + 8 + baseHi);
+        uint32_t sHi3 = __shfl_sync(mask, pr[ki], tid * 2 + 9 + baseHi);
+
+        if (k == ki)
+        {
+            uint16_t h0, h1;
+            h0 = (uint16_t)(sLo0 >> shift); h1 = (uint16_t)(sLo1 >> shift);
+            r0 = (uint32_t)h0 | ((uint32_t)h1 << 16);
+            h0 = (uint16_t)(sLo2 >> shift); h1 = (uint16_t)(sLo3 >> shift);
+            r1 = (uint32_t)h0 | ((uint32_t)h1 << 16);
+            h0 = (uint16_t)(sHi0 >> shift); h1 = (uint16_t)(sHi1 >> shift);
+            r2 = (uint32_t)h0 | ((uint32_t)h1 << 16);
+            h0 = (uint16_t)(sHi2 >> shift); h1 = (uint16_t)(sHi3 >> shift);
+            r3 = (uint32_t)h0 | ((uint32_t)h1 << 16);
+        }
+    }
+    *reinterpret_cast<uint4*>(regs) = make_uint4(r0, r1, r2, r3);
+}
+
+// MatrixC/D 16x16 f16 ToLocalRow: extract from lo half (all rows identical in reduction use).
+__device__ inline void mmaToRowMatrixCD_f16_16x16(
+    void* localRow,
+    const uint32_t* regs,
+    int matIndex,
+    unsigned laneid)
+{
+    mmaToRowMatrixCD_f16_16x8(localRow, regs, matIndex * 2, laneid);
+}
+
+// MatrixC/D 16x16 f32 ToLocalColumn: combined lo+hi. regs[0:3] = lo, regs[4:7] = hi.
+__device__ inline void mmaToColMatrixCD_f32_16x16(
+    void* localCol,
+    const uint32_t* regs,
+    int matIndex,
+    unsigned laneid)
+{
+    mmaToColMatrixCD_f32_16x8(localCol, regs,     matIndex * 2,     laneid);
+    mmaToColMatrixCD_f32_16x8(localCol, regs + 4, matIndex * 2 + 1, laneid);
+}
+
+// MatrixC/D 16x16 f32 ToLocalRow: extract from lo half.
+__device__ inline void mmaToRowMatrixCD_f32_16x16(
+    void* localRow,
+    const uint32_t* regs,
+    int matIndex,
+    unsigned laneid)
+{
+    mmaToRowMatrixCD_f32_16x8(localRow, regs, matIndex * 2, laneid);
+}
+
+// MatrixC/D 16x16 f16 FromLocalColumn: combined lo+hi.
+__device__ inline void mmaFromColMatrixCD_f16_16x16(
+    uint32_t* regs,
+    const void* localCol,
+    int matIndex,
+    unsigned gid,
+    unsigned tid)
+{
+    mmaFromColMatrixCD_f16_16x8(regs,     localCol, matIndex * 2,     gid, tid);
+    mmaFromColMatrixCD_f16_16x8(regs + 2, localCol, matIndex * 2 + 1, gid, tid);
+}
+
+// MatrixC/D 16x16 f32 FromLocalColumn: combined lo+hi.
+__device__ inline void mmaFromColMatrixCD_f32_16x16(
+    uint32_t* regs,
+    const void* localCol,
+    int matIndex,
+    unsigned gid,
+    unsigned tid)
+{
+    mmaFromColMatrixCD_f32_16x8(regs,     localCol, matIndex * 2,     gid, tid);
+    mmaFromColMatrixCD_f32_16x8(regs + 4, localCol, matIndex * 2 + 1, gid, tid);
+}
+
+// MatrixC/D 16x16 f16 FromLocalRow: combined lo+hi.
+__device__ inline void mmaFromRowMatrixCD_f16_16x16(
+    uint32_t* regs,
+    const void* localRow,
+    int matIndex,
+    unsigned gid,
+    unsigned tid)
+{
+    mmaFromRowMatrixCD_f16_16x8(regs,     localRow, matIndex * 2,     gid, tid);
+    mmaFromRowMatrixCD_f16_16x8(regs + 2, localRow, matIndex * 2 + 1, gid, tid);
+}
+
+// MatrixC/D 16x16 f32 FromLocalRow: combined lo+hi.
+__device__ inline void mmaFromRowMatrixCD_f32_16x16(
+    uint32_t* regs,
+    const void* localRow,
+    int matIndex,
+    unsigned gid,
+    unsigned tid)
+{
+    mmaFromRowMatrixCD_f32_16x8(regs,     localRow, matIndex * 2,     gid, tid);
+    mmaFromRowMatrixCD_f32_16x8(regs + 4, localRow, matIndex * 2 + 1, gid, tid);
+}
+
 // The dimensions of the fragment are specified by M, N, K which are totally determined during
 // compile time, so slang already did the pre-filter on the shape & type combination.
 template<typename T, int M, int N, int K, MatrixUse R>
@@ -8743,6 +8900,14 @@ struct WmmaFragment
         {
             regs[i] = packed;
         }
+    }
+
+    // Zero-clear all registers using integer zero (enables CSE to single register).
+    void __device__ clear()
+    {
+#pragma unroll
+        for (int i = 0; i < RegsCount; i++)
+            regs[i] = 0U;
     }
 
     __device__ This operator*(T b)
@@ -9075,66 +9240,56 @@ struct WmmaFragment
     {
         WmmaFragment<T, M, N, K, R> fragment;
 
-        if constexpr (M == 16 && N == 8 && K == 16)
-        {
-            unsigned laneid;
-            asm("mov.u32 %0, %%laneid;" : "=r"(laneid));
-            unsigned gid = laneid >> 2;
-            unsigned tid = laneid & 3;
+        static_assert(M == 16 && N == 16 && K == 16,
+            "FromLocalRow only supports the m16n16k16 MMA shape");
 
-            if constexpr (R == MatrixUse::MatrixA && sizeof(T) == 2)
-                mmaFromRowMatrixA_16x16(fragment.regs, localRow, matIndex, gid, tid);
-            else if constexpr (R == MatrixUse::MatrixB && sizeof(T) == 2)
-                mmaFromRowMatrixB_16x8(fragment.regs, localRow, matIndex, gid, tid);
-            else if constexpr (
-                (R == MatrixUse::MatrixC || R == MatrixUse::MatrixD) && sizeof(T) == 4)
-                mmaFromRowMatrixCD_f32_16x8(fragment.regs, localRow, matIndex, gid, tid);
-            else if constexpr (
-                (R == MatrixUse::MatrixC || R == MatrixUse::MatrixD) && sizeof(T) == 2)
-                mmaFromRowMatrixCD_f16_16x8(fragment.regs, localRow, matIndex, gid, tid);
-        }
-        else
-        {
-            static_assert(M == 16 && N == 8 && K == 16,
-                "FromLocalRow only supports the m16n8k16 MMA shape");
-        }
+        unsigned laneid;
+        asm("mov.u32 %0, %%laneid;" : "=r"(laneid));
+        unsigned gid = laneid >> 2;
+        unsigned tid = laneid & 3;
+
+        if constexpr (R == MatrixUse::MatrixA && sizeof(T) == 2)
+            mmaFromRowMatrixA_16x16(fragment.regs, localRow, matIndex, gid, tid);
+        else if constexpr (R == MatrixUse::MatrixB && sizeof(T) == 2)
+            mmaFromRowMatrixB_16x16(fragment.regs, localRow, matIndex, gid, tid);
+        else if constexpr (
+            (R == MatrixUse::MatrixC || R == MatrixUse::MatrixD) && sizeof(T) == 4)
+            mmaFromRowMatrixCD_f32_16x16(fragment.regs, localRow, matIndex, gid, tid);
+        else if constexpr (
+            (R == MatrixUse::MatrixC || R == MatrixUse::MatrixD) && sizeof(T) == 2)
+            mmaFromRowMatrixCD_f16_16x16(fragment.regs, localRow, matIndex, gid, tid);
+
         fragment.m_layout = Layout::RowMajor;
         return fragment;
     }
 
-    // Extract one row per thread from the cooperative matrix.
-    // Inverse of FromLocalRow. Each thread receives one full row (colsPerRow elements).
     void __device__ ToLocalRow(T* localRow, int matIndex) const
     {
-        static_assert(M == 16 && N == 8 && K == 16,
-            "ToLocalRow only supports the m16n8k16 MMA shape");
+        static_assert(M == 16 && N == 16 && K == 16,
+            "ToLocalRow only supports the m16n16k16 MMA shape");
 
         unsigned laneid;
         asm("mov.u32 %0, %%laneid;" : "=r"(laneid));
 
         if constexpr (R == MatrixUse::MatrixA && sizeof(T) == 2)
             mmaToRowMatrixA_16x16(localRow, regs, matIndex, laneid);
-        else if constexpr (R == MatrixUse::MatrixB && sizeof(T) == 2)
-            mmaToRowMatrixB_16x8(localRow, regs, matIndex, laneid);
-        else if constexpr (
-            (R == MatrixUse::MatrixC || R == MatrixUse::MatrixD) && sizeof(T) == 4)
-            mmaToRowMatrixCD_f32_16x8(localRow, regs, matIndex, laneid);
         else if constexpr (
             (R == MatrixUse::MatrixC || R == MatrixUse::MatrixD) && sizeof(T) == 2)
-            mmaToRowMatrixCD_f16_16x8(localRow, regs, matIndex, laneid);
+            mmaToRowMatrixCD_f16_16x16(localRow, regs, matIndex, laneid);
+        else if constexpr (
+            (R == MatrixUse::MatrixC || R == MatrixUse::MatrixD) && sizeof(T) == 4)
+            mmaToRowMatrixCD_f32_16x16(localRow, regs, matIndex, laneid);
     }
 
     // Construct a cooperative matrix from per-thread local columns.
     // Each thread provides one full column of the matrix (M elements for the row count of this matrix).
-    // N threads form one matrix (one per column). matIndex selects which group of N threads
-    // contributes: threads [matIndex*N_threads .. (matIndex+1)*N_threads).
-    // N_threads = K for MatrixA (16), N for MatrixB/C/D (8).
+    // matIndex selects which group of threads contributes.
     static This __device__ FromLocalColumn(const T* localCol, int matIndex)
     {
         WmmaFragment<T, M, N, K, R> fragment;
 
-        static_assert(M == 16 && N == 8 && K == 16,
-            "FromLocalColumn only supports the m16n8k16 MMA shape");
+        static_assert(M == 16 && N == 16 && K == 16,
+            "FromLocalColumn only supports the m16n16k16 MMA shape");
 
         unsigned laneid;
         asm("mov.u32 %0, %%laneid;" : "=r"(laneid));
@@ -9144,13 +9299,13 @@ struct WmmaFragment
         if constexpr (R == MatrixUse::MatrixA && sizeof(T) == 2)
             mmaFromColMatrixA_16x16(fragment.regs, localCol, matIndex, gid, tid);
         else if constexpr (R == MatrixUse::MatrixB && sizeof(T) == 2)
-            mmaFromColMatrixB_16x8(fragment.regs, localCol, matIndex, gid, tid);
+            mmaFromColMatrixB_16x16(fragment.regs, localCol, matIndex, gid, tid);
         else if constexpr (
             (R == MatrixUse::MatrixC || R == MatrixUse::MatrixD) && sizeof(T) == 4)
-            mmaFromColMatrixCD_f32_16x8(fragment.regs, localCol, matIndex, gid, tid);
+            mmaFromColMatrixCD_f32_16x16(fragment.regs, localCol, matIndex, gid, tid);
         else if constexpr (
             (R == MatrixUse::MatrixC || R == MatrixUse::MatrixD) && sizeof(T) == 2)
-            mmaFromColMatrixCD_f16_16x8(fragment.regs, localCol, matIndex, gid, tid);
+            mmaFromColMatrixCD_f16_16x16(fragment.regs, localCol, matIndex, gid, tid);
 
         fragment.m_layout = Layout::ColMajor;
         return fragment;
@@ -9160,22 +9315,32 @@ struct WmmaFragment
     // Inverse of FromLocalColumn. Each thread receives M elements (one full column).
     void __device__ ToLocalColumn(T* localCol, int matIndex) const
     {
-        static_assert(M == 16 && N == 8 && K == 16,
-            "ToLocalColumn only supports the m16n8k16 MMA shape");
+        static_assert(M == 16 && N == 16 && K == 16,
+            "ToLocalColumn only supports the m16n16k16 MMA shape");
 
         unsigned laneid;
         asm("mov.u32 %0, %%laneid;" : "=r"(laneid));
 
         if constexpr (R == MatrixUse::MatrixA && sizeof(T) == 2)
             mmaToColMatrixA_16x16(localCol, regs, matIndex, laneid);
-        else if constexpr (R == MatrixUse::MatrixB && sizeof(T) == 2)
-            mmaToColMatrixB_16x8(localCol, regs, matIndex, laneid);
-        else if constexpr (
-            (R == MatrixUse::MatrixC || R == MatrixUse::MatrixD) && sizeof(T) == 4)
-            mmaToColMatrixCD_f32_16x8(localCol, regs, matIndex, laneid);
         else if constexpr (
             (R == MatrixUse::MatrixC || R == MatrixUse::MatrixD) && sizeof(T) == 2)
-            mmaToColMatrixCD_f16_16x8(localCol, regs, matIndex, laneid);
+            mmaToColMatrixCD_f16_16x16(localCol, regs, matIndex, laneid);
+        else if constexpr (
+            (R == MatrixUse::MatrixC || R == MatrixUse::MatrixD) && sizeof(T) == 4)
+            mmaToColMatrixCD_f32_16x16(localCol, regs, matIndex, laneid);
+    }
+
+    // Convert a 16x16 MatA fragment to a 16x16 MatB fragment (register copy, no shuffles).
+    // After ChangeMajor on MatA, its regs[0:3] hold column-major data that can be
+    // directly reinterpreted as two 16x8 MatB halves: lo=regs[0:1], hi=regs[2:3].
+    static This __device__ FromMatA(const WmmaFragment<T, M, N, K, MatrixUse::MatrixA>& matA)
+    {
+        static_assert(R == MatrixUse::MatrixB && M == 16 && N == 16 && K == 16,
+            "FromMatA only valid for 16x16 MatrixB");
+        This result;
+        *reinterpret_cast<uint4*>(result.regs) = *reinterpret_cast<const uint4*>(matA.regs);
+        return result;
     }
 
     static constexpr __device__ uint32_t GetLength() { return This::elements_per_thread; }
@@ -9207,7 +9372,15 @@ struct WmmaFragment
     {
         unsigned lane_id = threadIdx.x % 32;
         unsigned* dst = reinterpret_cast<unsigned*>(shmem + offset) + lane_id * NativeStridePerLane;
-        memcpy(dst, regs, RegsCount * sizeof(unsigned));
+        if constexpr (RegsCount == 2)
+            *reinterpret_cast<uint2*>(dst) = *reinterpret_cast<const uint2*>(regs);
+        else if constexpr (RegsCount == 4)
+            *reinterpret_cast<uint4*>(dst) = *reinterpret_cast<const uint4*>(regs);
+        else if constexpr (RegsCount == 8)
+        {
+            *reinterpret_cast<uint4*>(dst) = *reinterpret_cast<const uint4*>(regs);
+            *reinterpret_cast<uint4*>(dst + 4) = *reinterpret_cast<const uint4*>(regs + 4);
+        }
     }
 
     template<typename U>
@@ -9215,7 +9388,15 @@ struct WmmaFragment
     {
         unsigned lane_id = threadIdx.x % 32;
         const unsigned* src = reinterpret_cast<const unsigned*>(shmem + offset) + lane_id * NativeStridePerLane;
-        memcpy(regs, src, RegsCount * sizeof(unsigned));
+        if constexpr (RegsCount == 2)
+            *reinterpret_cast<uint2*>(regs) = *reinterpret_cast<const uint2*>(src);
+        else if constexpr (RegsCount == 4)
+            *reinterpret_cast<uint4*>(regs) = *reinterpret_cast<const uint4*>(src);
+        else if constexpr (RegsCount == 8)
+        {
+            *reinterpret_cast<uint4*>(regs) = *reinterpret_cast<const uint4*>(src);
+            *reinterpret_cast<uint4*>(regs + 4) = *reinterpret_cast<const uint4*>(src + 4);
+        }
     }
 };
 
@@ -9654,8 +9835,8 @@ struct IntegerMMAHelper<
 #if SLANG_CUDA_ENABLE_HALF
 template<int N_COLS>
 __device__ inline void mmaBatchFromArray_MatA_16x16(
-    WmmaFragment<half, 16, 8, 16, MatrixUse::MatrixA>* fragments,
-    const uint32_t* ip_packed_arr)
+    WmmaFragment<half, 16, 16, 16, MatrixUse::MatrixA>* __restrict__ fragments,
+    const uint32_t* __restrict__ ip_packed_arr)
 {
     unsigned laneid;
     asm("mov.u32 %0, %%laneid;" : "=r"(laneid));
@@ -9760,7 +9941,7 @@ __device__ inline void mmaStoreLocalRowToShMem(
 //     addr = base + row * stride + col_offset
 #if SLANG_CUDA_ENABLE_HALF
 __device__ inline void mmaLoadShMemMatA_16x16(
-    WmmaFragment<half, 16, 8, 16, MatrixUse::MatrixA>* outTiles,
+    WmmaFragment<half, 16, 16, 16, MatrixUse::MatrixA>* outTiles,
     const half* smem_base,
     int stride)
 {
@@ -9810,7 +9991,7 @@ __device__ inline void mmaLoadShMemMatA_16x16(
 // rowOffset: starting row in shmem (0 for threads 0-15, 16 for threads 16-31).
 #if SLANG_CUDA_ENABLE_HALF
 __device__ inline void mmaLoadShMemMatA_16x16_single(
-    WmmaFragment<half, 16, 8, 16, MatrixUse::MatrixA>& outTile,
+    WmmaFragment<half, 16, 16, 16, MatrixUse::MatrixA>& outTile,
     const half* smem_base,
     int stride,
     int rowOffset)
@@ -9838,7 +10019,7 @@ __device__ inline void mmaLoadShMemMatA_16x16_single(
 
 // Extract the lower 16x8 half (columns 0-7) of a ChangeMajor'd MatA as MatB.
 __device__ inline WmmaFragment<half, 16, 8, 16, MatrixUse::MatrixB>
-mmaExtractMatBLo(const WmmaFragment<half, 16, 8, 16, MatrixUse::MatrixA>& a)
+mmaExtractMatBLo(const WmmaFragment<half, 16, 16, 16, MatrixUse::MatrixA>& a)
 {
     WmmaFragment<half, 16, 8, 16, MatrixUse::MatrixB> b;
     b.regs[0] = a.regs[0];
@@ -9848,7 +10029,7 @@ mmaExtractMatBLo(const WmmaFragment<half, 16, 8, 16, MatrixUse::MatrixA>& a)
 
 // Extract the upper 16x8 half (columns 8-15) of a ChangeMajor'd MatA as MatB.
 __device__ inline WmmaFragment<half, 16, 8, 16, MatrixUse::MatrixB>
-mmaExtractMatBHi(const WmmaFragment<half, 16, 8, 16, MatrixUse::MatrixA>& a)
+mmaExtractMatBHi(const WmmaFragment<half, 16, 16, 16, MatrixUse::MatrixA>& a)
 {
     WmmaFragment<half, 16, 8, 16, MatrixUse::MatrixB> b;
     b.regs[0] = a.regs[2];
@@ -9864,7 +10045,7 @@ mmaExtractMatBHi(const WmmaFragment<half, 16, 8, 16, MatrixUse::MatrixA>& a)
 template<int M, int N, int K, MatrixUse R>
 __device__ inline void mmaChangeMajor(WmmaFragment<half, M, N, K, R>& frag)
 {
-    if constexpr (M == 16 && N == 8 && K == 16 && R == MatrixUse::MatrixA)
+    if constexpr (M == 16 && K == 16 && R == MatrixUse::MatrixA)
     {
         uint32_t t0, t1, t2, t3;
         asm volatile("movmatrix.sync.aligned.m8n8.trans.b16 %0, %1;" : "=r"(t0) : "r"(frag.regs[0]));
@@ -9876,15 +10057,17 @@ __device__ inline void mmaChangeMajor(WmmaFragment<half, M, N, K, R>& frag)
         frag.regs[2] = t2;
         frag.regs[3] = t3;
     }
-    else if constexpr (M == 16 && N == 8 && K == 16 && R == MatrixUse::MatrixB)
+    else if constexpr (M == 16 && N == 16 && K == 16 && R == MatrixUse::MatrixB)
     {
-        // MatB (16×8): 2 registers, two stacked 8×8 sub-blocks.
-        // Transpose each sub-block independently.
-        uint32_t t0, t1;
+        uint32_t t0, t1, t2, t3;
         asm volatile("movmatrix.sync.aligned.m8n8.trans.b16 %0, %1;" : "=r"(t0) : "r"(frag.regs[0]));
         asm volatile("movmatrix.sync.aligned.m8n8.trans.b16 %0, %1;" : "=r"(t1) : "r"(frag.regs[1]));
+        asm volatile("movmatrix.sync.aligned.m8n8.trans.b16 %0, %1;" : "=r"(t2) : "r"(frag.regs[2]));
+        asm volatile("movmatrix.sync.aligned.m8n8.trans.b16 %0, %1;" : "=r"(t3) : "r"(frag.regs[3]));
         frag.regs[0] = t0;
         frag.regs[1] = t1;
+        frag.regs[2] = t2;
+        frag.regs[3] = t3;
     }
 }
 #endif // #if SLANG_CUDA_ENABLE_HALF
@@ -9905,22 +10088,20 @@ struct Mma16n8k16_f16_f32
         const WmmaFragment<half, 16, 8, 16, MatrixUse::MatrixB>& b,
         const WmmaFragment<float, 16, 8, 16, MatrixUse::MatrixC>& c)
     {
+        eval(d.regs, a.regs, b.regs, c.regs);
+    }
+
+    __device__ static void eval(unsigned* d, const unsigned* a, const unsigned* b, const unsigned* c)
+    {
         asm volatile("mma.sync.aligned.m16n8k16.row.col.f32.f16.f16.f32 "
                      "{%0, %1, %2, %3}, "
                      "{%4, %5, %6, %7}, "
                      "{%8, %9}, "
                      "{%10, %11, %12, %13};\n"
-                     : "=r"(d.regs[0]), "=r"(d.regs[1]), "=r"(d.regs[2]), "=r"(d.regs[3])
-                     : "r"(a.regs[0]),
-                       "r"(a.regs[1]),
-                       "r"(a.regs[2]),
-                       "r"(a.regs[3]),
-                       "r"(b.regs[0]),
-                       "r"(b.regs[1]),
-                       "r"(c.regs[0]),
-                       "r"(c.regs[1]),
-                       "r"(c.regs[2]),
-                       "r"(c.regs[3]));
+                     : "=r"(d[0]), "=r"(d[1]), "=r"(d[2]), "=r"(d[3])
+                     : "r"(a[0]), "r"(a[1]), "r"(a[2]), "r"(a[3]),
+                       "r"(b[0]), "r"(b[1]),
+                       "r"(c[0]), "r"(c[1]), "r"(c[2]), "r"(c[3]));
     }
 };
 
@@ -9933,20 +10114,20 @@ struct Mma16n8k16_f16_f16
         const WmmaFragment<half, 16, 8, 16, MatrixUse::MatrixB>& b,
         const WmmaFragment<half, 16, 8, 16, MatrixUse::MatrixC>& c)
     {
+        eval(d.regs, a.regs, b.regs, c.regs);
+    }
+
+    __device__ static void eval(unsigned* d, const unsigned* a, const unsigned* b, const unsigned* c)
+    {
         asm volatile("mma.sync.aligned.m16n8k16.row.col.f16.f16.f16.f16 "
                      "{%0, %1}, "
                      "{%2, %3, %4, %5}, "
                      "{%6, %7}, "
                      "{%8, %9};\n"
-                     : "=r"(d.regs[0]), "=r"(d.regs[1])
-                     : "r"(a.regs[0]),
-                       "r"(a.regs[1]),
-                       "r"(a.regs[2]),
-                       "r"(a.regs[3]),
-                       "r"(b.regs[0]),
-                       "r"(b.regs[1]),
-                       "r"(c.regs[0]),
-                       "r"(c.regs[1]));
+                     : "=r"(d[0]), "=r"(d[1])
+                     : "r"(a[0]), "r"(a[1]), "r"(a[2]), "r"(a[3]),
+                       "r"(b[0]), "r"(b[1]),
+                       "r"(c[0]), "r"(c[1]));
     }
 };
 #endif // #if SLANG_CUDA_ENABLE_HALF
@@ -9966,6 +10147,10 @@ struct Mma16n8k16Helper<half, half, float>
     {
         Mma16n8k16_f16_f32::eval(d, a, b, c);
     }
+    __device__ static void eval(unsigned* d, const unsigned* a, const unsigned* b, const unsigned* c)
+    {
+        Mma16n8k16_f16_f32::eval(d, a, b, c);
+    }
 };
 
 template<>
@@ -9976,6 +10161,10 @@ struct Mma16n8k16Helper<half, half, half>
         const WmmaFragment<half, 16, 8, 16, MatrixUse::MatrixA>& a,
         const WmmaFragment<half, 16, 8, 16, MatrixUse::MatrixB>& b,
         const WmmaFragment<half, 16, 8, 16, MatrixUse::MatrixC>& c)
+    {
+        Mma16n8k16_f16_f16::eval(d, a, b, c);
+    }
+    __device__ static void eval(unsigned* d, const unsigned* a, const unsigned* b, const unsigned* c)
     {
         Mma16n8k16_f16_f16::eval(d, a, b, c);
     }
@@ -10043,19 +10232,18 @@ WmmaFragment<DType, M, N, K, MatrixC> __device__ coopMatMulAdd(
 {
     WmmaFragment<DType, M, N, K, MatrixC> matD;
 
-    if constexpr (M == 16 && N == 8 && K == 16)
+    if constexpr (M == 16 && N == 16 && K == 16)
     {
-        // MMA m16n8k16: layout is always row.col in the PTX instruction.
-        // Memory layout conversion is handled in Load/Store.
-        Mma16n8k16Helper<AType, BType, CType>::eval(matD, matA, matB, matC);
+        // m16n16k16 via 2x m16n8k16: lo half in lower regs, hi half in upper regs.
+        constexpr int cRegsPerHalf = RegisterCount<CType, 16, 8, 16, MatrixUse::MatrixC>::value;
+        Mma16n8k16Helper<AType, BType, CType>::eval(matD.regs,                matA.regs, matB.regs,     matC.regs);
+        Mma16n8k16Helper<AType, BType, CType>::eval(matD.regs + cRegsPerHalf, matA.regs, matB.regs + 2, matC.regs + cRegsPerHalf);
     }
     else
     {
         constexpr ShapeCombination shape =
-            (M == 16 && N == 16 && K == 16)
-                ? ShapeCombination::m16n16k16
-                : (M == 8 && N == 32 && K == 16) ? ShapeCombination::m8n32k16
-                                                  : ShapeCombination::m32n8k16;
+            (M == 8 && N == 32 && K == 16) ? ShapeCombination::m8n32k16
+                                           : ShapeCombination::m32n8k16;
 
         uint32_t encodedLayout = (matA.m_layout == Layout::RowMajor ? 1 : 0) << 1 |
                                  (matB.m_layout == Layout::RowMajor ? 1 : 0);

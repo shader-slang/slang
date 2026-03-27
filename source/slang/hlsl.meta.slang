@@ -27671,6 +27671,7 @@ struct CoopMat
             __intrinsic_asm "$0.Store($1, $2, $3, dx::linalg::MatrixLayout::ColMajor)";
     }
 
+
     /// Copies the contents from another cooperative matrix into this matrix.
     /// @param U The element type of the source cooperative matrix.
     /// @param other The source cooperative matrix to copy from.
@@ -28064,6 +28065,41 @@ struct CoopMat
         }
     }
 
+    /// Writes 2 MatB fragments directly into a destination array at outOffset,
+    /// reading column data from a source array at elementOffset.
+    /// Each thread provides M column elements. Two fragments are built (one per thread group).
+    [require(cuda)]
+    static void FromLocalColumnPackOffsetInto<int ArraySize, int OutN>(T data[ArraySize], int elementOffset, inout This outArray[OutN], int outOffset)
+    {
+        __target_switch
+        {
+        case cuda:
+            __intrinsic_asm R"({
+                unsigned _gid = __lane_id() >> 2;
+                unsigned _tid = __lane_id() & 3;
+                Slang_CUDA_WMMA::mmaFromColMatrixB_16x16((*($2))[$3].regs, (const void*)&(($0).m_data[$1]), 0, _gid, _tid);
+                Slang_CUDA_WMMA::mmaFromColMatrixB_16x16((*($2))[$3 + 1].regs, (const void*)&(($0).m_data[$1]), 1, _gid, _tid);
+            })";
+        }
+    }
+
+    /// Writes 2 MatB fragments directly into a destination array at outOffset
+    /// from a local column array.
+    [require(cuda)]
+    static void FromLocalColumnPackInto<int OutN>(T localCol[M], inout This outArray[OutN], int outOffset)
+    {
+        __target_switch
+        {
+        case cuda:
+            __intrinsic_asm R"({
+                unsigned _gid = __lane_id() >> 2;
+                unsigned _tid = __lane_id() & 3;
+                Slang_CUDA_WMMA::mmaFromColMatrixB_16x16((*($1))[$2].regs, (const void*)($0).m_data, 0, _gid, _tid);
+                Slang_CUDA_WMMA::mmaFromColMatrixB_16x16((*($1))[$2 + 1].regs, (const void*)($0).m_data, 1, _gid, _tid);
+            })";
+        }
+    }
+
     /// Extracts one column per thread from the cooperative matrix.
     /// Inverse of FromLocalColumn. Each thread receives M elements representing
     /// its column of the matrix.
@@ -28112,6 +28148,30 @@ struct CoopMat
         }
     }
 
+    /// Writes 2 MatA fragments directly into a destination array at outOffset,
+    /// reading from a source array at elementOffset. No intermediate temporaries.
+    [require(cuda)]
+    static void FromLocalRowPackOffsetInto<int ArraySize, int OutN>(T data[ArraySize], int elementOffset, inout This outArray[OutN], int outOffset)
+    {
+        __target_switch
+        {
+        case cuda:
+            __intrinsic_asm R"(Slang_CUDA_WMMA::mmaBatchFromArray_MatA_16x16<16>(&((*($2))[$3]), (const uint32_t*)&(($0).m_data[$1 / 2])))";
+        }
+    }
+
+    /// Writes 2 MatA fragments directly into a destination array at outOffset
+    /// from a local row. No intermediate temporaries.
+    [require(cuda)]
+    static void FromLocalRowPackInto<int OutN>(T localRow[N], inout This outArray[OutN], int outOffset)
+    {
+        __target_switch
+        {
+        case cuda:
+            __intrinsic_asm R"(Slang_CUDA_WMMA::mmaBatchFromArray_MatA_16x16<16>(&((*($1))[$2]), (const uint32_t*)($0).m_data))";
+        }
+    }
+
     /// Extracts the lower 16x8 half (columns 0-7) of a ChangeMajor'd MatA as MatB.
     /// Used to split a 16x16 col-major tile into two 16x8 MatB tiles for m16n8k16 MMA.
     [require(cuda)]
@@ -28132,6 +28192,18 @@ struct CoopMat
         {
         case cuda:
             __intrinsic_asm R"(Slang_CUDA_WMMA::mmaExtractMatBHi($0))";
+        }
+    }
+
+    /// Converts a 16x16 MatA fragment to a MatB fragment (register copy, no shuffles).
+    /// The MatA should have been ChangeMajor'd to column-major layout first.
+    [require(cuda)]
+    static linalg.CoopMat<T, S, M, N, linalg.CoopMatMatrixUse.MatrixB> FromMatA(linalg.CoopMat<T, S, M, N, linalg.CoopMatMatrixUse.MatrixA> a)
+    {
+        __target_switch
+        {
+        case cuda:
+            __intrinsic_asm "$TR::FromMatA($0)";
         }
     }
 
