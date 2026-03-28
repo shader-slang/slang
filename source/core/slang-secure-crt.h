@@ -125,7 +125,8 @@ inline size_t strnlen_s(const char* str, size_t numberOfElements)
 #ifdef __GNUC__
 __attribute__((format(printf, 3, 4)))
 #endif
-inline int sprintf_s(char* buffer, size_t sizeOfBuffer, const char* format, ...)
+inline int
+sprintf_s(char* buffer, size_t sizeOfBuffer, const char* format, ...)
 {
     if (buffer == nullptr || format == nullptr || sizeOfBuffer == 0)
     {
