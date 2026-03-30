@@ -78,6 +78,7 @@ enum class ContainerNestingCategory : uint32_t
     Extension,     // ExtensionDecl
     Subscript,     // SubscriptDecl
     Property,      // PropertyDecl
+    Function,      // FunctionDeclBase (function/method bodies)
 
     Count,
     Unknown = Count, // skip validation
@@ -169,8 +170,11 @@ static ContainerNestingCategory classifyContainerForNesting(ContainerDecl* conta
         return ContainerNestingCategory::Subscript;
     if (as<PropertyDecl>(container))
         return ContainerNestingCategory::Property;
+    if (as<FunctionDeclBase>(container))
+        return ContainerNestingCategory::Function;
 
-    // GenericDecl, ScopeDecl, FunctionDeclBase, etc. — skip.
+    // GenericDecl is unwrapped by getParentDecl(); ScopeDecl likewise.
+    // Anything else is compiler-internal — skip.
     return ContainerNestingCategory::Unknown;
 }
 
@@ -206,9 +210,9 @@ struct NestingRule
 // clang-format off
 static const NestingRule kNestingRules[] = {
 //  child category                          allowed containers                                       display name
-    {DeclNestingCategory::StructType,       allowedIn(CC::Module, CC::StructOrClass, CC::Extension), "struct/class"},
+    {DeclNestingCategory::StructType,       allowedIn(CC::Module, CC::StructOrClass, CC::Extension, CC::Function), "struct/class"},
     {DeclNestingCategory::InterfaceType,    allowedIn(CC::Module),                                   "interface"},
-    {DeclNestingCategory::EnumType,         allowedIn(CC::Module, CC::StructOrClass, CC::Enum, CC::Extension), "enum"},
+    {DeclNestingCategory::EnumType,         allowedIn(CC::Module, CC::StructOrClass, CC::Enum, CC::Extension, CC::Function), "enum"},
     {DeclNestingCategory::AssocType,        allowedIn(CC::Interface),                                "associatedtype"},
     {DeclNestingCategory::Extension,        allowedIn(CC::Module),                                   "extension"},
     {DeclNestingCategory::Function,         allowedIn(CC::Module, CC::StructOrClass, CC::Interface, CC::Extension, CC::Enum), "function"},
@@ -216,15 +220,15 @@ static const NestingRule kNestingRules[] = {
     {DeclNestingCategory::Subscript,        allowedIn(CC::StructOrClass, CC::Interface, CC::Extension, CC::Enum), "subscript"},
     {DeclNestingCategory::Property,         allowedIn(CC::Module, CC::StructOrClass, CC::Interface, CC::Extension, CC::Enum), "property"},
     {DeclNestingCategory::Accessor,         allowedIn(CC::Subscript, CC::Property),                  "accessor"},
-    {DeclNestingCategory::InstanceVar,      allowedIn(CC::Module, CC::StructOrClass),                "non-static member variable"},
-    {DeclNestingCategory::StaticVar,        allowedIn(CC::Module, CC::StructOrClass, CC::Interface, CC::Extension, CC::Enum), "static variable"},
-    {DeclNestingCategory::TypeAlias,        allowedIn(CC::Module, CC::StructOrClass, CC::Interface, CC::Extension, CC::Enum), "typealias"},
+    {DeclNestingCategory::InstanceVar,      allowedIn(CC::Module, CC::StructOrClass, CC::Function),  "non-static member variable"},
+    {DeclNestingCategory::StaticVar,        allowedIn(CC::Module, CC::StructOrClass, CC::Interface, CC::Extension, CC::Enum, CC::Function), "static variable"},
+    {DeclNestingCategory::TypeAlias,        allowedIn(CC::Module, CC::StructOrClass, CC::Interface, CC::Extension, CC::Enum, CC::Function), "typealias"},
     {DeclNestingCategory::EnumCase,         allowedIn(CC::Enum),                                     "enum case"},
     {DeclNestingCategory::Inheritance,      allowedIn(CC::StructOrClass, CC::Interface, CC::Enum, CC::Extension), "inheritance"},
     {DeclNestingCategory::Import,           allowedIn(CC::Module),                                   "import"},
-    {DeclNestingCategory::Using,            allowedIn(CC::Module, CC::StructOrClass, CC::Interface, CC::Extension), "using"},
+    {DeclNestingCategory::Using,            allowedIn(CC::Module, CC::StructOrClass, CC::Interface, CC::Extension, CC::Function), "using"},
     {DeclNestingCategory::Namespace,        allowedIn(CC::Module),                                   "namespace"},
-    {DeclNestingCategory::Empty,            allowedIn(CC::Module, CC::StructOrClass, CC::Interface, CC::Enum, CC::Extension, CC::Subscript, CC::Property), "empty"},
+    {DeclNestingCategory::Empty,            allowedIn(CC::Module, CC::StructOrClass, CC::Interface, CC::Enum, CC::Extension, CC::Subscript, CC::Property, CC::Function), "empty"},
     {DeclNestingCategory::ModuleDeclaration,allowedIn(CC::Module),                                   "module declaration"},
     {DeclNestingCategory::Include,          allowedIn(CC::Module),                                   "include"},
     {DeclNestingCategory::Capability,       allowedIn(CC::Module),                                   "require capability"},
@@ -258,6 +262,8 @@ static const char* getContainerNestingCategoryName(ContainerNestingCategory cat)
         return "subscript";
     case ContainerNestingCategory::Property:
         return "property";
+    case ContainerNestingCategory::Function:
+        return "function";
     default:
         return "unknown";
     }
