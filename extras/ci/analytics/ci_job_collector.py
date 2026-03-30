@@ -390,7 +390,8 @@ def prune_old_jobs(data, max_age_days, verbose=False):
     if max_age_days <= 0:
         return data
     cutoff = datetime.datetime.now(timezone.utc) - datetime.timedelta(days=max_age_days)
-    cutoff_str = cutoff.isoformat()
+    # Use 'Z' suffix to match GitHub API timestamp format for correct string comparison
+    cutoff_str = cutoff.strftime("%Y-%m-%dT%H:%M:%SZ")
     before = len(data)
     data = [j for j in data if (j.get("created_at") or "") >= cutoff_str]
     pruned = before - len(data)
@@ -459,9 +460,9 @@ def main():
     merged, failed_job_fetches, failed_run_ids = collect_jobs(
         args.repo, runs, args.output, existing, args.verbose
     )
+    new_count = len(merged) - existing_count
     # Prune old jobs to keep file size bounded
     merged = prune_old_jobs(merged, args.max_age_days, args.verbose)
-    new_count = len(merged) - existing_count
     save_data(merged, args.output)
 
     total_runs = len(runs)
