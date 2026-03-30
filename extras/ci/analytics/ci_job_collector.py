@@ -65,6 +65,12 @@ def parse_args():
         default=0.05,
         help="Maximum tolerated fraction of run job-fetch failures before exiting non-zero (default: 0.05).",
     )
+    parser.add_argument(
+        "--max-age-days",
+        type=int,
+        default=0,
+        help="Prune jobs older than this many days to keep output size bounded (default: 0 = disabled).",
+    )
     return parser.parse_args()
 
 
@@ -379,13 +385,29 @@ def merge_data(existing, new_data, verbose=False):
     return existing
 
 
+def prune_old_jobs(data, max_age_days, verbose=False):
+    """Remove jobs older than max_age_days. Returns pruned list."""
+    if max_age_days <= 0:
+        return data
+    cutoff = datetime.datetime.now(timezone.utc) - datetime.timedelta(days=max_age_days)
+    cutoff_str = cutoff.isoformat()
+    before = len(data)
+    data = [j for j in data if (j.get("created_at") or "") >= cutoff_str]
+    pruned = before - len(data)
+    if pruned > 0:
+        print(f"Pruned {pruned} jobs older than {max_age_days} days (kept {len(data)})")
+    elif verbose:
+        print(f"No jobs older than {max_age_days} days to prune")
+    return data
+
+
 def save_data(data, file_path):
     """Save job data as JSON."""
     directory = os.path.dirname(file_path)
     if directory:
         os.makedirs(directory, exist_ok=True)
     with open(file_path, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2, default=str)
+        json.dump(data, f, separators=(",", ":"), default=str)
 
 
 def main():
@@ -437,6 +459,8 @@ def main():
     merged, failed_job_fetches, failed_run_ids = collect_jobs(
         args.repo, runs, args.output, existing, args.verbose
     )
+    # Prune old jobs to keep file size bounded
+    merged = prune_old_jobs(merged, args.max_age_days, args.verbose)
     new_count = len(merged) - existing_count
     save_data(merged, args.output)
 
