@@ -1,9 +1,9 @@
 # RecordReplay tests require a GPU
-slang-unit-test-tool/RecordReplay_triangle.internal
-slang-unit-test-tool/RecordReplay_ray_tracing.internal
-slang-unit-test-tool/RecordReplay_ray_tracing_pipeline.internal
-slang-unit-test-tool/RecordReplay_autodiff_texture.internal
-slang-unit-test-tool/RecordReplay_gpu_printing.internal
+slang-unit-test-tool/replayRecord_triangle.internal
+slang-unit-test-tool/replayRecord_ray_tracing.internal
+slang-unit-test-tool/replayRecord_ray_tracing_pipeline.internal
+slang-unit-test-tool/replayRecord_autodiff_texture.internal
+slang-unit-test-tool/replayRecord_gpu_printing.internal
 
 # CUDA tests require a GPU
 slang-unit-test-tool/cudaCodeGenBug.internal
@@ -19,7 +19,7 @@ gfx-unit-test-tool/linkTimeConstantStructOffsetsVulkan.internal
 gfx-unit-test-tool/linkTimeConstantVulkan.internal
 gfx-unit-test-tool/linkTimeDefaultVulkan.internal
 gfx-unit-test-tool/linkTimeLogicalOperatorsVulkan.internal
-gfx-unit-test-tool/linkTimeTypeGenerictVulkan.internal
+gfx-unit-test-tool/linkTimeTypeGenericVulkan.internal
 gfx-unit-test-tool/linkTimeTypeLayoutCache.internal
 gfx-unit-test-tool/linkTimeTypeLayoutNested.internal
 gfx-unit-test-tool/linkTimeTypeLayout.internal
