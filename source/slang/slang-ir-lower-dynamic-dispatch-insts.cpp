@@ -895,21 +895,21 @@ struct UntaggedUnionLoweringContext : public InstPassBase
             return true;
 
         case kIROp_StructType:
-        {
-            auto structType = cast<IRStructType>(type);
-            for (auto field : structType->getFields())
             {
-                if (containsUnmarshalableType(field->getFieldType()))
-                    return true;
+                auto structType = cast<IRStructType>(type);
+                for (auto field : structType->getFields())
+                {
+                    if (containsUnmarshalableType(field->getFieldType()))
+                        return true;
+                }
+                return false;
             }
-            return false;
-        }
 
         case kIROp_ArrayType:
-        {
-            auto arrayType = cast<IRArrayType>(type);
-            return containsUnmarshalableType((IRType*)arrayType->getElementType());
-        }
+            {
+                auto arrayType = cast<IRArrayType>(type);
+                return containsUnmarshalableType((IRType*)arrayType->getElementType());
+            }
 
         default:
             return false;
