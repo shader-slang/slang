@@ -453,7 +453,7 @@ If Phase 3 produced a passing implementation in an isolated worktree:
 ```bash
 # The best-of-n-runner agent already committed to its branch.
 # Cherry-pick or merge the winning branch into a clean fix branch.
-git checkout -b fix/<bug-id>-<short-description>
+git checkout -b fix-<bug-id>-<short-description>
 git cherry-pick <commit-hash-from-winning-strategy>
 
 # If the user wants adjustments, make them now
@@ -467,7 +467,7 @@ cmake --build --preset release --target slangc slang-test >/dev/null 2>&1 || \
 
 If no Phase 3 agent produced a clean result, or if the user wants a different approach:
 
-1. **Create branch**: `git checkout -b fix/<bug-id>-<short-description>`
+1. **Create branch**: `git checkout -b fix-<bug-id>-<short-description>`
 2. **Implement the fix**:
    - Minimal diff -- change only what is necessary
    - Follow existing patterns in the codebase
