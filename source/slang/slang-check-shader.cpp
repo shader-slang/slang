@@ -1670,10 +1670,11 @@ RefPtr<ComponentType> createUnspecializedGlobalComponentType(FrontEndCompileRequ
                 Diagnostics::InvalidTypeConformanceOptionString{.option = stringValue});
             continue;
         }
+        DiagnosticSink typeLookupSink(linkage->getSourceManager(), nullptr);
         auto concreteType = globalComponentType->getTypeFromString(
             String(typeName).getBuffer(),
-            compileRequest->getSink());
-        if (!concreteType)
+            &typeLookupSink);
+        if (!concreteType || as<ErrorType>(concreteType))
         {
             compileRequest->getSink()->diagnose(Diagnostics::InvalidTypeConformanceOptionNoType{
                 .option = stringValue,
@@ -1682,8 +1683,8 @@ RefPtr<ComponentType> createUnspecializedGlobalComponentType(FrontEndCompileRequ
         }
         auto interfaceType = globalComponentType->getTypeFromString(
             String(interfaceName).getBuffer(),
-            compileRequest->getSink());
-        if (!interfaceType)
+            &typeLookupSink);
+        if (!interfaceType || as<ErrorType>(interfaceType))
         {
             compileRequest->getSink()->diagnose(Diagnostics::InvalidTypeConformanceOptionNoType{
                 .option = stringValue,
