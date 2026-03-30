@@ -3097,4 +3097,40 @@ IRType* getSamplerTypeFromCombinedTextureSampler(IRType* type)
         return builder.getType(kIROp_SamplerStateType);
 }
 
+bool tryGetConstantIntLit(IRInst* inst, Int64& outValue)
+{
+    if (auto intLit = as<IRIntLit>(inst))
+    {
+        outValue = intLit->getValue();
+        return true;
+    }
+    return false;
+}
+
+bool areKnownEqualShapeElements(IRInst* left, IRInst* right)
+{
+    if (left == right)
+        return true;
+
+    auto leftInt = as<IRIntLit>(left);
+    auto rightInt = as<IRIntLit>(right);
+    return leftInt && rightInt && leftInt->getValue() == rightInt->getValue();
+}
+
+IRInst* emitPackLike(IRModule* module, IRInst* oldInst, ArrayView<IRInst*> elements)
+{
+    auto resultType = as<IRType>(oldInst->getDataType());
+    if (!resultType)
+        return nullptr;
+
+    IRBuilder builder(module);
+    IRBuilderSourceLocRAII srcLocRAII(&builder, oldInst->sourceLoc);
+    builder.setInsertBefore(oldInst);
+
+    if (resultType->getOp() == kIROp_TupleType)
+        return builder.emitMakeTuple(resultType, elements.getCount(), elements.getBuffer());
+
+    return builder.emitMakeValuePack(resultType, elements.getCount(), elements.getBuffer());
+}
+
 } // namespace Slang
