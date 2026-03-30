@@ -16,20 +16,32 @@ interface IFoo
 [anyValueSize(32)]
 interface IBar
 {
-    void process();
+    float process();
 }
 
 struct BarImpl : IBar
 {
-    IFoo foo;  // Contains IFoo
-    void process() {}
+    IFoo foo;
+    float process() { return foo.getValue(); }
 }
 
 // CHECK: error[E{{[0-9]+}}]
 struct FooImpl : IFoo
 {
-    IBar bar;  // Cycle: FooImpl -> IBar -> BarImpl -> IFoo -> FooImpl
-    float getValue() { return 0; }
+    IBar bar;
+    float getValue() { return bar.process(); }
+}
+
+IFoo createFoo()
+{
+    FooImpl f;
+    return f;
+}
+
+IBar createBar()
+{
+    BarImpl b;
+    return b;
 }
 
 RWStructuredBuffer<float> outputBuffer;
@@ -37,6 +49,7 @@ RWStructuredBuffer<float> outputBuffer;
 [numthreads(1, 1, 1)]
 void computeMain()
 {
-    IFoo f = createDynamicObject<IFoo>(0, 5);
-    outputBuffer[0] = f.getValue();
+    IFoo f = createFoo();
+    IBar b = createBar();
+    outputBuffer[0] = f.getValue() + b.process();
 }

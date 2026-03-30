@@ -5,9 +5,9 @@
 // packing the interface value, creating the same circular dependency as a
 // direct interface field.
 //
-// This is a subtle distinction: Optional<SomeConcreteType*> would work (pointer
-// breaks cycle), but Optional<IInterface> does not because the interface value
-// must still be packed into the AnyValue representation.
+// Note: Optional<INode> is lowered to a TaggedUnionType in IR, so the error
+// manifests as "cannot be packed" (41014) rather than "circular conformance"
+// (41003). Both errors correctly reject the unsatisfiable layout.
 
 //TEST:SIMPLE(filecheck=CHECK): -target spirv
 
@@ -27,7 +27,7 @@ struct LeafNode : INode
 struct LinkedNode : INode
 {
     float value;
-    Optional<INode> next;  // Optional contains the interface value - no cycle break
+    Optional<INode> next;
     float getValue() { return value; }
 }
 
@@ -44,7 +44,7 @@ INode makeNode(uint id)
         LinkedNode linked;
         linked.value = 100.0;
         linked.next = none;
-        return linked;  // Dynamic dispatch triggers packing error
+        return linked;
     }
 }
 

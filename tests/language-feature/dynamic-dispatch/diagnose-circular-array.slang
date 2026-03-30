@@ -12,11 +12,18 @@ interface INode
     float get();
 }
 
-// CHECK: error[E{{[0-9]+}}]
+// CHECK: error[E41003]
+// CHECK: circular reference through interface
 struct TreeNode : INode
 {
-    INode children[2];  // Array embeds values - does not break the cycle
+    INode children[2];
     float get() { return 0; }
+}
+
+INode createNode()
+{
+    TreeNode t;
+    return t;
 }
 
 RWStructuredBuffer<float> outputBuffer;
@@ -24,6 +31,6 @@ RWStructuredBuffer<float> outputBuffer;
 [numthreads(1, 1, 1)]
 void computeMain()
 {
-    INode n = createDynamicObject<INode>(0, 5);
+    INode n = createNode();
     outputBuffer[0] = n.get();
 }

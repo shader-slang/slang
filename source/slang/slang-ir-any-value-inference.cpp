@@ -36,6 +36,12 @@ void _findDependenciesOfTypeInSet(
             }
         }
         break;
+    case kIROp_PtrType:
+    case kIROp_IntPtrType:
+    case kIROp_UIntPtrType:
+        // Pointers have fixed size and don't embed their pointee, so they
+        // break dependency cycles. Do not recurse into the pointee type.
+        break;
     default:
         {
             for (UInt i = 0; i < type->getOperandCount(); i++)
@@ -88,6 +94,66 @@ List<IRInterfaceType*> sortTopologically(
         _sortTopologically(interfaceType, visited, sortedInterfaceTypes, getDependencies);
     }
     return sortedInterfaceTypes;
+}
+
+// Detect which interfaces participate in cycles in the dependency graph.
+// Uses DFS with a recursion stack to find back edges.
+void _findCyclicInterfaces(
+    IRInterfaceType* interfaceType,
+    Dictionary<IRInterfaceType*, HashSet<IRInterfaceType*>>& dependencyMap,
+    HashSet<IRInterfaceType*>& visited,
+    HashSet<IRInterfaceType*>& onStack,
+    HashSet<IRInterfaceType*>& cyclicInterfaces)
+{
+    visited.add(interfaceType);
+    onStack.add(interfaceType);
+
+    if (auto deps = dependencyMap.tryGetValue(interfaceType))
+    {
+        for (auto dependency : *deps)
+        {
+            if (!visited.contains(dependency))
+            {
+                _findCyclicInterfaces(
+                    dependency,
+                    dependencyMap,
+                    visited,
+                    onStack,
+                    cyclicInterfaces);
+            }
+            if (onStack.contains(dependency))
+            {
+                cyclicInterfaces.add(interfaceType);
+                cyclicInterfaces.add(dependency);
+            }
+        }
+    }
+
+    onStack.remove(interfaceType);
+}
+
+HashSet<IRInterfaceType*> findCyclicInterfaces(
+    HashSet<IRInterfaceType*>& interfaceTypes,
+    Dictionary<IRInterfaceType*, HashSet<IRInterfaceType*>>& dependencyMap)
+{
+    HashSet<IRInterfaceType*> visited;
+    HashSet<IRInterfaceType*> onStack;
+    HashSet<IRInterfaceType*> cyclicInterfaces;
+
+    for (auto interfaceType : interfaceTypes)
+    {
+        if (!visited.contains(interfaceType))
+        {
+            _findCyclicInterfaces(
+                interfaceType,
+                dependencyMap,
+                visited,
+                onStack,
+                cyclicInterfaces);
+        }
+    }
+
+    return cyclicInterfaces;
 }
 
 void inferAnyValueSizeWhereNecessary(
@@ -230,13 +296,53 @@ void inferAnyValueSizeWhereNecessary(
         selfReferentialImpls.add(interfaceType, selfRefList);
         nonSelfReferentialImpls.add(interfaceType, nonSelfRefList);
 
-        // Check for issue #9835: If ALL implementations are self-referential,
-        // there's no base case and AnyValue size cannot be calculated.
+        // Diagnose each self-referential implementation: a struct that conforms to
+        // an interface and contains a field of that same interface type creates an
+        // inherently unsatisfiable layout constraint (the struct must be larger than
+        // the AnyValue it contains, but the AnyValue must fit the struct).
+        for (auto impl : selfRefList)
+        {
+            sink->diagnose(Diagnostics::CircularConformance{
+                .type = impl,
+                .interfaceType = interfaceType,
+                .location = impl->sourceLoc,
+            });
+        }
+
+        // If ALL implementations are self-referential, there's no base case and
+        // AnyValue size cannot be calculated at all.
         if (nonSelfRefList.getCount() == 0 && selfRefList.getCount() > 0)
         {
             sink->diagnose(Diagnostics::CyclicInterfaceDependency{
                 .interfaceType = interfaceType,
             });
+        }
+    }
+
+    // Detect interfaces that participate in cross-interface dependency cycles.
+    // E.g., IFoo depends on IBar (via FooImpl containing IBar) and IBar depends on
+    // IFoo (via BarImpl containing IFoo).
+    HashSet<IRInterfaceType*> cyclicInterfaces =
+        findCyclicInterfaces(interfaceTypes, interfaceDependencyMap);
+
+    // Diagnose implementations that participate in cross-interface cycles.
+    for (auto interfaceType : cyclicInterfaces)
+    {
+        for (auto impl : mapInterfaceToImplementations[interfaceType])
+        {
+            auto deps = findDependenciesOfTypeInSet((IRType*)impl, interfaceTypes);
+            for (auto dep : deps)
+            {
+                if (dep != interfaceType && cyclicInterfaces.contains(dep))
+                {
+                    sink->diagnose(Diagnostics::CircularConformance{
+                        .type = impl,
+                        .interfaceType = interfaceType,
+                        .location = impl->sourceLoc,
+                    });
+                    break;
+                }
+            }
         }
     }
 
@@ -259,6 +365,8 @@ void inferAnyValueSizeWhereNecessary(
 
         IRIntegerValue maxAnyValueSize = -1;
 
+        bool isCyclic = cyclicInterfaces.contains(interfaceType);
+
         // First pass: Calculate size from non-self-referential implementations.
         // This establishes the base AnyValue size for the interface.
         for (auto implType : nonSelfReferentialImpls[interfaceType])
@@ -271,7 +379,9 @@ void inferAnyValueSizeWhereNecessary(
 
             maxAnyValueSize = Math::Max(maxAnyValueSize, sizeAndAlignment.size);
 
-            if (existingMaxSize < sizeAndAlignment.size)
+            // Skip the confusing "does not fit" diagnostic for types that participate
+            // in cross-interface cycles; we already emitted CircularConformance.
+            if (!isCyclic && existingMaxSize < sizeAndAlignment.size)
             {
                 sink->diagnose(Diagnostics::TypeDoesNotFitAnyValueSize{
                     .type = implType,
@@ -296,6 +406,8 @@ void inferAnyValueSizeWhereNecessary(
 
         // Second pass: Calculate size from self-referential implementations.
         // These can now use the AnyValue size set above.
+        // We skip the "does not fit" diagnostic for self-referential impls because
+        // we already emitted CircularConformance which is more specific and actionable.
         for (auto implType : selfReferentialImpls[interfaceType])
         {
             IRSizeAndAlignment sizeAndAlignment;
@@ -305,20 +417,6 @@ void inferAnyValueSizeWhereNecessary(
                 &sizeAndAlignment);
 
             maxAnyValueSize = Math::Max(maxAnyValueSize, sizeAndAlignment.size);
-
-            if (existingMaxSize < sizeAndAlignment.size)
-            {
-                sink->diagnose(Diagnostics::TypeDoesNotFitAnyValueSize{
-                    .type = implType,
-                    .location = implType->sourceLoc,
-                });
-                sink->diagnose(Diagnostics::TypeAndLimit{
-                    .type = implType,
-                    .size = sizeAndAlignment.size,
-                    .limit = existingMaxSize,
-                    .location = implType->sourceLoc,
-                });
-            }
         }
 
         // Should not encounter interface types without any conforming implementations.

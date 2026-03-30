@@ -4153,6 +4153,13 @@ err(
 )
 
 err(
+    "circular-conformance",
+    41003,
+    "type contains circular reference through conforming interface",
+    span { loc = "location", message = "type '~type:IRInst' contains circular reference through interface '~interfaceType:IRInst'. A type that conforms to an interface cannot contain a field of that interface type." }
+)
+
+err(
     "missing-return-error",
     41009,
     "non-void function must return",
