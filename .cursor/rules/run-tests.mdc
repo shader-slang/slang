@@ -1,9 +1,0 @@
----
-description: To run Slang tests
-globs: 
----
-
-- Use "slang-test.exe", which will be present in "build.vs2022/Debug/bin/" after Slang is built. 
-- To run all Slang tests (takes a long time), no need to give any arguments
-- To run a specific test use "tests/<folder>/<test-name>" as the argument (without the .slang extension)
-

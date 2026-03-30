@@ -1691,8 +1691,8 @@ FIDDLE()
 class AutoPyBindCudaAttribute : public Attribute
 {
     FIDDLE(...)
-    FIDDLE() DeclRefExpr* fwdDiffFuncDeclRef = false;
-    FIDDLE() DeclRefExpr* bwdDiffFuncDeclRef = false;
+    FIDDLE() DeclRefExpr* fwdDiffFuncDeclRef = nullptr;
+    FIDDLE() DeclRefExpr* bwdDiffFuncDeclRef = nullptr;
 };
 
 FIDDLE()
