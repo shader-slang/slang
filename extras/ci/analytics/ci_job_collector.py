@@ -393,7 +393,7 @@ def prune_old_jobs(data, max_age_days, verbose=False):
     # Use 'Z' suffix to match GitHub API timestamp format for correct string comparison
     cutoff_str = cutoff.strftime("%Y-%m-%dT%H:%M:%SZ")
     before = len(data)
-    data = [j for j in data if (j.get("created_at") or "") >= cutoff_str]
+    data = [j for j in data if not j.get("created_at") or j["created_at"] >= cutoff_str]
     pruned = before - len(data)
     if pruned > 0:
         print(f"Pruned {pruned} jobs older than {max_age_days} days (kept {len(data)})")
