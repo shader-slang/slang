@@ -1494,8 +1494,7 @@ struct TypeFlowSpecializationContext
             return;
 
         diagnosedBitCasts.add(inst);
-        sink->diagnose(Diagnostics::BitCastToNonConcreteType{
-            .location = inst->sourceLoc});
+        sink->diagnose(Diagnostics::BitCastToNonConcreteType{.location = inst->sourceLoc});
     }
 
     void resolveAndReplaceIfGlobal(IRInst* context, IRInst* inst)
