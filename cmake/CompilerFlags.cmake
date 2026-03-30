@@ -241,7 +241,9 @@ function(set_default_compile_options target)
         elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
             target_compile_options(
                 ${target}
-                PRIVATE -fsanitize=address -fsanitize=undefined
+                PRIVATE
+                    -fsanitize=address
+                    -fsanitize=undefined
             )
             target_link_options(
                 ${target}
