@@ -40,7 +40,16 @@ def get_slangpy_include_paths():
 
     env_neural = os.environ.get("NEURAL_MODULE_PATH")
     if env_neural:
-        paths.append(env_neural)
+        env_path = Path(env_neural)
+        if env_path.is_dir():
+            paths.append(str(env_path))
+            for d in sorted(env_path.iterdir()):
+                if d.is_dir() and d.name.startswith("slang-standard-module-"):
+                    paths.append(str(d))
+                    inner_slang = d / "slang"
+                    if inner_slang.is_dir():
+                        paths.append(str(inner_slang))
+                    break
 
     return paths
 
