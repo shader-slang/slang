@@ -1671,9 +1671,8 @@ RefPtr<ComponentType> createUnspecializedGlobalComponentType(FrontEndCompileRequ
             continue;
         }
         DiagnosticSink typeLookupSink(linkage->getSourceManager(), nullptr);
-        auto concreteType = globalComponentType->getTypeFromString(
-            String(typeName).getBuffer(),
-            &typeLookupSink);
+        auto concreteType =
+            globalComponentType->getTypeFromString(String(typeName).getBuffer(), &typeLookupSink);
         if (!concreteType || as<ErrorType>(concreteType))
         {
             compileRequest->getSink()->diagnose(Diagnostics::InvalidTypeConformanceOptionNoType{
