@@ -1,6 +1,35 @@
+# RecordReplay tests require a GPU
 slang-unit-test-tool/RecordReplay_triangle.internal
 slang-unit-test-tool/RecordReplay_ray_tracing.internal
 slang-unit-test-tool/RecordReplay_ray_tracing_pipeline.internal
 slang-unit-test-tool/RecordReplay_autodiff_texture.internal
 slang-unit-test-tool/RecordReplay_gpu_printing.internal
+
+# CUDA tests require a GPU
 slang-unit-test-tool/cudaCodeGenBug.internal
+
+# Vulkan gfx-unit-tests require a Vulkan-capable GPU
+gfx-unit-test-tool/bufferBarrierVulkan.internal
+gfx-unit-test-tool/computeSmokeVulkan.internal
+gfx-unit-test-tool/computeTrivialVulkan.internal
+gfx-unit-test-tool/createBufferFromHandleVulkan.internal
+gfx-unit-test-tool/linkTimeConstantArraySizeVulkan.internal
+gfx-unit-test-tool/linkTimeConstantNestedStructOffsetsVulkan.internal
+gfx-unit-test-tool/linkTimeConstantStructOffsetsVulkan.internal
+gfx-unit-test-tool/linkTimeConstantVulkan.internal
+gfx-unit-test-tool/linkTimeDefaultVulkan.internal
+gfx-unit-test-tool/linkTimeLogicalOperatorsVulkan.internal
+gfx-unit-test-tool/linkTimeTypeGenerictVulkan.internal
+gfx-unit-test-tool/linkTimeTypeLayoutCache.internal
+gfx-unit-test-tool/linkTimeTypeLayoutNested.internal
+gfx-unit-test-tool/linkTimeTypeLayout.internal
+gfx-unit-test-tool/linkTimeTypeMultiUseGenericVulkan.internal
+gfx-unit-test-tool/linkTimeTypeMultiUseVulkan.internal
+gfx-unit-test-tool/linkTimeTypeVulkan.internal
+gfx-unit-test-tool/mutableShaderObjectVulkan.internal
+gfx-unit-test-tool/nestedParameterBlockTestVulkan.internal
+gfx-unit-test-tool/precompiledModuleCacheVulkan.internal
+gfx-unit-test-tool/precompiledModuleVulkan.internal
+gfx-unit-test-tool/rootShaderParameterVulkan.internal
+gfx-unit-test-tool/samplerArrayVulkan.internal
+gfx-unit-test-tool/uint16BufferTestVulkan.internal
