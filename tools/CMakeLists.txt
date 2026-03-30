@@ -278,6 +278,8 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
             slang-rt
             slang-glslang
             slang-llvm
+            copy-dxcompiler
+            copy-dxil
             copy-webgpu_dawn
             copy-slang-tint
             # See issue 5305.

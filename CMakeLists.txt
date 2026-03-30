@@ -541,6 +541,10 @@ if(${SLANG_USE_SYSTEM_GLSLANG})
     endif()
 endif()
 
+if(SLANG_ENABLE_DXIL)
+    include(FetchDXC)
+endif()
+
 add_subdirectory(external)
 
 # webgpu_dawn is only available as a fetched shared library, since Dawn's nested source
