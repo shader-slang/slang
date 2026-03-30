@@ -88,6 +88,12 @@ bool DebugValueStoreContext::isDebuggableType(IRType* type)
             debuggable = false; // specTypeDebuggable;
             break;
         }
+    case kIROp_EnumType:
+        {
+            auto enumType = as<IREnumType>(type);
+            debuggable = isDebuggableType(enumType->getTagType());
+            break;
+        }
     default:
         if (as<IRBasicType>(type))
             debuggable = true;

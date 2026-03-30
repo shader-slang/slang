@@ -797,9 +797,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         {
             switch (irOpCode)
             {
-            case kIROp_IntCast:
-            case kIROp_ConstexprIntCast:
-                return SpvOpUConvert;
             case kIROp_FloatCast:
             case kIROp_ConstexprFloatCast:
                 return SpvOpFConvert;
@@ -3073,9 +3070,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
         if (format == SpvImageFormatUnknown && sampled == ImageOpConstants::readWriteImage)
         {
-            // TODO: It may not be necessary to have both of these
-            // depending on if we read or write
-            requireSPIRVCapability(SpvCapabilityStorageImageReadWithoutFormat);
+            // Write-only textures (WTexture*) only need the write capability.
+            // Read-write and rasterizer-ordered textures need both.
+            if (inst->getAccess() != SLANG_RESOURCE_ACCESS_WRITE)
+                requireSPIRVCapability(SpvCapabilityStorageImageReadWithoutFormat);
             requireSPIRVCapability(SpvCapabilityStorageImageWriteWithoutFormat);
         }
 
@@ -3476,6 +3474,47 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return result;
     }
 
+    SpvInst* emitSpecConstantUConvert(IRInst* inst, IRType* resultType, SpvInst* operand)
+    {
+        return emitInst(
+            getSection(SpvLogicalSectionID::ConstantsAndTypes),
+            inst,
+            SpvOpSpecConstantOp,
+            resultType,
+            kResultID,
+            SpvOpUConvert,
+            operand);
+    }
+
+    SpvInst* emitSpecConstantSConvert(IRInst* inst, IRType* resultType, SpvInst* operand)
+    {
+        return emitInst(
+            getSection(SpvLogicalSectionID::ConstantsAndTypes),
+            inst,
+            SpvOpSpecConstantOp,
+            resultType,
+            kResultID,
+            SpvOpSConvert,
+            operand);
+    }
+
+    // Emit IAdd-by-zero wrapped in OpSpecConstantOp to reinterpret signedness.
+    // OpBitcast is not in the set of opcodes allowed by OpSpecConstantOp, so
+    // we use IAdd-by-zero instead (same approach as glslang's GlslangToSpv.cpp).
+    SpvInst* emitSpecConstantSignReinterpret(IRInst* inst, IRType* resultType, SpvInst* operand)
+    {
+        auto zero = emitIntConstant(0, resultType);
+        return emitInst(
+            getSection(SpvLogicalSectionID::ConstantsAndTypes),
+            inst,
+            SpvOpSpecConstantOp,
+            resultType,
+            kResultID,
+            SpvOpIAdd,
+            operand,
+            zero);
+    }
+
     SpvInst* emitSpecializationConstantOp(IRInst* inst)
     {
         SpvInst* spv = nullptr;
@@ -3505,6 +3544,52 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         {
             // We need to emit the constant as a specialization constant
             return emitLit(inst);
+        }
+
+        // Handle integer casts in spec constant context.
+        // Inside OpSpecConstantOp, UConvert/SConvert require different bit widths
+        // and matching signedness on the result type, and OpBitcast is not in the
+        // set of allowed opcodes. See emitSpecConstantSignReinterpret for the
+        // workaround used for signedness changes.
+        auto irOp = inst->getOp();
+        if (irOp == kIROp_IntCast || irOp == kIROp_ConstexprIntCast)
+        {
+            auto srcType = inst->getOperand(0)->getDataType();
+            auto dstType = inst->getDataType();
+            if (isIntegralType(srcType) && isIntegralType(dstType))
+            {
+                auto srcInfo = getIntTypeInfo(m_targetRequest, srcType);
+                auto dstInfo = getIntTypeInfo(m_targetRequest, dstType);
+
+                if (srcInfo == dstInfo)
+                {
+                    auto operand = emitSpecializationConstantOp(inst->getOperand(0));
+                    registerInst(inst, operand);
+                    return operand;
+                }
+
+                auto operand = emitSpecializationConstantOp(inst->getOperand(0));
+                bool needsWidthChange = srcInfo.width != dstInfo.width;
+                bool needsSignReinterpret = srcInfo.isSigned != dstInfo.isSigned;
+
+                if (needsWidthChange)
+                {
+                    IRBuilder builder(m_irModule);
+                    auto convertType = needsSignReinterpret
+                                           ? builder.getType(getIntTypeOpFromInfo(
+                                                 {dstInfo.width, srcInfo.isSigned}))
+                                           : inst->getFullType();
+                    auto convertInst = needsSignReinterpret ? nullptr : inst;
+                    operand = srcInfo.isSigned
+                                  ? emitSpecConstantSConvert(convertInst, convertType, operand)
+                                  : emitSpecConstantUConvert(convertInst, convertType, operand);
+                }
+
+                if (needsSignReinterpret)
+                    operand = emitSpecConstantSignReinterpret(inst, inst->getFullType(), operand);
+
+                return operand;
+            }
         }
 
         IRType* type = inst->getOperand(0)->getDataType();
@@ -4217,6 +4302,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             scope,
             builder.getIntValue(builder.getUIntType(), 0),
             debugVar->getArgIndex());
+
+        registerDebugInst(debugVar, spvDebugLocalVar);
 
         if (hasBackingVar)
         {
@@ -9429,15 +9516,19 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 if (!structType)
                     return false;
                 UInt fieldIndex = 0;
+                bool foundField = false;
                 for (auto field : structType->getFields())
                 {
                     if (field->getKey() == key)
                     {
                         type = unwrapAttributedType(field->getFieldType());
+                        foundField = true;
                         break;
                     }
                     fieldIndex++;
                 }
+                if (!foundField)
+                    return false;
                 spvAccessChain.add(emitIntConstant(fieldIndex, builder.getIntType()));
             }
             else
@@ -9452,7 +9543,13 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         matrixType->getColumnCount());
                 else
                     return false;
-                spvAccessChain.add(ensureInst(element));
+                // DebugValue index operands must be constant integers.
+                auto indexOperand = element;
+                if (auto globalValueRef = as<IRGlobalValueRef>(indexOperand))
+                    indexOperand = globalValueRef->getValue();
+                if (!as<IRIntLit>(indexOperand))
+                    return false;
+                spvAccessChain.add(ensureInst(indexOperand));
             }
         }
         return true;
@@ -9463,12 +9560,12 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         auto debugVar = debugValue->getDebugVar();
         auto debugValueVal = debugValue->getValue();
         // We are asked to update the value for a debug variable.
-        // A debug variable is already emited as a OpDebugVariable +
-        // OpVariable + OpDebugDeclare. We only need to store the new value
-        // into the associated OpVariable. The `debugValue->getDebugVar()` inst
-        // already maps to the `OpVariable` SpvInst, so we just need to emit
-        // code for a store into the subset of the OpVariable with the correct
-        // accesschain defined in the debug value inst.
+        // A debug variable is already emitted as an OpDebugLocalVariable +
+        // OpVariable + OpDebugDeclare. We need to both:
+        // 1. Emit an OpDebugValue (can be helpful if the OpVariable gets
+        //    optimized out).
+        // 2. Store the new value into the associated OpVariable (for the
+        //    DebugDeclare association).
         //
         IRBuilder builder(debugValue);
         builder.setInsertBefore(debugValue);
@@ -9483,42 +9580,48 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             return nullptr;
         if (!spvDebugVar)
             return nullptr;
-        if (spvDebugVar->opcode != SpvOpVariable)
+
+        // Emit an OpDebugValue if possible.
+        //
+        SpvInst* spvDebugLocalVar = nullptr;
+        m_mapIRInstToSpvDebugInst.tryGetValue(rootVar, spvDebugLocalVar);
+        if (spvDebugLocalVar)
         {
-            // If the root variable can't be represented by a normal variable,
-            // try to emit a DebugValue if possible. Usually this means that the variable
-            // represents a shader resource.
-            //
             // SPIR-V requires the access chain specified in a DebugValue operation to
             // be fully static. We will skip emitting the debug inst if the access chain
             // isn't static.
             //
-            auto type = unwrapAttributedType(debugVar->getDataType());
+            auto type = rootVar->getDataType();
+            if (auto pointedToType = tryGetPointedToType(&builder, type))
+                type = pointedToType;
+            else
+                type = as<IRType>(unwrapAttributedType(type));
             List<SpvInst*> accessChain;
             bool isConstAccessChain =
                 translateIRAccessChain(builder, type, irAccessChain, accessChain);
 
             if (isConstAccessChain)
             {
-                return emitOpDebugValue(
+                emitOpDebugValue(
                     parent,
-                    debugValue,
+                    nullptr,
                     m_voidType,
                     getNonSemanticDebugInfoExtInst(),
-                    rootVar,
+                    spvDebugLocalVar,
                     debugValueVal,
                     getDwarfExpr(),
                     accessChain);
             }
-
-            // Fallback to not emit anything for now.
-            return nullptr;
         }
 
-        // The ordinary case is the debug variable has a backing ordinary variable.
-        // We can simply emit a store into the backing variable for the DebugValue operation.
+        // If the debug variable has a backing OpVariable, emit a store into it
+        // to keep the DebugDeclare association in sync.
         //
-        return emitStore(parent, debugValue, debugVar, debugValueVal);
+        if (spvDebugVar->opcode == SpvOpVariable)
+            return emitStore(parent, debugValue, debugVar, debugValueVal);
+
+        // Fallback to not emit anything.
+        return nullptr;
     }
 
     void maybeAssignAnonymousMemberNames(IRStructType* structType)

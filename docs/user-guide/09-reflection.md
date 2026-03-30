@@ -131,7 +131,7 @@ case slang::TypeReflection::Kind::Scalar:
 ```
 
 The `slang::ScalarType` enumeration includes cases for the built-in integer and floating-point types (for example, `slang::ScalarType::UInt64` and `slang::ScalarType::Float16`), as well as the basic `bool` type (`slang::ScalarType::Bool`).
-The `void` type is also considered a scalar type (`slang::ScalarType::Void`);
+The `void` type is also considered a scalar type (`slang::ScalarType::Void`).
 
 #### Structure Types
 
@@ -185,7 +185,7 @@ fields:
 
 #### Arrays
 
-An array type like `int[3]` is defined by the number and type of elements in the array, which can be queried with `getElementCount()` and `getElementType`, respectively:
+An array type like `int[3]` is defined by the number and type of elements in the array, which can be queried with `getElementCount()` and `getElementType()`, respectively:
 
 ```c++
 case slang::TypeReflection::Kind::Array:
@@ -445,7 +445,8 @@ void printOffset(
     case slang::ParameterCategory::UnorderedAccess:
     case slang::ParameterCategory::SamplerState:
     case slang::ParameterCategory::DescriptorTableSlot:
-        print("space: "); print(spaceOffset);    
+        print("space: "); print(spaceOffset);
+        break;
     }
 }
 ```
@@ -551,7 +552,7 @@ void printTypeLayout(slang::TypeLayoutReflection* typeLayout)
     {
     default:
         break;
-    
+
         // ...
     }
 }
@@ -649,7 +650,7 @@ ParameterBlock<Material> material;
 ```
 
 When this is laid out for Vulkan, the `Material` type will consume 3 bindings, but the `material` parameter will instead consume one space.
-A `ParameterBLock<>` type hides the bindings/registers/slots used by its element.
+A `ParameterBlock<>` type hides the bindings/registers/slots used by its element.
 
 ##### When Things Leak
 
@@ -717,7 +718,7 @@ struct LightingEnvironment
 ParameterBlock<LightingEnvironment> lightEnv;
 ```
 
-If this example is compiled for Vulkan, the `LightingEnvironment` type uses 316 bytes and one `binding` (ParameterCategory::DescriptorTableSlot), while `lightEnv` uses one descriptor `set`  (ParameterCategory::SubElementRegisterSpace).
+If this example is compiled for Vulkan, the `LightingEnvironment` type uses 316 bytes and one `binding` (ParameterCategory::DescriptorTableSlot), while `lightEnv` uses one descriptor `set` (ParameterCategory::SubElementRegisterSpace).
 
 What is not clear in the above description, however, is that because `LightingEnvironment` uses ordinary bytes, the Slang compiler will have to implicitly allocate a `binding` for a constant buffer to hold those bytes.
 Conceptually, the layout is similar to what would be produced for `ParameterBlock<ConstantBuffer<LightingEnvironment>>`.
@@ -757,14 +758,14 @@ case slang::TypeReflection::Kind::ShaderStorageBuffer:
     {
         print("container: ");
         printOffsets(typeLayout->getContainerVarLayout());
-    
+
         auto elementVarLayout = typeLayout->getElementVarLayout();
         print("element: ");
         printOffsets(elementVarLayout);
 
         print("type layout: ");
         printTypeLayout(
-            elementVarLayout->getTypeLayout();
+            elementVarLayout->getTypeLayout());
     }
     break;
 ```
@@ -860,7 +861,7 @@ element:
         unit: Uniform # bytes
     alignment in bytes: 16
     stride in bytes: 64
-    fields:                  
+    fields:
       - name: "material"
         offset:
           relative:
@@ -885,7 +886,7 @@ The implementation of the reflection API makes an effort to ensure that the type
 Programs and Scopes
 -------------------
 
-So far, our presentation has largely been bottom-up: we have shown how to recursively perform reflection on types, variables, and their layouts, but we have not yet shown how how to get this recursive traversal started.
+So far, our presentation has largely been bottom-up: we have shown how to recursively perform reflection on types, variables, and their layouts, but we have not yet shown how to get this recursive traversal started.
 We will now proceed top-down for a bit, and look at how to reflect the top-level parameters of a program.
 
 A `ProgramLayout` is typically obtained using `IComponentType::getLayout()` after compiling and linking a Slang program.
@@ -1137,7 +1138,7 @@ case SLANG_STAGE_COMPUTE:
 #### Varying Parameters
 
 So far we have primarily been talking about the *uniform* shader parameters of a program: those that can be passed in from application code to shader code.
-Slang's reflection API also reflects the *varying* shader parameters that appear are passed between stages of a pipeline.
+Slang's reflection API also reflects the *varying* shader parameters that are passed between stages of a pipeline.
 
 Variable and type layouts for varying shader parameters will typically show usage of:
 
@@ -1240,7 +1241,7 @@ uniform Params params;
 
 we expect that the cumulative offset of `params.material.glossMap` in units of Vulkan `binding`s can be computed by summing up the offsets in that unit of `params` (0), `material` (1), and `glossMap` (1).
 
-When recursively traversing the parameters of a shader, out example application will track an access path as a singly-linked list of variable layouts that points up the stack, from the deepest variable to the shallowest:
+When recursively traversing the parameters of a shader, our example application will track an access path as a singly-linked list of variable layouts that points up the stack, from the deepest variable to the shallowest:
 
 ```c++
 struct AccessPathNode
@@ -1255,7 +1256,7 @@ struct AccessPath
 };
 ```
 
-For the example code above, if our recursive traversal is at `params.material.glossMap`, then the access path will start with a node for `glossMap` which points to a node for `material`, which points to a node for `glossMap`.
+For the example code above, if our recursive traversal is at `params.material.glossMap`, then the access path will start with a node for `glossMap` which points to a node for `material`, which points to a node for `params`.
 
 For many layout units, we can calculate a cumulative offset simply by summing up contributions along the entire access path, with logic like the following:
 
@@ -1355,7 +1356,7 @@ The calls to `printOffsets()`, `printTypeLayout()`, etc. inside of `printScope()
 
 #### Array-Like Types
 
-When the traversing an array, matrix, or vector type, it is impossible to compute a single cumulative offset that is applicable to all elements of the type.
+When traversing an array, matrix, or vector type, it is impossible to compute a single cumulative offset that is applicable to all elements of the type.
 The recursive calls to `printTypeLayout()` in these cases will simply pass in an empty `AccessPath`.
 For example:
 
@@ -1388,7 +1389,7 @@ struct A
 struct B
 {
     float4 y;
-    ConstantBuffer<Inner> a;
+    ConstantBuffer<A> a;
 }
 struct C
 {
@@ -1400,7 +1401,7 @@ uniform C c;
 ```
 
 When compiling for D3D12, the cumulative byte offset of `c.b` is 16, but the cumulative byte offset of `c.b.a.x` needs to be zero, because its byte offset should be measured relative to the enclosing constant buffer `c.b.a`.
-In contrast, the cumulative of offset of `c.b` in `t` registers is one, and the cumulative offset of `c.b.a.t` needs to be two.
+In contrast, the cumulative offset of `c.b` in `t` registers is one, and the cumulative offset of `c.b.a.t` needs to be two.
 
 Similarly, when calculating the cumulative offsets of variables inside a parameter block (for targets that can allocate each parameter block its own space), it is important not to sum contributions past an enclosing parameter block.
 
@@ -1592,7 +1593,7 @@ unsigned calculateParameterStageMask(
         auto layoutUnit = varLayout->getCategoryByIndex(i);
         auto offset = calculateCumulativeOffset(
             varLayout, layoutUnit, accessPath);
-        
+
         mask |= calculateStageMask(
             layoutUnit, offset);
     }
@@ -1624,6 +1625,16 @@ void printVarLayout(
     // ...
 }
 ```
+
+### Target-Specific Limitations
+
+On targets where entry point varying inputs are packed into a single struct parameter during legalization (currently Metal and WGSL), `isParameterLocationUsed` cannot distinguish between used and unused individual varying inputs.
+The post-emit metadata is recorded at the struct level, so if any varying input is used, all varying input locations covered by the struct will be reported as used.
+
+This limitation does not apply to SPIR-V or GLSL targets, where each varying input becomes a separate global parameter that can be individually eliminated by dead code elimination and individually tracked in the metadata.
+Non-varying resource types (e.g., `DescriptorTableSlot`, `ShaderResource`) are not affected by this limitation on any target.
+
+See the [Metal](a2-02-metal-target-specific.md#limitation-isparameterlocationused-for-varying-inputs) and [WGSL](a2-03-wgsl-target-specific.md#limitation-isparameterlocationused-for-varying-inputs) target-specific documentation for details.
 
 Conclusion
 ----------

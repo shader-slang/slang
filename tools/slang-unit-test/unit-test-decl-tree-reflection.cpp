@@ -18,20 +18,33 @@ static String getTypeFullName(slang::TypeReflection* type)
     return String((const char*)blob->getBufferPointer());
 }
 
-static void printRefl(slang::DeclReflection* refl, unsigned int level = 0)
+static void printRefl(slang::ISession* session, slang::DeclReflection* refl, unsigned int level = 0)
 {
-    // Mapping of kind ids to names
-    std::string names[] = {"Unsupported", "Struct", "Function", "Module", "Generic", "Variable"};
+    std::string names[] = {
+        "Unsupported",
+        "Struct",
+        "Function",
+        "Module",
+        "Generic",
+        "Variable",
+        "Namespace",
+        "Enum",
+    };
     for (unsigned int i = 0; i < level; i++)
     {
         std::cout << "  ";
     }
-    std::cout << "[" << names[(unsigned int)refl->getKind()] << "] (" << refl->getChildrenCount()
-              << ")" << std::endl;
+    slang::SourceLocation sourceLocation;
+    session->getDeclSourceLocation(refl, &sourceLocation);
+    const char* filePath = sourceLocation.filePath ? sourceLocation.filePath : "<null>";
+    auto kindIndex = (unsigned int)refl->getKind();
+    auto kindName = kindIndex < SLANG_COUNT_OF(names) ? names[kindIndex] : std::string("Unknown");
+    std::cout << "[" << kindName << "] (" << refl->getChildrenCount() << ") " << filePath << ":"
+              << sourceLocation.line << ":" << sourceLocation.column << std::endl;
 
     for (auto* child : refl->getChildren())
     {
-        printRefl(child, level + 1);
+        printRefl(session, child, level + 1);
     }
 }
 
@@ -135,6 +148,16 @@ SLANG_UNIT_TEST(declTreeReflection)
     SLANG_CHECK(firstDecl->getKind() == slang::DeclReflection::Kind::Struct);
     SLANG_CHECK(firstDecl->getChildrenCount() == 2);
 
+    // Verify getDeclSourceLocation on a struct declaration.
+    {
+        slang::SourceLocation srcLoc;
+        SLANG_CHECK(session->getDeclSourceLocation(firstDecl, &srcLoc) == SLANG_OK);
+        SLANG_CHECK(srcLoc.filePath != nullptr);
+        SLANG_CHECK(UnownedStringSlice(srcLoc.filePath) == "m.slang");
+        SLANG_CHECK(srcLoc.line == 3);
+        SLANG_CHECK(srcLoc.column == 16);
+    }
+
     {
         slang::TypeReflection* type = firstDecl->getType();
         SLANG_CHECK(getTypeFullName(type) == "MyFuncPropertyAttribute");
@@ -152,6 +175,16 @@ SLANG_UNIT_TEST(declTreeReflection)
     SLANG_CHECK(
         secondDecl->getChildrenCount() ==
         2); // Parameter declarations are children (return type is not)
+
+    // Verify getDeclSourceLocation on a function declaration.
+    {
+        slang::SourceLocation srcLoc;
+        SLANG_CHECK(session->getDeclSourceLocation(secondDecl, &srcLoc) == SLANG_OK);
+        SLANG_CHECK(srcLoc.filePath != nullptr);
+        SLANG_CHECK(UnownedStringSlice(srcLoc.filePath) == "m.slang");
+        SLANG_CHECK(srcLoc.line == 7);
+        SLANG_CHECK(srcLoc.column == 15);
+    }
 
     {
         auto funcReflection = secondDecl->asFunction();

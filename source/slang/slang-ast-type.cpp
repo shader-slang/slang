@@ -17,6 +17,10 @@ bool isAbstractTypePack(Type* type)
     type = unwrapModifiedType(type);
     if (as<ExpandType>(type))
         return true;
+    if (as<TrimFirstTypePack>(type))
+        return true;
+    if (as<TrimLastTypePack>(type))
+        return true;
     if (isDeclRefTypeOf<GenericTypePackParamDecl>(type))
         return true;
     return false;
@@ -877,6 +881,168 @@ Val* ExpandType::_substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet
         (*ioDiff)++;
         return astBuilder->getTypePack(expandedTypes.getArrayView().arrayView);
     }
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! PackBranchType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+void PackBranchType::_toTextOverride(StringBuilder& out)
+{
+    out << "__packBranch(";
+    getPackOperand()->toText(out);
+    out << ", ";
+    getEmptyType()->toText(out);
+    out << ", ";
+    getNonEmptyType()->toText(out);
+    out << ")";
+}
+
+Type* PackBranchType::_createCanonicalTypeOverride()
+{
+    // `__packBranch` stores its pack operand as a `Val*`, not always a `Type*`.
+    // When the operand is a type pack we do want type canonicalization here, but
+    // term-valued symbolic packs must continue to be treated as plain `Val`s.
+    // Do not blindly call `getCanonicalType()` on the operand unless this path is
+    // updated to use a helper like `_getCanonicalValue()`.
+    auto canonicalPack = getPackOperand()->resolve();
+    auto canonicalEmptyType = getEmptyType()->getCanonicalType();
+    auto canonicalNonEmptyType = getNonEmptyType()->getCanonicalType();
+    if (canonicalPack == getPackOperand() && canonicalEmptyType == getEmptyType() &&
+        canonicalNonEmptyType == getNonEmptyType())
+        return this;
+    return getCurrentASTBuilder()->getPackBranchType(
+        canonicalPack,
+        canonicalEmptyType,
+        canonicalNonEmptyType);
+}
+
+Val* PackBranchType::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    int diff = 0;
+    auto substPackOperand = getPackOperand()->substituteImpl(astBuilder, subst, &diff);
+    auto substEmptyType = as<Type>(getEmptyType()->substituteImpl(astBuilder, subst, &diff));
+    auto substNonEmptyType = as<Type>(getNonEmptyType()->substituteImpl(astBuilder, subst, &diff));
+    if (!diff)
+        return this;
+    (*ioDiff)++;
+    return astBuilder->getPackBranchType(substPackOperand, substEmptyType, substNonEmptyType);
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! FirstType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+void FirstPackElementType::_toTextOverride(StringBuilder& out)
+{
+    out << "__first(";
+    getBasePack()->toText(out);
+    out << ")";
+}
+
+Type* FirstPackElementType::_createCanonicalTypeOverride()
+{
+    auto canonicalBasePack = getBasePack()->getCanonicalType();
+    if (canonicalBasePack == getBasePack())
+        return this;
+    return getCurrentASTBuilder()->getFirstElement(canonicalBasePack);
+}
+
+Val* FirstPackElementType::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    int diff = 0;
+    auto substBasePack = as<Type>(getBasePack()->substituteImpl(astBuilder, subst, &diff));
+    if (!diff)
+        return this;
+    (*ioDiff)++;
+    return astBuilder->getFirstElement(substBasePack);
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! LastType !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+void LastPackElementType::_toTextOverride(StringBuilder& out)
+{
+    out << "__last(";
+    getBasePack()->toText(out);
+    out << ")";
+}
+
+Type* LastPackElementType::_createCanonicalTypeOverride()
+{
+    auto canonicalBasePack = getBasePack()->getCanonicalType();
+    if (canonicalBasePack == getBasePack())
+        return this;
+    return getCurrentASTBuilder()->getLastElement(canonicalBasePack);
+}
+
+Val* LastPackElementType::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    int diff = 0;
+    auto substBasePack = as<Type>(getBasePack()->substituteImpl(astBuilder, subst, &diff));
+    if (!diff)
+        return this;
+    (*ioDiff)++;
+    return astBuilder->getLastElement(substBasePack);
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TrimFirstTypePack !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+void TrimFirstTypePack::_toTextOverride(StringBuilder& out)
+{
+    out << "__trimFirst(";
+    getBasePack()->toText(out);
+    out << ")";
+}
+
+Type* TrimFirstTypePack::_createCanonicalTypeOverride()
+{
+    auto canonicalBasePack = getBasePack()->getCanonicalType();
+    if (canonicalBasePack == getBasePack())
+        return this;
+    return getCurrentASTBuilder()->getTrimFirstPack(canonicalBasePack);
+}
+
+Val* TrimFirstTypePack::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    int diff = 0;
+    auto substBasePack = as<Type>(getBasePack()->substituteImpl(astBuilder, subst, &diff));
+    if (!diff)
+        return this;
+    (*ioDiff)++;
+    return astBuilder->getTrimFirstPack(substBasePack);
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TrimLastTypePack !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+void TrimLastTypePack::_toTextOverride(StringBuilder& out)
+{
+    out << "__trimLast(";
+    getBasePack()->toText(out);
+    out << ")";
+}
+
+Type* TrimLastTypePack::_createCanonicalTypeOverride()
+{
+    auto canonicalBasePack = getBasePack()->getCanonicalType();
+    if (canonicalBasePack == getBasePack())
+        return this;
+    return getCurrentASTBuilder()->getTrimLastPack(canonicalBasePack);
+}
+
+Val* TrimLastTypePack::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    int diff = 0;
+    auto substBasePack = as<Type>(getBasePack()->substituteImpl(astBuilder, subst, &diff));
+    if (!diff)
+        return this;
+    (*ioDiff)++;
+    return astBuilder->getTrimLastPack(substBasePack);
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ConcreteTypePack !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

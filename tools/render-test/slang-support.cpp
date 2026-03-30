@@ -96,7 +96,7 @@ static SlangResult _compileProgramImpl(
     List<Slang::String> referencedSlangModulePaths;
     for (int optionIndex = 0; optionIndex < sessionDesc.compilerOptionEntryCount; optionIndex++)
     {
-        slang::CompilerOptionEntry& option = sessionDesc.compilerOptionEntries[optionIndex];
+        const slang::CompilerOptionEntry& option = sessionDesc.compilerOptionEntries[optionIndex];
         if (option.name == slang::CompilerOptionName::ReferenceModule)
         {
             SLANG_ASSERT(option.value.kind == slang::CompilerOptionValueKind::String);
