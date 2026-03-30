@@ -9,6 +9,7 @@
 #include "slang-ir-util.h"
 #include "slang-ir.h"
 #include "slang-rich-diagnostics.h"
+#include "slang-target.h"
 
 namespace Slang
 {
@@ -883,9 +884,8 @@ struct UntaggedUnionLoweringContext : public InstPassBase
     }
 
     // Check whether a type (or any of its nested fields) contains types that
-    // cannot be marshalled to/from an AnyValue. Types like Atomic<T> and
-    // unsized arrays would crash in emitMarshallingCode; reject them here
-    // so we emit error 41014 instead.
+    // cannot be marshalled to/from an AnyValue. Rejects types that would crash
+    // in emitMarshallingCode or produce invalid output for the current target.
     bool containsUnmarshalableType(IRType* type)
     {
         switch (type->getOp())
@@ -893,6 +893,13 @@ struct UntaggedUnionLoweringContext : public InstPassBase
         case kIROp_AtomicType:
         case kIROp_UnsizedArrayType:
             return true;
+
+        case kIROp_PtrType:
+            // SPIRV generates incompatible struct types for Function vs
+            // PhysicalStorageBuffer storage classes. Pointer fields packed
+            // into AnyValue produce type mismatches in the generated SPIRV.
+            // CPU and CUDA handle pointer-in-AnyValue correctly.
+            return isSPIRV(targetProgram->getTargetReq()->getTarget());
 
         case kIROp_StructType:
             {
