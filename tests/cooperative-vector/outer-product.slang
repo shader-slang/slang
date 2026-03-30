@@ -40,7 +40,7 @@
 // CHECK-NEXT: 28.000000
 // CHECK-NEXT: 32.000000
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=2):out,name=outputBuffer
+//TEST_INPUT:ubuffer(data=[0], count=32, stride=2):out,name=outputBuffer
 RWStructuredBuffer<half> outputBuffer;
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4),name=output

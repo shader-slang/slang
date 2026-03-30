@@ -319,6 +319,28 @@ class CountOfIntVal : public SizeOfLikeIntVal
     static Val* tryFold(ASTBuilder* astBuilder, Type* intType, Val* newVal);
 };
 
+FIDDLE()
+class FirstIntVal : public IntVal
+{
+    FIDDLE(...)
+    FirstIntVal(Type* inType, Val* basePack) { setOperands(inType, basePack); }
+    Val* getBasePack() const { return getOperand(1); }
+    void _toTextOverride(StringBuilder& out);
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    Val* _resolveImplOverride();
+};
+
+FIDDLE()
+class LastIntVal : public IntVal
+{
+    FIDDLE(...)
+    LastIntVal(Type* inType, Val* basePack) { setOperands(inType, basePack); }
+    Val* getBasePack() const { return getOperand(1); }
+    void _toTextOverride(StringBuilder& out);
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    Val* _resolveImplOverride();
+};
+
 // A concrete pack of integer values, analogous to ConcreteTypePack for types.
 FIDDLE()
 class ConcreteIntValPack : public IntVal
@@ -332,6 +354,96 @@ class ConcreteIntValPack : public IntVal
     }
     Index getCount() { return getOperandCount() - 1; }
     IntVal* getElement(Index i) { return as<IntVal>(getOperand(i + 1)); }
+    void _toTextOverride(StringBuilder& out);
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    Val* _resolveImplOverride();
+};
+
+FIDDLE()
+class TrimFirstIntValPack : public IntVal
+{
+    FIDDLE(...)
+    TrimFirstIntValPack(Type* inType, Val* basePack) { setOperands(inType, basePack); }
+    Val* getBasePack() const { return getOperand(1); }
+    void _toTextOverride(StringBuilder& out);
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    Val* _resolveImplOverride();
+};
+
+FIDDLE()
+class TrimLastIntValPack : public IntVal
+{
+    FIDDLE(...)
+    TrimLastIntValPack(Type* inType, Val* basePack) { setOperands(inType, basePack); }
+    Val* getBasePack() const { return getOperand(1); }
+    void _toTextOverride(StringBuilder& out);
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    Val* _resolveImplOverride();
+};
+
+FIDDLE(abstract)
+class ShapeTransformIntValPack : public IntVal
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class ShapeConcatIntValPack : public ShapeTransformIntValPack
+{
+    FIDDLE(...)
+    ShapeConcatIntValPack(Type* inType, Val* leftPack, Val* rightPack, IntVal* axis)
+    {
+        setOperands(inType, leftPack, rightPack, axis);
+    }
+    Val* getLeftPack() const { return getOperand(1); }
+    Val* getRightPack() const { return getOperand(2); }
+    IntVal* getAxis() const { return as<IntVal>(getOperand(3)); }
+    void _toTextOverride(StringBuilder& out);
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    Val* _resolveImplOverride();
+};
+
+FIDDLE()
+class ShapePermuteIntValPack : public ShapeTransformIntValPack
+{
+    FIDDLE(...)
+    ShapePermuteIntValPack(Type* inType, Val* valuePack, Val* orderPack)
+    {
+        setOperands(inType, valuePack, orderPack);
+    }
+    Val* getValuePack() const { return getOperand(1); }
+    Val* getOrderPack() const { return getOperand(2); }
+    void _toTextOverride(StringBuilder& out);
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    Val* _resolveImplOverride();
+};
+
+FIDDLE()
+class ShapeSwapIntValPack : public ShapeTransformIntValPack
+{
+    FIDDLE(...)
+    ShapeSwapIntValPack(Type* inType, Val* valuePack, IntVal* dim0, IntVal* dim1)
+    {
+        setOperands(inType, valuePack, dim0, dim1);
+    }
+    Val* getValuePack() const { return getOperand(1); }
+    IntVal* getDim0() const { return as<IntVal>(getOperand(2)); }
+    IntVal* getDim1() const { return as<IntVal>(getOperand(3)); }
+    void _toTextOverride(StringBuilder& out);
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    Val* _resolveImplOverride();
+};
+
+FIDDLE()
+class ShapeReduceIntValPack : public ShapeTransformIntValPack
+{
+    FIDDLE(...)
+    ShapeReduceIntValPack(Type* inType, Val* valuePack, IntVal* axis)
+    {
+        setOperands(inType, valuePack, axis);
+    }
+    Val* getValuePack() const { return getOperand(1); }
+    IntVal* getAxis() const { return as<IntVal>(getOperand(2)); }
     void _toTextOverride(StringBuilder& out);
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
     Val* _resolveImplOverride();
@@ -693,6 +805,93 @@ class EachSubtypeWitness : public SubtypeWitness
 };
 
 FIDDLE()
+class FirstSubtypeWitness : public SubtypeWitness
+{
+    FIDDLE(...)
+    FirstSubtypeWitness(Type* sub, Type* sup, SubtypeWitness* patternWitness)
+    {
+        setOperands(sub, sup, patternWitness);
+    }
+    Type* getSub() { return as<Type>(getOperand(0)); }
+    Type* getSup() { return as<Type>(getOperand(1)); }
+    SubtypeWitness* getPatternTypeWitness() { return as<SubtypeWitness>(getOperand(2)); }
+    void _toTextOverride(StringBuilder& out);
+    Val* _resolveImplOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
+FIDDLE()
+class LastSubtypeWitness : public SubtypeWitness
+{
+    FIDDLE(...)
+    LastSubtypeWitness(Type* sub, Type* sup, SubtypeWitness* patternWitness)
+    {
+        setOperands(sub, sup, patternWitness);
+    }
+    Type* getSub() { return as<Type>(getOperand(0)); }
+    Type* getSup() { return as<Type>(getOperand(1)); }
+    SubtypeWitness* getPatternTypeWitness() { return as<SubtypeWitness>(getOperand(2)); }
+    void _toTextOverride(StringBuilder& out);
+    Val* _resolveImplOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
+FIDDLE()
+class TrimFirstSubtypeWitness : public SubtypeWitness
+{
+    FIDDLE(...)
+    TrimFirstSubtypeWitness(Type* sub, Type* sup, SubtypeWitness* patternWitness)
+    {
+        setOperands(sub, sup, patternWitness);
+    }
+    Type* getSub() { return as<Type>(getOperand(0)); }
+    Type* getSup() { return as<Type>(getOperand(1)); }
+    SubtypeWitness* getPatternTypeWitness() { return as<SubtypeWitness>(getOperand(2)); }
+    void _toTextOverride(StringBuilder& out);
+    Val* _resolveImplOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
+FIDDLE()
+class TrimLastSubtypeWitness : public SubtypeWitness
+{
+    FIDDLE(...)
+    TrimLastSubtypeWitness(Type* sub, Type* sup, SubtypeWitness* patternWitness)
+    {
+        setOperands(sub, sup, patternWitness);
+    }
+    Type* getSub() { return as<Type>(getOperand(0)); }
+    Type* getSup() { return as<Type>(getOperand(1)); }
+    SubtypeWitness* getPatternTypeWitness() { return as<SubtypeWitness>(getOperand(2)); }
+    void _toTextOverride(StringBuilder& out);
+    Val* _resolveImplOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
+FIDDLE()
+class PackBranchSubtypeWitness : public SubtypeWitness
+{
+    FIDDLE(...)
+    PackBranchSubtypeWitness(
+        Type* sub,
+        Type* sup,
+        Val* packOperand,
+        SubtypeWitness* emptyWitness,
+        SubtypeWitness* nonEmptyWitness)
+    {
+        setOperands(sub, sup, packOperand, emptyWitness, nonEmptyWitness);
+    }
+    Type* getSub() { return as<Type>(getOperand(0)); }
+    Type* getSup() { return as<Type>(getOperand(1)); }
+    Val* getPackOperand() { return getOperand(2); }
+    SubtypeWitness* getEmptyWitness() { return as<SubtypeWitness>(getOperand(3)); }
+    SubtypeWitness* getNonEmptyWitness() { return as<SubtypeWitness>(getOperand(4)); }
+    void _toTextOverride(StringBuilder& out);
+    Val* _resolveImplOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
+FIDDLE()
 class ExpandSubtypeWitness : public SubtypeWitness
 {
     FIDDLE(...)
@@ -855,6 +1054,18 @@ class NoneWitness : public Witness
 
     void _toTextOverride(StringBuilder& out);
     Val* _resolveImplOverride();
+};
+
+FIDDLE()
+class NonEmptyPackWitness : public Witness
+{
+    FIDDLE(...)
+    NonEmptyPackWitness(Val* pack) { setOperands(pack); }
+    Val* getPack() const { return getOperand(0); }
+
+    void _toTextOverride(StringBuilder& out);
+    Val* _resolveImplOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
 /// A value that represents a modifier attached to some other value
@@ -1059,6 +1270,14 @@ inline bool isTypeEqualityWitness(Val* witness)
     else if (auto expandWitness = as<ExpandSubtypeWitness>(witness))
     {
         return isTypeEqualityWitness(expandWitness->getPatternTypeWitness());
+    }
+    else if (auto trimFirstWitness = as<TrimFirstSubtypeWitness>(witness))
+    {
+        return isTypeEqualityWitness(trimFirstWitness->getPatternTypeWitness());
+    }
+    else if (auto trimLastWitness = as<TrimLastSubtypeWitness>(witness))
+    {
+        return isTypeEqualityWitness(trimLastWitness->getPatternTypeWitness());
     }
     return false;
 }

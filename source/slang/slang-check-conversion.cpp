@@ -14,6 +14,315 @@
 
 namespace Slang
 {
+namespace
+{
+
+static bool _diagnoseKnownInvalidShapePackTransformArg(
+    Val* val,
+    SourceLoc loc,
+    DiagnosticSink* sink)
+{
+    if (!val || !sink)
+        return false;
+
+    if (auto shapeConcatPack = as<ShapeConcatIntValPack>(val))
+    {
+        auto leftPack = as<ConcreteIntValPack>(shapeConcatPack->getLeftPack()->resolve());
+        auto rightPack = as<ConcreteIntValPack>(shapeConcatPack->getRightPack()->resolve());
+        IntegerLiteralValue axisValue = 0;
+        auto knownRankPack = leftPack ? leftPack : rightPack;
+        if (knownRankPack && (!leftPack || !rightPack))
+        {
+            if (tryGetConstantIntVal(shapeConcatPack->getAxis(), axisValue))
+            {
+                if (axisValue < 0 || axisValue >= knownRankPack->getCount())
+                {
+                    sink->diagnose(Diagnostics::ShapePackAxisOutOfRange{
+                        .opName = "__shapeConcat",
+                        .axis = (int)axisValue,
+                        .rank = (int)knownRankPack->getCount(),
+                        .location = loc});
+                    return true;
+                }
+            }
+            else if (knownRankPack->getCount() == 0)
+            {
+                sink->diagnose(Diagnostics::ShapePackNoValidAxis{
+                    .opName = "__shapeConcat",
+                    .rank = 0,
+                    .location = loc});
+                return true;
+            }
+        }
+
+        if (leftPack && rightPack)
+        {
+            if (leftPack->getCount() != rightPack->getCount())
+            {
+                sink->diagnose(Diagnostics::ShapePackRankMismatch{
+                    .opName = "__shapeConcat",
+                    .leftRank = (int)leftPack->getCount(),
+                    .rightRank = (int)rightPack->getCount(),
+                    .location = loc});
+                return true;
+            }
+
+            if (tryGetConstantIntVal(shapeConcatPack->getAxis(), axisValue))
+            {
+                if (axisValue < 0 || axisValue >= leftPack->getCount())
+                {
+                    sink->diagnose(Diagnostics::ShapePackAxisOutOfRange{
+                        .opName = "__shapeConcat",
+                        .axis = (int)axisValue,
+                        .rank = (int)leftPack->getCount(),
+                        .location = loc});
+                    return true;
+                }
+
+                for (Index i = 0; i < leftPack->getCount(); ++i)
+                {
+                    if (i != axisValue && areProvablyDifferentShapeElements(
+                                              leftPack->getElement(i),
+                                              rightPack->getElement(i)))
+                    {
+                        sink->diagnose(Diagnostics::ShapeConcatNonAxisMismatch{
+                            .axis = (int)axisValue,
+                            .dimIndex = (int)i,
+                            .location = loc});
+                        return true;
+                    }
+                }
+            }
+            else if (leftPack->getCount() == 0)
+            {
+                sink->diagnose(Diagnostics::ShapePackNoValidAxis{
+                    .opName = "__shapeConcat",
+                    .rank = 0,
+                    .location = loc});
+                return true;
+            }
+            else if (!hasAnyPotentialConcatAxis(leftPack, rightPack))
+            {
+                sink->diagnose(Diagnostics::ShapeConcatNoValidAxis{
+                    .rank = (int)leftPack->getCount(),
+                    .location = loc});
+                return true;
+            }
+        }
+
+        if (_diagnoseKnownInvalidShapePackTransformArg(shapeConcatPack->getLeftPack(), loc, sink))
+            return true;
+        if (_diagnoseKnownInvalidShapePackTransformArg(shapeConcatPack->getRightPack(), loc, sink))
+            return true;
+        if (_diagnoseKnownInvalidShapePackTransformArg(shapeConcatPack->getAxis(), loc, sink))
+            return true;
+    }
+    else if (auto shapePermutePack = as<ShapePermuteIntValPack>(val))
+    {
+        auto valuePack = as<ConcreteIntValPack>(shapePermutePack->getValuePack()->resolve());
+        auto orderPack = as<ConcreteIntValPack>(shapePermutePack->getOrderPack()->resolve());
+        if (valuePack && orderPack)
+        {
+            if (valuePack->getCount() != orderPack->getCount())
+            {
+                sink->diagnose(Diagnostics::ShapePermuteOrderLengthMismatch{
+                    .orderRank = (int)orderPack->getCount(),
+                    .valueRank = (int)valuePack->getCount(),
+                    .location = loc});
+                return true;
+            }
+
+            Index firstPosition = 0;
+            Index secondPosition = 0;
+            IntegerLiteralValue orderIndex = 0;
+            bool hasConcreteIndex = false;
+            if (tryFindProvableDuplicateOrderIndices(
+                    orderPack,
+                    firstPosition,
+                    secondPosition,
+                    orderIndex,
+                    hasConcreteIndex))
+            {
+                if (hasConcreteIndex)
+                {
+                    sink->diagnose(Diagnostics::ShapePermuteDuplicateIndex{
+                        .indexValue = (int)orderIndex,
+                        .firstPosition = (int)firstPosition,
+                        .secondPosition = (int)secondPosition,
+                        .location = loc});
+                }
+                else
+                {
+                    sink->diagnose(Diagnostics::ShapePermuteDuplicateEquivalentIndex{
+                        .firstPosition = (int)firstPosition,
+                        .secondPosition = (int)secondPosition,
+                        .location = loc});
+                }
+                return true;
+            }
+
+            for (Index i = 0; i < orderPack->getCount(); ++i)
+            {
+                orderIndex = 0;
+                if (!tryGetConstantIntVal(orderPack->getElement(i), orderIndex))
+                    continue;
+
+                if (orderIndex < 0 || orderIndex >= valuePack->getCount())
+                {
+                    sink->diagnose(Diagnostics::ShapePermuteIndexOutOfRange{
+                        .indexValue = (int)orderIndex,
+                        .indexPosition = (int)i,
+                        .rank = (int)valuePack->getCount(),
+                        .location = loc});
+                    return true;
+                }
+            }
+        }
+
+        if (_diagnoseKnownInvalidShapePackTransformArg(shapePermutePack->getValuePack(), loc, sink))
+            return true;
+        if (_diagnoseKnownInvalidShapePackTransformArg(shapePermutePack->getOrderPack(), loc, sink))
+            return true;
+    }
+    else if (auto shapeSwapPack = as<ShapeSwapIntValPack>(val))
+    {
+        auto valuePack = as<ConcreteIntValPack>(shapeSwapPack->getValuePack()->resolve());
+        IntegerLiteralValue dimValue = 0;
+        if (valuePack && tryGetConstantIntVal(shapeSwapPack->getDim0(), dimValue) &&
+            (dimValue < 0 || dimValue >= valuePack->getCount()))
+        {
+            sink->diagnose(Diagnostics::ShapePackAxisOutOfRange{
+                .opName = "__shapeSwap",
+                .axis = (int)dimValue,
+                .rank = (int)valuePack->getCount(),
+                .location = loc});
+            return true;
+        }
+
+        if (valuePack && tryGetConstantIntVal(shapeSwapPack->getDim1(), dimValue) &&
+            (dimValue < 0 || dimValue >= valuePack->getCount()))
+        {
+            sink->diagnose(Diagnostics::ShapePackAxisOutOfRange{
+                .opName = "__shapeSwap",
+                .axis = (int)dimValue,
+                .rank = (int)valuePack->getCount(),
+                .location = loc});
+            return true;
+        }
+
+        if (valuePack && valuePack->getCount() == 0)
+        {
+            sink->diagnose(Diagnostics::ShapePackNoValidAxis{
+                .opName = "__shapeSwap",
+                .rank = 0,
+                .location = loc});
+            return true;
+        }
+
+        if (_diagnoseKnownInvalidShapePackTransformArg(shapeSwapPack->getValuePack(), loc, sink))
+            return true;
+        if (_diagnoseKnownInvalidShapePackTransformArg(shapeSwapPack->getDim0(), loc, sink))
+            return true;
+        if (_diagnoseKnownInvalidShapePackTransformArg(shapeSwapPack->getDim1(), loc, sink))
+            return true;
+    }
+    else if (auto shapeReducePack = as<ShapeReduceIntValPack>(val))
+    {
+        auto valuePack = as<ConcreteIntValPack>(shapeReducePack->getValuePack()->resolve());
+        IntegerLiteralValue axisValue = 0;
+        if (valuePack && tryGetConstantIntVal(shapeReducePack->getAxis(), axisValue) &&
+            (axisValue < 0 || axisValue >= valuePack->getCount()))
+        {
+            sink->diagnose(Diagnostics::ShapePackAxisOutOfRange{
+                .opName = "__shapeReduce",
+                .axis = (int)axisValue,
+                .rank = (int)valuePack->getCount(),
+                .location = loc});
+            return true;
+        }
+
+        if (valuePack && valuePack->getCount() == 0)
+        {
+            sink->diagnose(Diagnostics::ShapePackNoValidAxis{
+                .opName = "__shapeReduce",
+                .rank = 0,
+                .location = loc});
+            return true;
+        }
+
+        if (_diagnoseKnownInvalidShapePackTransformArg(shapeReducePack->getValuePack(), loc, sink))
+            return true;
+        if (_diagnoseKnownInvalidShapePackTransformArg(shapeReducePack->getAxis(), loc, sink))
+            return true;
+    }
+    else if (auto concretePack = as<ConcreteIntValPack>(val))
+    {
+        for (Index i = 0; i < concretePack->getCount(); ++i)
+        {
+            if (_diagnoseKnownInvalidShapePackTransformArg(concretePack->getElement(i), loc, sink))
+                return true;
+        }
+    }
+    else if (auto firstVal = as<FirstIntVal>(val))
+    {
+        if (_diagnoseKnownInvalidShapePackTransformArg(firstVal->getBasePack(), loc, sink))
+            return true;
+    }
+    else if (auto lastVal = as<LastIntVal>(val))
+    {
+        if (_diagnoseKnownInvalidShapePackTransformArg(lastVal->getBasePack(), loc, sink))
+            return true;
+    }
+    else if (auto trimFirstPack = as<TrimFirstIntValPack>(val))
+    {
+        if (_diagnoseKnownInvalidShapePackTransformArg(trimFirstPack->getBasePack(), loc, sink))
+            return true;
+    }
+    else if (auto trimLastPack = as<TrimLastIntValPack>(val))
+    {
+        if (_diagnoseKnownInvalidShapePackTransformArg(trimLastPack->getBasePack(), loc, sink))
+            return true;
+    }
+
+    return false;
+}
+
+static bool _diagnoseKnownInvalidShapePackTransforms(
+    Type* toType,
+    Type* fromType,
+    SourceLoc loc,
+    DiagnosticSink* sink)
+{
+    if (!sink)
+        return false;
+
+    auto toDeclRefType = as<DeclRefType>(toType);
+    auto fromDeclRefType = as<DeclRefType>(fromType);
+    if (!toDeclRefType || !fromDeclRefType)
+        return false;
+
+    auto toGenApp = as<GenericAppDeclRef>(toDeclRefType->getDeclRefBase());
+    auto fromGenApp = as<GenericAppDeclRef>(fromDeclRefType->getDeclRefBase());
+    if (!toGenApp || !fromGenApp || toGenApp->getBase() != fromGenApp->getBase())
+        return false;
+
+    auto toArgs = toGenApp->getArgs();
+    auto fromArgs = fromGenApp->getArgs();
+    auto argCount =
+        toArgs.getCount() < fromArgs.getCount() ? toArgs.getCount() : fromArgs.getCount();
+    for (Index i = 0; i < argCount; ++i)
+    {
+        if (_diagnoseKnownInvalidShapePackTransformArg(toArgs[i], loc, sink))
+            return true;
+        if (_diagnoseKnownInvalidShapePackTransformArg(fromArgs[i], loc, sink))
+            return true;
+    }
+
+    return false;
+}
+
+} // namespace
+
 ConversionCost SemanticsVisitor::getImplicitConversionCost(Decl* decl)
 {
     if (auto modifier = decl->findModifier<ImplicitConversionModifier>())
@@ -369,6 +678,70 @@ Expr* SemanticsVisitor::_createCtorInvokeExpr(
     return constructorExpr;
 }
 
+static bool _canLookupConstructorsThroughAbstractType(Type* type)
+{
+    return isDeclRefTypeOf<GenericTypeParamDeclBase>(type) || as<FirstPackElementType>(type) ||
+           as<LastPackElementType>(type) || as<PackBranchType>(type);
+}
+
+bool SemanticsVisitor::createCtorInvokeExprForAbstractType(
+    Type* toType,
+    InitializerListExpr* fromInitializerListExpr,
+    Expr** outExpr)
+{
+    if (!_canLookupConstructorsThroughAbstractType(toType))
+        return false;
+
+    auto ctors = lookupConstructorsInType(toType, m_outerScope);
+    if (!ctors.isValid())
+        return false;
+
+    Expr* ctorExpr = nullptr;
+    if (ctors.isOverloaded())
+    {
+        auto overloadedExpr = m_astBuilder->create<OverloadedExpr2>();
+        overloadedExpr->type = m_astBuilder->getOverloadedType();
+        for (auto item : ctors.items)
+        {
+            overloadedExpr->candidateExprs.add(ConstructDeclRefExpr(
+                item.declRef,
+                nullptr,
+                item.declRef.getName(),
+                fromInitializerListExpr->loc,
+                nullptr));
+        }
+        ctorExpr = overloadedExpr;
+    }
+    else
+    {
+        ctorExpr = ConstructDeclRefExpr(
+            ctors.item.declRef,
+            nullptr,
+            ctors.item.declRef.getName(),
+            fromInitializerListExpr->loc,
+            nullptr);
+    }
+
+    auto ctorInvokeExpr = m_astBuilder->create<InvokeExpr>();
+    ctorInvokeExpr->functionExpr = ctorExpr;
+    ctorInvokeExpr->arguments.addRange(fromInitializerListExpr->args);
+    ctorInvokeExpr->loc = fromInitializerListExpr->loc;
+
+    DiagnosticSink tempSink(getSourceManager(), nullptr, getSink());
+
+    SemanticsVisitor subVisitor(withSink(&tempSink));
+    Expr* checkedCtorInvokeExpr = subVisitor.CheckExpr(ctorInvokeExpr);
+
+    if (tempSink.getErrorCount())
+    {
+        return false;
+    }
+
+    if (outExpr)
+        *outExpr = checkedCtorInvokeExpr;
+    return true;
+}
+
 // translation from initializer list to constructor invocation if the struct has constructor.
 bool SemanticsVisitor::createInvokeExprForExplicitCtor(
     Type* toType,
@@ -395,13 +768,7 @@ bool SemanticsVisitor::createInvokeExprForExplicitCtor(
                 fromInitializerListExpr->loc,
                 fromInitializerListExpr->args);
 
-            DiagnosticSink tempSink(getSourceManager(), nullptr);
-            if (auto parentSink = getSink())
-            {
-                tempSink.setFlags(parentSink->getFlags());
-                tempSink.setDiagnosticColorMode(parentSink->getDiagnosticColorMode());
-                tempSink.setEnableUnicode(parentSink->getEnableUnicode());
-            }
+            DiagnosticSink tempSink(getSourceManager(), nullptr, getSink());
 
             SemanticsVisitor subVisitor(withSink(&tempSink));
             ctorInvokeExpr = subVisitor.CheckTerm(ctorInvokeExpr);
@@ -484,13 +851,7 @@ bool SemanticsVisitor::createInvokeExprForSynthesizedCtor(
             return false;
     }
 
-    DiagnosticSink tempSink(getSourceManager(), nullptr);
-    if (auto parentSink = getSink())
-    {
-        tempSink.setFlags(parentSink->getFlags());
-        tempSink.setDiagnosticColorMode(parentSink->getDiagnosticColorMode());
-        tempSink.setEnableUnicode(parentSink->getEnableUnicode());
-    }
+    DiagnosticSink tempSink(getSourceManager(), nullptr, getSink());
     SemanticsVisitor subVisitor(withSink(&tempSink));
 
     // First make sure the struct is fully checked, otherwise the synthesized constructor may not be
@@ -984,6 +1345,13 @@ bool SemanticsVisitor::_coerceInitializerList(
         return true;
     }
 
+    // Finally, allow selected abstract wrapper types to surface a common
+    // default constructor through their facets.
+    if (createCtorInvokeExprForAbstractType(toType, fromInitializerListExpr, outToExpr))
+    {
+        return true;
+    }
+
     // We will fall back to the legacy logic of initialize list.
     Expr* outInitListExpr = nullptr;
     if (!_readAggregateValueFromInitializerList(
@@ -1270,6 +1638,24 @@ bool SemanticsVisitor::_coerce(
             }
         }
         return false;
+    }
+
+    if (outToExpr)
+    {
+        // Before falling back to generic type equality, check for fully-known invalid
+        // shape-pack transforms in the generic arguments of the types being compared.
+        // This lets us report the more specific `__shapeConcat` / `__shapePermute` /
+        // `__shapeSwap` / `__shapeReduce` diagnostics instead of a later generic
+        // type-mismatch error.
+        bool diagnosedKnownInvalidShapePack =
+            _diagnoseKnownInvalidShapePackTransforms(toType, fromType.type, fromExpr->loc, sink);
+        if (diagnosedKnownInvalidShapePack)
+        {
+            *outToExpr = CreateErrorExpr(fromExpr);
+            if (outCost)
+                *outCost = kConversionCost_None;
+            return true;
+        }
     }
 
     // An important and easy case is when the "to" and "from" types are equal.
@@ -2027,6 +2413,70 @@ bool SemanticsVisitor::_coerce(
         //
         if (outToExpr && site != CoercionSite::ExplicitCoercion)
         {
+            bool overflowWarningDetected = false;
+            bool isCoreModule = false;
+            if (auto module = getShared()->getModule())
+                if (auto moduleDecl = module->getModuleDecl())
+                    isCoreModule = moduleDecl->hasModifier<FromCoreModuleModifier>();
+
+            // Cache the constant-fold result so both the overflow check and
+            // the UnrecommendedImplicitConversion check can reuse it.
+            ConstantIntVal* cachedFoldedVal = nullptr;
+            bool hasFolded = false;
+            auto getFoldedIntVal = [&]() -> ConstantIntVal*
+            {
+                if (!hasFolded)
+                {
+                    cachedFoldedVal = as<ConstantIntVal>(tryFoldIntegerConstantExpression(
+                        fromExpr,
+                        ConstantFoldingKind::CompileTime,
+                        nullptr));
+                    hasFolded = true;
+                }
+                return cachedFoldedVal;
+            };
+
+            int maxBitSize = getMaximumTypeBitSize(toType);
+            if (!isCoreModule && maxBitSize > 0 && cost < kConversionCost_Explicit)
+            {
+                if (auto val = getFoldedIntVal())
+                {
+                    IntegerLiteralValue v = val->getValue();
+                    bool overflow = false;
+                    if (v < 0)
+                    {
+                        // Two's complement minimum for N bits is -(2^(N-1)).
+                        // For 64-bit targets, any int64_t value fits by definition.
+                        if (maxBitSize < 64)
+                        {
+                            int64_t minValue = -(INT64_C(1) << (maxBitSize - 1));
+                            overflow = v < minValue;
+                        }
+                    }
+                    else
+                    {
+                        // Positive: bit-width comparison to avoid false positives
+                        // on hex bit-pattern idioms like int x = 0xFF030206.
+                        overflow = getIntValueBitSize(v) > maxBitSize;
+                    }
+
+                    if (overflow)
+                    {
+                        // Set even when sink is null so that the
+                        // UnrecommendedImplicitConversion path below is
+                        // consistently suppressed for overflow cases.
+                        overflowWarningDetected = true;
+                        if (sink)
+                        {
+                            sink->diagnose(Diagnostics::IntegerConstantOverflow{
+                                .value = String(val->getValue()),
+                                .toType = toType,
+                                .expr = fromExpr});
+                        }
+                    }
+                }
+            }
+
             if (cost >= kConversionCost_Explicit)
             {
                 if (sink)
@@ -2041,25 +2491,19 @@ bool SemanticsVisitor::_coerce(
                         .location = fromExpr->loc});
                 }
             }
-            else if (cost >= kConversionCost_Default)
+            // For general implicit conversions with high cost, emit a warning
+            // unless the value is a known constant within the target type's
+            // range. Skip if the overflow check already covered this case.
+            else if (cost >= kConversionCost_Default && !overflowWarningDetected)
             {
-                // For general types of implicit conversions, we issue a warning, unless `fromExpr`
-                // is a known constant and we know it won't cause a problem.
                 bool shouldEmitGeneralWarning = true;
                 if (isScalarIntegerType(toType) || isHalfType(toType))
                 {
-                    if (auto intVal = tryFoldIntegerConstantExpression(
-                            fromExpr,
-                            ConstantFoldingKind::CompileTime,
-                            nullptr))
+                    if (auto val = getFoldedIntVal())
                     {
-                        if (auto val = as<ConstantIntVal>(intVal))
+                        if (isIntValueInRangeOfType(val->getValue(), toType))
                         {
-                            if (isIntValueInRangeOfType(val->getValue(), toType))
-                            {
-                                // OK.
-                                shouldEmitGeneralWarning = false;
-                            }
+                            shouldEmitGeneralWarning = false;
                         }
                     }
                 }

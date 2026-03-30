@@ -81,6 +81,26 @@ if(NOT ${SLANG_USE_SYSTEM_LZ4})
     endif()
 endif()
 
+# cmark-gfm (CommonMark / GFM Markdown parser, swiftlang fork)
+set(CMARK_LIB_FUZZER OFF)
+set(CMARK_FUZZ_QUADRATIC OFF)
+set(_prev_BUILD_TESTING ${BUILD_TESTING})
+set(_prev_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
+set(BUILD_TESTING OFF)
+set(BUILD_SHARED_LIBS OFF)
+if(NOT SLANG_OVERRIDE_CMARK_PATH)
+    add_subdirectory(cmark EXCLUDE_FROM_ALL ${system})
+else()
+    add_subdirectory(
+        ${SLANG_OVERRIDE_CMARK_PATH}/cmark
+        cmark
+        EXCLUDE_FROM_ALL
+        ${system}
+    )
+endif()
+set(BUILD_TESTING ${_prev_BUILD_TESTING})
+set(BUILD_SHARED_LIBS ${_prev_BUILD_SHARED_LIBS})
+
 # Vulkan headers
 if(NOT TARGET Vulkan::Headers)
     if(NOT ${SLANG_USE_SYSTEM_VULKAN_HEADERS})

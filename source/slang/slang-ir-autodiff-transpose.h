@@ -1573,7 +1573,7 @@ struct DiffTransposePass
             }
 
         default:
-            SLANG_ASSERT_FAILURE("Unhandled instruction");
+            SLANG_UNIMPLEMENTED_X("Unhandled instruction");
         }
     }
 
@@ -2517,7 +2517,7 @@ struct DiffTransposePass
             }
 
         default:
-            SLANG_ASSERT_FAILURE("Unhandled arithmetic");
+            SLANG_UNIMPLEMENTED_X("Unhandled arithmetic");
         }
     }
 
@@ -2735,7 +2735,7 @@ struct DiffTransposePass
                 gradients);
 
         default:
-            SLANG_ASSERT_FAILURE("Unhandled gradient flavor for materialization");
+            SLANG_UNIMPLEMENTED_X("Unhandled gradient flavor for materialization");
         }
     }
 

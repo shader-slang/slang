@@ -144,8 +144,8 @@ set(SLANG_LOOKUP_GENERATED_SOURCE
     "${SLANG_LOOKUP_GENERATOR_OUTPUT_DIR}/slang-lookup-GLSLstd450.cpp"
 )
 set(SLANG_RECORD_REPLAY_SYSTEM
-    "${slang_SOURCE_DIR}/source/slang-record-replay/record"
-    "${slang_SOURCE_DIR}/source/slang-record-replay/util"
+    "${slang_SOURCE_DIR}/source/slang-record-replay"
+    "${slang_SOURCE_DIR}/source/slang-record-replay/proxy"
 )
 
 add_custom_command(
@@ -254,6 +254,7 @@ set(slang_link_args
     slang-fiddle-output
     slang-lookup-tables
     SPIRV-Headers::SPIRV-Headers
+    libcmark-gfm
 )
 set(slang_interface_args INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/include)
 set(slang_public_lib_args

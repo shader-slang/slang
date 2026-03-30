@@ -2860,7 +2860,8 @@ struct TypeFlowSpecializationContext
                     SLANG_ASSERT(elementOfSetType->getSet()->isSingleton());
                     auto specializeInst =
                         cast<IRSpecialize>(elementOfSetType->getSet()->getElement(0));
-                    auto specializedFuncType = cast<IRFuncType>(specializeGeneric(specializeInst));
+                    auto specializedFuncType =
+                        cast<IRFuncType>(specializeGeneric(specializationContext, specializeInst));
                     typeOfSpecialization = specializedFuncType;
                 }
                 else
@@ -4282,9 +4283,12 @@ struct TypeFlowSpecializationContext
         {
             if (isGlobalInst(specializeInst))
             {
-                // callee->setFullType((IRType*)specializeGeneric(specializeInst));
+                // callee->setFullType((IRType*)specializeGeneric(specializationContext,
+                // specializeInst));
                 IRBuilder builder(module);
-                return builder.replaceOperand(&callee->typeUse, specializeGeneric(specializeInst));
+                return builder.replaceOperand(
+                    &callee->typeUse,
+                    specializeGeneric(specializationContext, specializeInst));
             }
         }
 
@@ -5795,8 +5799,11 @@ struct TypeFlowSpecializationContext
         return hasChanges;
     }
 
-    TypeFlowSpecializationContext(IRModule* module, DiagnosticSink* sink)
-        : module(module), sink(sink)
+    TypeFlowSpecializationContext(
+        IRModule* module,
+        DiagnosticSink* sink,
+        SpecializationContext* specializationContext)
+        : module(module), sink(sink), specializationContext(specializationContext)
     {
     }
 
@@ -5804,6 +5811,7 @@ struct TypeFlowSpecializationContext
     // Basic context
     IRModule* module;
     DiagnosticSink* sink;
+    SpecializationContext* specializationContext = nullptr;
 
     // Set of parameters already diagnosed for ref/constref interface issues,
     // to avoid emitting duplicate diagnostics per call edge.
@@ -5837,9 +5845,12 @@ struct TypeFlowSpecializationContext
 };
 
 // Main entry point
-bool specializeDynamicInsts(IRModule* module, DiagnosticSink* sink)
+bool specializeDynamicInsts(
+    IRModule* module,
+    DiagnosticSink* sink,
+    SpecializationContext* specializationContext)
 {
-    TypeFlowSpecializationContext context(module, sink);
+    TypeFlowSpecializationContext context(module, sink, specializationContext);
     return context.processModule();
 }
 
