@@ -10,7 +10,7 @@
 //
 // See #10398 and #10399.
 
-//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -conformance "PtrImpl:IFoo=0" -conformance "MultiPtrImpl:IFoo=1" -conformance "NestedPtrImpl:IFoo=2" -conformance "GoodImpl:IFoo=3" -conformance "GoodInterfacePtrImpl:IFoo=4"
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -conformance "PtrImpl:IFoo=0" -conformance "MultiPtrImpl:IFoo=1" -conformance "NestedPtrImpl:IFoo=2" -conformance "ArrayPtrImpl:IFoo=3" -conformance "GoodImpl:IFoo=4" -conformance "GoodInterfacePtrImpl:IFoo=5"
 
 interface IFoo
 {
@@ -48,6 +48,15 @@ export struct NestedPtrImpl : IFoo
 {
     Inner inner;
     int get() { return *inner.p; }
+}
+
+// Array of pointers - tests ArrayType -> PtrType recursion
+export struct ArrayPtrImpl : IFoo
+//CHECK:      ^^^^^^^^^^^^ type cannot be packed for dynamic dispatch
+//CHECK:      ^^^^^^^^^^^^ type 'ArrayPtrImpl' contains fields that cannot be packed into ordinary bytes for dynamic dispatch.
+{
+    int* arr[2];
+    int get() { return *arr[0]; }
 }
 
 // Good: no pointer fields
