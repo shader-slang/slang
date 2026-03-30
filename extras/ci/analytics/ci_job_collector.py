@@ -65,6 +65,12 @@ def parse_args():
         default=0.05,
         help="Maximum tolerated fraction of run job-fetch failures before exiting non-zero (default: 0.05).",
     )
+    parser.add_argument(
+        "--max-age-days",
+        type=int,
+        default=0,
+        help="Prune jobs older than this many days to keep output size bounded (default: 0 = disabled).",
+    )
     return parser.parse_args()
 
 
@@ -379,13 +385,30 @@ def merge_data(existing, new_data, verbose=False):
     return existing
 
 
+def prune_old_jobs(data, max_age_days, verbose=False):
+    """Remove jobs older than max_age_days. Returns pruned list."""
+    if max_age_days <= 0:
+        return data
+    cutoff = datetime.datetime.now(timezone.utc) - datetime.timedelta(days=max_age_days)
+    # Use 'Z' suffix to match GitHub API timestamp format for correct string comparison
+    cutoff_str = cutoff.strftime("%Y-%m-%dT%H:%M:%SZ")
+    before = len(data)
+    data = [j for j in data if not j.get("created_at") or j["created_at"] >= cutoff_str]
+    pruned = before - len(data)
+    if pruned > 0:
+        print(f"Pruned {pruned} jobs older than {max_age_days} days (kept {len(data)})")
+    elif verbose:
+        print(f"No jobs older than {max_age_days} days to prune")
+    return data
+
+
 def save_data(data, file_path):
     """Save job data as JSON."""
     directory = os.path.dirname(file_path)
     if directory:
         os.makedirs(directory, exist_ok=True)
     with open(file_path, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2, default=str)
+        json.dump(data, f, separators=(",", ":"), default=str)
 
 
 def main():
@@ -423,8 +446,12 @@ def main():
         sys.exit(2)
     if not runs:
         print("No completed runs found in the specified time range.")
+        pruned_existing = prune_old_jobs(existing, args.max_age_days, args.verbose)
         if existing_count > 0:
             print(f"Existing dataset contains {existing_count} jobs.")
+        if len(pruned_existing) != existing_count:
+            save_data(pruned_existing, args.output)
+            print(f"Data saved to: {args.output}")
         return
 
     # Keep name-based filter for safety (in case workflow resolution fails)
@@ -438,6 +465,8 @@ def main():
         args.repo, runs, args.output, existing, args.verbose
     )
     new_count = len(merged) - existing_count
+    # Prune old jobs to keep file size bounded
+    merged = prune_old_jobs(merged, args.max_age_days, args.verbose)
     save_data(merged, args.output)
 
     total_runs = len(runs)
