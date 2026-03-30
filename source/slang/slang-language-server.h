@@ -22,8 +22,10 @@ struct Command
     template<typename T>
     struct Optional
     {
-    public:
+    private:
         T* value = nullptr;
+
+    public:
         bool isValid() const { return value != nullptr; }
         Optional& operator=(const T& val)
         {

@@ -187,9 +187,13 @@ jobs:
             "-expected-failure-list" "tests/expected-failure-no-gpu.txt"
             "-skip-reference-image-generation"
             "-show-adapter-info"
-            "-ignore-abort-msg"
             "-enable-debug-layers" "true"
           )
+
+          # macOS: cross-dylib C++ exception tests fail in-process (server-count=1)
+          if [[ "${{ inputs.os }}" == "macos" ]]; then
+            test_args+=("-expected-failure-list" "tests/expected-failure-coverage.txt")
+          fi
 
           # Add test server arguments if server count > 1
           if [ "${{ inputs.server-count }}" -gt 1 ]; then

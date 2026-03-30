@@ -42,7 +42,7 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E make_directory ${core_module_meta_output_dir}
     COMMAND
         slang-generate ${core_module_meta_source} --target-directory
-        ${core_module_meta_output_dir} ${slang_ignore_abort_msg_arg}
+        ${core_module_meta_output_dir}
     DEPENDS ${core_module_meta_source} slang-generate
     WORKING_DIRECTORY "${core_module_meta_source_dir}"
     VERBATIM
@@ -118,7 +118,7 @@ add_custom_command(
     COMMAND
         slang-bootstrap -archive-type riff-lz4 -save-core-module-bin-source
         ${core_module_generated_header} -save-glsl-module-bin-source
-        ${glsl_module_generated_header} ${slang_ignore_abort_msg_arg}
+        ${glsl_module_generated_header}
     DEPENDS slang-bootstrap slang-without-embedded-core-module
     VERBATIM
 )

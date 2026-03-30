@@ -4171,7 +4171,7 @@ struct SessionDesc
 
     /** Pointer to an array of compiler option entries, whose size is compilerOptionEntryCount.
      */
-    CompilerOptionEntry* compilerOptionEntries = nullptr;
+    const CompilerOptionEntry* compilerOptionEntries = nullptr;
 
     /** Number of additional compiler option entries.
      */
@@ -4682,7 +4682,7 @@ struct IComponentType : public ISlangUnknown
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL linkWithOptions(
         IComponentType** outLinkedComponentType,
         uint32_t compilerOptionEntryCount,
-        CompilerOptionEntry* compilerOptionEntries,
+        CompilerOptionEntry const* compilerOptionEntries,
         ISlangBlob** outDiagnostics = nullptr) = 0;
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
@@ -4939,6 +4939,9 @@ struct SlangGlobalSessionDesc
 };
 
 /* Create a blob from binary data.
+ *
+ * The caller takes ownership of the returned blob (initial reference count is 1).
+ * Use ComPtr::attach() to adopt without incrementing the reference count.
  *
  * @param data Pointer to the binary data to store in the blob. Must not be null.
  * @param size Size of the data in bytes. Must be greater than 0.
