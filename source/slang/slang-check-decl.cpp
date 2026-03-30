@@ -325,11 +325,13 @@ static bool validateDeclNesting(SemanticsVisitor* visitor, Decl* decl)
     if (rule->allowedContainers & containerBit(parentCategory))
         return false; // allowed
 
-    // NOTE: The parser's isDeclAllowed() may have already emitted a diagnostic
-    // for this same construct (e.g. E30102 "declaration not allowed here").
-    // The duplicate is intentional defense-in-depth: the parser catches syntax-level
-    // violations while this check covers semantic-level nesting rules that the parser
-    // cannot enforce.
+    // The parser's isDeclAllowed (slang-parser.cpp:5177) and
+    // parseVarDeclrStatement (slang-parser.cpp:6607) set
+    // nestingAlreadyDiagnosed when they emit a nesting diagnostic.
+    // Skip our diagnostic to avoid showing duplicates to the user.
+    if (decl->nestingAlreadyDiagnosed)
+        return true;
+
     visitor->getSink()->diagnose(Diagnostics::DeclNotAllowedInContext{
         .childKind = rule->childName,
         .parentKind = getContainerNestingCategoryName(parentCategory),
