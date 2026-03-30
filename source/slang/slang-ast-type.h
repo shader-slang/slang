@@ -1064,22 +1064,22 @@ class LastPackElementType : public Type
 };
 
 FIDDLE()
-class TrimHeadTypePack : public Type
+class TrimFirstTypePack : public Type
 {
     FIDDLE(...)
     Type* getBasePack() const { return as<Type>(getOperand(0)); }
-    TrimHeadTypePack(Type* basePack) { m_operands.add(ValNodeOperand(basePack)); }
+    TrimFirstTypePack(Type* basePack) { m_operands.add(ValNodeOperand(basePack)); }
     void _toTextOverride(StringBuilder& out);
     Type* _createCanonicalTypeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
 };
 
 FIDDLE()
-class TrimTailTypePack : public Type
+class TrimLastTypePack : public Type
 {
     FIDDLE(...)
     Type* getBasePack() const { return as<Type>(getOperand(0)); }
-    TrimTailTypePack(Type* basePack) { m_operands.add(ValNodeOperand(basePack)); }
+    TrimLastTypePack(Type* basePack) { m_operands.add(ValNodeOperand(basePack)); }
     void _toTextOverride(StringBuilder& out);
     Type* _createCanonicalTypeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);

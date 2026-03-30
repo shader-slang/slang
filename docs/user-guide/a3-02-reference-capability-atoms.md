@@ -274,6 +274,14 @@ Versions
 > HLSL shader model 6.1 and related capabilities of other targets.
 > Includes related GLSL/SPIRV extensions.
 
+`sm_6_10`
+> HLSL shader model 6.10 and related capabilities of other targets.
+> Includes related GLSL/SPIRV extensions.
+
+`sm_6_10_version`
+> HLSL shader model 6.10 and related capabilities of other targets.
+> Does not include related GLSL/SPIRV extensions.
+
 `sm_6_1_version`
 > HLSL shader model 6.1 and related capabilities of other targets.
 > Does not include related GLSL/SPIRV extensions.
@@ -1529,6 +1537,9 @@ Other
 
 `DX_6_1`
 > Use `sm_6_1` instead
+
+`DX_6_10`
+> Use `sm_6_10` instead
 
 `DX_6_2`
 > Use `sm_6_2` instead

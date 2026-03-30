@@ -412,6 +412,25 @@ struct AssignValsFromLayoutContext
     {
         const InputBufferDesc& srcBuffer = srcVal->bufferDesc;
         auto& bufferData = srcVal->bufferData;
+
+        // When stride=1 or stride=2, each value in data=[] should occupy only `stride` bytes.
+        // Pack values per uint32, little-endian (first value in LSB).
+        if (srcBuffer.stride == 1 || srcBuffer.stride == 2)
+        {
+            const int strideBits = srcBuffer.stride * 8;
+            const uint32_t mask = (1u << strideBits) - 1u;
+            const int valsPerWord = (int)sizeof(uint32_t) / srcBuffer.stride;
+            List<uint32_t> packed;
+            for (Index i = 0; i < bufferData.getCount(); i += valsPerWord)
+            {
+                uint32_t word = 0;
+                for (int j = 0; j < valsPerWord && (i + j) < bufferData.getCount(); j++)
+                    word |= (bufferData[i + j] & mask) << (j * strideBits);
+                packed.add(word);
+            }
+            bufferData = packed;
+        }
+
         const size_t bufferSize = Math::Max(
             (size_t)bufferData.getCount() * sizeof(uint32_t),
             (size_t)(srcBuffer.elementCount * srcBuffer.stride));
@@ -1995,6 +2014,12 @@ SLANG_TEST_TOOL_API SlangResult innerMain(
 int main(int argc, char** argv)
 {
     using namespace Slang;
+
+#if SLANG_IGNORE_ABORT_MSG && defined(_MSC_VER)
+    // Suppress the modal abort() dialog in unattended/LLM-driven builds.
+    _set_abort_behavior(0, _WRITE_ABORT_MSG);
+#endif
+
     SlangSession* session = spCreateSession(nullptr);
 
     TestToolUtil::setSessionDefaultPreludeFromExePath(argv[0], session);

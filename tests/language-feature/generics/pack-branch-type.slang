@@ -41,7 +41,7 @@ struct EvalLeaf<let Head : int> : IEvalNode
 
 struct EvalNode<let Head : int, let each Tail : int> : IEvalNode where nonempty(Tail)
 {
-    typealias Next = EvalHelper<__first(Tail), __trimHead(Tail)>;
+    typealias Next = EvalHelper<__first(Tail), __trimFirst(Tail)>;
     typealias Result = Next::Result;
 
     static int eval()

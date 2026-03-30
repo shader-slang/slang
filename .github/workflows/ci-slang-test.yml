@@ -73,7 +73,6 @@ jobs:
             "-expected-failure-list" "tests/expected-failure-github.txt"
             "-skip-reference-image-generation"
             "-show-adapter-info"
-            "-ignore-abort-msg"
             "-enable-debug-layers" "${{ inputs.enable-debug-layers }}"
           )
 
@@ -86,6 +85,11 @@ jobs:
           # Add no-GPU failure list for non-GPU tests
           if [[ "${{ inputs.full-gpu-tests }}" != "true" ]]; then
             slang_test_args+=("-expected-failure-list" "tests/expected-failure-no-gpu.txt")
+          fi
+
+          # Add known failures on Linux regardless GPU presence
+          if [[ "${{ inputs.os }}" == "linux" ]]; then
+            slang_test_args+=("-expected-failure-list" "tests/expected-failure-linux.txt")
           fi
 
           # Add Linux GPU expected failure list for CUDA builds (Tesla T4 driver limitations)
@@ -124,7 +128,6 @@ jobs:
             -server-count ${{ inputs.server-count }} \
             -category ${{ inputs.test-category }} \
             -emit-spirv-via-glsl \
-            -ignore-abort-msg \
             -api vk \
             -expected-failure-list tests/expected-failure-via-glsl.txt \
             -skip-reference-image-generation
