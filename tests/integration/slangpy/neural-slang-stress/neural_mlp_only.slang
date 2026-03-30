@@ -5,6 +5,15 @@
 // InlineVector mode exposes regular slangpy-callable functions.
 // WaveTangledVector mode exposes explicit compute entry points selected with
 // -DUSE_WAVE_TANGLED=1 from Python.
+//
+// Half-precision variant (USE_HALF=1) uses mixed-precision training:
+//   - Forward/backward: WaveTangledVector<half> with PointerAddress<half>
+//   - Gradients: accumulated in half via PointerAddress<half> atomicAdd
+//   - Optimizer: reads half grads, does Adam in fp32 on a master copy,
+//               copies fp32 master back to half params
+//   - Kernel parameters are declared as 'float*' for all variants because
+//     slangpy passes raw device addresses; PointerAddress<ElemType>(float*)
+//     reinterprets the pointer at the correct element stride.
 
 import slangpy;
 import slang.neural;
@@ -93,6 +102,7 @@ void compute_calculate_grads(
     uniform uint seed,
     uniform int2 batch_size,
     uniform int2 img_resolution,
+    uniform float loss_scale,
     uniform float* ref_image,
     uniform float* params,
     uniform float* params_grad)
@@ -113,9 +123,9 @@ void compute_calculate_grads(
 
     OutputVec out = forward_inference(params, pixel_uv);
     ElemType doutArr[OUTPUT_DIM];
-    doutArr[0] = ElemType(2.0f * (float(out[0]) - ref_color.x) / float(OUTPUT_DIM));
-    doutArr[1] = ElemType(2.0f * (float(out[1]) - ref_color.y) / float(OUTPUT_DIM));
-    doutArr[2] = ElemType(2.0f * (float(out[2]) - ref_color.z) / float(OUTPUT_DIM));
+    doutArr[0] = ElemType(2.0f * (float(out[0]) - ref_color.x) * loss_scale / float(OUTPUT_DIM));
+    doutArr[1] = ElemType(2.0f * (float(out[1]) - ref_color.y) * loss_scale / float(OUTPUT_DIM));
+    doutArr[2] = ElemType(2.0f * (float(out[2]) - ref_color.z) * loss_scale / float(OUTPUT_DIM));
     OutputVec dOutput = OutputVec(doutArr);
 
     bwd_diff(mlp_forward_coords)(
@@ -182,12 +192,36 @@ void compute_optimizer_step(
     uniform float* variance_buf,
     uniform float lr,
     uniform int iter,
+    uniform float loss_scale,
     uniform int param_count)
 {
     int idx = int(gid.x) * WORKGROUP_SZ + int(gtid);
     if (idx >= param_count) return;
-    adam_step(primal[idx], grad[idx], mean_buf[idx], variance_buf[idx], lr, iter);
+    adam_step(primal[idx], grad[idx], mean_buf[idx], variance_buf[idx], lr, iter, loss_scale);
 }
+
+#ifdef USE_HALF
+[shader("compute")]
+[numthreads(WORKGROUP_SIZE, 1, 1)]
+void compute_optimizer_step_half(
+    uint3 gid : SV_GroupID,
+    uint gtid : SV_GroupIndex,
+    uniform half* primal,
+    uniform half* grad,
+    uniform float* primal_master,
+    uniform float* mean_buf,
+    uniform float* variance_buf,
+    uniform float lr,
+    uniform int iter,
+    uniform float loss_scale,
+    uniform int param_count)
+{
+    int idx = int(gid.x) * WORKGROUP_SZ + int(gtid);
+    if (idx >= param_count) return;
+    adam_step_mixed(primal[idx], grad[idx], primal_master[idx],
+                    mean_buf[idx], variance_buf[idx], lr, iter, loss_scale);
+}
+#endif
 #else
 [Differentiable]
 OutputVec mlp_forward(Address paramAddr, InputVec input)
@@ -255,6 +289,6 @@ void optimizer_step(inout float primal, inout float grad,
                     inout float mean, inout float variance,
                     float lr, int iter)
 {
-    adam_step(primal, grad, mean, variance, lr, iter);
+    adam_step(primal, grad, mean, variance, lr, iter, 1.0f /* no loss scaling */);
 }
 #endif

@@ -132,29 +132,39 @@ class InlineRunner:
 
 class WaveRunner:
     def __init__(self, device_type, use_half=False):
+        wg = 32 if use_half else WORKGROUP_SIZE
         defines = {
             "USE_WAVE_TANGLED": "1",
-            "WORKGROUP_SIZE": str(WORKGROUP_SIZE),
+            "WORKGROUP_SIZE": str(wg),
         }
         if use_half:
             defines["USE_HALF"] = "1"
+        self.wg = wg
+        self.loss_scale = 1.0
         self.dtype = "float16" if use_half else "float32"
+        entry_points = list(ENTRY_POINTS)
+        if use_half:
+            entry_points.append("compute_optimizer_step_half")
         self.device, self.kernels, self.module = load_compute_kernels(
             "neural_permuto_mlp.slang",
-            ENTRY_POINTS,
+            entry_points,
             device_type=device_type,
             defines=defines,
         )
-        mlp_np = xavier_init(MLP_LAYERS, dtype=self.dtype)
+        mlp_np_f32 = xavier_init(MLP_LAYERS, dtype="float32")
         feature_rng = np.random.default_rng(42)
         feature_np = feature_rng.uniform(-1e-4, 1e-4, (FEATURE_TABLE_SIZE,)).astype("float32")
 
-        self.mlp_count = len(mlp_np)
+        self.mlp_count = len(mlp_np_f32)
         self.feature_count = len(feature_np)
+        self.use_half = use_half
+        mlp_np = mlp_np_f32.astype(self.dtype)
         self.params = create_buffer(self.device, mlp_np)
-        self.params_grad = zeros_buffer(self.device, self.mlp_count)
-        self.params_m = zeros_buffer(self.device, self.mlp_count)
-        self.params_v = zeros_buffer(self.device, self.mlp_count)
+        self.params_grad = zeros_buffer(self.device, self.mlp_count, dtype=self.dtype)
+        if use_half:
+            self.params_master = create_buffer(self.device, mlp_np_f32)
+        self.params_m = zeros_buffer(self.device, self.mlp_count, dtype="float32")
+        self.params_v = zeros_buffer(self.device, self.mlp_count, dtype="float32")
         self.feature_table = create_buffer(self.device, feature_np)
         self.feature_grad = zeros_buffer(self.device, self.feature_count)
         self.feature_m = zeros_buffer(self.device, self.feature_count)
@@ -170,12 +180,13 @@ class WaveRunner:
 
     def train_step(self, iteration: int) -> None:
         batch_count = BATCH_SIZE[0] * BATCH_SIZE[1]
-        num_groups = self._ceildiv(batch_count, WORKGROUP_SIZE)
+        num_groups = self._ceildiv(batch_count, self.wg)
         self.kernels["compute_calculate_grads"].dispatch(
-            thread_count=[num_groups * WORKGROUP_SIZE, 1, 1],
+            thread_count=[num_groups * self.wg, 1, 1],
             seed=make_seed(iteration),
             batch_size=[BATCH_SIZE[0], BATCH_SIZE[1]],
             img_resolution=[self.resolution[0], self.resolution[1]],
+            loss_scale=self.loss_scale,
             ref_image=self.ref_buf,
             params=self.params,
             params_grad=self.params_grad,
@@ -183,27 +194,51 @@ class WaveRunner:
             feature_table_grad=self.feature_grad,
         )
 
-        for primal, grad, mean_buf, variance_buf, lr, count in [
-            (self.params, self.params_grad, self.params_m, self.params_v, MLP_LEARNING_RATE, self.mlp_count),
-            (self.feature_table, self.feature_grad, self.feature_m, self.feature_v, FEATURE_LEARNING_RATE, self.feature_count),
-        ]:
-            num_groups = self._ceildiv(count, WORKGROUP_SIZE)
-            self.kernels["compute_optimizer_step"].dispatch(
-                thread_count=[num_groups * WORKGROUP_SIZE, 1, 1],
-                primal=primal,
-                grad=grad,
-                mean_buf=mean_buf,
-                variance_buf=variance_buf,
-                lr=lr,
+        mlp_groups = self._ceildiv(self.mlp_count, self.wg)
+        if self.use_half:
+            self.kernels["compute_optimizer_step_half"].dispatch(
+                thread_count=[mlp_groups * self.wg, 1, 1],
+                primal=self.params,
+                grad=self.params_grad,
+                primal_master=self.params_master,
+                mean_buf=self.params_m,
+                variance_buf=self.params_v,
+                lr=MLP_LEARNING_RATE,
                 iter=iteration + 1,
-                param_count=count,
+                loss_scale=self.loss_scale,
+                param_count=self.mlp_count,
             )
+        else:
+            self.kernels["compute_optimizer_step"].dispatch(
+                thread_count=[mlp_groups * self.wg, 1, 1],
+                primal=self.params,
+                grad=self.params_grad,
+                mean_buf=self.params_m,
+                variance_buf=self.params_v,
+                lr=MLP_LEARNING_RATE,
+                iter=iteration + 1,
+                loss_scale=self.loss_scale,
+                param_count=self.mlp_count,
+            )
+
+        feat_groups = self._ceildiv(self.feature_count, self.wg)
+        self.kernels["compute_optimizer_step"].dispatch(
+            thread_count=[feat_groups * self.wg, 1, 1],
+            primal=self.feature_table,
+            grad=self.feature_grad,
+            mean_buf=self.feature_m,
+            variance_buf=self.feature_v,
+            lr=FEATURE_LEARNING_RATE,
+            iter=iteration + 1,
+            loss_scale=self.loss_scale,
+            param_count=self.feature_count,
+        )
 
     def loss(self) -> float:
         total_pixels = self.resolution[0] * self.resolution[1]
-        num_groups = self._ceildiv(total_pixels, WORKGROUP_SIZE)
+        num_groups = self._ceildiv(total_pixels, self.wg)
         self.kernels["compute_show_loss"].dispatch(
-            thread_count=[num_groups * WORKGROUP_SIZE, 1, 1],
+            thread_count=[num_groups * self.wg, 1, 1],
             img_resolution=[self.resolution[0], self.resolution[1]],
             params=self.params,
             feature_table=self.feature_table,
@@ -214,10 +249,10 @@ class WaveRunner:
 
     def render(self) -> np.ndarray:
         total_pixels = self.resolution[0] * self.resolution[1]
-        num_groups = self._ceildiv(total_pixels, WORKGROUP_SIZE)
+        num_groups = self._ceildiv(total_pixels, self.wg)
         output = create_output_buffer(self.device, self.resolution)
         self.kernels["compute_render"].dispatch(
-            thread_count=[num_groups * WORKGROUP_SIZE, 1, 1],
+            thread_count=[num_groups * self.wg, 1, 1],
             img_resolution=[self.resolution[0], self.resolution[1]],
             params=self.params,
             feature_table=self.feature_table,
@@ -236,7 +271,7 @@ def _create_runner(vector_type: str, device_type):
         return WaveRunner(device_type)
     if vector_type == "wave_half":
         return WaveRunner(device_type, use_half=True)
-    raise AssertionError(f"Unknown vector type: {vector_type}")
+    raise ValueError(f"Unknown vector type: {vector_type}")
 
 
 @pytest.mark.parametrize("device_type", [spy.DeviceType.cuda])

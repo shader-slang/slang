@@ -102,25 +102,35 @@ class InlineRunner:
 
 class WaveRunner:
     def __init__(self, device_type, use_half=False):
+        wg = 32 if use_half else WORKGROUP_SIZE
         defines = {
             "USE_WAVE_TANGLED": "1",
-            "WORKGROUP_SIZE": str(WORKGROUP_SIZE),
+            "WORKGROUP_SIZE": str(wg),
         }
         if use_half:
             defines["USE_HALF"] = "1"
+        self.wg = wg
+        self.loss_scale = 1.0
         self.dtype = "float16" if use_half else "float32"
+        entry_points = list(ENTRY_POINTS)
+        if use_half:
+            entry_points.append("compute_optimizer_step_half")
         self.device, self.kernels, self.module = load_compute_kernels(
             "neural_mlp_only.slang",
-            ENTRY_POINTS,
+            entry_points,
             device_type=device_type,
             defines=defines,
         )
-        params_np = xavier_init(MLP_LAYERS, dtype=self.dtype)
-        self.param_count = len(params_np)
+        params_np_f32 = xavier_init(MLP_LAYERS, dtype="float32")
+        self.param_count = len(params_np_f32)
+        params_np = params_np_f32.astype(self.dtype)
         self.params = create_buffer(self.device, params_np)
-        self.params_grad = zeros_buffer(self.device, self.param_count)
-        self.adam_m = zeros_buffer(self.device, self.param_count)
-        self.adam_v = zeros_buffer(self.device, self.param_count)
+        self.params_grad = zeros_buffer(self.device, self.param_count, dtype=self.dtype)
+        self.use_half = use_half
+        if use_half:
+            self.params_master = create_buffer(self.device, params_np_f32)
+        self.adam_m = zeros_buffer(self.device, self.param_count, dtype="float32")
+        self.adam_v = zeros_buffer(self.device, self.param_count, dtype="float32")
         self.ref_buf, self.resolution, self.ref_np = load_reference_image_buffer(self.device)
         self.loss_buf = create_output_buffer(self.device, self.resolution)
 
@@ -132,34 +142,50 @@ class WaveRunner:
 
     def train_step(self, iteration: int) -> None:
         batch_count = BATCH_SIZE[0] * BATCH_SIZE[1]
-        num_groups = self._ceildiv(batch_count, WORKGROUP_SIZE)
+        num_groups = self._ceildiv(batch_count, self.wg)
         self.kernels["compute_calculate_grads"].dispatch(
-            thread_count=[num_groups * WORKGROUP_SIZE, 1, 1],
+            thread_count=[num_groups * self.wg, 1, 1],
             seed=make_seed(iteration),
             batch_size=[BATCH_SIZE[0], BATCH_SIZE[1]],
             img_resolution=[self.resolution[0], self.resolution[1]],
+            loss_scale=self.loss_scale,
             ref_image=self.ref_buf,
             params=self.params,
             params_grad=self.params_grad,
         )
 
-        param_groups = self._ceildiv(self.param_count, WORKGROUP_SIZE)
-        self.kernels["compute_optimizer_step"].dispatch(
-            thread_count=[param_groups * WORKGROUP_SIZE, 1, 1],
-            primal=self.params,
-            grad=self.params_grad,
-            mean_buf=self.adam_m,
-            variance_buf=self.adam_v,
-            lr=LEARNING_RATE,
-            iter=iteration + 1,
-            param_count=self.param_count,
-        )
+        param_groups = self._ceildiv(self.param_count, self.wg)
+        if self.use_half:
+            self.kernels["compute_optimizer_step_half"].dispatch(
+                thread_count=[param_groups * self.wg, 1, 1],
+                primal=self.params,
+                grad=self.params_grad,
+                primal_master=self.params_master,
+                mean_buf=self.adam_m,
+                variance_buf=self.adam_v,
+                lr=LEARNING_RATE,
+                iter=iteration + 1,
+                loss_scale=self.loss_scale,
+                param_count=self.param_count,
+            )
+        else:
+            self.kernels["compute_optimizer_step"].dispatch(
+                thread_count=[param_groups * self.wg, 1, 1],
+                primal=self.params,
+                grad=self.params_grad,
+                mean_buf=self.adam_m,
+                variance_buf=self.adam_v,
+                lr=LEARNING_RATE,
+                iter=iteration + 1,
+                loss_scale=self.loss_scale,
+                param_count=self.param_count,
+            )
 
     def loss(self) -> float:
         total_pixels = self.resolution[0] * self.resolution[1]
-        num_groups = self._ceildiv(total_pixels, WORKGROUP_SIZE)
+        num_groups = self._ceildiv(total_pixels, self.wg)
         self.kernels["compute_show_loss"].dispatch(
-            thread_count=[num_groups * WORKGROUP_SIZE, 1, 1],
+            thread_count=[num_groups * self.wg, 1, 1],
             img_resolution=[self.resolution[0], self.resolution[1]],
             params=self.params,
             ref_image=self.ref_buf,
@@ -169,10 +195,10 @@ class WaveRunner:
 
     def render(self) -> np.ndarray:
         total_pixels = self.resolution[0] * self.resolution[1]
-        num_groups = self._ceildiv(total_pixels, WORKGROUP_SIZE)
+        num_groups = self._ceildiv(total_pixels, self.wg)
         output = create_output_buffer(self.device, self.resolution)
         self.kernels["compute_render"].dispatch(
-            thread_count=[num_groups * WORKGROUP_SIZE, 1, 1],
+            thread_count=[num_groups * self.wg, 1, 1],
             img_resolution=[self.resolution[0], self.resolution[1]],
             params=self.params,
             output_image=output,
@@ -190,7 +216,7 @@ def _create_runner(vector_type: str, device_type):
         return WaveRunner(device_type)
     if vector_type == "wave_half":
         return WaveRunner(device_type, use_half=True)
-    raise AssertionError(f"Unknown vector type: {vector_type}")
+    raise ValueError(f"Unknown vector type: {vector_type}")
 
 
 @pytest.mark.parametrize("device_type", [spy.DeviceType.cuda])
