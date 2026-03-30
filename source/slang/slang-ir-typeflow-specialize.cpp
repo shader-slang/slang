@@ -5720,9 +5720,59 @@ struct TypeFlowSpecializationContext
         }
     }
 
+    // Diagnose functions that use lookupWitness with TypeEqualityWitness
+    // as callees. These arise from explicit generic specialization with
+    // interface types (e.g. genericFunc<IFoo>(...)) and cannot be handled
+    // by the propagation phase. The implicit inference path works because
+    // it uses ExtractExistentialType instead.
+    void diagnoseExplicitInterfaceSpecializations()
+    {
+        for (auto globalInst : module->getGlobalInsts())
+        {
+            auto lookup = as<IRLookupWitnessMethod>(globalInst);
+            if (!lookup)
+                continue;
+
+            auto witness = lookup->getWitnessTable();
+            if (witness->getOp() != kIROp_TypeEqualityWitness)
+                continue;
+
+            // Find a function that uses this lookupWitness as a callee.
+            for (auto use = lookup->firstUse; use; use = use->nextUse)
+            {
+                auto call = as<IRCall>(use->getUser());
+                if (!call || call->getCallee() != lookup)
+                    continue;
+
+                // Find the enclosing function for the error location.
+                auto parentFunc = as<IRFunc>(call->getParent()->getParent());
+                String funcName;
+                if (parentFunc)
+                {
+                    if (auto nameHint = parentFunc->findDecoration<IRNameHintDecoration>())
+                        funcName = nameHint->getName();
+                }
+                if (funcName.getLength() == 0)
+                    funcName = "<generic>";
+
+                sink->diagnose(Diagnostics::CannotSpecializeGenericWithExistential{
+                    .generic = funcName,
+                    .location = call->sourceLoc});
+                return;
+            }
+        }
+    }
+
     bool processModule()
     {
         bool hasChanges = false;
+
+        // Diagnose generics explicitly specialized with interface types
+        // before propagation, which crashes on the lookupWitness callees
+        // they generate.
+        diagnoseExplicitInterfaceSpecializations();
+        if (sink->getErrorCount() > 0)
+            return false;
 
         // Part 1: Information Propagation
         //    This phase propagates type information through the module
