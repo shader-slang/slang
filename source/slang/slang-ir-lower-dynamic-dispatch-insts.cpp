@@ -911,6 +911,18 @@ struct UntaggedUnionLoweringContext : public InstPassBase
                 return containsUnmarshalableType((IRType*)arrayType->getElementType());
             }
 
+        case kIROp_VectorType:
+            {
+                auto vectorType = cast<IRVectorType>(type);
+                return containsUnmarshalableType((IRType*)vectorType->getElementType());
+            }
+
+        case kIROp_MatrixType:
+            {
+                auto matrixType = cast<IRMatrixType>(type);
+                return containsUnmarshalableType((IRType*)matrixType->getElementType());
+            }
+
         default:
             return false;
         }
