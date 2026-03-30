@@ -4436,6 +4436,13 @@ err(
 )
 
 err(
+    "bit-cast-to-non-concrete-type",
+    41203,
+    "cannot bit-cast to existential (non-concrete) type",
+    span { loc = "location", message = "cannot bit-cast to existential (non-concrete) type" }
+)
+
+err(
     "byte-address-buffer-unaligned",
     41300,
     "invalid byte address buffer alignment",

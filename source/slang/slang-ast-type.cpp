@@ -540,6 +540,14 @@ Val* BwdCallableFuncType::_resolveImplOverride()
                     // BorrowInOut stays BorrowInOut
                     newParamTypes.add(astBuilder->getBorrowInOutParamType(diffValueType));
                     break;
+                case ParamPassingMode::BorrowIn:
+                case ParamPassingMode::Ref:
+                    // We can't handle ConstRef and Ref properly for differentiable
+                    // values in differentiable methods so we return an error type,
+                    // and rely on diagnostics instead.
+                    //
+                    newParamTypes.add(astBuilder->getErrorType());
+                    break;
                 default:
                     SLANG_ASSERT(!"Unknown parameter direction");
                     break;

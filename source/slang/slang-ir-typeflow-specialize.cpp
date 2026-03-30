@@ -1474,13 +1474,28 @@ struct TypeFlowSpecializationContext
 
         if (auto dataTypeInfo = tryGetInfo(context, inst->getDataType()))
         {
-            if (auto elementOfSetType = as<IRElementOfSetType>(dataTypeInfo))
+            if (auto elementOfSetType =
+                    as<IRElementOfSetType, IRDynamicCastBehavior::NoUnwrap>(dataTypeInfo))
             {
                 return makeUntaggedUnionType(cast<IRTypeSet>(elementOfSetType->getSet()));
             }
         }
 
         return none();
+    }
+
+    void diagnoseUnsupportedBitCast(IRInst* inst)
+    {
+        auto resultType = inst->getDataType();
+        if (!resultType || isConcreteType(resultType))
+            return;
+
+        if (diagnosedBitCasts.contains(inst))
+            return;
+
+        diagnosedBitCasts.add(inst);
+        sink->diagnose(Diagnostics::BitCastToNonConcreteType{
+            .location = inst->sourceLoc});
     }
 
     void resolveAndReplaceIfGlobal(IRInst* context, IRInst* inst)
@@ -1527,6 +1542,9 @@ struct TypeFlowSpecializationContext
         case kIROp_Specialize:
             info = analyzeSpecialize(context, as<IRSpecialize>(inst));
             break;
+        case kIROp_BitCast:
+            diagnoseUnsupportedBitCast(inst);
+            return;
         case kIROp_Load:
         case kIROp_RWStructuredBufferLoad:
         case kIROp_StructuredBufferLoad:
@@ -3597,7 +3615,11 @@ struct TypeFlowSpecializationContext
             // these.
             //
             if (setOp == kIROp_Invalid)
+            {
+                module->getContainerPool().free(&specializedSet);
+                module->getContainerPool().free(&specializationArgs);
                 return none();
+            }
 
             auto resultSetType = makeElementOfSetType(builder.getSet(setOp, specializedSet));
             module->getContainerPool().free(&specializedSet);
@@ -4135,7 +4157,6 @@ struct TypeFlowSpecializationContext
                 // Note: Currently, an unbounded set can only have an unbounded element (and nothing
                 // else), but in the future, we can allow for a mix of unbounded and known elements.
                 //
-                module->getContainerPool().free(&calleeSet);
                 return none();
             }
 
@@ -6207,6 +6228,7 @@ struct TypeFlowSpecializationContext
                     sink->diagnose(Diagnostics::CannotSpecializeGenericWithExistential{
                         .generic = genericName,
                         .location = inst->sourceLoc});
+                    module->getContainerPool().free(&callArgs);
                     return false;
                 }
                 else
@@ -6247,6 +6269,7 @@ struct TypeFlowSpecializationContext
             auto defaultVal = builder.emitDefaultConstruct(inst->getDataType());
             inst->replaceUsesWith(defaultVal);
             inst->removeAndDeallocate();
+            module->getContainerPool().free(&callArgs);
             return true;
         }
         else if (isGlobalInst(callee))
@@ -6900,6 +6923,7 @@ struct TypeFlowSpecializationContext
                     operands.getBuffer());
                 inst->replaceUsesWith(newInst);
                 inst->removeAndDeallocate();
+                module->getContainerPool().free(&args);
                 return true;
             }
         }
@@ -7529,6 +7553,10 @@ struct TypeFlowSpecializationContext
     // Set of parameters already diagnosed for ref/constref interface issues,
     // to avoid emitting duplicate diagnostics per call edge.
     HashSet<IRInst*> diagnosedRefParams;
+
+    // Set of bit-cast instructions already diagnosed for unsupported
+    // non-concrete result types during propagation.
+    HashSet<IRInst*> diagnosedBitCasts;
 
     // Mapping from (context, inst) --> propagated info
     Dictionary<InstWithContext, IRWeakUse*> propagationMap;
