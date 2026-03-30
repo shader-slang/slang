@@ -446,8 +446,12 @@ def main():
         sys.exit(2)
     if not runs:
         print("No completed runs found in the specified time range.")
+        pruned_existing = prune_old_jobs(existing, args.max_age_days, args.verbose)
         if existing_count > 0:
             print(f"Existing dataset contains {existing_count} jobs.")
+        if len(pruned_existing) != existing_count:
+            save_data(pruned_existing, args.output)
+            print(f"Data saved to: {args.output}")
         return
 
     # Keep name-based filter for safety (in case workflow resolution fails)
