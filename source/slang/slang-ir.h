@@ -1344,7 +1344,7 @@ struct IRBlock : IRInst
 
         SuccessorList reverse()
         {
-            if (!begin_)
+            if (!begin_ || !end_)
                 return SuccessorList(nullptr, nullptr, -stride);
             return SuccessorList(end_ - stride, begin_ - stride, -stride);
         }

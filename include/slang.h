@@ -4940,6 +4940,9 @@ struct SlangGlobalSessionDesc
 
 /* Create a blob from binary data.
  *
+ * The caller takes ownership of the returned blob (initial reference count is 1).
+ * Use ComPtr::attach() to adopt without incrementing the reference count.
+ *
  * @param data Pointer to the binary data to store in the blob. Must not be null.
  * @param size Size of the data in bytes. Must be greater than 0.
  * @return The created blob on success, or nullptr on failure.
