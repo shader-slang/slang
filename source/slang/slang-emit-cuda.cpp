@@ -825,7 +825,6 @@ bool CUDASourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
         }
     case kIROp_CoopVecMatMulAdd:
         {
-            auto coopVecMatMulAdd = cast<IRCoopVecMatMulAdd>(inst);
             if (!isOptixCoopVec)
             {
                 getSink()->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
