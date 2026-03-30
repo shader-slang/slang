@@ -1119,17 +1119,8 @@ ModuleDecl* getModuleDecl(Scope* scope)
 ContainerDecl* getParentDecl(Decl* decl)
 {
     auto parentDecl = decl->parentDecl;
-    // Unwrap transparent containers that don't represent user-visible nesting.
-    // GenericDecl wraps a parameterised declaration; ScopeDecl wraps a block scope.
-    for (;;)
-    {
-        if (auto genericDecl = as<GenericDecl>(parentDecl))
-            parentDecl = genericDecl->parentDecl;
-        else if (auto scopeDecl = as<ScopeDecl>(parentDecl))
-            parentDecl = scopeDecl->parentDecl;
-        else
-            break;
-    }
+    while (auto genericDecl = as<GenericDecl>(parentDecl))
+        parentDecl = genericDecl->parentDecl;
     return parentDecl;
 }
 

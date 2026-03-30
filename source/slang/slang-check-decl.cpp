@@ -153,6 +153,27 @@ static DeclNestingCategory classifyDeclForNesting(Decl* decl)
     return DeclNestingCategory::Unknown;
 }
 
+/// Walk up the parent chain, skipping GenericDecl and ScopeDecl wrappers,
+/// to find the nearest container relevant to nesting validation.
+///
+/// This is intentionally separate from getParentDecl() (which only skips
+/// GenericDecl) to avoid changing behaviour for the ~30 other callsites
+/// that rely on the shared utility.
+static ContainerDecl* getParentContainerForNesting(Decl* decl)
+{
+    auto parentDecl = decl->parentDecl;
+    for (;;)
+    {
+        if (auto genericDecl = as<GenericDecl>(parentDecl))
+            parentDecl = genericDecl->parentDecl;
+        else if (auto scopeDecl = as<ScopeDecl>(parentDecl))
+            parentDecl = scopeDecl->parentDecl;
+        else
+            break;
+    }
+    return parentDecl;
+}
+
 /// Classify a container declaration into a ContainerNestingCategory.
 static ContainerNestingCategory classifyContainerForNesting(ContainerDecl* container)
 {
@@ -173,8 +194,8 @@ static ContainerNestingCategory classifyContainerForNesting(ContainerDecl* conta
     if (as<FunctionDeclBase>(container))
         return ContainerNestingCategory::Function;
 
-    // GenericDecl is unwrapped by getParentDecl(); ScopeDecl likewise.
-    // Anything else is compiler-internal — skip.
+    // GenericDecl and ScopeDecl are unwrapped by getParentContainerForNesting();
+    // anything else is compiler-internal — skip.
     return ContainerNestingCategory::Unknown;
 }
 
@@ -286,8 +307,10 @@ static bool validateDeclNesting(SemanticsVisitor* visitor, Decl* decl)
     if (childCategory == DeclNestingCategory::Unknown)
         return false;
 
-    // getParentDecl unwraps GenericDecl to find the real parent container.
-    auto parentContainer = getParentDecl(decl);
+    // Unwrap GenericDecl and ScopeDecl to reach the user-visible container.
+    // This uses a nesting-specific helper rather than the shared getParentDecl()
+    // to avoid changing behaviour for ~30 other callsites.
+    auto parentContainer = getParentContainerForNesting(decl);
     if (!parentContainer)
         return false;
 
@@ -302,6 +325,11 @@ static bool validateDeclNesting(SemanticsVisitor* visitor, Decl* decl)
     if (rule->allowedContainers & containerBit(parentCategory))
         return false; // allowed
 
+    // NOTE: The parser's isDeclAllowed() may have already emitted a diagnostic
+    // for this same construct (e.g. E30102 "declaration not allowed here").
+    // The duplicate is intentional defense-in-depth: the parser catches syntax-level
+    // violations while this check covers semantic-level nesting rules that the parser
+    // cannot enforce.
     visitor->getSink()->diagnose(Diagnostics::DeclNotAllowedInContext{
         .childKind = rule->childName,
         .parentKind = getContainerNestingCategoryName(parentCategory),
@@ -9490,6 +9518,9 @@ void SemanticsDeclHeaderVisitor::visitGlobalGenericParamDecl(GlobalGenericParamD
 
 void SemanticsDeclHeaderVisitor::visitAssocTypeDecl(AssocTypeDecl* decl)
 {
+    // validateDeclNesting enforces that associatedtype only appears inside
+    // an interface; assert to catch regressions if that check is ever bypassed.
+    SLANG_ASSERT(as<InterfaceDecl>(decl->parentDecl) || getSink()->getErrorCount() > 0);
     checkVisibility(decl);
 }
 
@@ -11673,7 +11704,8 @@ Type* SemanticsVisitor::findResultTypeForConstructorDecl(ConstructorDecl* decl)
     if (!thisType)
     {
         // The nesting validation in validateDeclNesting already reports the error;
-        // we just need error recovery here.
+        // assert to catch regressions if that check is ever bypassed.
+        SLANG_ASSERT(getSink()->getErrorCount() > 0);
         thisType = m_astBuilder->getErrorType();
     }
     return thisType;
@@ -11765,6 +11797,9 @@ Type* SemanticsDeclHeaderVisitor::_getAccessorStorageType(AccessorDecl* decl)
     }
     else
     {
+        // validateDeclNesting enforces that accessors only appear inside
+        // subscript or property; assert to catch regressions.
+        SLANG_ASSERT(getSink()->getErrorCount() > 0);
         return getASTBuilder()->getErrorType();
     }
 }
