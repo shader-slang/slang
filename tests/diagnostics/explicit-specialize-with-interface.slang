@@ -7,6 +7,7 @@
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target hlsl -stage compute -entry computeMain
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target glsl -stage compute -entry computeMain
 
 interface IFoo
 {

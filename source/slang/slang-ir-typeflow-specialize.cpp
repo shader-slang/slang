@@ -5762,7 +5762,6 @@ struct TypeFlowSpecializationContext
                 sink->diagnose(Diagnostics::CannotSpecializeGenericWithExistential{
                     .generic = funcName,
                     .location = call->sourceLoc});
-                return;
             }
         }
     }
