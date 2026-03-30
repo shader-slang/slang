@@ -248,8 +248,9 @@ Write `tmp/<bug-id>/investigation.md`:
 
 ## Phase 3: EXPLORE ALTERNATIVES
 
-Launch parallel sub-agents to investigate different fix strategies. Each agent explores
-one approach independently and reports back with a concrete assessment.
+Launch parallel sub-agents in isolated worktrees to implement and test different fix
+strategies. Each agent gets its own branch and working directory, implements the fix,
+builds, runs the reproducer and test suite, and reports back with concrete results.
 
 ### When to Use Parallel Exploration
 
@@ -257,12 +258,16 @@ one approach independently and reports back with a concrete assessment.
 - **Skip** only when the fix is unambiguous (e.g., a missing case in a switch statement
   where the pattern for other cases is clear)
 
+### Agent Configuration
+
+Launch each agent with `subagent_type="best-of-n-runner"`. Each agent runs in its own
+git worktree with an isolated branch, so agents cannot conflict with each other.
+
 ### Agent Prompt Template
 
-Launch each agent with `subagent_type="generalPurpose"`:
-
 ```text
-You are investigating a fix strategy for a Slang compiler bug.
+You are implementing and testing a fix strategy for a Slang compiler bug.
+You are running in an isolated git worktree with your own branch.
 
 ## Bug Summary
 {intake.md content}
@@ -272,46 +277,88 @@ You are investigating a fix strategy for a Slang compiler bug.
 
 ## Your Strategy: [Strategy Name]
 
-Investigate whether the following approach is viable:
+Implement the following fix approach:
 [Description of the specific fix strategy]
+
+## Project Context
+
+This is the Slang shading language compiler (C++). Key conventions:
+- Build: cmake --build --preset release --target slangc slang-test
+- Test: ./build/Release/bin/slang-test tests/path/to/test.slang
+- Format: ./extras/formatting.sh
+- Single-dash CLI options: -target spirv (not --target)
+- SPIRV validation: SLANG_RUN_SPIRV_VALIDATION=1 slangc -target spirv test.slang
+- Redirect build output: cmake --build ... >/dev/null 2>&1 || cmake --build ...
+- Do not mention AI tools in commits
 
 ## Instructions
 
+### Step 1: Implement the fix
 1. Read the relevant source files to understand the current implementation
-2. Identify the exact changes needed (files, functions, line ranges)
-3. Assess the following:
-   - **Correctness**: Does this fix the root cause or just the symptom?
-   - **Completeness**: Does it handle all related cases or just the reproducer?
-   - **Risk**: What could break? What assumptions does it change?
-   - **Scope**: How many files/functions need to change?
-   - **Consistency**: Does it follow existing patterns in the codebase?
-   - **Test impact**: Will existing tests need updating?
-4. Write a prototype of the key changes (pseudocode or actual code)
-5. Identify any edge cases or interactions that need testing
+2. Implement the fix -- change only what is necessary
+3. Follow existing patterns in the codebase
+4. Add comments only for non-obvious logic
 
-## Return Format
+### Step 2: Write a regression test
+1. Create a .slang test file that reproduces the original bug
+2. Place it in tests/bugs/ or tests/diagnostics/ or tests/language-feature/
+3. Use the appropriate test type:
+   - COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -shaderobj -output-using-type
+   - DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):-target spirv
+   - SIMPLE(filecheck=CHECK): -target spirv
+
+### Step 3: Build and validate
+1. Build: cmake --build --preset release --target slangc slang-test >/dev/null 2>&1 || \
+     cmake --build --preset release --target slangc slang-test
+2. Run the regression test: ./build/Release/bin/slang-test tests/path/to/test.slang
+3. Run the original reproducer to confirm it's fixed
+4. Run SPIRV validation if applicable
+5. Run broader test suite: ./build/Release/bin/slang-test -use-test-server -server-count 8
+6. Record pass/fail counts
+
+### Step 4: Format
+Run ./extras/formatting.sh on changed files.
+
+### Step 5: Commit
+Create a commit with message: "Fix [short description]"
+Do NOT push -- the orchestrator will compare results across strategies.
+
+### Step 6: Report back
+Return a structured result with ALL of the following:
 
 STRATEGY: [Name]
+BRANCH: [branch-name]
+COMMIT: [commit-hash]
 VERDICT: RECOMMENDED | VIABLE | RISKY | NOT_VIABLE
+
+BUILD: pass | fail
+  build_output: [key lines if failed]
+
+REPRODUCER_FIXED: yes | no
+  output: [compiler output after fix]
+
+REGRESSION_TEST: pass | fail
+  test_file: [path]
+  output: [test runner output]
+
+TEST_SUITE: pass | fail
+  total: N
+  passed: N
+  failed: N
+  failed_tests: [list of any newly failing tests]
 
 CHANGES:
 - file: source/slang/<file>.cpp
   function: <name>
   description: <what changes>
-  lines_affected: ~N
+  lines_changed: N
 
 CORRECTNESS: [root cause fix / symptom fix / partial fix]
 COMPLETENESS: [handles all cases / handles reproducer only / handles N of M cases]
 RISK: [low / medium / high -- what could break]
-SCOPE: [N files, ~M lines changed]
-CONSISTENCY: [follows pattern X / new pattern needed]
-
-PROTOTYPE:
-[key code changes, pseudocode or actual]
 
 EDGE_CASES:
 - [case 1]: [how this strategy handles it]
-- [case 2]: [how this strategy handles it]
 
 CONCERNS:
 - [any remaining concerns or unknowns]
@@ -330,13 +377,19 @@ Choose 2-4 of these based on the bug classification:
 
 ### Evaluation Output
 
-After all agents return, write `tmp/<bug-id>/alternatives.md`:
+After all agents return, compare the **real results** (not just analysis). Write
+`tmp/<bug-id>/alternatives.md`:
 
 ```markdown
 # Fix Alternatives
 
 ## Strategy A: [Name]
+- **Branch**: [branch-name]
 - **Verdict**: [RECOMMENDED / VIABLE / RISKY / NOT_VIABLE]
+- **Build**: pass/fail
+- **Reproducer fixed**: yes/no
+- **Regression test**: pass/fail
+- **Test suite**: N passed, M failed (list any new failures)
 - **Approach**: [1-2 sentences]
 - **Pros**: [bullet points]
 - **Cons**: [bullet points]
@@ -350,15 +403,17 @@ After all agents return, write `tmp/<bug-id>/alternatives.md`:
 
 | Criterion | Strategy A | Strategy B | Strategy C |
 |-----------|-----------|-----------|-----------|
+| Build succeeds | yes/no | yes/no | yes/no |
+| Reproducer fixed | yes/no | yes/no | yes/no |
+| Test suite regressions | 0 | N | ... |
 | Fixes root cause | yes/no | yes/no | yes/no |
 | Handles all cases | yes/partial/no | ... | ... |
 | Risk level | low/med/high | ... | ... |
 | Code scope | N files | ... | ... |
 | Follows existing patterns | yes/no | ... | ... |
-| Requires test changes | yes/no | ... | ... |
 
 ## Recommendation
-[Which strategy and why. Be explicit about trade-offs.]
+[Which strategy and why, backed by concrete build/test evidence.]
 ```
 
 ---
@@ -389,76 +444,56 @@ The user may:
 
 ## Phase 5: IMPLEMENT
 
-After user approval, implement the chosen fix.
+After user approval, adopt the chosen strategy's worktree branch or implement fresh.
 
-### Step 1: Create a Working Branch
+### Option A: Adopt from Worktree (preferred)
+
+If Phase 3 produced a passing implementation in an isolated worktree:
 
 ```bash
+# The best-of-n-runner agent already committed to its branch.
+# Cherry-pick or merge the winning branch into a clean fix branch.
 git checkout -b fix/<bug-id>-<short-description>
-```
+git cherry-pick <commit-hash-from-winning-strategy>
 
-### Step 2: Implement the Fix
-
-Follow these principles:
-
-- **Minimal diff**: Change only what is necessary. Do not refactor unrelated code.
-- **Follow existing patterns**: If the codebase handles a similar case, follow that pattern.
-- **Add comments only for non-obvious logic**: Explain why, not what.
-- **No trailing whitespace**: No lines with only spaces/tabs.
-
-### Step 3: Write Regression Tests
-
-Every bug fix must include a regression test. Use the `slang-test-development` skill
-for test syntax reference.
-
-**Test placement**:
-- `tests/bugs/` for regression tests tied to specific issues
-- `tests/diagnostics/` for diagnostic tests
-- `tests/language-feature/` if the test covers a language feature
-
-**Test requirements**:
-- Must reproduce the original bug without the fix
-- Must pass with the fix
-- Must use the appropriate test type (compute, diagnostic, simple compilation)
-- Must verify the specific behavior, not just "doesn't crash"
-
-```bash
-# Verify the test fails without the fix (if practical)
-git stash
-./build/Release/bin/slang-test tests/path/to/regression-test.slang
-git stash pop
-
-# Verify the test passes with the fix
-./build/Release/bin/slang-test tests/path/to/regression-test.slang
-```
-
-### Step 4: Validate
-
-```bash
-# Rebuild with the fix
+# If the user wants adjustments, make them now
+# Rebuild and re-validate after any changes
 cmake --build --preset release --target slangc slang-test >/dev/null 2>&1 || \
   cmake --build --preset release --target slangc slang-test
-
-# Run the specific regression test
-./build/Release/bin/slang-test tests/path/to/regression-test.slang
-
-# Run the original reproducer
-./build/Release/bin/slangc -target <target> test.slang
-
-# Run SPIRV validation if target is spirv
-SLANG_RUN_SPIRV_VALIDATION=1 ./build/Release/bin/slangc -target spirv test.slang
-
-# Run broader test suite to check for regressions
 ./build/Release/bin/slang-test -use-test-server -server-count 8
 ```
 
-### Step 5: Format
+### Option B: Implement Fresh
+
+If no Phase 3 agent produced a clean result, or if the user wants a different approach:
+
+1. **Create branch**: `git checkout -b fix/<bug-id>-<short-description>`
+2. **Implement the fix**:
+   - Minimal diff -- change only what is necessary
+   - Follow existing patterns in the codebase
+   - Add comments only for non-obvious logic
+   - No trailing whitespace, no lines with only spaces/tabs
+3. **Write regression test** (use `slang-test-development` skill for syntax reference):
+   - Place in `tests/bugs/`, `tests/diagnostics/`, or `tests/language-feature/`
+   - Must reproduce the original bug without the fix
+   - Must pass with the fix
+   - Must verify specific behavior, not just "doesn't crash"
+4. **Build and validate**:
+   ```bash
+   cmake --build --preset release --target slangc slang-test >/dev/null 2>&1 || \
+     cmake --build --preset release --target slangc slang-test
+   ./build/Release/bin/slang-test tests/path/to/regression-test.slang
+   SLANG_RUN_SPIRV_VALIDATION=1 ./build/Release/bin/slangc -target spirv test.slang
+   ./build/Release/bin/slang-test -use-test-server -server-count 8
+   ```
+
+### Format
 
 ```bash
 ./extras/formatting.sh
 ```
 
-### Step 6: Commit and PR
+### Commit and PR
 
 Follow the project's PR conventions from the `slang-issues` skill:
 

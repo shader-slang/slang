@@ -290,6 +290,28 @@ cmake --build --preset release --target slangc slang-test
 
 **Self-review**: Is there an existing test just as good? Would I understand this in 6 months? Does it run on all targets?
 
+### Parallel Implementation (for large gap lists)
+
+When the gap list has 5+ independent tests to write, group them into batches and
+launch parallel agents using `subagent_type="best-of-n-runner"`. Each agent gets its
+own git worktree and branch, preventing file conflicts.
+
+**Grouping strategy**: Group tests by semantic area (not by test type) so each agent's
+tests are independent. For example, group all positive + negative tests for "generic
+struct parameters" into one agent, and "generic function parameters" into another.
+
+**Agent prompt**: Give each agent:
+1. The specific tests to write (from the gap list with filenames and descriptions)
+2. The `slang-test-development` skill content for test syntax reference
+3. Feature context from Phase 1
+4. Build/test/format/commit instructions (same as `slang-feature-test-flow` Phase 3)
+
+**Collecting results**: After agents complete, the orchestrator reviews each branch's
+test results and cherry-picks passing tests into a single branch for the PR.
+
+For a full parallel orchestration workflow with sub-plan decomposition, bug triage,
+and PR creation, use the `slang-feature-test-flow` skill instead.
+
 ---
 
 ## Phase 6: Bug Investigation

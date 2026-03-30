@@ -205,7 +205,10 @@ Write `tmp/<feature>/plan.md` with overview table:
 
 ## Phase 3: EXECUTE
 
-Launch parallel agents (one per approved sub-plan) in **worktree isolation**.
+Launch parallel agents (one per approved sub-plan) in **worktree isolation** using
+`subagent_type="best-of-n-runner"`. Each agent gets its own git worktree and branch,
+so agents cannot conflict with each other even when creating files in the same
+directory hierarchy.
 
 ### Agent Configuration
 
@@ -215,10 +218,14 @@ Each agent receives:
 3. Feature context from research.md
 4. Mode flag (dry-run vs live)
 
+Launch agents in parallel by sending multiple `Task` tool calls in a single message,
+each with `subagent_type="best-of-n-runner"`.
+
 ### Agent Prompt
 
 ```text
 You are implementing tests for the Slang compiler.
+You are running in an isolated git worktree with your own branch.
 
 ## Your Sub-plan
 {sub-plan content}
@@ -229,7 +236,24 @@ You are implementing tests for the Slang compiler.
 ## Feature Context
 {research.md overview section}
 
+## Project Context
+
+This is the Slang shading language compiler (C++). Key conventions:
+- Build: cmake --build --preset release --target slangc slang-test >/dev/null 2>&1 || \
+    cmake --build --preset release --target slangc slang-test
+- Test: ./build/Release/bin/slang-test tests/path/to/test.slang (run from repo root)
+- Format: ./extras/formatting.sh
+- Single-dash CLI options: -target spirv (not --target)
+- Do not mention AI tools in commits
+- No trailing whitespace or blank lines with only spaces/tabs
+
 ## Instructions
+
+### Step 0: Build (if needed)
+Check if ./build/Release/bin/slang-test exists. If not, build:
+  cmake --preset default
+  cmake --build --preset release --target slangc slang-test >/dev/null 2>&1 || \
+    cmake --build --preset release --target slangc slang-test
 
 ### Step 1: Write and validate tests
 For each test in the sub-plan:
@@ -313,8 +337,10 @@ BUGS:
 
 ### Constraints
 - Max 5 parallel agents (configurable via --max-agents)
-- Worktree isolation per agent — no conflicts
+- Each agent uses `subagent_type="best-of-n-runner"` for git worktree isolation
 - Plan phase assigns unique branch names and file paths
+- Agents run fully autonomously: write tests, build, run, format, commit
+- In dry-run mode agents stop at commit; in live mode they push and create PRs
 
 ---
 
