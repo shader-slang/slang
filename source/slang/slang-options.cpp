@@ -473,7 +473,7 @@ void initCommandOptions(CommandOptions& options)
          "-profile <profile>[+<capability>...]",
          "Specify the shader profile for code generation.\n"
          "Accepted profiles are:\n"
-         "* sm_{4_0,4_1,5_0,5_1,6_0,6_1,6_2,6_3,6_4,6_5,6_6}\n"
+         "* sm_{4_0,4_1,5_0,5_1,6_0,6_1,6_2,6_3,6_4,6_5,6_6,6_7,6_8,6_9,6_10}\n"
          "* glsl_{110,120,130,140,150,330,400,410,420,430,440,450,460}\n"
          "Additional profiles that include -stage information:\n"
          "* {vs,hs,ds,gs,ps}_<version>\n"
