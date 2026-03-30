@@ -8,7 +8,7 @@
 //
 // When a property setter or subscript setter is invoked through an interface-typed variable
 // (dynamic dispatch), the compiler emits a controlled error (not a crash/segfault):
-//   error 99999: unimplemented: Unimplemented type packing
+//   error 99997: unimplemented: Unimplemented type packing
 //
 // The mutation requires repacking the modified concrete value back into the AnyValue
 // storage of the existential interface value, which is not yet implemented.
@@ -69,8 +69,8 @@ void computeMain(int id : SV_DispatchThreadID)
 {
     IFullFeatured obj = makeObj(id);
 
-    // Property setter through dynamic dispatch — emits error 99999: unimplemented type packing
-    // CHECK: error[E99999]
+    // Property setter through dynamic dispatch — emits error 99997: unimplemented type packing
+    // CHECK: error[E99997]
     obj.value = 5.0;
 
     // Subscript setter through dynamic dispatch — same limitation

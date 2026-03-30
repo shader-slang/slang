@@ -1873,7 +1873,7 @@ void CLikeSourceEmitter::emitDereferenceOperand(IRInst* inst, EmitOpInfo const& 
                 IRVectorType* vectorType = nullptr;
                 if (auto ptrType = as<IRPtrTypeBase>(inst->getOperand(0)->getDataType()))
                 {
-                    vectorType = as<IRVectorType>(ptrType->getValueType());
+                    vectorType = as<IRVectorType>(unwrapAttributedType(ptrType->getValueType()));
                 }
                 if (vectorType)
                 {

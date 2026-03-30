@@ -18,6 +18,14 @@ User-specific instructions for Slang (optional, may not exist):
 
 ### Building the Project
 
+If you are running in a Windows sandbox, run extras\win-sandbox-build.bat to produce a build in
+debug configuration. This script discovers Visual Studio, runs vcvarsall.bat, configures with the
+`vs2022-dev` preset, prefers locally cached dependencies instead of fetching them over the network,
+and defaults to building `slangc`, `slang-test`, and `slangi`. Pass extra target names if you need
+something other than that default target set.
+
+On non-Windows platforms (Linux/macOS), run cmake directly to build:
+
 ```bash
 # Configure with default settings (Ninja Multi-Config)
 cmake --preset default
@@ -226,8 +234,8 @@ On Windows, assertion failures normally open a modal dialog that blocks executio
 | `release-assert-only` | Skip debug-only assertions (`SLANG_ASSERT`, `SLANG_ASSERT_FAILURE`) and continue; `SLANG_RELEASE_ASSERT` still fires           |
 | _(unset)_             | Throws an exception                                                                                                            |
 
-The behavior on Windows after an exception is thrown is controlled by a CMake option `SLANG_IGNORE_ABORT_MSG` or `-ignore-abort-msg` command-line argument.
-Both options are highly recommended for unattended automation with LLM workflow.
+The behavior on Windows after an exception is thrown is controlled by the CMake option `SLANG_IGNORE_ABORT_MSG`.
+This option is highly recommended for unattended automation with LLM workflow; it bakes the behavior into all built executables at compile time.
 
 #### RTX Remix Testing
 
