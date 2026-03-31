@@ -1968,6 +1968,56 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         return emitWitnessedPackQuery(type, kIROp_TrimLastOfPack, basePack);
     }
 
+    LoweredValInfo visitShapeConcatIntValPack(ShapeConcatIntValPack* valPack)
+    {
+        auto irBuilder = getBuilder();
+        auto type = lowerType(context, valPack->getType());
+        IRInst* args[] = {
+            lowerSimpleVal(context, valPack->getLeftPack()),
+            lowerSimpleVal(context, valPack->getRightPack()),
+            lowerSimpleVal(context, valPack->getAxis()),
+        };
+        return LoweredValInfo::simple(
+            irBuilder->emitIntrinsicInst(type, kIROp_ShapeConcat, SLANG_COUNT_OF(args), args));
+    }
+
+    LoweredValInfo visitShapePermuteIntValPack(ShapePermuteIntValPack* valPack)
+    {
+        auto irBuilder = getBuilder();
+        auto type = lowerType(context, valPack->getType());
+        IRInst* args[] = {
+            lowerSimpleVal(context, valPack->getValuePack()),
+            lowerSimpleVal(context, valPack->getOrderPack()),
+        };
+        return LoweredValInfo::simple(
+            irBuilder->emitIntrinsicInst(type, kIROp_ShapePermute, SLANG_COUNT_OF(args), args));
+    }
+
+    LoweredValInfo visitShapeSwapIntValPack(ShapeSwapIntValPack* valPack)
+    {
+        auto irBuilder = getBuilder();
+        auto type = lowerType(context, valPack->getType());
+        IRInst* args[] = {
+            lowerSimpleVal(context, valPack->getValuePack()),
+            lowerSimpleVal(context, valPack->getDim0()),
+            lowerSimpleVal(context, valPack->getDim1()),
+        };
+        return LoweredValInfo::simple(
+            irBuilder->emitIntrinsicInst(type, kIROp_ShapeSwap, SLANG_COUNT_OF(args), args));
+    }
+
+    LoweredValInfo visitShapeReduceIntValPack(ShapeReduceIntValPack* valPack)
+    {
+        auto irBuilder = getBuilder();
+        auto type = lowerType(context, valPack->getType());
+        IRInst* args[] = {
+            lowerSimpleVal(context, valPack->getValuePack()),
+            lowerSimpleVal(context, valPack->getAxis()),
+        };
+        return LoweredValInfo::simple(
+            irBuilder->emitIntrinsicInst(type, kIROp_ShapeReduce, SLANG_COUNT_OF(args), args));
+    }
+
     LoweredValInfo visitExpandIntValPack(ExpandIntValPack* expandVal)
     {
         auto irBuilder = getBuilder();
@@ -5122,6 +5172,37 @@ struct ExprLoweringVisitorBase : public ExprVisitor<Derived, LoweredValInfo>
         return LoweredValInfo::simple(builder->emitIntrinsicInst(resultType, op, 2, args));
     }
 
+    LoweredValInfo visitShapePackTransformExpr(ShapePackTransformExpr* shapePackExpr)
+    {
+        auto builder = getBuilder();
+        auto resultType = lowerType(context, shapePackExpr->type);
+
+        IROp op = kIROp_Invalid;
+        if (as<ShapeConcatExpr>(shapePackExpr))
+            op = kIROp_ShapeConcat;
+        else if (as<ShapePermuteExpr>(shapePackExpr))
+            op = kIROp_ShapePermute;
+        else if (as<ShapeSwapExpr>(shapePackExpr))
+            op = kIROp_ShapeSwap;
+        else if (as<ShapeReduceExpr>(shapePackExpr))
+            op = kIROp_ShapeReduce;
+        else
+        {
+            SLANG_UNEXPECTED("unexpected ShapePackTransformExpr subtype");
+            UNREACHABLE_RETURN(LoweredValInfo());
+        }
+
+        ShortList<IRInst*> args;
+        for (auto arg : shapePackExpr->args)
+            args.add(getSimpleVal(context, lowerSubExpr(arg)));
+
+        return LoweredValInfo::simple(builder->emitIntrinsicInst(
+            resultType,
+            op,
+            args.getCount(),
+            args.getArrayView().getBuffer()));
+    }
+
     LoweredValInfo visitFloatBitCastExpr(FloatBitCastExpr* /*expr*/)
     {
         // __floatAsInt should always be constant-folded during semantic checking.
@@ -8250,6 +8331,34 @@ struct StmtLoweringVisitor : StmtVisitor<StmtLoweringVisitor>
             builder->addDecoration(switchInst, kIROp_BranchDecoration);
         }
     }
+
+    void visitRequireCapabilityStmt(RequireCapabilityStmt* stmt)
+    {
+        auto builder = getBuilder();
+        startBlockIfNeeded(stmt);
+
+        List<CapabilityName> capNames;
+        for (const Token& t : stmt->requiredCaps)
+        {
+            CapabilityName capName = findCapabilityName(t.getContent());
+
+            // Note: capability names have already been validated, so we'll
+            // just do a quick assert here
+            SLANG_ASSERT(capName != CapabilityName::Invalid);
+
+            capNames.add(capName);
+        }
+
+        CapabilitySet capabilitySet(capNames);
+
+        IRInst* capSetInst = builder->getCapabilityValue(capabilitySet);
+
+        builder->emitIntrinsicInst(
+            builder->getVoidType(),
+            kIROp_LateRequireCapability,
+            1,
+            &capSetInst);
+    }
 };
 
 IRInst* getOrEmitDebugSource(IRGenContext* context, SourceLoc loc)
@@ -9835,17 +9944,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             // with the value `5`, then we might have only a single
             // instruction to represent `5`.
             //
-            // FuncCallIntVal means the initializer was symbolically folded but
-            // not fully evaluated (operands are spec constants or generic value
-            // params). Lower via visitFuncCallIntVal which emits constexpr IR
-            // ops and propagates @SpecConst rate when any operand carries it.
-            // The raw initExpr path would emit plain ops without that rate.
-            //
-            IRInst* irInitVal;
-            if (auto funcCallIntVal = as<FuncCallIntVal>(decl->val))
-                irInitVal = lowerSimpleVal(subContext, funcCallIntVal);
-            else
-                irInitVal = getSimpleVal(subContext, lowerRValueExpr(subContext, initExpr));
+            auto irInitVal = getSimpleVal(subContext, lowerRValueExpr(subContext, initExpr));
 
             // We construct a distinct IR instruction to represent the
             // constant itself, with the value as an operand.

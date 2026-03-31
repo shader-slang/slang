@@ -5,7 +5,7 @@ layout: user-guide
 Obfuscation
 ===========
 
-The Slang obfuscation feature allows developers to distribute shader code in a way where the implementation details are kept secret. For example, let's say a developer has produced a novel way to render and wants to protect that intellectual property. If it is possible to compile all possible uses of the shader code into SPIR-V/DXIL, the developer can ship their product with those binaries without debug information. This is similar to the protection achieved by shipping an executable - a determined person may with a good deal of effort work out how some algorithm in the executable works, but doing so requires a considerable amount of work, and certainly more work than reading the original source code.
+The Slang obfuscation feature allows developers to distribute shader code in a way where the implementation details are kept secret. For example, let's say a developer has produced a novel way to render and wants to protect that intellectual property. If it is possible to compile all possible uses of the shader code into SPIR-V/DXIL, the developer can ship their product with those binaries without debug information. This is similar to the protection achieved by shipping an executable - a determined person may, with a good deal of effort, work out how some algorithm in the executable works, but doing so requires a considerable amount of work, and certainly more work than reading the original source code.
 
 If a developer is not able to ship all shader binaries then there is a problem. The developer doesn't want to ship the source code as in doing so it is relatively straightforward to see how it works or even copy the implementation. A developer could provide some level of protection by encrypting the source, but when compilation occurs it will still be necessary to decrypt and so make it available to read. A developer could obfuscate their source before shipping it. In this scenario:
 
@@ -25,8 +25,8 @@ Slang provides an obfuscation feature that addresses these issues. The major par
 
 * The ability to compile a module with obfuscation enabled
   * The module is a binary format, that doesn't contain the original names or locations
-* The ability to compile regular slang code that can *link* against an obfuscated module
-* Code emitted to downstream compilers contain none of the symbols or locations from the original source
+* The ability to compile regular Slang code that can *link* against an obfuscated module
+* Code emitted to downstream compilers contains none of the symbols or locations from the original source
 * Source map(s) to provide mappings between originating source and obfuscated source produced on the client
 
 Enabling obfuscation can be achieved via the `-obfuscate` option. When using the Slang API the `-obfuscate` option can be passed via `spProcessCommandLineArguments` function or `processCommandLineArguments` method. 
@@ -41,11 +41,11 @@ When enabled a few things will happen
 
 The source Slang emits which is passed down to downstream compilers is obfuscated, and only contains the sections of code necessary for the kernel to compile and function. 
 
-Currently all source that is going to be compiled and linked must all have the `-obfuscate` option enabled to be able to link correctly.
+Currently, all source that is going to be compiled and linked must have the `-obfuscate` option enabled to be able to link correctly.
 
-When obfuscation is enabled source locations are scrambled, but Slang will also create a [source map](https://github.com/source-map/source-map-spec), which provides the mapping from the obfuscated locations to the original source. This so called "obfuscated source map" is stored with the module. If compilation produces an error, Slang will automatically use the obfuscated source map to display the error location in the originating source.
+When obfuscation is enabled source locations are scrambled, but Slang will also create a [source map](https://github.com/source-map/source-map-spec), which provides the mapping from the obfuscated locations to the original source. This so-called "obfuscated source map" is stored with the module. If compilation produces an error, Slang will automatically use the obfuscated source map to display the error location in the originating source.
 
-If the obfuscated source map isn't available, it will still display a source location if available, but the location will be to the "empty" obfuscated source file. This will appear in diagnostics as "(hex-digits)-obfuscated(line)". With this information and the source map it is possible to output the original source location. Importantly without the obfuscated source map information leakage about the original source is very limited.
+If the obfuscated source map isn't available, it will still display a source location if available, but the location will be to the "empty" obfuscated source file. This will appear in diagnostics as "(hex-digits)-obfuscated(line)". With this information and the source map it is possible to output the original source location. Importantly, without the obfuscated source map, information leakage about the original source is very limited.
 
 It should be noted that the obfuscated source map is of key importance in hiding the information. In the example scenario of protecting intellectual property, a developer should compile the code they wish to protect with `-obfuscate` and distribute *just* the `.slang-module` file to link on the client machine. The source map file should not be distributed onto client machines. 
 
@@ -64,7 +64,7 @@ To use a `slang-module` with obfuscation requires
   * Currently there is only support for referencing modules stored in files
 * Specifying the `-obfuscate` option
 
-In a non obfuscated module, parts of the AST are serialized. This AST information could be through as broadly analogous to a header in C++. It is enough such that functionality in the module can be semantically checked, and linked with, however it does not, for example, contain the implementations of functions. This means doing a `-r` is roughly equivalent to doing an `import` of the source, without having the source. Any of the types, functions and so forth are available.
+In a non-obfuscated module, parts of the AST are serialized. This AST information could be thought of as broadly analogous to a header in C++. It is enough such that functionality in the module can be semantically checked, and linked with, however it does not, for example, contain the implementations of functions. This means doing a `-r` is roughly equivalent to doing an `import` of the source, without having the source. Any of the types, functions and so forth are available.
 
 With the `-obfuscate` option we strip the AST, in an abundance of caution to try and limit leaking information about the module.
 
@@ -154,10 +154,11 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
 That this works might seem surprising to users of languages such as C/C++, because in these languages it is necessary to know the layout of `Thing` to be able to create the `thing` variable.  This isn't necessary here though, and this can be very useful for some scenarios.
 
-A future iteration of the feature may include parts of the AST such that an obfuscated slang-module can be used like a regular module. It would be important that what is exposed is clear and under programmer control. By default most of the definitions within a module would typically not be exposed. 
+A future iteration of the feature may include parts of the AST such that an obfuscated slang-module can be used like a regular module. It would be important that what is exposed is clear and under programmer control. By default most of the definitions within a module would typically not be exposed.
+
 ## Accessing Source Maps
 
-During a compilation Slang can produce many different "artifacts". When using the obfuscated source map option to produce a `slang-module` Slang will associate an obfuscated source map providing the mapping to the original source. 
+During a compilation Slang can produce many different "artifacts". When using the obfuscated source map option to produce a `slang-module`, Slang will associate an obfuscated source map providing the mapping to the original source. 
 
 With typical Slang API usage, a compilation takes place and the output is a "blob" that is the output kernel. It is also possible to compile to a container, such as a zip file or a directory. The zip file can contain the kernel as well as source map(s).
 
@@ -179,11 +180,11 @@ Notice here that the `-r` module reference is to the `.zip` file rather than the
 
 It is also worth noticing that in this second compilation, using `module.zip`, we need the `-obfuscate` flag set. If this isn't set linking will not work correctly.
 
-NOTE! As previously discussed, though you should *not* ship the .zip file with the obfuscated source map such that it's available on client machines, as doing so does leak some information about the original source. Not the original source itself, but the names of files and the locations in files. You could ship a .zip to client machines, but make sure the `.map` obfuscated source maps are stripped. Alternatively, and perhaps less riskily, you could ship `.slang-module` files taken from the `.zip` file and then it is clear there is no source map information available.
+NOTE! As previously discussed, you should *not* ship the .zip file with the obfuscated source map such that it's available on client machines, as doing so does leak some information about the original source. Not the original source itself, but the names of files and the locations in files. You could ship a .zip to client machines, but make sure the `.map` obfuscated source maps are stripped. Alternatively, and perhaps less riskily, you could ship `.slang-module` files taken from the `.zip` file and then it is clear there is no source map information available.
 
 ## Accessing Source Maps without Files
 
-When using the Slang API typically things work through memory, such as accessing a compilation result via a blob. It is possible to access source maps via memory also, but doing so currently requires accessing the result of a compilation as if its a file system. The current API to do this is 
+When using the Slang API typically things work through memory, such as accessing a compilation result via a blob. It is possible to access source maps via memory also, but doing so currently requires accessing the result of a compilation as if it's a file system. The current API to do this is 
 
 ```
 ISlangMutableFileSystem* getCompileRequestResultAsFileSystem();
@@ -216,7 +217,7 @@ At the moment the types of files need to be determined by their extensions. A fu
 
 So far we have been mainly discussing "obfuscation" source maps. These maps provide a mapping from output locations to hidden original locations.
 
-It is also possible to generate a source map as part of emitting source to be passed to downstream compilers such as DXC, FXC, GLSLANG, NVRTCC or C++ compilers. This can be achieved via `-line-directive-mode source-map` option. The line directive mode controls how information about the original source is handled when emitting the source. The default mechanism, will add `#line` declarations into the original source. 
+It is also possible to generate a source map as part of emitting source to be passed to downstream compilers such as DXC, FXC, GLSLANG, NVRTCC or C++ compilers. This can be achieved via `-line-directive-mode source-map` option. The line directive mode controls how information about the original source is handled when emitting the source. The default mechanism will add `#line` directives into the original source. 
 
 Via the API there are a few options to enable emit source maps
 
@@ -234,7 +235,7 @@ request->setLineDirectiveMode(SLANG_LINE_DIRECTIVE_MODE_SOURCE_MAP);
 spSetLineDirectiveMode(request, SLANG_LINE_DIRECTIVE_MODE_SOURCE_MAP);
 ```
 
-The `#line` mechanism is fairly straight forward in that all of the information is including the mapping information is in a single file. A downstream compiler will then embed that information into its debug information. If obfuscation is being used, this will work and the `#line` will actually reference the "made up" "xxx-obfuscated" files.
+The `#line` mechanism is fairly straightforward in that all of the information, including the mapping information, is in a single file. A downstream compiler will then embed that information into its debug information. If obfuscation is being used, this will work and the `#line` will actually reference the "made up" "xxx-obfuscated" files.
 
 With the `-line-directive-mode source-map` option no line directives are emitted, but a source map is produced that can map from a location in the emitted source back to its origin. If one of the origins is an obfuscated module this will reference "xxx-obfuscated" files. So in this scenario if you want to do a lookup to a location in the original source you *potentially* have to do two source map lookups.
 
@@ -254,8 +255,8 @@ Why might you want to use an emit source map rather than use the `#line` mechani
 Why you might not want to use an emit source map
 
 * The `#line` mechanism doesn't require any special handling, and the mapping back is embedded directly into the emitted source/output binary
-* There is more housekeeping in getting keeping and using source maps
-* Currently Slang doesn't directly expose a source map processing API directly  
+* There is more housekeeping in getting, keeping, and using source maps
+* Currently Slang doesn't directly expose a source map processing API  
   * We do support source maps in module files, or produced as part of a compilation
   * A developer could use the slang `compiler-core` implementation
   * In the future the project could provide some API support 
@@ -271,7 +272,7 @@ Why you might not want to use an emit source map
 * Provide other ways to ingest modules, such as through memory (currently -r just supports files)
 * Provide more support for other kinds of artifacts
   * Diagnostics
-  * Meta data (such as bindings used)
+  * Metadata (such as bindings used)
   * Reflection
 * We use -g to indicate debug information
   * On DXC the debug information is embedded in the DXIL, we allow for pdb to separate, but we currently *don't* strip the PDB from the DXIL

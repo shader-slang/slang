@@ -152,9 +152,6 @@ struct Options
 
     Slang::List<Slang::String> skipList;
 
-    // Ignore abort message dialog popup on Windows
-    bool ignoreAbortMsg = false;
-
     /// Parse the args, report any errors into stdError, and write the results into optionsOut
     static SlangResult parse(
         int argc,

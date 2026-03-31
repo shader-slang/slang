@@ -2474,6 +2474,10 @@ local insts = {
 	{ ExtractLastFromPack = { operands = { { "pack" }, { "witness" } }, hoistable = true } },
 	{ TrimFirstOfPack = { operands = { { "pack" }, { "witness" } }, hoistable = true } },
 	{ TrimLastOfPack = { operands = { { "pack" }, { "witness" } }, hoistable = true } },
+	{ ShapeConcat = { operands = { { "leftPack" }, { "rightPack" }, { "axis" } }, hoistable = true } },
+	{ ShapePermute = { operands = { { "pack" }, { "order" } }, hoistable = true } },
+	{ ShapeSwap = { operands = { { "pack" }, { "dim0" }, { "dim1" } }, hoistable = true } },
+	{ ShapeReduce = { operands = { { "pack" }, { "axis" } }, hoistable = true } },
 	{ NonEmptyPackWitness = { operands = { { "pack" } }, hoistable = true } },
 	{ GetArrayLength = { operands = { { "array" } } } },
 	{
@@ -2999,6 +3003,14 @@ local insts = {
 		--
 		hoistable = true
 	} },
+	{ LateRequireCapability = {
+		-- A capability requirement that is checked after linking, specialization, and IR-level dead
+		-- code elimination passes.
+		--
+		-- Parameters: IRCapabilitySet
+		operands = { { "capabilitySet", "IRCapabilitySet" } },
+	} },
+
 	-- Constexpr arithmetic ops. These are hoistable variants of the regular
 	-- arithmetic ops, used for lowering compile-time integer expressions
 	-- (IntVal subclasses like PolynomialIntVal) so that they get deduplicated.

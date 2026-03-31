@@ -498,6 +498,11 @@ struct ASTIterator
             iterator->maybeDispatchCallback(stmt);
             iterator->visitExpr(stmt->expression);
         }
+
+        void visitRequireCapabilityStmt(RequireCapabilityStmt* stmt)
+        {
+            iterator->maybeDispatchCallback(stmt);
+        }
     };
 };
 
