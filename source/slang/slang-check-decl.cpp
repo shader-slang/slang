@@ -290,13 +290,11 @@ static const char* getContainerNestingCategoryName(ContainerNestingCategory cat)
     }
 }
 
-/// Find the nesting rule for a given declaration category, or null if none.
-static const NestingRule* findNestingRule(DeclNestingCategory child)
+/// Look up the nesting rule for a given declaration category.
+/// The table is ordered 1:1 with DeclNestingCategory (enforced by static_assert).
+static const NestingRule& findNestingRule(DeclNestingCategory child)
 {
-    for (const auto& rule : kNestingRules)
-        if (rule.child == child)
-            return &rule;
-    return nullptr;
+    return kNestingRules[static_cast<uint32_t>(child)];
 }
 
 /// Validate that a declaration is allowed in its parent container.
@@ -318,11 +316,9 @@ static bool validateDeclNesting(SemanticsVisitor* visitor, Decl* decl)
     if (parentCategory == ContainerNestingCategory::Unknown)
         return false;
 
-    auto* rule = findNestingRule(childCategory);
-    if (!rule)
-        return false;
+    auto& rule = findNestingRule(childCategory);
 
-    if (rule->allowedContainers & containerBit(parentCategory))
+    if (rule.allowedContainers & containerBit(parentCategory))
         return false; // allowed
 
     // The parser's isDeclAllowed (slang-parser.cpp:5177) and
@@ -333,7 +329,7 @@ static bool validateDeclNesting(SemanticsVisitor* visitor, Decl* decl)
         return true;
 
     visitor->getSink()->diagnose(Diagnostics::DeclNotAllowedInContext{
-        .childKind = rule->childName,
+        .childKind = rule.childName,
         .parentKind = getContainerNestingCategoryName(parentCategory),
         .decl = decl});
     return true;
