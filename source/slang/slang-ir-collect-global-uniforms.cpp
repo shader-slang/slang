@@ -268,6 +268,27 @@ struct CollectGlobalUniformParametersContext
             // just generated, and the type of the original parameter.
             //
             auto globalParamType = globalParam->getFullType();
+
+            // For CUDA/CPP targets, unwrap ConstantBuffer<T> for push_constant
+            // parameters. Push constants are a Vulkan concept; on CUDA/CPP the data
+            // should be inlined directly into the GlobalParams struct rather than
+            // becoming a pointer (which ConstantBuffer<T> lowers to on these targets).
+            //
+            bool unwrappedPushConstant = false;
+            if (target == CodeGenTarget::CUDASource || target == CodeGenTarget::CPPSource)
+            {
+                if (auto cbufType = as<IRConstantBufferType>(globalParamType))
+                {
+                    auto layoutType = cbufType->getLayoutType();
+                    if (layoutType &&
+                        layoutType->getOp() == kIROp_DefaultPushConstantBufferLayoutType)
+                    {
+                        globalParamType = cbufType->getElementType();
+                        unwrappedPushConstant = true;
+                    }
+                }
+            }
+
             builder->createStructField(wrapperStructType, fieldKey, globalParamType);
 
             // Next we need to replace the uses of the parameter will
@@ -346,7 +367,18 @@ struct CollectGlobalUniformParametersContext
                 builder->setInsertBefore(user);
 
                 IRInst* value = nullptr;
-                if (globalParameterGroupTypeLayout)
+                if (unwrappedPushConstant && globalParameterGroupTypeLayout)
+                {
+                    // For unwrapped push_constant parameters on CUDA/CPP:
+                    // The original ConstantBuffer<T> global acted as a pointer to T.
+                    // After unwrapping to T in the GlobalParams struct, we provide
+                    // a pointer to the field (fieldAddress) so that existing
+                    // get_field_addr uses continue to work.
+                    //
+                    auto ptrType = builder->getPtrType(globalParamType);
+                    value = builder->emitFieldAddress(ptrType, wrapperParam, fieldKey);
+                }
+                else if (globalParameterGroupTypeLayout)
                 {
                     // If the global parameters are being placed in a
                     // `ConstantBuffer<GlobalParams>`, then we need to
