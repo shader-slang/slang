@@ -179,12 +179,12 @@ SubtypeWitness* SharedSemanticsContext::_specializeInterfaceInheritanceWitness(
     SLANG_ASSERT(selfIsSubtypeOfBase);
     SLANG_ASSERT(baseIsSubtypeOfFacet);
 
-    auto lookupSubstitution = SubstitutionSet(
-        _getASTBuilder()->getLookupDeclRef(
-            selfIsSubtypeOfBase,
-            baseInterfaceDecl->getThisTypeDecl()));
+    auto lookupSubstitution = SubstitutionSet(_getASTBuilder()->getLookupDeclRef(
+        selfIsSubtypeOfBase,
+        baseInterfaceDecl->getThisTypeDecl()));
 
-    return as<SubtypeWitness>(baseIsSubtypeOfFacet->substitute(_getASTBuilder(), lookupSubstitution));
+    return as<SubtypeWitness>(
+        baseIsSubtypeOfFacet->substitute(_getASTBuilder(), lookupSubstitution));
 }
 
 InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
