@@ -1365,14 +1365,12 @@ extension Array<T, N> : IDifferentiable
 {
     typedef Array<T.Differential, N> Differential;
 
-    [__unsafeForceInlineEarly]
     [Differentiable]
     static Differential dzero()
     {
         return makeArrayFromElement<T.Differential, N>(T.dzero());
     }
 
-    [__unsafeForceInlineEarly]
     [Differentiable]
     static Differential dadd(Differential a, Differential b)
     {

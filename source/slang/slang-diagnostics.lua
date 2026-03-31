@@ -4437,7 +4437,7 @@ err(
 
 err(
     "bit-cast-to-non-concrete-type",
-    41203,
+    41204,
     "cannot bit-cast to existential (non-concrete) type",
     span { loc = "location", message = "cannot bit-cast to existential (non-concrete) type" }
 )
