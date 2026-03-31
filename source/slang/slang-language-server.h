@@ -22,27 +22,14 @@ struct Command
     template<typename T>
     struct Optional
     {
-    private:
-        T* value = nullptr;
-
     public:
-        bool isValid() const { return value != nullptr; }
-        Optional& operator=(const T& val)
+        T* value = nullptr;
+        bool isValid() { return value != nullptr; }
+        T& operator=(const T& val)
         {
-            T* newValue = new T(val);
             delete value;
-            value = newValue;
-            return *this;
-        }
-        Optional& operator=(const Optional& other)
-        {
-            if (this != &other)
-            {
-                T* newValue = other.isValid() ? new T(other.get()) : nullptr;
-                delete value;
-                value = newValue;
-            }
-            return *this;
+            value = new T(val);
+            return *value;
         }
         Optional& operator=(Optional&& other)
         {
@@ -59,20 +46,16 @@ struct Command
             SLANG_ASSERT(isValid());
             return *value;
         }
-        const T& get() const
-        {
-            SLANG_ASSERT(isValid());
-            return *value;
-        }
         Optional() = default;
         Optional(const Optional& other)
         {
             if (other.isValid())
-                value = new T(other.get());
+                *this = (other.get());
         }
         Optional(Optional&& other)
-            : value(other.value)
         {
+            if (other.isValid())
+                *this = (other.get());
             other.value = nullptr;
         }
 
