@@ -97,8 +97,10 @@ List<IRInterfaceType*> sortTopologically(
 }
 
 // Detect which interfaces participate in cycles in the dependency graph.
-// Uses DFS with a recursion stack to find back edges.
-void _findCyclicInterfaces(
+// Uses DFS with cycle membership propagated up the return path so that
+// all nodes in a cycle are marked, not just the back-edge endpoints.
+// Returns true if this node can reach a back edge (i.e. is part of a cycle).
+bool _findCyclicInterfaces(
     IRInterfaceType* interfaceType,
     Dictionary<IRInterfaceType*, HashSet<IRInterfaceType*>>& dependencyMap,
     HashSet<IRInterfaceType*>& visited,
@@ -108,28 +110,35 @@ void _findCyclicInterfaces(
     visited.add(interfaceType);
     onStack.add(interfaceType);
 
+    bool inCycle = false;
+
     if (auto deps = dependencyMap.tryGetValue(interfaceType))
     {
         for (auto dependency : *deps)
         {
             if (!visited.contains(dependency))
             {
-                _findCyclicInterfaces(
-                    dependency,
-                    dependencyMap,
-                    visited,
-                    onStack,
-                    cyclicInterfaces);
+                if (_findCyclicInterfaces(
+                        dependency,
+                        dependencyMap,
+                        visited,
+                        onStack,
+                        cyclicInterfaces))
+                    inCycle = true;
             }
-            if (onStack.contains(dependency))
+            else if (onStack.contains(dependency))
             {
-                cyclicInterfaces.add(interfaceType);
                 cyclicInterfaces.add(dependency);
+                inCycle = true;
             }
         }
     }
 
+    if (inCycle)
+        cyclicInterfaces.add(interfaceType);
+
     onStack.remove(interfaceType);
+    return inCycle;
 }
 
 HashSet<IRInterfaceType*> findCyclicInterfaces(
@@ -325,10 +334,23 @@ void inferAnyValueSizeWhereNecessary(
     HashSet<IRInterfaceType*> cyclicInterfaces =
         findCyclicInterfaces(interfaceTypes, interfaceDependencyMap);
 
-    // Diagnose implementations that participate in cross-interface cycles.
+    // Track all implementations diagnosed with CircularConformance so we can
+    // exclude them from the confusing "does not fit" (E41011) diagnostic later,
+    // and avoid diagnosing the same impl twice.
+    HashSet<IRInst*> cyclicImpls;
+
+    // Record self-referential impls that were already diagnosed above.
+    for (auto interfaceType : interfaceTypes)
+    {
+        for (auto impl : selfReferentialImpls[interfaceType])
+            cyclicImpls.add(impl);
+    }
+
+    // Diagnose non-self-referential implementations that participate in
+    // cross-interface cycles.
     for (auto interfaceType : cyclicInterfaces)
     {
-        for (auto impl : mapInterfaceToImplementations[interfaceType])
+        for (auto impl : nonSelfReferentialImpls[interfaceType])
         {
             auto deps = findDependenciesOfTypeInSet((IRType*)impl, interfaceTypes);
             for (auto dep : deps)
@@ -340,6 +362,7 @@ void inferAnyValueSizeWhereNecessary(
                         .interfaceType = interfaceType,
                         .location = impl->sourceLoc,
                     });
+                    cyclicImpls.add(impl);
                     break;
                 }
             }
@@ -365,12 +388,13 @@ void inferAnyValueSizeWhereNecessary(
 
         IRIntegerValue maxAnyValueSize = -1;
 
-        bool isCyclic = cyclicInterfaces.contains(interfaceType);
-
         // First pass: Calculate size from non-self-referential implementations.
         // This establishes the base AnyValue size for the interface.
         for (auto implType : nonSelfReferentialImpls[interfaceType])
         {
+            if (cyclicImpls.contains(implType))
+                continue;
+
             IRSizeAndAlignment sizeAndAlignment;
             getNaturalSizeAndAlignment(
                 targetProgram->getTargetReq(),
@@ -379,9 +403,7 @@ void inferAnyValueSizeWhereNecessary(
 
             maxAnyValueSize = Math::Max(maxAnyValueSize, sizeAndAlignment.size);
 
-            // Skip the confusing "does not fit" diagnostic for types that participate
-            // in cross-interface cycles; we already emitted CircularConformance.
-            if (!isCyclic && existingMaxSize < sizeAndAlignment.size)
+            if (existingMaxSize < sizeAndAlignment.size)
             {
                 sink->diagnose(Diagnostics::TypeDoesNotFitAnyValueSize{
                     .type = implType,
@@ -406,10 +428,14 @@ void inferAnyValueSizeWhereNecessary(
 
         // Second pass: Calculate size from self-referential implementations.
         // These can now use the AnyValue size set above.
-        // We skip the "does not fit" diagnostic for self-referential impls because
-        // we already emitted CircularConformance which is more specific and actionable.
+        // We skip cyclic impls entirely and omit the "does not fit" diagnostic for
+        // remaining self-referential impls because we already emitted
+        // CircularConformance which is more specific and actionable.
         for (auto implType : selfReferentialImpls[interfaceType])
         {
+            if (cyclicImpls.contains(implType))
+                continue;
+
             IRSizeAndAlignment sizeAndAlignment;
             getNaturalSizeAndAlignment(
                 targetProgram->getTargetReq(),

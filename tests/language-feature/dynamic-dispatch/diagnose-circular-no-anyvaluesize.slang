@@ -14,7 +14,9 @@ dyn interface IFoo
 }
 
 // CHECK: error[E41003]
+// CHECK: BadImpl
 // CHECK: circular reference through interface
+// CHECK: IFoo
 struct BadImpl : IFoo
 {
     IFoo child;

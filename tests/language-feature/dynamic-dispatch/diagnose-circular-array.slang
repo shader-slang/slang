@@ -13,7 +13,9 @@ interface INode
 }
 
 // CHECK: error[E41003]
+// CHECK: TreeNode
 // CHECK: circular reference through interface
+// CHECK: INode
 struct TreeNode : INode
 {
     INode children[2];

@@ -15,7 +15,9 @@ interface IValue
 }
 
 // CHECK: error[E41003]
+// CHECK: BadImpl
 // CHECK: circular reference through interface
+// CHECK: IValue
 struct BadImpl : IValue
 {
     IValue child;

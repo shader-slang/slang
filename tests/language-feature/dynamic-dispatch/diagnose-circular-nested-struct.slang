@@ -18,7 +18,9 @@ struct InnerData
 }
 
 // CHECK: error[E41003]
+// CHECK: OuterNode
 // CHECK: circular reference through interface
+// CHECK: INode
 struct OuterNode : INode
 {
     InnerData inner;

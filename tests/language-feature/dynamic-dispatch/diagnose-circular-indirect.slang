@@ -25,7 +25,10 @@ struct BarImpl : IBar
     float process() { return foo.getValue(); }
 }
 
-// CHECK: error[E{{[0-9]+}}]
+// CHECK: error[E41003]
+// CHECK: FooImpl
+// CHECK: circular reference through interface
+// CHECK: IFoo
 struct FooImpl : IFoo
 {
     IBar bar;
