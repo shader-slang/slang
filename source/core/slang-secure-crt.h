@@ -119,9 +119,9 @@ inline size_t strnlen_s(const char* str, size_t numberOfElements)
 #ifndef HAVE_SPRINTF_S
 // https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/sprintf-s-sprintf-s-l-swprintf-s-swprintf-s-l
 // Note: unlike MSVC's sprintf_s which invokes the invalid parameter handler
-// on overflow, this fallback uses vsnprintf which truncates on overflow and
-// null-terminates the buffer, returning the number of characters that would
-// have been written.
+// on overflow, this fallback detects overflow via vsnprintf's return value.
+// On overflow, it zeros the buffer and returns -1, matching MSVC's return
+// value semantics but without the invalid parameter handler invocation.
 #ifdef __GNUC__
 __attribute__((format(printf, 3, 4)))
 #endif
@@ -163,6 +163,11 @@ inline int swprintf_s(wchar_t* buffer, size_t sizeOfBuffer, const wchar_t* forma
     va_start(argptr, format);
     int rs = vswprintf(buffer, sizeOfBuffer, format, argptr);
     va_end(argptr);
+    if (rs < 0 || (size_t)rs >= sizeOfBuffer)
+    {
+        buffer[0] = L'\0';
+        return -1;
+    }
     return rs;
 }
 #endif // HAVE_SWPRINTF_S
