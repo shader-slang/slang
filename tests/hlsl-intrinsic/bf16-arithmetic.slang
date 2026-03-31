@@ -1,18 +1,21 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -emit-spirv-directly -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -output-using-type
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
+// Scalar arithmetic: a=3.0, b=2.0
 // CHECK: 50
 // CHECK: 10
 // CHECK: 60
-// CHECK: 20
+// CHECK: 15
 // CHECK: -30
+
+// Vector arithmetic: va=(3.0, 4.0), vb=(2.0, 1.0)
 // CHECK: 50
-// CHECK: 10
+// CHECK: 30
 // CHECK: 60
-// CHECK: 20
+// CHECK: 40
 // CHECK: -30
 
 [numthreads(1,1,1)]
@@ -30,7 +33,7 @@ void computeMain()
     outputBuffer[0] = int(float(sum) * 10.0);
     outputBuffer[1] = int(float(diff) * 10.0);
     outputBuffer[2] = int(float(prod) * 10.0);
-    outputBuffer[3] = int(float(quot) * 10.0 + 0.5);
+    outputBuffer[3] = int(float(quot) * 10.0);
     outputBuffer[4] = int(float(neg) * 10.0);
 
     // Vector arithmetic
@@ -44,8 +47,8 @@ void computeMain()
     let vneg = -va;
 
     outputBuffer[5] = int(float(vsum[0]) * 10.0);
-    outputBuffer[6] = int(float(vdiff[1]) * 10.0 + 0.5);
+    outputBuffer[6] = int(float(vdiff[1]) * 10.0);
     outputBuffer[7] = int(float(vprod[0]) * 10.0);
-    outputBuffer[8] = int(float(vquot[1]) * 10.0 + 0.5);
+    outputBuffer[8] = int(float(vquot[1]) * 10.0);
     outputBuffer[9] = int(float(vneg[0]) * 10.0);
 }

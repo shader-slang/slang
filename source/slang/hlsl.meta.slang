@@ -10002,7 +10002,7 @@ BFloat16 clamp(BFloat16 x, BFloat16 minBound, BFloat16 maxBound)
         result:$$BFloat16 = OpExtInst glsl450 FClamp $x $minBound $maxBound;
     };
     case cuda:
-        return min(max(x, minBound), maxBound);
+        return BFloat16(clamp(float(x), float(minBound), float(maxBound)));
     }
 }
 
@@ -10017,7 +10017,7 @@ vector<BFloat16, N> clamp(vector<BFloat16, N> x, vector<BFloat16, N> minBound, v
         result:$$vector<BFloat16, N> = OpExtInst glsl450 FClamp $x $minBound $maxBound;
     };
     case cuda:
-        return min(max(x, minBound), maxBound);
+        VECTOR_MAP_TRINARY(BFloat16, N, clamp, x, minBound, maxBound);
     }
 }
 

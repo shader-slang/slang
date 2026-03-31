@@ -1722,23 +1722,6 @@ __intrinsic_op($(kIROp_Greater)) vector<bool,N> operator>(vector<BFloat16,N> lef
 __generic<let N : int>
 __intrinsic_op($(kIROp_Geq)) vector<bool,N> operator>=(vector<BFloat16,N> left, vector<BFloat16,N> right);
 
-// BFloat16 scalar-vector mixed arithmetic
-__generic<let N : int>
-__intrinsic_op($(kIROp_Add)) vector<BFloat16,N> operator+(BFloat16 left, vector<BFloat16,N> right);
-__generic<let N : int>
-__intrinsic_op($(kIROp_Add)) vector<BFloat16,N> operator+(vector<BFloat16,N> left, BFloat16 right);
-__generic<let N : int>
-__intrinsic_op($(kIROp_Sub)) vector<BFloat16,N> operator-(BFloat16 left, vector<BFloat16,N> right);
-__generic<let N : int>
-__intrinsic_op($(kIROp_Sub)) vector<BFloat16,N> operator-(vector<BFloat16,N> left, BFloat16 right);
-__generic<let N : int>
-__intrinsic_op($(kIROp_Mul)) vector<BFloat16,N> operator*(BFloat16 left, vector<BFloat16,N> right);
-__generic<let N : int>
-__intrinsic_op($(kIROp_Mul)) vector<BFloat16,N> operator*(vector<BFloat16,N> left, BFloat16 right);
-__generic<let N : int>
-__intrinsic_op($(kIROp_Div)) vector<BFloat16,N> operator/(BFloat16 left, vector<BFloat16,N> right);
-__generic<let N : int>
-__intrinsic_op($(kIROp_Div)) vector<BFloat16,N> operator/(vector<BFloat16,N> left, BFloat16 right);
 
 
 //@hidden:
