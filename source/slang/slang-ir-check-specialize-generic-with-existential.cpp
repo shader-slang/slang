@@ -47,6 +47,17 @@ void addDecorationsForGenericsSpecializedWithExistentialsRec(IRInst* parent, Dia
                                 kIROp_DisallowSpecializationWithExistentialsDecoration);
                             goto nextInst;
                         }
+                    case kIROp_TypeEqualityWitness:
+                        {
+                            if (!as<IRInterfaceType>(specArg->getOperand(0)))
+                                continue;
+
+                            IRBuilder builder(parent->getModule());
+                            builder.addDecoration(
+                                specialize,
+                                kIROp_DisallowSpecializationWithExistentialsDecoration);
+                            goto nextInst;
+                        }
                     }
                 }
             nextInst:;

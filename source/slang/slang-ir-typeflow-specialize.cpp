@@ -143,6 +143,76 @@ bool isNoneCallee(IRInst* callee)
     return false;
 }
 
+IRInst* getInvalidExistentialSpecializationTarget(IRInst* specializedValue)
+{
+    IRInst* specializationBase = specializedValue;
+    if (auto specialize = as<IRSpecialize>(specializationBase))
+        specializationBase = specialize->getBase();
+
+    if (auto generic = as<IRGeneric>(specializationBase))
+        specializationBase = findInnerMostGenericReturnVal(generic);
+
+    if (auto lookupWitness = as<IRLookupWitnessMethod>(specializationBase))
+        specializationBase = lookupWitness->getRequirementKey();
+
+    return specializationBase;
+}
+
+bool isInvalidExistentialSpecialization(IRInst* specializedValue)
+{
+    if (specializedValue->findDecoration<IRDisallowSpecializationWithExistentialsDecoration>())
+        return true;
+
+    if (auto func = as<IRFunc>(specializedValue))
+    {
+        for (auto block = func->getFirstBlock(); block; block = block->getNextBlock())
+        {
+            for (auto inst : block->getOrdinaryInsts())
+            {
+                auto call = as<IRCall>(inst);
+                if (!call)
+                    continue;
+
+                auto lookupWitness = as<IRLookupWitnessMethod>(call->getCallee());
+                if (!lookupWitness)
+                    continue;
+
+                auto typeEqualityWitness = as<IRInst>(lookupWitness->getWitnessTable());
+                if (typeEqualityWitness && typeEqualityWitness->getOp() == kIROp_TypeEqualityWitness &&
+                    as<IRInterfaceType>(typeEqualityWitness->getOperand(0)))
+                {
+                    return true;
+                }
+            }
+        }
+    }
+
+    auto specialize = as<IRSpecialize>(specializedValue);
+    if (!specialize)
+        return false;
+
+    for (UInt i = 0; i < specialize->getArgCount(); ++i)
+    {
+        auto arg = specialize->getArg(i);
+        switch (arg->getOp())
+        {
+        case kIROp_InterfaceType:
+        case kIROp_ExtractExistentialType:
+        case kIROp_ExtractExistentialWitnessTable:
+        case kIROp_MakeExistential:
+            return true;
+        case kIROp_TypeEqualityWitness:
+            if (as<IRInterfaceType>(arg->getOperand(0)))
+                return true;
+            break;
+        default:
+            break;
+        }
+    }
+
+    return false;
+}
+
 // Represents an interprocedural edge between call sites and functions
 struct InterproceduralEdge
 {
@@ -1222,7 +1292,11 @@ struct TypeFlowSpecializationContext
         //
         for (auto inst : module->getGlobalInsts())
             if (auto func = as<IRFunc>(inst))
+            {
+                if (isInvalidExistentialSpecialization(func))
+                    continue;
                 discoverContext(func, workQueue);
+            }
 
         // Process until fixed point.
         while (workQueue.hasItems())
@@ -2987,6 +3061,27 @@ struct TypeFlowSpecializationContext
             case kIROp_Specialize:
                 {
                     auto specialize = cast<IRSpecialize>(context);
+                    if (isInvalidExistentialSpecialization(specialize))
+                    {
+                        if (diagnosedExistentialSpecializationSites.add(specialize))
+                        {
+                            String genericName;
+                            auto diagnosticTarget =
+                                getInvalidExistentialSpecializationTarget(specialize);
+                            if (auto nameHint =
+                                    diagnosticTarget->findDecoration<IRNameHintDecoration>())
+                                genericName = nameHint->getName();
+                            if (genericName.getLength() == 0)
+                                genericName = "<generic>";
+
+                            sink->diagnose(
+                                Diagnostics::CannotSpecializeGenericWithExistential{
+                                    .generic = genericName,
+                                    .location = specialize->sourceLoc});
+                        }
+                        return;
+                    }
+
                     auto generic = cast<IRGeneric>(specialize->getBase());
                     func = cast<IRFunc>(findGenericReturnVal(generic));
 
@@ -3073,6 +3168,25 @@ struct TypeFlowSpecializationContext
 
         auto propagateToCallSite = [&](IRInst* callee)
         {
+            if (isInvalidExistentialSpecialization(callee))
+            {
+                if (diagnosedExistentialSpecializationSites.add(inst))
+                {
+                    String genericName;
+                    auto diagnosticTarget = getInvalidExistentialSpecializationTarget(callee);
+                    if (auto nameHint =
+                            diagnosticTarget->findDecoration<IRNameHintDecoration>())
+                        genericName = nameHint->getName();
+                    if (genericName.getLength() == 0)
+                        genericName = "<generic>";
+
+                    sink->diagnose(Diagnostics::CannotSpecializeGenericWithExistential{
+                        .generic = genericName,
+                        .location = inst->sourceLoc});
+                }
+                return;
+            }
+
             if (as<IRUnboundedFuncElement>(callee))
             {
                 // An unbounded element represents an unknown function,
@@ -4539,18 +4653,15 @@ struct TypeFlowSpecializationContext
                 IRBuilder builder(module);
                 builder.setInsertInto(module);
 
-                // Check if the original callee inst has a dis-allow existential specialization
+                // Check if the selected callee has a disallowed existential specialization
                 // decoration.
                 //
-                if (inst->getCallee()
-                        ->findDecoration<IRDisallowSpecializationWithExistentialsDecoration>())
+                if (isInvalidExistentialSpecialization(callee))
                 {
-                    // In Slang 2025 and later, specializing a generic with multiple types is not
-                    // allowed, so we'll throw a diagnostic message.
-                    //
-                    auto genericBase = as<IRSpecialize>(callee)->getBase();
                     String genericName;
-                    if (auto nameHint = genericBase->findDecoration<IRNameHintDecoration>())
+                    auto diagnosticTarget = getInvalidExistentialSpecializationTarget(callee);
+                    if (auto nameHint =
+                            diagnosticTarget->findDecoration<IRNameHintDecoration>())
                         genericName = nameHint->getName();
                     else
                         genericName = "<generic>";
@@ -5724,95 +5835,9 @@ struct TypeFlowSpecializationContext
         }
     }
 
-    // Detect explicit generic specialization with interface types
-    // (e.g. genericFunc<IFoo>(...)) which the propagation phase cannot handle.
-    //
-    // After specializeModule() resolves IRSpecialize instructions, explicit
-    // interface specialization produces TypeEqualityWitness(IFoo, IFoo) at
-    // global scope. We scan for these witnesses where the type is an interface,
-    // then trace through lookupWitness uses to the specialized function and
-    // its call sites to emit the diagnostic at the user-visible call location.
-    //
-    // The implicit inference path (genericFunc(obj, ...)) is unaffected as it
-    // uses ExtractExistentialType instead of TypeEqualityWitness.
-    void diagnoseExplicitInterfaceSpecializations()
-    {
-        HashSet<IRFunc*> diagnosed;
-
-        for (auto globalInst : module->getGlobalInsts())
-        {
-            if (globalInst->getOp() != kIROp_TypeEqualityWitness)
-                continue;
-
-            if (!as<IRInterfaceType>(globalInst->getOperand(0)))
-                continue;
-
-            for (auto witnessUse = globalInst->firstUse; witnessUse;
-                 witnessUse = witnessUse->nextUse)
-            {
-                auto lookup = as<IRLookupWitnessMethod>(witnessUse->getUser());
-                if (!lookup)
-                    continue;
-
-                for (auto lookupUse = lookup->firstUse; lookupUse;
-                     lookupUse = lookupUse->nextUse)
-                {
-                    auto call = as<IRCall>(lookupUse->getUser());
-                    if (!call || call->getCallee() != lookup)
-                        continue;
-
-                    auto specializedFunc = getParentFunc(call);
-                    if (!specializedFunc || diagnosed.contains(specializedFunc))
-                        continue;
-                    diagnosed.add(specializedFunc);
-
-                    String funcName;
-                    if (auto nameHint =
-                            specializedFunc->findDecoration<IRNameHintDecoration>())
-                        funcName = nameHint->getName();
-                    if (funcName.getLength() == 0)
-                        funcName = "<generic>";
-
-                    // Emit the diagnostic at each call site of the specialized
-                    // function so the error points at the user-written
-                    // genericFunc<IFoo>(...) expression.
-                    bool foundCallSite = false;
-                    for (auto funcUse = specializedFunc->firstUse; funcUse;
-                         funcUse = funcUse->nextUse)
-                    {
-                        auto callSite = as<IRCall>(funcUse->getUser());
-                        if (callSite && callSite->getCallee() == specializedFunc)
-                        {
-                            sink->diagnose(
-                                Diagnostics::CannotSpecializeGenericWithExistential{
-                                    .generic = funcName,
-                                    .location = callSite->sourceLoc});
-                            foundCallSite = true;
-                        }
-                    }
-                    if (!foundCallSite)
-                    {
-                        sink->diagnose(
-                            Diagnostics::CannotSpecializeGenericWithExistential{
-                                .generic = funcName,
-                                .location = specializedFunc->sourceLoc});
-                    }
-                }
-            }
-        }
-    }
-
     bool processModule()
     {
         bool hasChanges = false;
-
-        // Diagnose generics explicitly specialized with interface types
-        // before propagation, which crashes on the lookupWitness callees
-        // they generate.
-        auto errorCountBefore = sink->getErrorCount();
-        diagnoseExplicitInterfaceSpecializations();
-        if (sink->getErrorCount() > errorCountBefore)
-            return false;
 
         // Part 1: Information Propagation
         //    This phase propagates type information through the module
@@ -5852,6 +5877,10 @@ struct TypeFlowSpecializationContext
     // Set of parameters already diagnosed for ref/constref interface issues,
     // to avoid emitting duplicate diagnostics per call edge.
     HashSet<IRInst*> diagnosedRefParams;
+
+    // Set of call sites/contexts already diagnosed for invalid existential specialization,
+    // to avoid duplicate diagnostics when instructions are revisited during propagation.
+    HashSet<IRInst*> diagnosedExistentialSpecializationSites;
 
     // Mapping from (context, inst) --> propagated info
     Dictionary<InstWithContext, IRInst*> propagationMap;
