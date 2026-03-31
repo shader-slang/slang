@@ -5201,7 +5201,7 @@ static void CompleteDecl(
                     parser->sink->diagnose(Diagnostics::DeclNotAllowed{
                         .declType = sb.produceString(),
                         .location = decl->loc});
-                    decl->nestingAlreadyDiagnosed = true;
+                    declToModify->nestingAlreadyDiagnosed = true;
                 }
             }
         }
