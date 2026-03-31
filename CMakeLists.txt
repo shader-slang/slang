@@ -152,7 +152,6 @@ option(
     ON
 )
 
-option(SLANG_ENABLE_PREBUILT_BINARIES "Enable using prebuilt binaries" ON)
 option(SLANG_ENABLE_GFX "Enable gfx targets" ON)
 option(SLANG_ENABLE_SLANGD "Enable language server target" ON)
 option(SLANG_ENABLE_SLANGC "Enable standalone compiler target" ON)
@@ -539,6 +538,10 @@ if(${SLANG_USE_SYSTEM_GLSLANG})
     if(NOT TARGET glslang)
         add_library(glslang ALIAS glslang::glslang)
     endif()
+endif()
+
+if(SLANG_ENABLE_DXIL)
+    include(FetchDXC)
 endif()
 
 add_subdirectory(external)
