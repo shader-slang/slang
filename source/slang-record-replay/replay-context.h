@@ -604,6 +604,19 @@ public:
     /// The signature should match what __FUNCSIG__ or __PRETTY_FUNCTION__ produces.
     SLANG_API void registerHandler(const char* signature, PlaybackHandler handler);
 
+    /// Return the number of registered playback handlers.
+    SLANG_API size_t getHandlerCount() const;
+
+    /// Clear the handler dictionary and deallocate its backing storage.
+    /// Called from slang_shutdown() to free heap-allocated handler strings
+    /// before _CrtDumpMemoryLeaks() runs.
+    SLANG_API void resetHandlers();
+
+    /// Re-register the default set of playback handlers.
+    /// Call after resetHandlers() to restore replay functionality.
+    /// Normal initialization happens automatically via static HandlerRegistrar.
+    SLANG_API void registerDefaultHandlers();
+
     /// Execute the next recorded call from the stream.
     /// Reads the function signature, looks up the handler, and calls it.
     /// Returns true if a call was executed, false if at end of stream.

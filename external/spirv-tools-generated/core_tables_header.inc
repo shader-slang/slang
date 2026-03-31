@@ -165,6 +165,7 @@ enum Extension : uint32_t {
   kSPV_KHR_no_integer_wrap_decoration,
   kSPV_KHR_non_semantic_info,
   kSPV_KHR_physical_storage_buffer,
+  kSPV_KHR_poison_freeze,
   kSPV_KHR_post_depth_coverage,
   kSPV_KHR_quad_control,
   kSPV_KHR_ray_cull_mask,

@@ -4303,6 +4303,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             builder.getIntValue(builder.getUIntType(), 0),
             debugVar->getArgIndex());
 
+        registerDebugInst(debugVar, spvDebugLocalVar);
+
         if (hasBackingVar)
         {
             emitOpDebugDeclare(
@@ -9514,15 +9516,19 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 if (!structType)
                     return false;
                 UInt fieldIndex = 0;
+                bool foundField = false;
                 for (auto field : structType->getFields())
                 {
                     if (field->getKey() == key)
                     {
                         type = unwrapAttributedType(field->getFieldType());
+                        foundField = true;
                         break;
                     }
                     fieldIndex++;
                 }
+                if (!foundField)
+                    return false;
                 spvAccessChain.add(emitIntConstant(fieldIndex, builder.getIntType()));
             }
             else
@@ -9537,7 +9543,13 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         matrixType->getColumnCount());
                 else
                     return false;
-                spvAccessChain.add(ensureInst(element));
+                // DebugValue index operands must be constant integers.
+                auto indexOperand = element;
+                if (auto globalValueRef = as<IRGlobalValueRef>(indexOperand))
+                    indexOperand = globalValueRef->getValue();
+                if (!as<IRIntLit>(indexOperand))
+                    return false;
+                spvAccessChain.add(ensureInst(indexOperand));
             }
         }
         return true;
@@ -9548,12 +9560,12 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         auto debugVar = debugValue->getDebugVar();
         auto debugValueVal = debugValue->getValue();
         // We are asked to update the value for a debug variable.
-        // A debug variable is already emited as a OpDebugVariable +
-        // OpVariable + OpDebugDeclare. We only need to store the new value
-        // into the associated OpVariable. The `debugValue->getDebugVar()` inst
-        // already maps to the `OpVariable` SpvInst, so we just need to emit
-        // code for a store into the subset of the OpVariable with the correct
-        // accesschain defined in the debug value inst.
+        // A debug variable is already emitted as an OpDebugLocalVariable +
+        // OpVariable + OpDebugDeclare. We need to both:
+        // 1. Emit an OpDebugValue (can be helpful if the OpVariable gets
+        //    optimized out).
+        // 2. Store the new value into the associated OpVariable (for the
+        //    DebugDeclare association).
         //
         IRBuilder builder(debugValue);
         builder.setInsertBefore(debugValue);
@@ -9568,42 +9580,48 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             return nullptr;
         if (!spvDebugVar)
             return nullptr;
-        if (spvDebugVar->opcode != SpvOpVariable)
+
+        // Emit an OpDebugValue if possible.
+        //
+        SpvInst* spvDebugLocalVar = nullptr;
+        m_mapIRInstToSpvDebugInst.tryGetValue(rootVar, spvDebugLocalVar);
+        if (spvDebugLocalVar)
         {
-            // If the root variable can't be represented by a normal variable,
-            // try to emit a DebugValue if possible. Usually this means that the variable
-            // represents a shader resource.
-            //
             // SPIR-V requires the access chain specified in a DebugValue operation to
             // be fully static. We will skip emitting the debug inst if the access chain
             // isn't static.
             //
-            auto type = unwrapAttributedType(debugVar->getDataType());
+            auto type = rootVar->getDataType();
+            if (auto pointedToType = tryGetPointedToType(&builder, type))
+                type = pointedToType;
+            else
+                type = as<IRType>(unwrapAttributedType(type));
             List<SpvInst*> accessChain;
             bool isConstAccessChain =
                 translateIRAccessChain(builder, type, irAccessChain, accessChain);
 
             if (isConstAccessChain)
             {
-                return emitOpDebugValue(
+                emitOpDebugValue(
                     parent,
-                    debugValue,
+                    nullptr,
                     m_voidType,
                     getNonSemanticDebugInfoExtInst(),
-                    rootVar,
+                    spvDebugLocalVar,
                     debugValueVal,
                     getDwarfExpr(),
                     accessChain);
             }
-
-            // Fallback to not emit anything for now.
-            return nullptr;
         }
 
-        // The ordinary case is the debug variable has a backing ordinary variable.
-        // We can simply emit a store into the backing variable for the DebugValue operation.
+        // If the debug variable has a backing OpVariable, emit a store into it
+        // to keep the DebugDeclare association in sync.
         //
-        return emitStore(parent, debugValue, debugVar, debugValueVal);
+        if (spvDebugVar->opcode == SpvOpVariable)
+            return emitStore(parent, debugValue, debugVar, debugValueVal);
+
+        // Fallback to not emit anything.
+        return nullptr;
     }
 
     void maybeAssignAnonymousMemberNames(IRStructType* structType)

@@ -30,6 +30,313 @@ static Val* _getNonEmptyConstraintPackVal(
     ASTBuilder* astBuilder,
     DeclRef<NonEmptyPackConstraintDecl> const& constraintDeclRef);
 
+// ============================================================================
+// Declaration nesting validation (disallowed-by-default)
+//
+// A data-driven table determines which declaration categories are legal inside
+// which container categories. Any combination not explicitly allowed is
+// rejected with a diagnostic.
+// ============================================================================
+
+/// Categories for child declarations (what is being declared).
+enum class DeclNestingCategory : uint32_t
+{
+    StructType,        // StructDecl, ClassDecl
+    InterfaceType,     // InterfaceDecl
+    EnumType,          // EnumDecl
+    AssocType,         // AssocTypeDecl
+    Extension,         // ExtensionDecl
+    Function,          // FuncDecl
+    Constructor,       // ConstructorDecl
+    Subscript,         // SubscriptDecl
+    Property,          // PropertyDecl
+    Accessor,          // GetterDecl, SetterDecl, RefAccessorDecl
+    InstanceVar,       // VarDecl/LetDecl without static modifier
+    StaticVar,         // VarDecl/LetDecl with HLSLStaticModifier
+    TypeAlias,         // TypeDefDecl, TypeAliasDecl
+    EnumCase,          // EnumCaseDecl
+    Inheritance,       // InheritanceDecl
+    Import,            // ImportDecl
+    Using,             // UsingDecl
+    Namespace,         // NamespaceDecl
+    Empty,             // EmptyDecl
+    ModuleDeclaration, // ModuleDeclarationDecl
+    Include,           // IncludeDecl, ImplementingDecl
+    Capability,        // RequireCapabilityDecl
+
+    Count,
+    Unknown = Count, // compiler-generated or unclassified (skip validation)
+};
+
+/// Categories for parent containers.
+enum class ContainerNestingCategory : uint32_t
+{
+    Module,        // ModuleDecl, FileDecl, NamespaceDeclBase
+    StructOrClass, // StructDecl, ClassDecl
+    Interface,     // InterfaceDecl
+    Enum,          // EnumDecl
+    Extension,     // ExtensionDecl
+    Subscript,     // SubscriptDecl
+    Property,      // PropertyDecl
+    Function,      // FunctionDeclBase (function/method bodies)
+
+    Count,
+    Unknown = Count, // skip validation
+};
+
+/// Classify a declaration into a DeclNestingCategory.
+static DeclNestingCategory classifyDeclForNesting(Decl* decl)
+{
+    // Order matters for inheritance: check more-derived types first.
+    if (as<AccessorDecl>(decl))
+        return DeclNestingCategory::Accessor;
+    if (as<ConstructorDecl>(decl))
+        return DeclNestingCategory::Constructor;
+    if (as<FuncDecl>(decl))
+        return DeclNestingCategory::Function;
+    if (as<SubscriptDecl>(decl))
+        return DeclNestingCategory::Subscript;
+    if (as<PropertyDecl>(decl))
+        return DeclNestingCategory::Property;
+
+    if (as<InterfaceDecl>(decl))
+        return DeclNestingCategory::InterfaceType;
+    if (as<StructDecl>(decl) || as<ClassDecl>(decl))
+        return DeclNestingCategory::StructType;
+    if (as<EnumDecl>(decl))
+        return DeclNestingCategory::EnumType;
+    if (as<AssocTypeDecl>(decl))
+        return DeclNestingCategory::AssocType;
+    if (as<ExtensionDecl>(decl))
+        return DeclNestingCategory::Extension;
+
+    if (auto varDecl = as<VarDeclBase>(decl))
+    {
+        // ParamDecl / ModernParamDecl are structural, not user-chosen nesting.
+        if (as<ParamDecl>(decl) || as<ModernParamDecl>(decl))
+            return DeclNestingCategory::Unknown;
+        // GenericValueParamDecl and friends are inside GenericDecl, skip.
+        if (as<GenericValueParamDecl>(decl) || as<GenericValuePackParamDecl>(decl) ||
+            as<GlobalGenericValueParamDecl>(decl))
+            return DeclNestingCategory::Unknown;
+        // `extern` vars in extensions reference existing fields, not new declarations.
+        if (varDecl->hasModifier<ExternModifier>() && as<ExtensionDecl>(varDecl->parentDecl))
+            return DeclNestingCategory::Unknown;
+
+        if (varDecl->hasModifier<HLSLStaticModifier>())
+            return DeclNestingCategory::StaticVar;
+        return DeclNestingCategory::InstanceVar;
+    }
+
+    if (as<TypeDefDecl>(decl))
+        return DeclNestingCategory::TypeAlias;
+    if (as<EnumCaseDecl>(decl))
+        return DeclNestingCategory::EnumCase;
+    if (as<InheritanceDecl>(decl))
+        return DeclNestingCategory::Inheritance;
+    if (as<ImportDecl>(decl))
+        return DeclNestingCategory::Import;
+    if (as<UsingDecl>(decl))
+        return DeclNestingCategory::Using;
+    if (as<NamespaceDecl>(decl))
+        return DeclNestingCategory::Namespace;
+    if (as<EmptyDecl>(decl))
+        return DeclNestingCategory::Empty;
+    if (as<ModuleDeclarationDecl>(decl))
+        return DeclNestingCategory::ModuleDeclaration;
+    if (as<IncludeDecl>(decl) || as<ImplementingDecl>(decl))
+        return DeclNestingCategory::Include;
+    if (as<RequireCapabilityDecl>(decl))
+        return DeclNestingCategory::Capability;
+
+    // Everything else is compiler-generated or unclassified: skip validation.
+    return DeclNestingCategory::Unknown;
+}
+
+/// Walk up the parent chain, skipping GenericDecl and ScopeDecl wrappers,
+/// to find the nearest container relevant to nesting validation.
+///
+/// This is intentionally separate from getParentDecl() (which only skips
+/// GenericDecl) to avoid changing behaviour for the ~30 other callsites
+/// that rely on the shared utility.
+static ContainerDecl* getParentContainerForNesting(Decl* decl)
+{
+    auto parentDecl = decl->parentDecl;
+    for (;;)
+    {
+        if (auto genericDecl = as<GenericDecl>(parentDecl))
+            parentDecl = genericDecl->parentDecl;
+        else if (auto scopeDecl = as<ScopeDecl>(parentDecl))
+            parentDecl = scopeDecl->parentDecl;
+        else
+            break;
+    }
+    return parentDecl;
+}
+
+/// Classify a container declaration into a ContainerNestingCategory.
+static ContainerNestingCategory classifyContainerForNesting(ContainerDecl* container)
+{
+    if (as<NamespaceDeclBase>(container) || as<FileDecl>(container))
+        return ContainerNestingCategory::Module;
+    if (as<StructDecl>(container) || as<ClassDecl>(container))
+        return ContainerNestingCategory::StructOrClass;
+    if (as<InterfaceDecl>(container))
+        return ContainerNestingCategory::Interface;
+    if (as<EnumDecl>(container))
+        return ContainerNestingCategory::Enum;
+    if (as<ExtensionDecl>(container))
+        return ContainerNestingCategory::Extension;
+    if (as<SubscriptDecl>(container))
+        return ContainerNestingCategory::Subscript;
+    if (as<PropertyDecl>(container))
+        return ContainerNestingCategory::Property;
+    if (as<FunctionDeclBase>(container))
+        return ContainerNestingCategory::Function;
+
+    // GenericDecl and ScopeDecl are unwrapped by getParentContainerForNesting();
+    // anything else is compiler-internal — skip.
+    return ContainerNestingCategory::Unknown;
+}
+
+/// Build a bitmask from one ContainerNestingCategory value.
+static constexpr uint32_t containerBit(ContainerNestingCategory c)
+{
+    return 1u << static_cast<uint32_t>(c);
+}
+
+/// Build a bitmask from multiple ContainerNestingCategory values.
+template<typename... Ts>
+static constexpr uint32_t allowedIn(Ts... cats)
+{
+    return (containerBit(cats) | ...);
+}
+
+using CC = ContainerNestingCategory;
+
+/// One row in the nesting-rule table: which containers a declaration kind may appear in.
+struct NestingRule
+{
+    DeclNestingCategory child;
+    uint32_t allowedContainers;
+    const char* childName;
+};
+
+/// The nesting-rule table.  Each row reads as:
+///   "<childName> declaration is allowed in <allowedContainers>."
+///
+/// Note: The parser restricts enum body syntax to cases and a limited set of
+/// members, so some CC::Enum entries (e.g. Constructor, Subscript, Property)
+/// only take effect when these constructs appear on an enum type via extension.
+// clang-format off
+static const NestingRule kNestingRules[] = {
+//  child category                          allowed containers                                       display name
+    {DeclNestingCategory::StructType,       allowedIn(CC::Module, CC::StructOrClass, CC::Extension, CC::Function), "struct/class"},
+    {DeclNestingCategory::InterfaceType,    allowedIn(CC::Module),                                   "interface"},
+    {DeclNestingCategory::EnumType,         allowedIn(CC::Module, CC::StructOrClass, CC::Enum, CC::Extension, CC::Function), "enum"},
+    {DeclNestingCategory::AssocType,        allowedIn(CC::Interface),                                "associatedtype"},
+    {DeclNestingCategory::Extension,        allowedIn(CC::Module),                                   "extension"},
+    {DeclNestingCategory::Function,         allowedIn(CC::Module, CC::StructOrClass, CC::Interface, CC::Extension, CC::Enum), "function"},
+    {DeclNestingCategory::Constructor,      allowedIn(CC::StructOrClass, CC::Interface, CC::Extension, CC::Enum), "constructor"},
+    {DeclNestingCategory::Subscript,        allowedIn(CC::StructOrClass, CC::Interface, CC::Extension, CC::Enum), "subscript"},
+    {DeclNestingCategory::Property,         allowedIn(CC::Module, CC::StructOrClass, CC::Interface, CC::Extension, CC::Enum), "property"},
+    {DeclNestingCategory::Accessor,         allowedIn(CC::Subscript, CC::Property),                  "accessor"},
+    {DeclNestingCategory::InstanceVar,      allowedIn(CC::Module, CC::StructOrClass, CC::Function),  "non-static member variable"},
+    {DeclNestingCategory::StaticVar,        allowedIn(CC::Module, CC::StructOrClass, CC::Interface, CC::Extension, CC::Enum, CC::Function), "static variable"},
+    {DeclNestingCategory::TypeAlias,        allowedIn(CC::Module, CC::StructOrClass, CC::Interface, CC::Extension, CC::Enum, CC::Function), "typealias"},
+    {DeclNestingCategory::EnumCase,         allowedIn(CC::Enum),                                     "enum case"},
+    {DeclNestingCategory::Inheritance,      allowedIn(CC::StructOrClass, CC::Interface, CC::Enum, CC::Extension), "inheritance"},
+    {DeclNestingCategory::Import,           allowedIn(CC::Module),                                   "import"},
+    {DeclNestingCategory::Using,            allowedIn(CC::Module, CC::StructOrClass, CC::Interface, CC::Extension, CC::Function), "using"},
+    {DeclNestingCategory::Namespace,        allowedIn(CC::Module),                                   "namespace"},
+    {DeclNestingCategory::Empty,            allowedIn(CC::Module, CC::StructOrClass, CC::Interface, CC::Enum, CC::Extension, CC::Subscript, CC::Property, CC::Function), "empty"},
+    {DeclNestingCategory::ModuleDeclaration,allowedIn(CC::Module),                                   "module declaration"},
+    {DeclNestingCategory::Include,          allowedIn(CC::Module),                                   "include"},
+    {DeclNestingCategory::Capability,       allowedIn(CC::Module),                                   "require capability"},
+};
+// clang-format on
+
+static_assert(
+    SLANG_COUNT_OF(kNestingRules) == static_cast<SlangSSizeT>(DeclNestingCategory::Count),
+    "kNestingRules must have one entry per DeclNestingCategory");
+
+static_assert(
+    static_cast<uint32_t>(ContainerNestingCategory::Count) <= 32,
+    "Too many ContainerNestingCategory values for uint32_t bitmask");
+
+/// Return a human-readable name for a ContainerNestingCategory.
+static const char* getContainerNestingCategoryName(ContainerNestingCategory cat)
+{
+    switch (cat)
+    {
+    case ContainerNestingCategory::Module:
+        return "module/namespace";
+    case ContainerNestingCategory::StructOrClass:
+        return "struct/class";
+    case ContainerNestingCategory::Interface:
+        return "interface";
+    case ContainerNestingCategory::Enum:
+        return "enum";
+    case ContainerNestingCategory::Extension:
+        return "extension";
+    case ContainerNestingCategory::Subscript:
+        return "subscript";
+    case ContainerNestingCategory::Property:
+        return "property";
+    case ContainerNestingCategory::Function:
+        return "function";
+    default:
+        return "unknown";
+    }
+}
+
+/// Look up the nesting rule for a given declaration category.
+/// The table is ordered 1:1 with DeclNestingCategory (enforced by static_assert).
+static const NestingRule& findNestingRule(DeclNestingCategory child)
+{
+    return kNestingRules[static_cast<uint32_t>(child)];
+}
+
+/// Validate that a declaration is allowed in its parent container.
+/// Returns true if a diagnostic was emitted (i.e. the nesting is invalid).
+static bool validateDeclNesting(SemanticsVisitor* visitor, Decl* decl)
+{
+    auto childCategory = classifyDeclForNesting(decl);
+    if (childCategory == DeclNestingCategory::Unknown)
+        return false;
+
+    // Unwrap GenericDecl and ScopeDecl to reach the user-visible container.
+    // This uses a nesting-specific helper rather than the shared getParentDecl()
+    // to avoid changing behaviour for ~30 other callsites.
+    auto parentContainer = getParentContainerForNesting(decl);
+    if (!parentContainer)
+        return false;
+
+    auto parentCategory = classifyContainerForNesting(parentContainer);
+    if (parentCategory == ContainerNestingCategory::Unknown)
+        return false;
+
+    auto& rule = findNestingRule(childCategory);
+
+    if (rule.allowedContainers & containerBit(parentCategory))
+        return false; // allowed
+
+    // The parser's isDeclAllowed (slang-parser.cpp:5177) and
+    // parseVarDeclrStatement (slang-parser.cpp:6607) set
+    // nestingAlreadyDiagnosed when they emit a nesting diagnostic.
+    // Skip our diagnostic to avoid showing duplicates to the user.
+    if (decl->nestingAlreadyDiagnosed)
+        return true;
+
+    visitor->getSink()->diagnose(Diagnostics::DeclNotAllowedInContext{
+        .childKind = rule.childName,
+        .parentKind = getContainerNestingCategoryName(parentCategory),
+        .decl = decl});
+    return true;
+}
+
+// ============================================================================
+
 static bool isAssociatedTypeDecl(Decl* decl)
 {
     auto d = decl;
@@ -252,7 +559,11 @@ struct SemanticsDeclModifiersVisitor : public SemanticsDeclVisitorBase,
         }
     }
 
-    void visitDecl(Decl* decl) { checkModifiers(decl); }
+    void visitDecl(Decl* decl)
+    {
+        validateDeclNesting(this, decl);
+        checkModifiers(decl);
+    }
 
     void visitStructDecl(StructDecl* structDecl);
 
@@ -415,9 +726,6 @@ struct SemanticsDeclHeaderVisitor : public SemanticsDeclVisitorBase,
     ///
     /// The type of storage is determined by the parent declaration.
     Type* _getAccessorStorageType(AccessorDecl* decl);
-
-    /// Perform checks common to all types of accessors.
-    void _visitAccessorDeclCommon(AccessorDecl* decl);
 
     void visitAccessorDecl(AccessorDecl* decl);
     void visitSetterDecl(SetterDecl* decl);
@@ -837,6 +1145,11 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
             dispatchIfNotNull(t.type);
         }
     }
+    void visitShapePackTransformExpr(ShapePackTransformExpr* expr)
+    {
+        for (auto arg : expr->args)
+            dispatchIfNotNull(arg);
+    }
     void visitPackBranchTypeExpr(PackBranchTypeExpr* expr)
     {
         dispatchIfNotNull(expr->packOperand.type);
@@ -947,6 +1260,8 @@ struct SemanticsDeclReferenceVisitor : public SemanticsDeclVisitorBase,
     void visitGpuForeachStmt(GpuForeachStmt*) { return; }
 
     void visitExpressionStmt(ExpressionStmt* stmt) { dispatchIfNotNull(stmt->expression); }
+
+    void visitRequireCapabilityStmt(RequireCapabilityStmt*) { return; }
 
     // Val Visitor
 
@@ -1790,7 +2105,7 @@ void SemanticsDeclModifiersVisitor::visitInterfaceDecl(InterfaceDecl* interfaceD
 
 void SemanticsDeclModifiersVisitor::visitStructDecl(StructDecl* structDecl)
 {
-    checkModifiers(structDecl);
+    visitDecl(structDecl);
 
     // Replace any bitfield member with a property, do this here before
     // name lookup to avoid the original var decl being referenced
@@ -3715,8 +4030,8 @@ void SemanticsDeclHeaderVisitor::checkGenericTypeEqualityConstraintSubType(
             return compareDecls(subAncestor, supAncestor);
         }
 
-        auto subIndex = ancestor->getMembers().binarySearch(subAncestor);
-        auto supIndex = ancestor->getMembers().binarySearch(supAncestor);
+        auto subIndex = ancestor->getMembers().indexOf(subAncestor);
+        auto supIndex = ancestor->getMembers().indexOf(supAncestor);
 
         return int(supIndex - subIndex);
     };
@@ -8767,6 +9082,11 @@ bool SemanticsVisitor::isHalfType(Type* type)
     return baseType == BaseType::Half;
 }
 
+bool SemanticsVisitor::isValidSpecializationConstantType(Type* type)
+{
+    return as<BasicExpressionType>(type) || isEnumType(type);
+}
+
 bool SemanticsVisitor::isValidCompileTimeConstantType(Type* type)
 {
     return isScalarIntegerType(type) || isEnumType(type);
@@ -9201,10 +9521,9 @@ void SemanticsDeclHeaderVisitor::visitGlobalGenericParamDecl(GlobalGenericParamD
 
 void SemanticsDeclHeaderVisitor::visitAssocTypeDecl(AssocTypeDecl* decl)
 {
-    // assoctype only allowed in an interface
-    auto interfaceDecl = as<InterfaceDecl>(decl->parentDecl);
-    if (!interfaceDecl)
-        getSink()->diagnose(Diagnostics::AssocTypeInInterfaceOnly{.decl = decl});
+    // validateDeclNesting enforces that associatedtype only appears inside
+    // an interface; assert to catch regressions if that check is ever bypassed.
+    SLANG_ASSERT(as<InterfaceDecl>(decl->parentDecl) || getSink()->getErrorCount() > 0);
     checkVisibility(decl);
 }
 
@@ -11387,7 +11706,9 @@ Type* SemanticsVisitor::findResultTypeForConstructorDecl(ConstructorDecl* decl)
     auto thisType = calcThisType(makeDeclRef(parent));
     if (!thisType)
     {
-        getSink()->diagnose(Diagnostics::InitializerNotInsideType{.decl = decl});
+        // The nesting validation in validateDeclNesting already reports the error;
+        // assert to catch regressions if that check is ever bypassed.
+        SLANG_ASSERT(getSink()->getErrorCount() > 0);
         thisType = m_astBuilder->getErrorType();
     }
     return thisType;
@@ -11479,30 +11800,15 @@ Type* SemanticsDeclHeaderVisitor::_getAccessorStorageType(AccessorDecl* decl)
     }
     else
     {
+        // validateDeclNesting enforces that accessors only appear inside
+        // subscript or property; assert to catch regressions.
+        SLANG_ASSERT(getSink()->getErrorCount() > 0);
         return getASTBuilder()->getErrorType();
-    }
-}
-
-void SemanticsDeclHeaderVisitor::_visitAccessorDeclCommon(AccessorDecl* decl)
-{
-    // An accessor must appear nested inside a subscript or property declaration.
-    //
-    auto parentDecl = decl->parentDecl;
-    if (as<SubscriptDecl>(parentDecl))
-    {
-    }
-    else if (as<PropertyDecl>(parentDecl))
-    {
-    }
-    else
-    {
-        getSink()->diagnose(Diagnostics::AccessorMustBeInsideSubscriptOrProperty{.decl = decl});
     }
 }
 
 void SemanticsDeclHeaderVisitor::visitAccessorDecl(AccessorDecl* decl)
 {
-    _visitAccessorDeclCommon(decl);
 
     // Note: This subroutine is used by both `get`
     // and `ref` accessors, but is bypassed by
@@ -11539,9 +11845,6 @@ void SemanticsDeclHeaderVisitor::visitAccessorDecl(AccessorDecl* decl)
 
 void SemanticsDeclHeaderVisitor::visitSetterDecl(SetterDecl* decl)
 {
-    // Make sure to invoke the common checking logic for all accessors.
-    _visitAccessorDeclCommon(decl);
-
     // A `set` accessor always returns `void`.
     //
     decl->returnType.type = getASTBuilder()->getVoidType();
@@ -14016,12 +14319,11 @@ void SemanticsDeclAttributesVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
     {
         if (as<SpecializationConstantAttribute>(modifier) || as<VkConstantIdAttribute>(modifier))
         {
-            // Specialization constant.
-            // Check that type is basic type.
-            if (!as<BasicExpressionType>(varDecl->getType()) && !as<ErrorType>(varDecl->getType()))
+            if (!isValidSpecializationConstantType(varDecl->getType()) &&
+                !as<ErrorType>(varDecl->getType()))
             {
                 getSink()->diagnose(
-                    Diagnostics::SpecializationConstantMustBeScalar{.modifier = modifier});
+                    Diagnostics::SpecializationConstantMustBeScalarOrEnum{.modifier = modifier});
             }
             hasSpecConstAttr = true;
         }

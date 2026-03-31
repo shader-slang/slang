@@ -217,6 +217,7 @@ public:
     ReturnStmt* ParseReturnStatement();
     DeferStmt* ParseDeferStatement();
     ThrowStmt* ParseThrowStatement();
+    RequireCapabilityStmt* ParseRequireCapabilityStatement();
     ExpressionStmt* ParseExpressionStatement();
     Expr* ParseExpression(Precedence level = Precedence::Comma);
 
@@ -305,6 +306,10 @@ static NodeBase* parseFirstExpr(Parser* parser, void* userData);
 static NodeBase* parseLastExpr(Parser* parser, void* userData);
 static NodeBase* parseTrimFirstExpr(Parser* parser, void* userData);
 static NodeBase* parseTrimLastExpr(Parser* parser, void* userData);
+static NodeBase* parseShapeConcatExpr(Parser* parser, void* userData);
+static NodeBase* parseShapePermuteExpr(Parser* parser, void* userData);
+static NodeBase* parseShapeSwapExpr(Parser* parser, void* userData);
+static NodeBase* parseShapeReduceExpr(Parser* parser, void* userData);
 
 //
 
@@ -1918,6 +1923,12 @@ public:
             if (member.exp)
                 dispatch(member.exp);
     }
+    void visitShapePackTransformExpr(ShapePackTransformExpr* expr)
+    {
+        for (auto arg : expr->args)
+            if (arg)
+                dispatch(arg);
+    }
     void visitPackBranchTypeExpr(PackBranchTypeExpr* expr)
     {
         if (expr->packOperand.exp)
@@ -3013,6 +3024,8 @@ static TypeSpec _parseSimpleTypeSpec(Parser* parser)
         parser->LookAheadToken("expand") || parser->LookAheadToken("each") ||
         parser->LookAheadToken("__first") || parser->LookAheadToken("__last") ||
         parser->LookAheadToken("__trimFirst") || parser->LookAheadToken("__trimLast") ||
+        parser->LookAheadToken("__shapeConcat") || parser->LookAheadToken("__shapePermute") ||
+        parser->LookAheadToken("__shapeSwap") || parser->LookAheadToken("__shapeReduce") ||
         parser->LookAheadToken("__packBranch"))
     {
         typeExpr = parsePrefixExpr(parser);
@@ -5182,6 +5195,7 @@ static void CompleteDecl(
             printDiagnosticArg(sb, decl->astNodeType);
             parser->sink->diagnose(
                 Diagnostics::DeclNotAllowed{.declType = sb.produceString(), .location = decl->loc});
+            decl->nestingAlreadyDiagnosed = true;
         }
         else
         {
@@ -5199,6 +5213,7 @@ static void CompleteDecl(
                     parser->sink->diagnose(Diagnostics::DeclNotAllowed{
                         .declType = sb.produceString(),
                         .location = decl->loc});
+                    declToModify->nestingAlreadyDiagnosed = true;
                 }
             }
         }
@@ -6324,6 +6339,10 @@ Stmt* Parser::ParseStatement(Stmt* parentStmt)
     {
         statement = ParseThrowStatement();
     }
+    else if (LookAheadToken("__requireCapability"))
+    {
+        statement = ParseRequireCapabilityStatement();
+    }
     else if (LookAheadToken(TokenType::Identifier) || LookAheadToken(TokenType::Scope))
     {
         if (LookAheadToken(TokenType::Identifier) && LookAheadToken(TokenType::Colon, 1))
@@ -6605,6 +6624,8 @@ DeclStmt* Parser::parseVarDeclrStatement(Modifiers modifiers)
         printDiagnosticArg(sb, decl->astNodeType);
         sink->diagnose(
             Diagnostics::DeclNotAllowed{.declType = sb.produceString(), .location = decl->loc});
+        if (auto d = as<Decl>(decl))
+            d->nestingAlreadyDiagnosed = true;
     }
     return varDeclrStatement;
 }
@@ -6934,6 +6955,39 @@ ExpressionStmt* Parser::ParseExpressionStatement()
     statement->expression = ParseExpression();
 
     ReadToken(TokenType::Semicolon);
+    return statement;
+}
+
+// '__requireCapability' '(' identifier (',' identifier)* ')' ';'
+RequireCapabilityStmt* Parser::ParseRequireCapabilityStatement()
+{
+    RequireCapabilityStmt* statement = astBuilder->create<RequireCapabilityStmt>();
+    FillPosition(statement);
+    ReadToken("__requireCapability");
+
+    ReadToken(TokenType::LParent);
+
+    while (true)
+    {
+        Token capToken = ReadToken(TokenType::Identifier);
+        if (capToken.type != TokenType::Identifier)
+            break;
+
+        UnownedStringSlice capNameStr = capToken.getContent();
+        CapabilityName capName = findCapabilityName(capNameStr);
+        if (capName != CapabilityName::Invalid)
+            statement->requiredCaps.add(capToken);
+        else
+            sink->diagnose(
+                Diagnostics::UnknownCapability{.capability = capNameStr, .location = capToken.loc});
+
+        if (!AdvanceIf(this, TokenType::Comma))
+            break;
+    }
+
+    ReadToken(TokenType::RParent);
+    ReadToken(TokenType::Semicolon);
+
     return statement;
 }
 
@@ -7387,6 +7441,21 @@ static NodeBase* parsePackQueryExprImpl(Parser* parser)
     return expr;
 }
 
+template<typename TExpr>
+static NodeBase* parseShapePackTransformExprImpl(Parser* parser, int argCount)
+{
+    TExpr* expr = parser->astBuilder->create<TExpr>();
+    parser->ReadMatchingToken(TokenType::LParent);
+    for (int i = 0; i < argCount; ++i)
+    {
+        if (i != 0)
+            parser->ReadMatchingToken(TokenType::Comma);
+        expr->args.add(parser->ParseArgExpr());
+    }
+    parser->ReadMatchingToken(TokenType::RParent);
+    return expr;
+}
+
 static NodeBase* parseFirstExpr(Parser* parser, void* /*userData*/)
 {
     return parsePackQueryExprImpl<FirstExpr>(parser);
@@ -7405,6 +7474,26 @@ static NodeBase* parseTrimFirstExpr(Parser* parser, void* /*userData*/)
 static NodeBase* parseTrimLastExpr(Parser* parser, void* /*userData*/)
 {
     return parsePackQueryExprImpl<TrimLastExpr>(parser);
+}
+
+static NodeBase* parseShapeConcatExpr(Parser* parser, void* /*userData*/)
+{
+    return parseShapePackTransformExprImpl<ShapeConcatExpr>(parser, 3);
+}
+
+static NodeBase* parseShapePermuteExpr(Parser* parser, void* /*userData*/)
+{
+    return parseShapePackTransformExprImpl<ShapePermuteExpr>(parser, 2);
+}
+
+static NodeBase* parseShapeSwapExpr(Parser* parser, void* /*userData*/)
+{
+    return parseShapePackTransformExprImpl<ShapeSwapExpr>(parser, 3);
+}
+
+static NodeBase* parseShapeReduceExpr(Parser* parser, void* /*userData*/)
+{
+    return parseShapePackTransformExprImpl<ShapeReduceExpr>(parser, 2);
 }
 
 static NodeBase* parsePackBranchTypeExpr(Parser* parser, void* /*userData*/)
@@ -9099,6 +9188,34 @@ static Expr* parsePrefixExpr(Parser* parser)
                     expr->loc = tokenLoc;
                 return expr;
             }
+            else if (AdvanceIf(parser, "__shapeConcat"))
+            {
+                auto expr = as<Expr>(parseShapeConcatExpr(parser, nullptr));
+                if (expr && !expr->loc.isValid())
+                    expr->loc = tokenLoc;
+                return expr;
+            }
+            else if (AdvanceIf(parser, "__shapePermute"))
+            {
+                auto expr = as<Expr>(parseShapePermuteExpr(parser, nullptr));
+                if (expr && !expr->loc.isValid())
+                    expr->loc = tokenLoc;
+                return expr;
+            }
+            else if (AdvanceIf(parser, "__shapeSwap"))
+            {
+                auto expr = as<Expr>(parseShapeSwapExpr(parser, nullptr));
+                if (expr && !expr->loc.isValid())
+                    expr->loc = tokenLoc;
+                return expr;
+            }
+            else if (AdvanceIf(parser, "__shapeReduce"))
+            {
+                auto expr = as<Expr>(parseShapeReduceExpr(parser, nullptr));
+                if (expr && !expr->loc.isValid())
+                    expr->loc = tokenLoc;
+                return expr;
+            }
             return parsePostfixExpr(parser);
         }
     default:
@@ -10108,6 +10225,10 @@ static const SyntaxParseInfo g_parseSyntaxEntries[] = {
     _makeParseExpr("__last", parseLastExpr),
     _makeParseExpr("__trimFirst", parseTrimFirstExpr),
     _makeParseExpr("__trimLast", parseTrimLastExpr),
+    _makeParseExpr("__shapeConcat", parseShapeConcatExpr),
+    _makeParseExpr("__shapePermute", parseShapePermuteExpr),
+    _makeParseExpr("__shapeSwap", parseShapeSwapExpr),
+    _makeParseExpr("__shapeReduce", parseShapeReduceExpr),
     _makeParseExpr("__packBranch", parsePackBranchTypeExpr),
     _makeParseExpr("__getAddress", parseAddressOfExpr),
     _makeParseExpr("__floatAsInt", parseFloatAsIntExpr),
