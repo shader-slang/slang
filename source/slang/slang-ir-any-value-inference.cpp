@@ -153,12 +153,7 @@ HashSet<IRInterfaceType*> findCyclicInterfaces(
     {
         if (!visited.contains(interfaceType))
         {
-            _findCyclicInterfaces(
-                interfaceType,
-                dependencyMap,
-                visited,
-                onStack,
-                cyclicInterfaces);
+            _findCyclicInterfaces(interfaceType, dependencyMap, visited, onStack, cyclicInterfaces);
         }
     }
 
