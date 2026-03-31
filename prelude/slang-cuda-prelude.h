@@ -6765,7 +6765,7 @@ struct RegisterCount;
 template<int M, int N, int K>
 struct RegisterCount<half, M, N, K, MatrixUse::MatrixA>
 {
-    static constexpr int value = 8;
+    static constexpr int value = 4;
 };
 template<int M, int N, int K>
 struct RegisterCount<half, M, N, K, MatrixUse::MatrixB>
@@ -6789,7 +6789,7 @@ struct RegisterCount<half, M, N, K, MatrixUse::MatrixD>
 template<int M, int N, int K>
 struct RegisterCount<__nv_bfloat16, M, N, K, MatrixUse::MatrixA>
 {
-    static constexpr int value = 8;
+    static constexpr int value = 4;
 };
 template<int M, int N, int K>
 struct RegisterCount<__nv_bfloat16, M, N, K, MatrixUse::MatrixB>
@@ -10059,8 +10059,8 @@ __device__ inline void mmaChangeMajor(WmmaFragment<half, M, N, K, R>& frag)
     {
         uint32_t t0, t1, t2, t3;
         asm volatile("movmatrix.sync.aligned.m8n8.trans.b16 %0, %1;" : "=r"(t0) : "r"(frag.regs[0]));
-        asm volatile("movmatrix.sync.aligned.m8n8.trans.b16 %0, %1;" : "=r"(t1) : "r"(frag.regs[2]));
-        asm volatile("movmatrix.sync.aligned.m8n8.trans.b16 %0, %1;" : "=r"(t2) : "r"(frag.regs[1]));
+        asm volatile("movmatrix.sync.aligned.m8n8.trans.b16 %0, %1;" : "=r"(t1) : "r"(frag.regs[1]));
+        asm volatile("movmatrix.sync.aligned.m8n8.trans.b16 %0, %1;" : "=r"(t2) : "r"(frag.regs[2]));
         asm volatile("movmatrix.sync.aligned.m8n8.trans.b16 %0, %1;" : "=r"(t3) : "r"(frag.regs[3]));
         frag.regs[0] = t0;
         frag.regs[1] = t1;

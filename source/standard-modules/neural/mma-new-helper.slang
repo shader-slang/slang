@@ -373,9 +373,9 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
     // warp shuffle. Single flat loop over all packed columns — matches Tin2's
     // Vector::from_array structure exactly. Tile index derived from col_packed.
     [require(cuda, subgroup_shuffle)]
-    static void buildAllTilesFromArray<int ArraySize, int OutN, let OutR : linalg.CoopMatMatrixUse>(
+    VISIBILITY_LEVEL static void buildAllTilesFromArray<int ArraySize, int OutN>(
         inout half data[ArraySize],
-        inout linalg.CoopMat<half, MemoryScope.Subgroup, ROW_A, COLUMN_A, OutR> outArray[OutN])
+        inout MatA outArray[OutN])
     {
         uint laneid = WaveGetLaneIndex();
         let packedData = bit_cast<uint[ArraySize / 2]>(data);
@@ -423,6 +423,7 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
             {
                 uint r_row = i % RegRows;
                 uint mma_row = i / RegRows;
+
                 int reg_idx = int(r_col * RegRows + r_row);
                 int frag_idx = int(mma_col * MMARows + mma_row);
 
@@ -436,6 +437,42 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
 
                 outArray[frag_idx].fragmentWrite(reg_idx, value);
             }
+        }
+    }
+
+    // Per-tile transpose for MatA: swaps register (row,col)→(col,row).
+    // Equivalent to Tin2's MMAMatrix::transpose().
+    //
+    // MatA has 4 registers per thread:
+    //   reg 0=(r0,c0), 1=(r1,c0), 2=(r0,c1), 3=(r1,c1)
+    // Transpose swaps reg 1↔2.
+    VISIBILITY_LEVEL static void transposeTilesA<int Count>(inout MatA tiles[Count])
+    {
+        [ForceUnroll]
+        for (int idx = 0; idx < Count; idx++)
+        {
+            uint r1 = tiles[idx].fragmentRead(1);
+            uint r2 = tiles[idx].fragmentRead(2);
+            tiles[idx].fragmentWrite(1, r2);
+            tiles[idx].fragmentWrite(2, r1);
+        }
+    }
+
+    // Per-tile transpose for MatC (accumulator): swaps register (row,col)→(col,row).
+    // Equivalent to Tin2's w.transpose() on the MMA result.
+    //
+    // MatC has 4 registers (two m16n8k16 accumulators, 2 regs each):
+    //   reg 0=(r0,c0), 1=(r1,c0), 2=(r0,c1), 3=(r1,c1)
+    // Transpose swaps reg 1↔2.
+    static void transposeTilesC<int Count>(inout MatC tiles[Count])
+    {
+        [ForceUnroll]
+        for (int idx = 0; idx < Count; idx++)
+        {
+            uint r1 = tiles[idx].fragmentRead(1);
+            uint r2 = tiles[idx].fragmentRead(2);
+            tiles[idx].fragmentWrite(1, r2);
+            tiles[idx].fragmentWrite(2, r1);
         }
     }
 
@@ -454,6 +491,10 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
             where InArrayTypeB : IArrayAccessor<TypeB>
     {
         // --- Build dOut as 16x16 MatA tiles into allDOut ---
+        // After buildAllTilesFromArray, tiles represent a (WarpSize × M) matrix
+        // (thread index in rows, dOut elements in columns).
+        // transposeTileArray transposes to (M × WarpSize), matching Tin2's b.transpose(),
+        // so that dOut element indices map to MMA rows (M dimension).
         MatA allDOut[OPA_TotalDOutMatA];
         if (InArrayTypeA is half[M])
         {
@@ -468,6 +509,8 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
                 localA[m] = __realCast<half>(inputVectorA[m]);
             buildAllTilesFromArray<M, OPA_TotalDOutMatA>(localA, allDOut);
         }
+
+        transposeTilesA<OPA_TotalDOutMatA>(allDOut);
 
         [ForceUnroll]
         for (int i = 0; i < OPA_TotalDOutMatA; i++)
