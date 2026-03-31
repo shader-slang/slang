@@ -178,7 +178,8 @@ bool isInvalidExistentialSpecialization(IRInst* specializedValue)
                     continue;
 
                 auto typeEqualityWitness = as<IRInst>(lookupWitness->getWitnessTable());
-                if (typeEqualityWitness && typeEqualityWitness->getOp() == kIROp_TypeEqualityWitness &&
+                if (typeEqualityWitness &&
+                    typeEqualityWitness->getOp() == kIROp_TypeEqualityWitness &&
                     as<IRInterfaceType>(typeEqualityWitness->getOperand(0)))
                 {
                     return true;
@@ -3074,10 +3075,9 @@ struct TypeFlowSpecializationContext
                             if (genericName.getLength() == 0)
                                 genericName = "<generic>";
 
-                            sink->diagnose(
-                                Diagnostics::CannotSpecializeGenericWithExistential{
-                                    .generic = genericName,
-                                    .location = specialize->sourceLoc});
+                            sink->diagnose(Diagnostics::CannotSpecializeGenericWithExistential{
+                                .generic = genericName,
+                                .location = specialize->sourceLoc});
                         }
                         return;
                     }
@@ -3174,8 +3174,7 @@ struct TypeFlowSpecializationContext
                 {
                     String genericName;
                     auto diagnosticTarget = getInvalidExistentialSpecializationTarget(callee);
-                    if (auto nameHint =
-                            diagnosticTarget->findDecoration<IRNameHintDecoration>())
+                    if (auto nameHint = diagnosticTarget->findDecoration<IRNameHintDecoration>())
                         genericName = nameHint->getName();
                     if (genericName.getLength() == 0)
                         genericName = "<generic>";
@@ -4660,8 +4659,7 @@ struct TypeFlowSpecializationContext
                 {
                     String genericName;
                     auto diagnosticTarget = getInvalidExistentialSpecializationTarget(callee);
-                    if (auto nameHint =
-                            diagnosticTarget->findDecoration<IRNameHintDecoration>())
+                    if (auto nameHint = diagnosticTarget->findDecoration<IRNameHintDecoration>())
                         genericName = nameHint->getName();
                     else
                         genericName = "<generic>";
