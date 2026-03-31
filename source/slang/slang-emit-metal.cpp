@@ -358,10 +358,9 @@ void MetalSourceEmitter::emitAtomicImageCoord(IRImageSubscript* inst)
     {
         if (as<IRVectorType>(textureType->getElementType()))
         {
-            getSink()->diagnose(
-                Diagnostics::UnsupportedTargetIntrinsic{
-                    .operation = "atomic operation on non-scalar texture",
-                    .location = inst->sourceLoc});
+            getSink()->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
+                .operation = "atomic operation on non-scalar texture",
+                .location = inst->sourceLoc});
         }
     }
     bool isArray = resourceType && getIntVal(resourceType->getIsArrayInst()) != 0;
@@ -382,10 +381,9 @@ void MetalSourceEmitter::emitAtomicImageCoord(IRImageSubscript* inst)
         }
         else
         {
-            getSink()->diagnose(
-                Diagnostics::UnsupportedTargetIntrinsic{
-                    .operation = "invalid image coordinate for atomic operation",
-                    .location = inst->sourceLoc});
+            getSink()->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
+                .operation = "invalid image coordinate for atomic operation",
+                .location = inst->sourceLoc});
         }
     }
     else
@@ -462,10 +460,9 @@ bool MetalSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     };
     auto diagnoseFloatAtomic = [&]()
     {
-        getSink()->diagnose(
-            Diagnostics::UnsupportedTargetIntrinsic{
-                .operation = "Unsupported floating point atomic operation",
-                .location = inst->sourceLoc});
+        getSink()->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
+            .operation = "Unsupported floating point atomic operation",
+            .location = inst->sourceLoc});
     };
     switch (inst->getOp())
     {
@@ -1238,9 +1235,8 @@ void MetalSourceEmitter::emitSimpleTypeImpl(IRType* type)
 
     case kIROp_RayQueryType:
         {
-            m_writer->emit(
-                "raytracing::intersection_query<raytracing::triangle_data, "
-                "raytracing::instancing>");
+            m_writer->emit("raytracing::intersection_query<raytracing::triangle_data, "
+                           "raytracing::instancing>");
             return;
         }
     case kIROp_ParameterBlockType:
