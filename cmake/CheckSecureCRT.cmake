@@ -15,7 +15,7 @@ function(slang_probe_symbol_call macro call_expr header)
     endif()
 endfunction()
 
-# Probing is only required for MINGW and CYGWIN as they only partially support 
+# Probing is only required for MINGW and CYGWIN as they only partially support
 # the C11 Annex K. The other cases are covered by directives in slang-secure-crt.h
 if(MINGW OR CYGWIN)
     slang_probe_symbol_call(
