@@ -9907,7 +9907,6 @@ BFloat16 dot<let N : int>(vector<BFloat16, N> x, vector<BFloat16, N> y)
 
 /// Absolute value for BFloat16.
 [__readNone]
-[require(cuda_spirv)]
 BFloat16 abs(BFloat16 x)
 {
     __target_switch
@@ -9915,7 +9914,7 @@ BFloat16 abs(BFloat16 x)
     case spirv: return spirv_asm {
         result:$$BFloat16 = OpExtInst glsl450 FAbs $x;
     };
-    default:
+    case cuda:
         return BFloat16(abs(float(x)));
     }
 }
@@ -9923,7 +9922,6 @@ BFloat16 abs(BFloat16 x)
 /// Absolute value for BFloat16 vectors.
 __generic<let N : int>
 [__readNone]
-[require(cuda_spirv)]
 vector<BFloat16, N> abs(vector<BFloat16, N> x)
 {
     __target_switch
@@ -9931,14 +9929,13 @@ vector<BFloat16, N> abs(vector<BFloat16, N> x)
     case spirv: return spirv_asm {
         result:$$vector<BFloat16, N> = OpExtInst glsl450 FAbs $x;
     };
-    default:
+    case cuda:
         VECTOR_MAP_UNARY(BFloat16, N, abs, x);
     }
 }
 
 /// Minimum of two BFloat16 values.
 [__readNone]
-[require(cuda_spirv)]
 BFloat16 min(BFloat16 x, BFloat16 y)
 {
     __target_switch
@@ -9946,7 +9943,7 @@ BFloat16 min(BFloat16 x, BFloat16 y)
     case spirv: return spirv_asm {
         result:$$BFloat16 = OpExtInst glsl450 FMin $x $y;
     };
-    default:
+    case cuda:
         return BFloat16(min(float(x), float(y)));
     }
 }
@@ -9954,7 +9951,6 @@ BFloat16 min(BFloat16 x, BFloat16 y)
 /// Minimum of two BFloat16 vectors.
 __generic<let N : int>
 [__readNone]
-[require(cuda_spirv)]
 vector<BFloat16, N> min(vector<BFloat16, N> x, vector<BFloat16, N> y)
 {
     __target_switch
@@ -9962,14 +9958,13 @@ vector<BFloat16, N> min(vector<BFloat16, N> x, vector<BFloat16, N> y)
     case spirv: return spirv_asm {
         result:$$vector<BFloat16, N> = OpExtInst glsl450 FMin $x $y;
     };
-    default:
+    case cuda:
         VECTOR_MAP_BINARY(BFloat16, N, min, x, y);
     }
 }
 
 /// Maximum of two BFloat16 values.
 [__readNone]
-[require(cuda_spirv)]
 BFloat16 max(BFloat16 x, BFloat16 y)
 {
     __target_switch
@@ -9977,7 +9972,7 @@ BFloat16 max(BFloat16 x, BFloat16 y)
     case spirv: return spirv_asm {
         result:$$BFloat16 = OpExtInst glsl450 FMax $x $y;
     };
-    default:
+    case cuda:
         return BFloat16(max(float(x), float(y)));
     }
 }
@@ -9985,7 +9980,6 @@ BFloat16 max(BFloat16 x, BFloat16 y)
 /// Maximum of two BFloat16 vectors.
 __generic<let N : int>
 [__readNone]
-[require(cuda_spirv)]
 vector<BFloat16, N> max(vector<BFloat16, N> x, vector<BFloat16, N> y)
 {
     __target_switch
@@ -9993,14 +9987,13 @@ vector<BFloat16, N> max(vector<BFloat16, N> x, vector<BFloat16, N> y)
     case spirv: return spirv_asm {
         result:$$vector<BFloat16, N> = OpExtInst glsl450 FMax $x $y;
     };
-    default:
+    case cuda:
         VECTOR_MAP_BINARY(BFloat16, N, max, x, y);
     }
 }
 
 /// Clamp a BFloat16 value to a range.
 [__readNone]
-[require(cuda_spirv)]
 BFloat16 clamp(BFloat16 x, BFloat16 minBound, BFloat16 maxBound)
 {
     __target_switch
@@ -10008,7 +10001,7 @@ BFloat16 clamp(BFloat16 x, BFloat16 minBound, BFloat16 maxBound)
     case spirv: return spirv_asm {
         result:$$BFloat16 = OpExtInst glsl450 FClamp $x $minBound $maxBound;
     };
-    default:
+    case cuda:
         return min(max(x, minBound), maxBound);
     }
 }
@@ -10016,7 +10009,6 @@ BFloat16 clamp(BFloat16 x, BFloat16 minBound, BFloat16 maxBound)
 /// Clamp a BFloat16 vector to a range.
 __generic<let N : int>
 [__readNone]
-[require(cuda_spirv)]
 vector<BFloat16, N> clamp(vector<BFloat16, N> x, vector<BFloat16, N> minBound, vector<BFloat16, N> maxBound)
 {
     __target_switch
@@ -10024,7 +10016,7 @@ vector<BFloat16, N> clamp(vector<BFloat16, N> x, vector<BFloat16, N> minBound, v
     case spirv: return spirv_asm {
         result:$$vector<BFloat16, N> = OpExtInst glsl450 FClamp $x $minBound $maxBound;
     };
-    default:
+    case cuda:
         return min(max(x, minBound), maxBound);
     }
 }
