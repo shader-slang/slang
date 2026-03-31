@@ -25,6 +25,98 @@ public struct SharedMemoryPool<ShMemSize: ISharedMemorySize>
     // =========================================================================
 
     [ForceInline]
+    [require(cuda)]
+    static uint getSharedBaseAddr<let V : int>(groupshared uint4[V] shmem)
+    {
+        __intrinsic_asm "(unsigned)__cvta_generic_to_shared(($0).m_data)";
+    }
+
+    [ForceInline]
+    [require(cuda)]
+    static U smemLoadShared32<U>(uint addr)
+        where U : IArithmetic
+    {
+        switch (sizeof(U))
+        {
+        case 2:
+            __intrinsic_asm R"(
+                ([&]{
+                    unsigned short _r;
+                    asm("ld.shared.u16 %0, [%1];" : "=h"(_r) : "r"($0));
+                    return *reinterpret_cast<$TR*>(&_r);
+                }())
+            )";
+        case 4:
+            __intrinsic_asm R"(
+                ([&]{
+                    unsigned _r;
+                    asm("ld.shared.u32 %0, [%1];" : "=r"(_r) : "r"($0));
+                    return *reinterpret_cast<$TR*>(&_r);
+                }())
+            )";
+        case 8:
+            __intrinsic_asm R"(
+                ([&]{
+                    unsigned _r[2];
+                    asm("ld.shared.v2.u32 {%0, %1}, [%2];" : "=r"(_r[0]), "=r"(_r[1]) : "r"($0));
+                    return *reinterpret_cast<$TR*>(_r);
+                }())
+            )";
+        case 16:
+            __intrinsic_asm R"(
+                ([&]{
+                    unsigned _r[4];
+                    asm("ld.shared.v4.u32 {%0, %1, %2, %3}, [%4];" : "=r"(_r[0]), "=r"(_r[1]), "=r"(_r[2]), "=r"(_r[3]) : "r"($0));
+                    return *reinterpret_cast<$TR*>(_r);
+                }())
+            )";
+        default:
+            static_assert(false, "smemLoadShared32: unsupported sizeof(U)");
+            return U(0);
+        }
+    }
+
+    [ForceInline]
+    [require(cuda)]
+    static void smemStoreShared32<U>(uint addr, U value)
+        where U : IArithmetic
+    {
+        switch (sizeof(U))
+        {
+        case 2:
+            __intrinsic_asm R"(
+                {
+                    unsigned short _v = *reinterpret_cast<const unsigned short*>(&$1);
+                    asm("st.shared.u16 [%0], %1;" :: "r"($0), "h"(_v));
+                }
+            )";
+        case 4:
+            __intrinsic_asm R"(
+                {
+                    unsigned _v = *reinterpret_cast<const unsigned*>(&$1);
+                    asm("st.shared.u32 [%0], %1;" :: "r"($0), "r"(_v));
+                }
+            )";
+        case 8:
+            __intrinsic_asm R"(
+                {
+                    const unsigned* _t = reinterpret_cast<const unsigned*>(&$1);
+                    asm("st.shared.v2.u32 [%0], {%1, %2};" :: "r"($0), "r"(_t[0]), "r"(_t[1]));
+                }
+            )";
+        case 16:
+            __intrinsic_asm R"(
+                {
+                    const unsigned* _t = reinterpret_cast<const unsigned*>(&$1);
+                    asm("st.shared.v4.u32 [%0], {%1, %2, %3, %4};" :: "r"($0), "r"(_t[0]), "r"(_t[1]), "r"(_t[2]), "r"(_t[3]));
+                }
+            )";
+        default:
+            static_assert(false, "smemStoreShared32: unsupported sizeof(U)");
+        }
+    }
+
+    [ForceInline]
     static void smemStore<U>(uint memOffset, int index, U value)
         where U : IArithmetic
     {
@@ -32,9 +124,8 @@ public struct SharedMemoryPool<ShMemSize: ISharedMemorySize>
         {
         case cuda:
             {
-                let basePtr = __getAddress(data[memOffset]);
-                let typedPtr = bit_cast<Ptr<U, Access.ReadWrite, AddressSpace.GroupShared>>(basePtr);
-                typedPtr[index] = value;
+                uint addr = getSharedBaseAddr(data) + memOffset * sizeof(uint4) + index * sizeof(U);
+                smemStoreShared32<U>(addr, value);
             }
         default:
             smemStoreGeneric<U>(memOffset, index, value);
@@ -49,9 +140,8 @@ public struct SharedMemoryPool<ShMemSize: ISharedMemorySize>
         {
         case cuda:
             {
-                let basePtr = __getAddress(data[memOffset]);
-                let typedPtr = bit_cast<Ptr<U, Access.Read, AddressSpace.GroupShared>>(basePtr);
-                return typedPtr[index];
+                uint addr = getSharedBaseAddr(data) + memOffset * sizeof(uint4) + index * sizeof(U);
+                return smemLoadShared32<U>(addr);
             }
         default:
             return smemLoadGeneric<U>(memOffset, index);
@@ -97,6 +187,11 @@ public struct SharedMemoryPool<ShMemSize: ISharedMemorySize>
                 data[memOffset + slot8][comp8 + 1] = v[1];
             }
             break;
+        case 16:
+            data[memOffset + index] = bit_cast<uint4>(value);
+            break;
+        default:
+            static_assert(false, "smemStoreGeneric: unsupported sizeof(U)");
         }
     }
 
@@ -133,7 +228,10 @@ public struct SharedMemoryPool<ShMemSize: ISharedMemorySize>
                 uint hi = data[memOffset + slot8][comp8 + 1];
                 return bit_cast<U>(vector<uint, 2>(lo, hi));
             }
+        case 16:
+            return bit_cast<U>(data[memOffset + index]);
         default:
+            static_assert(false, "smemLoadGeneric: unsupported sizeof(U)");
             return U(0);
         }
     }

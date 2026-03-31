@@ -9375,7 +9375,10 @@ struct WmmaFragment
     __device__ void storeNative(U* shmem, unsigned offset)
     {
         unsigned lane_id = threadIdx.x % 32;
-        unsigned* dst = reinterpret_cast<unsigned*>(shmem + offset) + lane_id * NativeStridePerLane;
+        unsigned saddr = (unsigned)__cvta_generic_to_shared(shmem) + offset * sizeof(U) + lane_id * NativeStridePerLane * sizeof(unsigned);
+        size_t saddr64 = saddr;
+        unsigned* dst;
+        asm("cvta.shared.u64 %0, %1;" : "=l"(dst) : "l"(saddr64));
         if constexpr (RegsCount == 2)
             *reinterpret_cast<uint2*>(dst) = *reinterpret_cast<const uint2*>(regs);
         else if constexpr (RegsCount == 4)
@@ -9391,7 +9394,10 @@ struct WmmaFragment
     __device__ void loadNative(const U* shmem, unsigned offset)
     {
         unsigned lane_id = threadIdx.x % 32;
-        const unsigned* src = reinterpret_cast<const unsigned*>(shmem + offset) + lane_id * NativeStridePerLane;
+        unsigned saddr = (unsigned)__cvta_generic_to_shared(shmem) + offset * sizeof(U) + lane_id * NativeStridePerLane * sizeof(unsigned);
+        size_t saddr64 = saddr;
+        const unsigned* src;
+        asm("cvta.shared.u64 %0, %1;" : "=l"(src) : "l"(saddr64));
         if constexpr (RegsCount == 2)
             *reinterpret_cast<uint2*>(regs) = *reinterpret_cast<const uint2*>(src);
         else if constexpr (RegsCount == 4)
