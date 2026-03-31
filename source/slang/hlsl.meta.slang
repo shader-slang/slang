@@ -15303,7 +15303,7 @@ bool WaveMaskIsFirstLane(WaveMask mask)
     case spirv:
         return spirv_asm
         {
-            OpCapability GroupNonUniformBallot;
+            OpCapability GroupNonUniform;
             OpGroupNonUniformElect $$bool result Subgroup
         };
     }
@@ -17224,7 +17224,7 @@ bool WaveIsFirstLane()
     case spirv:
         return spirv_asm
         {
-            OpCapability GroupNonUniformBallot;
+            OpCapability GroupNonUniform;
             OpGroupNonUniformElect $$bool result Subgroup
         };
     case wgsl: __intrinsic_asm "subgroupElect";
