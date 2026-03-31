@@ -367,7 +367,7 @@ struct CollectGlobalUniformParametersContext
                 builder->setInsertBefore(user);
 
                 IRInst* value = nullptr;
-                if (unwrappedPushConstant && globalParameterGroupTypeLayout)
+                if (unwrappedPushConstant)
                 {
                     // For unwrapped push_constant parameters on CUDA/CPP:
                     // The original ConstantBuffer<T> global acted as a pointer to T.
@@ -376,7 +376,17 @@ struct CollectGlobalUniformParametersContext
                     // get_field_addr uses continue to work.
                     //
                     auto ptrType = builder->getPtrType(globalParamType);
-                    value = builder->emitFieldAddress(ptrType, wrapperParam, fieldKey);
+                    if (globalParameterGroupTypeLayout)
+                    {
+                        value = builder->emitFieldAddress(ptrType, wrapperParam, fieldKey);
+                    }
+                    else
+                    {
+                        auto addr = builder->emitGetAddress(
+                            builder->getPtrType(wrapperParam->getFullType()),
+                            wrapperParam);
+                        value = builder->emitFieldAddress(ptrType, addr, fieldKey);
+                    }
                 }
                 else if (globalParameterGroupTypeLayout)
                 {

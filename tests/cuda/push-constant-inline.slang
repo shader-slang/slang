@@ -22,33 +22,39 @@ RWStructuredBuffer<float> outputBuffer;
 [[vk::push_constant]]
 ConstantBuffer<PushData> explicitPushConstants;
 RWStructuredBuffer<float> explicitOutputBuffer;
+ConstantBuffer<PushData> regularCB;
 
 [numthreads(1,1,1)]
 void computeMain(uint3 tid : SV_DispatchThreadID)
 {
-    outputBuffer[tid.x] = pushConstants.scale + pushConstants.offset;
+    outputBuffer[tid.x] = pushConstants.scale + pushConstants.offset + regularCB.scale;
 }
 
 [numthreads(1,1,1)]
 void computeMainExplicit(uint3 tid : SV_DispatchThreadID)
 {
     explicitOutputBuffer[tid.x] =
-        explicitPushConstants.scale + explicitPushConstants.offset;
+        explicitPushConstants.scale + explicitPushConstants.offset + regularCB.scale;
 }
 
-// Verify push constant struct is inlined by value (not a pointer) in GlobalParams.
+// Verify push constant struct is inlined by value (not a pointer) in GlobalParams,
+// while a regular ConstantBuffer<T> remains a pointer.
 // CUDA_IMPLICIT: struct GlobalParams
-// CUDA_IMPLICIT-NOT: PushData{{.*}}*
+// CUDA_IMPLICIT-NOT: PushData{{.*}}*{{.*}}pushConstants
 // CUDA_IMPLICIT: PushData{{.*}}pushConstants
+// CUDA_IMPLICIT: PushData{{.*}}*{{.*}}regularCB
 
 // CPP_IMPLICIT: struct GlobalParams
-// CPP_IMPLICIT-NOT: PushData{{.*}}*
+// CPP_IMPLICIT-NOT: PushData{{.*}}*{{.*}}pushConstants
 // CPP_IMPLICIT: PushData{{.*}}pushConstants
+// CPP_IMPLICIT: PushData{{.*}}*{{.*}}regularCB
 
 // CUDA_EXPLICIT: struct GlobalParams
-// CUDA_EXPLICIT-NOT: PushData{{.*}}*
+// CUDA_EXPLICIT-NOT: PushData{{.*}}*{{.*}}explicitPushConstants
 // CUDA_EXPLICIT: PushData{{.*}}explicitPushConstants
+// CUDA_EXPLICIT: PushData{{.*}}*{{.*}}regularCB
 
 // CPP_EXPLICIT: struct GlobalParams
-// CPP_EXPLICIT-NOT: PushData{{.*}}*
+// CPP_EXPLICIT-NOT: PushData{{.*}}*{{.*}}explicitPushConstants
 // CPP_EXPLICIT: PushData{{.*}}explicitPushConstants
+// CPP_EXPLICIT: PushData{{.*}}*{{.*}}regularCB
