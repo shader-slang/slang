@@ -17,8 +17,8 @@ RWStructuredBuffer<int> outputBuffer;
 // CHECK: 40
 // CHECK: 20
 // CHECK: 10
-// CHECK: 50
 // CHECK: 40
+// CHECK: 50
 // CHECK: 30
 // CHECK: 40
 
