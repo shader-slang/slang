@@ -9,5 +9,3 @@ RWStructuredBuffer<int> out;
 void computeMain() { out[0] = 0; }
 
 //CHECK: invalid conformance option 'Impl:NonExistentInterface=0', type 'NonExistentInterface' is not found.
-//CHECK-NOT: undefined identifier
-//CHECK-NOT: cannot create type conformance

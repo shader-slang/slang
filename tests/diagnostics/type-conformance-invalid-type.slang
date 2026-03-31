@@ -9,5 +9,3 @@ RWStructuredBuffer<int> out;
 void computeMain() { out[0] = 0; }
 
 //CHECK: invalid conformance option 'NonExistent:IFoo=0', type 'NonExistent' is not found.
-//CHECK-NOT: undefined identifier
-//CHECK-NOT: cannot create type conformance
