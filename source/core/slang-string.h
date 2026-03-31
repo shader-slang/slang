@@ -16,17 +16,6 @@
 
 namespace Slang
 {
-
-// Returns a pointer to a shared zero-initialized buffer used as the
-// empty-string fallback. Using a dedicated buffer avoids returning a bare ""
-// literal whose 1-byte global gets tight ASan redzones, causing
-// global-buffer-overflow reports on off-by-one reads.
-inline const char* getEmptyStringBuffer()
-{
-    static const char kEmpty[2] = {0, 0};
-    return kEmpty;
-}
-
 class _EndLine
 {
 };
@@ -309,7 +298,7 @@ public:
 
     static const char* getData(const StringRepresentation* stringRep)
     {
-        return stringRep ? stringRep->getData() : getEmptyStringBuffer();
+        return stringRep ? stringRep->getData() : "";
     }
 
     static UnownedStringSlice asSlice(const StringRepresentation* rep)
@@ -395,11 +384,11 @@ public:
 
     StringSlice(String const& str, UInt beginIndex, UInt endIndex);
 
-    UInt getLength() const { return endIndex - beginIndex; }
+    UInt getLength() const { return representation ? (endIndex - beginIndex) : 0; }
 
     char const* begin() const
     {
-        return representation ? representation->getData() + beginIndex : getEmptyStringBuffer();
+        return representation ? representation->getData() + beginIndex : "";
     }
 
     char const* end() const { return begin() + getLength(); }
@@ -478,7 +467,7 @@ class SLANG_RT_API String
     friend class StringBuilder;
 
 private:
-    const char* getData() const { return m_buffer ? m_buffer->getData() : getEmptyStringBuffer(); }
+    const char* getData() const { return m_buffer ? m_buffer->getData() : ""; }
 
     // Note: This is not a non-const version of getData(), since this method
     // assumes that the buffer always exists.

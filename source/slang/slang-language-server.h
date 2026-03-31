@@ -22,27 +22,14 @@ struct Command
     template<typename T>
     struct Optional
     {
-    private:
-        T* value = nullptr;
-
     public:
+        T* value = nullptr;
         bool isValid() const { return value != nullptr; }
-        Optional& operator=(const T& val)
+        T& operator=(const T& val)
         {
-            T* newValue = new T(val);
             delete value;
-            value = newValue;
-            return *this;
-        }
-        Optional& operator=(const Optional& other)
-        {
-            if (this != &other)
-            {
-                T* newValue = other.isValid() ? new T(other.get()) : nullptr;
-                delete value;
-                value = newValue;
-            }
-            return *this;
+            value = new T(val);
+            return *value;
         }
         Optional& operator=(Optional&& other)
         {
