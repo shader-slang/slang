@@ -958,6 +958,33 @@ private:
         FacetList baseFacets,
         FacetList::Builder& ioMergedFacets);
 
+    /// Rewrite an interface inheritance witness that is still expressed in terms of the
+    /// base interface's abstract `This` lookup so it applies to a concrete/new subtype path.
+    ///
+    /// Inputs:
+    /// - `baseInterfaceDecl`: the interface that contributed the original `This` type.
+    /// - `selfIsSubtypeOfBase`: witness for `Self : Base`.
+    /// - `baseIsSubtypeOfFacet`: witness for `Base : Facet`, expressed using `Base.This`.
+    ///
+    /// Returns:
+    /// - A witness for `Self : Facet` produced by replacing the abstract `Base.This`
+    ///   lookup inside `baseIsSubtypeOfFacet` with
+    ///   `Lookup(selfIsSubtypeOfBase, baseInterfaceDecl.This)`.
+    ///
+    /// Examples:
+    /// - If `baseIsSubtypeOfFacet` proves `IBase.This : IFacet`, and
+    ///   `selfIsSubtypeOfBase` proves `Child : IBase`, the result proves `Child : IFacet`.
+    /// - If `baseIsSubtypeOfFacet` proves `IBase.This : IFacet`, and
+    ///   `selfIsSubtypeOfBase` proves `IDerived : IBase`, the result proves
+    ///   `IDerived : IFacet`.
+    ///
+    /// This is a centralized workaround until we have a first-class utility for substituting
+    /// an interface `This` type and its constraint with a concrete subtype witness.
+    SubtypeWitness* _specializeInterfaceInheritanceWitness(
+        InterfaceDecl* baseInterfaceDecl,
+        SubtypeWitness* selfIsSubtypeOfBase,
+        SubtypeWitness* baseIsSubtypeOfFacet);
+
     Dictionary<Type*, InheritanceInfo> m_mapTypeToInheritanceInfo;
     Dictionary<DeclRef<Decl>, InheritanceInfo> m_mapDeclRefToInheritanceInfo;
     Dictionary<TypePair, SubtypeWitness*> m_mapTypePairToSubtypeWitness;

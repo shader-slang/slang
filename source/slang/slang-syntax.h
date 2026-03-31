@@ -391,17 +391,7 @@ inline Type* getResultType(ASTBuilder* astBuilder, DeclRef<CallableDecl> declRef
                    declRef.substitute(astBuilder, declRef.getDecl()->funcType.type)->resolve())
             ->getResultType();
     }
-    /*
-    else
-    {*/
-    /*auto returnType = declRef.substitute(astBuilder, declRef.getDecl()->returnType.type);
-    if (!declRef.getDecl()->findModifier<NoDiffModifier>())
-        return returnType;
-    else
-    {
-        return astBuilder->getModifiedType(returnType, astBuilder->getNoDiffModifierVal());
-    //}
-    //}*/
+
     return declRef.substitute(astBuilder, declRef.getDecl()->returnType.type);
 }
 

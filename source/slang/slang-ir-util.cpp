@@ -1603,7 +1603,8 @@ bool areCallArgumentsSideEffectFree(IRCall* call, SideEffectAnalysisOptions opti
         }
         else
         {
-            if (param && param->findDecoration<IRIgnoreSideEffectsDecoration>())
+            if (param && !as<IROutParamType>(param->getDataType()) &&
+                param->findDecoration<IRIgnoreSideEffectsDecoration>())
                 continue;
 
             return false;
