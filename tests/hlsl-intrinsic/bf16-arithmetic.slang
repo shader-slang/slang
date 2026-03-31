@@ -1,7 +1,7 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -emit-spirv-directly -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -output-using-type
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
 // Scalar arithmetic: a=3.0, b=2.0
@@ -17,6 +17,31 @@ RWStructuredBuffer<int> outputBuffer;
 // CHECK: 60
 // CHECK: 40
 // CHECK: -30
+
+// Scalar unary plus, compound assignment, and inc/dec
+// CHECK: 30
+// CHECK: 50
+// CHECK: 30
+// CHECK: 60
+// CHECK: 30
+// CHECK: 40
+// CHECK: 40
+// CHECK: 50
+// CHECK: 40
+// CHECK: 40
+// CHECK: 30
+
+// Vector unary plus, compound assignment, and inc/dec
+// CHECK: 30
+// CHECK: 50
+// CHECK: 60
+// CHECK: 50
+// CHECK: 100
+// CHECK: 200
+// CHECK: 100
+// CHECK: 110
+// CHECK: 110
+// CHECK: 100
 
 [numthreads(1,1,1)]
 void computeMain()
@@ -51,4 +76,57 @@ void computeMain()
     outputBuffer[7] = int(float(vprod[0]) * 10.0);
     outputBuffer[8] = int(float(vquot[1]) * 10.0);
     outputBuffer[9] = int(float(vneg[0]) * 10.0);
+
+    BFloat16 pos = +a;
+    outputBuffer[10] = int(float(pos) * 10.0);
+
+    BFloat16 acc = BFloat16(3.0);
+    acc += b;
+    outputBuffer[11] = int(float(acc) * 10.0);
+    acc -= b;
+    outputBuffer[12] = int(float(acc) * 10.0);
+    acc *= b;
+    outputBuffer[13] = int(float(acc) * 10.0);
+    acc /= b;
+    outputBuffer[14] = int(float(acc) * 10.0);
+
+    BFloat16 preInc = ++acc;
+    outputBuffer[15] = int(float(preInc) * 10.0);
+    BFloat16 postInc = acc++;
+    outputBuffer[16] = int(float(postInc) * 10.0);
+    outputBuffer[17] = int(float(acc) * 10.0);
+    BFloat16 preDec = --acc;
+    outputBuffer[18] = int(float(preDec) * 10.0);
+    BFloat16 postDec = acc--;
+    outputBuffer[19] = int(float(postDec) * 10.0);
+    outputBuffer[20] = int(float(acc) * 10.0);
+
+    vector<BFloat16, 2> vacc = vector<BFloat16, 2>(a, BFloat16(4.0));
+    let vpos = +vacc;
+    outputBuffer[21] = int(float(vpos[0]) * 10.0);
+
+    vacc += vb;
+    outputBuffer[22] = int(float(vacc[0]) * 10.0);
+
+    vacc += BFloat16(1.0);
+    outputBuffer[23] = int(float(vacc[0]) * 10.0);
+
+    vacc -= BFloat16(1.0);
+    outputBuffer[24] = int(float(vacc[0]) * 10.0);
+
+    vacc *= vb;
+    outputBuffer[25] = int(float(vacc[0]) * 10.0);
+
+    vacc *= BFloat16(2.0);
+    outputBuffer[26] = int(float(vacc[0]) * 10.0);
+
+    vacc /= BFloat16(2.0);
+    outputBuffer[27] = int(float(vacc[0]) * 10.0);
+
+    let vpreInc = ++vacc;
+    outputBuffer[28] = int(float(vpreInc[0]) * 10.0);
+
+    let vpostDec = vacc--;
+    outputBuffer[29] = int(float(vpostDec[0]) * 10.0);
+    outputBuffer[30] = int(float(vacc[0]) * 10.0);
 }

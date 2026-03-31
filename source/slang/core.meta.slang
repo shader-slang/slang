@@ -1682,11 +1682,78 @@ extension<T:__BuiltinFloatingPointType> T
 }
 
 // BFloat16 arithmetic operators (scalar)
+[__unsafeForceInlineEarly]
+__prefix BFloat16 operator+(BFloat16 value)
+{
+    return value;
+}
 __intrinsic_op($(kIROp_Add)) BFloat16 operator+(BFloat16 left, BFloat16 right);
 __intrinsic_op($(kIROp_Sub)) BFloat16 operator-(BFloat16 left, BFloat16 right);
 __intrinsic_op($(kIROp_Mul)) BFloat16 operator*(BFloat16 left, BFloat16 right);
 __intrinsic_op($(kIROp_Div)) BFloat16 operator/(BFloat16 left, BFloat16 right);
 __prefix __intrinsic_op($(kIROp_Neg)) BFloat16 operator-(BFloat16 value);
+
+[__unsafeForceInlineEarly]
+BFloat16 operator+=(in out BFloat16 left, BFloat16 right)
+{
+    left = left + right;
+    return left;
+}
+
+[__unsafeForceInlineEarly]
+BFloat16 operator-=(in out BFloat16 left, BFloat16 right)
+{
+    left = left - right;
+    return left;
+}
+
+[__unsafeForceInlineEarly]
+BFloat16 operator*=(in out BFloat16 left, BFloat16 right)
+{
+    left = left * right;
+    return left;
+}
+
+[__unsafeForceInlineEarly]
+BFloat16 operator/=(in out BFloat16 left, BFloat16 right)
+{
+    left = left / right;
+    return left;
+}
+
+__prefix
+[__unsafeForceInlineEarly]
+BFloat16 operator++(in out BFloat16 value)
+{
+    value = value + BFloat16(1);
+    return value;
+}
+
+__postfix
+[__unsafeForceInlineEarly]
+BFloat16 operator++(in out BFloat16 value)
+{
+    let result = value;
+    value = value + BFloat16(1);
+    return result;
+}
+
+__prefix
+[__unsafeForceInlineEarly]
+BFloat16 operator--(in out BFloat16 value)
+{
+    value = value - BFloat16(1);
+    return value;
+}
+
+__postfix
+[__unsafeForceInlineEarly]
+BFloat16 operator--(in out BFloat16 value)
+{
+    let result = value;
+    value = value - BFloat16(1);
+    return result;
+}
 
 // BFloat16 comparison operators (scalar)
 __intrinsic_op($(kIROp_Eql)) bool operator==(BFloat16 left, BFloat16 right);
@@ -1698,29 +1765,317 @@ __intrinsic_op($(kIROp_Geq)) bool operator>=(BFloat16 left, BFloat16 right);
 
 // BFloat16 vector arithmetic operators
 __generic<let N : int>
+[__unsafeForceInlineEarly]
+__prefix vector<BFloat16,N> operator+(vector<BFloat16,N> value)
+{
+    return value;
+}
+__generic<let N : int>
 __intrinsic_op($(kIROp_Add)) vector<BFloat16,N> operator+(vector<BFloat16,N> left, vector<BFloat16,N> right);
+__generic<let N : int>
+[__unsafeForceInlineEarly]
+vector<BFloat16,N> operator+(BFloat16 left, vector<BFloat16,N> right)
+{
+    vector<BFloat16,N> result;
+    for (int i = 0; i < N; ++i)
+        result[i] = left + right[i];
+    return result;
+}
+__generic<let N : int>
+[__unsafeForceInlineEarly]
+vector<BFloat16,N> operator+(vector<BFloat16,N> left, BFloat16 right)
+{
+    vector<BFloat16,N> result;
+    for (int i = 0; i < N; ++i)
+        result[i] = left[i] + right;
+    return result;
+}
 __generic<let N : int>
 __intrinsic_op($(kIROp_Sub)) vector<BFloat16,N> operator-(vector<BFloat16,N> left, vector<BFloat16,N> right);
 __generic<let N : int>
+[__unsafeForceInlineEarly]
+vector<BFloat16,N> operator-(BFloat16 left, vector<BFloat16,N> right)
+{
+    vector<BFloat16,N> result;
+    for (int i = 0; i < N; ++i)
+        result[i] = left - right[i];
+    return result;
+}
+__generic<let N : int>
+[__unsafeForceInlineEarly]
+vector<BFloat16,N> operator-(vector<BFloat16,N> left, BFloat16 right)
+{
+    vector<BFloat16,N> result;
+    for (int i = 0; i < N; ++i)
+        result[i] = left[i] - right;
+    return result;
+}
+__generic<let N : int>
 __intrinsic_op($(kIROp_Mul)) vector<BFloat16,N> operator*(vector<BFloat16,N> left, vector<BFloat16,N> right);
+__generic<let N : int>
+[__unsafeForceInlineEarly]
+vector<BFloat16,N> operator*(BFloat16 left, vector<BFloat16,N> right)
+{
+    vector<BFloat16,N> result;
+    for (int i = 0; i < N; ++i)
+        result[i] = left * right[i];
+    return result;
+}
+__generic<let N : int>
+[__unsafeForceInlineEarly]
+vector<BFloat16,N> operator*(vector<BFloat16,N> left, BFloat16 right)
+{
+    vector<BFloat16,N> result;
+    for (int i = 0; i < N; ++i)
+        result[i] = left[i] * right;
+    return result;
+}
 __generic<let N : int>
 __intrinsic_op($(kIROp_Div)) vector<BFloat16,N> operator/(vector<BFloat16,N> left, vector<BFloat16,N> right);
 __generic<let N : int>
+[__unsafeForceInlineEarly]
+vector<BFloat16,N> operator/(BFloat16 left, vector<BFloat16,N> right)
+{
+    vector<BFloat16,N> result;
+    for (int i = 0; i < N; ++i)
+        result[i] = left / right[i];
+    return result;
+}
+__generic<let N : int>
+[__unsafeForceInlineEarly]
+vector<BFloat16,N> operator/(vector<BFloat16,N> left, BFloat16 right)
+{
+    vector<BFloat16,N> result;
+    for (int i = 0; i < N; ++i)
+        result[i] = left[i] / right;
+    return result;
+}
+__generic<let N : int>
 __prefix __intrinsic_op($(kIROp_Neg)) vector<BFloat16,N> operator-(vector<BFloat16,N> value);
+
+__generic<let N : int>
+[__unsafeForceInlineEarly]
+vector<BFloat16,N> operator+=(in out vector<BFloat16,N> left, vector<BFloat16,N> right)
+{
+    left = left + right;
+    return left;
+}
+
+__generic<let N : int>
+[__unsafeForceInlineEarly]
+vector<BFloat16,N> operator+=(in out vector<BFloat16,N> left, BFloat16 right)
+{
+    left = left + right;
+    return left;
+}
+
+__generic<let N : int>
+[__unsafeForceInlineEarly]
+vector<BFloat16,N> operator-=(in out vector<BFloat16,N> left, vector<BFloat16,N> right)
+{
+    left = left - right;
+    return left;
+}
+
+__generic<let N : int>
+[__unsafeForceInlineEarly]
+vector<BFloat16,N> operator-=(in out vector<BFloat16,N> left, BFloat16 right)
+{
+    left = left - right;
+    return left;
+}
+
+__generic<let N : int>
+[__unsafeForceInlineEarly]
+vector<BFloat16,N> operator*=(in out vector<BFloat16,N> left, vector<BFloat16,N> right)
+{
+    left = left * right;
+    return left;
+}
+
+__generic<let N : int>
+[__unsafeForceInlineEarly]
+vector<BFloat16,N> operator*=(in out vector<BFloat16,N> left, BFloat16 right)
+{
+    left = left * right;
+    return left;
+}
+
+__generic<let N : int>
+[__unsafeForceInlineEarly]
+vector<BFloat16,N> operator/=(in out vector<BFloat16,N> left, vector<BFloat16,N> right)
+{
+    left = left / right;
+    return left;
+}
+
+__generic<let N : int>
+[__unsafeForceInlineEarly]
+vector<BFloat16,N> operator/=(in out vector<BFloat16,N> left, BFloat16 right)
+{
+    left = left / right;
+    return left;
+}
+
+__generic<let N : int>
+__prefix
+[__unsafeForceInlineEarly]
+vector<BFloat16,N> operator++(in out vector<BFloat16,N> value)
+{
+    value = value + BFloat16(1);
+    return value;
+}
+
+__generic<let N : int>
+__postfix
+[__unsafeForceInlineEarly]
+vector<BFloat16,N> operator++(in out vector<BFloat16,N> value)
+{
+    let result = value;
+    value = value + BFloat16(1);
+    return result;
+}
+
+__generic<let N : int>
+__prefix
+[__unsafeForceInlineEarly]
+vector<BFloat16,N> operator--(in out vector<BFloat16,N> value)
+{
+    value = value - BFloat16(1);
+    return value;
+}
+
+__generic<let N : int>
+__postfix
+[__unsafeForceInlineEarly]
+vector<BFloat16,N> operator--(in out vector<BFloat16,N> value)
+{
+    let result = value;
+    value = value - BFloat16(1);
+    return result;
+}
 
 // BFloat16 vector comparison operators
 __generic<let N : int>
 __intrinsic_op($(kIROp_Eql)) vector<bool,N> operator==(vector<BFloat16,N> left, vector<BFloat16,N> right);
 __generic<let N : int>
+[__unsafeForceInlineEarly]
+vector<bool,N> operator==(BFloat16 left, vector<BFloat16,N> right)
+{
+    vector<bool,N> result;
+    for (int i = 0; i < N; ++i)
+        result[i] = left == right[i];
+    return result;
+}
+__generic<let N : int>
+[__unsafeForceInlineEarly]
+vector<bool,N> operator==(vector<BFloat16,N> left, BFloat16 right)
+{
+    vector<bool,N> result;
+    for (int i = 0; i < N; ++i)
+        result[i] = left[i] == right;
+    return result;
+}
+__generic<let N : int>
 __intrinsic_op($(kIROp_Neq)) vector<bool,N> operator!=(vector<BFloat16,N> left, vector<BFloat16,N> right);
+__generic<let N : int>
+[__unsafeForceInlineEarly]
+vector<bool,N> operator!=(BFloat16 left, vector<BFloat16,N> right)
+{
+    vector<bool,N> result;
+    for (int i = 0; i < N; ++i)
+        result[i] = left != right[i];
+    return result;
+}
+__generic<let N : int>
+[__unsafeForceInlineEarly]
+vector<bool,N> operator!=(vector<BFloat16,N> left, BFloat16 right)
+{
+    vector<bool,N> result;
+    for (int i = 0; i < N; ++i)
+        result[i] = left[i] != right;
+    return result;
+}
 __generic<let N : int>
 __intrinsic_op($(kIROp_Less)) vector<bool,N> operator<(vector<BFloat16,N> left, vector<BFloat16,N> right);
 __generic<let N : int>
+[__unsafeForceInlineEarly]
+vector<bool,N> operator<(BFloat16 left, vector<BFloat16,N> right)
+{
+    vector<bool,N> result;
+    for (int i = 0; i < N; ++i)
+        result[i] = left < right[i];
+    return result;
+}
+__generic<let N : int>
+[__unsafeForceInlineEarly]
+vector<bool,N> operator<(vector<BFloat16,N> left, BFloat16 right)
+{
+    vector<bool,N> result;
+    for (int i = 0; i < N; ++i)
+        result[i] = left[i] < right;
+    return result;
+}
+__generic<let N : int>
 __intrinsic_op($(kIROp_Leq)) vector<bool,N> operator<=(vector<BFloat16,N> left, vector<BFloat16,N> right);
+__generic<let N : int>
+[__unsafeForceInlineEarly]
+vector<bool,N> operator<=(BFloat16 left, vector<BFloat16,N> right)
+{
+    vector<bool,N> result;
+    for (int i = 0; i < N; ++i)
+        result[i] = left <= right[i];
+    return result;
+}
+__generic<let N : int>
+[__unsafeForceInlineEarly]
+vector<bool,N> operator<=(vector<BFloat16,N> left, BFloat16 right)
+{
+    vector<bool,N> result;
+    for (int i = 0; i < N; ++i)
+        result[i] = left[i] <= right;
+    return result;
+}
 __generic<let N : int>
 __intrinsic_op($(kIROp_Greater)) vector<bool,N> operator>(vector<BFloat16,N> left, vector<BFloat16,N> right);
 __generic<let N : int>
+[__unsafeForceInlineEarly]
+vector<bool,N> operator>(BFloat16 left, vector<BFloat16,N> right)
+{
+    vector<bool,N> result;
+    for (int i = 0; i < N; ++i)
+        result[i] = left > right[i];
+    return result;
+}
+__generic<let N : int>
+[__unsafeForceInlineEarly]
+vector<bool,N> operator>(vector<BFloat16,N> left, BFloat16 right)
+{
+    vector<bool,N> result;
+    for (int i = 0; i < N; ++i)
+        result[i] = left[i] > right;
+    return result;
+}
+__generic<let N : int>
 __intrinsic_op($(kIROp_Geq)) vector<bool,N> operator>=(vector<BFloat16,N> left, vector<BFloat16,N> right);
+__generic<let N : int>
+[__unsafeForceInlineEarly]
+vector<bool,N> operator>=(BFloat16 left, vector<BFloat16,N> right)
+{
+    vector<bool,N> result;
+    for (int i = 0; i < N; ++i)
+        result[i] = left >= right[i];
+    return result;
+}
+__generic<let N : int>
+[__unsafeForceInlineEarly]
+vector<bool,N> operator>=(vector<BFloat16,N> left, BFloat16 right)
+{
+    vector<bool,N> result;
+    for (int i = 0; i < N; ++i)
+        result[i] = left[i] >= right;
+    return result;
+}
 
 
 
