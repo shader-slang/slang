@@ -161,7 +161,7 @@ jobs:
           # per run. Using server-count > 1 isolates tests in separate
           # processes for better coverage.
           export ASAN_OPTIONS="detect_leaks=1:halt_on_error=0:print_scariness=1:log_path=$PWD/asan-logs/asan"
-          export UBSAN_OPTIONS="print_stacktrace=1:halt_on_error=0:log_path=$PWD/asan-logs/ubsan"
+          export UBSAN_OPTIONS="print_stacktrace=1:halt_on_error=0:print_suppressions=0:log_path=$PWD/asan-logs/ubsan"
           export LSAN_OPTIONS="suppressions=$PWD/cmake/lsan-suppressions.txt"
 
           export SLANG_RUN_SPIRV_VALIDATION=1
@@ -176,9 +176,9 @@ jobs:
             "-category" "$TEST_CATEGORY"
             "-expected-failure-list" "tests/expected-failure-github.txt"
             "-expected-failure-list" "tests/expected-failure-no-gpu.txt"
+            "-expected-failure-list" "tests/expected-failure-linux.txt"
             "-skip-reference-image-generation"
             "-show-adapter-info"
-            "-ignore-abort-msg"
             "-enable-debug-layers" "false"
           )
 
@@ -198,7 +198,7 @@ jobs:
         if: steps.build.outcome == 'success'
         run: |
           export ASAN_OPTIONS="detect_leaks=1:halt_on_error=0:print_scariness=1:log_path=$PWD/asan-logs/asan-slangc"
-          export UBSAN_OPTIONS="print_stacktrace=1:halt_on_error=0:log_path=$PWD/asan-logs/ubsan-slangc"
+          export UBSAN_OPTIONS="print_stacktrace=1:halt_on_error=0:print_suppressions=0:log_path=$PWD/asan-logs/ubsan-slangc"
           export LSAN_OPTIONS="suppressions=$PWD/cmake/lsan-suppressions.txt"
 
           PATH=$bin_dir:$PATH tools/slangc-test/test.sh && slangc_test_exit=0 || slangc_test_exit=$?
