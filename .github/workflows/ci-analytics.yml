@@ -68,7 +68,7 @@ jobs:
         run: |
           cd ci_analytics_repo
           # Copy updated monthly data files
-          cp /tmp/ci_data/ci_jobs_*.json .
+          cp /tmp/ci_data/ci_jobs_*.json . 2>/dev/null || true
           if [ -f /tmp/pr_merges.json ]; then
             cp /tmp/pr_merges.json pr_merges.json
           fi

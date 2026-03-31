@@ -1547,6 +1547,15 @@ def _load_monthly_jobs(input_dir):
     """Load all ci_jobs_YYYY-MM.json files from a directory into a flat list."""
     pattern = os.path.join(input_dir, "ci_jobs_*.json")
     files = sorted(glob.glob(pattern))
+    # Filter to only YYYY-MM format files (exclude legacy ci_jobs.json if present)
+    prefix = "ci_jobs_"
+    suffix = ".json"
+    files = [
+        p for p in files
+        if (m := os.path.basename(p)[len(prefix):-len(suffix)])
+        and len(m) == 7
+        and m[4] == "-"
+    ]
     if not files:
         print(f"Error: no ci_jobs_*.json files found in {input_dir}", file=sys.stderr)
         sys.exit(2)
