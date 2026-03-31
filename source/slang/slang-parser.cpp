@@ -5195,6 +5195,7 @@ static void CompleteDecl(
             printDiagnosticArg(sb, decl->astNodeType);
             parser->sink->diagnose(
                 Diagnostics::DeclNotAllowed{.declType = sb.produceString(), .location = decl->loc});
+            decl->nestingAlreadyDiagnosed = true;
         }
         else
         {
@@ -5212,6 +5213,7 @@ static void CompleteDecl(
                     parser->sink->diagnose(Diagnostics::DeclNotAllowed{
                         .declType = sb.produceString(),
                         .location = decl->loc});
+                    declToModify->nestingAlreadyDiagnosed = true;
                 }
             }
         }
@@ -6622,6 +6624,8 @@ DeclStmt* Parser::parseVarDeclrStatement(Modifiers modifiers)
         printDiagnosticArg(sb, decl->astNodeType);
         sink->diagnose(
             Diagnostics::DeclNotAllowed{.declType = sb.produceString(), .location = decl->loc});
+        if (auto d = as<Decl>(decl))
+            d->nestingAlreadyDiagnosed = true;
     }
     return varDeclrStatement;
 }
