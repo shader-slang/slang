@@ -1780,6 +1780,8 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
     {
         bool isLegalGlobalInstForTarget(IRInst* inst) override
         {
+            if (isSpecConstRateType(inst->getFullType()))
+                return true;
             switch (inst->getOp())
             {
             case kIROp_MakeStruct:

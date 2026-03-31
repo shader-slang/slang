@@ -2828,6 +2828,13 @@ IRType* maybeAddRateType(IRBuilder* builder, IRType* rateQulifiedType, IRType* o
     return oldType;
 }
 
+IRType* maybeAddSpecConstRate(IRBuilder* builder, IRType* type)
+{
+    if (as<IRRateQualifiedType>(type))
+        return type;
+    return builder->getRateQualifiedType(builder->getSpecConstRate(), type);
+}
+
 bool canOperationBeSpecConst(IROp op, IRType* resultType, IRInst* const* fixedArgs, IRUse* operands)
 {
     // Returns true for ops that can be declared as an operation under `OpSpecConstantOp`.
@@ -2888,6 +2895,33 @@ bool canOperationBeSpecConst(IROp op, IRType* resultType, IRInst* const* fixedAr
     }
 }
 
+bool shouldHaveSpecConstRate(
+    IROp op,
+    IRType* resultType,
+    UInt operandCount,
+    IRInst* const* operands)
+{
+    if (operandCount == 0)
+        return false;
+
+    if (!canOperationBeSpecConst(op, resultType, operands, nullptr))
+        return false;
+
+    // An instruction whose result carries a spec-const rate is hoisted and
+    // emitted as OpSpecConstantOp for SPIR-V. That is only valid when
+    // every operand is itself a specialization constant or a plain
+    // constant. Mixing in a runtime value would produce invalid SPIR-V.
+    bool hasSpecConstOperand = false;
+    for (UInt ii = 0; ii < operandCount; ++ii)
+    {
+        if (isSpecConstRateType(operands[ii]->getFullType()))
+            hasSpecConstOperand = true;
+        else if (!as<IRConstant>(operands[ii]))
+            return false;
+    }
+    return hasSpecConstOperand;
+}
+
 bool isSpecConstOpHoistable(IROp op, IRType* type, IRInst* const* fixedArgs)
 {
     auto rateType = as<IRRateQualifiedType>(type);
@@ -2896,10 +2930,9 @@ bool isSpecConstOpHoistable(IROp op, IRType* type, IRInst* const* fixedArgs)
 }
 
 
-bool isInstHoistable(IROp op, IRType* type, IRInst* const* fixedArgs)
+bool isInstHoistable(IROp op)
 {
-    return (getIROpInfo(op).flags & kIROpFlag_Hoistable) ||
-           isSpecConstOpHoistable(op, type, fixedArgs);
+    return (getIROpInfo(op).flags & kIROpFlag_Hoistable);
 }
 
 IRType* getUnsignedTypeFromSignedType(IRBuilder* builder, IRType* type)
