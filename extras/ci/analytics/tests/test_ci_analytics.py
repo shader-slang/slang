@@ -682,6 +682,18 @@ class TestMonthlySplit(unittest.TestCase):
             self.assertEqual(len(all_jobs), 2)
             self.assertEqual({j["id"] for j in all_jobs}, {1, 2})
 
+    def test_visualization_load_monthly_jobs_ignores_legacy_and_non_monthly_files(self):
+        jobs_mar = [self._make_job(2, "2026-03-01T10:00:00Z")]
+        with tempfile.TemporaryDirectory() as tmp:
+            ci_job_collector.save_data(jobs_mar, os.path.join(tmp, "ci_jobs_2026-03.json"))
+            ci_job_collector.save_data([self._make_job(99, "2026-01-01T10:00:00Z")], os.path.join(tmp, "ci_jobs.json"))
+            ci_job_collector.save_data([self._make_job(100, "2026-01-02T10:00:00Z")], os.path.join(tmp, "ci_jobs_backup.json"))
+
+            all_jobs = ci_visualization._load_monthly_jobs(tmp)
+
+            self.assertEqual(len(all_jobs), 1)
+            self.assertEqual(all_jobs[0]["id"], 2)
+
     def test_visualization_load_monthly_jobs_fails_on_invalid_file(self):
         jobs_feb = [self._make_job(1, "2026-02-15T10:00:00Z")]
         with tempfile.TemporaryDirectory() as tmp:
