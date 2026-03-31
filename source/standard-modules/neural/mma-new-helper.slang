@@ -369,10 +369,77 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
     // Number of 16x16 MatA tiles for the dOut vector.
     static const int OPA_TotalDOutMatA = NColGroupsOPA * OPA_CoopMatCRows;
 
+    // Builds all CoopMat fragments from a per-thread input array using optimized
+    // warp shuffle. Single flat loop over all packed columns — matches Tin2's
+    // Vector::from_array structure exactly. Tile index derived from col_packed.
+    [require(cuda, subgroup_shuffle)]
+    static void buildAllTilesFromArray<int ArraySize, int OutN, let OutR : linalg.CoopMatMatrixUse>(
+        inout half data[ArraySize],
+        inout linalg.CoopMat<half, MemoryScope.Subgroup, ROW_A, COLUMN_A, OutR> outArray[OutN])
+    {
+        uint laneid = WaveGetLaneIndex();
+        let packedData = bit_cast<uint[ArraySize / 2]>(data);
+
+        static const int TotalColsPacked = ArraySize / 2;
+        static const int TileColsPacked = COLUMN_A / 2;
+        static const uint RegColsPacked = 4;
+        static const uint RegRowsPacked = 8;
+        static const uint RegRows = 2;
+        static const uint MMARows = 2;
+
+        [ForceUnroll]
+        for (uint col_packed = 0; col_packed < uint(TotalColsPacked); col_packed += RegColsPacked)
+        {
+            uint regsi[4];
+
+            [ForceUnroll]
+            for (uint i = 0; i < RegColsPacked; i++)
+            {
+                regsi[i] = packedData[int(col_packed + i)];
+
+                [ForceUnroll]
+                for (uint j = 1; j < RegColsPacked; j++)
+                {
+                    uint alt_src = col_packed + (i + j) % RegColsPacked;
+                    uint val_packed = packedData[int(alt_src)];
+                    if (laneid / RegRowsPacked == j)
+                        regsi[i] = val_packed;
+                }
+            }
+
+            WaveMask fullMask = WaveMask(0xFFFFFFFF);
+            [ForceUnroll]
+            for (uint i = 0; i < RegColsPacked; i++)
+            {
+                uint shfl_idx = ((laneid + (RegColsPacked - i)) % RegColsPacked) * RegRowsPacked + laneid / RegColsPacked;
+                regsi[i] = WaveMaskReadLaneAt(fullMask, regsi[i], int(shfl_idx));
+            }
+
+            uint mma_col = col_packed / uint(TileColsPacked);
+            uint r_col = (col_packed % uint(TileColsPacked)) / RegColsPacked;
+
+            [ForceUnroll]
+            for (uint i = 0; i < RegColsPacked; i++)
+            {
+                uint r_row = i % RegRows;
+                uint mma_row = i / RegRows;
+                int reg_idx = int(r_col * RegRows + r_row);
+                int frag_idx = int(mma_col * MMARows + mma_row);
+
+                uint value = regsi[0];
+                [ForceUnroll]
+                for (uint j = 1; j < RegColsPacked; j++)
+                {
+                    if (laneid % RegColsPacked == (i + j) % RegColsPacked)
+                        value = regsi[j];
+                }
+
+                outArray[frag_idx].fragmentWrite(reg_idx, value);
+            }
+        }
+    }
+
     // Outer product compute: dW[m][k] = sum_{all threads} dOut[m] * input[k]
-    //
-    // Builds 16x16 MatA tiles via FromLocalRowPackOffset (optimized batch shuffle),
-    // converts to MatB via FromMatA, then uses single m16n16k16 MMA per tile pair.
     [ForceInline]
     [require(cuda, subgroup_basic)]
     static void outerProductCompute<TypeA, InArrayTypeA, TypeB, InArrayTypeB>(
@@ -386,70 +453,48 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
             where InArrayTypeA : IArrayAccessor<TypeA>
             where InArrayTypeB : IArrayAccessor<TypeB>
     {
-        // --- Build dOut as 16x16 MatA tiles directly into allDOut + ChangeMajor ---
+        // --- Build dOut as 16x16 MatA tiles into allDOut ---
         MatA allDOut[OPA_TotalDOutMatA];
-        if (let arrA = inputVectorA as half[M])
+        if (InArrayTypeA is half[M])
         {
-            [ForceUnroll]
-            for (int i = 0; i < OPA_CoopMatCRows; i++)
-            {
-                MatA.FromLocalRowPackOffsetInto(arrA, i * ROW_A, allDOut, i * 2);
-                allDOut[i * 2 + 0].ChangeMajor();
-                allDOut[i * 2 + 1].ChangeMajor();
-            }
+            var arrA = bit_cast<half[M]>(inputVectorA);
+            buildAllTilesFromArray<M, OPA_TotalDOutMatA>(arrA, allDOut);
         }
         else
         {
+            half localA[M];
             [ForceUnroll]
-            for (int i = 0; i < OPA_CoopMatCRows; i++)
-            {
-                half localRowA[COLUMN_A];
-                [ForceUnroll]
-                for (int m = 0; m < COLUMN_A; m++)
-                {
-                    int elemIdx = i * ROW_A + m;
-                    localRowA[m] = (elemIdx < M) ? __realCast<half>(inputVectorA[elemIdx]) : half(0.0);
-                }
-                MatA.FromLocalRowPackInto(localRowA, allDOut, i * 2);
-                allDOut[i * 2 + 0].ChangeMajor();
-                allDOut[i * 2 + 1].ChangeMajor();
-            }
+            for (int m = 0; m < M; m++)
+                localA[m] = __realCast<half>(inputVectorA[m]);
+            buildAllTilesFromArray<M, OPA_TotalDOutMatA>(localA, allDOut);
         }
 
-        // --- Build input as MatB tiles (via MatA → ChangeMajor → FromMatA) ---
-        MatB allInputB[OPA_TotalInputMatA];
-        if (let arrB = inputVectorB as half[K])
+        [ForceUnroll]
+        for (int i = 0; i < OPA_TotalDOutMatA; i++)
+            allDOut[i].ChangeMajor();
+
+        // --- Build input as MatA tiles, then ChangeMajor + FromMatA to MatB ---
+        MatA allInputA[OPA_TotalInputMatA];
+        if (InArrayTypeB is half[K])
         {
-            [ForceUnroll]
-            for (int j16 = 0; j16 < OPA_InputTileCols; j16++)
-            {
-                MatA tilePairB[2];
-                MatA.FromLocalRowPackOffset(arrB, j16 * COLUMN_A, tilePairB);
-                tilePairB[0].ChangeMajor();
-                tilePairB[1].ChangeMajor();
-                allInputB[j16 * 2 + 0] = MatB.FromMatA(tilePairB[0]);
-                allInputB[j16 * 2 + 1] = MatB.FromMatA(tilePairB[1]);
-            }
+            var arrB = bit_cast<half[K]>(inputVectorB);
+            buildAllTilesFromArray<K, OPA_TotalInputMatA>(arrB, allInputA);
         }
         else
         {
+            half localB[K];
             [ForceUnroll]
-            for (int j16 = 0; j16 < OPA_InputTileCols; j16++)
-            {
-                half localRowB[COLUMN_A];
-                [ForceUnroll]
-                for (int n = 0; n < COLUMN_A; n++)
-                {
-                    int elemIdx = j16 * COLUMN_A + n;
-                    localRowB[n] = (elemIdx < K) ? __realCast<half>(inputVectorB[elemIdx]) : half(0.0);
-                }
-                MatA tilePairB[2];
-                MatA.FromLocalRowPack(localRowB, tilePairB);
-                tilePairB[0].ChangeMajor();
-                tilePairB[1].ChangeMajor();
-                allInputB[j16 * 2 + 0] = MatB.FromMatA(tilePairB[0]);
-                allInputB[j16 * 2 + 1] = MatB.FromMatA(tilePairB[1]);
-            }
+            for (int n = 0; n < K; n++)
+                localB[n] = __realCast<half>(inputVectorB[n]);
+            buildAllTilesFromArray<K, OPA_TotalInputMatA>(localB, allInputA);
+        }
+
+        MatB allInputB[OPA_TotalInputMatA];
+        [ForceUnroll]
+        for (int i = 0; i < OPA_TotalInputMatA; i++)
+        {
+            allInputA[i].ChangeMajor();
+            allInputB[i] = MatB.FromMatA(allInputA[i]);
         }
 
         // --- MMA loop using m16n16k16 ---

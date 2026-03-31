@@ -9150,6 +9150,9 @@ struct WmmaFragment
         }
     }
 
+    __device__ void FragmentWrite(int regIndex, unsigned value) { regs[regIndex] = value; }
+    __device__ unsigned FragmentRead(int regIndex) const { return regs[regIndex]; }
+
     template<Layout layout>
     void __device__ Store(T* buffer, uint element, uint stride)
     {
@@ -9344,6 +9347,7 @@ struct WmmaFragment
     }
 
     static constexpr __device__ uint32_t GetLength() { return This::elements_per_thread; }
+    static constexpr __device__ int GetPackedFragmentCount() { return RegsCount; }
 
     // For referencing those template parameters outside the struct
     using ElementType = T;
