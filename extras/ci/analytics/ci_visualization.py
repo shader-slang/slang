@@ -1555,10 +1555,16 @@ def _load_monthly_jobs(input_dir):
         try:
             with open(path, encoding="utf-8") as f:
                 data = json.load(f)
-            if isinstance(data, list):
-                all_jobs.extend(data)
+            if not isinstance(data, list):
+                print(
+                    f"Error: expected top-level array in {path}, got {type(data).__name__}",
+                    file=sys.stderr,
+                )
+                sys.exit(2)
+            all_jobs.extend(data)
         except (json.JSONDecodeError, OSError) as e:
-            print(f"Warning: skipping {path}: {e}", file=sys.stderr)
+            print(f"Error: failed reading {path}: {e}", file=sys.stderr)
+            sys.exit(2)
     return all_jobs
 
 

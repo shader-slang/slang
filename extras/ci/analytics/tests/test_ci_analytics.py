@@ -1,3 +1,5 @@
+import contextlib
+import io
 import json
 import os
 import sys
@@ -679,6 +681,17 @@ class TestMonthlySplit(unittest.TestCase):
             all_jobs = ci_visualization._load_monthly_jobs(tmp)
             self.assertEqual(len(all_jobs), 2)
             self.assertEqual({j["id"] for j in all_jobs}, {1, 2})
+
+    def test_visualization_load_monthly_jobs_fails_on_invalid_file(self):
+        jobs_feb = [self._make_job(1, "2026-02-15T10:00:00Z")]
+        with tempfile.TemporaryDirectory() as tmp:
+            ci_job_collector.save_data(jobs_feb, os.path.join(tmp, "ci_jobs_2026-02.json"))
+            with open(os.path.join(tmp, "ci_jobs_2026-03.json"), "w", encoding="utf-8") as f:
+                f.write("{invalid json")
+            with contextlib.redirect_stderr(io.StringIO()):
+                with self.assertRaises(SystemExit) as exc:
+                    ci_visualization._load_monthly_jobs(tmp)
+            self.assertEqual(exc.exception.code, 2)
 
     def test_job_month_extraction(self):
         self.assertEqual(ci_job_collector.job_month({"created_at": "2026-03-15T10:00:00Z"}), "2026-03")
