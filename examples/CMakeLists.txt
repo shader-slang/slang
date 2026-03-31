@@ -73,8 +73,7 @@ function(example dir)
         EXTRA_COMPILE_DEFINITIONS_PRIVATE
             SLANG_EXAMPLE_NAME=${dir}
             $<$<BOOL:${SLANG_ENABLE_XLIB}>:SLANG_ENABLE_XLIB>
-        REQUIRED_BY all-examples
-        ${_optional_requires_arg}
+        REQUIRED_BY all-examples ${_optional_requires_arg}
         FOLDER examples
         DEBUG_DIR ${debug_dir}
         ${ARGN}
