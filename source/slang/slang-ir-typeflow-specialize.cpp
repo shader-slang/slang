@@ -5724,44 +5724,80 @@ struct TypeFlowSpecializationContext
         }
     }
 
-    // Diagnose functions that use lookupWitness with TypeEqualityWitness
-    // as callees. These arise from explicit generic specialization with
-    // interface types (e.g. genericFunc<IFoo>(...)) and cannot be handled
-    // by the propagation phase. The implicit inference path works because
-    // it uses ExtractExistentialType instead.
+    // Detect explicit generic specialization with interface types
+    // (e.g. genericFunc<IFoo>(...)) which the propagation phase cannot handle.
+    //
+    // After specializeModule() resolves IRSpecialize instructions, explicit
+    // interface specialization produces TypeEqualityWitness(IFoo, IFoo) at
+    // global scope. We scan for these witnesses where the type is an interface,
+    // then trace through lookupWitness uses to the specialized function and
+    // its call sites to emit the diagnostic at the user-visible call location.
+    //
+    // The implicit inference path (genericFunc(obj, ...)) is unaffected as it
+    // uses ExtractExistentialType instead of TypeEqualityWitness.
     void diagnoseExplicitInterfaceSpecializations()
     {
+        HashSet<IRFunc*> diagnosed;
+
         for (auto globalInst : module->getGlobalInsts())
         {
-            auto lookup = as<IRLookupWitnessMethod>(globalInst);
-            if (!lookup)
+            if (globalInst->getOp() != kIROp_TypeEqualityWitness)
                 continue;
 
-            auto witness = lookup->getWitnessTable();
-            if (witness->getOp() != kIROp_TypeEqualityWitness)
+            if (!as<IRInterfaceType>(globalInst->getOperand(0)))
                 continue;
 
-            // Find a function that uses this lookupWitness as a callee.
-            for (auto use = lookup->firstUse; use; use = use->nextUse)
+            for (auto witnessUse = globalInst->firstUse; witnessUse;
+                 witnessUse = witnessUse->nextUse)
             {
-                auto call = as<IRCall>(use->getUser());
-                if (!call || call->getCallee() != lookup)
+                auto lookup = as<IRLookupWitnessMethod>(witnessUse->getUser());
+                if (!lookup)
                     continue;
 
-                // Find the enclosing function for the error location.
-                auto parentFunc = as<IRFunc>(call->getParent()->getParent());
-                String funcName;
-                if (parentFunc)
+                for (auto lookupUse = lookup->firstUse; lookupUse;
+                     lookupUse = lookupUse->nextUse)
                 {
-                    if (auto nameHint = parentFunc->findDecoration<IRNameHintDecoration>())
-                        funcName = nameHint->getName();
-                }
-                if (funcName.getLength() == 0)
-                    funcName = "<generic>";
+                    auto call = as<IRCall>(lookupUse->getUser());
+                    if (!call || call->getCallee() != lookup)
+                        continue;
 
-                sink->diagnose(Diagnostics::CannotSpecializeGenericWithExistential{
-                    .generic = funcName,
-                    .location = call->sourceLoc});
+                    auto specializedFunc = getParentFunc(call);
+                    if (!specializedFunc || diagnosed.contains(specializedFunc))
+                        continue;
+                    diagnosed.add(specializedFunc);
+
+                    String funcName;
+                    if (auto nameHint =
+                            specializedFunc->findDecoration<IRNameHintDecoration>())
+                        funcName = nameHint->getName();
+                    if (funcName.getLength() == 0)
+                        funcName = "<generic>";
+
+                    // Emit the diagnostic at each call site of the specialized
+                    // function so the error points at the user-written
+                    // genericFunc<IFoo>(...) expression.
+                    bool foundCallSite = false;
+                    for (auto funcUse = specializedFunc->firstUse; funcUse;
+                         funcUse = funcUse->nextUse)
+                    {
+                        auto callSite = as<IRCall>(funcUse->getUser());
+                        if (callSite && callSite->getCallee() == specializedFunc)
+                        {
+                            sink->diagnose(
+                                Diagnostics::CannotSpecializeGenericWithExistential{
+                                    .generic = funcName,
+                                    .location = callSite->sourceLoc});
+                            foundCallSite = true;
+                        }
+                    }
+                    if (!foundCallSite)
+                    {
+                        sink->diagnose(
+                            Diagnostics::CannotSpecializeGenericWithExistential{
+                                .generic = funcName,
+                                .location = specializedFunc->sourceLoc});
+                    }
+                }
             }
         }
     }
@@ -5773,8 +5809,9 @@ struct TypeFlowSpecializationContext
         // Diagnose generics explicitly specialized with interface types
         // before propagation, which crashes on the lookupWitness callees
         // they generate.
+        auto errorCountBefore = sink->getErrorCount();
         diagnoseExplicitInterfaceSpecializations();
-        if (sink->getErrorCount() > 0)
+        if (sink->getErrorCount() > errorCountBefore)
             return false;
 
         // Part 1: Information Propagation
