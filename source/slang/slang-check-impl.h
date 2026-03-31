@@ -55,6 +55,54 @@ bool isUniformParameterType(Type* type);
 
 bool isSlang2026OrLater(SemanticsVisitor* visitor);
 
+/// Direction of a semantic value (input from previous stage, or output to next stage).
+enum class SemanticDirection
+{
+    Input,
+    Output,
+};
+
+/// Look up a SemanticDecl by name in the given scope.
+/// Semantic names in core.meta.slang are stored lowercase for case-insensitive matching.
+SemanticDecl* lookUpSemanticDecl(
+    ASTBuilder* astBuilder,
+    SemanticsVisitor* visitor,
+    const String& semanticName,
+    Scope* scope);
+
+/// Determine whether a semantic accessor's capability requirement is purely a
+/// stage restriction, with no additional non-stage capabilities.
+///
+/// Used to avoid propagating stage-only requirements into the inferred capability
+/// set, which would duplicate the more specific diagnostics produced by
+/// validateSystemValueSemantic (e.g. "SV_X cannot be used in Y stage").
+///
+/// Constructs a pure-stage CapabilitySet from @p stage, then uses
+/// CapabilitySet::implies() to check whether the stage alone satisfies every
+/// alternative in the requirement. The implies() call checks all target sets
+/// and stage sets, so this is comprehensive for the common case of
+/// single-stage accessors. For hypothetical multi-stage disjunctions (e.g.
+/// [require(fragment+capA | compute+capB)]), it conservatively returns false
+/// (non-stage-only), which is the safe direction.
+///
+/// Callers must first filter out accessors incompatible with the current stage
+/// (via isIncompatibleWith), so this only sees capSets compatible with @p stage.
+bool isStageOnlySemanticRequirement(const CapabilitySetVal* capSet, Stage stage);
+
+/// Collect non-stage capability requirements from a SemanticDecl's accessors.
+///
+/// Iterates the getters/setters of a SemanticDecl, filters by direction, skips
+/// accessors incompatible with the given stage, and collects capabilities that go
+/// beyond what the stage alone requires. This prevents duplicating stage-only
+/// diagnostics produced by validateSystemValueSemantic.
+///
+/// For inout parameters, callers should invoke this twice (once per direction).
+void collectSemanticAccessorCaps(
+    SemanticDecl* semanticDecl,
+    SemanticDirection direction,
+    Stage stage,
+    CapabilitySet& outCaps);
+
 /// Create a new component type based on `inComponentType`, but with all its requiremetns filled.
 RefPtr<ComponentType> fillRequirements(ComponentType* inComponentType);
 

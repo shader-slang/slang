@@ -17,6 +17,7 @@
 #include "slang-ast-print.h"
 #include "slang-ast-synthesis.h"
 #include "slang-lookup.h"
+#include "slang-parameter-binding.h"
 #include "slang-parser.h"
 #include "slang-rich-diagnostics.h"
 #include "slang-syntax.h"
@@ -14672,6 +14673,81 @@ static void _propagateRequirement(
     }
 };
 
+// Propagate non-stage capability requirements from system value semantics on a
+// parameter declaration.
+//
+// SV_ semantics in core.meta.slang declare [require()] attributes on their
+// accessors (getters/setters). Stage-only requirements are validated by
+// validateSystemValueSemantic (slang-check-shader.cpp); this function
+// propagates non-stage capabilities so the profile checker can detect missing
+// capabilities and emit upgrade warnings.
+//
+// Scoped to ParamDecl only: the core/GLSL modules use SV_ semantics on
+// internal struct fields where propagating capabilities would conflict with
+// the module's capability structure. Struct fields in user entry point
+// parameters are handled by collectStructFieldSemanticCapabilities in
+// slang-check-shader.cpp.
+static void _propagateSemanticCapabilities(
+    SemanticsVisitor* visitor,
+    CapabilitySet& outCaps,
+    ParamDecl* paramDecl)
+{
+    auto semantic = paramDecl->findModifier<HLSLSimpleSemantic>();
+    if (!semantic)
+        return;
+
+    auto semanticNameSlice = semantic->name.getContent();
+    if (!semanticNameSlice.startsWithCaseInsensitive(toSlice("sv_")))
+        return;
+
+    UnownedStringSlice baseNameSlice, indexSlice;
+    splitNameAndIndex(semanticNameSlice, baseNameSlice, indexSlice);
+
+    auto scope = visitor->getSession()->coreLanguageScope;
+    if (!scope)
+        return;
+
+    auto semanticDecl =
+        lookUpSemanticDecl(visitor->getASTBuilder(), visitor, String(baseNameSlice), scope);
+    if (!semanticDecl)
+        return;
+
+    // SV_ semantics are only meaningful at entry point boundaries.
+    auto parentFunc = as<FunctionDeclBase>(paramDecl->parentDecl);
+    if (!parentFunc)
+        return;
+    auto entryPointAttr = parentFunc->findModifier<EntryPointAttribute>();
+    if (!entryPointAttr || !entryPointAttr->capabilitySet)
+        return;
+    Stage stage = getStageFromAtom(entryPointAttr->capabilitySet->getTargetStage());
+
+    // Determine direction, matching the InOutModifier-first pattern used by
+    // validateSystemValueSemantic (InOutModifier inherits from OutModifier).
+    CapabilitySet accessorCaps;
+    if (paramDecl->hasModifier<InOutModifier>())
+    {
+        collectSemanticAccessorCaps(semanticDecl, SemanticDirection::Input, stage, accessorCaps);
+        collectSemanticAccessorCaps(semanticDecl, SemanticDirection::Output, stage, accessorCaps);
+    }
+    else
+    {
+        bool isOutput = paramDecl->hasModifier<OutModifier>();
+        if (auto paramType = paramDecl->getType())
+        {
+            if (as<MeshOutputType>(paramType) || as<HLSLStreamOutputType>(paramType))
+                isOutput = true;
+        }
+        collectSemanticAccessorCaps(
+            semanticDecl,
+            isOutput ? SemanticDirection::Output : SemanticDirection::Input,
+            stage,
+            accessorCaps);
+    }
+
+    if (!accessorCaps.isEmpty())
+        outCaps.join(accessorCaps);
+}
+
 CapabilitySet getStatementCapabilityUsage(SemanticsVisitor* visitor, Stmt* stmt);
 
 template<typename ProcessFunc, typename ParentDiagnosticFunc>
@@ -14977,6 +15053,10 @@ void SemanticsDeclCapabilityVisitor::checkVarDeclCommon(VarDeclBase* varDecl)
         { _propagateRequirement(this, mutableCapSet, varDecl, node, nodeCaps, refLoc); },
         [this, varDecl](DiagnosticCategory category)
         { _propagateSeeDefinitionOf(this, varDecl, category); });
+
+    if (auto paramDecl = as<ParamDecl>(varDecl))
+        _propagateSemanticCapabilities(this, mutableCapSet, paramDecl);
+
     varDecl->inferredCapabilityRequirements = mutableCapSet.freeze(getASTBuilder());
 }
 
