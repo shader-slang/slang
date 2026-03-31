@@ -2241,6 +2241,8 @@ Result linkAndOptimizeIR(
         validateIRModuleIfEnabled(codeGenContext, irModule);
     }
 
+    SLANG_PASS(validateCooperativeOperations, sink);
+
     auto metadata = new ArtifactPostEmitMetadata;
     outLinkedIR.metadata = metadata;
 

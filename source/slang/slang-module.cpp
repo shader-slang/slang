@@ -275,6 +275,8 @@ UnownedStringSlice Module::getExportedDeclMangledName(Index index)
 
 SLANG_NO_THROW SlangResult SLANG_MCALL Module::serialize(ISlangBlob** outSerializedBlob)
 {
+    SLANG_AST_BUILDER_RAII(m_astBuilder);
+
     SerialContainerUtil::WriteOptions writeOptions;
     OwnedMemoryStream memoryStream(FileAccess::Write);
     SLANG_RETURN_ON_FAIL(SerialContainerUtil::write(this, writeOptions, &memoryStream));
@@ -287,6 +289,8 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Module::serialize(ISlangBlob** outSeriali
 
 SLANG_NO_THROW SlangResult SLANG_MCALL Module::writeToFile(char const* fileName)
 {
+    SLANG_AST_BUILDER_RAII(m_astBuilder);
+
     SerialContainerUtil::WriteOptions writeOptions;
     FileStream fileStream;
     SLANG_RETURN_ON_FAIL(fileStream.init(fileName, FileMode::Create));

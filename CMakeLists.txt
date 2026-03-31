@@ -647,6 +647,21 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
             NAMESPACE ${PROJECT_NAME}::
             DESTINATION ${SLANG_CMAKE_CONFIG_DIR}
         )
+
+        if(UNIX)
+            configure_file(
+                "${PROJECT_SOURCE_DIR}/extras/pkgconfig/slang-compiler.pc.in"
+                "${PROJECT_BINARY_DIR}/slang-compiler.pc"
+                @ONLY
+            )
+
+            # TODO: When build system is changed to respect CMAKE_INSTALL_LIBDIR,
+            # update this destination.
+            install(
+                FILES "${PROJECT_BINARY_DIR}/slang-compiler.pc"
+                DESTINATION "lib/pkgconfig"
+            )
+        endif()
     endif()
 endif()
 

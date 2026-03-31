@@ -622,6 +622,52 @@ struct UntaggedUnionLoweringContext : public InstPassBase
         return builder->getAnyValueType(size);
     }
 
+    // Check whether a type (or any of its nested fields) contains types that
+    // cannot be marshalled to/from an AnyValue. Types like Atomic<T> and
+    // unsized arrays would crash in emitMarshallingCode; reject them here
+    // so we emit error 41014 instead.
+    bool containsUnmarshalableType(IRType* type)
+    {
+        switch (type->getOp())
+        {
+        case kIROp_AtomicType:
+        case kIROp_UnsizedArrayType:
+            return true;
+
+        case kIROp_StructType:
+            {
+                auto structType = cast<IRStructType>(type);
+                for (auto field : structType->getFields())
+                {
+                    if (containsUnmarshalableType(field->getFieldType()))
+                        return true;
+                }
+                return false;
+            }
+
+        case kIROp_ArrayType:
+            {
+                auto arrayType = cast<IRArrayType>(type);
+                return containsUnmarshalableType((IRType*)arrayType->getElementType());
+            }
+
+        case kIROp_VectorType:
+            {
+                auto vectorType = cast<IRVectorType>(type);
+                return containsUnmarshalableType((IRType*)vectorType->getElementType());
+            }
+
+        case kIROp_MatrixType:
+            {
+                auto matrixType = cast<IRMatrixType>(type);
+                return containsUnmarshalableType((IRType*)matrixType->getElementType());
+            }
+
+        default:
+            return false;
+        }
+    }
+
     bool canTypeBeStored(IRType* concreteType)
     {
         if (!areResourceTypesBindlessOnTarget(targetProgram->getTargetReq()))
@@ -640,6 +686,9 @@ struct UntaggedUnionLoweringContext : public InstPassBase
             &sizeAndAlignment);
 
         if (SLANG_FAILED(result))
+            return false;
+
+        if (containsUnmarshalableType(concreteType))
             return false;
 
         return true;
