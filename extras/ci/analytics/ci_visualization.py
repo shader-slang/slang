@@ -15,6 +15,7 @@ Usage:
 
 import argparse
 import datetime
+import glob
 import html as html_mod
 import json
 import os
@@ -35,7 +36,11 @@ def parse_args():
     parser = argparse.ArgumentParser(
         description="Generate CI analytics HTML from job data."
     )
-    parser.add_argument("--input", default="ci_jobs.json", help="Input JSON file")
+    parser.add_argument("--input", default="ci_jobs.json", help="Input JSON file (legacy single-file mode)")
+    parser.add_argument(
+        "--input-dir",
+        help="Input directory containing monthly ci_jobs_YYYY-MM.json files (preferred over --input)",
+    )
     parser.add_argument(
         "--pr-input", default="pr_merges.json",
         help="Input JSON file with merged PR data (default: pr_merges.json)",
@@ -1538,6 +1543,25 @@ def generate_health(output_dir):
         f.write(page_template("Health", body, "Health"))
 
 
+def _load_monthly_jobs(input_dir):
+    """Load all ci_jobs_YYYY-MM.json files from a directory into a flat list."""
+    pattern = os.path.join(input_dir, "ci_jobs_*.json")
+    files = sorted(glob.glob(pattern))
+    if not files:
+        print(f"Error: no ci_jobs_*.json files found in {input_dir}", file=sys.stderr)
+        sys.exit(2)
+    all_jobs = []
+    for path in files:
+        try:
+            with open(path, encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data, list):
+                all_jobs.extend(data)
+        except (json.JSONDecodeError, OSError) as e:
+            print(f"Warning: skipping {path}: {e}", file=sys.stderr)
+    return all_jobs
+
+
 # --- Main ---
 
 
@@ -1546,25 +1570,29 @@ def main():
     config = load_config()
 
     # Load job data
-    print(f"Loading job data from {args.input}...")
-    try:
-        with open(args.input, encoding="utf-8") as f:
-            jobs_data = json.load(f)
-    except FileNotFoundError:
-        print(f"Error: input JSON not found: {args.input}", file=sys.stderr)
-        sys.exit(2)
-    except json.JSONDecodeError as e:
-        print(f"Error: invalid JSON in {args.input}: {e}", file=sys.stderr)
-        sys.exit(2)
-    except OSError as e:
-        print(f"Error: failed reading {args.input}: {e}", file=sys.stderr)
-        sys.exit(2)
-    if not isinstance(jobs_data, list):
-        print(
-            f"Error: expected top-level array in {args.input}, got {type(jobs_data).__name__}",
-            file=sys.stderr,
-        )
-        sys.exit(2)
+    if args.input_dir:
+        print(f"Loading job data from {args.input_dir}/...")
+        jobs_data = _load_monthly_jobs(args.input_dir)
+    else:
+        print(f"Loading job data from {args.input}...")
+        try:
+            with open(args.input, encoding="utf-8") as f:
+                jobs_data = json.load(f)
+        except FileNotFoundError:
+            print(f"Error: input JSON not found: {args.input}", file=sys.stderr)
+            sys.exit(2)
+        except json.JSONDecodeError as e:
+            print(f"Error: invalid JSON in {args.input}: {e}", file=sys.stderr)
+            sys.exit(2)
+        except OSError as e:
+            print(f"Error: failed reading {args.input}: {e}", file=sys.stderr)
+            sys.exit(2)
+        if not isinstance(jobs_data, list):
+            print(
+                f"Error: expected top-level array in {args.input}, got {type(jobs_data).__name__}",
+                file=sys.stderr,
+            )
+            sys.exit(2)
     print(f"Loaded {len(jobs_data)} jobs")
 
     # Load PR merge data (optional)

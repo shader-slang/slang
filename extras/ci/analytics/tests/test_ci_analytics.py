@@ -11,6 +11,7 @@ if ANALYTICS_DIR not in sys.path:
     sys.path.insert(0, ANALYTICS_DIR)
 
 import ci_health
+import ci_job_collector
 import ci_status
 import ci_visualization
 
@@ -560,6 +561,128 @@ class TestStatusPage(unittest.TestCase):
         nav = ci_visualization.nav_html("Status")
         self.assertIn("status.html", nav)
         self.assertIn("Status", nav)
+
+
+class TestMonthlySplit(unittest.TestCase):
+    def _make_job(self, job_id, created_at):
+        return {
+            "id": job_id,
+            "run_id": 1,
+            "name": "test-job",
+            "workflow_name": "CI",
+            "workflow_path": ".github/workflows/ci.yml",
+            "status": "completed",
+            "conclusion": "success",
+            "created_at": created_at,
+            "started_at": created_at,
+            "completed_at": created_at,
+            "duration_seconds": 60,
+            "queued_seconds": 5,
+            "runner_name": "",
+            "runner_id": 0,
+            "runner_group_name": "",
+            "labels": [],
+            "head_branch": "main",
+            "event": "push",
+            "actor": "dev",
+            "html_url": "",
+            "run_created_at": created_at,
+        }
+
+    def test_save_monthly_data_splits_by_month(self):
+        jobs = [
+            self._make_job(1, "2026-02-15T10:00:00Z"),
+            self._make_job(2, "2026-02-20T10:00:00Z"),
+            self._make_job(3, "2026-03-01T10:00:00Z"),
+            self._make_job(4, "2026-03-15T10:00:00Z"),
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            ci_job_collector.save_monthly_data(jobs, tmp)
+            feb_path = os.path.join(tmp, "ci_jobs_2026-02.json")
+            mar_path = os.path.join(tmp, "ci_jobs_2026-03.json")
+            self.assertTrue(os.path.exists(feb_path))
+            self.assertTrue(os.path.exists(mar_path))
+            with open(feb_path) as f:
+                feb_data = json.load(f)
+            with open(mar_path) as f:
+                mar_data = json.load(f)
+            self.assertEqual(len(feb_data), 2)
+            self.assertEqual(len(mar_data), 2)
+            self.assertEqual({j["id"] for j in feb_data}, {1, 2})
+            self.assertEqual({j["id"] for j in mar_data}, {3, 4})
+
+    def test_save_monthly_data_changed_months_filter(self):
+        jobs = [
+            self._make_job(1, "2026-02-15T10:00:00Z"),
+            self._make_job(2, "2026-03-01T10:00:00Z"),
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            ci_job_collector.save_monthly_data(jobs, tmp, changed_months={"2026-03"})
+            self.assertFalse(os.path.exists(os.path.join(tmp, "ci_jobs_2026-02.json")))
+            self.assertTrue(os.path.exists(os.path.join(tmp, "ci_jobs_2026-03.json")))
+
+    def test_load_all_monthly_data_concatenates(self):
+        jobs_feb = [self._make_job(1, "2026-02-15T10:00:00Z")]
+        jobs_mar = [self._make_job(2, "2026-03-01T10:00:00Z")]
+        with tempfile.TemporaryDirectory() as tmp:
+            ci_job_collector.save_data(jobs_feb, os.path.join(tmp, "ci_jobs_2026-02.json"))
+            ci_job_collector.save_data(jobs_mar, os.path.join(tmp, "ci_jobs_2026-03.json"))
+            all_jobs = ci_job_collector.load_all_monthly_data(tmp)
+            self.assertEqual(len(all_jobs), 2)
+            self.assertEqual({j["id"] for j in all_jobs}, {1, 2})
+
+    def test_load_recent_monthly_data_returns_latest(self):
+        jobs_feb = [self._make_job(1, "2026-02-15T10:00:00Z")]
+        jobs_mar = [self._make_job(2, "2026-03-01T10:00:00Z")]
+        with tempfile.TemporaryDirectory() as tmp:
+            ci_job_collector.save_data(jobs_feb, os.path.join(tmp, "ci_jobs_2026-02.json"))
+            ci_job_collector.save_data(jobs_mar, os.path.join(tmp, "ci_jobs_2026-03.json"))
+            recent = ci_job_collector.load_recent_monthly_data(tmp)
+            self.assertEqual(len(recent), 1)
+            self.assertEqual(recent[0]["id"], 2)
+
+    def test_migrate_single_to_monthly(self):
+        jobs = [
+            self._make_job(1, "2026-02-15T10:00:00Z"),
+            self._make_job(2, "2026-03-01T10:00:00Z"),
+            self._make_job(3, "2026-03-15T10:00:00Z"),
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            single_file = os.path.join(tmp, "ci_jobs.json")
+            ci_job_collector.save_data(jobs, single_file)
+            out_dir = os.path.join(tmp, "monthly")
+            ci_job_collector.migrate_single_to_monthly(single_file, out_dir)
+            files = ci_job_collector.find_monthly_files(out_dir)
+            self.assertEqual(len(files), 2)
+            self.assertEqual(files[0][0], "2026-02")
+            self.assertEqual(files[1][0], "2026-03")
+            all_jobs = ci_job_collector.load_all_monthly_data(out_dir)
+            self.assertEqual(len(all_jobs), 3)
+
+    def test_find_monthly_files_ignores_non_monthly(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            # Create a monthly file and a non-monthly file
+            ci_job_collector.save_data([], os.path.join(tmp, "ci_jobs_2026-03.json"))
+            ci_job_collector.save_data([], os.path.join(tmp, "ci_jobs.json"))
+            ci_job_collector.save_data([], os.path.join(tmp, "ci_jobs_bad.json"))
+            files = ci_job_collector.find_monthly_files(tmp)
+            self.assertEqual(len(files), 1)
+            self.assertEqual(files[0][0], "2026-03")
+
+    def test_visualization_load_monthly_jobs(self):
+        jobs_feb = [self._make_job(1, "2026-02-15T10:00:00Z")]
+        jobs_mar = [self._make_job(2, "2026-03-01T10:00:00Z")]
+        with tempfile.TemporaryDirectory() as tmp:
+            ci_job_collector.save_data(jobs_feb, os.path.join(tmp, "ci_jobs_2026-02.json"))
+            ci_job_collector.save_data(jobs_mar, os.path.join(tmp, "ci_jobs_2026-03.json"))
+            all_jobs = ci_visualization._load_monthly_jobs(tmp)
+            self.assertEqual(len(all_jobs), 2)
+            self.assertEqual({j["id"] for j in all_jobs}, {1, 2})
+
+    def test_job_month_extraction(self):
+        self.assertEqual(ci_job_collector.job_month({"created_at": "2026-03-15T10:00:00Z"}), "2026-03")
+        self.assertEqual(ci_job_collector.job_month({"created_at": None}), "unknown")
+        self.assertEqual(ci_job_collector.job_month({}), "unknown")
 
 
 if __name__ == "__main__":
