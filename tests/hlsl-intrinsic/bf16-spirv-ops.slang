@@ -26,6 +26,12 @@
 // SPV-DAG: OpExtInst %bfloat16 {{%[0-9]+}} FMax
 // SPV-DAG: OpExtInst %bfloat16 {{%[0-9]+}} FClamp
 
+// Vector operations (verify vector types work with same opcodes)
+// SPV-DAG: OpFAdd %v4bfloat16
+// SPV-DAG: OpFSub %v4bfloat16
+// SPV-DAG: OpFMul %v4bfloat16
+// SPV-DAG: OpFNegate %v4bfloat16
+
 RWStructuredBuffer<int> outputBuffer;
 
 void use(int v, int idx) { outputBuffer[idx] = v; }
@@ -72,4 +78,18 @@ void computeMain()
     use(int(float(minVal)), 12);
     use(int(float(maxVal)), 13);
     use(int(float(clamped)), 14);
+
+    // Vector4 operations
+    vector<BFloat16, 4> va = vector<BFloat16, 4>(a, b, a, b);
+    vector<BFloat16, 4> vb = vector<BFloat16, 4>(b, a, b, a);
+
+    let vsum = va + vb;
+    let vdiff = va - vb;
+    let vprod = va * vb;
+    let vneg = -va;
+
+    use(int(float(vsum[0])), 15);
+    use(int(float(vdiff[1])), 16);
+    use(int(float(vprod[2])), 17);
+    use(int(float(vneg[3])), 18);
 }

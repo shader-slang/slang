@@ -1,7 +1,7 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-vk -compute -emit-spirv-directly -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cuda -compute -output-using-type
 
-//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
+//TEST_INPUT:ubuffer(data=[0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0], stride=4):out,name outputBuffer
 RWStructuredBuffer<int> outputBuffer;
 
 // Scalar arithmetic: a=3.0, b=2.0
@@ -11,7 +11,7 @@ RWStructuredBuffer<int> outputBuffer;
 // CHECK: 15
 // CHECK: -30
 
-// Vector arithmetic: va=(3.0, 4.0), vb=(2.0, 1.0)
+// Vector2 arithmetic: va=(3.0, 4.0), vb=(2.0, 1.0)
 // CHECK: 50
 // CHECK: 30
 // CHECK: 60
@@ -31,7 +31,7 @@ RWStructuredBuffer<int> outputBuffer;
 // CHECK: 40
 // CHECK: 30
 
-// Vector unary plus, compound assignment, and inc/dec
+// Vector2 unary plus, compound assignment, and inc/dec
 // CHECK: 30
 // CHECK: 50
 // CHECK: 60
@@ -42,6 +42,17 @@ RWStructuredBuffer<int> outputBuffer;
 // CHECK: 110
 // CHECK: 110
 // CHECK: 100
+
+// Vector4 arithmetic: v4a=(1.0, 2.0, 3.0, 4.0), v4b=(2.0, 1.0, 2.0, 1.0)
+// sum=(3,3,5,5), diff=(-1,1,1,3), prod=(2,2,6,4), neg=(-1,-2,-3,-4)
+// CHECK: 30
+// CHECK: 10
+// CHECK: 20
+// CHECK: 50
+// CHECK: 30
+// CHECK: 50
+// CHECK: 60
+// CHECK: -40
 
 [numthreads(1,1,1)]
 void computeMain()
@@ -129,4 +140,22 @@ void computeMain()
     let vpostDec = vacc--;
     outputBuffer[29] = int(float(vpostDec[0]) * 10.0);
     outputBuffer[30] = int(float(vacc[0]) * 10.0);
+
+    // Vector4 arithmetic
+    vector<BFloat16, 4> v4a = vector<BFloat16, 4>(BFloat16(1.0), BFloat16(2.0), BFloat16(3.0), BFloat16(4.0));
+    vector<BFloat16, 4> v4b = vector<BFloat16, 4>(BFloat16(2.0), BFloat16(1.0), BFloat16(2.0), BFloat16(1.0));
+
+    let v4sum = v4a + v4b;
+    let v4diff = v4a - v4b;
+    let v4prod = v4a * v4b;
+    let v4neg = -v4a;
+
+    outputBuffer[31] = int(float(v4sum[0]) * 10.0);  // (1+2)*10 = 30
+    outputBuffer[32] = int(float(v4diff[1]) * 10.0);  // (2-1)*10 = 10
+    outputBuffer[33] = int(float(v4prod[0]) * 10.0);  // (1*2)*10 = 20
+    outputBuffer[34] = int(float(v4sum[2]) * 10.0);   // (3+2)*10 = 50
+    outputBuffer[35] = int(float(v4diff[3]) * 10.0);  // (4-1)*10 = 30
+    outputBuffer[36] = int(float(v4sum[3]) * 10.0);   // (4+1)*10 = 50
+    outputBuffer[37] = int(float(v4prod[2]) * 10.0);  // (3*2)*10 = 60
+    outputBuffer[38] = int(float(v4neg[3]) * 10.0);   // -4*10 = -40
 }

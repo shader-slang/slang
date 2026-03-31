@@ -1681,7 +1681,17 @@ extension<T:__BuiltinFloatingPointType> T
     __init(BFloat16 val);
 }
 
-// BFloat16 arithmetic operators (scalar)
+// BFloat16 arithmetic operators (scalar and vector)
+//
+// Unlike base types (half, float, double) which get operators via
+// __BuiltinArithmeticType, BFloat16 uses explicit overloads because
+// promoting it to __BuiltinArithmeticType would require a BaseType
+// enum and conflict with CoopMat restrictions.
+//
+// Mixed scalar-vector operators (e.g. BFloat16 + vector<BFloat16,N>)
+// are not declared here. The implicit vector<T,N>::__init(T) conversion
+// should handle promotion, but MakeVectorFromScalar is not yet supported
+// for BFloat16 in all backends. Users must construct vectors explicitly.
 [__unsafeForceInlineEarly]
 __prefix BFloat16 operator+(BFloat16 value)
 {
