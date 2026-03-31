@@ -4,6 +4,7 @@ import sys
 import tempfile
 import unittest
 from datetime import datetime, timezone
+from unittest import mock
 
 
 ANALYTICS_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -683,6 +684,45 @@ class TestMonthlySplit(unittest.TestCase):
         self.assertEqual(ci_job_collector.job_month({"created_at": "2026-03-15T10:00:00Z"}), "2026-03")
         self.assertEqual(ci_job_collector.job_month({"created_at": None}), "unknown")
         self.assertEqual(ci_job_collector.job_month({}), "unknown")
+
+    def test_monthly_main_handles_cross_month_jobs(self):
+        existing_feb_job = self._make_job(1, "2026-02-15T10:00:00Z")
+        existing_mar_job = self._make_job(2, "2026-03-01T10:00:00Z")
+        cross_month_job = self._make_job(3, "2026-03-01T00:05:00Z")
+        run = {
+            "id": 99,
+            "name": "CI",
+            "created_at": "2026-02-28T23:59:00Z",
+        }
+
+        with tempfile.TemporaryDirectory() as tmp:
+            ci_job_collector.save_data(
+                [existing_feb_job], os.path.join(tmp, "ci_jobs_2026-02.json")
+            )
+            ci_job_collector.save_data(
+                [existing_mar_job], os.path.join(tmp, "ci_jobs_2026-03.json")
+            )
+
+            with mock.patch.object(
+                ci_job_collector, "fetch_completed_runs", return_value=[run]
+            ), mock.patch.object(
+                ci_job_collector, "collect_jobs", return_value=([cross_month_job], 0, [])
+            ), mock.patch.object(
+                ci_job_collector, "resolve_workflow_id", return_value=123
+            ), mock.patch.object(
+                ci_job_collector.sys,
+                "argv",
+                ["ci_job_collector.py", "--output-dir", tmp, "--workflow", "CI"],
+            ):
+                ci_job_collector.main()
+
+            with open(os.path.join(tmp, "ci_jobs_2026-02.json"), encoding="utf-8") as f:
+                feb_data = json.load(f)
+            with open(os.path.join(tmp, "ci_jobs_2026-03.json"), encoding="utf-8") as f:
+                mar_data = json.load(f)
+
+            self.assertEqual({j["id"] for j in feb_data}, {1})
+            self.assertEqual({j["id"] for j in mar_data}, {2, 3})
 
 
 if __name__ == "__main__":

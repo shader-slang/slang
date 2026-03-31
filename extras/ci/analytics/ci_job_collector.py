@@ -177,6 +177,11 @@ def save_monthly_data(all_jobs, output_dir, changed_months=None):
     return written
 
 
+def months_in_jobs(jobs):
+    """Return the set of month strings represented by the jobs' created_at values."""
+    return {month for month in (job_month(job) for job in jobs) if month != "unknown"}
+
+
 def migrate_single_to_monthly(single_file, output_dir, verbose=False):
     """Migrate a single ci_jobs.json into monthly files."""
     data = load_existing_data(single_file, verbose)
@@ -585,38 +590,24 @@ def main():
         )
 
     if use_monthly:
-        # For monthly mode, load all data for months that overlap with new runs
-        # to allow proper deduplication
-        new_months = set()
-        for r in runs:
-            created = r.get("created_at") or ""
-            if len(created) >= 7:
-                new_months.add(created[:7])
+        fetched_jobs, failed_job_fetches, failed_run_ids = collect_jobs(
+            args.repo,
+            runs,
+            verbose=args.verbose,
+        )
+        changed_months = months_in_jobs(fetched_jobs)
         existing_for_merge = []
-        for month in new_months:
+        for month in changed_months:
             existing_for_merge.extend(
                 load_monthly_file(args.output_dir, month, args.verbose)
             )
         if existing_for_merge:
             print(
-                f"Loaded {len(existing_for_merge)} existing jobs from {len(new_months)} overlapping months"
+                f"Loaded {len(existing_for_merge)} existing jobs from {len(changed_months)} overlapping months"
             )
 
-        merged, failed_job_fetches, failed_run_ids = collect_jobs(
-            args.repo,
-            runs,
-            existing=existing_for_merge,
-            output_dir=args.output_dir,
-            verbose=args.verbose,
-        )
+        merged = merge_data(existing_for_merge, fetched_jobs, args.verbose)
         new_count = len(merged) - len(existing_for_merge)
-
-        # Determine which months have new data
-        changed_months = set()
-        for job in merged:
-            m = job_month(job)
-            if m in new_months:
-                changed_months.add(m)
 
         written = save_monthly_data(merged, args.output_dir, changed_months)
         print(f"Added {new_count} new jobs (wrote {written} monthly files)")
