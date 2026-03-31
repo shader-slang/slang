@@ -24,7 +24,7 @@ struct Command
     {
     public:
         T* value = nullptr;
-        bool isValid() const { return value != nullptr; }
+        bool isValid() { return value != nullptr; }
         T& operator=(const T& val)
         {
             delete value;
@@ -46,20 +46,16 @@ struct Command
             SLANG_ASSERT(isValid());
             return *value;
         }
-        const T& get() const
-        {
-            SLANG_ASSERT(isValid());
-            return *value;
-        }
         Optional() = default;
         Optional(const Optional& other)
         {
             if (other.isValid())
-                value = new T(other.get());
+                *this = (other.get());
         }
         Optional(Optional&& other)
-            : value(other.value)
         {
+            if (other.isValid())
+                *this = (other.get());
             other.value = nullptr;
         }
 
