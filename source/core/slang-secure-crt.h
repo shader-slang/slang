@@ -137,6 +137,11 @@ sprintf_s(char* buffer, size_t sizeOfBuffer, const char* format, ...)
     va_start(argptr, format);
     int rs = vsnprintf(buffer, sizeOfBuffer, format, argptr);
     va_end(argptr);
+    if (rs < 0 || (size_t)rs >= sizeOfBuffer)
+    {
+        buffer[0] = '\0';
+        return -1;
+    }
     return rs;
 }
 #endif // HAVE_SPRINTF_S
