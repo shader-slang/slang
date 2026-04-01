@@ -32,14 +32,14 @@ In Slang, the following logical address spaces are defined:
   <td>The group-shared address space contains memory accessible by all threads in the thread group.</td>
 </tr>
 <tr>
-  <td>Thread private</td>
+  <td>Thread-private</td>
   <td>Thread</td>
   <td>The memory is private to the thread. It cannot be shared with other threads. Function-local memory
     is considered thread-private.</td>
 </tr>
 </table>
 
-In Slang, the address spaces are not directly accessible. They are described here for context.
+In Slang, address spaces are not directly accessible by name or keyword. They are described here for context.
 
 
 > 📝 **Remark 1:** The term *logical address space* is used here. The logical address spaces may be
@@ -53,7 +53,7 @@ In Slang, the address spaces are not directly accessible. They are described her
 
 A storage class determines the memory location, the address space, and other characteristics of memory. In
 Slang, the storage class for a variable is determined by its type, modifiers, and attributes. For example,
-data in `ConstantBuffer<T>` belongs in the uniform storage class, and the storage class for a
+data in `ConstantBuffer<T>` belongs to the uniform storage class, and the storage class for a
 `static groupshared` variable is group-shared.
 
 The following storage classes are defined by Slang:
@@ -74,7 +74,7 @@ The following storage classes are defined by Slang:
 </tr>
 <tr>
   <td>Image</td>
-  <td><code>Texture1D<...></code><br><code>Texture2D<...></code><br>etc.</td>
+  <td><code>Texture1D&lt;...&gt;</code><br><code>Texture2D&lt;...&gt;</code><br>etc.</td>
   <td>Device</td>
   <td>Storage class for image data.</td>
 </tr>
@@ -88,7 +88,7 @@ The following storage classes are defined by Slang:
   <td>Storage buffer</td>
   <td><code>StructuredBuffer&lt;T&gt;</code><br><code>RWStructuredBuffer&lt;T&gt;</code></td>
   <td>Device</td>
-  <td>Storage buffers are read-only and read-write buffers, typically shared by the host and Slang programs.</td>
+  <td>Storage buffers are read-only or read-write buffers, typically shared between the host and Slang programs.</td>
 </tr>
 <tr>
   <td>Group-shared</td>
@@ -100,7 +100,7 @@ The following storage classes are defined by Slang:
   <td>Function</td>
   <td>Function parameters and non-static local variable declarations</td>
   <td>Thread</td>
-  <td>The function parameters and local variables are visible only to the function invocation.</td>
+  <td>Visible only to the function invocation.</td>
 </tr>
 <tr>
   <td>Thread-local</td>
