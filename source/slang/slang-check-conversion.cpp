@@ -1953,6 +1953,54 @@ bool SemanticsVisitor::_coerce(
         }
         return true;
     }
+
+    // Pointer covariance: Ptr<T> -> Ptr<I> when T implements I and the
+    // pointee types differ. The address value is preserved via bitcast.
+    // All other Ptr generic parameters (access, address space, layout)
+    // must match; changing access qualifier requires an explicit cast.
+    if (auto fromPtrType = as<PtrType>(fromType))
+    {
+        if (auto toPtrType = as<PtrType>(toType))
+        {
+            auto fromValueType = fromPtrType->getValueType();
+            auto toValueType = toPtrType->getValueType();
+            if (!fromValueType->equals(toValueType))
+            {
+                auto fromAccess = fromPtrType->getAccessQualifier();
+                auto toAccess = toPtrType->getAccessQualifier();
+                auto fromAddrSpace = fromPtrType->getAddressSpace();
+                auto toAddrSpace = toPtrType->getAddressSpace();
+                auto fromLayout = fromPtrType->getDataLayout();
+                auto toLayout = toPtrType->getDataLayout();
+                // Null layout is tolerated: during generic specialization a PtrType
+                // may have an unresolved layout parameter. In practice both sides
+                // default to DefaultDataLayout so both are non-null.
+                if (fromAccess->equals(toAccess) && fromAddrSpace->equals(toAddrSpace) &&
+                    (!fromLayout || !toLayout || fromLayout->equals(toLayout)))
+                {
+                    if (auto witness = tryGetSubtypeWitness(fromValueType, toValueType))
+                    {
+                        // TODO(#10015): when dispatch through the converted IFoo* is
+                        // supported, the witness will be needed to resolve the vtable.
+                        // For now the bitcast only preserves the address value.
+                        SLANG_UNUSED(witness);
+                        if (outCost)
+                            *outCost = kConversionCost_CastToInterface;
+                        if (outToExpr)
+                        {
+                            auto castExpr = getASTBuilder()->create<BuiltinCastExpr>();
+                            castExpr->type = QualType(toType);
+                            castExpr->loc = fromExpr->loc;
+                            castExpr->base = fromExpr;
+                            *outToExpr = castExpr;
+                        }
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+
     // none_t can be cast into any Optional<T> type.
     if (as<NoneType>(fromType) && as<OptionalType>(toType))
     {

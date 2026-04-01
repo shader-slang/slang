@@ -5,6 +5,7 @@ A pointer to type `T` represents an address of an object of type `T`.
 > ⚠️ **Warning:** Pointers are not yet fully implemented in `slangc`.
 
 Current limitations include:
+
 - Pointers to local memory are supported only on CUDA and CPU targets.
 - Slang does not support pointers to opaque handle types such as `Texture2D`.
   For handle pointers, use `DescriptorHandle<T>` instead.
@@ -14,18 +15,21 @@ Current limitations include:
   [storeAligned()](../../../core-module-reference/global-decls/storealigned-5.html) may be used for loads and
   stores using pointers with known alignment.
 - Pointers are not supported on all targets.
-- Slang does not currently support inheritance with pointers. In particular, a pointer to a structure
-  conforming to interface `I` cannot be cast to a pointer to `I`.
+- Slang supports implicit covariant pointer conversion: a pointer to a structure conforming to
+  interface `I` can be implicitly converted to a pointer to `I` (e.g. `IFoo* p = &myStruct;`),
+  provided both pointers share the same access qualifier, address space, and data layout. The
+  conversion preserves the raw address via bitcast. Dereferencing the resulting interface pointer
+  for dynamic dispatch is not yet supported (see [#10015](https://github.com/shader-slang/slang/issues/10015)).
 
 See also GitHub issue [#9061](https://github.com/shader-slang/slang/issues/9061).
 
 ## Declaration Syntax {#syntax}
 
-> *`simple-type-id-spec`* =<br>
+> _`simple-type-id-spec`_ =<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;[*`modifier-list`*]<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;*`type-identifier`*<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;_`type-identifier`_<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;[*`generic-params-decl`*]<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;(**`'['`** [*`constant-index-expr`*] **`']'`** | **`'*'`** )*
+> &nbsp;&nbsp;&nbsp;&nbsp;(**`'['`** [*`constant-index-expr`*] **`']'`** | **`'*'`** )\*
 
 See [type specifier syntax](types.md#syntax) for full type specifier syntax.
 
@@ -35,31 +39,30 @@ See [type specifier syntax](types.md#syntax) for full type specifier syntax.
 > 📝 **Remark 2:** Pointers can also be declared using [variable declarations](declarations.md). In this case, a
 > variable is declared as a pointer to a type, rather than the type itself being a pointer type.
 
-
 ### Parameters
 
-- *`modifier-list`* is an optional list of modifiers (TODO: link)
-- *`type-identifier`* is an identifier that names an existing type or a generic type. For example, this may be
+- _`modifier-list`_ is an optional list of modifiers (TODO: link)
+- _`type-identifier`_ is an identifier that names an existing type or a generic type. For example, this may be
   a [fundamental type](types-fundamental.md), [vector/matrix generic type](types-vector-and-matrix.md),
   user-defined type such as a named [structure type](types-struct.md), [interface type](types-interface.md),
   [enumeration type](types-enum.md), type alias, or a type provided by a module.
-- *`generic-params-decl`* is a [generic parameters declaration](generics.md).
+- _`generic-params-decl`_ is a [generic parameters declaration](generics.md).
 - **`'['`** [*`constant-index-expr`*] **`']'`** is an [array dimension declaration](types-array.md) with an
   optional constant integral expression specifying the dimension length.
 - **`'*'`** is a [pointer declaration](types-pointer.md).
 
-
 ## Generic Pointer Types {#generic-pointer}
 
 Type aliases provided by the Slang standard library:
+
 - A generic pointer type: [Ptr<T, AccessMode, AddressSpace>](../../../core-module-reference/types/ptr-0/index.html)
 - Pointer to immutable data: [ImmutablePtr<T, AddressSpace>](../../../core-module-reference/types/immutableptr-09.html)
 
 ### Parameters
 
-- *`T`* is the element type.
-- *`AccessMode`* is the storage access mode.
-- *`AddressSpace`* is the storage address space.
+- _`T`_ is the element type.
+- _`AccessMode`_ is the storage access mode.
+- _`AddressSpace`_ is the storage address space.
 
 See [pointer traits](#traits).
 
@@ -68,10 +71,10 @@ See [pointer traits](#traits).
 The pointer declaration `*` applied to a base type creates a pointer type. The base type may be
 any [addressable](types-traits.md) type including pointer and [array](types-array.md) types.
 
-To obtain the address of an object, the *address-of* operator `&` is used. The address may be assigned to a
+To obtain the address of an object, the _address-of_ operator `&` is used. The address may be assigned to a
 pointer variable with a matching type. Alternatively, `__getAddress(obj)` may be used.
 
-To access the *pointed-to* object, the pointer dereference operator `*` is used. If the pointed-to type is a
+To access the _pointed-to_ object, the pointer dereference operator `*` is used. If the pointed-to type is a
 [structure](types-struct.md) or a [class](types-class.md) type, the member access operators `.` or `->` may be
 used to dereference the pointer and access a member.
 
@@ -79,6 +82,7 @@ When a pointer points to an array element, an integer value may be added to or s
 resulting pointer points to an element offset by that value.
 
 A pointer value belongs to one of the following classes:
+
 - a pointer to an object with matching [traits](#traits), including a pointer to an array element
 - a pointer past the end of an object
 - a null pointer, which is a special pointer value that points to nothing
@@ -116,10 +120,10 @@ For a comprehensive description, see [pointer expressions (TODO)](expressions.md
 >                // dereferencing would be undefined behavior
 > ```
 
-
 ## Pointer Traits {#traits}
 
 A pointer type has the following traits:
+
 - type of the pointed-to object
 - access mode
 - address space
@@ -133,7 +137,6 @@ syntax.
 Pointers for other address spaces and access modes may be declared by using type alias
 [Ptr<T, AccessMode, AddressSpace>](../../../core-module-reference/types/ptr-0/index.html) provided
 by the standard library. There is no implicit conversion from read-write to read-only pointers.
-
 
 ## Examples {#examples}
 
