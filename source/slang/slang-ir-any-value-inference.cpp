@@ -396,43 +396,11 @@ void inferAnyValueSizeWhereNecessary(
             }
         }
 
-        // Set the AnyValue size from non-self-referential impls first,
-        // so self-referential impls can use it.
+        // Infer the AnyValue size from valid, non-cyclic implementations only.
         if (maxAnyValueSize >= 0 && !interfaceType->findDecoration<IRAnyValueSizeDecoration>())
         {
             IRBuilder builder(module);
             builder.addAnyValueSizeDecoration(interfaceType, maxAnyValueSize);
-        }
-
-        // Second pass: Calculate size from self-referential implementations.
-        // These can now use the AnyValue size set above.
-        // Skip cyclic impls (already diagnosed with CircularConformance).
-        for (auto implType : selfReferentialImpls[interfaceType])
-        {
-            if (cyclicImpls.contains(implType))
-                continue;
-
-            IRSizeAndAlignment sizeAndAlignment;
-            getNaturalSizeAndAlignment(
-                targetProgram->getTargetReq(),
-                (IRType*)implType,
-                &sizeAndAlignment);
-
-            maxAnyValueSize = Math::Max(maxAnyValueSize, sizeAndAlignment.size);
-
-            if (existingMaxSize < sizeAndAlignment.size)
-            {
-                sink->diagnose(Diagnostics::TypeDoesNotFitAnyValueSize{
-                    .type = implType,
-                    .location = implType->sourceLoc,
-                });
-                sink->diagnose(Diagnostics::TypeAndLimit{
-                    .type = implType,
-                    .size = sizeAndAlignment.size,
-                    .limit = existingMaxSize,
-                    .location = implType->sourceLoc,
-                });
-            }
         }
 
         // All implementations may have been filtered out because they were
@@ -441,7 +409,7 @@ void inferAnyValueSizeWhereNecessary(
         if (maxAnyValueSize < 0)
             continue;
 
-        // Update the AnyValue size if self-referential impls require a larger size.
+        // Update the AnyValue size if the inferred size is larger.
         if (maxAnyValueSize >= 0)
         {
             IRBuilder builder(module);

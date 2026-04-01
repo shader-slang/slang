@@ -7,6 +7,7 @@
 // unsatisfiable.
 
 //TEST:SIMPLE(filecheck=CHECK): -target spirv
+//TEST:SIMPLE(filecheck=CHECK_NEG): -target spirv
 
 [anyValueSize(32)]
 interface IValue
@@ -18,6 +19,7 @@ interface IValue
 // CHECK: BadImpl
 // CHECK: circular reference through interface
 // CHECK: IValue
+// CHECK_NEG-NOT: error[E41011]
 struct BadImpl : IValue
 {
     IValue child;
