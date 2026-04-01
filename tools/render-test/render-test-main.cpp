@@ -283,7 +283,6 @@ struct AssignValsFromLayoutContext
     TestResourceContext& resourceContext;
     IAccelerationStructure* accelerationStructure;
     Dictionary<String, ComPtr<IBuffer>> namedBuffers;
-    String currentFieldName;
 
     AssignValsFromLayoutContext(
         IDevice* device,
@@ -318,6 +317,14 @@ struct AssignValsFromLayoutContext
 
     SlangResult assignData(ShaderCursor const& dstCursor, ShaderInputLayout::DataVal* srcVal)
     {
+        if (srcVal->addressRefs.getCount() > 0)
+        {
+            StdWriters::getError().print(
+                "error: data=[bufferName] address references are only supported in buffer"
+                " (ubuffer) inputs, not uniform data\n");
+            return SLANG_FAIL;
+        }
+
         const size_t bufferSize = srcVal->bufferData.getCount() * sizeof(uint32_t);
 
         ShaderCursor dataCursor = dstCursor;
@@ -410,13 +417,24 @@ struct AssignValsFromLayoutContext
         }
     }
 
-    SlangResult assignBuffer(ShaderCursor const& dstCursor, ShaderInputLayout::BufferVal* srcVal)
+    SlangResult assignBuffer(
+        ShaderCursor const& dstCursor,
+        ShaderInputLayout::BufferVal* srcVal,
+        String const& fieldName = String())
     {
         const InputBufferDesc& srcBuffer = srcVal->bufferDesc;
         auto& bufferData = srcVal->bufferData;
 
         // Resolve buffer address references: replace placeholders with actual device addresses
         // of previously created named buffers.
+        if (srcVal->addressRefs.getCount() > 0 && srcBuffer.stride > 0 && srcBuffer.stride < 4)
+        {
+            StdWriters::getError().print(
+                "error: data=[bufferName] requires stride >= 4 (got %d);"
+                " device addresses occupy 8 bytes and would be mangled by sub-word packing\n",
+                srcBuffer.stride);
+            return SLANG_FAIL;
+        }
         for (auto& ref : srcVal->addressRefs)
         {
             ComPtr<IBuffer> refBuffer;
@@ -474,8 +492,8 @@ struct AssignValsFromLayoutContext
         resourceContext.resources.add(ComPtr<IResource>(bufferResource.get()));
 
         // Register named buffer for cross-referencing by other buffers' data=[]
-        if (currentFieldName.getLength() > 0)
-            namedBuffers[currentFieldName] = bufferResource;
+        if (fieldName.getLength() > 0)
+            namedBuffers[fieldName] = bufferResource;
 
         // Check for device address/pointer FIRST (before descriptor handles)
         // This ensures plain uint64/pointer types use device addresses, not descriptor handles
@@ -710,7 +728,6 @@ struct AssignValsFromLayoutContext
         for (Index fieldIndex = 0; fieldIndex < fieldCount; ++fieldIndex)
         {
             auto& field = srcVal->fields[fieldIndex];
-            currentFieldName = field.name;
 
             if (field.name.getLength() == 0)
             {
@@ -723,7 +740,7 @@ struct AssignValsFromLayoutContext
                         (int)fieldIndex);
                     return SLANG_E_INVALID_ARG;
                 }
-                SLANG_RETURN_ON_FAIL(assign(fieldCursor, field.val));
+                SLANG_RETURN_ON_FAIL(assign(fieldCursor, field.val, field.name));
             }
             else
             {
@@ -735,7 +752,7 @@ struct AssignValsFromLayoutContext
                         field.name.begin());
                     return SLANG_E_INVALID_ARG;
                 }
-                SLANG_RETURN_ON_FAIL(assign(fieldCursor, field.val));
+                SLANG_RETURN_ON_FAIL(assign(fieldCursor, field.val, field.name));
             }
         }
         return SLANG_OK;
@@ -830,7 +847,10 @@ struct AssignValsFromLayoutContext
         return SLANG_OK;
     }
 
-    SlangResult assign(ShaderCursor const& dstCursor, ShaderInputLayout::ValPtr const& srcVal)
+    SlangResult assign(
+        ShaderCursor const& dstCursor,
+        ShaderInputLayout::ValPtr const& srcVal,
+        String const& fieldName = String())
     {
         auto& entryCursor = dstCursor;
         switch (srcVal->kind)
@@ -839,7 +859,7 @@ struct AssignValsFromLayoutContext
             return assignData(dstCursor, (ShaderInputLayout::DataVal*)srcVal.Ptr());
 
         case ShaderInputType::Buffer:
-            return assignBuffer(dstCursor, (ShaderInputLayout::BufferVal*)srcVal.Ptr());
+            return assignBuffer(dstCursor, (ShaderInputLayout::BufferVal*)srcVal.Ptr(), fieldName);
 
         case ShaderInputType::CombinedTextureSampler:
             return assignCombinedTextureSampler(
