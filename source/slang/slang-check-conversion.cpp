@@ -1905,7 +1905,10 @@ bool SemanticsVisitor::_coerce(
         {
             auto fromAddrSpace = fromPtrType->getAddressSpace();
             auto toAddrSpace = toPtrType->getAddressSpace();
-            if (fromAddrSpace->equals(toAddrSpace))
+            auto fromLayout = fromPtrType->getDataLayout();
+            auto toLayout = toPtrType->getDataLayout();
+            if (fromAddrSpace->equals(toAddrSpace) &&
+                (!fromLayout || !toLayout || fromLayout->equals(toLayout)))
             {
                 auto fromValueType = fromPtrType->getValueType();
                 auto toValueType = toPtrType->getValueType();

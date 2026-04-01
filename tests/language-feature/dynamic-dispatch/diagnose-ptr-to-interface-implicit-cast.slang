@@ -1,5 +1,9 @@
 // Covariant pointer conversion (Foo* -> IFoo* when Foo : IFoo) is allowed
 // as of #9962. The reverse (contravariant) direction is still rejected.
+//
+// Note: dereferencing the converted IFoo* and dispatching through it
+// (ip->getVal()) is not yet supported when pointing to concrete memory
+// rather than a serialized existential. See #10015.
 
 //TEST:SIMPLE(filecheck=CHECK): -target spirv
 
