@@ -3,6 +3,7 @@ name: Falcor Tests
 on:
   pull_request:
     branches: [master]
+    types: [opened, synchronize, reopened, ready_for_review]
     paths-ignore:
       - "docs/**"
       - "LICENSES/**"
@@ -14,6 +15,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   build:
+    if: github.event.pull_request.draft != true
     timeout-minutes: 100
     continue-on-error: false
     strategy:

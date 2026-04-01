@@ -224,6 +224,9 @@ Versions
 `metallib_3_1`
 > Represents MetalLib 3.1.
 
+`metallib_4_0`
+> Represents MetalLib 4.0.
+
 `metallib_latest`
 > Represents the latest MetalLib version.
 
@@ -270,6 +273,14 @@ Versions
 `sm_6_1`
 > HLSL shader model 6.1 and related capabilities of other targets.
 > Includes related GLSL/SPIRV extensions.
+
+`sm_6_10`
+> HLSL shader model 6.10 and related capabilities of other targets.
+> Includes related GLSL/SPIRV extensions.
+
+`sm_6_10_version`
+> HLSL shader model 6.10 and related capabilities of other targets.
+> Does not include related GLSL/SPIRV extensions.
 
 `sm_6_1_version`
 > HLSL shader model 6.1 and related capabilities of other targets.
@@ -576,6 +587,9 @@ Extensions
 `SPV_EXT_demote_to_helper_invocation`
 > Represents the SPIR-V extension for demoting to helper invocation.
 
+`SPV_EXT_descriptor_heap`
+> Represents the SPIR-V extension for descriptor heaps.
+
 `SPV_EXT_descriptor_indexing`
 > Represents the SPIR-V extension for descriptor indexing.
 
@@ -654,6 +668,9 @@ Extensions
 `SPV_KHR_subgroup_rotate`
 > Represents the SPIR-V extension enables rotating values across invocations within a subgroup.
 
+`SPV_KHR_untyped_pointers`
+> Represents the SPIR-V extension for untyped pointers.
+
 `SPV_KHR_vulkan_memory_model`
 > Represents the SPIR-V extension for SPV_KHR_vulkan_memory_model.
 
@@ -683,7 +700,7 @@ Extensions
 
 `SPV_NV_shader_invocation_reorder`
 > Represents the SPIR-V extension for shader invocation reorder (NVIDIA-specific).
-> Requires SPV_KHR_ray_tracing.
+> Inherits from SPV_EXT_shader_invocation_reorder so NV implies EXT.
 
 `SPV_NV_shader_subgroup_partitioned`
 > Represents the SPIR-V extension for shader subgroup partitioned.
@@ -750,6 +767,9 @@ Extensions
 
 `spvDerivativeControl`
 > Represents the SPIR-V capability for 'derivative control' operations.
+
+`spvDescriptorHeapEXT`
+> Represents the SPIR-V capability for descriptor heaps.
 
 `spvDeviceGroup`
 > Represents the SPIR-V capability for DeviceGroup.
@@ -851,6 +871,7 @@ Extensions
 
 `spvShaderInvocationReorderNV`
 > Represents the SPIR-V capability for shader invocation reorder (NVIDIA-specific).
+> Inherits from spvShaderInvocationReorderEXT so that NV implies EXT capability.
 
 `spvShaderNonUniform`
 > Represents the SPIR-V capability for non-uniform resource indexing.
@@ -1517,6 +1538,9 @@ Other
 `DX_6_1`
 > Use `sm_6_1` instead
 
+`DX_6_10`
+> Use `sm_6_10` instead
+
 `DX_6_2`
 > Use `sm_6_2` instead
 
@@ -1564,6 +1588,9 @@ Other
 
 `METAL_3_1`
 > Use `metallib_3_1` instead
+
+`METAL_4_0`
+> Use `metallib_4_0` instead
 
 `SPIRV_1_0`
 > Use `spirv_1_0` instead

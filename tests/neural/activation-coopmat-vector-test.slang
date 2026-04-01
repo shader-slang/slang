@@ -6,7 +6,7 @@
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-vk -compute -shaderobj -xslang -experimental-feature -output-using-type -emit-spirv-directly
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUFFER):-cuda -compute -shaderobj -output-using-type -capability cuda_sm_7_0 -xslang -experimental-feature
 
-import neural;
+import slang.neural;
 
 //TEST_INPUT: ubuffer(data=[0 0 0 0 0 0 0 0 0], stride=4):out,name=testResult
 RWStructuredBuffer<uint> testResult;
@@ -20,8 +20,7 @@ static const int BatchSize = 32;
 typealias ShMemSize = SharedMemorySize<ElementType, TargetEnum.CUDA, ExecutionMode.Inference, SubgroupSize, BatchSize / SubgroupSize>;
 // Use a dummy layer size for shared memory calculation (we only need minimal shared memory for activations)
 typealias ShMemSizeLayer = ShMemSize.OfLayer1<VecSize, VecSize>;
-typealias ShMemPool = SharedMemoryPool<ShMemSizeLayer>;
-typealias Vec3 = WaveTangledVector<ElementType, ShMemPool, VecSize, SubgroupSize>;
+typealias Vec3 = WaveTangledVector<ElementType, ShMemSizeLayer, VecSize, SubgroupSize>;
 
 // Helper: check if two floats are approximately equal
 bool approxEqual(ElementType a, ElementType b, ElementType eps = 0.0001)

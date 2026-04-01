@@ -1,0 +1,86 @@
+name: CI Analytics
+
+on:
+  schedule:
+    - cron: "0 6 * * *" # Daily at 6 AM UTC
+  workflow_dispatch: {} # Manual trigger
+
+jobs:
+  collect-and-publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Checkout analytics repo
+        uses: actions/checkout@v4
+        with:
+          repository: shader-slang/slang-ci-analytics
+          path: ci_analytics_repo
+          token: ${{ secrets.CI_ANALYTICS_PAT }}
+
+      - name: Collect job data
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir -p /tmp/ci_data
+          # Copy existing monthly files
+          cp ci_analytics_repo/ci_jobs_*.json /tmp/ci_data/ 2>/dev/null || true
+          # Migrate legacy single file if monthly files don't exist yet
+          if [ -f ci_analytics_repo/ci_jobs.json ] && ! ls /tmp/ci_data/ci_jobs_*.json 1>/dev/null 2>&1; then
+            python3 extras/ci/analytics/ci_job_collector.py \
+              --migrate ci_analytics_repo/ci_jobs.json \
+              --output-dir /tmp/ci_data \
+              --verbose
+          fi
+          python3 extras/ci/analytics/ci_job_collector.py \
+            --output-dir /tmp/ci_data \
+            --workflow CI \
+            --verbose
+
+      - name: Collect merged PR data
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -f ci_analytics_repo/pr_merges.json ]; then
+            cp ci_analytics_repo/pr_merges.json /tmp/pr_merges.json
+          fi
+          python3 extras/ci/analytics/pr_collector.py \
+            --output /tmp/pr_merges.json \
+            --verbose
+
+      - name: Generate visualizations
+        run: |
+          python3 extras/ci/analytics/ci_visualization.py \
+            --input-dir /tmp/ci_data \
+            --pr-input /tmp/pr_merges.json \
+            --output ci_analytics_repo
+
+      - name: Generate status page
+        run: |
+          python3 extras/ci/analytics/ci_status.py \
+            --output ci_analytics_repo
+
+      - name: Push to analytics repo
+        run: |
+          cd ci_analytics_repo
+          # Copy updated monthly data files
+          cp /tmp/ci_data/ci_jobs_*.json . 2>/dev/null || true
+          if [ -f /tmp/pr_merges.json ]; then
+            cp /tmp/pr_merges.json pr_merges.json
+          fi
+          # Remove legacy single file after migration
+          if [ -f ci_jobs.json ] && ls ci_jobs_*.json 1>/dev/null 2>&1; then
+            git rm ci_jobs.json 2>/dev/null || rm -f ci_jobs.json
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet || {
+            git commit -m "Update CI analytics $(date -u +%Y-%m-%d)" &&
+            git push
+          }

@@ -384,7 +384,7 @@ public:
 
     StringSlice(String const& str, UInt beginIndex, UInt endIndex);
 
-    UInt getLength() const { return endIndex - beginIndex; }
+    UInt getLength() const { return representation ? (endIndex - beginIndex) : 0; }
 
     char const* begin() const
     {
@@ -467,8 +467,15 @@ class SLANG_RT_API String
     friend class StringBuilder;
 
 private:
-    char* getData() const { return m_buffer ? m_buffer->getData() : (char*)""; }
+    const char* getData() const { return m_buffer ? m_buffer->getData() : ""; }
 
+    // Note: This is not a non-const version of getData(), since this method
+    // assumes that the buffer always exists.
+    char* getMutableData()
+    {
+        SLANG_ASSERT(m_buffer);
+        return m_buffer->getData();
+    }
 
     void ensureUniqueStorageWithCapacity(Index capacity);
 
@@ -659,7 +666,6 @@ public:
         }
     }
     bool operator==(const char* strbuffer) const { return (strcmp(begin(), strbuffer) == 0); }
-
     bool operator==(const String& str) const { return (strcmp(begin(), str.begin()) == 0); }
     bool operator!=(const char* strbuffer) const { return (strcmp(begin(), strbuffer) != 0); }
     bool operator!=(const String& str) const { return (strcmp(begin(), str.begin()) != 0); }

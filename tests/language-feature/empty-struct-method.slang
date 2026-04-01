@@ -14,7 +14,7 @@ StructuredBuffer<Light> globalLightList;
 
 struct Lighting
 {
-    //CHECK: ([[# @LINE+1]]): error 20102
+    //CHECK: error[E20102]
     float3 DoLighting(Light light);
     {
         // Not emitted

@@ -329,7 +329,7 @@ public:
         if (!parent)
             return getDirectDeclRef(memberDecl);
         // A Generic value/type ParamDecl is always referred to directly.
-        if (as<GenericTypeParamDecl>(memberDecl) || as<GenericValueParamDecl>(memberDecl))
+        if (isGenericParam(memberDecl))
             return getDirectDeclRef(memberDecl);
         if (as<ThisTypeDecl>(memberDecl) && !as<InterfaceDecl>(memberDecl->parentDecl))
             return as<T>(parent);
@@ -534,8 +534,12 @@ public:
     Type* getDiffInterfaceType() { return m_sharedASTBuilder->getDiffInterfaceType(); }
     // Construct the type `Ptr<valueType>`, where `Ptr`
     // is looked up as a builtin type.
-    PtrType* getPtrType(Type* valueType, AccessQualifier accessQualifier, AddressSpace addrSpace);
-    PtrType* getPtrType(Type* valueType, Val* accessQualifier, Val* addrSpace);
+    PtrType* getPtrType(
+        Type* valueType,
+        AccessQualifier accessQualifier,
+        AddressSpace addrSpace,
+        Type* dataLayout);
+    PtrType* getPtrType(Type* valueType, Val* accessQualifier, Val* addrSpace, Type* dataLayout);
 
     // Construct the type `OutParam<valueType>`
     OutParamType* getOutParamType(Type* valueType);
@@ -565,11 +569,13 @@ public:
         Type* valueType,
         Val* accessQualifier,
         Val* addrSpace,
+        Type* dataLayoutType,
         char const* ptrTypeName);
     PtrTypeBase* getPtrType(
         Type* valueType,
         AccessQualifier accessQualifier,
         AddressSpace addrSpace,
+        Type* dataLayoutType,
         char const* ptrTypeName);
 
     ArrayExpressionType* getArrayType(Type* elementType, IntVal* elementCount);
@@ -645,9 +651,43 @@ public:
 
     Type* getEachType(Type* baseType);
 
-    Type* getExpandType(Type* pattern, ArrayView<Type*> capturedPacks);
+    Type* getExpandType(Type* pattern, ArrayView<Val*> capturedPacks);
+
+    Type* getPackBranchType(Val* packOperand, Type* emptyType, Type* nonEmptyType);
+
+    Type* getFirstElement(Type* basePack);
+
+    Type* getLastElement(Type* basePack);
+
+    Type* getTrimFirstPack(Type* basePack);
+
+    Type* getTrimLastPack(Type* basePack);
 
     ConcreteTypePack* getTypePack(ArrayView<Type*> types);
+
+    ConcreteIntValPack* getIntValPack(ArrayView<IntVal*> vals);
+
+    IntVal* getEachIntVal(Type* elementType, Val* basePack);
+
+    Val* getExpandIntValPack(Val* patternVal, ArrayView<Val*> capturedPacks);
+
+    Val* getFirstElement(Val* basePack);
+
+    Val* getLastElement(Val* basePack);
+
+    Val* getTrimFirstPack(Val* basePack);
+
+    Val* getTrimLastPack(Val* basePack);
+
+    Val* getShapeConcatIntValPack(Val* leftPack, Val* rightPack, IntVal* axis);
+
+    Val* getShapePermuteIntValPack(Val* valuePack, Val* orderPack);
+
+    Val* getShapeSwapIntValPack(Val* valuePack, IntVal* dim0, IntVal* dim1);
+
+    Val* getShapeReduceIntValPack(Val* valuePack, IntVal* axis);
+
+    NonEmptyPackWitness* getNonEmptyPackWitness(Val* pack);
 
     /// Produce a witness that `T : T` for any type `T`
     TypeEqualityWitness* getTypeEqualityWitness(Type* type);
@@ -672,28 +712,43 @@ public:
         Type* superType,
         SubtypeWitness* patternWitness);
 
+    SubtypeWitness* getFirstSubtypeWitness(
+        Type* subType,
+        Type* superType,
+        SubtypeWitness* patternWitness);
+
+    SubtypeWitness* getLastSubtypeWitness(
+        Type* subType,
+        Type* superType,
+        SubtypeWitness* patternWitness);
+
+    SubtypeWitness* getTrimFirstSubtypeWitness(
+        Type* subType,
+        Type* superType,
+        SubtypeWitness* patternWitness);
+
+    SubtypeWitness* getTrimLastSubtypeWitness(
+        Type* subType,
+        Type* superType,
+        SubtypeWitness* patternWitness);
+
+    SubtypeWitness* getPackBranchSubtypeWitness(
+        Type* subType,
+        Type* superType,
+        Val* packOperand,
+        SubtypeWitness* emptyWitness,
+        SubtypeWitness* nonEmptyWitness);
+
     /// Produce a witness that `A <: C` given witnesses that `A <: B` and `B <: C`
     SubtypeWitness* getTransitiveSubtypeWitness(
         SubtypeWitness* aIsSubtypeOfBWitness,
         SubtypeWitness* bIsSubtypeOfCWitness);
 
-    /// Produce a witness that `T <: L` or `T <: R` given `T <: L&R`
-    SubtypeWitness* getExtractFromConjunctionSubtypeWitness(
+    BuiltinTypeCoercionWitness* getBuiltinTypeCoercionWitness(Type* subType, Type* superType);
+
+    DeclRefTypeCoercionWitness* getDeclRefTypeCoercionWitness(
         Type* subType,
         Type* superType,
-        SubtypeWitness* subIsSubtypeOfConjunction,
-        int indexOfSuperTypeInConjunction);
-
-    /// Produce a witnes that `S <: L&R` given witnesses that `S <: L` and `S <: R`
-    SubtypeWitness* getConjunctionSubtypeWitness(
-        Type* sub,
-        Type* lAndR,
-        SubtypeWitness* subIsLWitness,
-        SubtypeWitness* subIsRWitness);
-
-    TypeCoercionWitness* getTypeCoercionWitness(
-        Type* fromType,
-        Type* toType,
         DeclRef<Decl> declRef);
 
     /// Helpers to get type info from the SharedASTBuilder
@@ -835,6 +890,7 @@ private:
 };
 
 // Retrieves the ASTBuilder for the current compilation session.
+// Session destruction must occur in LIFO order relative to creation.
 ASTBuilder* getCurrentASTBuilder();
 
 // Sets the ASTBuilder for the current compilation session.

@@ -470,6 +470,15 @@ IRIntegerValue getInterfaceAnyValueSize(IRInst* type, SourceLoc usageLoc);
 // Return true if the inst can be stored into a variable.
 bool canInstBeStored(IRInst* inst);
 
+IRType* getTextureTypeFromCombinedTextureSampler(IRType* type);
+IRType* getSamplerTypeFromCombinedTextureSampler(IRType* type);
+
+bool tryGetConstantIntLit(IRInst* inst, Int64& outValue);
+
+bool areKnownEqualShapeElements(IRInst* left, IRInst* right);
+
+IRInst* emitPackLike(IRModule* module, IRInst* oldInst, ArrayView<IRInst*> elements);
+
 } // namespace Slang
 
 #endif

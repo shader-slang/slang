@@ -10,6 +10,7 @@
 #include "slang-compiler.h"
 #include "slang-lookup.h"
 #include "slang-mangle.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -379,11 +380,9 @@ RefPtr<ComponentType> ComponentType::specialize(
         sink);
     if (consumedArgCount != specializationArgCount)
     {
-        sink->diagnose(
-            SourceLoc(),
-            Diagnostics::mismatchSpecializationArguments,
-            Math::Max(consumedArgCount, getSpecializationParamCount()),
-            specializationArgCount);
+        sink->diagnose(Diagnostics::MismatchSpecializationArguments{
+            .expected = (int64_t)Math::Max(consumedArgCount, getSpecializationParamCount()),
+            .provided = (int64_t)specializationArgCount});
     }
     if (sink->getErrorCount() != 0)
         return nullptr;
@@ -494,7 +493,7 @@ ComponentType::link(slang::IComponentType** outLinkedComponentType, ISlangBlob**
 SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::linkWithOptions(
     slang::IComponentType** outLinkedComponentType,
     uint32_t count,
-    slang::CompilerOptionEntry* entries,
+    slang::CompilerOptionEntry const* entries,
     ISlangBlob** outDiagnostics)
 {
     SLANG_RETURN_ON_FAIL(link(outLinkedComponentType, outDiagnostics));
@@ -745,11 +744,9 @@ IArtifact* ComponentType::getTargetArtifact(Int targetIndex, slang::IBlob** outD
             DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
             applySettingsToDiagnosticSink(&sink, &sink, linkage->m_optionSet);
             applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
-            sink.diagnose(
-                SourceLoc(),
-                Diagnostics::compilationAbortedDueToException,
-                typeid(e).name(),
-                e.Message);
+            sink.diagnose(Diagnostics::CompilationAbortedDueToException{
+                .exceptionType = typeid(e).name(),
+                .exceptionMessage = e.Message});
             sink.getBlobIfNeeded(outDiagnostics);
         }
         return nullptr;
@@ -793,7 +790,7 @@ Expr* ComponentType::parseExprFromString(String exprStr, DiagnosticSink* sink)
     Scope* scope = _getOrCreateScopeForLegacyLookup(astBuilder);
     Expr* expr = linkage->parseTermString(exprStr, scope);
     if (!expr || as<IncompleteExpr>(expr))
-        sink->diagnose(SourceLoc(), Diagnostics::syntaxError);
+        sink->diagnose(Diagnostics::SyntaxError{});
     return expr;
 }
 

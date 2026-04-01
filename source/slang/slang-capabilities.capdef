@@ -198,9 +198,13 @@ def metallib_3_0 : metallib_2_4;
 /// [Version]
 def metallib_3_1 : metallib_3_0;
 
+/// Represents MetalLib 4.0.
+/// [Version]
+def metallib_4_0 : metallib_3_1;
+
 /// Represents the latest MetalLib version.
 /// [Version]
-alias metallib_latest = metallib_3_1;
+alias metallib_latest = metallib_4_0;
 
 // HLSL versions
 
@@ -218,6 +222,7 @@ def _sm_6_6 : _sm_6_5;
 def _sm_6_7 : _sm_6_6;
 def _sm_6_8 : _sm_6_7;
 def _sm_6_9 : _sm_6_8;
+def _sm_6_10 : _sm_6_9;
 
 /// Represents HLSL NVAPI support.
 /// [Version]
@@ -593,16 +598,16 @@ def SPV_KHR_subgroup_rotate : _spirv_1_3;
 /// [EXT]
 def SPV_NV_ray_tracing_motion_blur : _spirv_1_0;
 
-/// Represents the SPIR-V extension for shader invocation reorder (NVIDIA-specific).
-/// Requires SPV_KHR_ray_tracing.
-/// [EXT]
-def SPV_NV_shader_invocation_reorder : _spirv_1_5 + SPV_KHR_ray_tracing;
-
 /// Represents the SPIR-V extension for shader invocation reorder (cross-vendor standard).
 /// Requires SPV_KHR_ray_tracing and SPIR-V 1.5 (which includes physical storage buffer).
 /// Note: Spec allows SPIR-V 1.4 + physical_storage_buffer extension, but we require 1.5 for simplicity.
 /// [EXT]
 def SPV_EXT_shader_invocation_reorder : _spirv_1_5 + SPV_KHR_ray_tracing;
+
+/// Represents the SPIR-V extension for shader invocation reorder (NVIDIA-specific).
+/// Inherits from SPV_EXT_shader_invocation_reorder so NV implies EXT.
+/// [EXT]
+def SPV_NV_shader_invocation_reorder : SPV_EXT_shader_invocation_reorder;
 
 /// Represents the SPIR-V extension for cluster acceleration structure.
 /// [EXT]
@@ -659,6 +664,14 @@ def SPV_NV_bindless_texture: _spirv_1_0;
 /// Represents the SPIR-V extension for SPV_EXT_float8.
 /// [EXT]
 def SPV_EXT_float8: _spirv_1_0;
+
+/// Represents the SPIR-V extension for descriptor heaps.
+/// [EXT]
+def SPV_EXT_descriptor_heap : _spirv_1_0;
+
+/// Represents the SPIR-V extension for untyped pointers.
+/// [EXT]
+def SPV_KHR_untyped_pointers : _spirv_1_0;
 
 /// Represents the SPIR-V extension for BFloat16 types.
 /// [EXT]
@@ -795,13 +808,14 @@ def spvRayQueryKHR : SPV_KHR_ray_query;
 /// [EXT]
 def spvRayQueryPositionFetchKHR : SPV_KHR_ray_tracing_position_fetch + spvRayQueryKHR;
 
-/// Represents the SPIR-V capability for shader invocation reorder (NVIDIA-specific).
-/// [EXT]
-def spvShaderInvocationReorderNV : SPV_NV_shader_invocation_reorder;
-
 /// Represents the SPIR-V capability for shader invocation reorder (cross-vendor standard).
 /// [EXT]
 def spvShaderInvocationReorderEXT : SPV_EXT_shader_invocation_reorder;
+
+/// Represents the SPIR-V capability for shader invocation reorder (NVIDIA-specific).
+/// Inherits from spvShaderInvocationReorderEXT so that NV implies EXT capability.
+/// [EXT]
+def spvShaderInvocationReorderNV : SPV_NV_shader_invocation_reorder + spvShaderInvocationReorderEXT;
 
 /// Represents the SPIR-V capability for shader invocation reorder + motion blur (NVIDIA-specific).
 /// Used for motion blur variants of SER functions that require both extensions.
@@ -901,6 +915,10 @@ def spvVulkanMemoryModelDeviceScopeKHR : SPV_KHR_vulkan_memory_model;
 /// [EXT]
 def spvBindlessTextureNV : SPV_NV_bindless_texture;
 
+/// Represents the SPIR-V capability for descriptor heaps.
+/// [EXT]
+def spvDescriptorHeapEXT : SPV_EXT_descriptor_heap + SPV_KHR_untyped_pointers;
+
 // The following capabilities all pertain to how ray tracing shaders are translated
 // to GLSL, where there are two different extensions that can provide the core
 // functionality of `TraceRay` and the related operations.
@@ -976,8 +994,8 @@ def _GL_NV_gpu_shader5 : _GL_ARB_gpu_shader5;
 def _GL_NV_ray_tracing : _GL_EXT_ray_tracing;
 def _GL_NV_ray_tracing_motion_blur : _GLSL_460;
 def _GL_NV_shader_atomic_fp16_vector : _GL_NV_gpu_shader5;
-def _GL_NV_shader_invocation_reorder : _GLSL_460;
 def _GL_EXT_shader_invocation_reorder : _GLSL_460;
+def _GL_NV_shader_invocation_reorder : _GL_EXT_shader_invocation_reorder;
 alias _GL_NV_shader_invocation_reorder_motion = _GL_NV_shader_invocation_reorder + _GL_NV_ray_tracing_motion_blur;
 alias _GL_EXT_shader_invocation_reorder_motion = _GL_EXT_shader_invocation_reorder + _GL_NV_ray_tracing_motion_blur;
 def _GL_NV_shader_subgroup_partitioned : _GLSL_140;
@@ -1294,7 +1312,7 @@ alias ser_nv = raytracing + GL_NV_shader_invocation_reorder | cuda;
 alias motionblur_nv = GL_NV_ray_tracing_motion_blur | cuda;
 /// Capabilities needed for compute-shader rayquery
 /// [Compound]
-alias rayquery = GL_EXT_ray_query | _sm_6_3;
+alias rayquery = GL_EXT_ray_query | _sm_6_3 | metal;
 /// Capabilities needed for compute-shader rayquery and motion-blur
 /// [Compound]
 alias raytracing_motionblur =  raytracing + motionblur_nv | cuda;
@@ -1879,6 +1897,25 @@ alias sm_6_9 = sm_6_9_version
              | sm_6_8
              ;
 
+/// HLSL shader model 6.10 and related capabilities of other targets.
+/// Does not include related GLSL/SPIRV extensions.
+/// [Version]
+alias sm_6_10_version = _sm_6_10
+             | _GLSL_460
+             | spirv_1_5
+             | _cuda_sm_7_0
+             | metal
+             | cpp
+             | llvm
+             ;
+
+/// HLSL shader model 6.10 and related capabilities of other targets.
+/// Includes related GLSL/SPIRV extensions.
+/// [Version]
+alias sm_6_10 = sm_6_10_version
+             | sm_6_9
+             ;
+
 // Profiles
 /// Use `sm_4_0` instead
 /// [Other]
@@ -1935,6 +1972,10 @@ alias DX_6_8 = sm_6_8;
 /// Use `sm_6_9` instead
 /// [Other]
 alias DX_6_9 = sm_6_9;
+
+/// Use `sm_6_10` instead
+/// [Other]
+alias DX_6_10 = sm_6_10;
 
 // GLSL profile capabilities
 //
@@ -2160,6 +2201,10 @@ alias METAL_3_0 = metallib_3_0;
 /// [Other]
 alias METAL_3_1 = metallib_3_1;
 
+/// Use `metallib_4_0` instead
+/// [Other]
+alias METAL_4_0 = metallib_4_0;
+
 // Capabilities of convenience
 //
 /// Capabilities required to use AppendStructuredBuffer
@@ -2280,8 +2325,7 @@ alias texture_querylod = texture_sm_4_1 | GL_EXT_texture_query_lod;
 alias texture_querylevels = texture_sm_4_1 | GL_ARB_texture_query_levels;
 /// Capabilities required to query shadow texture lod info
 /// [Compound]
-alias texture_shadowlod = texture_sm_4_1 | GL_EXT_texture_shadow_lod
-                        | texture_sm_4_1;
+alias texture_shadowlod = texture_sm_4_1;
 /// Capabilities required for shadow texture sampling with bias and gradients.
 /// New in HLSL SM6.8 but existed in older GLSL and SPIRV targets.
 /// [Compound]
@@ -2587,10 +2631,10 @@ alias ser_dxr_raygen = raygen + ser_dxr;
 
 /// User should not use this capability
 /// [Other]
-alias all = _sm_6_9 + hlsl_nvapi
-          | glsl_spirv_1_5 + sm_6_9
+alias all = _sm_6_10 + hlsl_nvapi
+          | glsl_spirv_1_5 + sm_6_10
              + ser + shaderclock + texturefootprint + fragmentshaderinterlock + _GL_NV_shader_subgroup_partitioned
              + _GL_NV_ray_tracing_motion_blur + _GL_NV_shader_texture_footprint
-          | spirv_1_5 + sm_6_9
+          | spirv_1_5 + sm_6_10
              + ser + shaderclock + texturefootprint + fragmentshaderinterlock + spvGroupNonUniformPartitionedNV
              + spvRayTracingMotionBlurNV + spvRayTracingMotionBlurNV;

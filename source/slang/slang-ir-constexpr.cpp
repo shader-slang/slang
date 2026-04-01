@@ -5,6 +5,7 @@
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
 #include "slang-ir.h"
+#include "slang-rich-diagnostics.h"
 
 namespace Slang
 {
@@ -152,6 +153,15 @@ bool opCanBeConstExpr(IROp op)
     case kIROp_DifferentialPairGetPrimal:
     case kIROp_LookupWitnessMethod:
     case kIROp_Specialize:
+    case kIROp_ExtractFirstFromPack:
+    case kIROp_ExtractLastFromPack:
+    case kIROp_TrimFirstOfPack:
+    case kIROp_TrimLastOfPack:
+    case kIROp_ShapeConcat:
+    case kIROp_ShapePermute:
+    case kIROp_ShapeSwap:
+    case kIROp_ShapeReduce:
+    case kIROp_PackBranch:
         // TODO: more cases
         return true;
 
@@ -450,11 +460,11 @@ bool propagateConstExprBackward(PropagateConstExprContext* context, IRGlobalValu
                                 // that. This is not expected.
                                 if (!isConstExpr(arg))
                                 {
-                                    context->getSink()->diagnose(
-                                        callInst->sourceLoc,
-                                        Diagnostics::argIsNotConstexpr,
-                                        pp + 1,
-                                        calleeFunc);
+                                    context->getSink()->diagnose(Diagnostics::ArgIsNotConstexpr{
+                                        .argIndex = static_cast<int64_t>(pp + 1),
+                                        .funcName = calleeFunc,
+                                        .location = callInst->sourceLoc,
+                                    });
                                     return false;
                                 }
                             }
@@ -551,8 +561,7 @@ void validateConstExpr(PropagateConstExprContext* context, IRGlobalValueWithCode
                         // Diagnose the failure.
 
                         context->getSink()->diagnose(
-                            ii->sourceLoc,
-                            Diagnostics::needCompileTimeConstant);
+                            Diagnostics::NeedCompileTimeConstant{.location = ii->sourceLoc});
 
                         break;
                     }

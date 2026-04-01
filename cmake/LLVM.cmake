@@ -38,7 +38,6 @@ function(fetch_or_build_slang_llvm)
             endif()
         endif()
     elseif(SLANG_SLANG_LLVM_FLAVOR STREQUAL "USE_SYSTEM_LLVM")
-        find_package(LLVM 21.1 REQUIRED CONFIG)
         find_package(Clang REQUIRED CONFIG)
 
         if(LLVM_LINK_LLVM_DYLIB)
@@ -104,30 +103,5 @@ function(fetch_or_build_slang_llvm)
         # directive for libLLVM-21.so, it's almost certainly going to break at
         # runtime in surprising ways when linked alongside Mesa (or anything else
         # pulling in libLLVM.so)
-    endif()
-
-    if(SLANG_ENABLE_PREBUILT_BINARIES)
-        if(CMAKE_SYSTEM_NAME MATCHES "Windows")
-            file(
-                GLOB prebuilt_binaries
-                "${slang_SOURCE_DIR}/external/slang-binaries/bin/windows-x64/*"
-            )
-            list(REMOVE_ITEM prebuilt_binaries ${prebuilt_d3d12_binaries})
-            add_custom_target(
-                copy-prebuilt-binaries
-                ALL
-                COMMAND
-                    ${CMAKE_COMMAND} -E make_directory
-                    ${CMAKE_BINARY_DIR}/$<CONFIG>/${runtime_subdir}
-                COMMAND
-                    ${CMAKE_COMMAND} -E copy_if_different ${prebuilt_binaries}
-                    ${CMAKE_BINARY_DIR}/$<CONFIG>/${runtime_subdir}
-                VERBATIM
-            )
-            set_target_properties(
-                copy-prebuilt-binaries
-                PROPERTIES FOLDER external
-            )
-        endif()
     endif()
 endfunction()

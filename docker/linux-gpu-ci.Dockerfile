@@ -6,11 +6,10 @@
 # Used by:
 # - .github/workflows/ci-slang-build-container.yml
 # - .github/workflows/ci-slang-test-container.yml
-# - .github/workflows/copilot-setup-steps.yml
 #
 # Build and push:
-#   docker build -f docker/linux-gpu-ci.Dockerfile -t ghcr.io/shader-slang/slang-linux-gpu-ci:v1.3.0 .
-#   docker push ghcr.io/shader-slang/slang-linux-gpu-ci:v1.3.0
+#   docker build -f docker/linux-gpu-ci.Dockerfile -t ghcr.io/shader-slang/slang-linux-gpu-ci:v1.5.1 .
+#   docker push ghcr.io/shader-slang/slang-linux-gpu-ci:v1.5.1
 #
 # IMPORTANT: After pushing a new version, update all references in:
 #   - .github/workflows/ci-slang-build-container.yml
@@ -24,8 +23,8 @@
 
 FROM nvidia/cuda:13.0.1-devel-ubuntu22.04
 
-# Install essential tools required for GitHub Actions and Copilot
-# - curl: for downloading Copilot runtime and dependencies
+# Install essential tools required for GitHub Actions
+# - curl: for downloading dependencies
 # - wget: for downloading CMake and other tools
 # - git: for repository operations and submodules
 # - tar, gzip: for archive extraction
@@ -40,6 +39,9 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install build dependencies
+# Note: Vulkan headers, spirv-tools, and glslang come from the Vulkan SDK tarball below.
+# Do NOT install libgl1-mesa-dev — it pulls in mesa-vulkan-drivers and libLLVM-15,
+# which cause concurrent Vulkan initialization crashes in test-servers (see #10618).
 RUN apt-get update && apt-get install -y \
     build-essential \
     ninja-build \
@@ -52,27 +54,26 @@ RUN apt-get update && apt-get install -y \
     libxrandr-dev \
     libxinerama-dev \
     libxi-dev \
-    libgl1-mesa-dev \
-    libvulkan-dev \
-    spirv-tools \
-    glslang-tools \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Vulkan SDK 1.4.321.1 from tarball (apt packages discontinued after 1.4.313)
+# Install Vulkan SDK 1.4.341.1 from tarball (apt packages discontinued after 1.4.313)
 # Using tarball to get the fixed validation layers that resolve cooperative vector issues
-ENV VULKAN_SDK=/opt/vulkan-sdk/1.4.321.1/x86_64
+ENV VULKAN_SDK=/opt/vulkan-sdk/1.4.341.1/x86_64
 ENV PATH="${VULKAN_SDK}/bin:${PATH}"
 ENV LD_LIBRARY_PATH="${VULKAN_SDK}/lib:${LD_LIBRARY_PATH}"
 ENV VK_LAYER_PATH="${VULKAN_SDK}/share/vulkan/explicit_layer.d"
 
-RUN wget -q https://sdk.lunarg.com/sdk/download/1.4.321.1/linux/vulkansdk-linux-x86_64-1.4.321.1.tar.xz && \
-    tar -xf vulkansdk-linux-x86_64-1.4.321.1.tar.xz && \
+RUN wget -q https://sdk.lunarg.com/sdk/download/1.4.341.1/linux/vulkansdk-linux-x86_64-1.4.341.1.tar.xz && \
+    tar -xf vulkansdk-linux-x86_64-1.4.341.1.tar.xz && \
     mkdir -p /opt/vulkan-sdk && \
-    mv 1.4.321.1 /opt/vulkan-sdk/ && \
-    rm -rf vulkansdk-linux-x86_64-1.4.321.1.tar.xz
+    mv 1.4.341.1 /opt/vulkan-sdk/ && \
+    rm -rf vulkansdk-linux-x86_64-1.4.341.1.tar.xz && \
+    echo "${VULKAN_SDK}/lib" > /etc/ld.so.conf.d/vulkan-sdk.conf && \
+    ldconfig
 
 # Install runtime libraries for test execution
-RUN apt-get update && apt-get install -y \
+# Use --no-install-recommends to avoid pulling in mesa-vulkan-drivers (see #10618).
+RUN apt-get update && apt-get install -y --no-install-recommends \
     libx11-6 \
     libxext6 \
     libegl1 \

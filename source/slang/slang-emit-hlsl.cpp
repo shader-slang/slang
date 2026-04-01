@@ -5,6 +5,7 @@
 #include "slang-emit-source-writer.h"
 #include "slang-ir-util.h"
 #include "slang-mangled-lexer.h"
+#include "slang-rich-diagnostics.h"
 
 #include <assert.h>
 
@@ -27,6 +28,74 @@ double _slang_asdouble(uint64_t x)
     return asdouble(low, high);
 }
 )";
+
+static UnownedStringSlice _mapSlangCoopVecComponentTypeToHLSL(
+    int32_t slangValue,
+    IRIntegerValue inputInterpretationPackingFactor)
+{
+    if (inputInterpretationPackingFactor != 1)
+    {
+        switch (slangValue)
+        {
+        case SLANG_SCALAR_TYPE_INT8:
+            return UnownedStringSlice("SignedInt8Packed");
+        case SLANG_SCALAR_TYPE_UINT8:
+            return UnownedStringSlice("UnsignedInt8Packed");
+        default:
+            SLANG_UNEXPECTED(
+                "Unsupported packed cooperative vector input interpretation for HLSL emission");
+        }
+    }
+
+    switch (slangValue)
+    {
+    case SLANG_SCALAR_TYPE_FLOAT_E4M3:
+        return UnownedStringSlice("FloatE4M3");
+    case SLANG_SCALAR_TYPE_FLOAT_E5M2:
+        return UnownedStringSlice("FloatE5M2");
+    case SLANG_SCALAR_TYPE_FLOAT16:
+        return UnownedStringSlice("Float16");
+    case SLANG_SCALAR_TYPE_FLOAT32:
+        return UnownedStringSlice("Float32");
+    case SLANG_SCALAR_TYPE_FLOAT64:
+        return UnownedStringSlice("Float64");
+    case SLANG_SCALAR_TYPE_INT8:
+        return UnownedStringSlice("SignedInt8");
+    case SLANG_SCALAR_TYPE_INT16:
+        return UnownedStringSlice("SignedInt16");
+    case SLANG_SCALAR_TYPE_INT32:
+        return UnownedStringSlice("SignedInt32");
+    case SLANG_SCALAR_TYPE_INT64:
+        return UnownedStringSlice("SignedInt64");
+    case SLANG_SCALAR_TYPE_UINT8:
+        return UnownedStringSlice("UnsignedInt8");
+    case SLANG_SCALAR_TYPE_UINT16:
+        return UnownedStringSlice("UnsignedInt16");
+    case SLANG_SCALAR_TYPE_UINT32:
+        return UnownedStringSlice("UnsignedInt32");
+    case SLANG_SCALAR_TYPE_UINT64:
+        return UnownedStringSlice("UnsignedInt64");
+    default:
+        SLANG_UNEXPECTED("Unsupported cooperative vector component type for HLSL emission");
+    }
+}
+
+static UnownedStringSlice _mapSlangCoopVecMatrixLayoutToHLSL(int32_t slangValue)
+{
+    switch (slangValue)
+    {
+    case SLANG_COOPERATIVE_VECTOR_MATRIX_LAYOUT_ROW_MAJOR:
+        return UnownedStringSlice("RowMajor");
+    case SLANG_COOPERATIVE_VECTOR_MATRIX_LAYOUT_COLUMN_MAJOR:
+        return UnownedStringSlice("ColumnMajor");
+    case SLANG_COOPERATIVE_VECTOR_MATRIX_LAYOUT_INFERENCING_OPTIMAL:
+        return UnownedStringSlice("InferencingOptimal");
+    case SLANG_COOPERATIVE_VECTOR_MATRIX_LAYOUT_TRAINING_OPTIMAL:
+        return UnownedStringSlice("TrainingOptimal");
+    default:
+        SLANG_UNEXPECTED("Unsupported cooperative vector matrix layout for HLSL emission");
+    }
+}
 
 void HLSLSourceEmitter::_emitHLSLDecorationSingleString(
     const char* name,
@@ -592,14 +661,47 @@ void HLSLSourceEmitter::emitEntryPointAttributesImpl(
     }
 }
 
+void HLSLSourceEmitter::emitMappedCoopVecComponentType(
+    IRInst* operand,
+    IRInst* inputInterpretationPackingFactor)
+{
+    auto intLit = cast<IRIntLit>(operand);
+
+    if (intLit->getValue() == SLANG_SCALAR_TYPE_BFLOAT16)
+    {
+        getSink()->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
+            .operation = "BFloat16 cooperative vector component type",
+            .location = operand->sourceLoc});
+        m_writer->emit("0");
+        return;
+    }
+
+    IRIntegerValue inputInterpretationPackingFactorValue = 1;
+    if (inputInterpretationPackingFactor)
+    {
+        inputInterpretationPackingFactorValue =
+            cast<IRIntLit>(inputInterpretationPackingFactor)->getValue();
+    }
+
+    m_writer->emit(_mapSlangCoopVecComponentTypeToHLSL(
+        (int32_t)intLit->getValue(),
+        inputInterpretationPackingFactorValue));
+}
+
+void HLSLSourceEmitter::emitMappedCoopVecMatrixLayout(IRInst* operand)
+{
+    auto intLit = cast<IRIntLit>(operand);
+
+    m_writer->emit(_mapSlangCoopVecMatrixLayoutToHLSL((int32_t)intLit->getValue()));
+}
+
 bool HLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
 {
     auto diagnoseFloatAtommic = [&]()
     {
-        getSink()->diagnose(
-            inst,
-            Diagnostics::unsupportedTargetIntrinsic,
-            "floating point atomic operation");
+        getSink()->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
+            .operation = "floating point atomic operation",
+            .location = inst->sourceLoc});
     };
     switch (inst->getOp())
     {
@@ -778,6 +880,104 @@ bool HLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             m_writer->emit(", -1, ");
             m_writer->emit(getName(inst));
             m_writer->emit(");");
+            return true;
+        }
+    case kIROp_CoopVecMatMulAdd:
+        {
+            auto coopVecMatMulAdd = cast<IRCoopVecMatMulAdd>(inst);
+            auto input = coopVecMatMulAdd->getInput();
+            auto matrixPtr = coopVecMatMulAdd->getMatrixPtr();
+            auto matrixOffset = coopVecMatMulAdd->getMatrixOffset();
+            auto matrixInterpretation = coopVecMatMulAdd->getMatrixInterpretation();
+            auto biasPtr = coopVecMatMulAdd->getBiasPtr();
+            auto biasOffset = coopVecMatMulAdd->getBiasOffset();
+            auto biasInterpretation = coopVecMatMulAdd->getBiasInterpretation();
+            auto k = coopVecMatMulAdd->getK();
+            auto memoryLayout = coopVecMatMulAdd->getMemoryLayout();
+            auto transpose = coopVecMatMulAdd->getTranspose();
+            auto matrixStride = coopVecMatMulAdd->getMatrixStride();
+            bool hasBias = biasInterpretation != nullptr;
+
+            auto resultType = cast<IRCoopVectorType>(inst->getDataType());
+            auto inputType = cast<IRCoopVectorType>(input->getDataType());
+
+            const bool outputIsUnsigned = isScalarIntegerType(resultType->getElementType()) &&
+                                          !getIntTypeSigned(resultType->getElementType());
+            const bool inputIsUnsigned = isScalarIntegerType(inputType->getElementType()) &&
+                                         !getIntTypeSigned(inputType->getElementType());
+
+            emitInstResultDecl(inst);
+            emitType(inst->getDataType());
+            m_writer->emit("(0);\n");
+
+            m_writer->emit(hasBias ? "__builtin_MatVecMulAdd(" : "__builtin_MatVecMul(");
+            m_writer->emit(getName(inst));
+            m_writer->emit(outputIsUnsigned ? ", true, " : ", false, ");
+            emitOperand(input, getInfo(EmitOp::General));
+            m_writer->emit(inputIsUnsigned ? ", true, " : ", false, ");
+            emitMappedCoopVecComponentType(
+                coopVecMatMulAdd->getInputInterpretation(),
+                coopVecMatMulAdd->getInputInterpretationPackingFactor());
+            m_writer->emit(", ");
+            emitOperand(matrixPtr, getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(matrixOffset, getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitMappedCoopVecComponentType(matrixInterpretation);
+            m_writer->emit(", ");
+            emitOperand(resultType->getElementCount(), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(k, getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitMappedCoopVecMatrixLayout(memoryLayout);
+            m_writer->emit(", ");
+            emitOperand(transpose, getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(matrixStride, getInfo(EmitOp::General));
+            if (hasBias)
+            {
+                m_writer->emit(", ");
+                emitOperand(biasPtr, getInfo(EmitOp::General));
+                m_writer->emit(", ");
+                emitOperand(biasOffset, getInfo(EmitOp::General));
+                m_writer->emit(", ");
+                emitMappedCoopVecComponentType(biasInterpretation);
+            }
+            m_writer->emit(");\n");
+            return true;
+        }
+    case kIROp_CoopVecOuterProductAccumulate:
+        {
+            auto outerProduct = cast<IRCoopVecOuterProductAccumulate>(inst);
+
+            m_writer->emit("__builtin_OuterProductAccumulate(");
+            emitOperand(outerProduct->getA(), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(outerProduct->getB(), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(outerProduct->getMatrixPtr(), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(outerProduct->getMatrixOffset(), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitMappedCoopVecComponentType(outerProduct->getMatrixInterpretation());
+            m_writer->emit(", ");
+            emitMappedCoopVecMatrixLayout(outerProduct->getMemoryLayout());
+            m_writer->emit(", ");
+            emitOperand(outerProduct->getMatrixStride(), getInfo(EmitOp::General));
+            m_writer->emit(");\n");
+            return true;
+        }
+    case kIROp_CoopVecReduceSumAccumulate:
+        {
+            auto reduceSum = cast<IRCoopVecReduceSumAccumulate>(inst);
+
+            m_writer->emit("__builtin_VectorAccumulate(");
+            emitOperand(reduceSum->getValue(), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(reduceSum->getBufferPtr(), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(reduceSum->getOffset(), getInfo(EmitOp::General));
+            m_writer->emit(");\n");
             return true;
         }
     default:
@@ -1686,11 +1886,10 @@ void HLSLSourceEmitter::emitSemanticsImpl(IRInst* inst, bool allowOffsets)
         auto semanticName = semanticDecoration->getSemanticName();
         m_writer->emit(semanticName);
 
-        // Only emit semantic index for semantics that accept them
-        if (doesHLSLSemanticAcceptIndex(semanticName))
-        {
-            m_writer->emit(semanticDecoration->getSemanticIndex());
-        }
+        auto semanticIndex = semanticDecoration->getSemanticIndex();
+        // Only emit semantic index for semantics that specify an index and accept an index
+        if (semanticIndex >= 0 && doesHLSLSemanticAcceptIndex(semanticName))
+            m_writer->emit(semanticIndex);
         return;
     }
     else if (auto packOffsetDecoration = inst->findDecoration<IRPackOffsetDecoration>())

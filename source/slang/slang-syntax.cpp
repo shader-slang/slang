@@ -47,6 +47,105 @@ void SyntaxClassBase::destructInstanceImpl(void* instance) const
 
 /* static */ const TypeExp TypeExp::empty;
 
+bool tryGetConstantIntVal(Val* val, IntegerLiteralValue& outValue)
+{
+    auto intVal = as<IntVal>(val);
+    if (auto constantIntVal = intVal ? as<ConstantIntVal>(intVal->resolve()) : nullptr)
+    {
+        outValue = constantIntVal->getValue();
+        return true;
+    }
+    return false;
+}
+
+bool tryFindProvableDuplicateOrderIndices(
+    ConcreteIntValPack* orderPack,
+    Index& outFirstPosition,
+    Index& outSecondPosition,
+    IntegerLiteralValue& outConcreteIndex,
+    bool& outHasConcreteIndex)
+{
+    for (Index i = 0; i < orderPack->getCount(); ++i)
+    {
+        for (Index j = 0; j < i; ++j)
+        {
+            if (!orderPack->getElement(i)->equals(orderPack->getElement(j)))
+                continue;
+
+            outFirstPosition = j;
+            outSecondPosition = i;
+            outHasConcreteIndex = tryGetConstantIntVal(orderPack->getElement(i), outConcreteIndex);
+            return true;
+        }
+    }
+    return false;
+}
+
+bool areProvablyDifferentShapeElements(Val* left, Val* right)
+{
+    IntegerLiteralValue leftValue = 0;
+    IntegerLiteralValue rightValue = 0;
+    return tryGetConstantIntVal(left, leftValue) && tryGetConstantIntVal(right, rightValue) &&
+           leftValue != rightValue;
+}
+
+bool hasAnyPotentialConcatAxis(ConcreteIntValPack* leftPack, ConcreteIntValPack* rightPack)
+{
+    SLANG_ASSERT(leftPack->getCount() == rightPack->getCount());
+    for (Index axis = 0; axis < leftPack->getCount(); ++axis)
+    {
+        bool isPossibleAxis = true;
+        for (Index i = 0; i < leftPack->getCount(); ++i)
+        {
+            if (i != axis && areProvablyDifferentShapeElements(
+                                 leftPack->getElement(i),
+                                 rightPack->getElement(i)))
+            {
+                isPossibleAxis = false;
+                break;
+            }
+        }
+        if (isPossibleAxis)
+            return true;
+    }
+    return false;
+}
+
+const char* getPackQueryName(PackQueryExpr* expr)
+{
+    if (as<FirstExpr>(expr))
+        return "__first";
+    if (as<LastExpr>(expr))
+        return "__last";
+    if (as<TrimFirstExpr>(expr))
+        return "__trimFirst";
+    if (as<TrimLastExpr>(expr))
+        return "__trimLast";
+    SLANG_UNEXPECTED("unknown PackQueryExpr subtype");
+    UNREACHABLE_RETURN("");
+}
+
+const char* getShapePackTransformName(ShapePackTransformExpr* expr)
+{
+    if (as<ShapeConcatExpr>(expr))
+        return "__shapeConcat";
+    if (as<ShapePermuteExpr>(expr))
+        return "__shapePermute";
+    if (as<ShapeSwapExpr>(expr))
+        return "__shapeSwap";
+    if (as<ShapeReduceExpr>(expr))
+        return "__shapeReduce";
+    SLANG_UNEXPECTED("unknown ShapePackTransformExpr subtype");
+    UNREACHABLE_RETURN("");
+}
+
+VariadicPackCardinality getKnownPackCardinality(Val* packOperand)
+{
+    return getPackCardinalityFromStructure(
+        packOperand,
+        [](Val* operand) { return getKnownPackCardinality(operand); });
+}
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!! DiagnosticSink impls !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 void printDiagnosticArg(StringBuilder& sb, Decl* decl)
@@ -212,6 +311,9 @@ void printDiagnosticArg(StringBuilder& sb, ASTNodeType nodeType)
         break;
     case ASTNodeType::GenericTypeConstraintDecl:
         sb << "GenericTypeConstraintDecl";
+        break;
+    case ASTNodeType::NonEmptyPackConstraintDecl:
+        sb << "NonEmptyPackConstraintDecl";
         break;
     case ASTNodeType::SimpleTypeDecl:
         sb << "SimpleTypeDecl";
@@ -587,6 +689,25 @@ RequirementWitness tryLookUpRequirementWitness(
     SubtypeWitness* subtypeWitness,
     Decl* requirementKey)
 {
+    if (auto packBranchWitness = as<PackBranchSubtypeWitness>(subtypeWitness))
+    {
+        switch (getKnownPackCardinality(packBranchWitness->getPackOperand()))
+        {
+        case VariadicPackCardinality::Empty:
+            return tryLookUpRequirementWitness(
+                astBuilder,
+                packBranchWitness->getEmptyWitness(),
+                requirementKey);
+        case VariadicPackCardinality::NonEmpty:
+            return tryLookUpRequirementWitness(
+                astBuilder,
+                packBranchWitness->getNonEmptyWitness(),
+                requirementKey);
+        default:
+            return RequirementWitness();
+        }
+    }
+
     if (auto declaredSubtypeWitness = as<DeclaredSubtypeWitness>(subtypeWitness))
     {
         if (auto inheritanceDeclRef = declaredSubtypeWitness->getDeclRef().as<InheritanceDecl>())
@@ -672,19 +793,6 @@ RequirementWitness tryLookUpRequirementWitness(
                 }
                 return result;
             }
-        }
-    }
-    else if (
-        auto extractFromConjunctionTypeWitness =
-            as<ExtractFromConjunctionSubtypeWitness>(subtypeWitness))
-    {
-        if (auto conjunctionTypeWitness = as<ConjunctionSubtypeWitness>(
-                extractFromConjunctionTypeWitness->getConjunctionWitness()))
-        {
-            auto componentWitness = as<SubtypeWitness>(conjunctionTypeWitness->getComponentWitness(
-                extractFromConjunctionTypeWitness->getIndexInConjunction()));
-
-            return tryLookUpRequirementWitness(astBuilder, componentWitness, requirementKey);
         }
     }
 

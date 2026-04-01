@@ -356,6 +356,120 @@ protected:
     OSPathKind m_osPathKind = OSPathKind::None; ///< OS path kind
 };
 
+/// A file system where all operations are no-ops.
+/// loadFile/saveFile/etc. return SLANG_E_NOT_AVAILABLE, and void methods do nothing.
+/// Useful as a null/stub file system when no real file I/O is desired.
+class NULLFileSystem : public ISlangMutableFileSystem
+{
+public:
+    // ISlangUnknown - singleton, so ref counting is a no-op
+    SLANG_IUNKNOWN_QUERY_INTERFACE
+    SLANG_NO_THROW uint32_t SLANG_MCALL addRef() SLANG_OVERRIDE { return 1; }
+    SLANG_NO_THROW uint32_t SLANG_MCALL release() SLANG_OVERRIDE { return 1; }
+
+    // ISlangCastable
+    virtual SLANG_NO_THROW void* SLANG_MCALL castAs(const Guid& guid) SLANG_OVERRIDE
+    {
+        if (auto ptr = getInterface(guid))
+            return ptr;
+        return getObject(guid);
+    }
+
+    // ISlangFileSystem
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL loadFile(char const* path, ISlangBlob** outBlob)
+        SLANG_OVERRIDE
+    {
+        SLANG_UNUSED(path);
+        SLANG_UNUSED(outBlob);
+        return SLANG_E_NOT_AVAILABLE;
+    }
+
+    // ISlangFileSystemExt
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    getFileUniqueIdentity(const char* path, ISlangBlob** outUniqueIdentity) SLANG_OVERRIDE
+    {
+        SLANG_UNUSED(path);
+        SLANG_UNUSED(outUniqueIdentity);
+        return SLANG_E_NOT_AVAILABLE;
+    }
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL calcCombinedPath(
+        SlangPathType fromPathType,
+        const char* fromPath,
+        const char* path,
+        ISlangBlob** pathOut) SLANG_OVERRIDE
+    {
+        SLANG_UNUSED(fromPathType);
+        SLANG_UNUSED(fromPath);
+        SLANG_UNUSED(path);
+        SLANG_UNUSED(pathOut);
+        return SLANG_E_NOT_AVAILABLE;
+    }
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    getPathType(const char* path, SlangPathType* outPathType) SLANG_OVERRIDE
+    {
+        SLANG_UNUSED(path);
+        SLANG_UNUSED(outPathType);
+        return SLANG_E_NOT_AVAILABLE;
+    }
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    getPath(PathKind pathKind, const char* path, ISlangBlob** outPath) SLANG_OVERRIDE
+    {
+        SLANG_UNUSED(pathKind);
+        SLANG_UNUSED(path);
+        SLANG_UNUSED(outPath);
+        return SLANG_E_NOT_AVAILABLE;
+    }
+    virtual SLANG_NO_THROW void SLANG_MCALL clearCache() SLANG_OVERRIDE {}
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL enumeratePathContents(
+        const char* path,
+        FileSystemContentsCallBack callback,
+        void* userData) SLANG_OVERRIDE
+    {
+        SLANG_UNUSED(path);
+        SLANG_UNUSED(callback);
+        SLANG_UNUSED(userData);
+        return SLANG_E_NOT_AVAILABLE;
+    }
+    virtual SLANG_NO_THROW OSPathKind SLANG_MCALL getOSPathKind() SLANG_OVERRIDE
+    {
+        return OSPathKind::None;
+    }
+
+    // ISlangModifyableFileSystem
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    saveFile(const char* path, const void* data, size_t size) SLANG_OVERRIDE
+    {
+        SLANG_UNUSED(path);
+        SLANG_UNUSED(data);
+        SLANG_UNUSED(size);
+        return SLANG_E_NOT_AVAILABLE;
+    }
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    saveFileBlob(const char* path, ISlangBlob* dataBlob) SLANG_OVERRIDE
+    {
+        SLANG_UNUSED(path);
+        SLANG_UNUSED(dataBlob);
+        return SLANG_E_NOT_AVAILABLE;
+    }
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL remove(const char* path) SLANG_OVERRIDE
+    {
+        SLANG_UNUSED(path);
+        return SLANG_E_NOT_AVAILABLE;
+    }
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL createDirectory(const char* path) SLANG_OVERRIDE
+    {
+        SLANG_UNUSED(path);
+        return SLANG_E_NOT_AVAILABLE;
+    }
+
+    NULLFileSystem() = default;
+    virtual ~NULLFileSystem() = default;
+
+private:
+    ISlangUnknown* getInterface(const Guid& guid);
+    void* getObject(const Guid& guid);
+};
+
 } // namespace Slang
 
 #endif // SLANG_FILE_SYSTEM_H_INCLUDED

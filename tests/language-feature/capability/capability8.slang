@@ -16,11 +16,11 @@ struct Test
     }
 }
 
-// CHECK-PASS-NOT: error 36107
-// CHECK: ([[# @LINE+1]]): error 36107{{.*}}metal
+// CHECK-PASS-NOT: E36107
+// CHECK: error[E36107]
+// CHECK: metal
 void computeMain()
 {
     Test t;
-    // CHECK: ([[# @LINE+1]]): note: see using of 'data'
     outputBuffer[0] = t.data();
 }
