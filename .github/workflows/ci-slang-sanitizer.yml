@@ -238,9 +238,25 @@ jobs:
           fi
 
           if [ "$total_logs" -gt 0 ]; then
-            # Classify each sanitizer log as PR-related or pre-existing by
-            # checking whether any source file referenced in its stack traces
-            # was changed by this PR.
+            # Prepare expected-findings patterns (strip comments and blank lines).
+            expected_patterns="/tmp/expected-patterns.txt"
+            if [ -f cmake/expected-sanitizer-findings.txt ]; then
+              grep -v '^\s*#' cmake/expected-sanitizer-findings.txt \
+                | grep -v '^\s*$' > "$expected_patterns" || true
+            else
+              : > "$expected_patterns"
+            fi
+            has_expected_patterns=false
+            if [ -s "$expected_patterns" ]; then
+              has_expected_patterns=true
+              echo "Loaded $(wc -l < "$expected_patterns" | tr -d ' ') expected-finding pattern(s)"
+            fi
+
+            # Classify each sanitizer log into one of three buckets:
+            #   expected       -- all SUMMARY lines match expected-sanitizer-findings.txt
+            #   pr_related     -- unexpected, stack frames in PR-changed files
+            #   preexisting    -- unexpected, stack frames only in unchanged code
+            expected_files=""
             pr_related_files=""
             preexisting_files=""
             has_pr_changed_files=false
@@ -249,6 +265,16 @@ jobs:
             fi
 
             while IFS= read -r f; do
+              # Check if all findings in this log are expected.
+              summaries=$(grep -h 'SUMMARY:' "$f" 2>/dev/null || true)
+              if $has_expected_patterns && [ -n "$summaries" ]; then
+                unexpected=$(echo "$summaries" | grep -vFf "$expected_patterns" || true)
+                if [ -z "$unexpected" ]; then
+                  expected_files="${expected_files}${f}"$'\n'
+                  continue
+                fi
+              fi
+
               # Extract workspace-relative source paths from stack traces.
               # Sanitizer output uses absolute paths like:
               #   #0 0x... in func /home/runner/work/slang/slang/source/foo.cpp:123:45
@@ -278,10 +304,15 @@ jobs:
             done <<< "$log_files"
 
             # Trim trailing newlines and count
+            expected_files="${expected_files%$'\n'}"
             pr_related_files="${pr_related_files%$'\n'}"
             preexisting_files="${preexisting_files%$'\n'}"
+            expected_count=0
             pr_count=0
             preexisting_count=0
+            if [ -n "$expected_files" ]; then
+              expected_count=$(echo "$expected_files" | wc -l | tr -d ' ')
+            fi
             if [ -n "$pr_related_files" ]; then
               pr_count=$(echo "$pr_related_files" | wc -l | tr -d ' ')
             fi
@@ -289,11 +320,32 @@ jobs:
               preexisting_count=$(echo "$preexisting_files" | wc -l | tr -d ' ')
             fi
 
-            echo "FOUND $total_logs SANITIZER LOG(S): $pr_count PR-related, $preexisting_count pre-existing"
+            echo "FOUND $total_logs SANITIZER LOG(S): $pr_count PR-related, $preexisting_count pre-existing, $expected_count expected"
             echo ""
+
+            # Show expected findings as notices
+            if [ -n "$expected_files" ]; then
+              echo "--- Expected findings (known issues, not blocking) ---"
+              echo "$expected_files" | while IFS= read -r f; do
+                echo "::group::EXPECTED: $(basename "$f")"
+                head -100 "$f"
+                echo "::endgroup::"
+              done
+
+              expected_summaries=$(echo "$expected_files" | xargs grep -h 'SUMMARY:' 2>/dev/null | sort -u | head -20 || true)
+              if [ -n "$expected_summaries" ]; then
+                echo ""
+                echo "Expected (known) issues:"
+                echo "$expected_summaries"
+                while IFS= read -r line; do
+                  echo "::notice::Expected: $line"
+                done <<< "$expected_summaries"
+              fi
+            fi
 
             # Show PR-related findings as errors
             if [ -n "$pr_related_files" ]; then
+              echo ""
               echo "--- PR-related findings (will fail the job) ---"
               echo "$pr_related_files" | while IFS= read -r f; do
                 echo "::group::PR-RELATED: $(basename "$f")"
@@ -367,15 +419,28 @@ jobs:
                   echo ""
                 fi
               fi
+              if [ "$expected_count" -gt 0 ]; then
+                expected_summaries=$(echo "$expected_files" | xargs grep -h 'SUMMARY:' 2>/dev/null | sort -u | head -20 || true)
+                echo "### Expected findings: $expected_count (known issues)"
+                echo ""
+                echo "These match patterns in \`cmake/expected-sanitizer-findings.txt\`."
+                echo ""
+                if [ -n "$expected_summaries" ]; then
+                  echo '```'
+                  echo "$expected_summaries"
+                  echo '```'
+                  echo ""
+                fi
+              fi
               echo "Download the \`sanitizer-logs\` artifact for full stack traces."
             } >> "$GITHUB_STEP_SUMMARY"
 
-            # Only fail the job for PR-related findings
+            # Only fail the job for unexpected PR-related findings
             if [ "$pr_count" -gt 0 ]; then
-              echo "Failing: $pr_count sanitizer finding(s) in PR-changed files."
+              echo "Failing: $pr_count unexpected sanitizer finding(s) in PR-changed files."
               exit 1
             else
-              echo "All $preexisting_count finding(s) are pre-existing -- passing with warnings."
+              echo "Passing: $expected_count expected, $preexisting_count pre-existing finding(s)."
             fi
           else
             if [ "${{ steps.build.outcome }}" != "success" ]; then
