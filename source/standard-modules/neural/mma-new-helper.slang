@@ -105,7 +105,15 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
         var matA = MatA.LoadNative(bit_cast<RWStructuredBuffer<half>>(tileAddr.getBuffer()), tileAddr.getBaseIndex());
 
         if (TransposeA)
+        {
             matA.ChangeMajor();
+            // ChangeMajor transposes each 8x8 sub-block via movmatrix, but the
+            // full 16x16 transpose also requires swapping the off-diagonal blocks.
+            uint r1 = matA.fragmentRead(1);
+            uint r2 = matA.fragmentRead(2);
+            matA.fragmentWrite(1, r2);
+            matA.fragmentWrite(2, r1);
+        }
 
         return matA;
     }
@@ -153,7 +161,7 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
 
             for (uint j = 0; j < NCoopMatColumn; j++)
             {
-                let matB = MatB.FromLocalColumn(localColB, int(j));
+                let matB = buildMatBFromLocalCol(localColB, int(j));
 
                 [ForceUnroll]
                 for (uint i = 0; i < NCoopMatRow; i++)
@@ -175,7 +183,7 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
                 int index = i * NCoopMatColumn + j;
 
                 T localColC[ROW_C];
-                matC[index].ToLocalColumn(localColC, j);
+                extractColFromMatC(matC[index], j, localColC);
 
                 int rowBase = i * ROW_C;
                 [ForceUnroll]
@@ -436,6 +444,109 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
                 }
 
                 outArray[frag_idx].fragmentWrite(reg_idx, value);
+            }
+        }
+    }
+
+    // Builds one MatB tile from per-thread column data, on demand.
+    // Direct Slang implementation of mmaFromColMatrixB_16x16.
+    // matIndex selects which 16-thread group (0 or 1).
+    [ForceInline]
+    [require(cuda, subgroup_shuffle)]
+    VISIBILITY_LEVEL static MatB buildMatBFromLocalCol(
+        inout half localCol[ROW_B],
+        int matIndex)
+    {
+        uint laneid = WaveGetLaneIndex();
+        let packedCol = bit_cast<uint[ROW_B / 2]>(localCol);
+
+        uint gid = laneid >> 2;
+        uint tid = laneid & 3;
+        uint base = uint(matIndex) * 16;
+        WaveMask fullMask = WaveMask(0xFFFFFFFF);
+
+        uint reg0 = 0, reg1 = 0, reg2 = 0, reg3 = 0;
+
+        [ForceUnroll]
+        for (uint t = 0; t < 4; t++)
+        {
+            uint tmp0 = WaveMaskReadLaneAt(fullMask, packedCol[int(t)],     int(gid + base));
+            uint tmp1 = WaveMaskReadLaneAt(fullMask, packedCol[int(t + 4)], int(gid + base));
+            uint tmp2 = WaveMaskReadLaneAt(fullMask, packedCol[int(t)],     int(gid + base + 8));
+            uint tmp3 = WaveMaskReadLaneAt(fullMask, packedCol[int(t + 4)], int(gid + base + 8));
+
+            if (tid == t)
+            {
+                reg0 = tmp0;
+                reg1 = tmp1;
+                reg2 = tmp2;
+                reg3 = tmp3;
+            }
+        }
+
+        MatB result;
+        result.fragmentWrite(0, reg0);
+        result.fragmentWrite(1, reg1);
+        result.fragmentWrite(2, reg2);
+        result.fragmentWrite(3, reg3);
+        return result;
+    }
+
+    // Extracts one column per thread from a MatC (accumulator) tile.
+    // Slang implementation of mmaToColMatrixCD for both f16 and f32.
+    //
+    // MatC f16 (16x16, 4 regs): reg0=packed(C[gid,tid*2],C[gid,tid*2+1]),
+    //   reg1=packed(C[gid+8,tid*2],C[gid+8,tid*2+1]), reg2/3 = hi 8 cols.
+    // MatC f32 (16x16, 8 regs): reg0=C[gid,tid*2], reg1=C[gid,tid*2+1],
+    //   reg2=C[gid+8,tid*2], reg3=C[gid+8,tid*2+1], reg4-7 = hi 8 cols.
+    [ForceInline]
+    [require(cuda, subgroup_shuffle)]
+    VISIBILITY_LEVEL static void extractColFromMatC(
+        MatC matC,
+        int matIndex,
+        inout T localCol[ROW_C])
+    {
+        uint laneid = WaveGetLaneIndex();
+        WaveMask fullMask = WaveMask(0xFFFFFFFF);
+
+        if (sizeof(T) == 2)
+        {
+            // f16 path: 4 regs, each packed pair of halves.
+            // 16x16 = lo(regs 0,1) + hi(regs 2,3), matIndex selects 8-col group.
+            uint col_in_mat = laneid % 8;
+            uint tid_src = col_in_mat / 2;
+            uint col_shift = (col_in_mat & 1) * 16;
+
+            int regBase = matIndex * 2;  // 0 for lo, 2 for hi
+
+            [ForceUnroll]
+            for (int row = 0; row < 16; row++)
+            {
+                uint gid_src = (row < 8) ? uint(row) : uint(row - 8);
+                int reg_sel = regBase + ((row < 8) ? 0 : 1);
+                uint v = WaveMaskReadLaneAt(fullMask, matC.fragmentRead(reg_sel), int(gid_src * 4 + tid_src));
+                localCol[row] = __realCast<T>(bit_cast<half>(uint16_t(v >> col_shift)));
+            }
+        }
+        else
+        {
+            // f32 path: 8 regs. 16x16 = lo(regs 0-3) + hi(regs 4-7).
+            // reg layout: reg[col_offset + row_half*2], col_offset=col&1, row_half=row<8?0:1
+            uint col_in_mat = laneid % 8;
+            uint tid_src = col_in_mat / 2;
+            uint col_offset = col_in_mat & 1;
+            int regBase = matIndex * 4;  // 0 for lo, 4 for hi
+            int src_reg_lo = regBase + int(col_offset);
+            int src_reg_hi = regBase + 2 + int(col_offset);
+
+            [ForceUnroll]
+            for (int g = 0; g < 8; g++)
+            {
+                uint src_lane = uint(g) * 4 + tid_src;
+                uint val_lo = WaveMaskReadLaneAt(fullMask, matC.fragmentRead(src_reg_lo), int(src_lane));
+                uint val_hi = WaveMaskReadLaneAt(fullMask, matC.fragmentRead(src_reg_hi), int(src_lane));
+                localCol[g] = __realCast<T>(val_lo);
+                localCol[g + 8] = __realCast<T>(val_hi);
             }
         }
     }
