@@ -282,6 +282,8 @@ struct AssignValsFromLayoutContext
     ShaderOutputPlan& outputPlan;
     TestResourceContext& resourceContext;
     IAccelerationStructure* accelerationStructure;
+    Dictionary<String, ComPtr<IBuffer>> namedBuffers;
+    String currentFieldName;
 
     AssignValsFromLayoutContext(
         IDevice* device,
@@ -413,6 +415,27 @@ struct AssignValsFromLayoutContext
         const InputBufferDesc& srcBuffer = srcVal->bufferDesc;
         auto& bufferData = srcVal->bufferData;
 
+        // Resolve buffer address references: replace placeholders with actual device addresses
+        // of previously created named buffers.
+        for (auto& ref : srcVal->addressRefs)
+        {
+            ComPtr<IBuffer> refBuffer;
+            if (namedBuffers.tryGetValue(ref.bufferName, refBuffer))
+            {
+                uint64_t addr = refBuffer->getDeviceAddress();
+                bufferData[ref.dataOffset] = (uint32_t)(addr & 0xFFFFFFFF);
+                bufferData[ref.dataOffset + 1] = (uint32_t)(addr >> 32);
+            }
+            else
+            {
+                StdWriters::getError().print(
+                    "error: buffer '%s' referenced in data=[] not found"
+                    " (ensure it is declared before this buffer)\n",
+                    ref.bufferName.begin());
+                return SLANG_FAIL;
+            }
+        }
+
         // When stride=1 or stride=2, each value in data=[] should occupy only `stride` bytes.
         // Pack values per uint32, little-endian (first value in LSB).
         if (srcBuffer.stride == 1 || srcBuffer.stride == 2)
@@ -449,6 +472,10 @@ struct AssignValsFromLayoutContext
 
         // Keep buffer alive in resource context
         resourceContext.resources.add(ComPtr<IResource>(bufferResource.get()));
+
+        // Register named buffer for cross-referencing by other buffers' data=[]
+        if (currentFieldName.getLength() > 0)
+            namedBuffers[currentFieldName] = bufferResource;
 
         // Check for device address/pointer FIRST (before descriptor handles)
         // This ensures plain uint64/pointer types use device addresses, not descriptor handles
@@ -683,6 +710,7 @@ struct AssignValsFromLayoutContext
         for (Index fieldIndex = 0; fieldIndex < fieldCount; ++fieldIndex)
         {
             auto& field = srcVal->fields[fieldIndex];
+            currentFieldName = field.name;
 
             if (field.name.getLength() == 0)
             {
