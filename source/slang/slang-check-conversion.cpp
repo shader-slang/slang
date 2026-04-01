@@ -1895,6 +1895,39 @@ bool SemanticsVisitor::_coerce(
         }
         return true;
     }
+
+    // Pointer covariance: Ptr<T> -> Ptr<I> when T implements I.
+    // Pointers have fixed size regardless of pointee type, so this
+    // conversion is valid as a bitcast of the address value.
+    if (auto fromPtrType = as<PtrType>(fromType))
+    {
+        if (auto toPtrType = as<PtrType>(toType))
+        {
+            auto fromAddrSpace = fromPtrType->getAddressSpace();
+            auto toAddrSpace = toPtrType->getAddressSpace();
+            if (fromAddrSpace->equals(toAddrSpace))
+            {
+                auto fromValueType = fromPtrType->getValueType();
+                auto toValueType = toPtrType->getValueType();
+                if (auto witness = tryGetSubtypeWitness(fromValueType, toValueType))
+                {
+                    SLANG_UNUSED(witness);
+                    if (outCost)
+                        *outCost = kConversionCost_CastToInterface;
+                    if (outToExpr)
+                    {
+                        auto castExpr = getASTBuilder()->create<BuiltinCastExpr>();
+                        castExpr->type = QualType(toType);
+                        castExpr->loc = fromExpr->loc;
+                        castExpr->base = fromExpr;
+                        *outToExpr = castExpr;
+                    }
+                    return true;
+                }
+            }
+        }
+    }
+
     // none_t can be cast into any Optional<T> type.
     if (as<NoneType>(fromType) && as<OptionalType>(toType))
     {

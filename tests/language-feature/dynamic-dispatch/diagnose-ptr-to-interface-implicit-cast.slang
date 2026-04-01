@@ -1,7 +1,5 @@
-// Implicit conversion from a concrete pointer (Foo*) to an interface pointer
-// (IFoo*) is not allowed. The type checker requires an explicit cast because
-// the memory layouts differ: Foo contains only its fields, while IFoo contains
-// a tag, witness table, and AnyValue payload.
+// Covariant pointer conversion (Foo* -> IFoo* when Foo : IFoo) is allowed
+// as of #9962. The reverse (contravariant) direction is still rejected.
 
 //TEST:SIMPLE(filecheck=CHECK): -target spirv
 
@@ -25,9 +23,12 @@ void computeMain()
     f.val = 5;
     Foo* pf = &f;
 
-    // Implicit conversion: error
-    // CHECK: error[E30019]
+    // Covariant direction: Foo* -> IFoo* is allowed (#9962)
     IFoo* ip = pf;
+
+    // Contravariant direction: IFoo* -> Foo* is NOT allowed
+    // CHECK: error[E30019]
+    Foo* pf2 = ip;
 
     outputBuffer[0] = 0;
 }
