@@ -73,7 +73,7 @@ jobs:
       config: release
       runs-on: '["ubuntu-22.04"]'
 
-  # Sanitizer build+test (non-blocking, runs on every PR for early detection)
+  # Sanitizer build+test (blocking via check-ci, runs on every PR)
   sanitizer-linux-clang-x86_64:
     needs: [filter]
     if: needs.filter.outputs.should-run == 'true'

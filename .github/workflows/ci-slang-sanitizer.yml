@@ -38,7 +38,23 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: "recursive"
-          fetch-depth: "2"
+          # Need full history to diff PR changes against the base branch
+          # for classifying sanitizer findings as PR-related vs pre-existing.
+          fetch-depth: "0"
+
+      - name: Compute PR changed files
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base_sha="${{ github.event.pull_request.base.sha }}"
+            echo "Computing diff against PR base: $base_sha"
+            git diff --name-only "$base_sha"...HEAD > /tmp/pr-changed-files.txt
+            changed_count=$(wc -l < /tmp/pr-changed-files.txt)
+            echo "PR touches $changed_count file(s)"
+            cat /tmp/pr-changed-files.txt
+          else
+            echo "Not a PR event -- all sanitizer findings will be treated as errors"
+            : > /tmp/pr-changed-files.txt
+          fi
 
       - name: Install Clang 18 and LLVM Tools
         run: |
@@ -222,22 +238,100 @@ jobs:
           fi
 
           if [ "$total_logs" -gt 0 ]; then
-            unique_issues=$(grep -rh 'SUMMARY:' asan-logs/ 2>/dev/null | sort -u | head -20 || true)
-
-            echo "FOUND $total_logs SANITIZER LOG(S)"
-            echo ""
-
-            if [ -n "$unique_issues" ]; then
-              echo "Unique issues:"
-              echo "$unique_issues"
-              echo ""
+            # Classify each sanitizer log as PR-related or pre-existing by
+            # checking whether any source file referenced in its stack traces
+            # was changed by this PR.
+            pr_related_files=""
+            preexisting_files=""
+            has_pr_changed_files=false
+            if [ -s /tmp/pr-changed-files.txt ]; then
+              has_pr_changed_files=true
             fi
 
-            echo "$log_files" | while IFS= read -r f; do
-              echo "::group::$(basename "$f")"
-              head -100 "$f"
-              echo "::endgroup::"
-            done
+            while IFS= read -r f; do
+              # Extract workspace-relative source paths from stack traces.
+              # Sanitizer output uses absolute paths like:
+              #   #0 0x... in func /home/runner/work/slang/slang/source/foo.cpp:123:45
+              # Also catches UBSan inline locations (/path/file.cpp:line:col: runtime error).
+              log_paths=$(grep -oE "${GITHUB_WORKSPACE}/[^:[:space:]]+" "$f" 2>/dev/null \
+                | sed "s|${GITHUB_WORKSPACE}/||" | sort -u || true)
+
+              is_pr_related=false
+
+              if $has_pr_changed_files && [ -n "$log_paths" ]; then
+                while IFS= read -r src_path; do
+                  if grep -qxF "$src_path" /tmp/pr-changed-files.txt; then
+                    is_pr_related=true
+                    break
+                  fi
+                done <<< "$log_paths"
+              elif ! $has_pr_changed_files; then
+                # Not a PR (push to master, etc.) -- treat all findings as errors
+                is_pr_related=true
+              fi
+
+              if $is_pr_related; then
+                pr_related_files="${pr_related_files}${f}"$'\n'
+              else
+                preexisting_files="${preexisting_files}${f}"$'\n'
+              fi
+            done <<< "$log_files"
+
+            # Trim trailing newlines and count
+            pr_related_files="${pr_related_files%$'\n'}"
+            preexisting_files="${preexisting_files%$'\n'}"
+            pr_count=0
+            preexisting_count=0
+            if [ -n "$pr_related_files" ]; then
+              pr_count=$(echo "$pr_related_files" | wc -l | tr -d ' ')
+            fi
+            if [ -n "$preexisting_files" ]; then
+              preexisting_count=$(echo "$preexisting_files" | wc -l | tr -d ' ')
+            fi
+
+            echo "FOUND $total_logs SANITIZER LOG(S): $pr_count PR-related, $preexisting_count pre-existing"
+            echo ""
+
+            # Show PR-related findings as errors
+            if [ -n "$pr_related_files" ]; then
+              echo "--- PR-related findings (will fail the job) ---"
+              echo "$pr_related_files" | while IFS= read -r f; do
+                echo "::group::PR-RELATED: $(basename "$f")"
+                head -100 "$f"
+                echo "::endgroup::"
+              done
+
+              pr_summaries=$(echo "$pr_related_files" | xargs grep -h 'SUMMARY:' 2>/dev/null | sort -u | head -20 || true)
+              if [ -n "$pr_summaries" ]; then
+                echo ""
+                echo "PR-related unique issues:"
+                echo "$pr_summaries"
+                while IFS= read -r line; do
+                  echo "::error::$line"
+                done <<< "$pr_summaries"
+              fi
+            fi
+
+            # Show pre-existing findings as warnings
+            if [ -n "$preexisting_files" ]; then
+              echo ""
+              echo "--- Pre-existing findings (warnings only) ---"
+              echo "$preexisting_files" | while IFS= read -r f; do
+                echo "::group::PRE-EXISTING: $(basename "$f")"
+                head -100 "$f"
+                echo "::endgroup::"
+              done
+
+              preexisting_summaries=$(echo "$preexisting_files" | xargs grep -h 'SUMMARY:' 2>/dev/null | sort -u | head -20 || true)
+              if [ -n "$preexisting_summaries" ]; then
+                echo ""
+                echo "Pre-existing unique issues:"
+                echo "$preexisting_summaries"
+                while IFS= read -r line; do
+                  echo "::warning::Pre-existing: $line"
+                done <<< "$preexisting_summaries"
+              fi
+            fi
 
             echo ""
             echo "========================================"
@@ -247,28 +341,42 @@ jobs:
             {
               echo "## Sanitizer Report"
               echo ""
-              echo "Found **$total_logs** sanitizer log(s)."
-              echo ""
-              if [ -n "$unique_issues" ]; then
-                echo "### Unique Issues"
-                echo '```'
-                echo "$unique_issues"
-                echo '```'
+              if [ "$pr_count" -gt 0 ]; then
+                pr_summaries=$(echo "$pr_related_files" | xargs grep -h 'SUMMARY:' 2>/dev/null | sort -u | head -20 || true)
+                echo "### PR-related findings: $pr_count"
                 echo ""
+                echo "These findings have stack frames in files changed by this PR."
+                echo ""
+                if [ -n "$pr_summaries" ]; then
+                  echo '```'
+                  echo "$pr_summaries"
+                  echo '```'
+                  echo ""
+                fi
+              fi
+              if [ "$preexisting_count" -gt 0 ]; then
+                preexisting_summaries=$(echo "$preexisting_files" | xargs grep -h 'SUMMARY:' 2>/dev/null | sort -u | head -20 || true)
+                echo "### Pre-existing findings: $preexisting_count (warnings only)"
+                echo ""
+                echo "These findings are in code not changed by this PR."
+                echo ""
+                if [ -n "$preexisting_summaries" ]; then
+                  echo '```'
+                  echo "$preexisting_summaries"
+                  echo '```'
+                  echo ""
+                fi
               fi
               echo "Download the \`sanitizer-logs\` artifact for full stack traces."
             } >> "$GITHUB_STEP_SUMMARY"
 
-            # Emit each unique issue as a separate error annotation
-            if [ -n "$unique_issues" ]; then
-              while IFS= read -r line; do
-                echo "::error::$line"
-              done <<< "$unique_issues"
+            # Only fail the job for PR-related findings
+            if [ "$pr_count" -gt 0 ]; then
+              echo "Failing: $pr_count sanitizer finding(s) in PR-changed files."
+              exit 1
             else
-              echo "::error::Sanitizers detected $total_logs issue(s). See the sanitizer-logs artifact."
+              echo "All $preexisting_count finding(s) are pre-existing -- passing with warnings."
             fi
-
-            exit 1
           else
             if [ "${{ steps.build.outcome }}" != "success" ]; then
               echo "Build failed -- sanitizer results unavailable."
