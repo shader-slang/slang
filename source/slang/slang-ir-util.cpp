@@ -2922,14 +2922,6 @@ bool shouldHaveSpecConstRate(
     return hasSpecConstOperand;
 }
 
-bool isSpecConstOpHoistable(IROp op, IRType* type, IRInst* const* fixedArgs)
-{
-    auto rateType = as<IRRateQualifiedType>(type);
-    return rateType && as<IRSpecConstRate>(rateType->getRate()) &&
-           canOperationBeSpecConst(op, rateType->getValueType(), fixedArgs, nullptr);
-}
-
-
 bool isInstHoistable(IROp op)
 {
     return (getIROpInfo(op).flags & kIROpFlag_Hoistable);
