@@ -249,6 +249,24 @@ void MetalSourceEmitter::emitEntryPointAttributesImpl(
 {
     auto stage = entryPointDecor->getProfile().getStage();
 
+    const auto emitRequiredThreadsPerThreadgroup = [&]()
+    {
+        if (getTargetCaps().implies(CapabilityAtom::metallib_4_0))
+        {
+            Int sizeAlongAxis[kThreadGroupAxisCount];
+            getComputeThreadGroupSize(irFunc, sizeAlongAxis);
+
+            m_writer->emit("[[required_threads_per_threadgroup(");
+            for (int ii = 0; ii < kThreadGroupAxisCount; ++ii)
+            {
+                if (ii != 0)
+                    m_writer->emit(", ");
+                m_writer->emit(sizeAlongAxis[ii]);
+            }
+            m_writer->emit(")]]\n");
+        }
+    };
+
     switch (stage)
     {
     case Stage::Fragment:
@@ -258,12 +276,15 @@ void MetalSourceEmitter::emitEntryPointAttributesImpl(
         m_writer->emit("[[vertex]] ");
         break;
     case Stage::Compute:
+        emitRequiredThreadsPerThreadgroup();
         m_writer->emit("[[kernel]] ");
         break;
     case Stage::Mesh:
+        emitRequiredThreadsPerThreadgroup();
         m_writer->emit("[[mesh]] ");
         break;
     case Stage::Amplification:
+        emitRequiredThreadsPerThreadgroup();
         m_writer->emit("[[object]] ");
         break;
     default:

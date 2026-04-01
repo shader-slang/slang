@@ -19,7 +19,7 @@ SLANG_UNIT_TEST(createBlob)
         size_t dataSize = strlen(testData);
 
         ComPtr<ISlangBlob> blob;
-        blob = slang_createBlob((const void*)testData, dataSize);
+        blob.attach(slang_createBlob((const void*)testData, dataSize));
 
         SLANG_CHECK(blob != nullptr);
 
@@ -36,7 +36,7 @@ SLANG_UNIT_TEST(createBlob)
         size_t dataSize = sizeof(binaryData);
 
         ComPtr<ISlangBlob> blob;
-        blob = slang_createBlob((const void*)binaryData, dataSize);
+        blob.attach(slang_createBlob((const void*)binaryData, dataSize));
 
         SLANG_CHECK(blob != nullptr);
 
@@ -59,7 +59,7 @@ SLANG_UNIT_TEST(createBlob)
         }
 
         ComPtr<ISlangBlob> blob;
-        blob = slang_createBlob((const void*)largeData, largeSize);
+        blob.attach(slang_createBlob((const void*)largeData, largeSize));
 
         SLANG_CHECK(blob != nullptr);
 
@@ -76,7 +76,7 @@ SLANG_UNIT_TEST(createBlob)
     {
         char* testData = nullptr;
         ComPtr<ISlangBlob> blob;
-        blob = slang_createBlob((const void*)testData, 10);
+        blob.attach(slang_createBlob((const void*)testData, 10));
 
         SLANG_CHECK(blob == nullptr);
     }
@@ -85,7 +85,7 @@ SLANG_UNIT_TEST(createBlob)
     {
         char* testData = nullptr;
         ComPtr<ISlangBlob> blob;
-        blob = slang_createBlob((const void*)testData, 0);
+        blob.attach(slang_createBlob((const void*)testData, 0));
 
         SLANG_CHECK(blob == nullptr);
     }
@@ -95,7 +95,7 @@ SLANG_UNIT_TEST(createBlob)
         const char* testData = "test";
 
         ComPtr<ISlangBlob> blob;
-        blob = slang_createBlob((const void*)testData, 0);
+        blob.attach(slang_createBlob((const void*)testData, 0));
 
         SLANG_CHECK(blob == nullptr);
     }
@@ -106,7 +106,7 @@ SLANG_UNIT_TEST(createBlob)
         size_t dataSize = strlen(testData);
 
         ComPtr<ISlangBlob> blob;
-        blob = slang_createBlob((const void*)testData, dataSize);
+        blob.attach(slang_createBlob((const void*)testData, dataSize));
 
         SLANG_CHECK(blob != nullptr);
 
@@ -125,9 +125,9 @@ SLANG_UNIT_TEST(createBlob)
         ComPtr<ISlangBlob> blob1;
         ComPtr<ISlangBlob> blob2;
         ComPtr<ISlangBlob> blob3;
-        blob1 = slang_createBlob((const void*)testData, dataSize);
-        blob2 = slang_createBlob((const void*)testData, dataSize);
-        blob3 = slang_createBlob((const void*)testData, dataSize);
+        blob1.attach(slang_createBlob((const void*)testData, dataSize));
+        blob2.attach(slang_createBlob((const void*)testData, dataSize));
+        blob3.attach(slang_createBlob((const void*)testData, dataSize));
 
         SLANG_CHECK(blob1 != nullptr);
         SLANG_CHECK(blob2 != nullptr);
@@ -149,7 +149,7 @@ SLANG_UNIT_TEST(createBlob)
         size_t dataSize = strlen(testData);
 
         ComPtr<ISlangBlob> blob;
-        blob = slang_createBlob((const void*)testData, dataSize);
+        blob.attach(slang_createBlob((const void*)testData, dataSize));
 
         // Modify original data - blob should remain unchanged
         char* mutableData = new char[dataSize + 1];
