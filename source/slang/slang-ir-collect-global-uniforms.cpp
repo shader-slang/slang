@@ -2,6 +2,7 @@
 #include "slang-ir-collect-global-uniforms.h"
 
 #include "slang-ir-insts.h"
+#include "slang-target.h"
 
 namespace Slang
 {
@@ -275,7 +276,7 @@ struct CollectGlobalUniformParametersContext
             // becoming a pointer (which ConstantBuffer<T> lowers to on these targets).
             //
             bool unwrappedPushConstant = false;
-            if (target == CodeGenTarget::CUDASource || target == CodeGenTarget::CPPSource)
+            if (isCUDATarget(target) || isCPUTarget(target))
             {
                 if (auto cbufType = as<IRConstantBufferType>(globalParamType))
                 {
@@ -382,6 +383,11 @@ struct CollectGlobalUniformParametersContext
                     }
                     else
                     {
+                        // This path is not expected to be reached on CUDA/CPP
+                        // targets since layout computation always wraps GlobalParams
+                        // in a ConstantBuffer, but handle it for robustness.
+                        SLANG_ASSERT_FAILURE("Unexpected: unwrapped push constant "
+                                             "without globalParameterGroupTypeLayout");
                         auto addr = builder->emitGetAddress(
                             builder->getPtrType(wrapperParam->getFullType()),
                             wrapperParam);
