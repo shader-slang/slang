@@ -39,8 +39,17 @@ void _findDependenciesOfTypeInSet(
     case kIROp_PtrType:
     case kIROp_IntPtrType:
     case kIROp_UIntPtrType:
-        // Pointers have fixed size and don't embed their pointee, so they
-        // break dependency cycles. Do not recurse into the pointee type.
+    case kIROp_RawPointerType:
+    case kIROp_NativePtrType:
+    case kIROp_ComPtrType:
+    case kIROp_OutParamType:
+    case kIROp_BorrowInOutParamType:
+    case kIROp_RefParamType:
+    case kIROp_BorrowInParamType:
+    case kIROp_NativeStringType:
+    case kIROp_FuncType:
+        // Pointer-like and fixed-size types don't embed their pointee/operand,
+        // so they break dependency cycles. Do not recurse into operand types.
         break;
     default:
         {
@@ -67,6 +76,7 @@ List<IRInterfaceType*> findDependenciesOfTypeInSet(
 void _sortTopologically(
     IRInterfaceType* interfaceType,
     HashSet<IRInterfaceType*>& visited,
+    HashSet<IRInterfaceType*>& onStack,
     List<IRInterfaceType*>& sortedInterfaceTypes,
     const Func<HashSet<IRInterfaceType*>, IRInterfaceType*>& getDependencies)
 {
@@ -74,12 +84,17 @@ void _sortTopologically(
         return;
 
     visited.add(interfaceType);
+    onStack.add(interfaceType);
 
     for (auto dependency : getDependencies(interfaceType))
     {
-        _sortTopologically(dependency, visited, sortedInterfaceTypes, getDependencies);
+        // Skip back-edges to prevent infinite recursion on cycles.
+        if (onStack.contains(dependency))
+            continue;
+        _sortTopologically(dependency, visited, onStack, sortedInterfaceTypes, getDependencies);
     }
 
+    onStack.remove(interfaceType);
     sortedInterfaceTypes.add(interfaceType);
 }
 
@@ -89,28 +104,29 @@ List<IRInterfaceType*> sortTopologically(
 {
     List<IRInterfaceType*> sortedInterfaceTypes;
     HashSet<IRInterfaceType*> visited;
+    HashSet<IRInterfaceType*> onStack;
     for (auto interfaceType : interfaceTypes)
     {
-        _sortTopologically(interfaceType, visited, sortedInterfaceTypes, getDependencies);
+        _sortTopologically(interfaceType, visited, onStack, sortedInterfaceTypes, getDependencies);
     }
     return sortedInterfaceTypes;
 }
 
 // Detect which interfaces participate in cycles in the dependency graph.
-// Uses DFS with cycle membership propagated up the return path so that
-// all nodes in a cycle are marked, not just the back-edge endpoints.
-// Returns true if this node can reach a back edge (i.e. is part of a cycle).
-bool _findCyclicInterfaces(
+// Uses DFS with an explicit stack so that when a back-edge is found,
+// ALL nodes on the stack from the back-edge target onwards are marked
+// as cyclic (not just the endpoints).
+void _findCyclicInterfaces(
     IRInterfaceType* interfaceType,
     Dictionary<IRInterfaceType*, HashSet<IRInterfaceType*>>& dependencyMap,
     HashSet<IRInterfaceType*>& visited,
-    HashSet<IRInterfaceType*>& onStack,
+    HashSet<IRInterfaceType*>& onStackSet,
+    List<IRInterfaceType*>& dfsStack,
     HashSet<IRInterfaceType*>& cyclicInterfaces)
 {
     visited.add(interfaceType);
-    onStack.add(interfaceType);
-
-    bool inCycle = false;
+    onStackSet.add(interfaceType);
+    dfsStack.add(interfaceType);
 
     if (auto deps = dependencyMap.tryGetValue(interfaceType))
     {
@@ -118,27 +134,30 @@ bool _findCyclicInterfaces(
         {
             if (!visited.contains(dependency))
             {
-                if (_findCyclicInterfaces(
-                        dependency,
-                        dependencyMap,
-                        visited,
-                        onStack,
-                        cyclicInterfaces))
-                    inCycle = true;
+                _findCyclicInterfaces(
+                    dependency,
+                    dependencyMap,
+                    visited,
+                    onStackSet,
+                    dfsStack,
+                    cyclicInterfaces);
             }
-            else if (onStack.contains(dependency))
+            else if (onStackSet.contains(dependency))
             {
-                cyclicInterfaces.add(dependency);
-                inCycle = true;
+                // Back edge found: mark ALL nodes on the stack from
+                // the target (dependency) to the current node.
+                for (Index i = dfsStack.getCount() - 1; i >= 0; i--)
+                {
+                    cyclicInterfaces.add(dfsStack[i]);
+                    if (dfsStack[i] == dependency)
+                        break;
+                }
             }
         }
     }
 
-    if (inCycle)
-        cyclicInterfaces.add(interfaceType);
-
-    onStack.remove(interfaceType);
-    return inCycle;
+    dfsStack.removeLast();
+    onStackSet.remove(interfaceType);
 }
 
 HashSet<IRInterfaceType*> findCyclicInterfaces(
@@ -146,14 +165,21 @@ HashSet<IRInterfaceType*> findCyclicInterfaces(
     Dictionary<IRInterfaceType*, HashSet<IRInterfaceType*>>& dependencyMap)
 {
     HashSet<IRInterfaceType*> visited;
-    HashSet<IRInterfaceType*> onStack;
+    HashSet<IRInterfaceType*> onStackSet;
+    List<IRInterfaceType*> dfsStack;
     HashSet<IRInterfaceType*> cyclicInterfaces;
 
     for (auto interfaceType : interfaceTypes)
     {
         if (!visited.contains(interfaceType))
         {
-            _findCyclicInterfaces(interfaceType, dependencyMap, visited, onStack, cyclicInterfaces);
+            _findCyclicInterfaces(
+                interfaceType,
+                dependencyMap,
+                visited,
+                onStackSet,
+                dfsStack,
+                cyclicInterfaces);
         }
     }
 
@@ -266,6 +292,8 @@ void inferAnyValueSizeWhereNecessary(
     // Track which implementations have self-referential dependencies on their own interface.
     Dictionary<IRInterfaceType*, List<IRInst*>> selfReferentialImpls;
     Dictionary<IRInterfaceType*, List<IRInst*>> nonSelfReferentialImpls;
+    // Interfaces where ALL impls are self-referential (no base case for size inference).
+    HashSet<IRInterfaceType*> fullyCircularInterfaces;
 
     // Collect dependencies for each interface, separating self-referential implementations.
     for (auto interfaceType : interfaceTypes)
@@ -320,6 +348,7 @@ void inferAnyValueSizeWhereNecessary(
             sink->diagnose(Diagnostics::CyclicInterfaceDependency{
                 .interfaceType = interfaceType,
             });
+            fullyCircularInterfaces.add(interfaceType);
         }
     }
 
@@ -375,6 +404,11 @@ void inferAnyValueSizeWhereNecessary(
 
     for (auto interfaceType : sortedInterfaceTypes)
     {
+        // Skip interfaces where all impls are circular — size inference is impossible
+        // and we already emitted CyclicInterfaceDependency.
+        if (fullyCircularInterfaces.contains(interfaceType))
+            continue;
+
         IRIntegerValue existingMaxSize = (IRIntegerValue)kMaxInt; // Default to max int.
         if (auto existingAnyValueDecor = interfaceType->findDecoration<IRAnyValueSizeDecoration>())
         {
@@ -423,9 +457,7 @@ void inferAnyValueSizeWhereNecessary(
 
         // Second pass: Calculate size from self-referential implementations.
         // These can now use the AnyValue size set above.
-        // We skip cyclic impls entirely and omit the "does not fit" diagnostic for
-        // remaining self-referential impls because we already emitted
-        // CircularConformance which is more specific and actionable.
+        // Skip cyclic impls (already diagnosed with CircularConformance).
         for (auto implType : selfReferentialImpls[interfaceType])
         {
             if (cyclicImpls.contains(implType))
@@ -438,6 +470,20 @@ void inferAnyValueSizeWhereNecessary(
                 &sizeAndAlignment);
 
             maxAnyValueSize = Math::Max(maxAnyValueSize, sizeAndAlignment.size);
+
+            if (existingMaxSize < sizeAndAlignment.size)
+            {
+                sink->diagnose(Diagnostics::TypeDoesNotFitAnyValueSize{
+                    .type = implType,
+                    .location = implType->sourceLoc,
+                });
+                sink->diagnose(Diagnostics::TypeAndLimit{
+                    .type = implType,
+                    .size = sizeAndAlignment.size,
+                    .limit = existingMaxSize,
+                    .location = implType->sourceLoc,
+                });
+            }
         }
 
         // Should not encounter interface types without any conforming implementations.

@@ -19,6 +19,10 @@ interface IBar
     float process();
 }
 
+// CHECK: error[E41003]
+// CHECK: BarImpl
+// CHECK: circular reference through interface
+// CHECK: IBar
 struct BarImpl : IBar
 {
     IFoo foo;

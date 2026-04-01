@@ -4145,7 +4145,7 @@ err(
     "circular-conformance",
     41003,
     "type contains circular reference through conforming interface",
-    span { loc = "location", message = "type '~type:IRInst' contains circular reference through interface '~interfaceType:IRInst'. A type that conforms to an interface cannot contain fields that lead back to that interface through dynamic-dispatch storage." }
+    span { loc = "location", message = "type '~type:IRInst' contains circular reference through interface '~interfaceType:IRInst'. The type's conformance creates a cycle in dynamic-dispatch storage that prevents computing a finite AnyValue size." }
 )
 
 err(
