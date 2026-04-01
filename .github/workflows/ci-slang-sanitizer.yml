@@ -6,10 +6,6 @@ on:
       runs-on:
         required: true
         type: string
-      build-llvm:
-        required: false
-        type: boolean
-        default: true
       server-count:
         required: false
         type: number
@@ -89,7 +85,6 @@ jobs:
             sccache-linux-clang-18-x86_64-asan-
 
       - name: Setup LLVM from GCS
-        if: inputs.build-llvm
         uses: ./.github/actions/setup-llvm-from-gcs
         with:
           os: linux
@@ -107,7 +102,7 @@ jobs:
           compiler: clang-18
           platform: x86_64
           config: releaseWithDebugInfo
-          build-llvm: ${{ inputs.build-llvm }}
+          build-llvm: true
           use-cached-llvm: false
 
       - name: Create sanitizer log directory
@@ -206,6 +201,7 @@ jobs:
           # Non-zero exits are expected (sanitizer errors, test failures); this
           # job gates only on sanitizer log output in the Summary step.
           "$bin_dir/slang-test" "${slang_test_args[@]}" && slang_test_exit=0 || slang_test_exit=$?
+          echo "SLANG_TEST_EXIT=$slang_test_exit" >> "$GITHUB_ENV"
           if [ "$slang_test_exit" -ne 0 ]; then
             echo "::warning::slang-test exited with code $slang_test_exit"
           fi
@@ -218,6 +214,7 @@ jobs:
           export LSAN_OPTIONS="suppressions=$PWD/cmake/lsan-suppressions.txt"
 
           PATH=$bin_dir:$PATH tools/slangc-test/test.sh && slangc_test_exit=0 || slangc_test_exit=$?
+          echo "SLANGC_TEST_EXIT=$slangc_test_exit" >> "$GITHUB_ENV"
           if [ "$slangc_test_exit" -ne 0 ]; then
             echo "::warning::slangc tests exited with code $slangc_test_exit"
           fi
@@ -449,6 +446,17 @@ jobs:
               echo "## Sanitizer Report" >> "$GITHUB_STEP_SUMMARY"
               echo "" >> "$GITHUB_STEP_SUMMARY"
               echo "Build failed -- sanitizer results unavailable." >> "$GITHUB_STEP_SUMMARY"
+            elif [ "${SLANG_TEST_EXIT:-0}" -ne 0 ] || [ "${SLANGC_TEST_EXIT:-0}" -ne 0 ]; then
+              echo "::error::Tests exited with errors but produced no sanitizer logs."
+              echo ""
+              {
+                echo "## Sanitizer Report"
+                echo ""
+                echo "Tests exited with errors (slang-test=$SLANG_TEST_EXIT, slangc=$SLANGC_TEST_EXIT)"
+                echo "but produced no sanitizer logs. This may indicate a loader error or"
+                echo "infrastructure problem that prevented the sanitizer from running."
+              } >> "$GITHUB_STEP_SUMMARY"
+              exit 1
             else
               echo "No sanitizer issues detected."
               echo ""
