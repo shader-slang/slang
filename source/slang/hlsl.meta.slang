@@ -27908,6 +27908,32 @@ struct CoopMat
     }
 
     [ForceInline]
+    [require(cooperative_matrix, subgroup_basic, cuda_spirv)]
+    void StoreRaw<U, let V : int>(__ref groupshared U[V] data, uint element)
+    {
+        __target_switch
+        {
+        case cuda:
+            __intrinsic_asm "($0).storeNative(($1)->m_data, $2)";
+        default:
+            Store<CoopMatMatrixLayout.RowMajor>(data, element, N * sizeof(T) / sizeof(U));
+        }
+    }
+
+    [ForceInline]
+    [require(cooperative_matrix, subgroup_basic, cuda_spirv)]
+    static This LoadRaw<U, let V : int>(__constref groupshared U[V] data, uint element)
+    {
+        __target_switch
+        {
+        case cuda:
+            __intrinsic_asm "$TR::loadNative(($0)->m_data, $1)";
+        default:
+            return This.Load<CoopMatMatrixLayout.RowMajor>(data, element, N * sizeof(T) / sizeof(U));
+        }
+    }
+
+    [ForceInline]
     [require(cooperative_matrix)]
     [__NoSideEffect]
     static int getPackedFragmentCount()

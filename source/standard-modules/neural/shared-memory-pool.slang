@@ -291,7 +291,7 @@ public struct SharedMemorySize0<T, TargetEnum Target, ExecutionMode ExeMode, int
 
     // The MMA forward/backward uses: shared A tiles + per-warp B/C tiles.
     // With MMAHelperNew (CUDA + OptimalLayout), forward and backward MMA
-    // use zero shmem (LoadNative + FromLocal). This term only applies to
+    // use zero shmem (LoadRaw + FromLocal). This term only applies to
     // the legacy shmem-based MMAHelper/TiledMMAHelper paths (non-CUDA).
     static const uint BytesForMMA = (Target == TargetEnum.CUDA) ? 0 :
         (ShMemInfo.SharedMemSizeInVectorMatA + (ShMemInfo.SharedMemSizeInVectorMatC) * SubgroupCount) * sizeof(uint4);

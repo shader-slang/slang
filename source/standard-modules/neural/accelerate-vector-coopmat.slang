@@ -600,7 +600,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
                     [ForceUnroll]
                     for (int j = 0; j < COLUMN; j++)
                     {
-                        matC[i * COLUMN + j].storeNative(ShMemPool.data, base + (i * COLUMN + j) * TileStride);
+                        matC[i * COLUMN + j].StoreRaw(ShMemPool.data, base + (i * COLUMN + j) * TileStride);
                     }
                 }
             }
@@ -618,8 +618,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
                         [ForceUnroll]
                         for (int j = 0; j < COLUMN; j++)
                         {
-                            MatC other;
-                            other.loadNative(ShMemPool.data, base + (i * COLUMN + j) * TileStride);
+                            let other = MatC.LoadRaw(ShMemPool.data, base + (i * COLUMN + j) * TileStride);
                             matC[i * COLUMN + j] = matC[i * COLUMN + j] + other;
                         }
                     }

@@ -8,10 +8,10 @@ implementing neural;
 //   The weight matrix must be pre-tiled into 16×16 tiles in row-major tile order.
 //   M and K must be multiples of 16.
 //
-// MatB (input): constructed from each thread's local input vector via FromLocalColumn.
-//   Input is read directly from a StructuredBuffer per K-tile to avoid register pressure.
+// MatB (input): constructed from each thread's local input vector via buildAllTilesFromArray
+//   + ChangeMajor + copyFrom. Input is read from a StructuredBuffer per K-tile.
 //
-// MatC (output): extracted to each thread's local output vector via ToLocalColumn.
+// MatC (output): extracted to each thread's local output vector via extractColFromMatC.
 //
 // MMA shape: m16n16k16 (internally 2x m16n8k16)
 //   MatA: 16×16 (half)
@@ -22,7 +22,7 @@ implementing neural;
 //
 // TransposeA:
 //   When true, computes W^T × input instead of W × input.
-//   LoadNative loads the tile in its stored (row-major) layout, then ChangeMajor()
+//   LoadRaw loads the tile in its stored (row-major) layout, then ChangeMajor()
 //   transposes the fragment registers. The tile addressing swaps row/col indices
 //   to walk the stored M×K grid in the transposed order.
 
@@ -102,7 +102,7 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
 
         int offset = tileElementOffset(storedRow, storedCol);
         let tileAddr = weightAddress.getOffset(offset);
-        var matA = MatA.LoadNative(bit_cast<RWStructuredBuffer<half>>(tileAddr.getBuffer()), tileAddr.getBaseIndex());
+        var matA = MatA.LoadRaw(bit_cast<RWStructuredBuffer<half>>(tileAddr.getBuffer()), tileAddr.getBaseIndex());
 
         if (TransposeA)
         {
@@ -205,24 +205,173 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
     }
 
     // =========================================================================
-    // Bias gradient reduction: bias_grad[i] = sum_{all lanes} dOut_lane[i]
-    //
-    // Uses MMA with A=all-ones, B=dOut via FromLocalRow, C=accumulator.
-    // FromLocalRow puts thread identity in the K dimension (rows of B),
-    // so C = ones × B sums ACROSS THREADS for each output element.
-    //
-    // Per-warp MMA phase uses zero shared memory.
-    // Cross-warp reduction uses shared memory + atomicAdd.
+    // Bias gradient reduction helpers
     // =========================================================================
 
-    // FromLocalRow on MatB (16×16): M=16 threads per matrix → 2 groups for 32 threads.
+    // 16 threads per matrix group → 2 groups for 32-thread warp.
     static const int NRowGroups = (N + ROW_B - 1) / ROW_B;
 
-    // Number of output tiles: M elements in chunks of COLUMN_B (16).
+    // Number of output tiles: M elements in chunks of 16.
     static const int NBiasTiles = (M + COLUMN_B - 1) / COLUMN_B;
 
+    // Total MatA tiles = column tiles × thread groups.
+    static const int TotalBiasTilesMatA = NBiasTiles * NRowGroups;
+
+    // In-warp shuffle reduction: reduces MatA tiles across threads and writes
+    // per-warp partial sums to shared memory. No MMA — uses register adds
+    // and 3 shfl_down steps per column tile.
+    //
+    // MatA register layout (f16, 16x16):
+    //   reg[0]=(r0,c0), reg[1]=(r1,c0), reg[2]=(r0,c1), reg[3]=(r1,c1)
+    // Step 1: Add tiles across NRowGroups (threads 0-15 + 16-31)
+    // Step 2: Add row halves (reg[0]+=reg[1], reg[2]+=reg[3])
+    // Step 3: shfl_down across gid groups (stride 4, 8, 16)
+    // Step 4: gid=0 threads write result to shmem
+    [ForceInline]
+    [require(cuda, subgroup_shuffle)]
+    static void reduceMatATilesToShmem<ShMemSize : ISharedMemorySize>(
+        uint sharedMemoryOffset,
+        inout MatA allMatA[TotalBiasTilesMatA],
+        int subgroupId)
+    {
+        typealias ShMemPool = SharedMemoryPool<ShMemSize>;
+        const uint laneId = WaveGetLaneIndex();
+        static const int MPadded = (M + 1) & ~1;
+        static const int PairsPerWarp = MPadded / 2;
+        static const int PairsPerTile = COLUMN_C / 2;
+        WaveMask fullMask = WaveMask(0xFFFFFFFF);
+
+        [ForceUnroll]
+        for (int tc = 0; tc < NBiasTiles; tc++)
+        {
+            [ForceUnroll]
+            for (int g = 1; g < NRowGroups; g++)
+            {
+                [ForceUnroll]
+                for (int r = 0; r < 4; r++)
+                {
+                    uint v0 = allMatA[tc * NRowGroups].fragmentRead(r);
+                    uint v1 = allMatA[tc * NRowGroups + g].fragmentRead(r);
+                    allMatA[tc * NRowGroups].fragmentWrite(r, bit_cast<uint>(bit_cast<half2>(v0) + bit_cast<half2>(v1)));
+                }
+            }
+
+            {
+                uint r0 = allMatA[tc * NRowGroups].fragmentRead(0);
+                uint r1 = allMatA[tc * NRowGroups].fragmentRead(1);
+                uint r2 = allMatA[tc * NRowGroups].fragmentRead(2);
+                uint r3 = allMatA[tc * NRowGroups].fragmentRead(3);
+
+                half2 sum_lo = bit_cast<half2>(r0) + bit_cast<half2>(r1);
+                half2 sum_hi = bit_cast<half2>(r2) + bit_cast<half2>(r3);
+
+                [ForceUnroll]
+                for (uint stride = 4; stride <= 16; stride <<= 1)
+                {
+                    uint shfl_lo = WaveMaskReadLaneAt(fullMask, bit_cast<uint>(sum_lo), int(laneId + stride));
+                    uint shfl_hi = WaveMaskReadLaneAt(fullMask, bit_cast<uint>(sum_hi), int(laneId + stride));
+                    sum_lo = sum_lo + bit_cast<half2>(shfl_lo);
+                    sum_hi = sum_hi + bit_cast<half2>(shfl_hi);
+                }
+
+                uint gid = laneId >> 2;
+                uint tid = laneId & 3;
+                if (gid == 0)
+                {
+                    int base = tc * PairsPerTile;
+                    ShMemPool.smemStore<uint>(sharedMemoryOffset, subgroupId * PairsPerWarp + base + int(tid), bit_cast<uint>(sum_lo));
+                    if (base + int(tid) + 4 < PairsPerWarp)
+                        ShMemPool.smemStore<uint>(sharedMemoryOffset, subgroupId * PairsPerWarp + base + int(tid) + 4, bit_cast<uint>(sum_hi));
+                }
+            }
+        }
+    }
+
+    // Cross-warp reduction: reads per-warp partial sums from shmem,
+    // sums across warps, and atomicAdds to the global bias buffer.
     [ForceInline]
     [require(cuda, subgroup_basic)]
+    static void crossWarpReduceAndStore<U, Address, ShMemSize : ISharedMemorySize, int SubgroupCount>(
+        uint sharedMemoryOffset,
+        int subgroupId,
+        Address biasAddress)
+        where U : __BuiltinFloatingPointType
+        where U.Differential == U
+        where Address : IPointerLikeAddress<U>
+    {
+        typealias ShMemPool = SharedMemoryPool<ShMemSize>;
+        const uint laneId = WaveGetLaneIndex();
+        static const int MPadded = (M + 1) & ~1;
+        static const int PairsPerWarp = MPadded / 2;
+
+        const int NUM_VECTORS = SubgroupCount * N;
+        const int PairsPerThread = PairsPerWarp / NUM_VECTORS;
+        const int NumIters = (PairsPerWarp % NUM_VECTORS) != 0 ? PairsPerThread + 1 : PairsPerThread;
+
+        int pairIdx = subgroupId * N + int(laneId);
+
+        if (sizeof(U) == 2)
+        {
+            for (int j = 0; j < NumIters; j++)
+            {
+                if (pairIdx < PairsPerWarp)
+                {
+                    vector<U, 2> sum_v2 = vector<U, 2>(U(0), U(0));
+                    for (int i = 0; i < SubgroupCount; i++)
+                        sum_v2 = sum_v2 + ShMemPool.smemLoad<vector<U, 2>>(sharedMemoryOffset, pairIdx + i * PairsPerWarp);
+
+                    int elemIdx0 = pairIdx * 2;
+                    int elemIdx1 = elemIdx0 + 1;
+
+                    if (elemIdx1 < M)
+                    {
+                        let addr = biasAddress.getOffset(elemIdx0);
+                        addr.atomicAdd(0u, sum_v2);
+                    }
+                    else if (elemIdx0 < M)
+                    {
+                        biasAddress.atomicAdd(uint(elemIdx0), sum_v2[0]);
+                    }
+                }
+                pairIdx += NUM_VECTORS;
+            }
+        }
+        else
+        {
+            for (int j = 0; j < NumIters; j++)
+            {
+                if (pairIdx < PairsPerWarp)
+                {
+                    int elemIdx0 = pairIdx * 2;
+                    int elemIdx1 = elemIdx0 + 1;
+
+                    U sum0 = U(0);
+                    U sum1 = U(0);
+                    for (int i = 0; i < SubgroupCount; i++)
+                    {
+                        sum0 = sum0 + ShMemPool.smemLoad<U>(sharedMemoryOffset, i * MPadded + elemIdx0);
+                        if (elemIdx1 < MPadded)
+                            sum1 = sum1 + ShMemPool.smemLoad<U>(sharedMemoryOffset, i * MPadded + elemIdx1);
+                    }
+
+                    if (elemIdx0 < M)
+                        biasAddress.atomicAdd(uint(elemIdx0), sum0);
+                    if (elemIdx1 < M)
+                        biasAddress.atomicAdd(uint(elemIdx1), sum1);
+                }
+                pairIdx += NUM_VECTORS;
+            }
+        }
+    }
+
+    // =========================================================================
+    // Bias gradient reduction v1 (MMA-based):
+    // buildAllTilesFromArray → ChangeMajor → copyFrom → MMA(ones × B) →
+    // direct register read → shmem → crossWarpReduceAndStore.
+    // =========================================================================
+
+    [ForceInline]
+    [require(cuda, subgroup_basic, subgroup_shuffle)]
     VISIBILITY_LEVEL static void sumReduceRows<U, Address, InArrayType, ShMemSize : ISharedMemorySize, int SubgroupCount>(
         uint sharedMemoryOffset,
         in InArrayType dOut,
@@ -237,129 +386,130 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
 
         const uint laneId = WaveGetLaneIndex();
         static const int MPadded = (M + 1) & ~1;
-        static const int ColsPacked = MPadded / 2;
-        static const int H2PerTile = COLUMN_C / 2;
+        static const int PairsPerWarp = MPadded / 2;
+        static const int PairsPerTile = COLUMN_C / 2;
 
-        // MatA = all ones. C = ones × B → C[m][n] = sum_k B[k][n] = col sum of B.
-        // FromLocalRow on MatB puts thread identity in K (rows),
-        // so col sum = sum across threads. 8 elements per tile (COLUMN_B).
+        // Build MatA tiles from per-thread dOut, then convert to MatB on demand.
+        // buildAllTilesFromArray + ChangeMajor + copyFrom is cheaper than
+        // per-tile shuffle construction (batched shuffles vs per-tile shuffles).
+        static const int TotalBiasTilesMatA = NBiasTiles * NRowGroups;
+
+        MatA allMatA[TotalBiasTilesMatA];
+        if (InArrayType is half[M])
+        {
+            var arr = bit_cast<half[M]>(dOut);
+            buildAllTilesFromArray<M, TotalBiasTilesMatA>(arr, allMatA);
+        }
+        else
+        {
+            half dOutLocal[M];
+            [ForceUnroll]
+            for (int i = 0; i < M; i++)
+                dOutLocal[i] = __realCast<half>(dOut[i]);
+            buildAllTilesFromArray<M, TotalBiasTilesMatA>(dOutLocal, allMatA);
+        }
+
         MatA matOnes;
         matOnes.fill(half(1));
 
         [ForceUnroll]
         for (int tc = 0; tc < NBiasTiles; tc++)
         {
-            half localRowB[COLUMN_B];
-            [ForceUnroll]
-            for (int n = 0; n < COLUMN_B; n++)
-            {
-                int elemIdx = tc * COLUMN_B + n;
-                localRowB[n] = (elemIdx < M) ? __realCast<half>(dOut[elemIdx]) : half(0.0);
-            }
-
             MatC matC;
             matC.clear();
 
             [ForceUnroll]
             for (int g = 0; g < NRowGroups; g++)
             {
-                let matB = MatB.FromLocalRow(localRowB, g);
+                allMatA[tc * NRowGroups + g].ChangeMajor();
+                MatB matB;
+                matB.copyFrom(allMatA[tc * NRowGroups + g]);
                 matC = linalg.coopMatMulAdd<T, false, half, half, T,
                     MemoryScope.Subgroup, ROW_A, COLUMN_A, COLUMN_B
                     >(matOnes, matB, matC);
             }
 
-            // All rows of matC are identical. Extract via ToLocalRow.
-            T localResult[COLUMN_C];
-            matC.ToLocalRow(localResult, 0);
-
-            // Write per-warp result to shmem using half2-packed stores.
-            int dstBase = tc * H2PerTile;
-            int remainingH2 = ColsPacked - dstBase;
-            int h2ToCopy = (remainingH2 < H2PerTile) ? remainingH2 : H2PerTile;
-            for (int p = int(laneId); p < h2ToCopy; p += N)
+            // Since C = ones × B, all rows of matC are identical.
+            // Each thread's fragment registers already hold its assigned
+            // column values — no shuffles needed.
+            // f16: reg[0] = packed(col tid*2, tid*2+1), one read per half2.
+            // f32: reg[0] = col tid*2, reg[1] = col tid*2+1, convert+pack.
+            static const int MatCRegsLo = (sizeof(T) == 2) ? 2 : 4;
+            int dstBase = tc * PairsPerTile;
+            int remaining = PairsPerWarp - dstBase;
+            int pairsToCopy = (remaining < PairsPerTile) ? remaining : PairsPerTile;
+            for (int p = int(laneId); p < pairsToCopy; p += N)
             {
-                vector<U, 2> v2 = vector<U, 2>(
-                    __realCast<U>(localResult[p * 2]),
-                    __realCast<U>(localResult[p * 2 + 1]));
-                ShMemPool.smemStore(sharedMemoryOffset, subgroupId * ColsPacked + dstBase + p, v2);
+                int regBase = (p < PairsPerTile / 2) ? 0 : MatCRegsLo;
+                if (sizeof(T) == 2)
+                {
+                    ShMemPool.smemStore<uint>(sharedMemoryOffset, subgroupId * PairsPerWarp + dstBase + p, matC.fragmentRead(regBase));
+                }
+                else
+                {
+                    uint2 u2 = uint2(matC.fragmentRead(regBase), matC.fragmentRead(regBase + 1));
+                    ShMemPool.smemStore<uint2>(sharedMemoryOffset, subgroupId * PairsPerWarp + dstBase + p, u2);
+                }
             }
         }
 
         GroupMemoryBarrierWithGroupSync();
+        crossWarpReduceAndStore<U, Address, ShMemSize, SubgroupCount>(sharedMemoryOffset, subgroupId, biasAddress);
+    }
 
-        // Cross-warp reduction + half2 atomicAdd using all threads.
+    // =========================================================================
+    // Bias gradient reduction v2: shuffle-based tree reduction (Tin2 style).
+    //
+    // Instead of MMA (ones × B), reduces via:
+    //   1. buildAllTilesFromArray to get MatA tiles (threads in rows, dOut in cols)
+    //   2. Register adds to reduce row tiles and row halves (0 shuffles)
+    //   3. shfl_down across gid groups (3 shuffles per column tile)
+    //   4. Write result from gid=0 threads to shmem
+    //   5. Cross-warp reduction (same as v1)
+    // =========================================================================
+
+    [ForceInline]
+    [require(cuda, subgroup_basic, subgroup_shuffle)]
+    VISIBILITY_LEVEL static void sumReduceRowsV2<U, Address, InArrayType, ShMemSize : ISharedMemorySize, int SubgroupCount>(
+        uint sharedMemoryOffset,
+        in InArrayType dOut,
+        in int subgroupId,
+        Address biasAddress)
+        where U : __BuiltinFloatingPointType
+        where U.Differential == U
+        where Address : IPointerLikeAddress<U>
+        where InArrayType : IArrayAccessor<U>
+    {
+        MatA allMatA[TotalBiasTilesMatA];
+        if (InArrayType is half[M])
         {
-            const int NUM_VECTORS = SubgroupCount * N;
-            const int ColsPerThread = ColsPacked / NUM_VECTORS;
-            const int NumIters = (ColsPacked % NUM_VECTORS) != 0 ? ColsPerThread + 1 : ColsPerThread;
-
-            int packed_col_idx = subgroupId * N + int(laneId);
-
-            if (sizeof(U) == 2)
-            {
-                for (int j = 0; j < NumIters; j++)
-                {
-                    if (packed_col_idx < ColsPacked)
-                    {
-                        vector<U, 2> sum_v2 = vector<U, 2>(U(0), U(0));
-                        for (int i = 0; i < SubgroupCount; i++)
-                            sum_v2 = sum_v2 + ShMemPool.smemLoad<vector<U, 2>>(sharedMemoryOffset, packed_col_idx + i * ColsPacked);
-
-                        int elemIdx0 = packed_col_idx * 2;
-                        int elemIdx1 = elemIdx0 + 1;
-
-                        if (elemIdx1 < M)
-                        {
-                            let addr = biasAddress.getOffset(elemIdx0);
-                            addr.atomicAdd(0u, sum_v2);
-                        }
-                        else if (elemIdx0 < M)
-                        {
-                            biasAddress.atomicAdd(uint(elemIdx0), sum_v2[0]);
-                        }
-                    }
-                    packed_col_idx += NUM_VECTORS;
-                }
-            }
-            else
-            {
-                for (int j = 0; j < NumIters; j++)
-                {
-                    if (packed_col_idx < ColsPacked)
-                    {
-                        int elemIdx0 = packed_col_idx * 2;
-                        int elemIdx1 = elemIdx0 + 1;
-
-                        U sum0 = U(0);
-                        U sum1 = U(0);
-                        for (int i = 0; i < SubgroupCount; i++)
-                        {
-                            sum0 = sum0 + ShMemPool.smemLoad<U>(sharedMemoryOffset, i * MPadded + elemIdx0);
-                            if (elemIdx1 < MPadded)
-                                sum1 = sum1 + ShMemPool.smemLoad<U>(sharedMemoryOffset, i * MPadded + elemIdx1);
-                        }
-
-                        if (elemIdx0 < M)
-                            biasAddress.atomicAdd(uint(elemIdx0), sum0);
-                        if (elemIdx1 < M)
-                            biasAddress.atomicAdd(uint(elemIdx1), sum1);
-                    }
-                    packed_col_idx += NUM_VECTORS;
-                }
-            }
+            var arr = bit_cast<half[M]>(dOut);
+            buildAllTilesFromArray<M, TotalBiasTilesMatA>(arr, allMatA);
         }
+        else
+        {
+            half dOutLocal[M];
+            [ForceUnroll]
+            for (int i = 0; i < M; i++)
+                dOutLocal[i] = __realCast<half>(dOut[i]);
+            buildAllTilesFromArray<M, TotalBiasTilesMatA>(dOutLocal, allMatA);
+        }
+
+        reduceMatATilesToShmem<ShMemSize>(sharedMemoryOffset, allMatA, subgroupId);
+
+        GroupMemoryBarrierWithGroupSync();
+        crossWarpReduceAndStore<U, Address, ShMemSize, SubgroupCount>(sharedMemoryOffset, subgroupId, biasAddress);
     }
 
     // =========================================================================
     // Outer product: dW[m][k] = sum_{all threads} dOut_thread[m] * input_thread[k]
     //
-    // MatA from FromLocalColumn: thread identity in K (columns of A).
-    // MatB from FromLocalRow: thread identity in K (rows of B).
+    // MatA from buildAllTilesFromArray: thread identity in K (columns of A).
+    // MatB from buildAllTilesFromArray + ChangeMajor + copyFrom: thread identity in K (rows of B).
     // MMA sums over K = sums over threads.
     //
-    // Result stored in native tiled layout via storeNative + atomicAdd.
-    // Cross-warp reduction via shmem storeNative/loadNative.
+    // Result stored in native tiled layout via StoreRaw + atomicAdd.
+    // Cross-warp reduction via shmem StoreRaw/LoadRaw.
     // =========================================================================
 
     static const int NColGroupsOPA = (N + COLUMN_A - 1) / COLUMN_A;
@@ -449,7 +599,7 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
     }
 
     // Builds one MatB tile from per-thread column data, on demand.
-    // Direct Slang implementation of mmaFromColMatrixB_16x16.
+    // Direct Slang implementation of MatB column construction (16x16).
     // matIndex selects which 16-thread group (0 or 1).
     [ForceInline]
     [require(cuda, subgroup_shuffle)]
@@ -627,7 +777,7 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
         for (int i = 0; i < OPA_TotalDOutMatA; i++)
             allDOut[i].ChangeMajor();
 
-        // --- Build input as MatA tiles, then ChangeMajor + FromMatA to MatB ---
+        // --- Build input as MatA tiles, then ChangeMajor + copyFrom to MatB ---
         MatA allInputA[OPA_TotalInputMatA];
         if (InArrayTypeB is half[K])
         {
@@ -648,7 +798,7 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
         for (int i = 0; i < OPA_TotalInputMatA; i++)
         {
             allInputA[i].ChangeMajor();
-            allInputB[i] = MatB.FromMatA(allInputA[i]);
+            allInputB[i].copyFrom(allInputA[i]);
         }
 
         // --- MMA loop using m16n16k16 ---
@@ -692,7 +842,7 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
             {
                 [ForceUnroll]
                 for (int idx = 0; idx < OPA_TotalTiles; idx++)
-                    matC[idx].storeNative(ShMemPool.data, base + idx * OPA_TileStride);
+                    matC[idx].StoreRaw(ShMemPool.data, base + idx * OPA_TileStride);
             }
 
             GroupMemoryBarrierWithGroupSync();
@@ -704,8 +854,7 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
                     [ForceUnroll]
                     for (int idx = 0; idx < OPA_TotalTiles; idx++)
                     {
-                        MatC other;
-                        other.loadNative(ShMemPool.data, base + idx * OPA_TileStride);
+                        let other = MatC.LoadRaw(ShMemPool.data, base + idx * OPA_TileStride);
                         matC[idx] = matC[idx] + other;
                     }
                 }
@@ -715,7 +864,7 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
         }
     }
 
-    // Phase 3: Store matC tiles to global weight buffer via storeNative + atomicAdd.
+    // Phase 3: Store matC tiles to global weight buffer via StoreRaw + atomicAdd.
     // Weight gradient uses native fragment layout (same as weight buffer).
     //
     // Iterates linearly over all half2 elements, using a single base address
@@ -733,10 +882,10 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
         typealias ShMemPool = SharedMemoryPool<ShMemSize>;
         const uint laneId = WaveGetLaneIndex();
 
-        // storeNative all tiles to shmem first
+        // StoreRaw all tiles to shmem first
         [ForceUnroll]
         for (int idx = 0; idx < OPA_TotalTiles; idx++)
-            matC[idx].storeNative(ShMemPool.data, sharedMemoryOffset + idx * OPA_TileStride);
+            matC[idx].StoreRaw(ShMemPool.data, sharedMemoryOffset + idx * OPA_TileStride);
 
         GroupMemoryBarrierWithWaveSync();
 
