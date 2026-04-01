@@ -47,7 +47,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     IFoo obj = makeInterface(dispatchThreadID.x);
 
     float result = genericFunc<IFoo>(obj, 3.0);
-//CHECK:                            ^ cannot specialize generic with existential type
+//CHECK:                            ^ error E33180
 //CHECK:                            ^ specializing 'genericFunc' with an existential type is not allowed.
 
     outputBuffer[0] = result;

@@ -2,7 +2,10 @@
 // type should be rejected with the same existential-specialization
 // diagnostic as the implicit form. Previously this crashed in typeflow.
 
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -conformance "B:IBar" -conformance "Foo:IFoo" -conformance "AnotherFoo:IFoo"
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target hlsl -stage compute -entry computeMain -conformance "B:IBar" -conformance "Foo:IFoo" -conformance "AnotherFoo:IFoo"
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target glsl -stage compute -entry computeMain -conformance "B:IBar" -conformance "Foo:IFoo" -conformance "AnotherFoo:IFoo"
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target metal -stage compute -entry computeMain -conformance "B:IBar" -conformance "Foo:IFoo" -conformance "AnotherFoo:IFoo"
 
 #lang slang 2025
 
@@ -42,7 +45,7 @@ void computeMain(int id : SV_DispatchThreadID)
     IBar b = createDynamicObject<IBar>(id, 0);
     IFoo df = createDynamicObject<IFoo>(id, 0);
     int result = b.eval<IFoo>(df);
-//CHECK:                     ^ cannot specialize generic with existential type
+//CHECK:                     ^ error E33180
 //CHECK:                     ^ specializing 'B.eval' with an existential type is not allowed.
     outputBuffer[0] = result;
 }

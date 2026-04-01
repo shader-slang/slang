@@ -3064,21 +3064,10 @@ struct TypeFlowSpecializationContext
                     auto specialize = cast<IRSpecialize>(context);
                     if (isInvalidExistentialSpecialization(specialize))
                     {
-                        if (diagnosedExistentialSpecializationSites.add(specialize))
-                        {
-                            String genericName;
-                            auto diagnosticTarget =
-                                getInvalidExistentialSpecializationTarget(specialize);
-                            if (auto nameHint =
-                                    diagnosticTarget->findDecoration<IRNameHintDecoration>())
-                                genericName = nameHint->getName();
-                            if (genericName.getLength() == 0)
-                                genericName = "<generic>";
-
-                            sink->diagnose(Diagnostics::CannotSpecializeGenericWithExistential{
-                                .generic = genericName,
-                                .location = specialize->sourceLoc});
-                        }
+                        emitExistentialSpecializationDiagnostic(
+                            specialize,
+                            specialize->sourceLoc,
+                            specialize);
                         return;
                     }
 
@@ -3170,19 +3159,7 @@ struct TypeFlowSpecializationContext
         {
             if (isInvalidExistentialSpecialization(callee))
             {
-                if (diagnosedExistentialSpecializationSites.add(inst))
-                {
-                    String genericName;
-                    auto diagnosticTarget = getInvalidExistentialSpecializationTarget(callee);
-                    if (auto nameHint = diagnosticTarget->findDecoration<IRNameHintDecoration>())
-                        genericName = nameHint->getName();
-                    if (genericName.getLength() == 0)
-                        genericName = "<generic>";
-
-                    sink->diagnose(Diagnostics::CannotSpecializeGenericWithExistential{
-                        .generic = genericName,
-                        .location = inst->sourceLoc});
-                }
+                emitExistentialSpecializationDiagnostic(callee, inst->sourceLoc, inst);
                 return;
             }
 
@@ -4657,15 +4634,7 @@ struct TypeFlowSpecializationContext
                 //
                 if (isInvalidExistentialSpecialization(callee))
                 {
-                    String genericName;
-                    auto diagnosticTarget = getInvalidExistentialSpecializationTarget(callee);
-                    if (auto nameHint = diagnosticTarget->findDecoration<IRNameHintDecoration>())
-                        genericName = nameHint->getName();
-                    else
-                        genericName = "<generic>";
-                    sink->diagnose(Diagnostics::CannotSpecializeGenericWithExistential{
-                        .generic = genericName,
-                        .location = inst->sourceLoc});
+                    emitExistentialSpecializationDiagnostic(callee, inst->sourceLoc, inst);
                     return false;
                 }
                 else
@@ -5879,6 +5848,29 @@ struct TypeFlowSpecializationContext
     // Set of call sites/contexts already diagnosed for invalid existential specialization,
     // to avoid duplicate diagnostics when instructions are revisited during propagation.
     HashSet<IRInst*> diagnosedExistentialSpecializationSites;
+
+    // Emit error 33180 for an invalid existential specialization, deduplicating by `dedupKey`.
+    // Returns true if the diagnostic was emitted (first time for this key).
+    bool emitExistentialSpecializationDiagnostic(
+        IRInst* specializedValue,
+        SourceLoc location,
+        IRInst* dedupKey)
+    {
+        if (!diagnosedExistentialSpecializationSites.add(dedupKey))
+            return false;
+
+        String genericName;
+        auto diagnosticTarget = getInvalidExistentialSpecializationTarget(specializedValue);
+        if (auto nameHint = diagnosticTarget->findDecoration<IRNameHintDecoration>())
+            genericName = nameHint->getName();
+        if (genericName.getLength() == 0)
+            genericName = "<generic>";
+
+        sink->diagnose(Diagnostics::CannotSpecializeGenericWithExistential{
+            .generic = genericName,
+            .location = location});
+        return true;
+    }
 
     // Mapping from (context, inst) --> propagated info
     Dictionary<InstWithContext, IRInst*> propagationMap;
