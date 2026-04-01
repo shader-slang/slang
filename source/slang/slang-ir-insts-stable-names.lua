@@ -778,4 +778,8 @@ return {
 	["ShapePermute"] = 776,
 	["ShapeSwap"] = 777,
 	["ShapeReduce"] = 778,
+	["CoopMatMulAdd"] = 779,
+	["CoopVecMatMulAdd"] = 780,
+	["CoopVecOuterProductAccumulate"] = 781,
+	["CoopVecReduceSumAccumulate"] = 782,
 }
