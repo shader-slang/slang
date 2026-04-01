@@ -85,7 +85,7 @@ jobs:
               contentId: prNodeId,
             });
 
-            const itemId = addResult.addProjectV2ItemById.item.id;
+            const itemId = addResult?.addProjectV2ItemById?.item?.id;
             if (!itemId) {
               throw new Error('Failed to add PR to project: no item ID returned');
             }
