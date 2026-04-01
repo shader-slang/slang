@@ -92,7 +92,7 @@ jobs:
             console.log(`Added PR to project, item ID: ${itemId}`);
 
             // Set the Source field
-            await github.graphql(`
+            const updateResult = await github.graphql(`
               mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
                 updateProjectV2ItemFieldValue(input: {
                   projectId: $projectId,
@@ -109,5 +109,9 @@ jobs:
               fieldId: SOURCE_FIELD_ID,
               optionId: optionId,
             });
+
+            if (!updateResult?.updateProjectV2ItemFieldValue?.projectV2Item?.id) {
+              throw new Error('Failed to set Source field: unexpected response');
+            }
 
             console.log(`Set Source field to: ${source}`);
