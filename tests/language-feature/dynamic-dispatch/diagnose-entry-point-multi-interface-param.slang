@@ -19,18 +19,6 @@ interface IBar
     float weight();
 }
 
-struct ImplA : IFoo
-{
-    float v;
-    float getValue() { return v; }
-}
-
-struct BarImplA : IBar
-{
-    float w;
-    float weight() { return w; }
-}
-
 RWStructuredBuffer<float> outputBuffer;
 
 [numthreads(1, 1, 1)]
