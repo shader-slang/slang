@@ -779,8 +779,8 @@ Expr* SemanticsVisitor::maybeUseSynthesizedDeclForLookupResult(
 
                 markSelfDifferentialMembersOfType(parent, subType);
             }
+            break;
         }
-        break;
     default:
         return nullptr;
     }
@@ -1392,10 +1392,118 @@ Expr* SemanticsVisitor::resolveOverloadedExpr(
     return _resolveOverloadedExprImpl(overloadedExpr, mask, targetType, getSink());
 }
 
+Type* SemanticsVisitor::tryGetDifferentialValueType(ASTBuilder* builder, Type* type)
+{
+    if (auto declRefType = as<DeclRefType>(type))
+    {
+        if (auto builtinRequirement =
+                declRefType->getDeclRef().getDecl()->findModifier<BuiltinRequirementModifier>())
+        {
+            if (builtinRequirement->kind == BuiltinRequirementKind::DifferentialType ||
+                builtinRequirement->kind == BuiltinRequirementKind::DifferentialPtrType)
+            {
+                // We are trying to get differential type from a differential type.
+                // The result is itself.
+                return type;
+            }
+        }
+    }
+
+    type = resolveType(type);
+    auto witness = as<SubtypeWitness>(
+        tryGetInterfaceConformanceWitness(type, builder->getDifferentiableInterfaceType()));
+
+    if (witness)
+    {
+        // If we're dealing with an interface type that requires conformance to one of the
+        // differentiable type interfaces, then we'll use the differentiable type interface
+        // itself as the derivative type.
+        //
+        if (auto declRefType = as<DeclRefType>(type))
+            if (auto interfaceDeclRef = declRefType->getDeclRef().as<InterfaceDecl>())
+                return witness->getSup();
+
+        auto diffTypeLookupResult = lookUpMember(
+            getASTBuilder(),
+            this,
+            getName("Differential"),
+            type,
+            nullptr,
+            Slang::LookupMask::type,
+            Slang::LookupOptions::None);
+
+        diffTypeLookupResult = resolveOverloadedLookup(diffTypeLookupResult, nullptr);
+
+        if (!diffTypeLookupResult.isValid())
+        {
+            return nullptr;
+        }
+        else if (diffTypeLookupResult.isOverloaded())
+        {
+            return nullptr;
+        }
+        else
+        {
+            SharedTypeExpr* baseTypeExpr = m_astBuilder->create<SharedTypeExpr>();
+            baseTypeExpr->base.type = type;
+            baseTypeExpr->type.type = m_astBuilder->getTypeType(type);
+
+            NameLoc nameLoc = NameLoc();
+            if (auto declRefType = as<DeclRefType>(type))
+            {
+                nameLoc.name = declRefType->getDeclRef().getName();
+                nameLoc.loc = declRefType->getDeclRef().getLoc();
+            }
+
+            auto diffTypeExpr = ConstructLookupResultExpr(
+                diffTypeLookupResult.item,
+                baseTypeExpr,
+                nameLoc.name,
+                nameLoc.loc,
+                baseTypeExpr);
+
+            return resolveType(ExtractTypeFromTypeRepr(diffTypeExpr));
+        }
+    }
+    return nullptr;
+}
+
 Type* SemanticsVisitor::tryGetDifferentialType(ASTBuilder* builder, Type* type)
 {
     if (auto ptrType = as<PtrTypeBase>(type))
     {
+        if (as<SubtypeWitness>(tryGetInterfaceConformanceWitness(
+                type,
+                builder->getDifferentiableRefInterfaceType())))
+        {
+            auto diffTypeLookupResult = lookUpMember(
+                getASTBuilder(),
+                this,
+                getName("Differential"),
+                type,
+                nullptr,
+                Slang::LookupMask::type,
+                Slang::LookupOptions::NoDeref);
+
+            diffTypeLookupResult = resolveOverloadedLookup(diffTypeLookupResult, nullptr);
+
+            if (diffTypeLookupResult.isValid())
+            {
+                SharedTypeExpr* baseTypeExpr = m_astBuilder->create<SharedTypeExpr>();
+                baseTypeExpr->base.type = type;
+                baseTypeExpr->type.type = m_astBuilder->getTypeType(type);
+
+                auto diffTypeExpr = ConstructLookupResultExpr(
+                    diffTypeLookupResult.item,
+                    baseTypeExpr,
+                    ptrType->getDeclRef().getName(),
+                    ptrType->getDeclRef().getLoc(),
+                    baseTypeExpr);
+
+                return resolveType(ExtractTypeFromTypeRepr(diffTypeExpr));
+            }
+        }
+
         auto baseDiffType = tryGetDifferentialType(builder, ptrType->getValueType());
         if (!baseDiffType)
             return nullptr;
@@ -1431,6 +1539,14 @@ Type* SemanticsVisitor::tryGetDifferentialType(ASTBuilder* builder, Type* type)
                 builder->getDifferentiableRefInterfaceType()));
         if (witness)
         {
+            // If we're dealing with an interface type that requires conformance to one of the
+            // differentiable type interfaces, then we'll use the differentiable type interface
+            // itself as the derivative type.
+            //
+            if (auto innerDeclRefType = as<DeclRefType>(type))
+                if (auto interfaceDeclRef = innerDeclRefType->getDeclRef().as<InterfaceDecl>())
+                    return witness->getSup();
+
             auto diffTypeLookupResult = lookUpMember(
                 getASTBuilder(),
                 this,
@@ -1604,14 +1720,6 @@ Type* SemanticsVisitor::getDifferentialType(ASTBuilder* builder, Type* type, Sou
     return result;
 }
 
-void SemanticsVisitor::addDifferentiableTypeToDiffTypeRegistry(Type* type, SubtypeWitness* witness)
-{
-    SLANG_RELEASE_ASSERT(m_parentDifferentiableAttr);
-    if (witness)
-    {
-        m_parentDifferentiableAttr->addType(type, witness);
-    }
-}
 
 void SemanticsVisitor::maybeRegisterDifferentiableType(
     ASTBuilder* builder,
@@ -1634,6 +1742,54 @@ void SemanticsVisitor::maybeRegisterDifferentiableType(
     }
 
     maybeRegisterDifferentiableTypeImplRecursive(builder, type);
+}
+
+
+Val* maybeRegisterVal(
+    SemanticsVisitor* visitor,
+    Type* baseForLookup,
+    Val* baseForRegistry,
+    Name* name,
+    AnnotationKind kind)
+{
+    auto lookupResult = lookUpMember(
+        visitor->getASTBuilder(),
+        visitor,
+        name,
+        baseForLookup,
+        visitor->getOuterScope(),
+        LookupMask::Default);
+    lookupResult = visitor->resolveOverloadedLookup(lookupResult);
+
+    if (!lookupResult.isOverloaded() && lookupResult.isValid())
+    {
+        visitor->getParentDifferentiableAttribute()->addAssocVal(
+            baseForRegistry,
+            (SlangInt)kind,
+            lookupResult.item.declRef);
+        return (Val*)lookupResult.item.declRef;
+    }
+
+    return nullptr;
+};
+
+Val* maybeRegisterWitness(
+    SemanticsVisitor* visitor,
+    Type* baseForLookup,
+    Val* baseForRegistry,
+    Type* superType,
+    AnnotationKind kind)
+{
+    if (auto witness = visitor->tryGetSubtypeWitness(baseForLookup, superType))
+    {
+        visitor->getParentDifferentiableAttribute()->addAssocVal(
+            baseForRegistry,
+            (SlangInt)kind,
+            witness);
+        return (Val*)witness;
+    }
+
+    return nullptr;
 }
 
 void SemanticsVisitor::maybeRegisterDifferentiableTypeImplRecursive(ASTBuilder* builder, Type* type)
@@ -1683,22 +1839,27 @@ void SemanticsVisitor::maybeRegisterDifferentiableTypeImplRecursive(ASTBuilder* 
         // Fall through to register the array type itself.
     }
 
+    if (auto matrixType = as<MatrixExpressionType>(type))
+    {
+        // Matrix types are lowered using sub-vector (row) types, so we need to
+        // register the row vector type as well.
+        maybeRegisterDifferentiableTypeImplRecursive(builder, matrixType->getRowType());
+        // Fall through to register the matrix type itself.
+    }
+
+    if (auto typePack = as<ConcreteTypePack>(type))
+    {
+        for (Index i = 0; i < typePack->getTypeCount(); i++)
+            maybeRegisterDifferentiableTypeImplRecursive(builder, typePack->getElementType(i));
+        return;
+    }
+
     if (auto declRefType = as<DeclRefType>(type))
     {
-        if (auto subtypeWitness = as<SubtypeWitness>(tryGetInterfaceConformanceWitness(
-                type,
-                getASTBuilder()->getDifferentiableInterfaceType())))
-        {
-            addDifferentiableTypeToDiffTypeRegistry(type, subtypeWitness);
-        }
-
-        if (auto subtypeWitness = as<SubtypeWitness>(tryGetInterfaceConformanceWitness(
-                type,
-                getASTBuilder()->getDifferentiableRefInterfaceType())))
-        {
-            addDifferentiableTypeToDiffTypeRegistry(type, subtypeWitness);
-        }
-
+        // TODO: Why? If an agg-type's member is accessed in the function, it should
+        // come with an expr that uses that member, and that expr's type should be registered
+        // separately.
+        //
         if (auto aggTypeDeclRef = declRefType->getDeclRef().as<AggTypeDecl>())
         {
             foreachDirectOrExtensionMemberOfType<InheritanceDecl>(
@@ -1727,23 +1888,96 @@ void SemanticsVisitor::maybeRegisterDifferentiableTypeImplRecursive(ASTBuilder* 
                         maybeRegisterDifferentiableTypeImplRecursive(m_astBuilder, typeArg);
                     }
                 });
-        return;
     }
 
-    if (auto typePack = as<ConcreteTypePack>(type))
+    bool hasDiffValueConformance = false;
+    if (isDeclRefTypeOf<InterfaceDecl>(type))
     {
-        for (Index i = 0; i < typePack->getTypeCount(); i++)
-            maybeRegisterDifferentiableTypeImplRecursive(builder, typePack->getElementType(i));
-        return;
+        // Existential types. There's not a proper way to represent
+        // the differential of an existential type (yet).
+        //
+        // We'll 'cheat' a bit and register it as IDifferentiable.
+        //
+        // The backend will treat it as if its a tuple of existentials.
+        //
+        if (auto witness = tryGetInterfaceConformanceWitness(
+                type,
+                getASTBuilder()->getDifferentiableInterfaceType()))
+        {
+            this->getParentDifferentiableAttribute()->addAssocVal(
+                type,
+                (SlangInt)AnnotationKind::DifferentialPairType,
+                getCurrentASTBuilder()->getDifferentialPairType(type, witness));
+            this->getParentDifferentiableAttribute()->addAssocVal(
+                type,
+                (SlangInt)AnnotationKind::DifferentialType,
+                getCurrentASTBuilder()->getDifferentiableInterfaceType());
+            // Leave the rest unregistered for now. The backend will take care of it.
+        }
+        else if (tryGetInterfaceConformanceWitness(
+                     type,
+                     getASTBuilder()->getDifferentiableRefInterfaceType()))
+        {
+            // Unsupported at the moment.
+            SLANG_UNEXPECTED("existential differentiable pointer types not supported");
+        }
     }
-
-    // General check for types that may not be decl-ref-type, but still have some conformance to
-    // IDifferentiable/IDifferentiablePtrType
-    if (auto subtypeWitness = as<SubtypeWitness>(tryGetInterfaceConformanceWitness(
-            type,
-            getASTBuilder()->getDifferentiableInterfaceType())))
+    else if (isAbstractTypePack(type))
     {
-        addDifferentiableTypeToDiffTypeRegistry(type, subtypeWitness);
+        // For now, skip registering this.
+        //
+        // TODO: We will need to handle this properly, or there will be
+        // corner cases that crash (e.g. when a type is passed in within a pack from a
+        // non-differentiable context)
+        //
+    }
+    else
+    {
+        // Lower associated information for a regular type.
+
+        if (auto witness = tryGetInterfaceConformanceWitness(
+                type,
+                getASTBuilder()->getDifferentiableInterfaceType()))
+        {
+            hasDiffValueConformance = true;
+            maybeRegisterVal(
+                this,
+                type,
+                type,
+                getName("Differential"),
+                AnnotationKind::DifferentialType);
+            this->getParentDifferentiableAttribute()->addAssocVal(
+                type,
+                (SlangInt)AnnotationKind::DifferentialPairType,
+                getCurrentASTBuilder()->getDifferentialPairType(type, witness));
+            maybeRegisterVal(this, type, type, getName("dzero"), AnnotationKind::DifferentialZero);
+            maybeRegisterVal(this, type, type, getName("dadd"), AnnotationKind::DifferentialAdd);
+        }
+
+        if (auto witness = tryGetInterfaceConformanceWitness(
+                type,
+                getASTBuilder()->getDifferentiableRefInterfaceType()))
+        {
+            if (hasDiffValueConformance)
+            {
+                if (auto declRefType = as<DeclRefType>(type))
+                    getSink()->diagnose(
+                        Diagnostics::TypeCannotConformToBothValueAndPointerDiffInterfaces{
+                            .type = type,
+                            .decl = declRefType->getDeclRef().getDecl()});
+                return;
+            }
+            maybeRegisterVal(
+                this,
+                type,
+                type,
+                getName("Differential"),
+                AnnotationKind::DifferentialPtrType);
+            this->getParentDifferentiableAttribute()->addAssocVal(
+                type,
+                (SlangInt)AnnotationKind::DifferentialPtrPairType,
+                getCurrentASTBuilder()->getDifferentialPtrPairType(type, witness));
+        }
     }
 }
 
@@ -2907,6 +3141,92 @@ Expr* SemanticsVisitor::CheckSimpleSubscriptExpr(IndexExpr* subscriptExpr, Type*
     return subscriptExpr;
 }
 
+void registerAssociatedMethods(SemanticsVisitor* context, DeclRef<Decl> declRef)
+{
+    // Lower witness for ForwardDifferentiable for this function.
+    // First we'll turn it into a func-as-type-expr, then check that
+    // to get the function reference as a type, and then get the witness
+    // from that.
+    //
+    // TODO: Make this more general, by registering the interfaces that we
+    // need to check against as 'Decl' in the parent functions' body &
+    // lowering all of them in CheckTerm()
+    //
+    auto funcAsType = DeclRefType::create(context->getASTBuilder(), declRef);
+
+    // Revised AD 2.0 lowering.
+    {
+        if (auto fwdDiffVal = maybeRegisterVal(
+                context,
+                funcAsType,
+                declRef.declRefBase,
+                context->getName("fwd_diff"),
+                AnnotationKind::ForwardDerivative))
+        {
+            auto effectiveDiffVal = fwdDiffVal;
+            auto funcAliasDeclRef = DeclRef<FuncAliasDecl>(as<DeclRefBase>(fwdDiffVal));
+            if (funcAliasDeclRef)
+            {
+                effectiveDiffVal = substituteDeclRef(
+                                       SubstitutionSet(funcAliasDeclRef),
+                                       getCurrentASTBuilder(),
+                                       funcAliasDeclRef.getDecl()->targetDeclRef)
+                                       .as<FunctionDeclBase>();
+            }
+
+            // Create a type for the fwd_diff function to look up its own conformances.
+            auto fwdDiffType =
+                DeclRefType::create(context->getASTBuilder(), as<DeclRefBase>(effectiveDiffVal));
+
+            // Lower the fwd_diff : IForwardDifferentiable witness table
+            maybeRegisterWitness(
+                context,
+                fwdDiffType,
+                declRef.declRefBase,
+                context->getForwardDiffFuncInterfaceType(fwdDiffType),
+                AnnotationKind::FwdDiffForwardDerivativeWitnessTable);
+
+            // Lower the fwd_diff : IBackwardDifferentiable witness table
+            maybeRegisterWitness(
+                context,
+                fwdDiffType,
+                declRef.declRefBase,
+                context->getBackwardDiffFuncInterfaceType(fwdDiffType),
+                AnnotationKind::FwdDiffBackwardDerivativeWitnessTable);
+        }
+
+        if (maybeRegisterVal(
+                context,
+                funcAsType,
+                declRef.declRefBase,
+                context->getName("apply_bwd"),
+                AnnotationKind::BackwardDerivativeApply))
+        {
+            auto bwdCallableType = as<DeclRefBase>(maybeRegisterVal(
+                context,
+                funcAsType,
+                declRef.declRefBase,
+                context->getName("BwdCallable"),
+                AnnotationKind::BackwardDerivativeContext));
+            SLANG_ASSERT(bwdCallableType); // TODO: Diagnose if not found.
+
+            maybeRegisterVal(
+                context,
+                DeclRefType::create(getCurrentASTBuilder(), bwdCallableType),
+                declRef.declRefBase,
+                context->getName("()"),
+                AnnotationKind::BackwardDerivativePropagate);
+
+            maybeRegisterVal(
+                context,
+                funcAsType,
+                declRef.declRefBase,
+                context->getName("remat"),
+                AnnotationKind::BackwardDerivativeContextRemat);
+        }
+    }
+}
+
 Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
 {
     bool needDeref = false;
@@ -3033,7 +3353,31 @@ Expr* SemanticsExprVisitor::visitIndexExpr(IndexExpr* subscriptExpr)
     subscriptCallExpr->arguments.addRange(subscriptExpr->indexExprs);
     subscriptCallExpr->argumentDelimeterLocs.addRange(subscriptExpr->argumentDelimeterLocs);
 
-    return CheckInvokeExprWithCheckedOperands(subscriptCallExpr);
+    auto checkedCallExpr = CheckInvokeExprWithCheckedOperands(subscriptCallExpr);
+
+    if (m_parentDifferentiableAttr)
+    {
+        if (auto checkedInvokeExpr = as<InvokeExpr>(checkedCallExpr))
+        {
+            // Register types for final resolved invoke arguments again.
+            for (auto& arg : checkedInvokeExpr->arguments)
+                maybeRegisterDifferentiableType(m_astBuilder, arg->type.type);
+
+            if (auto fnExpr = as<DeclRefExpr>(checkedInvokeExpr->functionExpr))
+            {
+                if (auto subscriptDeclRef = fnExpr->declRef.as<SubscriptDecl>())
+                {
+                    for (auto accessorDeclRef :
+                         getMembersOfType<AccessorDecl>(m_astBuilder, subscriptDeclRef))
+                        registerAssociatedMethods(this, accessorDeclRef);
+                }
+                else
+                    registerAssociatedMethods(this, getDeclRef(m_astBuilder, fnExpr));
+            }
+        }
+    }
+
+    return checkedCallExpr;
 }
 
 Expr* SemanticsExprVisitor::visitParenExpr(ParenExpr* expr)
@@ -3260,6 +3604,105 @@ void SemanticsVisitor::compareMemoryQualifierOfParamToArgument(ParamDecl* paramI
     // dropping a `restrict` qualifier from arguments is allowed in GLSL with memory qualifiers
 }
 
+DeclRef<CallableDecl> getResolvedFunc(DeclRef<CallableDecl> declRef)
+{
+    // Resolve aliases
+    if (auto funcAliasDecl = as<FuncAliasDecl>(declRef.getDecl()))
+    {
+        auto target = substituteDeclRef(
+                          SubstitutionSet(declRef),
+                          getCurrentASTBuilder(),
+                          funcAliasDecl->targetDeclRef)
+                          .as<CallableDecl>();
+        return getResolvedFunc(target);
+    }
+
+    return declRef;
+}
+
+// Convert an expression of the form "hof(fn)" where "hof" is a higher-order function like
+// "fwd_diff" or "bwd_diff", into a lookup of the form "fn.fwd_diff" or "fn.bwd_diff"
+//
+static Expr* convertHigherOrderExprToLookup(
+    SemanticsVisitor* visitor,
+    HigherOrderInvokeExpr* resultExpr)
+{
+    Name* lookupName = nullptr;
+    if (as<ForwardDifferentiateExpr>(resultExpr))
+    {
+        lookupName = visitor->getName("fwd_diff");
+    }
+    else if (as<BackwardDifferentiateExpr>(resultExpr))
+    {
+        lookupName = visitor->getName("bwd_diff");
+    }
+    else
+    {
+        visitor->getSink()->diagnose(
+            Diagnostics::InternalCompilerError{.location = resultExpr->loc});
+        return resultExpr;
+    }
+
+
+    if (auto hofExpr = as<HigherOrderInvokeExpr>(resultExpr->baseFunction))
+    {
+        resultExpr->baseFunction = convertHigherOrderExprToLookup(visitor, hofExpr);
+    }
+
+    if (auto declRefExpr = as<DeclRefExpr>(resultExpr->baseFunction))
+    {
+        auto callableDeclRef = declRefExpr->declRef.as<CallableDecl>()
+                                   ? getResolvedFunc(declRefExpr->declRef.as<CallableDecl>())
+                                   : declRefExpr->declRef;
+
+        auto funcAsType = DeclRefType::create(visitor->getASTBuilder(), callableDeclRef);
+
+        auto result = lookUpMember(
+            visitor->getASTBuilder(),
+            visitor,
+            lookupName,
+            funcAsType,
+            visitor->getOuterScope(),
+            LookupMask::Default,
+            LookupOptions::NoDeref);
+        result = visitor->resolveOverloadedLookup(result);
+
+        if (result.isValid() && !result.isOverloaded())
+        {
+            if (auto funcAliasDeclRef = result.item.declRef.as<FuncAliasDecl>())
+            {
+                result.item.declRef = substituteDeclRef(
+                                          SubstitutionSet(result.item.declRef),
+                                          getCurrentASTBuilder(),
+                                          funcAliasDeclRef.getDecl()->targetDeclRef)
+                                          .as<CallableDecl>();
+            }
+
+            // Return the lookup result.
+            auto lookupResultExpr = visitor->createLookupResultExpr(
+                lookupName,
+                result,
+                resultExpr->baseFunction,
+                resultExpr->loc,
+                resultExpr);
+
+            return lookupResultExpr;
+        }
+        else
+        {
+            visitor->getSink()->diagnose(
+                Diagnostics::InternalCompilerError{.location = resultExpr->loc});
+            return resultExpr;
+        }
+    }
+    else
+    {
+        visitor->getSink()->diagnose(
+            Diagnostics::InternalCompilerError{.location = resultExpr->loc});
+        return resultExpr;
+    }
+}
+
 Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
 {
     auto rs = ResolveInvoke(expr);
@@ -3296,6 +3739,7 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                 funcDeclBase = as<FunctionDeclBase>(funcDeclRefExpr->declRef.getDecl());
 
             Index paramCount = funcType->getParamCount();
+
             for (Index pp = 0; pp < paramCount; ++pp)
             {
                 auto paramType = funcType->getParamTypeWithModeWrapper(pp);
@@ -3304,7 +3748,7 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
                 if (pp < invoke->arguments.getCount())
                 {
                     argExpr = invoke->arguments[pp];
-                    if (funcDeclBase)
+                    if (funcDeclBase && funcDeclBase->getParameters().getCount() > pp)
                         paramDecl = funcDeclBase->getParameters()[pp];
                 }
                 compareMemoryQualifierOfParamToArgument(paramDecl, argExpr);
@@ -3484,38 +3928,7 @@ Expr* SemanticsVisitor::CheckInvokeExprWithCheckedOperands(InvokeExpr* expr)
 
             if (auto higherOrderInvoke = as<DifferentiateExpr>(invoke->functionExpr))
             {
-                FunctionDifferentiableLevel requiredLevel;
-                if (auto funcDeclExpr = as<DeclRefExpr>(
-                        getInnerMostExprFromHigherOrderExpr(higherOrderInvoke, requiredLevel)))
-                {
-                    auto funcDecl = as<FunctionDeclBase>(funcDeclExpr->declRef.getDecl());
-                    if (funcDecl)
-                    {
-                        if (requiredLevel == FunctionDifferentiableLevel::Forward &&
-                            !getShared()->isDifferentiableFunc(funcDecl))
-                        {
-                            getSink()->diagnose(Diagnostics::FunctionNotMarkedAsDifferentiable{
-                                .func = funcDecl,
-                                .kind = "forward",
-                                .expr = funcDeclExpr});
-                        }
-                        if (requiredLevel == FunctionDifferentiableLevel::Backward &&
-                            !getShared()->isBackwardDifferentiableFunc(funcDecl))
-                        {
-                            getSink()->diagnose(Diagnostics::FunctionNotMarkedAsDifferentiable{
-                                .func = funcDecl,
-                                .kind = "backward",
-                                .expr = funcDeclExpr});
-                        }
-                        if (!isEffectivelyStatic(funcDecl) && !isGlobalDecl(funcDecl))
-                        {
-                            getSink()->diagnose(
-                                Diagnostics::NonStaticMemberFunctionNotAllowedAsDiffOperand{
-                                    .func = funcDecl,
-                                    .expr = invoke->functionExpr});
-                        }
-                    }
-                }
+                invoke->functionExpr = convertHigherOrderExprToLookup(this, higherOrderInvoke);
             }
         }
     }
@@ -3730,10 +4143,6 @@ Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
 
     if (m_parentDifferentiableAttr)
     {
-        FunctionDifferentiableLevel callerDiffLevel = FunctionDifferentiableLevel::None;
-        if (m_parentFunc)
-            callerDiffLevel = getShared()->getFuncDifferentiableLevel(m_parentFunc);
-
         if (auto checkedInvokeExpr = as<InvokeExpr>(checkedExpr))
         {
             // Register types for final resolved invoke arguments again.
@@ -3742,29 +4151,10 @@ Expr* SemanticsExprVisitor::visitInvokeExpr(InvokeExpr* expr)
                 maybeRegisterDifferentiableType(m_astBuilder, arg->type.type, arg->loc);
             }
 
-            if (auto calleeExpr = as<DeclRefExpr>(checkedInvokeExpr->functionExpr))
+            if (auto fnExpr = as<DeclRefExpr>(checkedInvokeExpr->functionExpr))
             {
-                if (auto calleeDecl = as<FunctionDeclBase>(calleeExpr->declRef.getDecl()))
-                {
-                    auto calleeDiffLevel = getShared()->getFuncDifferentiableLevel(calleeDecl);
-                    if (calleeDiffLevel >= callerDiffLevel)
-                    {
-                        if (!m_treatAsDifferentiableExpr)
-                        {
-                            auto newFuncExpr = getASTBuilder()->create<TreatAsDifferentiableExpr>();
-                            newFuncExpr->type = checkedInvokeExpr->type;
-                            newFuncExpr->innerExpr = checkedInvokeExpr;
-                            newFuncExpr->loc = checkedInvokeExpr->loc;
-                            newFuncExpr->flavor = TreatAsDifferentiableExpr::Flavor::Differentiable;
-                            checkedExpr = newFuncExpr;
-                        }
-                        else
-                        {
-                            getSink()->diagnose(Diagnostics::UseOfNoDiffOnDifferentiableFunc{
-                                .expr = m_treatAsDifferentiableExpr});
-                        }
-                    }
-                }
+                if (fnExpr->declRef)
+                    registerAssociatedMethods(this, getDeclRef(m_astBuilder, fnExpr));
             }
         }
         maybeRegisterDifferentiableType(m_astBuilder, checkedExpr->type.type, checkedExpr->loc);
@@ -4002,15 +4392,18 @@ Type* SemanticsVisitor::_toDifferentialParamType(Type* primalParamType)
         }
     }
 
-    return getDifferentialPairType(primalParamType);
+    if (auto diffPairType = tryGetDifferentialPairType(primalParamType))
+        return diffPairType;
+    else
+        return primalParamType;
 }
 
-Type* SemanticsVisitor::getDifferentialPairType(Type* primalType)
+Type* SemanticsVisitor::tryGetDifferentialPairType(Type* primalType)
 {
     if (auto modifiedType = as<ModifiedType>(primalType))
     {
         if (modifiedType->findModifier<NoDiffModifierVal>())
-            return modifiedType->getBase();
+            return nullptr;
     }
 
     if (auto typePack = as<ConcreteTypePack>(primalType))
@@ -4020,16 +4413,20 @@ Type* SemanticsVisitor::getDifferentialPairType(Type* primalType)
         for (Index i = 0; i < typePack->getTypeCount(); i++)
         {
             auto t = typePack->getElementType(i);
-            diffTypes.add(getDifferentialPairType(t));
+            auto diffPairType = tryGetDifferentialPairType(t);
+            diffTypes.add((diffPairType ? diffPairType : t));
         }
         return m_astBuilder->getTypePack(diffTypes.getArrayView());
     }
     else if (isAbstractTypePack(primalType))
     {
-        // The differential pair of an abstract type pack P should be `expand DifferentialPair<each
-        // P>`.
+        // The differential pair of an abstract type pack P should be `expand
+        // DifferentialPair<each P>`.
         auto eachType = m_astBuilder->getEachType(primalType);
-        auto diffPairEachType = getDifferentialPairType(eachType);
+        auto diffPairEachType = tryGetDifferentialPairType(eachType);
+        if (!diffPairEachType)
+            diffPairEachType = eachType;
+
         if (auto expandType = as<ExpandType>(primalType))
         {
             List<Val*> capturedPacks;
@@ -4063,24 +4460,44 @@ Type* SemanticsVisitor::getDifferentialPairType(Type* primalType)
             return m_astBuilder->getDifferentialPtrPairType(primalType, conformanceWitness);
         }
     }
-    return primalType;
+
+    return nullptr;
 }
 
-Type* SemanticsVisitor::getForwardDiffFuncType(FuncType* originalType)
+Type* SemanticsVisitor::getForwardDiffFuncType(FuncType* originalType, QualType thisQualType)
 {
-    // Resolve JVP type here.
+    // Resolve diff type here.
     // Note that this type checking needs to be in sync with
-    // the auto-generation logic in slang-ir-jvp-diff.cpp
+    // the auto-generation logic in slang-ir-diff-diff.cpp
     List<Type*> paramTypes;
 
-    // The JVP return type is float if primal return type is float
-    // void otherwise.
-    //
-    auto resultType = getDifferentialPairType(originalType->getResultType());
+    Type* thisType = nullptr;
+
+    if (thisQualType.type)
+    {
+        if (thisQualType.isLeftValue)
+            thisType = getCurrentASTBuilder()->getBorrowInOutParamType(thisQualType.type);
+        else
+            thisType = thisQualType.type;
+    }
+
+
+    auto resultType = originalType->getResultType();
+    if (auto resultPairType = tryGetDifferentialPairType(resultType))
+        resultType = resultPairType;
 
     // No support for differentiating function that throw errors, for now.
     SLANG_ASSERT(originalType->getErrorType()->equals(m_astBuilder->getBottomType()));
     auto errorType = originalType->getErrorType();
+
+    if (thisType)
+    {
+        // The first parameter is the primal function itself.
+        if (auto diffThisType = _toDifferentialParamType(thisType))
+        {
+            paramTypes.add(diffThisType);
+        }
+    }
 
     for (Index i = 0; i < originalType->getParamCount(); i++)
     {
@@ -4088,9 +4505,11 @@ Type* SemanticsVisitor::getForwardDiffFuncType(FuncType* originalType)
                 _toDifferentialParamType(originalType->getParamTypeWithModeWrapper(i)))
             paramTypes.add(jvpParamType);
     }
-    FuncType* jvpType = m_astBuilder->getFuncType(paramTypes.getArrayView(), resultType, errorType);
 
-    return jvpType;
+    FuncType* diffType =
+        m_astBuilder->getFuncType(paramTypes.getArrayView(), resultType, errorType);
+
+    return diffType;
 }
 
 Type* SemanticsVisitor::getBackwardDiffFuncType(FuncType* originalType)
@@ -4110,42 +4529,79 @@ Type* SemanticsVisitor::getBackwardDiffFuncType(FuncType* originalType)
 
     for (Index i = 0; i < originalType->getParamCount(); i++)
     {
-        auto originalParamType = originalType->getParamTypeWithModeWrapper(i);
+        auto paramValType = originalType->getParamValueType(i);
+        auto paramPassingMode = originalType->getParamPassingMode(i);
 
-        if (auto outType = as<OutType>(originalParamType))
+        switch (paramPassingMode)
         {
-            auto diffElementType = tryGetDifferentialType(m_astBuilder, outType->getValueType());
-            if (diffElementType)
+        case ParamPassingMode::Out:
             {
-                paramTypes.add(diffElementType);
+                auto diffElementType = tryGetDifferentialValueType(m_astBuilder, paramValType);
+                if (diffElementType)
+                    paramTypes.add(diffElementType);
+
+                break;
             }
-            else
+        case ParamPassingMode::In:
             {
-                continue;
-            }
-        }
-        else if (auto derivType = _toDifferentialParamType(originalParamType))
-        {
-            if (as<DifferentialPairType>(derivType))
-            {
-                // An `in` differentiable parameter becomes an `inout` parameter.
-                derivType = m_astBuilder->getBorrowInOutParamType(derivType);
-            }
-            else if (auto inoutType = as<BorrowInOutParamType>(derivType))
-            {
-                if (!as<DifferentialPairType>(inoutType->getValueType()))
+                if (auto diffPairValType = tryGetDifferentialPairType(paramValType))
                 {
-                    // An `inout` non differentiable parameter becomes an `in` parameter
-                    // (removing `out`).
-                    derivType = inoutType->getValueType();
+                    if (as<DifferentialPairType>(diffPairValType))
+                        paramTypes.add(m_astBuilder->getBorrowInOutParamType(diffPairValType));
+                    else if (as<DifferentialPtrPairType>(diffPairValType))
+                        paramTypes.add(diffPairValType);
                 }
+                else
+                {
+                    paramTypes.add(m_astBuilder->getModifiedType(
+                        paramValType,
+                        {m_astBuilder->getNoDiffModifierVal()}));
+                }
+
+                break;
             }
-            paramTypes.add(derivType);
+        case ParamPassingMode::BorrowInOut:
+            {
+                if (auto diffPairValType = tryGetDifferentialPairType(paramValType))
+                {
+                    paramTypes.add(m_astBuilder->getBorrowInOutParamType(diffPairValType));
+                }
+                else
+                {
+                    paramTypes.add(m_astBuilder->getModifiedType(
+                        paramValType,
+                        {m_astBuilder->getNoDiffModifierVal()}));
+                }
+
+                break;
+            }
+        case ParamPassingMode::BorrowIn:
+            {
+                if (auto diffPairValType = tryGetDifferentialPairType(paramValType))
+                {
+                    paramTypes.add(m_astBuilder->getConstRefParamType(diffPairValType));
+                }
+                else
+                {
+                    paramTypes.add(m_astBuilder->getConstRefParamType(m_astBuilder->getModifiedType(
+                        paramValType,
+                        {m_astBuilder->getNoDiffModifierVal()})));
+                }
+
+                break;
+            }
+        case ParamPassingMode::Ref:
+            {
+                // Not allowed..
+                SLANG_UNEXPECTED("ref parameter not allowed in backward diff function");
+            }
+
+            break;
         }
     }
 
     // Last parameter is the initial derivative of the original return type
-    auto dOutType = tryGetDifferentialType(m_astBuilder, originalType->getResultType());
+    auto dOutType = tryGetDifferentialValueType(m_astBuilder, originalType->getResultType());
     if (dOutType)
         paramTypes.add(dOutType);
 
@@ -4159,6 +4615,7 @@ struct HigherOrderInvokeExprCheckingActions
         HigherOrderInvokeExpr* resultDiffExpr,
         SemanticsVisitor* semantics,
         Expr* funcExpr) = 0;
+
     FuncType* getBaseFunctionType(SemanticsVisitor* semantics, Expr* funcExpr)
     {
         if (auto funcType = as<FuncType>(funcExpr->type.type))
@@ -4205,7 +4662,7 @@ struct ForwardDifferentiateExprCheckingActions : HigherOrderInvokeExprCheckingAc
             semantics->getSink()->diagnose(Diagnostics::ExpectedFunction{.expr = funcExpr});
             return;
         }
-        resultDiffExpr->type = semantics->getForwardDiffFuncType(baseFuncType);
+        resultDiffExpr->type = semantics->getForwardDiffFuncType(baseFuncType, nullptr);
         if (auto declRefExpr = as<DeclRefExpr>(getInnerMostExprFromHigherOrderExpr(funcExpr)))
         {
             auto funcDecl = declRefExpr->declRef.as<CallableDecl>().getDecl();
@@ -4315,7 +4772,12 @@ static Expr* _checkHigherOrderInvokeExpr(
     HigherOrderInvokeExprCheckingActions* actions)
 {
     // Check/Resolve inner function declaration.
-    expr->baseFunction = semantics->CheckTerm(expr->baseFunction);
+    SemanticsVisitor subVisitor(semantics->getShared());
+    subVisitor = subVisitor.withSink(semantics->getSink()).allowStaticReferenceToNonStaticMember();
+    // expr->baseFunction = subVisitor.CheckExpr(expr->baseFunction);
+    expr->baseFunction = subVisitor.dispatchExpr(expr->baseFunction, subVisitor);
+    expr->baseFunction =
+        subVisitor.maybeResolveOverloadedExpr(expr->baseFunction, LookupMask::Function, nullptr);
 
     auto astBuilder = semantics->getASTBuilder();
 
@@ -4372,6 +4834,60 @@ Expr* SemanticsExprVisitor::visitBackwardDifferentiateExpr(BackwardDifferentiate
     return _checkHigherOrderInvokeExpr(this, expr, &actions);
 }
 
+Expr* SemanticsExprVisitor::visitFuncAsTypeExpr(FuncAsTypeExpr* expr)
+{
+    SemanticsContext ctx(*this);
+    ctx = ctx.allowStaticReferenceToNonStaticMember();
+    expr->base = dispatchExpr(expr->base, ctx);
+
+    if (auto overloadedExpr = as<OverloadedExpr>(expr->base))
+        expr->base = maybeResolveOverloadedExpr(overloadedExpr, LookupMask::Function, nullptr);
+
+    // Expect a func-decl-ref expr
+    auto declRefExpr = as<DeclRefExpr>(expr->base);
+    if (!declRefExpr)
+    {
+        // Diagnose.
+        getSink()->diagnose(Diagnostics::ExpectedFunction{.expr = expr->base});
+    }
+
+    auto funcDeclRef = declRefExpr->declRef.as<CallableDecl>();
+    if (!funcDeclRef)
+    {
+        // Diagnose.
+        getSink()->diagnose(Diagnostics::ExpectedFunction{.expr = expr->base});
+    }
+
+    auto declRefType = DeclRefType::create(m_astBuilder, funcDeclRef);
+
+    // Create a shared type expr.
+    auto typeExpr = m_astBuilder->create<SharedTypeExpr>();
+    auto typetype = m_astBuilder->getOrCreate<TypeType>(declRefType);
+    typeExpr->type = typetype;
+
+    return typeExpr;
+}
+
+Expr* SemanticsExprVisitor::visitFuncTypeOfExpr(FuncTypeOfExpr* expr)
+{
+    expr->base = dispatchExpr(expr->base, *this);
+    auto funcType = as<FuncType>(expr->base->type.type);
+    if (!funcType)
+    {
+        getSink()->diagnose(Diagnostics::ExpectedFunction{.expr = expr->base});
+        expr->type = m_astBuilder->getErrorType();
+        return expr;
+    }
+    else
+    {
+        // Create a shared type expr.
+        auto typeExpr = m_astBuilder->create<SharedTypeExpr>();
+        auto typetype = m_astBuilder->getOrCreate<TypeType>(funcType);
+        typeExpr->type = typetype;
+        return typeExpr;
+    }
+}
+
 Expr* SemanticsExprVisitor::visitPrimalSubstituteExpr(PrimalSubstituteExpr* expr)
 {
     PassthroughHighOrderExprCheckingActionsBase<PrimalSubstituteExpr> actions;
@@ -4420,7 +4936,7 @@ Expr* SemanticsExprVisitor::visitDispatchKernelExpr(DispatchKernelExpr* expr)
 
 Expr* SemanticsExprVisitor::visitTreatAsDifferentiableExpr(TreatAsDifferentiableExpr* expr)
 {
-    auto subContext = withTreatAsDifferentiable(expr);
+    auto subContext = withTreatAsDifferentiable(expr).allowDroppingDerivatives();
     expr->innerExpr = dispatchExpr(expr->innerExpr, subContext);
     expr->type = expr->innerExpr->type;
     auto innerExpr = expr->innerExpr;
@@ -4471,7 +4987,9 @@ Expr* SemanticsExprVisitor::visitDefaultConstructExpr(DefaultConstructExpr* expr
 Expr* SemanticsExprVisitor::visitDetachExpr(DetachExpr* expr)
 {
     expr->inner = CheckTerm(expr->inner);
-    expr->type = expr->inner->type;
+    expr->type = getTypeWithModifier(
+        expr->inner->type,
+        getCurrentASTBuilder()->getOrCreate<NoDiffModifierVal>());
     return expr;
 }
 
@@ -5673,7 +6191,27 @@ Expr* SemanticsExprVisitor::visitTypeCastExpr(TypeCastExpr* expr)
 
     // Now process this like any other explicit call (so casts
     // and constructor calls are semantically equivalent).
-    return CheckInvokeExprWithCheckedOperands(expr);
+    //
+    auto checkedExpr = CheckInvokeExprWithCheckedOperands(expr);
+
+    if (m_parentDifferentiableAttr)
+    {
+        if (auto checkedInvokeExpr = as<InvokeExpr>(checkedExpr))
+        {
+            // Register types for final resolved invoke arguments again.
+            for (auto& arg : checkedInvokeExpr->arguments)
+            {
+                maybeRegisterDifferentiableType(m_astBuilder, arg->type.type);
+            }
+
+            if (auto fnExpr = as<DeclRefExpr>(checkedInvokeExpr->functionExpr))
+            {
+                registerAssociatedMethods(this, getDeclRef(m_astBuilder, fnExpr));
+            }
+        }
+    }
+
+    return checkedExpr;
 }
 
 Expr* SemanticsExprVisitor::visitTryExpr(TryExpr* expr)
@@ -6535,14 +7073,15 @@ Expr* SemanticsVisitor::_lookupStaticMember(DeclRefExpr* expr, Expr* baseExpress
             // We are looking up a namespace member.
             //
             // We should lookup in all sibling scopes of the namespace.
-            // Another detail here is that we need to skip scopes that are transitively imported.
-            // For example, given:
+            // Another detail here is that we need to skip scopes that are transitively
+            // imported. For example, given:
             // ```
             //     module a;
             //     namespace ns { int f_a(); }
             //
             //     module b;
-            //     namespace ns { int f_b(); } // will have a sibling scope that refers to a::ns.
+            //     namespace ns { int f_b(); } // will have a sibling scope that refers to
+            //     a::ns.
             //
             //     module c;
             //     import b;
@@ -6679,6 +7218,22 @@ Expr* SemanticsVisitor::_lookupStaticMember(DeclRefExpr* expr, Expr* baseExpress
                 base = baseExpression;
             }
         }
+        else if (auto callableDecl = as<CallableDecl>(baseDeclRef))
+        {
+            // Make a decl-ref-type out of the CallableDecl.
+            auto funcAsType = DeclRefType::create(m_astBuilder, callableDecl);
+            LookupResult lookupResult = lookUpMember(
+                m_astBuilder,
+                this,
+                expr->name,
+                funcAsType,
+                m_outerScope,
+                LookupMask::Default,
+                LookupOptions::NoDeref);
+
+            AddToLookupResult(globalLookupResult, lookupResult);
+            base = baseExpression;
+        }
     };
 
     auto handleLeafExpr = [&](Expr* e)
@@ -6692,6 +7247,11 @@ Expr* SemanticsVisitor::_lookupStaticMember(DeclRefExpr* expr, Expr* baseExpress
             auto properType = CoerceToProperType(TypeExp(e));
             if (properType.type)
                 handleLeafCase(DeclRef<Decl>(), properType.type);
+        }
+        else if (as<FuncType>(e->type))
+        {
+            auto declRefExpr = as<DeclRefExpr>(e);
+            handleLeafCase(declRefExpr->declRef, nullptr);
         }
     };
 
@@ -6992,6 +7552,20 @@ Expr* SemanticsExprVisitor::visitMemberExpr(MemberExpr* expr)
     else if (as<ErrorType>(baseType))
     {
         return CreateErrorExpr(expr);
+    }
+    else if (as<FuncType>(baseType))
+    {
+        // Treat the function expression as a type.
+        // auto funcAsTypeExpr = m_astBuilder->create<FuncAsTypeExpr>();
+        // funcAsTypeExpr->base = expr->baseExpression;
+
+        // auto funcAsType =
+        //     DeclRefType::create(m_astBuilder,
+        //     as<DeclRefExpr>(expr->baseExpression)->declRef);
+        // auto sharedTypeExpr = m_astBuilder->create<SharedTypeExpr>();
+        // sharedTypeExpr->base.type = funcAsType;
+
+        return _lookupStaticMember(expr, expr->baseExpression);
     }
     else
     {
@@ -7536,8 +8110,8 @@ Expr* SemanticsExprVisitor::visitSPIRVAsmExpr(SPIRVAsmExpr* expr)
         const bool isLast = &inst == &expr->insts.getLast();
         for (Index operandIndex = 0; operandIndex < inst.operands.getCount(); ++operandIndex)
         {
-            // Clamp to the end of the type info array, because the last one will be any variable
-            // operands
+            // Clamp to the end of the type info array, because the last one will be any
+            // variable operands
             const auto invalidOperandKind = SPIRVCoreGrammarInfo::OperandKind{0xff};
             const auto operandType =
                 opInfo.has_value()

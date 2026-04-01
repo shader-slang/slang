@@ -191,7 +191,7 @@ def save_data(data, file_path):
     if directory:
         os.makedirs(directory, exist_ok=True)
     with open(file_path, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2, default=str)
+        json.dump(data, f, separators=(",", ":"), default=str)
 
 
 def main():

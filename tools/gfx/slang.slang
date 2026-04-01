@@ -277,6 +277,11 @@ public enum SlangScalarType
     UINT8,
     INT16,
     UINT16,
+    INTPTR,
+    UINTPTR,
+    BFLOAT16,
+    FLOAT_E4M3,
+    FLOAT_E5M2,
 };
 
 public struct TypeReflection

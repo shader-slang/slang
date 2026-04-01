@@ -4,7 +4,9 @@
 #include "../core/slang-performance-profiler.h"
 #include "slang-ir-clone.h"
 #include "slang-ir-dce.h"
+#include "slang-ir-inline.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-loop-unroll.h"
 #include "slang-ir-lower-dynamic-dispatch-insts.h"
 #include "slang-ir-peephole.h"
 #include "slang-ir-sccp.h"
@@ -226,7 +228,8 @@ struct SpecializationContext
 
         if (isWrapperType(inst))
         {
-            // For all the wrapper type, we need to make sure the operands are fully specialized.
+            // For all the wrapper type, we need to make sure the operands are fully
+            // specialized.
             return areAllOperandsFullySpecialized(inst);
         }
 
@@ -435,6 +438,10 @@ struct SpecializationContext
             }
         }
 
+        IRBuilder builder(module);
+        auto entry =
+            builder.fetchCompilerDictionaryEntry(module->getTranslationDict(), specializeInst);
+
         // We want to see if an existing specialization
         // has already been made. To do that we will construct a key
         // for lookup in the generic specialization context.
@@ -459,6 +466,8 @@ struct SpecializationContext
             //
             if (auto specializedVal = tryGetDictionaryEntry(genericSpecializations, key))
                 return specializedVal;
+            if (auto existingVal = entry->getValue())
+                return existingVal;
         }
 
         if (activeGenericSpecializations.containsKey(key))
@@ -501,6 +510,8 @@ struct SpecializationContext
                 kIROp_GenericSpecializationDictionary,
                 key.vals,
                 specializedVal));
+
+        builder.setCompilerDictionaryEntryValue(entry, specializedVal);
 
         return specializedVal;
     }
@@ -588,6 +599,30 @@ struct SpecializationContext
         }
     }
 
+    bool hasNonTrivialUses(IRInst* inst)
+    {
+        // Check that our instruction either has non-annotation uses,
+        // or is marked as a dynamic dispatch witness table, in which case it should be specialized
+        // even if it has no uses, since it will be found by the dynamic dispatch pass.
+        //
+        bool hasNonTrivialUses = false;
+        traverseUsers<IRInst>(
+            inst,
+            [&](IRInst* user)
+            {
+                if (user->getOp() != kIROp_Annotation)
+                    hasNonTrivialUses = true;
+            });
+
+        if (auto specialize = as<IRSpecialize>(inst))
+        {
+            if (specialize->findDecoration<IRDynamicDispatchWitnessDecoration>())
+                hasNonTrivialUses = true;
+        }
+
+        return hasNonTrivialUses;
+    }
+
     // Now that we know when we can specialize a generic, and how
     // to do it, we can write a subroutine that takes a
     // `specialize(g, a, b, c, ...)` instruction and performs
@@ -603,6 +638,10 @@ struct SpecializationContext
         // themselves fully specialized.
         //
         if (!areAllOperandsFullySpecialized(specInst))
+            return false;
+
+
+        if (!hasNonTrivialUses(specInst))
             return false;
 
         // The invariant that the arguments are fully specialized
@@ -623,81 +662,6 @@ struct SpecializationContext
         //
         if (!canSpecializeGeneric(genericVal))
         {
-            // We have to consider a special case here if baseVal is
-            // an intrinsic, and contains a custom differential.
-            // This is a case where the base cannot be specialized since it has
-            // no body, but the custom should be specialized.
-            // A better way to handle this would be to grab a reference to the
-            // appropriate custom differential, if one exists, at checking time
-            // during CheckInvoke() and construct it's specialization args appropriately.
-            //
-            // For now, we will overwrite the specialization args for the differential
-            // using the args for the base.
-            //
-            auto genericReturnVal = findInnerMostGenericReturnVal(genericVal);
-            if (genericReturnVal->findDecoration<IRTargetIntrinsicDecoration>())
-            {
-                for (auto decor : genericReturnVal->getDecorations())
-                {
-                    bool specialized = false;
-                    if (decor->getOp() == kIROp_ForwardDerivativeDecoration ||
-                        decor->getOp() == kIROp_UserDefinedBackwardDerivativeDecoration)
-                    {
-                        // If we already have a diff func on this specialize, skip.
-                        if (const auto specDiffRef = specInst->findDecorationImpl(decor->getOp()))
-                        {
-                            continue;
-                        }
-
-                        auto specDiffFunc = as<IRSpecialize>(decor->getOperand(0));
-
-                        // If the base is specialized, the JVP version must be also be a specialized
-                        // generic.
-                        //
-                        SLANG_RELEASE_ASSERT(specDiffFunc);
-
-                        // Build specialization arguments from specInst.
-                        // Note that if we've reached this point, we can safely assume
-                        // that our args are fully specialized/concrete.
-                        //
-                        UCount argCount = specInst->getArgCount();
-                        ShortList<IRInst*> args;
-                        for (UIndex ii = 0; ii < argCount; ii++)
-                            args.add(specInst->getArg(ii));
-
-                        IRBuilder builder(module);
-
-                        // Specialize the custom derivative function type with the original
-                        // arguments.
-                        builder.setInsertInto(module);
-                        auto newDiffFuncType = builder.emitSpecializeInst(
-                            builder.getTypeKind(),
-                            specDiffFunc->getBase()->getDataType(),
-                            argCount,
-                            args.getArrayView().getBuffer());
-
-                        // Specialize the custom derivative function with the original arguments.
-                        builder.setInsertBefore(specInst);
-                        auto newDiffFunc = builder.emitSpecializeInst(
-                            (IRType*)newDiffFuncType,
-                            specDiffFunc->getBase(),
-                            argCount,
-                            args.getArrayView().getBuffer());
-
-                        // Add the new spec insts to the list so they get specialized with
-                        // the usual logic.
-                        //
-                        addToWorkList(newDiffFuncType);
-                        addToWorkList(newDiffFunc);
-
-                        builder.addDecoration(specInst, decor->getOp(), newDiffFunc);
-
-                        specialized = true;
-                    }
-                    if (specialized)
-                        return true;
-                }
-            }
             return false;
         }
 
@@ -824,6 +788,9 @@ struct SpecializationContext
 
         case kIROp_CountOf:
             return maybeSpecializeCountOf(inst);
+
+        case kIROp_FuncTypeOf:
+            return maybeSpecializeFuncTypeOf(inst);
 
         case kIROp_Func:
 
@@ -1059,6 +1026,56 @@ struct SpecializationContext
         return true;
     }
 
+    bool maybeSpecializeFuncTypeOf(IRInst* inst)
+    {
+        // The `func_type_of` instruction is a special case
+        // where we want to specialize the type of a function
+        // based on the concrete types of its parameters.
+        //
+        // We will only do this if all of the operands are
+        // fully specialized, and then we will replace the
+        // `func_type_of` with a `specialize` instruction
+        // that specializes the function type.
+        //
+        auto operand = inst->getOperand(0);
+        if (auto func = as<IRFunc>(operand))
+        {
+            addUsersToWorkList(inst);
+            inst->replaceUsesWith(func->getDataType());
+            inst->removeAndDeallocate();
+            return true;
+        }
+
+        if (auto specialize = as<IRSpecialize>(operand))
+        {
+            if (auto generic = as<IRGeneric>(specialize->getBase()))
+            {
+                if (auto typeGeneric = as<IRGeneric>(generic->getDataType()))
+                {
+                    // If the generic is a type, we can specialize it directly.
+                    //
+                    IRBuilder builder(module);
+                    builder.setInsertBefore(inst);
+
+                    List<IRInst*> args;
+                    for (UInt i = 0; i < specialize->getArgCount(); i++)
+                    {
+                        args.add(specialize->getArg(i));
+                    }
+                    auto funcTypeInst =
+                        builder.emitSpecializeInst(builder.getTypeKind(), typeGeneric, args);
+                    addUsersToWorkList(inst);
+                    addUsersToWorkList(funcTypeInst);
+                    inst->replaceUsesWith(funcTypeInst);
+                    inst->removeAndDeallocate();
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
     // Specializing lookup on witness tables is a general
     // transformation that helps with both generic and
     // existential-based code.
@@ -1095,6 +1112,7 @@ struct SpecializationContext
                 HashSet<IRInst*> satisfyingValSet;
                 bool skipSpecialization = false;
                 forEachInSet(
+                    module,
                     witnessTableSet,
                     [&](IRInst* instElement)
                     {
@@ -1147,6 +1165,8 @@ struct SpecializationContext
                         return false;
 
                     interfaceType = as<IRInterfaceType>(witnessTableType->getConformanceType());
+                    if (!interfaceType)
+                        return false;
                 }
             }
             else
@@ -1835,7 +1855,8 @@ struct SpecializationContext
                         // of an IR generic, because we don't actually want
                         // to perform specialization inside of generics.
                         //
-                        addToWorkList(child);
+                        if (!isAnnotation(child))
+                            addToWorkList(child);
                     }
                 }
                 if (hasSpecialization)
@@ -1849,30 +1870,34 @@ struct SpecializationContext
                 this->changed = true;
                 eliminateDeadCode(module->getModuleInst());
                 peepholeOptimizeGlobalScope(targetProgram, this->module);
-                applySparseConditionalConstantPropagationForGlobalScope(
-                    this->module,
-                    targetProgram,
-                    this->sink);
+                performMandatoryEarlyInlining(module);
+                applySparseConditionalConstantPropagation(this->module, targetProgram, this->sink);
+                unrollLoopsInModule(module, targetProgram, sink);
             }
 
             // Once the work list has gone dry, we should have the invariant
             // that there are no `specialize` instructions inside of non-generic
-            // functions that in turn reference a generic type/function unless the generic is for a
-            // builtin type/function, or some of the type arguments are unknown at compile time, in
-            // which case we will rely on a follow up pass the translate it into a dynamic dispatch
-            // function.
+            // functions that in turn reference a generic type/function unless the generic is
+            // for a builtin type/function, or some of the type arguments are unknown at compile
+            // time, in which case we will rely on a follow up pass the translate it into a
+            // dynamic dispatch function.
             //
             // Now we consider lower lookupWitnessMethod insts into dynamic dispatch calls,
             // which may open up more specialization opportunities.
             //
             if (options.lowerWitnessLookups)
             {
-                iterChanged = specializeDynamicInsts(module, sink, this);
-                if (iterChanged)
-                {
+                bool dynPassChanged = specializeDynamicInsts(
+                    module,
+                    targetProgram,
+                    sink,
+                    this,
+                    options.reportDynamicDispatchSites);
+
+                if (dynPassChanged)
                     eliminateDeadCode(module->getModuleInst());
-                    lowerDispatchers(module, sink, options.reportDynamicDispatchSites);
-                }
+
+                iterChanged |= dynPassChanged;
             }
 
             if (!iterChanged || sink->getErrorCount())
@@ -1914,8 +1939,9 @@ struct SpecializationContext
         return false;
     }
 
-    /// Used by `maybeSpecailizeBufferLoadCall`, this function returns a new specialized callee that
-    /// replaces a `specialize(.operator[], oldType)` to `specialize(.operator[], newElementType)`.
+    /// Used by `maybeSpecailizeBufferLoadCall`, this function returns a new specialized callee
+    /// that replaces a `specialize(.operator[], oldType)` to `specialize(.operator[],
+    /// newElementType)`.
     IRInst* getNewSpecializedBufferLoadCallee(
         IRInst* oldSpecializedCallee,
         IRType* newContainerType,
@@ -2059,251 +2085,7 @@ struct SpecializationContext
             inst = tryExpandArgPack((IRCall*)inst);
         }
 
-        // We can only specialize a call when the callee function is known.
-        //
-        auto calleeFunc = as<IRFunc>(inst->getCallee());
-        if (!calleeFunc)
-            return false;
-
-        // Update result type since the callee may have been changed.
-        if (inst->getDataType() != calleeFunc->getResultType())
-        {
-            inst->setFullType(calleeFunc->getResultType());
-        }
-
-        // We can only specialize if we have access to a body for the callee.
-        //
-        if (!calleeFunc->isDefinition())
-            return false;
-
-        // We shouldn't bother specializing unless the callee has at least
-        // one parameter/return type that has an existential/interface type.
-        //
-        bool returnTypeNeedSpecialization = isExistentialReturnTypeSpecializable(calleeFunc);
-        bool argumentNeedSpecialization = false;
-        UInt argCounter = 0;
-        for (auto param : calleeFunc->getParams())
-        {
-            auto arg = inst->getArg(argCounter++);
-            if (!isExistentialType(param->getDataType()))
-                continue;
-
-            // Is arg in the most simplified form for specialization? If not we are
-            // not ready to consider specialization yet.
-            if (!isSimplifiedExistentialArg(arg))
-                return false;
-
-            // We *cannot* specialize unless the argument value corresponding
-            // to such a parameter is one we can specialize.
-            //
-            if (!canSpecializeExistentialArg(arg))
-                continue;
-
-            argumentNeedSpecialization = true;
-        }
-
-        // If we never found a parameter or return type worth specializing, we should bail out.
-        //
-        if (!returnTypeNeedSpecialization && !argumentNeedSpecialization)
-            return false;
-
-        // At this point, we believe we *should* and *can* specialize.
-        //
-        // We need a specialized variant of the callee (with the concrete
-        // types substituted in for existential-type parameters), and then
-        // we can replace the call site to call the new function instead.
-        //
-        // Any two call sites where the argument types are the same can
-        // re-use the same callee, so we will  cache and re-use the
-        // specialized functions that we generate (similar to how generic
-        // specialization works). Therefore we will construct a key
-        // for use when caching the specialized functions.
-        //
-        IRSimpleSpecializationKey key;
-
-        // The specialized callee will always depend on the unspecialized
-        // function from which it is generated, so we add that to our key.
-        //
-        key.vals.add(calleeFunc);
-
-        // Also, for any parameter that has an existential type, the
-        // specialized function will depend on the concrete type of the
-        // argument.
-        //
-        argCounter = 0;
-        for (auto param : calleeFunc->getParams())
-        {
-            auto arg = inst->getArg(argCounter++);
-            if (!isExistentialType(param->getDataType()))
-                continue;
-            if (auto makeExistential = as<IRMakeExistential>(arg))
-            {
-                // Note that we use the *type* stored in the
-                // existential-type argument, but not anything to
-                // do with the particular value (otherwise we'd only
-                // be able to re-use the specialized callee for
-                // call sites that pass in the exact same argument).
-                //
-                auto val = makeExistential->getWrappedValue();
-                auto valType = val->getDataType();
-                if (isCompileTimeConstantType(valType))
-                {
-                    key.vals.add(valType);
-
-                    // We are also including the witness table in the key.
-                    // This isn't required with our current language model,
-                    // since a given type can only conform to a given interface
-                    // in one way (so there can be only one witness table).
-                    // That means that the `valType` and the existential
-                    // type of `param` above should uniquely determine
-                    // the witness table we see.
-                    //
-                    // There are forward-looking cases where supporting
-                    // "overlapping conformances" could be required, and
-                    // there is low incremental cost to future-proofing
-                    // this code, so we go ahead and add the witness
-                    // table even if it is redundant.
-                    //
-                    auto witnessTable = makeExistential->getWitnessTable();
-                    key.vals.add(witnessTable);
-                }
-                else
-                {
-                    key.vals.add(param->getDataType());
-                }
-            }
-            else if (auto wrapExistential = as<IRWrapExistential>(arg))
-            {
-                auto val = wrapExistential->getWrappedValue();
-                auto valType = val->getFullType();
-                key.vals.add(valType);
-
-                UInt slotOperandCount = wrapExistential->getSlotOperandCount();
-                for (UInt ii = 0; ii < slotOperandCount; ++ii)
-                {
-                    auto slotOperand = wrapExistential->getSlotOperand(ii);
-                    key.vals.add(slotOperand);
-                }
-            }
-            else
-            {
-                SLANG_UNEXPECTED("unhandled existential argument");
-            }
-        }
-
-        // Once we've constructed our key, we can try to look for an
-        // existing specialization of the callee that we can use.
-        //
-        IRFunc* specializedCallee =
-            cast<IRFunc>(tryGetDictionaryEntry(existentialSpecializedFuncs, key));
-
-        if (!specializedCallee)
-        {
-            // If we didn't find a specialized callee already made, then we
-            // will go ahead and create one, and then register it in our cache.
-            //
-            specializedCallee = createExistentialSpecializedFunc(inst, calleeFunc);
-            existentialSpecializedFuncs.add(
-                key,
-                addEntryToIRDictionary(
-                    kIROp_ExistentialFuncSpecializationDictionary,
-                    key.vals,
-                    specializedCallee));
-        }
-
-        // At this point we have found or generated a specialized version
-        // of the callee, and we need to emit a call to it.
-        //
-        // We will start by constructing the argument list for the new call.
-        //
-        argCounter = 0;
-        ShortList<IRInst*> newArgs;
-        for (auto param : calleeFunc->getParams())
-        {
-            auto arg = inst->getArg(argCounter++);
-
-            // How we handle each argument depends on whether the corresponding
-            // parameter has an existential type or not.
-            //
-            if (!isExistentialType(param->getDataType()))
-            {
-                // If the parameter doesn't have an existential type, then we
-                // don't want to change up the argument we pass at all.
-                //
-                newArgs.add(arg);
-            }
-            else
-            {
-                // Any place where the original function had a parameter of
-                // existential type, we will now be passing in the concrete
-                // argument value instead of an existential wrapper.
-                //
-                if (auto makeExistential = as<IRMakeExistential>(arg))
-                {
-                    auto val = makeExistential->getWrappedValue();
-                    auto valType = val->getDataType();
-                    if (isCompileTimeConstantType(valType))
-                        newArgs.add(val);
-                    else
-                        newArgs.add(arg);
-                }
-                else if (auto wrapExistential = as<IRWrapExistential>(arg))
-                {
-                    auto val = wrapExistential->getWrappedValue();
-                    newArgs.add(val);
-                }
-                else
-                {
-                    SLANG_UNEXPECTED("missing case for existential argument");
-                }
-            }
-        }
-
-        // Now that we've built up our argument list, it is simple enough
-        // to construct a new `call` instruction.
-        //
-        IRBuilder builderStorage(module);
-        auto builder = &builderStorage;
-
-        builder->setInsertBefore(inst);
-        auto callResultType = specializedCallee->getResultType();
-        IRInst* newCall = builder->emitCallInst(
-            callResultType,
-            specializedCallee,
-            (UInt)newArgs.getCount(),
-            newArgs.getArrayView().getBuffer());
-
-        if (as<IRInterfaceType>(inst->getDataType()))
-        {
-            // If the result of the original call is specialized to a concrete type,
-            // we need to wrap it back into an existential type.
-            //
-            if (auto resultWitnessDecor =
-                    specializedCallee->findDecoration<IRResultWitnessDecoration>())
-            {
-                newCall = builder->emitMakeExistential(
-                    inst->getDataType(),
-                    newCall,
-                    resultWitnessDecor->getWitness());
-            }
-        }
-
-        // We will completely replace the old `call` instruction with the
-        // new one, and will go so far as to transfer any decorations
-        // that were attached to the old call over to the new one.
-        //
-        inst->transferDecorationsTo(newCall);
-        inst->replaceUsesWith(newCall);
-        inst->removeAndDeallocate();
-
-        // Just in case, we will add any instructions that used the
-        // result of this call to our work list for re-consideration.
-        // At this moment this shouldn't open up new opportunities
-        // for specialization, but we can always play it safe.
-        //
-        addUsersToWorkList(newCall);
-
-        return true;
+        return false;
     }
 
     // The above `maybeSpecializeExistentialsForCall` routine needed
@@ -2681,8 +2463,8 @@ struct SpecializationContext
             // concrete type, we can simplify the function to return the concrete type.
             // We also need to mark the simplfiied function with a result witness decoration
             // so we can rewrite all the callsites into IRMakeExistential using the witness.
-            // This is effectively pushing the MakeExistential to the call sites, so optimizations
-            // can happen across the function call boundaries.
+            // This is effectively pushing the MakeExistential to the call sites, so
+            // optimizations can happen across the function call boundaries.
             IRInst* witnessTable = nullptr;
             IRInst* concreteType = nullptr;
             for (auto block : newFunc->getBlocks())
@@ -4114,7 +3896,12 @@ IRInst* specializeGenericImpl(
     //
     IRBuilder builderStorage(module);
     IRBuilder* builder = &builderStorage;
-    builder->setInsertBefore(genericVal);
+    // builder->setInsertBefore(genericVal);
+    //
+    // We can just insert before the specialize inst, which is hoistable
+    // and de-duplicated, and so will be in the appropriate scope.
+    //
+    builder->setInsertBefore(specializeInst);
 
     List<IRInst*> pendingWorkList;
     SLANG_DEFER(for (Index ii = pendingWorkList.getCount() - 1; ii >= 0; ii--) if (context)
@@ -4147,16 +3934,16 @@ IRInst* specializeGenericImpl(
             {
                 auto specializedVal = findCloneForOperand(&env, returnValInst->getVal());
 
-                // Clone decorations on the orignal `specialize` inst over to the newly specialized
-                // value.
+                // Clone decorations on the orignal `specialize` inst over to the newly
+                // specialized value.
                 cloneInstDecorationsAndChildren(&env, module, specializeInst, specializedVal);
                 if (context)
                     context->removeSpecializationDepthDecorations(specializedVal);
 
-                // Perform IR simplifications to fold constants in this specialized value if it is a
-                // function, so further specializations from the specialized function will have as
-                // simple specialization arguments as possible to avoid creating specializations
-                // that eventually simplified into the same thing.
+                // Perform IR simplifications to fold constants in this specialized value if it
+                // is a function, so further specializations from the specialized function will
+                // have as simple specialization arguments as possible to avoid creating
+                // specializations that eventually simplified into the same thing.
                 if (context)
                 {
                     if (auto func = as<IRFunc>(specializedVal))
