@@ -1896,36 +1896,42 @@ bool SemanticsVisitor::_coerce(
         return true;
     }
 
-    // Pointer covariance: Ptr<T> -> Ptr<I> when T implements I.
-    // Pointers have fixed size regardless of pointee type, so this
-    // conversion is valid as a bitcast of the address value.
+    // Pointer covariance: Ptr<T> -> Ptr<I> when T implements I and the
+    // pointee types differ. The address value is preserved via bitcast.
+    // All other Ptr generic parameters (access, address space, layout)
+    // must match; changing access qualifier requires an explicit cast.
     if (auto fromPtrType = as<PtrType>(fromType))
     {
         if (auto toPtrType = as<PtrType>(toType))
         {
-            auto fromAddrSpace = fromPtrType->getAddressSpace();
-            auto toAddrSpace = toPtrType->getAddressSpace();
-            auto fromLayout = fromPtrType->getDataLayout();
-            auto toLayout = toPtrType->getDataLayout();
-            if (fromAddrSpace->equals(toAddrSpace) &&
-                (!fromLayout || !toLayout || fromLayout->equals(toLayout)))
+            auto fromValueType = fromPtrType->getValueType();
+            auto toValueType = toPtrType->getValueType();
+            if (!fromValueType->equals(toValueType))
             {
-                auto fromValueType = fromPtrType->getValueType();
-                auto toValueType = toPtrType->getValueType();
-                if (auto witness = tryGetSubtypeWitness(fromValueType, toValueType))
+                auto fromAccess = fromPtrType->getAccessQualifier();
+                auto toAccess = toPtrType->getAccessQualifier();
+                auto fromAddrSpace = fromPtrType->getAddressSpace();
+                auto toAddrSpace = toPtrType->getAddressSpace();
+                auto fromLayout = fromPtrType->getDataLayout();
+                auto toLayout = toPtrType->getDataLayout();
+                if (fromAccess->equals(toAccess) && fromAddrSpace->equals(toAddrSpace) &&
+                    (!fromLayout || !toLayout || fromLayout->equals(toLayout)))
                 {
-                    SLANG_UNUSED(witness);
-                    if (outCost)
-                        *outCost = kConversionCost_CastToInterface;
-                    if (outToExpr)
+                    if (auto witness = tryGetSubtypeWitness(fromValueType, toValueType))
                     {
-                        auto castExpr = getASTBuilder()->create<BuiltinCastExpr>();
-                        castExpr->type = QualType(toType);
-                        castExpr->loc = fromExpr->loc;
-                        castExpr->base = fromExpr;
-                        *outToExpr = castExpr;
+                        SLANG_UNUSED(witness);
+                        if (outCost)
+                            *outCost = kConversionCost_CastToInterface;
+                        if (outToExpr)
+                        {
+                            auto castExpr = getASTBuilder()->create<BuiltinCastExpr>();
+                            castExpr->type = QualType(toType);
+                            castExpr->loc = fromExpr->loc;
+                            castExpr->base = fromExpr;
+                            *outToExpr = castExpr;
+                        }
+                        return true;
                     }
-                    return true;
                 }
             }
         }
