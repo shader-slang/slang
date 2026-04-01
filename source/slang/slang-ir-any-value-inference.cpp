@@ -112,78 +112,29 @@ List<IRInterfaceType*> sortTopologically(
     return sortedInterfaceTypes;
 }
 
-// Detect which interfaces participate in cycles in the dependency graph.
-// Uses DFS with an explicit stack so that when a back-edge is found,
-// ALL nodes on the stack from the back-edge target onwards are marked
-// as cyclic (not just the endpoints).
-void _findCyclicInterfaces(
-    IRInterfaceType* interfaceType,
+bool hasDependencyPath(
+    IRInterfaceType* source,
+    IRInterfaceType* target,
     Dictionary<IRInterfaceType*, HashSet<IRInterfaceType*>>& dependencyMap,
-    HashSet<IRInterfaceType*>& visited,
-    HashSet<IRInterfaceType*>& onStackSet,
-    List<IRInterfaceType*>& dfsStack,
-    HashSet<IRInterfaceType*>& cyclicInterfaces)
+    HashSet<IRInterfaceType*>& visited)
 {
-    visited.add(interfaceType);
-    onStackSet.add(interfaceType);
-    dfsStack.add(interfaceType);
+    if (source == target)
+        return true;
 
-    if (auto deps = dependencyMap.tryGetValue(interfaceType))
+    if (visited.contains(source))
+        return false;
+    visited.add(source);
+
+    if (auto deps = dependencyMap.tryGetValue(source))
     {
         for (auto dependency : *deps)
         {
-            if (!visited.contains(dependency))
-            {
-                _findCyclicInterfaces(
-                    dependency,
-                    dependencyMap,
-                    visited,
-                    onStackSet,
-                    dfsStack,
-                    cyclicInterfaces);
-            }
-            else if (onStackSet.contains(dependency))
-            {
-                // Back edge found: mark ALL nodes on the stack from
-                // the target (dependency) to the current node.
-                for (Index i = dfsStack.getCount() - 1; i >= 0; i--)
-                {
-                    cyclicInterfaces.add(dfsStack[i]);
-                    if (dfsStack[i] == dependency)
-                        break;
-                }
-            }
+            if (hasDependencyPath(dependency, target, dependencyMap, visited))
+                return true;
         }
     }
 
-    dfsStack.removeLast();
-    onStackSet.remove(interfaceType);
-}
-
-HashSet<IRInterfaceType*> findCyclicInterfaces(
-    HashSet<IRInterfaceType*>& interfaceTypes,
-    Dictionary<IRInterfaceType*, HashSet<IRInterfaceType*>>& dependencyMap)
-{
-    HashSet<IRInterfaceType*> visited;
-    HashSet<IRInterfaceType*> onStackSet;
-    List<IRInterfaceType*> dfsStack;
-    HashSet<IRInterfaceType*> cyclicInterfaces;
-
-    for (auto interfaceType : interfaceTypes)
-    {
-        if (!visited.contains(interfaceType))
-        {
-            _findCyclicInterfaces(
-                interfaceType,
-                dependencyMap,
-                visited,
-                onStackSet,
-                dfsStack,
-                cyclicInterfaces);
-        }
-    }
-
-    return cyclicInterfaces;
+    return false;
 }
 
 void inferAnyValueSizeWhereNecessary(
@@ -352,12 +303,6 @@ void inferAnyValueSizeWhereNecessary(
         }
     }
 
-    // Detect interfaces that participate in cross-interface dependency cycles.
-    // E.g., IFoo depends on IBar (via FooImpl containing IBar) and IBar depends on
-    // IFoo (via BarImpl containing IFoo).
-    HashSet<IRInterfaceType*> cyclicInterfaces =
-        findCyclicInterfaces(interfaceTypes, interfaceDependencyMap);
-
     // Track all implementations diagnosed with CircularConformance so we can
     // exclude them from the confusing "does not fit" (E41011) diagnostic later,
     // and avoid diagnosing the same impl twice.
@@ -372,14 +317,18 @@ void inferAnyValueSizeWhereNecessary(
 
     // Diagnose non-self-referential implementations that participate in
     // cross-interface cycles.
-    for (auto interfaceType : cyclicInterfaces)
+    for (auto interfaceType : interfaceTypes)
     {
         for (auto impl : nonSelfReferentialImpls[interfaceType])
         {
             auto deps = findDependenciesOfTypeInSet((IRType*)impl, interfaceTypes);
             for (auto dep : deps)
             {
-                if (dep != interfaceType && cyclicInterfaces.contains(dep))
+                if (dep == interfaceType)
+                    continue;
+
+                HashSet<IRInterfaceType*> visited;
+                if (hasDependencyPath(dep, interfaceType, interfaceDependencyMap, visited))
                 {
                     sink->diagnose(Diagnostics::CircularConformance{
                         .type = impl,
@@ -486,8 +435,11 @@ void inferAnyValueSizeWhereNecessary(
             }
         }
 
-        // Should not encounter interface types without any conforming implementations.
-        SLANG_ASSERT(maxAnyValueSize >= 0);
+        // All implementations may have been filtered out because they were
+        // diagnosed as cross-interface cycles. In that case there is nothing
+        // left to infer for this interface.
+        if (maxAnyValueSize < 0)
+            continue;
 
         // Update the AnyValue size if self-referential impls require a larger size.
         if (maxAnyValueSize >= 0)

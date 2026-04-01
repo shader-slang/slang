@@ -19,20 +19,20 @@ interface IBar
     float process();
 }
 
-// CHECK: error[E41003]
-// CHECK: BarImpl
-// CHECK: circular reference through interface
-// CHECK: IBar
+// CHECK-DAG: error[E41003]
+// CHECK-DAG: BarImpl
+// CHECK-DAG: circular reference through interface
+// CHECK-DAG: IBar
 struct BarImpl : IBar
 {
     IFoo foo;
     float process() { return foo.getValue(); }
 }
 
-// CHECK: error[E41003]
-// CHECK: FooImpl
-// CHECK: circular reference through interface
-// CHECK: IFoo
+// CHECK-DAG: error[E41003]
+// CHECK-DAG: FooImpl
+// CHECK-DAG: circular reference through interface
+// CHECK-DAG: IFoo
 struct FooImpl : IFoo
 {
     IBar bar;
