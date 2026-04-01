@@ -11495,6 +11495,63 @@ Type* SemanticsDeclHeaderVisitor::_getAccessorStorageType(AccessorDecl* decl)
     }
 }
 
+// Check whether an AST type includes a dynamic-dispatch interface,
+// i.e. a non-COM, non-builtin interface that requires AnyValue packing.
+// This mirrors the IR-level `typeIncludesDynamicDispatch()` in
+// slang-ir-typeflow-specialize.cpp but operates on AST types so it
+// can be used during semantic checking.
+static bool _astTypeIncludesDynamicDispatch(Type* type)
+{
+    if (auto declRefType = as<DeclRefType>(type))
+    {
+        if (auto interfaceDecl = as<InterfaceDecl>(declRefType->getDeclRef().getDecl()))
+        {
+            bool isCom = interfaceDecl->findModifier<ComInterfaceAttribute>() != nullptr;
+            bool isBuiltin = interfaceDecl->findModifier<BuiltinAttribute>() != nullptr;
+            if (!isCom && !isBuiltin)
+                return true;
+        }
+    }
+
+    if (auto structType = as<DeclRefType>(type))
+    {
+        if (auto structDecl = as<StructDecl>(structType->getDeclRef().getDecl()))
+        {
+            for (auto field : structDecl->getFields())
+            {
+                if (field->type.type && _astTypeIncludesDynamicDispatch(field->type.type))
+                    return true;
+            }
+        }
+    }
+
+    if (auto arrayType = as<ArrayExpressionType>(type))
+    {
+        if (auto elemType = arrayType->getElementType())
+            return _astTypeIncludesDynamicDispatch(elemType);
+    }
+
+    if (auto optionalType = as<OptionalType>(type))
+    {
+        if (auto valType = optionalType->getValueType())
+            return _astTypeIncludesDynamicDispatch(valType);
+    }
+
+    if (auto tupleType = as<TupleType>(type))
+    {
+        for (Index i = 0; i < tupleType->getMemberCount(); i++)
+        {
+            if (auto memberType = tupleType->getMember(i))
+            {
+                if (_astTypeIncludesDynamicDispatch(memberType))
+                    return true;
+            }
+        }
+    }
+
+    return false;
+}
+
 void SemanticsDeclHeaderVisitor::_visitAccessorDeclCommon(AccessorDecl* decl)
 {
     // An accessor must appear nested inside a subscript or property declaration.
@@ -11545,6 +11602,24 @@ void SemanticsDeclHeaderVisitor::visitAccessorDecl(AccessorDecl* decl)
     // for `GetterDecl`s.
     //
     decl->returnType.type = _getAccessorStorageType(decl);
+
+    // A `ref` accessor returns a reference to the storage location.
+    // If the storage type involves a dynamic-dispatch interface, the
+    // reference would point directly into AnyValue-packed existential
+    // storage, bypassing the pack/unpack marshalling that dynamic
+    // dispatch requires.  This leads to runtime corruption/segfaults,
+    // so we reject it at compile time.
+    if (as<RefAccessorDecl>(decl))
+    {
+        auto storageType = decl->returnType.type;
+        if (storageType && _astTypeIncludesDynamicDispatch(storageType))
+        {
+            getSink()->diagnose(
+                Diagnostics::RefAccessorWithInterfaceTypeInDynamicDispatch{
+                    .valueType = storageType,
+                    .location = decl->loc});
+        }
+    }
 
     checkDifferentiableCallableCommon(decl);
 }

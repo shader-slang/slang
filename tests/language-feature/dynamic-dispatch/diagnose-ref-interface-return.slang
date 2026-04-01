@@ -1,7 +1,6 @@
-// Tests disabled: diagnostic 52010 covers __ref/__constref parameters (#9906)
-// but has not been extended to ref accessor returns yet (see #10244).
-//DISABLED_TEST:SIMPLE(filecheck=CHECK): -target spirv
-//DISABLED_TEST:SIMPLE(filecheck=CHECK): -target hlsl
+// Tests that ref accessors returning interface types are rejected (#10244).
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target hlsl
 
 // Returning a reference to an interface-typed value is incompatible
 // with dynamic dispatch. Interface values are stored as existential
@@ -36,16 +35,15 @@ struct ImplB : IFoo
 }
 
 // Scenario 1: Property ref accessor with direct interface type.
-// The ref accessor implicitly returns a pointer to the existential
-// tuple, which is unsound for dynamic dispatch.
 struct ContainerPropRef
 {
     IFoo stored;
     property IFoo val
     {
         get { return stored; }
-        // CHECK: ([[# @LINE+1]]): error 52010
         ref { return stored; }
+//CHECK:^^^ ref accessor incompatible with dynamic dispatch
+//CHECK:^^^ 'ref' accessor returning type 'IFoo' is incompatible with dynamic dispatch because interface types require AnyValue marshalling.
     }
 }
 
@@ -56,14 +54,13 @@ struct CollectionSubRef
     __subscript(int i) -> IFoo
     {
         get { return items[i]; }
-        // CHECK: ([[# @LINE+1]]): error 52010
         ref { return items[i]; }
+//CHECK:^^^ ref accessor incompatible with dynamic dispatch
+//CHECK:^^^ 'ref' accessor returning type 'IFoo' is incompatible with dynamic dispatch because interface types require AnyValue marshalling.
     }
 }
 
 // Scenario 3: Property ref accessor with struct containing interface.
-// The struct has an interface-typed field, so a reference to it also
-// provides indirect access to AnyValue-packed storage.
 struct Wrapper
 {
     IFoo item;
@@ -75,14 +72,13 @@ struct ContainerStructRef
     property Wrapper val
     {
         get { return w; }
-        // CHECK: ([[# @LINE+1]]): error 52010
         ref { return w; }
+//CHECK:^^^ ref accessor incompatible with dynamic dispatch
+//CHECK:^^^ 'ref' accessor returning type 'Wrapper' is incompatible with dynamic dispatch because interface types require AnyValue marshalling.
     }
 }
 
 // Scenario 4: Property ref accessor with Tuple containing interface.
-// The check should recurse into generic compound types, just as it
-// does for __ref/__constref parameters.
 typealias TupleWithInterface = Tuple<IFoo, float>;
 
 struct ContainerTupleRef
@@ -91,8 +87,9 @@ struct ContainerTupleRef
     property TupleWithInterface val
     {
         get { return t; }
-        // CHECK: ([[# @LINE+1]]): error 52010
         ref { return t; }
+//CHECK:^^^ ref accessor incompatible with dynamic dispatch
+//CHECK:^^^ 'ref' accessor returning type 'Tuple<IFoo, float>' is incompatible with dynamic dispatch because interface types require AnyValue marshalling.
     }
 }
 
@@ -103,12 +100,13 @@ struct ContainerOptionalRef
     property Optional<IFoo> val
     {
         get { return opt; }
-        // CHECK: ([[# @LINE+1]]): error 52010
         ref { return opt; }
+//CHECK:^^^ ref accessor incompatible with dynamic dispatch
+//CHECK:^^^ 'ref' accessor returning type 'Optional<IFoo>' is incompatible with dynamic dispatch because interface types require AnyValue marshalling.
     }
 }
 
-// CHECK-NOT: error 52010
+// CHECK-NOT: error 52012
 
 IFoo factory(uint id)
 {
@@ -118,10 +116,6 @@ IFoo factory(uint id)
 
 RWStructuredBuffer<float> outputBuffer;
 
-// The diagnostic fires at the ref accessor declaration for all five
-// scenarios above. Only scenarios 1-3 are exercised below to show
-// typical consumer patterns; scenarios 4-5 (Tuple, Optional) don't
-// need runtime usage since the error is caught at declaration time.
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
