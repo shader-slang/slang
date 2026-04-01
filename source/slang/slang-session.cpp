@@ -2212,7 +2212,7 @@ SlangResult Linkage::loadSerializedModuleContents(
     }
     module->setPathInfo(moduleFilePathInfo);
     module->setDigest(moduleChunk->getDigest());
-    module->_collectShaderParams();
+    module->_collectShaderParams(sink);
 
     // When loading from a binary module, the semantic checker doesn't run, so
     // imported modules are not registered in the module dependency list. We

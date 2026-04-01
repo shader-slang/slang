@@ -12,7 +12,7 @@ uniform int* pointer;
 RWStructuredBuffer<int> outputBuffer;
 
 // Ensure we have a proper GLSL supported ctor call for BDA
-//GLSL: BufferPointer__{{[a-zA-Z0-9_]+}}({{[a-zA-Z0-9_]+}}_0)
+//GLSL: BufferPointer__{{[a-zA-Z0-9_]+}}({{[a-zA-Z0-9_]+}})
 
 // Ensure our GLSL code compiles and runs
 //BUF: 2
