@@ -243,6 +243,12 @@ static void _cloneInstDecorationsAndChildren(
         if (lookUp(env, oldChild))
             continue;
 
+        // When dedup returns a pre-existing instruction (e.g. a hoistable inst),
+        // cloning NameHintDecorations onto it again would cause unbounded
+        // accumulation across repeated generic-specialization passes.
+        if (as<IRNameHintDecoration>(oldChild) && newInst->findDecoration<IRNameHintDecoration>())
+            continue;
+
         // Now we can perform the first phase of cloning
         // on the child, and register it in our map from
         // old to new values.

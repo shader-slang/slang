@@ -1864,9 +1864,18 @@ IRInst* IRBuilder::_createInst(
     type = (IRType*)instReplacement;
 
     if (type && shouldHaveSpecConstRate(op, type, fixedArgCount, fixedArgs))
-        type = maybeAddSpecConstRate(this, type);
-
-    if (isInstHoistable(op))
+    {
+        type = ensureSpecConstRate(this, type);
+        return _findOrEmitHoistableInst(
+            type,
+            op,
+            fixedArgCount,
+            fixedArgs,
+            varArgListCount,
+            listArgCounts,
+            listArgs);
+    }
+    else if (isInstHoistable(op))
     {
         return _findOrEmitHoistableInst(
             type,

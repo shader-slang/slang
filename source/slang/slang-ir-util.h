@@ -410,7 +410,7 @@ bool isFirstBlock(IRInst* inst);
 bool isSpecConstRateType(IRType* type);
 void hoistInstAndOperandsToGlobal(IRBuilder* builder, IRInst* inst);
 IRType* maybeAddRateType(IRBuilder* builder, IRType* rateQulifiedType, IRType* oldType);
-IRType* maybeAddSpecConstRate(IRBuilder* builder, IRType* type);
+IRType* ensureSpecConstRate(IRBuilder* builder, IRType* type);
 bool canOperationBeSpecConst(
     IROp op,
     IRType* resultType,
