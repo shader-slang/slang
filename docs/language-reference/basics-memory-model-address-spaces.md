@@ -52,8 +52,9 @@ In Slang, the address spaces are not directly accessible. They are described her
 ## Storage Classes
 
 A storage class determines the memory location, the address space, and other characteristics of memory. In
-Slang, the storage class for a variable is determined by its type. For example, data in `ConstantBuffer<T>`
-belongs in the uniform storage class.
+Slang, the storage class for a variable is determined by its type, modifiers, and attributes. For example,
+data in `ConstantBuffer<T>` belongs in the uniform storage class, and the storage class for a
+`static groupshared` variable is group-shared.
 
 The following storage classes are defined by Slang:
 

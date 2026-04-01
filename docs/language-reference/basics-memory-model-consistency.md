@@ -145,7 +145,7 @@ The Slang standard library provides atomic memory access primitives as follows:
 - [Relaxed atomic operations](../../../core-module-reference/global-decls/atomic.html)
 - [Atomic\<T\>](../../../core-module-reference/types/atomic-0/index.html) type
 
-> 📝 **Remark:** "It is advisable to use only relaxed-memory-order atomics for Slang code that is intended for
+> 📝 **Remark:** It is advisable to use only relaxed-memory-order atomics for Slang code that is intended for
 > multiple targets. Most targets do not have native support for other memory ordering semantics.
 
 

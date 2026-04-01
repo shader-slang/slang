@@ -2,11 +2,11 @@
 
 ## Function Parameters with in/out/inout Modifiers
 
-Arguments to function parameters with `in`/`out`/`inout` or no modifiers may be accessed during the lifetime of the
+Arguments to function parameters with `in`/`out`/`inout` directions may be accessed during the lifetime of the
 function invocation as follows:
 
-- An argument passed to a parameter without `in`/`out`/`inout` modifiers is value-copied when the function is called.
-- The function may read the argument passed to the `in`-parameter any number of times during the function call.
+- The function may read the argument passed to the `in`-parameter any number of times during the function
+  call. This is the default direction.
 - The function may write the argument passed to the `out`-parameter any number of times during the function call.
 - The function may read and write the argument passed to the `inout`-parameter any number of times during the
   function call.
@@ -15,21 +15,49 @@ Even if the function does nothing with the parameter, the argument passed to an 
 may still be accessed during a function call.
 
 The usual [data race](basics-memory-model-consistency.md#data-race) rules apply to arguments passed to
-functions. That is, if a variable is passed as an argument to a function parameter twice, there is a memory
-access conflict if one or both parameters are `out`/`inout`. The memory access conflict is a data race, and
-thus, [undefined behavior](basics-behavior.md), unless one function call happens before the other.
+functions. That is, if a variable is passed as an argument to a function parameter in one thread, there is a
+data race if the same variable is passed as an argument to an `out`/`inout` function parameter in another
+thread, and the full duration of one function call does not happen before the other.
 
-Note that it is possible to induce a function parameter data race in a single thread by passing the same
-variable as an argument to two different parameters of the same function if at least one of the parameters is
-`out`/`inout`.
+In addition, it is [undefined behavior](basics-behavior.md) to pass the same variable as an argument to two
+parameters of a function if at least one parameter is `out`/`inout`.
+
+**Example 1:**
+
+```hlsl
+RWStructuredBuffer<int> output;
+
+void addConsumeTwoValues(
+    inout int i1, inout int i2, inout int o)
+{
+    o += i1;
+    i1 = -1; // mark consumed
+
+    o += i2;
+    i2 = -1; // mark consumed
+}
+
+[numthreads(1,1,1)]
+void computeMain(uint3 dispatchThreadID: SV_DispatchThreadID)
+{
+    int a = dispatchThreadID.x;
+    int b = dispatchThreadID.y;
+
+    // undefined behavior: a is passed twice to
+    // inout parameters
+    addConsumeTwoValues(a, b, a);
+
+    output[0] = a;
+}
+```
+
 
 > 📝 **Remark:** There are two main implementation approaches for `in`/`out`/`inout`-parameters:
 > - Read the `in`/`inout` arguments on function entry and write back `out`/`inout` arguments on function
 >   exit.
 > - Convert `in`/`out`/`inout` arguments to pointers, and replace parameter accesses with pointer indirections.
 >
-> However, it is unspecified which approach (if either) is used. The exact mechanism depends on the target, and
-> in some cases, also on the downstream compiler.
+> However, it is unspecified which approach (if either) is used. The exact mechanism is target-dependent.
 
 
 ## Memory Aliasing via Binding
