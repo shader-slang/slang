@@ -16,9 +16,18 @@ inputs:
   use-cached-llvm:
     default: true
     required: false
+  min-disk-gb:
+    description: "Minimum required free disk space in GB"
+    default: "3"
+    required: false
 runs:
   using: composite
   steps:
+    - name: Check disk space
+      uses: ./.github/actions/check-disk-space
+      with:
+        min-disk-gb: ${{ inputs.min-disk-gb }}
+
     - name: Add bash to PATH
       shell: pwsh
       if: ${{inputs.os == 'windows'}}
