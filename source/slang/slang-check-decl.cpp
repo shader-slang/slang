@@ -11500,8 +11500,19 @@ Type* SemanticsDeclHeaderVisitor::_getAccessorStorageType(AccessorDecl* decl)
 // This mirrors the IR-level `typeIncludesDynamicDispatch()` in
 // slang-ir-typeflow-specialize.cpp but operates on AST types so it
 // can be used during semantic checking.
-static bool _astTypeIncludesDynamicDispatch(Type* type)
+//
+// `visitor` is used to ensure struct field types are resolved via
+// ensureDecl before inspection.  `seenDecls` guards against infinite
+// recursion on self-recursive aggregates.
+static bool _astTypeIncludesDynamicDispatch(
+    SemanticsVisitor* visitor,
+    Type* type,
+    HashSet<Decl*>& seenDecls)
 {
+    // Peel ModifiedType wrappers (e.g. `const`, `volatile`).
+    while (auto modifiedType = as<ModifiedType>(type))
+        type = modifiedType->getBase();
+
     if (auto declRefType = as<DeclRefType>(type))
     {
         if (auto interfaceDecl = as<InterfaceDecl>(declRefType->getDeclRef().getDecl()))
@@ -11517,24 +11528,29 @@ static bool _astTypeIncludesDynamicDispatch(Type* type)
     {
         if (auto structDecl = as<StructDecl>(structType->getDeclRef().getDecl()))
         {
+            if (!seenDecls.add(structDecl))
+                return false;
             for (auto field : structDecl->getFields())
             {
-                if (field->type.type && _astTypeIncludesDynamicDispatch(field->type.type))
+                visitor->ensureDecl(field, DeclCheckState::CanUseTypeOfValueDecl);
+                if (field->type.type &&
+                    _astTypeIncludesDynamicDispatch(visitor, field->type.type, seenDecls))
                     return true;
             }
+            seenDecls.remove(structDecl);
         }
     }
 
     if (auto arrayType = as<ArrayExpressionType>(type))
     {
         if (auto elemType = arrayType->getElementType())
-            return _astTypeIncludesDynamicDispatch(elemType);
+            return _astTypeIncludesDynamicDispatch(visitor, elemType, seenDecls);
     }
 
     if (auto optionalType = as<OptionalType>(type))
     {
         if (auto valType = optionalType->getValueType())
-            return _astTypeIncludesDynamicDispatch(valType);
+            return _astTypeIncludesDynamicDispatch(visitor, valType, seenDecls);
     }
 
     if (auto tupleType = as<TupleType>(type))
@@ -11543,7 +11559,7 @@ static bool _astTypeIncludesDynamicDispatch(Type* type)
         {
             if (auto memberType = tupleType->getMember(i))
             {
-                if (_astTypeIncludesDynamicDispatch(memberType))
+                if (_astTypeIncludesDynamicDispatch(visitor, memberType, seenDecls))
                     return true;
             }
         }
@@ -11612,12 +11628,14 @@ void SemanticsDeclHeaderVisitor::visitAccessorDecl(AccessorDecl* decl)
     if (as<RefAccessorDecl>(decl))
     {
         auto storageType = decl->returnType.type;
-        if (storageType && _astTypeIncludesDynamicDispatch(storageType))
+        HashSet<Decl*> seenDecls;
+        if (storageType && _astTypeIncludesDynamicDispatch(this, storageType, seenDecls))
         {
             getSink()->diagnose(
                 Diagnostics::RefAccessorWithInterfaceTypeInDynamicDispatch{
                     .valueType = storageType,
                     .location = decl->loc});
+            decl->returnType.type = getASTBuilder()->getErrorType();
         }
     }
 
