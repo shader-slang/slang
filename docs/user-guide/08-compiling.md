@@ -570,31 +570,12 @@ float4 psMain() : SV_Target
 slangc macrodefine.slang -entry psMain -target spirv-asm -o targets.spvasm -Dmymacro
 ```
 
-#### Cooperative Vector on DXIL (SM6.10)
+#### Cooperative Vector and Matrix on DXIL (SM6.10)
 
-When targeting DXIL with cooperative vector operations on SM6.10, Slang emits
-HLSL that includes `dx/linalg.h` from the DXC SDK. This header is **not**
-shipped with Slang, so you must provide DXC's include directory explicitly:
-
-```
--Xdxc -I<path_to_dxc_includes>
-```
-
-For example, if DXC is installed at `/opt/dxc`:
-
-```
-slangc myshader.slang -target dxil -profile cs_6_10 -entry main -Xdxc -I/opt/dxc/include
-```
-
-When building Slang from source, the DXC headers are automatically copied to
-`build/dxc/include/` during the build, so you can use `-Xdxc -Ibuild/dxc/include`
-for local development and testing.
-
-#### Cooperative Matrix on DXIL (SM6.10)
-
-When targeting DXIL with cooperative matrix operations on SM6.10, Slang emits
-HLSL that includes `dx/linalg.h` from the DXC SDK. This header is **not**
-shipped with Slang, so you must provide DXC's include directory explicitly:
+When targeting DXIL with cooperative vector or matrix operations on SM6.10, Slang emits
+`#include "dx/linalg.h"`, because the emitted HLSL uses `linalg` namespace.
+This header is **not** shipped with Slang, and the user must provide DXC's include
+directory explicitly:
 
 ```
 -Xdxc -I<path_to_dxc_includes>
