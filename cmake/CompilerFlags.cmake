@@ -228,7 +228,9 @@ function(set_default_compile_options target)
             target_link_options(
                 ${target}
                 BEFORE
-                PRIVATE -fsanitize=address -fsanitize=undefined
+                PRIVATE
+                    -fsanitize=address
+                    -fsanitize=undefined
             )
             if(NOT APPLE)
                 # Clang defaults to statically linking the sanitizer runtime,
@@ -241,12 +243,16 @@ function(set_default_compile_options target)
         elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
             target_compile_options(
                 ${target}
-                PRIVATE -fsanitize=address -fsanitize=undefined
+                PRIVATE
+                    -fsanitize=address
+                    -fsanitize=undefined
             )
             target_link_options(
                 ${target}
                 BEFORE
-                PRIVATE -fsanitize=address -fsanitize=undefined
+                PRIVATE
+                    -fsanitize=address
+                    -fsanitize=undefined
             )
         elseif(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
             target_compile_options(${target} PRIVATE /fsanitize=address)

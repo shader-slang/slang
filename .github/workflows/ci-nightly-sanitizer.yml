@@ -11,6 +11,5 @@ jobs:
     uses: ./.github/workflows/ci-slang-sanitizer.yml
     with:
       runs-on: '["ubuntu-22.04"]'
-      # Nightly runs can afford broader coverage than PR smoke tests
       test-category: smoke
       server-count: 8
