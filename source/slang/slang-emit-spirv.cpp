@@ -797,9 +797,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         {
             switch (irOpCode)
             {
-            case kIROp_IntCast:
-            case kIROp_ConstexprIntCast:
-                return SpvOpUConvert;
             case kIROp_FloatCast:
             case kIROp_ConstexprFloatCast:
                 return SpvOpFConvert;
@@ -2337,7 +2334,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         static_cast<IRIntLit*>(coopMatType->getColumnCount())->getValue(),
                         builder.getIntType()),
                     emitIntConstant(
-                        static_cast<IRIntLit*>(coopMatType->getMatrixUse())->getValue(),
+                        mapSlangCooperativeMatrixUseToSpv(
+                            static_cast<IRIntLit*>(coopMatType->getMatrixUse())->getValue()),
                         builder.getIntType()));
             }
         case kIROp_TensorAddressingTensorLayoutType:
@@ -3073,9 +3071,10 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         }
         if (format == SpvImageFormatUnknown && sampled == ImageOpConstants::readWriteImage)
         {
-            // TODO: It may not be necessary to have both of these
-            // depending on if we read or write
-            requireSPIRVCapability(SpvCapabilityStorageImageReadWithoutFormat);
+            // Write-only textures (WTexture*) only need the write capability.
+            // Read-write and rasterizer-ordered textures need both.
+            if (inst->getAccess() != SLANG_RESOURCE_ACCESS_WRITE)
+                requireSPIRVCapability(SpvCapabilityStorageImageReadWithoutFormat);
             requireSPIRVCapability(SpvCapabilityStorageImageWriteWithoutFormat);
         }
 
@@ -3476,6 +3475,47 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return result;
     }
 
+    SpvInst* emitSpecConstantUConvert(IRInst* inst, IRType* resultType, SpvInst* operand)
+    {
+        return emitInst(
+            getSection(SpvLogicalSectionID::ConstantsAndTypes),
+            inst,
+            SpvOpSpecConstantOp,
+            resultType,
+            kResultID,
+            SpvOpUConvert,
+            operand);
+    }
+
+    SpvInst* emitSpecConstantSConvert(IRInst* inst, IRType* resultType, SpvInst* operand)
+    {
+        return emitInst(
+            getSection(SpvLogicalSectionID::ConstantsAndTypes),
+            inst,
+            SpvOpSpecConstantOp,
+            resultType,
+            kResultID,
+            SpvOpSConvert,
+            operand);
+    }
+
+    // Emit IAdd-by-zero wrapped in OpSpecConstantOp to reinterpret signedness.
+    // OpBitcast is not in the set of opcodes allowed by OpSpecConstantOp, so
+    // we use IAdd-by-zero instead (same approach as glslang's GlslangToSpv.cpp).
+    SpvInst* emitSpecConstantSignReinterpret(IRInst* inst, IRType* resultType, SpvInst* operand)
+    {
+        auto zero = emitIntConstant(0, resultType);
+        return emitInst(
+            getSection(SpvLogicalSectionID::ConstantsAndTypes),
+            inst,
+            SpvOpSpecConstantOp,
+            resultType,
+            kResultID,
+            SpvOpIAdd,
+            operand,
+            zero);
+    }
+
     SpvInst* emitSpecializationConstantOp(IRInst* inst)
     {
         SpvInst* spv = nullptr;
@@ -3505,6 +3545,52 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         {
             // We need to emit the constant as a specialization constant
             return emitLit(inst);
+        }
+
+        // Handle integer casts in spec constant context.
+        // Inside OpSpecConstantOp, UConvert/SConvert require different bit widths
+        // and matching signedness on the result type, and OpBitcast is not in the
+        // set of allowed opcodes. See emitSpecConstantSignReinterpret for the
+        // workaround used for signedness changes.
+        auto irOp = inst->getOp();
+        if (irOp == kIROp_IntCast || irOp == kIROp_ConstexprIntCast)
+        {
+            auto srcType = inst->getOperand(0)->getDataType();
+            auto dstType = inst->getDataType();
+            if (isIntegralType(srcType) && isIntegralType(dstType))
+            {
+                auto srcInfo = getIntTypeInfo(m_targetRequest, srcType);
+                auto dstInfo = getIntTypeInfo(m_targetRequest, dstType);
+
+                if (srcInfo == dstInfo)
+                {
+                    auto operand = emitSpecializationConstantOp(inst->getOperand(0));
+                    registerInst(inst, operand);
+                    return operand;
+                }
+
+                auto operand = emitSpecializationConstantOp(inst->getOperand(0));
+                bool needsWidthChange = srcInfo.width != dstInfo.width;
+                bool needsSignReinterpret = srcInfo.isSigned != dstInfo.isSigned;
+
+                if (needsWidthChange)
+                {
+                    IRBuilder builder(m_irModule);
+                    auto convertType = needsSignReinterpret
+                                           ? builder.getType(getIntTypeOpFromInfo(
+                                                 {dstInfo.width, srcInfo.isSigned}))
+                                           : inst->getFullType();
+                    auto convertInst = needsSignReinterpret ? nullptr : inst;
+                    operand = srcInfo.isSigned
+                                  ? emitSpecConstantSConvert(convertInst, convertType, operand)
+                                  : emitSpecConstantUConvert(convertInst, convertType, operand);
+                }
+
+                if (needsSignReinterpret)
+                    operand = emitSpecConstantSignReinterpret(inst, inst->getFullType(), operand);
+
+                return operand;
+            }
         }
 
         IRType* type = inst->getOperand(0)->getDataType();
@@ -4217,6 +4303,8 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             scope,
             builder.getIntValue(builder.getUIntType(), 0),
             debugVar->getArgIndex());
+
+        registerDebugInst(debugVar, spvDebugLocalVar);
 
         if (hasBackingVar)
         {
@@ -4937,6 +5025,18 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             break;
         case kIROp_CoopMatMapElementIFunc:
             result = emitCoopMatMapElementWithIFunc(parent, as<IRCoopMatMapElementIFunc>(inst));
+            break;
+        case kIROp_CoopMatMulAdd:
+            result = emitCoopMatMulAdd(parent, inst);
+            break;
+        case kIROp_CoopVecMatMulAdd:
+            result = emitCoopVecMatMulAdd(parent, inst);
+            break;
+        case kIROp_CoopVecOuterProductAccumulate:
+            result = emitCoopVecOuterProductAccumulate(parent, inst);
+            break;
+        case kIROp_CoopVecReduceSumAccumulate:
+            result = emitCoopVecReduceSumAccumulate(parent, inst);
             break;
         case kIROp_MakeTensorAddressingTensorLayout:
             result = emitOpCreateTensorLayout(parent, inst, getID(ensureInst(inst->getDataType())));
@@ -8213,6 +8313,41 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return result;
     }
 
+    // Emit an operand that satisfies cooperative vector SPIRV opcodes, which require a pointer
+    // to an array type (not a pointer to a struct).
+    //
+    // - Buffer resource case (ByteAddressBuffer / StructuredBuffer): after SPIRV legalization
+    //   the global param has type ptr-to-struct{runtimeArray<T>}. Emit an OpAccessChain with
+    //   index 0 to pierce through the wrapper struct and expose the runtime array.
+    //
+    // - Ptr<T[]> case: the pointer already points directly to the unsized array, so return it
+    //   as-is.
+    SpvInst* emitBufferPtrAsArrayPtr(SpvInstParent* parent, IRInst* bufferVal)
+    {
+        IRBuilder builder(bufferVal);
+        auto addressSpace =
+            isSpirv14OrLater() ? AddressSpace::StorageBuffer : AddressSpace::Uniform;
+        IRPtrTypeBase* bufPtrType = cast<IRPtrTypeBase>(bufferVal->getDataType());
+        // If the pointee is not a struct, the pointer already targets an array directly
+        // (e.g. Ptr<T[]>) — use it without modification.
+        IRStructType* bufType = as<IRStructType>(bufPtrType->getValueType());
+        if (!bufType)
+            return ensureInst(bufferVal);
+        // The struct's first (and only) field is the runtime array of elements.
+        IRArrayTypeBase* arrayType =
+            cast<IRArrayTypeBase>(bufType->getFields().getFirst()->getFieldType());
+        return emitOpAccessChain(
+            parent,
+            nullptr,
+            builder.getPtrType(
+                arrayType,
+                AccessQualifier::ReadWrite,
+                addressSpace,
+                bufPtrType->getDataLayout()),
+            bufferVal,
+            makeArray(emitIntConstant(0, builder.getIntType())));
+    }
+
     SpvInst* emitGetBufferPtr(SpvInstParent* parent, IRInst* inst)
     {
         IRBuilder builder(inst);
@@ -8895,6 +9030,269 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             });
     }
 
+    bool isSignedIntegerScalarType(IRType* type)
+    {
+        return isScalarIntegerType(type) && getIntTypeSigned(type);
+    }
+
+    SpvInst* emitCoopMatMulAdd(SpvInstParent* parent, IRInst* inst)
+    {
+        requireSPIRVCapability(SpvCapabilityCooperativeMatrixKHR);
+        ensureExtensionDeclaration(UnownedStringSlice("SPV_KHR_cooperative_matrix"));
+
+        SLANG_ASSERT(inst->getOperandCount() == 4);
+
+        auto coopMatMulAdd = cast<IRCoopMatMulAdd>(inst);
+        auto saturatingAccumulation =
+            cast<IRBoolLit>(coopMatMulAdd->getSaturatingAccumulation())->getValue();
+
+        uint32_t operandsMask = 0;
+        auto aType = cast<IRCoopMatrixType>(coopMatMulAdd->getMatA()->getDataType());
+        auto bType = cast<IRCoopMatrixType>(coopMatMulAdd->getMatB()->getDataType());
+        auto cType = cast<IRCoopMatrixType>(coopMatMulAdd->getMatC()->getDataType());
+        auto resultType = cast<IRCoopMatrixType>(inst->getDataType());
+
+        if (isSignedIntegerScalarType(aType->getElementType()))
+            operandsMask |= SpvCooperativeMatrixOperandsMatrixASignedComponentsKHRMask;
+        if (isSignedIntegerScalarType(bType->getElementType()))
+            operandsMask |= SpvCooperativeMatrixOperandsMatrixBSignedComponentsKHRMask;
+        if (isSignedIntegerScalarType(cType->getElementType()))
+            operandsMask |= SpvCooperativeMatrixOperandsMatrixCSignedComponentsKHRMask;
+        if (isSignedIntegerScalarType(resultType->getElementType()))
+            operandsMask |= SpvCooperativeMatrixOperandsMatrixResultSignedComponentsKHRMask;
+
+        if (saturatingAccumulation)
+            operandsMask |= SpvCooperativeMatrixOperandsSaturatingAccumulationKHRMask;
+        return emitInstCustomOperandFunc(
+            parent,
+            inst,
+            SpvOpCooperativeMatrixMulAddKHR,
+            [&]()
+            {
+                emitOperand(inst->getFullType());
+                emitOperand(kResultID);
+                emitOperand(coopMatMulAdd->getMatA());
+                emitOperand(coopMatMulAdd->getMatB());
+                emitOperand(coopMatMulAdd->getMatC());
+                if (operandsMask)
+                    emitOperand(SpvLiteralInteger::from32(operandsMask));
+            });
+    }
+
+    IRIntegerValue mapSlangCooperativeMatrixUseToSpv(IRIntegerValue slangValue)
+    {
+        switch ((int32_t)slangValue)
+        {
+        case SLANG_COOPERATIVE_MATRIX_USE_A:
+            return SpvCooperativeMatrixUseMatrixAKHR;
+        case SLANG_COOPERATIVE_MATRIX_USE_B:
+            return SpvCooperativeMatrixUseMatrixBKHR;
+        case SLANG_COOPERATIVE_MATRIX_USE_ACCUMULATOR:
+            return SpvCooperativeMatrixUseMatrixAccumulatorKHR;
+        default:
+            SLANG_UNEXPECTED("Unsupported cooperative matrix use for SPIR-V emission");
+        }
+    }
+
+    IRIntegerValue mapSlangCoopVecMatrixLayoutToSpv(IRIntegerValue slangValue)
+    {
+        switch ((int32_t)slangValue)
+        {
+        case SLANG_COOPERATIVE_VECTOR_MATRIX_LAYOUT_ROW_MAJOR:
+            return SpvCooperativeVectorMatrixLayoutRowMajorNV;
+        case SLANG_COOPERATIVE_VECTOR_MATRIX_LAYOUT_COLUMN_MAJOR:
+            return SpvCooperativeVectorMatrixLayoutColumnMajorNV;
+        case SLANG_COOPERATIVE_VECTOR_MATRIX_LAYOUT_INFERENCING_OPTIMAL:
+            return SpvCooperativeVectorMatrixLayoutInferencingOptimalNV;
+        case SLANG_COOPERATIVE_VECTOR_MATRIX_LAYOUT_TRAINING_OPTIMAL:
+            return SpvCooperativeVectorMatrixLayoutTrainingOptimalNV;
+        default:
+            SLANG_UNEXPECTED("Unsupported cooperative vector matrix layout for SPIR-V emission");
+        }
+    }
+
+    IRIntegerValue mapSlangCoopVecComponentTypeToSpv(
+        IRIntegerValue slangValue,
+        IRIntegerValue inputInterpretationPackingFactor)
+    {
+        if (inputInterpretationPackingFactor != 1)
+        {
+            switch ((int32_t)slangValue)
+            {
+            case SLANG_SCALAR_TYPE_INT8:
+                return SpvComponentTypeSignedInt8PackedNV;
+            case SLANG_SCALAR_TYPE_UINT8:
+                return SpvComponentTypeUnsignedInt8PackedNV;
+            default:
+                SLANG_UNEXPECTED("Unsupported packed cooperative vector input interpretation for "
+                                 "SPIR-V emission");
+            }
+        }
+
+        switch ((int32_t)slangValue)
+        {
+        case SLANG_SCALAR_TYPE_FLOAT_E4M3:
+            return SpvComponentTypeFloatE4M3NV;
+        case SLANG_SCALAR_TYPE_FLOAT_E5M2:
+            return SpvComponentTypeFloatE5M2NV;
+        case SLANG_SCALAR_TYPE_FLOAT16:
+            return SpvComponentTypeFloat16NV;
+        case SLANG_SCALAR_TYPE_FLOAT32:
+            return SpvComponentTypeFloat32NV;
+        case SLANG_SCALAR_TYPE_FLOAT64:
+            return SpvComponentTypeFloat64NV;
+        case SLANG_SCALAR_TYPE_INT8:
+            return SpvComponentTypeSignedInt8NV;
+        case SLANG_SCALAR_TYPE_INT16:
+            return SpvComponentTypeSignedInt16NV;
+        case SLANG_SCALAR_TYPE_INT32:
+            return SpvComponentTypeSignedInt32NV;
+        case SLANG_SCALAR_TYPE_INT64:
+            return SpvComponentTypeSignedInt64NV;
+        case SLANG_SCALAR_TYPE_UINT8:
+            return SpvComponentTypeUnsignedInt8NV;
+        case SLANG_SCALAR_TYPE_UINT16:
+            return SpvComponentTypeUnsignedInt16NV;
+        case SLANG_SCALAR_TYPE_UINT32:
+            return SpvComponentTypeUnsignedInt32NV;
+        case SLANG_SCALAR_TYPE_UINT64:
+            return SpvComponentTypeUnsignedInt64NV;
+        default:
+            SLANG_UNEXPECTED("Unsupported cooperative vector component type for SPIR-V emission");
+        }
+    }
+
+    void emitMappedCoopVecMatrixLayoutOperand(IRInst* operand)
+    {
+        auto intLit = cast<IRIntLit>(operand);
+        emitOperand(emitIntConstant(
+            mapSlangCoopVecMatrixLayoutToSpv(intLit->getValue()),
+            operand->getDataType()));
+    }
+
+    void emitMappedCoopVecComponentTypeOperand(
+        IRInst* operand,
+        IRInst* inputInterpretationPackingFactor = nullptr)
+    {
+        auto intLit = cast<IRIntLit>(operand);
+
+        IRIntegerValue packingFactor = 1;
+        if (inputInterpretationPackingFactor)
+        {
+            packingFactor = cast<IRIntLit>(inputInterpretationPackingFactor)->getValue();
+        }
+
+        if (intLit->getValue() == SLANG_SCALAR_TYPE_BFLOAT16)
+        {
+            m_sink->diagnose(Diagnostics::UnsupportedTargetIntrinsic{
+                .operation = "BFloat16 cooperative vector component type",
+                .location = operand->sourceLoc});
+            emitOperand(emitIntConstant(0, operand->getDataType()));
+            return;
+        }
+
+        emitOperand(emitIntConstant(
+            mapSlangCoopVecComponentTypeToSpv(intLit->getValue(), packingFactor),
+            operand->getDataType()));
+    }
+
+    SpvInst* emitCoopVecMatMulAdd(SpvInstParent* parent, IRInst* inst)
+    {
+        requireSPIRVCapability(SpvCapabilityCooperativeVectorNV);
+        ensureExtensionDeclaration(UnownedStringSlice("SPV_NV_cooperative_vector"));
+
+        SLANG_ASSERT(inst->getOperandCount() == 10 || inst->getOperandCount() == 13);
+
+        auto coopVecMatMulAdd = cast<IRCoopVecMatMulAdd>(inst);
+        auto k = cast<IRIntLit>(coopVecMatMulAdd->getK());
+        auto transpose = cast<IRBoolLit>(coopVecMatMulAdd->getTranspose());
+        bool hasBias = coopVecMatMulAdd->getBiasInterpretation() != nullptr;
+
+        uint32_t operandsMask = 0;
+        auto inputType = cast<IRCoopVectorType>(coopVecMatMulAdd->getInput()->getDataType());
+        auto resultType = cast<IRCoopVectorType>(inst->getDataType());
+        auto resultElementCount = cast<IRIntLit>(resultType->getElementCount());
+        if (isSignedIntegerScalarType(inputType->getElementType()))
+            operandsMask |= SpvCooperativeMatrixOperandsMatrixBSignedComponentsKHRMask;
+        if (isSignedIntegerScalarType(resultType->getElementType()))
+            operandsMask |= SpvCooperativeMatrixOperandsMatrixResultSignedComponentsKHRMask;
+
+        return emitInstCustomOperandFunc(
+            parent,
+            inst,
+            hasBias ? SpvOpCooperativeVectorMatrixMulAddNV : SpvOpCooperativeVectorMatrixMulNV,
+            [&]()
+            {
+                emitOperand(inst->getFullType());
+                emitOperand(kResultID);
+                emitOperand(coopVecMatMulAdd->getInput());
+                emitMappedCoopVecComponentTypeOperand(
+                    coopVecMatMulAdd->getInputInterpretation(),
+                    coopVecMatMulAdd->getInputInterpretationPackingFactor());
+                emitOperand(emitBufferPtrAsArrayPtr(parent, coopVecMatMulAdd->getMatrixPtr()));
+                emitOperand(coopVecMatMulAdd->getMatrixOffset());
+                emitMappedCoopVecComponentTypeOperand(coopVecMatMulAdd->getMatrixInterpretation());
+                if (hasBias)
+                {
+                    emitOperand(emitBufferPtrAsArrayPtr(parent, coopVecMatMulAdd->getBiasPtr()));
+                    emitOperand(coopVecMatMulAdd->getBiasOffset());
+                    emitMappedCoopVecComponentTypeOperand(
+                        coopVecMatMulAdd->getBiasInterpretation());
+                }
+                emitOperand(resultElementCount);
+                emitOperand(emitIntConstant(k->getValue(), k->getDataType()));
+                emitMappedCoopVecMatrixLayoutOperand(coopVecMatMulAdd->getMemoryLayout());
+                emitOperand(transpose);
+                emitOperand(coopVecMatMulAdd->getMatrixStride());
+                if (operandsMask)
+                    emitOperand(SpvLiteralInteger::from32(operandsMask));
+            });
+    }
+
+    SpvInst* emitCoopVecOuterProductAccumulate(SpvInstParent* parent, IRInst* inst)
+    {
+        requireSPIRVCapability(SpvCapabilityCooperativeVectorTrainingNV);
+        ensureExtensionDeclaration(UnownedStringSlice("SPV_NV_cooperative_vector"));
+
+        SLANG_ASSERT(inst->getOperandCount() == 7);
+
+        auto outerProduct = cast<IRCoopVecOuterProductAccumulate>(inst);
+
+        return emitInstCustomOperandFunc(
+            parent,
+            inst,
+            SpvOpCooperativeVectorOuterProductAccumulateNV,
+            [&]()
+            {
+                emitOperand(emitBufferPtrAsArrayPtr(parent, outerProduct->getMatrixPtr()));
+                emitOperand(outerProduct->getMatrixOffset());
+                emitOperand(outerProduct->getA());
+                emitOperand(outerProduct->getB());
+                emitMappedCoopVecMatrixLayoutOperand(outerProduct->getMemoryLayout());
+                emitMappedCoopVecComponentTypeOperand(outerProduct->getMatrixInterpretation());
+                emitOperand(outerProduct->getMatrixStride());
+            });
+    }
+
+    SpvInst* emitCoopVecReduceSumAccumulate(SpvInstParent* parent, IRInst* inst)
+    {
+        requireSPIRVCapability(SpvCapabilityCooperativeVectorTrainingNV);
+        ensureExtensionDeclaration(UnownedStringSlice("SPV_NV_cooperative_vector"));
+
+        auto reduceSum = cast<IRCoopVecReduceSumAccumulate>(inst);
+
+        return emitInstCustomOperandFunc(
+            parent,
+            inst,
+            SpvOpCooperativeVectorReduceSumAccumulateNV,
+            [&]()
+            {
+                emitOperand(emitBufferPtrAsArrayPtr(parent, reduceSum->getBufferPtr()));
+                emitOperand(reduceSum->getOffset());
+                emitOperand(reduceSum->getValue());
+            });
+    }
+
     SpvInst* emitSplat(SpvInstParent* parent, IRInst* inst, IRInst* scalar, IRIntegerValue numElems)
     {
         const auto scalarTy = as<IRBasicType>(scalar->getDataType());
@@ -9429,15 +9827,19 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                 if (!structType)
                     return false;
                 UInt fieldIndex = 0;
+                bool foundField = false;
                 for (auto field : structType->getFields())
                 {
                     if (field->getKey() == key)
                     {
                         type = unwrapAttributedType(field->getFieldType());
+                        foundField = true;
                         break;
                     }
                     fieldIndex++;
                 }
+                if (!foundField)
+                    return false;
                 spvAccessChain.add(emitIntConstant(fieldIndex, builder.getIntType()));
             }
             else
@@ -9452,7 +9854,13 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                         matrixType->getColumnCount());
                 else
                     return false;
-                spvAccessChain.add(ensureInst(element));
+                // DebugValue index operands must be constant integers.
+                auto indexOperand = element;
+                if (auto globalValueRef = as<IRGlobalValueRef>(indexOperand))
+                    indexOperand = globalValueRef->getValue();
+                if (!as<IRIntLit>(indexOperand))
+                    return false;
+                spvAccessChain.add(ensureInst(indexOperand));
             }
         }
         return true;
@@ -9463,12 +9871,12 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         auto debugVar = debugValue->getDebugVar();
         auto debugValueVal = debugValue->getValue();
         // We are asked to update the value for a debug variable.
-        // A debug variable is already emited as a OpDebugVariable +
-        // OpVariable + OpDebugDeclare. We only need to store the new value
-        // into the associated OpVariable. The `debugValue->getDebugVar()` inst
-        // already maps to the `OpVariable` SpvInst, so we just need to emit
-        // code for a store into the subset of the OpVariable with the correct
-        // accesschain defined in the debug value inst.
+        // A debug variable is already emitted as an OpDebugLocalVariable +
+        // OpVariable + OpDebugDeclare. We need to both:
+        // 1. Emit an OpDebugValue (can be helpful if the OpVariable gets
+        //    optimized out).
+        // 2. Store the new value into the associated OpVariable (for the
+        //    DebugDeclare association).
         //
         IRBuilder builder(debugValue);
         builder.setInsertBefore(debugValue);
@@ -9483,42 +9891,48 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
             return nullptr;
         if (!spvDebugVar)
             return nullptr;
-        if (spvDebugVar->opcode != SpvOpVariable)
+
+        // Emit an OpDebugValue if possible.
+        //
+        SpvInst* spvDebugLocalVar = nullptr;
+        m_mapIRInstToSpvDebugInst.tryGetValue(rootVar, spvDebugLocalVar);
+        if (spvDebugLocalVar)
         {
-            // If the root variable can't be represented by a normal variable,
-            // try to emit a DebugValue if possible. Usually this means that the variable
-            // represents a shader resource.
-            //
             // SPIR-V requires the access chain specified in a DebugValue operation to
             // be fully static. We will skip emitting the debug inst if the access chain
             // isn't static.
             //
-            auto type = unwrapAttributedType(debugVar->getDataType());
+            auto type = rootVar->getDataType();
+            if (auto pointedToType = tryGetPointedToType(&builder, type))
+                type = pointedToType;
+            else
+                type = as<IRType>(unwrapAttributedType(type));
             List<SpvInst*> accessChain;
             bool isConstAccessChain =
                 translateIRAccessChain(builder, type, irAccessChain, accessChain);
 
             if (isConstAccessChain)
             {
-                return emitOpDebugValue(
+                emitOpDebugValue(
                     parent,
-                    debugValue,
+                    nullptr,
                     m_voidType,
                     getNonSemanticDebugInfoExtInst(),
-                    rootVar,
+                    spvDebugLocalVar,
                     debugValueVal,
                     getDwarfExpr(),
                     accessChain);
             }
-
-            // Fallback to not emit anything for now.
-            return nullptr;
         }
 
-        // The ordinary case is the debug variable has a backing ordinary variable.
-        // We can simply emit a store into the backing variable for the DebugValue operation.
+        // If the debug variable has a backing OpVariable, emit a store into it
+        // to keep the DebugDeclare association in sync.
         //
-        return emitStore(parent, debugValue, debugVar, debugValueVal);
+        if (spvDebugVar->opcode == SpvOpVariable)
+            return emitStore(parent, debugValue, debugVar, debugValueVal);
+
+        // Fallback to not emit anything.
+        return nullptr;
     }
 
     void maybeAssignAnonymousMemberNames(IRStructType* structType)

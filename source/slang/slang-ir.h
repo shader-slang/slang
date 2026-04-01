@@ -1342,7 +1342,12 @@ struct IRBlock : IRInst
         Iterator begin() { return Iterator(begin_, stride); }
         Iterator end() { return Iterator(end_, stride); }
 
-        SuccessorList reverse() { return SuccessorList(end_ - stride, begin_ - stride, -stride); }
+        SuccessorList reverse()
+        {
+            if (!begin_ || !end_)
+                return SuccessorList(nullptr, nullptr, -stride);
+            return SuccessorList(end_ - stride, begin_ - stride, -stride);
+        }
     };
 
     PredecessorList getPredecessors();
@@ -2133,7 +2138,7 @@ public:
     // anything to do with serialization format
     //
     const static UInt k_minSupportedModuleVersion = 4;
-    const static UInt k_maxSupportedModuleVersion = 9;
+    const static UInt k_maxSupportedModuleVersion = 13;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
 private:
@@ -2370,6 +2375,11 @@ extern bool _slangIRPrintStackAtBreak;
 void _debugSetInstBeingCloned(uint32_t uid);
 void _debugResetInstBeingCloned();
 #endif
+
+// Print a call stack leading to 'inst' as a series of
+// Diagnostics::seeCallOfFunc diagnostic messages.
+void diagnoseCallStack(IRInst* inst, DiagnosticSink* sink);
+
 
 // TODO: Ellie, comment and move somewhere more appropriate?
 

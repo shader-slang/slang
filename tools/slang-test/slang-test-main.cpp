@@ -166,7 +166,10 @@ typedef TestResult (*TestCallback)(TestContext* context, TestInput& input);
 // Globals
 
 // Pre declare
-static void _addRenderTestOptions(const Options& options, CommandLine& ioCmdLine);
+static void _addRenderTestOptions(
+    const Options& options,
+    CommandLine& ioCmdLine,
+    bool allowCacheRHI);
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! Functions !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
@@ -1482,18 +1485,24 @@ static SlangResult _extractRenderTestRequirements(
         passThru = SLANG_PASS_THROUGH_NONE;
     }
 
-    if (passThru == SLANG_PASS_THROUGH_NONE)
+    // In compile-only mode, we need neither the GPU API nor downstream compilers.
+    // render-test will use text output targets (HLSL, GLSL, MSL, CUDA source)
+    // that only exercise Slang's own emit code.
+    bool isCompileOnly =
+        cmdLine.findArgIndex(UnownedStringSlice::fromLiteral("-compile-only")) >= 0;
+    if (!isCompileOnly)
     {
-        // Work out backends needed based on the target
-        ioRequirements->addUsedBackends(_getPassThroughFlagsForTarget(target));
-    }
-    else
-    {
-        ioRequirements->addUsedBackEnd(passThru);
-    }
+        if (passThru == SLANG_PASS_THROUGH_NONE)
+        {
+            ioRequirements->addUsedBackends(_getPassThroughFlagsForTarget(target));
+        }
+        else
+        {
+            ioRequirements->addUsedBackEnd(passThru);
+        }
 
-    // Add the render api used
-    ioRequirements->addUsedRenderApi(renderApiType);
+        ioRequirements->addUsedRenderApi(renderApiType);
+    }
 
     return SLANG_OK;
 }
@@ -1546,7 +1555,7 @@ static SlangResult _extractTestRequirements(const CommandLine& cmdLine, TestRequ
     {
         return _extractSlangCTestRequirements(cmdLine, ioInfo);
     }
-    else if (exeName == "slangi")
+    else if (exeName == "slangi" || exeName == "slang")
     {
         return SLANG_OK;
     }
@@ -1612,7 +1621,9 @@ static RenderApiFlags _getAvailableRenderApiFlags(TestContext* context)
                 CommandLine cmdLine;
                 cmdLine.setExecutableLocation(
                     ExecutableLocation(context->options.binDir, "render-test"));
-                _addRenderTestOptions(context->options, cmdLine);
+                // Don't cache startup devices: a cached non-experimental device would prevent
+                // D3D12EnableExperimentalFeatures from succeeding in subsequent test runs.
+                _addRenderTestOptions(context->options, cmdLine, false);
                 // We just want to see if the device can be started up
                 cmdLine.addArg("-only-startup");
 
@@ -1921,6 +1932,12 @@ String findExpectedPath(const TestInput& input, const char* postFix)
 static SlangResult _initSlangInterpreter(TestContext* context, CommandLine& ioCmdLine)
 {
     ioCmdLine.setExecutableLocation(ExecutableLocation(context->options.binDir, "slangi"));
+    return SLANG_OK;
+}
+
+static SlangResult _initSlangDispatcher(TestContext* context, CommandLine& ioCmdLine)
+{
+    ioCmdLine.setExecutableLocation(ExecutableLocation(context->options.binDir, "slang"));
     return SLANG_OK;
 }
 
@@ -2826,6 +2843,41 @@ TestResult runInterpreterTest(TestContext* context, TestInput& input)
         [&input](auto e, auto a) { return _areResultsEqual(input.testOptions->type, e, a); });
 }
 
+TestResult runDispatcherTest(TestContext* context, TestInput& input)
+{
+    auto outputStem = input.outputStem;
+
+    CommandLine cmdLine;
+
+    for (auto arg : input.testOptions->args)
+    {
+        cmdLine.addArg(arg);
+    }
+
+    if (SLANG_FAILED(_initSlangDispatcher(context, cmdLine)))
+    {
+        return TestResult::Ignored;
+    }
+
+    ExecuteResult exeRes;
+    TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, SpawnType::UseExe, cmdLine, exeRes));
+
+    if (context->isCollectingRequirements())
+    {
+        return TestResult::Pass;
+    }
+
+    String actualOutput = getOutput(exeRes);
+
+    return _validateOutput(
+        context,
+        input,
+        actualOutput,
+        false,
+        "result code = 0\nstandard error = {\n}\nstandard output = {\n}\n",
+        [&input](auto e, auto a) { return _areResultsEqual(input.testOptions->type, e, a); });
+}
+
 TestResult runCompile(TestContext* context, TestInput& input)
 {
     auto outputStem = input.outputStem;
@@ -2850,6 +2902,44 @@ TestResult runCompile(TestContext* context, TestInput& input)
             cmdLine.addArg(arg);
         }
     }
+
+    ExecuteResult exeRes;
+    TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));
+    if (context->isCollectingRequirements())
+    {
+        return TestResult::Pass;
+    }
+
+    if (exeRes.resultCode != 0)
+    {
+        auto reporter = context->getTestReporter();
+        if (reporter)
+        {
+            auto output = getOutput(exeRes);
+            reporter->message(TestMessageType::TestFailure, output);
+        }
+
+        return TestResult::Fail;
+    }
+
+    return TestResult::Pass;
+}
+
+TestResult runCompileTarget(TestContext* context, TestInput& input)
+{
+    auto outputStem = input.outputStem;
+
+    CommandLine cmdLine;
+    cmdLine.setExecutableLocation(ExecutableLocation(context->options.binDir, "render-test"));
+    cmdLine.addArg(input.filePath);
+    _addRenderTestOptions(context->options, cmdLine, true);
+
+    for (auto arg : input.testOptions->args)
+    {
+        cmdLine.addArg(arg);
+    }
+
+    cmdLine.addArg("-compile-only");
 
     ExecuteResult exeRes;
     TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, input.spawnType, cmdLine, exeRes));
@@ -3776,7 +3866,10 @@ TestResult runGLSLComparisonTest(TestContext* context, TestInput& input)
     return TestResult::Pass;
 }
 
-static void _addRenderTestOptions(const Options& options, CommandLine& ioCmdLine)
+static void _addRenderTestOptions(
+    const Options& options,
+    CommandLine& ioCmdLine,
+    bool allowCacheRHI)
 {
     if (!options.emitSPIRVDirectly)
     {
@@ -3794,12 +3887,7 @@ static void _addRenderTestOptions(const Options& options, CommandLine& ioCmdLine
         ioCmdLine.addArg("-enable-debug-layers");
     }
 
-    if (options.ignoreAbortMsg)
-    {
-        ioCmdLine.addArg("-ignore-abort-msg");
-    }
-
-    if (options.cacheRhiDevice)
+    if (allowCacheRHI && options.cacheRhiDevice)
     {
         ioCmdLine.addArg("-cache-rhi-device");
     }
@@ -3837,7 +3925,7 @@ TestResult runPerformanceProfile(TestContext* context, TestInput& input)
     cmdLine.addArg(input.filePath);
     cmdLine.addArg("-performance-profile");
 
-    _addRenderTestOptions(context->options, cmdLine);
+    _addRenderTestOptions(context->options, cmdLine, true);
 
     for (auto arg : input.testOptions->args)
     {
@@ -3962,6 +4050,9 @@ static SlangResult _compareWithType(
         case ScalarType::Float16:
         case ScalarType::Float32:
         case ScalarType::Float64:
+        case ScalarType::BFloat16:
+        case ScalarType::FloatE4M3:
+        case ScalarType::FloatE5M2:
             {
 
                 // Compare as double
@@ -3996,7 +4087,7 @@ TestResult runComputeComparisonImpl(
     cmdLine.setExecutableLocation(ExecutableLocation(context->options.binDir, "render-test"));
     cmdLine.addArg(filePath999);
 
-    _addRenderTestOptions(context->options, cmdLine);
+    _addRenderTestOptions(context->options, cmdLine, true);
 
     for (auto arg : input.testOptions->args)
     {
@@ -4104,7 +4195,7 @@ TestResult doRenderComparisonTestRun(
     cmdLine.setExecutableLocation(ExecutableLocation(context->options.binDir, "render-test"));
     cmdLine.addArg(filePath);
 
-    _addRenderTestOptions(context->options, cmdLine);
+    _addRenderTestOptions(context->options, cmdLine, true);
 
     for (auto arg : input.testOptions->args)
     {
@@ -4445,6 +4536,7 @@ static const TestCommandInfo s_testCommandInfos[] = {
     {"SIMPLE_EX", &runSimpleTest, 0},
     {"SIMPLE_LINE", &runSimpleLineTest, 0},
     {"INTERPRET", &runInterpreterTest, 0},
+    {"DISPATCHER", &runDispatcherTest, 0},
     {"REFLECTION", &runReflectionTest, 0},
     {"CPU_REFLECTION", &runReflectionTest, 0},
     {"COMMAND_LINE_SIMPLE", &runSimpleCompareCommandLineTest, 0},
@@ -4464,6 +4556,7 @@ static const TestCommandInfo s_testCommandInfos[] = {
     {"CPP_COMPILER_COMPILE", &runCPPCompilerCompile, RenderApiFlag::CPU},
     {"PERFORMANCE_PROFILE", &runPerformanceProfile, 0},
     {"COMPILE", &runCompile, 0},
+    {"COMPILE_TARGET", &runCompileTarget, 0},
     {"DOC", &runDocTest, 0},
     {"LANG_SERVER", &runLanguageServerTest, 0},
     {"EXECUTABLE", &runExecutableTest, RenderApiFlag::CPU}};
@@ -4675,6 +4768,93 @@ static void _calcSynthesizedTests(
     }
 }
 
+static bool _isGpuComputeCommand(const String& command)
+{
+    return command == "COMPARE_COMPUTE" || command == "COMPARE_COMPUTE_EX" ||
+           command == "COMPARE_RENDER_COMPUTE" || command == "HLSL_COMPUTE";
+}
+
+static RenderApiType _getRenderApiFromArgs(const List<String>& args)
+{
+    for (const auto& arg : args)
+    {
+        if (arg.getLength() > 1 && arg[0] == '-')
+        {
+            UnownedStringSlice name(arg.getUnownedSlice().begin() + 1, arg.getUnownedSlice().end());
+            RenderApiType apiType = RenderApiUtil::findApiTypeByName(name);
+            if (apiType != RenderApiType::Unknown)
+                return apiType;
+        }
+    }
+    return RenderApiType::Unknown;
+}
+
+static void _calcSynthesizedCompileTargetTests(
+    TestContext* context,
+    const String& filePath,
+    const List<TestDetails>& srcTests,
+    List<TestDetails>& ioSynthTests)
+{
+    SLANG_UNUSED(filePath);
+
+    HashSet<String> synthesizedKeys;
+
+    for (const auto& srcTest : srcTests)
+    {
+        if (!srcTest.options.isEnabled || srcTest.options.isSynthesized ||
+            !_isGpuComputeCommand(srcTest.options.command))
+            continue;
+
+        RenderApiType renderApi = _getRenderApiFromArgs(srcTest.options.args);
+        if (renderApi == RenderApiType::Unknown)
+            continue;
+
+        StringBuilder keyBuilder;
+        keyBuilder << RenderApiUtil::getApiName(renderApi) << "|" << srcTest.options.command;
+        String synthKey = keyBuilder.produceString();
+        if (synthesizedKeys.contains(synthKey))
+            continue;
+
+        TestDetails synthDetails;
+        TestOptions& synthOptions = synthDetails.options;
+        synthOptions.command = "COMPILE_TARGET";
+        synthOptions.isSynthesized = true;
+
+        if (auto c = context->categorySet.find("compile-target"))
+        {
+            synthOptions.categories.add(c);
+        }
+
+        synthOptions.args = srcTest.options.args;
+
+        // Add the implicit args that each command handler normally appends.
+        // COMPARE_COMPUTE_EX adds no implicit args (passes nullptr, 0 to
+        // runComputeComparisonImpl), so no branch is needed for it.
+        if (srcTest.options.command == "COMPARE_COMPUTE")
+        {
+            synthOptions.args.add("-slang");
+            synthOptions.args.add("-compute");
+        }
+        else if (srcTest.options.command == "COMPARE_RENDER_COMPUTE")
+        {
+            synthOptions.args.add("-slang");
+            synthOptions.args.add("-gcompute");
+        }
+        else if (srcTest.options.command == "HLSL_COMPUTE")
+        {
+            synthOptions.args.add("--hlsl-rewrite");
+            synthOptions.args.add("-compute");
+        }
+
+        context->setTestRequirements(&synthDetails.requirements);
+        runTest(context, "", "", "", synthOptions);
+        context->setTestRequirements(nullptr);
+
+        ioSynthTests.add(synthDetails);
+        synthesizedKeys.add(synthKey);
+    }
+}
+
 static bool _canIgnore(TestContext* context, const TestDetails& details)
 {
     if (details.options.isEnabled == false)
@@ -4833,6 +5013,13 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
         testList.tests.addRange(synthesizedTests);
     }
 
+    if (context->options.synthesizeCompileTargets)
+    {
+        List<TestDetails> compileTargetTests;
+        _calcSynthesizedCompileTargetTests(context, filePath, testList.tests, compileTargetTests);
+        testList.tests.addRange(compileTargetTests);
+    }
+
     // If explicit test order is requested, reorder subtests by prefix order
     List<Index> testOrder;
     for (Index i = 0; i < testList.tests.getCount(); i++)
@@ -4880,8 +5067,19 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
     // We have found a test to run!
     for (Index orderIdx = 0; orderIdx < testOrder.getCount(); orderIdx++)
     {
+        // Stop scheduling new tests if too many consecutive failures suggest a systemic issue.
+        if (context->stopSchedulingTests.load())
+            return SLANG_OK;
+
         Index subTestIndex = testOrder[orderIdx];
         auto& testDetails = testList.tests[subTestIndex];
+
+        // When -only-synthesized is set, only run synthesized compile-target tests
+        if (context->options.onlySynthesized &&
+            !(testDetails.options.isSynthesized && testDetails.options.command == "COMPILE_TARGET"))
+        {
+            continue;
+        }
 
         // Check that the test passes our current category mask
         if (!testPassesCategoryMask(context, testDetails.options))
@@ -4907,6 +5105,16 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
         }
 
         const auto& requirements = testDetails.requirements;
+
+        // For synthesized compile-target tests, show the render API name
+        if (testDetails.options.isSynthesized && testDetails.options.command == "COMPILE_TARGET")
+        {
+            RenderApiType renderApi = _getRenderApiFromArgs(testDetails.options.args);
+            if (renderApi != RenderApiType::Unknown)
+            {
+                testName << " (" << RenderApiUtil::getApiName(renderApi) << ")";
+            }
+        }
 
         // Display list of used apis on render test
         if (requirements.usedRenderApiFlags)
@@ -5027,10 +5235,13 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
                 {
                     context->getTestReporter()->addResult(testResult);
                 }
+
+                // Track consecutive failures for early abort on systemic issues
+                if (testResult == TestResult::Fail || testResult == TestResult::PendingRetry)
+                    context->reportTestFailure();
+                else if (testResult == TestResult::Pass)
+                    context->reportTestPass();
             }
-
-
-            // Could determine if to continue or not here... based on result
         }
     }
 
@@ -5041,24 +5252,9 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
 static bool endsWithAllowedExtension(TestContext* /*context*/, String filePath)
 {
     char const* allowedExtensions[] = {
-        ".slang",
-        ".hlsl",
-        ".fx",
-        ".glsl",
-        ".vert",
-        ".frag",
-        ".geom",
-        ".tesc",
-        ".tese",
-        ".comp",
-        ".internal",
-        ".ahit",
-        ".chit",
-        ".miss",
-        ".rgen",
-        ".c",
-        ".cpp",
-        ".cu",
+        ".slang.md", ".slang", ".hlsl", ".fx",   ".glsl",     ".vert", ".frag",
+        ".geom",     ".tesc",  ".tese", ".comp", ".internal", ".ahit", ".chit",
+        ".miss",     ".rgen",  ".c",    ".cpp",  ".cu",
     };
 
     for (auto allowedExtension : allowedExtensions)
@@ -5175,6 +5371,8 @@ void runTestsInParallel(TestContext* context, int count, const F& f)
         context->setTestReporter(&reporter);
         do
         {
+            if (context->stopSchedulingTests.load())
+                break;
             int index = consumePtr.fetch_add(1);
             if (index >= count)
                 break;
@@ -5499,6 +5697,7 @@ static SlangResult runUnitTestModule(
 
             try
             {
+                slang_replayMarker(test.testName.getBuffer());
                 test.testFunc(&unitTestContext);
 
                 // Check for VVL errors after test completion
@@ -5586,6 +5785,8 @@ SlangResult innerMain(int argc, char** argv)
     auto compatibilityIssueCategory = categorySet.add("compatibility-issue", fullTestCategory);
 
     auto sharedLibraryCategory = categorySet.add("shared-library", fullTestCategory);
+
+    categorySet.add("compile-target", fullTestCategory);
 
 #if SLANG_WINDOWS_FAMILY
     auto windowsCategory = categorySet.add("windows", fullTestCategory);
@@ -5858,7 +6059,18 @@ SlangResult innerMain(int argc, char** argv)
         // If we have a couple failed tests, they maybe intermittent failures due to parallel
         // excution or driver instability. We can try running them again. Debug build has more
         // instability at this moment, so we allow more retries.
-        if (!context.options.disableRetries)
+        if (context.stopSchedulingTests.load())
+        {
+            fprintf(
+                stderr,
+                "\n*** Stopped scheduling new tests after too many consecutive failures.\n"
+                "*** This usually indicates a systemic issue such as a GPU driver crash.\n"
+                "*** Skipping retries for %d failed tests.\n\n",
+                (int)context.failedFileTests.getCount());
+            fflush(stderr);
+        }
+
+        if (!context.options.disableRetries && !context.stopSchedulingTests.load())
         {
 #if _DEBUG
             static constexpr int kFailedTestLimitForRetry = 100;
@@ -5916,6 +6128,11 @@ int main(int argc, char** argv)
     // Ignore SIGPIPE so that writing to a broken pipe (e.g. a crashed test-server)
     // returns EPIPE instead of killing this process (exit code 141).
     signal(SIGPIPE, SIG_IGN);
+#endif
+
+#if SLANG_IGNORE_ABORT_MSG && defined(_MSC_VER)
+    // Suppress the modal abort() dialog in unattended/LLM-driven builds.
+    _set_abort_behavior(0, _WRITE_ABORT_MSG);
 #endif
 
     // Fallback: run without cleanup if context initialization fails

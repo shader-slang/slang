@@ -12,7 +12,6 @@ struct VECTOR<T> {}
 
 extension<T, U : ICompatibleWith<T>> VECTOR<U> : ICompatibleWith<VECTOR<T>> {}
 //CHECK:  ^ the extension is non-standard and may not work as intended because the generic parameter 'T' is not referenced by extension target type 'VECTOR<U>'
-//CHECK:  ^ the extension is non-standard and may not work as intended because the generic parameter 'T' is not referenced by extension target type 'VECTOR<U>'
 
 void main()
 {}

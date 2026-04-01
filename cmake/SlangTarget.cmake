@@ -413,6 +413,13 @@ function(slang_add_target dir type)
         )
     endif()
 
+    if(WIN32)
+        set_target_properties(
+            ${target}
+            PROPERTIES VS_DEBUGGER_ENVIRONMENT "SLANG_ASSERT=debugbreak"
+        )
+    endif()
+
     #
     # Link and include from dependencies
     #

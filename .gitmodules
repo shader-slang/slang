@@ -10,9 +10,6 @@
 [submodule "external/imgui"]
 	path = external/imgui
 	url = https://github.com/ocornut/imgui.git
-[submodule "external/slang-binaries"]
-	path = external/slang-binaries
-	url = https://github.com/shader-slang/slang-binaries
 [submodule "external/spirv-tools"]
 	path = external/spirv-tools
 	url = https://github.com/KhronosGroup/SPIRV-Tools.git
@@ -47,3 +44,7 @@
 [submodule "external/optix-dev"]
 	path = external/optix-dev
 	url = https://github.com/NVIDIA/optix-dev.git
+[submodule "external/cmark"]
+	path = external/cmark
+	url = https://github.com/swiftlang/swift-cmark.git
+	branch = gfm

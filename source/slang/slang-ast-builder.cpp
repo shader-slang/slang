@@ -1,7 +1,9 @@
 // slang-ast-builder.cpp
 #include "slang-ast-builder.h"
 
+#include "slang-check.h"
 #include "slang-compiler.h"
+#include "slang-syntax.h"
 
 #include <assert.h>
 
@@ -904,6 +906,124 @@ Type* ASTBuilder::getExpandType(Type* pattern, ArrayView<Val*> capturedPacks)
     return getOrCreate<ExpandType>(pattern, capturedPacks);
 }
 
+Type* ASTBuilder::getPackBranchType(Val* packOperand, Type* emptyType, Type* nonEmptyType)
+{
+    if (auto tupleType = as<TupleType>(packOperand))
+        packOperand = tupleType->getTypePack();
+
+    if (emptyType == nonEmptyType)
+        return emptyType;
+
+    switch (getKnownPackCardinality(packOperand))
+    {
+    case VariadicPackCardinality::Empty:
+        return emptyType;
+    case VariadicPackCardinality::NonEmpty:
+        return nonEmptyType;
+    default:
+        break;
+    }
+
+    return getOrCreate<PackBranchType>(packOperand, emptyType, nonEmptyType);
+}
+
+static bool _containsEachType(Type* type)
+{
+    if (!type)
+        return false;
+    if (as<EachType>(type))
+        return true;
+    for (Index i = 0; i < type->getOperandCount(); ++i)
+    {
+        if (auto operandType = as<Type>(type->getOperand(i)))
+        {
+            if (_containsEachType(operandType))
+                return true;
+        }
+    }
+    return false;
+}
+
+Type* ASTBuilder::getFirstElement(Type* basePack)
+{
+    if (auto tupleType = as<TupleType>(basePack))
+        return getFirstElement(tupleType->getTypePack());
+
+    if (auto expandType = as<ExpandType>(basePack))
+    {
+        auto patternType = expandType->getPatternType();
+        if (!_containsEachType(patternType))
+            return patternType;
+    }
+
+    if (auto typePack = as<ConcreteTypePack>(basePack))
+    {
+        if (typePack->getTypeCount() > 0)
+            return typePack->getElementType(0);
+    }
+
+    return getOrCreate<FirstPackElementType>(basePack);
+}
+
+Type* ASTBuilder::getLastElement(Type* basePack)
+{
+    if (auto tupleType = as<TupleType>(basePack))
+        return getLastElement(tupleType->getTypePack());
+
+    if (auto expandType = as<ExpandType>(basePack))
+    {
+        auto patternType = expandType->getPatternType();
+        if (!_containsEachType(patternType))
+            return patternType;
+    }
+
+    if (auto typePack = as<ConcreteTypePack>(basePack))
+    {
+        if (typePack->getTypeCount() > 0)
+            return typePack->getElementType(typePack->getTypeCount() - 1);
+    }
+
+    return getOrCreate<LastPackElementType>(basePack);
+}
+
+Type* ASTBuilder::getTrimFirstPack(Type* basePack)
+{
+    if (auto tupleType = as<TupleType>(basePack))
+    {
+        Type* trimmedPack = getTrimFirstPack(tupleType->getTypePack());
+        return getTupleType(makeArrayView(&trimmedPack, 1));
+    }
+
+    if (auto typePack = as<ConcreteTypePack>(basePack))
+    {
+        ShortList<Type*> trimmedTypes;
+        for (Index i = 1; i < typePack->getTypeCount(); i++)
+            trimmedTypes.add(typePack->getElementType(i));
+        return getTypePack(trimmedTypes.getArrayView().arrayView);
+    }
+
+    return getOrCreate<TrimFirstTypePack>(basePack);
+}
+
+Type* ASTBuilder::getTrimLastPack(Type* basePack)
+{
+    if (auto tupleType = as<TupleType>(basePack))
+    {
+        Type* trimmedPack = getTrimLastPack(tupleType->getTypePack());
+        return getTupleType(makeArrayView(&trimmedPack, 1));
+    }
+
+    if (auto typePack = as<ConcreteTypePack>(basePack))
+    {
+        ShortList<Type*> trimmedTypes;
+        for (Index i = 0; i + 1 < typePack->getTypeCount(); i++)
+            trimmedTypes.add(typePack->getElementType(i));
+        return getTypePack(trimmedTypes.getArrayView().arrayView);
+    }
+
+    return getOrCreate<TrimLastTypePack>(basePack);
+}
+
 void flattenTypeList(ShortList<Type*>& flattenedList, Type* type)
 {
     if (auto typePack = as<ConcreteTypePack>(type))
@@ -937,6 +1057,37 @@ static void flattenIntValList(ShortList<IntVal*>& flattenedList, IntVal* val)
     {
         flattenedList.add(val);
     }
+}
+
+static Type* _getIntPackTypeForVal(ASTBuilder* astBuilder, Val* pack)
+{
+    if (auto intVal = as<IntVal>(pack))
+    {
+        if (auto type = as<Type>(intVal->getType()))
+            return type;
+    }
+    return astBuilder->getOrCreate<ValuePackType>(astBuilder->getIntType());
+}
+
+static Type* _getIntPackTypeForVals(ASTBuilder* astBuilder, Val* pack0, Val* pack1 = nullptr)
+{
+    for (auto pack : {pack0, pack1})
+    {
+        if (auto intVal = as<IntVal>(pack))
+        {
+            if (auto valuePackType = as<ValuePackType>(intVal->getType()))
+                return valuePackType;
+        }
+    }
+
+    if (auto intVal = as<IntVal>(pack0))
+    {
+        if (auto type = as<Type>(intVal->getType()))
+            return type;
+    }
+    if (pack1)
+        return _getIntPackTypeForVal(astBuilder, pack1);
+    return astBuilder->getOrCreate<ValuePackType>(astBuilder->getIntType());
 }
 
 ConcreteIntValPack* ASTBuilder::getIntValPack(ArrayView<IntVal*> vals)
@@ -980,6 +1131,211 @@ Val* ASTBuilder::getExpandIntValPack(Val* patternVal, ArrayView<Val*> capturedPa
     return getOrCreate<ExpandIntValPack>(packType, patternVal, capturedPacks);
 }
 
+Val* ASTBuilder::getFirstElement(Val* basePack)
+{
+    if (auto valPack = as<ConcreteIntValPack>(basePack))
+    {
+        if (valPack->getCount() > 0)
+            return valPack->getElement(0);
+    }
+
+    auto baseIntVal = as<IntVal>(basePack);
+    auto packType = baseIntVal ? as<ValuePackType>(baseIntVal->getType()) : nullptr;
+    auto elementType = packType ? packType->getElementType() : getIntType();
+    return getOrCreate<FirstIntVal>(elementType, basePack);
+}
+
+Val* ASTBuilder::getLastElement(Val* basePack)
+{
+    if (auto valPack = as<ConcreteIntValPack>(basePack))
+    {
+        if (valPack->getCount() > 0)
+            return valPack->getElement(valPack->getCount() - 1);
+    }
+
+    auto baseIntVal = as<IntVal>(basePack);
+    auto packType = baseIntVal ? as<ValuePackType>(baseIntVal->getType()) : nullptr;
+    auto elementType = packType ? packType->getElementType() : getIntType();
+    return getOrCreate<LastIntVal>(elementType, basePack);
+}
+
+Val* ASTBuilder::getTrimFirstPack(Val* basePack)
+{
+    if (auto valPack = as<ConcreteIntValPack>(basePack))
+    {
+        ShortList<IntVal*> trimmedVals;
+        for (Index i = 1; i < valPack->getCount(); i++)
+            trimmedVals.add(valPack->getElement(i));
+        return getOrCreate<ConcreteIntValPack>(
+            as<Type>(valPack->getType()),
+            trimmedVals.getArrayView().arrayView);
+    }
+
+    auto baseIntVal = as<IntVal>(basePack);
+    auto packType = baseIntVal ? baseIntVal->getType() : getOrCreate<ValuePackType>(getIntType());
+    return getOrCreate<TrimFirstIntValPack>(packType, basePack);
+}
+
+Val* ASTBuilder::getTrimLastPack(Val* basePack)
+{
+    if (auto valPack = as<ConcreteIntValPack>(basePack))
+    {
+        ShortList<IntVal*> trimmedVals;
+        for (Index i = 0; i + 1 < valPack->getCount(); i++)
+            trimmedVals.add(valPack->getElement(i));
+        return getOrCreate<ConcreteIntValPack>(
+            as<Type>(valPack->getType()),
+            trimmedVals.getArrayView().arrayView);
+    }
+
+    auto baseIntVal = as<IntVal>(basePack);
+    auto packType = baseIntVal ? baseIntVal->getType() : getOrCreate<ValuePackType>(getIntType());
+    return getOrCreate<TrimLastIntValPack>(packType, basePack);
+}
+
+Val* ASTBuilder::getShapeConcatIntValPack(Val* leftPack, Val* rightPack, IntVal* axis)
+{
+    IntegerLiteralValue axisValue = 0;
+    if (auto leftValPack = as<ConcreteIntValPack>(leftPack))
+    {
+        if (auto rightValPack = as<ConcreteIntValPack>(rightPack))
+        {
+            if (tryGetConstantIntVal(axis, axisValue) &&
+                leftValPack->getCount() == rightValPack->getCount() && axisValue >= 0 &&
+                axisValue < leftValPack->getCount())
+            {
+                ShortList<IntVal*> resultVals;
+                bool canFold = true;
+                for (Index i = 0; i < leftValPack->getCount(); ++i)
+                {
+                    if (i == axisValue)
+                    {
+                        resultVals.add(PolynomialIntVal::add(
+                            this,
+                            leftValPack->getElement(i),
+                            rightValPack->getElement(i)));
+                    }
+                    else if (leftValPack->getElement(i)->equals(rightValPack->getElement(i)))
+                    {
+                        resultVals.add(leftValPack->getElement(i));
+                    }
+                    else
+                    {
+                        canFold = false;
+                        break;
+                    }
+                }
+                if (canFold)
+                    return getIntValPack(resultVals.getArrayView().arrayView);
+            }
+        }
+    }
+
+    auto packType = _getIntPackTypeForVals(this, leftPack, rightPack);
+    return getOrCreate<ShapeConcatIntValPack>(packType, leftPack, rightPack, axis);
+}
+
+Val* ASTBuilder::getShapePermuteIntValPack(Val* valuePack, Val* orderPack)
+{
+    if (auto concreteValuePack = as<ConcreteIntValPack>(valuePack))
+    {
+        if (auto concreteOrderPack = as<ConcreteIntValPack>(orderPack))
+        {
+            if (concreteValuePack->getCount() == concreteOrderPack->getCount())
+            {
+                List<bool> seen;
+                seen.setCount(concreteValuePack->getCount());
+                for (Index i = 0; i < seen.getCount(); ++i)
+                    seen[i] = false;
+
+                ShortList<IntVal*> resultVals;
+                bool canFold = true;
+                for (Index i = 0; i < concreteOrderPack->getCount(); ++i)
+                {
+                    IntegerLiteralValue orderIndex = 0;
+                    if (!tryGetConstantIntVal(concreteOrderPack->getElement(i), orderIndex) ||
+                        orderIndex < 0 || orderIndex >= concreteValuePack->getCount() ||
+                        seen[orderIndex])
+                    {
+                        canFold = false;
+                        break;
+                    }
+
+                    seen[orderIndex] = true;
+                    resultVals.add(concreteValuePack->getElement(orderIndex));
+                }
+
+                if (canFold)
+                    return getIntValPack(resultVals.getArrayView().arrayView);
+            }
+        }
+    }
+
+    auto packType = _getIntPackTypeForVal(this, valuePack);
+    return getOrCreate<ShapePermuteIntValPack>(packType, valuePack, orderPack);
+}
+
+Val* ASTBuilder::getShapeSwapIntValPack(Val* valuePack, IntVal* dim0, IntVal* dim1)
+{
+    IntegerLiteralValue dim0Value = 0;
+    IntegerLiteralValue dim1Value = 0;
+    if (auto concreteValuePack = as<ConcreteIntValPack>(valuePack))
+    {
+        if (tryGetConstantIntVal(dim0, dim0Value) && tryGetConstantIntVal(dim1, dim1Value) &&
+            dim0Value >= 0 && dim1Value >= 0 && dim0Value < concreteValuePack->getCount() &&
+            dim1Value < concreteValuePack->getCount())
+        {
+            if (dim0Value == dim1Value)
+                return valuePack;
+
+            ShortList<IntVal*> resultVals;
+            for (Index i = 0; i < concreteValuePack->getCount(); ++i)
+            {
+                if (i == dim0Value)
+                    resultVals.add(concreteValuePack->getElement(dim1Value));
+                else if (i == dim1Value)
+                    resultVals.add(concreteValuePack->getElement(dim0Value));
+                else
+                    resultVals.add(concreteValuePack->getElement(i));
+            }
+            return getIntValPack(resultVals.getArrayView().arrayView);
+        }
+    }
+
+    auto packType = _getIntPackTypeForVal(this, valuePack);
+    return getOrCreate<ShapeSwapIntValPack>(packType, valuePack, dim0, dim1);
+}
+
+Val* ASTBuilder::getShapeReduceIntValPack(Val* valuePack, IntVal* axis)
+{
+    IntegerLiteralValue axisValue = 0;
+    if (auto concreteValuePack = as<ConcreteIntValPack>(valuePack))
+    {
+        if (tryGetConstantIntVal(axis, axisValue) && axisValue >= 0 &&
+            axisValue < concreteValuePack->getCount())
+        {
+            ShortList<IntVal*> resultVals;
+            for (Index i = 0; i < concreteValuePack->getCount(); ++i)
+            {
+                if (i == axisValue)
+                    resultVals.add(
+                        getIntVal(as<Type>(concreteValuePack->getElement(i)->getType()), 1));
+                else
+                    resultVals.add(concreteValuePack->getElement(i));
+            }
+            return getIntValPack(resultVals.getArrayView().arrayView);
+        }
+    }
+
+    auto packType = _getIntPackTypeForVal(this, valuePack);
+    return getOrCreate<ShapeReduceIntValPack>(packType, valuePack, axis);
+}
+
+NonEmptyPackWitness* ASTBuilder::getNonEmptyPackWitness(Val* pack)
+{
+    return getOrCreate<NonEmptyPackWitness>(pack);
+}
+
 TypeEqualityWitness* ASTBuilder::getTypeEqualityWitness(Type* type)
 {
     return getOrCreate<TypeEqualityWitness>(type, type);
@@ -1011,6 +1367,90 @@ SubtypeWitness* ASTBuilder::getEachSubtypeWitness(
     if (auto expandWitness = as<ExpandSubtypeWitness>(patternWitness))
         return expandWitness->getPatternTypeWitness();
     return getOrCreate<EachSubtypeWitness>(subType, superType, patternWitness);
+}
+
+SubtypeWitness* ASTBuilder::getFirstSubtypeWitness(
+    Type* subType,
+    Type* superType,
+    SubtypeWitness* patternWitness)
+{
+    if (auto witnessPack = as<TypePackSubtypeWitness>(patternWitness))
+    {
+        if (witnessPack->getCount() > 0)
+            return witnessPack->getWitness(0);
+    }
+    return getOrCreate<FirstSubtypeWitness>(subType, superType, patternWitness);
+}
+
+SubtypeWitness* ASTBuilder::getLastSubtypeWitness(
+    Type* subType,
+    Type* superType,
+    SubtypeWitness* patternWitness)
+{
+    if (auto witnessPack = as<TypePackSubtypeWitness>(patternWitness))
+    {
+        if (witnessPack->getCount() > 0)
+            return witnessPack->getWitness(witnessPack->getCount() - 1);
+    }
+    return getOrCreate<LastSubtypeWitness>(subType, superType, patternWitness);
+}
+
+SubtypeWitness* ASTBuilder::getTrimFirstSubtypeWitness(
+    Type* subType,
+    Type* superType,
+    SubtypeWitness* patternWitness)
+{
+    if (auto witnessPack = as<TypePackSubtypeWitness>(patternWitness))
+    {
+        List<SubtypeWitness*> newWitnesses;
+        for (Index i = 1; i < witnessPack->getCount(); i++)
+            newWitnesses.add(witnessPack->getWitness(i));
+        return getSubtypeWitnessPack(subType, superType, newWitnesses.getArrayView());
+    }
+    return getOrCreate<TrimFirstSubtypeWitness>(subType, superType, patternWitness);
+}
+
+SubtypeWitness* ASTBuilder::getTrimLastSubtypeWitness(
+    Type* subType,
+    Type* superType,
+    SubtypeWitness* patternWitness)
+{
+    if (auto witnessPack = as<TypePackSubtypeWitness>(patternWitness))
+    {
+        List<SubtypeWitness*> newWitnesses;
+        for (Index i = 0; i + 1 < witnessPack->getCount(); i++)
+            newWitnesses.add(witnessPack->getWitness(i));
+        return getSubtypeWitnessPack(subType, superType, newWitnesses.getArrayView());
+    }
+    return getOrCreate<TrimLastSubtypeWitness>(subType, superType, patternWitness);
+}
+
+SubtypeWitness* ASTBuilder::getPackBranchSubtypeWitness(
+    Type* subType,
+    Type* superType,
+    Val* packOperand,
+    SubtypeWitness* emptyWitness,
+    SubtypeWitness* nonEmptyWitness)
+{
+    switch (getKnownPackCardinality(packOperand))
+    {
+    case VariadicPackCardinality::Empty:
+        return emptyWitness;
+    case VariadicPackCardinality::NonEmpty:
+        return nonEmptyWitness;
+    default:
+        break;
+    }
+
+    if (emptyWitness == nonEmptyWitness)
+        return emptyWitness;
+
+    return getOrCreate<PackBranchSubtypeWitness>(
+        subType,
+        superType,
+        packOperand,
+        emptyWitness,
+        nonEmptyWitness);
 }
 
 DeclaredSubtypeWitness* ASTBuilder::getDeclaredSubtypeWitness(
@@ -1113,6 +1553,40 @@ top:
             expandWitness->getPatternTypeWitness(),
             bIsSubtypeOfCWitness);
         return getExpandSubtypeWitness(expandWitness->getSub(), cType, innerTransitiveWitness);
+    }
+
+    if (auto trimFirstWitness = as<TrimFirstSubtypeWitness>(aIsSubtypeOfBWitness))
+    {
+        auto innerTransitiveWitness = getTransitiveSubtypeWitness(
+            trimFirstWitness->getPatternTypeWitness(),
+            bIsSubtypeOfCWitness);
+        return getTrimFirstSubtypeWitness(
+            trimFirstWitness->getSub(),
+            cType,
+            innerTransitiveWitness);
+    }
+
+    if (auto trimLastWitness = as<TrimLastSubtypeWitness>(aIsSubtypeOfBWitness))
+    {
+        auto innerTransitiveWitness = getTransitiveSubtypeWitness(
+            trimLastWitness->getPatternTypeWitness(),
+            bIsSubtypeOfCWitness);
+        return getTrimLastSubtypeWitness(trimLastWitness->getSub(), cType, innerTransitiveWitness);
+    }
+
+    if (auto packBranchWitness = as<PackBranchSubtypeWitness>(aIsSubtypeOfBWitness))
+    {
+        auto emptyTransitiveWitness =
+            getTransitiveSubtypeWitness(packBranchWitness->getEmptyWitness(), bIsSubtypeOfCWitness);
+        auto nonEmptyTransitiveWitness = getTransitiveSubtypeWitness(
+            packBranchWitness->getNonEmptyWitness(),
+            bIsSubtypeOfCWitness);
+        return getPackBranchSubtypeWitness(
+            packBranchWitness->getSub(),
+            cType,
+            packBranchWitness->getPackOperand(),
+            emptyTransitiveWitness,
+            nonEmptyTransitiveWitness);
     }
 
     // If left hand is a DeclaredWitness for a type pack parameter T, then we want to perform the

@@ -53,6 +53,33 @@ void printDiagnosticArg(StringBuilder& sb, IRInst* irObject)
     }
 }
 
+void diagnoseCallStack(IRInst* inst, DiagnosticSink* sink)
+{
+    static const int maxDepth = 5;
+    for (int i = 0; i < maxDepth; i++)
+    {
+        auto func = getParentFunc(inst);
+        if (!func)
+            return;
+        bool shouldContinue = false;
+        for (auto use = func->firstUse; use; use = use->nextUse)
+        {
+            auto user = use->getUser();
+            if (auto call = as<IRCall>(user))
+            {
+                sink->diagnose(
+                    Diagnostics::SeeCallOfFuncIr{.inst = func, .location = call->sourceLoc});
+                inst = call;
+                shouldContinue = true;
+                break;
+            }
+        }
+        if (!shouldContinue)
+            return;
+    }
+}
+
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
@@ -3579,6 +3606,16 @@ IRInst* IRBuilder::emitEachInst(IRType* type, IRInst* base, IRInst* indexArg)
     return emitIntrinsicInst(type, kIROp_Each, indexArg ? 2 : 1, args);
 }
 
+IRInst* IRBuilder::emitPackBranchInst(
+    IRType* type,
+    IRInst* pack,
+    IRInst* emptyValue,
+    IRInst* nonEmptyValue)
+{
+    IRInst* args[] = {pack, emptyValue, nonEmptyValue};
+    return emitIntrinsicInst(type, kIROp_PackBranch, 3, args);
+}
+
 IRInst* IRBuilder::emitLookupInterfaceMethodInst(
     IRType* type,
     IRInst* witnessTableVal,
@@ -6059,16 +6096,16 @@ IRInst* IRBuilder::emitExtractTaggedUnionPayload(IRType* type, IRInst* val, IRIn
 }
 
 
-IRInst* IRBuilder::emitSizeOf(IRInst* sizedType)
+IRInst* IRBuilder::emitSizeOf(IRInst* sizedType, IRType* dataLayoutType)
 {
-    auto inst = createInst<IRInst>(this, kIROp_SizeOf, getIntType(), sizedType);
+    auto inst = createInst<IRInst>(this, kIROp_SizeOf, getIntType(), sizedType, dataLayoutType);
     addInst(inst);
     return inst;
 }
 
-IRInst* IRBuilder::emitAlignOf(IRInst* sizedType)
+IRInst* IRBuilder::emitAlignOf(IRInst* sizedType, IRType* dataLayoutType)
 {
-    auto inst = createInst<IRInst>(this, kIROp_AlignOf, getIntType(), sizedType);
+    auto inst = createInst<IRInst>(this, kIROp_AlignOf, getIntType(), sizedType, dataLayoutType);
     addInst(inst);
     return inst;
 }
@@ -8896,7 +8933,17 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_MakeCoopMatrixFromScalar:
     case kIROp_MatrixReshape:
     case kIROp_VectorReshape:
+    case kIROp_ExtractFirstFromPack:
+    case kIROp_ExtractLastFromPack:
+    case kIROp_TrimFirstOfPack:
+    case kIROp_TrimLastOfPack:
+    case kIROp_ShapeConcat:
+    case kIROp_ShapePermute:
+    case kIROp_ShapeSwap:
+    case kIROp_ShapeReduce:
+    case kIROp_PackBranch:
     case kIROp_MakeWitnessPack:
+    case kIROp_NonEmptyPackWitness:
     case kIROp_MakeArray:
     case kIROp_MakeArrayFromElement:
     case kIROp_MakeStruct:
@@ -8967,6 +9014,8 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_ConstexprAnd:
     case kIROp_ConstexprOr:
     case kIROp_ConstexprSelect:
+    case kIROp_CoopMatMulAdd:
+    case kIROp_CoopVecMatMulAdd:
     case kIROp_Lsh:
     case kIROp_Rsh:
     case kIROp_Eql:

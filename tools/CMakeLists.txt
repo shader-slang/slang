@@ -278,10 +278,10 @@ if(SLANG_ENABLE_TESTS AND SLANG_ENABLE_SLANG_RHI)
             slang-rt
             slang-glslang
             slang-llvm
+            copy-dxcompiler
+            copy-dxil
             copy-webgpu_dawn
             copy-slang-tint
-            # See issue 5305.
-            copy-prebuilt-binaries
         FOLDER test
         DEBUG_DIR ${slang_SOURCE_DIR}
     )
@@ -435,9 +435,8 @@ if(SLANG_ENABLE_REPLAYER)
     slang_add_target(
         slang-replay
         EXECUTABLE
-        EXTRA_SOURCE_DIRS
-            ${slang_SOURCE_DIR}/source/slang-record-replay/replay
-            ${slang_SOURCE_DIR}/source/slang-record-replay/util
+        # Note: replay-context sources are already compiled into the slang library,
+        # so we only add include directories here, not EXTRA_SOURCE_DIRS
         LINK_WITH_PRIVATE core compiler-core slang
         INCLUDE_DIRECTORIES_PUBLIC
             ${slang_SOURCE_DIR}/source/slang-record-replay

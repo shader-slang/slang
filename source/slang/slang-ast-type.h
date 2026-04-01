@@ -996,6 +996,7 @@ class EachType : public Type
 {
     FIDDLE(...)
     Type* getElementType() const { return as<Type>(getOperand(0)); }
+    // Convenience accessor for the subset of EachType forms whose element is a bare decl-ref.
     DeclRefType* getElementDeclRefType() const { return as<DeclRefType>(getOperand(0)); }
 
     EachType(Type* elementType) { m_operands.add(ValNodeOperand(elementType)); }
@@ -1017,6 +1018,68 @@ class ExpandType : public Type
         for (auto t : capturedPacks)
             m_operands.add(ValNodeOperand(t));
     }
+    void _toTextOverride(StringBuilder& out);
+    Type* _createCanonicalTypeOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
+FIDDLE()
+class PackBranchType : public Type
+{
+    FIDDLE(...)
+    Val* getPackOperand() const { return getOperand(0); }
+    Type* getEmptyType() const { return as<Type>(getOperand(1)); }
+    Type* getNonEmptyType() const { return as<Type>(getOperand(2)); }
+    PackBranchType(Val* packOperand, Type* emptyType, Type* nonEmptyType)
+    {
+        m_operands.add(ValNodeOperand(packOperand));
+        m_operands.add(ValNodeOperand(emptyType));
+        m_operands.add(ValNodeOperand(nonEmptyType));
+    }
+    void _toTextOverride(StringBuilder& out);
+    Type* _createCanonicalTypeOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
+FIDDLE()
+class FirstPackElementType : public Type
+{
+    FIDDLE(...)
+    Type* getBasePack() const { return as<Type>(getOperand(0)); }
+    FirstPackElementType(Type* basePack) { m_operands.add(ValNodeOperand(basePack)); }
+    void _toTextOverride(StringBuilder& out);
+    Type* _createCanonicalTypeOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
+FIDDLE()
+class LastPackElementType : public Type
+{
+    FIDDLE(...)
+    Type* getBasePack() const { return as<Type>(getOperand(0)); }
+    LastPackElementType(Type* basePack) { m_operands.add(ValNodeOperand(basePack)); }
+    void _toTextOverride(StringBuilder& out);
+    Type* _createCanonicalTypeOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
+FIDDLE()
+class TrimFirstTypePack : public Type
+{
+    FIDDLE(...)
+    Type* getBasePack() const { return as<Type>(getOperand(0)); }
+    TrimFirstTypePack(Type* basePack) { m_operands.add(ValNodeOperand(basePack)); }
+    void _toTextOverride(StringBuilder& out);
+    Type* _createCanonicalTypeOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
+FIDDLE()
+class TrimLastTypePack : public Type
+{
+    FIDDLE(...)
+    Type* getBasePack() const { return as<Type>(getOperand(0)); }
+    TrimLastTypePack(Type* basePack) { m_operands.add(ValNodeOperand(basePack)); }
     void _toTextOverride(StringBuilder& out);
     Type* _createCanonicalTypeOverride();
     Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);

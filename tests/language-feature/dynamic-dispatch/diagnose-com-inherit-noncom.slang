@@ -4,10 +4,7 @@
 // inconsistent calling conventions, so any interface inheriting from a COM
 // interface must itself be marked as COM.
 
-// Disabled: error 31124 does not fire due to a bug where checkConformance()
-// checks the parent type, and visitInterfaceDecl() lacks a COM check.
-// Enable when #10228 is fixed.
-//DISABLED_TEST:SIMPLE(filecheck=CHECK): -target spirv
+//DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv
 
 [COM("00000000-0000-0000-0000-000000000001")]
 interface ICOMBase
@@ -15,8 +12,9 @@ interface ICOMBase
     float getValue();
 }
 
-// CHECK: ([[# @LINE+1]]): error 31124
 interface INonCOM : ICOMBase
+//CHECK:            ^^^^^^^^ E31124
+//CHECK:            ^^^^^^^^ an interface type that inherits from a [COM] interface must itself be a [COM] interface
 {
     float compute();
 }

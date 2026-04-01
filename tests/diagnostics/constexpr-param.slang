@@ -26,7 +26,6 @@ int func_external(int a)
 {
     int2 offset = int2(a, a);
 //CHECK:              ^ expected a compile-time constant
-//CHECK:              ^ expected a compile-time constant
     int3 location = int3(0, 0, 0);
     // Load requires constexpr offset
     return input.Load(location, offset);

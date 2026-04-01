@@ -857,6 +857,23 @@ typedef uint32_t SlangSizeT;
         SLANG_STAGE_PIXEL = SLANG_STAGE_FRAGMENT,
     };
 
+    typedef SlangUInt32 SlangCooperativeMatrixUseIntegral;
+    enum SlangCooperativeMatrixUse : SlangCooperativeMatrixUseIntegral
+    {
+        SLANG_COOPERATIVE_MATRIX_USE_A,
+        SLANG_COOPERATIVE_MATRIX_USE_B,
+        SLANG_COOPERATIVE_MATRIX_USE_ACCUMULATOR,
+    };
+
+    typedef SlangUInt32 SlangCooperativeVectorMatrixLayoutIntegral;
+    enum SlangCooperativeVectorMatrixLayout : SlangCooperativeVectorMatrixLayoutIntegral
+    {
+        SLANG_COOPERATIVE_VECTOR_MATRIX_LAYOUT_ROW_MAJOR,
+        SLANG_COOPERATIVE_VECTOR_MATRIX_LAYOUT_COLUMN_MAJOR,
+        SLANG_COOPERATIVE_VECTOR_MATRIX_LAYOUT_INFERENCING_OPTIMAL,
+        SLANG_COOPERATIVE_VECTOR_MATRIX_LAYOUT_TRAINING_OPTIMAL,
+    };
+
     typedef SlangUInt32 SlangDebugInfoLevelIntegral;
     enum SlangDebugInfoLevel : SlangDebugInfoLevelIntegral
     {
@@ -1964,7 +1981,10 @@ public:                                                              \
         SLANG_SCALAR_TYPE_INT16,
         SLANG_SCALAR_TYPE_UINT16,
         SLANG_SCALAR_TYPE_INTPTR,
-        SLANG_SCALAR_TYPE_UINTPTR
+        SLANG_SCALAR_TYPE_UINTPTR,
+        SLANG_SCALAR_TYPE_BFLOAT16,
+        SLANG_SCALAR_TYPE_FLOAT_E4M3,
+        SLANG_SCALAR_TYPE_FLOAT_E5M2,
     };
 
     // abstract decl reflection
@@ -2349,6 +2369,11 @@ struct TypeReflection
         UInt8 = SLANG_SCALAR_TYPE_UINT8,
         Int16 = SLANG_SCALAR_TYPE_INT16,
         UInt16 = SLANG_SCALAR_TYPE_UINT16,
+        IntPtr = SLANG_SCALAR_TYPE_INTPTR,
+        UIntPtr = SLANG_SCALAR_TYPE_UINTPTR,
+        BFloat16 = SLANG_SCALAR_TYPE_BFLOAT16,
+        FloatE4M3 = SLANG_SCALAR_TYPE_FLOAT_E4M3,
+        FloatE5M2 = SLANG_SCALAR_TYPE_FLOAT_E5M2,
     };
 
     Kind getKind() { return (Kind)spReflectionType_GetKind((SlangReflectionType*)this); }
@@ -4171,7 +4196,7 @@ struct SessionDesc
 
     /** Pointer to an array of compiler option entries, whose size is compilerOptionEntryCount.
      */
-    CompilerOptionEntry* compilerOptionEntries = nullptr;
+    const CompilerOptionEntry* compilerOptionEntries = nullptr;
 
     /** Number of additional compiler option entries.
      */
@@ -4189,6 +4214,13 @@ enum class ContainerType
     StructuredBuffer,
     ConstantBuffer,
     ParameterBlock
+};
+
+struct SourceLocation
+{
+    const char* filePath = nullptr;
+    SlangInt line = -1;
+    SlangInt column = -1;
 };
 
 /** A session provides a scope for code that is loaded.
@@ -4423,6 +4455,13 @@ struct ISession : public ISlangUnknown
         SlangInt& outModuleVersion,
         const char*& outModuleCompilerVersion,
         const char*& outModuleName) = 0;
+
+    /** Get the source location of a declaration.
+     *
+     * The returned filePath pointer is valid for as long as the session.
+     */
+    virtual SLANG_NO_THROW SlangResult SLANG_MCALL
+    getDeclSourceLocation(slang::DeclReflection* decl, slang::SourceLocation* outLocation) = 0;
 };
 
     #define SLANG_UUID_ISession ISession::getTypeGuid()
@@ -4668,7 +4707,7 @@ struct IComponentType : public ISlangUnknown
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL linkWithOptions(
         IComponentType** outLinkedComponentType,
         uint32_t compilerOptionEntryCount,
-        CompilerOptionEntry* compilerOptionEntries,
+        CompilerOptionEntry const* compilerOptionEntries,
         ISlangBlob** outDiagnostics = nullptr) = 0;
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
@@ -5028,6 +5067,57 @@ SLANG_API ISlangBlob* slang_getEmbeddedCoreModule();
  should be called after this function.
  */
 SLANG_EXTERN_C SLANG_API void slang_shutdown();
+
+/* Enable or disable the record layer for API call recording.
+   When enabled, API calls are captured for later replay.
+   The record layer can also be enabled by setting the SLANG_RECORD_LAYER=1 environment variable.
+
+   Environment variables:
+   - SLANG_RECORD_LAYER=1: Enable recording on startup
+   - SLANG_RECORD_PATH=<path>: Use the exact path specified for recording output
+     instead of generating a timestamped folder under .slang-replays/
+ */
+SLANG_EXTERN_C SLANG_API void slang_enableRecordLayer(bool enable);
+
+/* Check if the record layer is currently enabled.
+ */
+SLANG_EXTERN_C SLANG_API bool slang_isRecordLayerEnabled();
+
+/* Set the base directory for replay files (default: ".slang-replays").
+   Must be called before enabling recording.
+   @param path Path to the replay directory.
+ */
+SLANG_EXTERN_C SLANG_API void slang_setReplayDirectory(const char* path);
+
+/* Get the current replay base directory.
+   @return Path to the replay directory.
+ */
+SLANG_EXTERN_C SLANG_API const char* slang_getReplayDirectory();
+
+/* Get the path to the current recording session folder.
+   @return Path to the current replay folder, or nullptr if not recording.
+ */
+SLANG_EXTERN_C SLANG_API const char* slang_getCurrentReplayPath();
+
+/* Load a replay from a folder path (reads stream.bin).
+   Switches to playback mode on success.
+   @param folderPath Path to the replay folder.
+   @return SLANG_OK on success, SLANG_E_NOT_FOUND if stream.bin doesn't exist.
+ */
+SLANG_EXTERN_C SLANG_API SlangResult slang_loadReplay(const char* folderPath);
+
+/* Load the most recent replay from the replay directory.
+   Switches to playback mode on success.
+   @return SLANG_OK on success, SLANG_E_NOT_FOUND if no replays exist.
+ */
+SLANG_EXTERN_C SLANG_API SlangResult slang_loadLatestReplay();
+
+/* Insert a labeled marker into the replay stream.
+   Useful for debugging replay streams. Marks a point with a human-readable label.
+   No-op if the record layer is not active.
+   @param label The marker label string.
+ */
+SLANG_EXTERN_C SLANG_API void slang_replayMarker(const char* label);
 
 /* Return the last signaled internal error message.
  */

@@ -629,8 +629,8 @@ extension vector<int64_t,2>:ITexelElement
 /// @param isArray Indicates whether the texture is an array texture.
 /// @param isMS Indicates whether the texture is a multisampled texture.
 /// @param sampleCount The number of samples of a multisampled texture.
-/// @param access The access mode of the texture. 0 for read-only, 1 for read-write, 2 for rasterizer-ordered, 3 for feedback.
-/// @param isShadow Indicates whether the texture is a shadow texture (for combined texture-sampler only).
+/// @param access The access mode of the texture. 0 for read-only, 1 for read-write, 2 for write-only, 3 for rasterizer-ordered, 4 for feedback.
+/// @param isShadow Indicates whether the texture is a depth texture (`isCombined==0`) or a shadow texture (`isCombined==1`).
 /// @param isCombined Indicates whether the texture is a combined texture-sampler.
 /// @param format The storage format of the texture. Users should specify the format using an `[format("...")]` attribute instead.
 /// @see `Texture1D`, `Texture2D`, `Texture3D`, `TextureCube`, `Texture1DArray`,
@@ -692,7 +692,91 @@ extension vector<int64_t,2>:ITexelElement
 ///
 /// When targeting Vulkan, a combined-texture-sampler type (`isCombined==1`) translates to a `OpTypeSampledImage` type in SPIR-V.
 /// For other targets, the combined-texture-sampler type is translated to a pair of a `Texture` and `SamplerState`.
-/// `isShadow` is only applicable to combined-texture-sampler types and must be `0` for non-combined texture types.
+///
+/// The defined texture types and their backend support:
+///
+/// | Type                              | Cuda | GLSL core version / extension         | HLSL   | Metal/macOS | SPIR-V | WGSL |
+/// |:----------------------------------|:-----|:--------------------------------------|:-------|:------------|:-------|:-----|
+/// | `DepthTexture1D`                  |      | 110                                   | SM 4.0 | -           |        | -    |
+/// | `DepthTexture1DArray`             |      | 130 / EXT_texture_array               | SM 4.0 | -           |        | -    |
+/// | `DepthTexture2D`                  |      | 110                                   | SM 4.0 | 1.0         |        | 1.0  |
+/// | `DepthTexture2DArray`             |      | 130 / EXT_texture_array               | SM 4.0 | 1.0         |        | 1.0  |
+/// | `DepthTexture2DMS`                |      | -                                     | SM 4.0 | 1.0         |        | 1.0  |
+/// | `DepthTexture2DMSArray`           |      | -                                     | SM 4.0 | 2.0         |        | -    |
+/// | `DepthTexture3D`                  |      | -                                     | -      | -           |        | -    |
+/// | `DepthTextureCube`                |      | 110                                   | SM 4.0 | 1.0         |        | 1.0  |
+/// | `DepthTextureCubeArray`           |      | 400 / ARB_texture_cube_map_array      | SM 4.0 | 1.0         |        | 1.0  |
+/// | `FeedbackTexture2D`               |      | -                                     | SM 6.5 | -           |        | -    |
+/// | `FeedbackTexture2DArray`          |      | -                                     | SM 6.5 | -           |        | -    |
+/// | `RWTexture1D`                     |      | 420 / ARB_shader_image_load_store     | SM 5.0 | 1.0         |        | 1.0  |
+/// | `RWTexture1DArray`                |      | 420 / ARB_shader_image_load_store     | SM 5.0 | 1.0         |        | -    |
+/// | `RWTexture2D`                     |      | 420 / ARB_shader_image_load_store     | SM 5.0 | 1.0         |        | 1.0  |
+/// | `RWTexture2DArray`                |      | 420 / ARB_shader_image_load_store     | SM 5.0 | 1.0         |        | 1.0  |
+/// | `RWTexture2DMS`                   |      | 420 / ARB_shader_image_load_store     | SM 6.7 | -           |        | -    |
+/// | `RWTexture2DMSArray`              |      | 420 / ARB_shader_image_load_store     | SM 6.7 | -           |        | -    |
+/// | `RWTexture3D`                     |      | 420 / ARB_shader_image_load_store     | SM 5.0 | 1.0         |        | 1.0  |
+/// | `RasterizerOrderedTexture1D`      |      | none / ARB_fragment_shader_interlock  | SM 5.1 | 2.0         |        | -    |
+/// | `RasterizerOrderedTexture1DArray` |      | none / ARB_fragment_shader_interlock  | SM 5.1 | 2.0         |        | -    |
+/// | `RasterizerOrderedTexture2D`      |      | none / ARB_fragment_shader_interlock  | SM 5.1 | 2.0         |        | -    |
+/// | `RasterizerOrderedTexture2DArray` |      | none / ARB_fragment_shader_interlock  | SM 5.1 | 2.0         |        | -    |
+/// | `RasterizerOrderedTexture3D`      |      | none / ARB_fragment_shader_interlock  | SM 5.1 | 2.0         |        | -    |
+/// | `Texture1D`                       |      | 110                                   | SM 4.0 | 1.0         |        | 1.0  |
+/// | `Texture1DArray`                  |      | 130 / EXT_texture_array               | SM 4.0 | 1.0         |        | -    |
+/// | `Texture2D`                       |      | 110                                   | SM 4.0 | 1.0         |        | 1.0  |
+/// | `Texture2DArray`                  |      | 130 / EXT_texture_array               | SM 4.0 | 1.0         |        | 1.0  |
+/// | `Texture2DMS`                     |      | 150(*)                                | SM 4.0 | 1.0         |        | 1.0  |
+/// | `Texture2DMSArray`                |      | 150(*)                                | SM 4.0 | 2.0         |        | -    |
+/// | `Texture3D`                       |      | 110                                   | SM 4.0 | 1.0         |        | 1.0  |
+/// | `TextureCube`                     |      | 110                                   | SM 4.0 | 1.0         |        | 1.0  |
+/// | `TextureCubeArray`                |      | 400 / ARB_texture_cube_map_array      | SM 4.0 | 1.0         |        | 1.0  |
+/// | `WTexture1D`                      |      | 420 / ARB_shader_image_load_store     | -      | 1.0         |        | 1.0  |
+/// | `WTexture1DArray`                 |      | 420 / ARB_shader_image_load_store     | -      | 1.0         |        | -    |
+/// | `WTexture2D`                      |      | 420 / ARB_shader_image_load_store     | -      | 1.0         |        | 1.0  |
+/// | `WTexture2DArray`                 |      | 420 / ARB_shader_image_load_store     | -      | 1.0         |        | 1.0  |
+/// | `WTexture3D`                      |      | 420 / ARB_shader_image_load_store     | -      | 1.0         |        | 1.0  |
+///
+/// (*) Usable only via combined texture-sampler types.
+///
+/// The combined texture-sampler types and their backend support:
+///
+/// | Type                              | Cuda | GLSL | HLSL   | Metal/macOS | SPIR-V | WGSL |
+/// |:----------------------------------|:-----|:-----|:-------|:------------|:-------|:-----|
+/// | `Sampler1DShadow`                 |      |      |        |             |        |      |
+/// | `Sampler1DArrayShadow`            |      |      |        |             |        |      |
+/// | `Sampler2DShadow`                 |      |      |        |             |        |      |
+/// | `Sampler2DArrayShadow`            |      |      |        |             |        |      |
+/// | `Sampler2DMSShadow`               |      |      |        |             |        |      |
+/// | `Sampler2DMSArrayShadow`          |      |      |        |             |        |      |
+/// | `Sampler3DShadow`                 |      |      |        |             |        |      |
+/// | `SamplerCubeShadow`               |      |      |        |             |        |      |
+/// | `SamplerCubeArrayShadow`          |      |      |        |             |        |      |
+/// | `RWSampler1D`                     |      |      |        |             |        |      |
+/// | `RWSampler1DArray`                |      |      |        |             |        |      |
+/// | `RWSampler2D`                     |      |      |        |             |        |      |
+/// | `RWSampler2DArray`                |      |      |        |             |        |      |
+/// | `RWSampler2DMS`                   |      |      |        |             |        |      |
+/// | `RWSampler2DMSArray`              |      |      |        |             |        |      |
+/// | `RWSampler3D`                     |      |      |        |             |        |      |
+/// | `RasterizerOrderedSampler1D`      |      |      |        |             |        |      |
+/// | `RasterizerOrderedSampler1DArray` |      |      |        |             |        |      |
+/// | `RasterizerOrderedSampler2D`      |      |      |        |             |        |      |
+/// | `RasterizerOrderedSampler2DArray` |      |      |        |             |        |      |
+/// | `RasterizerOrderedSampler3D`      |      |      |        |             |        |      |
+/// | `Sampler1D`                       |      |      |        |             |        |      |
+/// | `Sampler1DArray`                  |      |      |        |             |        |      |
+/// | `Sampler2D`                       |      |      |        |             |        |      |
+/// | `Sampler2DArray`                  |      |      |        |             |        |      |
+/// | `Sampler2DMS`                     |      |      |        |             |        |      |
+/// | `Sampler2DMSArray`                |      |      |        |             |        |      |
+/// | `Sampler3D`                       |      |      |        |             |        |      |
+/// | `SamplerCube`                     |      |      |        |             |        |      |
+/// | `SamplerCubeArray`                |      |      |        |             |        |      |
+/// | `WSampler1D`                      |      |      |        |             |        |      |
+/// | `WSampler1DArray`                 |      |      |        |             |        |      |
+/// | `WSampler2D`                      |      |      |        |             |        |      |
+/// | `WSampler2DArray`                 |      |      |        |             |        |      |
+/// | `WSampler3D`                      |      |      |        |             |        |      |
+///
 /// @internal
 /// @category texture_types Texture types
 __magic_type(TextureType)
@@ -793,33 +877,45 @@ float __glsl_texture_offset_1d_shadow<TSampler, TCoord, TOffset>(TSampler s, TCo
     }
 }
 
+[require(glsl, texture_sm_4_1)]
+float __glsl150_texture_level<TSampler, TCoord>(TSampler s, TCoord value, float level)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "textureLod($0, $1, $2)";
+    }
+}
+
+[require(glsl, texture_sm_4_1)]
+float __glsl150_texture_level_1d_shadow<TSampler, TCoord>(TSampler s, TCoord value, float level)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "textureLod($0, $1, $2)";
+    }
+}
+
 __glsl_extension(GL_EXT_texture_shadow_lod)
 [require(glsl, texture_sm_4_1)]
-float __glsl_texture_level<TSampler, TCoord>(TSampler s, TCoord value, float level)
+float __glsl_shadow_lod_texture_level<TSampler, TCoord>(TSampler s, TCoord value, float level)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "textureLod($0, $1, $2)";
+    case glsl:
+        __requireCapability(GL_EXT_texture_shadow_lod);
+        __intrinsic_asm "textureLod($0, $1, $2)";
     }
 }
 
 __glsl_extension(GL_EXT_texture_shadow_lod)
-[require(glsl, texture_shadowlod)]
-float __glsl_texture_level_1d_shadow<TSampler, TCoord>(TSampler s, TCoord value, float level)
+[require(glsl, texture_sm_4_1)]
+float __glsl_shadow_lod_texture_level_cube_array_shadow<TSampler, TCoord>(TSampler s, TCoord value, float comparison, float level)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "textureLod($0, $1, $2)";
-    }
-}
-
-__glsl_extension(GL_EXT_texture_shadow_lod)
-[require(glsl, texture_shadowlod)]
-float __glsl_texture_level_cube_array_shadow<TSampler, TCoord>(TSampler s, TCoord value, float comparison, float level)
-{
-    __target_switch
-    {
-    case glsl: __intrinsic_asm "textureLod($0, $1, $2, $3)";
+    case glsl:
+        __requireCapability(GL_EXT_texture_shadow_lod);
+        __intrinsic_asm "textureLod($0, $1, $2, $3)";
     }
 }
 
@@ -892,7 +988,16 @@ float __glsl_texture_offset_1d_shadow<TTexture, TCoord, TOffset>(TTexture t,Samp
 }
 
 [require(glsl, texture_sm_4_1)]
-float __glsl_texture_level<TTexture, TCoord>(TTexture t,SamplerComparisonState s, TCoord value, float level)
+float __glsl150_texture_level<TTexture, TCoord>(TTexture t, SamplerComparisonState s, TCoord value, float level)
+{
+    __target_switch
+    {
+    case glsl: __intrinsic_asm "textureLod($p, $2, $3)";
+    }
+}
+
+[require(glsl, texture_sm_4_1)]
+float __glsl150_texture_level_1d_shadow<TTexture, TCoord>(TTexture t,SamplerComparisonState s, TCoord value, float level)
 {
     __target_switch
     {
@@ -901,22 +1006,26 @@ float __glsl_texture_level<TTexture, TCoord>(TTexture t,SamplerComparisonState s
 }
 
 __glsl_extension(GL_EXT_texture_shadow_lod)
-[require(glsl, texture_shadowlod)]
-float __glsl_texture_level_1d_shadow<TTexture, TCoord>(TTexture t,SamplerComparisonState s, TCoord value, float level)
+[require(glsl, texture_sm_4_1)]
+float __glsl_shadow_lod_texture_level<TTexture, TCoord>(TTexture t, SamplerComparisonState s, TCoord value, float level)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "textureLod($p, $2, $3)";
+    case glsl:
+        __requireCapability(GL_EXT_texture_shadow_lod);
+        __intrinsic_asm "textureLod($p, $2, $3)";
     }
 }
 
 __glsl_extension(GL_EXT_texture_shadow_lod)
-[require(glsl, texture_shadowlod)]
-float __glsl_texture_level_cube_array_shadow<TTexture, TCoord>(TTexture t,SamplerComparisonState s, TCoord value, float compare, float level)
+[require(glsl, texture_sm_4_1)]
+float __glsl_shadow_lod_texture_level_cube_array_shadow<TTexture, TCoord>(TTexture t,SamplerComparisonState s, TCoord value, float compare, float level)
 {
     __target_switch
     {
-    case glsl: __intrinsic_asm "textureLod($p, $2, $3, $4)";
+    case glsl:
+        __requireCapability(GL_EXT_texture_shadow_lod);
+        __intrinsic_asm "textureLod($p, $2, $3, $4)";
     }
 }
 
@@ -967,9 +1076,21 @@ void __wgsl_check_texture_type()
     static_assert(isShadow == 0 || Shape.flavor == $(SLANG_TEXTURE_2D) || Shape.flavor == $(SLANG_TEXTURE_CUBE)
         , "WGSL depth texture shape must be either 2D or Cube");
 
-    // Multisampled texture shapes
+    // Multisampled textures
     static_assert(isMS == 0 || Shape.flavor == $(SLANG_TEXTURE_2D)
         , "WGSL multisampled texture shape must be 2D");
+    static_assert(isMS == 0 ||
+                 (access != $(kCoreModule_ResourceAccessWriteOnly) &&
+                  access != $(kCoreModule_ResourceAccessReadWrite))
+        , "WGSL does not support multisampled texture storage");
+
+    // access
+    static_assert(access != $(kCoreModule_ResourceAccessRasterizerOrdered)
+        , "WGSL does not support RasterizerOrderedTexture types");
+    static_assert(access != $(kCoreModule_ResourceAccessFeedback)
+        , "WGSL does not support FeedbackTexture types");
+    static_assert(access <= $(kCoreModule_ResourceAccessFeedback)
+        , "WGSL: unhandled texture access type");
 }
 
 __generic<T:ITexelElement, Shape: __ITextureShape, let isArray:int, let isMS:int, let sampleCount:int, let access:int, let isShadow:int, let isCombined:int, let format:int>
@@ -1520,23 +1641,47 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,1,format>
 
     [__readNone]
     [ForceInline]
-    [require(glsl_hlsl_metal_spirv, texture_shadowlod)]
+    [require(glsl_hlsl_metal_spirv, texture_sm_4_1)]
     float SampleCmpLevel(vector<float, Shape.dimensions+isArray> location, float compareValue, float level)
     {
         __target_switch
         {
         case glsl:
-            if (Shape.dimensions == 1 && isArray == 0)
+            // Note: the baseline requirement texture_sm_4_1 corresponds to GLSL 1.50, which covers the following variants:
+            // - float textureLod(sampler1DShadow sampler, vec3 P, float lod)
+            // - float textureLod(sampler1DArrayShadow sampler, vec3 P, float lod)
+            // - float textureLod(sampler2DShadow sampler, vec3 P, float lod)
+            //
+            // The above list is not extended by later GLSL versions.
+            //
+            // GL_EXT_texture_shadow_lod adds the following variants:
+            // - float textureLod(sampler2DArrayShadow sampler, vec4 P, float lod)
+            // - float textureLod(samplerCubeShadow sampler, vec4 P, float lod)
+            // - float textureLod(samplerCubeArrayShadow sampler, vec4 P, float compare, float lod)
+            //
+            // Anything else requires additional capabilities
+
+            if (Shape.dimensions == 1)
             {
-                return __glsl_texture_level_1d_shadow(this, __makeVector(__makeVector(location, 0.0), compareValue), level);
+                if (isArray == 0)
+                    return __glsl150_texture_level_1d_shadow(this, __makeVector(__makeVector(location, 0.0), compareValue), level);
+                else
+                    return __glsl150_texture_level(this, __makeVector(location, compareValue), level);
             }
-            else if (Shape.dimensions == 3 && isArray == 1)
+            else if (Shape.dimensions == 2)
             {
-                return __glsl_texture_level_cube_array_shadow(this, location, compareValue, level);
+                if (isArray == 0)
+                    return __glsl150_texture_level(this, __makeVector(location, compareValue), level);
+                else
+                    return __glsl_shadow_lod_texture_level(this, __makeVector(location, compareValue), level);
             }
             else
             {
-                return __glsl_texture_level(this, __makeVector(location, compareValue), level);
+                static_assert(Shape.dimensions == 3, "_Texture::SampleCmpLevel(location, compareValue, level): Unimplemented shape dimension");
+                if (isArray == 0)
+                    return __glsl_shadow_lod_texture_level(this, __makeVector(location, compareValue), level);
+                else
+                    return __glsl_shadow_lod_texture_level_cube_array_shadow(this, location, compareValue, level);
             }
         case hlsl:
             static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
@@ -2870,17 +3015,40 @@ extension _Texture<T,Shape,isArray,isMS,sampleCount,0,isShadow,0,format>
         __target_switch
         {
         case glsl:
-            if (Shape.dimensions == 1 && isArray == 0)
+            // Note: the baseline requirement texture_sm_4_1 corresponds to GLSL 1.50, which covers the following variants:
+            // - float textureLod(sampler1DShadow sampler, vec3 P, float lod)
+            // - float textureLod(sampler1DArrayShadow sampler, vec3 P, float lod)
+            // - float textureLod(sampler2DShadow sampler, vec3 P, float lod)
+            //
+            // The above list is not extended by later GLSL versions.
+            //
+            // GL_EXT_texture_shadow_lod adds the following variants:
+            // - float textureLod(sampler2DArrayShadow sampler, vec4 P, float lod)
+            // - float textureLod(samplerCubeShadow sampler, vec4 P, float lod)
+            // - float textureLod(samplerCubeArrayShadow sampler, vec4 P, float compare, float lod)
+
+            if (Shape.dimensions == 1)
             {
-                return __glsl_texture_level_1d_shadow(this, s, __makeVector(__makeVector(location, 0.0), compareValue), level);
+                if (isArray == 0)
+                    return __glsl150_texture_level_1d_shadow(this, s, __makeVector(__makeVector(location, 0.0), compareValue), level);
+                else
+                    return __glsl150_texture_level(this, s, __makeVector(location,compareValue), level);
             }
-            else if (Shape.dimensions == 3 && isArray == 1)
+            else if (Shape.dimensions == 2)
             {
-                return __glsl_texture_level_cube_array_shadow(this, s, location, compareValue, level);
+                if (isArray == 0)
+                    return __glsl150_texture_level(this, s, __makeVector(location,compareValue), level);
+                else
+                    return __glsl_shadow_lod_texture_level(this, s, __makeVector(location, compareValue), level);
             }
             else
             {
-                return __glsl_texture_level(this, s, __makeVector(location,compareValue), level);
+                static_assert(Shape.dimensions == 3, "_Texture::SampleCmpLevel(location, compareValue, level): Unimplemented shape dimension");
+
+                if (isArray == 0)
+                    return __glsl_shadow_lod_texture_level(this, s, __makeVector(location, compareValue), level);
+                else
+                    return __glsl_shadow_lod_texture_level_cube_array_shadow(this, s, location, compareValue, level);
             }
         case hlsl:
             static_assert(T is float || T is vector<float,2> || T is vector<float,3> || T is vector<float,4>
@@ -21956,9 +22124,6 @@ int __hitObjectAttributesLocation(__ref Attributes attributes);
 /// and its related functions are available in raytracing shader types only.
 /// @category raytracing Ray-tracing
 __glsl_extension(GL_EXT_ray_tracing)
-__glsl_extension(GL_EXT_buffer_reference_uvec2)
-__glsl_extension(GL_EXT_shader_invocation_reorder)
-__glsl_extension(GL_NV_shader_invocation_reorder)
 [__NonCopyableType]
 __intrinsic_type($(kIROp_HitObjectType))
 struct HitObject
@@ -22003,6 +22168,7 @@ struct HitObject
             }
         case _GL_NV_shader_invocation_reorder:
             {
+                __requireTargetExtension("GL_NV_shader_invocation_reorder");
                 // Conditional: if T is int (location), pass directly; else convert data to location
                 if (T is int)
                 {
@@ -22050,6 +22216,8 @@ struct HitObject
         case glsl: // use GL_EXT until KHR is available.
         //case _GL_EXT_shader_invocation_reorder: // Not sure why, but needs to be commented out.
             {
+                __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+                __requireTargetExtension("GL_EXT_shader_invocation_reorder");
                 // Conditional: if T is int (location), pass directly; else convert data to location
                 if (T is int)
                 {
@@ -22207,6 +22375,8 @@ struct HitObject
         {
         case _GL_NV_shader_invocation_reorder:
             {
+                __requireTargetExtension("GL_NV_ray_tracing_motion_blur");
+                __requireTargetExtension("GL_NV_shader_invocation_reorder");
                 // Conditional: if T is int (location), pass directly; else convert data to location
                 if (T is int)
                 {
@@ -22254,6 +22424,8 @@ struct HitObject
         case glsl: // use GL_EXT until KHR is available.
         //case _GL_EXT_shader_invocation_reorder: // Not sure why, but needs to be commented out.
             {
+                __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+                __requireTargetExtension("GL_EXT_shader_invocation_reorder");
                 // Conditional: if T is int (location), pass directly; else convert data to location
                 if (T is int)
                 {
@@ -22746,9 +22918,12 @@ struct HitObject
         {
         case hlsl_nvapi: __intrinsic_asm "($2=NvMakeMiss($0,$1))";
         case _GL_NV_shader_invocation_reorder:
+            __requireTargetExtension("GL_NV_shader_invocation_reorder");
             __glslMakeMissNV(__return_val, MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax);
         case glsl: // use GL_EXT until KHR is available.
         //case _GL_EXT_shader_invocation_reorder: // Not sure why, but needs to be commented out.
+            __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+            __requireTargetExtension("GL_EXT_shader_invocation_reorder");
             // EXT spec requires RayFlags parameter, pass 0 as default
             __glslMakeMissEXT(__return_val, 0, MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax);
         case cuda: __intrinsic_asm "optixMakeMissHitObject";
@@ -22789,9 +22964,13 @@ struct HitObject
         __target_switch
         {
         case _GL_NV_shader_invocation_reorder:
+            __requireTargetExtension("GL_NV_ray_tracing_motion_blur");
+            __requireTargetExtension("GL_NV_shader_invocation_reorder");
             __glslMakeMissMotionNV(__return_val, MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax, CurrentTime);
         case glsl: // use GL_EXT until KHR is available.
         //case _GL_EXT_shader_invocation_reorder: // Not sure why, but needs to be commented out.
+            __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+            __requireTargetExtension("GL_EXT_shader_invocation_reorder");
             // EXT requires RayFlags parameter - use 0 as default
             __glslMakeMissMotionEXT(__return_val, 0, MissShaderIndex, Ray.Origin, Ray.TMin, Ray.Direction, Ray.TMax, CurrentTime);
         case cuda: __intrinsic_asm "optixMakeMissHitObject";
@@ -22923,6 +23102,7 @@ struct HitObject
                 __forceVarIntoRayPayloadStructTemporarily(Payload));
         case _GL_NV_shader_invocation_reorder:
             {
+                __requireTargetExtension("GL_NV_shader_invocation_reorder");
                 [__vulkanRayPayload]
                 static payload_t p;
 
@@ -22937,6 +23117,8 @@ struct HitObject
         case glsl: // use GL_EXT until KHR is available.
         //case _GL_EXT_shader_invocation_reorder: // Not sure why, but needs to be commented out.
             {
+                __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+                __requireTargetExtension("GL_EXT_shader_invocation_reorder");
                 [__vulkanRayPayload]
                 static payload_t p;
 
@@ -23140,9 +23322,6 @@ struct HitObject
 
         /// Queries shader table index from HitObject. Valid if the hit object represents a hit or a miss.
     __glsl_extension(GL_EXT_ray_tracing)
-    __glsl_extension(GL_EXT_buffer_reference_uvec2)
-    __glsl_extension(GL_EXT_shader_invocation_reorder)
-    __glsl_extension(GL_NV_shader_invocation_reorder)
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     uint GetShaderTableIndex()
@@ -23152,9 +23331,12 @@ struct HitObject
         case hlsl:
             __intrinsic_asm ".GetShaderTableIndex";
         case _GL_NV_shader_invocation_reorder:
+            __requireTargetExtension("GL_NV_shader_invocation_reorder");
             __intrinsic_asm "hitObjectGetShaderBindingTableRecordIndexNV($0)";
         case glsl: // use GL_EXT until KHR is available.
         case _GL_EXT_shader_invocation_reorder:
+            __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+            __requireTargetExtension("GL_EXT_shader_invocation_reorder");
             __intrinsic_asm "hitObjectGetShaderBindingTableRecordIndexEXT($0)";
         case cuda: __intrinsic_asm "slangOptixHitObjectGetSbtRecordIndex";
         case spvShaderInvocationReorderNV:
@@ -23202,9 +23384,6 @@ struct HitObject
     }
         /// Returns the instance index of a hit. Valid if the hit object represents a hit.
     __glsl_extension(GL_EXT_ray_tracing)
-    __glsl_extension(GL_EXT_buffer_reference_uvec2)
-    __glsl_extension(GL_EXT_shader_invocation_reorder)
-    __glsl_extension(GL_NV_shader_invocation_reorder)
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     uint GetInstanceIndex()
@@ -23214,9 +23393,12 @@ struct HitObject
         case hlsl:
             __intrinsic_asm ".GetInstanceIndex";
         case _GL_NV_shader_invocation_reorder:
+            __requireTargetExtension("GL_NV_shader_invocation_reorder");
             __intrinsic_asm "hitObjectGetInstanceIdNV($0)";
         case glsl: // use GL_EXT until KHR is available.
         case _GL_EXT_shader_invocation_reorder:
+            __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+            __requireTargetExtension("GL_EXT_shader_invocation_reorder");
             __intrinsic_asm "hitObjectGetInstanceIdEXT($0)";
         case cuda: __intrinsic_asm "slangOptixHitObjectGetInstanceIndex";
         case spvShaderInvocationReorderNV:
@@ -23238,9 +23420,6 @@ struct HitObject
 
         /// Returns the instance ID of a hit. Valid if the hit object represents a hit.
     __glsl_extension(GL_EXT_ray_tracing)
-    __glsl_extension(GL_EXT_buffer_reference_uvec2)
-    __glsl_extension(GL_EXT_shader_invocation_reorder)
-    __glsl_extension(GL_NV_shader_invocation_reorder)
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     uint GetInstanceID()
@@ -23250,9 +23429,12 @@ struct HitObject
         case hlsl:
             __intrinsic_asm ".GetInstanceID";
         case _GL_NV_shader_invocation_reorder:
+            __requireTargetExtension("GL_NV_shader_invocation_reorder");
             __intrinsic_asm "hitObjectGetInstanceCustomIndexNV($0)";
         case glsl: // use GL_EXT until KHR is available.
         case _GL_EXT_shader_invocation_reorder:
+            __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+            __requireTargetExtension("GL_EXT_shader_invocation_reorder");
             __intrinsic_asm "hitObjectGetInstanceCustomIndexEXT($0)";
         case cuda: __intrinsic_asm "slangOptixHitObjectGetInstanceId";
         case spvShaderInvocationReorderNV:
@@ -23274,9 +23456,6 @@ struct HitObject
 
         /// Returns the geometry index of a hit. Valid if the hit object represents a hit.
     __glsl_extension(GL_EXT_ray_tracing)
-    __glsl_extension(GL_EXT_buffer_reference_uvec2)
-    __glsl_extension(GL_EXT_shader_invocation_reorder)
-    __glsl_extension(GL_NV_shader_invocation_reorder)
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     uint GetGeometryIndex()
@@ -23286,9 +23465,12 @@ struct HitObject
         case hlsl:
             __intrinsic_asm ".GetGeometryIndex";
         case _GL_NV_shader_invocation_reorder:
+            __requireTargetExtension("GL_NV_shader_invocation_reorder");
             __intrinsic_asm "hitObjectGetGeometryIndexNV($0)";
         case glsl: // use GL_EXT until KHR is available.
         case _GL_EXT_shader_invocation_reorder:
+            __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+            __requireTargetExtension("GL_EXT_shader_invocation_reorder");
             __intrinsic_asm "hitObjectGetGeometryIndexEXT($0)";
         case cuda: __intrinsic_asm "slangOptixHitObjectGetSbtGASIndex";
         case spvShaderInvocationReorderNV:
@@ -23310,9 +23492,6 @@ struct HitObject
 
         /// Returns the primitive index of a hit. Valid if the hit object represents a hit.
     __glsl_extension(GL_EXT_ray_tracing)
-    __glsl_extension(GL_EXT_buffer_reference_uvec2)
-    __glsl_extension(GL_EXT_shader_invocation_reorder)
-    __glsl_extension(GL_NV_shader_invocation_reorder)
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     uint GetPrimitiveIndex()
@@ -23322,9 +23501,12 @@ struct HitObject
         case hlsl:
             __intrinsic_asm ".GetPrimitiveIndex";
         case _GL_NV_shader_invocation_reorder:
+            __requireTargetExtension("GL_NV_shader_invocation_reorder");
             __intrinsic_asm "hitObjectGetPrimitiveIndexNV($0)";
         case glsl: // use GL_EXT until KHR is available.
         case _GL_EXT_shader_invocation_reorder:
+            __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+            __requireTargetExtension("GL_EXT_shader_invocation_reorder");
             __intrinsic_asm "hitObjectGetPrimitiveIndexEXT($0)";
         case cuda: __intrinsic_asm "slangOptixHitObjectGetPrimitiveIndex";
         case spvShaderInvocationReorderNV:
@@ -23346,9 +23528,6 @@ struct HitObject
 
         /// Returns the hit kind. Valid if the hit object represents a hit.
     __glsl_extension(GL_EXT_ray_tracing)
-    __glsl_extension(GL_EXT_buffer_reference_uvec2)
-    __glsl_extension(GL_EXT_shader_invocation_reorder)
-    __glsl_extension(GL_NV_shader_invocation_reorder)
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     uint GetHitKind()
@@ -23358,9 +23537,12 @@ struct HitObject
         case hlsl:
             __intrinsic_asm ".GetHitKind";
         case _GL_NV_shader_invocation_reorder:
+            __requireTargetExtension("GL_NV_shader_invocation_reorder");
             __intrinsic_asm "hitObjectGetHitKindNV($0)";
         case glsl: // use GL_EXT until KHR is available.
         case _GL_EXT_shader_invocation_reorder:
+            __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+            __requireTargetExtension("GL_EXT_shader_invocation_reorder");
             __intrinsic_asm "hitObjectGetHitKindEXT($0)";
         case cuda: __intrinsic_asm "optixHitObjectGetHitKind()";
         case spvShaderInvocationReorderNV:
@@ -23507,9 +23689,6 @@ struct HitObject
         /// Returns 4x3 world-to-object transform matrix. Valid if the hit object represents a hit.
         /// Note: NVAPI/SPIRV/GLSL extension. DXR 1.3 uses GetWorldToObject3x4() and GetWorldToObject4x3().
     __glsl_extension(GL_EXT_ray_tracing)
-    __glsl_extension(GL_EXT_buffer_reference_uvec2)
-    __glsl_extension(GL_EXT_shader_invocation_reorder)
-    __glsl_extension(GL_NV_shader_invocation_reorder)
     [ForceInline]
     [require(cuda_glsl_spirv, ser_raygen_closesthit_miss)]
     [require(nvapi, ser_raygen_closesthit_miss)]
@@ -23519,9 +23698,12 @@ struct HitObject
         {
         case hlsl_nvapi: __intrinsic_asm ".GetWorldToObject";
         case _GL_NV_shader_invocation_reorder:
+            __requireTargetExtension("GL_NV_shader_invocation_reorder");
             __intrinsic_asm "hitObjectGetWorldToObjectNV($0)";
         case glsl: // use GL_EXT until KHR is available.
         case _GL_EXT_shader_invocation_reorder:
+            __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+            __requireTargetExtension("GL_EXT_shader_invocation_reorder");
             __intrinsic_asm "hitObjectGetWorldToObjectEXT($0)";
         case cuda: __intrinsic_asm "slangOptixHitObjectGetWorldToObject";
         case spvShaderInvocationReorderNV:
@@ -23544,9 +23726,6 @@ struct HitObject
         /// Returns 4x3 object-to-world transform matrix. Valid if the hit object represents a hit.
         /// Note: NVAPI/SPIRV/GLSL extension. DXR 1.3 uses GetObjectToWorld3x4() and GetObjectToWorld4x3().
     __glsl_extension(GL_EXT_ray_tracing)
-    __glsl_extension(GL_EXT_buffer_reference_uvec2)
-    __glsl_extension(GL_EXT_shader_invocation_reorder)
-    __glsl_extension(GL_NV_shader_invocation_reorder)
     [ForceInline]
     [require(cuda_glsl_spirv, ser_raygen_closesthit_miss)]
     [require(nvapi, ser_raygen_closesthit_miss)]
@@ -23556,9 +23735,12 @@ struct HitObject
         {
         case hlsl_nvapi: __intrinsic_asm ".GetObjectToWorld";
         case _GL_NV_shader_invocation_reorder:
+            __requireTargetExtension("GL_NV_shader_invocation_reorder");
             __intrinsic_asm "hitObjectGetObjectToWorldNV($0)";
         case glsl: // use GL_EXT until KHR is available.
         case _GL_EXT_shader_invocation_reorder:
+            __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+            __requireTargetExtension("GL_EXT_shader_invocation_reorder");
             __intrinsic_asm "hitObjectGetObjectToWorldEXT($0)";
         case cuda: __intrinsic_asm "slangOptixHitObjectGetObjectToWorld";
         case spvShaderInvocationReorderNV:
@@ -23579,19 +23761,19 @@ struct HitObject
     }
 
     __glsl_extension(GL_EXT_ray_tracing)
-    __glsl_extension(GL_EXT_buffer_reference_uvec2)
-    __glsl_extension(GL_EXT_shader_invocation_reorder)
-    __glsl_extension(GL_NV_ray_tracing_motion_blur)
-    __glsl_extension(GL_NV_shader_invocation_reorder)
     [ForceInline]
     [require(cuda_glsl_spirv, ser_raygen_closesthit_miss)]
     float GetCurrentTime() {
         __target_switch
         {
         case _GL_NV_shader_invocation_reorder:
+            __requireTargetExtension("GL_NV_ray_tracing_motion_blur");
+            __requireTargetExtension("GL_NV_shader_invocation_reorder");
             __intrinsic_asm "hitObjectGetCurrentTimeNV($0)";
         case glsl: // use GL_EXT until KHR is available.
         case _GL_EXT_shader_invocation_reorder:
+            __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+            __requireTargetExtension("GL_EXT_shader_invocation_reorder");
             __intrinsic_asm "hitObjectGetCurrentTimeEXT($0)";
         case cuda: __intrinsic_asm "slangOptixHitObjectGetRayTime";
         case spvShaderInvocationReorderNV:
@@ -23613,9 +23795,6 @@ struct HitObject
 
         /// Returns object-space ray origin. Valid if the hit object represents a hit.
     __glsl_extension(GL_EXT_ray_tracing)
-    __glsl_extension(GL_EXT_buffer_reference_uvec2)
-    __glsl_extension(GL_EXT_shader_invocation_reorder)
-    __glsl_extension(GL_NV_shader_invocation_reorder)
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     float3 GetObjectRayOrigin() {
@@ -23624,9 +23803,12 @@ struct HitObject
         case hlsl:
             __intrinsic_asm ".GetObjectRayOrigin";
         case _GL_NV_shader_invocation_reorder:
+            __requireTargetExtension("GL_NV_shader_invocation_reorder");
             __intrinsic_asm "hitObjectGetObjectRayOriginNV($0)";
         case glsl: // use GL_EXT until KHR is available.
         case _GL_EXT_shader_invocation_reorder:
+            __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+            __requireTargetExtension("GL_EXT_shader_invocation_reorder");
             __intrinsic_asm "hitObjectGetObjectRayOriginEXT($0)";
         case cuda: __intrinsic_asm "optixGetObjectRayOrigin()";
         case spvShaderInvocationReorderNV:
@@ -23648,9 +23830,6 @@ struct HitObject
 
         /// Returns object-space ray direction. Valid if the hit object represents a hit.
     __glsl_extension(GL_EXT_ray_tracing)
-    __glsl_extension(GL_EXT_buffer_reference_uvec2)
-    __glsl_extension(GL_EXT_shader_invocation_reorder)
-    __glsl_extension(GL_NV_shader_invocation_reorder)
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     float3 GetObjectRayDirection() {
@@ -23659,9 +23838,12 @@ struct HitObject
         case hlsl:
             __intrinsic_asm ".GetObjectRayDirection";
         case _GL_NV_shader_invocation_reorder:
+            __requireTargetExtension("GL_NV_shader_invocation_reorder");
             __intrinsic_asm "hitObjectGetObjectRayDirectionNV($0)";
         case glsl: // use GL_EXT until KHR is available.
         case _GL_EXT_shader_invocation_reorder:
+            __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+            __requireTargetExtension("GL_EXT_shader_invocation_reorder");
             __intrinsic_asm "hitObjectGetObjectRayDirectionEXT($0)";
         case cuda: __intrinsic_asm "optixGetObjectRayDirection()";
         case spvShaderInvocationReorderNV:
@@ -23682,18 +23864,18 @@ struct HitObject
     }
 
     __glsl_extension(GL_EXT_ray_tracing)
-    __glsl_extension(GL_EXT_buffer_reference_uvec2)
-    __glsl_extension(GL_EXT_shader_invocation_reorder)
-    __glsl_extension(GL_NV_shader_invocation_reorder)
     [ForceInline]
     [require(glsl_spirv, ser_raygen_closesthit_miss)]
     uint2 GetShaderRecordBufferHandle() {
         __target_switch
         {
         case _GL_NV_shader_invocation_reorder:
+            __requireTargetExtension("GL_NV_shader_invocation_reorder");
             __intrinsic_asm "hitObjectGetShaderRecordBufferHandleNV($0)";
         case glsl: // use GL_EXT until KHR is available.
         case _GL_EXT_shader_invocation_reorder:
+            __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+            __requireTargetExtension("GL_EXT_shader_invocation_reorder");
             __intrinsic_asm "hitObjectGetShaderRecordBufferHandleEXT($0)";
         case spvShaderInvocationReorderNV:
             return spirv_asm
@@ -23714,9 +23896,6 @@ struct HitObject
 
     /// Returns the attributes of a hit. Valid if the hit object represents a hit or a miss.
     __glsl_extension(GL_EXT_ray_tracing)
-    __glsl_extension(GL_EXT_buffer_reference_uvec2)
-    __glsl_extension(GL_EXT_shader_invocation_reorder)
-    __glsl_extension(GL_NV_shader_invocation_reorder)
     [ForceInline]
     [require(cuda_glsl_hlsl_spirv, ser_raygen_closesthit_miss)]
     attr_t GetAttributes<attr_t>()
@@ -23734,6 +23913,8 @@ struct HitObject
             __intrinsic_asm ".GetAttributes";
         case _GL_NV_shader_invocation_reorder:
             {
+                __requireTargetExtension("GL_NV_shader_invocation_reorder");
+
                 // Work out the location
                 int attributeLocation = __hitObjectAttributesLocation(__hitObjectAttributes<attr_t>());
 
@@ -23746,6 +23927,9 @@ struct HitObject
         case glsl: // use GL_EXT until KHR is available.
         case _GL_EXT_shader_invocation_reorder:
             {
+                __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+                __requireTargetExtension("GL_EXT_shader_invocation_reorder");
+
                 // Work out the location
                 int attributeLocation = __hitObjectAttributesLocation(__hitObjectAttributes<attr_t>());
 
@@ -24220,52 +24404,52 @@ struct HitObject
     }
 
     __glsl_extension(GL_EXT_ray_tracing)
-    __glsl_extension(GL_EXT_buffer_reference_uvec2)
-    __glsl_extension(GL_EXT_shader_invocation_reorder)
-    __glsl_extension(GL_NV_shader_invocation_reorder)
     [require(glsl, ser_raygen_closesthit_miss)]
     static void __glslMakeNop(out HitObject hitObj)
     {
         __target_switch
         {
         case _GL_NV_shader_invocation_reorder:
+            __requireTargetExtension("GL_NV_shader_invocation_reorder");
             __intrinsic_asm "hitObjectRecordEmptyNV";
         case glsl: // use GL_EXT until KHR is available.
         case _GL_EXT_shader_invocation_reorder:
+            __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+            __requireTargetExtension("GL_EXT_shader_invocation_reorder");
             __intrinsic_asm "hitObjectRecordEmptyEXT";
         }
     }
 
     __glsl_extension(GL_EXT_ray_tracing)
-    __glsl_extension(GL_EXT_buffer_reference_uvec2)
-    __glsl_extension(GL_EXT_shader_invocation_reorder)
-    __glsl_extension(GL_NV_shader_invocation_reorder)
     [require(glsl, ser_raygen_closesthit_miss)]
     float3 __glslGetRayDirection()
     {
         __target_switch
         {
         case _GL_NV_shader_invocation_reorder:
+            __requireTargetExtension("GL_NV_shader_invocation_reorder");
             __intrinsic_asm "hitObjectGetObjectRayDirectionNV($0)";
         case glsl: // use GL_EXT until KHR is available.
         case _GL_EXT_shader_invocation_reorder:
+            __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+            __requireTargetExtension("GL_EXT_shader_invocation_reorder");
             __intrinsic_asm "hitObjectGetObjectRayDirectionEXT($0)";
         }
     }
 
     __glsl_extension(GL_EXT_ray_tracing)
-    __glsl_extension(GL_EXT_buffer_reference_uvec2)
-    __glsl_extension(GL_EXT_shader_invocation_reorder)
-    __glsl_extension(GL_NV_shader_invocation_reorder)
     [require(glsl, ser_raygen_closesthit_miss)]
     float3 __glslGetRayWorldDirection()
     {
         __target_switch
         {
         case _GL_NV_shader_invocation_reorder:
+            __requireTargetExtension("GL_NV_shader_invocation_reorder");
             __intrinsic_asm "hitObjectGetWorldRayDirectionNV($0)";
         case glsl: // use GL_EXT until KHR is available.
         case _GL_EXT_shader_invocation_reorder:
+            __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+            __requireTargetExtension("GL_EXT_shader_invocation_reorder");
             __intrinsic_asm "hitObjectGetWorldRayDirectionEXT($0)";
         }
     }
@@ -24283,18 +24467,18 @@ struct HitObject
     }
 
     __glsl_extension(GL_EXT_ray_tracing)
-    __glsl_extension(GL_EXT_buffer_reference_uvec2)
-    __glsl_extension(GL_EXT_shader_invocation_reorder)
-    __glsl_extension(GL_NV_shader_invocation_reorder)
     [require(glsl, ser_raygen_closesthit_miss)]
     float3 __glslGetRayWorldOrigin()
     {
         __target_switch
         {
         case _GL_NV_shader_invocation_reorder:
+            __requireTargetExtension("GL_NV_shader_invocation_reorder");
             __intrinsic_asm "hitObjectGetWorldRayOriginNV($0)";
         case glsl: // use GL_EXT until KHR is available.
         case _GL_EXT_shader_invocation_reorder:
+            __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+            __requireTargetExtension("GL_EXT_shader_invocation_reorder");
             __intrinsic_asm "hitObjectGetWorldRayOriginEXT($0)";
         }
     }
@@ -24312,18 +24496,18 @@ struct HitObject
     }
 
     __glsl_extension(GL_EXT_ray_tracing)
-    __glsl_extension(GL_EXT_buffer_reference_uvec2)
-    __glsl_extension(GL_EXT_shader_invocation_reorder)
-    __glsl_extension(GL_NV_shader_invocation_reorder)
     [require(glsl, ser_raygen_closesthit_miss)]
     float __glslGetTMax()
     {
         __target_switch
         {
         case _GL_NV_shader_invocation_reorder:
+            __requireTargetExtension("GL_NV_shader_invocation_reorder");
             __intrinsic_asm "hitObjectGetRayTMaxNV($0)";
         case glsl: // use GL_EXT until KHR is available.
         case _GL_EXT_shader_invocation_reorder:
+            __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+            __requireTargetExtension("GL_EXT_shader_invocation_reorder");
             __intrinsic_asm "hitObjectGetRayTMaxEXT($0)";
         }
     }
@@ -24341,18 +24525,18 @@ struct HitObject
     }
 
     __glsl_extension(GL_EXT_ray_tracing)
-    __glsl_extension(GL_EXT_buffer_reference_uvec2)
-    __glsl_extension(GL_EXT_shader_invocation_reorder)
-    __glsl_extension(GL_NV_shader_invocation_reorder)
     [require(glsl, ser_raygen_closesthit_miss)]
     float __glslGetTMin()
     {
         __target_switch
         {
         case _GL_NV_shader_invocation_reorder:
+            __requireTargetExtension("GL_NV_shader_invocation_reorder");
             __intrinsic_asm "hitObjectGetRayTMinNV($0)";
         case glsl: // use GL_EXT until KHR is available.
         case _GL_EXT_shader_invocation_reorder:
+            __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+            __requireTargetExtension("GL_EXT_shader_invocation_reorder");
             __intrinsic_asm "hitObjectGetRayTMinEXT($0)";
         }
     }
@@ -24475,18 +24659,18 @@ struct HitObject
 
 
     __glsl_extension(GL_EXT_ray_tracing)
-    __glsl_extension(GL_EXT_buffer_reference_uvec2)
-    __glsl_extension(GL_EXT_shader_invocation_reorder)
-    __glsl_extension(GL_NV_shader_invocation_reorder)
     [require(glsl, ser_raygen_closesthit_miss)]
     void __glslGetAttributes(int attributeLocation)
     {
         __target_switch
         {
         case _GL_NV_shader_invocation_reorder:
+            __requireTargetExtension("GL_NV_shader_invocation_reorder");
             __intrinsic_asm "hitObjectGetAttributesNV($0, $1)";
         case glsl: // use GL_EXT until KHR is available.
         case _GL_EXT_shader_invocation_reorder:
+            __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+            __requireTargetExtension("GL_EXT_shader_invocation_reorder");
             __intrinsic_asm "hitObjectGetAttributesEXT($0, $1)";
         }
     }
@@ -24505,9 +24689,6 @@ struct HitObject
     }
 
     __glsl_extension(GL_EXT_ray_tracing)
-    __glsl_extension(GL_EXT_buffer_reference_uvec2)
-    __glsl_extension(GL_EXT_shader_invocation_reorder)
-    __glsl_extension(GL_NV_shader_invocation_reorder)
     [require(glsl, ser_raygen_closesthit_miss)]
     static void __glslTraceRay(
         out HitObject hitObject,
@@ -24526,9 +24707,12 @@ struct HitObject
         __target_switch
         {
         case _GL_NV_shader_invocation_reorder:
+            __requireTargetExtension("GL_NV_shader_invocation_reorder");
             __intrinsic_asm "hitObjectTraceRayNV";
         case glsl: // use GL_EXT until KHR is available.
         case _GL_EXT_shader_invocation_reorder:
+            __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+            __requireTargetExtension("GL_EXT_shader_invocation_reorder");
             __intrinsic_asm "hitObjectTraceRayEXT";
         }
     }
@@ -25026,10 +25210,6 @@ struct HitObject
     }
 
     __glsl_extension(GL_EXT_ray_tracing)
-    __glsl_extension(GL_EXT_buffer_reference_uvec2)
-    __glsl_extension(GL_EXT_shader_invocation_reorder)
-    __glsl_extension(GL_NV_ray_tracing_motion_blur)
-    __glsl_extension(GL_NV_shader_invocation_reorder)
     [require(glsl, ser_motion_raygen_closesthit_miss)]
     static void __glslTraceMotionRay(
         out HitObject hitObject,
@@ -25049,9 +25229,13 @@ struct HitObject
         __target_switch
         {
         case _GL_NV_shader_invocation_reorder:
+            __requireTargetExtension("GL_NV_ray_tracing_motion_blur");
+            __requireTargetExtension("GL_NV_shader_invocation_reorder");
             __intrinsic_asm "hitObjectTraceRayMotionNV";
         case glsl: // use GL_EXT until KHR is available.
         case _GL_EXT_shader_invocation_reorder:
+            __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+            __requireTargetExtension("GL_EXT_shader_invocation_reorder");
             __intrinsic_asm "hitObjectTraceRayMotionEXT";
         }
     }
@@ -25059,7 +25243,6 @@ struct HitObject
     __glsl_extension(GL_EXT_ray_tracing)
     __glsl_extension(GL_EXT_buffer_reference_uvec2)
     __glsl_extension(GL_EXT_shader_invocation_reorder)
-    __glsl_extension(GL_NV_ray_tracing_motion_blur)
     [require(glsl, ser_motion_raygen_closesthit_miss)]
     static void __glslTraceMotionRayEXT(
         out HitObject hitObject,
@@ -25078,14 +25261,11 @@ struct HitObject
     {
         __target_switch
         {
-        case _GL_EXT_shader_invocation_reorder_motion: __intrinsic_asm "hitObjectTraceRayMotionEXT";
+        case _GL_EXT_shader_invocation_reorder: __intrinsic_asm "hitObjectTraceRayMotionEXT";
         }
     }
 
     __glsl_extension(GL_EXT_ray_tracing)
-    __glsl_extension(GL_EXT_buffer_reference_uvec2)
-    __glsl_extension(GL_EXT_shader_invocation_reorder)
-    __glsl_extension(GL_NV_shader_invocation_reorder)
     [require(glsl, ser_raygen_closesthit_miss)]
     static void __glslInvoke(
         HitObject hitObj,
@@ -25094,9 +25274,12 @@ struct HitObject
         __target_switch
         {
         case _GL_NV_shader_invocation_reorder:
+            __requireTargetExtension("GL_NV_shader_invocation_reorder");
             __intrinsic_asm "hitObjectExecuteShaderNV";
         case glsl: // use GL_EXT until KHR is available.
         case _GL_EXT_shader_invocation_reorder:
+            __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+            __requireTargetExtension("GL_EXT_shader_invocation_reorder");
             __intrinsic_asm "hitObjectExecuteShaderEXT";
         }
     }
@@ -25125,9 +25308,6 @@ struct HitObject
     /// Where possible, reordering will also attempt to retain locality in the thread's launch indices
     /// (DispatchRaysIndex in DXR).
 __glsl_extension(GL_EXT_ray_tracing)
-__glsl_extension(GL_EXT_buffer_reference_uvec2)
-__glsl_extension(GL_EXT_shader_invocation_reorder)
-__glsl_extension(GL_NV_shader_invocation_reorder)
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, ser_raygen)]
 void ReorderThread( uint CoherenceHint, uint NumCoherenceHintBitsFromLSB )
@@ -25137,9 +25317,12 @@ void ReorderThread( uint CoherenceHint, uint NumCoherenceHintBitsFromLSB )
     case hlsl_nvapi: __intrinsic_asm "NvReorderThread";
     case hlsl: __intrinsic_asm "dx::MaybeReorderThread";
     case _GL_NV_shader_invocation_reorder:
+        __requireTargetExtension("GL_NV_shader_invocation_reorder");
         __intrinsic_asm "reorderThreadNV";
     case glsl: // use GL_EXT until KHR is available.
     case _GL_EXT_shader_invocation_reorder:
+        __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+        __requireTargetExtension("GL_EXT_shader_invocation_reorder");
         __intrinsic_asm "reorderThreadEXT";
     case cuda: __intrinsic_asm "optixReorder";
     case spvShaderInvocationReorderNV:
@@ -25176,9 +25359,6 @@ void ReorderThread( uint CoherenceHint, uint NumCoherenceHintBitsFromLSB )
     /// of equal coherence hints, it will attempt to maximize locality in 3D space of the ray hit (if any).
 
 __glsl_extension(GL_EXT_ray_tracing)
-__glsl_extension(GL_EXT_buffer_reference_uvec2)
-__glsl_extension(GL_EXT_shader_invocation_reorder)
-__glsl_extension(GL_NV_shader_invocation_reorder)
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, ser_raygen)]
 void ReorderThread( HitObject HitOrMiss, uint CoherenceHint, uint NumCoherenceHintBitsFromLSB )
@@ -25188,9 +25368,12 @@ void ReorderThread( HitObject HitOrMiss, uint CoherenceHint, uint NumCoherenceHi
     case hlsl_nvapi: __intrinsic_asm "NvReorderThread";
     case hlsl: __intrinsic_asm "dx::MaybeReorderThread";
     case _GL_NV_shader_invocation_reorder:
+        __requireTargetExtension("GL_NV_shader_invocation_reorder");
         __intrinsic_asm "reorderThreadNV";
     case glsl: // use GL_EXT until KHR is available.
     case _GL_EXT_shader_invocation_reorder:
+        __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+        __requireTargetExtension("GL_EXT_shader_invocation_reorder");
         __intrinsic_asm "reorderThreadEXT";
     case cuda: __intrinsic_asm "optixReorder($1, $2)";
     case spvShaderInvocationReorderNV:
@@ -25217,9 +25400,6 @@ void ReorderThread( HitObject HitOrMiss, uint CoherenceHint, uint NumCoherenceHi
     // With CoherenceHint and NumCoherenceHintBitsFromLSB as 0, meaning they are ignored.
 
 __glsl_extension(GL_EXT_ray_tracing)
-__glsl_extension(GL_EXT_buffer_reference_uvec2)
-__glsl_extension(GL_EXT_shader_invocation_reorder)
-__glsl_extension(GL_NV_shader_invocation_reorder)
 [ForceInline]
 [require(cuda_glsl_hlsl_spirv, ser_raygen)]
 void ReorderThread( HitObject HitOrMiss )
@@ -25229,9 +25409,12 @@ void ReorderThread( HitObject HitOrMiss )
     case hlsl_nvapi: __intrinsic_asm "NvReorderThread";
     case hlsl: __intrinsic_asm "dx::MaybeReorderThread";
     case _GL_NV_shader_invocation_reorder:
+        __requireTargetExtension("GL_NV_shader_invocation_reorder");
         __intrinsic_asm "reorderThreadNV";
     case glsl: // use GL_EXT until KHR is available.
     case _GL_EXT_shader_invocation_reorder:
+        __requireTargetExtension("GL_EXT_buffer_reference_uvec2");
+        __requireTargetExtension("GL_EXT_shader_invocation_reorder");
         __intrinsic_asm "reorderThreadEXT";
     case cuda: __intrinsic_asm "optixReorder()";
     case spvShaderInvocationReorderNV:
@@ -26942,9 +27125,9 @@ namespace linalg
 
 enum CoopMatMatrixUse
 {
-    MatrixA = 0,
-    MatrixB = 1,
-    MatrixAccumulator = 2,
+    MatrixA = $(SLANG_COOPERATIVE_MATRIX_USE_A),
+    MatrixB = $(SLANG_COOPERATIVE_MATRIX_USE_B),
+    MatrixAccumulator = $(SLANG_COOPERATIVE_MATRIX_USE_ACCUMULATOR),
 };
 
 enum CoopMatMatrixLayout
@@ -28916,6 +29099,22 @@ CoopMat<T,S,M,N,R1> __float_to_int_cast<
 // Cooperative Matrix Multiply-Accumulate
 //
 
+__intrinsic_op($(kIROp_CoopMatMulAdd))
+internal CoopMat<T, S, M, N, CoopMatMatrixUse.MatrixAccumulator> __coopMatMulAdd<
+    T : ICoopElement,
+    U : ICoopElement,
+    V : ICoopElement,
+    W : ICoopElement,
+    let S : MemoryScope,
+    let M : int,
+    let K : int,
+    let N : int
+>(
+    CoopMat<U, S, M, K, CoopMatMatrixUse.MatrixA> matA,
+    CoopMat<V, S, K, N, CoopMatMatrixUse.MatrixB> matB,
+    CoopMat<W, S, M, N, CoopMatMatrixUse.MatrixAccumulator> matC,
+    bool saturatingAccumulation);
+
 /// Performs cooperative matrix multiply-accumulate operation: D = A * B + C
 /// This is the fundamental operation for hardware-accelerated matrix multiplication.
 /// All threads in the warp/subgroup cooperate to compute the result.
@@ -28948,61 +29147,7 @@ CoopMat<T, S, M, N, CoopMatMatrixUse.MatrixAccumulator> coopMatMulAdd<
     CoopMat<V, S, K, N, CoopMatMatrixUse.MatrixB> matB,
     CoopMat<W, S, M, N, CoopMatMatrixUse.MatrixAccumulator> matC)
 {
-    __target_switch
-    {
-    case spirv:
-        // https://github.com/KhronosGroup/SPIRV-Registry/blob/main/extensions/KHR/SPV_KHR_cooperative_matrix.asciidoc#3x-cooperative-matrix-operands
-        int operands = 0; // NoneKHR
-        if (__isSignedInt<U>())
-        {
-            operands |= 0x01; // MatrixASignedComponentsKHR
-        }
-        if (__isSignedInt<V>())
-        {
-            operands |= 0x02; // MatrixBSignedComponentsKHR
-        }
-        if (__isSignedInt<W>())
-        {
-            operands |= 0x04; // MatrixCSignedComponentsKHR
-        }
-        if (__isSignedInt<T>())
-        {
-            operands |= 0x08; // MatrixResultSignedComponentsKHR
-        }
-        if (saturatingAccumulation)
-        {
-            operands |= 0x10; // SaturatingAccumulationKHR
-        }
-
-        return spirv_asm
-        {
-            result:$$CoopMat<T, S, M, N, CoopMatMatrixUse.MatrixAccumulator> = OpCooperativeMatrixMulAddKHR $matA $matB $matC !operands;
-        };
-    case cuda:
-        if (saturatingAccumulation)
-            __intrinsic_asm R"(Slang_CUDA_WMMA::coopMatMulAdd<
-                                                         $T0::ElementType,
-                                                         $T1::ElementType,
-                                                         $T2::ElementType,
-                                                         $TR::ElementType,
-                                                         $T0::m_M,
-                                                         $T0::m_N,
-                                                         $T0::m_K,
-                                                         true
-                                                        >($0, $1, $2))";
-        else
-            __intrinsic_asm R"(Slang_CUDA_WMMA::coopMatMulAdd<
-                                                         $T0::ElementType,
-                                                         $T1::ElementType,
-                                                         $T2::ElementType,
-                                                         $TR::ElementType,
-                                                         $T0::m_M,
-                                                         $T0::m_N,
-                                                         $T0::m_K,
-                                                         false
-                                                        >($0, $1, $2))";
-
-    }
+    return __coopMatMulAdd<T, U, V, W, S, M, K, N>(matA, matB, matC, saturatingAccumulation);
 }
 
 extension<
@@ -30045,63 +30190,6 @@ static const struct {
 };
 for(auto buffer : kByteAddressBufferCases) {
 $}
-    [mutating]
-    [ForceInline]
-    [require(hlsl, byteaddressbuffer_rw)]
-    void __mutMatMul<U : __BuiltinArithmeticType, let K : int>(
-        CoopVec<U, K> input, uint inputInterpretationHLSL,
-        $(buffer.type) matrix, uint matrixOffset, uint matrixInterpretationHLSL,
-        uint m, uint k, uint memoryLayoutHLSL, bool transpose, uint matrixStride)
-    {
-        __target_switch
-        {
-        case hlsl:
-            if (__isFloat<T>() || __isSignedInt<T>())
-            {
-                if (__isFloat<U>() || __isSignedInt<U>())
-                    __intrinsic_asm "__builtin_MatVecMul($0, false,  $1, false, $2,  $3, $4, $5,  $6, $7, $8, $9, $10)";
-                else
-                    __intrinsic_asm "__builtin_MatVecMul($0, false,  $1,  true, $2,  $3, $4, $5,  $6, $7, $8, $9, $10)";
-            }
-            else
-            {
-                if (__isFloat<U>() || __isSignedInt<U>())
-                    __intrinsic_asm "__builtin_MatVecMul($0, true,  $1, false, $2,  $3, $4, $5,  $6, $7, $8, $9, $10)";
-                else
-                    __intrinsic_asm "__builtin_MatVecMul($0, true,  $1,  true, $2,  $3, $4, $5,  $6, $7, $8, $9, $10)";
-            }
-        }
-    }
-
-    [mutating]
-    [ForceInline]
-    [require(hlsl, byteaddressbuffer_rw)]
-    void __mutMatMulAdd<U : __BuiltinArithmeticType, let K : int>(
-        CoopVec<U, K> input, uint inputInterpretationHLSL,
-        $(buffer.type) matrix, uint matrixOffset, uint matrixInterpretationHLSL,
-        $(buffer.type) bias, uint biasOffset, uint biasInterpretationHLSL,
-        uint m, uint k, uint memoryLayoutHLSL, bool transpose, uint matrixStride)
-    {
-        __target_switch
-        {
-        case hlsl:
-            if (__isFloat<T>() || __isSignedInt<T>())
-            {
-                if (__isFloat<U>() || __isSignedInt<U>())
-                    __intrinsic_asm "__builtin_MatVecMulAdd($0, false,  $1, false, $2,  $3, $4, $5,  $9, $10, $11, $12, $13,  $6, $7, $8)";
-                else
-                    __intrinsic_asm "__builtin_MatVecMulAdd($0, false,  $1,  true, $2,  $3, $4, $5,  $9, $10, $11, $12, $13,  $6, $7, $8)";
-            }
-            else
-            {
-                if (__isFloat<U>() || __isSignedInt<U>())
-                    __intrinsic_asm "__builtin_MatVecMulAdd($0, true,  $1, false, $2,  $3, $4, $5,  $9, $10, $11, $12, $13,  $6, $7, $8)";
-                else
-                    __intrinsic_asm "__builtin_MatVecMulAdd($0, true,  $1,  true, $2,  $3, $4, $5,  $9, $10, $11, $12, $13,  $6, $7, $8)";
-            }
-        }
-    }
-
     /// Multiply the given input Cooperative vector with the given matrix and accumulate the result into this vector.
     /// @param input The input Cooperative vector to multiply with the matrix.
     /// @param inputInterpretation Specifies how to interpret the values in the input vector (e.g. as packed values).
@@ -30133,41 +30221,20 @@ $}
         static_assert(__isPackedInputInterpretation(inputInterpretation) || k == PackedK
                     , "for non-packed inputInterpretation values k must be equal to the input vector length");
         static_assert(!__isPackedInputInterpretation(inputInterpretation)
-                    || k <= __inputInterpretationPackingFactor(inputInterpretation)*PackedK
+                    || k <= __componentPackingFactor(inputInterpretation)*PackedK
                     , "for packed inputInterpretation values k must be less than or equal to the input vector length times the packing factor");
 
-        __target_switch
-        {
-        case hlsl:
-            let inputInterpretationHLSL = __getHLSLCoopVecComponentType(inputInterpretation);
-            let matrixInterpretationHLSL = __getHLSLCoopVecComponentType(matrixInterpretation);
-            let memoryLayoutHLSL = __getHLSLCoopVecMatrixLayout(memoryLayout);
-            This temp = this;
-            temp.__mutMatMul(
-                input,
-                inputInterpretationHLSL,
-                matrix,
-                matrixOffset,
-                matrixInterpretationHLSL,
-                N,
-                k,
-                memoryLayoutHLSL,
-                transpose,
-                matrixStride
-            );
-            this.__mutAdd(temp);
-        default: this = this + coopVecMatMulPacked<T, N, PackedK, U>(
-                input,
-                inputInterpretation,
-                k,
-                matrix,
-                matrixOffset,
-                matrixInterpretation,
-                memoryLayout,
-                transpose,
-                matrixStride
-            );
-        }
+        this = this + coopVecMatMulPacked<T, N, PackedK, U>(
+            input,
+            inputInterpretation,
+            k,
+            matrix,
+            matrixOffset,
+            matrixInterpretation,
+            memoryLayout,
+            transpose,
+            matrixStride
+        );
     }
 
     /// Accumulate the result from a matrix multiplication between an input Cooperative vector and a matrix.
@@ -30230,34 +30297,10 @@ $}
         static_assert(__isPackedInputInterpretation(inputInterpretation) || k == PackedK
                     , "for non-packed inputInterpretation values k must be equal to the input vector length");
         static_assert(!__isPackedInputInterpretation(inputInterpretation)
-                    || k <= __inputInterpretationPackingFactor(inputInterpretation)*PackedK
+                    || k <= __componentPackingFactor(inputInterpretation)*PackedK
                     , "for packed inputInterpretation values k must be less than or equal to the input vector length times the packing factor");
 
-        __target_switch
-        {
-        case hlsl:
-            let inputInterpretationHLSL = __getHLSLCoopVecComponentType(inputInterpretation);
-            let matrixInterpretationHLSL = __getHLSLCoopVecComponentType(matrixInterpretation);
-            let biasInterpretationHLSL = __getHLSLCoopVecComponentType(biasInterpretation);
-            let memoryLayoutHLSL = __getHLSLCoopVecMatrixLayout(memoryLayout);
-            This temp = this;
-            temp.__mutMatMulAdd(
-                input,
-                inputInterpretationHLSL,
-                matrix,
-                matrixOffset,
-                matrixInterpretationHLSL,
-                bias,
-                biasOffset,
-                biasInterpretationHLSL,
-                N,
-                k,
-                memoryLayoutHLSL,
-                transpose,
-                matrixStride
-            );
-            this.__mutAdd(temp);
-        default: this = this + coopVecMatMulAddPacked<T, N, PackedK, U>(
+        this = this + coopVecMatMulAddPacked<T, N, PackedK, U>(
             input,
             inputInterpretation,
             k,
@@ -30270,8 +30313,7 @@ $}
             memoryLayout,
             transpose,
             matrixStride
-            );
-        }
+        );
     }
 
     /// Performs matrix multiplication and accumulation with bias: this += input * matrix + bias
@@ -30323,25 +30365,6 @@ $}
             matrixStride
         );
     }
-
-    [ForceInline]
-    [require(hlsl, byteaddressbuffer_rw)]
-    void __OuterProductAccumulate<let K : int>(
-        CoopVec<T, K> b,
-        $(buffer.type) matrix,
-        int32_t matrixOffset,
-        uint matrixStride,
-        uint memoryLayout,
-        uint matrixInterpretation,
-    )
-    {
-        __target_switch
-        {
-        case hlsl:
-            __intrinsic_asm "__builtin_OuterProductAccumulate($0, $1, $2, $3, $6, $5, $4)";
-        }
-    }
-
 
 ${
 }
@@ -30877,10 +30900,10 @@ CoopVec<T, N> coopVecLoadGroupshared<let N : int, T : __BuiltinArithmeticType, l
 /// including standard row-major and column-major layouts as well as specialized layouts optimized for specific operations.
 enum CoopVecMatrixLayout
 {
-    RowMajor,
-    ColumnMajor,
-    InferencingOptimal,
-    TrainingOptimal
+    RowMajor = $(SLANG_COOPERATIVE_VECTOR_MATRIX_LAYOUT_ROW_MAJOR),
+    ColumnMajor = $(SLANG_COOPERATIVE_VECTOR_MATRIX_LAYOUT_COLUMN_MAJOR),
+    InferencingOptimal = $(SLANG_COOPERATIVE_VECTOR_MATRIX_LAYOUT_INFERENCING_OPTIMAL),
+    TrainingOptimal = $(SLANG_COOPERATIVE_VECTOR_MATRIX_LAYOUT_TRAINING_OPTIMAL)
 };
 
 /// Specifies how to interpret the values in a cooperative vector or matrix.
@@ -30906,7 +30929,7 @@ enum CoopVecComponentType
 };
 
 [ForceInline]
-int __inputInterpretationPackingFactor(CoopVecComponentType componentType)
+int __componentPackingFactor(CoopVecComponentType componentType)
 {
     switch (componentType)
     {
@@ -30920,133 +30943,47 @@ int __inputInterpretationPackingFactor(CoopVecComponentType componentType)
 [ForceInline]
 bool __isPackedInputInterpretation(CoopVecComponentType componentType)
 {
-    return __inputInterpretationPackingFactor(componentType) != 1;
-}
-
-// TODO: We might consider some way of specifying these from our lookup tables
-[ForceInline]
-uint32_t __getSpvCoopVecMatrixLayout(CoopVecMatrixLayout layout)
-{
-    switch (layout)
-    {
-    case CoopVecMatrixLayout::RowMajor:
-        return 0;
-    case CoopVecMatrixLayout::ColumnMajor:
-        return 1;
-    case CoopVecMatrixLayout::InferencingOptimal:
-        return 2;
-    case CoopVecMatrixLayout::TrainingOptimal:
-        return 3;
-    default:
-        static_assert(false, "unsupported layout value");
-    }
-    return 0xffffffff;
+    return __componentPackingFactor(componentType) != 1;
 }
 
 [ForceInline]
-uint32_t __getHLSLCoopVecMatrixLayout(CoopVecMatrixLayout layout)
-{
-    switch (layout)
-    {
-    // TODO: Check these are the same
-    case CoopVecMatrixLayout::RowMajor:
-        return 0;
-    case CoopVecMatrixLayout::ColumnMajor:
-        return 1;
-    case CoopVecMatrixLayout::InferencingOptimal:
-        return 2;
-    case CoopVecMatrixLayout::TrainingOptimal:
-        return 3;
-    default:
-        static_assert(false, "unsupported layout value");
-    }
-    return 0xffffffff;
-}
-
-[ForceInline]
-uint32_t __getSpvCoopVecComponentType(CoopVecComponentType componentType)
+int __getCoopVecComponentScalarType(CoopVecComponentType componentType)
 {
     switch (componentType)
     {
-    case CoopVecComponentType::Float16:
-        return 0;
-    case CoopVecComponentType::Float32:
-        return 1;
-    case CoopVecComponentType::Float64:
-        return 2;
-    case CoopVecComponentType::SignedInt8:
-        return 3;
-    case CoopVecComponentType::SignedInt16:
-        return 4;
-    case CoopVecComponentType::SignedInt32:
-        return 5;
-    case CoopVecComponentType::SignedInt8Packed:
-        return 1000491000;
-    case CoopVecComponentType::SignedInt64:
-        return 6;
-    case CoopVecComponentType::UnsignedInt8:
-        return 7;
-    case CoopVecComponentType::UnsignedInt16:
-        return 8;
-    case CoopVecComponentType::UnsignedInt32:
-        return 9;
-    case CoopVecComponentType::UnsignedInt8Packed:
-        return 1000491001;
-    case CoopVecComponentType::UnsignedInt64:
-        return 10;
     case CoopVecComponentType::FloatE4M3:
-        return 1000491002;
+        return $(SLANG_SCALAR_TYPE_FLOAT_E4M3);
     case CoopVecComponentType::FloatE5M2:
-        return 1000491003;
-    default:
-        static_assert(false, "unsupported componentType value");
+        return $(SLANG_SCALAR_TYPE_FLOAT_E5M2);
+    case CoopVecComponentType::Float16:
+        return $(SLANG_SCALAR_TYPE_FLOAT16);
+    case CoopVecComponentType::Float32:
+        return $(SLANG_SCALAR_TYPE_FLOAT32);
+    case CoopVecComponentType::Float64:
+        return $(SLANG_SCALAR_TYPE_FLOAT64);
+    case CoopVecComponentType::SignedInt8:
+    case CoopVecComponentType::SignedInt8Packed:
+        // Packed property is handled in a separate field.
+        return $(SLANG_SCALAR_TYPE_INT8);
+    case CoopVecComponentType::SignedInt16:
+        return $(SLANG_SCALAR_TYPE_INT16);
+    case CoopVecComponentType::SignedInt32:
+        return $(SLANG_SCALAR_TYPE_INT32);
+    case CoopVecComponentType::SignedInt64:
+        return $(SLANG_SCALAR_TYPE_INT64);
+    case CoopVecComponentType::UnsignedInt8:
+    case CoopVecComponentType::UnsignedInt8Packed:
+        // Packed property is handled in a separate field.
+        return $(SLANG_SCALAR_TYPE_UINT8);
+    case CoopVecComponentType::UnsignedInt16:
+        return $(SLANG_SCALAR_TYPE_UINT16);
+    case CoopVecComponentType::UnsignedInt32:
+        return $(SLANG_SCALAR_TYPE_UINT32);
+    case CoopVecComponentType::UnsignedInt64:
+        return $(SLANG_SCALAR_TYPE_UINT64);
     }
+    static_assert(false, "unsupported componentType value");
     return 0xffffffff;
-}
-
-[ForceInline]
-uint32_t __getHLSLCoopVecComponentType(CoopVecComponentType componentType)
-{
-    __target_switch
-    {
-    case hlsl:
-        switch (componentType)
-        {
-        case CoopVecComponentType::SignedInt16:
-            return 2;
-        case CoopVecComponentType::UnsignedInt16:
-            return 3;
-        case CoopVecComponentType::SignedInt32:
-            return 4;
-        case CoopVecComponentType::UnsignedInt32:
-            return 5;
-        case CoopVecComponentType::SignedInt64:
-            return 6;
-        case CoopVecComponentType::UnsignedInt64:
-            return 7;
-        case CoopVecComponentType::Float16:
-            return 8;
-        case CoopVecComponentType::Float32:
-            return 9;
-        case CoopVecComponentType::Float64:
-            return 10;
-        case CoopVecComponentType::SignedInt8Packed:
-            return 17;
-        case CoopVecComponentType::UnsignedInt8Packed:
-            return 18;
-        case CoopVecComponentType::UnsignedInt8:
-            return 19;
-        case CoopVecComponentType::SignedInt8:
-            return 20;
-        case CoopVecComponentType::FloatE4M3:
-            return 21;
-        case CoopVecComponentType::FloatE5M2:
-            return 22;
-        default:
-            static_assert(false, "unsupported componentType value");
-        }
-        return 0; // ComponentType::Invalid
-    }
 }
 
 [ForceInline]
@@ -31098,12 +31035,109 @@ static const struct {
 for(auto buffer : kByteAddressBufferCases_) {
 $}
 
-// Internal implementation without static_assert; github issue 8620
+__intrinsic_op($(kIROp_CoopVecMatMulAdd))
+internal __generic<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType>
+CoopVec<T, M> __coopVecMatMul(
+    CoopVec<U, PackedK> input,
+    constexpr int inputInterpretation,
+    constexpr int inputInterpretationPackingFactor,
+    Ptr<T[]> matrixPtr,
+    int32_t matrixOffset,
+    constexpr int matrixInterpretation,
+    constexpr int32_t k,
+    constexpr CoopVecMatrixLayout memoryLayout,
+    constexpr bool transpose,
+    constexpr uint matrixStride);
+
+__intrinsic_op($(kIROp_CoopVecMatMulAdd))
+internal __generic<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType>
+CoopVec<T, M> __coopVecMatMul(
+    CoopVec<U, PackedK> input,
+    constexpr int inputInterpretation,
+    constexpr int inputInterpretationPackingFactor,
+    $(buffer.type) matrix,
+    int32_t matrixOffset,
+    constexpr int matrixInterpretation,
+    constexpr int32_t k,
+    constexpr CoopVecMatrixLayout memoryLayout,
+    constexpr bool transpose,
+    constexpr uint matrixStride);
+
+__intrinsic_op($(kIROp_CoopVecMatMulAdd))
+internal __generic<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType>
+CoopVec<T, M> __coopVecMatMulAdd(
+    CoopVec<U, PackedK> input,
+    constexpr int inputInterpretation,
+    constexpr int inputInterpretationPackingFactor,
+    Ptr<T[]> matrixPtr,
+    int32_t matrixOffset,
+    constexpr int matrixInterpretation,
+    constexpr int32_t k,
+    constexpr CoopVecMatrixLayout memoryLayout,
+    constexpr bool transpose,
+    constexpr uint matrixStride,
+    Ptr<T[]> biasPtr,
+    int32_t biasOffset,
+    constexpr int biasInterpretation);
+
+__intrinsic_op($(kIROp_CoopVecMatMulAdd))
+internal __generic<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType>
+CoopVec<T, M> __coopVecMatMulAdd(
+    CoopVec<U, PackedK> input,
+    constexpr int inputInterpretation,
+    constexpr int inputInterpretationPackingFactor,
+    $(buffer.type) matrix,
+    int32_t matrixOffset,
+    constexpr int matrixInterpretation,
+    constexpr int32_t k,
+    constexpr CoopVecMatrixLayout memoryLayout,
+    constexpr bool transpose,
+    constexpr uint matrixStride,
+    $(buffer.type) bias,
+    int32_t biasOffset,
+    constexpr int biasInterpretation);
+
+__intrinsic_op($(kIROp_CoopVecOuterProductAccumulate))
+internal __generic<T : __BuiltinArithmeticType, let M : int, let N : int>
+void __coopVecOuterProductAccumulate(
+    Ptr<T[]> matrixPtr,
+    int32_t matrixOffset,
+    CoopVec<T, M> a,
+    CoopVec<T, N> b,
+    constexpr CoopVecMatrixLayout memoryLayout,
+    constexpr int matrixInterpretation,
+    constexpr uint matrixStride);
+
+__intrinsic_op($(kIROp_CoopVecOuterProductAccumulate))
+internal __generic<T : __BuiltinArithmeticType, let M : int, let N : int>
+void __coopVecOuterProductAccumulate(
+    $(buffer.type) matrix,
+    int32_t matrixOffset,
+    CoopVec<T, M> a,
+    CoopVec<T, N> b,
+    constexpr CoopVecMatrixLayout memoryLayout,
+    constexpr int matrixInterpretation,
+    constexpr uint matrixStride);
+
+__intrinsic_op($(kIROp_CoopVecReduceSumAccumulate))
+internal __generic<T : __BuiltinArithmeticType, let N : int>
+void __coopVecReduceSumAccumulate(
+    Ptr<T[]> bufferPtr,
+    int32_t offset,
+    CoopVec<T, N> v);
+
+__intrinsic_op($(kIROp_CoopVecReduceSumAccumulate))
+internal __generic<T : __BuiltinArithmeticType, let N : int>
+void __coopVecReduceSumAccumulate(
+    $(buffer.type) buffer,
+    int32_t offset,
+    CoopVec<T, N> v);
+
 [ForceInline]
 [require(cooperative_vector)]
 [require(optix_coopvec)]
 __generic<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType>
-CoopVec<T, M> __coopVecMatMulPacked_impl(
+CoopVec<T, M> coopVecMatMulPacked(
     CoopVec<U, PackedK> input,
     constexpr CoopVecComponentType inputInterpretation,
     constexpr int k,
@@ -31115,54 +31149,42 @@ CoopVec<T, M> __coopVecMatMulPacked_impl(
     constexpr uint matrixStride
 )
 {
+    static_assert(__isPackedInputInterpretation(inputInterpretation) || k == PackedK
+                 , "for non-packed inputInterpretation values k must be equal to the input vector length");
+    static_assert(!__isPackedInputInterpretation(inputInterpretation)
+                || k <= __componentPackingFactor(inputInterpretation)*PackedK
+                 , "for packed inputInterpretation values k must be less than or equal to the input vector length times the packing factor");
+    static_assert(__componentPackingFactor(matrixInterpretation) == 1, "can't use packed component type in matrixInterpretation");
+
     __target_switch
     {
     case spirv:
-        let m : int32_t = M;
-        let matrixInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(matrixInterpretation);
-        let inputInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(inputInterpretation);
-        let memoryLayoutSpirv : int32_t = __getSpvCoopVecMatrixLayout(memoryLayout);
         let matrixBuf = __getEquivalentStructuredBuffer<uint32_t>(matrix);
-        let zero = 0;
-
-        int operands = 0;
-        if (__isSignedInt<U>())
-        {
-            operands |= 0x02;
-        }
-        if (__isSignedInt<T>())
-        {
-            operands |= 0x08;
-        }
-        return spirv_asm
-        {
-            %runtimeArrayType = OpTypeRuntimeArray $$uint32_t;
-            %storagePointerType = OpTypePointer StorageBuffer %runtimeArrayType;
-            %matrixPointer:%storagePointerType = OpAccessChain $matrixBuf $zero;
-            result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulNV $input $inputInterpretationSpirv %matrixPointer $matrixOffset $matrixInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride !operands;
-        };
+        return __coopVecMatMul<T, M, PackedK, U, uint32_t>(
+            input,
+            __getCoopVecComponentScalarType(inputInterpretation),
+            __componentPackingFactor(inputInterpretation),
+            matrixBuf,
+            matrixOffset,
+            __getCoopVecComponentScalarType(matrixInterpretation),
+            k,
+            memoryLayout,
+            transpose,
+            matrixStride);
 
     case hlsl:
-        var ret = CoopVec<T, M>(0);
-        let inputInterpretationHLSL = __getHLSLCoopVecComponentType(inputInterpretation);
-        let matrixInterpretationHLSL = __getHLSLCoopVecComponentType(matrixInterpretation);
-        let memoryLayoutHLSL = __getHLSLCoopVecMatrixLayout(memoryLayout);
-        ret.__mutMatMul(
-             input,
-             inputInterpretationHLSL,
-             matrix,
-             matrixOffset,
-             matrixInterpretationHLSL,
-             M,
-             k,
-             memoryLayoutHLSL,
-             transpose,
-             matrixStride
-        );
-        return ret;
-
     case optix_coopvec:
-        __intrinsic_asm "slangOptixCoopVecMatMul<OptixCoopVec<$[0], $[1]>, OptixCoopVec<$[2], $[3]>, $1, $5, $6>($0, (CUdeviceptr)(&($3)), $4, $7, $8)", T, M, U, PackedK;
+        return __coopVecMatMul<T, M, PackedK, U>(
+            input,
+            __getCoopVecComponentScalarType(inputInterpretation),
+            __componentPackingFactor(inputInterpretation),
+            matrix,
+            matrixOffset,
+            __getCoopVecComponentScalarType(matrixInterpretation),
+            k,
+            memoryLayout,
+            transpose,
+            matrixStride);
 
     default:
         var result = CoopVec<T, M>(0);
@@ -31260,42 +31282,6 @@ CoopVec<T, M> __coopVecMatMulPacked_impl(
 /// values to use from the packed input.
 // TODO: Can we ForceInline for just hlsl? the other platforms don't really
 // need it
-[ForceInline]
-[require(cooperative_vector)]
-[require(optix_coopvec)]
-__generic<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType>
-CoopVec<T, M> coopVecMatMulPacked(
-    CoopVec<U, PackedK> input,
-    constexpr CoopVecComponentType inputInterpretation,
-    constexpr int k,
-    $(buffer.type) matrix,
-    int32_t matrixOffset,
-    constexpr CoopVecComponentType matrixInterpretation,
-    constexpr CoopVecMatrixLayout memoryLayout,
-    constexpr bool transpose,
-    constexpr uint matrixStride
-)
-{
-    // Static assertions to validate parameters at compile time
-    // These can be evaluated because this wrapper function can be inlined (no GenericAsm)
-    static_assert(__isPackedInputInterpretation(inputInterpretation) || k == PackedK
-                 , "for non-packed inputInterpretation values k must be equal to the input vector length");
-    static_assert(!__isPackedInputInterpretation(inputInterpretation)
-                || k <= __inputInterpretationPackingFactor(inputInterpretation)*PackedK
-                 , "for packed inputInterpretation values k must be less than or equal to the input vector length times the packing factor");
-
-    // Delegate to implementation function (which contains GenericAsm for OptiX)
-    return __coopVecMatMulPacked_impl<T, M, PackedK, U>(
-        input,
-        inputInterpretation,
-        k,
-        matrix,
-        matrixOffset,
-        matrixInterpretation,
-        memoryLayout,
-        transpose,
-        matrixStride);
-}
 
 /// Multiply a matrix with a cooperative vector. Given a M-row by K-col `matrix`, and a K-element column vector `input`, computes `matrix * input`, and
 /// returns a M-element vector.
@@ -31345,11 +31331,10 @@ CoopVec<T, M> coopVecMatMul(
         matrixStride);
 }
 
-// Internal implementation without static_assert; github issue 8620
 [ForceInline]
 [require(cooperative_vector)]
 [require(optix_coopvec)]
-CoopVec<T, M> __coopVecMatMulAddPacked_impl<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType>(
+CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType>(
     CoopVec<U, PackedK> input,
     constexpr CoopVecComponentType inputInterpretation,
     constexpr int k,
@@ -31364,61 +31349,50 @@ CoopVec<T, M> __coopVecMatMulAddPacked_impl<T : __BuiltinArithmeticType, let M :
     constexpr uint matrixStride
 )
 {
+    static_assert(__isPackedInputInterpretation(inputInterpretation) || k == PackedK
+                 , "for non-packed inputInterpretation values k must be equal to the input vector length");
+    static_assert(!__isPackedInputInterpretation(inputInterpretation)
+                || k <= __componentPackingFactor(inputInterpretation)*PackedK
+                 , "for packed inputInterpretation values k must be less than or equal to the input vector length times the packing factor");
+    static_assert(__componentPackingFactor(matrixInterpretation) == 1, "can't use packed component type in matrixInterpretation");
+    static_assert(__componentPackingFactor(biasInterpretation) == 1, "can't use packed component type in biasInterpretation");
+
     __target_switch
     {
     case spirv:
-        let m : int32_t = M;
-        let matrixInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(matrixInterpretation);
-        let biasInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(biasInterpretation);
-        let inputInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(inputInterpretation);
-        let memoryLayoutSpirv : int32_t = __getSpvCoopVecMatrixLayout(memoryLayout);
         let matrixBuf = __getEquivalentStructuredBuffer<uint32_t>(matrix);
         let biasBuf = __getEquivalentStructuredBuffer<uint32_t>(bias);
-        let zero = 0;
-
-        int operands = 0;
-        if (__isSignedInt<U>())
-        {
-            operands |= 0x02;
-        }
-        if (__isSignedInt<T>())
-        {
-            operands |= 0x08;
-        }
-        return spirv_asm
-        {
-            %runtimeArrayType = OpTypeRuntimeArray $$uint32_t;
-            %storagePointerType = OpTypePointer StorageBuffer %runtimeArrayType;
-            %matrixPointer:%storagePointerType = OpAccessChain $matrixBuf $zero;
-            %biasPointer:%storagePointerType = OpAccessChain $biasBuf $zero;
-            result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulAddNV $input $inputInterpretationSpirv %matrixPointer $matrixOffset $matrixInterpretationSpirv %biasPointer $biasOffset $biasInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride !operands;
-        };
+        return __coopVecMatMulAdd<T, M, PackedK, U, uint32_t>(
+            input,
+            __getCoopVecComponentScalarType(inputInterpretation),
+            __componentPackingFactor(inputInterpretation),
+            matrixBuf,
+            matrixOffset,
+            __getCoopVecComponentScalarType(matrixInterpretation),
+            k,
+            memoryLayout,
+            transpose,
+            matrixStride,
+            biasBuf,
+            biasOffset,
+            __getCoopVecComponentScalarType(biasInterpretation));
 
     case hlsl:
-        var ret = CoopVec<T, M>(0);
-        let inputInterpretationHLSL = __getHLSLCoopVecComponentType(inputInterpretation);
-        let matrixInterpretationHLSL = __getHLSLCoopVecComponentType(matrixInterpretation);
-        let biasInterpretationHLSL = __getHLSLCoopVecComponentType(biasInterpretation);
-        let memoryLayoutHLSL = __getHLSLCoopVecMatrixLayout(memoryLayout);
-        ret.__mutMatMulAdd(
-             input,
-             inputInterpretationHLSL,
-             matrix,
-             matrixOffset,
-             matrixInterpretationHLSL,
-             bias,
-             biasOffset,
-             biasInterpretationHLSL,
-             M,
-             k,
-             memoryLayoutHLSL,
-             transpose,
-             matrixStride
-        );
-        return ret;
-
     case optix_coopvec:
-        __intrinsic_asm "slangOptixCoopVecMatMul<OptixCoopVec<$[0], $[1]>, OptixCoopVec<$[2], $[3]>, $1, $5, $9, $8>($0, (CUdeviceptr)(&($3)), $4, (CUdeviceptr)(&($6)), $7, $11)", T, M, U, PackedK;
+        return __coopVecMatMulAdd<T, M, PackedK, U>(
+            input,
+            __getCoopVecComponentScalarType(inputInterpretation),
+            __componentPackingFactor(inputInterpretation),
+            matrix,
+            matrixOffset,
+            __getCoopVecComponentScalarType(matrixInterpretation),
+            k,
+            memoryLayout,
+            transpose,
+            matrixStride,
+            bias,
+            biasOffset,
+            __getCoopVecComponentScalarType(biasInterpretation));
 
     default:
         var result = coopVecMatMulPacked<T, M, PackedK, U>(
@@ -31510,31 +31484,6 @@ CoopVec<T, M> __coopVecMatMulAddPacked_impl<T : __BuiltinArithmeticType, let M :
 /// Transposing is not supported when `memoryLayout` is `RowMajor` or `ColumnMajor`, and `transpose` must be `false`.
 /// Not all component types support transposing.
 /// When `memoryLayout` is `InferencingOptimal` or `TrainingOptimal`, `matrixStride` is ignored.
-[ForceInline]
-[require(cooperative_vector)]
-[require(optix_coopvec)]
-CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType>(
-    CoopVec<U, PackedK> input,
-    constexpr CoopVecComponentType inputInterpretation,
-    constexpr int k,
-    $(buffer.type) matrix,
-    int32_t matrixOffset,
-    constexpr CoopVecComponentType matrixInterpretation,
-    $(buffer.type) bias,
-    int32_t biasOffset,
-    constexpr CoopVecComponentType biasInterpretation,
-    constexpr CoopVecMatrixLayout memoryLayout,
-    constexpr bool transpose,
-    constexpr uint matrixStride
-)
-{
-    static_assert(__isPackedInputInterpretation(inputInterpretation) || k == PackedK
-                 , "for non-packed inputInterpretation values k must be equal to the input vector length");
-    static_assert(!__isPackedInputInterpretation(inputInterpretation)
-                || k <= __inputInterpretationPackingFactor(inputInterpretation)*PackedK
-                 , "for packed inputInterpretation values k must be less than or equal to the input vector length times the packing factor");
-    return __coopVecMatMulAddPacked_impl<T, M, PackedK, U>(input, inputInterpretation, k, matrix, matrixOffset, matrixInterpretation, bias, biasOffset, biasInterpretation, memoryLayout, transpose, matrixStride);
-}
 
 /// Multiply a matrix with a cooperative vector and add a bias vector.
 /// Given a M-row by K-col `matrix`, a K-element column vector `input`, and a M-element vector `bias`, computes `matrix * input + bias`, and
@@ -31639,27 +31588,30 @@ void coopVecOuterProductAccumulate<T : __BuiltinArithmeticType, let M : int, let
     constexpr CoopVecComponentType matrixInterpretation,
 )
 {
+    static_assert(__componentPackingFactor(matrixInterpretation) == 1, "can't use packed component type in matrixInterpretation");
+
     __target_switch
     {
-    case hlsl:
-        uint matrixInterpretationHLSL = __getHLSLCoopVecComponentType(matrixInterpretation);
-        uint memoryLayoutHLSL = __getHLSLCoopVecMatrixLayout(memoryLayout);
-        return a.__OuterProductAccumulate(b, matrix, matrixOffset, matrixStride, memoryLayoutHLSL, matrixInterpretationHLSL);
     case spirv:
-        let matrixInterpretationSpirv : int = __getSpvCoopVecComponentType(matrixInterpretation);
-        let memoryLayoutSpirv : int = __getSpvCoopVecMatrixLayout(memoryLayout);
         let matrixBuf = __getEquivalentStructuredBuffer<uint32_t>(matrix);
-        let zero = 0;
-        spirv_asm
-        {
-            OpCapability CooperativeVectorTrainingNV;
-            %runtimeArrayType = OpTypeRuntimeArray $$uint32_t;
-            %storagePointerType = OpTypePointer StorageBuffer %runtimeArrayType;
-            %matrixPointer:%storagePointerType = OpAccessChain $matrixBuf $zero;
-            OpCooperativeVectorOuterProductAccumulateNV %matrixPointer $matrixOffset $a $b $memoryLayoutSpirv $matrixInterpretationSpirv $matrixStride;
-        };
+        __coopVecOuterProductAccumulate<T, M, N, uint32_t>(
+            matrixBuf,
+            matrixOffset,
+            a,
+            b,
+            memoryLayout,
+            __getCoopVecComponentScalarType(matrixInterpretation),
+            matrixStride);
+    case hlsl:
     case optix_coopvec:
-        __intrinsic_asm "optixCoopVecOuterProductAccumulate($0, $1, (CUdeviceptr)(&$2), $3, $4)";
+        __coopVecOuterProductAccumulate<T, M, N>(
+            matrix,
+            matrixOffset,
+            a,
+            b,
+            memoryLayout,
+            __getCoopVecComponentScalarType(matrixInterpretation),
+            matrixStride);
     default:
         for (int i = 0; i < M; ++i)
         {
@@ -31726,6 +31678,7 @@ void coopVecOuterProductAccumulate<T : __BuiltinArithmeticType, let M : int, let
 /// for (int i = 0; i < N; i++)
 ///     atomicAdd(dest[i], v[i]);
 /// ```
+[ForceInline]
 [require(cooperative_vector)]
 [require(optix_coopvec)]
 void coopVecReduceSumAccumulate<T : __BuiltinArithmeticType, let N : int>(
@@ -31736,21 +31689,12 @@ void coopVecReduceSumAccumulate<T : __BuiltinArithmeticType, let N : int>(
 {
     __target_switch
     {
-    case hlsl:
-        __intrinsic_asm "__builtin_VectorAccumulate($0, $1, $2)";
     case spirv:
         let bufBuf = __getEquivalentStructuredBuffer<uint32_t>(buffer);
-        let zero = 0;
-        spirv_asm
-        {
-            OpCapability CooperativeVectorTrainingNV;
-            %runtimeArrayType = OpTypeRuntimeArray $$uint32_t;
-            %storagePointerType = OpTypePointer StorageBuffer %runtimeArrayType;
-            %bufferPointer:%storagePointerType = OpAccessChain $bufBuf $zero;
-            OpCooperativeVectorReduceSumAccumulateNV %bufferPointer $offset $v;
-        };
+        __coopVecReduceSumAccumulate<T, N, uint32_t>(bufBuf, offset, v);
+    case hlsl:
     case optix_coopvec:
-        __intrinsic_asm "optixCoopVecReduceSumAccumulate($0, (CUdeviceptr)(&$1), $2)";
+        __coopVecReduceSumAccumulate<T, N>(buffer, offset, v);
     default:
         for (int i = 0; i < N; ++i)
         {
@@ -31771,66 +31715,68 @@ ${
 static const struct {
     bool isRW;
     char const* type;
+    char const* biasType;
 } kStructuredBufferCases_[] =
 {
-    {true, "RWStructuredBuffer<IgnoredBufferElementType>"},
-    {false, "StructuredBuffer<IgnoredBufferElementType>"},
+    {true, "RWStructuredBuffer<IgnoredBufferElementType>", "RWStructuredBuffer<IgnoredBiasBufferElementType>"},
+    {false, "StructuredBuffer<IgnoredBufferElementType>", "StructuredBuffer<IgnoredBiasBufferElementType>"},
 };
 for(auto buffer : kStructuredBufferCases_) {
 $}
 
-// Internal implementation without static_assert; github issue 8620
-[ForceInline]
-[require(spirv, cooperative_vector)]
-[require(optix_coopvec)]
-__generic<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType,IgnoredBufferElementType>
-CoopVec<T, M> __coopVecMatMulPacked_impl(
+__intrinsic_op($(kIROp_CoopVecMatMulAdd))
+internal __generic<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType, IgnoredBufferElementType>
+CoopVec<T, M> __coopVecMatMul(
     CoopVec<U, PackedK> input,
-    constexpr CoopVecComponentType inputInterpretation,
-    constexpr int k,
+    constexpr int inputInterpretation,
+    constexpr int inputInterpretationPackingFactor,
     $(buffer.type) matrix,
     int32_t matrixOffset,
-    constexpr CoopVecComponentType matrixInterpretation,
+    constexpr int matrixInterpretation,
+    constexpr int32_t k,
     constexpr CoopVecMatrixLayout memoryLayout,
     constexpr bool transpose,
-    constexpr uint matrixStride
-)
-{
-    __target_switch
-    {
-    case spirv:
-        let m : int32_t = M;
-        let matrixInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(matrixInterpretation);
-        let inputInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(inputInterpretation);
-        let memoryLayoutSpirv : int32_t = __getSpvCoopVecMatrixLayout(memoryLayout);
-        let zero = 0;
+    constexpr uint matrixStride);
 
-        // https://github.com/KhronosGroup/SPIRV-Registry/blob/main/extensions/KHR/SPV_KHR_cooperative_matrix.asciidoc#3x-cooperative-matrix-operands
-        int operands = 0; // NoneKHR
-        if (__isSignedInt<U>())
-        {
-            operands |= 0x02; // MatrixBSignedComponentsKHR
-        }
-        if (__isSignedInt<T>())
-        {
-            operands |= 0x08; // MatrixResultSignedComponentsKHR
-        }
-        return spirv_asm
-        {
-            %runtimeArrayType = OpTypeRuntimeArray $$IgnoredBufferElementType;
-            %storagePointerType = OpTypePointer StorageBuffer %runtimeArrayType;
-            %matrixPointer:%storagePointerType = OpAccessChain $matrix $zero;
-            result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulNV $input $inputInterpretationSpirv %matrixPointer $matrixOffset $matrixInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride !operands;
-        };
-    case optix_coopvec:
-        __intrinsic_asm "slangOptixCoopVecMatMul<$T0, $T0, $1, $5, $6>($0, (CUdeviceptr)(&($3)), $4, $8)";
-    }
-}
+__intrinsic_op($(kIROp_CoopVecMatMulAdd))
+internal __generic<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType, IgnoredBufferElementType, IgnoredBiasBufferElementType>
+CoopVec<T, M> __coopVecMatMulAdd(
+    CoopVec<U, PackedK> input,
+    constexpr int inputInterpretation,
+    constexpr int inputInterpretationPackingFactor,
+    $(buffer.type) matrix,
+    int32_t matrixOffset,
+    constexpr int matrixInterpretation,
+    constexpr int32_t k,
+    constexpr CoopVecMatrixLayout memoryLayout,
+    constexpr bool transpose,
+    constexpr uint matrixStride,
+    $(buffer.biasType) bias,
+    int32_t biasOffset,
+    constexpr int biasInterpretation);
+
+__intrinsic_op($(kIROp_CoopVecOuterProductAccumulate))
+internal __generic<T : __BuiltinArithmeticType, let M : int, let N : int, IgnoredBufferElementType>
+void __coopVecOuterProductAccumulate(
+    $(buffer.type) matrix,
+    int32_t matrixOffset,
+    CoopVec<T, M> a,
+    CoopVec<T, N> b,
+    constexpr CoopVecMatrixLayout memoryLayout,
+    constexpr int matrixInterpretation,
+    constexpr uint matrixStride);
+
+__intrinsic_op($(kIROp_CoopVecReduceSumAccumulate))
+internal __generic<T : __BuiltinArithmeticType, let N : int, IgnoredBufferElementType>
+void __coopVecReduceSumAccumulate(
+    $(buffer.type) buffer,
+    int32_t offset,
+    CoopVec<T, N> v);
 
 [ForceInline]
 [require(spirv, cooperative_vector)]
 [require(optix_coopvec)]
-__generic<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType,IgnoredBufferElementType>
+__generic<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType, IgnoredBufferElementType>
 CoopVec<T, M> coopVecMatMulPacked(
     CoopVec<U, PackedK> input,
     constexpr CoopVecComponentType inputInterpretation,
@@ -31846,15 +31792,27 @@ CoopVec<T, M> coopVecMatMulPacked(
     static_assert(__isPackedInputInterpretation(inputInterpretation) || k == PackedK
                  , "for non-packed inputInterpretation values k must be equal to the input vector length");
     static_assert(!__isPackedInputInterpretation(inputInterpretation)
-                || k <= __inputInterpretationPackingFactor(inputInterpretation)*PackedK
+                || k <= __componentPackingFactor(inputInterpretation)*PackedK
                  , "for packed inputInterpretation values k must be less than or equal to the input vector length times the packing factor");
-    return __coopVecMatMulPacked_impl<T, M, PackedK, U, IgnoredBufferElementType>(input, inputInterpretation, k, matrix, matrixOffset, matrixInterpretation, memoryLayout, transpose, matrixStride);
+    static_assert(__componentPackingFactor(matrixInterpretation) == 1, "can't use packed component type in matrixInterpretation");
+
+    return __coopVecMatMul<T, M, PackedK, U, IgnoredBufferElementType>(
+        input,
+        __getCoopVecComponentScalarType(inputInterpretation),
+        __componentPackingFactor(inputInterpretation),
+        matrix,
+        matrixOffset,
+        __getCoopVecComponentScalarType(matrixInterpretation),
+        k,
+        memoryLayout,
+        transpose,
+        matrixStride);
 }
 
 // specialized coopVecMatMul for non-packed inputs
 [require(spirv, cooperative_vector)]
 [require(optix_coopvec)]
-__generic<T : __BuiltinArithmeticType, let M : int, let K : int, U : __BuiltinArithmeticType,IgnoredBufferElementType>
+__generic<T : __BuiltinArithmeticType, let M : int, let K : int, U : __BuiltinArithmeticType, IgnoredBufferElementType>
 CoopVec<T, M> coopVecMatMul(
     CoopVec<U, K> input,
     constexpr CoopVecComponentType inputInterpretation,
@@ -31881,70 +31839,17 @@ CoopVec<T, M> coopVecMatMul(
         matrixStride);
 }
 
-// Internal implementation without static_assert; github issue 8620
 [ForceInline]
 [require(spirv, cooperative_vector)]
 [require(optix_coopvec)]
-CoopVec<T, M> __coopVecMatMulAddPacked_impl<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType, IgnoredBufferElementType>(
+CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType, IgnoredBufferElementType, IgnoredBiasBufferElementType>(
     CoopVec<U, PackedK> input,
     constexpr CoopVecComponentType inputInterpretation,
     constexpr int k,
     $(buffer.type) matrix,
     int32_t matrixOffset,
     constexpr CoopVecComponentType matrixInterpretation,
-    $(buffer.type) bias,
-    int32_t biasOffset,
-    constexpr CoopVecComponentType biasInterpretation,
-    constexpr CoopVecMatrixLayout memoryLayout,
-    constexpr bool transpose,
-    constexpr uint matrixStride
-)
-{
-    __target_switch
-    {
-    case spirv:
-        let m : int32_t = M;
-        let matrixInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(matrixInterpretation);
-        let biasInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(biasInterpretation);
-        let inputInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(inputInterpretation);
-        let memoryLayoutSpirv : int32_t = __getSpvCoopVecMatrixLayout(memoryLayout);
-        let zero = 0;
-
-        // https://github.com/KhronosGroup/SPIRV-Registry/blob/main/extensions/KHR/SPV_KHR_cooperative_matrix.asciidoc#3x-cooperative-matrix-operands
-        int operands = 0; // NoneKHR
-        if (__isSignedInt<U>())
-        {
-            operands |= 0x02; // MatrixBSignedComponentsKHR
-        }
-        if (__isSignedInt<T>())
-        {
-            operands |= 0x08; // MatrixResultSignedComponentsKHR
-        }
-
-        return spirv_asm
-        {
-            %runtimeArrayType = OpTypeRuntimeArray $$IgnoredBufferElementType;
-            %storagePointerType = OpTypePointer StorageBuffer %runtimeArrayType;
-            %matrixPointer:%storagePointerType = OpAccessChain $matrix $zero;
-            %biasPointer:%storagePointerType = OpAccessChain $bias $zero;
-            result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulAddNV $input $inputInterpretationSpirv %matrixPointer $matrixOffset $matrixInterpretationSpirv %biasPointer $biasOffset $biasInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride !operands;
-        };
-    case optix_coopvec:
-        __intrinsic_asm "slangOptixCoopVecMatMul<OptixCoopVec<$[0], $[1]>, OptixCoopVec<$[2], $[3]>, $1, $5, $9, $8>($0, (CUdeviceptr)(&($3)), $4, (CUdeviceptr)(&($6)), $7, $11)", T, M, U, PackedK;
-    }
-}
-
-[ForceInline]
-[require(spirv, cooperative_vector)]
-[require(optix_coopvec)]
-CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, let PackedK : int, U : __BuiltinArithmeticType, IgnoredBufferElementType>(
-    CoopVec<U, PackedK> input,
-    constexpr CoopVecComponentType inputInterpretation,
-    constexpr int k,
-    $(buffer.type) matrix,
-    int32_t matrixOffset,
-    constexpr CoopVecComponentType matrixInterpretation,
-    $(buffer.type) bias,
+    $(buffer.biasType) bias,
     int32_t biasOffset,
     constexpr CoopVecComponentType biasInterpretation,
     constexpr CoopVecMatrixLayout memoryLayout,
@@ -31955,20 +31860,36 @@ CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, l
     static_assert(__isPackedInputInterpretation(inputInterpretation) || k == PackedK
                  , "for non-packed inputInterpretation values k must be equal to the input vector length");
     static_assert(!__isPackedInputInterpretation(inputInterpretation)
-                || k <= __inputInterpretationPackingFactor(inputInterpretation)*PackedK
+                || k <= __componentPackingFactor(inputInterpretation)*PackedK
                  , "for packed inputInterpretation values k must be less than or equal to the input vector length times the packing factor");
-    return __coopVecMatMulAddPacked_impl<T, M, PackedK, U, IgnoredBufferElementType>(input, inputInterpretation, k, matrix, matrixOffset, matrixInterpretation, bias, biasOffset, biasInterpretation, memoryLayout, transpose, matrixStride);
+    static_assert(__componentPackingFactor(matrixInterpretation) == 1, "can't use packed component type in matrixInterpretation");
+
+    return __coopVecMatMulAdd<T, M, PackedK, U, IgnoredBufferElementType, IgnoredBiasBufferElementType>(
+        input,
+        __getCoopVecComponentScalarType(inputInterpretation),
+        __componentPackingFactor(inputInterpretation),
+        matrix,
+        matrixOffset,
+        __getCoopVecComponentScalarType(matrixInterpretation),
+        k,
+        memoryLayout,
+        transpose,
+        matrixStride,
+        bias,
+        biasOffset,
+        __getCoopVecComponentScalarType(biasInterpretation));
 }
+
 
 [require(spirv, cooperative_vector)]
 [require(optix_coopvec)]
-CoopVec<T, M> coopVecMatMulAdd<T : __BuiltinArithmeticType, let M : int, let K : int, U : __BuiltinArithmeticType, IgnoredBufferElementType>(
+CoopVec<T, M> coopVecMatMulAdd<T : __BuiltinArithmeticType, let M : int, let K : int, U : __BuiltinArithmeticType, IgnoredBufferElementType, IgnoredBiasBufferElementType>(
     CoopVec<U, K> input,
     constexpr CoopVecComponentType inputInterpretation,
     $(buffer.type) matrix,
     int32_t matrixOffset,
     constexpr CoopVecComponentType matrixInterpretation,
-    $(buffer.type) bias,
+    $(buffer.biasType) bias,
     int32_t biasOffset,
     constexpr CoopVecComponentType biasInterpretation,
     constexpr CoopVecMatrixLayout memoryLayout,
@@ -31979,7 +31900,7 @@ CoopVec<T, M> coopVecMatMulAdd<T : __BuiltinArithmeticType, let M : int, let K :
     static_assert(!__isPackedInputInterpretation(inputInterpretation)
                  , "for packed inputInterpretation values please use coopVecMatMulPacked and specify k manually");
     return coopVecMatMulAddPacked<
-        T, M, K, U, IgnoredBufferElementType>(
+        T, M, K, U, IgnoredBufferElementType, IgnoredBiasBufferElementType>(
         input,
         inputInterpretation,
         K,
@@ -32013,21 +31934,16 @@ void coopVecOuterProductAccumulate<T : __BuiltinArithmeticType, let M : int, let
     constexpr CoopVecComponentType matrixInterpretation,
 )
 {
-    __target_switch
-    {
-    case spirv:
-        let matrixInterpretationSpirv : int = __getSpvCoopVecComponentType(matrixInterpretation);
-        let memoryLayoutSpirv : int = __getSpvCoopVecMatrixLayout(memoryLayout);
-        let zero = 0;
-        spirv_asm
-        {
-            OpCapability CooperativeVectorTrainingNV;
-            %runtimeArrayType = OpTypeRuntimeArray $$IgnoredBufferElementType;
-            %storagePointerType = OpTypePointer StorageBuffer %runtimeArrayType;
-            %matrixPointer:%storagePointerType = OpAccessChain $matrix $zero;
-            OpCooperativeVectorOuterProductAccumulateNV %matrixPointer $matrixOffset $a $b $memoryLayoutSpirv $matrixInterpretationSpirv $matrixStride;
-        };
-    }
+    static_assert(__componentPackingFactor(matrixInterpretation) == 1, "can't use packed component type in matrixInterpretation");
+
+    __coopVecOuterProductAccumulate<T, M, N, IgnoredBufferElementType>(
+        matrix,
+        matrixOffset,
+        a,
+        b,
+        memoryLayout,
+        __getCoopVecComponentScalarType(matrixInterpretation),
+        matrixStride);
 }
 
 [require(spirv, cooperative_vector_training)]
@@ -32037,19 +31953,7 @@ void coopVecReduceSumAccumulate<T : __BuiltinArithmeticType, let N : int, Ignore
     int32_t offset
 )
 {
-    __target_switch
-    {
-    case spirv:
-        let zero = 0;
-        spirv_asm
-        {
-            OpCapability CooperativeVectorTrainingNV;
-            %runtimeArrayType = OpTypeRuntimeArray $$IgnoredBufferElementType;
-            %storagePointerType = OpTypePointer StorageBuffer %runtimeArrayType;
-            %bufferPointer:%storagePointerType = OpAccessChain $buffer $zero;
-            OpCooperativeVectorReduceSumAccumulateNV %bufferPointer $offset $v;
-        };
-    }
+    __coopVecReduceSumAccumulate<T, N, IgnoredBufferElementType>(buffer, offset, v);
 }
 
 ${
@@ -32057,6 +31961,40 @@ ${
 } // buffer type loop
 $}
 
+[ForceInline]
+[require(spirv, cooperative_vector_training)]
+__generic<T : __BuiltinArithmeticType, let M : int, let N : int>
+void __coopVecOuterProductAccumulateFromPointer(
+    void* matrixPtr,
+    int32_t matrixOffset,
+    CoopVec<T, M> a,
+    CoopVec<T, N> b,
+    constexpr CoopVecMatrixLayout memoryLayout,
+    constexpr CoopVecComponentType matrixInterpretation,
+    constexpr uint matrixStride)
+{
+    static_assert(__componentPackingFactor(matrixInterpretation) == 1, "can't use packed component type in matrixInterpretation");
+
+    __coopVecOuterProductAccumulate<T, M, N>(
+        (Ptr<T[]>)matrixPtr,
+        matrixOffset,
+        a,
+        b,
+        memoryLayout,
+        __getCoopVecComponentScalarType(matrixInterpretation),
+        matrixStride);
+}
+
+[ForceInline]
+[require(spirv, cooperative_vector_training)]
+__generic<T : __BuiltinArithmeticType, let N : int>
+void __coopVecReduceSumAccumulateFromPointer(
+    void* bufferPtr,
+    int32_t offset,
+    CoopVec<T, N> v)
+{
+    __coopVecReduceSumAccumulate<T, N>((Ptr<T[]>)bufferPtr, offset, v);
+}
 
 [require(spirv, cooperative_vector_training)]
 void coopVecOuterProductAccumulate<T : __BuiltinArithmeticType, let M : int, let N : int, U : __BuiltinArithmeticType, let IgnoredBufferSize : int>(
@@ -32069,17 +32007,15 @@ void coopVecOuterProductAccumulate<T : __BuiltinArithmeticType, let M : int, let
     constexpr CoopVecComponentType matrixInterpretation,
 )
 {
-    __target_switch
-    {
-    case spirv:
-        let matrixInterpretationSpirv : int = __getSpvCoopVecComponentType(matrixInterpretation);
-        let memoryLayoutSpirv : int = __getSpvCoopVecMatrixLayout(memoryLayout);
-        spirv_asm
-        {
-            OpCapability CooperativeVectorTrainingNV;
-            OpCooperativeVectorOuterProductAccumulateNV &matrix $matrixOffset $a $b $memoryLayoutSpirv $matrixInterpretationSpirv $matrixStride;
-        };
-    }
+    let matrixPtr0 = (void*)(&matrix);
+    __coopVecOuterProductAccumulateFromPointer<T, M, N>(
+        matrixPtr0,
+        matrixOffset,
+        a,
+        b,
+        memoryLayout,
+        matrixInterpretation,
+        matrixStride);
 }
 
 [require(spirv, cooperative_vector_training)]
@@ -32089,15 +32025,8 @@ void coopVecReduceSumAccumulate<T : __BuiltinArithmeticType, let N : int, U, let
     int32_t offset
 )
 {
-    __target_switch
-    {
-    case spirv:
-        spirv_asm
-        {
-            OpCapability CooperativeVectorTrainingNV;
-            OpCooperativeVectorReduceSumAccumulateNV &buffer $offset $v;
-        };
-    }
+    let bufferPtr0 = (void*)(&buffer);
+    __coopVecReduceSumAccumulateFromPointer<T, N>(bufferPtr0, offset, v);
 }
 
 // Pointer overloads for coopvector operations.
@@ -32118,31 +32047,23 @@ CoopVec<T, M> coopVecMatMulPacked(
     static_assert(__isPackedInputInterpretation(inputInterpretation) || k == PackedK
                  , "for non-packed inputInterpretation values k must be equal to the input vector length");
     static_assert(!__isPackedInputInterpretation(inputInterpretation)
-                || k <= __inputInterpretationPackingFactor(inputInterpretation)*PackedK
+                || k <= __componentPackingFactor(inputInterpretation)*PackedK
                  , "for packed inputInterpretation values k must be less than or equal to the input vector length times the packing factor");
-    __target_switch
-    {
-    case spirv:
-        let m : int32_t = M;
-        let matrixInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(matrixInterpretation);
-        let inputInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(inputInterpretation);
-        let memoryLayoutSpirv : int32_t = __getSpvCoopVecMatrixLayout(memoryLayout);
-        int operands = 0; // NoneKHR
-        let zero = 0;
-        let cvtMatPtr = (Ptr<T[]>)matrixPtr;
-        if (__isSignedInt<U>())
-        {
-            operands |= 0x02; // MatrixBSignedComponentsKHR
-        }
-        if (__isSignedInt<T>())
-        {
-            operands |= 0x08; // MatrixResultSignedComponentsKHR
-        }
-        return spirv_asm
-        {
-            result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulNV $input $inputInterpretationSpirv $cvtMatPtr $zero $matrixInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride !operands;
-        };
-    }
+    static_assert(__componentPackingFactor(matrixInterpretation) == 1, "can't use packed component type in matrixInterpretation");
+
+    let zero = 0;
+    let cvtMatPtr = (Ptr<T[]>)matrixPtr;
+    return __coopVecMatMul<T, M, PackedK, U>(
+        input,
+        __getCoopVecComponentScalarType(inputInterpretation),
+        __componentPackingFactor(inputInterpretation),
+        cvtMatPtr,
+        zero,
+        __getCoopVecComponentScalarType(matrixInterpretation),
+        k,
+        memoryLayout,
+        transpose,
+        matrixStride);
 }
 
 // specialized coopVecMatMul for non-packed inputs
@@ -32189,34 +32110,28 @@ CoopVec<T, M> coopVecMatMulAddPacked<T : __BuiltinArithmeticType, let M : int, l
     static_assert(__isPackedInputInterpretation(inputInterpretation) || k == PackedK
                  , "for non-packed inputInterpretation values k must be equal to the input vector length");
     static_assert(!__isPackedInputInterpretation(inputInterpretation)
-                || k <= __inputInterpretationPackingFactor(inputInterpretation)*PackedK
+                || k <= __componentPackingFactor(inputInterpretation)*PackedK
                  , "for packed inputInterpretation values k must be less than or equal to the input vector length times the packing factor");
+    static_assert(__componentPackingFactor(matrixInterpretation) == 1, "can't use packed component type in matrixInterpretation");
+    static_assert(__componentPackingFactor(biasInterpretation) == 1, "can't use packed component type in biasInterpretation");
 
-    __target_switch
-    {
-    case spirv:
-        let m : int32_t = M;
-        let matrixInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(matrixInterpretation);
-        let biasInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(biasInterpretation);
-        let inputInterpretationSpirv : int32_t = __getSpvCoopVecComponentType(inputInterpretation);
-        let memoryLayoutSpirv : int32_t = __getSpvCoopVecMatrixLayout(memoryLayout);
-        let zero : int32_t = 0;
-        let cvtMatPtr = (Ptr<T[]>)matrixPtr;
-        let cvtBiasPtr = (Ptr<T[]>)biasPtr;
-        int operands = 0; // NoneKHR
-        if (__isSignedInt<U>())
-        {
-            operands |= 0x02; // MatrixBSignedComponentsKHR
-        }
-        if (__isSignedInt<T>())
-        {
-            operands |= 0x08; // MatrixResultSignedComponentsKHR
-        }
-        return spirv_asm
-        {
-            result:$$CoopVec<T, M> = OpCooperativeVectorMatrixMulAddNV $input $inputInterpretationSpirv $cvtMatPtr $zero $matrixInterpretationSpirv $cvtBiasPtr $zero $biasInterpretationSpirv $m $k $memoryLayoutSpirv $transpose $matrixStride !operands;
-        };
-    }
+    let zero : int32_t = 0;
+    let cvtMatPtr = (Ptr<T[]>)matrixPtr;
+    let cvtBiasPtr = (Ptr<T[]>)biasPtr;
+    return __coopVecMatMulAdd<T, M, PackedK, U>(
+        input,
+        __getCoopVecComponentScalarType(inputInterpretation),
+        __componentPackingFactor(inputInterpretation),
+        cvtMatPtr,
+        zero,
+        __getCoopVecComponentScalarType(matrixInterpretation),
+        k,
+        memoryLayout,
+        transpose,
+        matrixStride,
+        cvtBiasPtr,
+        zero,
+        __getCoopVecComponentScalarType(biasInterpretation));
 }
 
 [require(spirv, cooperative_vector)]
@@ -32259,18 +32174,14 @@ void coopVecOuterProductAccumulate<T : __BuiltinArithmeticType, let M : int, let
 )
 {
     let zero : int32_t = 0;
-    __target_switch
-    {
-    case spirv:
-        let matrixInterpretationSpirv : int = __getSpvCoopVecComponentType(matrixInterpretation);
-        let memoryLayoutSpirv : int = __getSpvCoopVecMatrixLayout(memoryLayout);
-        let cvtMatrixPtr = (Ptr<T[]>)matrixPtr;
-        spirv_asm
-        {
-            OpCapability CooperativeVectorTrainingNV;
-            OpCooperativeVectorOuterProductAccumulateNV $cvtMatrixPtr $zero $a $b $memoryLayoutSpirv $matrixInterpretationSpirv $matrixStride;
-        };
-    }
+    __coopVecOuterProductAccumulateFromPointer<T, M, N>(
+        matrixPtr,
+        zero,
+        a,
+        b,
+        memoryLayout,
+        matrixInterpretation,
+        matrixStride);
 }
 
 [require(spirv, cooperative_vector_training)]
@@ -32280,16 +32191,7 @@ void coopVecReduceSumAccumulate<T : __BuiltinArithmeticType, let N : int>(
 )
 {
     let zero : int32_t = 0;
-    let bufferPtr = (Ptr<T[]>)(buffer);
-    __target_switch
-    {
-    case spirv:
-        spirv_asm
-        {
-            OpCapability CooperativeVectorTrainingNV;
-            OpCooperativeVectorReduceSumAccumulateNV $bufferPtr $zero $v;
-        };
-    }
+    __coopVecReduceSumAccumulateFromPointer<T, N>(buffer, zero, v);
 }
 
 //@public:

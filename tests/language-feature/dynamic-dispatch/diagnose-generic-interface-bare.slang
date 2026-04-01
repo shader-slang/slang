@@ -21,7 +21,6 @@ void computeMain()
     IProcessor obj = Doubler();
 /*CHECK:
     ^^^^^^^^^^ generic type 'IProcessor' used without argument
-    ^^^^^^^^^^ generic type 'IProcessor' used without argument
 */
     outputBuffer[0] = obj.process(5.0);
 }
