@@ -395,7 +395,8 @@ include(\"${slang_SOURCE_DIR}/cmake/RegenerateDllExports.cmake\")
         RUNTIME_OUTPUT_DIRECTORY "${slang_runtime_dir}"
         ARCHIVE_OUTPUT_DIRECTORY "${slang_archive_dir}"
     )
-    
+    target_link_options(slang-proxy PRIVATE "$<$<CXX_COMPILER_ID:MSVC>:/INCREMENTAL:NO>")
+
     # Install the proxy DLL alongside slang-compiler.dll
     install(
         TARGETS slang-proxy
