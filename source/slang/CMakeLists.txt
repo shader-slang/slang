@@ -392,6 +392,7 @@ include(\"${slang_SOURCE_DIR}/cmake/RegenerateDllExports.cmake\")
     # Set output name to slang (produces slang.dll) and match directories
     set_target_properties(slang-proxy PROPERTIES
         OUTPUT_NAME slang
+        PDB_NAME slang-proxy
         RUNTIME_OUTPUT_DIRECTORY "${slang_runtime_dir}"
         ARCHIVE_OUTPUT_DIRECTORY "${slang_archive_dir}"
     )
