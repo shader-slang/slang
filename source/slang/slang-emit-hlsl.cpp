@@ -12,238 +12,6 @@
 namespace Slang
 {
 
-// The following prelude functions are required to
-// workaround the limitation that we cannot construct
-// temporary instances in-place; and they have to be
-// temporary local variables.
-//
-// SM6.9 uses a legacy `__builtin_XXX` functions whereas
-// SM6.10 uses `dx::linalg::XXX` namespace.
-//
-static const char* kHLSLBuiltInPreludeCoopVecSm610 = R"(
-template<
-    typename OutElTy,
-    dx::linalg::ComponentEnum MatDT,
-    uint MatM,
-    uint MatK,
-    dx::linalg::MatrixLayoutEnum LoadLayout,
-    dx::linalg::ComponentEnum InputDT,
-    uint InputVecDim,
-    typename BufTy,
-    typename InElTy>
-vector<OutElTy, MatM> __slang_linalg_Mul(
-    BufTy matBuf,
-    uint matOff,
-    uint matStr,
-    vector<InElTy, InputVecDim> input)
-{
-    using MatTy = dx::linalg::Matrix<
-        MatDT,
-        MatM,
-        MatK,
-        dx::linalg::MatrixUse::A,
-        dx::linalg::MatrixScope::Thread>;
-    MatTy mat = MatTy::template Load<LoadLayout>(matBuf, matOff, matStr);
-    return dx::linalg::Multiply<OutElTy>(
-        mat,
-        dx::linalg::MakeInterpretedVector<InputDT>(input));
-}
-
-template<
-    typename OutElTy,
-    dx::linalg::ComponentEnum MatDT,
-    uint MatM,
-    uint MatK,
-    dx::linalg::MatrixLayoutEnum LoadLayout,
-    dx::linalg::ComponentEnum InputDT,
-    uint InputVecDim,
-    typename BiasElTy,
-    uint BiasVecDim,
-    typename MatBufTy,
-    typename BiasBufTy,
-    typename InElTy>
-vector<OutElTy, MatM> __slang_linalg_MulAdd(
-    MatBufTy matBuf,
-    uint matOff,
-    uint matStr,
-    BiasBufTy biasBuf,
-    uint biasOff,
-    vector<InElTy, InputVecDim> input)
-{
-    using MatTy = dx::linalg::Matrix<
-        MatDT,
-        MatM,
-        MatK,
-        dx::linalg::MatrixUse::A,
-        dx::linalg::MatrixScope::Thread>;
-    MatTy mat = MatTy::template Load<LoadLayout>(matBuf, matOff, matStr);
-    using BiasVecTy = vector<BiasElTy, BiasVecDim>;
-    BiasVecTy biasVec = biasBuf.template Load<BiasVecTy>(biasOff);
-    return dx::linalg::MultiplyAdd<OutElTy>(
-        mat,
-        dx::linalg::MakeInterpretedVector<InputDT>(input),
-        biasVec);
-}
-
-template<
-    typename ElTy,
-    dx::linalg::ComponentEnum MatDT,
-    uint MatM,
-    uint MatN,
-    dx::linalg::MatrixLayoutEnum /*IgnoredMemoryLayout*/,
-    typename BufTy>
-void __slang_linalg_OuterProductAccumulate(
-    vector<ElTy, MatM> a,
-    vector<ElTy, MatN> b,
-    BufTy matBuf,
-    uint matOff,
-    uint /*IgnoredMatrixStride*/)
-{
-    using AccTy = dx::linalg::Matrix<
-        MatDT,
-        MatM * dx::linalg::__detail::ComponentTypeTraits<ElTy>::ElementsPerScalar,
-        MatN * dx::linalg::__detail::ComponentTypeTraits<ElTy>::ElementsPerScalar,
-        dx::linalg::MatrixUse::Accumulator,
-        dx::linalg::MatrixScope::Thread>;
-    AccTy acc =
-        dx::linalg::OuterProduct<MatDT, dx::linalg::MatrixScope::Thread>(a, b);
-    acc.InterlockedAccumulate(matBuf, matOff, uint(sizeof(ElTy)));
-}
-
-template<typename ElTy, uint N, typename BufTy>
-void __slang_linalg_VectorAccumulate(vector<ElTy, N> inputVec, BufTy buffer, uint offset)
-{
-    // No dx::linalg wrapper for cooperative-vector reduce-sum yet; approximate with per-lane load/add/store
-    for (uint i = 0; i < N; ++i)
-    {
-        uint byteOffset = offset + i * uint(sizeof(ElTy));
-        ElTy cur = buffer.template Load<ElTy>(byteOffset);
-        buffer.template Store<ElTy>(byteOffset, cur + inputVec[i]);
-    }
-}
-)";
-
-// SM6.9 functions with `__builtin_XXX` names are mutating
-// functions whereas we want the immutable behavior.
-// It requires to create a temporary variable.
-static const char* kHLSLBuiltInPreludeCoopVecSm609 = R"(
-template<
-    typename OutElTy,
-    dx::linalg::DataType MatDT,
-    uint MatM,
-    uint MatK,
-    dx::linalg::MatrixLayout MatML,
-    bool MatTranspose,
-    dx::linalg::DataType InputDT,
-    uint InputVecDim,
-    typename BufTy,
-    typename InElTy,
-    bool OutputIsUnsigned,
-    bool InputIsUnsigned>
-vector<OutElTy, MatM> __slang_linalg_Mul(
-    BufTy matBuf,
-    uint matOff,
-    uint matStr,
-    vector<InElTy, InputVecDim> input)
-{
-    vector<OutElTy, MatM> __slang_r = (vector<OutElTy, MatM>)0;
-    __builtin_MatVecMul(__slang_r, OutputIsUnsigned, input, InputIsUnsigned, InputDT, matBuf, matOff,
-        MatDT, MatM, MatK, MatML, MatTranspose, matStr);
-    return __slang_r;
-}
-
-template<
-    typename OutElTy,
-    dx::linalg::DataType MatDT,
-    uint MatM,
-    uint MatK,
-    dx::linalg::MatrixLayout MatML,
-    bool MatTranspose,
-    dx::linalg::DataType InputDT,
-    uint InputVecDim,
-    dx::linalg::DataType BiasDT,
-    typename MatBufTy,
-    typename BiasBufTy,
-    typename InElTy,
-    bool OutputIsUnsigned,
-    bool InputIsUnsigned>
-vector<OutElTy, MatM> __slang_linalg_MulAdd(
-    MatBufTy matBuf,
-    uint matOff,
-    uint matStr,
-    BiasBufTy biasBuf,
-    uint biasOff,
-    vector<InElTy, InputVecDim> input)
-{
-    vector<OutElTy, MatM> __slang_r = (vector<OutElTy, MatM>)0;
-    __builtin_MatVecMulAdd(__slang_r, OutputIsUnsigned, input, InputIsUnsigned, InputDT, matBuf,
-        matOff, MatDT, MatM, MatK, MatML, MatTranspose, matStr, biasBuf, biasOff, BiasDT);
-    return __slang_r;
-}
-
-template<typename ElTy, dx::linalg::DataType MatDT, uint MatM, uint MatN, dx::linalg::MatrixLayout MatML, typename BufTy>
-void __slang_linalg_OuterProductAccumulate(
-    vector<ElTy, MatM> a,
-    vector<ElTy, MatN> b,
-    BufTy matBuf,
-    uint matOff,
-    uint matStr)
-{
-    __builtin_OuterProductAccumulate(a, b, matBuf, matOff, MatDT, MatML, matStr);
-}
-
-template<typename ElTy, uint N, typename BufTy>
-void __slang_linalg_VectorAccumulate(vector<ElTy, N> inputVec, BufTy buffer, uint offset)
-{
-    __builtin_VectorAccumulate(inputVec, buffer, offset);
-}
-)";
-
-static UnownedStringSlice _mapSlangCoopVecComponentTypeToHLSL(
-    int32_t slangValue,
-    IRIntegerValue inputInterpretationPackingFactor,
-    bool sm610OrAbove)
-{
-    if (inputInterpretationPackingFactor != 1)
-    {
-        switch (slangValue)
-        {
-        case SLANG_SCALAR_TYPE_INT8:
-            return UnownedStringSlice(sm610OrAbove ? "PackedS8x32" : "DATA_TYPE_SINT8_T4_PACKED");
-        case SLANG_SCALAR_TYPE_UINT8:
-            return UnownedStringSlice(sm610OrAbove ? "PackedU8x32" : "DATA_TYPE_UINT8_T4_PACKED");
-        default:
-            SLANG_UNEXPECTED(
-                "Unsupported packed cooperative vector input interpretation for HLSL emission");
-        }
-    }
-
-    switch (slangValue)
-    {
-    case SLANG_SCALAR_TYPE_FLOAT_E4M3:
-        return UnownedStringSlice(sm610OrAbove ? "F8_E4M3" : "DATA_TYPE_FLOAT8_E4M3");
-    case SLANG_SCALAR_TYPE_FLOAT_E5M2:
-        return UnownedStringSlice(sm610OrAbove ? "F8_E5M2" : "DATA_TYPE_FLOAT8_E5M2");
-    case SLANG_SCALAR_TYPE_FLOAT16:
-        return UnownedStringSlice(sm610OrAbove ? "F16" : "DATA_TYPE_FLOAT16");
-    case SLANG_SCALAR_TYPE_FLOAT32:
-        return UnownedStringSlice(sm610OrAbove ? "F32" : "DATA_TYPE_FLOAT32");
-    case SLANG_SCALAR_TYPE_INT8:
-        return UnownedStringSlice(sm610OrAbove ? "I8" : "DATA_TYPE_SINT8");
-    case SLANG_SCALAR_TYPE_INT16:
-        return UnownedStringSlice(sm610OrAbove ? "I16" : "DATA_TYPE_SINT16");
-    case SLANG_SCALAR_TYPE_INT32:
-        return UnownedStringSlice(sm610OrAbove ? "I32" : "DATA_TYPE_SINT32");
-    case SLANG_SCALAR_TYPE_UINT8:
-        return UnownedStringSlice(sm610OrAbove ? "U8" : "DATA_TYPE_UINT8");
-    case SLANG_SCALAR_TYPE_UINT16:
-        return UnownedStringSlice(sm610OrAbove ? "U16" : "DATA_TYPE_UINT16");
-    case SLANG_SCALAR_TYPE_UINT32:
-        return UnownedStringSlice(sm610OrAbove ? "U32" : "DATA_TYPE_UINT32");
-    default:
-        SLANG_UNEXPECTED("Unsupported cooperative vector component type for HLSL emission");
-    }
-}
 
 void HLSLSourceEmitter::_emitHLSLDecorationSingleString(
     const char* name,
@@ -834,7 +602,7 @@ void HLSLSourceEmitter::emitMappedCoopVecComponentType(
     // SM 6.9 dx/linalg.h uses an unscoped `enum DataType` with `DATA_TYPE_*` enumerators in
     // namespace dx::linalg (not DataType::Float16-style names).
     m_writer->emit(m_sm610OrAbove ? "dx::linalg::ComponentType::" : "dx::linalg::");
-    m_writer->emit(_mapSlangCoopVecComponentTypeToHLSL(
+    m_writer->emit(getCoopVecComponentType_enum(
         (int32_t)intLit->getValue(),
         inputInterpretationPackingFactorValue,
         m_sm610OrAbove));
@@ -908,11 +676,11 @@ void HLSLSourceEmitter::ensureCoopVecHlslPreludeForProfile()
     auto targetProfile = getTargetProgram()->getOptionSet().getProfile();
     if (targetProfile.getVersion() > ProfileVersion::DX_6_9)
     {
-        ensurePrelude(kHLSLBuiltInPreludeCoopVecSm610);
+        ensurePrelude(m_CoopVecPrelude_sm610);
     }
     else
     {
-        ensurePrelude(kHLSLBuiltInPreludeCoopVecSm609);
+        ensurePrelude(m_CoopVecPrelude_sm609);
     }
 }
 
@@ -2471,26 +2239,6 @@ void HLSLSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
     Super::emitSimpleFuncParamImpl(param);
 }
 
-static UnownedStringSlice _getInterpolationModifierText(IRInterpolationMode mode)
-{
-    switch (mode)
-    {
-    case IRInterpolationMode::PerVertex:
-    case IRInterpolationMode::NoInterpolation:
-        return UnownedStringSlice::fromLiteral("nointerpolation");
-    case IRInterpolationMode::NoPerspective:
-        return UnownedStringSlice::fromLiteral("noperspective");
-    case IRInterpolationMode::Linear:
-        return UnownedStringSlice::fromLiteral("linear");
-    case IRInterpolationMode::Sample:
-        return UnownedStringSlice::fromLiteral("sample");
-    case IRInterpolationMode::Centroid:
-        return UnownedStringSlice::fromLiteral("centroid");
-    default:
-        return UnownedStringSlice();
-    }
-}
-
 void HLSLSourceEmitter::emitInterpolationModifiersImpl(
     IRInst* varInst,
     IRType* valueType,
@@ -2506,7 +2254,7 @@ void HLSLSourceEmitter::emitInterpolationModifiersImpl(
 
         auto decoration = (IRInterpolationModeDecoration*)dd;
 
-        UnownedStringSlice modeText = _getInterpolationModifierText(decoration->getMode());
+        UnownedStringSlice modeText = getInterpolationModifier_keyword(decoration->getMode());
         if (modeText.getLength() > 0)
         {
             m_writer->emit(modeText);

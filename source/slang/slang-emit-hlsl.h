@@ -153,6 +153,8 @@ protected:
     // HLSL prelude strings for built-in helper functions injected at the top of emitted output.
     static const char* m_BuiltinPrelude64BitCast;
     static const char* m_CoopMatPrelude;
+    static const char* m_CoopVecPrelude_sm610;
+    static const char* m_CoopVecPrelude_sm609;
 
     // Helpers for emitting dx::linalg type names for cooperative matrix operations (SM6.10).
     static const char* getCoopMatComponentTypeName(
@@ -164,6 +166,12 @@ protected:
         IRIntegerValue scopeVal,
         DiagnosticSink* sink,
         SourceLoc loc);
+    static UnownedStringSlice getCoopVecComponentType_enum(
+        int32_t slangValue,
+        IRIntegerValue inputInterpretationPackingFactor,
+        bool sm610OrAbove);
+
+    static UnownedStringSlice getInterpolationModifier_keyword(IRInterpolationMode mode);
 };
 
 } // namespace Slang
