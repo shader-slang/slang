@@ -628,6 +628,20 @@ static void _lookUpMembersInSuperTypeImpl(
             ioResult,
             inBreadcrumbs);
     }
+    else if (auto modifiedType = as<ModifiedType>(superType))
+    {
+        // We can just look through modified types
+        InheritanceInfo inheritanceInfo =
+            request.semantics->getShared()->getInheritanceInfo(modifiedType);
+        _lookupMembersInSuperTypeFacets(
+            astBuilder,
+            name,
+            modifiedType,
+            inheritanceInfo,
+            request,
+            ioResult,
+            inBreadcrumbs);
+    }
     else if (as<FirstPackElementType>(superType) || as<LastPackElementType>(superType))
     {
         if (!request.semantics)
@@ -639,6 +653,22 @@ static void _lookUpMembersInSuperTypeImpl(
             astBuilder,
             name,
             canQueryType,
+            inheritanceInfo,
+            request,
+            ioResult,
+            inBreadcrumbs);
+    }
+    else if (as<PackBranchType>(superType))
+    {
+        if (!request.semantics)
+            return;
+        auto canBranchType = superType->getCanonicalType();
+        InheritanceInfo inheritanceInfo =
+            request.semantics->getShared()->getInheritanceInfo(canBranchType);
+        _lookupMembersInSuperTypeFacets(
+            astBuilder,
+            name,
+            canBranchType,
             inheritanceInfo,
             request,
             ioResult,

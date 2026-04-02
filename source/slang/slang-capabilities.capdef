@@ -198,9 +198,13 @@ def metallib_3_0 : metallib_2_4;
 /// [Version]
 def metallib_3_1 : metallib_3_0;
 
+/// Represents MetalLib 4.0.
+/// [Version]
+def metallib_4_0 : metallib_3_1;
+
 /// Represents the latest MetalLib version.
 /// [Version]
-alias metallib_latest = metallib_3_1;
+alias metallib_latest = metallib_4_0;
 
 // HLSL versions
 
@@ -218,6 +222,7 @@ def _sm_6_6 : _sm_6_5;
 def _sm_6_7 : _sm_6_6;
 def _sm_6_8 : _sm_6_7;
 def _sm_6_9 : _sm_6_8;
+def _sm_6_10 : _sm_6_9;
 
 /// Represents HLSL NVAPI support.
 /// [Version]
@@ -1896,6 +1901,25 @@ alias sm_6_9 = sm_6_9_version
              | sm_6_8
              ;
 
+/// HLSL shader model 6.10 and related capabilities of other targets.
+/// Does not include related GLSL/SPIRV extensions.
+/// [Version]
+alias sm_6_10_version = _sm_6_10
+             | _GLSL_460
+             | spirv_1_5
+             | _cuda_sm_7_0
+             | metal
+             | cpp
+             | llvm
+             ;
+
+/// HLSL shader model 6.10 and related capabilities of other targets.
+/// Includes related GLSL/SPIRV extensions.
+/// [Version]
+alias sm_6_10 = sm_6_10_version
+             | sm_6_9
+             ;
+
 // Profiles
 /// Use `sm_4_0` instead
 /// [Other]
@@ -1952,6 +1976,10 @@ alias DX_6_8 = sm_6_8;
 /// Use `sm_6_9` instead
 /// [Other]
 alias DX_6_9 = sm_6_9;
+
+/// Use `sm_6_10` instead
+/// [Other]
+alias DX_6_10 = sm_6_10;
 
 // GLSL profile capabilities
 //
@@ -2177,6 +2205,10 @@ alias METAL_3_0 = metallib_3_0;
 /// [Other]
 alias METAL_3_1 = metallib_3_1;
 
+/// Use `metallib_4_0` instead
+/// [Other]
+alias METAL_4_0 = metallib_4_0;
+
 // Capabilities of convenience
 //
 /// Capabilities required to use AppendStructuredBuffer
@@ -2297,8 +2329,7 @@ alias texture_querylod = texture_sm_4_1 | GL_EXT_texture_query_lod;
 alias texture_querylevels = texture_sm_4_1 | GL_ARB_texture_query_levels;
 /// Capabilities required to query shadow texture lod info
 /// [Compound]
-alias texture_shadowlod = texture_sm_4_1 | GL_EXT_texture_shadow_lod
-                        | texture_sm_4_1;
+alias texture_shadowlod = texture_sm_4_1;
 /// Capabilities required for shadow texture sampling with bias and gradients.
 /// New in HLSL SM6.8 but existed in older GLSL and SPIRV targets.
 /// [Compound]
@@ -2604,10 +2635,10 @@ alias ser_dxr_raygen = raygen + ser_dxr;
 
 /// User should not use this capability
 /// [Other]
-alias all = _sm_6_9 + hlsl_nvapi
-          | glsl_spirv_1_5 + sm_6_9
+alias all = _sm_6_10 + hlsl_nvapi
+          | glsl_spirv_1_5 + sm_6_10
              + ser + shaderclock + texturefootprint + fragmentshaderinterlock + _GL_NV_shader_subgroup_partitioned
              + _GL_NV_ray_tracing_motion_blur + _GL_NV_shader_texture_footprint
-          | spirv_1_5 + sm_6_9
+          | spirv_1_5 + sm_6_10
              + ser + shaderclock + texturefootprint + fragmentshaderinterlock + spvGroupNonUniformPartitionedNV
              + spvRayTracingMotionBlurNV + spvRayTracingMotionBlurNV;

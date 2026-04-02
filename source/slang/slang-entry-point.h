@@ -153,7 +153,7 @@ public:
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL linkWithOptions(
         slang::IComponentType** outLinkedComponentType,
         uint32_t count,
-        slang::CompilerOptionEntry* entries,
+        slang::CompilerOptionEntry const* entries,
         ISlangBlob** outDiagnostics) override
     {
         return Super::linkWithOptions(outLinkedComponentType, count, entries, outDiagnostics);

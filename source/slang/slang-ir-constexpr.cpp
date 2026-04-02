@@ -155,8 +155,13 @@ bool opCanBeConstExpr(IROp op)
     case kIROp_Specialize:
     case kIROp_ExtractFirstFromPack:
     case kIROp_ExtractLastFromPack:
-    case kIROp_TrimHeadOfPack:
-    case kIROp_TrimTailOfPack:
+    case kIROp_TrimFirstOfPack:
+    case kIROp_TrimLastOfPack:
+    case kIROp_ShapeConcat:
+    case kIROp_ShapePermute:
+    case kIROp_ShapeSwap:
+    case kIROp_ShapeReduce:
+    case kIROp_PackBranch:
         // TODO: more cases
         return true;
 

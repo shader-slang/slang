@@ -102,4 +102,7 @@ void validateAndRemoveAssumeAddress(
     bool validate,
     DiagnosticSink* sink);
 
+// Validate cooperative matrix/vector operations after type specialization.
+void validateCooperativeOperations(IRModule* module, DiagnosticSink* sink);
+
 } // namespace Slang

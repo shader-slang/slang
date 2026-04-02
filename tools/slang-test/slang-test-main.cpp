@@ -166,7 +166,10 @@ typedef TestResult (*TestCallback)(TestContext* context, TestInput& input);
 // Globals
 
 // Pre declare
-static void _addRenderTestOptions(const Options& options, CommandLine& ioCmdLine);
+static void _addRenderTestOptions(
+    const Options& options,
+    CommandLine& ioCmdLine,
+    bool allowCacheRHI);
 
 /* !!!!!!!!!!!!!!!!!!!!!!!!!!!!! Functions !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! */
 
@@ -1552,7 +1555,7 @@ static SlangResult _extractTestRequirements(const CommandLine& cmdLine, TestRequ
     {
         return _extractSlangCTestRequirements(cmdLine, ioInfo);
     }
-    else if (exeName == "slangi")
+    else if (exeName == "slangi" || exeName == "slang")
     {
         return SLANG_OK;
     }
@@ -1618,7 +1621,9 @@ static RenderApiFlags _getAvailableRenderApiFlags(TestContext* context)
                 CommandLine cmdLine;
                 cmdLine.setExecutableLocation(
                     ExecutableLocation(context->options.binDir, "render-test"));
-                _addRenderTestOptions(context->options, cmdLine);
+                // Don't cache startup devices: a cached non-experimental device would prevent
+                // D3D12EnableExperimentalFeatures from succeeding in subsequent test runs.
+                _addRenderTestOptions(context->options, cmdLine, false);
                 // We just want to see if the device can be started up
                 cmdLine.addArg("-only-startup");
 
@@ -1927,6 +1932,12 @@ String findExpectedPath(const TestInput& input, const char* postFix)
 static SlangResult _initSlangInterpreter(TestContext* context, CommandLine& ioCmdLine)
 {
     ioCmdLine.setExecutableLocation(ExecutableLocation(context->options.binDir, "slangi"));
+    return SLANG_OK;
+}
+
+static SlangResult _initSlangDispatcher(TestContext* context, CommandLine& ioCmdLine)
+{
+    ioCmdLine.setExecutableLocation(ExecutableLocation(context->options.binDir, "slang"));
     return SLANG_OK;
 }
 
@@ -2832,6 +2843,41 @@ TestResult runInterpreterTest(TestContext* context, TestInput& input)
         [&input](auto e, auto a) { return _areResultsEqual(input.testOptions->type, e, a); });
 }
 
+TestResult runDispatcherTest(TestContext* context, TestInput& input)
+{
+    auto outputStem = input.outputStem;
+
+    CommandLine cmdLine;
+
+    for (auto arg : input.testOptions->args)
+    {
+        cmdLine.addArg(arg);
+    }
+
+    if (SLANG_FAILED(_initSlangDispatcher(context, cmdLine)))
+    {
+        return TestResult::Ignored;
+    }
+
+    ExecuteResult exeRes;
+    TEST_RETURN_ON_DONE(spawnAndWait(context, outputStem, SpawnType::UseExe, cmdLine, exeRes));
+
+    if (context->isCollectingRequirements())
+    {
+        return TestResult::Pass;
+    }
+
+    String actualOutput = getOutput(exeRes);
+
+    return _validateOutput(
+        context,
+        input,
+        actualOutput,
+        false,
+        "result code = 0\nstandard error = {\n}\nstandard output = {\n}\n",
+        [&input](auto e, auto a) { return _areResultsEqual(input.testOptions->type, e, a); });
+}
+
 TestResult runCompile(TestContext* context, TestInput& input)
 {
     auto outputStem = input.outputStem;
@@ -2886,7 +2932,7 @@ TestResult runCompileTarget(TestContext* context, TestInput& input)
     CommandLine cmdLine;
     cmdLine.setExecutableLocation(ExecutableLocation(context->options.binDir, "render-test"));
     cmdLine.addArg(input.filePath);
-    _addRenderTestOptions(context->options, cmdLine);
+    _addRenderTestOptions(context->options, cmdLine, true);
 
     for (auto arg : input.testOptions->args)
     {
@@ -3820,7 +3866,10 @@ TestResult runGLSLComparisonTest(TestContext* context, TestInput& input)
     return TestResult::Pass;
 }
 
-static void _addRenderTestOptions(const Options& options, CommandLine& ioCmdLine)
+static void _addRenderTestOptions(
+    const Options& options,
+    CommandLine& ioCmdLine,
+    bool allowCacheRHI)
 {
     if (!options.emitSPIRVDirectly)
     {
@@ -3838,12 +3887,7 @@ static void _addRenderTestOptions(const Options& options, CommandLine& ioCmdLine
         ioCmdLine.addArg("-enable-debug-layers");
     }
 
-    if (options.ignoreAbortMsg)
-    {
-        ioCmdLine.addArg("-ignore-abort-msg");
-    }
-
-    if (options.cacheRhiDevice)
+    if (allowCacheRHI && options.cacheRhiDevice)
     {
         ioCmdLine.addArg("-cache-rhi-device");
     }
@@ -3881,7 +3925,7 @@ TestResult runPerformanceProfile(TestContext* context, TestInput& input)
     cmdLine.addArg(input.filePath);
     cmdLine.addArg("-performance-profile");
 
-    _addRenderTestOptions(context->options, cmdLine);
+    _addRenderTestOptions(context->options, cmdLine, true);
 
     for (auto arg : input.testOptions->args)
     {
@@ -4006,6 +4050,9 @@ static SlangResult _compareWithType(
         case ScalarType::Float16:
         case ScalarType::Float32:
         case ScalarType::Float64:
+        case ScalarType::BFloat16:
+        case ScalarType::FloatE4M3:
+        case ScalarType::FloatE5M2:
             {
 
                 // Compare as double
@@ -4040,7 +4087,7 @@ TestResult runComputeComparisonImpl(
     cmdLine.setExecutableLocation(ExecutableLocation(context->options.binDir, "render-test"));
     cmdLine.addArg(filePath999);
 
-    _addRenderTestOptions(context->options, cmdLine);
+    _addRenderTestOptions(context->options, cmdLine, true);
 
     for (auto arg : input.testOptions->args)
     {
@@ -4148,7 +4195,7 @@ TestResult doRenderComparisonTestRun(
     cmdLine.setExecutableLocation(ExecutableLocation(context->options.binDir, "render-test"));
     cmdLine.addArg(filePath);
 
-    _addRenderTestOptions(context->options, cmdLine);
+    _addRenderTestOptions(context->options, cmdLine, true);
 
     for (auto arg : input.testOptions->args)
     {
@@ -4489,6 +4536,7 @@ static const TestCommandInfo s_testCommandInfos[] = {
     {"SIMPLE_EX", &runSimpleTest, 0},
     {"SIMPLE_LINE", &runSimpleLineTest, 0},
     {"INTERPRET", &runInterpreterTest, 0},
+    {"DISPATCHER", &runDispatcherTest, 0},
     {"REFLECTION", &runReflectionTest, 0},
     {"CPU_REFLECTION", &runReflectionTest, 0},
     {"COMMAND_LINE_SIMPLE", &runSimpleCompareCommandLineTest, 0},
@@ -5204,24 +5252,9 @@ static SlangResult _runTestsOnFile(TestContext* context, String filePath)
 static bool endsWithAllowedExtension(TestContext* /*context*/, String filePath)
 {
     char const* allowedExtensions[] = {
-        ".slang",
-        ".hlsl",
-        ".fx",
-        ".glsl",
-        ".vert",
-        ".frag",
-        ".geom",
-        ".tesc",
-        ".tese",
-        ".comp",
-        ".internal",
-        ".ahit",
-        ".chit",
-        ".miss",
-        ".rgen",
-        ".c",
-        ".cpp",
-        ".cu",
+        ".slang.md", ".slang", ".hlsl", ".fx",   ".glsl",     ".vert", ".frag",
+        ".geom",     ".tesc",  ".tese", ".comp", ".internal", ".ahit", ".chit",
+        ".miss",     ".rgen",  ".c",    ".cpp",  ".cu",
     };
 
     for (auto allowedExtension : allowedExtensions)
@@ -6095,6 +6128,11 @@ int main(int argc, char** argv)
     // Ignore SIGPIPE so that writing to a broken pipe (e.g. a crashed test-server)
     // returns EPIPE instead of killing this process (exit code 141).
     signal(SIGPIPE, SIG_IGN);
+#endif
+
+#if SLANG_IGNORE_ABORT_MSG && defined(_MSC_VER)
+    // Suppress the modal abort() dialog in unattended/LLM-driven builds.
+    _set_abort_behavior(0, _WRITE_ABORT_MSG);
 #endif
 
     // Fallback: run without cleanup if context initialization fails

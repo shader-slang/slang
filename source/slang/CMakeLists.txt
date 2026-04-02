@@ -33,7 +33,6 @@ add_custom_command(
     COMMAND
         slang-fiddle -i "${SLANG_FIDDLE_INPUT_DIR}/" -o
         "${SLANG_FIDDLE_OUTPUT_DIR}/" ${SLANG_FIDDLE_INPUT_FILE_NAMES}
-        ${slang_ignore_abort_msg_arg}
     DEPENDS ${SLANG_FIDDLE_INPUTS} ${SLANG_FIDDLE_LUA_INPUTS} slang-fiddle
     WORKING_DIRECTORY ${slang_SOURCE_DIR}
     VERBATIM
@@ -255,6 +254,7 @@ set(slang_link_args
     slang-fiddle-output
     slang-lookup-tables
     SPIRV-Headers::SPIRV-Headers
+    libcmark-gfm
 )
 set(slang_interface_args INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/include)
 set(slang_public_lib_args
@@ -392,10 +392,12 @@ include(\"${slang_SOURCE_DIR}/cmake/RegenerateDllExports.cmake\")
     # Set output name to slang (produces slang.dll) and match directories
     set_target_properties(slang-proxy PROPERTIES
         OUTPUT_NAME slang
+        PDB_NAME slang-proxy
         RUNTIME_OUTPUT_DIRECTORY "${slang_runtime_dir}"
         ARCHIVE_OUTPUT_DIRECTORY "${slang_archive_dir}"
     )
-    
+    target_link_options(slang-proxy PRIVATE "$<$<CXX_COMPILER_ID:MSVC>:/INCREMENTAL:NO>")
+
     # Install the proxy DLL alongside slang-compiler.dll
     install(
         TARGETS slang-proxy

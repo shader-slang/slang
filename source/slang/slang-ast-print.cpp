@@ -582,6 +582,17 @@ void ASTPrinter::addExpr(Expr* expr)
         {
             addExpr(sizeOfExpr->value);
         }
+
+        if (sizeOfExpr->dataLayoutType)
+        {
+            sb << ", ";
+            addType(sizeOfExpr->dataLayoutType);
+        }
+        else if (sizeOfExpr->dataLayout)
+        {
+            sb << ", ";
+            addExpr(sizeOfExpr->dataLayout);
+        }
         sb << ")";
     }
     else if (const auto alignOfExpr = as<AlignOfExpr>(expr))
@@ -594,6 +605,17 @@ void ASTPrinter::addExpr(Expr* expr)
         else if (alignOfExpr->value)
         {
             addExpr(alignOfExpr->value);
+        }
+
+        if (alignOfExpr->dataLayoutType)
+        {
+            sb << ", ";
+            addType(alignOfExpr->dataLayoutType);
+        }
+        else if (alignOfExpr->dataLayout)
+        {
+            sb << ", ";
+            addExpr(alignOfExpr->dataLayout);
         }
         sb << ")";
     }
@@ -612,19 +634,37 @@ void ASTPrinter::addExpr(Expr* expr)
     }
     else if (const auto packQueryExpr = as<PackQueryExpr>(expr))
     {
-        if (as<FirstExpr>(packQueryExpr))
-            sb << "__first(";
-        else if (as<LastExpr>(packQueryExpr))
-            sb << "__last(";
-        else if (as<TrimHeadExpr>(packQueryExpr))
-            sb << "__trimHead(";
-        else if (as<TrimTailExpr>(packQueryExpr))
-            sb << "__trimTail(";
-        else
-            SLANG_UNEXPECTED("unknown PackQueryExpr subtype");
+        sb << getPackQueryName(packQueryExpr) << "(";
 
         if (packQueryExpr->value)
             addExpr(packQueryExpr->value);
+        sb << ")";
+    }
+    else if (const auto shapePackExpr = as<ShapePackTransformExpr>(expr))
+    {
+        sb << getShapePackTransformName(shapePackExpr) << "(";
+
+        bool isFirst = true;
+        for (auto arg : shapePackExpr->args)
+        {
+            if (!isFirst)
+                sb << ", ";
+            addExpr(arg);
+            isFirst = false;
+        }
+        sb << ")";
+    }
+    else if (const auto packBranchExpr = as<PackBranchTypeExpr>(expr))
+    {
+        sb << "__packBranch(";
+        if (packBranchExpr->packOperand.exp)
+            addExpr(packBranchExpr->packOperand.exp);
+        sb << ", ";
+        if (packBranchExpr->emptyType.exp)
+            addExpr(packBranchExpr->emptyType.exp);
+        sb << ", ";
+        if (packBranchExpr->nonEmptyType.exp)
+            addExpr(packBranchExpr->nonEmptyType.exp);
         sb << ")";
     }
     else if (const auto floatBitCastExpr = as<FloatBitCastExpr>(expr))

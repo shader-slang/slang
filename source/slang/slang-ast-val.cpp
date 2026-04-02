@@ -467,6 +467,7 @@ Val* EachSubtypeWitness::_substituteImplOverride(
     auto newSup = as<Type>(getSup()->substituteImpl(astBuilder, subst, &diff));
     if (!diff)
         return this;
+    (*ioDiff)++;
     return getCurrentASTBuilder()->getEachSubtypeWitness(newSub, newSup, newPatternWitness);
 }
 
@@ -560,7 +561,7 @@ Val* _substituteTrimPackSubtypeWitness(
     ASTBuilder* astBuilder,
     SubstitutionSet subst,
     int* ioDiff,
-    bool trimTail)
+    bool trimLast)
 {
     int diff = 0;
     auto newPatternWitness = as<SubtypeWitness>(
@@ -570,8 +571,8 @@ Val* _substituteTrimPackSubtypeWitness(
     if (auto witnessPack = as<TypePackSubtypeWitness>(newPatternWitness))
     {
         List<SubtypeWitness*> newWitnesses;
-        Index end = trimTail ? witnessPack->getCount() - 1 : witnessPack->getCount();
-        Index start = trimTail ? 0 : 1;
+        Index end = trimLast ? witnessPack->getCount() - 1 : witnessPack->getCount();
+        Index start = trimLast ? 0 : 1;
         for (Index i = start; i < end; i++)
             newWitnesses.add(witnessPack->getWitness(i));
         (*ioDiff)++;
@@ -583,18 +584,18 @@ Val* _substituteTrimPackSubtypeWitness(
     if (!diff)
         return witness;
     (*ioDiff)++;
-    return trimTail ? getCurrentASTBuilder()->getTrimTailSubtypeWitness(
+    return trimLast ? getCurrentASTBuilder()->getTrimLastSubtypeWitness(
                           newSub,
                           newSup,
                           newPatternWitness)
-                    : getCurrentASTBuilder()->getTrimHeadSubtypeWitness(
+                    : getCurrentASTBuilder()->getTrimFirstSubtypeWitness(
                           newSub,
                           newSup,
                           newPatternWitness);
 }
 
 template<typename TWitness>
-Val* _resolveTrimPackSubtypeWitness(TWitness* witness, bool trimTail)
+Val* _resolveTrimPackSubtypeWitness(TWitness* witness, bool trimLast)
 {
     int diff = 0;
     auto newPatternWitness = as<SubtypeWitness>(witness->getPatternTypeWitness()->resolve());
@@ -609,8 +610,8 @@ Val* _resolveTrimPackSubtypeWitness(TWitness* witness, bool trimTail)
     if (auto witnessPack = as<TypePackSubtypeWitness>(newPatternWitness))
     {
         List<SubtypeWitness*> newWitnesses;
-        Index end = trimTail ? witnessPack->getCount() - 1 : witnessPack->getCount();
-        Index start = trimTail ? 0 : 1;
+        Index end = trimLast ? witnessPack->getCount() - 1 : witnessPack->getCount();
+        Index start = trimLast ? 0 : 1;
         for (Index i = start; i < end; i++)
             newWitnesses.add(witnessPack->getWitness(i));
         return getCurrentASTBuilder()->getSubtypeWitnessPack(
@@ -620,11 +621,11 @@ Val* _resolveTrimPackSubtypeWitness(TWitness* witness, bool trimTail)
     }
     if (!diff)
         return witness;
-    return trimTail ? getCurrentASTBuilder()->getTrimTailSubtypeWitness(
+    return trimLast ? getCurrentASTBuilder()->getTrimLastSubtypeWitness(
                           newSub,
                           newSup,
                           newPatternWitness)
-                    : getCurrentASTBuilder()->getTrimHeadSubtypeWitness(
+                    : getCurrentASTBuilder()->getTrimFirstSubtypeWitness(
                           newSub,
                           newSup,
                           newPatternWitness);
@@ -675,9 +676,9 @@ void LastSubtypeWitness::_toTextOverride(StringBuilder& out)
     out << toSlice(")");
 }
 
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TrimHeadSubtypeWitness !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TrimFirstSubtypeWitness !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-Val* TrimHeadSubtypeWitness::_substituteImplOverride(
+Val* TrimFirstSubtypeWitness::_substituteImplOverride(
     ASTBuilder* astBuilder,
     SubstitutionSet subst,
     int* ioDiff)
@@ -685,21 +686,21 @@ Val* TrimHeadSubtypeWitness::_substituteImplOverride(
     return _substituteTrimPackSubtypeWitness(this, astBuilder, subst, ioDiff, false);
 }
 
-Val* TrimHeadSubtypeWitness::_resolveImplOverride()
+Val* TrimFirstSubtypeWitness::_resolveImplOverride()
 {
     return _resolveTrimPackSubtypeWitness(this, false);
 }
 
-void TrimHeadSubtypeWitness::_toTextOverride(StringBuilder& out)
+void TrimFirstSubtypeWitness::_toTextOverride(StringBuilder& out)
 {
-    out << toSlice("TrimHeadWitness(");
+    out << toSlice("TrimFirstWitness(");
     getPatternTypeWitness()->toText(out);
     out << toSlice(")");
 }
 
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TrimTailSubtypeWitness !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TrimLastSubtypeWitness !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-Val* TrimTailSubtypeWitness::_substituteImplOverride(
+Val* TrimLastSubtypeWitness::_substituteImplOverride(
     ASTBuilder* astBuilder,
     SubstitutionSet subst,
     int* ioDiff)
@@ -707,15 +708,71 @@ Val* TrimTailSubtypeWitness::_substituteImplOverride(
     return _substituteTrimPackSubtypeWitness(this, astBuilder, subst, ioDiff, true);
 }
 
-Val* TrimTailSubtypeWitness::_resolveImplOverride()
+Val* TrimLastSubtypeWitness::_resolveImplOverride()
 {
     return _resolveTrimPackSubtypeWitness(this, true);
 }
 
-void TrimTailSubtypeWitness::_toTextOverride(StringBuilder& out)
+void TrimLastSubtypeWitness::_toTextOverride(StringBuilder& out)
 {
-    out << toSlice("TrimTailWitness(");
+    out << toSlice("TrimLastWitness(");
     getPatternTypeWitness()->toText(out);
+    out << toSlice(")");
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! PackBranchSubtypeWitness !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+Val* PackBranchSubtypeWitness::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    int diff = 0;
+    auto newSub = as<Type>(getSub()->substituteImpl(astBuilder, subst, &diff));
+    auto newSup = as<Type>(getSup()->substituteImpl(astBuilder, subst, &diff));
+    auto newPackOperand = getPackOperand()->substituteImpl(astBuilder, subst, &diff);
+    auto newEmptyWitness =
+        as<SubtypeWitness>(getEmptyWitness()->substituteImpl(astBuilder, subst, &diff));
+    auto newNonEmptyWitness =
+        as<SubtypeWitness>(getNonEmptyWitness()->substituteImpl(astBuilder, subst, &diff));
+    if (!diff)
+        return this;
+    (*ioDiff)++;
+    return astBuilder->getPackBranchSubtypeWitness(
+        newSub,
+        newSup,
+        newPackOperand,
+        newEmptyWitness,
+        newNonEmptyWitness);
+}
+
+Val* PackBranchSubtypeWitness::_resolveImplOverride()
+{
+    auto astBuilder = getCurrentASTBuilder();
+    auto newSub = as<Type>(getSub()->resolve());
+    auto newSup = as<Type>(getSup()->resolve());
+    auto newPackOperand = getPackOperand()->resolve();
+    auto newEmptyWitness = as<SubtypeWitness>(getEmptyWitness()->resolve());
+    auto newNonEmptyWitness = as<SubtypeWitness>(getNonEmptyWitness()->resolve());
+    if (newSub == getSub() && newSup == getSup() && newPackOperand == getPackOperand() &&
+        newEmptyWitness == getEmptyWitness() && newNonEmptyWitness == getNonEmptyWitness())
+        return this;
+    return astBuilder->getPackBranchSubtypeWitness(
+        newSub,
+        newSup,
+        newPackOperand,
+        newEmptyWitness,
+        newNonEmptyWitness);
+}
+
+void PackBranchSubtypeWitness::_toTextOverride(StringBuilder& out)
+{
+    out << toSlice("PackBranchWitness(");
+    getPackOperand()->toText(out);
+    out << toSlice(", ");
+    getEmptyWitness()->toText(out);
+    out << toSlice(", ");
+    getNonEmptyWitness()->toText(out);
     out << toSlice(")");
 }
 
@@ -751,6 +808,9 @@ Val* DeclaredSubtypeWitness::_resolveImplOverride()
 
 ConversionCost DeclaredSubtypeWitness::_getOverloadResolutionCostOverride()
 {
+    if (auto nestedLookup = as<LookupDeclRef>(getDeclRef().declRefBase))
+        return nestedLookup->getWitness()->getOverloadResolutionCost() +
+               kConversionCost_GenericParamUpcast;
     return kConversionCost_None;
 }
 
@@ -830,11 +890,6 @@ breakLabel:;
     auto substSub = as<Type>(getSub()->substituteImpl(astBuilder, subst, &diff));
     auto substSup = as<Type>(getSup()->substituteImpl(astBuilder, subst, &diff));
 
-    if (!diff)
-        return this;
-
-    (*ioDiff)++;
-
     // If we have a reference to a type constraint for an
     // associated type declaration, then we can replace it
     // with the concrete conformance witness for a concrete
@@ -869,6 +924,7 @@ breakLabel:;
                     case RequirementWitness::Flavor::val:
                         {
                             auto satisfyingVal = requirementWitness.getVal();
+                            (*ioDiff)++;
                             return satisfyingVal;
                         }
                     }
@@ -879,6 +935,12 @@ breakLabel:;
 
     auto substDeclRef = getDeclRef().substituteImpl(astBuilder, subst, &diff);
     auto rs = astBuilder->getDeclaredSubtypeWitness(substSub, substSup, substDeclRef);
+
+    if (!diff)
+        return this;
+
+    (*ioDiff)++;
+
     return rs;
 }
 
@@ -1073,6 +1135,185 @@ Val* DeclRefTypeCoercionWitness::_resolveImplOverride()
     return this;
 }
 
+// DiffTypeInfoWitness
+void DiffTypeInfoWitness::_toTextOverride(StringBuilder& out)
+{
+    out << "DiffTypeInfoWitness(";
+    getOperand(0)->toText(out);
+    out << ")";
+}
+
+Val* DiffTypeInfoWitness::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    List<Val*> newOperands;
+
+    int diff = 0;
+    for (Index ii = 0; ii < (Index)getOperandCount(); ii++)
+    {
+        auto operand = getOperand(ii);
+        auto newOperand = operand ? operand->substituteImpl(astBuilder, subst, &diff) : nullptr;
+        newOperands.add(newOperand);
+    }
+
+    if (diff)
+    {
+        (*ioDiff)++;
+        return astBuilder->getOrCreate<DiffTypeInfoWitness>(newOperands);
+    }
+    else
+    {
+        return this;
+    }
+}
+
+Val* DiffTypeInfoWitness::_resolveImplOverride()
+{
+    List<Val*> newOperands;
+    int diff = 0;
+    for (Index ii = 0; ii < (Index)getOperandCount(); ii++)
+    {
+        auto operand = getOperand(ii);
+        auto newOperand = operand ? operand->resolve() : nullptr;
+        if (newOperand != operand)
+            diff++;
+        newOperands.add(newOperand);
+    }
+
+    if (diff)
+    {
+        return getCurrentASTBuilder()->getOrCreate<DiffTypeInfoWitness>(newOperands);
+    }
+    else
+    {
+        return this;
+    }
+}
+
+void HigherOrderDiffTypeTranslationWitness::_toTextOverride(StringBuilder& out)
+{
+    out << "HigherOrderDiffTypeTranslationWitness(";
+    getOperand(0)->toText(out);
+    out << ")";
+}
+
+Val* HigherOrderDiffTypeTranslationWitness::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    int diff = 0;
+    auto substWitness = getBaseWitness()->substituteImpl(astBuilder, subst, &diff);
+
+    if (diff)
+    {
+        (*ioDiff)++;
+        return astBuilder->getOrCreate<HigherOrderDiffTypeTranslationWitness>(substWitness);
+    }
+    else
+    {
+        return this;
+    }
+}
+
+Val* HigherOrderDiffTypeTranslationWitness::_resolveImplOverride()
+{
+    auto resolvedWitness = getBaseWitness()->resolve();
+
+    if (auto diffTypeInfoWitness = as<DiffTypeInfoWitness>(resolvedWitness))
+    {
+        // Generate higher order diff-type-info witness.
+        //
+        // This is a little bit of a hack for the fact that diff-type-info witness
+        // only gets the witness for ParamType : IDifferentiable, but during higher-order
+        // autodiff, we may also need the witness for DifferentialPair<ParamType> : IDifferentiable.
+        //
+        // Unfortunately, there could be arbitrary number of nesting levels, so it's not tractable
+        // to store all of them on the DiffTypeInfoWitness.
+        //
+        // Technically, this requires storing a higher-rank witness (i.e.
+        // a witness of the form: forall T : IDifferentiable . DifferentialPair<T> :
+        // IDifferentiable) but our type (and decl-ref) system does not support this at the moment.
+        //
+        // Fortunately, in practice this is the only higher-rank witness we need to handle,
+        // so we'll just manually construct the DifferentialPair<T> : IDifferentiable witness here.
+        // by looking up the InheritanceDecl in the DifferentialPair declaration, and forming
+        // a specialized member-decl-ref to it.
+        //
+
+        auto diffPairGenericDecl = as<GenericDecl>(
+            getCurrentASTBuilder()->getSharedASTBuilder()->findMagicDecl("DifferentialPairType"));
+        SLANG_ASSERT(diffPairGenericDecl);
+
+        InheritanceDecl* diffInheritanceDecl = nullptr;
+        for (auto inheritanceDecl : getMembersOfType<InheritanceDecl>(
+                 getCurrentASTBuilder(),
+                 as<ContainerDecl>(diffPairGenericDecl->inner)->getDefaultDeclRef()))
+        {
+            if (inheritanceDecl.getDecl()->base.type ==
+                getCurrentASTBuilder()->getDifferentiableInterfaceType())
+            {
+                diffInheritanceDecl = inheritanceDecl.getDecl();
+                break;
+            }
+        }
+        SLANG_ASSERT(diffInheritanceDecl);
+
+        auto makeDiffPairWitness = [&](Type* baseType,
+                                       SubtypeWitness* baseWitness) -> SubtypeWitness*
+        {
+            Val* args[] = {baseType, baseWitness};
+            auto diffPairDeclRef = getCurrentASTBuilder()->getGenericAppDeclRef(
+                diffPairGenericDecl,
+                makeArrayView(args));
+
+            auto inheritanceDeclRef =
+                getCurrentASTBuilder()->getMemberDeclRef(diffPairDeclRef, diffInheritanceDecl);
+
+            return getCurrentASTBuilder()->getDeclaredSubtypeWitness(
+                getCurrentASTBuilder()->getDifferentialPairType(baseType, baseWitness),
+                getCurrentASTBuilder()->getDifferentiableInterfaceType(),
+                inheritanceDeclRef);
+        };
+
+        Type* thisParamType = diffTypeInfoWitness->getThisParamType();
+        auto thisDiffWitness = diffTypeInfoWitness->getThisTypeDiffWitness();
+
+
+        if (thisParamType && thisDiffWitness)
+        {
+            thisParamType =
+                getCurrentASTBuilder()->getDifferentialPairType(thisParamType, thisDiffWitness);
+            thisDiffWitness = makeDiffPairWitness(thisParamType, thisDiffWitness);
+        }
+
+        SubtypeWitness* resultDiffWitness = diffTypeInfoWitness->getReturnTypeDiffWitness();
+        if (resultDiffWitness)
+            resultDiffWitness = makeDiffPairWitness(resultDiffWitness->getSub(), resultDiffWitness);
+
+        List<SubtypeWitness*> pairDiffWitnesses;
+        for (UIndex ii = 0; ii < diffTypeInfoWitness->getParamTypeCount(); ii++)
+        {
+            auto diffWitness = diffTypeInfoWitness->getParamTypeDiffWitness(ii);
+            if (diffWitness)
+                pairDiffWitnesses.add(makeDiffPairWitness(diffWitness->getSub(), diffWitness));
+            else
+                pairDiffWitnesses.add(diffWitness);
+        }
+
+        return getCurrentASTBuilder()->getOrCreate<DiffTypeInfoWitness>(
+            thisParamType,
+            thisDiffWitness,
+            resultDiffWitness,
+            pairDiffWitnesses);
+    }
+
+    return getCurrentASTBuilder()->getOrCreate<HigherOrderDiffTypeTranslationWitness>(
+        resolvedWitness);
+}
+
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! NoneWitness !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 void NoneWitness::_toTextOverride(StringBuilder& out)
@@ -1089,12 +1330,34 @@ Val* NoneWitness::_resolveImplOverride()
 
 void NonEmptyPackWitness::_toTextOverride(StringBuilder& out)
 {
-    out.append("nonempty_witness");
+    out.append("nonempty_witness(");
+    if (auto pack = getPack())
+        pack->toText(out);
+    else
+        out.append("<null>");
+    out.append(")");
 }
 
 Val* NonEmptyPackWitness::_resolveImplOverride()
 {
+    auto resolvedPack = getPack() ? getPack()->resolve() : nullptr;
+    if (resolvedPack != getPack())
+        return getCurrentASTBuilder()->getNonEmptyPackWitness(resolvedPack);
     return this;
+}
+
+Val* NonEmptyPackWitness::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    int diff = 0;
+    auto substPack = getPack() ? getPack()->substituteImpl(astBuilder, subst, &diff) : nullptr;
+    if (!diff)
+        return this;
+
+    (*ioDiff)++;
+    return astBuilder->getNonEmptyPackWitness(substPack);
 }
 
 // UNormModifierVal
@@ -2184,6 +2447,16 @@ void ConcreteIntValPack::_toTextOverride(StringBuilder& out)
     }
 }
 
+static void _appendShapePackOperandText(StringBuilder& out, Val* val)
+{
+    auto concretePack = as<ConcreteIntValPack>(val);
+    if (concretePack)
+        out << "(";
+    val->toText(out);
+    if (concretePack)
+        out << ")";
+}
+
 Val* ConcreteIntValPack::_substituteImplOverride(
     ASTBuilder* astBuilder,
     SubstitutionSet subst,
@@ -2215,16 +2488,16 @@ Val* ConcreteIntValPack::_resolveImplOverride()
     return this;
 }
 
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TrimHeadIntValPack !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TrimFirstIntValPack !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-void TrimHeadIntValPack::_toTextOverride(StringBuilder& out)
+void TrimFirstIntValPack::_toTextOverride(StringBuilder& out)
 {
-    out << "__trimHead(";
+    out << "__trimFirst(";
     getBasePack()->toText(out);
     out << ")";
 }
 
-Val* TrimHeadIntValPack::_substituteImplOverride(
+Val* TrimFirstIntValPack::_substituteImplOverride(
     ASTBuilder* astBuilder,
     SubstitutionSet subst,
     int* ioDiff)
@@ -2234,27 +2507,27 @@ Val* TrimHeadIntValPack::_substituteImplOverride(
     if (!diff)
         return this;
     (*ioDiff)++;
-    return astBuilder->getTrimHeadPack(substBase);
+    return astBuilder->getTrimFirstPack(substBase);
 }
 
-Val* TrimHeadIntValPack::_resolveImplOverride()
+Val* TrimFirstIntValPack::_resolveImplOverride()
 {
     auto resolvedArg = getBasePack()->resolve();
     if (resolvedArg == getBasePack())
         return this;
-    return getCurrentASTBuilder()->getTrimHeadPack(resolvedArg);
+    return getCurrentASTBuilder()->getTrimFirstPack(resolvedArg);
 }
 
-// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TrimTailIntValPack !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! TrimLastIntValPack !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-void TrimTailIntValPack::_toTextOverride(StringBuilder& out)
+void TrimLastIntValPack::_toTextOverride(StringBuilder& out)
 {
-    out << "__trimTail(";
+    out << "__trimLast(";
     getBasePack()->toText(out);
     out << ")";
 }
 
-Val* TrimTailIntValPack::_substituteImplOverride(
+Val* TrimLastIntValPack::_substituteImplOverride(
     ASTBuilder* astBuilder,
     SubstitutionSet subst,
     int* ioDiff)
@@ -2264,15 +2537,167 @@ Val* TrimTailIntValPack::_substituteImplOverride(
     if (!diff)
         return this;
     (*ioDiff)++;
-    return astBuilder->getTrimTailPack(substBase);
+    return astBuilder->getTrimLastPack(substBase);
 }
 
-Val* TrimTailIntValPack::_resolveImplOverride()
+Val* TrimLastIntValPack::_resolveImplOverride()
 {
     auto resolvedArg = getBasePack()->resolve();
     if (resolvedArg == getBasePack())
         return this;
-    return getCurrentASTBuilder()->getTrimTailPack(resolvedArg);
+    return getCurrentASTBuilder()->getTrimLastPack(resolvedArg);
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ShapeConcatIntValPack !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+void ShapeConcatIntValPack::_toTextOverride(StringBuilder& out)
+{
+    out << "__shapeConcat(";
+    _appendShapePackOperandText(out, getLeftPack());
+    out << ", ";
+    _appendShapePackOperandText(out, getRightPack());
+    out << ", ";
+    getAxis()->toText(out);
+    out << ")";
+}
+
+Val* ShapeConcatIntValPack::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    int diff = 0;
+    auto substLeftPack = getLeftPack()->substituteImpl(astBuilder, subst, &diff);
+    auto substRightPack = getRightPack()->substituteImpl(astBuilder, subst, &diff);
+    auto substAxis = as<IntVal>(getAxis()->substituteImpl(astBuilder, subst, &diff));
+    if (!diff)
+        return this;
+    (*ioDiff)++;
+    return astBuilder->getShapeConcatIntValPack(substLeftPack, substRightPack, substAxis);
+}
+
+Val* ShapeConcatIntValPack::_resolveImplOverride()
+{
+    auto resolvedLeftPack = getLeftPack()->resolve();
+    auto resolvedRightPack = getRightPack()->resolve();
+    auto resolvedAxis = as<IntVal>(getAxis()->resolve());
+    if (resolvedLeftPack == getLeftPack() && resolvedRightPack == getRightPack() &&
+        resolvedAxis == getAxis())
+        return this;
+    return getCurrentASTBuilder()->getShapeConcatIntValPack(
+        resolvedLeftPack,
+        resolvedRightPack,
+        resolvedAxis);
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ShapePermuteIntValPack !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+void ShapePermuteIntValPack::_toTextOverride(StringBuilder& out)
+{
+    out << "__shapePermute(";
+    _appendShapePackOperandText(out, getValuePack());
+    out << ", ";
+    _appendShapePackOperandText(out, getOrderPack());
+    out << ")";
+}
+
+Val* ShapePermuteIntValPack::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    int diff = 0;
+    auto substValuePack = getValuePack()->substituteImpl(astBuilder, subst, &diff);
+    auto substOrderPack = getOrderPack()->substituteImpl(astBuilder, subst, &diff);
+    if (!diff)
+        return this;
+    (*ioDiff)++;
+    return astBuilder->getShapePermuteIntValPack(substValuePack, substOrderPack);
+}
+
+Val* ShapePermuteIntValPack::_resolveImplOverride()
+{
+    auto resolvedValuePack = getValuePack()->resolve();
+    auto resolvedOrderPack = getOrderPack()->resolve();
+    if (resolvedValuePack == getValuePack() && resolvedOrderPack == getOrderPack())
+        return this;
+    return getCurrentASTBuilder()->getShapePermuteIntValPack(resolvedValuePack, resolvedOrderPack);
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ShapeSwapIntValPack !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+void ShapeSwapIntValPack::_toTextOverride(StringBuilder& out)
+{
+    out << "__shapeSwap(";
+    _appendShapePackOperandText(out, getValuePack());
+    out << ", ";
+    getDim0()->toText(out);
+    out << ", ";
+    getDim1()->toText(out);
+    out << ")";
+}
+
+Val* ShapeSwapIntValPack::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    int diff = 0;
+    auto substValuePack = getValuePack()->substituteImpl(astBuilder, subst, &diff);
+    auto substDim0 = as<IntVal>(getDim0()->substituteImpl(astBuilder, subst, &diff));
+    auto substDim1 = as<IntVal>(getDim1()->substituteImpl(astBuilder, subst, &diff));
+    if (!diff)
+        return this;
+    (*ioDiff)++;
+    return astBuilder->getShapeSwapIntValPack(substValuePack, substDim0, substDim1);
+}
+
+Val* ShapeSwapIntValPack::_resolveImplOverride()
+{
+    auto resolvedValuePack = getValuePack()->resolve();
+    auto resolvedDim0 = as<IntVal>(getDim0()->resolve());
+    auto resolvedDim1 = as<IntVal>(getDim1()->resolve());
+    if (resolvedValuePack == getValuePack() && resolvedDim0 == getDim0() &&
+        resolvedDim1 == getDim1())
+        return this;
+    return getCurrentASTBuilder()->getShapeSwapIntValPack(
+        resolvedValuePack,
+        resolvedDim0,
+        resolvedDim1);
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ShapeReduceIntValPack !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+void ShapeReduceIntValPack::_toTextOverride(StringBuilder& out)
+{
+    out << "__shapeReduce(";
+    _appendShapePackOperandText(out, getValuePack());
+    out << ", ";
+    getAxis()->toText(out);
+    out << ")";
+}
+
+Val* ShapeReduceIntValPack::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    int diff = 0;
+    auto substValuePack = getValuePack()->substituteImpl(astBuilder, subst, &diff);
+    auto substAxis = as<IntVal>(getAxis()->substituteImpl(astBuilder, subst, &diff));
+    if (!diff)
+        return this;
+    (*ioDiff)++;
+    return astBuilder->getShapeReduceIntValPack(substValuePack, substAxis);
+}
+
+Val* ShapeReduceIntValPack::_resolveImplOverride()
+{
+    auto resolvedValuePack = getValuePack()->resolve();
+    auto resolvedAxis = as<IntVal>(getAxis()->resolve());
+    if (resolvedValuePack == getValuePack() && resolvedAxis == getAxis())
+        return this;
+    return getCurrentASTBuilder()->getShapeReduceIntValPack(resolvedValuePack, resolvedAxis);
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ExpandIntValPack !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -2364,9 +2789,11 @@ bool isAbstractValuePack(Val* val)
 {
     if (as<ExpandIntValPack>(val))
         return true;
-    if (as<TrimHeadIntValPack>(val))
+    if (as<TrimFirstIntValPack>(val))
         return true;
-    if (as<TrimTailIntValPack>(val))
+    if (as<TrimLastIntValPack>(val))
+        return true;
+    if (as<ShapeTransformIntValPack>(val))
         return true;
     if (auto declRefIntVal = as<DeclRefIntVal>(val))
     {
@@ -2400,10 +2827,9 @@ Val* WitnessLookupIntVal::_resolveImplOverride()
     if (!newWitness)
         return this;
 
-    auto witnessVal = tryLookUpRequirementWitness(astBuilder, newWitness, getKey());
-    if (witnessVal.getFlavor() == RequirementWitness::Flavor::val)
+    if (auto val = tryFoldOrNull(astBuilder, newWitness, getKey()))
     {
-        return witnessVal.getVal();
+        return val;
     }
 
     auto newType = as<Type>(getType()->resolve());
@@ -2443,11 +2869,18 @@ Val* WitnessLookupIntVal::_substituteImplOverride(
 
 Val* WitnessLookupIntVal::tryFoldOrNull(ASTBuilder* astBuilder, SubtypeWitness* witness, Decl* key)
 {
-    auto witnessEntry = tryLookUpRequirementWitness(astBuilder, witness, key);
-    switch (witnessEntry.getFlavor())
+    // Check if we can find an entry for this key.
+    auto unspecializedEntry = getUnspecializedLookupRec(astBuilder, key, witness);
+
+    // If we found a relevant entry, try to specialize it.
+    switch (unspecializedEntry.getFlavor())
     {
     case RequirementWitness::Flavor::val:
-        return witnessEntry.getVal();
+        {
+            auto specializedEntry = specializeLookedUpRec(astBuilder, witness, unspecializedEntry);
+            SLANG_ASSERT(specializedEntry.getFlavor() == RequirementWitness::Flavor::val);
+            return specializedEntry.getVal();
+        }
         break;
     default:
         break;

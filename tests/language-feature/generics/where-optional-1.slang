@@ -10,6 +10,5 @@ void f<T>(T t) where optional T: IThing
     t.thing();
 /*diag:
       ^^^^^ the constraint providing 'thing' is optional and must be checked with an 'is' statement before usage
-      ^^^^^ the constraint providing 'thing' is optional and must be checked with an 'is' statement before usage
 */
 }

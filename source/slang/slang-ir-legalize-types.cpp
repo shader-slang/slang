@@ -918,9 +918,13 @@ static LegalVal legalizeDebugValue(
         return LegalVal();
     case LegalType::Flavor::pair:
         {
+            // The var should be legalized as a simple value, because we discard the special part
+            // for debug info insts.
+            //
+            SLANG_ASSERT(debugVar.flavor == LegalVal::Flavor::simple);
             auto ordinaryVal = legalizeDebugValue(
                 context,
-                debugVar.getPair()->ordinaryVal,
+                debugVar,
                 debugValue.getPair()->ordinaryVal,
                 originalInst);
             return ordinaryVal;
@@ -1634,7 +1638,11 @@ static LegalVal legalizeMakeStruct(
             {
                 // Ignore none values.
                 if (legalArgs[aa].flavor == LegalVal::Flavor::none)
+                {
+                    if (!legalType.getSimple()->findDecoration<IROptimizableTypeDecoration>())
+                        args.add(builder->getVoidValue());
                     continue;
+                }
 
                 // Note: we assume that all the arguments
                 // must be simple here, because otherwise
@@ -2087,6 +2095,13 @@ static LegalVal legalizeInst(
         SLANG_ASSERT(type.flavor == LegalType::Flavor::none);
         return LegalVal();
     default:
+        if (type.flavor == LegalType::Flavor::none)
+        {
+            // If the result type of the instruction is `none`, then we can
+            // just legalize to `none` without worrying about the details of
+            // the instruction, since there will be no value to produce.
+            return LegalVal();
+        }
         // TODO: produce a user-visible diagnostic here
         SLANG_UNEXPECTED("non-simple operand(s)!");
         break;
