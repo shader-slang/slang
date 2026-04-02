@@ -18,6 +18,12 @@ runs:
         # Get available space in KB for the current filesystem
         avail_kb=$(df -k . | tail -1 | awk '{print $4}')
 
+        if ! [[ "$avail_kb" =~ ^[0-9]+$ ]]; then
+          echo "::warning::Could not parse available disk space from df output"
+          df -k .
+          exit 0
+        fi
+
         avail_gb=$(awk "BEGIN {printf \"%.1f\", $avail_kb / 1048576}")
 
         echo "Available disk space: ${avail_gb} GB (minimum: ${min_gb} GB)"
