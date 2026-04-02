@@ -7867,6 +7867,15 @@ Expr* SemanticsExprVisitor::visitModifiedTypeExpr(ModifiedTypeExpr* expr)
         auto modifiedType = m_astBuilder->getModifiedType(baseType, modifierVals);
         expr->type = m_astBuilder->getTypeType(modifiedType);
     }
+    else if (expr->type == nullptr)
+    {
+        // It is possible that all modifiers were pruned in case the modifier
+        // list contained only modifiers that triggered diagnostics (e.g.,
+        // ConstModifier, HLSLVolatileModifier). We'll set the type here to
+        // avoid further diagnostics later in the pipeline.
+        expr->type = m_astBuilder->getTypeType(baseType);
+    }
+
     return expr;
 }
 
@@ -7891,6 +7900,17 @@ Val* SemanticsExprVisitor::checkTypeModifier(Modifier* modifier, Type* type)
     else if (as<ConstModifier>(modifier))
     {
         getSink()->diagnose(Diagnostics::ConstNotAllowedOnType{.location = modifier->loc});
+        return nullptr;
+    }
+    else if (as<HLSLVolatileModifier>(modifier))
+    {
+        getSink()->diagnose(Diagnostics::VolatileNotAllowedOnType{.location = modifier->loc});
+        return nullptr;
+    }
+    else if (as<GLSLVolatileModifier>(modifier))
+    {
+        // Note: 'volatile' adds both HLSLVolatileModifier and GLSLVolatileModifier.
+        // We're already diagnosing on HLSLVolatileModifier.
         return nullptr;
     }
     else

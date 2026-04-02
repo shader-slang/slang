@@ -9739,16 +9739,15 @@ static NodeBase* parseVolatileModifier(Parser* parser, void* /*userData*/)
             .modifierName = "volatile",
             .message = "Suggested replacement: Atomic<T>",
             .location = parser->tokenReader.peekLoc()});
-
-        return nullptr;
     }
-
-    if ((!parser->options.allowGLSLInput) &&
+    else if ((!parser->options.allowGLSLInput) &&
         (parser->currentModule->languageVersion >= SLANG_LANGUAGE_VERSION_2025))
+    {
         parser->sink->diagnose(Diagnostics::DeprecatedModifierUsage{
             .modifierName = "volatile",
             .message = "to be removed in Slang 2026. Suggested replacement: Atomic<T>",
             .location = parser->tokenReader.peekLoc()});
+    }
 
     // note: no diagnostics before Slang version 2025
 

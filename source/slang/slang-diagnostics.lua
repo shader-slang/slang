@@ -891,6 +891,13 @@ err(
     span { loc = "location", message = "cannot use 'const' as a type modifier" }
 )
 
+err(
+    "volatile-not-allowed-on-type",
+    20019,
+    "invalid 'volatile' usage",
+    span { loc = "location", message = "cannot use 'volatile' as a type modifier" }
+)
+
 warning(
     "unintended-empty-statement",
     20101,
