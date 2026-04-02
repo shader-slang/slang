@@ -1160,6 +1160,9 @@ Result linkAndOptimizeIR(
         SLANG_PASS(specializeModule, targetProgram, codeGenContext->getSink(), specOptions);
     }
 
+    if (sink->getErrorCount() != 0)
+        return SLANG_FAIL;
+
     if (requiredLoweringPassSet.higherOrderFunc)
     {
         SLANG_PASS(specializeHigherOrderParameters, codeGenContext);
