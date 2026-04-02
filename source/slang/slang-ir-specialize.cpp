@@ -672,6 +672,7 @@ struct SpecializationContext
         // version of the result of the generic (a specialized
         // type, function, or whatever).
         //
+        auto errorsBefore = sink ? sink->getErrorCount() : 0;
         auto specializedVal = specializeGeneric(genericVal, specInst);
         if (!specializedVal)
         {
@@ -679,7 +680,9 @@ struct SpecializationContext
             // (e.g. genericFunc<IFoo>(...) with a missing witness table argument),
             // emit a diagnostic and replace the specialize instruction with a poison
             // value so that subsequent passes don't crash on the unresolved instruction.
-            if (sink)
+            // Only emit E33180 if no other diagnostic was already produced (e.g. by
+            // the specialization depth budget check).
+            if (sink && sink->getErrorCount() == errorsBefore)
             {
                 String genericName;
                 if (auto inner = findGenericReturnVal(genericVal))

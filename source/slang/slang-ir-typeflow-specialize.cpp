@@ -212,6 +212,11 @@ bool isInvalidExistentialSpecialization(IRInst* specializedValue)
     if (specializedValue->findDecoration<IRDisallowSpecializationWithExistentialsDecoration>())
         return true;
 
+    // The decoration pass marks IRSpecialize instructions, but specializeModule() may
+    // resolve the specialization before the typeflow pass runs, consuming the decorated
+    // IRSpecialize and leaving behind a concrete function that contains the
+    // TypeEqualityWitness + LookupWitnessMethod pattern in its body. This body scan
+    // catches those post-resolution cases.
     if (auto func = as<IRFunc>(specializedValue))
     {
         for (auto block = func->getFirstBlock(); block; block = block->getNextBlock())
@@ -1506,7 +1511,10 @@ struct TypeFlowSpecializationContext
         // Global worklist for interprocedural analysis.
         WorkQueue<WorkItem> workQueue;
 
-        // Add all global functions to worklist.
+        // Add all global functions to worklist. Functions that are invalid existential
+        // specializations are skipped here; the diagnostic for them is emitted when
+        // discoverContext encounters the corresponding IRSpecialize context or when
+        // propagateToCallSite/specializeCall resolves the callee.
         //
         for (auto inst : module->getGlobalInsts())
             if (auto func = as<IRFunc>(inst))
@@ -6309,10 +6317,12 @@ struct TypeFlowSpecializationContext
                 IRBuilder builder(module);
                 builder.setInsertInto(module);
 
-                // Check if the selected callee has a disallowed existential specialization
-                // decoration.
+                // Check both the specialize instruction and the selected callee for
+                // disallowed existential specialization.
                 //
-                if (isInvalidExistentialSpecialization(callee))
+                auto selectedCallee = setTag->getSet()->getElement(0);
+                if (isInvalidExistentialSpecialization(callee) ||
+                    isInvalidExistentialSpecialization(selectedCallee))
                 {
                     emitExistentialSpecializationDiagnostic(callee, inst->sourceLoc, inst);
                     module->getContainerPool().free(&callArgs);
@@ -6324,7 +6334,7 @@ struct TypeFlowSpecializationContext
                     // Add in the arguments for the set specialization.
                     //
                     addArgsForSetSpecializedGeneric(cast<IRSpecialize>(callee), callArgs);
-                    callee = setTag->getSet()->getElement(0);
+                    callee = selectedCallee;
                     effectiveFuncType = getEffectiveFuncType(callee);
                     globalsWorkList.enqueue(callee);
                 }

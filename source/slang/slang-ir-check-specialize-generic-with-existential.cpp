@@ -12,8 +12,11 @@ namespace Slang
 class DiagnosticSink;
 struct IRModule;
 
-// Recursively visit the entire module, and diagnose an error whenever an ExtractExistentialType is
-// being used as a specialization argument to a generic function or type.
+// Recursively visit the entire module and mark IRSpecialize instructions that use an existential
+// or interface type as a specialization argument. Recognized argument patterns include
+// ExtractExistentialType, ExtractExistentialWitnessTable, MakeExistential, InterfaceType, and
+// TypeEqualityWitness whose first operand is an InterfaceType.
+// The actual diagnostic is emitted later by the typeflow or specialize passes.
 void addDecorationsForGenericsSpecializedWithExistentialsRec(IRInst* parent, DiagnosticSink* sink)
 {
     if (auto code = as<IRGlobalValueWithCode>(parent))
