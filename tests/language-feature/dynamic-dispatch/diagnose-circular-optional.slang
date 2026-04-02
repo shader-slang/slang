@@ -23,6 +23,8 @@ struct LeafNode : INode
 }
 
 // CHECK: error[E41003]
+// CHECK: LinkedNode
+// CHECK: circular reference through interface
 struct LinkedNode : INode
 {
     float value;

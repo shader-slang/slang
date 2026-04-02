@@ -24,7 +24,13 @@ struct LeafNode : INode
     float get() { return value; }
 }
 
-INode createNode()
+INode createPtrNode()
+{
+    PtrNode p;
+    return p;
+}
+
+INode createLeaf()
 {
     LeafNode leaf;
     leaf.value = 42.0;
@@ -37,6 +43,7 @@ RWStructuredBuffer<float> outputBuffer;
 [numthreads(1, 1, 1)]
 void computeMain()
 {
-    INode n = createNode();
-    outputBuffer[0] = n.get();
+    INode n = createPtrNode();
+    INode m = createLeaf();
+    outputBuffer[0] = n.get() + m.get();
 }

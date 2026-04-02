@@ -13,6 +13,7 @@ dyn interface IFoo
     float getValue();
 }
 
+// CHECK-NOT: internal error
 // CHECK: error[E41003]
 // CHECK: BadImpl
 // CHECK: circular reference through interface

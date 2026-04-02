@@ -5,6 +5,7 @@
 // Size inference should still work using the non-cyclic implementation.
 
 //TEST:SIMPLE(filecheck=CHECK): -target spirv
+//TEST:SIMPLE(filecheck=NEG): -target spirv
 
 [anyValueSize(32)]
 interface IValue
@@ -48,5 +49,6 @@ void computeMain()
 {
     IValue v = createGood();
     IValue w = createBad();
+    // NEG-NOT: GoodImpl{{.*}}circular
     outputBuffer[0] = v.get() + w.get();
 }

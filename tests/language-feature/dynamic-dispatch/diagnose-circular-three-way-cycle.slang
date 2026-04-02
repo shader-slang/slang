@@ -4,6 +4,7 @@
 // validating that hasDependencyPath correctly traces through multiple hops.
 
 //TEST:SIMPLE(filecheck=CHECK): -target spirv
+//TEST:SIMPLE(filecheck=NEG): -target spirv
 
 [anyValueSize(32)]
 interface IA
@@ -79,5 +80,6 @@ void computeMain()
     IA a = makeA();
     IB b = makeB();
     IC c = makeC();
+    // NEG-NOT: error[E41011]
     outputBuffer[0] = a.a() + b.b() + c.c();
 }

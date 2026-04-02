@@ -6,6 +6,7 @@
 // either from having a finite packed size.
 
 //TEST:SIMPLE(filecheck=CHECK): -target spirv
+//TEST:SIMPLE(filecheck=NEG): -target spirv
 
 [anyValueSize(32)]
 interface IFoo
@@ -58,5 +59,6 @@ void computeMain()
 {
     IFoo f = createFoo();
     IBar b = createBar();
+    // NEG-NOT: error[E41011]
     outputBuffer[0] = f.getValue() + b.process();
 }
