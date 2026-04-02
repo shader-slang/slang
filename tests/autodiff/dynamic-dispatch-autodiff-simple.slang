@@ -35,7 +35,6 @@ float sqr(IInterface obj, float x)
 //TEST_INPUT: type_conformance A:IInterface = 0
 //TEST_INPUT: type_conformance B:IInterface = 1
 
-
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
@@ -45,5 +44,5 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     obj = createDynamicObject<IInterface>(dispatchThreadID.x + 1, 0); // B
     outputBuffer[1] = __fwd_diff(sqr)(obj, DifferentialPair<float>(1.5, 1.0)).d; // B.calc, expect 3
 
-    outputBuffer[2] = __fwd_diff(obj.calc)(DifferentialPair<float>(1.5, 1.0)).d; // B.calc, expect 3
+    outputBuffer[2] = obj.calc.fwd_diff(DifferentialPair<float>(1.5, 1.0)).d; // B.calc, expect 3
 }

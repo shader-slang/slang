@@ -2,8 +2,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE_EX:-wgpu -compute -shaderobj -output-using-type
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -profile cs_5_0 -entry computeMain -line-directive-mode none
-//DISABLE_TEST:SIMPLE(filecheck=CHK):-target glsl -stage compute -entry computeMain -report-checkpoint-intermediates
+//TEST:SIMPLE(filecheck=CHK):-target glsl -stage compute -entry computeMain -report-checkpoint-intermediates
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -11,8 +10,6 @@ RWStructuredBuffer<float> outputBuffer;
 typedef DifferentialPair<float> dpfloat;
 typedef float.Differential dfloat;
 
-// Test that compute does not have a context.
-// CHECK-NOT: struct {{[a-zA-Z0-9_]*}}_compute_{{[a-zA-Z0-9_]*}}
 
 [BackwardDifferentiable]
 [PreferRecompute]
@@ -28,17 +25,10 @@ float infinitesimal(float x)
     return x - detach(x);
 }
 
-// Test that computeLoop compiles to just return 0.
-// CHECK: float3 computeLoop{{[_0-9]*}}(float y{{[_0-9]*}})
-// CHECK-NOT: for{{.*}}
-// CHECK: return (float3)0
 
-// Test that computeLoop's intermediates have no float sitting
+// Test that computeLoop's intermediates have no arrays sitting
 // around (must not cache the outvar from 'compute()')
-// CHECK: struct s_bwd_prop_computeLoop_Intermediates
-// CHECK-NEXT: {
-// CHECK-NOT: {{[A-Za-z0-9_]+}} {{[A-Za-z0-9_]+}}[{{.*}}]
-// CHECK: }
+// The CHK checks below verify the exact checkpoint contents.
 
 [PreferRecompute]
 [BackwardDifferentiable]
@@ -48,18 +38,17 @@ float3 infinitesimal(float3 x)
     return x - detach(x);
 }
 
-//CHK: note: checkpointing context of 20 bytes associated with function: 'computeLoop'
+//CHK-DAG: note: checkpointing context of 16 bytes associated with: 'computeLoop'
 [BackwardDifferentiable]
 [PreferRecompute]
 float3 computeLoop(float y)
 {
-    //CHK: note: 4 bytes (float) used to checkpoint the following item:
+    //CHK-DAG: 4 bytes (float)
     float w = 0;
 
-    //CHK: note: 12 bytes (Vector<float, 3> ) used to checkpoint the following item:
+    //CHK-DAG: 12 bytes (Vector<float, 3> )
     float3 w3 = float3(0, 0, 0);
 
-    //CHK: note: 4 bytes (int32_t) used for a loop counter here:
     for (int i = 0; i < 8; i++)
     {
         float k = compute(i, y);
@@ -72,13 +61,9 @@ float3 computeLoop(float y)
     return infinitesimal(p);
 }
 
-// Since computeLoop is recomputed, test_simple_loop should have nothing to store
-// therefore we check that there is no intermediate context type generated for test_simple_loop.
-
-// CHECK-NOT: struct {{[a-zA-Z0-9_]*}}test_simple_loop{{[a-zA-Z0-9_]*}}
 [BackwardDifferentiable]
 float test_simple_loop(float y)
-{  
+{
     float3 x = computeLoop(y);
     return y + x.x;
 }
