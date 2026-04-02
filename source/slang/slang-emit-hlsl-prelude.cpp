@@ -387,7 +387,7 @@ __slang_cm_muladd(
 }
 
 /* static */ UnownedStringSlice HLSLSourceEmitter::getCoopVecComponentType_enum(
-    int32_t slangValue,
+    SlangScalarType slangValue,
     IRIntegerValue inputInterpretationPackingFactor,
     bool sm610OrAbove)
 {

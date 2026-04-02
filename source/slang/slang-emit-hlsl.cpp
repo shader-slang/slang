@@ -603,7 +603,7 @@ void HLSLSourceEmitter::emitMappedCoopVecComponentType(
     // namespace dx::linalg (not DataType::Float16-style names).
     m_writer->emit(m_sm610OrAbove ? "dx::linalg::ComponentType::" : "dx::linalg::");
     m_writer->emit(getCoopVecComponentType_enum(
-        (int32_t)intLit->getValue(),
+        (SlangScalarType)intLit->getValue(),
         inputInterpretationPackingFactorValue,
         m_sm610OrAbove));
 }

@@ -167,7 +167,7 @@ protected:
         DiagnosticSink* sink,
         SourceLoc loc);
     static UnownedStringSlice getCoopVecComponentType_enum(
-        int32_t slangValue,
+        SlangScalarType slangValue,
         IRIntegerValue inputInterpretationPackingFactor,
         bool sm610OrAbove);
 
