@@ -452,7 +452,7 @@ jobs:
               {
                 echo "## Sanitizer Report"
                 echo ""
-                echo "Tests exited with errors (slang-test=$SLANG_TEST_EXIT, slangc=$SLANGC_TEST_EXIT)"
+                echo "Tests exited with errors (slang-test=${SLANG_TEST_EXIT:-skipped}, slangc=${SLANGC_TEST_EXIT:-skipped})"
                 echo "but produced no sanitizer logs. This may indicate a loader error or"
                 echo "infrastructure problem that prevented the sanitizer from running."
               } >> "$GITHUB_STEP_SUMMARY"

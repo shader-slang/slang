@@ -13,3 +13,31 @@ jobs:
       runs-on: '["ubuntu-22.04"]'
       test-category: smoke
       server-count: 8
+    secrets: inherit
+
+  notify:
+    needs: [sanitizer-nightly]
+    if: always() && github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Success notification
+        if: needs.sanitizer-nightly.result == 'success'
+        uses: slackapi/slack-github-action@v1.26.0
+        with:
+          payload: |
+            {
+              "Sanitizer-Nightly": ":green-check-mark: Sanitizer nightly: clean (${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_SANITIZER_NIGHTLY_WEBHOOK_URL }}
+
+      - name: Failure notification
+        if: needs.sanitizer-nightly.result != 'success'
+        uses: slackapi/slack-github-action@v1.26.0
+        with:
+          payload: |
+            {
+              "Sanitizer-Nightly": ":alert: Sanitizer nightly: ${{ needs.sanitizer-nightly.result }}\n${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_SANITIZER_NIGHTLY_WEBHOOK_URL }}
