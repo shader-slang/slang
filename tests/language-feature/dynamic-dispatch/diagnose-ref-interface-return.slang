@@ -184,7 +184,7 @@ struct ContainerGetOnly
     }
 }
 
-// Positive 3: set accessor (nonmutating) on interface type is fine.
+// Positive 3: get/set accessor on interface type is fine (no ref).
 struct ContainerSetOnly
 {
     IFoo stored;
