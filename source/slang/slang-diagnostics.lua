@@ -2585,10 +2585,24 @@ err(
 )
 
 err(
+    "removed-modifier-usage",
+    31207,
+    "use of removed modifier",
+    span { loc = "location", message = "modifier '~modifierName' has been removed from the language. ~message" }
+)
+
+err(
     "require-input-decorated-var-for-parameter",
     31208,
     "shader input required",
     span { loc = "expr:Expr", message = "~func:Decl expects for argument ~paramNumber:Int a type which is a shader input (`in`) variable." }
+)
+
+warning(
+    "deprecated-modifier-usage",
+    31209,
+    "use of deprecated modifier",
+    span { loc = "location", message = "modifier '~modifierName' has been deprecated: ~message" }
 )
 
 -- 3121x - Derivative group requirements
