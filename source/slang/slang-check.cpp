@@ -192,7 +192,7 @@ void checkTranslationUnit(
 
     visitor.checkModule(translationUnit->getModuleDecl());
 
-    translationUnit->getModule()->_collectShaderParams();
+    translationUnit->getModule()->_collectShaderParams(translationUnit->compileRequest->getSink());
 }
 
 void SemanticsVisitor::dispatchStmt(Stmt* stmt, SemanticsContext const& context)

@@ -9,11 +9,11 @@ RWStructuredBuffer<float> outputBuffer;
 typedef DifferentialPair<float> dpfloat;
 typedef float.Differential dfloat;
 
-//CHK-DAG: note: checkpointing context of 20 bytes associated with function: 'test_loop_with_continue'
+//CHK-DAG: note: checkpointing context of 20 bytes associated with: 'test_loop_with_continue'
 [BackwardDifferentiable]
 float test_loop_with_continue(float y)
 {
-    //CHK-DAG: note: 20 bytes (FixedArray<float, 5> ) used to checkpoint the following item:
+    //CHK-DAG: 20 bytes (FixedArray<float, 5> )
     float t = y;
 
     for (int i = 0; i < 3; i++)
@@ -45,4 +45,4 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     }
 }
 
-//CHK-NOT: note
+//CHK-NOT: tests/autodiff/reverse-continue-loop.slang({{[0-9]+}}): note:

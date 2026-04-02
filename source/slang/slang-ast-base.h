@@ -802,6 +802,11 @@ public:
 
     bool hiddenFromLookup = false;
 
+    // Set by the parser when it emits a nesting diagnostic (DeclNotAllowed)
+    // so that the semantic checker's validateDeclNesting can suppress its
+    // own duplicate diagnostic for the same violation.
+    bool nestingAlreadyDiagnosed = false;
+
 private:
     DeclRefBase* m_defaultDeclRef = nullptr;
 };

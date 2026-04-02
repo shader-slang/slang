@@ -1389,7 +1389,7 @@ Type* getParamTypeWithModeWrapper(
     }
 }
 
-void Module::_collectShaderParams()
+void Module::_collectShaderParams(DiagnosticSink* sink)
 {
     // We are going to walk the global declarations in the body of the
     // module, and use those to build up our lists of:
@@ -1454,7 +1454,7 @@ void Module::_collectShaderParams()
                         shaderParamInfo,
                         m_specializationParams,
                         makeDeclRef(globalVar),
-                        nullptr))
+                        sink))
                 {
                     return;
                 }

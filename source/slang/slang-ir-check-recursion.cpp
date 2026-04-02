@@ -16,10 +16,11 @@ bool checkTypeRecursionImpl(
     {
         if (!stack.add(elementType))
         {
-            sink->diagnose(Diagnostics::RecursiveType{
-                .typeName = type,
-                .location = (field ? field : type)->sourceLoc,
-            });
+            if (sink)
+                sink->diagnose(Diagnostics::RecursiveType{
+                    .typeName = type,
+                    .location = (field ? field : type)->sourceLoc,
+                });
             return false;
         }
         if (checkedTypes.add(elementType))
@@ -38,6 +39,14 @@ bool checkTypeRecursionImpl(
                 return false;
     }
     return true;
+}
+
+bool isTypeRecursive(IRType* type)
+{
+    HashSet<IRInst*> checkedTypes;
+    HashSet<IRInst*> stack;
+    stack.add(type);
+    return !checkTypeRecursionImpl(checkedTypes, stack, type, nullptr, nullptr);
 }
 
 void checkTypeRecursion(HashSet<IRInst*>& checkedTypes, IRInst* type, DiagnosticSink* sink)
