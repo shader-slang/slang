@@ -97,10 +97,7 @@ bool validateStructuredBufferResourceTypes(
 // checks that getRootAddr(addr) is in UserPointer address space and emits
 // an error if not. Always replaces each AssumeAddress(x) with x so backend
 // passes never see the opcode.
-void validateAndRemoveAssumeAddress(
-    IRModule* module,
-    bool validate,
-    DiagnosticSink* sink);
+void validateAndRemoveAssumeAddress(IRModule* module, bool validate, DiagnosticSink* sink);
 
 // Validate cooperative matrix/vector operations after type specialization.
 void validateCooperativeOperations(IRModule* module, DiagnosticSink* sink);
