@@ -9,12 +9,9 @@ struct EmptyNode
 }
 
 struct LoopNode<let each P : int>
-/*CHECK:
-       ^^^^^^^^ type contains cyclic reference
-       ^^^^^^^^ type 'LoopNode' contains cyclic reference to itself.
-*/
 {
     __packBranch(P, EmptyNode, LoopNode<P>) next = {};
+//CHECK:                                    ^^^^ maximum type nesting level exceeded
 }
 
 struct Params<let each P : int>

@@ -224,6 +224,9 @@ Versions
 `metallib_3_1`
 > Represents MetalLib 3.1.
 
+`metallib_4_0`
+> Represents MetalLib 4.0.
+
 `metallib_latest`
 > Represents the latest MetalLib version.
 
@@ -1585,6 +1588,9 @@ Other
 
 `METAL_3_1`
 > Use `metallib_3_1` instead
+
+`METAL_4_0`
+> Use `metallib_4_0` instead
 
 `SPIRV_1_0`
 > Use `spirv_1_0` instead
