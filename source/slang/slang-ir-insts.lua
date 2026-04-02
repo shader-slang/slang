@@ -2680,11 +2680,6 @@ local insts = {
 	{
 		LiveRangeMarker = { { liveRangeStart = { min_operands = 2 } }, { liveRangeEnd = {} } },
 	},
-	-- IRSpecialization
-	{ SpecializationDictionaryItem = {} },
-	{ GenericSpecializationDictionary = { parent = true } },
-	{ ExistentialFuncSpecializationDictionary = { parent = true } },
-	{ ExistentialTypeSpecializationDictionary = { parent = true } },
 	-- Differentiable Type Dictionary
 	{ DifferentiableTypeDictionaryItem = { operands = { { "concreteType" }, { "witness" } } } },
 	-- Differentiable Type Annotation (for run-time types)

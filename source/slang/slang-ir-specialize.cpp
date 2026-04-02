@@ -56,7 +56,6 @@ struct SpecializationContext
     DiagnosticSink* sink;
     TargetProgram* targetProgram;
     SpecializationOptions options;
-    Dictionary<IROp, IRInst*> irDictionaryMap;
     bool changed = false;
     Dictionary<IRSimpleSpecializationKey, IRSpecialize*> activeGenericSpecializations;
 
@@ -399,11 +398,7 @@ struct SpecializationContext
     // only want to generate the specialized code for `g<a,b,c>`
     // *once*, and re-use it for both versions.
     //
-    // We will cache existing specializations of generic function/types
-    // using the simple key type defined as part of the IR cloning infrastructure.
-    //
     typedef IRSimpleSpecializationKey Key;
-    Dictionary<Key, IRSpecializationDictionaryItem*> genericSpecializations;
 
 
     // Now let's look at the task of finding or generation a
@@ -439,12 +434,14 @@ struct SpecializationContext
         }
 
         IRBuilder builder(module);
-        auto entry =
-            builder.fetchCompilerDictionaryEntry(module->getTranslationDict(), specializeInst);
+        auto entry = builder.fetchCompilerDictionaryEntry(module->getTranslationDict(), specializeInst);
+
+        if (auto existingVal = entry->getValue())
+            return existingVal;
 
         // We want to see if an existing specialization
-        // has already been made. To do that we will construct a key
-        // for lookup in the generic specialization context.
+        // has already been made. To detect recursive specialization,
+        // we construct a key over the generic and its arguments.
         //
         // Our key will consist of the identity of the generic
         // being specialized, and each of the argument values
@@ -457,17 +454,6 @@ struct SpecializationContext
         for (UInt ii = 0; ii < argCount; ++ii)
         {
             key.vals.add(specializeInst->getArg(ii));
-        }
-
-        {
-            // We use our generated key to look for an
-            // existing specialization that has been registered.
-            // If one is found, our work is done.
-            //
-            if (auto specializedVal = tryGetDictionaryEntry(genericSpecializations, key))
-                return specializedVal;
-            if (auto existingVal = entry->getValue())
-                return existingVal;
         }
 
         if (activeGenericSpecializations.containsKey(key))
@@ -500,17 +486,10 @@ struct SpecializationContext
 
         // The value that was returned from evaluating
         // the generic is the specialized value, and we
-        // need to remember it in our dictionary of
-        // specializations so that we don't instantiate
-        // this generic again for the same arguments.
+        // need to remember it in the compiler dictionary
+        // so that we don't instantiate this generic again
+        // for the same arguments.
         //
-        genericSpecializations.add(
-            key,
-            addEntryToIRDictionary(
-                kIROp_GenericSpecializationDictionary,
-                key.vals,
-                specializedVal));
-
         builder.setCompilerDictionaryEntryValue(entry, specializedVal);
 
         return specializedVal;
@@ -1625,146 +1604,12 @@ struct SpecializationContext
         }
     }
 
-    template<typename TDict>
-    void _readSpecializationDictionaryImpl(TDict& dict, IRInst* dictInst)
-    {
-        int childrenCount = 0;
-        for (auto child = dictInst->getFirstChild(); child; child = child->next)
-            childrenCount++;
-        dict.reserve(Index{1} << Math::Log2Ceil(childrenCount * 2));
-
-        List<IRSpecializationDictionaryItem*> invalidItems;
-        for (auto child : dictInst->getChildren())
-        {
-            auto item = as<IRSpecializationDictionaryItem>(child);
-            if (!item)
-                continue;
-            IRSimpleSpecializationKey key;
-            bool isInvalid = false;
-            for (UInt i = 0; i < item->getOperandCount(); i++)
-            {
-                if (item->getOperand(i) == nullptr)
-                {
-                    isInvalid = true;
-                }
-                else if (item->getOperand(i)->getParent() == nullptr)
-                {
-                    isInvalid = true;
-                }
-                if (as<IRUndefined>(item->getOperand(i)))
-                {
-                    isInvalid = true;
-                }
-
-                if (i > 0)
-                {
-                    key.vals.add(item->getOperand(i));
-                }
-            }
-            if (isInvalid)
-            {
-                invalidItems.add(item);
-                if (dict.containsKey(key))
-                    dict.remove(key);
-                continue;
-            }
-            dict[key] = item;
-        }
-
-        // Clean up the IR dictionary
-        for (auto item : invalidItems)
-            item->removeAndDeallocate();
-    }
-    void readSpecializationDictionaries()
-    {
-        _readSpecializationDictionaryImpl(
-            genericSpecializations,
-            getOrCreateIRDictionary(kIROp_GenericSpecializationDictionary));
-
-        _readSpecializationDictionaryImpl(
-            existentialSpecializedFuncs,
-            getOrCreateIRDictionary(kIROp_ExistentialFuncSpecializationDictionary));
-
-        _readSpecializationDictionaryImpl(
-            existentialSpecializedStructs,
-            getOrCreateIRDictionary(kIROp_ExistentialTypeSpecializationDictionary));
-    }
-
-    IRInst* getOrCreateIRDictionary(IROp dictOp)
-    {
-        if (irDictionaryMap.containsKey(dictOp))
-            return irDictionaryMap[dictOp];
-
-        for (auto child : module->getModuleInst()->getChildren())
-        {
-            if (child->getOp() == dictOp)
-            {
-                irDictionaryMap[dictOp] = child;
-                return child;
-            }
-        }
-
-        IRBuilder builder(module);
-        builder.setInsertInto(module);
-        auto dictInst = builder.emitIntrinsicInst(nullptr, dictOp, 0, nullptr);
-        irDictionaryMap[dictOp] = dictInst;
-        return dictInst;
-    }
-
-    IRSpecializationDictionaryItem* addEntryToIRDictionary(
-        IROp dictOp,
-        const List<IRInst*>& key,
-        IRInst* val)
-    {
-        auto dictInst = getOrCreateIRDictionary(dictOp);
-        List<IRInst*> args;
-        args.add(val);
-        args.addRange(key);
-        IRBuilder builder(module);
-        builder.setInsertInto(dictInst);
-        return cast<IRSpecializationDictionaryItem>(builder.emitIntrinsicInst(
-            nullptr,
-            kIROp_SpecializationDictionaryItem,
-            (UInt)args.getCount(),
-            args.getBuffer()));
-    }
-
-    // Look up an entry in the given specialization dictionary.
-    //
-    // Takes care of cases where the entry is not longer valid
-    // by removing the entry in the dictionary and returning null.
-    //
-    IRInst* tryGetDictionaryEntry(
-        Dictionary<IRSimpleSpecializationKey, IRSpecializationDictionaryItem*>& dict,
-        const IRSimpleSpecializationKey& key)
-    {
-        IRSpecializationDictionaryItem* item = nullptr;
-        if (dict.tryGetValue(key, item))
-        {
-            auto value = item ? item->getOperand(0) : nullptr;
-            if (!value || value->getParent() == nullptr || as<IRUndefined>(value))
-            {
-                dict.remove(key);
-                return nullptr;
-            }
-
-            return value;
-        }
-
-        return nullptr;
-    }
-
     // All of the machinery for generic specialization
     // has been defined above, so we will now walk
     // through the flow of the overall specialization pass.
     //
     void processModule()
     {
-        // Sync local dictionaries with the IR specialization
-        // dictionaries for faster lookup.
-        //
-        readSpecializationDictionaries();
-
         // The unspecialized IR we receive as input will have
         // `IRBindGlobalGenericParam` instructions that associate
         // each global-scope generic parameter (a type, witness
@@ -2210,12 +2055,6 @@ struct SpecializationContext
 
         return false;
     }
-
-    // In order to cache and re-use functions that have had existential-type
-    // parameters specialized, we need storage for the cache.
-    //
-    Dictionary<IRSimpleSpecializationKey, IRSpecializationDictionaryItem*>
-        existentialSpecializedFuncs;
 
     // The logic for creating a specialized callee function by plugging
     // in concrete types for existentials is similar to other cases of
@@ -3031,9 +2870,6 @@ struct SpecializationContext
         return calcExistentialTypeParamSlotCount(type, activeTypes);
     }
 
-    Dictionary<IRSimpleSpecializationKey, IRSpecializationDictionaryItem*>
-        existentialSpecializedStructs;
-
     bool maybeSpecializeBindExistentialsType(IRBindExistentialsType* type)
     {
         auto baseType = type->getBaseType();
@@ -3126,10 +2962,19 @@ struct SpecializationContext
                 key.vals.add(type->getExistentialArg(ii));
             }
 
+            IRBuilder keyBuilder(module);
+            keyBuilder.setInsertBefore(type);
+            auto keyInst = keyBuilder.emitIntrinsicInst(
+                nullptr,
+                kIROp_SpecializeExistentials,
+                (UInt)key.vals.getCount(),
+                key.vals.getBuffer());
+            auto entry = builder.fetchCompilerDictionaryEntry(module->getTranslationDict(), keyInst);
+            keyInst->removeAndDeallocate();
+
             addUsersToWorkList(type);
 
-            IRStructType* newStructType =
-                cast<IRStructType>(tryGetDictionaryEntry(existentialSpecializedStructs, key));
+            IRStructType* newStructType = as<IRStructType>(entry->getValue());
 
             if (!newStructType)
             {
@@ -3158,13 +3003,7 @@ struct SpecializationContext
 
                     builder.createStructField(newStructType, oldField->getKey(), newFieldType);
                 }
-
-                existentialSpecializedStructs.add(
-                    key,
-                    addEntryToIRDictionary(
-                        kIROp_ExistentialTypeSpecializationDictionary,
-                        key.vals,
-                        newStructType));
+                builder.setCompilerDictionaryEntryValue(entry, newStructType);
             }
 
             type->replaceUsesWith(newStructType);
@@ -3530,10 +3369,6 @@ bool specializeModule(
 
 void finalizeSpecialization(IRModule* module)
 {
-    // Go through all the top-level children of module's module inst,
-    // and remove any specialization dictionary insts.
-    //
-
     auto moduleInst = module->getModuleInst();
     IRInst* next = nullptr;
     for (auto inst = moduleInst->getFirstChild(); inst; inst = next)
@@ -3561,12 +3396,6 @@ void finalizeSpecialization(IRModule* module)
                 }
                 decor = nextDecor;
             }
-            break;
-
-        case kIROp_ExistentialFuncSpecializationDictionary:
-        case kIROp_ExistentialTypeSpecializationDictionary:
-        case kIROp_GenericSpecializationDictionary:
-            inst->removeAndDeallocate();
             break;
         }
     }
@@ -4023,7 +3852,6 @@ IRInst* specializeGeneric(IRSpecialize* specializeInst)
 
     SpecializationContext context(module, nullptr, SpecializationOptions());
     context.sink = nullptr;
-    context.readSpecializationDictionaries();
     auto result = specializeGeneric(&context, specializeInst);
     return result;
 }
