@@ -26,6 +26,7 @@ namespace Slang
     {uint8_t(sizeof(uint16_t)), BaseTypeInfo::Flag::FloatingPoint, uint8_t(BaseType::Half)},
     {uint8_t(sizeof(float)), BaseTypeInfo::Flag::FloatingPoint, uint8_t(BaseType::Float)},
     {uint8_t(sizeof(double)), BaseTypeInfo::Flag::FloatingPoint, uint8_t(BaseType::Double)},
+    {uint8_t(sizeof(uint16_t)), BaseTypeInfo::Flag::FloatingPoint, uint8_t(BaseType::BFloat16)},
     {uint8_t(sizeof(char)),
      BaseTypeInfo::Flag::Signed | BaseTypeInfo::Flag::Integer,
      uint8_t(BaseType::Char)},
@@ -78,6 +79,8 @@ namespace Slang
         return UnownedStringSlice::fromLiteral("float");
     case BaseType::Double:
         return UnownedStringSlice::fromLiteral("double");
+    case BaseType::BFloat16:
+        return UnownedStringSlice::fromLiteral("BFloat16");
     case BaseType::Char:
         return UnownedStringSlice::fromLiteral("char");
     case BaseType::IntPtr:

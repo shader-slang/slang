@@ -1081,6 +1081,10 @@ void WGSLSourceEmitter::emitSimpleValueImpl(IRInst* inst)
             {
                 switch (type->getBaseType())
                 {
+                case BaseType::BFloat16:
+                    SLANG_UNEXPECTED("BFloat16 not supported on WGSL target");
+                    break;
+
                 default:
 
                 case BaseType::Half:

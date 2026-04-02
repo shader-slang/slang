@@ -123,6 +123,11 @@ static const BaseTypeConversionInfo kBaseTypes[] = {
      FLOAT_MASK,
      kBaseTypeConversionKind_Float,
      kBaseTypeConversionRank_Int64},
+    {"BFloat16",
+     BaseType::BFloat16,
+     FLOAT_MASK,
+     kBaseTypeConversionKind_Float,
+     kBaseTypeConversionRank_Int16},
 
     {"uint8_t",
      BaseType::UInt8,
@@ -159,7 +164,10 @@ ConversionCost getBaseTypeConversionCost(
     if (toInfo.conversionKind == fromInfo.conversionKind &&
         toInfo.conversionRank == fromInfo.conversionRank)
     {
-        // Thse should represent the exact same type.
+        // Same kind and rank normally means the exact same type,
+        // but BFloat16 and half are both 16-bit floats with different formats.
+        if (toInfo.tag != fromInfo.tag)
+            return kConversionCost_GeneralConversion;
         return kConversionCost_None;
     }
 

@@ -236,6 +236,7 @@ struct DefaultLayoutRulesImpl : SimpleLayoutRulesImpl
             return GetPointerLayout(context);
 
         case BaseType::Half:
+        case BaseType::BFloat16:
             return SimpleLayoutInfo(LayoutResourceKind::Uniform, 2, 2);
         case BaseType::Float:
             return SimpleLayoutInfo(LayoutResourceKind::Uniform, 4, 4);
@@ -5429,13 +5430,6 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
     {
         return createSimpleTypeLayout(
             rules->GetScalarLayout(BaseType::UInt8, context),
-            type,
-            rules);
-    }
-    else if (as<BFloat16Type>(type))
-    {
-        return createSimpleTypeLayout(
-            rules->GetScalarLayout(BaseType::UInt16, context),
             type,
             rules);
     }

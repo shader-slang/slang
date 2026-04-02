@@ -25,6 +25,12 @@
 // SPV-DAG: OpExtInst %bfloat16 {{%[0-9]+}} FMin
 // SPV-DAG: OpExtInst %bfloat16 {{%[0-9]+}} FMax
 // SPV-DAG: OpExtInst %bfloat16 {{%[0-9]+}} FClamp
+// SPV-DAG: OpExtInst %bfloat16 {{%[0-9]+}} Floor
+// SPV-DAG: OpExtInst %bfloat16 {{%[0-9]+}} Ceil
+// SPV-DAG: OpExtInst %bfloat16 {{%[0-9]+}} Sqrt
+
+// Conversions
+// SPV-DAG: OpFConvert %float %{{.*}}
 
 // Vector operations (verify vector types work with same opcodes)
 // SPV-DAG: OpFAdd %v4bfloat16
@@ -62,6 +68,12 @@ void computeMain()
     BFloat16 minVal = min(a, b);
     BFloat16 maxVal = max(a, b);
     BFloat16 clamped = clamp(a, b, BFloat16(float(outputBuffer[2])));
+    BFloat16 floorVal = floor(a);
+    BFloat16 ceilVal = ceil(a);
+    BFloat16 sqrtVal = sqrt(a);
+
+    // Conversion: BFloat16 -> float
+    float converted = float(a);
 
     use(int(float(sum)), 0);
     use(int(float(diff)), 1);
@@ -78,6 +90,10 @@ void computeMain()
     use(int(float(minVal)), 12);
     use(int(float(maxVal)), 13);
     use(int(float(clamped)), 14);
+    use(int(float(floorVal)), 15);
+    use(int(float(ceilVal)), 16);
+    use(int(float(sqrtVal)), 17);
+    use(int(converted), 18);
 
     // Vector4 operations
     vector<BFloat16, 4> va = vector<BFloat16, 4>(a, b, a, b);
@@ -88,8 +104,8 @@ void computeMain()
     let vprod = va * vb;
     let vneg = -va;
 
-    use(int(float(vsum[0])), 15);
-    use(int(float(vdiff[1])), 16);
-    use(int(float(vprod[2])), 17);
-    use(int(float(vneg[3])), 18);
+    use(int(float(vsum[0])), 19);
+    use(int(float(vdiff[1])), 20);
+    use(int(float(vprod[2])), 21);
+    use(int(float(vneg[3])), 22);
 }

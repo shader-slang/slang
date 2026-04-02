@@ -63,6 +63,7 @@ void ShaderExtensionTracker::requireBaseTypeExtension(BaseType baseType)
             break;
         }
     case BaseType::Half:
+    case BaseType::BFloat16:
     case BaseType::UInt16:
     case BaseType::Int16:
         {

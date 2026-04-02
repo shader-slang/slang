@@ -5812,7 +5812,8 @@ Expr* SemanticsExprVisitor::visitFloatBitCastExpr(FloatBitCastExpr* expr)
         switch (basicType->getBaseType())
         {
         case BaseType::Half:
-            floatBaseType = BaseType::Half;
+        case BaseType::BFloat16:
+            floatBaseType = basicType->getBaseType();
             resultType = m_astBuilder->getInt16Type();
             break;
         case BaseType::Float:
@@ -5832,7 +5833,7 @@ Expr* SemanticsExprVisitor::visitFloatBitCastExpr(FloatBitCastExpr* expr)
     {
         getSink()->diagnose(Diagnostics::FloatBitCastTypeMismatch{
             .intrinsic = "__floatAsInt",
-            .expectedType = "half, float, or double",
+            .expectedType = "half, float, double, or BFloat16",
             .expr = expr});
         expr->type = m_astBuilder->getErrorType();
         return expr;

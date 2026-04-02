@@ -176,6 +176,7 @@ IROp getTypeStyle(BaseType op)
     case BaseType::Half:
     case BaseType::Float:
     case BaseType::Double:
+    case BaseType::BFloat16:
         return kIROp_FloatType;
     default:
         return kIROp_Invalid;
