@@ -19,8 +19,10 @@
 # as "<unknown module>"; the second pattern catches those.
 # WARNING: "leak:<unknown module>" is broad -- it suppresses leaks from ANY
 # module where LSan cannot resolve symbols (not just slang-llvm). This is a
-# known trade-off; narrowing it requires LSan to reliably resolve module
-# names for non-instrumented shared libraries.
+# known trade-off.
+# TODO: Periodically re-validate without this suppression and replace it with a
+# narrower module or function-based pattern once LSan can resolve the relevant
+# non-instrumented shared-library frames reliably.
 leak:libslang-llvm
 leak:<unknown module>
 

@@ -11,6 +11,9 @@ jobs:
     uses: ./.github/workflows/ci-slang-sanitizer.yml
     with:
       runs-on: '["ubuntu-22.04"]'
+      # Keep nightly on smoke for now: this runs on a GitHub-hosted CPU runner
+      # with the sanitizer workflow's 120-minute budget, while broader full
+      # coverage already exists in the regular GPU/container CI jobs.
       test-category: smoke
       server-count: 8
     secrets: inherit
