@@ -4516,6 +4516,13 @@ err(
     span { loc = "location", message = "Cannot dynamically dispatch on potentially uninitialized interface object '~object'." }
 )
 
+err(
+    "interface-typed-entry-point-param-not-supported",
+    50104,
+    "interface-typed entry point parameter not supported",
+    span { loc = "location", message = "Interface-typed entry point parameter of type '~interfaceType' is not supported on the current target. Use a concrete type or a different target." }
+)
+
 standalone_note(
     "dynamic-dispatch-code-generated-here",
     50102,

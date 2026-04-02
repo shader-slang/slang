@@ -3120,10 +3120,11 @@ struct TypeFlowSpecializationContext
     }
 
     // Check if an existential operand is an entry-point parameter of interface type
-    // that has no registered conformances. If so, emit error 50100.
-    // This catches targets (like CUDA compute) that skip collectEntryPointUniformParams
-    // and moveEntryPointUniformParamsToGlobalScope, leaving interface-typed params
-    // as plain IRParam without typeflow info.
+    // that lacks typeflow info. This catches targets (like CUDA compute) that skip
+    // collectEntryPointUniformParams and moveEntryPointUniformParamsToGlobalScope,
+    // leaving interface-typed params as plain IRParam without typeflow info.
+    // Emits E50100 when no conformances are registered, or E50104 when conformances
+    // exist but the target cannot handle interface-typed entry-point params.
     void diagnoseEntryPointInterfaceParamIfNeeded(IRParam* param, IRInst* inst)
     {
         auto interfaceType = as<IRInterfaceType>(param->getDataType());
@@ -3135,14 +3136,21 @@ struct TypeFlowSpecializationContext
         if (!paramFunc || !paramFunc->findDecoration<IREntryPointDecoration>())
             return;
 
+        diagnosedEntryPointInterfaceParams.add(param);
+        StringBuilder typeStr;
+        printDiagnosticArg(typeStr, interfaceType);
+
         HashSet<IRInst*>& tables = *module->getContainerPool().getHashSet<IRInst>();
         collectExistentialTables(interfaceType, tables);
         if (tables.getCount() == 0)
         {
-            diagnosedEntryPointInterfaceParams.add(param);
-            StringBuilder typeStr;
-            printDiagnosticArg(typeStr, interfaceType);
             sink->diagnose(Diagnostics::NoTypeConformancesFoundForInterface{
+                .interfaceType = typeStr.produceString(),
+                .location = inst->sourceLoc});
+        }
+        else
+        {
+            sink->diagnose(Diagnostics::InterfaceTypedEntryPointParamNotSupported{
                 .interfaceType = typeStr.produceString(),
                 .location = inst->sourceLoc});
         }
