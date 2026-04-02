@@ -11533,8 +11533,17 @@ static bool _astTypeIncludesDynamicDispatch(
             for (auto field : structDecl->getFields())
             {
                 visitor->ensureDecl(field, DeclCheckState::CanUseTypeOfValueDecl);
-                if (field->type.type &&
-                    _astTypeIncludesDynamicDispatch(visitor, field->type.type, seenDecls))
+                // Use getMemberDeclRef + getType to apply generic substitutions,
+                // so that e.g. Box<IFoo> with field `T item` resolves T to IFoo.
+                auto fieldDeclRef =
+                    visitor->getASTBuilder()
+                        ->getMemberDeclRef(structType->getDeclRef(), field)
+                        .as<VarDeclBase>();
+                auto fieldType =
+                    fieldDeclRef ? getType(visitor->getASTBuilder(), fieldDeclRef)
+                                : field->type.type;
+                if (fieldType &&
+                    _astTypeIncludesDynamicDispatch(visitor, fieldType, seenDecls))
                     return true;
             }
             seenDecls.remove(structDecl);

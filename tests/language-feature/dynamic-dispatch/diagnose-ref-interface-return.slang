@@ -106,6 +106,112 @@ struct ContainerOptionalRef
     }
 }
 
+// Scenario 6: Generic struct with interface type parameter.
+// The check must apply generic substitutions to see through Box<IFoo>.
+struct Box<T>
+{
+    T item;
+}
+
+struct ContainerGenericRef
+{
+    Box<IFoo> b;
+    property Box<IFoo> val
+    {
+        get { return b; }
+        ref { return b; }
+//CHECK:^^^ ref accessor incompatible with dynamic dispatch
+//CHECK:^^^ 'ref' accessor returning type 'Box<IFoo>' is incompatible with dynamic dispatch because interface types require AnyValue marshalling.
+    }
+}
+
+// Scenario 7: Array of interface type.
+struct ContainerArrayRef
+{
+    IFoo arr[4];
+    property IFoo[4] val
+    {
+        get { return arr; }
+        ref { return arr; }
+//CHECK:^^^ ref accessor incompatible with dynamic dispatch
+//CHECK:^^^ 'ref' accessor returning type 'IFoo[4]' is incompatible with dynamic dispatch because interface types require AnyValue marshalling.
+    }
+}
+
+// Scenario 8: Nested depth > 1 (struct containing struct containing interface).
+struct Inner
+{
+    IFoo item;
+}
+
+struct Outer
+{
+    Inner inner;
+}
+
+struct ContainerNestedRef
+{
+    Outer o;
+    property Outer val
+    {
+        get { return o; }
+        ref { return o; }
+//CHECK:^^^ ref accessor incompatible with dynamic dispatch
+//CHECK:^^^ 'ref' accessor returning type 'Outer' is incompatible with dynamic dispatch because interface types require AnyValue marshalling.
+    }
+}
+
+// --- Positive tests: these should NOT produce error 52012 ---
+
+// Positive 1: ref accessor on a concrete (non-interface) type is fine.
+struct ContainerConcreteRef
+{
+    float stored;
+    property float val
+    {
+        get { return stored; }
+        ref { return stored; }
+    }
+}
+
+// Positive 2: get-only accessor on interface type is fine (no ref).
+struct ContainerGetOnly
+{
+    IFoo stored;
+    property IFoo val
+    {
+        get { return stored; }
+    }
+}
+
+// Positive 3: set accessor (nonmutating) on interface type is fine.
+struct ContainerSetOnly
+{
+    IFoo stored;
+    property IFoo val
+    {
+        get { return stored; }
+        set { stored = newValue; }
+    }
+}
+
+// Positive 4: COM interface with ref accessor is fine (COM uses vtable, not AnyValue).
+[COM("BE18F5D2-4522-4AB0-A6EE-1D157FA2B084")]
+interface ICom
+{
+    float getValue();
+}
+
+struct ContainerComRef
+{
+    ICom stored;
+    property ICom val
+    {
+        get { return stored; }
+        ref { return stored; }
+    }
+}
+
 // CHECK-NOT: error 52012
 
 IFoo factory(uint id)
