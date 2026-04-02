@@ -125,7 +125,11 @@ jobs:
         if: inputs.platform == 'wasm'
         run: |
           npm install -g typescript@5.9.3
-          tsc --version
+          TS_VERSION="$(tsc --version | awk '{print $2}')"  
+          if [[ "$TS_VERSION" != "5.9.3" ]]; then  
+            echo "Expected TypeScript 5.9.3, got ${TS_VERSION}"  
+            exit 1  
+          fi  
 
       - name: Build Slang
         run: |
