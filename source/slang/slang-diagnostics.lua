@@ -4600,6 +4600,13 @@ err(
     span { loc = "location", message = "'~paramKind' parameter of type '~paramType:IRInst' cannot be used in a dynamic dispatch context." }
 )
 
+err(
+    "ref-accessor-with-interface-type-in-dynamic-dispatch",
+    52012,
+    "ref accessor incompatible with dynamic dispatch",
+    span { loc = "location", message = "'ref' accessor returning type '~valueType:Type' is incompatible with dynamic dispatch because interface types require AnyValue marshalling." }
+)
+
 warning(
     "mesh-output-must-be-out",
     54001,
