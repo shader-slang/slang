@@ -301,10 +301,10 @@ if(SLANG_ENABLE_SLANG_RHI)
     set(SLANG_RHI_ENABLE_NVAPI ${SLANG_ENABLE_NVAPI})
 
     # CoopVec requires the preview Agility SDK that supports SM 6.10
-    set(SLANG_RHI_AGILITY_SDK_VERSION D3D12_PREVIEW_SDK_VERSION)
-    set(SLANG_RHI_AGILITY_SDK_URL
-        "https://www.nuget.org/api/v2/package/Microsoft.Direct3D.D3D12/1.719.1-preview"
-    )
+    #set(SLANG_RHI_AGILITY_SDK_VERSION D3D12_PREVIEW_SDK_VERSION)
+    #set(SLANG_RHI_AGILITY_SDK_URL
+    #"https://www.nuget.org/api/v2/package/Microsoft.Direct3D.D3D12/1.719.1-preview"
+    #)
 
     if(SLANG_ENABLE_DX_ON_VK)
         set(SLANG_RHI_HAS_D3D12 ON)
