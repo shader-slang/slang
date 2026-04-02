@@ -39,11 +39,13 @@ jobs:
           fetch-depth: "0"
 
       - name: Compute PR changed files
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            base_sha="${{ github.event.pull_request.base.sha }}"
-            echo "Computing diff against PR base: $base_sha"
-            git diff --name-only "$base_sha"...HEAD > /tmp/pr-changed-files.txt
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            echo "Computing diff against PR base: $BASE_SHA"
+            git diff --name-only "$BASE_SHA"...HEAD > /tmp/pr-changed-files.txt
             changed_count=$(wc -l < /tmp/pr-changed-files.txt)
             echo "PR touches $changed_count file(s)"
             cat /tmp/pr-changed-files.txt
@@ -221,6 +223,8 @@ jobs:
 
       - name: Sanitizer Summary
         if: always()
+        env:
+          BUILD_OUTCOME: ${{ steps.build.outcome }}
         run: |
           echo ""
           echo "========================================"
@@ -288,6 +292,10 @@ jobs:
                     break
                   fi
                 done <<< "$log_paths"
+              elif $has_pr_changed_files && [ -z "$log_paths" ]; then
+                # No parseable paths -- cannot attribute; treat as PR-related
+                # to be conservative (add to expected-findings if benign)
+                is_pr_related=true
               elif ! $has_pr_changed_files; then
                 # Not a PR (push to master, etc.) -- treat all findings as errors
                 is_pr_related=true
@@ -440,7 +448,7 @@ jobs:
               echo "Passing: $expected_count expected, $preexisting_count pre-existing finding(s)."
             fi
           else
-            if [ "${{ steps.build.outcome }}" != "success" ]; then
+            if [ "$BUILD_OUTCOME" != "success" ]; then
               echo "Build failed -- sanitizer results unavailable."
               echo ""
               echo "## Sanitizer Report" >> "$GITHUB_STEP_SUMMARY"
