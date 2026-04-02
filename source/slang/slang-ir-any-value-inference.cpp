@@ -137,23 +137,14 @@ bool hasDependencyPath(
     return false;
 }
 
-void inferAnyValueSizeWhereNecessary(
+// Helper: collect interface types and their implementations from the module.
+// Shared between diagnoseCircularConformances and inferAnyValueSizeWhereNecessary.
+static void collectInterfaceTypesAndImplementations(
     IRModule* module,
-    TargetProgram* targetProgram,
-    DiagnosticSink* sink)
+    HashSet<IRInterfaceType*>& interfaceTypes,
+    Dictionary<IRInterfaceType*, List<IRInst*>>& mapInterfaceToImplementations)
 {
-    // Go through the global insts and collect all interface types.
-    // For each interface type, infer its any-value-size, by looking up
-    // all witness tables whose conformance type matches the interface type.
-    // then using _calcNaturalSizeAndAlignment to find the max size.
-    //
-    // Note: we only infer any-value-size for interface types that are used
-    // as a generic type parameter, because we don't want to infer any-value-size
-    // for interface types that are used as a witness table type.
-    //
-
     HashSet<IRInst*> implementedInterfaces;
-    // Add all interface type that are implemented by at least one type to a set.
     for (auto inst : module->getGlobalInsts())
     {
         if (inst->getOp() == kIROp_WitnessTable)
@@ -164,28 +155,18 @@ void inferAnyValueSizeWhereNecessary(
         }
     }
 
-    // Collect all interface types that require inference.
-    HashSet<IRInterfaceType*> interfaceTypes;
     for (auto inst : module->getGlobalInsts())
     {
         if (inst->getOp() == kIROp_InterfaceType)
         {
             auto interfaceType = cast<IRInterfaceType>(inst);
 
-            // Do not infer anything for COM interfaces.
             if (isComInterfaceType((IRType*)interfaceType))
                 continue;
 
-            // Also skip builtin types.
             if (interfaceType->findDecoration<IRBuiltinDecoration>())
                 continue;
 
-            /* If the interface already has an explicit any-value-size, don't infer anything.
-            if (interfaceType->findDecoration<IRAnyValueSizeDecoration>())
-                continue;
-            */
-
-            // Skip interfaces that are not implemented by any type.
             if (!implementedInterfaces.contains(interfaceType))
                 continue;
 
@@ -193,13 +174,9 @@ void inferAnyValueSizeWhereNecessary(
         }
     }
 
-    Dictionary<IRInterfaceType*, List<IRInst*>> mapInterfaceToImplementations;
-
-    // Collect all concrete types that conform to this interface type.
     for (auto interfaceType : interfaceTypes)
     {
         IRWitnessTableType* witnessTableType = nullptr;
-        // Find witness table type corresponding to this interface.
         for (auto use = interfaceType->firstUse; use; use = use->nextUse)
         {
             if (auto _witnessTableType = as<IRWitnessTableType>(use->getUser()))
@@ -213,14 +190,9 @@ void inferAnyValueSizeWhereNecessary(
             }
         }
 
-        // If we hit this case, we have an interface without any conforming implementations.
-        // This case should be handled before this point.
-        //
         SLANG_ASSERT(witnessTableType);
 
         List<IRInst*> implList;
-
-        // Walk through all the uses of this witness table type to find the witness tables.
         for (auto use = witnessTableType->firstUse; use; use = use->nextUse)
         {
             auto witnessTable = as<IRWitnessTable>(use->getUser());
@@ -229,24 +201,29 @@ void inferAnyValueSizeWhereNecessary(
 
             auto concreteImpl = witnessTable->getConcreteType();
 
-            // Only consider implementations at the top-level (ignore those nested
-            // in generics)
-            //
             if (concreteImpl->getParent() == module->getModuleInst())
                 implList.add(concreteImpl);
         }
 
         mapInterfaceToImplementations.add(interfaceType, implList);
     }
+}
+
+void diagnoseCircularConformances(
+    IRModule* module,
+    DiagnosticSink* sink)
+{
+    HashSet<IRInterfaceType*> interfaceTypes;
+    Dictionary<IRInterfaceType*, List<IRInst*>> mapInterfaceToImplementations;
+    collectInterfaceTypesAndImplementations(module, interfaceTypes, mapInterfaceToImplementations);
+
+    if (interfaceTypes.getCount() == 0)
+        return;
 
     Dictionary<IRInterfaceType*, HashSet<IRInterfaceType*>> interfaceDependencyMap;
-    // Track which implementations have self-referential dependencies on their own interface.
     Dictionary<IRInterfaceType*, List<IRInst*>> selfReferentialImpls;
     Dictionary<IRInterfaceType*, List<IRInst*>> nonSelfReferentialImpls;
-    // Interfaces where ALL impls are self-referential (no base case for size inference).
-    HashSet<IRInterfaceType*> fullyCircularInterfaces;
 
-    // Collect dependencies for each interface, separating self-referential implementations.
     for (auto interfaceType : interfaceTypes)
     {
         HashSet<IRInterfaceType*> dependencySet;
@@ -260,13 +237,9 @@ void inferAnyValueSizeWhereNecessary(
             for (auto dependency : dependencies)
             {
                 if (dependency == interfaceType)
-                {
                     hasSelfReference = true;
-                }
                 else
-                {
                     dependencySet.add(dependency);
-                }
             }
 
             if (hasSelfReference)
@@ -279,10 +252,7 @@ void inferAnyValueSizeWhereNecessary(
         selfReferentialImpls.add(interfaceType, selfRefList);
         nonSelfReferentialImpls.add(interfaceType, nonSelfRefList);
 
-        // Diagnose each self-referential implementation: a struct that conforms to
-        // an interface and contains a field of that same interface type creates an
-        // inherently unsatisfiable layout constraint (the struct must be larger than
-        // the AnyValue it contains, but the AnyValue must fit the struct).
+        // Diagnose each self-referential implementation.
         for (auto impl : selfRefList)
         {
             sink->diagnose(Diagnostics::CircularConformance{
@@ -292,27 +262,12 @@ void inferAnyValueSizeWhereNecessary(
             });
         }
 
-        // If ALL implementations are self-referential, there's no base case and
-        // AnyValue size cannot be calculated at all.
         if (nonSelfRefList.getCount() == 0 && selfRefList.getCount() > 0)
         {
             sink->diagnose(Diagnostics::CyclicInterfaceDependency{
                 .interfaceType = interfaceType,
             });
-            fullyCircularInterfaces.add(interfaceType);
         }
-    }
-
-    // Track all implementations diagnosed with CircularConformance so we can
-    // exclude them from the confusing "does not fit" (E41011) diagnostic later,
-    // and avoid diagnosing the same impl twice.
-    HashSet<IRInst*> cyclicImpls;
-
-    // Record self-referential impls that were already diagnosed above.
-    for (auto interfaceType : interfaceTypes)
-    {
-        for (auto impl : selfReferentialImpls[interfaceType])
-            cyclicImpls.add(impl);
     }
 
     // Diagnose non-self-referential implementations that participate in
@@ -335,6 +290,85 @@ void inferAnyValueSizeWhereNecessary(
                         .interfaceType = interfaceType,
                         .location = impl->sourceLoc,
                     });
+                    break;
+                }
+            }
+        }
+    }
+}
+
+void inferAnyValueSizeWhereNecessary(
+    IRModule* module,
+    TargetProgram* targetProgram,
+    DiagnosticSink* sink)
+{
+    HashSet<IRInterfaceType*> interfaceTypes;
+    Dictionary<IRInterfaceType*, List<IRInst*>> mapInterfaceToImplementations;
+    collectInterfaceTypesAndImplementations(module, interfaceTypes, mapInterfaceToImplementations);
+
+    if (interfaceTypes.getCount() == 0)
+        return;
+
+    Dictionary<IRInterfaceType*, HashSet<IRInterfaceType*>> interfaceDependencyMap;
+    Dictionary<IRInterfaceType*, List<IRInst*>> selfReferentialImpls;
+    Dictionary<IRInterfaceType*, List<IRInst*>> nonSelfReferentialImpls;
+    HashSet<IRInterfaceType*> fullyCircularInterfaces;
+
+    // Collect dependencies for each interface, separating self-referential implementations.
+    for (auto interfaceType : interfaceTypes)
+    {
+        HashSet<IRInterfaceType*> dependencySet;
+        List<IRInst*> selfRefList;
+        List<IRInst*> nonSelfRefList;
+
+        for (auto impl : mapInterfaceToImplementations[interfaceType])
+        {
+            auto dependencies = findDependenciesOfTypeInSet((IRType*)impl, interfaceTypes);
+            bool hasSelfReference = false;
+            for (auto dependency : dependencies)
+            {
+                if (dependency == interfaceType)
+                    hasSelfReference = true;
+                else
+                    dependencySet.add(dependency);
+            }
+
+            if (hasSelfReference)
+                selfRefList.add(impl);
+            else
+                nonSelfRefList.add(impl);
+        }
+
+        interfaceDependencyMap.add(interfaceType, dependencySet);
+        selfReferentialImpls.add(interfaceType, selfRefList);
+        nonSelfReferentialImpls.add(interfaceType, nonSelfRefList);
+
+        if (nonSelfRefList.getCount() == 0 && selfRefList.getCount() > 0)
+            fullyCircularInterfaces.add(interfaceType);
+    }
+
+    // Track cyclic implementations to exclude from "does not fit" diagnostics.
+    HashSet<IRInst*> cyclicImpls;
+
+    for (auto interfaceType : interfaceTypes)
+    {
+        for (auto impl : selfReferentialImpls[interfaceType])
+            cyclicImpls.add(impl);
+    }
+
+    for (auto interfaceType : interfaceTypes)
+    {
+        for (auto impl : nonSelfReferentialImpls[interfaceType])
+        {
+            auto deps = findDependenciesOfTypeInSet((IRType*)impl, interfaceTypes);
+            for (auto dep : deps)
+            {
+                if (dep == interfaceType)
+                    continue;
+
+                HashSet<IRInterfaceType*> visited;
+                if (hasDependencyPath(dep, interfaceType, interfaceDependencyMap, visited))
+                {
                     cyclicImpls.add(impl);
                     break;
                 }
@@ -343,22 +377,17 @@ void inferAnyValueSizeWhereNecessary(
     }
 
     // Sort the interface types in topological order.
-    // This is necessary because we need to infer the any-value-size of an interface type
-    // before we infer the any-value-size of an interface type that depends on it.
-    // Note: Self-references are excluded from dependencySet so they don't break the sort.
-    //
     List<IRInterfaceType*> sortedInterfaceTypes = sortTopologically(
         interfaceTypes,
         [&](IRInterfaceType* interfaceType) { return interfaceDependencyMap[interfaceType]; });
 
     for (auto interfaceType : sortedInterfaceTypes)
     {
-        // Skip interfaces where all impls are circular — size inference is impossible
-        // and we already emitted CyclicInterfaceDependency.
+        // Skip interfaces where all impls are circular — size inference is impossible.
         if (fullyCircularInterfaces.contains(interfaceType))
             continue;
 
-        IRIntegerValue existingMaxSize = (IRIntegerValue)kMaxInt; // Default to max int.
+        IRIntegerValue existingMaxSize = (IRIntegerValue)kMaxInt;
         if (auto existingAnyValueDecor = interfaceType->findDecoration<IRAnyValueSizeDecoration>())
         {
             existingMaxSize = existingAnyValueDecor->getSize();
@@ -366,8 +395,7 @@ void inferAnyValueSizeWhereNecessary(
 
         IRIntegerValue maxAnyValueSize = -1;
 
-        // First pass: Calculate size from non-self-referential implementations.
-        // This establishes the base AnyValue size for the interface.
+        // Calculate size from non-cyclic implementations.
         for (auto implType : nonSelfReferentialImpls[interfaceType])
         {
             if (cyclicImpls.contains(implType))

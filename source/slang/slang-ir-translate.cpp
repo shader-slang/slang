@@ -365,8 +365,7 @@ IRInst* _resolveInstRec(TranslationContext* ctx, IRInst* inst)
     // If we still have something that's not in the global scope, then something went wrong.
     // since all operations after this point require this.
     //
-    if (!as<IRModuleInst>(instWithCanonicalOperands->getParent()))
-        return instWithCanonicalOperands;
+    SLANG_ASSERT(as<IRModuleInst>(instWithCanonicalOperands->getParent()));
 
     // TODO: Group these.
     if (as<IRTranslateBase>(instWithCanonicalOperands) ||

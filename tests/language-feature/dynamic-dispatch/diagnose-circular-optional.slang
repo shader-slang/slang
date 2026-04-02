@@ -5,9 +5,8 @@
 // packing the interface value, creating the same circular dependency as a
 // direct interface field.
 //
-// Note: Optional<INode> is lowered to a TaggedUnionType in IR, so the error
-// manifests as "cannot be packed" (41014) rather than "circular conformance"
-// (41003). Both errors correctly reject the unsatisfiable layout.
+// The early circular conformance detection sees through Optional to find
+// the INode dependency, so this now correctly produces E41003.
 
 //TEST:SIMPLE(filecheck=CHECK): -target spirv
 
@@ -23,7 +22,7 @@ struct LeafNode : INode
     float getValue() { return value; }
 }
 
-// CHECK: error[E41014]: type cannot be packed for dynamic dispatch
+// CHECK: error[E41003]
 struct LinkedNode : INode
 {
     float value;

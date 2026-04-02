@@ -1152,6 +1152,15 @@ Result linkAndOptimizeIR(
     // single pass that looks for all simplification opportunities.
     //
 
+    // Diagnose circular interface conformances before specialization.
+    // Circular conformance IR (e.g. a struct implementing IFoo that contains
+    // an IFoo field) produces IR that the translation/specialization passes
+    // cannot handle. Detecting and reporting this early avoids crashes in
+    // downstream passes.
+    SLANG_PASS(diagnoseCircularConformances, sink);
+    if (sink->getErrorCount() != 0)
+        return SLANG_FAIL;
+
     if (!codeGenContext->isSpecializationDisabled())
     {
         SpecializationOptions specOptions;
