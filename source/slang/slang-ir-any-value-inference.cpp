@@ -158,6 +158,7 @@ void diagnoseCircularConformances(IRModule* module, DiagnosticSink* sink)
     // other interfaces that any of its implementations depend on.
     Dictionary<IRInterfaceType*, HashSet<IRInterfaceType*>> dependencyMap;
     Dictionary<IRInterfaceType*, List<IRInst*>> implMap;
+    Dictionary<IRInst*, List<IRInterfaceType*>> implDeps;
 
     for (auto interfaceType : interfaceTypes)
     {
@@ -180,8 +181,11 @@ void diagnoseCircularConformances(IRModule* module, DiagnosticSink* sink)
                     continue;
 
                 impls.add(impl);
-                for (auto dep : findDependenciesOfTypeInSet((IRType*)impl, interfaceTypes))
+                auto depsForImpl = findDependenciesOfTypeInSet((IRType*)impl, interfaceTypes);
+                for (auto dep : depsForImpl)
                     deps.add(dep);
+                if (!implDeps.containsKey(impl))
+                    implDeps.add(impl, depsForImpl);
             }
         }
 
@@ -198,7 +202,7 @@ void diagnoseCircularConformances(IRModule* module, DiagnosticSink* sink)
 
         for (auto impl : implMap[interfaceType])
         {
-            auto deps = findDependenciesOfTypeInSet((IRType*)impl, interfaceTypes);
+            auto& deps = implDeps[impl];
             for (auto dep : deps)
             {
                 HashSet<IRInterfaceType*> visited;
@@ -224,8 +228,8 @@ void diagnoseCircularConformances(IRModule* module, DiagnosticSink* sink)
     }
 }
 
-// inferAnyValueSizeWhereNecessary runs after diagnoseCircularConformances has
-// already rejected circular conformances. It only sees non-circular interfaces.
+// inferAnyValueSizeWhereNecessary only runs when diagnoseCircularConformances
+// has not reported errors, so circular conformances never reach this point.
 void inferAnyValueSizeWhereNecessary(
     IRModule* module,
     TargetProgram* targetProgram,
