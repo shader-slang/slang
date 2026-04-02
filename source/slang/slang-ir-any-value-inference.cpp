@@ -42,6 +42,8 @@ void _findDependenciesOfTypeInSet(
     case kIROp_RawPointerType:
     case kIROp_NativePtrType:
     case kIROp_ComPtrType:
+    case kIROp_PseudoPtrType:
+    case kIROp_RTTIPointerType:
     case kIROp_OutParamType:
     case kIROp_BorrowInOutParamType:
     case kIROp_RefParamType:
@@ -112,7 +114,7 @@ List<IRInterfaceType*> sortTopologically(
     return sortedInterfaceTypes;
 }
 
-bool hasDependencyPath(
+static bool hasDependencyPath(
     IRInterfaceType* source,
     IRInterfaceType* target,
     Dictionary<IRInterfaceType*, HashSet<IRInterfaceType*>>& dependencyMap,
@@ -137,123 +139,182 @@ bool hasDependencyPath(
     return false;
 }
 
-// Helper: collect interface types and their implementations from the module.
-// Shared between diagnoseCircularConformances and inferAnyValueSizeWhereNecessary.
-static void collectInterfaceTypesAndImplementations(
-    IRModule* module,
-    HashSet<IRInterfaceType*>& interfaceTypes,
-    Dictionary<IRInterfaceType*, List<IRInst*>>& mapInterfaceToImplementations)
-{
-    HashSet<IRInst*> implementedInterfaces;
-    for (auto inst : module->getGlobalInsts())
-    {
-        if (inst->getOp() == kIROp_WitnessTable)
-        {
-            auto interfaceType =
-                cast<IRWitnessTableType>(inst->getDataType())->getConformanceType();
-            implementedInterfaces.add(interfaceType);
-        }
-    }
-
-    for (auto inst : module->getGlobalInsts())
-    {
-        if (inst->getOp() == kIROp_InterfaceType)
-        {
-            auto interfaceType = cast<IRInterfaceType>(inst);
-
-            if (isComInterfaceType((IRType*)interfaceType))
-                continue;
-
-            if (interfaceType->findDecoration<IRBuiltinDecoration>())
-                continue;
-
-            if (!implementedInterfaces.contains(interfaceType))
-                continue;
-
-            interfaceTypes.add(interfaceType);
-        }
-    }
-
-    for (auto interfaceType : interfaceTypes)
-    {
-        IRWitnessTableType* witnessTableType = nullptr;
-        for (auto use = interfaceType->firstUse; use; use = use->nextUse)
-        {
-            if (auto _witnessTableType = as<IRWitnessTableType>(use->getUser()))
-            {
-                if (_witnessTableType->getConformanceType() == interfaceType &&
-                    _witnessTableType->hasUses())
-                {
-                    witnessTableType = _witnessTableType;
-                    break;
-                }
-            }
-        }
-
-        SLANG_ASSERT(witnessTableType);
-
-        List<IRInst*> implList;
-        for (auto use = witnessTableType->firstUse; use; use = use->nextUse)
-        {
-            auto witnessTable = as<IRWitnessTable>(use->getUser());
-            if (!witnessTable || witnessTable->getDataType() != witnessTableType)
-                continue;
-
-            auto concreteImpl = witnessTable->getConcreteType();
-
-            if (concreteImpl->getParent() == module->getModuleInst())
-                implList.add(concreteImpl);
-        }
-
-        mapInterfaceToImplementations.add(interfaceType, implList);
-    }
-}
-
-void diagnoseCircularConformances(
-    IRModule* module,
-    DiagnosticSink* sink)
+// Shared dependency analysis used by both diagnoseCircularConformances and
+// inferAnyValueSizeWhereNecessary.
+struct InterfaceDependencyAnalysis
 {
     HashSet<IRInterfaceType*> interfaceTypes;
     Dictionary<IRInterfaceType*, List<IRInst*>> mapInterfaceToImplementations;
-    collectInterfaceTypesAndImplementations(module, interfaceTypes, mapInterfaceToImplementations);
-
-    if (interfaceTypes.getCount() == 0)
-        return;
-
     Dictionary<IRInterfaceType*, HashSet<IRInterfaceType*>> interfaceDependencyMap;
     Dictionary<IRInterfaceType*, List<IRInst*>> selfReferentialImpls;
     Dictionary<IRInterfaceType*, List<IRInst*>> nonSelfReferentialImpls;
+    HashSet<IRInterfaceType*> fullyCircularInterfaces;
+    HashSet<IRInst*> cyclicImpls;
 
-    for (auto interfaceType : interfaceTypes)
+    // Collect interface types, their implementations, classify dependencies,
+    // and identify cyclic implementations.
+    void analyze(IRModule* module)
     {
-        HashSet<IRInterfaceType*> dependencySet;
-        List<IRInst*> selfRefList;
-        List<IRInst*> nonSelfRefList;
+        collectInterfaceTypesAndImplementations(module);
 
-        for (auto impl : mapInterfaceToImplementations[interfaceType])
+        if (interfaceTypes.getCount() == 0)
+            return;
+
+        classifyDependencies();
+        findCyclicImpls();
+    }
+
+private:
+    void collectInterfaceTypesAndImplementations(IRModule* module)
+    {
+        HashSet<IRInst*> implementedInterfaces;
+        for (auto inst : module->getGlobalInsts())
         {
-            auto dependencies = findDependenciesOfTypeInSet((IRType*)impl, interfaceTypes);
-            bool hasSelfReference = false;
-            for (auto dependency : dependencies)
+            if (inst->getOp() == kIROp_WitnessTable)
             {
-                if (dependency == interfaceType)
-                    hasSelfReference = true;
-                else
-                    dependencySet.add(dependency);
+                auto interfaceType =
+                    cast<IRWitnessTableType>(inst->getDataType())->getConformanceType();
+                implementedInterfaces.add(interfaceType);
             }
-
-            if (hasSelfReference)
-                selfRefList.add(impl);
-            else
-                nonSelfRefList.add(impl);
         }
 
-        interfaceDependencyMap.add(interfaceType, dependencySet);
-        selfReferentialImpls.add(interfaceType, selfRefList);
-        nonSelfReferentialImpls.add(interfaceType, nonSelfRefList);
+        for (auto inst : module->getGlobalInsts())
+        {
+            if (inst->getOp() == kIROp_InterfaceType)
+            {
+                auto interfaceType = cast<IRInterfaceType>(inst);
 
-        // Diagnose each self-referential implementation.
-        for (auto impl : selfRefList)
+                if (isComInterfaceType((IRType*)interfaceType))
+                    continue;
+
+                if (interfaceType->findDecoration<IRBuiltinDecoration>())
+                    continue;
+
+                if (!implementedInterfaces.contains(interfaceType))
+                    continue;
+
+                interfaceTypes.add(interfaceType);
+            }
+        }
+
+        for (auto interfaceType : interfaceTypes)
+        {
+            IRWitnessTableType* witnessTableType = nullptr;
+            for (auto use = interfaceType->firstUse; use; use = use->nextUse)
+            {
+                if (auto _witnessTableType = as<IRWitnessTableType>(use->getUser()))
+                {
+                    if (_witnessTableType->getConformanceType() == interfaceType &&
+                        _witnessTableType->hasUses())
+                    {
+                        witnessTableType = _witnessTableType;
+                        break;
+                    }
+                }
+            }
+
+            SLANG_ASSERT(witnessTableType);
+
+            List<IRInst*> implList;
+            for (auto use = witnessTableType->firstUse; use; use = use->nextUse)
+            {
+                auto witnessTable = as<IRWitnessTable>(use->getUser());
+                if (!witnessTable || witnessTable->getDataType() != witnessTableType)
+                    continue;
+
+                auto concreteImpl = witnessTable->getConcreteType();
+
+                if (concreteImpl->getParent() == module->getModuleInst())
+                    implList.add(concreteImpl);
+            }
+
+            mapInterfaceToImplementations.add(interfaceType, implList);
+        }
+    }
+
+    void classifyDependencies()
+    {
+        for (auto interfaceType : interfaceTypes)
+        {
+            HashSet<IRInterfaceType*> dependencySet;
+            List<IRInst*> selfRefList;
+            List<IRInst*> nonSelfRefList;
+
+            for (auto impl : mapInterfaceToImplementations[interfaceType])
+            {
+                auto dependencies =
+                    findDependenciesOfTypeInSet((IRType*)impl, interfaceTypes);
+                bool hasSelfReference = false;
+                for (auto dependency : dependencies)
+                {
+                    if (dependency == interfaceType)
+                        hasSelfReference = true;
+                    else
+                        dependencySet.add(dependency);
+                }
+
+                if (hasSelfReference)
+                    selfRefList.add(impl);
+                else
+                    nonSelfRefList.add(impl);
+            }
+
+            interfaceDependencyMap.add(interfaceType, dependencySet);
+            selfReferentialImpls.add(interfaceType, selfRefList);
+            nonSelfReferentialImpls.add(interfaceType, nonSelfRefList);
+
+            if (nonSelfRefList.getCount() == 0 && selfRefList.getCount() > 0)
+                fullyCircularInterfaces.add(interfaceType);
+        }
+    }
+
+    void findCyclicImpls()
+    {
+        for (auto interfaceType : interfaceTypes)
+        {
+            for (auto impl : selfReferentialImpls[interfaceType])
+                cyclicImpls.add(impl);
+        }
+
+        for (auto interfaceType : interfaceTypes)
+        {
+            for (auto impl : nonSelfReferentialImpls[interfaceType])
+            {
+                auto deps =
+                    findDependenciesOfTypeInSet((IRType*)impl, interfaceTypes);
+                for (auto dep : deps)
+                {
+                    if (dep == interfaceType)
+                        continue;
+
+                    HashSet<IRInterfaceType*> visited;
+                    if (hasDependencyPath(
+                            dep,
+                            interfaceType,
+                            interfaceDependencyMap,
+                            visited))
+                    {
+                        cyclicImpls.add(impl);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+};
+
+void diagnoseCircularConformances(IRModule* module, DiagnosticSink* sink)
+{
+    InterfaceDependencyAnalysis analysis;
+    analysis.analyze(module);
+
+    if (analysis.interfaceTypes.getCount() == 0)
+        return;
+
+    // Diagnose each self-referential implementation.
+    for (auto interfaceType : analysis.interfaceTypes)
+    {
+        for (auto impl : analysis.selfReferentialImpls[interfaceType])
         {
             sink->diagnose(Diagnostics::CircularConformance{
                 .type = impl,
@@ -262,7 +323,8 @@ void diagnoseCircularConformances(
             });
         }
 
-        if (nonSelfRefList.getCount() == 0 && selfRefList.getCount() > 0)
+        if (analysis.nonSelfReferentialImpls[interfaceType].getCount() == 0 &&
+            analysis.selfReferentialImpls[interfaceType].getCount() > 0)
         {
             sink->diagnose(Diagnostics::CyclicInterfaceDependency{
                 .interfaceType = interfaceType,
@@ -272,26 +334,17 @@ void diagnoseCircularConformances(
 
     // Diagnose non-self-referential implementations that participate in
     // cross-interface cycles.
-    for (auto interfaceType : interfaceTypes)
+    for (auto interfaceType : analysis.interfaceTypes)
     {
-        for (auto impl : nonSelfReferentialImpls[interfaceType])
+        for (auto impl : analysis.nonSelfReferentialImpls[interfaceType])
         {
-            auto deps = findDependenciesOfTypeInSet((IRType*)impl, interfaceTypes);
-            for (auto dep : deps)
+            if (analysis.cyclicImpls.contains(impl))
             {
-                if (dep == interfaceType)
-                    continue;
-
-                HashSet<IRInterfaceType*> visited;
-                if (hasDependencyPath(dep, interfaceType, interfaceDependencyMap, visited))
-                {
-                    sink->diagnose(Diagnostics::CircularConformance{
-                        .type = impl,
-                        .interfaceType = interfaceType,
-                        .location = impl->sourceLoc,
-                    });
-                    break;
-                }
+                sink->diagnose(Diagnostics::CircularConformance{
+                    .type = impl,
+                    .interfaceType = interfaceType,
+                    .location = impl->sourceLoc,
+                });
             }
         }
     }
@@ -302,89 +355,22 @@ void inferAnyValueSizeWhereNecessary(
     TargetProgram* targetProgram,
     DiagnosticSink* sink)
 {
-    HashSet<IRInterfaceType*> interfaceTypes;
-    Dictionary<IRInterfaceType*, List<IRInst*>> mapInterfaceToImplementations;
-    collectInterfaceTypesAndImplementations(module, interfaceTypes, mapInterfaceToImplementations);
+    InterfaceDependencyAnalysis analysis;
+    analysis.analyze(module);
 
-    if (interfaceTypes.getCount() == 0)
+    if (analysis.interfaceTypes.getCount() == 0)
         return;
-
-    Dictionary<IRInterfaceType*, HashSet<IRInterfaceType*>> interfaceDependencyMap;
-    Dictionary<IRInterfaceType*, List<IRInst*>> selfReferentialImpls;
-    Dictionary<IRInterfaceType*, List<IRInst*>> nonSelfReferentialImpls;
-    HashSet<IRInterfaceType*> fullyCircularInterfaces;
-
-    // Collect dependencies for each interface, separating self-referential implementations.
-    for (auto interfaceType : interfaceTypes)
-    {
-        HashSet<IRInterfaceType*> dependencySet;
-        List<IRInst*> selfRefList;
-        List<IRInst*> nonSelfRefList;
-
-        for (auto impl : mapInterfaceToImplementations[interfaceType])
-        {
-            auto dependencies = findDependenciesOfTypeInSet((IRType*)impl, interfaceTypes);
-            bool hasSelfReference = false;
-            for (auto dependency : dependencies)
-            {
-                if (dependency == interfaceType)
-                    hasSelfReference = true;
-                else
-                    dependencySet.add(dependency);
-            }
-
-            if (hasSelfReference)
-                selfRefList.add(impl);
-            else
-                nonSelfRefList.add(impl);
-        }
-
-        interfaceDependencyMap.add(interfaceType, dependencySet);
-        selfReferentialImpls.add(interfaceType, selfRefList);
-        nonSelfReferentialImpls.add(interfaceType, nonSelfRefList);
-
-        if (nonSelfRefList.getCount() == 0 && selfRefList.getCount() > 0)
-            fullyCircularInterfaces.add(interfaceType);
-    }
-
-    // Track cyclic implementations to exclude from "does not fit" diagnostics.
-    HashSet<IRInst*> cyclicImpls;
-
-    for (auto interfaceType : interfaceTypes)
-    {
-        for (auto impl : selfReferentialImpls[interfaceType])
-            cyclicImpls.add(impl);
-    }
-
-    for (auto interfaceType : interfaceTypes)
-    {
-        for (auto impl : nonSelfReferentialImpls[interfaceType])
-        {
-            auto deps = findDependenciesOfTypeInSet((IRType*)impl, interfaceTypes);
-            for (auto dep : deps)
-            {
-                if (dep == interfaceType)
-                    continue;
-
-                HashSet<IRInterfaceType*> visited;
-                if (hasDependencyPath(dep, interfaceType, interfaceDependencyMap, visited))
-                {
-                    cyclicImpls.add(impl);
-                    break;
-                }
-            }
-        }
-    }
 
     // Sort the interface types in topological order.
     List<IRInterfaceType*> sortedInterfaceTypes = sortTopologically(
-        interfaceTypes,
-        [&](IRInterfaceType* interfaceType) { return interfaceDependencyMap[interfaceType]; });
+        analysis.interfaceTypes,
+        [&](IRInterfaceType* interfaceType)
+        { return analysis.interfaceDependencyMap[interfaceType]; });
 
     for (auto interfaceType : sortedInterfaceTypes)
     {
         // Skip interfaces where all impls are circular — size inference is impossible.
-        if (fullyCircularInterfaces.contains(interfaceType))
+        if (analysis.fullyCircularInterfaces.contains(interfaceType))
             continue;
 
         IRIntegerValue existingMaxSize = (IRIntegerValue)kMaxInt;
@@ -396,9 +382,9 @@ void inferAnyValueSizeWhereNecessary(
         IRIntegerValue maxAnyValueSize = -1;
 
         // Calculate size from non-cyclic implementations.
-        for (auto implType : nonSelfReferentialImpls[interfaceType])
+        for (auto implType : analysis.nonSelfReferentialImpls[interfaceType])
         {
-            if (cyclicImpls.contains(implType))
+            if (analysis.cyclicImpls.contains(implType))
                 continue;
 
             IRSizeAndAlignment sizeAndAlignment;
@@ -431,9 +417,8 @@ void inferAnyValueSizeWhereNecessary(
             builder.addAnyValueSizeDecoration(interfaceType, maxAnyValueSize);
         }
 
-        // All implementations may have been filtered out because they were
-        // diagnosed as cross-interface cycles. In that case there is nothing
-        // left to infer for this interface.
+        // All non-cyclic implementations may have been filtered out (e.g. all
+        // impls participate in cross-interface cycles). Nothing to infer.
         if (maxAnyValueSize < 0)
             continue;
 
@@ -456,4 +441,4 @@ void inferAnyValueSizeWhereNecessary(
         }
     }
 }
-}; // namespace Slang
+} // namespace Slang
