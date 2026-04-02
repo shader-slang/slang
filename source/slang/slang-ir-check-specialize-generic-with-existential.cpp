@@ -35,12 +35,6 @@ void addDecorationsForGenericsSpecializedWithExistentialsRec(IRInst* parent, Dia
                     case kIROp_ExtractExistentialWitnessTable:
                     case kIROp_MakeExistential:
                         {
-                            IRInst* specializationBase = specialize->getBase();
-                            if (auto generic = as<IRGeneric>(specializationBase))
-                                specializationBase = findInnerMostGenericReturnVal(generic);
-                            if (auto lookupWitness =
-                                    as<IRLookupWitnessMethod>(specialize->getBase()))
-                                specializationBase = lookupWitness->getRequirementKey();
                             IRBuilder builder(parent->getModule());
                             builder.addDecoration(
                                 specialize,

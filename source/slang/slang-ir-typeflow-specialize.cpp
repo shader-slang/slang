@@ -198,7 +198,8 @@ IRInst* getInvalidExistentialSpecializationTarget(IRInst* specializedValue)
         specializationBase = specialize->getBase();
 
     if (auto generic = as<IRGeneric>(specializationBase))
-        specializationBase = findInnerMostGenericReturnVal(generic);
+        if (auto retVal = findInnerMostGenericReturnVal(generic))
+            specializationBase = retVal;
 
     if (auto lookupWitness = as<IRLookupWitnessMethod>(specializationBase))
         specializationBase = lookupWitness->getRequirementKey();
