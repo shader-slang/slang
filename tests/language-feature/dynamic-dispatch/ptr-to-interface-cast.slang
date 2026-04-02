@@ -3,9 +3,9 @@
 // IFoo* are tested at runtime.
 //
 // The covariant cast is a bitcast: the pointer bits are preserved. Dispatching
-// through the resulting IFoo* only works when the pointed-to memory contains
-// a valid serialized existential (tag + AnyValue). Dereferencing an IFoo*
-// that points to concrete Foo memory is not yet supported (#10015).
+// through the resulting IFoo* works when the pointed-to memory contains a
+// valid serialized existential (tag + AnyValue). Dispatching through an
+// IFoo* that points directly at concrete Foo memory is not supported.
 
 // Runtime tests: dispatch through uniform IFoo*.
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cpu -compute -shaderobj -output-using-type

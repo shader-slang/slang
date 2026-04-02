@@ -19,7 +19,9 @@ Current limitations include:
   interface `I` can be implicitly converted to a pointer to `I` (e.g. `IFoo* p = &myStruct;`),
   provided both pointers share the same access qualifier, address space, and data layout. The
   conversion preserves the raw address via bitcast. Dereferencing the resulting interface pointer
-  for dynamic dispatch is not yet supported (see [#10015](https://github.com/shader-slang/slang/issues/10015)).
+  for dynamic dispatch works when the pointee memory contains a valid serialized existential
+  (tag + witness table + AnyValue); dispatching through an interface pointer that points directly
+  at concrete struct memory (without the existential header) is not supported.
 
 See also GitHub issue [#9061](https://github.com/shader-slang/slang/issues/9061).
 

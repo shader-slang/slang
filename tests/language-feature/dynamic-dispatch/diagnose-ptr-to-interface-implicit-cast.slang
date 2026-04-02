@@ -1,9 +1,10 @@
 // Covariant pointer conversion (Foo* -> IFoo* when Foo : IFoo) is allowed
 // as of #9962. The reverse (contravariant) direction is still rejected.
 //
-// Note: dereferencing the converted IFoo* and dispatching through it
-// (ip->getVal()) is not yet supported when pointing to concrete memory
-// rather than a serialized existential. See #10015.
+// Note: dispatching through an IFoo* that points directly at concrete
+// struct memory (not a serialized existential) is not supported.
+// See interface-ptr-deref-via-buffer-address.slang for dispatch through
+// properly serialized existentials.
 
 //TEST:SIMPLE(filecheck=CHECK): -target spirv
 
