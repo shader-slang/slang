@@ -131,7 +131,7 @@ const char* getShapePackTransformName(ShapePackTransformExpr* expr);
 struct SemanticsVisitor;
 
 List<ExtensionDecl*> const& getCandidateExtensions(
-    DeclRef<AggTypeDecl> const& declRef,
+    DeclRef<Decl> const& declRef,
     SemanticsVisitor* semantics);
 
 // Returns the members of `genericInnerDecl`'s enclosing generic decl.
@@ -181,6 +181,11 @@ inline FilteredMemberRefList<T> getMembersOfType(
         declRef.getDecl()->getDirectMemberDecls(),
         declRef,
         filterStyle);
+}
+
+inline bool hasDirectFuncType(DeclRef<CallableDecl> declRef)
+{
+    return declRef.getDecl()->funcType.type != nullptr;
 }
 
 void _foreachDirectOrExtensionMemberOfType(
@@ -380,6 +385,13 @@ inline Type* getType(ASTBuilder* astBuilder, DeclRef<TypeDefDecl> declRef)
 
 inline Type* getResultType(ASTBuilder* astBuilder, DeclRef<CallableDecl> declRef)
 {
+    if (hasDirectFuncType(declRef))
+    {
+        return as<FuncType>(
+                   declRef.substitute(astBuilder, declRef.getDecl()->funcType.type)->resolve())
+            ->getResultType();
+    }
+
     return declRef.substitute(astBuilder, declRef.getDecl()->returnType.type);
 }
 
@@ -401,6 +413,10 @@ inline FilteredMemberRefList<ParamDecl> getParameters(
 {
     return getMembersOfType<ParamDecl>(astBuilder, declRef);
 }
+
+std::tuple<Type*, ParamPassingMode> splitParameterTypeAndDirection(
+    ASTBuilder* astBuilder,
+    Type* paramTypeWithDirection);
 
 inline Decl* getInner(DeclRef<GenericDecl> declRef)
 {
@@ -472,6 +488,8 @@ NamespaceType* getNamespaceType(ASTBuilder* astBuilder, DeclRef<NamespaceDeclBas
 
 SamplerStateType* getSamplerStateType(ASTBuilder* astBuilder);
 
+ModifiedType* getTypeWithModifier(Type* baseType, Val* typeModifier);
+
 
 // Definitions that can't come earlier despite
 // being in templates, because gcc/clang get angry.
@@ -522,6 +540,7 @@ Module* getModule(Decl* decl);
 ContainerDecl* getParentDecl(Decl* decl);
 AggTypeDecl* getParentAggTypeDecl(Decl* decl);
 AggTypeDeclBase* getParentAggTypeDeclBase(Decl* decl);
+ExtensionDecl* getParentExtensionDecl(Decl* decl);
 FunctionDeclBase* getParentFunc(Decl* decl);
 
 /// Get the parent declref, skipping any generic decls in between.
