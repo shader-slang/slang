@@ -121,6 +121,13 @@ jobs:
           path: ir-version-check-artifact/
           retention-days: 1
 
+      - name: Install pinned TypeScript for WASM build
+        if: inputs.platform == 'wasm'
+        run: |
+          npm install -g typescript@5.6.3
+          npm install -g typescript@5.9.3
+          tsc --version
+
       - name: Build Slang
         run: |
           echo "cmake version: $(cmake --version)"
