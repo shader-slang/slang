@@ -5044,6 +5044,9 @@ struct TypeFlowSpecializationContext
         HashSet<IRInst*> processedSet;
         while (globalWorkList.hasItems())
         {
+            if (sink->getErrorCount() > 0)
+                break;
+
             auto globalInst = globalWorkList.dequeue();
 
             switch (globalInst->getOp())
@@ -5057,6 +5060,10 @@ struct TypeFlowSpecializationContext
                     hasChanges |= removeAnnotations(func);
                     hasChanges |= eliminateDeadCode(func);
                     hasChanges |= specializeFunc(func, globalWorkList);
+
+                    if (sink->getErrorCount() > 0)
+                        break;
+
                     hasChanges |= eliminateDeadCode(func);
                     hasChanges |= resolveTypesInFunc(func);
 
@@ -6339,12 +6346,18 @@ struct TypeFlowSpecializationContext
                     globalsWorkList.enqueue(callee);
                 }
             }
+            else if (auto specCallee = as<IRSpecialize>(callee))
+            {
+                // The callee is an IRSpecialize with set-tag-typed args that is NOT
+                // a set-specialized generic. This happens when an existential type
+                // flows into an unconstrained generic (no interface constraint), so
+                // the typeflow pass cannot generate dispatch code. Emit E33180.
+                emitExistentialSpecializationDiagnostic(specCallee, inst->sourceLoc, inst);
+                module->getContainerPool().free(&callArgs);
+                return false;
+            }
             else
             {
-                // If we reach here, then something is wrong. Our callee is an inst of
-                // tag-type, but we could not resolve it through the dispatch action
-                // collection or set-specialized generic paths.
-                //
                 SLANG_UNEXPECTED(
                     "Unexpected operand type for type-flow specialization of Call inst");
             }
@@ -7606,13 +7619,15 @@ struct TypeFlowSpecializationContext
     {
         bool hasChanges = false;
 
+        auto errorsBefore = sink->getErrorCount();
+
         // Part 1: Information Propagation
         //    This phase propagates type information through the module
         //    and records them into different maps in the current context.
         //
         performInformationPropagation();
 
-        if (sink->getErrorCount() > 0)
+        if (sink->getErrorCount() > errorsBefore)
         {
             // If there were errors during propagation, we bail out early.
             return false;
