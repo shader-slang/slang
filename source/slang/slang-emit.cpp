@@ -79,6 +79,7 @@
 #include "slang-ir-lower-bit-cast.h"
 #include "slang-ir-lower-buffer-element-type.h"
 #include "slang-ir-lower-combined-texture-sampler.h"
+#include "slang-ir-lower-conditional-type.h"
 #include "slang-ir-lower-coopvec.h"
 #include "slang-ir-lower-dynamic-dispatch-insts.h"
 #include "slang-ir-lower-dynamic-resource-heap.h"
@@ -425,6 +426,9 @@ void calcRequiredLoweringPassSet(
         break;
     case kIROp_OptionalType:
         result.optionalType = true;
+        break;
+    case kIROp_ConditionalType:
+        result.conditionalType = true;
         break;
     case kIROp_EnumType:
         result.enumType = true;
@@ -1184,6 +1188,9 @@ Result linkAndOptimizeIR(
     // result structure are generated.
     if (requiredLoweringPassSet.resultType)
         SLANG_PASS(lowerResultType, targetProgram, sink);
+
+    if (requiredLoweringPassSet.conditionalType)
+        SLANG_PASS(lowerConditionalType, sink);
 
     if (requiredLoweringPassSet.optionalType)
         SLANG_PASS(lowerReinterpretOptional, targetProgram, sink);

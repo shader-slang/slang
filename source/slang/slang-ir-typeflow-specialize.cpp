@@ -522,6 +522,24 @@ bool isConcreteType(IRInst* inst)
                isGlobalInst(cast<IRArrayType>(inst)->getElementCount());
     case kIROp_OptionalType:
         return isConcreteType(cast<IROptionalType>(inst)->getValueType());
+    case kIROp_ConditionalType:
+        {
+            auto conditionalType = cast<IRConditionalType>(inst);
+            auto hasValueInst = conditionalType->getHasValue();
+            if (auto boolLit = as<IRBoolLit>(hasValueInst))
+            {
+                if (!boolLit->getValue())
+                    return true;
+                return isConcreteType(conditionalType->getValueType());
+            }
+            else if (auto intLit = as<IRIntLit>(hasValueInst))
+            {
+                if (getIntVal(intLit) == 0)
+                    return true;
+                return isConcreteType(conditionalType->getValueType());
+            }
+            return false;
+        }
     case kIROp_DifferentialPairType:
         return isConcreteType(cast<IRDifferentialPairTypeBase>(inst)->getValueType());
     case kIROp_AttributedType:

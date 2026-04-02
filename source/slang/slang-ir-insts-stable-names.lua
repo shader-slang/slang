@@ -825,5 +825,8 @@ return {
 	["Type.TranslatedTypeBase.TrivialBackwardDiffMinimalContextType"] = 845,
 	["Type.TranslatedTypeBase.BackwardMinimalContextFromLegacyBwdDiffFunc"] = 846,
 	["Decoration.ParamsContextDecoration"] = 847,
-	["matrixSwizzleStore"] = 848
+	["matrixSwizzleStore"] = 848,
+	["Type.Conditional"] = 849,
+	["getConditionalValue"] = 850,
+	["makeConditionalValue"] = 851,
 }
