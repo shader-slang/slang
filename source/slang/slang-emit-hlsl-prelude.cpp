@@ -1,6 +1,5 @@
 // slang-emit-hlsl-prelude.cpp
 #include "slang-emit-hlsl.h"
-
 #include "slang-rich-diagnostics.h"
 
 namespace Slang
