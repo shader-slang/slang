@@ -696,7 +696,8 @@ interface IForwardDifferentiable<FType> where FType : IHasDiffTypeInfo
 {
     __builtin_requirement($( (int)BuiltinRequirementKind::ForwardDerivativeFunc))
     [MaybeDifferentiable]
-    static __associatedfunc FwdDiffFuncType<FType> fwd_diff; // -> fwd_diff
+    static __associatedfunc FwdDiffFuncType<FType> fwd_diff; // -> fwd_diff 
+    // FunctionDeclBase::funcType : TypeExp = GenericAppDeclRef(FwdDiffFuncType, [FType, FType : IHasDiffTypeInfo])
 };
 
 // Core library interfaces:

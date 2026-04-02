@@ -2616,23 +2616,7 @@ bool SemanticsVisitor::_coerce(
             castExpr->arguments.clear();
             castExpr->arguments.add(args[0]);
 
-            // TODO: Make this a common utility.
-            //
-            // TODO: Making this false for now, because we aren't accounting for
-            // `TypeCoercionConstraint` when generating auto-diff extensions.
-            //
-            if (m_parentDifferentiableAttr && false)
-            {
-                if (auto checkedInvokeExpr = as<InvokeExpr>(castExpr))
-                {
-                    // Register types for final resolved invoke arguments again.
-                    for (auto& arg : checkedInvokeExpr->arguments)
-                        maybeRegisterDifferentiableType(m_astBuilder, arg->type.type);
-
-                    if (auto fnExpr = as<DeclRefExpr>(checkedInvokeExpr->functionExpr))
-                        registerAssociatedMethods(this, getDeclRef(m_astBuilder, fnExpr));
-                }
-            }
+            // TODO: Register associated differentiable methods & types here as well.
         }
         if (!cachedMethod)
         {

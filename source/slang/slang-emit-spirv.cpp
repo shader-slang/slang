@@ -1212,26 +1212,6 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
         return result;
     }
 
-    SpvInst* emitNullPtr(IRType* type, IRInst* inst = nullptr)
-    {
-        ConstantValueKey<IRFloatingPointValue> key;
-        key.value = 0;
-        key.type = type;
-
-        SpvInst* result = nullptr;
-        if (m_spvFloatConstants.tryGetValue(key, result))
-        {
-            m_mapIRInstToSpvInst[inst] = result;
-            return result;
-        }
-
-        return emitInst(
-            getSection(SpvLogicalSectionID::ConstantsAndTypes),
-            inst,
-            SpvOpConstantNull,
-            inst->getDataType());
-    }
-
     SpvInst* emitFloatConstant(IRFloatingPointValue val, IRType* type, IRInst* inst = nullptr)
     {
         ConstantValueKey<IRFloatingPointValue> key;
