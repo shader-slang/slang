@@ -1,9 +1,17 @@
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry computeMain -profile cs_6_9
+//TEST:SIMPLE(filecheck=CHECK609): -target hlsl -entry computeMain -profile cs_6_9
+//TEST:SIMPLE(filecheck=CHECK610): -target hlsl -entry computeMain -profile cs_6_10
 
-// CHECK: RWByteAddressBuffer outerProductOutput_0 : register
-// CHECK: RWByteAddressBuffer reduceSumOutput_0 : register
-// CHECK-DAG: __builtin_OuterProductAccumulate(_S{{[0-9]+}}, _S{{[0-9]+}}, outerProductOutput_0, int(0), Float16, TrainingOptimal, 32U);
-// CHECK-DAG: __builtin_VectorAccumulate(vecA_0, reduceSumOutput_0, int(0));
+// CHECK609-DAG: RWByteAddressBuffer outerProductOutput_0 : register
+// CHECK609-DAG: RWByteAddressBuffer reduceSumOutput_0 : register
+// CHECK609-DAG: __builtin_OuterProductAccumulate(
+// CHECK609-DAG: __slang_coopvec_OuterProductAccumulate<
+// CHECK609-DAG: __builtin_VectorAccumulate(
+// CHECK609-DAG: __slang_coopvec_VectorAccumulate<
+
+// CHECK610-DAG: dx::linalg::OuterProductAccumulate(
+// CHECK610-DAG: __slang_coopvec_OuterProductAccumulate<
+// CHECK610-DAG: dx::linalg::VectorAccumulate(
+// CHECK610-DAG: __slang_coopvec_VectorAccumulate<
 
 RWByteAddressBuffer outerProductOutput;
 RWByteAddressBuffer reduceSumOutput;

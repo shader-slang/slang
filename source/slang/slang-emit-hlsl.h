@@ -22,6 +22,8 @@ public:
     HLSLSourceEmitter(const Desc& desc)
         : Super(desc), m_extensionTracker(new HLSLExtensionTracker)
     {
+        auto targetProfile = getTargetProgram()->getOptionSet().getProfile();
+        m_sm610OrAbove = targetProfile.getVersion() > ProfileVersion::DX_6_9;
     }
 
     virtual RefObject* getExtensionTracker() SLANG_OVERRIDE { return m_extensionTracker; }
@@ -40,6 +42,7 @@ protected:
 
     // Allow caching of capability results for easier lookup.
     Dictionary<CapabilityAtom, bool> m_capabilityCache{};
+    bool m_sm610OrAbove = false;
 
     virtual void emitLayoutSemanticsImpl(
         IRInst* inst,
@@ -85,7 +88,11 @@ protected:
     void emitMappedCoopVecComponentType(
         IRInst* operand,
         IRInst* inputInterpretationPackingFactor = nullptr);
-    void emitMappedCoopVecMatrixLayout(IRInst* operand);
+    void emitMatrixLayoutEnum_sm609(IRInst* operand);
+    void emitMatrixLayoutEnum_sm610(IRInst* memoryLayout, bool isTranspose);
+    void emitCoopVecMatMulBufferType(IRInst* bufferPtrInst);
+    void ensureCoopVecHlslPreludeForProfile();
+
     virtual void emitLoopControlDecorationImpl(IRLoopControlDecoration* decl) SLANG_OVERRIDE;
     virtual void emitFuncDecorationImpl(IRDecoration* decoration) SLANG_OVERRIDE;
     virtual void emitFuncDecorationsImpl(IRFunc* func) SLANG_OVERRIDE;

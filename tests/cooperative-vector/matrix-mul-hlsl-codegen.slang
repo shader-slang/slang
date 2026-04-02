@@ -1,11 +1,14 @@
-//TEST:SIMPLE(filecheck=CHECK): -target hlsl -entry computeMain -profile cs_6_9
+//TEST:SIMPLE(filecheck=CHECK609): -target hlsl -entry computeMain -profile cs_6_9
+//TEST:SIMPLE(filecheck=CHECK610): -target hlsl -entry computeMain -profile cs_6_10
 
-// CHECK: ByteAddressBuffer matrix_0 : register
-// CHECK: ByteAddressBuffer bias_0 : register
-// CHECK: __builtin_MatVecMul(_S{{[0-9]+}}, false, _S{{[0-9]+}}, true, SignedInt8Packed, matrix_0, int(0), SignedInt8, int(4), int(4), RowMajor, false, 4U);
-// CHECK: __builtin_MatVecMulAdd(_S{{[0-9]+}}, false, _S{{[0-9]+}}, true, SignedInt8Packed, matrix_0, int(0), SignedInt8, int(4), int(4), RowMajor, false, 4U, bias_0, int(0), SignedInt32);
-// CHECK: __builtin_MatVecMul(_S{{[0-9]+}}, false, _S{{[0-9]+}}, false, SignedInt8, matrix_0, int(0), SignedInt8, int(4), int(4), RowMajor, false, 4U);
-// CHECK: __builtin_MatVecMulAdd(_S{{[0-9]+}}, false, _S{{[0-9]+}}, false, SignedInt8, matrix_0, int(0), SignedInt8, int(4), int(4), RowMajor, false, 4U, bias_0, int(0), SignedInt32);
+// CHECK609: __builtin_MatVecMul(__slang_r,
+// CHECK609: __builtin_MatVecMulAdd(__slang_r,
+// CHECK609: ByteAddressBuffer matrix_0 : register
+// CHECK609: ByteAddressBuffer bias_0 : register
+// CHECK609-COUNT-4: __slang_coopvec_Mul
+
+// CHECK610: dx::linalg::Mul<
+// CHECK610: dx::linalg::MulAdd<
 
 RWStructuredBuffer<int32_t> outputBuffer;
 ByteAddressBuffer input;
