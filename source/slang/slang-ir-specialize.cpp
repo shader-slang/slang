@@ -434,7 +434,8 @@ struct SpecializationContext
         }
 
         IRBuilder builder(module);
-        auto entry = builder.fetchCompilerDictionaryEntry(module->getTranslationDict(), specializeInst);
+        auto entry =
+            builder.fetchCompilerDictionaryEntry(module->getTranslationDict(), specializeInst);
 
         if (auto existingVal = entry->getValue())
             return existingVal;
@@ -2969,7 +2970,8 @@ struct SpecializationContext
                 kIROp_SpecializeExistentials,
                 (UInt)key.vals.getCount(),
                 key.vals.getBuffer());
-            auto entry = builder.fetchCompilerDictionaryEntry(module->getTranslationDict(), keyInst);
+            auto entry =
+                builder.fetchCompilerDictionaryEntry(module->getTranslationDict(), keyInst);
             keyInst->removeAndDeallocate();
 
             addUsersToWorkList(type);
