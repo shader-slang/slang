@@ -129,7 +129,7 @@ jobs:
           if [[ "$TS_VERSION" != "5.9.3" ]]; then  
             echo "Expected TypeScript 5.9.3, got ${TS_VERSION}"  
             exit 1  
-          fi  
+          fi
 
       - name: Build Slang
         run: |
