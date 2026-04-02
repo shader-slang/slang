@@ -11,6 +11,37 @@ public interface ISharedMemorySize
     static const uint Bytes;
 }
 
+// Address mode for shared memory store/load operations.
+//
+// On CUDA, shared memory can be accessed via two paths:
+//
+// 1. Shared (32-bit): Uses st.shared.v4.u32 / ld.shared.v4.u32 inline asm
+//    with a 32-bit shared address. This generates STS.128 / LDS.128 in SASS.
+//    Pros: Fewest instructions (no address conversion overhead).
+//    Cons: Inline asm is opaque to ptxas — it cannot decompose, reorder, or
+//          reschedule around the instruction. For vectorized v4 stores, all 4
+//          data registers must be live simultaneously, which increases register
+//          pressure and can cause more spilling in register-starved kernels.
+//
+// 2. Generic (64-bit): Converts the 32-bit shared address to a 64-bit generic
+//    pointer via cvta.shared.u64, then dereferences through normal C++ pointer
+//    assignment (*ptr = value). This generates ST.E.128 / LD.E.128 in SASS.
+//    Pros: ptxas has full scheduling freedom — it can split, reorder, or
+//          interleave stores with other work, reducing register pressure.
+//    Cons: 3 extra address-computation instructions per access (IADD3 + IADD3
+//          + IMAD.X to build the 64-bit address), making total instruction
+//          count higher.
+//
+// For register-heavy kernels (e.g. 255 registers), Generic mode typically wins
+// because the scheduling freedom reduces spilling more than the extra address
+// instructions cost. For smaller kernels with register headroom, Shared mode
+// is more efficient due to fewer total instructions.
+internal enum ShmemAddressMode
+{
+    Shared,
+    Generic,
+}
+
 public struct SharedMemoryPool<ShMemSize: ISharedMemorySize>
 {
     VISIBILITY_LEVEL static groupshared uint4 data[ShMemSize.Bytes / sizeof(uint4)];
@@ -116,8 +147,40 @@ public struct SharedMemoryPool<ShMemSize: ISharedMemorySize>
         }
     }
 
+    // Generic address helpers: convert 32-bit shared addr → 64-bit generic ptr → dereference.
+    // Gives ptxas freedom to reschedule (generates st.v4.u32 / ld.v4.u32 via generic addressing).
     [ForceInline]
-    static void smemStore<U>(uint memOffset, int index, U value)
+    [require(cuda)]
+    static void smemStoreViaGenericPtr<U>(uint addr, U value)
+        where U : IArithmetic
+    {
+        __intrinsic_asm R"(
+            ([&]() {
+                size_t _a64 = (size_t)$0;
+                unsigned* _p;
+                asm("cvta.shared.u64 %0, %1;" : "=l"(_p) : "l"(_a64));
+                *reinterpret_cast<$T1*>(_p) = $1;
+            }())
+        )";
+    }
+
+    [ForceInline]
+    [require(cuda)]
+    static U smemLoadViaGenericPtr<U>(uint addr)
+        where U : IArithmetic
+    {
+        __intrinsic_asm R"(
+            ([&]() {
+                size_t _a64 = (size_t)$0;
+                const unsigned* _p;
+                asm("cvta.shared.u64 %0, %1;" : "=l"(_p) : "l"(_a64));
+                return *reinterpret_cast<const $TR*>(_p);
+            }())
+        )";
+    }
+
+    [ForceInline]
+    static void smemStore<U, ShmemAddressMode Mode>(uint memOffset, int index, U value)
         where U : IArithmetic
     {
         __target_switch
@@ -125,7 +188,10 @@ public struct SharedMemoryPool<ShMemSize: ISharedMemorySize>
         case cuda:
             {
                 uint addr = getSharedBaseAddr(data) + memOffset * sizeof(uint4) + index * sizeof(U);
-                smemStoreShared32<U>(addr, value);
+                if (Mode == ShmemAddressMode.Generic)
+                    smemStoreViaGenericPtr<U>(addr, value);
+                else
+                    smemStoreShared32<U>(addr, value);
             }
         default:
             smemStoreGeneric<U>(memOffset, index, value);
@@ -133,7 +199,14 @@ public struct SharedMemoryPool<ShMemSize: ISharedMemorySize>
     }
 
     [ForceInline]
-    static U smemLoad<U>(uint memOffset, int index)
+    static void smemStore<U>(uint memOffset, int index, U value)
+        where U : IArithmetic
+    {
+        smemStore<U, ShmemAddressMode.Shared>(memOffset, index, value);
+    }
+
+    [ForceInline]
+    static U smemLoad<U, ShmemAddressMode Mode>(uint memOffset, int index)
         where U : IArithmetic
     {
         __target_switch
@@ -141,11 +214,21 @@ public struct SharedMemoryPool<ShMemSize: ISharedMemorySize>
         case cuda:
             {
                 uint addr = getSharedBaseAddr(data) + memOffset * sizeof(uint4) + index * sizeof(U);
-                return smemLoadShared32<U>(addr);
+                if (Mode == ShmemAddressMode.Generic)
+                    return smemLoadViaGenericPtr<U>(addr);
+                else
+                    return smemLoadShared32<U>(addr);
             }
         default:
             return smemLoadGeneric<U>(memOffset, index);
         }
+    }
+
+    [ForceInline]
+    static U smemLoad<U>(uint memOffset, int index)
+        where U : IArithmetic
+    {
+        return smemLoad<U, ShmemAddressMode.Shared>(memOffset, index);
     }
 
     // Generic fallback for non-CUDA targets (SPIR-V etc.)

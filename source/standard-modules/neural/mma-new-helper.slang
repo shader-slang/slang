@@ -520,6 +520,67 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
     static const int OPA_RegsPerLane = (OPA_ElementsPerLane * sizeof(T) + 3) / 4;
     static const int OPA_TileStride = (OPA_RegsPerLane * N * 4 + sizeof(uint4) - 1) / sizeof(uint4);
 
+    // Uint4s per lane for shmem store/load (1 for 4-reg f16, 2 for 8-reg f32).
+    static const int OPA_Uint4sPerLane = (OPA_RegsPerLane + 3) / 4;
+
+    // Store a MatC tile's registers to groupshared memory as vectorized uint4 writes.
+    // Each lane packs its registers into uint4(s) and writes via generic addressing.
+    [ForceInline]
+    static void storeTileToShmem<ShMemSize : ISharedMemorySize>(
+        MatC tile, uint offset)
+    {
+        typealias ShMemPool = SharedMemoryPool<ShMemSize>;
+        uint laneId = WaveGetLaneIndex();
+
+        if (OPA_RegsPerLane <= 4)
+        {
+            uint4 v = uint4(tile.fragmentRead(0), tile.fragmentRead(1),
+                            tile.fragmentRead(2), tile.fragmentRead(3));
+            ShMemPool.smemStore<uint4, ShmemAddressMode.Generic>(offset, int(laneId), v);
+        }
+        else
+        {
+            uint4 v0 = uint4(tile.fragmentRead(0), tile.fragmentRead(1),
+                             tile.fragmentRead(2), tile.fragmentRead(3));
+            uint4 v1 = uint4(tile.fragmentRead(4), tile.fragmentRead(5),
+                             tile.fragmentRead(6), tile.fragmentRead(7));
+            ShMemPool.smemStore<uint4, ShmemAddressMode.Generic>(offset, int(laneId * 2), v0);
+            ShMemPool.smemStore<uint4, ShmemAddressMode.Generic>(offset, int(laneId * 2 + 1), v1);
+        }
+    }
+
+    // Load a MatC tile's registers from groupshared memory via generic addressing.
+    [ForceInline]
+    static MatC loadTileFromShmem<ShMemSize : ISharedMemorySize>(uint offset)
+    {
+        typealias ShMemPool = SharedMemoryPool<ShMemSize>;
+        uint laneId = WaveGetLaneIndex();
+        MatC tile;
+
+        if (OPA_RegsPerLane <= 4)
+        {
+            uint4 v = ShMemPool.smemLoad<uint4, ShmemAddressMode.Generic>(offset, int(laneId));
+            tile.fragmentWrite(0, v.x);
+            tile.fragmentWrite(1, v.y);
+            tile.fragmentWrite(2, v.z);
+            tile.fragmentWrite(3, v.w);
+        }
+        else
+        {
+            uint4 v0 = ShMemPool.smemLoad<uint4, ShmemAddressMode.Generic>(offset, int(laneId * 2));
+            uint4 v1 = ShMemPool.smemLoad<uint4, ShmemAddressMode.Generic>(offset, int(laneId * 2 + 1));
+            tile.fragmentWrite(0, v0.x);
+            tile.fragmentWrite(1, v0.y);
+            tile.fragmentWrite(2, v0.z);
+            tile.fragmentWrite(3, v0.w);
+            tile.fragmentWrite(4, v1.x);
+            tile.fragmentWrite(5, v1.y);
+            tile.fragmentWrite(6, v1.z);
+            tile.fragmentWrite(7, v1.w);
+        }
+        return tile;
+    }
+
     // Number of 16x16 MatA tiles for the input vector (covering K elements).
     static const int OPA_InputTileCols = (K + COLUMN_A - 1) / COLUMN_A;
     static const int OPA_TotalInputMatA = NColGroupsOPA * OPA_InputTileCols;
@@ -842,7 +903,7 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
             {
                 [ForceUnroll]
                 for (int idx = 0; idx < OPA_TotalTiles; idx++)
-                    matC[idx].StoreRaw(ShMemPool.data, base + idx * OPA_TileStride);
+                    storeTileToShmem<ShMemSize>(matC[idx], base + idx * OPA_TileStride);
             }
 
             GroupMemoryBarrierWithGroupSync();
@@ -854,7 +915,7 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
                     [ForceUnroll]
                     for (int idx = 0; idx < OPA_TotalTiles; idx++)
                     {
-                        let other = MatC.LoadRaw(ShMemPool.data, base + idx * OPA_TileStride);
+                        let other = loadTileFromShmem<ShMemSize>(base + idx * OPA_TileStride);
                         matC[idx] = matC[idx] + other;
                     }
                 }
@@ -882,10 +943,10 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
         typealias ShMemPool = SharedMemoryPool<ShMemSize>;
         const uint laneId = WaveGetLaneIndex();
 
-        // StoreRaw all tiles to shmem first
+        // Store all tiles to shmem via vectorized uint4 writes
         [ForceUnroll]
         for (int idx = 0; idx < OPA_TotalTiles; idx++)
-            matC[idx].StoreRaw(ShMemPool.data, sharedMemoryOffset + idx * OPA_TileStride);
+            storeTileToShmem<ShMemSize>(matC[idx], sharedMemoryOffset + idx * OPA_TileStride);
 
         GroupMemoryBarrierWithWaveSync();
 

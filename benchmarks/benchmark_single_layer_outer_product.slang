@@ -165,7 +165,14 @@ void convert_native_to_rowmajor(
 
     GroupMemoryBarrierWithGroupSync();
 
-    let tile = MatC.LoadRaw(shmem, 0u);
+    MatC tile;
+    {
+        uint4 v = shmem[WaveGetLaneIndex()];
+        tile.fragmentWrite(0, v.x);
+        tile.fragmentWrite(1, v.y);
+        tile.fragmentWrite(2, v.z);
+        tile.fragmentWrite(3, v.w);
+    }
 
     tile.Store<linalg.CoopMatMatrixLayout.RowMajor>(rowMajorBuffer, uint(tileIdx * 256), 16u);
 }

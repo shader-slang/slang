@@ -8598,29 +8598,6 @@ struct WmmaFragment
         return fragment;
     }
 
-    // Overload for groupshared: shmem pointer + offset (uses shared memory address computation).
-    template<typename U>
-    static This __device__ LoadRaw(const U* shmem, unsigned offset)
-    {
-        WmmaFragment<T, M, N, K, R> fragment;
-        unsigned lane_id = threadIdx.x % 32;
-        unsigned saddr = (unsigned)__cvta_generic_to_shared(shmem) + offset * sizeof(U) + lane_id * NativeStridePerLane * sizeof(unsigned);
-        size_t saddr64 = saddr;
-        const unsigned* src;
-        asm("cvta.shared.u64 %0, %1;" : "=l"(src) : "l"(saddr64));
-        if constexpr (RegsCount == 2)
-            *reinterpret_cast<uint2*>(fragment.regs) = *reinterpret_cast<const uint2*>(src);
-        else if constexpr (RegsCount == 4)
-            *reinterpret_cast<uint4*>(fragment.regs) = *reinterpret_cast<const uint4*>(src);
-        else if constexpr (RegsCount == 8)
-        {
-            *reinterpret_cast<uint4*>(fragment.regs) = *reinterpret_cast<const uint4*>(src);
-            *reinterpret_cast<uint4*>(fragment.regs + 4) = *reinterpret_cast<const uint4*>(src + 4);
-        }
-        return fragment;
-    }
-
-
     static constexpr __device__ uint32_t GetLength() { return This::elements_per_thread; }
     static constexpr __device__ int GetPackedFragmentCount() { return RegsCount; }
 
@@ -8636,34 +8613,6 @@ struct WmmaFragment
     unsigned regs[RegsCount] = {};
 
     static constexpr uint32_t elements_per_thread = RegsCount * (4 / sizeof(T));
-
-    // Native store/load for efficient shared memory reductions.
-    // Each lane stores/loads its raw registers as a contiguous block at shmem[offset + laneId].
-
-    // Number of uint4s per lane needed to store all registers.
-    static constexpr int Uint4PerLane = (RegsCount + 3) / 4;
-
-    // Stores raw registers to shmem. Each lane writes Uint4PerLane uint4s
-    static constexpr int NativeStridePerLane = RegsCount;
-
-    template<typename U>
-    __device__ void StoreRaw(U* shmem, unsigned offset)
-    {
-        unsigned lane_id = threadIdx.x % 32;
-        unsigned saddr = (unsigned)__cvta_generic_to_shared(shmem) + offset * sizeof(U) + lane_id * NativeStridePerLane * sizeof(unsigned);
-        size_t saddr64 = saddr;
-        unsigned* dst;
-        asm("cvta.shared.u64 %0, %1;" : "=l"(dst) : "l"(saddr64));
-        if constexpr (RegsCount == 2)
-            *reinterpret_cast<uint2*>(dst) = *reinterpret_cast<const uint2*>(regs);
-        else if constexpr (RegsCount == 4)
-            *reinterpret_cast<uint4*>(dst) = *reinterpret_cast<const uint4*>(regs);
-        else if constexpr (RegsCount == 8)
-        {
-            *reinterpret_cast<uint4*>(dst) = *reinterpret_cast<const uint4*>(regs);
-            *reinterpret_cast<uint4*>(dst + 4) = *reinterpret_cast<const uint4*>(regs + 4);
-        }
-    }
 
 };
 
