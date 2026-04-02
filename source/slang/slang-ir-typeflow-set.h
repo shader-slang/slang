@@ -11,10 +11,17 @@ namespace Slang
 //
 
 template<typename F>
-void forEachInSet(IRSetBase* info, F func)
+void forEachInSet(IRModule* module, IRSetBase* info, F func)
 {
+    List<IRInst*>& elements = *module->getContainerPool().getList<IRInst>();
+
     for (UInt i = 0; i < info->getOperandCount(); ++i)
-        func(info->getOperand(i));
+        elements.add(info->getElement(i));
+
+    for (auto element : elements)
+        func(element);
+
+    module->getContainerPool().free(&elements);
 }
 
 // Upcast the value in 'arg' to match the destInfo type. This method inserts
