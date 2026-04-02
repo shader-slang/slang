@@ -88,6 +88,7 @@ prelude/*.h.cpp
 /external/mimalloc/
 /external/slangpy/
 /external/dxvk-remix/
+/external/SaschaWillems-Vulkan/
 
 build/**/*.tlog
 build/**/*.lastbuildstate
@@ -140,3 +141,7 @@ perf.data.*
 .vars
 .github/test-events/
 __pycache__/
+
+.slang-replays*
+log*.txt
+replay-capture

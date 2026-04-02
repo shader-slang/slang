@@ -1,7 +1,7 @@
 //TEST:SIMPLE(filecheck=METAL): -target metal -stage vertex -entry vertexMain
 //TEST:SIMPLE(filecheck=METALLIB): -target metallib -stage vertex -entry vertexMain
 
-//METAL: [position]]
+// METAL: {{\[\[}}position{{\]\]}}
 //METALLIB: @vertexMain
 struct VertexOut
 {

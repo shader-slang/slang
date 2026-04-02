@@ -1,16 +1,13 @@
 // Compound types containing interface-typed members (nested structs, arrays,
 // Optional) are also invalid as varying parameters. The existential data
 // embedded inside these compound types cannot be interpolated.
-//
-// Currently triggers an ICE ("unhandled type kind") in parameter binding
-// instead of a clean diagnostic. Disabled until #10403 is fixed.
 
-//DISABLE_TEST:SIMPLE(filecheck=CHK1): -target spirv -entry vertexStructMain -stage vertex
-//DISABLE_TEST:SIMPLE(filecheck=CHK1): -target hlsl -entry vertexStructMain -stage vertex
-//DISABLE_TEST:SIMPLE(filecheck=CHK2): -target spirv -entry vertexArrayMain -stage vertex
-//DISABLE_TEST:SIMPLE(filecheck=CHK2): -target hlsl -entry vertexArrayMain -stage vertex
-//DISABLE_TEST:SIMPLE(filecheck=CHK3): -target spirv -entry vertexOptionalMain -stage vertex
-//DISABLE_TEST:SIMPLE(filecheck=CHK3): -target hlsl -entry vertexOptionalMain -stage vertex
+//TEST:SIMPLE(filecheck=CHK1): -target spirv -entry vertexStructMain -stage vertex
+//TEST:SIMPLE(filecheck=CHK1): -target hlsl -entry vertexStructMain -stage vertex
+//TEST:SIMPLE(filecheck=CHK2): -target spirv -entry vertexArrayMain -stage vertex
+//TEST:SIMPLE(filecheck=CHK2): -target hlsl -entry vertexArrayMain -stage vertex
+//TEST:SIMPLE(filecheck=CHK3): -target spirv -entry vertexOptionalMain -stage vertex
+//TEST:SIMPLE(filecheck=CHK3): -target hlsl -entry vertexOptionalMain -stage vertex
 
 interface IFoo
 {

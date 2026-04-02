@@ -4,7 +4,7 @@
 
 // Test error for field in ray payload struct missing read/write access qualifiers
 
-struct [raypayload] RayPayload
+[raypayload] struct RayPayload
 {
     float4 color : read(caller, anyhit) : write(caller);
     float4 colorMissingQualifiers;

@@ -113,6 +113,7 @@ Sections of the `expansion` string that are to be replaced are prefixed by the `
 * $XC - Ray tracing callable payload
 * $XH - Ray tracing hit object attribute
 * $P - Type-based prefix as used for CUDA and C++ targets (I8 for int8_t, F32 - float etc)
+* $[0-9] - Access extra type or value operands passed explicitly after the format string in `__intrinsic_asm`. For type operands (e.g. generic type parameters like `T`), emits the type name. For value operands (e.g. generic integer parameters like `let N : int`), emits the value expression. The extra operands are listed as a comma-separated sequence after the format string literal. Indices are zero-based.
 
 ## __attributeTarget(astClassName)
 

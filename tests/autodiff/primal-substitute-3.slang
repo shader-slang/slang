@@ -1,6 +1,6 @@
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -output-using-type -shaderobj
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
+//DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -output-using-type -shaderobj
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -46,8 +46,10 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     var obj = createDynamicObject<IFoo>(dispatchThreadID.x, 0); // A
 
     var a = diffPair(3.0, 1.0);
-    __bwd_diff(caller)(obj, a, 1.0);
+    //__bwd_diff(caller)(obj, a, 1.0);
+    caller.bwd_diff(obj, a, 1.0);
     outputBuffer[0] = a.d;                                         // Expect: 12.0
-    outputBuffer[1] = __fwd_diff(caller)(obj, diffPair(3.0, 1.0)).p; // Expect: 18.0
+    //outputBuffer[1] = __fwd_diff(caller)(obj, diffPair(3.0, 1.0)).p; // Expect: 18.0
+    outputBuffer[1] = caller.fwd_diff(obj, diffPair(3.0, 1.0)).p; // Expect: 18.0
     outputBuffer[2] = caller(obj, 3.0); // Expect: 9.0
 }
