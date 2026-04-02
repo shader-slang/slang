@@ -739,6 +739,11 @@ Result linkAndOptimizeIR(
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
+    {
+        bool validate = !isCPUTarget(targetRequest) && !isCUDATarget(targetRequest);
+        SLANG_PASS(validateAndRemoveAssumeAddress, validate, sink);
+    }
+
     // If the user specified the flag that they want us to dump
     // IR, then do it here, for the target-specific, but
     // un-specialized IR.
@@ -1622,11 +1627,6 @@ Result linkAndOptimizeIR(
     {
         bool skipFuncParamValidation = true;
         SLANG_PASS(validateAtomicOperations, skipFuncParamValidation, sink);
-    }
-
-    if (!isCPUTarget(targetRequest) && !isCUDATarget(targetRequest))
-    {
-        SLANG_PASS(validateGetAddressUsage, sink);
     }
 
     // For CUDA targets only, we will need to turn operations

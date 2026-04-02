@@ -93,9 +93,13 @@ bool validateStructuredBufferResourceTypes(
     DiagnosticSink* sink,
     TargetRequest* targetRequest);
 
-// Validate that __getAddress is not used on function-local variables.
-// Finds IRVars decorated with GetAddressDecoration and checks if the stored
-// value originates from a function-local variable.
-void validateGetAddressUsage(IRModule* module, DiagnosticSink* sink);
+// Process kIROp_AssumeAddress instructions. When validate is true,
+// checks that getRootAddr(addr) is in UserPointer address space and emits
+// an error if not. Always replaces each AssumeAddress(x) with x so backend
+// passes never see the opcode.
+void validateAndRemoveAssumeAddress(
+    IRModule* module,
+    bool validate,
+    DiagnosticSink* sink);
 
 } // namespace Slang

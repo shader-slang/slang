@@ -771,5 +771,5 @@ return {
 	["TrimHeadOfPack"] = 769,
 	["TrimTailOfPack"] = 770,
 	["NonEmptyPackWitness"] = 771,
-	["Decoration.GetAddressDecoration"] = 772,
+	["assumeAddress"] = 772,
 }

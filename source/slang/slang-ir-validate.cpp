@@ -791,69 +791,38 @@ void validateAtomicOperations(IRModule* module, bool skipFuncParamValidation, Di
     validateAtomicOperations(skipFuncParamValidation, sink, module->getModuleInst());
 }
 
-// Walk through derived-pointer ops to find the root allocation,
-// then check if it lives in function-local memory.
-static bool isFunctionLocalAddress(IRInst* val)
+static void collectAssumeAddressInsts(IRInst* inst, List<IRInst*>& out)
 {
-    IRInst* root = val;
-    while (root)
-    {
-        switch (root->getOp())
-        {
-        // Derived pointers — keep walking to the base.
-        case kIROp_FieldAddress:
-        case kIROp_GetElementPtr:
-        case kIROp_GetOffsetPtr:
-            root = root->getOperand(0);
-            continue;
-        case kIROp_Var:
-            {
-                auto ptrType = as<IRPtrType>(root->getDataType());
-                // IRVar should always have an IRPtrType in well-formed IR;
-                // treat malformed cases as function-local to err on the side of safety.
-                return !ptrType || !ptrType->hasAddressSpace() ||
-                       ptrType->getAddressSpace() == AddressSpace::Function;
-            }
-        default:
-            return false;
-        }
-    }
-    return false;
-}
-
-// visitAddressOfExpr lowers __getAddress into an IRVar decorated with
-// GetAddressDecoration, with a store of the source address into it.
-// Find those decorated vars and reject stores of function-local addresses.
-static void validateGetAddressUsageImpl(DiagnosticSink* sink, IRInst* inst)
-{
-    if (inst->getOp() == kIROp_Var && inst->findDecoration<IRGetAddressDecoration>())
-    {
-        for (auto use = inst->firstUse; use; use = use->nextUse)
-        {
-            auto user = use->getUser();
-            if (user->getOp() != kIROp_Store)
-                continue;
-            auto store = as<IRStore>(user);
-            if (store->getPtr() != inst)
-                continue;
-            if (isFunctionLocalAddress(store->getVal()))
-            {
-                sink->diagnose(Diagnostics::InvalidAddressOf{
-                    .location = inst->sourceLoc,
-                });
-            }
-        }
-    }
-
+    if (inst->getOp() == kIROp_AssumeAddress)
+        out.add(inst);
     for (auto child : inst->getModifiableChildren())
-    {
-        validateGetAddressUsageImpl(sink, child);
-    }
+        collectAssumeAddressInsts(child, out);
 }
 
-void validateGetAddressUsage(IRModule* module, DiagnosticSink* sink)
+void validateAndRemoveAssumeAddress(IRModule* module, bool validate, DiagnosticSink* sink)
 {
-    validateGetAddressUsageImpl(sink, module->getModuleInst());
+    List<IRInst*> assumeAddrs;
+    collectAssumeAddressInsts(module->getModuleInst(), assumeAddrs);
+
+    if (validate)
+    {
+        for (auto inst : assumeAddrs)
+        {
+            auto addr = inst->getOperand(0);
+            auto root = getRootAddr(addr);
+            if (root->getOp() != kIROp_Var)
+                continue;
+            sink->diagnose(Diagnostics::InvalidAddressOf{
+                .location = inst->sourceLoc,
+            });
+        }
+    }
+
+    for (auto inst : assumeAddrs)
+    {
+        inst->replaceUsesWith(inst->getOperand(0));
+        inst->removeAndDeallocate();
+    }
 }
 
 } // namespace Slang

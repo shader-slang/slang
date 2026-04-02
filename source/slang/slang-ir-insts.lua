@@ -1079,6 +1079,9 @@ local insts = {
 	-- Pointer offset: computes pBase + offset_in_elements
 	{ getOffsetPtr = { operands = { { "base" }, { "offset" } } } },
 	{ getAddr = { struct_name = "GetAddress", operands = { { "ptr" } } } },
+	-- An address obtained via __getAddress. Lowered away after validation
+	-- into the underlying address operand.
+	{ assumeAddress = { operands = { { "addr" } } } },
 	{ castDynamicResource = { operands = { { "resource" } } } },
 	-- Get an unowned NativeString from a String.
 	{ getNativeStr = { operands = { { "stringValue" } } } },
@@ -2382,9 +2385,6 @@ local insts = {
 			{
 				DisallowSpecializationWithExistentialsDecoration = { },
 			},
-			{
-				GetAddressDecoration = { },
-			}
 		},
 	},
 	-- Decoration
