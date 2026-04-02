@@ -14400,15 +14400,12 @@ static bool _astTypeIncludesDynamicDispatch(
                 visitor->ensureDecl(field, DeclCheckState::CanUseTypeOfValueDecl);
                 // Use getMemberDeclRef + getType to apply generic substitutions,
                 // so that e.g. Box<IFoo> with field `T item` resolves T to IFoo.
-                auto fieldDeclRef =
-                    visitor->getASTBuilder()
-                        ->getMemberDeclRef(structType->getDeclRef(), field)
-                        .as<VarDeclBase>();
-                auto fieldType =
-                    fieldDeclRef ? getType(visitor->getASTBuilder(), fieldDeclRef)
-                                : field->type.type;
-                if (fieldType &&
-                    _astTypeIncludesDynamicDispatch(visitor, fieldType, seenDecls))
+                auto fieldDeclRef = visitor->getASTBuilder()
+                                        ->getMemberDeclRef(structType->getDeclRef(), field)
+                                        .as<VarDeclBase>();
+                auto fieldType = fieldDeclRef ? getType(visitor->getASTBuilder(), fieldDeclRef)
+                                              : field->type.type;
+                if (fieldType && _astTypeIncludesDynamicDispatch(visitor, fieldType, seenDecls))
                     return true;
             }
             seenDecls.remove(structDecl);
@@ -14488,10 +14485,9 @@ void SemanticsDeclHeaderVisitor::visitAccessorDecl(AccessorDecl* decl)
         HashSet<Decl*> seenDecls;
         if (storageType && _astTypeIncludesDynamicDispatch(this, storageType, seenDecls))
         {
-            getSink()->diagnose(
-                Diagnostics::RefAccessorWithInterfaceTypeInDynamicDispatch{
-                    .valueType = storageType,
-                    .location = decl->loc});
+            getSink()->diagnose(Diagnostics::RefAccessorWithInterfaceTypeInDynamicDispatch{
+                .valueType = storageType,
+                .location = decl->loc});
             decl->returnType.type = getASTBuilder()->getErrorType();
         }
     }
