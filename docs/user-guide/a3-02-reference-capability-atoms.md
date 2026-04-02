@@ -224,6 +224,9 @@ Versions
 `metallib_3_1`
 > Represents MetalLib 3.1.
 
+`metallib_4_0`
+> Represents MetalLib 4.0.
+
 `metallib_latest`
 > Represents the latest MetalLib version.
 
@@ -270,6 +273,14 @@ Versions
 `sm_6_1`
 > HLSL shader model 6.1 and related capabilities of other targets.
 > Includes related GLSL/SPIRV extensions.
+
+`sm_6_10`
+> HLSL shader model 6.10 and related capabilities of other targets.
+> Includes related GLSL/SPIRV extensions.
+
+`sm_6_10_version`
+> HLSL shader model 6.10 and related capabilities of other targets.
+> Does not include related GLSL/SPIRV extensions.
 
 `sm_6_1_version`
 > HLSL shader model 6.1 and related capabilities of other targets.
@@ -1527,6 +1538,9 @@ Other
 `DX_6_1`
 > Use `sm_6_1` instead
 
+`DX_6_10`
+> Use `sm_6_10` instead
+
 `DX_6_2`
 > Use `sm_6_2` instead
 
@@ -1574,6 +1588,9 @@ Other
 
 `METAL_3_1`
 > Use `metallib_3_1` instead
+
+`METAL_4_0`
+> Use `metallib_4_0` instead
 
 `SPIRV_1_0`
 > Use `spirv_1_0` instead

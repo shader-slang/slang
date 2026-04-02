@@ -45,6 +45,7 @@ public interface IPointerLikeAddress<T> : IDifferentiablePtrType
     @param[in] elements Number of elements to offset by.
     @return The offset pointer.
     */
+    [ForwardDifferentiable]
     public This getOffset(int elements);
 
     /**

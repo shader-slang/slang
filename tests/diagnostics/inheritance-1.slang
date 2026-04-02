@@ -9,6 +9,5 @@ struct Base {}
 
 struct Derived : Base {}
 //CHECK:         ^^^^ support for inheritance is unstable and will be removed in future language versions, consider using composition instead
-//CHECK:         ^^^^ support for inheritance is unstable and will be removed in future language versions, consider using composition instead
 
 struct Base1 {}

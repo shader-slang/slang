@@ -290,10 +290,23 @@ static void validateSystemValueSemantic(
     Decl* decl,
     Stage stage,
     SemanticDirection direction,
-    Scope* scope)
+    Scope* scope,
+    UInt recursionDepth = 0)
 {
+    static constexpr UInt kMaxSystemValueSemanticRecursionDepth = 128;
     if (!decl)
         return;
+
+    if (recursionDepth >= kMaxSystemValueSemanticRecursionDepth)
+    {
+        if (sink)
+        {
+            Diagnostics::MaximumTypeNestingLevelExceeded diag = {};
+            diag.location = _getTypeNestingDiagnosticPosForDecl(decl);
+            sink->diagnose(diag);
+        }
+        return;
+    }
 
     // Get the type from the declaration
     Type* type = nullptr;
@@ -339,7 +352,14 @@ static void validateSystemValueSemantic(
                  getFields(astBuilder, structDeclRef, MemberFilterStyle::Instance))
             {
                 auto fieldDecl = fieldDeclRef.getDecl();
-                validateSystemValueSemantic(visitor, sink, fieldDecl, stage, direction, scope);
+                validateSystemValueSemantic(
+                    visitor,
+                    sink,
+                    fieldDecl,
+                    stage,
+                    direction,
+                    scope,
+                    recursionDepth + 1);
             }
         }
     }
@@ -362,19 +382,34 @@ static void validateSystemValueSemantic(
 
 /// Recursively walk `paramDeclRef` and add any existential/interface specialization parameters to
 /// `ioSpecializationParams`.
-static void _collectExistentialSpecializationParamsRec(
+static bool _collectExistentialSpecializationParamsRec(
     ASTBuilder* astBuilder,
     SpecializationParams& ioSpecializationParams,
-    DeclRef<VarDeclBase> paramDeclRef);
+    DeclRef<VarDeclBase> paramDeclRef,
+    DiagnosticSink* sink,
+    UInt recursionDepth);
 
 /// Recursively walk `type` and add any existential/interface specialization parameters to
 /// `ioSpecializationParams`.
-static void _collectExistentialSpecializationParamsRec(
+static bool _collectExistentialSpecializationParamsRec(
     ASTBuilder* astBuilder,
     SpecializationParams& ioSpecializationParams,
     Type* type,
-    SourceLoc loc)
+    SourceLoc loc,
+    DiagnosticSink* sink,
+    UInt recursionDepth)
 {
+    if (recursionDepth >= kMaxTypeNestingDepth)
+    {
+        if (sink)
+        {
+            Diagnostics::MaximumTypeNestingLevelExceeded diag = {};
+            diag.location = loc;
+            sink->diagnose(diag);
+        }
+        return false;
+    }
+
     // Whether or not something is an array does not affect
     // the number of existential slots it introduces.
     //
@@ -385,12 +420,13 @@ static void _collectExistentialSpecializationParamsRec(
 
     if (auto parameterGroupType = as<ParameterGroupType>(type))
     {
-        _collectExistentialSpecializationParamsRec(
+        return _collectExistentialSpecializationParamsRec(
             astBuilder,
             ioSpecializationParams,
             parameterGroupType->getElementType(),
-            loc);
-        return;
+            loc,
+            sink,
+            recursionDepth + 1);
     }
 
     if (auto declRefType = as<DeclRefType>(type))
@@ -416,10 +452,15 @@ static void _collectExistentialSpecializationParamsRec(
             for (auto fieldDeclRef :
                  getFields(astBuilder, structDeclRef, MemberFilterStyle::Instance))
             {
-                _collectExistentialSpecializationParamsRec(
-                    astBuilder,
-                    ioSpecializationParams,
-                    fieldDeclRef);
+                if (!_collectExistentialSpecializationParamsRec(
+                        astBuilder,
+                        ioSpecializationParams,
+                        fieldDeclRef,
+                        sink,
+                        recursionDepth + 1))
+                {
+                    return false;
+                }
             }
         }
     }
@@ -427,35 +468,50 @@ static void _collectExistentialSpecializationParamsRec(
     // TODO: We eventually need to handle cases like constant
     // buffers and parameter blocks that may have existential
     // element types.
+    return true;
 }
 
-static void _collectExistentialSpecializationParamsRec(
+static bool _collectExistentialSpecializationParamsRec(
     ASTBuilder* astBuilder,
     SpecializationParams& ioSpecializationParams,
-    DeclRef<VarDeclBase> paramDeclRef)
+    DeclRef<VarDeclBase> paramDeclRef,
+    DiagnosticSink* sink,
+    UInt recursionDepth)
 {
-    _collectExistentialSpecializationParamsRec(
+    return _collectExistentialSpecializationParamsRec(
         astBuilder,
         ioSpecializationParams,
         getType(astBuilder, paramDeclRef),
-        paramDeclRef.getLoc());
+        paramDeclRef.getLoc(),
+        sink,
+        recursionDepth);
 }
 
 
 /// Collect any interface/existential specialization parameters for `paramDeclRef` into
 /// `ioParamInfo` and `ioSpecializationParams`
-static void _collectExistentialSpecializationParamsForShaderParam(
+static bool _collectExistentialSpecializationParamsForShaderParam(
     ASTBuilder* astBuilder,
     ShaderParamInfo& ioParamInfo,
     SpecializationParams& ioSpecializationParams,
-    DeclRef<VarDeclBase> paramDeclRef)
+    DeclRef<VarDeclBase> paramDeclRef,
+    DiagnosticSink* sink)
 {
     Index beginParamIndex = ioSpecializationParams.getCount();
-    _collectExistentialSpecializationParamsRec(astBuilder, ioSpecializationParams, paramDeclRef);
+    if (!_collectExistentialSpecializationParamsRec(
+            astBuilder,
+            ioSpecializationParams,
+            paramDeclRef,
+            sink,
+            0))
+    {
+        return false;
+    }
     Index endParamIndex = ioSpecializationParams.getCount();
 
     ioParamInfo.firstSpecializationParamIndex = beginParamIndex;
     ioParamInfo.specializationParamCount = endParamIndex - beginParamIndex;
+    return true;
 }
 
 void EntryPoint::_collectGenericSpecializationParamsRec(Decl* decl)
@@ -533,11 +589,15 @@ void EntryPoint::_collectShaderParams()
             ShaderParamInfo shaderParamInfo;
             shaderParamInfo.paramDeclRef = paramDeclRef;
 
-            _collectExistentialSpecializationParamsForShaderParam(
-                getLinkage()->getASTBuilder(),
-                shaderParamInfo,
-                m_existentialSpecializationParams,
-                paramDeclRef);
+            if (!_collectExistentialSpecializationParamsForShaderParam(
+                    getLinkage()->getASTBuilder(),
+                    shaderParamInfo,
+                    m_existentialSpecializationParams,
+                    paramDeclRef,
+                    nullptr))
+            {
+                return;
+            }
 
             m_shaderParams.add(shaderParamInfo);
         }
@@ -1329,7 +1389,7 @@ Type* getParamTypeWithModeWrapper(
     }
 }
 
-void Module::_collectShaderParams()
+void Module::_collectShaderParams(DiagnosticSink* sink)
 {
     // We are going to walk the global declarations in the body of the
     // module, and use those to build up our lists of:
@@ -1389,11 +1449,15 @@ void Module::_collectShaderParams()
                 // can assocaite specialization arguments supplied later
                 // with the correct parameter.
                 //
-                _collectExistentialSpecializationParamsForShaderParam(
-                    getLinkage()->getASTBuilder(),
-                    shaderParamInfo,
-                    m_specializationParams,
-                    makeDeclRef(globalVar));
+                if (!_collectExistentialSpecializationParamsForShaderParam(
+                        getLinkage()->getASTBuilder(),
+                        shaderParamInfo,
+                        m_specializationParams,
+                        makeDeclRef(globalVar),
+                        sink))
+                {
+                    return;
+                }
 
                 m_shaderParams.add(shaderParamInfo);
             }
@@ -1606,10 +1670,10 @@ RefPtr<ComponentType> createUnspecializedGlobalComponentType(FrontEndCompileRequ
                 Diagnostics::InvalidTypeConformanceOptionString{.option = stringValue});
             continue;
         }
-        auto concreteType = globalComponentType->getTypeFromString(
-            String(typeName).getBuffer(),
-            compileRequest->getSink());
-        if (!concreteType)
+        DiagnosticSink typeLookupSink(linkage->getSourceManager(), nullptr);
+        auto concreteType =
+            globalComponentType->getTypeFromString(String(typeName).getBuffer(), &typeLookupSink);
+        if (!concreteType || as<ErrorType>(concreteType))
         {
             compileRequest->getSink()->diagnose(Diagnostics::InvalidTypeConformanceOptionNoType{
                 .option = stringValue,
@@ -1618,8 +1682,8 @@ RefPtr<ComponentType> createUnspecializedGlobalComponentType(FrontEndCompileRequ
         }
         auto interfaceType = globalComponentType->getTypeFromString(
             String(interfaceName).getBuffer(),
-            compileRequest->getSink());
-        if (!interfaceType)
+            &typeLookupSink);
+        if (!interfaceType || as<ErrorType>(interfaceType))
         {
             compileRequest->getSink()->diagnose(Diagnostics::InvalidTypeConformanceOptionNoType{
                 .option = stringValue,
@@ -2317,13 +2381,20 @@ Type* Linkage::specializeType(
     SemanticsVisitor visitor(&sharedSemanticsContext);
 
     SpecializationParams specializationParams;
-    _collectExistentialSpecializationParamsRec(
-        getASTBuilder(),
-        specializationParams,
-        unspecializedType,
-        SourceLoc());
+    if (!_collectExistentialSpecializationParamsRec(
+            getASTBuilder(),
+            specializationParams,
+            unspecializedType,
+            SourceLoc(),
+            sink,
+            0))
+    {
+        return nullptr;
+    }
 
     SLANG_ASSERT(specializationParams.getCount() == argCount);
+    if (specializationParams.getCount() != argCount)
+        return nullptr;
 
     ExpandedSpecializationArgs specializationArgs;
     for (Int aa = 0; aa < argCount; ++aa)
@@ -2609,5 +2680,22 @@ RefPtr<ComponentType> createSpecializedGlobalAndEntryPointsComponentType(
     return composed;
 }
 
+SourceLoc _getTypeNestingDiagnosticPosForDecl(Decl* decl)
+{
+    if (auto varDecl = as<VarDeclBase>(decl))
+    {
+        auto loc = getDiagnosticPos(varDecl->type);
+        if (loc.isValid())
+            return loc;
+    }
+    else if (auto callableDecl = as<CallableDecl>(decl))
+    {
+        auto loc = getDiagnosticPos(callableDecl->returnType);
+        if (loc.isValid())
+            return loc;
+    }
+
+    return getDiagnosticPos(decl);
+}
 
 } // namespace Slang

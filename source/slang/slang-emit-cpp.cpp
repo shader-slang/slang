@@ -1528,7 +1528,8 @@ bool CPPSourceEmitter::tryEmitInstExprImpl(IRInst* inst, const EmitOpInfo& inOut
             auto getElementInst = static_cast<IRGetElement*>(inst);
 
             IRInst* baseInst = getElementInst->getBase();
-            IRType* baseType = as<IRPtrTypeBase>(baseInst->getDataType())->getValueType();
+            IRType* baseType = (IRType*)unwrapAttributedType(
+                as<IRPtrTypeBase>(baseInst->getDataType())->getValueType());
             if (auto vectorBaseType = as<IRVectorType>(baseType))
             {
                 if (auto intLitIndex = as<IRIntLit>(getElementInst->getIndex()))

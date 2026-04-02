@@ -538,6 +538,9 @@ struct TupleTypeBuilder
             // original can also reference the new one.
             ordinaryStructType->insertAfter(originalStructType);
 
+            bool isOptimizableType =
+                (ordinaryStructType->findDecoration<IROptimizableTypeDecoration>());
+
             for (auto ee : ordinaryElements)
             {
                 // We will ensure that all the original fields are represented,
@@ -556,7 +559,14 @@ struct TupleTypeBuilder
                 //
                 IRType* fieldType = ee.type;
                 if (!fieldType)
-                    fieldType = context->getBuilder()->getVoidType();
+                    if (!isOptimizableType)
+                        // If the type is not optimizable, the position may be important for layout
+                        // information. In that case, we will keep the field but give it a `void`
+                        // type.
+                        //
+                        fieldType = context->getBuilder()->getVoidType();
+                    else
+                        continue; // If type is optimizable, skip the field entirely.
 
                 // TODO: shallow clone of modifiers, etc.
                 IRStructField* originalField = findStructField(originalStructType, ee.fieldKey);

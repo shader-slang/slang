@@ -144,8 +144,8 @@ set(SLANG_LOOKUP_GENERATED_SOURCE
     "${SLANG_LOOKUP_GENERATOR_OUTPUT_DIR}/slang-lookup-GLSLstd450.cpp"
 )
 set(SLANG_RECORD_REPLAY_SYSTEM
-    "${slang_SOURCE_DIR}/source/slang-record-replay/record"
-    "${slang_SOURCE_DIR}/source/slang-record-replay/util"
+    "${slang_SOURCE_DIR}/source/slang-record-replay"
+    "${slang_SOURCE_DIR}/source/slang-record-replay/proxy"
 )
 
 add_custom_command(
@@ -254,6 +254,7 @@ set(slang_link_args
     slang-fiddle-output
     slang-lookup-tables
     SPIRV-Headers::SPIRV-Headers
+    libcmark-gfm
 )
 set(slang_interface_args INCLUDE_DIRECTORIES_PUBLIC ${slang_SOURCE_DIR}/include)
 set(slang_public_lib_args
@@ -391,10 +392,12 @@ include(\"${slang_SOURCE_DIR}/cmake/RegenerateDllExports.cmake\")
     # Set output name to slang (produces slang.dll) and match directories
     set_target_properties(slang-proxy PROPERTIES
         OUTPUT_NAME slang
+        PDB_NAME slang-proxy
         RUNTIME_OUTPUT_DIRECTORY "${slang_runtime_dir}"
         ARCHIVE_OUTPUT_DIRECTORY "${slang_archive_dir}"
     )
-    
+    target_link_options(slang-proxy PRIVATE "$<$<CXX_COMPILER_ID:MSVC>:/INCREMENTAL:NO>")
+
     # Install the proxy DLL alongside slang-compiler.dll
     install(
         TARGETS slang-proxy
