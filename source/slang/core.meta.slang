@@ -1714,8 +1714,10 @@ struct FloatE5M2 : IFloatingPointCoopElement
     __init(U val);
 }
 
-// BFloat16 is now declared as a __BuiltinFloatingPointType via the kBaseTypes[] code-gen loop,
-// with [require(spvBFloat16KHR)] and [require(cuda_sm_8_0)] capability gates.
+// BFloat16 is now declared as a __BuiltinFloatingPointType via the kBaseTypes[] code-gen loop.
+// Capability enforcement (spvBFloat16KHR, cuda_sm_8_0) is at the backend emit level
+// rather than on the type declaration, because capability atoms are not yet available
+// when the kBaseTypes[] loop runs during early module compilation.
 
 extension<T:__BuiltinFloatingPointType> T
 {
