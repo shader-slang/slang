@@ -2972,7 +2972,6 @@ struct SpecializationContext
                 key.vals.getBuffer());
             auto entry =
                 builder.fetchCompilerDictionaryEntry(module->getTranslationDict(), keyInst);
-            keyInst->removeAndDeallocate();
 
             addUsersToWorkList(type);
 
