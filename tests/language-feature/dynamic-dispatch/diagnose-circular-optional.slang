@@ -41,10 +41,23 @@ INode makeNode(uint id)
     }
     else
     {
-        LinkedNode linked;
-        linked.value = 100.0;
-        linked.next = none;
-        return linked;
+        // We construct a scenario with a true loop, because otherwise, the compiler
+        // might be able to optimize away the dynamic dispatch and thus not trigger the
+        // packing error.
+        //
+
+        LeafNode leaf;
+        leaf.value = 42.0;
+
+        LinkedNode link1;
+        link1.value = 100.0;
+        link1.next = {leaf};
+
+        LinkedNode link2;
+        link2.value = 100.0;
+        link2.next = {link1};
+
+        return link2;  // Dynamic dispatch triggers packing error
     }
 }
 
