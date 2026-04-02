@@ -142,6 +142,21 @@ protected:
     void _emitHLSLDecorationSingleFloat(const char* name, IRFunc* entryPoint, IRFloatLit* val);
 
     void _emitStageAccessSemantic(IRStageAccessDecoration* decoration, const char* name);
+
+    // HLSL prelude strings for built-in helper functions injected at the top of emitted output.
+    static const char* m_BuiltinPrelude64BitCast;
+    static const char* m_CoopMatPrelude;
+
+    // Helpers for emitting dx::linalg type names for cooperative matrix operations (SM6.10).
+    static const char* getCoopMatComponentTypeName(
+        IROp elementTypeOp,
+        DiagnosticSink* sink,
+        SourceLoc loc);
+    static const char* getCoopMatMatrixUseName(IRIntegerValue useVal);
+    static const char* getCoopMatMatrixScopeName(
+        IRIntegerValue scopeVal,
+        DiagnosticSink* sink,
+        SourceLoc loc);
 };
 
 } // namespace Slang
