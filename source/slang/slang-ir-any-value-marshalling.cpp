@@ -195,6 +195,9 @@ struct AnyValueMarshallingContext
         auto dataType = cast<IRPtrTypeBase>(concreteTypedVar->getDataType())->getValueType();
         switch (dataType->getOp())
         {
+        case kIROp_VoidType:
+            // Void type has no data to marshal.
+            break;
         case kIROp_IntType:
         case kIROp_FloatType:
         case kIROp_UIntType:
