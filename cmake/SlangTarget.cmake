@@ -356,10 +356,17 @@ function(slang_add_target dir type)
                     WORKING_DIRECTORY ${output_dir}
                     VERBATIM
                 )
-                add_custom_target(
-                    ${target}-split-debug-info ALL
-                    DEPENDS ${split_debug_stamp}
-                )
+                if(ARG_EXCLUDE_FROM_ALL)
+                    add_custom_target(
+                        ${target}-split-debug-info
+                        DEPENDS ${split_debug_stamp}
+                    )
+                else()
+                    add_custom_target(
+                        ${target}-split-debug-info ALL
+                        DEPENDS ${split_debug_stamp}
+                    )
+                endif()
                 add_dependencies(${target}-split-debug-info ${target})
             else()
                 add_custom_command(
