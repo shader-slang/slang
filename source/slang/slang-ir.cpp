@@ -9303,7 +9303,8 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_DetachDerivative:
     case kIROp_FuncTypeOf:
     case kIROp_MakeIDifferentiableWitness:
-    case kIROp_SpecializeExistentials:
+    case kIROp_SpecializeExistentialsInFunc:
+    case kIROp_SpecializeExistentialsInType:
         return false;
 
     case kIROp_Div:
