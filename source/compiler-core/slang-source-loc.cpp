@@ -520,14 +520,10 @@ UnownedStringSlice SourceFile::getLineAtIndex(Index lineIndex)
     if (range.isValid() && hasContent())
     {
         const UnownedStringSlice content = getContent();
-        const uint32_t contentLen = uint32_t(content.getLength());
-        SLANG_ASSERT(range.end <= contentLen);
-
-        const uint32_t clampedStart = (range.start <= contentLen) ? range.start : contentLen;
-        const uint32_t clampedEnd = (range.end <= contentLen) ? range.end : contentLen;
+        SLANG_ASSERT(range.end <= uint32_t(content.getLength()));
 
         const char* const text = content.begin();
-        return UnownedStringSlice(text + clampedStart, text + clampedEnd);
+        return UnownedStringSlice(text + range.start, text + range.end);
     }
 
     return UnownedStringSlice();
@@ -594,12 +590,7 @@ int SourceFile::calcColumnIndex(int lineIndex, int offset, int tabSize)
 
     const auto line = getLineAtIndex(lineIndex);
 
-    // Clamp colOffset to [0, line.getLength()] to prevent out-of-bounds access when
-    // the offset exceeds the line (e.g., due to stale source locations or size mismatches).
-    const int clampedColOffset =
-        (colOffset < 0) ? 0 : ((colOffset > line.getLength()) ? int(line.getLength()) : colOffset);
-
-    const auto head = line.head(clampedColOffset);
+    const auto head = line.head(colOffset);
 
     auto colCount = UTF8Util::calcCodePointCount(head);
 
