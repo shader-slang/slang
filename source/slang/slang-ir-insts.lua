@@ -131,6 +131,8 @@ local insts = {
 			},
 			-- Represents an `Optional<T>`.
 			{ Optional = { struct_name = "OptionalType", operands = { { "valueType", "IRType" } }, hoistable = true } },
+			-- Represents a `Conditional<T, hasValue>`.
+			{ Conditional = { struct_name = "ConditionalType", operands = { { "valueType", "IRType" }, { "hasValue", "IRInst" } }, hoistable = true } },
 			-- Represents an enum type
 			{ Enum = { struct_name = "EnumType", operands = { { "tagType", "IRType" } }, parent = true } },
 			{
@@ -1024,6 +1026,8 @@ local insts = {
 	{ optionalHasValue = { operands = { { "optionalOperand" } } } },
 	{ makeOptionalValue = { operands = { { "value" } } } },
 	{ makeOptionalNone = {} },
+	{ getConditionalValue = { operands = { { "conditionalOperand" } } } },
+	{ makeConditionalValue = { operands = { { "value" } } } },
 	{ CombinedTextureSamplerGetTexture = { operands = { { "sampler" } } } },
 	{ CombinedTextureSamplerGetSampler = { operands = { { "sampler" } } } },
 	{ call = { operands = { { "callee" } } } },
