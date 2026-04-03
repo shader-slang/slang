@@ -1745,7 +1745,8 @@ struct TypeFlowSpecializationContext
                 else if (auto specInst = as<IRSpecialize>(targetCallee))
                     firstBlock = getGenericReturnVal(specInst->getBase())->getFirstBlock();
                 else if (
-                    auto existentialSpecializedFunc = as<IRSpecializeExistentialsInFunc>(targetCallee))
+                    auto existentialSpecializedFunc =
+                        as<IRSpecializeExistentialsInFunc>(targetCallee))
                 {
                     auto baseFunc = getFuncDefinitionForContext(existentialSpecializedFunc);
                     if (baseFunc)
@@ -3733,12 +3734,13 @@ struct TypeFlowSpecializationContext
         for (auto& binding : bindings)
             operands.add(binding);
 
-        auto existentialSpecializedFunc = cast<IRSpecializeExistentialsInFunc>(builder.emitIntrinsicInst(
-            nullptr, // Copy over the original func type, we'll replace the func-type
-                     // later once we have all the info.
-            kIROp_SpecializeExistentialsInFunc,
-            (UInt)operands.getCount(),
-            operands.getBuffer()));
+        auto existentialSpecializedFunc =
+            cast<IRSpecializeExistentialsInFunc>(builder.emitIntrinsicInst(
+                nullptr, // Copy over the original func type, we'll replace the func-type
+                         // later once we have all the info.
+                kIROp_SpecializeExistentialsInFunc,
+                (UInt)operands.getCount(),
+                operands.getBuffer()));
 
         existentialSpecializedFuncCache.addIfNotExists(
             callee,
@@ -4874,7 +4876,7 @@ struct TypeFlowSpecializationContext
             // For now, assert out.
             SLANG_UNEXPECTED(
                 "SpecializeExistentialsInFunc with a specialization as the base function is "
-                             "not supported yet");
+                "not supported yet");
         }
 
         // Clone the base function
