@@ -1239,6 +1239,9 @@ Compound Capabilities
 > `SPV_KHR_compute_shader_derivatives` (SPIR-V), or profile `cs_6_6` (HLSL).
 > 
 
+`mem_model`
+> Capabilities needed to use memory model
+
 `memorybarrier`
 > Capabilities required to use sm_5_0 style memory barriers
 

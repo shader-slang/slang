@@ -1250,6 +1250,16 @@ struct PeepholeContext : InstPassBase
                 }
             }
             break;
+        case kIROp_GetConditionalValue:
+            {
+                if (auto makeConditional = as<IRMakeConditionalValue>(inst->getOperand(0)))
+                {
+                    inst->replaceUsesWith(makeConditional->getValue());
+                    maybeRemoveOldInst(inst);
+                    changed = true;
+                }
+            }
+            break;
         case kIROp_OptionalHasValue:
             {
                 if (inst->getOperand(0)->getOp() == kIROp_MakeOptionalValue)
