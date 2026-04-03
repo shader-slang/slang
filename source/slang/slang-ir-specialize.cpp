@@ -652,9 +652,37 @@ struct SpecializationContext
         // version of the result of the generic (a specialized
         // type, function, or whatever).
         //
+        auto errorsBefore = sink ? sink->getErrorCount() : 0;
         auto specializedVal = specializeGeneric(genericVal, specInst);
         if (!specializedVal)
-            return false;
+        {
+            // When specialization fails due to an invalid existential specialization
+            // (e.g. genericFunc<IFoo>(...) with a missing witness table argument),
+            // emit a diagnostic and replace the specialize instruction with a poison
+            // value so that subsequent passes don't crash on the unresolved instruction.
+            // Only emit E33180 if no other diagnostic was already produced (e.g. by
+            // the specialization depth budget check).
+            if (sink && sink->getErrorCount() == errorsBefore)
+            {
+                String genericName;
+                if (auto inner = findGenericReturnVal(genericVal))
+                    if (auto nameHint = inner->findDecoration<IRNameHintDecoration>())
+                        genericName = nameHint->getName();
+                if (genericName.getLength() == 0)
+                    genericName = "<generic>";
+                sink->diagnose(Diagnostics::CannotSpecializeGenericWithExistential{
+                    .generic = genericName,
+                    .location = specInst->sourceLoc});
+            }
+            // Replace the specialize instruction with a poison value to prevent
+            // later passes from encountering an unresolvable specialize instruction.
+            IRBuilder builder(module);
+            builder.setInsertBefore(specInst);
+            auto poison = builder.emitPoison(specInst->getFullType());
+            specInst->replaceUsesWith(poison);
+            specInst->removeAndDeallocate();
+            return true;
+        }
 
         // Any uses of this `specialize(...)` instruction will
         // become uses of `specializeVal`, so we want to re-consider
@@ -1661,6 +1689,15 @@ struct SpecializationContext
                 //
                 while (workList.getCount() != 0)
                 {
+                    // If we've emitted errors (e.g. from diagnosing an invalid
+                    // existential specialization), bail out early to avoid
+                    // processing IR that may be in an inconsistent state.
+                    if (sink && sink->getErrorCount() != 0)
+                    {
+                        workList.clear();
+                        break;
+                    }
+
                     IRInst* inst = workList.getLast();
 
                     workList.removeLast();
@@ -1711,6 +1748,9 @@ struct SpecializationContext
                     break;
             }
 
+            if (sink && sink->getErrorCount() != 0)
+                break;
+
             if (iterChanged)
             {
                 this->changed = true;
@@ -1720,6 +1760,9 @@ struct SpecializationContext
                 applySparseConditionalConstantPropagation(this->module, targetProgram, this->sink);
                 unrollLoopsInModule(module, targetProgram, sink);
             }
+
+            if (sink && sink->getErrorCount() != 0)
+                break;
 
             // Once the work list has gone dry, we should have the invariant
             // that there are no `specialize` instructions inside of non-generic
@@ -3709,6 +3752,18 @@ IRInst* specializeGenericImpl(
     // be initializing our environment to map `T -> a`, `U -> b`,
     // and `V -> c`.
     //
+    // When a generic is explicitly specialized with an interface type (e.g.
+    // genericFunc<IFoo>(...)), the specialize instruction may have fewer arguments
+    // than the generic has parameters (the witness-table argument is missing).
+    // Return nullptr; the caller handles diagnostics and cleanup.
+    {
+        UInt paramCount = 0;
+        for ([[maybe_unused]] auto param : genericVal->getParams())
+            paramCount++;
+        if (specializeInst->getArgCount() < paramCount)
+            return nullptr;
+    }
+
     UInt argCounter = 0;
     for (auto param : genericVal->getParams())
     {

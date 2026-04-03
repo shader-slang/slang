@@ -14360,6 +14360,86 @@ Type* SemanticsDeclHeaderVisitor::_getAccessorStorageType(AccessorDecl* decl)
     }
 }
 
+// Check whether an AST type includes a dynamic-dispatch interface,
+// i.e. a non-COM, non-builtin interface that requires AnyValue packing.
+// This mirrors the IR-level `typeIncludesDynamicDispatch()` in
+// slang-ir-typeflow-specialize.cpp but operates on AST types so it
+// can be used during semantic checking.
+//
+// `visitor` is used to ensure struct field types are resolved via
+// ensureDecl before inspection.  `seenDecls` guards against infinite
+// recursion on self-recursive aggregates.
+static bool _astTypeIncludesDynamicDispatch(
+    SemanticsVisitor* visitor,
+    Type* type,
+    HashSet<Decl*>& seenDecls)
+{
+    // Peel ModifiedType wrappers (e.g. `const`, `volatile`).
+    while (auto modifiedType = as<ModifiedType>(type))
+        type = modifiedType->getBase();
+
+    if (auto declRefType = as<DeclRefType>(type))
+    {
+        if (auto interfaceDecl = as<InterfaceDecl>(declRefType->getDeclRef().getDecl()))
+        {
+            bool isCom = interfaceDecl->findModifier<ComInterfaceAttribute>() != nullptr;
+            bool isBuiltin = interfaceDecl->findModifier<BuiltinAttribute>() != nullptr;
+            if (!isCom && !isBuiltin)
+                return true;
+        }
+    }
+
+    if (auto structType = as<DeclRefType>(type))
+    {
+        if (auto structDecl = as<StructDecl>(structType->getDeclRef().getDecl()))
+        {
+            if (!seenDecls.add(structDecl))
+                return false;
+            for (auto field : structDecl->getFields())
+            {
+                visitor->ensureDecl(field, DeclCheckState::CanUseTypeOfValueDecl);
+                // Use getMemberDeclRef + getType to apply generic substitutions,
+                // so that e.g. Box<IFoo> with field `T item` resolves T to IFoo.
+                auto fieldDeclRef = visitor->getASTBuilder()
+                                        ->getMemberDeclRef(structType->getDeclRef(), field)
+                                        .as<VarDeclBase>();
+                auto fieldType = fieldDeclRef ? getType(visitor->getASTBuilder(), fieldDeclRef)
+                                              : field->type.type;
+                if (fieldType && _astTypeIncludesDynamicDispatch(visitor, fieldType, seenDecls))
+                    return true;
+            }
+            seenDecls.remove(structDecl);
+        }
+    }
+
+    if (auto arrayType = as<ArrayExpressionType>(type))
+    {
+        if (auto elemType = arrayType->getElementType())
+            return _astTypeIncludesDynamicDispatch(visitor, elemType, seenDecls);
+    }
+
+    if (auto optionalType = as<OptionalType>(type))
+    {
+        if (auto valType = optionalType->getValueType())
+            return _astTypeIncludesDynamicDispatch(visitor, valType, seenDecls);
+    }
+
+    if (auto tupleType = as<TupleType>(type))
+    {
+        for (Index i = 0; i < tupleType->getMemberCount(); i++)
+        {
+            if (auto memberType = tupleType->getMember(i))
+            {
+                if (_astTypeIncludesDynamicDispatch(visitor, memberType, seenDecls))
+                    return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+
 void SemanticsDeclHeaderVisitor::visitAccessorDecl(AccessorDecl* decl)
 {
 
@@ -14392,6 +14472,25 @@ void SemanticsDeclHeaderVisitor::visitAccessorDecl(AccessorDecl* decl)
     // for `GetterDecl`s.
     //
     decl->returnType.type = _getAccessorStorageType(decl);
+
+    // A `ref` accessor returns a reference to the storage location.
+    // If the storage type involves a dynamic-dispatch interface, the
+    // reference would point directly into AnyValue-packed existential
+    // storage, bypassing the pack/unpack marshalling that dynamic
+    // dispatch requires.  This leads to runtime corruption/segfaults,
+    // so we reject it at compile time.
+    if (as<RefAccessorDecl>(decl))
+    {
+        auto storageType = decl->returnType.type;
+        HashSet<Decl*> seenDecls;
+        if (storageType && _astTypeIncludesDynamicDispatch(this, storageType, seenDecls))
+        {
+            getSink()->diagnose(Diagnostics::RefAccessorWithInterfaceTypeInDynamicDispatch{
+                .valueType = storageType,
+                .location = decl->loc});
+            decl->returnType.type = getASTBuilder()->getErrorType();
+        }
+    }
 
     checkDifferentiableCallableCommon(decl);
 }

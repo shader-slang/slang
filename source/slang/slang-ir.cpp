@@ -9141,6 +9141,8 @@ bool IRInst::mightHaveSideEffects(SideEffectAnalysisOptions options)
     case kIROp_MakeOptionalNone:
     case kIROp_OptionalHasValue:
     case kIROp_GetOptionalValue:
+    case kIROp_MakeConditionalValue:
+    case kIROp_GetConditionalValue:
     case kIROp_DifferentialPairGetPrimal:
     case kIROp_DifferentialPairGetDifferential:
     case kIROp_MakeDifferentialPair:
@@ -9728,6 +9730,8 @@ bool isMovableInst(IRInst* inst)
     case kIROp_OptionalHasValue:
     case kIROp_GetOptionalValue:
     case kIROp_MakeOptionalValue:
+    case kIROp_MakeConditionalValue:
+    case kIROp_GetConditionalValue:
     case kIROp_MakeTuple:
     case kIROp_GetTupleElement:
     case kIROp_MakeStruct:
