@@ -3813,9 +3813,13 @@ void CLikeSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
             layout->usesResourceKind(LayoutResourceKind::VaryingOutput))
         {
             emitInterpolationModifiers(param, paramType, layout);
-            emitMeshShaderModifiers(param);
         }
     }
+
+    // Mesh output decorations do not always come with a varying-output layout kind
+    // (for example, OutputVertices can lower to a plain array layout), so gate on the
+    // decoration itself instead of the layout classification.
+    emitMeshShaderModifiers(param);
 
     emitParamType(paramType, paramName);
     emitSemantics(param);
