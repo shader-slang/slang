@@ -12,73 +12,6 @@
 namespace Slang
 {
 
-static UnownedStringSlice _mapSlangCoopVecComponentTypeToHLSL(
-    int32_t slangValue,
-    IRIntegerValue inputInterpretationPackingFactor)
-{
-    if (inputInterpretationPackingFactor != 1)
-    {
-        switch (slangValue)
-        {
-        case SLANG_SCALAR_TYPE_INT8:
-            return UnownedStringSlice("SignedInt8Packed");
-        case SLANG_SCALAR_TYPE_UINT8:
-            return UnownedStringSlice("UnsignedInt8Packed");
-        default:
-            SLANG_UNEXPECTED(
-                "Unsupported packed cooperative vector input interpretation for HLSL emission");
-        }
-    }
-
-    switch (slangValue)
-    {
-    case SLANG_SCALAR_TYPE_FLOAT_E4M3:
-        return UnownedStringSlice("FloatE4M3");
-    case SLANG_SCALAR_TYPE_FLOAT_E5M2:
-        return UnownedStringSlice("FloatE5M2");
-    case SLANG_SCALAR_TYPE_FLOAT16:
-        return UnownedStringSlice("Float16");
-    case SLANG_SCALAR_TYPE_FLOAT32:
-        return UnownedStringSlice("Float32");
-    case SLANG_SCALAR_TYPE_FLOAT64:
-        return UnownedStringSlice("Float64");
-    case SLANG_SCALAR_TYPE_INT8:
-        return UnownedStringSlice("SignedInt8");
-    case SLANG_SCALAR_TYPE_INT16:
-        return UnownedStringSlice("SignedInt16");
-    case SLANG_SCALAR_TYPE_INT32:
-        return UnownedStringSlice("SignedInt32");
-    case SLANG_SCALAR_TYPE_INT64:
-        return UnownedStringSlice("SignedInt64");
-    case SLANG_SCALAR_TYPE_UINT8:
-        return UnownedStringSlice("UnsignedInt8");
-    case SLANG_SCALAR_TYPE_UINT16:
-        return UnownedStringSlice("UnsignedInt16");
-    case SLANG_SCALAR_TYPE_UINT32:
-        return UnownedStringSlice("UnsignedInt32");
-    case SLANG_SCALAR_TYPE_UINT64:
-        return UnownedStringSlice("UnsignedInt64");
-    default:
-        SLANG_UNEXPECTED("Unsupported cooperative vector component type for HLSL emission");
-    }
-}
-
-static UnownedStringSlice _mapSlangCoopVecMatrixLayoutToHLSL(int32_t slangValue)
-{
-    switch (slangValue)
-    {
-    case SLANG_COOPERATIVE_VECTOR_MATRIX_LAYOUT_ROW_MAJOR:
-        return UnownedStringSlice("RowMajor");
-    case SLANG_COOPERATIVE_VECTOR_MATRIX_LAYOUT_COLUMN_MAJOR:
-        return UnownedStringSlice("ColumnMajor");
-    case SLANG_COOPERATIVE_VECTOR_MATRIX_LAYOUT_INFERENCING_OPTIMAL:
-        return UnownedStringSlice("InferencingOptimal");
-    case SLANG_COOPERATIVE_VECTOR_MATRIX_LAYOUT_TRAINING_OPTIMAL:
-        return UnownedStringSlice("TrainingOptimal");
-    default:
-        SLANG_UNEXPECTED("Unsupported cooperative vector matrix layout for HLSL emission");
-    }
-}
 
 void HLSLSourceEmitter::_emitHLSLDecorationSingleString(
     const char* name,
@@ -666,16 +599,89 @@ void HLSLSourceEmitter::emitMappedCoopVecComponentType(
             cast<IRIntLit>(inputInterpretationPackingFactor)->getValue();
     }
 
-    m_writer->emit(_mapSlangCoopVecComponentTypeToHLSL(
-        (int32_t)intLit->getValue(),
-        inputInterpretationPackingFactorValue));
+    // SM 6.9 dx/linalg.h uses an unscoped `enum DataType` with `DATA_TYPE_*` enumerators in
+    // namespace dx::linalg (not DataType::Float16-style names).
+    m_writer->emit(m_sm610OrAbove ? "dx::linalg::ComponentType::" : "dx::linalg::");
+    m_writer->emit(getCoopVecComponentType_enum(
+        (SlangScalarType)intLit->getValue(),
+        inputInterpretationPackingFactorValue,
+        m_sm610OrAbove));
 }
 
-void HLSLSourceEmitter::emitMappedCoopVecMatrixLayout(IRInst* operand)
+void HLSLSourceEmitter::emitMatrixLayoutEnum_sm609(IRInst* operand)
 {
-    auto intLit = cast<IRIntLit>(operand);
+    SLANG_ASSERT(!m_sm610OrAbove);
 
-    m_writer->emit(_mapSlangCoopVecMatrixLayoutToHLSL((int32_t)intLit->getValue()));
+    const auto layout = (int32_t)cast<IRIntLit>(operand)->getValue();
+    switch (layout)
+    {
+    case SLANG_COOPERATIVE_VECTOR_MATRIX_LAYOUT_ROW_MAJOR:
+        m_writer->emit("dx::linalg::MATRIX_LAYOUT_ROW_MAJOR");
+        break;
+    case SLANG_COOPERATIVE_VECTOR_MATRIX_LAYOUT_COLUMN_MAJOR:
+        m_writer->emit("dx::linalg::MATRIX_LAYOUT_COLUMN_MAJOR");
+        break;
+    case SLANG_COOPERATIVE_VECTOR_MATRIX_LAYOUT_INFERENCING_OPTIMAL:
+        m_writer->emit("dx::linalg::MATRIX_LAYOUT_MUL_OPTIMAL");
+        break;
+    case SLANG_COOPERATIVE_VECTOR_MATRIX_LAYOUT_TRAINING_OPTIMAL:
+        m_writer->emit("dx::linalg::MATRIX_LAYOUT_OUTER_PRODUCT_OPTIMAL");
+        break;
+    default:
+        SLANG_UNEXPECTED("Unsupported cooperative vector matrix layout for HLSL emission");
+    }
+}
+
+void HLSLSourceEmitter::emitMatrixLayoutEnum_sm610(IRInst* memoryLayout, bool isTranspose)
+{
+    SLANG_ASSERT(m_sm610OrAbove);
+    const auto layout = (int32_t)cast<IRIntLit>(memoryLayout)->getValue();
+
+    m_writer->emit("dx::linalg::MatrixLayoutEnum::");
+    switch (layout)
+    {
+    case SLANG_COOPERATIVE_VECTOR_MATRIX_LAYOUT_ROW_MAJOR:
+        m_writer->emit(isTranspose ? "ColMajor" : "RowMajor");
+        break;
+    case SLANG_COOPERATIVE_VECTOR_MATRIX_LAYOUT_COLUMN_MAJOR:
+        m_writer->emit(isTranspose ? "RowMajor" : "ColMajor");
+        break;
+    case SLANG_COOPERATIVE_VECTOR_MATRIX_LAYOUT_INFERENCING_OPTIMAL:
+        m_writer->emit("MulOptimal");
+        if (isTranspose)
+            m_writer->emit("Transpose");
+        break;
+    case SLANG_COOPERATIVE_VECTOR_MATRIX_LAYOUT_TRAINING_OPTIMAL:
+        m_writer->emit("OuterProductOptimal");
+        if (isTranspose)
+            m_writer->emit("Transpose");
+        break;
+    default:
+        SLANG_UNEXPECTED("Unsupported cooperative vector matrix layout for HLSL emission");
+    }
+}
+
+void HLSLSourceEmitter::emitCoopVecMatMulBufferType(IRInst* bufferPtrInst)
+{
+    IRType* ty = bufferPtrInst->getDataType();
+    if (auto ptrTy = as<IRPtrTypeBase>(ty))
+        ty = ptrTy->getValueType();
+    emitType(ty);
+}
+
+void HLSLSourceEmitter::ensureCoopVecHlslPreludeForProfile()
+{
+    ensurePrelude("#include \"dx/linalg.h\"");
+
+    auto targetProfile = getTargetProgram()->getOptionSet().getProfile();
+    if (targetProfile.getVersion() > ProfileVersion::DX_6_9)
+    {
+        ensurePrelude(m_CoopVecPrelude_sm610);
+    }
+    else
+    {
+        ensurePrelude(m_CoopVecPrelude_sm609);
+    }
 }
 
 bool HLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
@@ -896,32 +902,71 @@ bool HLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             const bool inputIsUnsigned = isScalarIntegerType(inputType->getElementType()) &&
                                          !getIntTypeSigned(inputType->getElementType());
 
-            emitInstResultDecl(inst);
-            emitType(inst->getDataType());
-            m_writer->emit("(0);\n");
+            ensureCoopVecHlslPreludeForProfile();
 
-            m_writer->emit(hasBias ? "__builtin_MatVecMulAdd(" : "__builtin_MatVecMul(");
-            m_writer->emit(getName(inst));
-            m_writer->emit(outputIsUnsigned ? ", true, " : ", false, ");
-            emitOperand(input, getInfo(EmitOp::General));
-            m_writer->emit(inputIsUnsigned ? ", true, " : ", false, ");
-            emitMappedCoopVecComponentType(
-                coopVecMatMulAdd->getInputInterpretation(),
-                coopVecMatMulAdd->getInputInterpretationPackingFactor());
+            emitInstResultDecl(inst);
+            m_writer->emit(hasBias ? "__slang_linalg_MulAdd<" : "__slang_linalg_Mul<");
+            emitType(resultType->getElementType());
             m_writer->emit(", ");
-            emitOperand(matrixPtr, getInfo(EmitOp::General));
-            m_writer->emit(", ");
-            emitOperand(matrixOffset, getInfo(EmitOp::General));
-            m_writer->emit(", ");
-            emitMappedCoopVecComponentType(matrixInterpretation);
+            emitMappedCoopVecComponentType(matrixInterpretation, nullptr);
             m_writer->emit(", ");
             emitOperand(resultType->getElementCount(), getInfo(EmitOp::General));
             m_writer->emit(", ");
             emitOperand(k, getInfo(EmitOp::General));
             m_writer->emit(", ");
-            emitMappedCoopVecMatrixLayout(memoryLayout);
+            if (m_sm610OrAbove)
+            {
+                emitMatrixLayoutEnum_sm610(memoryLayout, cast<IRBoolLit>(transpose)->getValue());
+            }
+            else
+            {
+                emitMatrixLayoutEnum_sm609(memoryLayout);
+                m_writer->emit(", ");
+                emitOperand(transpose, getInfo(EmitOp::General));
+            }
             m_writer->emit(", ");
-            emitOperand(transpose, getInfo(EmitOp::General));
+            emitMappedCoopVecComponentType(
+                coopVecMatMulAdd->getInputInterpretation(),
+                coopVecMatMulAdd->getInputInterpretationPackingFactor());
+            // Physical HLSL vector length (e.g. 1 x uint8_t4_packed for K==4); MatK stays logical
+            // K.
+            m_writer->emit(", ");
+            emitOperand(inputType->getElementCount(), getInfo(EmitOp::General));
+            if (hasBias)
+            {
+                if (m_sm610OrAbove)
+                {
+                    m_writer->emit(", ");
+                    emitType(resultType->getElementType());
+                    m_writer->emit(", ");
+                    emitOperand(resultType->getElementCount(), getInfo(EmitOp::General));
+                }
+                else
+                {
+                    m_writer->emit(", ");
+                    emitMappedCoopVecComponentType(biasInterpretation, nullptr);
+                }
+            }
+            m_writer->emit(", ");
+            emitCoopVecMatMulBufferType(matrixPtr);
+            if (hasBias)
+            {
+                m_writer->emit(", ");
+                emitCoopVecMatMulBufferType(biasPtr);
+            }
+            m_writer->emit(", ");
+            emitType(inputType->getElementType());
+            if (!m_sm610OrAbove)
+            {
+                m_writer->emit(", ");
+                m_writer->emit(outputIsUnsigned ? "true" : "false");
+                m_writer->emit(", ");
+                m_writer->emit(inputIsUnsigned ? "true" : "false");
+            }
+            m_writer->emit(">(");
+            emitOperand(matrixPtr, getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(matrixOffset, getInfo(EmitOp::General));
             m_writer->emit(", ");
             emitOperand(matrixStride, getInfo(EmitOp::General));
             if (hasBias)
@@ -930,17 +975,40 @@ bool HLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
                 emitOperand(biasPtr, getInfo(EmitOp::General));
                 m_writer->emit(", ");
                 emitOperand(biasOffset, getInfo(EmitOp::General));
-                m_writer->emit(", ");
-                emitMappedCoopVecComponentType(biasInterpretation);
             }
+            m_writer->emit(", ");
+            emitOperand(input, getInfo(EmitOp::General));
             m_writer->emit(");\n");
             return true;
         }
     case kIROp_CoopVecOuterProductAccumulate:
         {
             auto outerProduct = cast<IRCoopVecOuterProductAccumulate>(inst);
+            auto aType = cast<IRCoopVectorType>(outerProduct->getA()->getDataType());
+            auto bType = cast<IRCoopVectorType>(outerProduct->getB()->getDataType());
 
-            m_writer->emit("__builtin_OuterProductAccumulate(");
+            ensureCoopVecHlslPreludeForProfile();
+
+            m_writer->emit("__slang_linalg_OuterProductAccumulate<");
+            emitType(aType->getElementType());
+            m_writer->emit(", ");
+            emitMappedCoopVecComponentType(outerProduct->getMatrixInterpretation());
+            m_writer->emit(", ");
+            emitOperand(aType->getElementCount(), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitOperand(bType->getElementCount(), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            if (m_sm610OrAbove)
+            {
+                emitMatrixLayoutEnum_sm610(outerProduct->getMemoryLayout(), false);
+            }
+            else
+            {
+                emitMatrixLayoutEnum_sm609(outerProduct->getMemoryLayout());
+            }
+            m_writer->emit(", ");
+            emitCoopVecMatMulBufferType(outerProduct->getMatrixPtr());
+            m_writer->emit(">(");
             emitOperand(outerProduct->getA(), getInfo(EmitOp::General));
             m_writer->emit(", ");
             emitOperand(outerProduct->getB(), getInfo(EmitOp::General));
@@ -949,10 +1017,6 @@ bool HLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
             m_writer->emit(", ");
             emitOperand(outerProduct->getMatrixOffset(), getInfo(EmitOp::General));
             m_writer->emit(", ");
-            emitMappedCoopVecComponentType(outerProduct->getMatrixInterpretation());
-            m_writer->emit(", ");
-            emitMappedCoopVecMatrixLayout(outerProduct->getMemoryLayout());
-            m_writer->emit(", ");
             emitOperand(outerProduct->getMatrixStride(), getInfo(EmitOp::General));
             m_writer->emit(");\n");
             return true;
@@ -960,8 +1024,17 @@ bool HLSLSourceEmitter::tryEmitInstStmtImpl(IRInst* inst)
     case kIROp_CoopVecReduceSumAccumulate:
         {
             auto reduceSum = cast<IRCoopVecReduceSumAccumulate>(inst);
+            auto valueType = cast<IRCoopVectorType>(reduceSum->getValue()->getDataType());
 
-            m_writer->emit("__builtin_VectorAccumulate(");
+            ensureCoopVecHlslPreludeForProfile();
+
+            m_writer->emit("__slang_linalg_VectorAccumulate<");
+            emitType(valueType->getElementType());
+            m_writer->emit(", ");
+            emitOperand(valueType->getElementCount(), getInfo(EmitOp::General));
+            m_writer->emit(", ");
+            emitCoopVecMatMulBufferType(reduceSum->getBufferPtr());
+            m_writer->emit(">(");
             emitOperand(reduceSum->getValue(), getInfo(EmitOp::General));
             m_writer->emit(", ");
             emitOperand(reduceSum->getBufferPtr(), getInfo(EmitOp::General));
@@ -2166,26 +2239,6 @@ void HLSLSourceEmitter::emitSimpleFuncParamImpl(IRParam* param)
     Super::emitSimpleFuncParamImpl(param);
 }
 
-static UnownedStringSlice _getInterpolationModifierText(IRInterpolationMode mode)
-{
-    switch (mode)
-    {
-    case IRInterpolationMode::PerVertex:
-    case IRInterpolationMode::NoInterpolation:
-        return UnownedStringSlice::fromLiteral("nointerpolation");
-    case IRInterpolationMode::NoPerspective:
-        return UnownedStringSlice::fromLiteral("noperspective");
-    case IRInterpolationMode::Linear:
-        return UnownedStringSlice::fromLiteral("linear");
-    case IRInterpolationMode::Sample:
-        return UnownedStringSlice::fromLiteral("sample");
-    case IRInterpolationMode::Centroid:
-        return UnownedStringSlice::fromLiteral("centroid");
-    default:
-        return UnownedStringSlice();
-    }
-}
-
 void HLSLSourceEmitter::emitInterpolationModifiersImpl(
     IRInst* varInst,
     IRType* valueType,
@@ -2201,7 +2254,7 @@ void HLSLSourceEmitter::emitInterpolationModifiersImpl(
 
         auto decoration = (IRInterpolationModeDecoration*)dd;
 
-        UnownedStringSlice modeText = _getInterpolationModifierText(decoration->getMode());
+        UnownedStringSlice modeText = getInterpolationModifier_keyword(decoration->getMode());
         if (modeText.getLength() > 0)
         {
             m_writer->emit(modeText);
