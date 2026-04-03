@@ -3076,7 +3076,7 @@ local insts = {
 	} },
 	{ WeakUse = { hoistable = true } },
 	{ FuncTypeOf = { hoistable = true }},
-	{ SpecializeExistentials = {
+	{ SpecializeExistentialsInFunc = {
 		-- Represents a reference to a function with specific existential parameter bindings.
 		--
 		-- Used by the type-flow specialization pass to represent different
@@ -3091,6 +3091,15 @@ local insts = {
 		--
 		hoistable = true,
 		operands = { {"func"} }
+	} },
+	{ SpecializeExistentialsInType = {
+		-- Represents an existential specialization key for type specialization caching.
+		--
+		-- Used as a compiler-dictionary key for specialized BindExistentialsType results.
+		-- Operands: (baseType, binding0, binding1, ...)
+		--
+		hoistable = true,
+		operands = { {"baseType"} }
 	} },
 	{ CompilerDictionaryEntry = { hoistable = true, parent = true }},
 	{ CompilerDictionaryValue = { operands = { {"value"} } } },

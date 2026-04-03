@@ -2967,7 +2967,7 @@ struct SpecializationContext
             keyBuilder.setInsertBefore(type);
             auto keyInst = keyBuilder.emitIntrinsicInst(
                 nullptr,
-                kIROp_SpecializeExistentials,
+                kIROp_SpecializeExistentialsInType,
                 (UInt)key.vals.getCount(),
                 key.vals.getBuffer());
             auto entry =

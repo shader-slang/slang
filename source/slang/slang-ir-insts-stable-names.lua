@@ -810,7 +810,7 @@ return {
 	["constexprCastEnumToInt"] = 834,
 	["constexprEnumCast"] = 835,
 	["constexprDiv"] = 836,
-	["SpecializeExistentials"] = 837,
+	["SpecializeExistentialsInFunc"] = 837,
 	["ReportCheckpointStore"] = 838,
 	["Type.TupleName"] = 839,
 	["TranslateBase.BackwardRematFromLegacyBwdDiffFunc"] = 840,
@@ -821,5 +821,6 @@ return {
 	["Type.TranslatedTypeBase.TrivialBackwardDiffMinimalContextType"] = 845,
 	["Type.TranslatedTypeBase.BackwardMinimalContextFromLegacyBwdDiffFunc"] = 846,
 	["Decoration.ParamsContextDecoration"] = 847,
-	["matrixSwizzleStore"] = 848
+	["matrixSwizzleStore"] = 848,
+	["SpecializeExistentialsInType"] = 849
 }
