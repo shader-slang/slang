@@ -24,6 +24,6 @@ RWStructuredBuffer<float> outputBuffer;
 [numthreads(1, 1, 1)]
 void computeMain(uniform IFoo foo, uniform IBar bar)
 {
-    // CHECK: error[E50100]
+    // CHECK-COUNT-2: error[E50100]
     outputBuffer[0] = foo.getValue() + bar.weight();
 }
