@@ -2278,21 +2278,15 @@ void HLSLSourceEmitter::emitMeshShaderModifiersImpl(IRInst* varInst)
 {
     if (auto modifier = varInst->findDecoration<IRMeshOutputDecoration>())
     {
-        // Mesh outputs can lower either as borrow-style params (which need the
-        // full "out vertices"/"out indices"/"out primitives" spelling here) or
-        // as true Out<T> params (where the generic param emitter already prints
-        // the leading "out"). Handle both forms so direct DXIL/HLSL codegen
-        // doesn't duplicate the direction qualifier.
-        const bool typeAlreadyPrintsOut = as<IROutParamType>(varInst->getDataType()) ||
-                                          as<IRBorrowInOutParamType>(varInst->getDataType()) ||
-                                          as<IRRefParamType>(varInst->getDataType());
+        // Mesh output parameters are legalized to arrays while retaining their
+        // mesh output decorations, so emit the full HLSL spelling here.
         const char* s =
             as<IRVerticesDecoration>(modifier)
-                ? (typeAlreadyPrintsOut ? "vertices " : "out vertices ")
+                ? "out vertices "
             : as<IRIndicesDecoration>(modifier)
-                ? (typeAlreadyPrintsOut ? "indices " : "out indices ")
+                ? "out indices "
             : as<IRPrimitivesDecoration>(modifier)
-                ? (typeAlreadyPrintsOut ? "primitives " : "out primitives ")
+                ? "out primitives "
                 : nullptr;
         SLANG_ASSERT(s && "Unhandled type of mesh output decoration");
         m_writer->emit(s);
