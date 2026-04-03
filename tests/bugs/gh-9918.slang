@@ -6,7 +6,10 @@
 
 //CHECK_SPIRV: OpEntryPoint
 //CHECK_GLSL: void main()
-//CHECK_HLSL: void entry_mesh
+//CHECK_HLSL: void entry_mesh(
+//CHECK_HLSL: out indices uint3
+//CHECK_HLSL: out vertices
+//CHECK_HLSL: out primitives
 
 
 const static float2 positions[3] = {
