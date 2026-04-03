@@ -337,18 +337,30 @@ function(slang_add_target dir type)
             )
         else()
             if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
-                # macOS - use dsymutil with --flat to create separate debug file
+                # macOS - use dsymutil with --flat to create separate debug file.
+                # Use an output-based rule instead of POST_BUILD so incremental
+                # builds don't regenerate debug info from an already-stripped binary.
+                set(split_debug_stamp
+                    "${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/${target}-$<CONFIG>-split-debug.stamp"
+                )
                 add_custom_command(
-                    TARGET ${target}
-                    POST_BUILD
+                    OUTPUT ${split_debug_stamp}
                     COMMAND
                         dsymutil --flat $<TARGET_FILE:${target}> -o
                         $<TARGET_FILE:${target}>.dwarf
                     COMMAND chmod 644 $<TARGET_FILE:${target}>.dwarf
                     COMMAND ${CMAKE_STRIP} -S $<TARGET_FILE:${target}>
+                    COMMAND ${CMAKE_COMMAND} -E touch ${split_debug_stamp}
+                    DEPENDS $<TARGET_FILE:${target}>
+                    BYPRODUCTS $<TARGET_FILE:${target}>.dwarf
                     WORKING_DIRECTORY ${output_dir}
                     VERBATIM
                 )
+                add_custom_target(
+                    ${target}-split-debug-info ALL
+                    DEPENDS ${split_debug_stamp}
+                )
+                add_dependencies(${target}-split-debug-info ${target})
             else()
                 add_custom_command(
                     TARGET ${target}
