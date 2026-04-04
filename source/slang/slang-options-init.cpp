@@ -13,13 +13,14 @@
 #include "slang-capability.h"
 #include "slang-compiler-options.h"
 #include "slang-hlsl-to-vulkan-layout-options.h"
+#include "slang-options-value-category.h"
 #include "slang-profile.h"
 
 namespace Slang
 {
 
 namespace
-{ // anonymous – avoids ODR conflict with the same types in slang-options.cpp
+{ // anonymous
 
 typedef CompilerOptionName OptionKind;
 
@@ -33,53 +34,6 @@ struct Option
     const CommandOptions::InputLink* links = nullptr;
     Count linkCount = 0;
 };
-
-enum class ValueCategory
-{
-    Compiler,
-    Target,
-    Language,
-    FloatingPointMode,
-    FloatingPointDenormalMode,
-    ArchiveType,
-    Stage,
-    LineDirectiveMode,
-    DebugInfoFormat,
-    HelpStyle,
-    OptimizationLevel,
-    DebugLevel,
-    FileSystemType,
-    VulkanShift,
-    SourceEmbedStyle,
-    LanguageVersion,
-
-    CountOf,
-};
-
-template<typename T>
-struct GetValueCategory;
-
-#define SLANG_GET_VALUE_CATEGORY(cat, type)   \
-    template<>                                \
-    struct GetValueCategory<type>             \
-    {                                         \
-        enum                                  \
-        {                                     \
-            Value = Index(ValueCategory::cat) \
-        };                                    \
-    };
-
-SLANG_GET_VALUE_CATEGORY(Compiler, SlangPassThrough)
-SLANG_GET_VALUE_CATEGORY(ArchiveType, SlangArchiveType)
-SLANG_GET_VALUE_CATEGORY(LineDirectiveMode, SlangLineDirectiveMode)
-SLANG_GET_VALUE_CATEGORY(FloatingPointMode, FloatingPointMode)
-SLANG_GET_VALUE_CATEGORY(FloatingPointDenormalMode, FloatingPointDenormalMode)
-SLANG_GET_VALUE_CATEGORY(FileSystemType, TypeTextUtil::FileSystemType)
-SLANG_GET_VALUE_CATEGORY(HelpStyle, CommandOptionsWriter::Style)
-SLANG_GET_VALUE_CATEGORY(OptimizationLevel, SlangOptimizationLevel)
-SLANG_GET_VALUE_CATEGORY(VulkanShift, HLSLToVulkanLayoutOptions::Kind)
-SLANG_GET_VALUE_CATEGORY(SourceEmbedStyle, SourceEmbedUtil::Style)
-SLANG_GET_VALUE_CATEGORY(Language, SourceLanguage)
 
 static void _addOptions(const ConstArrayView<Option>& options, CommandOptions& cmdOptions)
 {

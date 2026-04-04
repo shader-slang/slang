@@ -24,6 +24,7 @@
 #include "slang-compiler.h"
 #include "slang-hlsl-to-vulkan-layout-options.h"
 #include "slang-markdown.h"
+#include "slang-options-value-category.h"
 #include "slang-profile.h"
 #include "slang-repro.h"
 #include "slang-rich-diagnostics.h"
@@ -40,53 +41,6 @@ namespace
 
 // All of the options are given an unique enum
 typedef CompilerOptionName OptionKind;
-
-enum class ValueCategory
-{
-    Compiler,
-    Target,
-    Language,
-    FloatingPointMode,
-    FloatingPointDenormalMode,
-    ArchiveType,
-    Stage,
-    LineDirectiveMode,
-    DebugInfoFormat,
-    HelpStyle,
-    OptimizationLevel,
-    DebugLevel,
-    FileSystemType,
-    VulkanShift,
-    SourceEmbedStyle,
-    LanguageVersion,
-
-    CountOf,
-};
-
-template<typename T>
-struct GetValueCategory;
-
-#define SLANG_GET_VALUE_CATEGORY(cat, type)   \
-    template<>                                \
-    struct GetValueCategory<type>             \
-    {                                         \
-        enum                                  \
-        {                                     \
-            Value = Index(ValueCategory::cat) \
-        };                                    \
-    };
-
-SLANG_GET_VALUE_CATEGORY(Compiler, SlangPassThrough)
-SLANG_GET_VALUE_CATEGORY(ArchiveType, SlangArchiveType)
-SLANG_GET_VALUE_CATEGORY(LineDirectiveMode, SlangLineDirectiveMode)
-SLANG_GET_VALUE_CATEGORY(FloatingPointMode, FloatingPointMode)
-SLANG_GET_VALUE_CATEGORY(FloatingPointDenormalMode, FloatingPointDenormalMode)
-SLANG_GET_VALUE_CATEGORY(FileSystemType, TypeTextUtil::FileSystemType)
-SLANG_GET_VALUE_CATEGORY(HelpStyle, CommandOptionsWriter::Style)
-SLANG_GET_VALUE_CATEGORY(OptimizationLevel, SlangOptimizationLevel)
-SLANG_GET_VALUE_CATEGORY(VulkanShift, HLSLToVulkanLayoutOptions::Kind)
-SLANG_GET_VALUE_CATEGORY(SourceEmbedStyle, SourceEmbedUtil::Style)
-SLANG_GET_VALUE_CATEGORY(Language, SourceLanguage)
 
 } // namespace
 

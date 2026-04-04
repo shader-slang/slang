@@ -236,8 +236,6 @@ set(slang_build_args
     SLANG
     EXPORT_TYPE_AS
     ${SLANG_LIB_TYPE}
-    EXTRA_SOURCE_DIRS
-    ${SLANG_RECORD_REPLAY_SYSTEM}
     REQUIRES
     copy_slang_headers
     generate_standard_module_config_header
@@ -278,6 +276,15 @@ set(slang_public_lib_args
 # Slang itself
 #
 
+# Manually glob sources to exclude slang-capability-names.cpp
+# (it's compiled separately in slang-help to avoid binary bloat from
+# duplicate static arrays in slang-generated-capability-defs-impl.h)
+slang_glob_sources(slang_sources ${CMAKE_CURRENT_SOURCE_DIR})
+list(REMOVE_ITEM slang_sources "${CMAKE_CURRENT_SOURCE_DIR}/slang-capability-names.cpp")
+foreach(extra_dir ${SLANG_RECORD_REPLAY_SYSTEM})
+    slang_glob_sources(slang_sources ${extra_dir})
+endforeach()
+
 if(NOT SLANG_EMBED_CORE_MODULE)
     # If we're not embedding core module we can just do a normal build of slang,
     # including all the options, this can also serve as our no embedded core module
@@ -286,6 +293,7 @@ if(NOT SLANG_EMBED_CORE_MODULE)
         .
         ${SLANG_LIB_TYPE}
         OUTPUT_NAME slang-compiler
+        EXPLICIT_SOURCE ${slang_sources}
         ${slang_build_args}
         ${slang_link_args}
         ${slang_interface_args}
@@ -300,6 +308,7 @@ else()
     slang_add_target(
         .
         OBJECT
+        EXPLICIT_SOURCE ${slang_sources}
         ${slang_build_args}
         ${slang_link_args}
         TARGET_NAME slang-common-objects
