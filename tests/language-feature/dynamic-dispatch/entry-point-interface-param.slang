@@ -6,7 +6,9 @@
 //TEST:SIMPLE(filecheck=SPIRV): -target spirv-asm -stage compute -entry computeMain -conformance "ImplA:IFoo=0" -conformance "ImplB:IFoo=1" -conformance "BarImplA:IBar=0" -conformance "BarImplB:IBar=1"
 //TEST:SIMPLE(filecheck=HLSL): -target hlsl -stage compute -entry computeMain -conformance "ImplA:IFoo=0" -conformance "ImplB:IFoo=1" -conformance "BarImplA:IBar=0" -conformance "BarImplB:IBar=1"
 //TEST:SIMPLE(filecheck=GLSL): -target glsl -stage compute -entry computeMain -conformance "ImplA:IFoo=0" -conformance "ImplB:IFoo=1" -conformance "BarImplA:IBar=0" -conformance "BarImplB:IBar=1"
-//TEST:SIMPLE(filecheck=CUDA): -target cuda -stage compute -entry computeMain -conformance "ImplA:IFoo=0" -conformance "ImplB:IFoo=1" -conformance "BarImplA:IBar=0" -conformance "BarImplB:IBar=1"
+// CUDA compute doesn't run collectEntryPointUniformParams, so interface-typed
+// entry-point params emit E50104 instead of compiling. See diagnose-entry-point-interface-param.slang.
+//DISABLED_TEST:SIMPLE(filecheck=CUDA): -target cuda -stage compute -entry computeMain -conformance "ImplA:IFoo=0" -conformance "ImplB:IFoo=1" -conformance "BarImplA:IBar=0" -conformance "BarImplB:IBar=1"
 //TEST:SIMPLE(filecheck=MTL): -target metal -stage compute -entry computeMain -conformance "ImplA:IFoo=0" -conformance "ImplB:IFoo=1" -conformance "BarImplA:IBar=0" -conformance "BarImplB:IBar=1"
 //TEST:SIMPLE(filecheck=WGSL): -target wgsl -stage compute -entry computeMain -conformance "ImplA:IFoo=0" -conformance "ImplB:IFoo=1" -conformance "BarImplA:IBar=0" -conformance "BarImplB:IBar=1"
 //TEST:SIMPLE(filecheck=REPORT): -target hlsl -stage compute -entry computeMain -conformance "ImplA:IFoo=0" -conformance "ImplB:IFoo=1" -conformance "BarImplA:IBar=0" -conformance "BarImplB:IBar=1" -report-dynamic-dispatch-sites

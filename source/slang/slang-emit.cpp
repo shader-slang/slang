@@ -1031,9 +1031,6 @@ Result linkAndOptimizeIR(
         case CodeGenTarget::CUDAHeader:
             SLANG_PASS(collectOptiXEntryPointUniformParams);
             validateIRModuleIfEnabled(codeGenContext, irModule);
-            passOptions.alwaysCreateCollectedParam = true;
-            SLANG_PASS(collectEntryPointUniformParams, passOptions);
-            validateIRModuleIfEnabled(codeGenContext, irModule);
             break;
 
         case CodeGenTarget::CPPSource:
