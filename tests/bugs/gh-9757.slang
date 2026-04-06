@@ -1,7 +1,7 @@
 // Test for issue #9757: InternalError when HitObject::TraceRay payload is an empty struct.
 // Empty ray payload structs should compile without crashing.
 
-//TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -emit-spirv-directly -capability spvShaderInvocationReorderNV -entry main -stage raygeneration -skip-spirv-validation
+//TEST:SIMPLE(filecheck=CHECK): -target spirv-asm -emit-spirv-directly -capability spvShaderInvocationReorderNV -entry main -stage raygeneration
 
 struct Payload{};
 
@@ -24,5 +24,6 @@ void main()
         outImage[DispatchRaysIndex().xy] = 1.0f;
     }
 
+    // CHECK: OpMemberName %Payload 0 "_slang_dummy"
     // CHECK: OpHitObjectTraceRayNV
 }

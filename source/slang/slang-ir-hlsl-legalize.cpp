@@ -126,7 +126,7 @@ void legalizeEmptyRayPayloadsForHLSL(IRModule* module)
     // First, collect all empty ray payload structs to process.
     // We must collect first because the processing phase inserts new global
     // instructions (struct keys, string values) which would invalidate the iterator.
-    List<IRStructType*> emptyRayPayloadStructs;
+    HashSet<IRStructType*> emptyRayPayloadStructs;
 
     for (auto globalInst : module->getGlobalInsts())
     {
