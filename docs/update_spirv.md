@@ -52,7 +52,7 @@ cd ../..
 1. Update the SPIRV-Headers submodule to what SPIRV-Tools uses
    ```
    grep spirv_headers_revision external/spirv-tools/DEPS
-   git -C external/spirv-headers fetch [commit hash from the previous command]
+   git -C external/spirv-headers fetch origin [commit hash from the previous command]
    git -C external/spirv-headers checkout [commit hash from the previous command]
    ```
 

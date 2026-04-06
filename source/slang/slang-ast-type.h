@@ -566,6 +566,7 @@ class ConditionalType : public DeclRefType
 {
     FIDDLE(...)
     Type* getValueType();
+    IntVal* getHasValue();
 };
 
 FIDDLE()
