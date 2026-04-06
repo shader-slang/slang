@@ -1065,8 +1065,7 @@ void GLSLSourceEmitter::_emitGLSLTextureOrTextureSamplerType(
         if (type->GetBaseShape() == SLANG_TEXTURE_CUBE)
         {
             // samplerCubeArray requires GL_ARB_texture_cube_map_array on GLSL < 4.00
-            _requireGLSLExtension(
-                UnownedStringSlice::fromLiteral("GL_ARB_texture_cube_map_array"));
+            _requireGLSLExtension(UnownedStringSlice::fromLiteral("GL_ARB_texture_cube_map_array"));
         }
     }
 
