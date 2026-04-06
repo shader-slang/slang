@@ -930,6 +930,7 @@ bool canTypeBeStored(IRInst* type)
     {
     case kIROp_StructType:
     case kIROp_OptionalType:
+    case kIROp_ConditionalType:
     case kIROp_ArrayType:
     case kIROp_DifferentialPairType:
     case kIROp_InterfaceType:

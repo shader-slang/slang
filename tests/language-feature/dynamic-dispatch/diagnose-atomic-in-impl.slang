@@ -2,9 +2,8 @@
 // incompatible with byte-level AnyValue packing. An Atomic<int> field
 // would lose its atomic guarantees when packed/unpacked through AnyValue.
 //
-// Currently crashes with "Unimplemented type packing" instead of producing
-// a user-facing diagnostic (#10419). The compiler should reject this with
-// error 41014 like other unsupported types.
+// The compiler rejects this with error 41014 like other unsupported types.
+// See #10419.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -conformance "Impl:IFoo=0" -conformance "GoodImpl:IFoo=1"
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target hlsl -stage compute -entry computeMain -conformance "Impl:IFoo=0" -conformance "GoodImpl:IFoo=1"
