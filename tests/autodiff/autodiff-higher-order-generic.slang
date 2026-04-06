@@ -1,9 +1,10 @@
-// Test higher-order forward differentiation of a generic function.
+// Test higher-order forward differentiation of a generic function
+// where the generic type parameter is used as the function parameter type.
 
 //TEST:INTERPRET(filecheck=CHECK):
 
 [ForwardDifferentiable]
-float genericPow4<T : IDifferentiable>(float x)
+T genericPow4<T : IDifferentiable & IFloat>(T x)
 {
     return x * x * x * x;
 }
