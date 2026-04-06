@@ -1095,10 +1095,10 @@ static LegalVal legalizeFieldExtract(
                 }
             }
 
-            // TODO: we can legally reach this case now
-            // when the field is "ordinary".
-
-            SLANG_UNEXPECTED("didn't find tuple element");
+            // Void fields now carry kFlag_hasOrdinary and are resolved
+            // through the pair's ordinary side before reaching this tuple
+            // case, so we should never fall through here.
+            SLANG_UNEXPECTED("didn't find tuple element in field extract");
             UNREACHABLE_RETURN(LegalVal());
         }
 
@@ -1363,10 +1363,10 @@ static LegalVal legalizeFieldAddress(
                 }
             }
 
-            // TODO: we can legally reach this case now
-            // when the field is "ordinary".
-
-            SLANG_UNEXPECTED("didn't find tuple element");
+            // Void fields now carry kFlag_hasOrdinary and are resolved
+            // through the pair's ordinary side before reaching this tuple
+            // case, so we should never fall through here.
+            SLANG_UNEXPECTED("didn't find tuple element in field address");
             UNREACHABLE_RETURN(LegalVal());
         }
 
@@ -3956,9 +3956,10 @@ struct IRExistentialTypeLegalizationContext : IRTypeLegalizationContext
     }
 };
 
-// This customization of type legalization is used to remove empty
-// structs from cpp/cuda programs if the empty type isn't used in
-// a public function signature.
+// This customization of type legalization removes empty/void types.
+// It runs after legalizeResourceTypes for all targets, and also as the
+// sole legalization pass for CPU/CUDA. Public-facing types (with layout
+// decorations) are preserved on non-Metal targets.
 struct IREmptyTypeLegalizationContext : IRTypeLegalizationContext
 {
     IREmptyTypeLegalizationContext(TargetProgram* target, IRModule* module, DiagnosticSink* sink)
@@ -3967,6 +3968,8 @@ struct IREmptyTypeLegalizationContext : IRTypeLegalizationContext
     }
 
     bool isSpecialType(IRType*) override { return false; }
+
+    bool shouldSkipVoidFields() override { return true; }
 
     bool isSimpleType(IRType* type) override
     {

@@ -648,6 +648,12 @@ struct IRTypeLegalizationContext
     /// This function is called in `legalizeTypeImpl` to decide whether a parameter block
     /// type should be legalized. Not all legalization passes need to legalize parameter block.
     virtual bool shouldLegalizeParameterBlockElementType() { return false; }
+
+    /// When true, void-typed fields are skipped in TupleTypeBuilder so that
+    /// void-only structs collapse to LegalType::none. Used by legalizeEmptyTypes.
+    /// During resource legalization this returns false so void fields stay as
+    /// ordinary entries in PairInfo.
+    virtual bool shouldSkipVoidFields() { return false; }
 };
 
 // This typedef exists to support pre-existing code from when
