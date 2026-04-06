@@ -648,10 +648,6 @@ bool isWeakReferenceOperand(IRInst* inst, UInt operandIndex)
         if (inst->getOperand(operandIndex)->getOp() == kIROp_WitnessTable)
             return true;
         break;*/
-    case kIROp_SpecializationDictionaryItem:
-        // Ignore all operands of SpecializationDictionaryItem.
-        // This inst is used as a cache and shouldn't hold anything alive.
-        return true;
     case kIROp_WeakUse:
         return true;
     case kIROp_ReportCheckpointStore:
