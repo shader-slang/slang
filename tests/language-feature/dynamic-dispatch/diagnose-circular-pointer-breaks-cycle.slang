@@ -5,6 +5,12 @@
 // do not embed the pointee inline.
 
 //TEST:SIMPLE(filecheck=CHECK): -target spirv
+//TEST:SIMPLE(filecheck=CHECK): -target hlsl
+//TEST:SIMPLE(filecheck=CHECK): -target glsl
+//TEST:SIMPLE(filecheck=CHECK): -target cuda
+//TEST:SIMPLE(filecheck=CHECK): -target cpp
+//TEST:SIMPLE(filecheck=CHECK): -target metal
+//TEST:SIMPLE(filecheck=CHECK): -target wgsl
 
 [anyValueSize(16)]
 interface INode

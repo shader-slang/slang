@@ -7,7 +7,14 @@
 // unsatisfiable.
 
 //TEST:SIMPLE(filecheck=CHECK): -target spirv
+//TEST:SIMPLE(filecheck=CHECK): -target hlsl
+//TEST:SIMPLE(filecheck=CHECK): -target glsl
+//TEST:SIMPLE(filecheck=CHECK): -target cuda
+//TEST:SIMPLE(filecheck=CHECK): -target cpp
+//TEST:SIMPLE(filecheck=CHECK): -target metal
+//TEST:SIMPLE(filecheck=CHECK): -target wgsl
 //TEST:SIMPLE(filecheck=CHECK_NEG): -target spirv
+//TEST:SIMPLE(filecheck=CHECK_NEG): -target hlsl
 
 [anyValueSize(32)]
 interface IValue
