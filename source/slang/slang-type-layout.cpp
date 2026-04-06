@@ -5726,6 +5726,22 @@ static TypeLayoutResult _createTypeLayout(TypeLayoutContext& context, Type* type
 
         auto declRef = declRefType->getDeclRef();
 
+        if (auto conditionalType = as<ConditionalType>(declRefType))
+        {
+            auto hasValue = conditionalType->getHasValue();
+            auto hasValueVal = hasValue ? context.tryResolveLinkTimeVal(hasValue) : nullptr;
+            if (auto constVal = as<ConstantIntVal>(hasValueVal))
+            {
+                if (getIntVal(constVal) != 0)
+                    return _createTypeLayout(context, conditionalType->getValueType());
+            }
+            RefPtr<TypeLayout> typeLayout = new TypeLayout();
+            typeLayout->type = type;
+            typeLayout->rules = rules;
+            _addLayout(context, type, typeLayout);
+            return TypeLayoutResult(typeLayout, SimpleLayoutInfo());
+        }
+
         if (auto structDeclRef = declRef.as<StructDecl>())
         {
             StructTypeLayoutBuilder typeLayoutBuilder;

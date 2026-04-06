@@ -1850,20 +1850,25 @@ bool operator!=(__none_t noneVal, Optional<T> val)
 }
 
 __magic_type(ConditionalType)
+__intrinsic_type($(kIROp_ConditionalType))
 struct Conditional<T, bool hasValue>
 {
-    internal vector<T, hasValue ? 1 : 0> storage;
+    internal property T value
+    {
+        __intrinsic_op($(kIROp_GetConditionalValue))
+        get;
+    }
 
     __implicit_conversion($(kConversionCost_ValToOptional))
-    [__unsafeForceInlineEarly]
-    __init(T val) { if (hasValue) storage[0] = val;}
+    __intrinsic_op($(kIROp_MakeConditionalValue))
+    __init(T val);
 
     [__unsafeForceInlineEarly]
     public Optional<T> get()
     {
         if (hasValue)
         {
-            return Optional<T>(storage[0]);
+            return Optional<T>(value);
         }
         else
         {
@@ -1873,10 +1878,10 @@ struct Conditional<T, bool hasValue>
 
     [__unsafeForceInlineEarly]
     [mutating]
-    public void set(T value)
+    public void set(T newValue)
     {
         if (hasValue)
-            storage[0] = value;
+            this = Conditional<T, hasValue>(newValue);
     }
 }
 
@@ -1888,7 +1893,7 @@ extension<T> Optional<T>
     __init(Conditional<T, condHasValue> condVal)
     {
         if (condHasValue)
-            this = Optional<T>(condVal.storage[0]);
+            this = Optional<T>(condVal.value);
         else
             this = none;
     }
