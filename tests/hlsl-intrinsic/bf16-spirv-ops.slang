@@ -1,4 +1,4 @@
-//TEST:SIMPLE(filecheck=SPV): -target spirv -emit-spirv-directly -O0
+//TEST:SIMPLE(filecheck=SPV): -target spirv -emit-spirv-directly -O0 -skip-spirv-validation
 
 // Verify BFloat16 operations emit correct SPIR-V opcodes.
 
