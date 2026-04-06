@@ -5872,11 +5872,9 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
 
             auto requiredType =
                 getHasDiffTypeInfoType(m_astBuilder, specializedRequiredConstraintDeclRef);
-            auto satisfyingType =
-                getHasDiffTypeInfoType(m_astBuilder, satisfyingConstraintDeclRef);
+            auto satisfyingType = getHasDiffTypeInfoType(m_astBuilder, satisfyingConstraintDeclRef);
             if (!satisfyingType->equals(requiredType))
                 return false;
-
         }
     }
 
@@ -6728,7 +6726,8 @@ GenericDecl* SemanticsVisitor::synthesizeGenericSignatureForRequirementWitness(
     }
 
     for (auto hasDiffTypeInfoDecl :
-         requiredMemberDeclRef.getDecl()->getDirectMemberDeclsOfType<HasDiffTypeInfoConstraintDecl>())
+         requiredMemberDeclRef.getDecl()
+             ->getDirectMemberDeclsOfType<HasDiffTypeInfoConstraintDecl>())
     {
         auto synConstraintDecl = m_astBuilder->create<HasDiffTypeInfoConstraintDecl>();
         synConstraintDecl->nameAndLoc = hasDiffTypeInfoDecl->getNameAndLoc();
@@ -11803,8 +11802,9 @@ bool SemanticsVisitor::doGenericSignaturesMatch(
                 return false;
 
             auto leftType = leftHasDiffTypeInfoConstraint->type.type;
-            auto rightType =
-                substInnerRightToLeft.substitute(m_astBuilder, rightConstraint.getDecl()->type.type);
+            auto rightType = substInnerRightToLeft.substitute(
+                m_astBuilder,
+                rightConstraint.getDecl()->type.type);
             if (!leftType->equals(rightType))
                 return false;
         }

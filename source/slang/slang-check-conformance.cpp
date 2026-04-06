@@ -103,8 +103,7 @@ Witness* SemanticsVisitor::getDiffTypeInfoWitness(Type* type)
                     auto constraintType =
                         getHasDiffTypeInfoType(getCurrentASTBuilder(), constraintDeclRef);
                     if (constraintType && constraintType->equals(type))
-                        return getCurrentASTBuilder()->getHasDiffTypeInfoWitness(
-                            constraintDeclRef);
+                        return getCurrentASTBuilder()->getHasDiffTypeInfoWitness(constraintDeclRef);
                 }
             }
         }
@@ -120,15 +119,13 @@ Witness* SemanticsVisitor::getDiffTypeInfoWitness(DeclRef<FunctionDeclBase> call
     auto astBuilder = getCurrentASTBuilder();
     FuncType* funcType = nullptr;
     auto rawDirectFuncType = callableDeclRef.getDecl()->funcType.type;
-    Type* substitutedDirectFuncType =
-        rawDirectFuncType
-            ? dynamicCast<Type>(
-                  substituteType(
-                      SubstitutionSet(callableDeclRef),
-                      getCurrentASTBuilder(),
-                      rawDirectFuncType)
-                      ->resolve())
-            : nullptr;
+    Type* substitutedDirectFuncType = rawDirectFuncType
+                                          ? dynamicCast<Type>(substituteType(
+                                                                  SubstitutionSet(callableDeclRef),
+                                                                  getCurrentASTBuilder(),
+                                                                  rawDirectFuncType)
+                                                                  ->resolve())
+                                          : nullptr;
 
     if (auto rawFwdDiffFuncType = as<FwdDiffFuncType>(rawDirectFuncType))
     {

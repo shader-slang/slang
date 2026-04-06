@@ -1358,7 +1358,8 @@ Val* HasDiffTypeInfoWitness::_substituteImplOverride(
             Index index = 0;
             for (auto member : genericDecl->getDirectMemberDecls())
             {
-                if (as<GenericTypeConstraintDecl>(member) || as<TypeCoercionConstraintDecl>(member) ||
+                if (as<GenericTypeConstraintDecl>(member) ||
+                    as<TypeCoercionConstraintDecl>(member) ||
                     as<NonEmptyPackConstraintDecl>(member) ||
                     as<HasDiffTypeInfoConstraintDecl>(member))
                 {
@@ -2193,7 +2194,10 @@ Val* FuncCallIntVal::tryFoldImpl(
     }                                       \
     else
 
-#define TERMINATING_CASE(MATCH) {MATCH}
+#define TERMINATING_CASE(MATCH) \
+    {                           \
+        MATCH                   \
+    }
 
         // Handle the cases using the macros
         BINARY_OPERATOR_CASE(>=)
