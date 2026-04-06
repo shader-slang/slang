@@ -165,8 +165,7 @@ private:
         {
             if (inst->getOp() == kIROp_WitnessTable)
             {
-                auto iface =
-                    cast<IRWitnessTableType>(inst->getDataType())->getConformanceType();
+                auto iface = cast<IRWitnessTableType>(inst->getDataType())->getConformanceType();
                 implementedInterfaces.add(iface);
             }
         }
@@ -226,8 +225,7 @@ private:
 
             for (auto impl : implMap[interfaceType])
             {
-                auto depsForImpl =
-                    findDependenciesOfTypeInSet((IRType*)impl, interfaceTypes);
+                auto depsForImpl = findDependenciesOfTypeInSet((IRType*)impl, interfaceTypes);
                 bool hasSelfReference = false;
                 for (auto dep : depsForImpl)
                 {
@@ -335,8 +333,7 @@ void inferAnyValueSizeWhereNecessary(
     //
     List<IRInterfaceType*> sortedInterfaceTypes = sortTopologically(
         analysis.interfaceTypes,
-        [&](IRInterfaceType* interfaceType)
-        { return analysis.dependencyMap[interfaceType]; });
+        [&](IRInterfaceType* interfaceType) { return analysis.dependencyMap[interfaceType]; });
 
     for (auto interfaceType : sortedInterfaceTypes)
     {
