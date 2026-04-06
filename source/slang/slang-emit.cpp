@@ -40,7 +40,6 @@
 #include "slang-ir-defer-buffer-load.h"
 #include "slang-ir-defunctionalization.h"
 #include "slang-ir-detect-uninitialized-resources.h"
-#include "slang-ir-diff-call.h"
 #include "slang-ir-dll-export.h"
 #include "slang-ir-dll-import.h"
 #include "slang-ir-early-raytracing-intrinsic-simplification.h"
@@ -59,6 +58,7 @@
 #include "slang-ir-hlsl-legalize.h"
 #include "slang-ir-inline.h"
 #include "slang-ir-insts.h"
+#include "slang-ir-late-require-capability.h"
 #include "slang-ir-layout.h"
 #include "slang-ir-legalize-array-return-type.h"
 #include "slang-ir-legalize-binary-operator.h"
@@ -79,12 +79,14 @@
 #include "slang-ir-lower-bit-cast.h"
 #include "slang-ir-lower-buffer-element-type.h"
 #include "slang-ir-lower-combined-texture-sampler.h"
+#include "slang-ir-lower-conditional-type.h"
 #include "slang-ir-lower-coopvec.h"
 #include "slang-ir-lower-dynamic-dispatch-insts.h"
 #include "slang-ir-lower-dynamic-resource-heap.h"
 #include "slang-ir-lower-enum-type.h"
 #include "slang-ir-lower-glsl-ssbo-types.h"
 #include "slang-ir-lower-l-value-cast.h"
+#include "slang-ir-lower-matrix-swizzle-store.h"
 #include "slang-ir-lower-optional-type.h"
 #include "slang-ir-lower-reinterpret.h"
 #include "slang-ir-lower-result-type.h"
@@ -117,6 +119,7 @@
 #include "slang-ir-synthesize-active-mask.h"
 #include "slang-ir-transform-params-to-constref.h"
 #include "slang-ir-translate-global-varying-var.h"
+#include "slang-ir-translate.h"
 #include "slang-ir-typeflow-specialize.h"
 #include "slang-ir-undo-param-copy.h"
 #include "slang-ir-uniformity.h"
@@ -222,7 +225,11 @@ static void reportCheckpointIntermediates(
     DiagnosticSink* sink,
     IRModule* irModule)
 {
-    // Report checkpointing information
+    // Report checkpointing information by consuming ReportCheckpointStore marker instructions.
+    // Each ReportCheckpointStore has 3 operands:
+    //   0: storedType - the IRType of the value being checkpointed
+    //   1: originalFunc - the function that the checkpoint is associated with
+    //   2: storeRef - weak reference to the store/address (becomes poison if optimized out)
     TargetRequest* targetReq = codeGenContext->getTargetReq();
     SourceManager* sourceManager = sink->getSourceManager();
 
@@ -234,64 +241,153 @@ static void reportCheckpointIntermediates(
 
     CPPSourceEmitter emitter(description);
 
-    int nonEmptyStructs = 0;
-    for (auto inst : irModule->getGlobalInsts())
+    // Collect all ReportCheckpointStore instructions, grouped by original function.
+    struct CheckpointEntry
     {
-        IRStructType* structType = as<IRStructType>(inst);
-        if (!structType)
-            continue;
+        IRType* storedType;
+        SourceLoc sourceLoc;
+    };
+    Dictionary<IRInst*, List<CheckpointEntry>> funcToEntries;
+    List<IRInst*> reportInstsToRemove;
 
-        auto checkpointDecoration =
-            structType->findDecoration<IRCheckpointIntermediateDecoration>();
-        if (!checkpointDecoration)
-            continue;
-
-        IRSizeAndAlignment structSize;
-        getNaturalSizeAndAlignment(targetReq, structType, &structSize);
-
-        // Reporting happens before empty structs are optimized out
-        // and we still want to keep the checkpointing decorations,
-        // so we end up needing to check for non-zero-ness
-        if (structSize.size == 0)
-            continue;
-
-        auto func = checkpointDecoration->getSourceFunction();
-        sink->diagnose(Diagnostics::ReportCheckpointIntermediates{
-            .size = (int64_t)structSize.size,
-            .func = func,
-            .location = structType->sourceLoc});
-        nonEmptyStructs++;
-
-        for (auto field : structType->getFields())
+    for (auto globalInst : irModule->getGlobalInsts())
+    {
+        auto func = as<IRFunc>(globalInst);
+        if (!func)
         {
-            IRType* fieldType = field->getFieldType();
-            IRSizeAndAlignment fieldSize;
-            getNaturalSizeAndAlignment(targetReq, fieldType, &fieldSize);
-            if (fieldSize.size == 0)
-                continue;
+            if (auto generic = as<IRGeneric>(globalInst))
+                func = as<IRFunc>(findGenericReturnVal(generic));
+        }
+        if (!func)
+            continue;
 
-            typeWriter.clearContent();
-            emitter.emitType(fieldType);
+        for (auto block : func->getBlocks())
+        {
+            for (auto inst : block->getChildren())
+            {
+                if (inst->getOp() == kIROp_ReportCheckpointStore)
+                {
+                    reportInstsToRemove.add(inst);
 
-            if (field->findDecoration<IRLoopCounterDecoration>())
-            {
-                sink->diagnose(Diagnostics::ReportCheckpointCounter{
-                    .size = (int64_t)fieldSize.size,
-                    .typeName = typeWriter.getContent(),
-                    .location = field->sourceLoc});
-            }
-            else
-            {
-                sink->diagnose(Diagnostics::ReportCheckpointVariable{
-                    .size = (int64_t)fieldSize.size,
-                    .typeName = typeWriter.getContent(),
-                    .location = field->sourceLoc});
+                    // If the store was optimized out (storeRef became poison),
+                    // skip reporting this entry.
+                    auto storeRef = inst->getOperand(2);
+                    if (storeRef->getOp() == kIROp_Poison)
+                        continue;
+
+                    auto storedType = (IRType*)inst->getOperand(0);
+                    auto originalFunc = inst->getOperand(1);
+                    CheckpointEntry entry;
+                    entry.storedType = storedType;
+                    entry.sourceLoc = inst->sourceLoc;
+                    funcToEntries[originalFunc].add(entry);
+                }
             }
         }
     }
 
-    if (nonEmptyStructs == 0)
+    int nonEmptyFuncs = 0;
+    for (auto& [originalFunc, entries] : funcToEntries)
+    {
+        IRSizeAndAlignment totalSize = {};
+        List<CheckpointEntry> nonZeroEntries;
+        for (auto& entry : entries)
+        {
+            IRSizeAndAlignment entrySize;
+            getNaturalSizeAndAlignment(targetReq, entry.storedType, &entrySize);
+            if (entrySize.size > 0)
+            {
+                totalSize.size += entrySize.size;
+                nonZeroEntries.add(entry);
+            }
+        }
+
+        if (totalSize.size == 0)
+            continue;
+
+        Diagnostics::ReportCheckpointIntermediates diagnostic;
+        diagnostic.size = (int64_t)totalSize.size;
+        diagnostic.func = originalFunc;
+        diagnostic.location = originalFunc->sourceLoc;
+
+        // Group entries by (sourceLoc, typeName) to deduplicate repeats from
+        // loop unrolling etc.
+        struct GroupKey
+        {
+            SourceLoc loc;
+            String typeName;
+            bool operator==(const GroupKey& other) const
+            {
+                return loc == other.loc && typeName == other.typeName;
+            }
+            HashCode getHashCode() const
+            {
+                return combineHash(Slang::getHashCode(loc.getRaw()), Slang::getHashCode(typeName));
+            }
+        };
+        struct GroupValue
+        {
+            int64_t varSize;
+            int64_t count;
+        };
+        Dictionary<GroupKey, GroupValue> grouped;
+        List<GroupKey> groupOrder;
+
+        for (auto& entry : nonZeroEntries)
+        {
+            IRSizeAndAlignment entrySize;
+            getNaturalSizeAndAlignment(targetReq, entry.storedType, &entrySize);
+
+            typeWriter.clearContent();
+            emitter.emitType(entry.storedType);
+
+            GroupKey key;
+            key.loc = entry.sourceLoc;
+            key.typeName = typeWriter.getContent();
+
+            if (auto* existing = grouped.tryGetValue(key))
+            {
+                existing->count++;
+            }
+            else
+            {
+                grouped[key] = GroupValue{(int64_t)entrySize.size, 1};
+                groupOrder.add(key);
+            }
+        }
+
+        for (auto& key : groupOrder)
+        {
+            auto& val = grouped[key];
+            if (val.count == 1)
+            {
+                Diagnostics::ReportCheckpointIntermediates::Single s;
+                s.singleSize = val.varSize;
+                s.singleTypeName = key.typeName;
+                s.singleLocation = key.loc;
+                diagnostic.singles.add(s);
+            }
+            else
+            {
+                Diagnostics::ReportCheckpointIntermediates::Multi m;
+                m.multiCount = val.count;
+                m.multiSize = val.varSize;
+                m.multiTypeName = key.typeName;
+                m.multiLocation = key.loc;
+                diagnostic.multis.add(m);
+            }
+        }
+
+        sink->diagnose(diagnostic);
+        nonEmptyFuncs++;
+    }
+
+    if (nonEmptyFuncs == 0)
         sink->diagnose(Diagnostics::ReportCheckpointNone{});
+
+    // Remove all consumed ReportCheckpointStore instructions.
+    for (auto inst : reportInstsToRemove)
+        inst->removeAndDeallocate();
 }
 
 struct LinkingAndOptimizationOptions
@@ -308,6 +404,9 @@ void calcRequiredLoweringPassSet(
     CodeGenContext* codeGenContext,
     IRInst* inst)
 {
+    if (as<IRTranslateBase>(inst) || as<IRTranslatedTypeBase>(inst))
+        result.autodiff = true;
+
     switch (inst->getOp())
     {
     case kIROp_DebugValue:
@@ -327,6 +426,9 @@ void calcRequiredLoweringPassSet(
         break;
     case kIROp_OptionalType:
         result.optionalType = true;
+        break;
+    case kIROp_ConditionalType:
+        result.conditionalType = true;
         break;
     case kIROp_EnumType:
         result.enumType = true;
@@ -363,7 +465,6 @@ void calcRequiredLoweringPassSet(
         break;
     case kIROp_BackwardDifferentiate:
     case kIROp_ForwardDifferentiate:
-    case kIROp_MakeDifferentialPairUserCode:
         result.autodiff = true;
         break;
     case kIROp_VerticesType:
@@ -434,6 +535,9 @@ void calcRequiredLoweringPassSet(
     case kIROp_MissingReturn:
         result.missingReturn = true;
         break;
+    case kIROp_MatrixSwizzleStore:
+        result.matrixSwizzleStore = true;
+        break;
     case kIROp_Select:
         if (!isScalarOrVectorType(inst->getFullType()))
             result.nonVectorCompositeSelect = true;
@@ -463,32 +567,6 @@ void calcRequiredLoweringPassSet(
             codeGenContext->getRequiredLoweringPassSet(),
             codeGenContext,
             child);
-    }
-}
-
-void diagnoseCallStack(IRInst* inst, DiagnosticSink* sink)
-{
-    static const int maxDepth = 5;
-    for (int i = 0; i < maxDepth; i++)
-    {
-        auto func = getParentFunc(inst);
-        if (!func)
-            return;
-        bool shouldContinue = false;
-        for (auto use = func->firstUse; use; use = use->nextUse)
-        {
-            auto user = use->getUser();
-            if (auto call = as<IRCall>(user))
-            {
-                sink->diagnose(
-                    Diagnostics::SeeCallOfFuncIr{.inst = func, .location = call->sourceLoc});
-                inst = call;
-                shouldContinue = true;
-                break;
-            }
-        }
-        if (!shouldContinue)
-            return;
     }
 }
 
@@ -686,6 +764,113 @@ String getBuildIdentifierString(ComponentType* component)
     return sb.produceString();
 }
 
+// Lower DiffTypeInfo instructions to MakeTuple.
+// DiffTypeInfo is a hoistable instruction that holds witness tables for differential type info.
+// After specialization, it can be safely converted to a regular MakeTuple.
+void lowerDiffTypeInfoInsts(IRModule* module)
+{
+    List<IRInst*> instsToReplace;
+    for (auto globalInst : module->getGlobalInsts())
+    {
+        if (globalInst->getOp() == kIROp_DiffTypeInfo)
+        {
+            instsToReplace.add(globalInst);
+        }
+    }
+
+    IRBuilder builder(module);
+    for (auto inst : instsToReplace)
+    {
+        builder.setInsertBefore(inst);
+        List<IRInst*> args;
+        for (UInt i = 0; i < inst->getOperandCount(); i++)
+        {
+            args.add(inst->getOperand(i));
+        }
+        auto tuple =
+            builder.emitMakeTuple(inst->getFullType(), (UInt)args.getCount(), args.getBuffer());
+        inst->replaceUsesWith(tuple);
+        inst->removeAndDeallocate();
+    }
+}
+
+void lowerSumVectorMatrixInsts(IRModule* module)
+{
+    struct LowerSumVectorMatrixPass : InstPassBase
+    {
+        LowerSumVectorMatrixPass(IRModule* module)
+            : InstPassBase(module)
+        {
+        }
+        void processModule()
+        {
+            processInstsOfType<IRSumVectorElements>(
+                kIROp_SumVectorElements,
+                [&](IRSumVectorElements* sumInst)
+                {
+                    auto vectorOperand = sumInst->getOperand(0);
+                    IRBuilder builder(module);
+                    builder.setInsertBefore(sumInst);
+                    auto vectorType = as<IRVectorType>(vectorOperand->getDataType());
+                    auto vectorSize = as<IRIntLit>(vectorType->getElementCount())->getValue();
+                    auto vectorElemType = vectorType->getElementType();
+
+                    IRInst* result = nullptr;
+                    for (auto ii = 0; ii < vectorSize; ii++)
+                    {
+                        auto element =
+                            builder.emitElementExtract(vectorOperand, builder.getIntValue(ii));
+                        if (ii == 0)
+                            result = element;
+                        else
+                            result = builder.emitAdd(vectorElemType, result, element);
+                    }
+
+                    SLANG_ASSERT(result);
+
+                    sumInst->replaceUsesWith(result);
+                    sumInst->removeAndDeallocate();
+                });
+
+            processInstsOfType<IRSumMatrixElements>(
+                kIROp_SumMatrixElements,
+                [&](IRSumMatrixElements* sumInst)
+                {
+                    auto matrixOperand = sumInst->getOperand(0);
+                    IRBuilder builder(module);
+                    builder.setInsertBefore(sumInst);
+                    auto matrixType = as<IRMatrixType>(matrixOperand->getDataType());
+                    auto matrixColCount = as<IRIntLit>(matrixType->getColumnCount())->getValue();
+                    auto matrixRowCount = as<IRIntLit>(matrixType->getRowCount())->getValue();
+                    auto matrixElemType = matrixType->getElementType();
+
+                    IRInst* result = nullptr;
+                    for (auto ii = 0; ii < matrixRowCount; ii++)
+                    {
+                        for (auto jj = 0; jj < matrixColCount; jj++)
+                        {
+                            auto element = builder.emitElementExtract(
+                                builder.emitElementExtract(matrixOperand, builder.getIntValue(ii)),
+                                builder.getIntValue(jj));
+                            if (ii == 0 && jj == 0)
+                                result = element;
+                            else
+                                result = builder.emitAdd(matrixElemType, result, element);
+                        }
+                    }
+                    SLANG_ASSERT(result);
+
+                    sumInst->replaceUsesWith(result);
+                    sumInst->removeAndDeallocate();
+                });
+        }
+    };
+
+    LowerSumVectorMatrixPass pass(module);
+    pass.processModule();
+}
+
+
 Result linkAndOptimizeIR(
     CodeGenContext* codeGenContext,
     LinkingAndOptimizationOptions const& options,
@@ -724,6 +909,12 @@ Result linkAndOptimizeIR(
     outLinkedIR = linkIR(codeGenContext);
     auto irModule = outLinkedIR.module;
     auto irEntryPoints = outLinkedIR.entryPoints;
+
+    // If our linking step resulted in errors, abort. We can't assume that
+    // our IR is complete.
+    //
+    if (sink->getErrorCount() != 0)
+        return SLANG_FAIL;
 
     // For now, only emit the debug build identifier if separate debug info is enabled
     // and only if there are targets.
@@ -897,6 +1088,12 @@ Result linkAndOptimizeIR(
     if (requiredLoweringPassSet.enumType)
         SLANG_PASS(lowerEnumType, sink);
 
+    // Lower enum types early since enums and enum casts may appear in
+    // specialization & not resolving them here would block specialization.
+    //
+    if (requiredLoweringPassSet.enumType)
+        lowerEnumType(irModule, sink);
+
     IRSimplificationOptions defaultIRSimplificationOptions =
         IRSimplificationOptions::getDefault(targetProgram);
     IRSimplificationOptions fastIRSimplificationOptions =
@@ -958,99 +1155,7 @@ Result linkAndOptimizeIR(
     // the relevant specialization transformations are handled in a
     // single pass that looks for all simplification opportunities.
     //
-    // TODO: We also need to extend this pass so that it will "expose"
-    // existential values that are nested inside of other types,
-    // so that the simplifications can be applied.
-    //
-    // TODO: This pass is *also* likely to be the place where we
-    // perform specialization of functions based on parameter
-    // values that need to be compile-time constants.
-    //
-    // Specialization passes and auto-diff passes runs in an iterative loop
-    // since each pass can enable the other pass to progress further.
-    for (;;)
-    {
-        bool changed = false;
-        if (!codeGenContext->isSpecializationDisabled())
-        {
-            // Pre-autodiff, we will attempt to specialize as much as possible.
-            //
-            // Note: Lowered dynamic-dispatch code cannot be differentiated correctly due to
-            // missing information, so we defer that to after the auto-dff step.
-            //
-            SpecializationOptions specOptions;
-            specOptions.lowerWitnessLookups = false;
-            specOptions.reportDynamicDispatchSites =
-                codeGenContext->shouldReportDynamicDispatchSites();
-            changed |=
-                SLANG_PASS(specializeModule, targetProgram, codeGenContext->getSink(), specOptions);
-        }
 
-        if (codeGenContext->getSink()->getErrorCount() != 0)
-            return SLANG_FAIL;
-
-        if (changed)
-        {
-            SLANG_PASS(
-                applySparseConditionalConstantPropagation,
-                targetProgram,
-                codeGenContext->getSink());
-        }
-        validateIRModuleIfEnabled(codeGenContext, irModule);
-
-        // Inline calls to any functions marked with [__unsafeInlineEarly] again,
-        // since we may be missing out cases prevented by the functions that we just
-        // specialzied.
-        SLANG_PASS(performMandatoryEarlyInlining, nullptr);
-        SLANG_PASS(eliminateDeadCode, deadCodeEliminationOptions);
-
-        // Unroll loops.
-        if (!fastIRSimplificationOptions.minimalOptimization)
-        {
-            if (codeGenContext->getSink()->getErrorCount() == 0)
-            {
-                if (!SLANG_PASS(unrollLoopsInModule, targetProgram, codeGenContext->getSink()))
-                    return SLANG_FAIL;
-            }
-        }
-
-        // Few of our targets support higher order functions, and
-        // we don't have the backend code to emit higher order functions for those
-        // which do.
-        // Specialize away these parameters
-        // TODO: We should implement a proper defunctionalization pass
-        if (requiredLoweringPassSet.higherOrderFunc)
-            changed |= SLANG_PASS(specializeHigherOrderParameters, codeGenContext);
-
-        if (requiredLoweringPassSet.autodiff)
-        {
-            {
-                auto validationScope = enableIRValidationScope();
-                changed |=
-                    SLANG_PASS(processAutodiffCalls, targetProgram, sink, IRAutodiffPassOptions());
-            }
-        }
-
-        if (!changed)
-            break;
-    }
-
-    // Report checkpointing information
-    if (codeGenContext->shouldReportCheckpointIntermediates())
-    {
-        SLANG_PASS(simplifyIR, targetProgram, fastIRSimplificationOptions, sink);
-        reportCheckpointIntermediates(codeGenContext, sink, irModule);
-    }
-
-    // Finalization is always run so AD-related instructions can be removed,
-    // even if the AD pass itself is not run.
-    //
-    SLANG_PASS(finalizeAutoDiffPass, targetProgram);
-    SLANG_PASS(eliminateDeadCode, deadCodeEliminationOptions);
-
-    // After auto-diff, we can perform more aggressive specialization with dynamic-dispatch
-    // lowering.
-    //
     if (!codeGenContext->isSpecializationDisabled())
     {
         SpecializationOptions specOptions;
@@ -1059,13 +1164,33 @@ Result linkAndOptimizeIR(
         SLANG_PASS(specializeModule, targetProgram, codeGenContext->getSink(), specOptions);
     }
 
+    if (sink->getErrorCount() != 0)
+        return SLANG_FAIL;
+
+    if (requiredLoweringPassSet.higherOrderFunc)
+    {
+        SLANG_PASS(specializeHigherOrderParameters, codeGenContext);
+    }
+
+    SLANG_PASS(finalizeAutoDiffPass, targetProgram);
+    if (requiredLoweringPassSet.matrixSwizzleStore)
+        SLANG_PASS(lowerMatrixSwizzleStores);
+    SLANG_PASS(eliminateDeadCode, deadCodeEliminationOptions);
+
     SLANG_PASS(finalizeSpecialization);
+
+    // Lower DiffTypeInfo instructions to MakeTuple.
+    // This must happen after specialization since DiffTypeInfo is hoistable.
+    lowerDiffTypeInfoInsts(irModule);
 
     // Lower `Result<T,E>` types into ordinary struct types. This must happen
     // after specialization, since otherwise incompatible copies of the lowered
     // result structure are generated.
     if (requiredLoweringPassSet.resultType)
         SLANG_PASS(lowerResultType, targetProgram, sink);
+
+    if (requiredLoweringPassSet.conditionalType)
+        SLANG_PASS(lowerConditionalType, sink);
 
     if (requiredLoweringPassSet.optionalType)
         SLANG_PASS(lowerReinterpretOptional, targetProgram, sink);
@@ -1152,24 +1277,19 @@ Result linkAndOptimizeIR(
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
 
-    // If we have a target that is GPU like we use the string hashing mechanism
-    // but for that to work we need to inline such that calls (or returns) of strings
-    // boil down into getStringHash(stringLiteral)
-    if (!ArtifactDescUtil::isCpuLikeTarget(artifactDesc))
-    {
-        // We could fail because
-        // 1) It's not inlinable for some reason (for example if it's recursive)
-        SLANG_RETURN_ON_FAIL(SLANG_PASS(performTypeInlining, targetProgram, sink));
-    }
-
-    if (sink->getErrorCount() != 0)
-        return SLANG_FAIL;
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
 
     SLANG_PASS(inferAnyValueSizeWhereNecessary, targetProgram, sink);
 
+    // If we have any witness tables that are marked as `KeepAlive`,
+    // but are not used for dynamic dispatch, unpin them so we don't
+    // do unnecessary work to lower them.
+    //
     SLANG_PASS(unpinWitnessTables);
+
+    SLANG_PASS(lowerSumVectorMatrixInsts);
+
     if (!fastIRSimplificationOptions.minimalOptimization)
     {
         SLANG_PASS(simplifyIR, targetProgram, fastIRSimplificationOptions, sink);
@@ -1196,6 +1316,37 @@ Result linkAndOptimizeIR(
 
     SLANG_PASS(lowerExistentials, targetProgram, sink);
 
+    // get rid of weak-use insts and any dictionaries in the
+    // module inst.
+    //
+    // -- put into a pass --
+    List<IRInst*> weakUseInsts;
+    for (auto insts : irModule->getModuleInst()->getGlobalInsts())
+    {
+        if (insts->getOp() == kIROp_WeakUse)
+            weakUseInsts.add(insts);
+    }
+
+    for (auto weakUse : weakUseInsts)
+    {
+        weakUse->removeAndDeallocate();
+    }
+
+    clearTranslationDictionary(irModule);
+
+    if (sink->getErrorCount() != 0)
+        return SLANG_FAIL;
+
+    // If we have a target that is GPU like we use the string hashing mechanism
+    // but for that to work we need to inline such that calls (or returns) of strings
+    // boil down into getStringHash(stringLiteral)
+    if (!ArtifactDescUtil::isCpuLikeTarget(artifactDesc))
+    {
+        // We could fail because
+        // 1) It's not inlinable for some reason (for example if it's recursive)
+        SLANG_RETURN_ON_FAIL(SLANG_PASS(performTypeInlining, targetProgram, sink));
+    }
+
     if (sink->getErrorCount() != 0)
         return SLANG_FAIL;
 
@@ -1207,9 +1358,15 @@ Result linkAndOptimizeIR(
         SLANG_RETURN_ON_FAIL(SLANG_PASS(checkGetStringHashInsts, sink));
     }
 
+    eliminateDeadCode(irModule, fastIRSimplificationOptions.deadCodeElimOptions);
+
     SLANG_PASS(lowerTuples, sink);
+    if (sink->getErrorCount() != 0)
+        return SLANG_FAIL;
 
     SLANG_PASS(generateAnyValueMarshallingFunctions, targetProgram);
+    if (sink->getErrorCount() != 0)
+        return SLANG_FAIL;
 
     // Don't need to run any further target-dependent passes if we are generating code
     // for host vm.
@@ -1269,6 +1426,12 @@ Result linkAndOptimizeIR(
     else
     {
         SLANG_PASS(simplifyIR, targetProgram, defaultIRSimplificationOptions, sink);
+    }
+
+    // Report checkpointing information.
+    if (codeGenContext->shouldReportCheckpointIntermediates())
+    {
+        reportCheckpointIntermediates(codeGenContext, sink, irModule);
     }
 
     validateIRModuleIfEnabled(codeGenContext, irModule);
@@ -1836,6 +1999,17 @@ Result linkAndOptimizeIR(
         if (targetProgram->shouldEmitSPIRVDirectly())
             SLANG_PASS(removeRawDefaultConstructors);
         break;
+    case CodeGenTarget::ShaderLLVMIR:
+    case CodeGenTarget::HostLLVMIR:
+    case CodeGenTarget::HostObjectCode:
+    case CodeGenTarget::ShaderObjectCode:
+    case CodeGenTarget::ShaderSharedLibrary:
+    case CodeGenTarget::HostExecutable:
+    case CodeGenTarget::HostSharedLibrary:
+    case CodeGenTarget::ShaderHostCallable:
+        if (isCPUTargetViaLLVM(targetRequest))
+            SLANG_PASS(removeRawDefaultConstructors);
+        break;
     default:
         break;
     }
@@ -1854,6 +2028,9 @@ Result linkAndOptimizeIR(
     // We run DCE pass again to clean things up.
     //
     SLANG_PASS(eliminateDeadCode, deadCodeEliminationOptions);
+
+    // Check the remaining LateRequireCapability IR insts
+    SLANG_PASS(processLateRequireCapabilityInsts, codeGenContext, sink);
 
     SLANG_PASS(cleanUpVoidType);
 
@@ -1972,6 +2149,12 @@ Result linkAndOptimizeIR(
         SLANG_PASS(legalizeModesOfNonCopyableOpaqueTypedParamsForGLSL, codeGenContext);
     }
 
+    // Required for AD 2.0 which can create empty types.
+    // TODO: Maybe make this conditional (only touch the optimizable types).
+    // to make it more narrowly scoped.
+    //
+    SLANG_PASS(legalizeEmptyTypes, targetProgram, sink);
+
     // As a late step, we need to take the SSA-form IR and move things *out*
     // of SSA form, by eliminating all "phi nodes" (block parameters) and
     // introducing explicit temporaries instead. Doing this at the IR level
@@ -2067,6 +2250,8 @@ Result linkAndOptimizeIR(
         SLANG_PASS(applyVariableScopeCorrection, targetRequest);
         validateIRModuleIfEnabled(codeGenContext, irModule);
     }
+
+    SLANG_PASS(validateCooperativeOperations, sink);
 
     auto metadata = new ArtifactPostEmitMetadata;
     outLinkedIR.metadata = metadata;

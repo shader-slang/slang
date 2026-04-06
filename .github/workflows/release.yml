@@ -126,6 +126,8 @@ jobs:
       - name: Build Slang
         run: |
           if [[ "${{ matrix.platform }}" == "wasm" ]]; then
+            npm install -g typescript@5.9.3
+            tsc --version
             git clone https://github.com/emscripten-core/emsdk.git
             pushd emsdk
               ./emsdk install latest

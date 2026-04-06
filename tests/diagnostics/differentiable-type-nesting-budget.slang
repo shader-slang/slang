@@ -6,12 +6,10 @@
 struct LoopField<each T>
 {
     LoopField<T, int> next;
-/*CHECK:
-    ^^^^^^^^^ maximum type nesting level exceeded
-*/
 }
 
 [Differentiable]
 void recursiveParam(LoopField<int> value)
+//CHECK:            ^^^^^^^^^ maximum type nesting level exceeded
 {
 }

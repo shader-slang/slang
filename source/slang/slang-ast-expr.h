@@ -539,6 +539,40 @@ class TrimLastExpr : public PackQueryExpr
     FIDDLE(...)
 };
 
+FIDDLE(abstract)
+class ShapePackTransformExpr : public Expr
+{
+    FIDDLE(...)
+    FIDDLE() List<Expr*> args;
+
+    Expr* getArg(Index index) const { return args[index]; }
+    Index getArgCount() const { return args.getCount(); }
+};
+
+FIDDLE()
+class ShapeConcatExpr : public ShapePackTransformExpr
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class ShapePermuteExpr : public ShapePackTransformExpr
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class ShapeSwapExpr : public ShapePackTransformExpr
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class ShapeReduceExpr : public ShapePackTransformExpr
+{
+    FIDDLE(...)
+};
+
 /// Expression for compile-time bit casting from floating-point to integer.
 /// __floatAsInt(expr) reinterprets the bits of a floating-point value as an integer.
 /// The input can be:
@@ -743,6 +777,20 @@ FIDDLE()
 class BackwardDifferentiateExpr : public DifferentiateExpr
 {
     FIDDLE(...)
+};
+
+FIDDLE()
+class FuncAsTypeExpr : public Expr
+{
+    FIDDLE(...)
+    FIDDLE() Expr* base = nullptr;
+};
+
+FIDDLE()
+class FuncTypeOfExpr : public Expr
+{
+    FIDDLE(...)
+    FIDDLE() Expr* base = nullptr;
 };
 
 /// An expression of the form `__dispatch_kernel(fn, threadGroupSize, dispatchSize)` to
