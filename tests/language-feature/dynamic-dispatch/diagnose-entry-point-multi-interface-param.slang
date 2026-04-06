@@ -1,7 +1,8 @@
 // Multiple interface-typed entry point parameters without conformances should
-// produce E50100 diagnostics. All targets now go through
-// collectEntryPointUniformParams, so the error surfaces through the normal
-// typeflow specialization path.
+// produce E50100 diagnostics. For most targets, the error surfaces through
+// collectEntryPointUniformParams and the normal typeflow path. For CUDA compute,
+// which skips that pass, the typeflow pass's diagnoseEntryPointInterfaceParamIfNeeded
+// catches the missing conformances directly.
 
 //TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry computeMain
 //TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry computeMain
