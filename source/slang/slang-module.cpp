@@ -160,7 +160,7 @@ static bool _canExportDeclSymbol(ASTNodeType type)
 
 static bool _canRecurseExportSymbol(Decl* decl)
 {
-    if (as<FunctionDeclBase>(decl) || as<ScopeDecl>(decl))
+    if (as<ScopeDecl>(decl))
     {
         return false;
     }
@@ -171,6 +171,8 @@ void Module::_processFindDeclsExportSymbolsRec(Decl* decl)
 {
     if (_canExportDeclSymbol(decl->astNodeType))
     {
+        SLANG_AST_BUILDER_RAII(m_astBuilder);
+
         // It's a reference to a declaration in another module, so first get the symbol name.
         String mangledName = getMangledName(getCurrentASTBuilder(), decl);
 
@@ -187,6 +189,15 @@ void Module::_processFindDeclsExportSymbolsRec(Decl* decl)
     if (!_canRecurseExportSymbol(decl))
     {
         // We don't need to recurse any further into this
+        return;
+    }
+
+    if (auto functionDeclBase = as<FunctionDeclBase>(decl))
+    {
+        for (auto constraint : functionDeclBase->getDirectMemberDeclsOfType<TypeConstraintDecl>())
+        {
+            _processFindDeclsExportSymbolsRec(constraint);
+        }
         return;
     }
 
@@ -264,6 +275,8 @@ UnownedStringSlice Module::getExportedDeclMangledName(Index index)
 
 SLANG_NO_THROW SlangResult SLANG_MCALL Module::serialize(ISlangBlob** outSerializedBlob)
 {
+    SLANG_AST_BUILDER_RAII(m_astBuilder);
+
     SerialContainerUtil::WriteOptions writeOptions;
     OwnedMemoryStream memoryStream(FileAccess::Write);
     SLANG_RETURN_ON_FAIL(SerialContainerUtil::write(this, writeOptions, &memoryStream));
@@ -276,6 +289,8 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Module::serialize(ISlangBlob** outSeriali
 
 SLANG_NO_THROW SlangResult SLANG_MCALL Module::writeToFile(char const* fileName)
 {
+    SLANG_AST_BUILDER_RAII(m_astBuilder);
+
     SerialContainerUtil::WriteOptions writeOptions;
     FileStream fileStream;
     SLANG_RETURN_ON_FAIL(fileStream.init(fileName, FileMode::Create));

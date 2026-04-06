@@ -468,6 +468,11 @@ static void emitReflectionScalarTypeInfoJSON(PrettyWriter& writer, SlangScalarTy
         CASE(Float16, float16);
         CASE(Float32, float32);
         CASE(Float64, float64);
+        CASE(IntPtr, intptr);
+        CASE(UIntPtr, uintptr);
+        CASE(BFloat16, bfloat16);
+        CASE(FloatE4M3, float_e4m3);
+        CASE(FloatE5M2, float_e5m2);
 #undef CASE
     }
     writer << "\"";
