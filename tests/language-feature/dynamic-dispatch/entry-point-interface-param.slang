@@ -7,8 +7,8 @@
 //TEST:SIMPLE(filecheck=HLSL): -target hlsl -stage compute -entry computeMain -conformance "ImplA:IFoo=0" -conformance "ImplB:IFoo=1" -conformance "BarImplA:IBar=0" -conformance "BarImplB:IBar=1"
 //TEST:SIMPLE(filecheck=GLSL): -target glsl -stage compute -entry computeMain -conformance "ImplA:IFoo=0" -conformance "ImplB:IFoo=1" -conformance "BarImplA:IBar=0" -conformance "BarImplB:IBar=1"
 // CUDA compute doesn't run collectEntryPointUniformParams, so interface-typed
-// entry-point params emit E50104 instead of compiling. See diagnose-entry-point-interface-param.slang.
-//DISABLED_TEST:SIMPLE(filecheck=CUDA): -target cuda -stage compute -entry computeMain -conformance "ImplA:IFoo=0" -conformance "ImplB:IFoo=1" -conformance "BarImplA:IBar=0" -conformance "BarImplB:IBar=1"
+// entry-point params emit E50104 instead of compiling.
+//TEST:SIMPLE(filecheck=CUDA_ERR): -target cuda -stage compute -entry computeMain -conformance "ImplA:IFoo=0" -conformance "ImplB:IFoo=1" -conformance "BarImplA:IBar=0" -conformance "BarImplB:IBar=1"
 //TEST:SIMPLE(filecheck=MTL): -target metal -stage compute -entry computeMain -conformance "ImplA:IFoo=0" -conformance "ImplB:IFoo=1" -conformance "BarImplA:IBar=0" -conformance "BarImplB:IBar=1"
 //TEST:SIMPLE(filecheck=WGSL): -target wgsl -stage compute -entry computeMain -conformance "ImplA:IFoo=0" -conformance "ImplB:IFoo=1" -conformance "BarImplA:IBar=0" -conformance "BarImplB:IBar=1"
 //TEST:SIMPLE(filecheck=REPORT): -target hlsl -stage compute -entry computeMain -conformance "ImplA:IFoo=0" -conformance "ImplB:IFoo=1" -conformance "BarImplA:IBar=0" -conformance "BarImplB:IBar=1" -report-dynamic-dispatch-sites
@@ -65,6 +65,6 @@ void computeMain(uniform IFoo foo, uniform IBar bar)
 // SPIRV: OpEntryPoint
 // HLSL: void computeMain
 // GLSL: void main()
-// CUDA: void computeMain
+// CUDA_ERR: error[E50104]
 // MTL: void computeMain
 // WGSL: fn computeMain
