@@ -1075,6 +1075,11 @@ static LegalVal legalizeFieldExtract(
                 specialVal =
                     legalizeFieldExtract(context, specialType, pairVal->specialVal, fieldKey);
             }
+
+            // A void field (flags==0) has neither ordinary nor special data.
+            if (pairElement->flags == 0)
+                return LegalVal::simple(context->getBuilder()->getVoidValue());
+
             return LegalVal::pair(ordinaryVal, specialVal, fieldPairInfo);
         }
         break;
@@ -1095,11 +1100,11 @@ static LegalVal legalizeFieldExtract(
                 }
             }
 
-            // TODO: we can legally reach this case now
-            // when the field is "ordinary".
-
-            SLANG_UNEXPECTED("didn't find tuple element");
-            UNREACHABLE_RETURN(LegalVal());
+            // The field is not in the tuple -- it's a void field whose
+            // PairInfo entry has flags=0. The struct collapsed to just
+            // its special-side tuple, so the void field has no
+            // representation here. Return a void value.
+            return LegalVal::simple(context->getBuilder()->getVoidValue());
         }
 
     default:
@@ -1343,6 +1348,11 @@ static LegalVal legalizeFieldAddress(
                 specialVal =
                     legalizeFieldAddress(context, specialType, pairVal->specialVal, fieldKey);
             }
+
+            // A void field (flags==0) has neither ordinary nor special data.
+            if (pairElement->flags == 0)
+                return LegalVal::simple(context->getBuilder()->getVoidValue());
+
             return LegalVal::pair(ordinaryVal, specialVal, fieldPairInfo);
         }
         break;
@@ -1363,11 +1373,9 @@ static LegalVal legalizeFieldAddress(
                 }
             }
 
-            // TODO: we can legally reach this case now
-            // when the field is "ordinary".
-
-            SLANG_UNEXPECTED("didn't find tuple element");
-            UNREACHABLE_RETURN(LegalVal());
+            // The field is not in the tuple -- it's a void field whose
+            // PairInfo entry has flags=0. Return a void value.
+            return LegalVal::simple(context->getBuilder()->getVoidValue());
         }
 
     case LegalVal::Flavor::implicitDeref:
