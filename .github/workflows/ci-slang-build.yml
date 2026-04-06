@@ -121,6 +121,16 @@ jobs:
           path: ir-version-check-artifact/
           retention-days: 1
 
+      - name: Install pinned TypeScript for WASM build
+        if: inputs.platform == 'wasm'
+        run: |
+          npm install -g typescript@5.9.3
+          TS_VERSION="$(tsc --version | awk '{print $2}')"  
+          if [[ "$TS_VERSION" != "5.9.3" ]]; then  
+            echo "Expected TypeScript 5.9.3, got ${TS_VERSION}"  
+            exit 1  
+          fi
+
       - name: Build Slang
         run: |
           echo "cmake version: $(cmake --version)"
@@ -185,6 +195,7 @@ jobs:
                 -DSLANG_SLANG_LLVM_FLAVOR=FETCH_BINARY \
                 "-DSLANG_SLANG_LLVM_BINARY_URL=$(pwd)/build/dist-release/slang-llvm.zip" \
                 "-DCMAKE_COMPILE_WARNING_AS_ERROR=${{ inputs.warnings-as-errors }}" \
+                -DSLANG_IGNORE_ABORT_MSG=ON \
                 "${cmake_launcher_defines[@]}"
               cmake --workflow --preset "${{ inputs.config }}"
             elif [[ "${{ inputs.build-llvm }}" = "false" ]]; then
@@ -192,6 +203,7 @@ jobs:
               cmake --preset default --fresh \
                 -DSLANG_SLANG_LLVM_FLAVOR=DISABLE \
                 -DCMAKE_COMPILE_WARNING_AS_ERROR=${{ inputs.warnings-as-errors }} \
+                -DSLANG_IGNORE_ABORT_MSG=ON \
                 "${cmake_launcher_defines[@]}"
               cmake --workflow --preset "${{ inputs.config }}"
             else
@@ -200,6 +212,7 @@ jobs:
               cmake --preset default --fresh \
                 -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
                 -DCMAKE_COMPILE_WARNING_AS_ERROR=${{ inputs.warnings-as-errors }} \
+                -DSLANG_IGNORE_ABORT_MSG=ON \
                 "${cmake_launcher_defines[@]}"
               cmake --workflow --preset "${{ inputs.config }}"
             fi

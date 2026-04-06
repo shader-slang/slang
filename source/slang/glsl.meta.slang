@@ -938,7 +938,8 @@ public matrix<T, R, C> outerProduct(vector<T, C> c, vector<T, R> r)
 }
 
 __generic<T : __BuiltinFloatingPointType, let N : int>
-[require(glsl_spirv, GLSL_400)]
+[require(glsl, GLSL_400)]
+[require(spirv)]
 public matrix<T,N,N> inverse(matrix<T,N,N> m)
 {
     __target_switch

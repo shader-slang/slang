@@ -225,6 +225,7 @@ public:
         if (auto moduleDecl = module->getModuleDecl())
         {
             SLANG_SCOPED_RIFF_BUILDER_LIST_CHUNK(_cursor, PropertyKeys<Module>::ASTModule);
+            SLANG_AST_BUILDER_RAII(module->getASTBuilder());
             writeSerializedModuleAST(_cursor, moduleDecl, _sourceLocWriter);
         }
 

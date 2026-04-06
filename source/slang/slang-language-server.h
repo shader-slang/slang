@@ -31,12 +31,15 @@ struct Command
             value = new T(val);
             return *value;
         }
-        T& operator=(Optional&& other)
+        Optional& operator=(Optional&& other)
         {
-            if (other.isValid())
-                *this = (other.get());
-            other.value = nullptr;
-            return *value;
+            if (this != &other)
+            {
+                delete value;
+                value = other.value;
+                other.value = nullptr;
+            }
+            return *this;
         }
         T& get()
         {
