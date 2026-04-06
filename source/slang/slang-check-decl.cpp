@@ -695,6 +695,8 @@ struct SemanticsDeclHeaderVisitor : public SemanticsDeclVisitorBase,
 
     void visitNonEmptyPackConstraintDecl(NonEmptyPackConstraintDecl* decl);
 
+    void visitHasDiffTypeInfoConstraintDecl(HasDiffTypeInfoConstraintDecl* decl);
+
     bool validateGenericConstraintSubType(
         GenericTypeConstraintDecl* decl,
         TypeExp type,
@@ -4090,6 +4092,13 @@ void SemanticsDeclHeaderVisitor::visitNonEmptyPackConstraintDecl(NonEmptyPackCon
     getSink()->diagnose(Diagnostics::InvalidNonEmptyPackConstraintTarget{.expr = packExpr});
 }
 
+void SemanticsDeclHeaderVisitor::visitHasDiffTypeInfoConstraintDecl(
+    HasDiffTypeInfoConstraintDecl* decl)
+{
+    if (!decl->type.type)
+        decl->type = TranslateTypeNodeForced(decl->type);
+}
+
 static void maybeFlattenConjunctionType(Type* type, List<Type*>& outTypes)
 {
     if (auto andType = as<AndType>(type))
@@ -4387,7 +4396,7 @@ void SemanticsDeclHeaderVisitor::visitGenericDecl(GenericDecl* genericDecl)
         }
         else if (
             as<GenericTypeConstraintDecl>(m) || as<TypeCoercionConstraintDecl>(m) ||
-            as<NonEmptyPackConstraintDecl>(m))
+            as<NonEmptyPackConstraintDecl>(m) || as<HasDiffTypeInfoConstraintDecl>(m))
         {
             ensureDecl(m, DeclCheckState::ReadyForReference);
         }
@@ -5413,6 +5422,8 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
             return true;
         if (as<NonEmptyPackConstraintDecl>(declRef))
             return true;
+        if (as<HasDiffTypeInfoConstraintDecl>(declRef))
+            return true;
         return false;
     };
 
@@ -5552,6 +5563,17 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
             else
                 return false;
         }
+        else if (
+            auto requiredHasDiffTypeInfoConstraintDeclRef =
+                requiredMemberDeclRef.as<HasDiffTypeInfoConstraintDecl>())
+        {
+            if (auto satisfyingConstraintDeclRef =
+                    satisfyingMemberDeclRef.as<HasDiffTypeInfoConstraintDecl>())
+            {
+            }
+            else
+                return false;
+        }
         else
             return false;
     }
@@ -5672,6 +5694,16 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
             if (!satisfyingPackVal)
                 satisfyingPackVal = m_astBuilder->getErrorType();
             requiredSubstArgs.add(m_astBuilder->getNonEmptyPackWitness(satisfyingPackVal));
+        }
+        else if (
+            auto requiredHasDiffTypeInfoConstraintDeclRef =
+                requiredMemberDeclRef.as<HasDiffTypeInfoConstraintDecl>())
+        {
+            auto satisfyingConstraintDeclRef =
+                satisfyingMemberDeclRef.as<HasDiffTypeInfoConstraintDecl>();
+            SLANG_ASSERT(satisfyingConstraintDeclRef);
+            requiredSubstArgs.add(
+                m_astBuilder->getHasDiffTypeInfoWitness(satisfyingConstraintDeclRef));
         }
     }
 
@@ -5819,6 +5851,32 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
             {
                 return false;
             }
+        }
+        else if (
+            auto requiredHasDiffTypeInfoConstraintDeclRef =
+                requiredMemberDeclRef.as<HasDiffTypeInfoConstraintDecl>())
+        {
+            auto satisfyingConstraintDeclRef =
+                satisfyingMemberDeclRef.as<HasDiffTypeInfoConstraintDecl>();
+            SLANG_ASSERT(satisfyingConstraintDeclRef);
+
+            auto specializedRequiredConstraintDeclRef =
+                m_astBuilder
+                    ->getGenericAppDeclRef(
+                        requiredGenericDeclRef,
+                        requiredSubstArgs.getArrayView(),
+                        requiredHasDiffTypeInfoConstraintDeclRef.getDecl())
+                    .as<HasDiffTypeInfoConstraintDecl>();
+            if (!specializedRequiredConstraintDeclRef)
+                return false;
+
+            auto requiredType =
+                getHasDiffTypeInfoType(m_astBuilder, specializedRequiredConstraintDeclRef);
+            auto satisfyingType =
+                getHasDiffTypeInfoType(m_astBuilder, satisfyingConstraintDeclRef);
+            if (!satisfyingType->equals(requiredType))
+                return false;
+
         }
     }
 
@@ -6321,6 +6379,31 @@ DeclRef<Decl> SemanticsVisitor::liftDeclFromGenericContainers(
                     getCurrentASTBuilder(),
                     SubstitutionSet(_partiallySpecializedRequiredGenericDeclRef)));
             }
+            else if (auto hasDiffTypeInfoDecl = as<HasDiffTypeInfoConstraintDecl>(member))
+            {
+                auto synConstraintDecl = m_astBuilder->create<HasDiffTypeInfoConstraintDecl>();
+                synConstraintDecl->nameAndLoc = hasDiffTypeInfoDecl->getNameAndLoc();
+                synConstraintDecl->parentDecl = synGenericDecl;
+                synConstraintDecl->whereTokenLoc = hasDiffTypeInfoDecl->whereTokenLoc;
+
+                synConstraintDecl->type = TypeExp((Type*)hasDiffTypeInfoDecl->type.type->substitute(
+                    m_astBuilder,
+                    SubstitutionSet(currentDeclRef)));
+                synGenericDecl->addDirectMemberDecl(synConstraintDecl);
+                mapSynToOrigTypeParams.add(synConstraintDecl, hasDiffTypeInfoDecl);
+
+                m_astBuilder->m_cachedGenericDefaultArgs.remove(synGenericDecl);
+                synGenericDecl->_cachedArgsForDefaultSubstitution.clear();
+                auto _partialDefaultArgs =
+                    getDefaultSubstitutionArgs(m_astBuilder, this, synGenericDecl);
+                DeclRef<Decl> _partiallySpecializedRequiredGenericDeclRef =
+                    m_astBuilder->getGenericAppDeclRef(
+                        genericDecl,
+                        _partialDefaultArgs.getArrayView());
+                currentDeclRef = as<DeclRefBase>(currentDeclRef->substitute(
+                    getCurrentASTBuilder(),
+                    SubstitutionSet(_partiallySpecializedRequiredGenericDeclRef)));
+            }
         }
 
         // Override generic pointer to point to the original generic container.
@@ -6582,6 +6665,20 @@ GenericDecl* SemanticsVisitor::synthesizeGenericSignatureForRequirementWitness(
 
             synGenericDecl->addDirectMemberDecl(synConstraintDecl);
         }
+        else if (
+            auto hasDiffTypeInfoConstraintDecl = as<HasDiffTypeInfoConstraintDecl>(constraintDecl))
+        {
+            auto synConstraintDecl = m_astBuilder->create<HasDiffTypeInfoConstraintDecl>();
+            synConstraintDecl->nameAndLoc = hasDiffTypeInfoConstraintDecl->getNameAndLoc();
+            synConstraintDecl->parentDecl = synGenericDecl;
+            synConstraintDecl->whereTokenLoc = hasDiffTypeInfoConstraintDecl->whereTokenLoc;
+            synConstraintDecl->type =
+                TypeExp((Type*)hasDiffTypeInfoConstraintDecl->type.type->substitute(
+                    m_astBuilder,
+                    SubstitutionSet(partiallySpecializedRequiredGenericDeclRef)));
+
+            synGenericDecl->addDirectMemberDecl(synConstraintDecl);
+        }
         else if (auto nonEmptyConstraintDecl = as<NonEmptyPackConstraintDecl>(constraintDecl))
         {
             auto synConstraintDecl = m_astBuilder->create<NonEmptyPackConstraintDecl>();
@@ -6628,6 +6725,20 @@ GenericDecl* SemanticsVisitor::synthesizeGenericSignatureForRequirementWitness(
             SubstitutionSet(partiallySpecializedRequiredGenericDeclRef)));
 
         synGenericDecl->addDirectMemberDecl(synCoercionDecl);
+    }
+
+    for (auto hasDiffTypeInfoDecl :
+         requiredMemberDeclRef.getDecl()->getDirectMemberDeclsOfType<HasDiffTypeInfoConstraintDecl>())
+    {
+        auto synConstraintDecl = m_astBuilder->create<HasDiffTypeInfoConstraintDecl>();
+        synConstraintDecl->nameAndLoc = hasDiffTypeInfoDecl->getNameAndLoc();
+        synConstraintDecl->parentDecl = synGenericDecl;
+        synConstraintDecl->whereTokenLoc = hasDiffTypeInfoDecl->whereTokenLoc;
+        synConstraintDecl->type = TypeExp((Type*)hasDiffTypeInfoDecl->type.type->substitute(
+            m_astBuilder,
+            SubstitutionSet(partiallySpecializedRequiredGenericDeclRef)));
+
+        synGenericDecl->addDirectMemberDecl(synConstraintDecl);
     }
 
     // Override generic pointer to point to the original generic container.
@@ -9180,22 +9291,19 @@ bool SemanticsVisitor::findDefaultInterfaceImpl(
 
 Type* SemanticsVisitor::getForwardDiffFuncInterfaceType(Type* baseType)
 {
-    auto diffTypeInfoWitness =
-        tryGetSubtypeWitness(baseType, m_astBuilder->getDiffTypeInfoInterfaceType());
+    auto diffTypeInfoWitness = getDiffTypeInfoWitness(baseType);
     return m_astBuilder->getForwardDiffFuncInterfaceType(baseType, diffTypeInfoWitness);
 }
 
 Type* SemanticsVisitor::getBackwardDiffFuncInterfaceType(Type* baseType)
 {
-    auto diffTypeInfoWitness =
-        tryGetSubtypeWitness(baseType, m_astBuilder->getDiffTypeInfoInterfaceType());
+    auto diffTypeInfoWitness = getDiffTypeInfoWitness(baseType);
     return m_astBuilder->getBackwardDiffFuncInterfaceType(baseType, diffTypeInfoWitness);
 }
 
 Type* SemanticsVisitor::getBwdCallableBaseType(Type* baseType)
 {
-    auto diffTypeInfoWitness =
-        tryGetSubtypeWitness(baseType, m_astBuilder->getDiffTypeInfoInterfaceType());
+    auto diffTypeInfoWitness = getDiffTypeInfoWitness(baseType);
     return m_astBuilder->getBwdCallableBaseType(baseType, diffTypeInfoWitness);
 }
 
@@ -11393,6 +11501,8 @@ void SemanticsVisitor::getGenericParams(
             outConstraints.add(typeCoercionConstraintDecl);
         else if (auto nonEmptyConstraintDecl = as<NonEmptyPackConstraintDecl>(dd))
             outConstraints.add(nonEmptyConstraintDecl);
+        else if (auto hasDiffTypeInfoConstraintDecl = as<HasDiffTypeInfoConstraintDecl>(dd))
+            outConstraints.add(hasDiffTypeInfoConstraintDecl);
     }
 }
 
@@ -11678,6 +11788,26 @@ bool SemanticsVisitor::doGenericSignaturesMatch(
                 return false;
             }
         }
+        else if (
+            auto leftHasDiffTypeInfoConstraint =
+                as<HasDiffTypeInfoConstraintDecl>(leftConstraints[cc]))
+        {
+            auto unspecializedRightConstraintDeclRef = createDefaultSubstitutionsIfNeeded(
+                m_astBuilder,
+                this,
+                makeDeclRef(rightConstraints[cc]));
+            auto rightConstraint =
+                substInnerRightToLeft.substitute(m_astBuilder, unspecializedRightConstraintDeclRef)
+                    .as<HasDiffTypeInfoConstraintDecl>();
+            if (!rightConstraint)
+                return false;
+
+            auto leftType = leftHasDiffTypeInfoConstraint->type.type;
+            auto rightType =
+                substInnerRightToLeft.substitute(m_astBuilder, rightConstraint.getDecl()->type.type);
+            if (!leftType->equals(rightType))
+                return false;
+        }
         else
         {
             return false;
@@ -11829,6 +11959,12 @@ List<Val*> getDefaultSubstitutionArgs(
             {
                 semantics->ensureDecl(nonEmptyConstraintDecl, DeclCheckState::ReadyForReference);
             }
+            else if (auto hasDiffTypeInfoConstraintDecl = as<HasDiffTypeInfoConstraintDecl>(member))
+            {
+                semantics->ensureDecl(
+                    hasDiffTypeInfoConstraintDecl,
+                    DeclCheckState::ReadyForReference);
+            }
         }
     }
 
@@ -11901,6 +12037,19 @@ List<Val*> getDefaultSubstitutionArgs(
                 continue;
             }
             args.add(astBuilder->getNonEmptyPackWitness(packVal));
+        }
+        else if (auto hasDiffTypeInfoConstraintDecl = as<HasDiffTypeInfoConstraintDecl>(decl))
+        {
+            if (semantics)
+                semantics->ensureDecl(
+                    hasDiffTypeInfoConstraintDecl,
+                    DeclCheckState::ReadyForReference);
+            auto constraintDeclRef = createDefaultSubstitutionsIfNeeded(
+                                         astBuilder,
+                                         semantics,
+                                         hasDiffTypeInfoConstraintDecl->getDefaultDeclRef())
+                                         .as<HasDiffTypeInfoConstraintDecl>();
+            args.add(astBuilder->getHasDiffTypeInfoWitness(constraintDeclRef));
         }
     }
 

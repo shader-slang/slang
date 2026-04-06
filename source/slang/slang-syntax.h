@@ -26,6 +26,13 @@ inline Type* getToType(ASTBuilder* astBuilder, DeclRef<TypeCoercionConstraintDec
     return declRef.substitute(astBuilder, declRef.getDecl()->toType);
 }
 
+inline Type* getHasDiffTypeInfoType(
+    ASTBuilder* astBuilder,
+    DeclRef<HasDiffTypeInfoConstraintDecl> const& declRef)
+{
+    return declRef.substitute(astBuilder, declRef.getDecl()->type.Ptr());
+}
+
 // `Val`
 
 inline bool areValsEqual(Val* left, Val* right)

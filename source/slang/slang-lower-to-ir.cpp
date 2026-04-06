@@ -2461,6 +2461,12 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
         return LoweredValInfo::simple(emitNonEmptyPackWitness(loweredPack));
     }
 
+    LoweredValInfo visitHasDiffTypeInfoWitness(HasDiffTypeInfoWitness* witness)
+    {
+        auto witnessType = getBuilder()->getWitnessTableType(getBuilder()->getVoidType());
+        return emitDeclRef(context, witness->getDeclRef(), witnessType);
+    }
+
     LoweredValInfo visitConstantIntVal(ConstantIntVal* val)
     {
         auto type = lowerType(context, val->getType());
@@ -5027,6 +5033,16 @@ struct ExprLoweringContext
                         subContext,
                         genSubst,
                         nonEmptyConstraintDecl,
+                        argCounter++);
+                }
+                else if (
+                    auto hasDiffTypeInfoConstraintDecl =
+                        as<HasDiffTypeInfoConstraintDecl>(memberDecl))
+                {
+                    _lowerSubstitutionArg(
+                        subContext,
+                        genSubst,
+                        hasDiffTypeInfoConstraintDecl,
                         argCounter++);
                 }
             }
@@ -9874,6 +9890,21 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         UNREACHABLE_RETURN(LoweredValInfo());
     }
 
+    LoweredValInfo visitHasDiffTypeInfoConstraintDecl(HasDiffTypeInfoConstraintDecl* decl)
+    {
+        if (const auto globalGenericParamDecl = as<GlobalGenericParamDecl>(decl->parentDecl))
+        {
+            SLANG_UNUSED(globalGenericParamDecl);
+            auto witnessType = getBuilder()->getWitnessTableType(getBuilder()->getVoidType());
+            auto inst = getBuilder()->emitGlobalGenericParam(witnessType);
+            addLinkageDecoration(context, inst, decl);
+            return LoweredValInfo::simple(inst);
+        }
+
+        SLANG_UNEXPECTED("has-diff-type-info constraint during lowering");
+        UNREACHABLE_RETURN(LoweredValInfo());
+    }
+
     LoweredValInfo visitGlobalGenericParamDecl(GlobalGenericParamDecl* decl)
     {
         auto inst = getBuilder()->emitGlobalGenericTypeParam();
@@ -11885,6 +11916,17 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         subContext->setValue(constraintDecl, LoweredValInfo::simple(param));
     }
 
+    void emitGenericConstraintDecl(
+        IRGenContext* subContext,
+        HasDiffTypeInfoConstraintDecl* constraintDecl)
+    {
+        auto subBuilder = subContext->irBuilder;
+        auto witnessType = subBuilder->getWitnessTableType(subBuilder->getVoidType());
+        auto param = subBuilder->emitParam(witnessType);
+        addNameHint(context, param, constraintDecl);
+        subContext->setValue(constraintDecl, LoweredValInfo::simple(param));
+    }
+
     IRGeneric* emitOuterGeneric(IRGenContext* subContext, GenericDecl* genericDecl, Decl* leafDecl)
     {
         auto subBuilder = subContext->irBuilder;
@@ -11948,6 +11990,12 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
             else if (auto nonEmptyConstraintDecl = as<NonEmptyPackConstraintDecl>(constraintDecl))
             {
                 emitGenericConstraintDecl(subContext, nonEmptyConstraintDecl);
+            }
+            else if (
+                auto hasDiffTypeInfoConstraintDecl =
+                    as<HasDiffTypeInfoConstraintDecl>(constraintDecl))
+            {
+                emitGenericConstraintDecl(subContext, hasDiffTypeInfoConstraintDecl);
             }
         }
 

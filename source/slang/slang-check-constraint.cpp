@@ -446,6 +446,42 @@ bool addTypeCoercionWitnessToArgs(
     return true;
 }
 
+bool addHasDiffTypeInfoWitnessToArgs(
+    ASTBuilder* astBuilder,
+    SemanticsVisitor* visitor,
+    HasDiffTypeInfoConstraintDecl* constraintDecl,
+    DeclRef<GenericDecl> genericDeclRef,
+    SemanticsVisitor::OverloadResolveContext* maybeContext,
+    HashSet<Decl*>* maybeConstrainedGenericParams,
+    ShortList<Val*>& args,
+    bool shouldEmitError)
+{
+    SLANG_UNUSED(maybeContext);
+    SLANG_UNUSED(shouldEmitError);
+    SLANG_ASSERT(!shouldEmitError || maybeContext);
+
+    auto constraintDeclRef =
+        astBuilder
+            ->getGenericAppDeclRef(genericDeclRef, args.getArrayView().arrayView, constraintDecl)
+            .as<HasDiffTypeInfoConstraintDecl>();
+    auto constrainedType = getHasDiffTypeInfoType(astBuilder, constraintDeclRef);
+    if (!constrainedType)
+        return false;
+    if (maybeConstrainedGenericParams)
+    {
+        if (auto declRefType = as<DeclRefType>(constrainedType))
+            maybeConstrainedGenericParams->add(declRefType->getDeclRef().getDecl());
+    }
+
+    if (auto witness = visitor->getDiffTypeInfoWitness(constrainedType))
+    {
+        args.add(witness);
+        return true;
+    }
+
+    return false;
+}
+
 DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
     ConstraintSystem* system,
     DeclRef<GenericDecl> genericDeclRef,
@@ -978,6 +1014,23 @@ DeclRef<Decl> SemanticsVisitor::trySolveConstraintSystem(
                     return DeclRef<Decl>();
 
                 args[_genericDecl].add(m_astBuilder->getNonEmptyPackWitness(constrainedArg));
+            }
+            else if (
+                auto hasDiffTypeInfoConstraintDecl =
+                    as<HasDiffTypeInfoConstraintDecl>(constraintDecl))
+            {
+                if (!addHasDiffTypeInfoWitnessToArgs(
+                        getASTBuilder(),
+                        this,
+                        hasDiffTypeInfoConstraintDecl,
+                        genericDeclRef,
+                        nullptr,
+                        &constrainedGenericParams,
+                        args[_genericDecl],
+                        false))
+                {
+                    return DeclRef<Decl>();
+                }
             }
         }
 
