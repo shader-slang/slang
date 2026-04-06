@@ -3,9 +3,8 @@
 // fixed-size byte buffer, so types with unknown size cannot participate
 // in dynamic dispatch.
 //
-// Currently crashes with "Unimplemented type packing" instead of producing
-// a user-facing diagnostic (#10420). The compiler should reject this with
-// error 41014 like other unsupported types.
+// The compiler rejects this with error 41014 like other unsupported types.
+// See #10420.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target spirv -conformance "Impl:IFoo=0" -conformance "GoodImpl:IFoo=1"
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK): -target hlsl -stage compute -entry computeMain -conformance "Impl:IFoo=0" -conformance "GoodImpl:IFoo=1"

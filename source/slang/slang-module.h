@@ -414,7 +414,7 @@ public:
     /// TODO: We might eventually consider a non-stateful approach
     /// to constructing a `Module`.
     ///
-    void _collectShaderParams();
+    void _collectShaderParams(DiagnosticSink* sink);
 
     void _discoverEntryPoints(DiagnosticSink* sink, const List<RefPtr<TargetRequest>>& targets);
     void _discoverEntryPointsImpl(

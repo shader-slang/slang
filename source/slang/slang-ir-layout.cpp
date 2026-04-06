@@ -2,9 +2,11 @@
 #include "slang-ir-layout.h"
 
 #include "slang-compiler-options.h"
+#include "slang-ir-check-recursion.h"
 #include "slang-ir-insts.h"
 #include "slang-ir-util.h"
 #include "slang-target.h"
+
 
 // This file implements facilities for computing and caching layout
 // information on IR types.
@@ -432,6 +434,12 @@ Result IRTypeLayoutRules::calcSizeAndAlignment(
             auto tagType = enumType->getTagType();
             return calcSizeAndAlignment(targetReq, tagType, outSizeAndAlignment);
         }
+    case kIROp_TupleNameType:
+        {
+            // Acts like VoidType
+            *outSizeAndAlignment = IRSizeAndAlignment(0, 1);
+            return SLANG_OK;
+        }
         break;
     default:
         break;
@@ -486,6 +494,12 @@ Result getSizeAndAlignment(
     {
         *outSizeAndAlignment = IRSizeAndAlignment(decor->getSize(), (int)decor->getAlignment());
         return SLANG_OK;
+    }
+
+    if (isTypeRecursive(type))
+    {
+        *outSizeAndAlignment = IRSizeAndAlignment(0, 0);
+        return SLANG_E_INTERNAL_FAIL;
     }
 
     IRSizeAndAlignment sizeAndAlignment;
