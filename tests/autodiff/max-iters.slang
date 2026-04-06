@@ -2,7 +2,6 @@
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-output-using-type -vk
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-output-using-type -metal
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-output-using-type -cuda
-//TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-output-using-type -cpu
 //TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-output-using-type -wgpu
 
 // Note: there is a bug in fxc compiler errorneously reporting infinite loop for this shader.

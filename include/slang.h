@@ -857,6 +857,23 @@ typedef uint32_t SlangSizeT;
         SLANG_STAGE_PIXEL = SLANG_STAGE_FRAGMENT,
     };
 
+    typedef SlangUInt32 SlangCooperativeMatrixUseIntegral;
+    enum SlangCooperativeMatrixUse : SlangCooperativeMatrixUseIntegral
+    {
+        SLANG_COOPERATIVE_MATRIX_USE_A,
+        SLANG_COOPERATIVE_MATRIX_USE_B,
+        SLANG_COOPERATIVE_MATRIX_USE_ACCUMULATOR,
+    };
+
+    typedef SlangUInt32 SlangCooperativeVectorMatrixLayoutIntegral;
+    enum SlangCooperativeVectorMatrixLayout : SlangCooperativeVectorMatrixLayoutIntegral
+    {
+        SLANG_COOPERATIVE_VECTOR_MATRIX_LAYOUT_ROW_MAJOR,
+        SLANG_COOPERATIVE_VECTOR_MATRIX_LAYOUT_COLUMN_MAJOR,
+        SLANG_COOPERATIVE_VECTOR_MATRIX_LAYOUT_INFERENCING_OPTIMAL,
+        SLANG_COOPERATIVE_VECTOR_MATRIX_LAYOUT_TRAINING_OPTIMAL,
+    };
+
     typedef SlangUInt32 SlangDebugInfoLevelIntegral;
     enum SlangDebugInfoLevel : SlangDebugInfoLevelIntegral
     {
@@ -1964,7 +1981,10 @@ public:                                                              \
         SLANG_SCALAR_TYPE_INT16,
         SLANG_SCALAR_TYPE_UINT16,
         SLANG_SCALAR_TYPE_INTPTR,
-        SLANG_SCALAR_TYPE_UINTPTR
+        SLANG_SCALAR_TYPE_UINTPTR,
+        SLANG_SCALAR_TYPE_BFLOAT16,
+        SLANG_SCALAR_TYPE_FLOAT_E4M3,
+        SLANG_SCALAR_TYPE_FLOAT_E5M2,
     };
 
     // abstract decl reflection
@@ -2349,6 +2369,11 @@ struct TypeReflection
         UInt8 = SLANG_SCALAR_TYPE_UINT8,
         Int16 = SLANG_SCALAR_TYPE_INT16,
         UInt16 = SLANG_SCALAR_TYPE_UINT16,
+        IntPtr = SLANG_SCALAR_TYPE_INTPTR,
+        UIntPtr = SLANG_SCALAR_TYPE_UINTPTR,
+        BFloat16 = SLANG_SCALAR_TYPE_BFLOAT16,
+        FloatE4M3 = SLANG_SCALAR_TYPE_FLOAT_E4M3,
+        FloatE5M2 = SLANG_SCALAR_TYPE_FLOAT_E5M2,
     };
 
     Kind getKind() { return (Kind)spReflectionType_GetKind((SlangReflectionType*)this); }
@@ -4171,7 +4196,7 @@ struct SessionDesc
 
     /** Pointer to an array of compiler option entries, whose size is compilerOptionEntryCount.
      */
-    CompilerOptionEntry* compilerOptionEntries = nullptr;
+    const CompilerOptionEntry* compilerOptionEntries = nullptr;
 
     /** Number of additional compiler option entries.
      */
@@ -4682,7 +4707,7 @@ struct IComponentType : public ISlangUnknown
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL linkWithOptions(
         IComponentType** outLinkedComponentType,
         uint32_t compilerOptionEntryCount,
-        CompilerOptionEntry* compilerOptionEntries,
+        CompilerOptionEntry const* compilerOptionEntries,
         ISlangBlob** outDiagnostics = nullptr) = 0;
 
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL

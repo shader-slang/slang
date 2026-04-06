@@ -1,4 +1,8 @@
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -emit-spirv-directly
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -emit-spirv-directly -Xslang -DBAB
+
+//DISABLE_TEST(compute):SIMPLE(filecheck=DXIL):-target dxil -profile cs_6_10 -entry computeMain -Xdxc -Ibuild/dxc/include -DBAB
+//DXIL: result code = 0
 
 // CHECK: 0
 // CHECK-NEXT: 0
@@ -16,7 +20,11 @@
 // CHECK-NEXT: 2
 
 //TEST_INPUT:ubuffer(stride=4, count=256):out,name=outputBuffer
+#if defined(BAB)
+RWByteAddressBuffer outputBuffer;
+#else
 RWStructuredBuffer<int> outputBuffer;
+#endif
 
 //TEST_INPUT:ubuffer(data=[4 3 5 7], stride=4, count=256),name=input1
 ByteAddressBuffer input1;

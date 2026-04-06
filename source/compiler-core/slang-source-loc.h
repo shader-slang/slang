@@ -352,7 +352,8 @@ protected:
     ComPtr<ISlangBlob> m_contentBlob; ///< A blob that owns the storage for the file contents. If
                                       ///< nullptr, there is no contents
     UnownedStringSlice m_content;     ///< The actual contents of the file.
-    size_t m_contentSize;             ///< The size of the actual contents
+    size_t m_contentSize; ///< Initially set to the raw blob size; updated by setContents() to
+                          ///< the decoded content size after BOM/encoding processing.
 
     SHA1::Digest m_digest;
 

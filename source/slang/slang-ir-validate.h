@@ -93,4 +93,7 @@ bool validateStructuredBufferResourceTypes(
     DiagnosticSink* sink,
     TargetRequest* targetRequest);
 
+// Validate cooperative matrix/vector operations after type specialization.
+void validateCooperativeOperations(IRModule* module, DiagnosticSink* sink);
+
 } // namespace Slang

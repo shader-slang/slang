@@ -687,6 +687,11 @@ void SemanticsStmtVisitor::visitExpressionStmt(ExpressionStmt* stmt)
     }
 }
 
+void SemanticsStmtVisitor::visitRequireCapabilityStmt(RequireCapabilityStmt*)
+{
+    // Nothing to do
+}
+
 void SemanticsStmtVisitor::tryInferLoopMaxIterations(ForStmt* stmt)
 {
     // If a for loop is in the form of `for (var = initialVal; var $compareOp otherVal; var

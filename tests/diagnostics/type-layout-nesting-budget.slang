@@ -6,9 +6,7 @@
 struct LoopField<each T>
 {
     LoopField<T, int> next;
-/*CHECK:
-    ^^^^^^^^^ maximum type nesting level exceeded
-*/
+//CHECK:              ^^^^ maximum type nesting level exceeded
 }
 
 ParameterBlock<LoopField<int>> gParams;
