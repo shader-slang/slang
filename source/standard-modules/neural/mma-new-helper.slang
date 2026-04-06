@@ -62,10 +62,13 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
     // Output dimension: M for forward, K for transpose.
     static const int OutputDim = TransposeA ? K : M;
 
+    // Total prebuilt input tiles for mma() when accepting precomputed MatA tiles.
+    VISIBILITY_LEVEL static const int PrebuiltInputTileCount = (SharedDimAligned / COLUMN_A) * NCoopMatColumn;
+
     static const linalg.CoopMatMatrixLayout RowMajor = linalg.CoopMatMatrixLayout.RowMajor;
     static const linalg.CoopMatMatrixLayout ColumnMajor = linalg.CoopMatMatrixLayout.ColumnMajor;
 
-    typealias MatA = linalg.CoopMat<half, MemoryScope.Subgroup, ROW_A, COLUMN_A, linalg.CoopMatMatrixUse.MatrixA>;
+    VISIBILITY_LEVEL typealias MatA = linalg.CoopMat<half, MemoryScope.Subgroup, ROW_A, COLUMN_A, linalg.CoopMatMatrixUse.MatrixA>;
     typealias MatB = linalg.CoopMat<half, MemoryScope.Subgroup, ROW_B, COLUMN_B, linalg.CoopMatMatrixUse.MatrixB>;
     typealias MatC = linalg.CoopMat<T,    MemoryScope.Subgroup, ROW_C, COLUMN_C, linalg.CoopMatMatrixUse.MatrixAccumulator>;
 
@@ -123,7 +126,7 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
     // =========================================================================
 
     [ForceInline]
-    [require(cuda)]
+    [require(cuda, subgroup_shuffle)]
     VISIBILITY_LEVEL static OutArrayType mma<U, Address, InArrayType, OutArrayType, V, bool Bias = false>(
         InArrayType inputVector,
         Address weightAddress,
@@ -151,17 +154,23 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
             for (uint i = 0; i < NCoopMatRow; i++)
                 matA[i] = loadTileDirect<U, Address>(int(i), tileColIdx, weightAddress);
 
-            half localColB[ROW_B];
+            half localSlice[COLUMN_A];
             [ForceUnroll]
-            for (uint r = 0; r < ROW_B; r++)
+            for (uint r = 0; r < uint(COLUMN_A); r++)
             {
                 int srcIdx = k + int(r);
-                localColB[r] = (srcIdx < SharedDimActual) ? __realCast<half>(inputVector[srcIdx]) : half(0.0);
+                localSlice[r] = (srcIdx < SharedDimActual) ? __realCast<half>(inputVector[srcIdx]) : half(0.0);
             }
 
+            MatA inputTilesA[NCoopMatColumn];
+            buildAllTilesFromArray<COLUMN_A, NCoopMatColumn>(localSlice, inputTilesA);
+            transposeTilesA<NCoopMatColumn>(inputTilesA);
+
+            [ForceUnroll]
             for (uint j = 0; j < NCoopMatColumn; j++)
             {
-                let matB = buildMatBFromLocalCol(localColB, int(j));
+                MatB matB;
+                matB.copyFrom(inputTilesA[j]);
 
                 [ForceUnroll]
                 for (uint i = 0; i < NCoopMatRow; i++)
@@ -175,27 +184,174 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
         }
 
         OutArrayType outputVector;
-        [ForceUnroll]
-        for (int i = 0; i < NCoopMatRow; i++)
+
+        if (sizeof(T) == 2)
         {
-            for (int j = 0; j < NCoopMatColumn; j++)
+            MatA outputTilesA[NCoopMat];
+            [ForceUnroll]
+            for (int i = 0; i < NCoopMat; i++)
             {
-                int index = i * NCoopMatColumn + j;
+                outputTilesA[i].copyFrom(matC[i]);
+                uint r1 = outputTilesA[i].fragmentRead(1);
+                uint r2 = outputTilesA[i].fragmentRead(2);
+                outputTilesA[i].fragmentWrite(1, r2);
+                outputTilesA[i].fragmentWrite(2, r1);
+                outputTilesA[i].ChangeMajor();
+            }
 
-                T localColC[ROW_C];
-                extractColFromMatC(matC[index], j, localColC);
+            half outputRaw[OutputDim];
+            extractAllTilesToArray<OutputDim, NCoopMat>(outputTilesA, outputRaw);
 
-                int rowBase = i * ROW_C;
-                [ForceUnroll]
-                for (int r = 0; r < ROW_C; r++)
+            [ForceUnroll]
+            for (int i = 0; i < OutputDim; i++)
+            {
+                V val = __realCast<V>(outputRaw[i]);
+                if (Bias)
+                    val = val + __realCast<V>(biasAddress.value[uint(i)]);
+                outputVector[i] = val;
+            }
+        }
+        else
+        {
+            [ForceUnroll]
+            for (int i = 0; i < NCoopMatRow; i++)
+            {
+                for (int j = 0; j < NCoopMatColumn; j++)
                 {
-                    int outIdx = rowBase + r;
-                    if (outIdx < OutputDim)
+                    int index = i * NCoopMatColumn + j;
+
+                    T localColC[ROW_C];
+                    extractColFromMatC(matC[index], j, localColC);
+
+                    int rowBase = i * ROW_C;
+                    [ForceUnroll]
+                    for (int r = 0; r < ROW_C; r++)
                     {
-                        V val = __realCast<V>(localColC[r]);
-                        if (Bias)
-                            val = val + __realCast<V>(biasAddress.value[uint(outIdx)]);
-                        outputVector[outIdx] = val;
+                        int outIdx = rowBase + r;
+                        if (outIdx < OutputDim)
+                        {
+                            V val = __realCast<V>(localColC[r]);
+                            if (Bias)
+                                val = val + __realCast<V>(biasAddress.value[uint(outIdx)]);
+                            outputVector[outIdx] = val;
+                        }
+                    }
+                }
+            }
+        }
+
+        return outputVector;
+    }
+
+    // Like mma() but accepts prebuilt MatA tiles for the input vector.
+    // Caller builds tiles once via buildAllTilesFromArray; this avoids
+    // redundant shuffle-heavy tile construction when the same input is
+    // consumed by multiple operations (transpose MMA, outer product, bias reduce).
+    [ForceInline]
+    [require(cuda, subgroup_shuffle)]
+    VISIBILITY_LEVEL static OutArrayType mmaFromTilesA<U, Address, OutArrayType, V, bool Bias = false>(
+        MatA prebuiltTiles[PrebuiltInputTileCount],
+        Address weightAddress,
+        Optional<Address> biasAddress)
+            where U : __BuiltinFloatingPointType
+            where U.Differential == U
+            where Address : IPointerLikeAddress<U>
+            where V : __BuiltinFloatingPointType
+            where V.Differential == V
+            where OutArrayType : IArrayAccessor<V>
+    {
+        MatC matC[NCoopMat];
+        [ForceUnroll]
+        for (int i = 0; i < NCoopMat; i++)
+            matC[i].clear();
+
+        [ForceUnroll]
+        for (int k = 0; k < SharedDimAligned; k += COLUMN_A)
+        {
+            int tileColIdx = k / COLUMN_A;
+
+            MatA matA[NCoopMatRow];
+            [ForceUnroll]
+            for (uint i = 0; i < NCoopMatRow; i++)
+                matA[i] = loadTileDirect<U, Address>(int(i), tileColIdx, weightAddress);
+
+            int k_iter = k / COLUMN_A;
+
+            [ForceUnroll]
+            for (uint j = 0; j < NCoopMatColumn; j++)
+            {
+                MatA tileA = prebuiltTiles[k_iter * NCoopMatColumn + int(j)];
+                uint r1 = tileA.fragmentRead(1);
+                uint r2 = tileA.fragmentRead(2);
+                tileA.fragmentWrite(1, r2);
+                tileA.fragmentWrite(2, r1);
+
+                MatB matB;
+                matB.copyFrom(tileA);
+
+                [ForceUnroll]
+                for (uint i = 0; i < NCoopMatRow; i++)
+                {
+                    int index = i * NCoopMatColumn + int(j);
+                    matC[index] = linalg.coopMatMulAdd<T, false, half, half, T,
+                                            MemoryScope.Subgroup, ROW_A, COLUMN_A, COLUMN_B
+                                            >(matA[i], matB, matC[index]);
+                }
+            }
+        }
+
+        OutArrayType outputVector;
+
+        if (sizeof(T) == 2)
+        {
+            MatA outputTilesA[NCoopMat];
+            [ForceUnroll]
+            for (int i = 0; i < NCoopMat; i++)
+            {
+                outputTilesA[i].copyFrom(matC[i]);
+                uint r1 = outputTilesA[i].fragmentRead(1);
+                uint r2 = outputTilesA[i].fragmentRead(2);
+                outputTilesA[i].fragmentWrite(1, r2);
+                outputTilesA[i].fragmentWrite(2, r1);
+                outputTilesA[i].ChangeMajor();
+            }
+
+            half outputRaw[OutputDim];
+            extractAllTilesToArray<OutputDim, NCoopMat>(outputTilesA, outputRaw);
+
+            [ForceUnroll]
+            for (int i = 0; i < OutputDim; i++)
+            {
+                V val = __realCast<V>(outputRaw[i]);
+                if (Bias)
+                    val = val + __realCast<V>(biasAddress.value[uint(i)]);
+                outputVector[i] = val;
+            }
+        }
+        else
+        {
+            [ForceUnroll]
+            for (int i = 0; i < NCoopMatRow; i++)
+            {
+                for (int j = 0; j < NCoopMatColumn; j++)
+                {
+                    int index = i * NCoopMatColumn + j;
+
+                    T localColC[ROW_C];
+                    extractColFromMatC(matC[index], j, localColC);
+
+                    int rowBase = i * ROW_C;
+                    [ForceUnroll]
+                    for (int r = 0; r < ROW_C; r++)
+                    {
+                        int outIdx = rowBase + r;
+                        if (outIdx < OutputDim)
+                        {
+                            V val = __realCast<V>(localColC[r]);
+                            if (Bias)
+                                val = val + __realCast<V>(biasAddress.value[uint(outIdx)]);
+                            outputVector[outIdx] = val;
+                        }
                     }
                 }
             }
@@ -501,6 +657,26 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
         crossWarpReduceAndStore<U, Address, ShMemSize, SubgroupCount>(sharedMemoryOffset, subgroupId, biasAddress);
     }
 
+    // Like sumReduceRowsV2 but accepts prebuilt MatA tiles, skipping
+    // the buildAllTilesFromArray shuffle overhead.
+    // The tiles are modified in place by reduceMatATilesToShmem, so
+    // this must be the last consumer of the prebuilt tiles.
+    [require(cuda, subgroup_shuffle)]
+    VISIBILITY_LEVEL static void sumReduceRowsV2FromTiles<U, Address, ShMemSize : ISharedMemorySize, int SubgroupCount>(
+        uint sharedMemoryOffset,
+        inout MatA prebuiltTiles[TotalBiasTilesMatA],
+        in int subgroupId,
+        Address biasAddress)
+        where U : __BuiltinFloatingPointType
+        where U.Differential == U
+        where Address : IPointerLikeAddress<U>
+    {
+        reduceMatATilesToShmem<ShMemSize>(sharedMemoryOffset, prebuiltTiles, subgroupId);
+
+        GroupMemoryBarrierWithGroupSync();
+        crossWarpReduceAndStore<U, Address, ShMemSize, SubgroupCount>(sharedMemoryOffset, subgroupId, biasAddress);
+    }
+
     // =========================================================================
     // Outer product: dW[m][k] = sum_{all threads} dOut_thread[m] * input_thread[k]
     //
@@ -583,10 +759,10 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
 
     // Number of 16x16 MatA tiles for the input vector (covering K elements).
     static const int OPA_InputTileCols = (K + COLUMN_A - 1) / COLUMN_A;
-    static const int OPA_TotalInputMatA = NColGroupsOPA * OPA_InputTileCols;
+    VISIBILITY_LEVEL static const int OPA_TotalInputMatA = NColGroupsOPA * OPA_InputTileCols;
 
     // Number of 16x16 MatA tiles for the dOut vector.
-    static const int OPA_TotalDOutMatA = NColGroupsOPA * OPA_CoopMatCRows;
+    VISIBILITY_LEVEL static const int OPA_TotalDOutMatA = NColGroupsOPA * OPA_CoopMatCRows;
 
     // Builds all CoopMat fragments from a per-thread input array using optimized
     // warp shuffle. Single flat loop over all packed columns — matches Tin2's
@@ -657,6 +833,83 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
                 outArray[frag_idx].fragmentWrite(reg_idx, value);
             }
         }
+    }
+
+    // Inverse of buildAllTilesFromArray: extracts per-thread array from MatA tiles.
+    // Mirrors Tin2's Vector::to_array optimized shuffle path.
+    // Tiles must already be transposed (transposeTilesA + ChangeMajor) so that
+    // row=thread identity, matching the layout built by buildAllTilesFromArray.
+    [require(cuda, subgroup_shuffle)]
+    VISIBILITY_LEVEL static void extractAllTilesToArray<int ArraySize, int InN>(
+        MatA inArray[InN],
+        inout half data[ArraySize])
+    {
+        uint laneid = WaveGetLaneIndex();
+
+        static const int TotalColsPacked = ArraySize / 2;
+        static const int TileColsPacked = COLUMN_A / 2;
+        static const uint RegColsPacked = 4;
+        static const uint RegRowsPacked = 8;
+        static const uint RegRows = 2;
+        static const uint MMARows = 2;
+
+        var packedOut = bit_cast<uint[ArraySize / 2]>(data);
+
+        [ForceUnroll]
+        for (uint col_packed = 0; col_packed < uint(TotalColsPacked); col_packed += RegColsPacked)
+        {
+            uint mma_col = col_packed / uint(TileColsPacked);
+            uint r_col = (col_packed % uint(TileColsPacked)) / RegColsPacked;
+
+            uint regsi[4];
+
+            [ForceUnroll]
+            for (uint i = 0; i < RegColsPacked; i++)
+            {
+                int base_reg_idx = int(r_col * RegRows);
+                int base_frag_idx = int(mma_col * MMARows);
+                regsi[i] = inArray[base_frag_idx].fragmentRead(base_reg_idx);
+
+                [ForceUnroll]
+                for (uint j = 1; j < RegColsPacked; j++)
+                {
+                    uint r_row = j % RegRows;
+                    uint mma_row = j / RegRows;
+
+                    int reg_idx = int(r_col * RegRows + r_row);
+                    int frag_idx = int(mma_col * MMARows + mma_row);
+
+                    if (laneid % RegColsPacked == (i + j) % RegColsPacked)
+                        regsi[i] = inArray[frag_idx].fragmentRead(reg_idx);
+                }
+            }
+
+            WaveMask fullMask = WaveMask(0xFFFFFFFF);
+            [ForceUnroll]
+            for (uint i = 0; i < RegColsPacked; i++)
+            {
+                uint shfl_idx = (laneid % RegRowsPacked) * RegColsPacked + (laneid / RegRowsPacked + i) % RegColsPacked;
+                regsi[i] = WaveMaskReadLaneAt(fullMask, regsi[i], int(shfl_idx));
+            }
+
+            [ForceUnroll]
+            for (uint i = 0; i < RegColsPacked; i++)
+            {
+                uint op = regsi[0];
+                [ForceUnroll]
+                for (uint j = 1; j < RegColsPacked; j++)
+                {
+                    if (laneid / RegRowsPacked == (RegColsPacked - j + i) % RegColsPacked)
+                        op = regsi[j];
+                }
+
+                uint idx = col_packed + i;
+                if (idx < uint(TotalColsPacked))
+                    packedOut[int(idx)] = op;
+            }
+        }
+
+        data = bit_cast<half[ArraySize]>(packedOut);
     }
 
     // Builds one MatB tile from per-thread column data, on demand.
@@ -1002,6 +1255,94 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
 
         outerProductCompute<TypeA, InArrayTypeA, TypeB, InArrayTypeB>(
             inputVectorA, inputVectorB, matC);
+
+        GroupMemoryBarrierWithGroupSync();
+
+        outerProductReduce<ShMemSize, SubgroupCount>(
+            matC, int(subgroupIndex), sharedMemoryOffset);
+
+        if (subgroupIndex == 0)
+        {
+            outerProductStore<U, Address, ShMemSize>(
+                matC, sharedMemoryOffset, weightAddress);
+        }
+
+        GroupMemoryBarrierWithGroupSync();
+    }
+
+    // Like outerProductCompute but accepts prebuilt MatA tiles for both
+    // dOut and input, skipping redundant buildAllTilesFromArray calls.
+    [ForceInline]
+    [require(cuda, subgroup_shuffle)]
+    static void outerProductComputeFromTiles(
+        MatA prebuiltDOutTiles[OPA_TotalDOutMatA],
+        MatA prebuiltInputTiles[OPA_TotalInputMatA],
+        inout MatC matC[OPA_TotalTiles])
+    {
+        MatA allDOut[OPA_TotalDOutMatA];
+        [ForceUnroll]
+        for (int i = 0; i < OPA_TotalDOutMatA; i++)
+            allDOut[i] = prebuiltDOutTiles[i];
+
+        transposeTilesA<OPA_TotalDOutMatA>(allDOut);
+
+        [ForceUnroll]
+        for (int i = 0; i < OPA_TotalDOutMatA; i++)
+            allDOut[i].ChangeMajor();
+
+        MatA allInputA[OPA_TotalInputMatA];
+        [ForceUnroll]
+        for (int i = 0; i < OPA_TotalInputMatA; i++)
+            allInputA[i] = prebuiltInputTiles[i];
+
+        MatB allInputB[OPA_TotalInputMatA];
+        [ForceUnroll]
+        for (int i = 0; i < OPA_TotalInputMatA; i++)
+        {
+            allInputA[i].ChangeMajor();
+            allInputB[i].copyFrom(allInputA[i]);
+        }
+
+        [ForceUnroll]
+        for (int k = 0; k < NColGroupsOPA; k++)
+        {
+            [ForceUnroll]
+            for (int j16 = 0; j16 < OPA_InputTileCols; j16++)
+            {
+                [ForceUnroll]
+                for (int i = 0; i < OPA_CoopMatCRows; i++)
+                {
+                    matC[i * OPA_CoopMatCColumns + j16] = linalg.coopMatMulAdd<T, false, half, half, T,
+                                            MemoryScope.Subgroup, ROW_A, COLUMN_A, COLUMN_B
+                                            >(allDOut[i * 2 + k], allInputB[j16 * 2 + k],
+                                              matC[i * OPA_CoopMatCColumns + j16]);
+                }
+            }
+        }
+    }
+
+    // Like outerProductAccumulate but accepts prebuilt MatA tiles.
+    [ForceInline]
+    [require(cuda, subgroup_basic)]
+    VISIBILITY_LEVEL static void outerProductAccumulateFromTiles<U, Address,
+                                                        ShMemSize : ISharedMemorySize, int SubgroupCount>(
+        uint sharedMemoryOffset,
+        MatA prebuiltDOutTiles[OPA_TotalDOutMatA],
+        MatA prebuiltInputTiles[OPA_TotalInputMatA],
+        Address weightAddress)
+            where U : __BuiltinFloatingPointType
+            where U.Differential == U
+            where Address : IPointerLikeAddress<U>
+    {
+        const uint subgroupIndex = getWaveId();
+
+        MatC matC[OPA_TotalTiles];
+        [ForceUnroll]
+        for (int idx = 0; idx < OPA_TotalTiles; idx++)
+            matC[idx].clear();
+
+        outerProductComputeFromTiles(
+            prebuiltDOutTiles, prebuiltInputTiles, matC);
 
         GroupMemoryBarrierWithGroupSync();
 

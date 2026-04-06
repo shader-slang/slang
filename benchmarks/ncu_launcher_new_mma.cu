@@ -249,6 +249,7 @@ int main(int argc, char** argv) {
 
     cudaFree(d_params);
     cudaFree(d_outputs);
+    cudaFree(d_bias);
     cuModuleUnload(module);
     return 0;
 }
