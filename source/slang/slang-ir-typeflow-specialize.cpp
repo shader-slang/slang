@@ -18,7 +18,7 @@ namespace Slang
 
 
 // Helper to extract the underlying IRFunc from any context type
-// (IRFunc, IRSpecialize, or IRSpecializeExistentials).
+// (IRFunc, IRSpecialize, or IRSpecializeExistentialsInFunc).
 IRFunc* getFuncDefinitionForContext(IRInst* context)
 {
     if (auto func = as<IRFunc>(context))
@@ -28,7 +28,7 @@ IRFunc* getFuncDefinitionForContext(IRInst* context)
         auto generic = cast<IRGeneric>(specialize->getBase());
         return cast<IRFunc>(findGenericReturnVal(generic));
     }
-    if (auto existentialSpecializedFunc = as<IRSpecializeExistentials>(context))
+    if (auto existentialSpecializedFunc = as<IRSpecializeExistentialsInFunc>(context))
     {
         return getFuncDefinitionForContext(existentialSpecializedFunc->getFunc());
     }
@@ -100,9 +100,9 @@ struct InstWithContext
                 SLANG_ASSERT(foundParent);
             }
             break;
-        case kIROp_SpecializeExistentials:
+        case kIROp_SpecializeExistentialsInFunc:
             {
-                // SpecializeExistentials wraps an IRFunc. The inst must be inside
+                // SpecializeExistentialsInFunc wraps an IRFunc. The inst must be inside
                 // the underlying function.
                 auto baseFunc = getFuncDefinitionForContext(context);
                 SLANG_ASSERT(baseFunc);
@@ -187,6 +187,83 @@ bool isNoneCallee(IRInst* callee)
 
     if (as<IRVoidLit>(callee))
         return true;
+
+    return false;
+}
+
+IRInst* getInvalidExistentialSpecializationTarget(IRInst* specializedValue)
+{
+    IRInst* specializationBase = specializedValue;
+    if (auto specialize = as<IRSpecialize>(specializationBase))
+        specializationBase = specialize->getBase();
+
+    if (auto generic = as<IRGeneric>(specializationBase))
+        if (auto retVal = findInnerMostGenericReturnVal(generic))
+            specializationBase = retVal;
+
+    if (auto lookupWitness = as<IRLookupWitnessMethod>(specializationBase))
+        specializationBase = lookupWitness->getRequirementKey();
+
+    return specializationBase;
+}
+
+bool isInvalidExistentialSpecialization(IRInst* specializedValue)
+{
+    if (specializedValue->findDecoration<IRDisallowSpecializationWithExistentialsDecoration>())
+        return true;
+
+    // The decoration pass marks IRSpecialize instructions, but specializeModule() may
+    // resolve the specialization before the typeflow pass runs, consuming the decorated
+    // IRSpecialize and leaving behind a concrete function that contains the
+    // TypeEqualityWitness + LookupWitnessMethod pattern in its body. This body scan
+    // catches those post-resolution cases.
+    if (auto func = as<IRFunc>(specializedValue))
+    {
+        for (auto block = func->getFirstBlock(); block; block = block->getNextBlock())
+        {
+            for (auto inst : block->getOrdinaryInsts())
+            {
+                auto call = as<IRCall>(inst);
+                if (!call)
+                    continue;
+
+                auto lookupWitness = as<IRLookupWitnessMethod>(call->getCallee());
+                if (!lookupWitness)
+                    continue;
+
+                auto typeEqualityWitness = as<IRInst>(lookupWitness->getWitnessTable());
+                if (typeEqualityWitness &&
+                    typeEqualityWitness->getOp() == kIROp_TypeEqualityWitness &&
+                    as<IRInterfaceType>(typeEqualityWitness->getOperand(0)))
+                {
+                    return true;
+                }
+            }
+        }
+    }
+
+    auto specialize = as<IRSpecialize>(specializedValue);
+    if (!specialize)
+        return false;
+
+    for (UInt i = 0; i < specialize->getArgCount(); ++i)
+    {
+        auto arg = specialize->getArg(i);
+        switch (arg->getOp())
+        {
+        case kIROp_InterfaceType:
+        case kIROp_ExtractExistentialType:
+        case kIROp_ExtractExistentialWitnessTable:
+        case kIROp_MakeExistential:
+            return true;
+        case kIROp_TypeEqualityWitness:
+            if (as<IRInterfaceType>(arg->getOperand(0)))
+                return true;
+            break;
+        default:
+            break;
+        }
+    }
 
     return false;
 }
@@ -445,6 +522,24 @@ bool isConcreteType(IRInst* inst)
                isGlobalInst(cast<IRArrayType>(inst)->getElementCount());
     case kIROp_OptionalType:
         return isConcreteType(cast<IROptionalType>(inst)->getValueType());
+    case kIROp_ConditionalType:
+        {
+            auto conditionalType = cast<IRConditionalType>(inst);
+            auto hasValueInst = conditionalType->getHasValue();
+            if (auto boolLit = as<IRBoolLit>(hasValueInst))
+            {
+                if (!boolLit->getValue())
+                    return true;
+                return isConcreteType(conditionalType->getValueType());
+            }
+            else if (auto intLit = as<IRIntLit>(hasValueInst))
+            {
+                if (getIntVal(intLit) == 0)
+                    return true;
+                return isConcreteType(conditionalType->getValueType());
+            }
+            return false;
+        }
     case kIROp_DifferentialPairType:
         return isConcreteType(cast<IRDifferentialPairTypeBase>(inst)->getValueType());
     case kIROp_AttributedType:
@@ -676,7 +771,7 @@ bool isIntrinsic(IRInst* inst)
     // an intrinsic function, so this automatically implies
     // that this is not an intrinsic.
     //
-    if (auto existentialSpecializedFunc = as<IRSpecializeExistentials>(inst))
+    if (auto existentialSpecializedFunc = as<IRSpecializeExistentialsInFunc>(inst))
         return false;
 
     if (!func)
@@ -1357,7 +1452,7 @@ struct TypeFlowSpecializationContext
     {
         // Don't update info if the callee has a concrete return type.
         IRInst* callableForType = callable;
-        if (auto fwb = as<IRSpecializeExistentials>(callable))
+        if (auto fwb = as<IRSpecializeExistentialsInFunc>(callable))
             callableForType = getFuncDefinitionForContext(fwb);
         auto callableFuncType = cast<IRFuncType>(callableForType->getDataType());
         if (isConcreteType(callableFuncType->getResultType()))
@@ -1434,11 +1529,14 @@ struct TypeFlowSpecializationContext
         // Global worklist for interprocedural analysis.
         WorkQueue<WorkItem> workQueue;
 
-        // Add all global functions to worklist.
+        // Add all global functions to worklist. Functions that are invalid existential
+        // specializations are skipped here; the diagnostic for them is emitted when
+        // discoverContext encounters the corresponding IRSpecialize context or when
+        // propagateToCallSite/specializeCall resolves the callee.
         //
         for (auto inst : module->getGlobalInsts())
             if (auto func = as<IRFunc>(inst))
-                if (isEntryPoint(func))
+                if (isEntryPoint(func) && !isInvalidExistentialSpecialization(func))
                     discoverContext(func, workQueue);
 
         // Process until fixed point.
@@ -1745,7 +1843,8 @@ struct TypeFlowSpecializationContext
                 else if (auto specInst = as<IRSpecialize>(targetCallee))
                     firstBlock = getGenericReturnVal(specInst->getBase())->getFirstBlock();
                 else if (
-                    auto existentialSpecializedFunc = as<IRSpecializeExistentials>(targetCallee))
+                    auto existentialSpecializedFunc =
+                        as<IRSpecializeExistentialsInFunc>(targetCallee))
                 {
                     auto baseFunc = getFuncDefinitionForContext(existentialSpecializedFunc);
                     if (baseFunc)
@@ -1870,7 +1969,7 @@ struct TypeFlowSpecializationContext
                         // known concrete type.
                         //
                         IRInst* calleeForType = targetCallee;
-                        if (auto fwb = as<IRSpecializeExistentials>(targetCallee))
+                        if (auto fwb = as<IRSpecializeExistentialsInFunc>(targetCallee))
                             calleeForType = getFuncDefinitionForContext(fwb);
                         auto concreteReturnType =
                             cast<IRFuncType>(calleeForType->getDataType())->getResultType();
@@ -3645,11 +3744,11 @@ struct TypeFlowSpecializationContext
     }
 
     // Given a callee and information about the call arguments, determine if we need
-    // a SpecializeExistentials context instead of the bare callee.
+    // a SpecializeExistentialsInFunc context instead of the bare callee.
     //
     // This is the core mechanism for specializing existential calls:
     // when a function has interface-typed parameters and we know the concrete type
-    // at the call site, we create a SpecializeExistentials to represent that
+    // at the call site, we create a SpecializeExistentialsInFunc to represent that
     // specialized version.
     //
     // Returns nullptr if the callee has non-concrete parameters but we don't have
@@ -3668,7 +3767,7 @@ struct TypeFlowSpecializationContext
             return callee;
 
         // If our callee is a specialize, we won't create separate bound functions yet,
-        // since it's currently tricky to lower a SpecializeExistentials(Specialize(...)).
+        // since it's currently tricky to lower a SpecializeExistentialsInFunc(Specialize(...)).
         //
         // Most of the complexity is that that we use `specializeGeneric` which loses cloning
         // information needed to transfer our propagation analysis to the newly created function.
@@ -3733,22 +3832,25 @@ struct TypeFlowSpecializationContext
         for (auto& binding : bindings)
             operands.add(binding);
 
-        auto existentialSpecializedFunc = cast<IRSpecializeExistentials>(builder.emitIntrinsicInst(
-            nullptr, // Copy over the original func type, we'll replace the func-type
-                     // later once we have all the info.
-            kIROp_SpecializeExistentials,
-            (UInt)operands.getCount(),
-            operands.getBuffer()));
+        auto existentialSpecializedFunc =
+            cast<IRSpecializeExistentialsInFunc>(builder.emitIntrinsicInst(
+                nullptr, // Copy over the original func type, we'll replace the func-type
+                         // later once we have all the info.
+                kIROp_SpecializeExistentialsInFunc,
+                (UInt)operands.getCount(),
+                operands.getBuffer()));
 
-        existentialSpecializedFuncCache.addIfNotExists(callee, List<IRSpecializeExistentials*>());
+        existentialSpecializedFuncCache.addIfNotExists(
+            callee,
+            List<IRSpecializeExistentialsInFunc*>());
         existentialSpecializedFuncCache[callee].add(existentialSpecializedFunc);
 
         return existentialSpecializedFunc;
     }
 
-    // Initialize parameter info from a SpecializeExistentials' binding operands.
+    // Initialize parameter info from a SpecializeExistentialsInFunc's binding operands.
     void initializeBindingsForSpecializeExistentials(
-        IRSpecializeExistentials* existentialSpecializedFunc,
+        IRSpecializeExistentialsInFunc* existentialSpecializedFunc,
         IRFunc* func,
         WorkQueue<WorkItem>& workQueue)
     {
@@ -3955,6 +4057,15 @@ struct TypeFlowSpecializationContext
             case kIROp_Specialize:
                 {
                     auto specialize = cast<IRSpecialize>(context);
+                    if (isInvalidExistentialSpecialization(specialize))
+                    {
+                        emitExistentialSpecializationDiagnostic(
+                            specialize,
+                            specialize->sourceLoc,
+                            specialize);
+                        return;
+                    }
+
                     auto generic = cast<IRGeneric>(specialize->getBase());
                     func = cast<IRFunc>(findGenericReturnVal(generic));
 
@@ -4026,9 +4137,9 @@ struct TypeFlowSpecializationContext
 
                     break;
                 }
-            case kIROp_SpecializeExistentials:
+            case kIROp_SpecializeExistentialsInFunc:
                 {
-                    auto existentialSpecializedFunc = cast<IRSpecializeExistentials>(context);
+                    auto existentialSpecializedFunc = cast<IRSpecializeExistentialsInFunc>(context);
                     func = getFuncDefinitionForContext(existentialSpecializedFunc);
 
                     if (this->uniqueDefs.add(func))
@@ -4066,6 +4177,12 @@ struct TypeFlowSpecializationContext
         HashSet<IRInst*> calleeSet;
         auto propagateToCallSite = [&](IRInst* callee)
         {
+            if (isInvalidExistentialSpecialization(callee))
+            {
+                emitExistentialSpecializationDiagnostic(callee, inst->sourceLoc, inst);
+                return;
+            }
+
             if (as<IRUnboundedFuncElement>(callee))
             {
                 // An unbounded element represents an unknown function,
@@ -4477,7 +4594,7 @@ struct TypeFlowSpecializationContext
             auto innerFunc = getGenericReturnVal(generic);
             func = cast<IRFunc>(innerFunc);
         }
-        else if (auto existentialSpecializedFunc = as<IRSpecializeExistentials>(context))
+        else if (auto existentialSpecializedFunc = as<IRSpecializeExistentialsInFunc>(context))
         {
             func = getFuncDefinitionForContext(existentialSpecializedFunc);
         }
@@ -4519,7 +4636,7 @@ struct TypeFlowSpecializationContext
             for (auto param : as<IRFunc>(innerFunc)->getParams())
                 infos.add(tryGetArgInfo(context, param, param->getDataType()));
         }
-        else if (auto existentialSpecializedFunc = as<IRSpecializeExistentials>(context))
+        else if (auto existentialSpecializedFunc = as<IRSpecializeExistentialsInFunc>(context))
         {
             auto baseFunc = getFuncDefinitionForContext(existentialSpecializedFunc);
             for (auto param : baseFunc->getParams())
@@ -4560,7 +4677,7 @@ struct TypeFlowSpecializationContext
                 directions.add(direction);
             }
         }
-        else if (auto existentialSpecializedFunc = as<IRSpecializeExistentials>(context))
+        else if (auto existentialSpecializedFunc = as<IRSpecializeExistentialsInFunc>(context))
         {
             auto baseFunc = getFuncDefinitionForContext(existentialSpecializedFunc);
             for (auto param : baseFunc->getParams())
@@ -4840,12 +4957,13 @@ struct TypeFlowSpecializationContext
     //      insts (e.g. `GetTagForMappedSet`, `GetTagForSpecializedSet`, etc.)
     //
 
-    // Lower a SpecializeExistentials context by cloning the base function
+    // Lower a SpecializeExistentialsInFunc context by cloning the base function
     // and transferring propagation info to the clone.
     //
     // Returns the cloned function, or nullptr if the base function is not found.
     //
-    IRFunc* lowerSpecializeExistentials(IRSpecializeExistentials* existentialSpecializedFunc)
+    IRFunc* lowerSpecializeExistentialsInFunc(
+        IRSpecializeExistentialsInFunc* existentialSpecializedFunc)
     {
         IRBuilder builder(module);
         auto entry = builder.fetchCompilerDictionaryEntry(
@@ -4869,8 +4987,9 @@ struct TypeFlowSpecializationContext
             //
             // translationContext.resolveInst(baseFunc);
             // For now, assert out.
-            SLANG_UNEXPECTED("SpecializeExistentials with a specialization as the base function is "
-                             "not supported yet");
+            SLANG_UNEXPECTED(
+                "SpecializeExistentialsInFunc with a specialization as the base function is "
+                "not supported yet");
         }
 
         // Clone the base function
@@ -4879,7 +4998,7 @@ struct TypeFlowSpecializationContext
         builder.setInsertBefore(baseFunc);
         auto clonedFunc = cast<IRFunc>(cloneInst(&cloneEnv, &builder, baseFunc));
 
-        // Transfer propagation info from the SpecializeExistentials context
+        // Transfer propagation info from the SpecializeExistentialsInFunc context
         // to the cloned function (using the cloned func as the new context).
         //
         for (auto& kv : cloneEnv.mapOldValToNew)
@@ -5576,7 +5695,7 @@ struct TypeFlowSpecializationContext
                         funcType->getResultType(),
                         resultTypeUnionMask));
             }
-            else if (auto boundFuncContext = as<IRSpecializeExistentials>(context))
+            else if (auto boundFuncContext = as<IRSpecializeExistentialsInFunc>(context))
             {
                 auto baseFuncForType = getFuncDefinitionForContext(boundFuncContext);
                 auto funcType2 = cast<IRFuncType>(baseFuncForType->getDataType());
@@ -5673,7 +5792,7 @@ struct TypeFlowSpecializationContext
         {
             resultType = funcType->getResultType();
         }
-        else if (auto boundFunc = as<IRSpecializeExistentials>(callee))
+        else if (auto boundFunc = as<IRSpecializeExistentialsInFunc>(callee))
         {
             auto baseFunc = getFuncDefinitionForContext(boundFunc);
             resultType = cast<IRFuncType>(baseFunc->getDataType())->getResultType();
@@ -5735,8 +5854,11 @@ struct TypeFlowSpecializationContext
         {
             if (isGlobalInst(specializeInst))
             {
+                auto specialized = specializeGeneric(specializeInst);
+                if (!specialized)
+                    return callee;
                 IRBuilder builder(module);
-                return builder.replaceOperand(&callee->typeUse, specializeGeneric(specializeInst));
+                return builder.replaceOperand(&callee->typeUse, specialized);
             }
         }
 
@@ -5805,7 +5927,7 @@ struct TypeFlowSpecializationContext
     // Walk the callee operand chain backward, collecting DispatchActions
     // and returning the base tag operand (whose type is SetTagType(witnessTableSet)).
     //
-    // Also inspects the calleeSet for IRSpecializeExistentials and appends a
+    // Also inspects the calleeSet for IRSpecializeExistentialsInFunc and appends a
     // BindExistentials action if any are found.
     //
     // Additionally, any spec args that are tags of witness table sets are
@@ -5867,7 +5989,7 @@ struct TypeFlowSpecializationContext
 
         actions.reverse();
 
-        // Check calleeSet for bindings (IRSpecializeExistentials).
+        // Check calleeSet for bindings (IRSpecializeExistentialsInFunc).
         IRBuilder builder(module);
         List<IRInst*> bindings;
         for (UInt i = 0; i < inst->getOperandCount() - 1; i++)
@@ -5879,7 +6001,7 @@ struct TypeFlowSpecializationContext
             calleeSet,
             [&](IRInst* element)
             {
-                if (auto existentialSpecializedFunc = as<IRSpecializeExistentials>(element))
+                if (auto existentialSpecializedFunc = as<IRSpecializeExistentialsInFunc>(element))
                 {
                     for (UInt i = 1; i < existentialSpecializedFunc->getOperandCount(); i++)
                     {
@@ -6008,14 +6130,14 @@ struct TypeFlowSpecializationContext
                                 boundFuncOperands.add(binding);
 
                             auto existentialSpecializedFunc =
-                                cast<IRSpecializeExistentials>(builder.emitIntrinsicInst(
+                                cast<IRSpecializeExistentialsInFunc>(builder.emitIntrinsicInst(
                                     nullptr,
-                                    kIROp_SpecializeExistentials,
+                                    kIROp_SpecializeExistentialsInFunc,
                                     (UInt)boundFuncOperands.getCount(),
                                     boundFuncOperands.getBuffer()));
 
                             auto loweredFunc =
-                                lowerSpecializeExistentials(existentialSpecializedFunc);
+                                lowerSpecializeExistentialsInFunc(existentialSpecializedFunc);
                             if (loweredFunc)
                                 val = loweredFunc;
                             break;
@@ -6117,6 +6239,16 @@ struct TypeFlowSpecializationContext
         if (isNoneCallee(callee))
             return false;
 
+        // Check for invalid existential specialization (e.g. specialize with
+        // interface type argument) before resolving the callee. These callees
+        // may have dangling operands after the specialize pass lowered their
+        // witness-lookup bases.
+        if (isInvalidExistentialSpecialization(callee))
+        {
+            emitExistentialSpecializationDiagnostic(callee, inst->sourceLoc, inst);
+            return false;
+        }
+
         if (isGlobalInst(callee))
             callee = translationContext.resolveInst(callee);
 
@@ -6209,24 +6341,14 @@ struct TypeFlowSpecializationContext
                 IRBuilder builder(module);
                 builder.setInsertInto(module);
 
-                // Check if the original callee inst has a dis-allow existential specialization
-                // decoration.
+                // Check both the specialize instruction and the selected callee for
+                // disallowed existential specialization.
                 //
-                if (inst->getCallee()
-                        ->findDecoration<IRDisallowSpecializationWithExistentialsDecoration>())
+                auto selectedCallee = setTag->getSet()->getElement(0);
+                if (isInvalidExistentialSpecialization(callee) ||
+                    isInvalidExistentialSpecialization(selectedCallee))
                 {
-                    // In Slang 2025 and later, specializing a generic with multiple types is
-                    // not allowed, so we'll throw a diagnostic message.
-                    //
-                    auto genericBase = as<IRSpecialize>(callee)->getBase();
-                    String genericName;
-                    if (auto nameHint = genericBase->findDecoration<IRNameHintDecoration>())
-                        genericName = nameHint->getName();
-                    else
-                        genericName = "<generic>";
-                    sink->diagnose(Diagnostics::CannotSpecializeGenericWithExistential{
-                        .generic = genericName,
-                        .location = inst->sourceLoc});
+                    emitExistentialSpecializationDiagnostic(callee, inst->sourceLoc, inst);
                     module->getContainerPool().free(&callArgs);
                     return false;
                 }
@@ -6236,7 +6358,7 @@ struct TypeFlowSpecializationContext
                     // Add in the arguments for the set specialization.
                     //
                     addArgsForSetSpecializedGeneric(cast<IRSpecialize>(callee), callArgs);
-                    callee = setTag->getSet()->getElement(0);
+                    callee = selectedCallee;
                     effectiveFuncType = getEffectiveFuncType(callee);
                     globalsWorkList.enqueue(callee);
                 }
@@ -6284,12 +6406,13 @@ struct TypeFlowSpecializationContext
                 effectiveFuncType = getEffectiveFuncType(calleeSet->getElement(0));
 
             // If we're dealing with bindings, materialize a new function now.
-            if (as<IRSpecializeExistentials>(calleeSet->getElement(0)))
+            if (as<IRSpecializeExistentialsInFunc>(calleeSet->getElement(0)))
             {
-                // If our callee is a SpecializeExistentials, we need to lower it to get a concrete
+                // If our callee is a SpecializeExistentialsInFunc, we need to lower it to get a
+                // concrete
                 // function.
-                callee = lowerSpecializeExistentials(
-                    as<IRSpecializeExistentials>(calleeSet->getElement(0)));
+                callee = lowerSpecializeExistentialsInFunc(
+                    as<IRSpecializeExistentialsInFunc>(calleeSet->getElement(0)));
             }
             else
             {
@@ -7553,9 +7676,36 @@ struct TypeFlowSpecializationContext
     // to avoid emitting duplicate diagnostics per call edge.
     HashSet<IRInst*> diagnosedRefParams;
 
+    // Set of call sites/contexts already diagnosed for invalid existential specialization,
+    // to avoid duplicate diagnostics when instructions are revisited during propagation.
+    HashSet<IRInst*> diagnosedExistentialSpecializationSites;
+
     // Set of bit-cast instructions already diagnosed for unsupported
     // non-concrete result types during propagation.
     HashSet<IRInst*> diagnosedBitCasts;
+
+    // Emit error 33180 for an invalid existential specialization, deduplicating by `dedupKey`.
+    // Returns true if the diagnostic was emitted (first time for this key).
+    bool emitExistentialSpecializationDiagnostic(
+        IRInst* specializedValue,
+        SourceLoc location,
+        IRInst* dedupKey)
+    {
+        if (!diagnosedExistentialSpecializationSites.add(dedupKey))
+            return false;
+
+        String genericName;
+        auto diagnosticTarget = getInvalidExistentialSpecializationTarget(specializedValue);
+        if (auto nameHint = diagnosticTarget->findDecoration<IRNameHintDecoration>())
+            genericName = nameHint->getName();
+        if (genericName.getLength() == 0)
+            genericName = "<generic>";
+
+        sink->diagnose(Diagnostics::CannotSpecializeGenericWithExistential{
+            .generic = genericName,
+            .location = location});
+        return true;
+    }
 
     // Mapping from (context, inst) --> propagated info
     Dictionary<InstWithContext, IRWeakUse*> propagationMap;
@@ -7583,11 +7733,12 @@ struct TypeFlowSpecializationContext
     // Set of already discovered contexts.
     HashSet<IRInst*> availableContexts;
 
-    // Cache for SpecializeExistentials: maps from base function to all SpecializeExistentials
-    // created for it. This is used to oppourtunistically merge variants of the same function
-    // depending on policy (i.e. as-few-variants-as-possible vs. aggressive specialization).
+    // Cache for SpecializeExistentialsInFunc: maps from base function to all
+    // SpecializeExistentialsInFunc contexts created for it. This is used to
+    // oppourtunistically merge variants of the same function depending on policy
+    // (i.e. as-few-variants-as-possible vs. aggressive specialization).
     //
-    Dictionary<IRInst*, List<IRSpecializeExistentials*>> existentialSpecializedFuncCache;
+    Dictionary<IRInst*, List<IRSpecializeExistentialsInFunc*>> existentialSpecializedFuncCache;
 
     // Information on the call-site. Note that this may be different from the information
     // on the inst used by the call-site, since it may carry bindings from call arguments.
