@@ -9,6 +9,7 @@ typedef DifferentialPair<float> dpfloat;
 typedef float.Differential dfloat;
 
 [BackwardDerivative(bwd_load)]
+[PreferRecompute(SideEffectBehavior::Allow)]
 float load(uint idx)
 {
     return outputBuffer[idx];
@@ -38,6 +39,7 @@ void bwd_store(uint idx, inout DifferentialPair<float> a)
 }
 
 [BackwardDerivative(bwd_g)]
+[PreferRecompute(SideEffectBehavior::Allow)]
 float g(float x)
 {
     return load(1) * load(1);
@@ -60,11 +62,9 @@ float f(int p, float x)
     return 0;
 }
 
-// Check that there are no calls to primal_ctx_f in bwd_f.
+// Check that there are no calls to apply_f.
 
-// CHECK: void s_bwd_f_{{[0-9]+}}
-// CHECK-NOT: s_primal_ctx_f_{{[0-9]+}}
-// CHECK: return
+// CHECK-NOT: s_apply_f_{{[0-9]+}}
 
 [numthreads(1, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)

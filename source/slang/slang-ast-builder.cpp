@@ -3,6 +3,7 @@
 
 #include "slang-check.h"
 #include "slang-compiler.h"
+#include "slang-syntax.h"
 
 #include <assert.h>
 
@@ -462,6 +463,36 @@ Type* ASTBuilder::getSpecializedBuiltinType(ArrayView<Val*> genericArgs, const c
     return rsType;
 }
 
+Type* ASTBuilder::getForwardDiffFuncInterfaceType(Type* baseType, Witness* typeInfoWitness)
+{
+    auto decl = getSharedASTBuilder()->findMagicDecl("ForwardDiffFuncInterfaceType");
+    return DeclRefType::create(
+        this,
+        this->getGenericAppDeclRef(
+            DeclRef<GenericDecl>(decl->getDefaultDeclRef()),
+            makeConstArrayView({as<Val>(baseType), as<Val>(typeInfoWitness)})));
+}
+
+Type* ASTBuilder::getBackwardDiffFuncInterfaceType(Type* baseType, Witness* typeInfoWitness)
+{
+    auto decl = getSharedASTBuilder()->findMagicDecl("BwdDiffFuncInterfaceType");
+    return DeclRefType::create(
+        this,
+        this->getGenericAppDeclRef(
+            DeclRef<GenericDecl>(decl->getDefaultDeclRef()),
+            makeConstArrayView({as<Val>(baseType), as<Val>(typeInfoWitness)})));
+}
+
+Type* ASTBuilder::getBwdCallableBaseType(Type* baseType, Witness* typeInfoWitness)
+{
+    auto decl = getSharedASTBuilder()->findMagicDecl("BwdCallableBaseType");
+    return DeclRefType::create(
+        this,
+        this->getGenericAppDeclRef(
+            DeclRef<GenericDecl>(decl->getDefaultDeclRef()),
+            makeConstArrayView({as<Val>(baseType), as<Val>(typeInfoWitness)})));
+}
+
 Type* ASTBuilder::getMagicEnumType(const char* magicEnumName)
 {
     auto& cache = getSharedASTBuilder()->m_magicEnumTypes;
@@ -695,6 +726,18 @@ DifferentialPairType* ASTBuilder::getDifferentialPairType(Type* valueType, Witne
         getSpecializedBuiltinType(makeArrayView(args), "DifferentialPairType"));
 }
 
+DeclRef<InterfaceDecl> ASTBuilder::getDiffTypeInfoInterfaceDecl()
+{
+    DeclRef<InterfaceDecl> declRef =
+        DeclRef<InterfaceDecl>(getBuiltinDeclRef("DiffTypeInfoInterfaceType", nullptr));
+    return declRef;
+}
+
+Type* ASTBuilder::getDiffTypeInfoInterfaceType()
+{
+    return DeclRefType::create(this, getDiffTypeInfoInterfaceDecl());
+}
+
 DifferentialPtrPairType* ASTBuilder::getDifferentialPtrPairType(
     Type* valueType,
     Witness* diffRefTypeWitness)
@@ -708,6 +751,13 @@ DeclRef<InterfaceDecl> ASTBuilder::getDifferentiableInterfaceDecl()
 {
     DeclRef<InterfaceDecl> declRef =
         DeclRef<InterfaceDecl>(getBuiltinDeclRef("DifferentiableType", nullptr));
+    return declRef;
+}
+
+DeclRef<InterfaceDecl> ASTBuilder::getFunctionBaseInterfaceDecl()
+{
+    DeclRef<InterfaceDecl> declRef =
+        DeclRef<InterfaceDecl>(getBuiltinDeclRef("FunctionBaseType", nullptr));
     return declRef;
 }
 
@@ -758,6 +808,11 @@ MeshOutputType* ASTBuilder::getMeshOutputTypeFromModifier(
 Type* ASTBuilder::getDifferentiableInterfaceType()
 {
     return DeclRefType::create(this, getDifferentiableInterfaceDecl());
+}
+
+Type* ASTBuilder::getFunctionBaseType()
+{
+    return DeclRefType::create(this, getFunctionBaseInterfaceDecl());
 }
 
 Type* ASTBuilder::getDifferentiableRefInterfaceType()
@@ -857,8 +912,8 @@ FuncType* ASTBuilder::getFuncType(ArrayView<Type*> parameters, Type* result, Typ
 TupleType* ASTBuilder::getTupleType(ArrayView<Type*> types)
 {
     // The canonical form of a tuple type is always a DeclRefType(GenAppDeclRef(TupleDecl,
-    // ConcreteTypePack(types...))). If `types` is already a single ConcreteTypePack, then we can
-    // use that directly.
+    // ConcreteTypePack(types...))). If `types` is already a single ConcreteTypePack, then we
+    // can use that directly.
     if (types.getCount() == 1)
     {
         if (isTypePack(types[0]))
@@ -1058,6 +1113,37 @@ static void flattenIntValList(ShortList<IntVal*>& flattenedList, IntVal* val)
     }
 }
 
+static Type* _getIntPackTypeForVal(ASTBuilder* astBuilder, Val* pack)
+{
+    if (auto intVal = as<IntVal>(pack))
+    {
+        if (auto type = as<Type>(intVal->getType()))
+            return type;
+    }
+    return astBuilder->getOrCreate<ValuePackType>(astBuilder->getIntType());
+}
+
+static Type* _getIntPackTypeForVals(ASTBuilder* astBuilder, Val* pack0, Val* pack1 = nullptr)
+{
+    for (auto pack : {pack0, pack1})
+    {
+        if (auto intVal = as<IntVal>(pack))
+        {
+            if (auto valuePackType = as<ValuePackType>(intVal->getType()))
+                return valuePackType;
+        }
+    }
+
+    if (auto intVal = as<IntVal>(pack0))
+    {
+        if (auto type = as<Type>(intVal->getType()))
+            return type;
+    }
+    if (pack1)
+        return _getIntPackTypeForVal(astBuilder, pack1);
+    return astBuilder->getOrCreate<ValuePackType>(astBuilder->getIntType());
+}
+
 ConcreteIntValPack* ASTBuilder::getIntValPack(ArrayView<IntVal*> vals)
 {
     ShortList<IntVal*> flattenedVals;
@@ -1159,6 +1245,144 @@ Val* ASTBuilder::getTrimLastPack(Val* basePack)
     auto baseIntVal = as<IntVal>(basePack);
     auto packType = baseIntVal ? baseIntVal->getType() : getOrCreate<ValuePackType>(getIntType());
     return getOrCreate<TrimLastIntValPack>(packType, basePack);
+}
+
+Val* ASTBuilder::getShapeConcatIntValPack(Val* leftPack, Val* rightPack, IntVal* axis)
+{
+    IntegerLiteralValue axisValue = 0;
+    if (auto leftValPack = as<ConcreteIntValPack>(leftPack))
+    {
+        if (auto rightValPack = as<ConcreteIntValPack>(rightPack))
+        {
+            if (tryGetConstantIntVal(axis, axisValue) &&
+                leftValPack->getCount() == rightValPack->getCount() && axisValue >= 0 &&
+                axisValue < leftValPack->getCount())
+            {
+                ShortList<IntVal*> resultVals;
+                bool canFold = true;
+                for (Index i = 0; i < leftValPack->getCount(); ++i)
+                {
+                    if (i == axisValue)
+                    {
+                        resultVals.add(PolynomialIntVal::add(
+                            this,
+                            leftValPack->getElement(i),
+                            rightValPack->getElement(i)));
+                    }
+                    else if (leftValPack->getElement(i)->equals(rightValPack->getElement(i)))
+                    {
+                        resultVals.add(leftValPack->getElement(i));
+                    }
+                    else
+                    {
+                        canFold = false;
+                        break;
+                    }
+                }
+                if (canFold)
+                    return getIntValPack(resultVals.getArrayView().arrayView);
+            }
+        }
+    }
+
+    auto packType = _getIntPackTypeForVals(this, leftPack, rightPack);
+    return getOrCreate<ShapeConcatIntValPack>(packType, leftPack, rightPack, axis);
+}
+
+Val* ASTBuilder::getShapePermuteIntValPack(Val* valuePack, Val* orderPack)
+{
+    if (auto concreteValuePack = as<ConcreteIntValPack>(valuePack))
+    {
+        if (auto concreteOrderPack = as<ConcreteIntValPack>(orderPack))
+        {
+            if (concreteValuePack->getCount() == concreteOrderPack->getCount())
+            {
+                List<bool> seen;
+                seen.setCount(concreteValuePack->getCount());
+                for (Index i = 0; i < seen.getCount(); ++i)
+                    seen[i] = false;
+
+                ShortList<IntVal*> resultVals;
+                bool canFold = true;
+                for (Index i = 0; i < concreteOrderPack->getCount(); ++i)
+                {
+                    IntegerLiteralValue orderIndex = 0;
+                    if (!tryGetConstantIntVal(concreteOrderPack->getElement(i), orderIndex) ||
+                        orderIndex < 0 || orderIndex >= concreteValuePack->getCount() ||
+                        seen[orderIndex])
+                    {
+                        canFold = false;
+                        break;
+                    }
+
+                    seen[orderIndex] = true;
+                    resultVals.add(concreteValuePack->getElement(orderIndex));
+                }
+
+                if (canFold)
+                    return getIntValPack(resultVals.getArrayView().arrayView);
+            }
+        }
+    }
+
+    auto packType = _getIntPackTypeForVal(this, valuePack);
+    return getOrCreate<ShapePermuteIntValPack>(packType, valuePack, orderPack);
+}
+
+Val* ASTBuilder::getShapeSwapIntValPack(Val* valuePack, IntVal* dim0, IntVal* dim1)
+{
+    IntegerLiteralValue dim0Value = 0;
+    IntegerLiteralValue dim1Value = 0;
+    if (auto concreteValuePack = as<ConcreteIntValPack>(valuePack))
+    {
+        if (tryGetConstantIntVal(dim0, dim0Value) && tryGetConstantIntVal(dim1, dim1Value) &&
+            dim0Value >= 0 && dim1Value >= 0 && dim0Value < concreteValuePack->getCount() &&
+            dim1Value < concreteValuePack->getCount())
+        {
+            if (dim0Value == dim1Value)
+                return valuePack;
+
+            ShortList<IntVal*> resultVals;
+            for (Index i = 0; i < concreteValuePack->getCount(); ++i)
+            {
+                if (i == dim0Value)
+                    resultVals.add(concreteValuePack->getElement(dim1Value));
+                else if (i == dim1Value)
+                    resultVals.add(concreteValuePack->getElement(dim0Value));
+                else
+                    resultVals.add(concreteValuePack->getElement(i));
+            }
+            return getIntValPack(resultVals.getArrayView().arrayView);
+        }
+    }
+
+    auto packType = _getIntPackTypeForVal(this, valuePack);
+    return getOrCreate<ShapeSwapIntValPack>(packType, valuePack, dim0, dim1);
+}
+
+Val* ASTBuilder::getShapeReduceIntValPack(Val* valuePack, IntVal* axis)
+{
+    IntegerLiteralValue axisValue = 0;
+    if (auto concreteValuePack = as<ConcreteIntValPack>(valuePack))
+    {
+        if (tryGetConstantIntVal(axis, axisValue) && axisValue >= 0 &&
+            axisValue < concreteValuePack->getCount())
+        {
+            ShortList<IntVal*> resultVals;
+            for (Index i = 0; i < concreteValuePack->getCount(); ++i)
+            {
+                if (i == axisValue)
+                    resultVals.add(
+                        getIntVal(as<Type>(concreteValuePack->getElement(i)->getType()), 1));
+                else
+                    resultVals.add(concreteValuePack->getElement(i));
+            }
+            return getIntValPack(resultVals.getArrayView().arrayView);
+        }
+    }
+
+    auto packType = _getIntPackTypeForVal(this, valuePack);
+    return getOrCreate<ShapeReduceIntValPack>(packType, valuePack, axis);
 }
 
 NonEmptyPackWitness* ASTBuilder::getNonEmptyPackWitness(Val* pack)
@@ -1311,18 +1535,18 @@ top:
     {
         return bIsSubtypeOfCWitness;
     }
-    else if (auto declAIsSubtypeOfBWitness = as<DeclaredSubtypeWitness>(aIsSubtypeOfBWitness))
+
+    if (as<TypeEqualityWitness>(bIsSubtypeOfCWitness))
+    {
+        return aIsSubtypeOfBWitness;
+    }
+
+    if (auto declAIsSubtypeOfBWitness = as<DeclaredSubtypeWitness>(aIsSubtypeOfBWitness))
     {
         if (declAIsSubtypeOfBWitness->isEquality())
             return bIsSubtypeOfCWitness;
     }
 
-    // Similarly, if `b == c`, then the `a <: b` witness is a witness for `a <: c`
-    //
-    if (as<TypeEqualityWitness>(bIsSubtypeOfCWitness))
-    {
-        return aIsSubtypeOfBWitness;
-    }
     else if (auto declBIsSubtypeOfCWitness = as<DeclaredSubtypeWitness>(bIsSubtypeOfCWitness))
     {
         if (declBIsSubtypeOfCWitness->isEquality())
