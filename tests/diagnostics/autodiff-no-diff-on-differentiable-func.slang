@@ -1,4 +1,4 @@
-//DISABLE_TEST:SIMPLE(diag=CHECK):
+//DISABLE_DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 // Test that error 38032 should be emitted when no_diff is applied to a
 // call to a differentiable function inside a differentiable function.

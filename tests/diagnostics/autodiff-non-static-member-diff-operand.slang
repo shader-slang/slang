@@ -1,4 +1,4 @@
-//DISABLE_TEST:SIMPLE(diag=CHECK):
+//DISABLE_DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 // Test that error 30098 should be emitted when a non-static member function
 // is used as an operand to fwd_diff.

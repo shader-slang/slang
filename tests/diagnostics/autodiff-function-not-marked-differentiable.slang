@@ -1,4 +1,4 @@
-//DISABLE_TEST:SIMPLE(diag=CHECK):
+//DISABLE_DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
 // Test that error 30097 should be emitted when fwd_diff is called on a
 // function that is not marked as differentiable.
