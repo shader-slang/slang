@@ -1794,9 +1794,8 @@ static void maybeParseGenericConstraints(Parser* parser, ContainerDecl* genericP
             parser->ReadMatchingToken(TokenType::RParent);
             if (optional)
             {
-                parser->sink->diagnose(
-                    Diagnostics::OptionalHasDiffTypeInfoConstraintIsInvalid{
-                        .location = hasDiffTypeInfoToken.loc});
+                parser->sink->diagnose(Diagnostics::OptionalHasDiffTypeInfoConstraintIsInvalid{
+                    .location = hasDiffTypeInfoToken.loc});
             }
             AddMember(genericParent, constraint);
             continue;

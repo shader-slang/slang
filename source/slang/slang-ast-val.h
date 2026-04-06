@@ -1096,12 +1096,12 @@ FIDDLE()
 class HasDiffTypeInfoWitness : public Witness
 {
     FIDDLE(...)
-    HasDiffTypeInfoWitness(DeclRef<HasDiffTypeInfoConstraintDecl> inDeclRef) { setOperands(inDeclRef); }
-
-    DeclRef<HasDiffTypeInfoConstraintDecl> getDeclRef()
+    HasDiffTypeInfoWitness(DeclRef<HasDiffTypeInfoConstraintDecl> inDeclRef)
     {
-        return as<DeclRefBase>(getOperand(0));
+        setOperands(inDeclRef);
     }
+
+    DeclRef<HasDiffTypeInfoConstraintDecl> getDeclRef() { return as<DeclRefBase>(getOperand(0)); }
 
     void _toTextOverride(StringBuilder& out);
     Val* _resolveImplOverride();
