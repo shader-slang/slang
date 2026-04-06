@@ -9890,21 +9890,6 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         UNREACHABLE_RETURN(LoweredValInfo());
     }
 
-    LoweredValInfo visitHasDiffTypeInfoConstraintDecl(HasDiffTypeInfoConstraintDecl* decl)
-    {
-        if (const auto globalGenericParamDecl = as<GlobalGenericParamDecl>(decl->parentDecl))
-        {
-            SLANG_UNUSED(globalGenericParamDecl);
-            auto witnessType = getBuilder()->getWitnessTableType(getBuilder()->getVoidType());
-            auto inst = getBuilder()->emitGlobalGenericParam(witnessType);
-            addLinkageDecoration(context, inst, decl);
-            return LoweredValInfo::simple(inst);
-        }
-
-        SLANG_UNEXPECTED("has-diff-type-info constraint during lowering");
-        UNREACHABLE_RETURN(LoweredValInfo());
-    }
-
     LoweredValInfo visitGlobalGenericParamDecl(GlobalGenericParamDecl* decl)
     {
         auto inst = getBuilder()->emitGlobalGenericTypeParam();

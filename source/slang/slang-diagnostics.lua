@@ -2796,6 +2796,13 @@ err(
     span { loc = "attr:Modifier", message = "'[MaybeDifferentiable]' cannot be applied to non-interface requirement; it can only be applied to interface requirements." }
 )
 
+err(
+    "optional-has-diff-type-info-constraint-is-invalid",
+    30315,
+    "optional __hasDiffTypeInfo constraint invalid",
+    span { loc = "location", message = "'optional' is not supported on '__hasDiffTypeInfo(...)' constraints" }
+)
+
 -- Interop (304xx)
 
 err(
