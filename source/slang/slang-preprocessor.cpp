@@ -1754,10 +1754,12 @@ void ExpansionInputStream::_maybeBeginMacroInvocation()
                 // are all those that were busy at the time we read the name of the macro
                 // to be expanded.
                 //
+                SourceLoc invocationLoc =
+                    token.macroInvocationLoc.isValid() ? token.macroInvocationLoc : token.loc;
                 MacroInvocation* invocation = new MacroInvocation(
                     preprocessor,
                     macro,
-                    token.loc,
+                    invocationLoc,
                     m_initiatingMacroInvocationLoc,
                     isStartOfLine);
                 invocation->prime(busyMacros);
@@ -1812,10 +1814,12 @@ void ExpansionInputStream::_maybeBeginMacroInvocation()
                 // If we saw an opening `(`, then we know we are starting some kind of
                 // macro invocation, although we don't yet know if it is well-formed.
                 //
+                SourceLoc invocationLoc =
+                    token.macroInvocationLoc.isValid() ? token.macroInvocationLoc : token.loc;
                 MacroInvocation* invocation = new MacroInvocation(
                     preprocessor,
                     macro,
-                    token.loc,
+                    invocationLoc,
                     m_initiatingMacroInvocationLoc,
                     isStartOfLine);
 

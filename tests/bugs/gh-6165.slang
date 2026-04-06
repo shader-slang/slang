@@ -21,3 +21,13 @@ int test()
         return 1;
     return 2;
 }
+
+#define INNER 2
+#define OUTER Params::INNER
+int test2()
+{
+    if (OUTER == 1)
+//CHECK:^^^^^ unexpected integer literal
+        return 1;
+    return 2;
+}
