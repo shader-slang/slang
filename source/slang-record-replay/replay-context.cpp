@@ -764,6 +764,17 @@ void ReplayContext::registerHandler(const char* signature, PlaybackHandler handl
     m_handlers[String(signature)] = handler;
 }
 
+size_t ReplayContext::getHandlerCount() const
+{
+    return m_handlers.getCount();
+}
+
+void ReplayContext::resetHandlers()
+{
+    Dictionary<String, PlaybackHandler> empty;
+    m_handlers.swapWith(empty);
+}
+
 bool ReplayContext::executeNextCall()
 {
     if (m_mode != Mode::Playback)

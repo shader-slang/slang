@@ -2356,6 +2356,21 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
             ptrTypeLayout->valueTypeLayout = valueTypeLayout;
             return ptrTypeLayout;
         }
+        else if (auto conditionalType = as<ConditionalType>(type))
+        {
+            auto hasValueVal = conditionalType->getHasValue();
+            auto folded =
+                hasValueVal ? context->getTargetProgram()->getProgram()->tryFoldIntVal(hasValueVal)
+                            : nullptr;
+            if (folded && getIntVal(folded) != 0)
+                return processParamOfTypeFunc(
+                    _Move(processParamOfTypeFunc),
+                    conditionalType->getValueType());
+            RefPtr<TypeLayout> typeLayout = new TypeLayout();
+            typeLayout->type = type;
+            typeLayout->rules = context->layoutContext.rules;
+            return typeLayout;
+        }
         else if (auto optionalType = as<OptionalType>(type))
         {
             Array<Type*, 2> types =

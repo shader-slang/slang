@@ -381,6 +381,74 @@ class TrimLastIntValPack : public IntVal
     Val* _resolveImplOverride();
 };
 
+FIDDLE(abstract)
+class ShapeTransformIntValPack : public IntVal
+{
+    FIDDLE(...)
+};
+
+FIDDLE()
+class ShapeConcatIntValPack : public ShapeTransformIntValPack
+{
+    FIDDLE(...)
+    ShapeConcatIntValPack(Type* inType, Val* leftPack, Val* rightPack, IntVal* axis)
+    {
+        setOperands(inType, leftPack, rightPack, axis);
+    }
+    Val* getLeftPack() const { return getOperand(1); }
+    Val* getRightPack() const { return getOperand(2); }
+    IntVal* getAxis() const { return as<IntVal>(getOperand(3)); }
+    void _toTextOverride(StringBuilder& out);
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    Val* _resolveImplOverride();
+};
+
+FIDDLE()
+class ShapePermuteIntValPack : public ShapeTransformIntValPack
+{
+    FIDDLE(...)
+    ShapePermuteIntValPack(Type* inType, Val* valuePack, Val* orderPack)
+    {
+        setOperands(inType, valuePack, orderPack);
+    }
+    Val* getValuePack() const { return getOperand(1); }
+    Val* getOrderPack() const { return getOperand(2); }
+    void _toTextOverride(StringBuilder& out);
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    Val* _resolveImplOverride();
+};
+
+FIDDLE()
+class ShapeSwapIntValPack : public ShapeTransformIntValPack
+{
+    FIDDLE(...)
+    ShapeSwapIntValPack(Type* inType, Val* valuePack, IntVal* dim0, IntVal* dim1)
+    {
+        setOperands(inType, valuePack, dim0, dim1);
+    }
+    Val* getValuePack() const { return getOperand(1); }
+    IntVal* getDim0() const { return as<IntVal>(getOperand(2)); }
+    IntVal* getDim1() const { return as<IntVal>(getOperand(3)); }
+    void _toTextOverride(StringBuilder& out);
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    Val* _resolveImplOverride();
+};
+
+FIDDLE()
+class ShapeReduceIntValPack : public ShapeTransformIntValPack
+{
+    FIDDLE(...)
+    ShapeReduceIntValPack(Type* inType, Val* valuePack, IntVal* axis)
+    {
+        setOperands(inType, valuePack, axis);
+    }
+    Val* getValuePack() const { return getOperand(1); }
+    IntVal* getAxis() const { return as<IntVal>(getOperand(2)); }
+    void _toTextOverride(StringBuilder& out);
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+    Val* _resolveImplOverride();
+};
+
 // Analogous to ExpandType: represents an unexpanded value pattern over captured value packs.
 FIDDLE()
 class ExpandIntValPack : public IntVal
@@ -923,6 +991,42 @@ class DeclaredSubtypeWitness : public SubtypeWitness
     ConversionCost _getOverloadResolutionCostOverride();
 };
 
+FIDDLE()
+class DiffTypeInfoWitness : public SubtypeWitness
+{
+    FIDDLE(...)
+
+    Type* getThisParamType() { return as<Type>(getOperand(0)); }
+
+    SubtypeWitness* getThisTypeDiffWitness() { return as<SubtypeWitness>(getOperand(1)); }
+
+    SubtypeWitness* getReturnTypeDiffWitness() { return as<SubtypeWitness>(getOperand(2)); }
+
+    SubtypeWitness* getParamTypeDiffWitness(Index index)
+    {
+        return as<SubtypeWitness>(getOperand(3 + index));
+    }
+
+    UCount getParamTypeCount() { return getOperandCount() - 3; }
+
+    void _toTextOverride(StringBuilder& out);
+    Val* _resolveImplOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
+FIDDLE()
+class HigherOrderDiffTypeTranslationWitness : public SubtypeWitness
+{
+    FIDDLE(...)
+
+    SubtypeWitness* getBaseWitness() { return as<SubtypeWitness>(getOperand(0)); }
+
+    void _toTextOverride(StringBuilder& out);
+    Val* _resolveImplOverride();
+    Val* _substituteImplOverride(ASTBuilder* astBuilder, SubstitutionSet subst, int* ioDiff);
+};
+
+
 // A witness that `sub : sup` because `sub : mid` and `mid : sup`
 FIDDLE()
 class TransitiveSubtypeWitness : public SubtypeWitness
@@ -1213,6 +1317,16 @@ inline bool isTypeEqualityWitness(Val* witness)
     }
     return false;
 }
+
+RequirementWitness getUnspecializedLookupRec(
+    ASTBuilder* astBuilder,
+    Decl* requirementKey,
+    SubtypeWitness* witness);
+
+RequirementWitness specializeLookedUpRec(
+    ASTBuilder* astBuilder,
+    SubtypeWitness* witness,
+    RequirementWitness lookedUpVal);
 
 bool isValuePack(Val* val);
 bool isAbstractValuePack(Val* val);
