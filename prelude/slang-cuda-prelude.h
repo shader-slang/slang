@@ -6461,63 +6461,6 @@ _slang_waveClusteredRotate(bool4 value, unsigned int delta, unsigned int cluster
 
 #if (OPTIX_VERSION >= 90000)
 
-// Constexpr function to map Slang component type enum to OptiX cooperative vector element type
-__host__ __device__ constexpr OptixCoopVecElemType slangToOptixComponentType(unsigned slangEnum)
-{
-    switch (slangEnum)
-    {
-    case 0:
-        return OPTIX_COOP_VEC_ELEM_TYPE_FLOAT8_E4M3; // FloatE4M3
-    case 1:
-        return OPTIX_COOP_VEC_ELEM_TYPE_FLOAT8_E5M2; // FloatE5M2
-    case 2:
-        return OPTIX_COOP_VEC_ELEM_TYPE_FLOAT16; // Float16
-    case 3:
-        return OPTIX_COOP_VEC_ELEM_TYPE_FLOAT32; // Float32
-    case 5:
-        return OPTIX_COOP_VEC_ELEM_TYPE_INT8; // SignedInt8
-    case 7:
-        return OPTIX_COOP_VEC_ELEM_TYPE_INT32; // SignedInt32
-    case 10:
-        return OPTIX_COOP_VEC_ELEM_TYPE_UINT8; // UnsignedInt8
-    case 12:
-        return OPTIX_COOP_VEC_ELEM_TYPE_UINT32; // UnsignedInt32
-    default:
-        return OPTIX_COOP_VEC_ELEM_TYPE_FLOAT32; // Default
-    }
-}
-
-// Constexpr function to map Slang matrix layout enum to OptiX cooperative vector matrix layout
-__host__ __device__ constexpr OptixCoopVecMatrixLayout slangToOptixMatrixLayout(unsigned slangEnum)
-{
-    switch (slangEnum)
-    {
-    case 0:
-        return OPTIX_COOP_VEC_MATRIX_LAYOUT_ROW_MAJOR; // RowMajor
-    case 1:
-        return OPTIX_COOP_VEC_MATRIX_LAYOUT_COLUMN_MAJOR; // ColumnMajor
-    case 2:
-        return OPTIX_COOP_VEC_MATRIX_LAYOUT_INFERENCING_OPTIMAL; // InferencingOptimal
-    case 3:
-        return OPTIX_COOP_VEC_MATRIX_LAYOUT_TRAINING_OPTIMAL; // TrainingOptimal
-    default:
-        return OPTIX_COOP_VEC_MATRIX_LAYOUT_ROW_MAJOR; // Default
-    }
-}
-
-// Wrapper structs to maintain compatibility with existing template-based interface
-template<unsigned SlangEnum>
-struct SlangToOptixComponentType
-{
-    static constexpr OptixCoopVecElemType value = slangToOptixComponentType(SlangEnum);
-};
-
-template<unsigned SlangEnum>
-struct SlangToOptixMatrixLayout
-{
-    static constexpr OptixCoopVecMatrixLayout value = slangToOptixMatrixLayout(SlangEnum);
-};
-
 // Template trait to extract vector size from OptixCoopVec<T, N>
 // Conditional compilation for NVRTC compatibility
 template<typename T>
@@ -6537,9 +6480,9 @@ struct OptixCoopVecTraits<OptixCoopVec<T, N>>
 template<
     typename VecTOut,
     typename VecTIn,
-    unsigned inputInterpretation,
-    unsigned matrixInterpretation,
-    unsigned matrixLayout>
+    OptixCoopVecElemType inputInterpretation,
+    OptixCoopVecElemType matrixInterpretation,
+    OptixCoopVecMatrixLayout matrixLayout>
 __forceinline__ __device__ VecTOut slangOptixCoopVecMatMul(
     const VecTIn& inputVector,
     CUdeviceptr matrix,
@@ -6553,26 +6496,22 @@ __forceinline__ __device__ VecTOut slangOptixCoopVecMatMul(
     return optixCoopVecMatMul<
         VecTOut,
         VecTIn,
-        SlangToOptixComponentType<inputInterpretation>::value,
-        SlangToOptixMatrixLayout<matrixLayout>::value,
+        inputInterpretation,
+        matrixLayout,
         false,
         N,
         K,
-        SlangToOptixComponentType<matrixInterpretation>::value>(
-        inputVector,
-        matrix,
-        matrixOffset,
-        matrixStride);
+        matrixInterpretation>(inputVector, matrix, matrixOffset, matrixStride);
 }
 
 // OptiX cooperative vector matrix multiplication wrapper (WITH bias - 6 runtime params)
 template<
     typename VecTOut,
     typename VecTIn,
-    unsigned inputInterpretation,
-    unsigned matrixInterpretation,
-    unsigned matrixLayout,
-    unsigned biasInterpretation>
+    OptixCoopVecElemType inputInterpretation,
+    OptixCoopVecElemType matrixInterpretation,
+    OptixCoopVecMatrixLayout matrixLayout,
+    OptixCoopVecElemType biasInterpretation>
 __forceinline__ __device__ VecTOut slangOptixCoopVecMatMul(
     const VecTIn& inputVector,
     CUdeviceptr matrix,
@@ -6588,19 +6527,13 @@ __forceinline__ __device__ VecTOut slangOptixCoopVecMatMul(
     return optixCoopVecMatMul<
         VecTOut,
         VecTIn,
-        SlangToOptixComponentType<inputInterpretation>::value,
-        SlangToOptixMatrixLayout<matrixLayout>::value,
+        inputInterpretation,
+        matrixLayout,
         false,
         N,
         K,
-        SlangToOptixComponentType<matrixInterpretation>::value,
-        SlangToOptixComponentType<biasInterpretation>::value>(
-        inputVector,
-        matrix,
-        matrixOffset,
-        bias,
-        biasOffset,
-        matrixStride);
+        matrixInterpretation,
+        biasInterpretation>(inputVector, matrix, matrixOffset, bias, biasOffset, matrixStride);
 }
 
 // OptiX cooperative vector matrix multiplication wrapper (WITHOUT bias, 4 runtime params -
@@ -6608,9 +6541,9 @@ __forceinline__ __device__ VecTOut slangOptixCoopVecMatMul(
 template<
     typename VecTOut,
     typename VecTIn,
-    unsigned inputInterpretation,
-    unsigned matrixInterpretation,
-    unsigned matrixLayout>
+    OptixCoopVecElemType inputInterpretation,
+    OptixCoopVecElemType matrixInterpretation,
+    OptixCoopVecMatrixLayout matrixLayout>
 __forceinline__ __device__ VecTOut slangOptixCoopVecMatMul(
     const VecTIn& inputVector,
     CUdeviceptr matrix,
@@ -6624,16 +6557,12 @@ __forceinline__ __device__ VecTOut slangOptixCoopVecMatMul(
     return optixCoopVecMatMul<
         VecTOut,
         VecTIn,
-        SlangToOptixComponentType<inputInterpretation>::value,
-        SlangToOptixMatrixLayout<matrixLayout>::value,
+        inputInterpretation,
+        matrixLayout,
         false,
         N,
         K,
-        SlangToOptixComponentType<matrixInterpretation>::value>(
-        inputVector,
-        matrix,
-        matrixOffset,
-        matrixStride);
+        matrixInterpretation>(inputVector, matrix, matrixOffset, matrixStride);
 }
 
 #endif // (OPTIX_VERSION >= 90000)

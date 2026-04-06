@@ -1275,6 +1275,7 @@ A capability describes an optional feature that a target may or may not support.
 * `metallib_2_4` 
 * `metallib_3_0` 
 * `metallib_3_1` 
+* `metallib_4_0` 
 * `hlsl_nvapi` 
 * `hlsl_2018` 
 * `optix_coopvec` 
@@ -1542,6 +1543,7 @@ A capability describes an optional feature that a target may or may not support.
 * `tensor_addressing` 
 * `cooperative_matrix_2` 
 * `vk_mem_model` 
+* `mem_model` 
 * `descriptor_handle` 
 * `pixel` 
 * `tesscontrol` 
@@ -1660,6 +1662,7 @@ A capability describes an optional feature that a target may or may not support.
 * `METAL_2_4` 
 * `METAL_3_0` 
 * `METAL_3_1` 
+* `METAL_4_0` 
 * `appendstructuredbuffer` 
 * `atomic_hlsl` 
 * `atomic_hlsl_nvapi` 

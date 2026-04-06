@@ -132,6 +132,7 @@ bool opCanBeConstExpr(IROp op)
     case kIROp_MakeExistentialWithRTTI:
     case kIROp_MakeOptionalNone:
     case kIROp_MakeOptionalValue:
+    case kIROp_MakeConditionalValue:
     case kIROp_MakeResultError:
     case kIROp_MakeResultValue:
     case kIROp_MakeString:
@@ -149,6 +150,7 @@ bool opCanBeConstExpr(IROp op)
     case kIROp_GetResultError:
     case kIROp_GetResultValue:
     case kIROp_GetOptionalValue:
+    case kIROp_GetConditionalValue:
     case kIROp_DifferentialPairGetDifferential:
     case kIROp_DifferentialPairGetPrimal:
     case kIROp_LookupWitnessMethod:

@@ -198,9 +198,13 @@ def metallib_3_0 : metallib_2_4;
 /// [Version]
 def metallib_3_1 : metallib_3_0;
 
+/// Represents MetalLib 4.0.
+/// [Version]
+def metallib_4_0 : metallib_3_1;
+
 /// Represents the latest MetalLib version.
 /// [Version]
-alias metallib_latest = metallib_3_1;
+alias metallib_latest = metallib_4_0;
 
 // HLSL versions
 
@@ -1368,7 +1372,7 @@ alias cooperative_vector = _sm_6_9 | cpp | _cuda_sm_9_0 | spvCooperativeVectorNV
 alias cooperative_vector_training = spvCooperativeVectorTrainingNV | _GL_NV_cooperative_vector;
 /// Capabilities needed to use cooperative matrices
 /// [Compound]
-alias cooperative_matrix = spvCooperativeMatrixKHR | cuda;
+alias cooperative_matrix = spvCooperativeMatrixKHR | cuda | _sm_6_10;
 /// Capabilities needed to use reduction operations with cooperative matrix
 /// [Compound]
 alias cooperative_matrix_spirv = spvCooperativeMatrixKHR;
@@ -1377,7 +1381,7 @@ alias cooperative_matrix_spirv = spvCooperativeMatrixKHR;
 alias cooperative_matrix_reduction = spvCooperativeMatrixReductionsNV;
 /// Capabilities needed to convert cooperative matrices, all the conversions can be supported by cuda
 /// [Compound]
-alias cooperative_matrix_conversion = spvCooperativeMatrixConversionsNV | cuda;
+alias cooperative_matrix_conversion = spvCooperativeMatrixConversionsNV | cuda | _sm_6_10;
 /// Capabilities needed to use MapElement operation with cooperative matrix
 /// [Compound]
 alias cooperative_matrix_map_element = spvCooperativeMatrixPerElementOperationsNV;
@@ -1397,6 +1401,10 @@ alias cooperative_matrix_2 = spvCooperativeMatrixKHR + spvCooperativeMatrixReduc
 /// Capabilities needed to use vulkan memory model
 /// [Compound]
 alias vk_mem_model = spvVulkanMemoryModelKHR + spvVulkanMemoryModelDeviceScopeKHR;
+
+/// Capabilities needed to use memory model
+/// [Compound]
+alias mem_model = vk_mem_model | _sm_6_10;
 
 /// Targets that support DescriptorHandle types for bindless descriptor access.
 /// [Compound]
@@ -2208,6 +2216,10 @@ alias METAL_3_0 = metallib_3_0;
 /// Use `metallib_3_1` instead
 /// [Other]
 alias METAL_3_1 = metallib_3_1;
+
+/// Use `metallib_4_0` instead
+/// [Other]
+alias METAL_4_0 = metallib_4_0;
 
 // Capabilities of convenience
 //

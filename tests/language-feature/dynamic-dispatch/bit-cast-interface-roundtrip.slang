@@ -3,9 +3,8 @@
 // Currently, the compiler lowers interface-typed existentials to a compact
 // tagged-union representation when the concrete type set is known, rather than
 // the full existential tuple (RTTI + WitnessTableID + AnyValue).  Because the
-// tagged-union size depends on the conforming types, the user cannot predict
-// the existential's byte-level layout at compile time, and bit_cast fails with
-// a size mismatch.
+// tagged-union size depends on the conforming types, bit_cast round-tripping
+// through an interface-typed existential is not currently supported.
 //
 // Two sub-issues block this feature:
 //   #10221 — bit_cast extracts concrete payload instead of full existential
@@ -47,12 +46,8 @@ float testRoundTrip(int typeId, float val)
 {
     IFoo foo = createDynamicObject<IFoo>(typeId, val);
     RawExistential raw = bit_cast<RawExistential>(foo);
-//CHECK:                                         ^ bit_cast size mismatch
-//CHECK:                                         ^ invalid to bit_cast differently sized types
-    // The reverse cast would also fail, but the compiler bails out after the
-    // first error above so no second diagnostic is emitted today.  A partial
-    // fix to #10221 or #10222 could change that; add a CHECK here when it does.
     IFoo foo2 = bit_cast<IFoo>(raw);
+//CHECK:                      ^ cannot bit-cast to existential (non-concrete) type
     return foo2.eval();
 }
 

@@ -9,6 +9,7 @@
 #include "slang-ir-util.h"
 #include "slang-ir.h"
 #include "slang-rich-diagnostics.h"
+#include "slang-target.h"
 
 namespace Slang
 {
@@ -146,17 +147,21 @@ IRStringLit* _getWitnessTableWrapperFuncName(IRModule* module, IRFunc* func)
 // The witness table wrapper will marshal from the union-types (ThisType) to the concrete types
 // (FooImpl) expected by the implementation.
 //
-IRFunc* emitWitnessTableWrapper(IRModule* module, IRInst* funcInst, IRInst* interfaceRequirementVal)
+IRFunc* emitWitnessTableWrapper(
+    IRModule* module,
+    IRInst* funcInst,
+    IRFuncType* effectiveFuncType,
+    IRFuncType* interfaceRequirementVal)
 {
-    auto funcTypeInInterface = cast<IRFuncType>(interfaceRequirementVal);
-    auto targetFuncType = as<IRFuncType>(funcInst->getDataType());
+    auto funcTypeInInterface = interfaceRequirementVal;
+    auto targetFuncType = effectiveFuncType;
 
     IRBuilder builderStorage(module);
     auto builder = &builderStorage;
     builder->setInsertBefore(funcInst);
 
     auto wrapperFunc = builder->createFunc();
-    wrapperFunc->setFullType((IRType*)interfaceRequirementVal);
+    wrapperFunc->setFullType(interfaceRequirementVal);
     if (auto func = as<IRFunc>(funcInst))
         if (auto name = _getWitnessTableWrapperFuncName(module, func))
             builder->addNameHintDecoration(wrapperFunc, name);
@@ -238,7 +243,9 @@ UInt getUniqueID(IRBuilder* builder, IRInst* inst)
 // The resulting function will have one additional parameter to accept the tag
 // indicating which function to call.
 //
-IRFunc* createDispatchFunc(IRFuncType* dispatchFuncType, Dictionary<IRInst*, IRInst*>& mapping)
+IRFunc* createDispatchFunc(
+    IRFuncType* dispatchFuncType,
+    Dictionary<IRInst*, std::pair<IRInst*, IRFuncType*>>& mapping)
 {
     // Create a dispatch function with switch-case for each function
     IRBuilder builder(dispatchFuncType->getModule());
@@ -250,7 +257,7 @@ IRFunc* createDispatchFunc(IRFuncType* dispatchFuncType, Dictionary<IRInst*, IRI
     innerParamTypes.removeAt(0); // Remove the first parameter (ID)
 
     auto resultType = dispatchFuncType->getResultType();
-    auto innerFuncType = builder.getFuncType(innerParamTypes, resultType);
+    auto innerDispatchFuncType = builder.getFuncType(innerParamTypes, resultType);
 
     auto func = builder.createFunc();
     builder.setInsertInto(func);
@@ -291,14 +298,19 @@ IRFunc* createDispatchFunc(IRFuncType* dispatchFuncType, Dictionary<IRInst*, IRI
 
     for (auto kvPair : mapping)
     {
-        auto funcInst = kvPair.second;
+        auto funcInst = kvPair.second.first;
+        auto effectiveFuncType = kvPair.second.second;
         auto funcTag = kvPair.first;
 
         // The different functions in the mapping may have different signatures,
         // so we need to emit a wrapper that marshals the parameters to the expected types for
         // each function.
         //
-        auto wrapperFunc = emitWitnessTableWrapper(funcInst->getModule(), funcInst, innerFuncType);
+        auto wrapperFunc = emitWitnessTableWrapper(
+            funcInst->getModule(),
+            funcInst,
+            effectiveFuncType,
+            innerDispatchFuncType);
 
         // Create case block
         auto caseBlock = builder.emitBlock();
@@ -567,277 +579,6 @@ struct TagOpsLoweringContext : public InstPassBase
     }
 };
 
-struct DispatcherLoweringContext : public InstPassBase
-{
-private:
-    bool m_reportDispatchLocations = false;
-    DiagnosticSink* m_sink = nullptr;
-
-public:
-    DispatcherLoweringContext(IRModule* module, DiagnosticSink* sink, bool reportDispatchLocations)
-        : InstPassBase(module), m_reportDispatchLocations(reportDispatchLocations), m_sink(sink)
-    {
-    }
-
-    void reportDispatchLocation(IRUse* use, IRWitnessTableSet* witnessTableSet)
-    {
-        if (m_sink)
-        {
-            // Make a string out of all the dispatch table element's concrete type names.
-            StringBuilder tableElementsStr;
-            bool first = true;
-            UInt count = 0;
-            forEachInSet(
-                witnessTableSet,
-                [&](IRInst* table)
-                {
-                    if (first)
-                        first = false;
-                    else
-                        tableElementsStr << ", ";
-                    auto concreteType = cast<IRWitnessTable>(table)->getConcreteType();
-                    printDiagnosticArg(tableElementsStr, concreteType);
-                    count++;
-                });
-
-            m_sink->diagnose(Diagnostics::DynamicDispatchCodeGeneratedHere{
-                .count = (int64_t)count,
-                .types = tableElementsStr.produceString(),
-                .location = use->getUser()->sourceLoc});
-        }
-    }
-
-    void reportSpecializedDispatchLocation(
-        IRUse* use,
-        IRWitnessTableSet* witnessTableSet,
-        List<IRInst*>& specArgs)
-    {
-        if (m_sink)
-        {
-            // Make a string out of all the dispatch table element's concrete type names.
-            StringBuilder tableElementsStr;
-            bool first = true;
-            UInt count = 0;
-            forEachInSet(
-                witnessTableSet,
-                [&](IRInst* table)
-                {
-                    if (first)
-                        first = false;
-                    else
-                        tableElementsStr << ", ";
-                    auto concreteType = cast<IRWitnessTable>(table)->getConcreteType();
-                    printDiagnosticArg(tableElementsStr, concreteType);
-                    count++;
-                });
-
-            // Make a string out of all specialization arguments.
-            StringBuilder specArgsStr;
-            first = true;
-            for (auto arg : specArgs)
-            {
-                if (as<IRWitnessTable>(arg))
-                {
-                    // Skip witness table args.
-                    continue;
-                }
-
-                if (first)
-                    first = false;
-                else
-                    specArgsStr << ", ";
-
-                printDiagnosticArg(specArgsStr, arg);
-            }
-
-            m_sink->diagnose(Diagnostics::SpecializedDynamicDispatchCodeGeneratedHere{
-                .count = (int64_t)count,
-                .types = tableElementsStr.produceString(),
-                .specArgs = specArgsStr.produceString(),
-                .location = use->getUser()->sourceLoc});
-        }
-    }
-
-    void lowerGetDispatcher(IRGetDispatcher* dispatcher)
-    {
-        // Replace the `IRGetDispatcher` with a dispatch function,
-        // which takes an extra first parameter for the tag (i.e. ID)
-        //
-        // We'll also replace the callee in all 'call' insts.
-        //
-        // The generated dispatch function uses a switch-case to call the
-        // appropriate function based on the integer tag. Since tags
-        // may not yet be lowered into actual integers, we use `GetTagOfElementInSet`
-        // as a placeholder literal.
-        //
-        // Note that before each function is called, it needs to be wrapped in a
-        // method (a 'witness table wrapper') that handles marshalling between the input types
-        // to the dispatcher and the actual function types (which may be different)
-        //
-
-        auto witnessTableSet = cast<IRWitnessTableSet>(dispatcher->getOperand(0));
-        auto key = cast<IRStructKey>(dispatcher->getOperand(1));
-
-        IRBuilder builder(dispatcher->getModule());
-
-        Dictionary<IRInst*, IRInst*> elements;
-        forEachInSet(
-            witnessTableSet,
-            [&](IRInst* table)
-            {
-                auto tag = builder.emitGetTagOfElementInSet(
-                    builder.getSetTagType(witnessTableSet),
-                    table,
-                    witnessTableSet);
-                elements.add(
-                    tag,
-                    cast<IRFunc>(findWitnessTableEntry(cast<IRWitnessTable>(table), key)));
-            });
-
-        if (dispatcher->hasUses() && dispatcher->getDataType() != nullptr)
-        {
-            auto dispatchFunc =
-                createDispatchFunc(cast<IRFuncType>(dispatcher->getDataType()), elements);
-
-            if (auto nameHint = dispatcher->getLookupKey()->findDecoration<IRNameHintDecoration>())
-            {
-                builder.setInsertBefore(dispatchFunc);
-                StringBuilder sb;
-                sb << "s_dispatch_" << nameHint->getName() << "";
-                builder.addNameHintDecoration(dispatchFunc, sb.getUnownedSlice());
-            }
-
-            traverseUses(
-                dispatcher,
-                [&](IRUse* use)
-                {
-                    if (m_reportDispatchLocations)
-                        reportDispatchLocation(use, witnessTableSet);
-
-                    if (auto callInst = as<IRCall>(use->getUser()))
-                    {
-                        // Replace callee with the generated dispatchFunc.
-                        if (callInst->getCallee() == dispatcher)
-                        {
-                            IRBuilder callBuilder(callInst);
-                            callBuilder.setInsertBefore(callInst);
-                            callBuilder.replaceOperand(callInst->getCalleeUse(), dispatchFunc);
-                        }
-                    }
-                });
-        }
-    }
-
-    void lowerGetSpecializedDispatcher(IRGetSpecializedDispatcher* dispatcher)
-    {
-        // Replace the `IRGetSpecializedDispatcher` with a dispatch function,
-        // which takes an extra first parameter for the tag (i.e. ID)
-        //
-        // We'll also replace the callee in all 'call' insts.
-        //
-        // The logic here is very similar to `lowerGetDispatcher`, except that we need to
-        // account for the specialization arguments when creating the dispatch function.
-        // We construct an `IRSpecialize` inst around each generic function before dispatching
-        // to it.
-        //
-
-        auto witnessTableSet = cast<IRWitnessTableSet>(dispatcher->getOperand(0));
-        auto key = cast<IRStructKey>(dispatcher->getOperand(1));
-
-        List<IRInst*> specArgs;
-        for (UIndex i = 2; i < dispatcher->getOperandCount(); i++)
-        {
-            specArgs.add(dispatcher->getOperand(i));
-        }
-
-        Dictionary<IRInst*, IRInst*> elements;
-        IRBuilder builder(dispatcher->getModule());
-        forEachInSet(
-            witnessTableSet,
-            [&](IRInst* table)
-            {
-                auto generic =
-                    cast<IRGeneric>(findWitnessTableEntry(cast<IRWitnessTable>(table), key));
-
-                auto specializeInst = cast<IRSpecialize>(builder.emitSpecializeInst(
-                    builder.getTypeKind(),
-                    generic->getDataType(),
-                    specArgs.getCount(),
-                    specArgs.getBuffer()));
-                auto specializedFuncType = (IRType*)specializeGeneric(specializeInst);
-
-                auto specializedFunc = builder.emitSpecializeInst(
-                    specializedFuncType,
-                    generic,
-                    specArgs.getCount(),
-                    specArgs.getBuffer());
-
-                auto singletonTag = builder.emitGetTagOfElementInSet(
-                    builder.getSetTagType(witnessTableSet),
-                    table,
-                    witnessTableSet);
-
-                elements.add(singletonTag, specializedFunc);
-            });
-
-        if (dispatcher->hasUses() && dispatcher->getDataType() != nullptr)
-        {
-            auto dispatchFunc =
-                createDispatchFunc(cast<IRFuncType>(dispatcher->getDataType()), elements);
-
-            if (auto keyNameHint = key->findDecoration<IRNameHintDecoration>())
-            {
-                builder.setInsertBefore(dispatchFunc);
-                StringBuilder sb;
-                sb << "s_dispatch_" << keyNameHint->getName() << "";
-                for (auto specArg : specArgs)
-                {
-                    sb << "_";
-                    getTypeNameHint(sb, specArg);
-                }
-                builder.addNameHintDecoration(dispatchFunc, sb.getUnownedSlice());
-            }
-
-            traverseUses(
-                dispatcher,
-                [&](IRUse* use)
-                {
-                    if (m_reportDispatchLocations)
-                        reportSpecializedDispatchLocation(use, witnessTableSet, specArgs);
-
-                    if (auto callInst = as<IRCall>(use->getUser()))
-                    {
-                        // Replace callee with the generated dispatchFunc.
-                        if (callInst->getCallee() == dispatcher)
-                        {
-                            IRBuilder callBuilder(callInst);
-                            callBuilder.setInsertBefore(callInst);
-                            callBuilder.replaceOperand(callInst->getCalleeUse(), dispatchFunc);
-                        }
-                    }
-                });
-        }
-    }
-
-    void processModule()
-    {
-        processInstsOfType<IRGetDispatcher>(
-            kIROp_GetDispatcher,
-            [&](IRGetDispatcher* inst) { return lowerGetDispatcher(inst); });
-
-        processInstsOfType<IRGetSpecializedDispatcher>(
-            kIROp_GetSpecializedDispatcher,
-            [&](IRGetSpecializedDispatcher* inst) { return lowerGetSpecializedDispatcher(inst); });
-    }
-};
-
-bool lowerDispatchers(IRModule* module, DiagnosticSink* sink, bool reportDispatchLocations)
-{
-    DispatcherLoweringContext context(module, sink, reportDispatchLocations);
-    context.processModule();
-    return true;
-}
-
 // This context lowers `TypeSet` instructions.
 struct UntaggedUnionLoweringContext : public InstPassBase
 {
@@ -883,9 +624,8 @@ struct UntaggedUnionLoweringContext : public InstPassBase
     }
 
     // Check whether a type (or any of its nested fields) contains types that
-    // cannot be marshalled to/from an AnyValue. Types like Atomic<T> and
-    // unsized arrays would crash in emitMarshallingCode; reject them here
-    // so we emit error 41014 instead.
+    // cannot be marshalled to/from an AnyValue. Rejects types that would crash
+    // in emitMarshallingCode or produce invalid output for the current target.
     bool containsUnmarshalableType(IRType* type)
     {
         switch (type->getOp())
@@ -893,6 +633,21 @@ struct UntaggedUnionLoweringContext : public InstPassBase
         case kIROp_AtomicType:
         case kIROp_UnsizedArrayType:
             return true;
+
+        case kIROp_PtrType:
+            {
+                // SPIRV generates incompatible struct types for Function vs
+                // PhysicalStorageBuffer storage classes. Pointers to concrete
+                // structs packed into AnyValue produce type mismatches in the
+                // generated SPIRV. CPU and CUDA handle this correctly.
+                // Interface pointers are allowed: they point to existential
+                // tuples that are already handled by dynamic dispatch lowering.
+                if (!isSPIRV(targetProgram->getTargetReq()->getTarget()))
+                    return false;
+                auto ptrType = cast<IRPtrTypeBase>(type);
+                auto valueType = ptrType->getValueType();
+                return valueType->getOp() != kIROp_InterfaceType;
+            }
 
         case kIROp_StructType:
             {
@@ -998,7 +753,11 @@ struct UntaggedUnionLoweringContext : public InstPassBase
     {
         processInstsOfType<IRUntaggedUnionType>(
             kIROp_UntaggedUnionType,
-            [&](IRUntaggedUnionType* inst) { return lowerUntaggedUnionType(inst); });
+            [&](IRUntaggedUnionType* inst)
+            {
+                if (inst->hasUses())
+                    return lowerUntaggedUnionType(inst);
+            });
 
         replaceNoneTypeElementWithVoidType();
     }
@@ -1053,6 +812,7 @@ struct SequentialIDTagLoweringContext : public InstPassBase
         builder.setInsertAfter(inst);
 
         forEachInSet(
+            module,
             destSet,
             [&](IRInst* table)
             {
@@ -1102,6 +862,7 @@ struct SequentialIDTagLoweringContext : public InstPassBase
         builder.setInsertAfter(inst);
 
         forEachInSet(
+            module,
             destSet,
             [&](IRInst* table)
             {
@@ -1334,6 +1095,16 @@ struct TaggedUnionLoweringContext : public InstPassBase
         IRInst* targetType)
     {
         auto baseInterfaceValue = val;
+
+        // Singleton case: the tagged union was lowered directly to the element type.
+        if (!as<IRTupleType>(targetType))
+        {
+            auto existentialVal = builder->emitExtractExistentialValue(
+                (IRType*)builder->emitExtractExistentialType(baseInterfaceValue),
+                baseInterfaceValue);
+            return builder->emitReinterpret((IRType*)targetType, existentialVal);
+        }
+
         auto witnessTable = builder->emitExtractExistentialWitnessTable(baseInterfaceValue);
         auto tableID = builder->emitGetSequentialIDInst(witnessTable);
 
@@ -1365,8 +1136,20 @@ struct TaggedUnionLoweringContext : public InstPassBase
         IRBuilder* builder,
         IRInst* val,
         IRInst* interfaceType,
-        IRInst* taggedUnionType)
+        IRInst* taggedUnionType,
+        IRWitnessTableSet* witnessTableSet = nullptr)
     {
+        // Singleton case: the tagged union was lowered directly to the element type.
+        if (!as<IRTupleType>(taggedUnionType))
+        {
+            SLANG_ASSERT(witnessTableSet && witnessTableSet->isSingleton());
+            auto witnessTable = witnessTableSet->getElement(0);
+            auto seqID = builder->emitGetSequentialIDInst(witnessTable);
+            IRInst* args[] = {seqID, val};
+            return builder
+                ->emitIntrinsicInst((IRType*)interfaceType, kIROp_CreateExistentialObject, 2, args);
+        }
+
         // Do the reverse of `convertToTaggedUnion`.
         auto taggedUnionTupleType = cast<IRTupleType>(taggedUnionType);
         auto tableTag =
@@ -1393,6 +1176,7 @@ struct TaggedUnionLoweringContext : public InstPassBase
 
     void lowerCastInterfaceToTaggedUnionPtr(IRCastInterfaceToTaggedUnionPtr* inst)
     {
+        auto witnessTableSet = as<IRWitnessTableSet>(inst->getWitnessTableSet());
         // `CastInterfaceToTaggedUnionPtr` is used to 'reinterpret' a pointer to an interface-typed
         // location into a tagged union type. Usually this is to avoid changing the type of the
         // base location because it is externally visible, and to avoid touching the external layout
@@ -1435,7 +1219,7 @@ struct TaggedUnionLoweringContext : public InstPassBase
                 {
                 case kIROp_Load:
                     {
-                        auto baseInterfacePtr = inst->getOperand(0);
+                        auto baseInterfacePtr = inst->getPtr();
                         auto baseInterfaceType = as<IRInterfaceType>(
                             as<IRPtrTypeBase>(baseInterfacePtr->getDataType())->getValueType());
 
@@ -1466,7 +1250,7 @@ struct TaggedUnionLoweringContext : public InstPassBase
                     {
                         auto storeInst = cast<IRStore>(user);
 
-                        auto baseInterfacePtr = inst->getOperand(0);
+                        auto baseInterfacePtr = inst->getPtr();
                         auto baseInterfaceType = as<IRInterfaceType>(
                             as<IRPtrTypeBase>(baseInterfacePtr->getDataType())->getValueType());
 
@@ -1480,7 +1264,8 @@ struct TaggedUnionLoweringContext : public InstPassBase
                             &builder,
                             storeInst->getVal(),
                             baseInterfaceType,
-                            as<IRPtrTypeBase>(inst->getDataType())->getValueType());
+                            as<IRPtrTypeBase>(inst->getDataType())->getValueType(),
+                            witnessTableSet);
 
                         builder.replaceOperand(storeInst->getPtrUse(), baseInterfacePtr);
                         builder.replaceOperand(storeInst->getValUse(), newVal);
@@ -1489,7 +1274,7 @@ struct TaggedUnionLoweringContext : public InstPassBase
                 case kIROp_StructuredBufferLoad:
                 case kIROp_RWStructuredBufferLoad:
                     {
-                        auto baseInterfacePtr = inst->getOperand(0);
+                        auto baseInterfacePtr = inst->getPtr();
                         auto baseInterfaceType =
                             as<IRInterfaceType>((baseInterfacePtr->getDataType())->getOperand(0));
 
@@ -1528,11 +1313,7 @@ struct TaggedUnionLoweringContext : public InstPassBase
         // `TupleType(SetTagType(tableSet), typeSet)`
         //
         // Unless the set has a single element, in which case we
-        // replace it with `TupleType(SetTagType(tableSet), elementType)`
-        //
-        // We still maintain a tuple type (even though it's not really necesssary) to avoid
-        // breaking any operations that assumed this is a tuple.
-        // In the single element case, the tuple should be optimized away.
+        // replace it directly with the element type (no tuple wrapper).
         //
 
         IRBuilder builder(module);
@@ -1541,10 +1322,16 @@ struct TaggedUnionLoweringContext : public InstPassBase
         auto typeSet = builder.getUntaggedUnionType(taggedUnion->getTypeSet());
         auto tableSet = taggedUnion->getWitnessTableSet();
 
-        if (taggedUnion->getTypeSet()->isSingleton())
-            return builder.getTupleType(List<IRType*>(
-                {(IRType*)builder.getSetTagType(tableSet),
-                 (IRType*)taggedUnion->getTypeSet()->getElement(0)}));
+        if (taggedUnion->isSingleton())
+        {
+            auto elementType = (IRType*)taggedUnion->getTypeSet()->getElement(0);
+            if (as<IRNoneTypeElement>(elementType))
+            {
+                IRBuilder emptyStructBuilder(module);
+                return emptyStructBuilder.createStructType();
+            }
+            return elementType;
+        }
 
         return builder.getTupleType(
             List<IRType*>({(IRType*)builder.getSetTagType(tableSet), (IRType*)typeSet}));
@@ -1552,14 +1339,23 @@ struct TaggedUnionLoweringContext : public InstPassBase
 
     bool lowerGetValueFromTaggedUnion(IRGetValueFromTaggedUnion* inst)
     {
-        // We replace `GetValueFromTaggedUnion(taggedUnionVal)` with
-        // `GetTupleElement(taggedUnionVal, 1)`
-        //
-
         IRBuilder builder(module);
         builder.setInsertAfter(inst);
 
         auto tupleVal = inst->getOperand(0);
+
+        // Singleton case: the tagged union was lowered directly to the element type,
+        // so GetValue is a no-op.
+        if (!as<IRTupleType>(tupleVal->getDataType()))
+        {
+            inst->replaceUsesWith(tupleVal);
+            inst->removeAndDeallocate();
+            return true;
+        }
+
+        // We replace `GetValueFromTaggedUnion(taggedUnionVal)` with
+        // `GetTupleElement(taggedUnionVal, 1)`
+        //
         inst->replaceUsesWith(builder.emitGetTupleElement(
             (IRType*)as<IRTupleType>(tupleVal->getDataType())->getOperand(1),
             tupleVal,
@@ -1570,13 +1366,23 @@ struct TaggedUnionLoweringContext : public InstPassBase
 
     bool lowerGetTagFromTaggedUnion(IRGetTagFromTaggedUnion* inst)
     {
-        // We replace `GetTagFromTaggedUnion(taggedUnionVal)` with
-        // `GetTupleElement(taggedUnionVal, 0)`
-        //
-
         IRBuilder builder(module);
         builder.setInsertAfter(inst);
 
+        // Singleton case: the tag is a compile-time constant.
+        auto tagType = cast<IRSetTagType>(inst->getDataType());
+        if (tagType->isSingleton())
+        {
+            auto set = tagType->getSet();
+            inst->replaceUsesWith(
+                builder.emitGetTagOfElementInSet(inst->getDataType(), set->getElement(0), set));
+            inst->removeAndDeallocate();
+            return true;
+        }
+
+        // We replace `GetTagFromTaggedUnion(taggedUnionVal)` with
+        // `GetTupleElement(taggedUnionVal, 0)`
+        //
         auto tupleVal = inst->getOperand(0);
         inst->replaceUsesWith(builder.emitGetTupleElement(
             (IRType*)as<IRTupleType>(tupleVal->getDataType())->getOperand(0),
@@ -1588,6 +1394,20 @@ struct TaggedUnionLoweringContext : public InstPassBase
 
     bool lowerGetTypeTagFromTaggedUnion(IRGetTypeTagFromTaggedUnion* inst)
     {
+        IRBuilder builder(module);
+        builder.setInsertAfter(inst);
+
+        // Singleton case: the type tag is a compile-time constant.
+        auto tagType = cast<IRSetTagType>(inst->getDataType());
+        if (tagType->isSingleton())
+        {
+            auto set = tagType->getSet();
+            inst->replaceUsesWith(
+                builder.emitGetTagOfElementInSet(inst->getDataType(), set->getElement(0), set));
+            inst->removeAndDeallocate();
+            return true;
+        }
+
         // `GetTypeTagFromTaggedUnion(taggedUnionVal)` is not expected to
         // appear after lowering, since we currently don't need the type tag
         // for anything.
@@ -1595,8 +1415,6 @@ struct TaggedUnionLoweringContext : public InstPassBase
         // We'll replace it with a poison value so that any accidental uses will result in
         // an error later on.
         //
-        IRBuilder builder(module);
-        builder.setInsertAfter(inst);
         inst->replaceUsesWith(builder.emitPoison(inst->getDataType()));
         return true;
     }
@@ -1604,12 +1422,22 @@ struct TaggedUnionLoweringContext : public InstPassBase
 
     bool lowerMakeTaggedUnion(IRMakeTaggedUnion* inst)
     {
-        // We replace `MakeTaggedUnion(typeTag, witnessTableTag, val)` with `MakeTuple(tag, val)`
-        //
-
         IRBuilder builder(module);
         builder.setInsertAfter(inst);
 
+        // Singleton case: MakeTaggedUnion is a no-op, just use the value directly.
+        if (!as<IRTupleType>(inst->getDataType()))
+        {
+            auto val = inst->getOperand(2);
+            if (val->getDataType() != inst->getDataType())
+                val = builder.emitReinterpret((IRType*)inst->getDataType(), val);
+            inst->replaceUsesWith(val);
+            inst->removeAndDeallocate();
+            return true;
+        }
+
+        // We replace `MakeTaggedUnion(typeTag, witnessTableTag, val)` with `MakeTuple(tag, val)`
+        //
         auto tuTupleType = cast<IRTupleType>(inst->getDataType());
 
         // The current lowering logic is only for bounded tagged unions (finite sets)
@@ -1630,8 +1458,9 @@ struct TaggedUnionLoweringContext : public InstPassBase
 
     bool processModule()
     {
-        // First, we'll lower all TaggedUnionType insts
-        // into tuples.
+        // Lower all TaggedUnionType insts.
+        // Singleton types are lowered directly to the element type.
+        // Non-singleton types are lowered to tuples.
         //
         processInstsOfType<IRTaggedUnionType>(
             kIROp_TaggedUnionType,
@@ -1641,27 +1470,28 @@ struct TaggedUnionLoweringContext : public InstPassBase
                 inst->removeAndDeallocate();
             });
 
-        bool hasCastInsts = false;
+        bool hasChanges = false;
         processAllInsts(
             [&](IRInst* inst)
             {
                 switch (inst->getOp())
                 {
                 case kIROp_GetTagFromTaggedUnion:
-                    lowerGetTagFromTaggedUnion(as<IRGetTagFromTaggedUnion>(inst));
+                    hasChanges |= lowerGetTagFromTaggedUnion(as<IRGetTagFromTaggedUnion>(inst));
                     break;
                 case kIROp_GetTypeTagFromTaggedUnion:
-                    lowerGetTypeTagFromTaggedUnion(as<IRGetTypeTagFromTaggedUnion>(inst));
+                    hasChanges |=
+                        lowerGetTypeTagFromTaggedUnion(as<IRGetTypeTagFromTaggedUnion>(inst));
                     break;
                 case kIROp_GetValueFromTaggedUnion:
-                    lowerGetValueFromTaggedUnion(as<IRGetValueFromTaggedUnion>(inst));
+                    hasChanges |= lowerGetValueFromTaggedUnion(as<IRGetValueFromTaggedUnion>(inst));
                     break;
                 case kIROp_MakeTaggedUnion:
-                    lowerMakeTaggedUnion(as<IRMakeTaggedUnion>(inst));
+                    hasChanges |= lowerMakeTaggedUnion(as<IRMakeTaggedUnion>(inst));
                     break;
                 case kIROp_CastInterfaceToTaggedUnionPtr:
                     {
-                        hasCastInsts = true;
+                        hasChanges = true;
                         lowerCastInterfaceToTaggedUnionPtr(
                             as<IRCastInterfaceToTaggedUnionPtr>(inst));
                     }
@@ -1670,7 +1500,8 @@ struct TaggedUnionLoweringContext : public InstPassBase
                     break;
                 }
             });
-        return hasCastInsts;
+
+        return hasChanges;
     }
 };
 
@@ -2095,6 +1926,7 @@ struct ExistentialLoweringContext : public InstPassBase
         // TupleType(RTTI, witness table ID, AnyValue) for regular interface types or a
         // TupleType(RTTI, witness table ID, PseudoPtr, AnyValue) for bound interface types.
         //
+
         processInstsOfType<IRInterfaceType>(
             kIROp_InterfaceType,
             [&](IRInterfaceType* inst)
@@ -2198,4 +2030,93 @@ bool lowerExistentials(IRModule* module, TargetProgram* targetProgram, Diagnosti
     context.processModule();
     return true;
 };
+
+
+void reportDispatchLocation(
+    IRModule* module,
+    DiagnosticSink* sink,
+    IRUse* use,
+    IRWitnessTableSet* witnessTableSet)
+{
+    if (sink)
+    {
+        // Make a string out of all the dispatch table element's concrete type names.
+        StringBuilder tableElementsStr;
+        bool first = true;
+        UInt count = 0;
+        forEachInSet(
+            module,
+            witnessTableSet,
+            [&](IRInst* table)
+            {
+                if (first)
+                    first = false;
+                else
+                    tableElementsStr << ", ";
+                auto concreteType = cast<IRWitnessTable>(table)->getConcreteType();
+                printDiagnosticArg(tableElementsStr, concreteType);
+                count++;
+            });
+
+        sink->diagnose(Diagnostics::DynamicDispatchCodeGeneratedHere{
+            .count = (int64_t)count,
+            .types = tableElementsStr.produceString(),
+            .location = use->getUser()->sourceLoc});
+    }
+}
+
+void reportSpecializedDispatchLocation(
+    IRModule* module,
+    DiagnosticSink* sink,
+    IRUse* use,
+    IRWitnessTableSet* witnessTableSet,
+    List<IRInst*>& specArgs)
+{
+    if (sink)
+    {
+        // Make a string out of all the dispatch table element's concrete type names.
+        StringBuilder tableElementsStr;
+        bool first = true;
+        UInt count = 0;
+        forEachInSet(
+            module,
+            witnessTableSet,
+            [&](IRInst* table)
+            {
+                if (first)
+                    first = false;
+                else
+                    tableElementsStr << ", ";
+                auto concreteType = cast<IRWitnessTable>(table)->getConcreteType();
+                printDiagnosticArg(tableElementsStr, concreteType);
+                count++;
+            });
+
+        // Make a string out of all specialization arguments.
+        StringBuilder specArgsStr;
+        first = true;
+        for (auto arg : specArgs)
+        {
+            if (as<IRWitnessTable>(arg))
+            {
+                // Skip witness table args.
+                continue;
+            }
+
+            if (first)
+                first = false;
+            else
+                specArgsStr << ", ";
+
+            printDiagnosticArg(specArgsStr, arg);
+        }
+
+        sink->diagnose(Diagnostics::SpecializedDynamicDispatchCodeGeneratedHere{
+            .count = (int64_t)count,
+            .types = tableElementsStr.produceString(),
+            .specArgs = specArgsStr.produceString(),
+            .location = use->getUser()->sourceLoc});
+    }
+}
+
 }; // namespace Slang

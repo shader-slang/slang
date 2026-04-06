@@ -224,6 +224,9 @@ Versions
 `metallib_3_1`
 > Represents MetalLib 3.1.
 
+`metallib_4_0`
+> Represents MetalLib 4.0.
+
 `metallib_latest`
 > Represents the latest MetalLib version.
 
@@ -1245,6 +1248,9 @@ Compound Capabilities
 > `SPV_KHR_compute_shader_derivatives` (SPIR-V), or profile `cs_6_6` (HLSL).
 > 
 
+`mem_model`
+> Capabilities needed to use memory model
+
 `memorybarrier`
 > Capabilities required to use sm_5_0 style memory barriers
 
@@ -1594,6 +1600,9 @@ Other
 
 `METAL_3_1`
 > Use `metallib_3_1` instead
+
+`METAL_4_0`
+> Use `metallib_4_0` instead
 
 `SPIRV_1_0`
 > Use `spirv_1_0` instead

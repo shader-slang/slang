@@ -53,10 +53,27 @@ struct TupleLoweringContext
         info->tupleType = (IRType*)type;
         auto structType = builder->createStructType();
         info->structType = structType;
-        builder->addNameHintDecoration(structType, UnownedStringSlice("Tuple"));
+
+        // Check if the last operand is a TupleNameType sentinel.
+        // If so, use its string as the struct name and exclude it from fields.
+        UInt operandCount = type->getOperandCount();
+        IRTupleNameType* tupleNameType = nullptr;
+        if (operandCount > 0)
+            tupleNameType = as<IRTupleNameType>(type->getOperand(operandCount - 1));
+
+        if (tupleNameType)
+        {
+            builder->addNameHintDecoration(structType, tupleNameType->getName()->getStringSlice());
+            builder->addDecoration(structType, kIROp_OptimizableTypeDecoration);
+            operandCount--; // exclude the TupleNameType from field iteration
+        }
+        else
+        {
+            builder->addNameHintDecoration(structType, UnownedStringSlice("Tuple"));
+        }
 
         StringBuilder fieldNameSb;
-        for (UInt i = 0; i < type->getOperandCount(); i++)
+        for (UInt i = 0; i < operandCount; i++)
         {
             auto elementType = maybeLowerTupleType(builder, (IRType*)(type->getOperand(i)));
             auto key = builder->createStructKey();

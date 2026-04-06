@@ -1464,6 +1464,10 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     case kIROp_MetalCastToDepthTexture:
     case kIROp_LoadResourceDescriptorFromHeap:
     case kIROp_LoadSamplerDescriptorFromHeap:
+    case kIROp_CoopMatMulAdd:
+    case kIROp_CoopVecMatMulAdd:
+    case kIROp_CoopVecOuterProductAccumulate:
+    case kIROp_CoopVecReduceSumAccumulate:
         return false;
 
     // Always fold these in, because they are trivial
@@ -3241,6 +3245,10 @@ void CLikeSourceEmitter::_emitInst(IRInst* inst)
     case kIROp_MetalAtomicCast:
     case kIROp_MetalCastToDepthTexture:
     case kIROp_SetOptiXPayloadRegister:
+    case kIROp_CoopMatMulAdd:
+    case kIROp_CoopVecMatMulAdd:
+    case kIROp_CoopVecOuterProductAccumulate:
+    case kIROp_CoopVecReduceSumAccumulate:
         emitInstStmt(inst);
         break;
 
