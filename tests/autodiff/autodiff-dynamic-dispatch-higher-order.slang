@@ -6,6 +6,7 @@
 // forward diff works, but computing the second derivative via
 // fwd_diff(firstDeriv) triggers the ICE.
 
+// BUG: https://github.com/shader-slang/slang/issues/10728
 //DISABLE_TEST:COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -shaderobj -output-using-type
 
 //TEST_INPUT: set outputBuffer = out ubuffer(data=[0 0 0 0], stride=4)
