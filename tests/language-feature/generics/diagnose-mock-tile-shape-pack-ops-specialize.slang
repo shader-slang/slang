@@ -1,12 +1,12 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=LATE_CONCAT_NON_AXIS,non-exhaustive): -target spirv -entry computeMain -stage compute -DLATE_CONCAT_NON_AXIS
-//DIAGNOSTIC_TEST:SIMPLE(diag=LATE_CONCAT_RANK,non-exhaustive): -target spirv -entry computeMain -stage compute -DLATE_CONCAT_RANK
-//DIAGNOSTIC_TEST:SIMPLE(diag=LATE_CONCAT_AXIS,non-exhaustive): -target spirv -entry computeMain -stage compute -DLATE_CONCAT_AXIS
-//DIAGNOSTIC_TEST:SIMPLE(diag=LATE_PERMUTE_LENGTH,non-exhaustive): -target spirv -entry computeMain -stage compute -DLATE_PERMUTE_LENGTH
-//DIAGNOSTIC_TEST:SIMPLE(diag=LATE_PERMUTE_DUP,non-exhaustive): -target spirv -entry computeMain -stage compute -DLATE_PERMUTE_DUP
-//DIAGNOSTIC_TEST:SIMPLE(diag=LATE_PERMUTE_RANGE,non-exhaustive): -target spirv -entry computeMain -stage compute -DLATE_PERMUTE_RANGE
-//DIAGNOSTIC_TEST:SIMPLE(diag=LATE_SWAP_AXIS,non-exhaustive): -target spirv -entry computeMain -stage compute -DLATE_SWAP_AXIS
-//DIAGNOSTIC_TEST:SIMPLE(diag=LATE_REDUCE_AXIS,non-exhaustive): -target spirv -entry computeMain -stage compute -DLATE_REDUCE_AXIS
-//DIAGNOSTIC_TEST:SIMPLE(diag=LATE_SWAP_SAME_AXIS,non-exhaustive): -target spirv -entry computeMain -stage compute -DLATE_SWAP_SAME_AXIS
+//DIAGNOSTIC_TEST:SIMPLE(diag=LATE_CONCAT_NON_AXIS): -target spirv -entry computeMain -stage compute -DLATE_CONCAT_NON_AXIS
+//DIAGNOSTIC_TEST:SIMPLE(diag=LATE_CONCAT_RANK): -target spirv -entry computeMain -stage compute -DLATE_CONCAT_RANK
+//DIAGNOSTIC_TEST:SIMPLE(diag=LATE_CONCAT_AXIS): -target spirv -entry computeMain -stage compute -DLATE_CONCAT_AXIS
+//DIAGNOSTIC_TEST:SIMPLE(diag=LATE_PERMUTE_LENGTH): -target spirv -entry computeMain -stage compute -DLATE_PERMUTE_LENGTH
+//DIAGNOSTIC_TEST:SIMPLE(diag=LATE_PERMUTE_DUP): -target spirv -entry computeMain -stage compute -DLATE_PERMUTE_DUP
+//DIAGNOSTIC_TEST:SIMPLE(diag=LATE_PERMUTE_RANGE): -target spirv -entry computeMain -stage compute -DLATE_PERMUTE_RANGE
+//DIAGNOSTIC_TEST:SIMPLE(diag=LATE_SWAP_AXIS): -target spirv -entry computeMain -stage compute -DLATE_SWAP_AXIS
+//DIAGNOSTIC_TEST:SIMPLE(diag=LATE_REDUCE_AXIS): -target spirv -entry computeMain -stage compute -DLATE_REDUCE_AXIS
+//DIAGNOSTIC_TEST:SIMPLE(diag=LATE_SWAP_SAME_AXIS): -target spirv -entry computeMain -stage compute -DLATE_SWAP_SAME_AXIS
 #lang slang 2026
 
 struct ShapeInfo<let each D : int>
