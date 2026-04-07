@@ -194,6 +194,20 @@ struct InliningPassBase
         return false;
     }
 
+    static IRInst* resolveLookups(IRInst* inst)
+    {
+        if (auto lookup = as<IRLookupWitnessMethod>(inst))
+        {
+            if (auto resolvedTable = as<IRWitnessTable>(resolveLookups(lookup->getWitnessTable())))
+            {
+                if (auto result = findWitnessTableEntry(resolvedTable, lookup->getRequirementKey()))
+                    return result;
+            }
+        }
+
+        return inst;
+    }
+
     /// Determine whether `call` can be inlined, and if so write information about it to
     /// `outCallSite`
     bool canInline(IRCall* call, CallSiteInfo& outCallSite)
@@ -204,7 +218,7 @@ struct InliningPassBase
 
         // Next we consider the callee.
         //
-        IRInst* callee = call->getCallee();
+        IRInst* callee = resolveLookups(call->getCallee());
 
         // If the callee is a `specialize` instruction, then we
         // want to look at what is being specialized instead.
@@ -740,6 +754,22 @@ struct InliningPassBase
                 ptrArgList.add(arg);
         }
 
+        if (debugInlineInfo.calleeDebugFunc && callSite.specialize)
+        {
+            auto debugFunc = as<IRDebugFunction>(debugInlineInfo.calleeDebugFunc);
+            auto newType = cloneInst(env, builder, debugFunc->getDebugType());
+            if (newType != debugFunc->getDebugType())
+            {
+                auto newDebugFunc = builder->emitDebugFunction(
+                    debugFunc->getName(),
+                    debugFunc->getLine(),
+                    debugFunc->getCol(),
+                    debugFunc->getFile(),
+                    newType);
+                debugInlineInfo.calleeDebugFunc = newDebugFunc;
+            }
+        }
+
         // If the callee consists of a single basic block *and* that block
         // ends with a `return` instruction, then we can apply a simple approach
         // to inlining that is compatible with any call site (including those
@@ -1159,7 +1189,32 @@ struct PreAutoDiffForceInliningPass : InliningPassBase
             info.callee->findDecoration<IRIntrinsicOpDecoration>())
             return true;
         bool hasForceInline = false;
-        bool hasUserDefinedDerivative = false;
+
+        // TODO: Need to come up with a better way to track functions that can be inlined
+        // pre-translation. Preferably this would be lowered as an associated attribute of the
+        // function (just like the differentiability of functions).
+        //
+        bool allowPreTranslationInlining = true;
+        traverseUsers<IRAnnotation>(
+            info.callee,
+            [&](IRAnnotation* annotation)
+            {
+                if (annotation->getTarget() == info.callee)
+                    allowPreTranslationInlining = false;
+            });
+
+        // If we're inlining a specialized version, then check the specialize inst,
+        // since that is what will have the annotations.
+        //
+        if (info.specialize)
+            traverseUsers<IRAnnotation>(
+                info.specialize,
+                [&](IRAnnotation* annotation)
+                {
+                    if (annotation->getTarget() == info.specialize)
+                        allowPreTranslationInlining = false;
+                });
+
         for (auto decor : info.callee->getDecorations())
         {
             switch (decor->getOp())
@@ -1170,16 +1225,15 @@ struct PreAutoDiffForceInliningPass : InliningPassBase
             case kIROp_ForceInlineDecoration:
                 hasForceInline = true;
                 break;
-            case kIROp_UserDefinedBackwardDerivativeDecoration:
-            case kIROp_ForwardDerivativeDecoration:
-                hasUserDefinedDerivative = true;
                 break;
             }
         }
-        if (!hasForceInline || hasUserDefinedDerivative)
+
+        if (!hasForceInline || !allowPreTranslationInlining)
         {
             return false;
         }
+
         if (auto result = m_funcCanInline.tryGetValue(info.callee))
             return *result;
         bool canInline = true;
@@ -1190,10 +1244,12 @@ struct PreAutoDiffForceInliningPass : InliningPassBase
                 switch (inst->getOp())
                 {
                 // Avoid inlining functions that have derivative instructions.
+                // TODO: Why?
                 case kIROp_ForwardDifferentiate:
                 case kIROp_BackwardDifferentiate:
                 case kIROp_BackwardDifferentiatePrimal:
                 case kIROp_BackwardDifferentiatePropagate:
+                case kIROp_BackwardRemat:
                     canInline = false;
                     goto end;
 
@@ -1301,6 +1357,7 @@ struct IntrinsicFunctionInliningPass : InliningPassBase
                 hasSpvAsm = true;
                 continue;
             case kIROp_Load:
+            case kIROp_LoadFromUninitializedMemory:
             case kIROp_Swizzle:
             case kIROp_Store:
                 continue;

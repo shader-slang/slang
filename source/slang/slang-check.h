@@ -42,4 +42,6 @@ OrderedDictionary<Type*, List<Type*>> getCanonicalGenericConstraints2(
 
 // General utility function to collect all referenced declarations from a value
 void collectReferencedDecls(Val* val, HashSet<Decl*>& outDecls);
+
+void registerAssociatedMethods(SemanticsVisitor* context, DeclRef<Decl> declRef);
 } // namespace Slang

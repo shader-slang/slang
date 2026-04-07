@@ -650,6 +650,11 @@ void SourceFile::setContents(ISlangBlob* blob)
     char const* decodedContentEnd = decodedContentBegin + decodedContentSize;
 
     m_content = UnownedStringSlice(decodedContentBegin, decodedContentEnd);
+
+    // Update m_contentSize to the decoded size so that getContentSize() always reflects the
+    // actual content length. For UTF-8 without BOM this is a no-op; for BOM or non-UTF-8 files,
+    // the decoded size may differ from the raw file size.
+    m_contentSize = decodedContentSize;
 }
 
 void SourceFile::setContents(const String& content)
