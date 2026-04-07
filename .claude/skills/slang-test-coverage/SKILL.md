@@ -279,7 +279,7 @@ See the `slang-test-development` skill for complete test templates, syntax refer
 cmake --preset default
 
 # Build if needed
-cmake --build --preset relwithdebinfo --target slangc slang-test
+cmake --build --preset releaseWithDebugInfo --target slangc slang-test
 
 # Run test
 ./build/RelWithDebInfo/bin/slang-test tests/path/to/test.slang

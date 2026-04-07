@@ -239,8 +239,8 @@ You are running in an isolated git worktree with your own branch.
 ## Project Context
 
 This is the Slang shading language compiler (C++). Key conventions:
-- Build: cmake --build --preset relwithdebinfo --target slangc slang-test >/dev/null 2>&1 || \
-    cmake --build --preset relwithdebinfo --target slangc slang-test
+- Build: cmake --build --preset releaseWithDebugInfo --target slangc slang-test >/dev/null 2>&1 || \
+    cmake --build --preset releaseWithDebugInfo --target slangc slang-test
 - Test: ./build/RelWithDebInfo/bin/slang-test tests/path/to/test.slang (run from repo root)
 - Format: ./extras/formatting.sh
 - Single-dash CLI options: -target spirv (not --target)
@@ -252,8 +252,8 @@ This is the Slang shading language compiler (C++). Key conventions:
 ### Step 0: Build (if needed)
 Check if ./build/RelWithDebInfo/bin/slang-test exists. If not, build:
   cmake --preset default
-  cmake --build --preset relwithdebinfo --target slangc slang-test >/dev/null 2>&1 || \
-    cmake --build --preset relwithdebinfo --target slangc slang-test
+  cmake --build --preset releaseWithDebugInfo --target slangc slang-test >/dev/null 2>&1 || \
+    cmake --build --preset releaseWithDebugInfo --target slangc slang-test
 
 ### Step 1: Write and validate tests
 For each test in the sub-plan:

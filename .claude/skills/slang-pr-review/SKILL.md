@@ -11,7 +11,7 @@ fixes the root cause optimally, addressing review feedback, and managing review 
 **Core Principle**: A good fix addresses the root cause, not symptoms. Evaluate each PR for
 long-term correctness and each review comment for actionability before acting.
 
-**Usage**: `/jv-slang-pr-review <pr-url-or-number>`
+**Usage**: `/slang-pr-review <pr-url-or-number>`
 
 Where `<pr-url-or-number>` is:
 - A PR URL (e.g., `https://github.com/shader-slang/slang/pull/10759`)
@@ -28,7 +28,7 @@ Collect all information about the PR, its linked issues, and review feedback in 
 ```bash
 # PR metadata, body, and reviews
 gh pr view <number> --repo shader-slang/slang \
-  --json title,body,state,headRefName,baseRefName,url
+  --json title,body,state,headRefName,baseRefName,url,isCrossRepository,headRepository,headRepositoryOwner
 
 # Review comments (inline code comments)
 gh api repos/shader-slang/slang/pulls/<number>/comments
@@ -72,11 +72,23 @@ gh issue view <number> --repo shader-slang/slang --json title,body,labels
 ### Step 4: Sync the Branch
 
 ```bash
+# Preferred: works for same-repo and fork-based PRs
+gh pr checkout <number>
+
+# Manual fallback if you need explicit control:
+# Same-repo PR
 git fetch origin <headRefName>
-git checkout <headRefName>
-# If already on the branch, ensure it's up to date
-git pull --rebase origin <headRefName>
+git checkout -B <headRefName> --track origin/<headRefName>
+
+# Fork-based PR
+git remote get-url pr-author >/dev/null 2>&1 || \
+  git remote add pr-author https://github.com/<headRepositoryOwner.login>/<headRepository.name>.git
+git fetch pr-author <headRefName>
+git checkout -B <headRefName> --track pr-author/<headRefName>
 ```
+
+If you add the fork remote manually, add it only once. Reuse the existing remote
+on later review iterations.
 
 ---
 
@@ -163,8 +175,8 @@ Address feedback in this order:
 If you switched from another branch, the binary may be stale:
 
 ```bash
-cmake --build --preset relwithdebinfo --target slang-test slangc \
-  >/dev/null 2>&1 || cmake --build --preset relwithdebinfo --target slang-test slangc
+cmake --build --preset releaseWithDebugInfo --target slang-test slangc \
+  >/dev/null 2>&1 || cmake --build --preset releaseWithDebugInfo --target slang-test slangc
 ```
 
 ### Step 2: Make Changes
@@ -202,14 +214,19 @@ Address review: <short description of what was fixed>
 <1-2 lines explaining what changed and why>
 EOF
 )"
-git push origin <branch-name>
+
+# If the branch already tracks the PR head remote, plain `git push` is enough
+git push
+
+# If the branch has no upstream yet, set it explicitly
+git push -u <head-remote> HEAD:<headRefName>
 ```
 
 If push is rejected (remote has new commits), rebase first:
 
 ```bash
-git pull --rebase origin <branch-name>
-git push origin <branch-name>
+git pull --rebase
+git push
 ```
 
 ---
