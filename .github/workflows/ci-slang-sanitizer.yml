@@ -22,6 +22,13 @@ jobs:
     permissions:
       id-token: write
       contents: read
+      packages: read
+
+    container:
+      image: ghcr.io/shader-slang/slang-linux-clang-ci:v1.0.0
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
 
     env:
       IS_FORK_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == true }}
@@ -53,18 +60,6 @@ jobs:
             echo "Not a PR event -- all sanitizer findings will be treated as errors"
             : > /tmp/pr-changed-files.txt
           fi
-
-      - name: Install Clang 18 and LLVM Tools
-        run: |
-          wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key \
-            | sudo gpg --dearmor -o /usr/share/keyrings/llvm.gpg
-          echo "deb [signed-by=/usr/share/keyrings/llvm.gpg] https://apt.llvm.org/jammy/ llvm-toolchain-jammy-18 main" \
-            | sudo tee /etc/apt/sources.list.d/llvm-18.list
-          sudo apt-get update
-          sudo apt-get install -y clang-18 llvm-18
-
-          clang-18 --version
-          clang++-18 --version
 
       - name: Authenticate to Google Cloud
         if: env.IS_FORK_PR != 'true'
