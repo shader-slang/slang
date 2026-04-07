@@ -846,6 +846,11 @@ struct SemanticsDeclTypeResolutionVisitor : public SemanticsDeclVisitorBase,
     void visitInheritanceDecl(InheritanceDecl* inheritanceDecl)
     {
         visitTypeExp(inheritanceDecl->base);
+        validateDynInterfaceUseWithInheritanceDecl(
+            this,
+            getSink(),
+            getOptionSet(),
+            inheritanceDecl);
     }
 
     void visitCallableDecl(CallableDecl* decl)
@@ -4527,7 +4532,7 @@ struct SemanticsDeclConformancesVisitor : public SemanticsDeclVisitorBase,
     }
 };
 
-// Check that types used as `Differential` type use themselves as their own `Differential` type.
+// Check that function extensions only conform to `[__FunctionInterface]` interfaces.
 struct SemanticsDeclFunctionConformancesVisitor
     : public SemanticsDeclVisitorBase,
       public DeclVisitor<SemanticsDeclFunctionConformancesVisitor>
@@ -4568,28 +4573,6 @@ struct SemanticsDeclFunctionConformancesVisitor
                 checkExtensionConformance(extensionDecl);
             }
         }
-    }
-};
-
-// Check that types used as `Differential` type use themselves as their own `Differential` type.
-struct SemanticsDeclDifferentialConformanceVisitor
-    : public SemanticsDeclVisitorBase,
-      public DeclVisitor<SemanticsDeclDifferentialConformanceVisitor>
-{
-    SemanticsDeclDifferentialConformanceVisitor(SemanticsContext const& outer)
-        : SemanticsDeclVisitorBase(outer)
-    {
-    }
-    void visitDecl(Decl*) {}
-    void visitDeclGroup(DeclGroup*) {}
-
-    void visitInheritanceDecl(InheritanceDecl* inheritanceDecl)
-    {
-        validateDynInterfaceUseWithInheritanceDecl(
-            this,
-            getSink(),
-            getOptionSet(),
-            inheritanceDecl);
     }
 };
 
@@ -15638,7 +15621,6 @@ static void _dispatchDeclCheckingVisitor(Decl* decl, DeclCheckState state, Seman
 
     case DeclCheckState::TypesFullyResolved:
         SemanticsDeclTypeResolutionVisitor(shared).dispatch(decl);
-        SemanticsDeclDifferentialConformanceVisitor(shared).dispatch(decl);
         SemanticsDeclFunctionConformancesVisitor(shared).dispatch(decl);
         break;
 
