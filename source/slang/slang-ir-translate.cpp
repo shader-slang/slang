@@ -409,22 +409,19 @@ IRInst* _resolveInstRec(TranslationContext* ctx, IRInst* inst)
 
                 if (specResult)
                 {
+                    // Specialization may have opened up some specialization opportunities.
+
                     applySparseConditionalConstantPropagation(
                         specResult,
                         ctx->getTargetProgram(),
                         ctx->getSink());
 
-                    if (auto specializedFunc = as<IRGlobalValueWithCode>(specResult))
-                    {
-                        if (!unrollLoopsInFunc(
-                                ctx->getTargetProgram(),
-                                ctx->getModule(),
-                                specializedFunc,
-                                ctx->getSink()))
-                        {
+                    if (!unrollLoopsInFunc(
+                            ctx->getTargetProgram(),
+                            ctx->getModule(),
+                            cast<IRGlobalValueWithCode>(specResult),
+                            ctx->getSink()))
                             return nullptr;
-                        }
-                    }
 
                     specInst->replaceUsesWith(specResult);
                 }
