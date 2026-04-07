@@ -1389,7 +1389,7 @@ Type* getParamTypeWithModeWrapper(
     }
 }
 
-void Module::_collectShaderParams()
+void Module::_collectShaderParams(DiagnosticSink* sink)
 {
     // We are going to walk the global declarations in the body of the
     // module, and use those to build up our lists of:
@@ -1454,7 +1454,7 @@ void Module::_collectShaderParams()
                         shaderParamInfo,
                         m_specializationParams,
                         makeDeclRef(globalVar),
-                        nullptr))
+                        sink))
                 {
                     return;
                 }
@@ -1670,10 +1670,10 @@ RefPtr<ComponentType> createUnspecializedGlobalComponentType(FrontEndCompileRequ
                 Diagnostics::InvalidTypeConformanceOptionString{.option = stringValue});
             continue;
         }
-        auto concreteType = globalComponentType->getTypeFromString(
-            String(typeName).getBuffer(),
-            compileRequest->getSink());
-        if (!concreteType)
+        DiagnosticSink typeLookupSink(linkage->getSourceManager(), nullptr);
+        auto concreteType =
+            globalComponentType->getTypeFromString(String(typeName).getBuffer(), &typeLookupSink);
+        if (!concreteType || as<ErrorType>(concreteType))
         {
             compileRequest->getSink()->diagnose(Diagnostics::InvalidTypeConformanceOptionNoType{
                 .option = stringValue,
@@ -1682,8 +1682,8 @@ RefPtr<ComponentType> createUnspecializedGlobalComponentType(FrontEndCompileRequ
         }
         auto interfaceType = globalComponentType->getTypeFromString(
             String(interfaceName).getBuffer(),
-            compileRequest->getSink());
-        if (!interfaceType)
+            &typeLookupSink);
+        if (!interfaceType || as<ErrorType>(interfaceType))
         {
             compileRequest->getSink()->diagnose(Diagnostics::InvalidTypeConformanceOptionNoType{
                 .option = stringValue,

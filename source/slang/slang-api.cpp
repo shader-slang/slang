@@ -283,6 +283,7 @@ SLANG_API void slang_shutdown()
     Slang::SPIRVCoreGrammarInfo::freeEmbeddedGrammerInfo();
     Slang::RttiInfo::deallocateAll();
     Slang::freeCapabilityDefs();
+    SlangRecord::ReplayContext::get().resetHandlers();
 }
 
 SLANG_API void slang_enableRecordLayer(bool enable)
@@ -1101,7 +1102,7 @@ SLANG_EXTERN_C SLANG_API slang::IModule* slang_loadModuleFromSource(
 
     // Create a blob from the source data using the slang_createBlob function.
     Slang::ComPtr<ISlangBlob> sourceBlob;
-    sourceBlob = slang_createBlob(source, sourceSize);
+    sourceBlob.attach(slang_createBlob(source, sourceSize));
     if (!sourceBlob)
         return nullptr;
 
@@ -1122,7 +1123,7 @@ SLANG_EXTERN_C SLANG_API slang::IModule* slang_loadModuleFromIRBlob(
 
     // Create a blob from the source data using the slang_createBlob function.
     Slang::ComPtr<ISlangBlob> sourceBlob;
-    sourceBlob = slang_createBlob(source, sourceSize);
+    sourceBlob.attach(slang_createBlob(source, sourceSize));
     if (!sourceBlob)
         return nullptr;
 
@@ -1143,7 +1144,7 @@ SLANG_EXTERN_C SLANG_API SlangResult slang_loadModuleInfoFromIRBlob(
 
     // Create a blob from the source data using the slang_createBlob function.
     Slang::ComPtr<ISlangBlob> sourceBlob;
-    sourceBlob = slang_createBlob(source, sourceSize);
+    sourceBlob.attach(slang_createBlob(source, sourceSize));
     if (!sourceBlob)
         return SLANG_E_INVALID_ARG;
 

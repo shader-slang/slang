@@ -40,13 +40,18 @@ runs:
 
         echo "🔍 Checking for LLVM prebuilt: ${GCS_PATH}"
 
-        # Try with gcloud first (works if authenticated), fall back to curl for public access
-        if gcloud storage ls "${GCS_PATH}" 2>/dev/null; then
-          echo "✅ Found LLVM prebuilt in GCS (authenticated access), downloading..."
+        # Remove any stale partial download from a previous run (self-hosted
+        # runners persist /tmp between runs).
+        rm -f /tmp/llvm-prebuilt.tar.gz
+
+        # Prefer curl for downloads — the bucket is publicly readable and curl
+        # is simpler and more reliable than gcloud storage cp (which has
+        # resumable transfer tracker issues on self-hosted Windows runners).
+        if curl -fL --retry 3 --retry-delay 5 -o /tmp/llvm-prebuilt.tar.gz "${PUBLIC_URL}"; then
+          echo "✅ Downloaded LLVM prebuilt via curl"
+        elif gcloud storage ls "${GCS_PATH}" 2>/dev/null; then
+          echo "⚠️  curl failed, falling back to gcloud..."
           gcloud storage cp "${GCS_PATH}" /tmp/llvm-prebuilt.tar.gz
-        elif curl -f -s -I "${PUBLIC_URL}" >/dev/null 2>&1; then
-          echo "✅ Found LLVM prebuilt in GCS (public access), downloading..."
-          curl -fL --retry 3 --retry-delay 5 -o /tmp/llvm-prebuilt.tar.gz "${PUBLIC_URL}"
         else
           echo "⚠️  LLVM prebuilt not found in GCS"
           echo "cache-hit=false" >> $GITHUB_OUTPUT

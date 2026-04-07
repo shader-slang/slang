@@ -5,6 +5,7 @@ namespace Slang
 {
 struct IRModule;
 struct IRInst;
+struct IRFunc;
 struct IRSpecialize;
 struct SpecializationContext;
 class DiagnosticSink;
@@ -32,10 +33,5 @@ void finalizeSpecialization(IRModule* module);
 
 IRInst* specializeGeneric(SpecializationContext* context, IRSpecialize* specInst);
 IRInst* specializeGeneric(IRSpecialize* specInst);
-
-// Specialize a generic with one or more arguments that are collections rather
-// than single concrete values.
-//
-IRInst* specializeDynamicGeneric(IRSpecialize* specializeInst);
 
 } // namespace Slang

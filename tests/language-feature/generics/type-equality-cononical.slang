@@ -80,7 +80,7 @@ void main()
     test(t);
 }
 
-// CHECK-NOT: 30402
+// CHECK-NOT: 30406
 // CHECK-NOT: 30404
 // CHECK-NOT: 30405
 
