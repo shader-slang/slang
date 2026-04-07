@@ -6,10 +6,6 @@
 struct BadDiff : IDifferentiable
 {
     typealias Differential = float;
-
-    static Differential dzero() { return 0.0; }
-    static Differential dadd(Differential a, Differential b) { return a + b; }
-    static Differential dmul(float a, Differential b) { return a * b; }
 }
 
 struct MyType : IDifferentiable
@@ -19,8 +15,4 @@ struct MyType : IDifferentiable
     float val;
 
     typealias Differential = BadDiff;
-
-    static BadDiff dzero() { return {}; }
-    static BadDiff dadd(BadDiff a, BadDiff b) { return a; }
-    static BadDiff dmul(float a, BadDiff b) { return b; }
 }
