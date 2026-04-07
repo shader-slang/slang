@@ -22,3 +22,14 @@ void test()
     //CHECK: expected an expression of type 'test..This', got 'test..This'
     //CHECK: the concrete 'This' type identity is lost after type erasure into interface type 'ISelfOp'; consider using a generic function with a type constraint instead
 }
+
+// Negative test: a regular type mismatch (not ExtractExistentialType on both sides)
+// should NOT produce the E30021 erasure note. The exhaustive checker ensures no
+// extra diagnostics appear beyond those annotated here.
+void testNoErasureNote()
+{
+    ISelfOp obj = Impl(5.0);
+    int x = obj.clone();
+    //CHECK: type mismatch
+    //CHECK: expected an expression of type 'int', got 'testNoErasureNote...This'
+}
