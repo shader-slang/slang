@@ -6348,10 +6348,19 @@ struct TypeFlowSpecializationContext
             }
             else if (auto specCallee = as<IRSpecialize>(callee))
             {
-                // The callee is an IRSpecialize with set-tag-typed args that is NOT
-                // a set-specialized generic. This happens when an existential type
-                // flows into an unconstrained generic (no interface constraint), so
-                // the typeflow pass cannot generate dispatch code. Emit E33180.
+                // The callee is an IRSpecialize whose args lack IRSetBase elements
+                // (isSetSpecializedGeneric returned false), meaning the generic has
+                // no interface constraint — an existential type flowed into an
+                // unconstrained generic, so dispatch code cannot be generated.
+                //
+                // Note: isInvalidExistentialSpecialization is not applicable here.
+                // It checks pre-typeflow representations (ExtractExistentialType,
+                // InterfaceType, etc.), but by this point the typeflow pass has
+                // transformed existential args into set-tag ops (e.g.,
+                // GetTagFromTaggedUnion with IRSetTagType). The code structure
+                // itself provides the guard: only unconstrained-generic callees
+                // that escaped both the dispatch-action and set-specialized-generic
+                // paths reach this branch.
                 emitExistentialSpecializationDiagnostic(specCallee, inst->sourceLoc, inst);
                 module->getContainerPool().free(&callArgs);
                 return false;
@@ -7630,6 +7639,14 @@ struct TypeFlowSpecializationContext
         if (sink->getErrorCount() > errorsBefore)
         {
             // If there were errors during propagation, we bail out early.
+            return false;
+        }
+
+        if (sink->getErrorCount() > 0)
+        {
+            // Pre-existing errors from earlier passes: propagation (read-only) ran
+            // to collect its own diagnostics, but don't mutate IR in the lowering
+            // phase when the module is already known-invalid.
             return false;
         }
 
