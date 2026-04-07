@@ -2509,7 +2509,27 @@ protected:
         if (!info.permittedTypes.getCount())
             return;
 
-        builder.addTargetSystemValueDecoration(var, info.systemValueName.getUnownedSlice());
+        auto sysValName = info.systemValueName;
+        if (info.systemValueNameEnum == SystemValueSemanticName::Target)
+        {
+            if (auto varLayout = findVarLayout(var))
+            {
+                if (auto offsetAttr =
+                        varLayout->findOffsetAttr(LayoutResourceKind::VaryingOutput))
+                {
+                    UInt colorIndex = offsetAttr->getOffset();
+                    UInt dualSrcIndex = offsetAttr->getSpace();
+                    StringBuilder sb;
+                    sb << "color(" << colorIndex << ")";
+                    if (dualSrcIndex != 0)
+                    {
+                        sb << ", index(" << dualSrcIndex << ")";
+                    }
+                    sysValName = sb.produceString();
+                }
+            }
+        }
+        builder.addTargetSystemValueDecoration(var, sysValName.getUnownedSlice());
 
         bool varTypeIsPermitted = false;
         for (auto& permittedType : info.permittedTypes)
@@ -3006,9 +3026,31 @@ private:
                     }
                     else
                     {
+                        auto sysValName = sysValInfo.systemValueName;
+                        if (sysValInfo.systemValueNameEnum == SystemValueSemanticName::Target &&
+                            typeLayout)
+                        {
+                            auto fieldLayout = typeLayout->getFieldLayout(index);
+                            if (fieldLayout)
+                            {
+                                if (auto offsetAttr =
+                                        fieldLayout->findOffsetAttr(LayoutResourceKind::VaryingOutput))
+                                {
+                                    UInt colorIndex = offsetAttr->getOffset();
+                                    UInt dualSrcIndex = offsetAttr->getSpace();
+                                    StringBuilder sb;
+                                    sb << "color(" << colorIndex << ")";
+                                    if (dualSrcIndex != 0)
+                                    {
+                                        sb << ", index(" << dualSrcIndex << ")";
+                                    }
+                                    sysValName = sb.produceString();
+                                }
+                            }
+                        }
                         builder.addTargetSystemValueDecoration(
                             key,
-                            sysValInfo.systemValueName.getUnownedSlice());
+                            sysValName.getUnownedSlice());
                         semanticDecor->removeAndDeallocate();
                     }
                 }
