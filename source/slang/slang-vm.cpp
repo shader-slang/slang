@@ -47,7 +47,8 @@ SlangResult ByteCodeInterpreter::prepareModuleForExecution()
         exeFunc.m_parameterOffsets.add(func.header->parameterSizeInBytes);
 
         // Copy the code into the executable function buffer
-        memcpy(exeFunc.m_codeBuffer.getBuffer(), func.functionCode, func.header->codeSize);
+        if (func.header->codeSize)
+            memcpy(exeFunc.m_codeBuffer.getBuffer(), func.functionCode, func.header->codeSize);
 
         // Replace the instruction headers with function pointers
         for (auto inst : exeFunc)

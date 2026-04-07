@@ -36,8 +36,6 @@ struct RawExistential
 void serialize(IFoo foo, RWStructuredBuffer<uint> buf, int baseSlot)
 {
     RawExistential raw = bit_cast<RawExistential>(foo);
-//CHECK:                                         ^ bit_cast size mismatch
-//CHECK:                                         ^ invalid to bit_cast differently sized types
     for (int i = 0; i < kRawUints; i++)
         buf[baseSlot + i] = raw.data[i];
 }
@@ -47,10 +45,8 @@ IFoo deserialize(RWStructuredBuffer<uint> buf, int baseSlot)
     RawExistential raw;
     for (int i = 0; i < kRawUints; i++)
         raw.data[i] = buf[baseSlot + i];
-    // This cast would also fail, but the compiler bails out after the first
-    // error in serialize() so no second diagnostic is emitted today.  A partial
-    // fix to #10221 or #10222 could change that; add a CHECK here when it does.
     return bit_cast<IFoo>(raw);
+//CHECK:                 ^ cannot bit-cast to existential (non-concrete) type
 }
 
 RWStructuredBuffer<float> outputBuffer;

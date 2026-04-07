@@ -7,6 +7,19 @@ struct MyPtr : IDifferentiablePtrType
 {
     typealias Differential = MyPtr;
     uint offset;
+
+    [ForwardDerivative(fwd_init)]
+    __init(uint x)
+    {
+        offset = x;
+    }
+
+    static DifferentialPtrPair<MyPtr> fwd_init(uint x)
+    {
+        MyPtr primal = MyPtr(x);
+        MyPtr diff = MyPtr(x);
+        return DifferentialPtrPair<MyPtr>(primal, diff);
+    }
 }
 
 // This function has both an IDifferentiablePtrType output (inout MyPtr)
@@ -32,9 +45,11 @@ float caller(float x)
     return r;
 }
 
+RWStructuredBuffer<float> outputBuffer;
+
 [shader("compute")]
 [numthreads(1, 1, 1)]
 void computeMain()
 {
-    fwd_diff(caller)(diffPair(1.0, 1.0));
+    outputBuffer[0] = fwd_diff(caller)(diffPair(1.0, 1.0)).d;
 }

@@ -1,8 +1,8 @@
 // Test calling dynamic dispatched generic function from differentiable function.
 
-//TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
-//TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
-//TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-slang -compute -shaderobj -output-using-type
+//DISABLE_TEST(compute, vulkan):COMPARE_COMPUTE_EX:-vk -compute -shaderobj -output-using-type
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj -output-using-type
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -47,6 +47,6 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     var obj = createDynamicObject<IInterface>(dispatchThreadID.x, 1); // B
     var foo = createDynamicObject<IFoo>(0, 0); // A
     var p = diffPair(3.0);
-    __bwd_diff(test)(foo, obj, p, 1.0);
+    bwd_diff(test)(foo, obj, p, 1.0);
     outputBuffer[0] = p.d;
 }

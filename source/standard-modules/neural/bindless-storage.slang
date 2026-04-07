@@ -8,7 +8,7 @@ public struct BindlessAddress<T> : IPointerLikeAddress<T>
     where T : __BuiltinFloatingPointType
     where T.Differential == T
 {
-    public typealias Differential = BindlessAddress<T.Differential>;
+    public typealias Differential = BindlessAddress<T>;
 
     internal RWStructuredBuffer<T>.Handle handle;
     internal uint baseIndex;
@@ -77,7 +77,6 @@ public struct BindlessAddress<T> : IPointerLikeAddress<T>
         }
     }
 
-    [Differentiable]
     [ForwardDerivative(fwd_getOffset)]
     public This getOffset(int elements)
     {
@@ -120,7 +119,7 @@ public struct PointerAddress<T> : IPointerLikeAddress<T>
     where T : __BuiltinFloatingPointType
     where T.Differential == T
 {
-    public typealias Differential = PointerAddress<T.Differential>;
+    public typealias Differential = PointerAddress<T>;
 
     T* ptr;
 
@@ -138,7 +137,6 @@ public struct PointerAddress<T> : IPointerLikeAddress<T>
         set { ptr[index] = newValue; }
     }
 
-    [Differentiable]
     [ForwardDerivative(fwd_getOffset)]
     public This getOffset(int elements)
     {
@@ -229,7 +227,7 @@ public struct TorchTensorViewAddress<T> : IPointerLikeAddress<T>
     where T : __BuiltinFloatingPointType
     where T.Differential == T
 {
-    public typealias Differential = TorchTensorViewAddress<T.Differential>;
+    public typealias Differential = TorchTensorViewAddress<T>;
 
     internal PointerAddress<T> inner;
 
@@ -247,7 +245,6 @@ public struct TorchTensorViewAddress<T> : IPointerLikeAddress<T>
     }
 
     [require(cuda)]
-    [Differentiable]
     [ForwardDerivative(fwd_getOffset)]
     public This getOffset(int elements)
     {
@@ -311,7 +308,7 @@ internal extension<T> Ptr<T, Access.ReadWrite, AddressSpace.Device> : IPointerLi
     where T : __BuiltinFloatingPointType
     where T.Differential == T
 {
-    internal typealias Differential = Ptr<T.Differential, Access.ReadWrite, AddressSpace.Device>;
+    internal typealias Differential = Ptr<T, Access.ReadWrite, AddressSpace.Device>;
 
     internal __init(Ptr<T, Access.ReadWrite, AddressSpace.Device> ptr)
     {
@@ -327,7 +324,6 @@ internal extension<T> Ptr<T, Access.ReadWrite, AddressSpace.Device> : IPointerLi
         set { this[index] = newValue; }
     }
 
-    [Differentiable]
     [ForwardDerivative(fwd_getOffset)]
     internal This getOffset(int elements)
     {
