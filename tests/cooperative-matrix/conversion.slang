@@ -1,13 +1,25 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -emit-spirv-directly -output-using-type
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK_BAB):-vk -emit-spirv-directly -Xslang -DBAB
 
-// CHECK: type: float
-// CHECK-NEXT: 2.000000
+//DISABLE_TEST(compute):SIMPLE(filecheck=DXIL):-target dxil -profile cs_6_10 -entry computeMain -Xdxc -Ibuild/dxc/include -DBAB
+//DXIL: result code = 0
+
+// CHECK: 2.000000
 // CHECK-NEXT: 4.000000
 // CHECK-NEXT: 6.000000
 // CHECK-NEXT: 8.000000
 
+// CHECK_BAB: 40000000
+// CHECK_BAB-NEXT: 40800000
+// CHECK_BAB-NEXT: 40C00000
+// CHECK_BAB-NEXT: 41000000
+
 //TEST_INPUT:ubuffer(data=[0 0 0 0], stride=4, count=256):out,name=outputBuffer
+#if defined(BAB)
+RWByteAddressBuffer outputBuffer;
+#else
 RWStructuredBuffer<float> outputBuffer;
+#endif
 
 //TEST_INPUT:ubuffer(data=[1 2 3 4], stride=4, count=256),name=input
 ByteAddressBuffer input;

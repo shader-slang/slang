@@ -965,7 +965,11 @@ StatementSet collectImplications(
 
         HashSet<IRBlock*> uniquePredecessors;
         for (auto predecessor : current->getPredecessors())
-            uniquePredecessors.add(predecessor);
+            if (!predecessor
+                     ->getTerminator() // TODO: This is a workaround for AD 2.0 (remove when
+                                       // possible)
+                     ->findDecoration<IRBackwardDerivativePrimalReturnDecoration>())
+                uniquePredecessors.add(predecessor);
 
         for (auto predecessor : uniquePredecessors)
         {

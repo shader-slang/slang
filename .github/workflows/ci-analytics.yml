@@ -26,12 +26,18 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Incremental update: fetch new data and merge with existing
-          if [ -f ci_analytics_repo/ci_jobs.json ]; then
-            cp ci_analytics_repo/ci_jobs.json /tmp/ci_jobs.json
+          mkdir -p /tmp/ci_data
+          # Copy existing monthly files
+          cp ci_analytics_repo/ci_jobs_*.json /tmp/ci_data/ 2>/dev/null || true
+          # Migrate legacy single file if monthly files don't exist yet
+          if [ -f ci_analytics_repo/ci_jobs.json ] && ! ls /tmp/ci_data/ci_jobs_*.json 1>/dev/null 2>&1; then
+            python3 extras/ci/analytics/ci_job_collector.py \
+              --migrate ci_analytics_repo/ci_jobs.json \
+              --output-dir /tmp/ci_data \
+              --verbose
           fi
           python3 extras/ci/analytics/ci_job_collector.py \
-            --output /tmp/ci_jobs.json \
+            --output-dir /tmp/ci_data \
             --workflow CI \
             --verbose
 
@@ -49,7 +55,7 @@ jobs:
       - name: Generate visualizations
         run: |
           python3 extras/ci/analytics/ci_visualization.py \
-            --input /tmp/ci_jobs.json \
+            --input-dir /tmp/ci_data \
             --pr-input /tmp/pr_merges.json \
             --output ci_analytics_repo
 
@@ -61,10 +67,14 @@ jobs:
       - name: Push to analytics repo
         run: |
           cd ci_analytics_repo
-          # Copy updated data files
-          cp /tmp/ci_jobs.json ci_jobs.json
+          # Copy updated monthly data files
+          cp /tmp/ci_data/ci_jobs_*.json . 2>/dev/null || true
           if [ -f /tmp/pr_merges.json ]; then
             cp /tmp/pr_merges.json pr_merges.json
+          fi
+          # Remove legacy single file after migration
+          if [ -f ci_jobs.json ] && ls ci_jobs_*.json 1>/dev/null 2>&1; then
+            git rm ci_jobs.json 2>/dev/null || rm -f ci_jobs.json
           fi
 
           git config user.name "github-actions[bot]"
