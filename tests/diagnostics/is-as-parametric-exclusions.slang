@@ -24,12 +24,14 @@ bool testGenericParam<T>(T val)
 {
     return val is Dog;
 }
+//CHECK-NOT: unrelated concrete types
 
 // Nested generic arg - should NOT trigger E30303
 bool testNestedGeneric<T>(Box<T> box)
 {
     return box is Box<Dog>;
 }
+//CHECK-NOT: unrelated concrete types
 
 // Unrelated concrete types - SHOULD trigger E30303
 void testConcreteMismatch()

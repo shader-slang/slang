@@ -6371,7 +6371,8 @@ Expr* SemanticsExprVisitor::visitIsTypeExpr(IsTypeExpr* expr)
     // Note: _isTypeParametric only handles DeclRefType-based types (incl. recursive generic args).
     // Builtin composite types like arrays or vectors with embedded generic params are not checked,
     // but these are unlikely to appear in `is`/`as` expressions in practice.
-    if (!isInterfaceType(valueType) && !_isTypeParametric(valueType) &&
+    if (!as<ErrorType>(valueType) && !as<ErrorType>(expr->typeExpr.type) &&
+        !isInterfaceType(valueType) && !_isTypeParametric(valueType) &&
         !_isTypeParametric(expr->typeExpr.type))
     {
         getSink()->diagnose(Diagnostics::IsAsOnUnrelatedConcreteTypes{.expr = expr});
@@ -6428,7 +6429,8 @@ Expr* SemanticsExprVisitor::visitAsTypeExpr(AsTypeExpr* expr)
     // (not generic type parameters, associated types, or ThisType), the `as` cast always
     // fails and the user is using `as` incorrectly on unrelated concrete types.
     auto asValueType = expr->value->type.type;
-    if (!isInterfaceType(asValueType) && !_isTypeParametric(asValueType) &&
+    if (!as<ErrorType>(asValueType) && !as<ErrorType>(typeExpr.type) &&
+        !isInterfaceType(asValueType) && !_isTypeParametric(asValueType) &&
         !_isTypeParametric(typeExpr.type))
     {
         getSink()->diagnose(Diagnostics::IsAsOnUnrelatedConcreteTypes{.expr = expr});
