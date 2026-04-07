@@ -409,7 +409,7 @@ IRInst* _resolveInstRec(TranslationContext* ctx, IRInst* inst)
 
                 if (specResult)
                 {
-                    // Specialization may have opened up some specialization opportunities.
+                    // Specialization may have opened up some simplification opportunities.
 
                     applySparseConditionalConstantPropagation(
                         specResult,
