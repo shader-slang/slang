@@ -1,4 +1,4 @@
-//DIAGNOSTIC_TEST:SIMPLE(diag=diag): -target spirv
+//DIAGNOSTIC_TEST:SIMPLE(diag=diag):
 
 interface IMyInterface
 {
@@ -61,9 +61,15 @@ void main()
     bool isTest2 = (other is AnotherType);
     bool isTest3 = (ConcreteImpl is ConcreteImpl);
     bool isTest4 = (AnotherType is ConcreteImpl);
+//diag:                         ^^ 'is'/'as' operator requires interface-typed expression
+//diag:                         ^^ 'is'/'as' operator requires an interface-typed expression.
 
     // Test as operator directly
     let asTest1 = impl as AnotherType;
+//diag:                ^^ 'is'/'as' operator requires interface-typed expression
+//diag:                ^^ 'is'/'as' operator requires an interface-typed expression.
     let asTest2 = other as ConcreteImpl;
+//diag:                 ^^ 'is'/'as' operator requires interface-typed expression
+//diag:                 ^^ 'is'/'as' operator requires an interface-typed expression.
     let asTest3 = impl as ConcreteImpl;
 }
