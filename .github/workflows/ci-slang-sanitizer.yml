@@ -164,6 +164,26 @@ jobs:
           path: /tmp/.cache/sccache
           key: sccache-linux-clang-18-x86_64-asan-${{ github.sha }}
 
+      - name: Verify sanitizer runtime is active
+        if: steps.build.outcome == 'success'
+        run: |
+          # Build and run a small program with a known ASan error to confirm
+          # the sanitizer runtime is loaded and producing log files.
+          cat > /tmp/asan-canary.c << 'CANARY'
+          #include <stdlib.h>
+          int main(void) { volatile int *p = (int*)malloc(sizeof(int)); free((void*)p); return *p; }
+          CANARY
+          export ASAN_OPTIONS="log_path=/tmp/canary"
+          clang-18 -fsanitize=address -O0 /tmp/asan-canary.c -o /tmp/asan-canary
+          /tmp/asan-canary || true
+          if ls /tmp/canary.* 1>/dev/null 2>&1; then
+            echo "Sanitizer runtime verified: log files produced"
+          else
+            echo "::error::Sanitizer canary failed — ASan runtime did not produce log files"
+            exit 1
+          fi
+          rm -f /tmp/canary.* /tmp/asan-canary /tmp/asan-canary.c
+
       - name: Run Tests with Sanitizers
         if: steps.build.outcome == 'success'
         env:

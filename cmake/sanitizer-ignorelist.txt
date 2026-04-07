@@ -17,8 +17,9 @@ type:*IDownstreamCompiler*
 # positives (e.g. IDownstreamCompiler from LLVMDownstreamCompilerUtil).
 # NOTE: This is broad (covers all COM objects). UBSan checks the base type at
 # the addRef() call site, so suppressing only derived interfaces is not enough.
-# TODO: Narrow this to src:-scoped suppressions or a smaller set of concrete
-# call sites once we can characterize the slang-llvm boundary more precisely.
+# TODO(#10754): Narrow this to src:-scoped suppressions or a smaller set of
+# concrete call sites once we can characterize the slang-llvm boundary more
+# precisely.
 type:*ISlangUnknown*
 type:*ISlangCastable*
 type:*ISlangSharedLibrary*
