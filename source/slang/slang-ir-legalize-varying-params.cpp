@@ -2365,6 +2365,21 @@ void depointerizeInputParams(IRFunc* entryPointFunc)
 }
 
 
+// Build the Metal color attribute string for fragment outputs.
+// For dual-source blending, the VaryingOutput layout encodes the color
+// attachment index in `offset` (from vk::location) and the blend source
+// index in `space` (from vk::index).
+String buildMetalColorAttribute(UInt colorIndex, UInt dualSrcIndex)
+{
+    StringBuilder sb;
+    sb << "color(" << colorIndex << ")";
+    if (dualSrcIndex != 0)
+    {
+        sb << ", index(" << dualSrcIndex << ")";
+    }
+    return sb.produceString();
+}
+
 class LegalizeShaderEntryPointContext
 {
 public:
@@ -2510,6 +2525,8 @@ protected:
             return;
 
         auto sysValName = info.systemValueName;
+        // Override the color attribute when the layout carries dual-source
+        // blending information (vk::location + vk::index).
         if (info.systemValueNameEnum == SystemValueSemanticName::Target)
         {
             if (auto varLayout = findVarLayout(var))
@@ -2517,15 +2534,7 @@ protected:
                 if (auto offsetAttr =
                         varLayout->findOffsetAttr(LayoutResourceKind::VaryingOutput))
                 {
-                    UInt colorIndex = offsetAttr->getOffset();
-                    UInt dualSrcIndex = offsetAttr->getSpace();
-                    StringBuilder sb;
-                    sb << "color(" << colorIndex << ")";
-                    if (dualSrcIndex != 0)
-                    {
-                        sb << ", index(" << dualSrcIndex << ")";
-                    }
-                    sysValName = sb.produceString();
+                    sysValName = buildMetalColorAttribute(offsetAttr->getOffset(), offsetAttr->getSpace());
                 }
             }
         }
@@ -3027,6 +3036,8 @@ private:
                     else
                     {
                         auto sysValName = sysValInfo.systemValueName;
+                        // Override the color attribute when the layout carries
+                        // dual-source blending information.
                         if (sysValInfo.systemValueNameEnum == SystemValueSemanticName::Target &&
                             typeLayout)
                         {
@@ -3036,15 +3047,7 @@ private:
                                 if (auto offsetAttr =
                                         fieldLayout->findOffsetAttr(LayoutResourceKind::VaryingOutput))
                                 {
-                                    UInt colorIndex = offsetAttr->getOffset();
-                                    UInt dualSrcIndex = offsetAttr->getSpace();
-                                    StringBuilder sb;
-                                    sb << "color(" << colorIndex << ")";
-                                    if (dualSrcIndex != 0)
-                                    {
-                                        sb << ", index(" << dualSrcIndex << ")";
-                                    }
-                                    sysValName = sb.produceString();
+                                    sysValName = buildMetalColorAttribute(offsetAttr->getOffset(), offsetAttr->getSpace());
                                 }
                             }
                         }
