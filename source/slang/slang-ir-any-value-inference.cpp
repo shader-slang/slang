@@ -299,6 +299,10 @@ void diagnoseCircularConformances(IRModule* module, DiagnosticSink* sink)
 
 // inferAnyValueSizeWhereNecessary only runs when diagnoseCircularConformances
 // has not reported errors, so circular conformances never reach this point.
+// Note: we rebuild InterfaceDependencyAnalysis here rather than threading it
+// from diagnoseCircularConformances because the two functions run at different
+// pipeline stages and the cost is O(interfaces + witness_tables), which is
+// negligible for realistic shader sizes.
 void inferAnyValueSizeWhereNecessary(
     IRModule* module,
     TargetProgram* targetProgram,
@@ -310,20 +314,15 @@ void inferAnyValueSizeWhereNecessary(
     if (analysis.interfaceTypes.getCount() == 0)
         return;
 
-    // Check for issue #9835: If ALL implementations are self-referential,
-    // there's no base case and AnyValue size cannot be calculated.
-    HashSet<IRInterfaceType*> fullyCircularInterfaces;
+    // Verify the invariant: diagnoseCircularConformances must have already
+    // caught any fully-circular interfaces (where all impls are self-referential).
+    // If this fires, the pipeline ordering has changed and circular conformances
+    // are reaching size inference.
     for (auto interfaceType : analysis.interfaceTypes)
     {
         auto& selfRefList = analysis.selfReferentialImpls[interfaceType];
         auto& nonSelfRefList = analysis.nonSelfReferentialImpls[interfaceType];
-        if (nonSelfRefList.getCount() == 0 && selfRefList.getCount() > 0)
-        {
-            sink->diagnose(Diagnostics::CyclicInterfaceDependency{
-                .interfaceType = interfaceType,
-            });
-            fullyCircularInterfaces.add(interfaceType);
-        }
+        SLANG_ASSERT(!(nonSelfRefList.getCount() == 0 && selfRefList.getCount() > 0));
     }
 
     // Sort the interface types in topological order.
@@ -337,11 +336,6 @@ void inferAnyValueSizeWhereNecessary(
 
     for (auto interfaceType : sortedInterfaceTypes)
     {
-        // Skip interfaces where all impls are circular — size inference is impossible
-        // and we already emitted CyclicInterfaceDependency.
-        if (fullyCircularInterfaces.contains(interfaceType))
-            continue;
-
         IRIntegerValue existingMaxSize = (IRIntegerValue)kMaxInt; // Default to max int.
         if (auto existingAnyValueDecor = interfaceType->findDecoration<IRAnyValueSizeDecoration>())
         {
