@@ -1,6 +1,7 @@
 #include "slang-ir-translate.h"
 
 #include "slang-ir-insts.h"
+#include "slang-ir-loop-unroll.h"
 #include "slang-ir-sccp.h"
 #include "slang-ir-typeflow-specialize.h"
 #include "slang-ir-util.h"
@@ -408,11 +409,22 @@ IRInst* _resolveInstRec(TranslationContext* ctx, IRInst* inst)
 
                 if (specResult)
                 {
-                    // TODO: We might need to do other things like loop-unrolling...
                     applySparseConditionalConstantPropagation(
                         specResult,
                         ctx->getTargetProgram(),
                         ctx->getSink());
+
+                    if (auto specializedFunc = as<IRGlobalValueWithCode>(specResult))
+                    {
+                        if (!unrollLoopsInFunc(
+                                ctx->getTargetProgram(),
+                                ctx->getModule(),
+                                specializedFunc,
+                                ctx->getSink()))
+                        {
+                            return nullptr;
+                        }
+                    }
 
                     specInst->replaceUsesWith(specResult);
                 }
