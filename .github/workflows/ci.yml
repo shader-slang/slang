@@ -326,7 +326,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gpu_failures=$(gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs?per_page=100" \
-            --jq '[.jobs[] | select(.conclusion == "failure") | select(.steps[]? | select(.name == "GPU health check" and .conclusion == "failure"))] | length' \
+            --jq '[.jobs[] | select(.conclusion == "failure") | select(
+              (.steps[]? | select(.name == "GPU health check" and .conclusion == "failure"))
+              or
+              (.steps[]? | select(.name == "GPU post-test diagnostics" and .conclusion == "success"))
+            )] | length' \
             || echo "0")
           gpu_failures=${gpu_failures:-0}
           if ! [[ "$gpu_failures" =~ ^[0-9]+$ ]]; then
@@ -334,8 +338,8 @@ jobs:
           fi
 
           if [ "$gpu_failures" -gt 0 ]; then
-            echo "Found $gpu_failures GPU health check failure(s) — dispatching retry workflow..."
+            echo "Found $gpu_failures GPU failure(s) — dispatching retry workflow..."
             gh workflow run ci-retry.yml -F run_id=${{ github.run_id }}
           else
-            echo "No GPU health check failures — not retrying."
+            echo "No GPU failures — not retrying."
           fi

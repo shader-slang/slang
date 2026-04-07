@@ -138,7 +138,10 @@ jobs:
         if: failure()
         run: |
           echo "=== GPU State ==="
-          nvidia-smi 2>&1 || echo "nvidia-smi FAILED (GPU may have crashed)"
+          if ! nvidia-smi 2>&1; then
+            echo "nvidia-smi FAILED (GPU may have crashed)"
+            echo "::error::GPU crashed during tests — retrying may help."
+          fi
           echo ""
           echo "=== GPU Memory & ECC ==="
           nvidia-smi --query-gpu=name,driver_version,memory.used,memory.free,temperature.gpu,ecc.errors.uncorrected.volatile.total,pstate \
@@ -242,7 +245,10 @@ jobs:
         if: failure()
         run: |
           echo "=== GPU State ==="
-          nvidia-smi 2>&1 || echo "nvidia-smi FAILED (GPU may have crashed)"
+          if ! nvidia-smi 2>&1; then
+            echo "nvidia-smi FAILED (GPU may have crashed)"
+            echo "::error::GPU crashed during tests — retrying may help."
+          fi
           echo ""
           echo "=== GPU Memory & ECC ==="
           nvidia-smi --query-gpu=name,driver_version,memory.used,memory.free,temperature.gpu,ecc.errors.uncorrected.volatile.total,pstate \
