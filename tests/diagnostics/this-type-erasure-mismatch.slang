@@ -33,3 +33,27 @@ void testNoErasureNote()
     //CHECK: type mismatch
     //CHECK: expected an expression of type 'int', got 'testNoErasureNote...This'
 }
+
+// Negative test: both sides are ExtractExistentialType but from different interfaces.
+// The equals() guard should prevent E30021 from firing here.
+interface IOther
+{
+    This make();
+}
+
+struct Impl2 : ISelfOp, IOther
+{
+    float v;
+    This clone() { return Impl2(v); }
+    bool matches(Impl2 other) { return v == other.v; }
+    This make() { return Impl2(v); }
+}
+
+void testDifferentInterfaces()
+{
+    ISelfOp a = Impl2(1.0);
+    IOther b = Impl2(2.0);
+    a.matches(b.make());
+    //CHECK: type mismatch
+    //CHECK: expected an expression of type 'testDifferentInterfaces..This', got 'testDifferentInterfaces..This'
+}
