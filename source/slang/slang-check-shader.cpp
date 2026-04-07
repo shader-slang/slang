@@ -298,10 +298,14 @@ static bool isPerPrimitiveMeshSemantic(UnownedStringSlice semanticName)
 static void validateNoPerPrimitiveSemanticsInType(
     DiagnosticSink* sink,
     Type* type,
-    ASTBuilder* astBuilder)
+    ASTBuilder* astBuilder,
+    HashSet<Type*>& seenTypes)
 {
     if (!type)
         return;
+    if (seenTypes.contains(type))
+        return;
+    seenTypes.add(type);
 
     auto declRefType = as<DeclRefType>(type);
     if (!declRefType)
@@ -321,7 +325,7 @@ static void validateNoPerPrimitiveSemanticsInType(
             Type* fieldType = unwrapConditionalType(fieldVarDecl->getType());
             while (auto arrayType = as<ArrayExpressionType>(fieldType))
                 fieldType = unwrapConditionalType(arrayType->getElementType());
-            validateNoPerPrimitiveSemanticsInType(sink, fieldType, astBuilder);
+            validateNoPerPrimitiveSemanticsInType(sink, fieldType, astBuilder, seenTypes);
         }
 
         // Check if this field has a per-primitive system value semantic
@@ -393,10 +397,22 @@ static void validateSystemValueSemantic(
         // Per-primitive semantics must only appear in OutputPrimitives / 'out primitives'.
         if (stage == Stage::Mesh && !as<PrimitivesType>(meshOutputType))
         {
+            if (auto semantic = decl->findModifier<HLSLSimpleSemantic>())
+            {
+                if (isPerPrimitiveMeshSemantic(semantic->name.getContent()))
+                {
+                    sink->diagnose(Diagnostics::PerPrimitiveSemanticInVertexOutput{
+                        .semantic = String(semantic->name.getContent()),
+                        .location = decl->loc});
+                }
+            }
+
+            HashSet<Type*> seenTypes;
             validateNoPerPrimitiveSemanticsInType(
                 sink,
                 unwrapConditionalType(elementType),
-                visitor->getASTBuilder());
+                visitor->getASTBuilder(),
+                seenTypes);
         }
         type = unwrapConditionalType(elementType);
         direction = SemanticDirection::Output;

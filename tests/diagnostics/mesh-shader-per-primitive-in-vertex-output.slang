@@ -43,3 +43,23 @@ void msmain_nested(out indices uint3 triangles[3], out vertices MeshOutputNested
     triangles[0] = uint3(0, 1, 2);
     vertices[0].Color = float3(0, 0, 0);
 }
+
+struct IndexWithPrimSemantic {
+    uint3 idx;
+    uint primId : SV_PrimitiveID;
+//CHECK: ^^^^^^ per-primitive system value semantic 'SV_PrimitiveID' must be placed in an 'OutputPrimitives' (or 'out primitives') parameter
+};
+
+struct MeshOutput2 {
+    float3 Color    : COLOR;
+    bool Cull : SV_CullPrimitive;
+    uint Prim : SV_PrimitiveID;
+    uint Layer : SV_RenderTargetArrayIndex;
+    uint Viewport : SV_ViewportArrayIndex;
+    uint Rate : SV_ShadingRate;
+};
+[outputtopology("triangle")]
+[numthreads(1, 1, 1)]
+void msmain_indices(out indices IndexWithPrimSemantic triangles[3], out primitives MeshOutput2 vertices[9]) {
+    SetMeshOutputCounts(6, 2);
+}
