@@ -22,6 +22,7 @@ struct Box<T>
 // Generic type parameter - should NOT trigger E30303
 bool testGenericParam<T>(T val)
 {
+    let d = val as Dog;
     return val is Dog;
 }
 //CHECK-NOT: unrelated concrete types
@@ -29,6 +30,7 @@ bool testGenericParam<T>(T val)
 // Nested generic arg - should NOT trigger E30303
 bool testNestedGeneric<T>(Box<T> box)
 {
+    let dogBox = box as Box<Dog>;
     return box is Box<Dog>;
 }
 //CHECK-NOT: unrelated concrete types
