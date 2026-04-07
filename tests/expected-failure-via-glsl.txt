@@ -12,3 +12,11 @@ tests/language-feature/saturated-cooperation/fuse3.slang (vk)
 tests/language-feature/saturated-cooperation/fuse-product.slang (vk)
 tests/language-feature/saturated-cooperation/fuse.slang (vk)
 tests/language-feature/saturated-cooperation/simple.slang (vk)
+
+# BFloat16 GPU compute tests: CI GPUs (T4) report VK_KHR_shader_bfloat16 support
+# but produce wrong results (zeros). Same as expected-failure-github.txt. Tracking in #10750.
+tests/hlsl-intrinsic/bf16-arithmetic.slang (vk)
+tests/hlsl-intrinsic/bf16-autodiff.slang (vk)
+tests/hlsl-intrinsic/bf16-comparison.slang (vk)
+tests/hlsl-intrinsic/bf16-conversions.slang (vk)
+tests/hlsl-intrinsic/bf16-math.slang (vk)
