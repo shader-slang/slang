@@ -107,35 +107,14 @@ List<IRInterfaceType*> sortTopologically(
     return sortedInterfaceTypes;
 }
 
-static bool hasDependencyPath(
-    IRInterfaceType* source,
-    IRInterfaceType* target,
-    Dictionary<IRInterfaceType*, HashSet<IRInterfaceType*>>& dependencyMap,
-    HashSet<IRInterfaceType*>& visited)
-{
-    if (source == target)
-        return true;
-
-    if (visited.contains(source))
-        return false;
-    visited.add(source);
-
-    if (auto deps = dependencyMap.tryGetValue(source))
-    {
-        for (auto dependency : *deps)
-        {
-            if (hasDependencyPath(dependency, target, dependencyMap, visited))
-                return true;
-        }
-    }
-
-    return false;
-}
-
 // Shared dependency analysis used by both diagnoseCircularConformances and
 // inferAnyValueSizeWhereNecessary. Collects interface types, their
-// implementations, and builds the dependency graph with self-referential
-// classification.
+// implementations, builds the interface dependency graph, and computes SCCs.
+//
+// dependencyMap excludes direct self-edges so self-referential implementations
+// do not break topological ordering for size inference. implDeps retains the
+// original per-implementation dependency lists so direct self-cycles can still
+// be diagnosed.
 struct InterfaceDependencyAnalysis
 {
     HashSet<IRInterfaceType*> interfaceTypes;
@@ -146,6 +125,8 @@ struct InterfaceDependencyAnalysis
 
     // Per-implementation dependency lists (used by cycle detection).
     Dictionary<IRInst*, List<IRInterfaceType*>> implDeps;
+    Dictionary<IRInterfaceType*, Index> interfaceToComponent;
+    HashSet<IRInterfaceType*> interfacesInDependencyCycle;
 
     void build(IRModule* module)
     {
@@ -154,6 +135,29 @@ struct InterfaceDependencyAnalysis
             return;
         collectImplementations(module);
         buildDependencyGraph();
+        computeStronglyConnectedComponents();
+    }
+
+    bool implCreatesCircularConformance(IRInterfaceType* interfaceType, IRInst* impl) const
+    {
+        auto deps = implDeps.tryGetValue(impl);
+        if (!deps)
+            return false;
+
+        auto interfaceComponent = interfaceToComponent.getValue(interfaceType);
+        for (auto dep : *deps)
+        {
+            if (dep == interfaceType)
+                return true;
+
+            if (interfacesInDependencyCycle.contains(interfaceType) &&
+                interfaceToComponent.getValue(dep) == interfaceComponent)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
 private:
@@ -249,6 +253,76 @@ private:
             nonSelfReferentialImpls.add(interfaceType, nonSelfRefList);
         }
     }
+
+    void computeStronglyConnectedComponents()
+    {
+        Dictionary<IRInterfaceType*, Index> indexMap;
+        Dictionary<IRInterfaceType*, Index> lowLinkMap;
+        HashSet<IRInterfaceType*> onStack;
+        List<IRInterfaceType*> stack;
+        Index nextIndex = 0;
+
+        for (auto interfaceType : interfaceTypes)
+        {
+            if (!indexMap.containsKey(interfaceType))
+            {
+                strongConnect(interfaceType, nextIndex, indexMap, lowLinkMap, onStack, stack);
+            }
+        }
+    }
+
+    void strongConnect(
+        IRInterfaceType* interfaceType,
+        Index& nextIndex,
+        Dictionary<IRInterfaceType*, Index>& indexMap,
+        Dictionary<IRInterfaceType*, Index>& lowLinkMap,
+        HashSet<IRInterfaceType*>& onStack,
+        List<IRInterfaceType*>& stack)
+    {
+        indexMap.add(interfaceType, nextIndex);
+        lowLinkMap.add(interfaceType, nextIndex);
+        nextIndex++;
+
+        stack.add(interfaceType);
+        onStack.add(interfaceType);
+
+        for (auto dependency : dependencyMap[interfaceType])
+        {
+            if (!indexMap.containsKey(dependency))
+            {
+                strongConnect(dependency, nextIndex, indexMap, lowLinkMap, onStack, stack);
+                lowLinkMap[interfaceType] =
+                    Math::Min(lowLinkMap[interfaceType], lowLinkMap[dependency]);
+            }
+            else if (onStack.contains(dependency))
+            {
+                lowLinkMap[interfaceType] =
+                    Math::Min(lowLinkMap[interfaceType], indexMap[dependency]);
+            }
+        }
+
+        if (lowLinkMap[interfaceType] != indexMap[interfaceType])
+            return;
+
+        Index componentIndex = interfaceToComponent.getCount();
+        List<IRInterfaceType*> componentMembers;
+        while (true)
+        {
+            auto member = stack.getLast();
+            stack.removeLast();
+            onStack.remove(member);
+            componentMembers.add(member);
+            interfaceToComponent.add(member, componentIndex);
+            if (member == interfaceType)
+                break;
+        }
+
+        if (componentMembers.getCount() > 1)
+        {
+            for (auto member : componentMembers)
+                interfacesInDependencyCycle.add(member);
+        }
+    }
 };
 
 // Detect and diagnose circular interface conformances before specialization.
@@ -271,20 +345,14 @@ void diagnoseCircularConformances(IRModule* module, DiagnosticSink* sink)
 
         for (auto impl : analysis.implMap[interfaceType])
         {
-            auto& deps = analysis.implDeps[impl];
-            for (auto dep : deps)
+            if (analysis.implCreatesCircularConformance(interfaceType, impl))
             {
-                HashSet<IRInterfaceType*> visited;
-                if (hasDependencyPath(dep, interfaceType, analysis.dependencyMap, visited))
-                {
-                    sink->diagnose(Diagnostics::CircularConformance{
-                        .type = impl,
-                        .interfaceType = interfaceType,
-                        .location = impl->sourceLoc,
-                    });
-                    circularCount++;
-                    break;
-                }
+                sink->diagnose(Diagnostics::CircularConformance{
+                    .type = impl,
+                    .interfaceType = interfaceType,
+                    .location = impl->sourceLoc,
+                });
+                circularCount++;
             }
         }
 
@@ -315,14 +383,20 @@ void inferAnyValueSizeWhereNecessary(
         return;
 
     // Verify the invariant: diagnoseCircularConformances must have already
-    // caught any fully-circular interfaces (where all impls are self-referential).
-    // If this fires, the pipeline ordering has changed and circular conformances
-    // are reaching size inference.
+    // removed both non-trivial interface SCCs and direct self-only cycles.
+    // If this fires, circular conformances are reaching size inference.
     for (auto interfaceType : analysis.interfaceTypes)
     {
+        bool participatesInDependencyCycle =
+            analysis.interfacesInDependencyCycle.contains(interfaceType);
         auto& selfRefList = analysis.selfReferentialImpls[interfaceType];
         auto& nonSelfRefList = analysis.nonSelfReferentialImpls[interfaceType];
-        SLANG_ASSERT(!(nonSelfRefList.getCount() == 0 && selfRefList.getCount() > 0));
+        bool hasOnlySelfReferentialImpls =
+            nonSelfRefList.getCount() == 0 && selfRefList.getCount() > 0;
+
+        SLANG_ASSERT(!participatesInDependencyCycle && !hasOnlySelfReferentialImpls);
+        if (participatesInDependencyCycle || hasOnlySelfReferentialImpls)
+            return;
     }
 
     // Sort the interface types in topological order.
