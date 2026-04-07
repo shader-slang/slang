@@ -2525,8 +2525,8 @@ protected:
             return;
 
         auto sysValName = info.systemValueName;
-        // Override the color attribute when the layout carries dual-source
-        // blending information (vk::location + vk::index).
+        // Use layout-provided color/index for SV_Target when present,
+        // needed for dual-source blending (color(0), index(1)).
         if (info.systemValueNameEnum == SystemValueSemanticName::Target)
         {
             if (auto varLayout = findVarLayout(var))
@@ -3036,8 +3036,7 @@ private:
                     else
                     {
                         auto sysValName = sysValInfo.systemValueName;
-                        // Override the color attribute when the layout carries
-                        // dual-source blending information.
+                        // Use layout-provided color/index for dual-source blending.
                         if (sysValInfo.systemValueNameEnum == SystemValueSemanticName::Target &&
                             typeLayout)
                         {
