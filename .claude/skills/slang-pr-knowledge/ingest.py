@@ -242,7 +242,7 @@ def store_pr(db, repo, pr_meta, pr_details):
     db.execute(
         """INSERT OR REPLACE INTO prs
            (number, repo, title, author, body, merged_at, labels, files_json, state, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",  # commit is batched by caller
         (
             number, repo, title, author,
             pr_details.get("body", ""),
@@ -275,8 +275,6 @@ def store_pr(db, repo, pr_meta, pr_details):
                VALUES (?, ?, ?, ?, ?)""",
             (number, repo, c["author"], c["body"], c.get("created_at", "")),
         )
-
-    db.commit()
 
 
 def ingest_repo(db, repo_key, full_repo, incremental=False, limit=None):
@@ -315,10 +313,13 @@ def ingest_repo(db, repo_key, full_repo, incremental=False, limit=None):
         store_pr(db, repo_key, pr_meta, details)
 
         if (i + 1) % 50 == 0:
+            db.commit()
             print(f"  ... pausing 10s for rate limiting (processed {i+1}/{len(new_prs)})")
             time.sleep(10)
         else:
             time.sleep(0.5)
+
+    db.commit()
 
     return len(new_prs)
 
@@ -341,16 +342,17 @@ def main():
     db = init_db()
     total_new = 0
 
-    repos_to_ingest = {args.repo: REPOS[args.repo]} if args.repo else REPOS
-    for repo_key, full_repo in repos_to_ingest.items():
-        count = ingest_repo(db, repo_key, full_repo,
-                            incremental=args.incremental, limit=args.limit)
-        total_new += count
+    try:
+        repos_to_ingest = {args.repo: REPOS[args.repo]} if args.repo else REPOS
+        for repo_key, full_repo in repos_to_ingest.items():
+            count = ingest_repo(db, repo_key, full_repo,
+                                incremental=args.incremental, limit=args.limit)
+            total_new += count
 
-    if total_new > 0:
-        rebuild_fts(db)
-
-    db.close()
+        if total_new > 0:
+            rebuild_fts(db)
+    finally:
+        db.close()
 
     print(f"\n{'='*60}")
     print(f"Done! Ingested {total_new} new PRs total.")

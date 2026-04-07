@@ -73,8 +73,9 @@ def search_prs(query: str, repo: Optional[str] = None, limit: int = 10) -> str:
                 "snippet": row["snippet"],
                 "url": f"https://github.com/shader-slang/{row['repo']}/pull/{row['number']}",
             })
-    except sqlite3.OperationalError:
-        pass
+    except sqlite3.OperationalError as e:
+        if "no such table" not in str(e):
+            raise
 
     review_hits = []
     sql2 = """
@@ -99,8 +100,9 @@ def search_prs(query: str, repo: Optional[str] = None, limit: int = 10) -> str:
                 "file": f"{row['file_path']}:{row['line']}",
                 "snippet": row["snippet"],
             })
-    except sqlite3.OperationalError:
-        pass
+    except sqlite3.OperationalError as e:
+        if "no such table" not in str(e):
+            raise
 
     db.close()
 
@@ -225,8 +227,9 @@ def search_reviews(query: str, repo: Optional[str] = None,
                 "body": row["body"][:500],
                 "created_at": row["created_at"],
             })
-    except sqlite3.OperationalError:
-        pass
+    except sqlite3.OperationalError as e:
+        if "no such table" not in str(e):
+            raise
 
     review_bodies = []
     sql2 = """
@@ -253,8 +256,9 @@ def search_reviews(query: str, repo: Optional[str] = None,
                 "body": row["body"][:500],
                 "state": row["state"],
             })
-    except sqlite3.OperationalError:
-        pass
+    except sqlite3.OperationalError as e:
+        if "no such table" not in str(e):
+            raise
 
     db.close()
 
@@ -299,7 +303,7 @@ def search_files(file_path: str, repo: Optional[str] = None, limit: int = 20) ->
     if repo:
         sql += " AND repo = ?"
         params.append(repo)
-    sql += " ORDER BY merged_at DESC"
+    sql += " ORDER BY merged_at DESC LIMIT 2000"
 
     results = []
     for row in db.execute(sql, params):

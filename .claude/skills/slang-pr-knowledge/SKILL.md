@@ -84,6 +84,8 @@ Replace `<repo-root>` with the absolute path to your slang repository.
 
 ### For Claude Code CLI
 
+Run this from the repository root:
+
 ```bash
 claude mcp add slang-pr-knowledge \
   .claude/skills/slang-pr-knowledge/.venv/bin/python3 \
