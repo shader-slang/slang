@@ -20,5 +20,5 @@ void test()
     obj.matches(copy);
     //CHECK: type mismatch in expression
     //CHECK: expected an expression of type 'test..This', got 'test..This'
-    //CHECK: the concrete 'This' type identity is lost after type erasure
+    //CHECK: the concrete 'This' type identity is lost after type erasure into interface type 'ISelfOp'; consider using a generic function with a type constraint instead
 }

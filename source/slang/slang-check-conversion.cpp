@@ -1417,12 +1417,17 @@ bool SemanticsVisitor::_failedCoercion(
                 // Add a note explaining the type-erasure issue.
                 if (auto toExtType = as<ExtractExistentialType>(toType))
                 {
-                    if (as<ExtractExistentialType>(fromType))
+                    if (auto fromExtType = as<ExtractExistentialType>(fromType))
                     {
-                        Type* interfaceType = toExtType->getOriginalInterfaceType();
-                        sink->diagnose(Diagnostics::ThisTypeMismatchAfterErasure{
-                            .interfaceType = interfaceType,
-                            .location = fromExpr->loc});
+                        Type* toInterfaceType = toExtType->getOriginalInterfaceType();
+                        Type* fromInterfaceType = fromExtType->getOriginalInterfaceType();
+                        if (toInterfaceType && fromInterfaceType &&
+                            toInterfaceType->equals(fromInterfaceType))
+                        {
+                            sink->diagnose(Diagnostics::ThisTypeMismatchAfterErasure{
+                                .interfaceType = toInterfaceType,
+                                .location = fromExpr->loc});
+                        }
                     }
                 }
             }
