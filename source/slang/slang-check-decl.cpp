@@ -4095,6 +4095,8 @@ void SemanticsDeclHeaderVisitor::visitNonEmptyPackConstraintDecl(NonEmptyPackCon
 void SemanticsDeclHeaderVisitor::visitHasDiffTypeInfoConstraintDecl(
     HasDiffTypeInfoConstraintDecl* decl)
 {
+    CheckConstraintSubType(decl->type);
+
     if (!decl->type.type)
         decl->type = TranslateTypeNodeForced(decl->type);
 }
@@ -5570,6 +5572,8 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
             if (auto satisfyingConstraintDeclRef =
                     satisfyingMemberDeclRef.as<HasDiffTypeInfoConstraintDecl>())
             {
+                // The actual constrained type comparison depends on the specialized
+                // substitution environment and is validated below.
             }
             else
                 return false;
@@ -5870,10 +5874,9 @@ bool SemanticsVisitor::doesGenericSignatureMatchRequirement(
             if (!specializedRequiredConstraintDeclRef)
                 return false;
 
-            auto requiredType =
-                getHasDiffTypeInfoType(m_astBuilder, specializedRequiredConstraintDeclRef);
-            auto satisfyingType = getHasDiffTypeInfoType(m_astBuilder, satisfyingConstraintDeclRef);
-            if (!satisfyingType->equals(requiredType))
+            auto requiredType = getBaseType(m_astBuilder, specializedRequiredConstraintDeclRef);
+            auto satisfyingType = getBaseType(m_astBuilder, satisfyingConstraintDeclRef);
+            if (!requiredType || !satisfyingType || !satisfyingType->equals(requiredType))
                 return false;
         }
     }
@@ -6701,43 +6704,6 @@ GenericDecl* SemanticsVisitor::synthesizeGenericSignatureForRequirementWitness(
 
             synGenericDecl->addDirectMemberDecl(synConstraintDecl);
         }
-    }
-
-    for (auto coercionDecl :
-         requiredMemberDeclRef.getDecl()->getDirectMemberDeclsOfType<TypeCoercionConstraintDecl>())
-    {
-        auto synCoercionDecl = m_astBuilder->create<TypeCoercionConstraintDecl>();
-        synCoercionDecl->nameAndLoc = coercionDecl->getNameAndLoc();
-        synCoercionDecl->parentDecl = synGenericDecl;
-        synCoercionDecl->whereTokenLoc = coercionDecl->whereTokenLoc;
-        if (coercionDecl->findModifier<ImplicitConversionModifier>())
-        {
-            addModifier(synCoercionDecl, m_astBuilder->create<ImplicitConversionModifier>());
-        }
-
-        synCoercionDecl->fromType = TypeExp((Type*)coercionDecl->fromType.type->substitute(
-            m_astBuilder,
-            SubstitutionSet(partiallySpecializedRequiredGenericDeclRef)));
-        synCoercionDecl->toType = TypeExp((Type*)coercionDecl->toType.type->substitute(
-            m_astBuilder,
-            SubstitutionSet(partiallySpecializedRequiredGenericDeclRef)));
-
-        synGenericDecl->addDirectMemberDecl(synCoercionDecl);
-    }
-
-    for (auto hasDiffTypeInfoDecl :
-         requiredMemberDeclRef.getDecl()
-             ->getDirectMemberDeclsOfType<HasDiffTypeInfoConstraintDecl>())
-    {
-        auto synConstraintDecl = m_astBuilder->create<HasDiffTypeInfoConstraintDecl>();
-        synConstraintDecl->nameAndLoc = hasDiffTypeInfoDecl->getNameAndLoc();
-        synConstraintDecl->parentDecl = synGenericDecl;
-        synConstraintDecl->whereTokenLoc = hasDiffTypeInfoDecl->whereTokenLoc;
-        synConstraintDecl->type = TypeExp((Type*)hasDiffTypeInfoDecl->type.type->substitute(
-            m_astBuilder,
-            SubstitutionSet(partiallySpecializedRequiredGenericDeclRef)));
-
-        synGenericDecl->addDirectMemberDecl(synConstraintDecl);
     }
 
     // Override generic pointer to point to the original generic container.
@@ -11802,10 +11768,8 @@ bool SemanticsVisitor::doGenericSignaturesMatch(
                 return false;
 
             auto leftType = leftHasDiffTypeInfoConstraint->type.type;
-            auto rightType = substInnerRightToLeft.substitute(
-                m_astBuilder,
-                rightConstraint.getDecl()->type.type);
-            if (!leftType->equals(rightType))
+            auto rightType = getBaseType(m_astBuilder, rightConstraint);
+            if (!leftType || !rightType || !leftType->equals(rightType))
                 return false;
         }
         else

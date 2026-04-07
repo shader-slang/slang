@@ -26,10 +26,12 @@ inline Type* getToType(ASTBuilder* astBuilder, DeclRef<TypeCoercionConstraintDec
     return declRef.substitute(astBuilder, declRef.getDecl()->toType);
 }
 
-inline Type* getHasDiffTypeInfoType(
+inline Type* getBaseType(
     ASTBuilder* astBuilder,
     DeclRef<HasDiffTypeInfoConstraintDecl> const& declRef)
 {
+    if (!declRef)
+        return nullptr;
     return declRef.substitute(astBuilder, declRef.getDecl()->type.Ptr());
 }
 

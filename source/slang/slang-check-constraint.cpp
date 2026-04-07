@@ -456,17 +456,25 @@ bool addHasDiffTypeInfoWitnessToArgs(
     ShortList<Val*>& args,
     bool shouldEmitError)
 {
-    SLANG_UNUSED(maybeContext);
-    SLANG_UNUSED(shouldEmitError);
     SLANG_ASSERT(!shouldEmitError || maybeContext);
 
     auto constraintDeclRef =
         astBuilder
             ->getGenericAppDeclRef(genericDeclRef, args.getArrayView().arrayView, constraintDecl)
             .as<HasDiffTypeInfoConstraintDecl>();
-    auto constrainedType = getHasDiffTypeInfoType(astBuilder, constraintDeclRef);
+    auto constrainedType = getBaseType(astBuilder, constraintDeclRef);
     if (!constrainedType)
+    {
+        if (shouldEmitError)
+        {
+            visitor->getSink()->diagnose(Diagnostics::TypeDoesNotHaveDiffTypeInfo{
+                .type = astBuilder->getErrorType(),
+                .location = maybeContext->loc});
+            visitor->getSink()->diagnose(
+                Diagnostics::SeeDefinitionOfConstraint{.decl = constraintDecl});
+        }
         return false;
+    }
     if (maybeConstrainedGenericParams)
     {
         if (auto declRefType = as<DeclRefType>(constrainedType))
@@ -477,6 +485,15 @@ bool addHasDiffTypeInfoWitnessToArgs(
     {
         args.add(witness);
         return true;
+    }
+
+    if (shouldEmitError)
+    {
+        visitor->getSink()->diagnose(Diagnostics::TypeDoesNotHaveDiffTypeInfo{
+            .type = constrainedType,
+            .location = maybeContext->loc});
+        visitor->getSink()->diagnose(
+            Diagnostics::SeeDefinitionOfConstraint{.decl = constraintDecl});
     }
 
     return false;

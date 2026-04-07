@@ -2463,8 +2463,8 @@ struct ValLoweringVisitor : ValVisitor<ValLoweringVisitor, LoweredValInfo, Lower
 
     LoweredValInfo visitHasDiffTypeInfoWitness(HasDiffTypeInfoWitness* witness)
     {
-        auto witnessType = getBuilder()->getWitnessTableType(getBuilder()->getVoidType());
-        return emitDeclRef(context, witness->getDeclRef(), witnessType);
+        SLANG_UNUSED(witness);
+        return LoweredValInfo::simple(getBuilder()->getVoidValue());
     }
 
     LoweredValInfo visitConstantIntVal(ConstantIntVal* val)
@@ -11906,8 +11906,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
         HasDiffTypeInfoConstraintDecl* constraintDecl)
     {
         auto subBuilder = subContext->irBuilder;
-        auto witnessType = subBuilder->getWitnessTableType(subBuilder->getVoidType());
-        auto param = subBuilder->emitParam(witnessType);
+        auto param = subBuilder->emitParam(subBuilder->getVoidType());
         addNameHint(context, param, constraintDecl);
         subContext->setValue(constraintDecl, LoweredValInfo::simple(param));
     }

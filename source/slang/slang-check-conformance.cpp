@@ -100,8 +100,7 @@ Witness* SemanticsVisitor::getDiffTypeInfoWitness(Type* type)
                     if (!constraintDeclRef)
                         continue;
 
-                    auto constraintType =
-                        getHasDiffTypeInfoType(getCurrentASTBuilder(), constraintDeclRef);
+                    auto constraintType = getBaseType(getCurrentASTBuilder(), constraintDeclRef);
                     if (constraintType && constraintType->equals(type))
                         return getCurrentASTBuilder()->getHasDiffTypeInfoWitness(constraintDeclRef);
                 }

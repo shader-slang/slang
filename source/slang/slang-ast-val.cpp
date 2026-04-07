@@ -1393,7 +1393,10 @@ Val* HasDiffTypeInfoWitness::_substituteImplOverride(
         return this;
 
     (*ioDiff)++;
-    return astBuilder->getHasDiffTypeInfoWitness(substDeclRef.as<HasDiffTypeInfoConstraintDecl>());
+    auto substConstraintDeclRef = substDeclRef.as<HasDiffTypeInfoConstraintDecl>();
+    if (!substConstraintDeclRef)
+        return this;
+    return astBuilder->getHasDiffTypeInfoWitness(substConstraintDeclRef);
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! NonEmptyPackWitness !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
