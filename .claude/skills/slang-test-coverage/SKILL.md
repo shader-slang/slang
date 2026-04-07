@@ -279,13 +279,13 @@ See the `slang-test-development` skill for complete test templates, syntax refer
 cmake --preset default
 
 # Build if needed
-cmake --build --preset release --target slangc slang-test
+cmake --build --preset relwithdebinfo --target slangc slang-test
 
 # Run test
-./build/Release/bin/slang-test tests/path/to/test.slang
+./build/RelWithDebInfo/bin/slang-test tests/path/to/test.slang
 
 # Run full suite
-./build/Release/bin/slang-test -use-test-server -server-count 8
+./build/RelWithDebInfo/bin/slang-test -use-test-server -server-count 8
 ```
 
 **Self-review**: Is there an existing test just as good? Would I understand this in 6 months? Does it run on all targets?

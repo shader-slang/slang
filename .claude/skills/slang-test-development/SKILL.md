@@ -22,13 +22,13 @@ Place tests under `tests/` directory, organized by category:
 
 ```bash
 # Run specific test
-./build/Release/bin/slang-test tests/path/to/test.slang
+./build/RelWithDebInfo/bin/slang-test tests/path/to/test.slang
 
 # Run all tests in a directory
-./build/Release/bin/slang-test tests/language-feature/dynamic-dispatch/
+./build/RelWithDebInfo/bin/slang-test tests/language-feature/dynamic-dispatch/
 
 # Run with multiple servers (faster)
-./build/Release/bin/slang-test -use-test-server -server-count 8
+./build/RelWithDebInfo/bin/slang-test -use-test-server -server-count 8
 ```
 
 ## Choosing a Test Type
@@ -251,7 +251,7 @@ outputBuffer[0] = 42.0;
 
 5. **Run test** to verify:
    ```bash
-   ./build/Release/bin/slang-test tests/your/test.slang
+   ./build/RelWithDebInfo/bin/slang-test tests/your/test.slang
    ```
 
 ## Pre-submission Checklist

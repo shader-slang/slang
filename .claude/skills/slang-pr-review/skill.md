@@ -163,8 +163,8 @@ Address feedback in this order:
 If you switched from another branch, the binary may be stale:
 
 ```bash
-cmake --build --preset release --target slang-test slangc \
-  >/dev/null 2>&1 || cmake --build --preset release --target slang-test slangc
+cmake --build --preset relwithdebinfo --target slang-test slangc \
+  >/dev/null 2>&1 || cmake --build --preset relwithdebinfo --target slang-test slangc
 ```
 
 ### Step 2: Make Changes
@@ -178,10 +178,10 @@ cmake --build --preset release --target slang-test slangc \
 
 ```bash
 # Run the specific test(s) affected by changes
-./build/Release/bin/slang-test tests/path/to/test.slang
+./build/RelWithDebInfo/bin/slang-test tests/path/to/test.slang
 
 # If modifying compiler source, also run related tests
-./build/Release/bin/slang-test tests/path/to/related-tests/
+./build/RelWithDebInfo/bin/slang-test tests/path/to/related-tests/
 ```
 
 ### Step 4: Format
@@ -326,7 +326,7 @@ When iterating:
 
 3. **Large omnibus commits**: One commit per logical fix makes review easier.
 
-4. **Not rebuilding after branch switch**: The binary in `build/Release/bin/` corresponds
+4. **Not rebuilding after branch switch**: The binary in `build/RelWithDebInfo/bin/` corresponds
    to whatever branch was last built. Always rebuild after switching branches.
 
 5. **Ignoring exhaustive test mode**: `DIAGNOSTIC_TEST:SIMPLE` with exhaustive mode catches

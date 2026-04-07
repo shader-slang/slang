@@ -239,9 +239,9 @@ You are running in an isolated git worktree with your own branch.
 ## Project Context
 
 This is the Slang shading language compiler (C++). Key conventions:
-- Build: cmake --build --preset release --target slangc slang-test >/dev/null 2>&1 || \
-    cmake --build --preset release --target slangc slang-test
-- Test: ./build/Release/bin/slang-test tests/path/to/test.slang (run from repo root)
+- Build: cmake --build --preset relwithdebinfo --target slangc slang-test >/dev/null 2>&1 || \
+    cmake --build --preset relwithdebinfo --target slangc slang-test
+- Test: ./build/RelWithDebInfo/bin/slang-test tests/path/to/test.slang (run from repo root)
 - Format: ./extras/formatting.sh
 - Single-dash CLI options: -target spirv (not --target)
 - Do not mention AI tools in commits
@@ -250,17 +250,17 @@ This is the Slang shading language compiler (C++). Key conventions:
 ## Instructions
 
 ### Step 0: Build (if needed)
-Check if ./build/Release/bin/slang-test exists. If not, build:
+Check if ./build/RelWithDebInfo/bin/slang-test exists. If not, build:
   cmake --preset default
-  cmake --build --preset release --target slangc slang-test >/dev/null 2>&1 || \
-    cmake --build --preset release --target slangc slang-test
+  cmake --build --preset relwithdebinfo --target slangc slang-test >/dev/null 2>&1 || \
+    cmake --build --preset relwithdebinfo --target slangc slang-test
 
 ### Step 1: Write and validate tests
 For each test in the sub-plan:
   a. Create the .slang test file at the specified path
   b. Follow the test templates from the syntax reference
   c. Write natural comments explaining semantic behavior
-  d. Run the test: ./build/Release/bin/slang-test tests/path/to/test.slang
+  d. Run the test: ./build/RelWithDebInfo/bin/slang-test tests/path/to/test.slang
   e. If it fails:
      - Wrong expected value → fix the test
      - Compiler bug → record bug in structured format (see below)

@@ -48,7 +48,7 @@ Parse the log to extract:
 ### From a Local Test Failure
 
 ```bash
-./build/Release/bin/slang-test tests/path/to/test.slang
+./build/RelWithDebInfo/bin/slang-test tests/path/to/test.slang
 ```
 
 Capture:
@@ -112,16 +112,16 @@ This is the most important phase. Do not skip to a fix.
 Confirm the bug reproduces with the current build:
 
 ```bash
-cmake --build --preset release --target slangc >/dev/null 2>&1 || cmake --build --preset release --target slangc
+cmake --build --preset relwithdebinfo --target slangc >/dev/null 2>&1 || cmake --build --preset relwithdebinfo --target slangc
 
 # For ICE/crash
-./build/Release/bin/slangc -target <target> test.slang
+./build/RelWithDebInfo/bin/slangc -target <target> test.slang
 
 # For SPIRV validation
-SLANG_RUN_SPIRV_VALIDATION=1 ./build/Release/bin/slangc -target spirv test.slang
+SLANG_RUN_SPIRV_VALIDATION=1 ./build/RelWithDebInfo/bin/slangc -target spirv test.slang
 
 # For wrong codegen (compute test)
-./build/Release/bin/slang-test tests/path/to/test.slang
+./build/RelWithDebInfo/bin/slang-test tests/path/to/test.slang
 ```
 
 If the bug does not reproduce, document why and stop.
@@ -158,11 +158,11 @@ Use IR dumps to understand which pass is involved:
 
 ```bash
 # Dump IR before/after specific passes
-./build/Release/bin/slangc -dump-ir -target <target> -o /dev/null test.slang 2>&1 | \
+./build/RelWithDebInfo/bin/slangc -dump-ir -target <target> -o /dev/null test.slang 2>&1 | \
   python extras/split-ir-dump.py
 
 # Dump IR around the suspected pass
-./build/Release/bin/slangc \
+./build/RelWithDebInfo/bin/slangc \
   -dump-ir-before <pass-name> \
   -dump-ir-after <pass-name> \
   -target <target> -o /dev/null test.slang > pass-dump.txt 2>&1
@@ -283,8 +283,8 @@ Implement the following fix approach:
 ## Project Context
 
 This is the Slang shading language compiler (C++). Key conventions:
-- Build: cmake --build --preset release --target slangc slang-test
-- Test: ./build/Release/bin/slang-test tests/path/to/test.slang
+- Build: cmake --build --preset relwithdebinfo --target slangc slang-test
+- Test: ./build/RelWithDebInfo/bin/slang-test tests/path/to/test.slang
 - Format: ./extras/formatting.sh
 - Single-dash CLI options: -target spirv (not --target)
 - SPIRV validation: SLANG_RUN_SPIRV_VALIDATION=1 slangc -target spirv test.slang
@@ -308,12 +308,12 @@ This is the Slang shading language compiler (C++). Key conventions:
    - SIMPLE(filecheck=CHECK): -target spirv
 
 ### Step 3: Build and validate
-1. Build: cmake --build --preset release --target slangc slang-test >/dev/null 2>&1 || \
-     cmake --build --preset release --target slangc slang-test
-2. Run the regression test: ./build/Release/bin/slang-test tests/path/to/test.slang
+1. Build: cmake --build --preset relwithdebinfo --target slangc slang-test >/dev/null 2>&1 || \
+     cmake --build --preset relwithdebinfo --target slangc slang-test
+2. Run the regression test: ./build/RelWithDebInfo/bin/slang-test tests/path/to/test.slang
 3. Run the original reproducer to confirm it's fixed
 4. Run SPIRV validation if applicable
-5. Run broader test suite: ./build/Release/bin/slang-test -use-test-server -server-count 8
+5. Run broader test suite: ./build/RelWithDebInfo/bin/slang-test -use-test-server -server-count 8
 6. Record pass/fail counts
 
 ### Step 4: Format
@@ -458,9 +458,9 @@ git cherry-pick <commit-hash-from-winning-strategy>
 
 # If the user wants adjustments, make them now
 # Rebuild and re-validate after any changes
-cmake --build --preset release --target slangc slang-test >/dev/null 2>&1 || \
-  cmake --build --preset release --target slangc slang-test
-./build/Release/bin/slang-test -use-test-server -server-count 8
+cmake --build --preset relwithdebinfo --target slangc slang-test >/dev/null 2>&1 || \
+  cmake --build --preset relwithdebinfo --target slangc slang-test
+./build/RelWithDebInfo/bin/slang-test -use-test-server -server-count 8
 ```
 
 ### Option B: Implement Fresh
@@ -480,11 +480,11 @@ If no Phase 3 agent produced a clean result, or if the user wants a different ap
    - Must verify specific behavior, not just "doesn't crash"
 4. **Build and validate**:
    ```bash
-   cmake --build --preset release --target slangc slang-test >/dev/null 2>&1 || \
-     cmake --build --preset release --target slangc slang-test
-   ./build/Release/bin/slang-test tests/path/to/regression-test.slang
-   SLANG_RUN_SPIRV_VALIDATION=1 ./build/Release/bin/slangc -target spirv test.slang
-   ./build/Release/bin/slang-test -use-test-server -server-count 8
+   cmake --build --preset relwithdebinfo --target slangc slang-test >/dev/null 2>&1 || \
+     cmake --build --preset relwithdebinfo --target slangc slang-test
+   ./build/RelWithDebInfo/bin/slang-test tests/path/to/regression-test.slang
+   SLANG_RUN_SPIRV_VALIDATION=1 ./build/RelWithDebInfo/bin/slangc -target spirv test.slang
+   ./build/RelWithDebInfo/bin/slang-test -use-test-server -server-count 8
    ```
 
 ### Format
