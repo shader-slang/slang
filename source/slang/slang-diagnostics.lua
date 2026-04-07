@@ -1440,6 +1440,13 @@ err(
 )
 
 err(
+    "is-as-on-unrelated-concrete-types",
+    30303,
+    "'is'/'as' on unrelated concrete types is always false",
+    span { loc = "expr:Expr", message = "'is'/'as' comparison between unrelated concrete types is always false. Use an interface-typed expression for runtime type checks." }
+)
+
+err(
     "expected-function",
     33070,
     "expected a function",

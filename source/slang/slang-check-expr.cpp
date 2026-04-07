@@ -6368,10 +6368,13 @@ Expr* SemanticsExprVisitor::visitIsTypeExpr(IsTypeExpr* expr)
     // If we reach here with no witness and both the value type and target type are concrete
     // (not generic type parameters, associated types, or ThisType), the `is` check is always
     // statically false and the user is using `is` incorrectly on unrelated concrete types.
+    // Note: _isTypeParametric only handles DeclRefType-based types (incl. recursive generic args).
+    // Builtin composite types like arrays or vectors with embedded generic params are not checked,
+    // but these are unlikely to appear in `is`/`as` expressions in practice.
     if (!isInterfaceType(valueType) && !_isTypeParametric(valueType) &&
         !_isTypeParametric(expr->typeExpr.type))
     {
-        getSink()->diagnose(Diagnostics::IsOperatorValueMustBeInterfaceType{.expr = expr});
+        getSink()->diagnose(Diagnostics::IsAsOnUnrelatedConcreteTypes{.expr = expr});
     }
     return expr;
 }
@@ -6428,7 +6431,7 @@ Expr* SemanticsExprVisitor::visitAsTypeExpr(AsTypeExpr* expr)
     if (!isInterfaceType(asValueType) && !_isTypeParametric(asValueType) &&
         !_isTypeParametric(typeExpr.type))
     {
-        getSink()->diagnose(Diagnostics::IsOperatorValueMustBeInterfaceType{.expr = expr});
+        getSink()->diagnose(Diagnostics::IsAsOnUnrelatedConcreteTypes{.expr = expr});
     }
 
     expr->typeExpr = typeExpr.exp;
