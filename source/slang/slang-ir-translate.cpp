@@ -362,10 +362,13 @@ IRInst* _resolveInstRec(TranslationContext* ctx, IRInst* inst)
     // At this point, we've resolved anything that can be translated & not in the global scope (i.e.
     // things like arithmetic operations)
     //
-    // If we still have something that's not in the global scope, then something went wrong.
-    // since all operations after this point require this.
+    // If the instruction is not at module scope, it cannot be resolved further.
+    // This can happen when a generic is specialized with an existential/interface type,
+    // producing function-local instructions that reach this resolution logic.
+    // Return the instruction as-is and let later passes handle the diagnostic.
     //
-    SLANG_ASSERT(as<IRModuleInst>(instWithCanonicalOperands->getParent()));
+    if (!as<IRModuleInst>(instWithCanonicalOperands->getParent()))
+        return instWithCanonicalOperands;
 
     // TODO: Group these.
     if (as<IRTranslateBase>(instWithCanonicalOperands) ||
