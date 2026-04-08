@@ -3884,6 +3884,20 @@ err(
     span { loc = "location", message = "'~fromType:Type' is not convertible to '~toType:Type', not satisfying the type coerce constraint '~toType:Type(~fromType:Type)'" }
 )
 
+err(
+    "invalid-entry-point-varying-type",
+    38050,
+    "type cannot be used as entry-point varying parameter or return type",
+    span { loc = "location", message = "type '~type:Type' cannot be used as ~direction ~context of entry point '~entryPoint:Name' because ~reason" }
+)
+
+err(
+    "invalid-entry-point-varying-type-for-target",
+    38051,
+    "type cannot be used as entry-point varying for this target",
+    span { loc = "location", message = "type '~type:Type' cannot be used as ~direction ~context of entry point '~entryPoint:Name' when targeting ~target because ~reason" }
+)
+
 --
 -- 382xx: module imports
 --
@@ -3947,6 +3961,20 @@ err(
     38205,
     "recursive type in structured buffer",
     span { loc = "location", message = "structured buffer element type '~type:Type' contains recursive type references" }
+)
+
+err(
+    "matrix-dimension-out-of-range",
+    38206,
+    "matrix dimension out of valid range",
+    span { loc = "location", message = "matrix type has ~dimName ~dimValue which exceeds the maximum of ~maxValue" }
+)
+
+err(
+    "matrix-invalid-element-type",
+    38207,
+    "matrix element type not supported",
+    span { loc = "location", message = "matrix with element type '~elementType:Type' is not supported; matrix elements must be float, half, double, int, or uint" }
 )
 
 
