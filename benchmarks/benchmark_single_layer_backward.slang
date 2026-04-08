@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
-// Single-layer backward benchmark: chains transpose MMA + outer product + bias reduce.
-// Uses MMAHelperNewV2 (Tin2-style operand assignment) for optimal MIO utilization.
+// Single-layer backward benchmark using MMAHelperNewV2 (WaveMatrix-based).
 
 import slang.neural;
 
@@ -10,30 +9,6 @@ import slang.neural;
 #endif
 #ifndef OUTPUT_SIZE
 #define OUTPUT_SIZE 16
-#endif
-
-#ifndef FRAGMENT_CHECKSUM_MODE
-#define FRAGMENT_CHECKSUM_MODE 0
-#endif
-
-#ifndef ENABLE_BIAS_REDUCE
-#define ENABLE_BIAS_REDUCE 1
-#endif
-
-#ifndef ENABLE_OUTER_PRODUCT
-#define ENABLE_OUTER_PRODUCT 1
-#endif
-
-#ifndef ENABLE_OUTER_REDUCE
-#define ENABLE_OUTER_REDUCE 1
-#endif
-
-#ifndef ENABLE_OUTER_STORE
-#define ENABLE_OUTER_STORE 1
-#endif
-
-#ifndef EARLY_RESULT_CHECKSUM
-#define EARLY_RESULT_CHECKSUM 0
 #endif
 
 static const int SubgroupSize = 32;
@@ -52,9 +27,6 @@ typealias Helper = MMAHelperNewV2<half, INPUT_SIZE, OUTPUT_SIZE, SubgroupSize, T
 static const int NTileRows = (OUTPUT_SIZE + 15) / 16;
 static const int NTileCols = (INPUT_SIZE + 15) / 16;
 static const int TILED_WEIGHT_COUNT = NTileRows * NTileCols * 256;
-
-static const uint ElementCountPerVector = sizeof(uint4) / sizeof(half);
-static const int Uint4AlignedInputSize = ((INPUT_SIZE + (ElementCountPerVector - 1)) / ElementCountPerVector) * ElementCountPerVector;
 
 public int get_input_size() { return INPUT_SIZE; }
 public int get_output_size() { return OUTPUT_SIZE; }
@@ -89,83 +61,44 @@ void compute_backward(
 
     static const int DOutPacked = OUTPUT_SIZE / 2;
     static const int InputPacked = INPUT_SIZE / 2;
-    static const int ResultPacked = INPUT_SIZE / 2;
 
     uint dOutPacked[DOutPacked];
     [ForceUnroll]
     for (int i = 0; i < DOutPacked; i++)
-        dOutPacked[i] = 0x3C003C00u;  // half2(1.0, 1.0)
+        dOutPacked[i] = 0x3C003C00u;
 
     uint inputPacked[InputPacked];
     [ForceUnroll]
     for (int i = 0; i < InputPacked; i++)
         inputPacked[i] = 0x3C003C00u;
 
-    // Build MatA tiles from packed arrays ONCE
-    Helper.MatA dOutTiles[Helper.DOutTileCount];
-    Helper.fromArrayPacked(dOutPacked, dOutTiles);
+    Helper.DOutMatrix dOut;
+    dOut.fromArrayPacked<DOutPacked>(dOutPacked);
 
-    Helper.MatA inputTiles[Helper.InputTileCount];
-    Helper.fromArrayPacked(inputPacked, inputTiles);
+    Helper.InputMatrix input;
+    input.fromArrayPacked<InputPacked>(inputPacked);
 
     // 1. Transpose MMA: dIn = W^T * dOut
-    Helper.MatA resultTiles[Helper.ResultTileCount];
-    Helper.mmaTranspose<half, Address>(dOutTiles, weightAddr, resultTiles);
-
-    uint checksum = 0;
-#if FRAGMENT_CHECKSUM_MODE && EARLY_RESULT_CHECKSUM
-    [ForceUnroll]
-    for (int t = 0; t < Helper.ResultTileCount; ++t)
-    {
-        checksum += resultTiles[t].fragmentRead(0);
-        checksum += resultTiles[t].fragmentRead(1);
-        checksum += resultTiles[t].fragmentRead(2);
-        checksum += resultTiles[t].fragmentRead(3);
-    }
-#endif
+    Helper.ResultMatrix result;
+    Helper.mmaTranspose<Address>(dOut, weightAddr, result);
 
     // 2. Bias reduce
-#if ENABLE_BIAS_REDUCE
     Helper.biasReduce<half, Address, ShMemSizeLayer, SubgroupCount>(
-        0u, dOutTiles, subgroupId, biasGradAddr);
-#endif
+        0u, dOut, subgroupId, biasGradAddr);
 
     // 3. Outer product
-    uint outerChecksum = 0;
-#if ENABLE_OUTER_PRODUCT
-#if ENABLE_OUTER_STORE
     Helper.outerProduct<half, Address, ShMemSizeLayer, SubgroupCount>(
-        0u, dOutTiles, inputTiles, weightGradAddr);
-#elif ENABLE_OUTER_REDUCE
-    outerChecksum = Helper.outerProductComputeReduceChecksum<ShMemSizeLayer, SubgroupCount>(
-        0u, dOutTiles, inputTiles);
-#else
-    outerChecksum = Helper.outerProductComputeChecksum(dOutTiles, inputTiles);
-#endif
-#endif
+        0u, dOut, input, weightGradAddr);
 
-    // 4. Compute checksum either by extracting to packed uint array
-    // or by directly reading all result fragment registers.
-#if !(FRAGMENT_CHECKSUM_MODE && EARLY_RESULT_CHECKSUM)
-    checksum = 0;
-#if FRAGMENT_CHECKSUM_MODE
-    [ForceUnroll]
-    for (int t = 0; t < Helper.ResultTileCount; ++t)
-    {
-        checksum += resultTiles[t].fragmentRead(0);
-        checksum += resultTiles[t].fragmentRead(1);
-        checksum += resultTiles[t].fragmentRead(2);
-        checksum += resultTiles[t].fragmentRead(3);
-    }
-#else
+    // 4. Extract result to local array and compute checksum
+    static const int ResultPacked = INPUT_SIZE / 2;
     uint resultPacked[ResultPacked];
-    Helper.toArrayPacked<ResultPacked, Helper.ResultTileCount>(resultTiles, resultPacked);
+    result.toArrayPacked<ResultPacked>(resultPacked);
 
+    uint checksum = 0;
     [ForceUnroll]
     for (int i = 0; i < ResultPacked; i++)
         checksum = checksum + resultPacked[i];
-#endif
-#endif
-    checksum += outerChecksum;
+
     outputs[sampleIdx * SubgroupSize + int(laneId)] = checksum;
 }

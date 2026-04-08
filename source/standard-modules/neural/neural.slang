@@ -29,7 +29,7 @@ __include "accelerate-vector-coopmat";
 // __include "mma-new-helper";
 __include "mma-new-helper-v2";
 __include "WaveMatrix";
-__include "mma-new-helper-v3";
+__include "mma-new-helper-v2";
 __include "mma-tiled-layout-helper";
 __include "mma-new-helper";
 __include "vectorized-reader";

@@ -19,7 +19,7 @@ implementing neural;
 
 VISIBILITY_LEVEL typealias MatrixA<int Rows, int Cols> = WaveMatrix<half, linalg.CoopMatMatrixUse.MatrixA, Rows, Cols>;
 VISIBILITY_LEVEL typealias MatrixB<int Rows, int Cols> = WaveMatrix<half, linalg.CoopMatMatrixUse.MatrixB, Rows, Cols>;
-VISIBILITY_LEVEL typealias MatrixC<T : __BuiltinFloatingPointType, int Rows, int Cols> = WaveMatrix<T, linalg.CoopMatMatrixUse.MatrixAccumulator, Rows, Cols>;
+VISIBILITY_LEVEL typealias MatrixC<T: __BuiltinFloatingPointType, int Rows, int Cols> = WaveMatrix<T, linalg.CoopMatMatrixUse.MatrixAccumulator, Rows, Cols>;
 
 [require(cuda)]
 VISIBILITY_LEVEL struct WaveMatrix<T, linalg.CoopMatMatrixUse Use, int Rows, int Cols>
@@ -116,7 +116,7 @@ VISIBILITY_LEVEL struct WaveMatrix<T, linalg.CoopMatMatrixUse Use, int Rows, int
     [ForceInline]
     [require(cuda, subgroup_shuffle)]
     [mutating]
-    void fromArrayPacked<int PackedSize>(uint packedData[PackedSize])
+    VISIBILITY_LEVEL void fromArrayPacked<int PackedSize>(uint packedData[PackedSize])
     {
         static_assert(Use == linalg.CoopMatMatrixUse.MatrixA, "fromArrayPacked only supports MatrixA");
 
@@ -194,14 +194,19 @@ VISIBILITY_LEVEL struct WaveMatrix<T, linalg.CoopMatMatrixUse Use, int Rows, int
 
     [ForceInline]
     [require(cuda, subgroup_shuffle)]
-    void toArrayPacked<int PackedSize>(inout uint packedOut[PackedSize])
+    VISIBILITY_LEVEL void toArrayPacked<int PackedSize>(inout uint packedOut[PackedSize])
     {
-        static_assert(Use == linalg.CoopMatMatrixUse.MatrixA, "toArrayPacked only supports MatrixA");
+        static_assert(Use == linalg.CoopMatMatrixUse.MatrixA
+                   || Use == linalg.CoopMatMatrixUse.MatrixAccumulator,
+            "toArrayPacked only supports MatrixA or MatrixAccumulator");
 
         uint laneid = WaveGetLaneIndex();
 
+        // For half: 2 elements per uint32, TileColsPacked = 8
+        // For float: 1 element per uint32, TileColsPacked = 16
+        static const int ElemsPerReg = sizeof(uint) / sizeof(T);
         static const int TotalColsPacked = PackedSize;
-        static const int TileColsPacked = TILE / 2;
+        static const int TileColsPacked = TILE / ElemsPerReg;
         static const uint RegColsPacked = 4;
         static const uint RegRowsPacked = 8;
         static const uint RegRows = 2;
@@ -277,12 +282,84 @@ VISIBILITY_LEVEL struct WaveMatrix<T, linalg.CoopMatMatrixUse Use, int Rows, int
     [ForceInline]
     [require(cuda)]
     [mutating]
+    void loadTileRawFromPointer<U>(int tileIndex, U* basePtr)
+    {
+        uint laneid = WaveGetLaneIndex();
+
+        // Native layout: 32 lanes × ElementsPerLane elements of type U per tile.
+        // Each lane reads its elements starting at laneid * ElementsPerLane.
+        static const int ElemsPerLane = (TILE * TILE) / 32;  // 8
+
+        if (sizeof(U) == sizeof(T))
+        {
+            // Same size (e.g. half→half or float→float): raw uint32 copy
+            let src = bit_cast<uint*>(basePtr) + laneid * RegsPerLane;
+
+            if (RegsPerLane <= 4)
+            {
+                let vec = *bit_cast<uint4*>(src);
+                tiles[tileIndex].fragmentWrite(0, vec.x);
+                tiles[tileIndex].fragmentWrite(1, vec.y);
+                tiles[tileIndex].fragmentWrite(2, vec.z);
+                tiles[tileIndex].fragmentWrite(3, vec.w);
+            }
+            else
+            {
+                let vec0 = *bit_cast<uint4*>(src);
+                let vec1 = *bit_cast<uint4*>(src + 4);
+                tiles[tileIndex].fragmentWrite(0, vec0.x);
+                tiles[tileIndex].fragmentWrite(1, vec0.y);
+                tiles[tileIndex].fragmentWrite(2, vec0.z);
+                tiles[tileIndex].fragmentWrite(3, vec0.w);
+                tiles[tileIndex].fragmentWrite(4, vec1.x);
+                tiles[tileIndex].fragmentWrite(5, vec1.y);
+                tiles[tileIndex].fragmentWrite(6, vec1.z);
+                tiles[tileIndex].fragmentWrite(7, vec1.w);
+            }
+        }
+        else if (sizeof(U) > sizeof(T))
+        {
+            // Wider source (e.g. float→half): read U values, convert to T, pack into uint32.
+            // Each lane reads ElemsPerLane values of U, converts to T,
+            // packs into RegsPerLane(T) uint32 registers.
+            U* src = basePtr + laneid * ElemsPerLane;
+
+            let fvec0 = *bit_cast<float4*>(src);
+            let fvec1 = *bit_cast<float4*>(src + 4);
+            let tvec0 = (vector<T, 4>)fvec0;
+            let tvec1 = (vector<T, 4>)fvec1;
+
+            tiles[tileIndex].fragmentWrite(0, bit_cast<uint>(tvec0.xy));
+            tiles[tileIndex].fragmentWrite(1, bit_cast<uint>(tvec0.zw));
+            tiles[tileIndex].fragmentWrite(2, bit_cast<uint>(tvec1.xy));
+            tiles[tileIndex].fragmentWrite(3, bit_cast<uint>(tvec1.zw));
+        }
+    }
+
+    [ForceInline]
+    [require(cuda)]
+    [mutating]
     void loadWeightRaw<U, Address>(Address weightAddress)
         where U : __BuiltinFloatingPointType
         where U.Differential == U
         where Address : IPointerLikeAddress<U>
     {
+        static_assert(Use == linalg.CoopMatMatrixUse.MatrixB, "loadWeightRaw only supports MatrixB");
+
         static const int TileSizeInElements = TILE * TILE;
+
+        U* basePtr;
+        if (Address.BufferType is RWStructuredBuffer<U>)
+        {
+            let bufferPtr = __getStructuredBufferPtr(bit_cast<RWStructuredBuffer<U>>(weightAddress.getBuffer()));
+            let doublePtr = bit_cast<U**>(bufferPtr);
+            basePtr = doublePtr[0] + weightAddress.getBaseIndex();
+        }
+        else
+        {
+            basePtr = bit_cast<U*>(weightAddress.getBuffer()) + weightAddress.getBaseIndex();
+        }
+
         [ForceUnroll]
         for (int r = 0; r < TileRows; r++)
         {
@@ -291,8 +368,7 @@ VISIBILITY_LEVEL struct WaveMatrix<T, linalg.CoopMatMatrixUse Use, int Rows, int
             {
                 int idx = tileIdx(r, c);
                 int offset = (r * TileCols + c) * TileSizeInElements;
-                let tileAddr = weightAddress.getOffset(offset);
-                tiles[idx] = tiles[idx].LoadRaw(bit_cast<RWStructuredBuffer<T>>(tileAddr.getBuffer()), tileAddr.getBaseIndex());
+                loadTileRawFromPointer<U>(idx, basePtr + offset);
             }
         }
     }
@@ -416,6 +492,7 @@ VISIBILITY_LEVEL void matMad<T, int R0, int C0, int C1>(
     WaveMatrix<half, linalg.CoopMatMatrixUse.MatrixB, C0, C1> b,
     inout WaveMatrix<T, linalg.CoopMatMatrixUse.MatrixAccumulator, R0, C1> c)
         where T : __BuiltinFloatingPointType
+        where T.Differential == T
 {
     static const int KTiles = (C0 + 15) / 16;
     static const int MRows = (R0 + 15) / 16;
@@ -450,6 +527,7 @@ matMul<T, int R0, int C0, int C1>(
     WaveMatrix<half, linalg.CoopMatMatrixUse.MatrixA, R0, C0> a,
     WaveMatrix<half, linalg.CoopMatMatrixUse.MatrixB, C0, C1> b)
         where T : __BuiltinFloatingPointType
+        where T.Differential == T
 {
     WaveMatrix<T, linalg.CoopMatMatrixUse.MatrixAccumulator, R0, C1> c;
 
