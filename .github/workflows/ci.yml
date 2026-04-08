@@ -329,7 +329,7 @@ jobs:
             --jq '[.jobs[] | select(.conclusion == "failure") | select(
               (.steps[]? | select(.name == "GPU health check" and .conclusion == "failure"))
               or
-              (.steps[]? | select(.name == "GPU post-test diagnostics" and .conclusion == "success"))
+              (.steps[]? | select(.name == "GPU post-test diagnostics" and .conclusion == "failure"))
             )] | length' \
             || echo "0")
           gpu_failures=${gpu_failures:-0}
