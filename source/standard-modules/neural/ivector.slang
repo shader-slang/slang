@@ -21,7 +21,7 @@ public interface IVector<T> : IDifferentiable, IArrayAccessor<T>
 
     /// The differential type for automatic differentiation.
     /// @remarks Ensures the differential is also a vector with the same structure.
-    public associatedtype Differential : IVector<T.Differential>;
+    public associatedtype Differential : IVector<T>;
 
     /// Default constructor - initializes vector to zero.
     public __init();
@@ -64,7 +64,7 @@ public interface IVector<T> : IDifferentiable, IArrayAccessor<T>
     [Differentiable]
     public OutputVector linearTransform<Address, Layout, OutputVector>(Address weightAddress)
             where Address : IPointerLikeAddress<T>
-            where Address.Differential : IPointerLikeAddress<T.Differential>
+            where Address.Differential : IPointerLikeAddress<T>
             where Layout : IStorageLayout
             where OutputVector : IVector<T>;
 
@@ -91,7 +91,7 @@ public interface IVector<T> : IDifferentiable, IArrayAccessor<T>
     public OutputVector linearTransform<Address, Layout, OutputVector>(
         Address weightAddress, Address biasAddress)
             where Address : IPointerLikeAddress<T>
-            where Address.Differential : IPointerLikeAddress<T.Differential>
+            where Address.Differential : IPointerLikeAddress<T>
             where Layout : IStorageLayout
             where OutputVector : IVector<T>;
 }

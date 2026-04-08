@@ -2968,7 +2968,7 @@ struct SlangSessionExtendedDesc
 {
     StructType structType = StructType::SlangSessionExtendedDesc;
     uint32_t compilerOptionEntryCount = 0;
-    slang::CompilerOptionEntry* compilerOptionEntries = nullptr;
+    slang::CompilerOptionEntry const* compilerOptionEntries = nullptr;
 };
 
 /// Whether to enable ray tracing validation (currently only Vulkan - D3D requires app layer to use

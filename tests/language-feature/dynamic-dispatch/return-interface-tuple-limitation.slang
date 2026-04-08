@@ -6,7 +6,7 @@
 // wrapper functions.
 
 // Disabled: ICE — SLANG_ASSERT(loweredTupleInfo) only fires in Debug builds;
-// in Release, the null dereference is UB and won't produce error 99999. (#10172)
+// in Release, the null dereference is UB and won't produce error 99997. (#10172)
 //DISABLE_TEST:SIMPLE(filecheck=CHECK):-target hlsl -stage compute -entry computeMain -conformance "FactoryA:IFactory=0" -conformance "FactoryB:IFactory=1" -conformance "FooA:IFoo=0" -conformance "FooB:IFoo=1"
 
 RWStructuredBuffer<float> outputBuffer;
@@ -60,7 +60,7 @@ IFactory createFactory(uint id)
     return createDynamicObject<IFactory>(id, 0.0);
 }
 
-// CHECK: error 99999
+// CHECK: error 99997
 [numthreads(1, 1, 1)]
 void computeMain(int id : SV_DispatchThreadID)
 {
