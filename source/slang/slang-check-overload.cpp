@@ -1192,6 +1192,22 @@ bool SemanticsVisitor::TryCheckOverloadCandidateConstraints(
 
             newArgs.add(m_astBuilder->getNonEmptyPackWitness(constrainedArg));
         }
+        else if (
+            auto hasDiffTypeInfoConstraintDecl = as<HasDiffTypeInfoConstraintDecl>(constraintDecl))
+        {
+            if (!addHasDiffTypeInfoWitnessToArgs(
+                    getASTBuilder(),
+                    this,
+                    hasDiffTypeInfoConstraintDecl,
+                    genericDeclRef,
+                    &context,
+                    nullptr,
+                    newArgs,
+                    context.mode != OverloadResolveContext::Mode::JustTrying))
+            {
+                return false;
+            }
+        }
     }
 
     candidate.subst = SubstitutionSet(
