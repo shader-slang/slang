@@ -42,3 +42,7 @@ __include "iactivation";
 __include "activations";
 __include "ilayer";
 __include "layers";
+
+#ifdef UNIT_TEST
+__include "test-mma";
+#endif
