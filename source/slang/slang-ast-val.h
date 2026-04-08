@@ -95,7 +95,7 @@ private:
 
 // A DeclRef that encodes that there is some member accessible called to `decl`.
 // This `decl` is not the real value and must be resolved via the original constraint
-// it comes from
+// it comes from.
 FIDDLE()
 class MemberConstraintDeclRef : public DeclRefBase
 {
@@ -107,7 +107,7 @@ public:
         setOperands(placeholderDecl, constraintDecl);
     }
 
-    // The source type that we are looking up from.
+    // The constraint that we resolve our declref with.
     TypeCoercionConstraintDecl* getConstraintDecl()
     {
         return as<TypeCoercionConstraintDecl>(getDeclOperand(1));
