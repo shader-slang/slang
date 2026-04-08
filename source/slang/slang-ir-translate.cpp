@@ -431,9 +431,9 @@ IRInst* _resolveInstRec(TranslationContext* ctx, IRInst* inst)
 
                 if (specResult && as<IRGlobalValueWithCode>(specResult))
                 {
-                    // If we ended up with something that has code, 
+                    // If we ended up with something that has code,
                     // specialization may have opened up some simplification opportunities.
-                    // 
+                    //
 
                     applySparseConditionalConstantPropagation(
                         specResult,
