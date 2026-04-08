@@ -1,6 +1,5 @@
 implementing neural;
 
-#include "common-def.slang"
 
 // MMAHelperNewV2: Same logic as V2 but using WaveMatrix types for readability.
 //
@@ -13,7 +12,7 @@ implementing neural;
 // are delegated to WaveMatrix methods.
 
 [require(cuda)]
-VISIBILITY_LEVEL struct MMAHelperNewV2<T, int InputSize, int OutputSize, int SubgroupSize, TargetEnum Target>
+internal struct MMAHelperNewV2<T, int InputSize, int OutputSize, int SubgroupSize, TargetEnum Target>
     where T : __BuiltinFloatingPointType
     where T.Differential == T
 {
@@ -25,25 +24,25 @@ VISIBILITY_LEVEL struct MMAHelperNewV2<T, int InputSize, int OutputSize, int Sub
     static const int COL = 16;
 
     // WaveMatrix types for the various roles
-    VISIBILITY_LEVEL typealias DOutMatrix   = MatrixA<N, M>;
-    VISIBILITY_LEVEL typealias InputMatrix  = MatrixA<N, K>;
+    internal typealias DOutMatrix   = MatrixA<N, M>;
+    internal typealias InputMatrix  = MatrixA<N, K>;
 
-    VISIBILITY_LEVEL typealias ResultMatrix = MatrixC<T, N, K>;
-    VISIBILITY_LEVEL typealias WeightMatrix = MatrixB<M, K>;
-    VISIBILITY_LEVEL typealias OPResult     = MatrixC<T, M, K>;
+    internal typealias ResultMatrix = MatrixC<T, N, K>;
+    internal typealias WeightMatrix = MatrixB<M, K>;
+    internal typealias OPResult     = MatrixC<T, M, K>;
     static const int OPResultTileStride = OPResult.TileStride;
 
-    VISIBILITY_LEVEL static const int DOutTileCount   = DOutMatrix.TileCount;
-    VISIBILITY_LEVEL static const int InputTileCount  = InputMatrix.TileCount;
-    VISIBILITY_LEVEL static const int ResultTileCount = ResultMatrix.TileCount;
-    VISIBILITY_LEVEL static const int OP_TotalTiles   = OPResult.TileCount;
+    internal static const int DOutTileCount   = DOutMatrix.TileCount;
+    internal static const int InputTileCount  = InputMatrix.TileCount;
+    internal static const int ResultTileCount = ResultMatrix.TileCount;
+    internal static const int OP_TotalTiles   = OPResult.TileCount;
 
     // =========================================================================
     // from_array / to_array: delegated to WaveMatrix methods
     // =========================================================================
 
     [require(cuda, subgroup_shuffle)]
-    VISIBILITY_LEVEL static void fromArrayPacked<int PackedSize>(
+    internal static void fromArrayPacked<int PackedSize>(
         uint packedData[PackedSize],
         inout DOutMatrix mat)
     {
@@ -51,7 +50,7 @@ VISIBILITY_LEVEL struct MMAHelperNewV2<T, int InputSize, int OutputSize, int Sub
     }
 
     [require(cuda, subgroup_shuffle)]
-    VISIBILITY_LEVEL static void fromArrayPackedInput<int PackedSize>(
+    internal static void fromArrayPackedInput<int PackedSize>(
         uint packedData[PackedSize],
         inout InputMatrix mat)
     {
@@ -59,7 +58,7 @@ VISIBILITY_LEVEL struct MMAHelperNewV2<T, int InputSize, int OutputSize, int Sub
     }
 
     [require(cuda, subgroup_shuffle)]
-    VISIBILITY_LEVEL static void toArrayPacked<T, int PackedSize>(
+    internal static void toArrayPacked<T, int PackedSize>(
         MatrixC<T, N, K> mat,
         inout uint packedOut[PackedSize])
             where T : __BuiltinFloatingPointType
@@ -74,8 +73,8 @@ VISIBILITY_LEVEL struct MMAHelperNewV2<T, int InputSize, int OutputSize, int Sub
     // Takes WaveTangledVector inputs directly, handles packing/unpacking.
     // =========================================================================
 
-    VISIBILITY_LEVEL static const int PackedSizeInput = K / (sizeof(uint) / sizeof(T));
-    VISIBILITY_LEVEL static const int PackedSizeOutput = M / (sizeof(uint) / sizeof(T));
+    internal static const int PackedSizeInput = K / (sizeof(uint) / sizeof(T));
+    internal static const int PackedSizeOutput = M / (sizeof(uint) / sizeof(T));
 
     // backward: given input and dOut, compute dInput, accumulate dWeight and dBias
     //
@@ -86,7 +85,7 @@ VISIBILITY_LEVEL struct MMAHelperNewV2<T, int InputSize, int OutputSize, int Sub
     //   3. dWeight += dOut ⊗ input (outer product accumulate)
     [ForceInline]
     [require(cuda, subgroup_shuffle)]
-    VISIBILITY_LEVEL static WaveTangledVector<T, ShMemSize, K, N, SubgroupCount>
+    internal static WaveTangledVector<T, ShMemSize, K, N, SubgroupCount>
     backward<Address, ShMemSize : ISharedMemorySize, int SubgroupCount>(
         WaveTangledVector<T, ShMemSize, K, N, SubgroupCount> input,
         WaveTangledVector<T, ShMemSize, M, N, SubgroupCount> dOut,
@@ -141,7 +140,7 @@ VISIBILITY_LEVEL struct MMAHelperNewV2<T, int InputSize, int OutputSize, int Sub
 
     [ForceInline]
     [require(cuda, subgroup_shuffle)]
-    VISIBILITY_LEVEL static void mma<bool Transpose, Address>(
+    internal static void mma<bool Transpose, Address>(
         DOutMatrix dOut,
         Address weightAddress,
         inout ResultMatrix result)
@@ -191,7 +190,7 @@ VISIBILITY_LEVEL struct MMAHelperNewV2<T, int InputSize, int OutputSize, int Sub
 
     [ForceInline]
     [require(cuda, subgroup_shuffle)]
-    VISIBILITY_LEVEL static void outerProduct<U, Address, ShMemSize : ISharedMemorySize, int SubgroupCount>(
+    internal static void outerProduct<U, Address, ShMemSize : ISharedMemorySize, int SubgroupCount>(
         uint sharedMemoryOffset,
         inout DOutMatrix dOut,
         inout InputMatrix input,
@@ -304,11 +303,11 @@ VISIBILITY_LEVEL struct MMAHelperNewV2<T, int InputSize, int OutputSize, int Sub
     static const int NBiasTiles = (M + COL - 1) / COL;
     static const int NRowTiles = (N + ROW - 1) / ROW;
     static const int NRowGroups = NRowTiles;
-    VISIBILITY_LEVEL static const int TotalBiasTilesMatA = NBiasTiles * NRowGroups;
+    internal static const int TotalBiasTilesMatA = NBiasTiles * NRowGroups;
 
     [ForceInline]
     [require(cuda, subgroup_shuffle)]
-    VISIBILITY_LEVEL static void biasReduce<U, Address, ShMemSize : ISharedMemorySize, int SubgroupCount>(
+    internal static void biasReduce<U, Address, ShMemSize : ISharedMemorySize, int SubgroupCount>(
         uint sharedMemoryOffset,
         DOutMatrix dOut,
         in int subgroupId,

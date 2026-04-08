@@ -2,7 +2,6 @@
 // So we can test this single file by providing -DUNIT_TEST to the compiler.
 implementing neural;
 
-#include "common-def.slang"
 
 // Perf profiling toggles. Override with -DPERF_xxx=0 to disable individual
 // backward components for decomposed benchmarking.
@@ -104,7 +103,7 @@ internal struct CoopMatShape<T, TargetEnum Target>
     static const uint CoopMatCSizeInVector = (ROW_C * COLUMN_C) / ElementCountPerVectorMatC;
 }
 
-VISIBILITY_LEVEL struct TileInfo<T, int M, int N, int K, TargetEnum Target, bool TransposeA = false>
+internal struct TileInfo<T, int M, int N, int K, TargetEnum Target, bool TransposeA = false>
     where T : __BuiltinFloatingPointType
     where T.Differential == T
 {
@@ -129,8 +128,8 @@ VISIBILITY_LEVEL struct TileInfo<T, int M, int N, int K, TargetEnum Target, bool
     // `Uint4AlignedK` is the K value that is aligned with the uint4 vector size. Because we always do the vectorized load
     // along K dimension, so we need to align the K value with the vector size.
     // Measured in T.
-    VISIBILITY_LEVEL static const int Uint4AlignedK = ((K + (MatShape.ElementCountPerVector - 1)) / MatShape.ElementCountPerVector) * MatShape.ElementCountPerVector;
-    VISIBILITY_LEVEL static const int Uint4AlignedM = ((M + (MatShape.ElementCountPerVector - 1)) / MatShape.ElementCountPerVector) * MatShape.ElementCountPerVector;
+    internal static const int Uint4AlignedK = ((K + (MatShape.ElementCountPerVector - 1)) / MatShape.ElementCountPerVector) * MatShape.ElementCountPerVector;
+    internal static const int Uint4AlignedM = ((M + (MatShape.ElementCountPerVector - 1)) / MatShape.ElementCountPerVector) * MatShape.ElementCountPerVector;
 
     // The height of tile A measure in T and uint4.
     static const uint HeightInElementsTileA = NCoopMatRow * MatShape.ROW_A;
@@ -165,7 +164,7 @@ VISIBILITY_LEVEL struct TileInfo<T, int M, int N, int K, TargetEnum Target, bool
 //       we need the logic to be expand as much as possible during compile time. WaveGetLaneCount() is a runtime function,
 //       so if we use it directly in our mma function, some of branches won't be eliminated during compile time.
 [require(cooperative_matrix)]
-VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int SubgroupSize, TargetEnum Target, ShMemSize: ISharedMemorySize, bool TransposeA, int SubgroupCount>
+internal struct MMAHelper<T, int InputSize, int OutputSize, int SubgroupSize, TargetEnum Target, ShMemSize: ISharedMemorySize, bool TransposeA, int SubgroupCount>
     where T : __BuiltinFloatingPointType
     where T.Differential == T
 {
@@ -186,8 +185,8 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
     static const int N = SubgroupSize;
     static const int K = InputSize;
 
-    VISIBILITY_LEVEL static const int Uint4AlignedK = TileInfo.Uint4AlignedK;
-    VISIBILITY_LEVEL static const int Uint4AlignedM = TileInfo.Uint4AlignedM;
+    internal static const int Uint4AlignedK = TileInfo.Uint4AlignedK;
+    internal static const int Uint4AlignedM = TileInfo.Uint4AlignedM;
 
     // NumLoadsEachThreadMatA is the number of loads each thread needs to perform.
     // N is the number of active threads in the subgroup.
@@ -359,7 +358,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
 
     [ForceInline]
     [require(cooperative_matrix, subgroup_basic, cuda_spirv)]
-    VISIBILITY_LEVEL static void loadShA<U, Address>(
+    internal static void loadShA<U, Address>(
         uint sharedMemoryOffset,
         int tileIndex,
         Address weightAddress)
@@ -372,7 +371,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
 
     [ForceInline]
     [require(cooperative_matrix, subgroup_basic, cuda_spirv)]
-    VISIBILITY_LEVEL static void storeShA<U, Address>(
+    internal static void storeShA<U, Address>(
         uint sharedMemoryOffset,
         int tileIndex,
         Address weightAddress)
@@ -492,7 +491,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
     // column of the matrix B.
     [ForceInline]
     [require(cooperative_matrix, subgroup_basic, cuda_spirv)]
-    VISIBILITY_LEVEL static void loadVectorToShB<U, InputArray>(
+    internal static void loadVectorToShB<U, InputArray>(
         uint sharedMemoryBOffset,
         int tileIndex,
         int subgroupIndex,
@@ -508,7 +507,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
     // column of the matrix B.
     [ForceInline]
     [require(cooperative_matrix, subgroup_basic, cuda_spirv)]
-    VISIBILITY_LEVEL static void storeVectorFromShB<U, InputArray, AccessOp Op = AccessOp.WRITE>(
+    internal static void storeVectorFromShB<U, InputArray, AccessOp Op = AccessOp.WRITE>(
         uint sharedMemoryBOffset,
         int tileIndex,
         int subgroupIndex,
@@ -526,7 +525,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
     // in a warp.
     [ForceInline]
     [require(cooperative_matrix, subgroup_basic, cuda_spirv)]
-    VISIBILITY_LEVEL static void loadVectorForOuterProduct<int BatchSize, int ArraySizeInVector, int TileStrideInVector, U, InputArray>(
+    internal static void loadVectorForOuterProduct<int BatchSize, int ArraySizeInVector, int TileStrideInVector, U, InputArray>(
         uint sharedMemoryOffset,
         int tileIndex,
         InputArray inputVector)
@@ -793,7 +792,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
     [ForceInline]
     [require(cooperative_matrix, subgroup_basic, cuda_spirv)]
     [require(cuda_spirv, sm_6_6)]
-    VISIBILITY_LEVEL static void sumReduceRows<U, Address, InArrayType>(
+    internal static void sumReduceRows<U, Address, InArrayType>(
         uint sharedMemoryOffset,
         in InArrayType dOut,
         in int subgroupId,
@@ -927,7 +926,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
     // Requires N * TileStrideInVector uint4 per warp (2x the per-batch allocation).
     [ForceInline]
     [require(cooperative_matrix, subgroup_basic, cuda_spirv)]
-    VISIBILITY_LEVEL static void loadAllVectorsForOuterProduct<int ArraySizeInVector, int TileStrideInVector, U, InputArray>(
+    internal static void loadAllVectorsForOuterProduct<int ArraySizeInVector, int TileStrideInVector, U, InputArray>(
         uint sharedMemoryOffset,
         InputArray inputVector)
             where U : __BuiltinFloatingPointType
@@ -971,7 +970,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
     // This eliminates one barrier per k-iteration at the cost of 2x vector shmem.
     [ForceInline]
     [require(cooperative_matrix, subgroup_basic, cuda_spirv)]
-    VISIBILITY_LEVEL static void outerProduct<int CoopMatCRows, int CoopMatCColumns, TypeA, InArrayTypeA, TypeB, InArrayTypeB>(
+    internal static void outerProduct<int CoopMatCRows, int CoopMatCColumns, TypeA, InArrayTypeA, TypeB, InArrayTypeB>(
         uint sharedMemoryAOffset,
         uint sharedMemoryBOffset,
         uint subgroupIndex,
@@ -1032,7 +1031,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
     [ForceInline]
     [require(cooperative_matrix, subgroup_basic, cuda_spirv)]
     [require(spvAtomicFloat16AddEXT)]
-    VISIBILITY_LEVEL static void outerProductAccumulate<U, Address, TypeA, InArrayTypeA, TypeB, InArrayTypeB>(
+    internal static void outerProductAccumulate<U, Address, TypeA, InArrayTypeA, TypeB, InArrayTypeB>(
         uint sharedMemoryAOffset,
         uint sharedMemoryBOffset,
         InArrayTypeA inputVectorA,
@@ -1102,7 +1101,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
     //  for each thread, so the matrix-matrix multiply only needs to be performed for each warp (sub-group).
     [ForceInline]
     [require(cooperative_matrix, subgroup_basic, cuda_spirv)]
-    VISIBILITY_LEVEL static OutArrayType mma<U, Address, InArrayType, OutArrayType, V, bool Bias = false>(InArrayType inputVector,
+    internal static OutArrayType mma<U, Address, InArrayType, OutArrayType, V, bool Bias = false>(InArrayType inputVector,
         uint sharedMemoryAOffset,
         uint sharedMemoryBOffset,
         uint sharedMemoryCOffset,

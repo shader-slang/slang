@@ -1,6 +1,5 @@
 implementing neural;
 
-#include "common-def.slang"
 
 
 internal interface IArrayAccessor<T>
@@ -140,7 +139,7 @@ internal extension<T, int N> Array<T, N> : IArrayAccessor<T>
     }
 }
 
-VISIBILITY_LEVEL enum AccessOp : uint32_t
+internal enum AccessOp : uint32_t
 {
     READ,
     WRITE,

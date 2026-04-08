@@ -26,15 +26,12 @@ typealias DType = float;
 //TEST_INPUT: set outputBuffer = ubuffer(stride=4, count=4096)
 uniform RWStructuredBuffer<DType>.Handle outputBuffer;
 
-typealias Address = BindlessAddress<DType>;
-
 static const int SubgroupSize = 32;
 static const int WorkgroupSize = 128;
 static const int workgroupCount = WorkgroupSize / SubgroupSize;
 
 static const int MaxK = 64;
 static const int MaxM = 64;
-
 static const int ShMemSizeA = MaxM * 4;
 static const int ShMemSizeB = MaxK * 4;
 static const int TotalShMemSizeA = ShMemSizeA * workgroupCount;
@@ -43,9 +40,6 @@ static const int TotalShMemSizeB = ShMemSizeB * workgroupCount * (sizeof(DType) 
 public struct TestShMemSize : ISharedMemorySize {
     public static const uint Bytes = (TotalShMemSizeA + TotalShMemSizeB) * sizeof(uint4);
 }
-typealias TestPool = SharedMemoryPool<TestShMemSize>;
-static const uint OffsetA = 0;
-static const uint OffsetB = TotalShMemSizeA;
 
 static const int TileSize = 16;
 
@@ -58,46 +52,12 @@ int tiledOffset<int NTileCols>(int row, int col)
     return (tileRow * NTileCols + tileCol) * (TileSize * TileSize) + localRow * TileSize + localCol;
 }
 
-void TestOuterProductAccumulateTiled<int InputSize, int OutputSize, int PaddedInputSize, int PaddedOutputSize, TargetEnum Target>(uint tid)
-{
-    Address address = Address(outputBuffer);
-
-    typealias MMA = TiledMMAHelper<DType, PaddedInputSize, PaddedOutputSize, SubgroupSize, Target, TestShMemSize, false, workgroupCount>;
-    const int OutSize = MMA.TileInfoT.Uint4AlignedM;
-    const int InSize = MMA.TileInfoT.Uint4AlignedK;
-
-    DType dOutVector[OutSize] = {};
-    DType inputVector[InSize] = {};
-
-    float scaleFactor = 1.0f / WorkgroupSize;
-
-    for (int i = 0; i < InputSize; i++)
-    {
-        inputVector[i] = DType((i + 1) * (tid + 1) * scaleFactor);
-    }
-
-    for (int i = 0; i < OutputSize; i++)
-    {
-        dOutVector[i] = DType((OutputSize - i) * scaleFactor);
-    }
-
-    MMA.outerProductAccumulate<DType, Address, DType, DType[OutSize], DType, DType[InSize]>(OffsetA, OffsetB, dOutVector, inputVector, address);
-}
-
 void test<int InputSize, int OutputSize>(uint tid, uint resIndex)
 {
     static const int PaddedInputSize = PadToTile<InputSize>.Value;
     static const int PaddedOutputSize = PadToTile<OutputSize>.Value;
 
-    __target_switch
-    {
-    case cuda:
-        TestOuterProductAccumulateTiled<InputSize, OutputSize, PaddedInputSize, PaddedOutputSize, TargetEnum.CUDA>(tid);
-        break;
-    case spirv:
-        TestOuterProductAccumulateTiled<InputSize, OutputSize, PaddedInputSize, PaddedOutputSize, TargetEnum.SPIR_V>(tid);
-        break;
-    }
+    neural_unittest.testOuterProductAccumulateTiled<DType, PaddedInputSize, PaddedOutputSize, TestShMemSize, workgroupCount, WorkgroupSize>(tid, outputBuffer);
 
     int subgroupIndex = tid / SubgroupSize;
     if (subgroupIndex != 0)
@@ -139,7 +99,6 @@ void test<int InputSize, int OutputSize>(uint tid, uint resIndex)
         resultBuffer[resIndex] = res ? 1 : 0;
 }
 
-// Clear tiled buffer: need to clear PaddedM * PaddedK elements (all tiles).
 void clearTiledBuffer<int PaddedSize, int WorkgroupSize>(uint tid)
 {
     static const int TotalElements = PaddedSize * PaddedSize;

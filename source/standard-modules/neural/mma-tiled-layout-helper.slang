@@ -6,7 +6,6 @@
 // focused on the linear-layout path.
 implementing neural;
 
-#include "common-def.slang"
 
 // Round up a compile-time integer to the next multiple of 16 (cooperative matrix tile size).
 internal struct TileAlignedSize<int Size>
@@ -31,7 +30,7 @@ internal struct TileAlignedSize<int Size>
 ///   * Outer-product results are stored directly in tiled layout without
 ///     converting back to linear format.
 [require(cooperative_matrix)]
-VISIBILITY_LEVEL struct TiledMMAHelper<T, int InputSize, int OutputSize, int SubgroupSize, TargetEnum Target, ShMemSize: ISharedMemorySize, bool TransposeA, int SubgroupCount>
+internal struct TiledMMAHelper<T, int InputSize, int OutputSize, int SubgroupSize, TargetEnum Target, ShMemSize: ISharedMemorySize, bool TransposeA, int SubgroupCount>
     where T : __BuiltinFloatingPointType
     where T.Differential == T
 {
@@ -41,8 +40,8 @@ VISIBILITY_LEVEL struct TiledMMAHelper<T, int InputSize, int OutputSize, int Sub
     // (input-vector loading, output-vector store-back, cross-warp reduction).
     typealias BaseMMA = MMAHelper<T, InputSize, OutputSize, SubgroupSize, Target, ShMemSize, TransposeA, SubgroupCount>;
 
-    VISIBILITY_LEVEL typealias TileInfoT = BaseMMA.TileInfo;
-    VISIBILITY_LEVEL typealias TileInfo = TileInfoT;
+    internal typealias TileInfoT = BaseMMA.TileInfo;
+    internal typealias TileInfo = TileInfoT;
     typealias CMShape = BaseMMA.CMShape;
     typealias ShMemInfo = BaseMMA.ShMemInfo;
 
@@ -92,7 +91,7 @@ VISIBILITY_LEVEL struct TiledMMAHelper<T, int InputSize, int OutputSize, int Sub
     // Shared memory layout: tiles are stored contiguously, tile i at offset
     // i * TileSizeInUint4.
     [ForceInline]
-    [require(cooperative_matrix, subgroup_basic)]
+    [require(cooperative_matrix, subgroup_basic, cuda_spirv)]
     internal static void loadTileColumnViaSharedMemory<U, Address>(
         uint sharedMemoryOffset,
         int tileIndex,
@@ -134,7 +133,7 @@ VISIBILITY_LEVEL struct TiledMMAHelper<T, int InputSize, int OutputSize, int Sub
     // memory, no type conversion, and no cross-warp sync.
     // Caller must ensure U is half before calling.
     [ForceInline]
-    [require(cooperative_matrix, subgroup_basic)]
+    [require(cooperative_matrix, subgroup_basic, cuda_spirv)]
     // Load a CoopMat A tile directly from global memory.
     // tileRowIdx and tileColIdx are in the iteration's logical space
     // (tileRowIdx = NCoopMatRow index, tileColIdx = shared dimension index).
@@ -178,7 +177,7 @@ VISIBILITY_LEVEL struct TiledMMAHelper<T, int InputSize, int OutputSize, int Sub
     // global memory using atomic writes (for concurrent gradient accumulation).
     // Writes in the native element type U (half or float) — no precision conversion.
     [ForceInline]
-    [require(cooperative_matrix, subgroup_basic)]
+    [require(cooperative_matrix, subgroup_basic, cuda_spirv)]
     internal static void storeTileToGlobal<U, Address>(
         uint sharedMemoryOffset,
         int tileRow,
@@ -232,7 +231,7 @@ VISIBILITY_LEVEL struct TiledMMAHelper<T, int InputSize, int OutputSize, int Sub
     ///    warps see the data before loading into CoopMat registers.
     [ForceInline]
     [require(cooperative_matrix, subgroup_basic, cuda_spirv)]
-    VISIBILITY_LEVEL static OutArrayType mma<U, Address, InArrayType, OutArrayType, V, bool Bias = false>(
+    internal static OutArrayType mma<U, Address, InArrayType, OutArrayType, V, bool Bias = false>(
         InArrayType inputVector,
         uint sharedMemoryAOffset,
         uint sharedMemoryBOffset,
@@ -363,7 +362,7 @@ VISIBILITY_LEVEL struct TiledMMAHelper<T, int InputSize, int OutputSize, int Sub
     [ForceInline]
     [require(cuda_spirv, subgroup_partitioned, subgroup_basic)]
     [require(cuda_spirv, sm_6_6)]
-    VISIBILITY_LEVEL static void sumReduceRows<U, Address, InArrayType>(
+    internal static void sumReduceRows<U, Address, InArrayType>(
         uint sharedMemoryOffset,
         in InArrayType dOut,
         in int subgroupId,
@@ -389,7 +388,8 @@ VISIBILITY_LEVEL struct TiledMMAHelper<T, int InputSize, int OutputSize, int Sub
     // TODO: U and T is actually always the same type, we should clean this up.
     [ForceInline]
     [require(cooperative_matrix, subgroup_basic, cuda_spirv)]
-    VISIBILITY_LEVEL static void outerProductAccumulate<U, Address, TypeA, InArrayTypeA, TypeB, InArrayTypeB>(
+    [require(spvAtomicFloat16AddEXT)]
+    internal static void outerProductAccumulate<U, Address, TypeA, InArrayTypeA, TypeB, InArrayTypeB>(
         uint sharedMemoryAOffset,
         uint sharedMemoryBOffset,
         InArrayTypeA inputVectorA,

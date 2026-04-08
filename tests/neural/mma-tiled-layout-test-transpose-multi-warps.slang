@@ -79,50 +79,21 @@ void fillWeightMatrixTiled<int InputSize, int OutputSize, int PaddedInputSize, i
     }
 }
 
-DType[TiledMMAHelper<DType, PaddedInputSize, PaddedOutputSize, SubgroupSize, Target, TestShMemSize, true, 2>.TileInfoT.Uint4AlignedK]
-    testMatTransposeVecMul<int InputSize, int OutputSize, int PaddedInputSize, int PaddedOutputSize, TargetEnum Target>(uint tid)
-{
-    typealias Address = BindlessAddress<DType>;
-    Address address = Address(inputBuffer);
-
-    typealias MMA = TiledMMAHelper<DType, PaddedInputSize, PaddedOutputSize, SubgroupSize, Target, TestShMemSize, true, 2>;
-    const int OutSize = MMA.TileInfoT.Uint4AlignedK;
-    const int InSize = MMA.TileInfoT.Uint4AlignedM;
-
-    DType inputVector[InSize] = {};
-    for (int i = 0; i < OutputSize; i++)
-    {
-        inputVector[i] = DType(tid + 1) * DType(0.125f);
-    }
-
-    let res = MMA.mma<DType, Address, DType[InSize], DType[OutSize], DType, false>(
-        inputVector, OffsetA, OffsetB, OffsetB, address, none);
-    return res;
-}
-
 void test<int InputSize, int OutputSize>(uint tid, int resIndex)
 {
     static const int PaddedInputSize = PadToTile<InputSize>.Value;
     static const int PaddedOutputSize = PadToTile<OutputSize>.Value;
 
-    DType[TiledMMAHelper<DType, PaddedInputSize, PaddedOutputSize, SubgroupSize, TargetEnum.CUDA, TestShMemSize, true, 2>.TileInfoT.Uint4AlignedK] outputVector;
-    __target_switch
-    {
-    case cuda:
-        outputVector = testMatTransposeVecMul<InputSize, OutputSize, PaddedInputSize, PaddedOutputSize, TargetEnum.CUDA>(tid);
-        break;
-    case spirv:
-        outputVector = testMatTransposeVecMul<InputSize, OutputSize, PaddedInputSize, PaddedOutputSize, TargetEnum.SPIR_V>(tid);
-        break;
-    }
+    let output = neural_unittest.testTiledMatVecMul<DType, InputSize, OutputSize, PaddedInputSize, PaddedOutputSize, TestShMemSize, false, 2, true>(
+        tid, inputBuffer, none);
 
     bool res = true;
     int scaleFactor = (OutputSize % 3 == 0) ? 0 : -1;
     for (int i = 0; i < InputSize; i++)
     {
         int intVal = (i + 1) * (tid + 1);
-        DType expected = DType(scaleFactor) * DType(intVal) * DType(0.125f);
-        if (!equals(outputVector[i], expected))
+        DType expected = DType(scaleFactor) * DType(intVal);
+        if (!equals(output[i], expected))
         {
             res = false;
             break;

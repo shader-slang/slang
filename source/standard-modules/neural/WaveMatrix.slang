@@ -1,6 +1,5 @@
 implementing neural;
 
-#include "common-def.slang"
 
 // WaveMatrix: A tiled matrix type over 16x16 cooperative matrix fragments.
 //
@@ -17,18 +16,18 @@ implementing neural;
 //   Rows - total row count (must be multiple of 16)
 //   Cols - total column count (must be multiple of 16)
 
-VISIBILITY_LEVEL typealias MatrixA<int Rows, int Cols> = WaveMatrix<half, linalg.CoopMatMatrixUse.MatrixA, Rows, Cols>;
-VISIBILITY_LEVEL typealias MatrixB<int Rows, int Cols> = WaveMatrix<half, linalg.CoopMatMatrixUse.MatrixB, Rows, Cols>;
-VISIBILITY_LEVEL typealias MatrixC<T: __BuiltinFloatingPointType, int Rows, int Cols> = WaveMatrix<T, linalg.CoopMatMatrixUse.MatrixAccumulator, Rows, Cols>;
+internal typealias MatrixA<int Rows, int Cols> = WaveMatrix<half, linalg.CoopMatMatrixUse.MatrixA, Rows, Cols>;
+internal typealias MatrixB<int Rows, int Cols> = WaveMatrix<half, linalg.CoopMatMatrixUse.MatrixB, Rows, Cols>;
+internal typealias MatrixC<T: __BuiltinFloatingPointType, int Rows, int Cols> = WaveMatrix<T, linalg.CoopMatMatrixUse.MatrixAccumulator, Rows, Cols>;
 
 [require(cuda)]
-VISIBILITY_LEVEL struct WaveMatrix<T, linalg.CoopMatMatrixUse Use, int Rows, int Cols>
+internal struct WaveMatrix<T, linalg.CoopMatMatrixUse Use, int Rows, int Cols>
     where T : __BuiltinFloatingPointType
 {
     static const int TILE = 16;
     static const int TileRows = (Rows + TILE - 1) / TILE;
     static const int TileCols = (Cols + TILE - 1) / TILE;
-    VISIBILITY_LEVEL static const int TileCount = TileRows * TileCols;
+    internal static const int TileCount = TileRows * TileCols;
 
     typealias Tile = linalg.CoopMat<T, MemoryScope.Subgroup, TILE, TILE, Use>;
 
@@ -36,7 +35,7 @@ VISIBILITY_LEVEL struct WaveMatrix<T, linalg.CoopMatMatrixUse Use, int Rows, int
     static const int RegsPerLane = (ElementsPerLane * sizeof(T) + 3) / 4;
     static const int TileStride = (RegsPerLane * 32 * 4 + sizeof(uint4) - 1) / sizeof(uint4);
 
-    VISIBILITY_LEVEL Tile tiles[TileCount];
+    internal Tile tiles[TileCount];
 
     // Column-major tile index (matches Tin2's mma_rc_to_idx = col * MMARows + row)
     [ForceInline]
@@ -116,7 +115,7 @@ VISIBILITY_LEVEL struct WaveMatrix<T, linalg.CoopMatMatrixUse Use, int Rows, int
     [ForceInline]
     [require(cuda, subgroup_shuffle)]
     [mutating]
-    VISIBILITY_LEVEL void fromArrayPacked<int PackedSize>(uint packedData[PackedSize])
+    internal void fromArrayPacked<int PackedSize>(uint packedData[PackedSize])
     {
         static_assert(Use == linalg.CoopMatMatrixUse.MatrixA, "fromArrayPacked only supports MatrixA");
 
@@ -194,7 +193,7 @@ VISIBILITY_LEVEL struct WaveMatrix<T, linalg.CoopMatMatrixUse Use, int Rows, int
 
     [ForceInline]
     [require(cuda, subgroup_shuffle)]
-    VISIBILITY_LEVEL void toArrayPacked<int PackedSize>(inout uint packedOut[PackedSize])
+    internal void toArrayPacked<int PackedSize>(inout uint packedOut[PackedSize])
     {
         static_assert(Use == linalg.CoopMatMatrixUse.MatrixA
                    || Use == linalg.CoopMatMatrixUse.MatrixAccumulator,
@@ -455,7 +454,7 @@ VISIBILITY_LEVEL struct WaveMatrix<T, linalg.CoopMatMatrixUse Use, int Rows, int
 // Equivalent to Tin2's change_major_axis(MatrixA) → MatrixB.
 [ForceInline]
 [require(cuda)]
-VISIBILITY_LEVEL WaveMatrix<half, linalg.CoopMatMatrixUse.MatrixB, Rows, Cols>
+internal WaveMatrix<half, linalg.CoopMatMatrixUse.MatrixB, Rows, Cols>
 toMatrixB<int Rows, int Cols>(
     WaveMatrix<half, linalg.CoopMatMatrixUse.MatrixA, Rows, Cols> input)
 {
@@ -487,7 +486,7 @@ toMatrixB<int Rows, int Cols>(
 // Equivalent to Tin2's mad(MatrixA, MatrixB, MatrixA).
 [ForceInline]
 [require(cuda)]
-VISIBILITY_LEVEL void matMad<T, int R0, int C0, int C1>(
+internal void matMad<T, int R0, int C0, int C1>(
     WaveMatrix<half, linalg.CoopMatMatrixUse.MatrixA, R0, C0> a,
     WaveMatrix<half, linalg.CoopMatMatrixUse.MatrixB, C0, C1> b,
     inout WaveMatrix<T, linalg.CoopMatMatrixUse.MatrixAccumulator, R0, C1> c)
@@ -522,7 +521,7 @@ VISIBILITY_LEVEL void matMad<T, int R0, int C0, int C1>(
 // Matrix multiply: A(R0×C0) × B(C0×C1) → MatA(R0×C1)
 [ForceInline]
 [require(cuda)]
-VISIBILITY_LEVEL WaveMatrix<T, linalg.CoopMatMatrixUse.MatrixAccumulator, R0, C1>
+internal WaveMatrix<T, linalg.CoopMatMatrixUse.MatrixAccumulator, R0, C1>
 matMul<T, int R0, int C0, int C1>(
     WaveMatrix<half, linalg.CoopMatMatrixUse.MatrixA, R0, C0> a,
     WaveMatrix<half, linalg.CoopMatMatrixUse.MatrixB, C0, C1> b)

@@ -20,10 +20,10 @@ typealias DType = float;
 #endif
 
 // TEST_INPUT: set weightBuffer = ubuffer(data=[0], stride=4, count=4096)
-uniform DType* weightBuffer;
+uniform RWStructuredBuffer<DType>.Handle weightBuffer;
 
 // TEST_INPUT: set biasBuffer = ubuffer(data=[0], stride=4, count=64)
-uniform DType* biasBuffer;
+uniform RWStructuredBuffer<DType>.Handle biasBuffer;
 
 // TEST_INPUT:ubuffer(stride=4, count=5):out, name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
@@ -89,50 +89,18 @@ void fillWeightMatrixTiled<int InputSize, int OutputSize, int PaddedK, int Padde
     }
 }
 
-DType[TiledMMAHelper<DType, PaddedInputSize, PaddedOutputSize, SubgroupSize, Target, TestShMemSize, false, 1>.TileInfoT.Uint4AlignedM]
-    testMatVecMul<int InputSize, int OutputSize, int PaddedInputSize, int PaddedOutputSize, TargetEnum Target>(uint tid)
-{
-    typealias Address = PointerAddress<DType>;
-    Address address = Address(weightBuffer);
-
-    typealias MMA = TiledMMAHelper<DType, PaddedInputSize, PaddedOutputSize, SubgroupSize, Target, TestShMemSize, false, 1>;
-    const int InSize = MMA.TileInfoT.Uint4AlignedK;
-    const int OutSize = MMA.TileInfoT.Uint4AlignedM;
-
-    DType inputVector[InSize] = {};
-    for (int i = 0; i < InputSize; i++)
-    {
-        inputVector[i] = DType(tid + 1);
-    }
-
-
-#if !TEST_BIAS
-    let res = MMA.mma<DType, Address, DType[InSize], DType[OutSize], DType, false>(
-        inputVector, OffsetA, OffsetB, OffsetB, address, none);
-#else
-    Address biasAddress = Address(biasBuffer);
-    let res = MMA.mma<DType, Address, DType[InSize], DType[OutSize], DType, true>(
-        inputVector, OffsetA, OffsetB, OffsetB, address, biasAddress);
-#endif
-
-    return res;
-}
-
 void test<int InputSize, int OutputSize>(uint tid, int resIndex)
 {
     static const int PaddedInputSize = PadToTile<InputSize>.Value;
     static const int PaddedOutputSize = PadToTile<OutputSize>.Value;
 
-    DType[TiledMMAHelper<DType, PaddedInputSize, PaddedOutputSize, SubgroupSize, TargetEnum.CUDA, TestShMemSize, false, 1>.TileInfoT.Uint4AlignedM] outputVector;
-    __target_switch
-    {
-    case cuda:
-        outputVector = testMatVecMul<InputSize, OutputSize, PaddedInputSize, PaddedOutputSize, TargetEnum.CUDA>(tid);
-        break;
-    case spirv:
-        outputVector = testMatVecMul<InputSize, OutputSize, PaddedInputSize, PaddedOutputSize, TargetEnum.SPIR_V>(tid);
-        break;
-    }
+#if TEST_BIAS
+    let output = neural_unittest.testTiledMatVecMul<DType, InputSize, OutputSize, PaddedInputSize, PaddedOutputSize, TestShMemSize, true, 1, false>(
+        tid, weightBuffer, Optional<RWStructuredBuffer<DType>.Handle>(biasBuffer));
+#else
+    let output = neural_unittest.testTiledMatVecMul<DType, InputSize, OutputSize, PaddedInputSize, PaddedOutputSize, TestShMemSize, false, 1, false>(
+        tid, weightBuffer, none);
+#endif
 
     bool res = true;
     if (tid < OutputSize)
@@ -144,10 +112,10 @@ void test<int InputSize, int OutputSize>(uint tid, int resIndex)
 #else
             DType expected = DType(tid + 1) * DType(InputSize) * DType(0.5) + DType(i);
 #endif
-            if (!equals(outputVector[i], expected))
+            if (!equals(output[i], expected))
             {
                 if (tid == 0)
-                    printf("FAIL resIndex=%d i=%d expected=%f got=%f\n", resIndex, i, float(expected), float(outputVector[i]));
+                    printf("FAIL resIndex=%d i=%d expected=%f got=%f\n", resIndex, i, float(expected), float(output[i]));
                 res = false;
                 break;
             }

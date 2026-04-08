@@ -99,51 +99,18 @@ void identityWeightMatrixTiled<int InputSize, int PaddedSize>(uint tid, bool cle
     }
 }
 
-DType[TiledMMAHelper<DType, PaddedInputSize, PaddedOutputSize, SubgroupSize, Target, TestShMemSize, false, 1>.TileInfoT.Uint4AlignedM]
-    testMatVecMul<int InputSize, int OutputSize, int PaddedInputSize, int PaddedOutputSize, TargetEnum Target>(uint tid)
-{
-    typealias Address = BindlessAddress<DType>;
-    Address address = Address(inputBuffer);
-
-    typealias MMA = TiledMMAHelper<DType, PaddedInputSize, PaddedOutputSize, SubgroupSize, Target, TestShMemSize, false, 1>;
-    const int InSize = MMA.TileInfoT.Uint4AlignedK;
-    const int OutSize = MMA.TileInfoT.Uint4AlignedM;
-
-    // Construct input vector: every element = tid + 1, padded with 0.
-    DType inputVector[InSize] = {};
-    for (int i = 0; i < InputSize; i++)
-    {
-        inputVector[i] = DType(tid + 1);
-    }
-
-
-#if !TEST_BIAS
-    let res = MMA.mma<DType, Address, DType[InSize], DType[OutSize], DType, false>(
-        inputVector, OffsetA, OffsetB, OffsetB, address, none);
-#else
-    Address biasAddress = Address(biasBuffer);
-    let res = MMA.mma<DType, Address, DType[InSize], DType[OutSize], DType, true>(
-        inputVector, OffsetA, OffsetB, OffsetB, address, biasAddress);
-#endif
-
-    return res;
-}
-
 void test<int InputSize, int OutputSize>(uint tid, int resIndex)
 {
     static const int PaddedInputSize = PadToTile<InputSize>.Value;
     static const int PaddedOutputSize = PadToTile<OutputSize>.Value;
 
-    DType[TiledMMAHelper<DType, PaddedInputSize, PaddedOutputSize, SubgroupSize, TargetEnum.CUDA, TestShMemSize, false, 1>.TileInfoT.Uint4AlignedM] outputVector;
-    __target_switch
-    {
-    case cuda:
-        outputVector = testMatVecMul<InputSize, OutputSize, PaddedInputSize, PaddedOutputSize, TargetEnum.CUDA>(tid);
-        break;
-    case spirv:
-        outputVector = testMatVecMul<InputSize, OutputSize, PaddedInputSize, PaddedOutputSize, TargetEnum.SPIR_V>(tid);
-        break;
-    }
+#if TEST_BIAS
+    let output = neural_unittest.testTiledMatVecMul<DType, InputSize, OutputSize, PaddedInputSize, PaddedOutputSize, TestShMemSize, true, 1, false>(
+        tid, inputBuffer, Optional<RWStructuredBuffer<DType>.Handle>(biasBuffer));
+#else
+    let output = neural_unittest.testTiledMatVecMul<DType, InputSize, OutputSize, PaddedInputSize, PaddedOutputSize, TestShMemSize, false, 1, false>(
+        tid, inputBuffer, none);
+#endif
 
     bool res = true;
     for (int i = 0; i < OutputSize; i++)
@@ -153,7 +120,7 @@ void test<int InputSize, int OutputSize>(uint tid, int resIndex)
 #else
         DType expected = DType(tid + 1) + DType(i);
 #endif
-        if (!equals(outputVector[i], expected))
+        if (!equals(output[i], expected))
         {
             res = false;
             break;

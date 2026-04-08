@@ -18,13 +18,11 @@ typealias DType = half;
 typealias DType = float;
 #endif
 
-// Use raw pointers (PointerAddress) instead of bindless buffer handles
-// to exercise a different IPointerLikeAddress implementation.
 // TEST_INPUT: set weightBuffer = ubuffer(data=[0], stride=4, count=4096)
-uniform DType* weightBuffer;
+uniform RWStructuredBuffer<DType>.Handle weightBuffer;
 
 // TEST_INPUT: set biasBuffer = ubuffer(data=[0], stride=4, count=64)
-uniform DType* biasBuffer;
+uniform RWStructuredBuffer<DType>.Handle biasBuffer;
 
 // TEST_INPUT:ubuffer(stride=4, count=5):out, name=outputBuffer
 RWStructuredBuffer<uint> outputBuffer;
@@ -91,37 +89,19 @@ void identityWeightMatrixTiled<int InputSize, int PaddedSize, bool Clear>(uint t
     }
 }
 
-DType[TiledMMAHelper<DType, PaddedInputSize, PaddedOutputSize, SubgroupSize, Target, TestShMemSize, false, 2>.TileInfoT.Uint4AlignedM]
-    testMatVecMul<int InputSize, int OutputSize, int PaddedInputSize, int PaddedOutputSize, TargetEnum Target>(uint tid)
+void test<int InputSize, int OutputSize>(uint tid, int resIndex)
 {
-    typealias Address = PointerAddress<DType>;
-    Address address = Address(weightBuffer);
+    static const int PaddedInputSize = PadToTile<InputSize>.Value;
+    static const int PaddedOutputSize = PadToTile<OutputSize>.Value;
 
-    typealias MMA = TiledMMAHelper<DType, PaddedInputSize, PaddedOutputSize, SubgroupSize, Target, TestShMemSize, false, 2>;
-    const int InSize = MMA.TileInfoT.Uint4AlignedK;
-    const int OutSize = MMA.TileInfoT.Uint4AlignedM;
-
-    DType inputVector[InSize] = {};
-    for (int i = 0; i < InputSize; i++)
-    {
-        inputVector[i] = DType(tid + 1);
-    }
-
-
-#if !TEST_BIAS
-    let res = MMA.mma<DType, Address, DType[InSize], DType[OutSize], DType, false>(
-        inputVector, OffsetA, OffsetB, OffsetB, address, none);
+#if TEST_BIAS
+    let output = neural_unittest.testTiledMatVecMul<DType, InputSize, OutputSize, PaddedInputSize, PaddedOutputSize, TestShMemSize, true, 2, false>(
+        tid, weightBuffer, Optional<RWStructuredBuffer<DType>.Handle>(biasBuffer));
 #else
-    Address biasAddress = Address(biasBuffer);
-    let res = MMA.mma<DType, Address, DType[InSize], DType[OutSize], DType, true>(
-        inputVector, OffsetA, OffsetB, OffsetB, address, biasAddress);
+    let output = neural_unittest.testTiledMatVecMul<DType, InputSize, OutputSize, PaddedInputSize, PaddedOutputSize, TestShMemSize, false, 2, false>(
+        tid, weightBuffer, none);
 #endif
 
-    return res;
-}
-
-bool verifyResult<int OutputSize, T: IArray<DType>>(uint tid, T output)
-{
     bool res = true;
     for (int i = 0; i < OutputSize; i++)
     {
@@ -136,27 +116,7 @@ bool verifyResult<int OutputSize, T: IArray<DType>>(uint tid, T output)
             break;
         }
     }
-    return res;
-}
 
-void test<int InputSize, int OutputSize>(uint tid, int resIndex)
-{
-    static const int PaddedInputSize = PadToTile<InputSize>.Value;
-    static const int PaddedOutputSize = PadToTile<OutputSize>.Value;
-
-    DType[TiledMMAHelper<DType, PaddedInputSize, PaddedOutputSize, SubgroupSize, TargetEnum.CUDA, TestShMemSize, false, 2>.TileInfoT.Uint4AlignedM] outputVector;
-
-    __target_switch
-    {
-    case cuda:
-        outputVector = testMatVecMul<InputSize, OutputSize, PaddedInputSize, PaddedOutputSize, TargetEnum.CUDA>(tid);
-        break;
-    case spirv:
-        outputVector = testMatVecMul<InputSize, OutputSize, PaddedInputSize, PaddedOutputSize, TargetEnum.SPIR_V>(tid);
-        break;
-    }
-
-    bool res = verifyResult<OutputSize>(tid, outputVector);
     bool finalResult = collectResults<BatchSize>(tid, res);
     if (tid == 0)
     {

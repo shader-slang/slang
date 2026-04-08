@@ -66,10 +66,10 @@ void identityWeightMatrix<int InputSize>(uint tid, bool clear = false)
 void test<int InputSize, int OutputSize>(uint tid, int resIndex)
 {
 #if !TEST_BIAS
-    let output = testMatVecMul<DType, InputSize, OutputSize, TestShMemSize, TargetEnum.CUDA, false>(
+    let output = neural_unittest.testMatVecMul<DType, InputSize, OutputSize, TestShMemSize, false, 1, false>(
         tid, inputBuffer, none);
 #else
-    let output = testMatVecMul<DType, InputSize, OutputSize, TestShMemSize, TargetEnum.CUDA, true>(
+    let output = neural_unittest.testMatVecMul<DType, InputSize, OutputSize, TestShMemSize, true, 1, false>(
         tid, inputBuffer, biasBuffer);
 #endif
 

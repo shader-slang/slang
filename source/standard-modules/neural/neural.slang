@@ -44,5 +44,10 @@ __include "ilayer";
 __include "layers";
 
 #ifdef UNIT_TEST
-__include "test-mma";
+__include "unit-test/unittest-mat-vec-mul";
+__include "unit-test/unittest-outerproduct-reduce";
+__include "unit-test/unittest-bias-reduce";
+__include "unit-test/unittest-mma-load";
+__include "unit-test/unittest-hash-function";
+__include "unit-test/unittest-permuto-encoder";
 #endif

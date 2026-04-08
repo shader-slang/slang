@@ -2,7 +2,6 @@
 // So we can test this single file by providing -DUNIT_TEST to the compiler.
 implementing neural;
 
-#include "common-def.slang"
 
 #define Max(A, B) ((A) > (B) ? (A) : (B))
 
@@ -44,7 +43,7 @@ internal enum ShmemAddressMode
 
 public struct SharedMemoryPool<ShMemSize: ISharedMemorySize>
 {
-    VISIBILITY_LEVEL static groupshared uint4 data[ShMemSize.Bytes / sizeof(uint4)];
+    internal static groupshared uint4 data[ShMemSize.Bytes / sizeof(uint4)];
 
     // =========================================================================
     // Pack/unpack helpers: store/load scalar U into/from uint4 array by index.
@@ -398,7 +397,18 @@ public struct SharedMemorySize0<T, TargetEnum Target, ExecutionMode ExeMode, int
     static const uint BytesForOuterProductStore = !ShMemInfo.IsTraining ? 0 :
         NCoopMatCColumns * CMShape.ROW_C * CMShape.COLUMN_C * sizeof(T);
 
-    public static const uint Bytes = Max(Max(BytesForMMA, BytesForOuterProductStore), BytesForCrossWarpReduction);
+    // sumReduceRows uses three contiguous shared memory regions:
+    //   1. Per-warp input vectors: SubgroupCount * SubgroupSize * HeightInVecB uint4s
+    //   2. Per-warp matC temp:     SubgroupCount * TileStrideVec * ROW_C uint4s
+    //   3. Cross-warp reduction:   enough to hold SubgroupCount * MPadded elements of T
+    static const int HeightInVecB_SR = CMShape.ROW_B / CMShape.ElementCountPerVector;
+    static const int TileStrideVec_SR = CMShape.COLUMN_C / CMShape.ElementCountPerVectorMatC;
+    static const int MPadded_SR = (OutputSize + 1) & ~1;
+    static const uint BytesForSumReduceRows = !ShMemInfo.IsTraining ? 0 :
+        (SubgroupCount * SubgroupSize * HeightInVecB_SR + SubgroupCount * TileStrideVec_SR * CMShape.ROW_C) * sizeof(uint4)
+        + ((SubgroupCount * MPadded_SR * sizeof(T) + sizeof(uint4) - 1) / sizeof(uint4)) * sizeof(uint4);
+
+    public static const uint Bytes = Max(Max(Max(BytesForMMA, BytesForOuterProductStore), BytesForCrossWarpReduction), BytesForSumReduceRows);
 }
 
 // The following code is a macro-based implementation of the shared memory size calculation.

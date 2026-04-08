@@ -11,7 +11,6 @@ import slang.neural;
 // TEST_INPUT: ubuffer(data=[0 0 0 0], stride=4, count=4):out, name=resultBuffer
 RWStructuredBuffer<uint> resultBuffer;
 
-
 #if TEST_HALF
 typealias DType = half;
 #else
@@ -21,8 +20,6 @@ typealias DType = float;
 // TEST_INPUT: set outputBuffer = ubuffer(stride=4, count=64)
 uniform RWStructuredBuffer<DType>.Handle outputBuffer;
 
-typealias Address = BindlessAddress<DType>;
-
 static const int SubgroupSize = 32;
 static const int WorkgroupSize = 128;
 static const int workgroupCount = WorkgroupSize / SubgroupSize;
@@ -31,99 +28,14 @@ static const int MaxOutputSize = 64;
 
 typealias ShMemSize = SharedMemorySize< DType, TargetEnum.CUDA, ExecutionMode.Training, SubgroupSize, workgroupCount>;
 typealias Layer1 = ShMemSize.OfLayer1<InputSize, MaxOutputSize>;
-typealias TestPool = SharedMemoryPool<Layer1>;
-// Basic test on MatMul without bias, this test covers both forward and backward pass
-void TestBiasSumReduce<int OutputSize, TargetEnum Target>(uint tid)
-{
-    Address biasAddress = Address(outputBuffer);
-
-    typealias MMA = MMAHelper<DType, InputSize, OutputSize, SubgroupSize, Target, Layer1, false, workgroupCount>;
-    const int OutSize = MMA.Uint4AlignedM;
-    const int InSize = MMA.Uint4AlignedK;
-
-    DType dOutVector[OutSize] = {};
-
-    // Use 1/128 = 0.0078125 which is exactly representable in half precision (2^-7)
-    // This avoids float->half conversion errors in the MMA path
-    for (int i = 0; i < OutputSize; i++)
-    {
-        dOutVector[i] = DType((i + 1) * 0.0078125);
-    }
-
-    uint subgroupId = tid / SubgroupSize;
-
-    // perform dOut OPA Input
-    MMA.sumReduceRows<DType, Address, DType[OutSize]>(0, dOutVector, subgroupId, biasAddress);
-
-    // serialRead<16, DType>(tid, 0);
-}
-
-// This function is just used for debugging, not for verification. So keep it here.
-void serialRead<int Stride, T: __BuiltinFloatingPointType>(uint tid, uint sharedMemOffset)
-{
-    GroupMemoryBarrierWithGroupSync();
-
-    if (tid > 0)
-        return;
-
-    for (int id = 0; id < 16; id++)
-    {
-        printf("tid: %d\n", id);
-        int strideInVector  = Stride / (sizeof(uint4) / sizeof(T));
-        for (int i = 0; i < strideInVector; i++)
-        {
-            uint4 values = TestPool.data[sharedMemOffset + id * strideInVector + i];
-            uint4 element = values;
-            for (int j = 0; j < 4; j++)
-            {
-                uint value = element[j];
-                if (sizeof(T) == 2)
-                {
-                    uint16_t a = (uint16_t)(value & 0xFFFF);
-                    uint16_t b = (uint16_t)((value >> 16) & 0xFFFF);
-
-                    half aa = bit_cast<half>(a);
-                    half bb = bit_cast<half>(b);
-                    printf("%.2f %.2f ", float(aa), float(bb));
-                }
-                else
-                {
-                    printf("%f ", bit_cast<float>(value));
-                }
-            }
-        }
-        printf("\n");
-    }
-}
-
-void serialRead<int Size>(uint tid, RWStructuredBuffer<DType> outputBuffer)
-{
-    GroupMemoryBarrierWithWaveSync();
-
-    if (tid > 0)
-        return;
-
-    for (int i = 0; i < Size; i++)
-    {
-        DType value = outputBuffer[i];
-        printf("%.4f ", float(value));
-    }
-    printf("\n");
-}
 
 void test<int OutputSize>(uint tid, uint resIndex)
 {
-    __target_switch
-    {
-    case cuda:
-        TestBiasSumReduce<OutputSize, TargetEnum.CUDA>(tid);
-        break;
-    case spirv:
-        TestBiasSumReduce<OutputSize, TargetEnum.SPIR_V>(tid);
-        break;
-    }
+    DType dOut[OutputSize];
+    for (int i = 0; i < OutputSize; i++)
+        dOut[i] = DType((i + 1) * 0.0078125);
 
-    // serialRead<OutputSize>(tid, outputBuffer);
+    neural_unittest.testBiasSumReduce<DType, InputSize, OutputSize, Layer1, workgroupCount>(tid, dOut, outputBuffer);
 
     int subgroupIndex = tid / SubgroupSize;
     if (subgroupIndex != 0)
@@ -135,7 +47,6 @@ void test<int OutputSize>(uint tid, uint resIndex)
         for (int i = 0; i < OutputSize; i++)
         {
             DType value = outputBuffer[i];
-            // Expected = (i+1) * 0.0078125 * 128 = (i+1) * 1.0
             DType expected = DType(i + 1);
             DType tolerance = DType(0.001);
             if (abs(value - expected) > tolerance)

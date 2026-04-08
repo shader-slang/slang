@@ -1,6 +1,5 @@
 implementing neural;
 
-#include "common-def.slang"
 
 // MMAHelperNew: Tiled MMA using m16n16k16 with no shared memory at all.
 //
@@ -27,7 +26,7 @@ implementing neural;
 //   to walk the stored M×K grid in the transposed order.
 
 [require(cuda)]
-VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int SubgroupSize, TargetEnum Target, bool TransposeA = false>
+internal struct MMAHelperNew<T, int InputSize, int OutputSize, int SubgroupSize, TargetEnum Target, bool TransposeA = false>
     where T : __BuiltinFloatingPointType
     where T.Differential == T
 {
@@ -47,13 +46,13 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
 
     // Forward: NCoopMatRow tiles down M (output dimension).
     // Transpose: NCoopMatRow tiles down K (output dimension of W^T).
-    VISIBILITY_LEVEL static const int NCoopMatRow = TransposeA ? (K + ROW_A - 1) / ROW_A
+    internal static const int NCoopMatRow = TransposeA ? (K + ROW_A - 1) / ROW_A
                                                                : (M + ROW_A - 1) / ROW_A;
-    VISIBILITY_LEVEL static const int NCoopMatColumn = (N + COLUMN_B - 1) / COLUMN_B;
-    VISIBILITY_LEVEL static const int NCoopMat = NCoopMatRow * NCoopMatColumn;
+    internal static const int NCoopMatColumn = (N + COLUMN_B - 1) / COLUMN_B;
+    internal static const int NCoopMat = NCoopMatRow * NCoopMatColumn;
 
-    VISIBILITY_LEVEL static const int Uint4AlignedK = ((K + (ElementCountPerVector - 1)) / ElementCountPerVector) * ElementCountPerVector;
-    VISIBILITY_LEVEL static const int Uint4AlignedM = ((M + (ElementCountPerVector - 1)) / ElementCountPerVector) * ElementCountPerVector;
+    internal static const int Uint4AlignedK = ((K + (ElementCountPerVector - 1)) / ElementCountPerVector) * ElementCountPerVector;
+    internal static const int Uint4AlignedM = ((M + (ElementCountPerVector - 1)) / ElementCountPerVector) * ElementCountPerVector;
 
     // Shared dimension: K for forward, M for transpose.
     static const int SharedDimAligned = TransposeA ? Uint4AlignedM : Uint4AlignedK;
@@ -63,12 +62,12 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
     static const int OutputDim = TransposeA ? K : M;
 
     // Total prebuilt input tiles for mma() when accepting precomputed MatA tiles.
-    VISIBILITY_LEVEL static const int PrebuiltInputTileCount = (SharedDimAligned / COLUMN_A) * NCoopMatColumn;
+    internal static const int PrebuiltInputTileCount = (SharedDimAligned / COLUMN_A) * NCoopMatColumn;
 
     static const linalg.CoopMatMatrixLayout RowMajor = linalg.CoopMatMatrixLayout.RowMajor;
     static const linalg.CoopMatMatrixLayout ColumnMajor = linalg.CoopMatMatrixLayout.ColumnMajor;
 
-    VISIBILITY_LEVEL typealias MatA = linalg.CoopMat<half, MemoryScope.Subgroup, ROW_A, COLUMN_A, linalg.CoopMatMatrixUse.MatrixA>;
+    internal typealias MatA = linalg.CoopMat<half, MemoryScope.Subgroup, ROW_A, COLUMN_A, linalg.CoopMatMatrixUse.MatrixA>;
     typealias MatB = linalg.CoopMat<half, MemoryScope.Subgroup, ROW_B, COLUMN_B, linalg.CoopMatMatrixUse.MatrixB>;
     typealias MatC = linalg.CoopMat<T,    MemoryScope.Subgroup, ROW_C, COLUMN_C, linalg.CoopMatMatrixUse.MatrixAccumulator>;
 
@@ -82,14 +81,14 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
     static const int TileSizeInElements = ROW_A * COLUMN_A;
 
     [ForceInline]
-    VISIBILITY_LEVEL static int tileElementOffset(int tileRow, int tileCol)
+    internal static int tileElementOffset(int tileRow, int tileCol)
     {
         return (tileRow * NTileCols + tileCol) * TileSizeInElements;
     }
 
     [ForceInline]
     [require(cuda)]
-    VISIBILITY_LEVEL static MatA loadTileDirect<U, Address>(
+    internal static MatA loadTileDirect<U, Address>(
         int tileRowIdx,
         int tileColIdx,
         Address weightAddress)
@@ -127,7 +126,7 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
 
     [ForceInline]
     [require(cuda, subgroup_shuffle)]
-    VISIBILITY_LEVEL static OutArrayType mma<U, Address, InArrayType, OutArrayType, V, bool Bias = false>(
+    internal static OutArrayType mma<U, Address, InArrayType, OutArrayType, V, bool Bias = false>(
         InArrayType inputVector,
         Address weightAddress,
         Optional<Address> biasAddress)
@@ -249,7 +248,7 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
     // consumed by multiple operations (transpose MMA, outer product, bias reduce).
     [ForceInline]
     [require(cuda, subgroup_shuffle)]
-    VISIBILITY_LEVEL static OutArrayType mmaFromTilesA<U, Address, OutArrayType, V, bool Bias = false>(
+    internal static OutArrayType mmaFromTilesA<U, Address, OutArrayType, V, bool Bias = false>(
         MatA prebuiltTiles[PrebuiltInputTileCount],
         Address weightAddress,
         Optional<Address> biasAddress)
@@ -528,7 +527,7 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
 
     [ForceInline]
     [require(cuda, subgroup_basic, subgroup_shuffle)]
-    VISIBILITY_LEVEL static void sumReduceRows<U, Address, InArrayType, ShMemSize : ISharedMemorySize, int SubgroupCount>(
+    internal static void sumReduceRows<U, Address, InArrayType, ShMemSize : ISharedMemorySize, int SubgroupCount>(
         uint sharedMemoryOffset,
         in InArrayType dOut,
         in int subgroupId,
@@ -626,7 +625,7 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
 
     [ForceInline]
     [require(cuda, subgroup_basic, subgroup_shuffle)]
-    VISIBILITY_LEVEL static void sumReduceRowsV2<U, Address, InArrayType, ShMemSize : ISharedMemorySize, int SubgroupCount>(
+    internal static void sumReduceRowsV2<U, Address, InArrayType, ShMemSize : ISharedMemorySize, int SubgroupCount>(
         uint sharedMemoryOffset,
         in InArrayType dOut,
         in int subgroupId,
@@ -662,7 +661,7 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
     // The tiles are modified in place by reduceMatATilesToShmem, so
     // this must be the last consumer of the prebuilt tiles.
     [require(cuda, subgroup_shuffle)]
-    VISIBILITY_LEVEL static void sumReduceRowsV2FromTiles<U, Address, ShMemSize : ISharedMemorySize, int SubgroupCount>(
+    internal static void sumReduceRowsV2FromTiles<U, Address, ShMemSize : ISharedMemorySize, int SubgroupCount>(
         uint sharedMemoryOffset,
         inout MatA prebuiltTiles[TotalBiasTilesMatA],
         in int subgroupId,
@@ -759,16 +758,16 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
 
     // Number of 16x16 MatA tiles for the input vector (covering K elements).
     static const int OPA_InputTileCols = (K + COLUMN_A - 1) / COLUMN_A;
-    VISIBILITY_LEVEL static const int OPA_TotalInputMatA = NColGroupsOPA * OPA_InputTileCols;
+    internal static const int OPA_TotalInputMatA = NColGroupsOPA * OPA_InputTileCols;
 
     // Number of 16x16 MatA tiles for the dOut vector.
-    VISIBILITY_LEVEL static const int OPA_TotalDOutMatA = NColGroupsOPA * OPA_CoopMatCRows;
+    internal static const int OPA_TotalDOutMatA = NColGroupsOPA * OPA_CoopMatCRows;
 
     // Builds all CoopMat fragments from a per-thread input array using optimized
     // warp shuffle. Single flat loop over all packed columns — matches Tin2's
     // Vector::from_array structure exactly. Tile index derived from col_packed.
     [require(cuda, subgroup_shuffle)]
-    VISIBILITY_LEVEL static void buildAllTilesFromArray<int ArraySize, int OutN>(
+    internal static void buildAllTilesFromArray<int ArraySize, int OutN>(
         inout half data[ArraySize],
         inout MatA outArray[OutN])
     {
@@ -840,7 +839,7 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
     // Tiles must already be transposed (transposeTilesA + ChangeMajor) so that
     // row=thread identity, matching the layout built by buildAllTilesFromArray.
     [require(cuda, subgroup_shuffle)]
-    VISIBILITY_LEVEL static void extractAllTilesToArray<int ArraySize, int InN>(
+    internal static void extractAllTilesToArray<int ArraySize, int InN>(
         MatA inArray[InN],
         inout half data[ArraySize])
     {
@@ -917,7 +916,7 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
     // matIndex selects which 16-thread group (0 or 1).
     [ForceInline]
     [require(cuda, subgroup_shuffle)]
-    VISIBILITY_LEVEL static MatB buildMatBFromLocalCol(
+    internal static MatB buildMatBFromLocalCol(
         inout half localCol[ROW_B],
         int matIndex)
     {
@@ -965,7 +964,7 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
     //   reg2=C[gid+8,tid*2], reg3=C[gid+8,tid*2+1], reg4-7 = hi 8 cols.
     [ForceInline]
     [require(cuda, subgroup_shuffle)]
-    VISIBILITY_LEVEL static void extractColFromMatC(
+    internal static void extractColFromMatC(
         MatC matC,
         int matIndex,
         inout T localCol[ROW_C])
@@ -1021,7 +1020,7 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
     // MatA has 4 registers per thread:
     //   reg 0=(r0,c0), 1=(r1,c0), 2=(r0,c1), 3=(r1,c1)
     // Transpose swaps reg 1↔2.
-    VISIBILITY_LEVEL static void transposeTilesA<int Count>(inout MatA tiles[Count])
+    internal static void transposeTilesA<int Count>(inout MatA tiles[Count])
     {
         [ForceUnroll]
         for (int idx = 0; idx < Count; idx++)
@@ -1230,7 +1229,7 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
     // Main entry: matC lives here, passed as inout to each phase.
     [ForceInline]
     [require(cuda, subgroup_basic)]
-    VISIBILITY_LEVEL static void outerProductAccumulate<U, Address, TypeA, InArrayTypeA, TypeB, InArrayTypeB,
+    internal static void outerProductAccumulate<U, Address, TypeA, InArrayTypeA, TypeB, InArrayTypeB,
                                                         ShMemSize : ISharedMemorySize, int SubgroupCount>(
         uint sharedMemoryOffset,
         InArrayTypeA inputVectorA,
@@ -1324,7 +1323,7 @@ VISIBILITY_LEVEL struct MMAHelperNew<T, int InputSize, int OutputSize, int Subgr
     // Like outerProductAccumulate but accepts prebuilt MatA tiles.
     [ForceInline]
     [require(cuda, subgroup_basic)]
-    VISIBILITY_LEVEL static void outerProductAccumulateFromTiles<U, Address,
+    internal static void outerProductAccumulateFromTiles<U, Address,
                                                         ShMemSize : ISharedMemorySize, int SubgroupCount>(
         uint sharedMemoryOffset,
         MatA prebuiltDOutTiles[OPA_TotalDOutMatA],
