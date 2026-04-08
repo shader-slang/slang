@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
-// Single-layer backward benchmark using MMAHelperNewV2 (WaveMatrix-based).
+// Single-layer backward benchmark using MMAHelperNewV2.backward().
 
 import slang.neural;
 
@@ -23,6 +23,8 @@ typealias ShMemSize = SharedMemorySize<half, TargetEnum.CUDA, ExecutionMode.Trai
 typealias ShMemSizeLayer = ShMemSize.OfLayer1<INPUT_SIZE, OUTPUT_SIZE>;
 
 typealias Helper = MMAHelperNewV2<half, INPUT_SIZE, OUTPUT_SIZE, SubgroupSize, TargetEnum.CUDA>;
+typealias InputVec = WaveTangledVector<half, ShMemSizeLayer, INPUT_SIZE, SubgroupSize, SubgroupCount>;
+typealias OutputVec = WaveTangledVector<half, ShMemSizeLayer, OUTPUT_SIZE, SubgroupSize, SubgroupCount>;
 
 static const int NTileRows = (OUTPUT_SIZE + 15) / 16;
 static const int NTileCols = (INPUT_SIZE + 15) / 16;
@@ -59,46 +61,17 @@ void compute_backward(
     let weightGradAddr = Address(weightGrad).getOffset(0);
     let biasGradAddr = Address(biasGrad).getOffset(0);
 
-    static const int DOutPacked = OUTPUT_SIZE / 2;
-    static const int InputPacked = INPUT_SIZE / 2;
+    InputVec input = InputVec(half(1.0));
+    OutputVec dOut = OutputVec(half(1.0));
 
-    uint dOutPacked[DOutPacked];
-    [ForceUnroll]
-    for (int i = 0; i < DOutPacked; i++)
-        dOutPacked[i] = 0x3C003C00u;
+    InputVec dInput = Helper.backward<Address, ShMemSizeLayer, SubgroupCount>(
+        input, dOut, weightAddr, weightGradAddr, biasGradAddr);
 
-    uint inputPacked[InputPacked];
-    [ForceUnroll]
-    for (int i = 0; i < InputPacked; i++)
-        inputPacked[i] = 0x3C003C00u;
-
-    Helper.DOutMatrix dOut;
-    dOut.fromArrayPacked<DOutPacked>(dOutPacked);
-
-    Helper.InputMatrix input;
-    input.fromArrayPacked<InputPacked>(inputPacked);
-
-    // 1. Transpose MMA: dIn = W^T * dOut
-    Helper.ResultMatrix result;
-    Helper.mmaTranspose<Address>(dOut, weightAddr, result);
-
-    // 2. Bias reduce
-    Helper.biasReduce<half, Address, ShMemSizeLayer, SubgroupCount>(
-        0u, dOut, subgroupId, biasGradAddr);
-
-    // 3. Outer product
-    Helper.outerProduct<half, Address, ShMemSizeLayer, SubgroupCount>(
-        0u, dOut, input, weightGradAddr);
-
-    // 4. Extract result to local array and compute checksum
-    static const int ResultPacked = INPUT_SIZE / 2;
-    uint resultPacked[ResultPacked];
-    result.toArrayPacked<ResultPacked>(resultPacked);
-
+    // Checksum
     uint checksum = 0;
     [ForceUnroll]
-    for (int i = 0; i < ResultPacked; i++)
-        checksum = checksum + resultPacked[i];
+    for (int i = 0; i < INPUT_SIZE; i++)
+        checksum += bit_cast<uint>(half2(dInput[i], half(0)));
 
     outputs[sampleIdx * SubgroupSize + int(laneId)] = checksum;
 }

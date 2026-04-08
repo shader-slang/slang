@@ -69,6 +69,65 @@ VISIBILITY_LEVEL struct MMAHelperNewV2<T, int InputSize, int OutputSize, int Sub
     }
 
     // =========================================================================
+    // High-level forward/backward API
+    //
+    // Takes WaveTangledVector inputs directly, handles packing/unpacking.
+    // =========================================================================
+
+    VISIBILITY_LEVEL static const int PackedSizeInput = K / (sizeof(uint) / sizeof(T));
+    VISIBILITY_LEVEL static const int PackedSizeOutput = M / (sizeof(uint) / sizeof(T));
+
+    // backward: given input and dOut, compute dInput, accumulate dWeight and dBias
+    //
+    // Takes WaveTangledVector inputs directly, handles packing/unpacking internally.
+    // Performs all three backward operations:
+    //   1. dInput = W^T × dOut (transpose MMA)
+    //   2. dBias += sum(dOut) (bias reduce)
+    //   3. dWeight += dOut ⊗ input (outer product accumulate)
+    [ForceInline]
+    [require(cuda, subgroup_shuffle)]
+    VISIBILITY_LEVEL static WaveTangledVector<T, ShMemSize, K, N, SubgroupCount>
+    backward<Address, ShMemSize : ISharedMemorySize, int SubgroupCount>(
+        WaveTangledVector<T, ShMemSize, K, N, SubgroupCount> input,
+        WaveTangledVector<T, ShMemSize, M, N, SubgroupCount> dOut,
+        Address weightAddress,
+        Address weightGradAddress,
+        Address biasGradAddress)
+        where Address : IPointerLikeAddress<T>
+    {
+        let dOutPacked = bit_cast<uint[PackedSizeOutput]>(dOut.data);
+        let inputPacked = bit_cast<uint[PackedSizeInput]>(input.data);
+
+        DOutMatrix dOutMat;
+        dOutMat.fromArrayPacked<PackedSizeOutput>(dOutPacked);
+
+        InputMatrix inputMat;
+        inputMat.fromArrayPacked<PackedSizeInput>(inputPacked);
+
+        // 1. Transpose MMA: dIn = W^T * dOut
+        ResultMatrix resultMat;
+        mma<true, Address>(dOutMat, weightAddress, resultMat);
+
+        // 2. Bias reduce
+        int subgroupId = int(getWaveId());
+        biasReduce<T, Address, ShMemSize, SubgroupCount>(
+            0u, dOutMat, subgroupId, biasGradAddress);
+
+        // 3. Outer product: accumulate dWeight
+        outerProduct<T, Address, ShMemSize, SubgroupCount>(
+            0u, dOutMat, inputMat, weightGradAddress);
+
+        // 4. Extract dInput from result
+        uint resultPacked[PackedSizeInput];
+        resultMat.toArrayPacked<PackedSizeInput>(resultPacked);
+
+        typealias InputVec = WaveTangledVector<T, ShMemSize, K, N, SubgroupCount>;
+        InputVec dInput;
+        dInput.data = bit_cast<T[InputVec.Uint4AlignedInputSize]>(resultPacked);
+        return dInput;
+    }
+
+    // =========================================================================
     // Transpose MMA: dIn = W^T × dOut
     //
     // Tin2 flow:
@@ -82,7 +141,7 @@ VISIBILITY_LEVEL struct MMAHelperNewV2<T, int InputSize, int OutputSize, int Sub
 
     [ForceInline]
     [require(cuda, subgroup_shuffle)]
-    VISIBILITY_LEVEL static void mmaTranspose<Address>(
+    VISIBILITY_LEVEL static void mma<bool Transpose, Address>(
         DOutMatrix dOut,
         Address weightAddress,
         inout ResultMatrix result)
@@ -92,18 +151,31 @@ VISIBILITY_LEVEL struct MMAHelperNewV2<T, int InputSize, int OutputSize, int Sub
         WeightMatrix w;
         w.loadWeightRaw<T, Address>(weightAddress);
 
-        // Transpose: MatB(M×K) → MatA(M×K) via copyFrom + sub-tile transpose
-        MatrixA<M, K> wA;
-        [ForceUnroll]
-        for (int i = 0; i < w.TileCount; i++)
-            wA.tiles[i].copyFrom(w.tiles[i]);
-        wA.transposeSubMatrix();
+        if (Transpose)
+        {
+            // Backward: W^T × dOut
+            // Transpose: MatB(M×K) → MatA(M×K) via copyFrom + sub-tile transpose
+            MatrixA<M, K> wA;
+            [ForceUnroll]
+            for (int i = 0; i < w.TileCount; i++)
+                wA.tiles[i].copyFrom(w.tiles[i]);
+            wA.transposeSubMatrix();
 
-        // changeMajorAxis: MatA(M×K) → MatB(M×K)
-        let wT = toMatrixB<M, K>(wA);
+            // changeMajorAxis: MatA(M×K) → MatB(M×K)
+            let wT = toMatrixB<M, K>(wA);
 
-        // MMA: result(32×K) = dOut(32×M) × wT(M×K)
-        result = matMul<T, N, M, K>(dOut, wT);
+            // MMA: result(32×K) = dOut(32×M) × wT(M×K)
+            result = matMul<T, N, M, K>(dOut, wT);
+        }
+        else
+        {
+            // Forward: input × W
+            // Weight is already MatB(M×K), use directly
+            // MMA: result(32×M) = input(32×K) × W(K×M)
+            // Note: for forward, DOutMatrix is actually InputMatrix (32×K)
+            // and result is (32×M), but the types must match the template params.
+            result = matMul<T, N, M, K>(dOut, w);
+        }
     }
 
     // =========================================================================
