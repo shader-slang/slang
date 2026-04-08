@@ -44,8 +44,8 @@ def scanForAnchor(file, anchorMatcher, filename, anchor):
 def checkMarkDownLinks(srcFile):
     errors = 0
 
-    # match:                            [link text......] ((url...)(anchr))
-    linkMatcherMarkDown = re.compile(r"\[(?:[^]\\]|\.)*\]\(([^)#]*)([^)]*)\)")
+    # match:                            [link text........] ((url...)(anchr))
+    linkMatcherMarkDown = re.compile(r"\[(?:[^\]\\]|\\.)*\]\(([^)#]*)([^)]*)\)")
 
     # match:                       <a      href="(url...)(anchr)"     >
     linkMatcherHref = re.compile(r'<a [^>]*href="([^"#]*)([^"]*)"[^>]*>')
