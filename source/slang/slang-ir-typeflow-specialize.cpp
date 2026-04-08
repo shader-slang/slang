@@ -7058,6 +7058,16 @@ struct TypeFlowSpecializationContext
                 args.getCount(),
                 args.getBuffer());
 
+            // Preserve existential-specialization diagnostics when rewriting a
+            // specialize instruction into its lowered form. Without this, the
+            // shared checker can miss post-rewrite IRSpecialize nodes.
+            if (inst->findDecoration<IRDisallowSpecializationWithExistentialsDecoration>())
+            {
+                builder.addDecoration(
+                    newInst,
+                    kIROp_DisallowSpecializationWithExistentialsDecoration);
+            }
+
             inst->replaceUsesWith(newInst);
             inst->removeAndDeallocate();
         }
