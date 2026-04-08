@@ -33,11 +33,6 @@ relationships between the accesses.
 > or [Multi-threaded executions and data races](https://en.cppreference.com/w/cpp/language/multithread) in the
 > C++ reference.
 
-> 📝 **Remark 3:** When available, it is generally advisable to use higher-level constructs rather than direct
-> atomic variables and memory barriers. See, e.g.,
-> [ConsumeStructuredBuffer&lt;T&gt;](../../../core-module-reference/types/consumestructuredbuffer-07h/index.html)
-> and
-> [AppendStructuredBuffer&lt;T&gt;](../../../core-module-reference/types/appendstructuredbuffer-06g/index.html).
 
 ## Data Race {#data-race}
 
@@ -157,7 +152,8 @@ barrier. That is, memory accesses before the barrier *happen before* memory acce
 
 There are three [address space](basics-memory-model-address-spaces.md) scopes for a memory barrier:
 - *All* --- applies to all memory accesses. That is, device and thread group memory accesses.
-- *Device* --- applies to device memory accesses. This includes all storage buffers and images.
+- *Device* --- applies to address spaces with [all threads](basics-memory-model-address-spaces.md) instance
+  scope. This includes all storage buffers and images.
 - *Thread group* --- applies to thread group memory accesses.
 
 The following memory barrier primitives are provided by the Slang standard library:
