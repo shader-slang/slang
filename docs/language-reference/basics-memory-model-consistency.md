@@ -16,7 +16,7 @@ behavior](basics-behavior.md), its output will be computed according to the prog
 
 The behavior of a multi-threaded program is undefined in the presence of *data races*. Broadly speaking, a
 [data race](#data-race) results from two threads accessing the same memory location, where at least one access
-is a write, using [non-atomic](#atomics) accesses without established [happens before](#memory-order)
+is a write, using [non-atomic](#atomics) accesses without established [happens-before](#memory-order)
 relationships between the accesses.
 
 > ⚠️ **Warning:** `slangc` currently emits incorrect code for `Atomic<T>` for multiple targets. See GitHub
@@ -43,7 +43,7 @@ access conflict is a data race unless:
 - the memory accesses are [atomic](#atomics), or
 - one memory access *happens before* the other.
 
-The *happens before* relation is established by an atomic load-acquire observing an atomic store-release,
+The *happens-before* relation is established by an atomic load-acquire observing an atomic store-release,
 memory barriers, or higher-level constructs provided by the Slang Standard Library.
 
 
@@ -57,8 +57,8 @@ The following memory orders are defined for operations in the current thread:
 - *Release memory order* --- loads or stores before a store-release operation cannot be reordered after the
   operation.
 - *Acquire-Release memory order* --- memory accesses cannot cross an acquire-release operation.
-- *Sequentially-consistent memory order* --- acquire-release memory order with sequential total order of the
-  operation.
+- *Sequentially-consistent memory order* --- acquire-release memory order with a sequential total order across
+  all sequentially consistent operations.
 
 Consequences:
 
@@ -113,8 +113,8 @@ Consequences:
 ## Atomic Memory Access {#atomics}
 
 All atomic modifications of a single variable occur in a total order. That is, the modifications are
-serialized. For example, if one thread increments a 0-initialized atomic variable by 1 and another by 2, all
-threads will observe the increments in the same order. That is, either 0 &rarr; 1 &rarr; 3 or 0 &rarr; 2
+serialized. For example, if one thread increments a 0-initialized atomic variable by 1 and another thread increments it by 2, all
+threads will observe the increments in the same order: either 0 &rarr; 1 &rarr; 3 or 0 &rarr; 2
 &rarr; 3.
 
 The *relaxed* memory ordering with atomic memory access does not provide any ordering relationship with other
