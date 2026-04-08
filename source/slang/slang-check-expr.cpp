@@ -6295,7 +6295,8 @@ static bool _isTypeParametric(Type* type)
     if (auto declRefType = as<DeclRefType>(type))
     {
         auto decl = declRefType->getDeclRef().getDecl();
-        if (as<GenericTypeParamDeclBase>(decl) || as<AssocTypeDecl>(decl))
+        if (as<GenericTypeParamDeclBase>(decl) || as<AssocTypeDecl>(decl) ||
+            as<ThisTypeDecl>(decl))
             return true;
         // Check generic arguments for parametric types.
         // E.g., Container<T> contains the generic param T.
