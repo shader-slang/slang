@@ -573,7 +573,10 @@ struct SCCPContext
 
         // Helper function to check if a type is floating-point
         auto isFloatingPointType = [](IROp op) -> bool
-        { return op == kIROp_FloatType || op == kIROp_DoubleType || op == kIROp_HalfType || op == kIROp_BFloat16Type; };
+        {
+            return op == kIROp_FloatType || op == kIROp_DoubleType || op == kIROp_HalfType ||
+                   op == kIROp_BFloat16Type;
+        };
 
         IROp op0 = operandType0->getOp();
         IROp op1 = operandType1->getOp();
