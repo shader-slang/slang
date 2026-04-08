@@ -93,9 +93,10 @@ private:
     Val* tryResolve(SubtypeWitness* newWitness, Type* newLookupSource);
 };
 
-// A DeclRef that encodes that there is some member accessible called to `decl`.
-// This `decl` is not the real value and must be resolved via the original constraint
-// it comes from.
+// A DeclRef that encodes that there is some `placeholderDecl` that was looked-up from
+// a synthetic facet, defined on some variation of a explicit member constraint (ex: type-coercion constraint).
+// This `placeholderDecl` can be resolved into a "real" declaration via the original constraint it comes from
+// subsituting.
 FIDDLE()
 class MemberConstraintDeclRef : public DeclRefBase
 {

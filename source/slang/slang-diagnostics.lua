@@ -3859,7 +3859,7 @@ err(
 err(
     "type-coerce-constraint-to-type-must-be-defined-in-the-current-scopes-generic",
     38044,
-    "type coerce constraint ToType must be defined in the current scopes generic parameter list",
+    "type coerce constraint ToType must be defined in the current scope's generic parameter list",
     span { loc = "location", message = "the ToType of a type coerce constraint ('~toType:Type') must be defined in the current scope's generic parameter list. Consider adding to '~locationOfGenericParameterList:Decl' the generic parameter 'ToType' with constraint 'where ToType == ~toType:Type'" }
 )
 

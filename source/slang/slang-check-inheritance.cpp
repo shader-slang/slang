@@ -640,8 +640,8 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                 syntheticFunctionDecl->addMember(paramDecl);
 
                 // `syntheticFunctionDecl` should be an implicit conversion if the constraint is `implicit`
-                if (auto implicitConversioModifier = typeCoercionConstraintDecl->findModifier<ImplicitConversionModifier>())
-                    addModifier(syntheticFunctionDecl, implicitConversioModifier);
+                if (auto implicitConversionModifier = typeCoercionConstraintDecl->findModifier<ImplicitConversionModifier>())
+                    addModifier(syntheticFunctionDecl, implicitConversionModifier);
 
                 auto parentDecl = getModule()->getModuleDecl();
                 DeclRef<KnownMethodDecl> syntheticFacetDeclRef =

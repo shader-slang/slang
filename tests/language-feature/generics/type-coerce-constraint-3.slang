@@ -37,7 +37,7 @@ ToType castableConstraint<ToType, FromType>() where ToType(FromType)
 ToType logic<ToType, FromType>()
 {
     // NEGATIVE_CHECK_1-DAG: error[E38043]:
-    // NEGATIVE_CHECK_1-DAG-NEXT: {{.*}}:[[# @LINE+1]]:
+    // NEGATIVE_CHECK_1-DAG: {{.*}}:[[# @LINE+1]]:
     return castableConstraint<ToType, FromType>();
 }
 

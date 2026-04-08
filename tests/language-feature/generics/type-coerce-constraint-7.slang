@@ -34,21 +34,21 @@ CustomStruct2 logic<FromType>(FromType dataIn)
     where CustomStruct2(FromType)
 {
     // NEGATIVE_CHECK_1-DAG: error[E38044]:
-    // NEGATIVE_CHECK_1-DAG-NEXT: {{.*}}:[[# @LINE+1]]:
+    // NEGATIVE_CHECK_1-DAG: {{.*}}:[[# @LINE+1]]:
     return CustomStruct2(dataIn);
 }
 
 struct CustomStruct3<T>
 {
     // NEGATIVE_CHECK_1-DAG: error[E38044]:
-    // NEGATIVE_CHECK_1-DAG-NEXT: {{.*}}:[[# @LINE+1]]:
+    // NEGATIVE_CHECK_1-DAG: {{.*}}:[[# @LINE+1]]:
     void convert<>() where CustomStruct1(int)
     {
 
     }
 
     // NEGATIVE_CHECK_1-DAG: error[E38044]:
-    // NEGATIVE_CHECK_1-DAG-NEXT: {{.*}}:[[# @LINE+1]]:
+    // NEGATIVE_CHECK_1-DAG: {{.*}}:[[# @LINE+1]]:
     void convert<>() where T(int)
     {
 

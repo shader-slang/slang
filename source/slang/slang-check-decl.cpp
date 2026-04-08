@@ -4053,11 +4053,11 @@ void SemanticsDeclHeaderVisitor::visitTypeCoercionConstraintDecl(TypeCoercionCon
     if (!decl->toType.type)
         decl->toType = TranslateTypeNodeForced(decl->toType);
 
-    // To resolve calling a method constrainted via a `TypeCoercionWitness` we must
-    // add a synthetic facet to our `ToType` and resolve the methods existance via
+    // To resolve calling a method constrained via a `TypeCoercionWitness` we must
+    // add a synthetic facet to our `ToType` and resolve the methods existence via
     // specialization. As a result, if a user specifies a `ToType` not defined in the
     // current scopes generic parameter list, we have a problem: we cannot retroactively add methods
-    // to an already baked `InheritanceInfo` (so the method constrainted will not be accessible).
+    // to an already baked `InheritanceInfo` (so the method constrained will not be accessible).
     //
     // If a user intends to constrain a type declared outside the current scope they need to use
     // type equality constraints.
@@ -4067,7 +4067,7 @@ void SemanticsDeclHeaderVisitor::visitTypeCoercionConstraintDecl(TypeCoercionCon
     {
         if (as<GenericDecl>(decl->parentDecl))
         {
-            auto toTypeDecl = as<DeclRefType>(decl->toType)->getDeclRef().getDecl();
+            auto toTypeDecl = toTypeDeclRefType->getDeclRef().getDecl();
             for (auto genericTypeParamDecl :
                  decl->parentDecl->getMembersOfType<GenericTypeParamDeclBase>())
             {
