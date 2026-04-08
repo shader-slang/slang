@@ -1732,6 +1732,10 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             return;
         }
 
+    case kIROp_BFloat16Type:
+        SLANG_UNEXPECTED("'BFloat16' type is not supported on HLSL target");
+        return;
+
     case kIROp_IntPtrType:
         if (getPointerSize(getTargetReq()) == sizeof(uint64_t))
             m_writer->emit("int64_t");

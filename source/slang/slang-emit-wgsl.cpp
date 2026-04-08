@@ -506,6 +506,9 @@ void WGSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         m_f16ExtensionEnabled = true;
         m_writer->emit("f16");
         break;
+    case kIROp_BFloat16Type:
+        SLANG_UNEXPECTED("'BFloat16' type is not supported on WGSL target");
+        break;
     case kIROp_BoolType:
         m_writer->emit("bool");
         break;
