@@ -32,11 +32,26 @@
 // Conversions
 // SPV-DAG: OpFConvert %float %{{.*}}
 
-// Vector operations (verify vector types work with same opcodes)
+// Vector arithmetic
 // SPV-DAG: OpFAdd %v4bfloat16
 // SPV-DAG: OpFSub %v4bfloat16
 // SPV-DAG: OpFMul %v4bfloat16
+// SPV-DAG: OpFDiv %v4bfloat16
 // SPV-DAG: OpFNegate %v4bfloat16
+
+// Vector comparisons
+// SPV-DAG: OpFOrdEqual %v2bool
+// SPV-DAG: OpFUnordNotEqual %v2bool
+// SPV-DAG: OpFOrdLessThan %v2bool
+// SPV-DAG: OpFOrdGreaterThan %v2bool
+// SPV-DAG: OpFOrdLessThanEqual %v2bool
+// SPV-DAG: OpFOrdGreaterThanEqual %v2bool
+
+// Vector math functions
+// SPV-DAG: OpExtInst %v2bfloat16 {{%[0-9]+}} FAbs
+// SPV-DAG: OpExtInst %v2bfloat16 {{%[0-9]+}} FMin
+// SPV-DAG: OpExtInst %v2bfloat16 {{%[0-9]+}} FMax
+// SPV-DAG: OpExtInst %v2bfloat16 {{%[0-9]+}} FClamp
 
 RWStructuredBuffer<int> outputBuffer;
 
@@ -95,17 +110,44 @@ void computeMain()
     use(int(float(sqrtVal)), 17);
     use(int(converted), 18);
 
-    // Vector4 operations
-    vector<BFloat16, 4> va = vector<BFloat16, 4>(a, b, a, b);
-    vector<BFloat16, 4> vb = vector<BFloat16, 4>(b, a, b, a);
+    // Vector4 arithmetic
+    vector<BFloat16, 4> v4a = vector<BFloat16, 4>(a, b, a, b);
+    vector<BFloat16, 4> v4b = vector<BFloat16, 4>(b, a, b, a);
 
-    let vsum = va + vb;
-    let vdiff = va - vb;
-    let vprod = va * vb;
-    let vneg = -va;
+    let vsum = v4a + v4b;
+    let vdiff = v4a - v4b;
+    let vprod = v4a * v4b;
+    let vquot = v4a / v4b;
+    let vneg = -v4a;
 
     use(int(float(vsum[0])), 19);
     use(int(float(vdiff[1])), 20);
     use(int(float(vprod[2])), 21);
-    use(int(float(vneg[3])), 22);
+    use(int(float(vquot[3])), 22);
+    use(int(float(vneg[3])), 23);
+
+    // Vector2 comparisons
+    vector<BFloat16, 2> v2a = vector<BFloat16, 2>(a, b);
+    vector<BFloat16, 2> v2b = vector<BFloat16, 2>(b, a);
+
+    let veq = (v2a == v2b);
+    let vneq = (v2a != v2b);
+    let vlt = (v2a < v2b);
+    let vgt = (v2a > v2b);
+    let vle = (v2a <= v2b);
+    let vge = (v2a >= v2b);
+
+    use(int(veq[0]) + int(vneq[0]) + int(vlt[0]) + int(vgt[0]) + int(vle[0]) + int(vge[0]), 24);
+
+    // Vector2 math functions
+    vector<BFloat16, 2> v2neg = vector<BFloat16, 2>(BFloat16(-float(a)), BFloat16(-float(b)));
+    let vabs = abs(v2neg);
+    let vmin = min(v2a, v2b);
+    let vmax = max(v2a, v2b);
+    let vclamped = clamp(v2a, v2b, vector<BFloat16, 2>(BFloat16(float(outputBuffer[2])), BFloat16(float(outputBuffer[2]))));
+
+    use(int(float(vabs[0])), 25);
+    use(int(float(vmin[1])), 26);
+    use(int(float(vmax[0])), 27);
+    use(int(float(vclamped[1])), 28);
 }
