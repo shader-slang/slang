@@ -84,6 +84,7 @@ struct ImmutableBufferLoadLoweringContext : InstPassBase
         {
         case kIROp_FloatType:
         case kIROp_HalfType:
+        case kIROp_BFloat16Type:
         case kIROp_DoubleType:
         case kIROp_Int8Type:
         case kIROp_Int16Type:

@@ -5868,6 +5868,9 @@ Expr* SemanticsExprVisitor::visitFloatBitCastExpr(FloatBitCastExpr* expr)
                     case BaseType::Half:
                         resultValue = (int16_t)FloatToHalf((float)floatVal);
                         break;
+                    case BaseType::BFloat16:
+                        resultValue = (int16_t)FloatToBFloat16((float)floatVal);
+                        break;
                     case BaseType::Float:
                         resultValue = FloatAsInt((float)floatVal);
                         break;
@@ -5898,6 +5901,9 @@ Expr* SemanticsExprVisitor::visitFloatBitCastExpr(FloatBitCastExpr* expr)
         {
         case BaseType::Half:
             resultValue = (int16_t)FloatToHalf((float)floatVal);
+            break;
+        case BaseType::BFloat16:
+            resultValue = (int16_t)FloatToBFloat16((float)floatVal);
             break;
         case BaseType::Float:
             resultValue = FloatAsInt((float)floatVal);
