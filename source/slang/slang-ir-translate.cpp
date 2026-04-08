@@ -323,6 +323,12 @@ IRInst* _resolveInstRec(TranslationContext* ctx, IRInst* inst)
         return inst;
     }
 
+    // IRParam is a function-scope value, not a type or specialization construct.
+    // It can appear as an operand of ExtractExistentialType when interface-typed
+    // entry-point params remain at function scope (e.g. CUDA compute).
+    if (as<IRParam>(inst))
+        return inst;
+
     List<IRInst*> operands;
     bool changed = false;
 
