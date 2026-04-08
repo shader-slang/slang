@@ -1314,6 +1314,7 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
             case BaseType::Int16:
             case BaseType::UInt16:
             case BaseType::Half:
+            case BaseType::BFloat16:
                 {
                     // Read 2 bytes from the appropriate position in the register
                     int byteInReg = ioByteOffset % 4;
@@ -1330,9 +1331,10 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
                     }
                     auto mask = builder->getIntValue(uintType, 0xFFFF);
                     auto maskedVal = builder->emitBitAnd(uintType, regVal, mask);
-                    if (basicType->getBaseType() == BaseType::Half)
+                    if (basicType->getBaseType() == BaseType::Half ||
+                        basicType->getBaseType() == BaseType::BFloat16)
                     {
-                        // Cast uint32 → uint16 first, then bitcast uint16 → Half
+                        // Cast uint32 → uint16 first, then bitcast uint16 → Half/BFloat16
                         auto uint16Type = builder->getBasicType(BaseType::UInt16);
                         auto uint16Val = builder->emitCast(uint16Type, maskedVal);
                         return builder->emitBitCast(typeToFetch, uint16Val);
@@ -1534,14 +1536,16 @@ struct CUDAEntryPointVaryingParamLegalizeContext : EntryPointVaryingParamLegaliz
             case BaseType::Int16:
             case BaseType::UInt16:
             case BaseType::Half:
+            case BaseType::BFloat16:
                 {
                     // Write 2 bytes at the appropriate position in the register
                     // Need read-modify-write since multiple sub-word values may share a register
                     int byteInReg = ioByteOffset % 4;
                     IRInst* valAsUint;
-                    if (basicType->getBaseType() == BaseType::Half)
+                    if (basicType->getBaseType() == BaseType::Half ||
+                        basicType->getBaseType() == BaseType::BFloat16)
                     {
-                        // Bitcast Half → uint16 first, then cast uint16 → uint32
+                        // Bitcast Half/BFloat16 → uint16 first, then cast uint16 → uint32
                         auto uint16Type = builder->getBasicType(BaseType::UInt16);
                         auto uint16Val = builder->emitBitCast(uint16Type, value);
                         valAsUint = builder->emitCast(uintType, uint16Val);
