@@ -2,6 +2,7 @@
 
 #include "slang-ir-insts.h"
 #include "slang-ir-loop-unroll.h"
+#include "slang-ir-peephole.h"
 #include "slang-ir-sccp.h"
 #include "slang-ir-typeflow-specialize.h"
 #include "slang-ir-util.h"
@@ -297,7 +298,9 @@ static IRInst* specializeWitnessLookup(IRLookupWitnessMethod* lookupInst)
     // the result of a `specialize` instruction or other
     // operation that will yield such a table.
     //
-    auto witnessTable = cast<IRWitnessTable>(lookupInst->getWitnessTable());
+    auto witnessTable = as<IRWitnessTable>(lookupInst->getWitnessTable());
+    if (!witnessTable)
+        return lookupInst;
 
     // Because we have a concrete witness table, we can
     // use it to look up the IR value that satisfies
@@ -359,6 +362,25 @@ IRInst* _resolveInstRec(TranslationContext* ctx, IRInst* inst)
                 "constant folded");
         }
     }
+    else
+    {
+        switch (instWithCanonicalOperands->getOp())
+        {
+        case kIROp_SizeOf:
+        case kIROp_AlignOf:
+        case kIROp_GetArrayLength:
+            if (tryReplaceInstUsesWithSimplifiedValue(
+                    ctx->getTargetProgram(),
+                    ctx->getModule(),
+                    instWithCanonicalOperands))
+            {
+                return instRef->getOperand(0);
+            }
+            break;
+        default:
+            break;
+        }
+    }
 
     // At this point, we've resolved anything that can be translated & not in the global scope (i.e.
     // things like arithmetic operations)
@@ -407,24 +429,29 @@ IRInst* _resolveInstRec(TranslationContext* ctx, IRInst* inst)
                 auto specInst = cast<IRSpecialize>(instWithCanonicalOperands);
                 auto specResult = specializeGeneric(ctx->getSpecializationContext(), specInst);
 
-                if (specResult)
+                if (specResult && as<IRGlobalValueWithCode>(specResult))
                 {
-                    // Specialization may have opened up some simplification opportunities.
+                    // If we ended up with something that has code, 
+                    // specialization may have opened up some simplification opportunities.
+                    // 
 
                     applySparseConditionalConstantPropagation(
                         specResult,
                         ctx->getTargetProgram(),
-                        ctx->getSink());
+                        ctx->getSink(),
+                        ctx);
 
                     if (!unrollLoopsInFunc(
                             ctx->getTargetProgram(),
                             ctx->getModule(),
-                            cast<IRGlobalValueWithCode>(specResult),
+                            as<IRGlobalValueWithCode>(specResult),
                             ctx->getSink()))
-                            return nullptr;
-
-                    specInst->replaceUsesWith(specResult);
+                        return nullptr;
                 }
+
+                if (specResult && specResult != specInst)
+                    specInst->replaceUsesWith(specResult);
+
                 // No need to memoize since specializeGeneric will already have memoized this.
                 return specResult;
             }
