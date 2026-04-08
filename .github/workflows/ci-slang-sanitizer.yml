@@ -39,18 +39,15 @@ jobs:
         shell: bash
 
     steps:
+      - name: Configure Git safe directory
+        run: git config --global --add safe.directory '*'
+
       - uses: actions/checkout@v4
         with:
           submodules: "recursive"
           # Need full history to diff PR changes against the base branch
           # for classifying sanitizer findings as PR-related vs pre-existing.
           fetch-depth: "0"
-
-      # GitHub Actions overrides HOME inside containers, so the
-      # safe.directory set during docker build (/root/.gitconfig) and
-      # by actions/checkout (temp HOME) are both invisible to later steps.
-      - name: Fix git safe.directory for container
-        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - name: Compute PR changed files
         env:
