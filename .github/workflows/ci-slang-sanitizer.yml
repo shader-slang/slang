@@ -46,6 +46,12 @@ jobs:
           # for classifying sanitizer findings as PR-related vs pre-existing.
           fetch-depth: "0"
 
+      # GitHub Actions overrides HOME inside containers, so the
+      # safe.directory set during docker build (/root/.gitconfig) and
+      # by actions/checkout (temp HOME) are both invisible to later steps.
+      - name: Fix git safe.directory for container
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
       - name: Compute PR changed files
         env:
           EVENT_NAME: ${{ github.event_name }}
