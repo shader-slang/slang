@@ -800,6 +800,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
     // 1. Uses relaxed memory ordering (less synchronization overhead)
     // 2. Single instruction for two half values
     [ForceInline]
+    [require(cuda_spirv, subgroup_basic)]
     [require(cuda_spirv, subgroup_partitioned)]
     [require(cuda_spirv, sm_6_6)]
     VISIBILITY_LEVEL static void sumReduceRows<U, Address, InArrayType>(
@@ -852,7 +853,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
     }
 
     [ForceInline]
-    [require(cooperative_matrix, subgroup_basic)]
+    [require(cuda_spirv, cooperative_matrix, subgroup_basic)]
     [require(spvAtomicFloat16AddEXT)]
     VISIBILITY_LEVEL static void outerProductAccumulate<U, Address, TypeA, InArrayTypeA, TypeB, InArrayTypeB>(
         uint sharedMemoryAOffset,
@@ -961,7 +962,7 @@ VISIBILITY_LEVEL struct MMAHelper<T, int InputSize, int OutputSize, int Subgroup
     // The workload is different from the large size matrix-matrix multiply, we actually perform the matrix-vector multiply
     //  for each thread, so the matrix-matrix multiply only needs to be performed for each warp (sub-group).
     [ForceInline]
-    [require(cooperative_matrix, subgroup_basic)]
+    [require(cuda_spirv, cooperative_matrix, subgroup_basic)]
     VISIBILITY_LEVEL static OutArrayType mma<U, Address, InArrayType, OutArrayType, V, bool Bias = false>(InArrayType inputVector,
         uint sharedMemoryAOffset,
         uint sharedMemoryBOffset,
@@ -1305,6 +1306,7 @@ public struct WaveTangledVector<T, ShMemSize : ISharedMemorySize, int N, int Sub
     [ForceInline]
     [HasTrivialForwardDerivative]
     [BackwardDerivative(linearTransformBwd)]
+    [require(cuda_spirv)]
     public OutputVector linearTransform<Address, Layout, OutputVector>(
         Address weightAddress)
             where Address : IPointerLikeAddress<T>
@@ -1346,6 +1348,7 @@ public struct WaveTangledVector<T, ShMemSize : ISharedMemorySize, int N, int Sub
     [ForceInline]
     [HasTrivialForwardDerivative]
     [BackwardDerivative(linearTransformBwd)]
+    [require(cuda_spirv)]
     public OutputVector linearTransform<Address, Layout, OutputVector>(
         Address weightAddress, Address biasAddress)
             where Address : IPointerLikeAddress<T>
@@ -1364,6 +1367,7 @@ public struct WaveTangledVector<T, ShMemSize : ISharedMemorySize, int N, int Sub
 
     // Backward of linear transformation with bias
     [ForceInline]
+    [require(cuda_spirv)]
     static void linearTransformBwd<Address, Layout, OutputVector>(
         inout DifferentialPair<This> dthis,
         DifferentialPtrPair<Address> dWeightAddress,

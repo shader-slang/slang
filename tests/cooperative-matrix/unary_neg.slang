@@ -1,17 +1,30 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -output-using-type -emit-spirv-directly
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -emit-spirv-directly -output-using-type
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK_BAB):-vk -emit-spirv-directly -Xslang -DBAB
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-cuda -output-using-type
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK_BAB):-cuda -Xslang -DBAB
 
-// CHECK: type: int32_t
-// CHECK-NEXT: -1
+//DISABLE_TEST(compute):SIMPLE(filecheck=DXIL):-target dxil -profile cs_6_10 -entry computeMain -Xdxc -Ibuild/dxc/include -DBAB
+//DXIL: result code = 0
+
+// CHECK: -1
 // CHECK-NEXT: -2
 // CHECK-NEXT: -3
 // CHECK-NEXT: -4
+
+// CHECK_BAB: FFFFFFFF
+// CHECK_BAB-NEXT: FFFFFFFE
+// CHECK_BAB-NEXT: FFFFFFFD
+// CHECK_BAB-NEXT: FFFFFFFC
 
 //TEST_INPUT:ubuffer(data=[1 2 3 4], stride=4, count=256),name=inputBuffer
 ByteAddressBuffer inputBuffer;
 
 //TEST_INPUT:ubuffer(stride=4, count=256):out,name=outputBuffer
+#if defined(BAB)
+RWByteAddressBuffer outputBuffer;
+#else
 RWStructuredBuffer<int32_t> outputBuffer;
+#endif
 
 using namespace linalg;
 

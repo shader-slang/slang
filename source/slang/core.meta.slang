@@ -660,39 +660,35 @@ interface IDifferentiablePtrType
     associatedtype Differential : IDifferentiablePtrType;
 };
 
-__magic_type(DiffTypeInfoInterfaceType)
-interface IHasDiffTypeInfo
-{ };
-
 __magic_type(FwdDiffFuncType)
 __intrinsic_type($(kIROp_ForwardDiffFuncType))
-struct FwdDiffFuncType<FType> where FType : IHasDiffTypeInfo
+struct FwdDiffFuncType<FType> where __hasDiffTypeInfo(FType)
 { };
 
 __magic_type(BwdCallableFuncType)
 __intrinsic_type($(kIROp_BwdCallableFuncType))
-struct BwdCallableFuncType<FType, CtxType> where FType : IHasDiffTypeInfo
+struct BwdCallableFuncType<FType, CtxType> where __hasDiffTypeInfo(FType)
 { };
 
 __magic_type(RematFuncType)
 __intrinsic_type($(kIROp_RematFuncType))
-struct RematFuncType<FType, MinimalCtxType, FullCtxType> where FType : IHasDiffTypeInfo
+struct RematFuncType<FType, MinimalCtxType, FullCtxType> where __hasDiffTypeInfo(FType)
 { };
 
 __magic_type(ApplyForBwdFuncType)
 __intrinsic_type($(kIROp_ApplyForBwdFuncType))
-struct ApplyForBwdFuncType<FType, CtxType> where FType : IHasDiffTypeInfo
+struct ApplyForBwdFuncType<FType, CtxType> where __hasDiffTypeInfo(FType)
 { };
 
 __magic_type(BwdDiffFuncType)
 __intrinsic_type($(kIROp_BackwardDiffFuncType))
-struct BwdDiffFuncType<FType> where FType : IHasDiffTypeInfo
+struct BwdDiffFuncType<FType> where __hasDiffTypeInfo(FType)
 { };
 
 __magic_type(ForwardDiffFuncInterfaceType)
 [KnownBuiltin($((int)KnownBuiltinDeclName::IForwardDifferentiable))]
 [__FunctionInterface]
-interface IForwardDifferentiable<FType> where FType : IHasDiffTypeInfo
+interface IForwardDifferentiable<FType> where __hasDiffTypeInfo(FType)
 {
     __builtin_requirement($( (int)BuiltinRequirementKind::ForwardDerivativeFunc))
     [MaybeDifferentiable]
@@ -702,7 +698,7 @@ interface IForwardDifferentiable<FType> where FType : IHasDiffTypeInfo
 // Core library interfaces:
 __magic_type(BwdCallableBaseType)
 [KnownBuiltin($((int)KnownBuiltinDeclName::IBwdCallable))]
-interface IBwdCallable<FType> where FType : IHasDiffTypeInfo
+interface IBwdCallable<FType> where __hasDiffTypeInfo(FType)
 {
     __builtin_requirement($( (int)BuiltinRequirementKind::BwdCallablePropFunc))
     __associatedfunc BwdCallableFuncType<FType, This> operator(); // -> bwd_prop
@@ -711,7 +707,7 @@ interface IBwdCallable<FType> where FType : IHasDiffTypeInfo
 __magic_type(BwdDiffFuncInterfaceType)
 [KnownBuiltin($((int)KnownBuiltinDeclName::IBackwardDifferentiable))]
 [__FunctionInterface]
-interface IBackwardDifferentiable<FType> where FType : IHasDiffTypeInfo
+interface IBackwardDifferentiable<FType> where __hasDiffTypeInfo(FType)
 {
     __builtin_requirement($( (int)BuiltinRequirementKind::BwdCallableContextType)) 
     associatedtype BwdCallable : IBwdCallable<FType>; // -> intermediate_context_type
@@ -1851,20 +1847,25 @@ bool operator!=(__none_t noneVal, Optional<T> val)
 }
 
 __magic_type(ConditionalType)
+__intrinsic_type($(kIROp_ConditionalType))
 struct Conditional<T, bool hasValue>
 {
-    internal vector<T, hasValue ? 1 : 0> storage;
+    internal property T value
+    {
+        __intrinsic_op($(kIROp_GetConditionalValue))
+        get;
+    }
 
     __implicit_conversion($(kConversionCost_ValToOptional))
-    [__unsafeForceInlineEarly]
-    __init(T val) { if (hasValue) storage[0] = val;}
+    __intrinsic_op($(kIROp_MakeConditionalValue))
+    __init(T val);
 
     [__unsafeForceInlineEarly]
     public Optional<T> get()
     {
         if (hasValue)
         {
-            return Optional<T>(storage[0]);
+            return Optional<T>(value);
         }
         else
         {
@@ -1874,10 +1875,10 @@ struct Conditional<T, bool hasValue>
 
     [__unsafeForceInlineEarly]
     [mutating]
-    public void set(T value)
+    public void set(T newValue)
     {
         if (hasValue)
-            storage[0] = value;
+            this = Conditional<T, hasValue>(newValue);
     }
 }
 
@@ -1889,7 +1890,7 @@ extension<T> Optional<T>
     __init(Conditional<T, condHasValue> condVal)
     {
         if (condHasValue)
-            this = Optional<T>(condVal.storage[0]);
+            this = Optional<T>(condVal.value);
         else
             this = none;
     }
