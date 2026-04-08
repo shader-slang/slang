@@ -16,7 +16,7 @@ FROM ubuntu:22.04
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Install essential tools required for GitHub Actions
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     wget \
     git \
@@ -46,7 +46,7 @@ RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-18 100 && 
 
 # Install build dependencies
 # libx11-dev is needed by common-setup and the Slang build
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     ninja-build \
     python3 \
@@ -59,6 +59,7 @@ RUN apt-get update && apt-get install -y \
 
 # Install CMake 3.30 (required for CMakePresets.json version 6)
 RUN wget -q https://github.com/Kitware/CMake/releases/download/v3.30.0/cmake-3.30.0-linux-x86_64.tar.gz && \
+    echo "09846a3858583f38189b59177586adf125a08c15f3cddcaf7d7d7081ac86969f  cmake-3.30.0-linux-x86_64.tar.gz" | sha256sum -c - && \
     tar -xzf cmake-3.30.0-linux-x86_64.tar.gz -C /opt && \
     rm cmake-3.30.0-linux-x86_64.tar.gz && \
     ln -s /opt/cmake-3.30.0-linux-x86_64/bin/cmake /usr/local/bin/cmake && \
