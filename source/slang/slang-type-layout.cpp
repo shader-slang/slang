@@ -6473,6 +6473,9 @@ void TypeLayoutContext::buildExternTypeMap()
 {
     externTypeMap.emplace();
 
+    if (!programLayout)
+        return;
+
     HashSet<String> externNames;
     Dictionary<String, DeclRefType*> allTypes;
 
