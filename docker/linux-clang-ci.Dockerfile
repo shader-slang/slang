@@ -8,8 +8,8 @@
 # - .github/workflows/ci-slang-coverage.yml  (future)
 #
 # Build and push:
-#   docker build -f docker/linux-clang-ci.Dockerfile -t ghcr.io/shader-slang/slang-linux-clang-ci:v1.0.0 .
-#   docker push ghcr.io/shader-slang/slang-linux-clang-ci:v1.0.0
+#   docker build -f docker/linux-clang-ci.Dockerfile -t ghcr.io/shader-slang/slang-linux-clang-ci:v1.0.1 .
+#   docker push ghcr.io/shader-slang/slang-linux-clang-ci:v1.0.1
 
 FROM ubuntu:22.04
 
@@ -22,6 +22,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     tar \
     gzip \
+    sudo \
     ca-certificates \
     gnupg \
     software-properties-common \
@@ -53,6 +54,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-pip \
     python-is-python3 \
     libx11-dev \
+    zlib1g-dev \
     nodejs \
     npm \
     && rm -rf /var/lib/apt/lists/*
