@@ -326,11 +326,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gpu_failures=$(gh api "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs?per_page=100" \
-            --jq '[.jobs[] | select(.conclusion == "failure") | select(
-              (.steps[]? | select(.name == "GPU health check" and .conclusion == "failure"))
-              or
-              (.steps[]? | select(.name == "GPU post-test diagnostics" and .conclusion == "failure"))
-            )] | length' \
+            --jq '[.jobs[]
+              | select(.conclusion == "failure")
+              | select(any(.steps[]?;
+                  (.name == "GPU health check" and .conclusion == "failure") or
+                  (.name == "GPU post-test diagnostics" and .conclusion == "failure")
+                ))
+            ] | length' \
             || echo "0")
           gpu_failures=${gpu_failures:-0}
           if ! [[ "$gpu_failures" =~ ^[0-9]+$ ]]; then
