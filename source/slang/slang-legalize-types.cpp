@@ -353,11 +353,6 @@ struct TupleTypeBuilder
                 {
                     specialType = legalFieldType;
                 }
-
-                // `void` is currently legalized to simple, but we don't want to add a
-                // `void` field to the struct.
-                if (legalLeafType.getSimple()->getOp() == kIROp_VoidType)
-                    return;
             }
             break;
 
