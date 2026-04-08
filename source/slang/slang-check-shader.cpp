@@ -10,6 +10,7 @@
 #include "slang-parameter-binding.h"
 #include "slang-profile.h"
 #include "slang-rich-diagnostics.h"
+#include "slang-target.h"
 
 namespace Slang
 {
@@ -693,6 +694,183 @@ bool isBuiltinParameterType(Type* type)
     return true;
 }
 
+// Returns true if `type` is the CoopMat<T,S,M,N,R> type.
+// CoopMat is declared with __intrinsic_type(kIROp_CoopMatrixType) and has no
+// dedicated AST type class, so we detect it by checking the inner struct name.
+static bool isCoopMatrixType(Type* type)
+{
+    auto declRefType = as<DeclRefType>(type);
+    if (!declRefType)
+        return false;
+    auto decl = declRefType->getDeclRef().getDecl();
+    if (!decl)
+        return false;
+
+    // Walk up to the inner decl if this is a GenericAppDeclRef
+    Decl* innerDecl = decl;
+    if (auto genericDecl = as<GenericDecl>(innerDecl))
+        innerDecl = genericDecl->inner;
+
+    auto name = innerDecl->getName();
+    if (!name)
+        return false;
+    return name->text == toSlice("CoopMat");
+}
+
+// Describes a rule for types that are invalid as entry-point varying parameters/return types.
+struct EntryPointVaryingTypeRule
+{
+    // Returns true if this type matches the rule (i.e., is invalid).
+    bool (*matches)(Type* type);
+
+    // Human-readable reason string for the diagnostic.
+    const char* reason;
+
+    // If non-null, this rule only applies when the target matches this predicate.
+    // When null, the rule applies to all targets.
+    bool (*targetPredicate)(CodeGenTarget target);
+};
+
+static bool _matchDifferentialPairType(Type* type)
+{
+    return as<DifferentialPairType>(type) != nullptr;
+}
+
+static bool _matchAtomicType(Type* type)
+{
+    return as<AtomicType>(type) != nullptr;
+}
+
+static bool _matchCoopVectorType(Type* type)
+{
+    return as<CoopVectorExpressionType>(type) != nullptr;
+}
+
+static bool _matchCoopMatrixType(Type* type)
+{
+    return isCoopMatrixType(type);
+}
+
+static bool _matchVectorBoolType(Type* type)
+{
+    auto vecType = as<VectorExpressionType>(type);
+    if (!vecType)
+        return false;
+    auto elemType = as<BasicExpressionType>(vecType->getElementType());
+    if (!elemType)
+        return false;
+    return elemType->getBaseType() == BaseType::Bool;
+}
+
+static bool _isSpirvTarget(CodeGenTarget target)
+{
+    return isSPIRV(target);
+}
+
+static const EntryPointVaryingTypeRule kEntryPointVaryingTypeRules[] = {
+    {_matchDifferentialPairType, "DifferentialPair is not a valid varying type", nullptr},
+    {_matchAtomicType, "Atomic is not a valid varying type", nullptr},
+    {_matchCoopVectorType, "CoopVec is not a valid varying type", nullptr},
+    {_matchCoopMatrixType, "CoopMat is not a valid varying type", nullptr},
+    {_matchVectorBoolType, "vector<bool> is not valid as a SPIR-V varying type", _isSpirvTarget},
+};
+
+struct VaryingTypeValidationContext
+{
+    DiagnosticSink* sink;
+    Name* entryPointName;
+    SourceLoc loc;
+    const char* direction;
+    const char* context;
+    ArrayView<CodeGenTarget> targets;
+    HashSet<Type*> seenTypes;
+};
+
+// Recursively walks a type and checks it against the varying type rules.
+// Returns true if any error was found.
+static bool validateVaryingType(VaryingTypeValidationContext& ctx, Type* type)
+{
+    if (!type)
+        return false;
+
+    if (as<ErrorType>(type))
+        return false;
+
+    // Unwrap ModifiedType
+    if (auto modType = as<ModifiedType>(type))
+        return validateVaryingType(ctx, modType->getBase());
+
+    for (const auto& rule : kEntryPointVaryingTypeRules)
+    {
+        if (!rule.matches(type))
+            continue;
+
+        if (rule.targetPredicate)
+        {
+            bool anyTargetMatches = false;
+            String matchedTargetName;
+            for (auto target : ctx.targets)
+            {
+                if (rule.targetPredicate(target))
+                {
+                    anyTargetMatches = true;
+                    matchedTargetName =
+                        TypeTextUtil::getCompileTargetName(SlangCompileTarget(target));
+                    break;
+                }
+            }
+            if (!anyTargetMatches)
+                continue;
+
+            ctx.sink->diagnose(Diagnostics::InvalidEntryPointVaryingTypeForTarget{
+                .type = type,
+                .direction = ctx.direction,
+                .context = ctx.context,
+                .entryPoint = ctx.entryPointName,
+                .target = matchedTargetName,
+                .reason = rule.reason,
+                .location = ctx.loc});
+        }
+        else
+        {
+            ctx.sink->diagnose(Diagnostics::InvalidEntryPointVaryingType{
+                .type = type,
+                .direction = ctx.direction,
+                .context = ctx.context,
+                .entryPoint = ctx.entryPointName,
+                .reason = rule.reason,
+                .location = ctx.loc});
+        }
+        return true;
+    }
+
+    // Recurse into struct fields
+    if (auto declRefType = as<DeclRefType>(type))
+    {
+        auto structDecl = as<StructDecl>(declRefType->getDeclRef().getDecl());
+        if (structDecl)
+        {
+            if (ctx.seenTypes.contains(type))
+                return false;
+            ctx.seenTypes.add(type);
+
+            bool foundError = false;
+            for (auto field : structDecl->getFields())
+            {
+                if (validateVaryingType(ctx, field->getType()))
+                    foundError = true;
+            }
+            return foundError;
+        }
+    }
+
+    // Recurse into array element type
+    if (auto arrayType = as<ArrayExpressionType>(type))
+        return validateVaryingType(ctx, arrayType->getElementType());
+
+    return false;
+}
+
 bool doStructFieldsHaveSemanticImpl(Type* type, HashSet<Type*>& seenTypes)
 {
     auto declRefType = as<DeclRefType>(type);
@@ -789,6 +967,52 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
                 .entryPoint = entryPointName,
                 .returnType = returnType,
                 .location = entryPointFuncDecl->loc});
+        }
+    }
+
+    // Validate that varying parameter/return types are legal.
+    {
+        List<CodeGenTarget> targets;
+        for (auto target : linkage->targets)
+            targets.add(target->getTarget());
+
+        // Validate return type as varying output
+        if (returnType)
+        {
+            VaryingTypeValidationContext ctx;
+            ctx.sink = sink;
+            ctx.entryPointName = entryPointName;
+            ctx.loc = entryPointFuncDecl->loc;
+            ctx.direction = "output";
+            ctx.context = "return type";
+            ctx.targets = targets.getArrayView();
+            validateVaryingType(ctx, returnType);
+        }
+
+        // Validate each parameter that would be treated as varying
+        for (const auto& param : entryPointFuncDecl->getParameters())
+        {
+            if (param->hasModifier<HLSLUniformModifier>())
+                continue;
+            if (isUniformParameterType(param->getType()))
+                continue;
+
+            VaryingTypeValidationContext ctx;
+            ctx.sink = sink;
+            ctx.entryPointName = entryPointName;
+            ctx.loc = param->loc;
+            ctx.direction = param->hasModifier<OutModifier>()      ? "output"
+                            : param->hasModifier<InOutModifier>()  ? "input/output"
+                            : param->hasModifier<RefModifier>()    ? "input/output"
+                            : param->hasModifier<ConstRefModifier>() ? "input"
+                                                                   : "input";
+
+            StringBuilder contextSb;
+            contextSb << "parameter '" << param->getName()->text << "'";
+            String contextStr = contextSb.produceString();
+            ctx.context = contextStr.getBuffer();
+            ctx.targets = targets.getArrayView();
+            validateVaryingType(ctx, param->getType());
         }
     }
 
