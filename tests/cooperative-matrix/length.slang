@@ -1,19 +1,22 @@
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHK-VK):-vk -output-using-type -emit-spirv-directly
-//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHK-CUDA):-cuda -output-using-type
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHK_VK):-vk -emit-spirv-directly
+//TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHK_CUDA):-cuda
+
+//DISABLE_TEST(compute):SIMPLE(filecheck=DXIL):-target dxil -profile cs_6_10 -entry computeMain -Xdxc -Ibuild/dxc/include
+//DXIL: result code = 0
 
 // Note the length is NOT row * column.
 // When the memory scope is set to subgroup, each thread gets 16 * 16 / 32 = 8 where 32 is the value used in `numthreads`.
 
-//CHK-VK:8
-//CHK-VK:4
-//CHK-VK:16
-//CHK-VK:4
+//CHK_VK:8
+//CHK_VK:4
+//CHK_VK:10
+//CHK_VK:4
 
 // https://docs.nvidia.com/cuda/parallel-thread-execution/#warp-level-matrix-fragment
-//CHK-CUDA:8
-//CHK-CUDA:16
-//CHK-CUDA:16
-//CHK-CUDA:16
+//CHK_CUDA:8
+//CHK_CUDA:10
+//CHK_CUDA:10
+//CHK_CUDA:10
 
 //TEST_INPUT:ubuffer(stride=4, count=4):out,name=outputBuffer
 RWStructuredBuffer<int32_t> outputBuffer;
@@ -28,6 +31,10 @@ void computeMain()
 
     __target_switch
     {
+    case hlsl:
+        outputBuffer[1] = CoopMat<half, MemoryScope.Subgroup, 16, 8, CoopMatMatrixUse.MatrixA>.GetLength();
+        outputBuffer[2] = 0;// int8 it not supported by HLSL
+
     case spirv:
         outputBuffer[1] = CoopMat<half, MemoryScope.Subgroup, 16, 8, CoopMatMatrixUse.MatrixA>.GetLength();
         outputBuffer[2] = CoopMat<int8_t, MemoryScope.Subgroup, 16, 32, CoopMatMatrixUse.MatrixA>.GetLength();
