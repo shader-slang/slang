@@ -2945,7 +2945,15 @@ bool shouldHaveSpecConstRate(
     if (operandCount == 0)
         return false;
 
-    if (!canOperationBeSpecConst(op, resultType, operands, nullptr))
+    // Unwrap any rate qualification so canOperationBeSpecConst sees the bare
+    // value type. isFloatingType checks as<IRBasicType> which doesn't match
+    // rate-qualified types like @ConstExpr float, so without unwrapping we
+    // would incorrectly allow float arithmetic as `OpSpecConstantOp`.
+    IRType* valueType = resultType;
+    if (auto rateQualifiedType = as<IRRateQualifiedType>(resultType))
+        valueType = rateQualifiedType->getValueType();
+
+    if (!canOperationBeSpecConst(op, valueType, operands, nullptr))
         return false;
 
     // An instruction whose result carries a spec-const rate is hoisted and
