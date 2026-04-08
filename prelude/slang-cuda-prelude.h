@@ -6631,7 +6631,6 @@ enum ShapeCombination : int
     m16n16k16 = 0,
     m8n32k16 = 1,
     m32n8k16 = 2,
-    m16n8k16 = 3
 };
 
 // ====================================================================================
@@ -6655,11 +6654,6 @@ template<>
 struct PtxShapeName<32, 8, 16>
 {
     static constexpr const char name[] = "m32n8k16";
-};
-template<>
-struct PtxShapeName<16, 8, 16>
-{
-    static constexpr const char name[] = "m16n8k16";
 };
 
 // Matrix role names
@@ -6962,67 +6956,6 @@ struct RegisterCount<__nv_fp8_e5m2, 32, 8, 16, MatrixUse::MatrixB>
 #endif
 
 
-// ====================================================================================
-// MMA m16n8k16 Register Counts (override generic WMMA counts)
-// A: 16x16 → 4 f16x2 regs, B: 16x8 → 2 f16x2 regs, C/D: 16x8 → 4 f32 or 2 f16x2
-// ====================================================================================
-
-#if SLANG_CUDA_ENABLE_HALF
-template<>
-struct RegisterCount<half, 16, 8, 16, MatrixUse::MatrixA>
-{
-    static constexpr int value = 4;
-};
-template<>
-struct RegisterCount<half, 16, 8, 16, MatrixUse::MatrixB>
-{
-    static constexpr int value = 2;
-};
-template<>
-struct RegisterCount<half, 16, 8, 16, MatrixUse::MatrixC>
-{
-    static constexpr int value = 2;
-};
-template<>
-struct RegisterCount<half, 16, 8, 16, MatrixUse::MatrixD>
-{
-    static constexpr int value = 2;
-};
-#endif // #if SLANG_CUDA_ENABLE_HALF
-
-#if SLANG_CUDA_ENABLE_BF16
-template<>
-struct RegisterCount<__nv_bfloat16, 16, 8, 16, MatrixUse::MatrixA>
-{
-    static constexpr int value = 4;
-};
-template<>
-struct RegisterCount<__nv_bfloat16, 16, 8, 16, MatrixUse::MatrixB>
-{
-    static constexpr int value = 2;
-};
-template<>
-struct RegisterCount<__nv_bfloat16, 16, 8, 16, MatrixUse::MatrixC>
-{
-    static constexpr int value = 2;
-};
-template<>
-struct RegisterCount<__nv_bfloat16, 16, 8, 16, MatrixUse::MatrixD>
-{
-    static constexpr int value = 2;
-};
-#endif // #if SLANG_CUDA_ENABLE_BF16
-
-template<>
-struct RegisterCount<float, 16, 8, 16, MatrixUse::MatrixC>
-{
-    static constexpr int value = 4;
-};
-template<>
-struct RegisterCount<float, 16, 8, 16, MatrixUse::MatrixD>
-{
-    static constexpr int value = 4;
-};
 
 // ====================================================================================
 // Saturation at the output for integer MMA
@@ -7956,7 +7889,7 @@ __device__ inline void mmaLoad(uint32_t* regs, const void* ptr, int stride)
 {
     const ElemT* buffer = static_cast<const ElemT*>(ptr);
 
-    if constexpr (M == 16 && N == 8 && K == 16)
+    if constexpr (M == 16 && N == 16 && K == 16)
     {
         unsigned laneid;
         asm("mov.u32 %0, %%laneid;" : "=r"(laneid));
@@ -8000,7 +7933,7 @@ __device__ inline void mmaStore(void* ptr, const uint32_t* regs, int stride)
 {
     ElemT* buffer = static_cast<ElemT*>(ptr);
 
-    if constexpr (M == 16 && N == 8 && K == 16)
+    if constexpr (M == 16 && N == 16 && K == 16)
     {
         unsigned laneid;
         asm("mov.u32 %0, %%laneid;" : "=r"(laneid));
@@ -8173,11 +8106,6 @@ template<>
 struct ShapeToMNK<ShapeCombination::m32n8k16>
 {
     static constexpr int M = 32, N = 8, K = 16;
-};
-template<>
-struct ShapeToMNK<ShapeCombination::m16n8k16>
-{
-    static constexpr int M = 16, N = 8, K = 16;
 };
 
 template<typename T>
@@ -8525,7 +8453,7 @@ struct WmmaFragment
     {
         // Force compile-time check, so we know the template parameter comibination is valid.
         (void)RegisterCount<T, M, N, K, R>::value;
-        if constexpr (M == 16 && N == 8 && K == 16)
+        if constexpr (M == 16 && N == 16 && K == 16)
             mmaStore<T, M, N, K, layout>(buffer + element, regs, stride);
         else
             wmmaStore<T, M, N, K, layout>(buffer + element, regs, stride);
@@ -8536,7 +8464,7 @@ struct WmmaFragment
     {
         // Force compile-time check, so we know the template parameter comibination is valid.
         (void)RegisterCount<T, M, N, K, R>::value;
-        if constexpr (M == 16 && N == 8 && K == 16)
+        if constexpr (M == 16 && N == 16 && K == 16)
             mmaStore<T, M, N, K, layout>(buffer, regs, stride * sizeof(U) / sizeof(T));
         else
             wmmaStore<T, M, N, K, layout>(buffer, regs, stride * sizeof(U) / sizeof(T));
@@ -8549,7 +8477,7 @@ struct WmmaFragment
 
         // Force compile-time check, so we know the template parameter comibination is valid.
         (void)RegisterCount<T, M, N, K, R>::value;
-        if constexpr (M == 16 && N == 8 && K == 16)
+        if constexpr (M == 16 && N == 16 && K == 16)
             mmaLoad<T, M, N, K, R, layout>(fragment.regs, buffer + element, stride);
         else
             wmmaLoad<T, M, N, K, R, layout>(fragment.regs, buffer + element, stride);
@@ -8564,7 +8492,7 @@ struct WmmaFragment
 
         // Force compile-time check, so we know the template parameter comibination is valid.
         (void)RegisterCount<T, M, N, K, R>::value;
-        if constexpr (M == 16 && N == 8 && K == 16)
+        if constexpr (M == 16 && N == 16 && K == 16)
             mmaLoad<T, M, N, K, R, layout>(fragment.regs, buffer, stride * sizeof(U) / sizeof(T));
         else
             wmmaLoad<T, M, N, K, R, layout>(fragment.regs, buffer, stride * sizeof(U) / sizeof(T));
