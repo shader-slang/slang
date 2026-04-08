@@ -3671,10 +3671,18 @@ struct TypeFlowSpecializationContext
                             return;
                         }
 
-                        specializedSet.add(builder.emitSpecializeInst(
+                        auto newSpec = builder.emitSpecializeInst(
                             typeOfSpecialization,
                             arg,
-                            specializationArgs));
+                            specializationArgs);
+                        if (inst->findDecoration<
+                                IRDisallowSpecializationWithExistentialsDecoration>())
+                        {
+                            builder.addDecoration(
+                                newSpec,
+                                kIROp_DisallowSpecializationWithExistentialsDecoration);
+                        }
+                        specializedSet.add(newSpec);
                     });
             }
             else
@@ -3682,8 +3690,15 @@ struct TypeFlowSpecializationContext
                 // Concrete case..
                 IRBuilder builder(module);
                 builder.setInsertInto(module);
-                specializedSet.add(
-                    builder.emitSpecializeInst(typeOfSpecialization, operand, specializationArgs));
+                auto newSpec =
+                    builder.emitSpecializeInst(typeOfSpecialization, operand, specializationArgs);
+                if (inst->findDecoration<IRDisallowSpecializationWithExistentialsDecoration>())
+                {
+                    builder.addDecoration(
+                        newSpec,
+                        kIROp_DisallowSpecializationWithExistentialsDecoration);
+                }
+                specializedSet.add(newSpec);
             }
 
             IRBuilder builder(module);
@@ -6348,19 +6363,10 @@ struct TypeFlowSpecializationContext
             }
             else if (auto specCallee = as<IRSpecialize>(callee))
             {
-                // The callee is an IRSpecialize whose args lack IRSetBase elements
-                // (isSetSpecializedGeneric returned false), meaning the generic has
-                // no interface constraint — an existential type flowed into an
-                // unconstrained generic, so dispatch code cannot be generated.
-                //
-                // Note: isInvalidExistentialSpecialization is not applicable here.
-                // It checks pre-typeflow representations (ExtractExistentialType,
-                // InterfaceType, etc.), but by this point the typeflow pass has
-                // transformed existential args into set-tag ops (e.g.,
-                // GetTagFromTaggedUnion with IRSetTagType). The code structure
-                // itself provides the guard: only unconstrained-generic callees
-                // that escaped both the dispatch-action and set-specialized-generic
-                // paths reach this branch.
+                // The callee is an IRSpecialize that escaped both the dispatch-action
+                // and set-specialized-generic resolution paths. This happens when an
+                // existential type flows into an unconstrained generic (no interface
+                // constraint), so the typeflow pass cannot generate dispatch code.
                 emitExistentialSpecializationDiagnostic(specCallee, inst->sourceLoc, inst);
                 module->getContainerPool().free(&callArgs);
                 return false;
@@ -7638,25 +7644,16 @@ struct TypeFlowSpecializationContext
     {
         bool hasChanges = false;
 
-        auto errorsBefore = sink->getErrorCount();
-
         // Part 1: Information Propagation
         //    This phase propagates type information through the module
         //    and records them into different maps in the current context.
         //
         performInformationPropagation();
 
-        if (sink->getErrorCount() > errorsBefore)
-        {
-            // If there were errors during propagation, we bail out early.
-            return false;
-        }
-
         if (sink->getErrorCount() > 0)
         {
-            // Pre-existing errors from earlier passes: propagation (read-only) ran
-            // to collect its own diagnostics, but don't mutate IR in the lowering
-            // phase when the module is already known-invalid.
+            // If there are any diagnostics after propagation, don't continue into
+            // the mutating lowering phase.
             return false;
         }
 
