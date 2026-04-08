@@ -184,6 +184,12 @@ jobs:
               echo "ℹ️  No cache compiler launcher available"
             fi
 
+            # When save-sccache is requested, sccache must be available
+            if [[ "${{ inputs.save-sccache }}" == "true" && -z "${sccache_path:-}" ]]; then
+              echo "::error::save-sccache is true but sccache is not available"
+              exit 1
+            fi
+
             if [[ "${{ inputs.os }}" =~ "windows" && "${{ inputs.config }}" == "debug" ]]; then
               # Doing a debug build will try to link against a release built llvm, this
               # is a problem on Windows, so make slang-llvm in release build and use
