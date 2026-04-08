@@ -3148,6 +3148,13 @@ err(
     span { loc = "location" }
 )
 
+err(
+    "parameter-without-default-after-parameter-with-default",
+    30703,
+    "parameter '~param:Decl' does not have a default value, but follows a parameter that does",
+    span { loc = "param:Decl" }
+)
+
 --
 -- 308xx: inheritance
 --

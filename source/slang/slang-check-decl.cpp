@@ -13843,6 +13843,21 @@ void SemanticsDeclHeaderVisitor::checkCallableDeclCommon(CallableDecl* decl)
         ensureDecl(paramDecl, DeclCheckState::ReadyForReference);
     }
 
+    // Check that no parameter without a default value follows a parameter with one.
+    bool seenDefaultParam = false;
+    for (auto paramDecl : decl->getParameters())
+    {
+        if (paramDecl->initExpr)
+        {
+            seenDefaultParam = true;
+        }
+        else if (seenDefaultParam)
+        {
+            getSink()->diagnose(
+                Diagnostics::ParameterWithoutDefaultAfterParameterWithDefault{.param = paramDecl});
+        }
+    }
+
     auto errorType = decl->errorType;
     if (errorType.type || errorType.exp)
     {
