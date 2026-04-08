@@ -4052,6 +4052,35 @@ void SemanticsDeclHeaderVisitor::visitTypeCoercionConstraintDecl(TypeCoercionCon
         decl->fromType = TranslateTypeNodeForced(decl->fromType);
     if (!decl->toType.type)
         decl->toType = TranslateTypeNodeForced(decl->toType);
+
+    // To resolve calling a method constrainted via a `TypeCoercionWitness` we must
+    // add a synthetic facet to our `ToType` and resolve the methods existance via
+    // specialization. As a result, if a user specifies a `ToType` not defined in the
+    // current scopes generic parameter list, we have a problem: we cannot retroactively add methods
+    // to an already baked `InheritanceInfo` (so the method constrainted will not be accessible).
+    //
+    // If a user intends to constrain a type declared outside the current scope they need to use
+    // type equality constraints.
+    //
+    auto toTypeDeclRefType = as<DeclRefType>(decl->toType);
+    if (toTypeDeclRefType)
+    {
+        if (as<GenericDecl>(decl->parentDecl))
+        {
+            auto toTypeDecl = as<DeclRefType>(decl->toType)->getDeclRef().getDecl();
+            for (auto genericTypeParamDecl :
+                 decl->parentDecl->getMembersOfType<GenericTypeParamDeclBase>())
+            {
+                if (genericTypeParamDecl == toTypeDecl)
+                    return;
+            }
+        }
+    }
+    getSink()->diagnose(
+        Diagnostics::TypeCoerceConstraintToTypeMustBeDefinedInTheCurrentScopesGeneric{
+            .toType = decl->toType,
+            .locationOfGenericParameterList = decl->parentDecl,
+            .location = decl->loc});
 }
 
 void SemanticsDeclHeaderVisitor::visitNonEmptyPackConstraintDecl(NonEmptyPackConstraintDecl* decl)
@@ -14050,13 +14079,24 @@ void SemanticsDeclBasesVisitor::_validateExtensionDeclGenericParams(ExtensionDec
 
         HashSet<Decl*> genericParamsReferencedByConstraints;
 
-        // Also collect declarations referenced by generic constraints
-        for (auto constraint :
-             getMembersOfType<GenericTypeConstraintDecl>(getASTBuilder(), genericDecl))
+        // Also collect declarations referenced by generic & type-coercion constraints
+        for (auto constraintDeclRef : getMembers(getASTBuilder(), genericDecl))
         {
-            collectReferencedDecls(
-                constraint.getDecl()->sup.type,
-                genericParamsReferencedByConstraints);
+            if (auto genericTypeConstraintDeclRef = constraintDeclRef.as<GenericTypeConstraintDecl>())
+                collectReferencedDecls(
+                    genericTypeConstraintDeclRef.getDecl()->sup.type,
+                    genericParamsReferencedByConstraints);
+            else if (
+                auto typeCoercionConstraintDeclRef =
+                    constraintDeclRef.as<TypeCoercionConstraintDecl>())
+            {
+                collectReferencedDecls(
+                    typeCoercionConstraintDeclRef.getDecl()->toType.type,
+                    genericParamsReferencedByConstraints);
+                collectReferencedDecls(
+                    typeCoercionConstraintDeclRef.getDecl()->fromType.type,
+                    genericParamsReferencedByConstraints);
+            }
         }
 
         // Note: We intentionally do NOT check inheritance declarations in the extension.
@@ -14220,6 +14260,10 @@ Type* SemanticsVisitor::calcThisType(DeclRef<Decl> declRef)
         ensureDecl(extDeclRef, DeclCheckState::CanUseExtensionTargetType);
         auto targetType = getTargetType(m_astBuilder, extDeclRef);
         return calcThisType(targetType);
+    }
+    else if (auto knownMethodDecl = declRef.as<KnownMethodDecl>())
+    {
+        return calcThisType(knownMethodDecl.getDecl()->getThisType());
     }
     else
     {

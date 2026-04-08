@@ -93,6 +93,38 @@ private:
     Val* tryResolve(SubtypeWitness* newWitness, Type* newLookupSource);
 };
 
+// A DeclRef that encodes that there is some member accessible called to `decl`.
+// This `decl` is not the real value and must be resolved via the original constraint
+// it comes from
+FIDDLE()
+class MemberConstraintDeclRef : public DeclRefBase
+{
+    FIDDLE(...)
+public:
+
+    MemberConstraintDeclRef(Decl* placeholderDecl, TypeCoercionConstraintDecl* constraintDecl)
+    { 
+        setOperands(placeholderDecl, constraintDecl);
+    }
+
+    // The source type that we are looking up from.
+    TypeCoercionConstraintDecl* getConstraintDecl()
+    {
+        return as<TypeCoercionConstraintDecl>(getDeclOperand(1));
+    }
+
+    DeclRefBase* _substituteImplOverride(
+        ASTBuilder* astBuilder,
+        SubstitutionSet subst,
+        int* ioDiff);
+
+    void _toTextOverride(StringBuilder& out);
+
+    Val* _resolveImplOverride();
+
+    DeclRefBase* _getBaseOverride();
+};
+
 // Represents a specialization of a generic decl.
 FIDDLE()
 class GenericAppDeclRef : public DeclRefBase

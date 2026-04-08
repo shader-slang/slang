@@ -439,6 +439,13 @@ bool addTypeCoercionWitnessToArgs(
     // If `_coerce` accepted the conversion but didn't provide an explicit
     // witness object, treat it as a builtin conversion witness so later
     // lowering still has a concrete generic argument to pass through.
+    //
+    // Despite this workaround, hitting this case is a bug in `_coerce`.
+    // The solution is to narrow-down on the particular `toType` and
+    // `fromType` that causes this result. In theory we should emit
+    // an error here, but to do this we need to implement more
+    // logic connecting `_coerce` to `TypeCoercionConstraint`
+    // so that we don't break existing (and unrelated) user code.
     if (!typeCoercionWitness)
         typeCoercionWitness = astBuilder->getBuiltinTypeCoercionWitness(fromType, toType);
 

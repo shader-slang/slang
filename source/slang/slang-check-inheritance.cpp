@@ -549,64 +549,128 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
         bool selfIsGenericParamType =
             isDeclRefTypeOf<GenericTypeParamDeclBase>(selfType) != nullptr;
 
-        for (auto constraintDeclRef :
-             getMembersOfType<GenericTypeConstraintDecl>(astBuilder, genericDeclRef))
+        for (auto genericDeclRefMember : getMembers(astBuilder, genericDeclRef))
         {
-            if (constraintDeclRef.getDecl()->checkState.isBeingChecked())
-                continue;
-
-            ensureDecl(&visitor, constraintDeclRef.getDecl(), DeclCheckState::ScopesWired);
-
-            // Check only the sub-type.
-            visitor.CheckConstraintSubType(constraintDeclRef.getDecl()->sub);
-            auto sub = constraintDeclRef.getDecl()->sub;
-
-            // If the sub-type part of the generic constraint is a member expression, it can't
-            // possibly be defining a constraint for a generic type parameter, so we skip it
-            // to avoid circular checking on the generic param type.
-            if (selfIsGenericParamType && as<MemberExpr>(sub.exp))
-                continue;
-
-            if (!sub.type)
-                sub = visitor.TranslateTypeNodeForced(sub);
-
-            // Canonicalize the constraint declRef to make sure we have a full reference to it.
-            constraintDeclRef =
-                createDefaultSubstitutionsIfNeeded(astBuilder, &visitor, constraintDeclRef)
-                    .as<GenericTypeConstraintDecl>();
-
-            auto subType = constraintDeclRef.substitute(astBuilder, sub.type);
-
-            // We only consider constraints where the type represented
-            // by `declRef` is the subtype, since those
-            // constraints are the ones that give us information about
-            // the declared supertypes.
-            //
-            auto subDeclRefType = as<DeclRefType>(subType);
-            if (!subDeclRefType)
+            if (auto constraintDeclRef = as<GenericTypeConstraintDecl>(genericDeclRefMember))
             {
-                if (auto subEachType = as<EachType>(subType))
-                {
-                    subDeclRefType = subEachType->getElementDeclRefType();
-                }
-                if (!subDeclRefType)
+                if (constraintDeclRef.getDecl()->checkState.isBeingChecked())
                     continue;
+
+                ensureDecl(&visitor, constraintDeclRef.getDecl(), DeclCheckState::ScopesWired);
+
+                // Check only the sub-type.
+                visitor.CheckConstraintSubType(constraintDeclRef.getDecl()->sub);
+                auto sub = constraintDeclRef.getDecl()->sub;
+
+                // If the sub-type part of the generic constraint is a member expression, it can't
+                // possibly be defining a constraint for a generic type parameter, so we skip it
+                // to avoid circular checking on the generic param type.
+                if (selfIsGenericParamType && as<MemberExpr>(sub.exp))
+                    continue;
+
+                if (!sub.type)
+                    sub = visitor.TranslateTypeNodeForced(sub);
+
+                // Canonicalize the constraint declRef to make sure we have a full reference to it.
+                constraintDeclRef =
+                    createDefaultSubstitutionsIfNeeded(astBuilder, &visitor, constraintDeclRef)
+                        .as<GenericTypeConstraintDecl>();
+
+                auto subType = constraintDeclRef.substitute(astBuilder, sub.type);
+
+                // We only consider constraints where the type represented
+                // by `declRef` is the subtype, since those
+                // constraints are the ones that give us information about
+                // the declared supertypes.
+                //
+                auto subDeclRefType = as<DeclRefType>(subType);
+                if (!subDeclRefType)
+                {
+                    if (auto subEachType = as<EachType>(subType))
+                    {
+                        subDeclRefType = subEachType->getElementDeclRefType();
+                    }
+                    if (!subDeclRefType)
+                        continue;
+                }
+                if (subDeclRefType->getDeclRef() != declRef)
+                    continue;
+
+                // Further check the constraint, since we now need the sup-type.
+                ensureDecl(&visitor, constraintDeclRef.getDecl(), DeclCheckState::CanSpecializeGeneric);
+
+                auto superType = getSup(astBuilder, constraintDeclRef);
+
+                // Because the constraint is a declared inheritance relationship,
+                // adding the base to our list of direct bases is as straightforward
+                // as in all the preceding cases.
+                //
+                auto satisfyingWitness =
+                    _getASTBuilder()->getDeclaredSubtypeWitness(selfType, superType, constraintDeclRef);
+                addDirectBaseType(superType, satisfyingWitness);
             }
-            if (subDeclRefType->getDeclRef() != declRef)
-                continue;
+            else if (
+                auto typeCoercionConstraintDeclRef = genericDeclRefMember.as<TypeCoercionConstraintDecl>())
+            {
+                auto typeCoercionConstraintDecl = typeCoercionConstraintDeclRef.getDecl();
+                ensureDecl(
+                    &visitor,
+                    typeCoercionConstraintDecl,
+                    DeclCheckState::CanSpecializeGeneric);
 
-            // Further check the constraint, since we now need the sup-type.
-            ensureDecl(&visitor, constraintDeclRef.getDecl(), DeclCheckState::CanSpecializeGeneric);
+                // Only add synthetic facets if the `selfType` is equal to the `toType`. Otherwise
+                // we will be adding $init's that are nonsensical. Expected form: `ToType __init(FromType);`.
+                auto toType = getToType(astBuilder, typeCoercionConstraintDecl);
+                if (!selfType->equals(toType))
+                    continue;
 
-            auto superType = getSup(astBuilder, constraintDeclRef);
+                auto fromType = getFromType(astBuilder, typeCoercionConstraintDecl);
 
-            // Because the constraint is a declared inheritance relationship,
-            // adding the base to our list of direct bases is as straightforward
-            // as in all the preceding cases.
-            //
-            auto satisfyingWitness =
-                _getASTBuilder()->getDeclaredSubtypeWitness(selfType, superType, constraintDeclRef);
-            addDirectBaseType(superType, satisfyingWitness);
+                // Create a synthetic-facet from our `KnownMethodDecl` and put inside it our synthetic-method
+                // that signifies that type-coercion with a particular type is possible
+                auto paramDecl = astBuilder->create<ParamDecl>();
+                paramDecl->type = TypeExp(fromType);
+                paramDecl->nameAndLoc.name = visitor.getName("value");
+                paramDecl->nameAndLoc.loc = typeCoercionConstraintDecl->loc;
+                
+                auto syntheticFunctionDecl = astBuilder->create<ConstructorDecl>();
+                syntheticFunctionDecl->returnType = TypeExp(toType);
+                syntheticFunctionDecl->nameAndLoc.name = visitor.getName("$init");
+                syntheticFunctionDecl->nameAndLoc.loc = typeCoercionConstraintDecl->loc;
+                syntheticFunctionDecl->addMember(paramDecl);
+
+                // `syntheticFunctionDecl` should be an implicit conversion if the constraint is `implicit`
+                if (auto implicitConversioModifier = typeCoercionConstraintDecl->findModifier<ImplicitConversionModifier>())
+                    addModifier(syntheticFunctionDecl, implicitConversioModifier);
+
+                auto parentDecl = getModule()->getModuleDecl();
+                DeclRef<KnownMethodDecl> syntheticFacetDeclRef =
+                    astBuilder->create<KnownMethodDecl>();
+                KnownMethodDecl* syntheticFacetDecl = syntheticFacetDeclRef.getDecl();
+                syntheticFacetDecl->constraintDecl = typeCoercionConstraintDecl;
+                syntheticFacetDecl->ownedScope = astBuilder->create<Scope>();
+                syntheticFacetDecl->ownedScope->parent = visitor.getScope(parentDecl);
+                syntheticFacetDecl->ownedScope->containerDecl = syntheticFacetDecl;
+                syntheticFacetDecl->parentDecl = parentDecl;
+                syntheticFacetDecl->nameAndLoc.loc = typeCoercionConstraintDecl->loc;
+                syntheticFacetDecl->addMember(syntheticFunctionDecl);
+                syntheticFacetDecl->thisType = selfType;
+                
+                auto syntheticAsAType = DeclRefType::create(astBuilder, syntheticFacetDeclRef);
+                auto syntheticAsAWitness = astBuilder->getTypeEqualityWitness(syntheticAsAType);
+
+                // Add a synthetic facet so that the frontend can pretend they have access to a
+                // valid `__init` function. This facet is `self` since the definition must come
+                // directly from `toType` for it to be an `__init`.
+                Facet typeCoercionFacet = new (arena) Facet::Impl(
+                    astBuilder,
+                    selfFacetKind,
+                    Facet::Directness::Self,
+                    syntheticFacetDeclRef,
+                    syntheticAsAType,
+                    syntheticAsAWitness);
+                allFacets.add(typeCoercionFacet);
+            }
         }
     }
 

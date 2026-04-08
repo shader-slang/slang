@@ -2836,13 +2836,17 @@ __generic<ToType, let N : int> extension vector<ToType,N>
 {
     __implicit_conversion(constraint)
     __intrinsic_op(BuiltinCast)
-    __init<FromType>(vector<FromType,N> value) where ToType(FromType) implicit;
+    __init<FromType, ToType_T>(vector<FromType,N> value) 
+        where ToType_T == ToType
+        where ToType_T(FromType) implicit;
 
-    __implicit_conversion(constraint+)
+    __implicit_conversion(constraint +)
     [__unsafeForceInlineEarly]
     [__readNone]
     [TreatAsDifferentiable]
-    __init<FromType>(FromType value) where ToType(FromType) implicit
+    __init<FromType, ToType_T>(FromType value)
+        where ToType_T == ToType
+        where ToType_T(FromType) implicit
     {
         this = __builtin_cast<vector<ToType,N>>(vector<FromType,N>(value));
     }
@@ -2853,7 +2857,9 @@ __generic<ToType, let R : int, let C : int, let L : int> extension matrix<ToType
 {
     __implicit_conversion(constraint)
     __intrinsic_op(BuiltinCast)
-    __init<FromType>(matrix<FromType,R,C,L> value) where ToType(FromType) implicit;
+    __init<FromType, ToType_T>(matrix<FromType,R,C,L> value)
+        where ToType_T == ToType
+        where ToType_T(FromType) implicit;
 }
 
 //@ hidden:

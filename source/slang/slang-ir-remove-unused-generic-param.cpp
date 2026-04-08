@@ -131,9 +131,12 @@ struct RemoveUnusedGenericParamContext : InstPassBase
                                 specialize->getBase(),
                                 newArgs.getCount(),
                                 newArgs.getBuffer());
-                            specialize->transferDecorationsTo(newSpecialize);
-                            specialize->replaceUsesWith(newSpecialize);
-                            specialize->removeAndDeallocate();
+                            if (specialize != newSpecialize)
+                            {
+                                specialize->transferDecorationsTo(newSpecialize);
+                                specialize->replaceUsesWith(newSpecialize);
+                                specialize->removeAndDeallocate();
+                            }
                         }
                     }
                     for (auto param : paramsToRemove)

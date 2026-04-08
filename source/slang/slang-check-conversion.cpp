@@ -1715,6 +1715,9 @@ bool SemanticsVisitor::_coerce(
                             // Skip witness arguments (SubtypeWitness)
                             if (as<SubtypeWitness>(toArg) && as<SubtypeWitness>(fromArg))
                                 continue;
+                            // Skip witness arguments (TypeCoercionWitness)
+                            if (as<TypeCoercionWitness>(toArg) && as<TypeCoercionWitness>(fromArg))
+                                continue;
                             // Non-witness arguments must be equal
                             if (!toArg->equals(fromArg))
                             {
@@ -2644,6 +2647,11 @@ bool SemanticsVisitor::_coerce(
                     ImplicitCastMethod{*overloadContext.bestCandidate, cost});
             }
         }
+        if (outWitnessOfConversion)
+           *outWitnessOfConversion = getASTBuilder()->getDeclRefTypeCoercionWitness(
+               fromType,
+               toType,
+               overloadContext.bestCandidate->item.declRef);
         return true;
     }
     if (!cachedMethod)
