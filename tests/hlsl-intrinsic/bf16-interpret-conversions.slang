@@ -38,4 +38,10 @@ void main()
     vector<BFloat16, 3> v = vector<BFloat16, 3>(scalar);
     // CHECK: splat=7,7,7
     printf("splat=%d,%d,%d\n", int(float(v[0])), int(float(v[1])), int(float(v[2])));
+
+    // __floatAsInt for BFloat16 (constant folding)
+    // BFloat16(1.0) has bit pattern 0x3F80 (sign=0, exp=01111111, mantissa=0000000)
+    int16_t bits = __floatAsInt(BFloat16(1.0));
+    // CHECK: bf16bits=16256
+    printf("bf16bits=%d\n", int(bits));
 }

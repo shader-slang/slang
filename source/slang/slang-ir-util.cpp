@@ -2280,6 +2280,8 @@ UnownedStringSlice getBasicTypeNameHint(IRType* basicType)
         return UnownedStringSlice::fromLiteral("float");
     case kIROp_HalfType:
         return UnownedStringSlice::fromLiteral("half");
+    case kIROp_BFloat16Type:
+        return UnownedStringSlice::fromLiteral("bfloat16");
     case kIROp_DoubleType:
         return UnownedStringSlice::fromLiteral("double");
     case kIROp_BoolType:

@@ -278,6 +278,8 @@ void CLikeSourceEmitter::emitSimpleType(IRType* type)
 
     case kIROp_HalfType:
         return UnownedStringSlice("half");
+    case kIROp_BFloat16Type:
+        return UnownedStringSlice("bfloat16");
 
     case kIROp_FloatType:
         return UnownedStringSlice("float");
