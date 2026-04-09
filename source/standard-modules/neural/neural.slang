@@ -25,6 +25,7 @@ __include "ivector";
 __include "inline-vector";
 __include "istorages";
 __include "bindless-storage";
+__include "mma-linear-layout-help";
 __include "accelerate-vector-coopmat";
 // __include "mma-new-helper";
 __include "mma-new-helper-v2";
@@ -48,6 +49,7 @@ __include "unit-test/unittest-mat-vec-mul";
 __include "unit-test/unittest-outerproduct-reduce";
 __include "unit-test/unittest-bias-reduce";
 __include "unit-test/unittest-mma-load";
+__include "unit-test/unittest-mma-backward";
 __include "unit-test/unittest-hash-function";
 __include "unit-test/unittest-permuto-encoder";
 #endif
