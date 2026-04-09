@@ -86,7 +86,11 @@ void fillWeightMatrix<int InputSize, int OutputSize>(uint tid, bool clear = fals
 
 void test<int InputSize, int OutputSize>(uint tid, int resIndex)
 {
-    let output = neural_unittest.testMatVecMul<DType, InputSize, OutputSize, TestShMemSize, false, 1, true>(tid, inputBuffer, none);
+    DType inputData[OutputSize];
+    for (int i = 0; i < OutputSize; i++)
+        inputData[i] = DType(tid + 1);
+
+    let output = neural_unittest.testMatVecMul<DType, InputSize, OutputSize, OutputSize, TestShMemSize, false, 1, true>(inputData, inputBuffer, none);
 
     bool res = true;
     int scaleFactor = (OutputSize % 3 == 0) ? 0 : -1;

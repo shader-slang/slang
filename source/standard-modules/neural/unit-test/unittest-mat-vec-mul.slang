@@ -9,12 +9,13 @@ DType[TransposeA ? InputSize : OutputSize]
         DType : __BuiltinFloatingPointType,
         int InputSize,
         int OutputSize,
+        int InArraySize,
         ShMemSize : ISharedMemorySize,
         TargetEnum Target,
         bool Bias,
         int SubgroupCount,
         bool TransposeA>
-    (uint tid,
+    (DType[InArraySize] inputData,
      RWStructuredBuffer<DType>.Handle weightBuffer,
      Optional<RWStructuredBuffer<DType>.Handle> biasBuffer)
         where DType.Differential == DType
@@ -25,24 +26,27 @@ DType[TransposeA ? InputSize : OutputSize]
     typealias MMA = MMAHelper<DType, InputSize, OutputSize, 32, Target, ShMemSize, TransposeA, SubgroupCount>;
     const int InSize = TransposeA ? MMA.Uint4AlignedM : MMA.Uint4AlignedK;
     const int OutSize = TransposeA ? MMA.Uint4AlignedK : MMA.Uint4AlignedM;
-    const int FillSize = TransposeA ? OutputSize : InputSize;
     const int ResultSize = TransposeA ? InputSize : OutputSize;
 
+    uint shA = 0;
+    uint shB = MMA.ShMemInfo.SharedMemSizeInVectorMatA;
+    uint shC = shB;
+
     DType inputVector[InSize] = {};
-    for (int i = 0; i < FillSize; i++)
-        inputVector[i] = DType(tid + 1);
+    for (int i = 0; i < InArraySize; i++)
+        inputVector[i] = inputData[i];
 
     DType alignedOutput[OutSize];
     if (Bias)
     {
         Address biasAddress = Address(biasBuffer.value);
         alignedOutput = MMA.mma<DType, Address, DType[InSize], DType[OutSize], DType, true>(
-            inputVector, 0, 256, 256, address, biasAddress);
+            inputVector, shA, shB, shC, address, biasAddress);
     }
     else
     {
         alignedOutput = MMA.mma<DType, Address, DType[InSize], DType[OutSize], DType, false>(
-            inputVector, 0, 256, 256, address, none);
+            inputVector, shA, shB, shC, address, none);
     }
 
     DType output[ResultSize];
@@ -56,11 +60,12 @@ public DType[TransposeA ? InputSize : OutputSize]
         DType : __BuiltinFloatingPointType,
         int InputSize,
         int OutputSize,
+        int InArraySize,
         ShMemSize : ISharedMemorySize,
         bool Bias,
         int SubgroupCount,
         bool TransposeA>
-    (uint tid,
+    (DType[InArraySize] inputData,
      RWStructuredBuffer<DType>.Handle weightBuffer,
      Optional<RWStructuredBuffer<DType>.Handle> biasBuffer)
         where DType.Differential == DType
@@ -68,9 +73,9 @@ public DType[TransposeA ? InputSize : OutputSize]
     __target_switch
     {
     case cuda:
-        return testMatVecMulImpl<DType, InputSize, OutputSize, ShMemSize, TargetEnum.CUDA, Bias, SubgroupCount, TransposeA>(tid, weightBuffer, biasBuffer);
+        return testMatVecMulImpl<DType, InputSize, OutputSize, InArraySize, ShMemSize, TargetEnum.CUDA, Bias, SubgroupCount, TransposeA>(inputData, weightBuffer, biasBuffer);
     case spirv:
-        return testMatVecMulImpl<DType, InputSize, OutputSize, ShMemSize, TargetEnum.SPIR_V, Bias, SubgroupCount, TransposeA>(tid, weightBuffer, biasBuffer);
+        return testMatVecMulImpl<DType, InputSize, OutputSize, InArraySize, ShMemSize, TargetEnum.SPIR_V, Bias, SubgroupCount, TransposeA>(inputData, weightBuffer, biasBuffer);
     }
 }
 
@@ -84,6 +89,7 @@ DType[TransposeA ? InputSize : OutputSize]
         DType : __BuiltinFloatingPointType,
         int InputSize,
         int OutputSize,
+        int InArraySize,
         int PaddedInputSize,
         int PaddedOutputSize,
         ShMemSize : ISharedMemorySize,
@@ -91,7 +97,7 @@ DType[TransposeA ? InputSize : OutputSize]
         bool Bias,
         int SubgroupCount,
         bool TransposeA>
-    (uint tid,
+    (DType[InArraySize] inputData,
      RWStructuredBuffer<DType>.Handle weightBuffer,
      Optional<RWStructuredBuffer<DType>.Handle> biasBuffer)
         where DType.Differential == DType
@@ -102,12 +108,11 @@ DType[TransposeA ? InputSize : OutputSize]
     typealias MMA = TiledMMAHelper<DType, PaddedInputSize, PaddedOutputSize, 32, Target, ShMemSize, TransposeA, SubgroupCount>;
     const int InSize = TransposeA ? MMA.TileInfoT.Uint4AlignedM : MMA.TileInfoT.Uint4AlignedK;
     const int OutSize = TransposeA ? MMA.TileInfoT.Uint4AlignedK : MMA.TileInfoT.Uint4AlignedM;
-    const int FillSize = TransposeA ? OutputSize : InputSize;
     const int ResultSize = TransposeA ? InputSize : OutputSize;
 
     DType inputVector[InSize] = {};
-    for (int i = 0; i < FillSize; i++)
-        inputVector[i] = DType(tid + 1);
+    for (int i = 0; i < InArraySize; i++)
+        inputVector[i] = inputData[i];
 
     DType alignedOutput[OutSize];
     if (Bias)
@@ -133,13 +138,14 @@ public DType[TransposeA ? InputSize : OutputSize]
         DType : __BuiltinFloatingPointType,
         int InputSize,
         int OutputSize,
+        int InArraySize,
         int PaddedInputSize,
         int PaddedOutputSize,
         ShMemSize : ISharedMemorySize,
         bool Bias,
         int SubgroupCount,
         bool TransposeA>
-    (uint tid,
+    (DType[InArraySize] inputData,
      RWStructuredBuffer<DType>.Handle weightBuffer,
      Optional<RWStructuredBuffer<DType>.Handle> biasBuffer)
         where DType.Differential == DType
@@ -147,9 +153,9 @@ public DType[TransposeA ? InputSize : OutputSize]
     __target_switch
     {
     case cuda:
-        return testTiledMatVecMulImpl<DType, InputSize, OutputSize, PaddedInputSize, PaddedOutputSize, ShMemSize, TargetEnum.CUDA, Bias, SubgroupCount, TransposeA>(tid, weightBuffer, biasBuffer);
+        return testTiledMatVecMulImpl<DType, InputSize, OutputSize, InArraySize, PaddedInputSize, PaddedOutputSize, ShMemSize, TargetEnum.CUDA, Bias, SubgroupCount, TransposeA>(inputData, weightBuffer, biasBuffer);
     case spirv:
-        return testTiledMatVecMulImpl<DType, InputSize, OutputSize, PaddedInputSize, PaddedOutputSize, ShMemSize, TargetEnum.SPIR_V, Bias, SubgroupCount, TransposeA>(tid, weightBuffer, biasBuffer);
+        return testTiledMatVecMulImpl<DType, InputSize, OutputSize, InArraySize, PaddedInputSize, PaddedOutputSize, ShMemSize, TargetEnum.SPIR_V, Bias, SubgroupCount, TransposeA>(inputData, weightBuffer, biasBuffer);
     }
 }
 

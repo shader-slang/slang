@@ -84,8 +84,12 @@ void test<int InputSize, int OutputSize>(uint tid, int resIndex)
     static const int PaddedInputSize = PadToTile<InputSize>.Value;
     static const int PaddedOutputSize = PadToTile<OutputSize>.Value;
 
-    let output = neural_unittest.testTiledMatVecMul<DType, InputSize, OutputSize, PaddedInputSize, PaddedOutputSize, TestShMemSize, false, 1, true>(
-        tid, inputBuffer, none);
+    DType inputData[OutputSize];
+    for (int i = 0; i < OutputSize; i++)
+        inputData[i] = DType(tid + 1);
+
+    let output = neural_unittest.testTiledMatVecMul<DType, InputSize, OutputSize, OutputSize, PaddedInputSize, PaddedOutputSize, TestShMemSize, false, 1, true>(
+        inputData, inputBuffer, none);
 
     bool res = true;
     int scaleFactor = (OutputSize % 3 == 0) ? 0 : -1;

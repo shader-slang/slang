@@ -104,12 +104,16 @@ void test<int InputSize, int OutputSize>(uint tid, int resIndex)
     static const int PaddedInputSize = PadToTile<InputSize>.Value;
     static const int PaddedOutputSize = PadToTile<OutputSize>.Value;
 
+    DType inputData[InputSize];
+    for (int i = 0; i < InputSize; i++)
+        inputData[i] = DType(tid + 1);
+
 #if TEST_BIAS
-    let output = neural_unittest.testTiledMatVecMul<DType, InputSize, OutputSize, PaddedInputSize, PaddedOutputSize, TestShMemSize, true, 1, false>(
-        tid, inputBuffer, Optional<RWStructuredBuffer<DType>.Handle>(biasBuffer));
+    let output = neural_unittest.testTiledMatVecMul<DType, InputSize, OutputSize, InputSize, PaddedInputSize, PaddedOutputSize, TestShMemSize, true, 1, false>(
+        inputData, inputBuffer, Optional<RWStructuredBuffer<DType>.Handle>(biasBuffer));
 #else
-    let output = neural_unittest.testTiledMatVecMul<DType, InputSize, OutputSize, PaddedInputSize, PaddedOutputSize, TestShMemSize, false, 1, false>(
-        tid, inputBuffer, none);
+    let output = neural_unittest.testTiledMatVecMul<DType, InputSize, OutputSize, InputSize, PaddedInputSize, PaddedOutputSize, TestShMemSize, false, 1, false>(
+        inputData, inputBuffer, none);
 #endif
 
     bool res = true;

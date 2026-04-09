@@ -14,9 +14,9 @@ void testOuterProductAccumulateImpl<
         int OutputSize,
         ShMemSize : ISharedMemorySize,
         TargetEnum Target,
-        int SubgroupCount,
-        int WorkgroupSize>
-    (uint tid,
+        int SubgroupCount>
+    (DType[InputSize] inputData,
+     DType[OutputSize] dOutData,
      RWStructuredBuffer<DType>.Handle outputBuffer)
         where DType.Differential == DType
 {
@@ -32,13 +32,11 @@ void testOuterProductAccumulateImpl<
     DType dOutVector[OutSize] = {};
     DType inputVector[InSize] = {};
 
-    float scaleFactor = 1.0f / float(WorkgroupSize);
-
     for (int i = 0; i < InputSize; i++)
-        inputVector[i] = DType((i + 1) * (tid + 1) * scaleFactor);
+        inputVector[i] = inputData[i];
 
     for (int i = 0; i < OutputSize; i++)
-        dOutVector[i] = DType((OutputSize - i) * scaleFactor);
+        dOutVector[i] = dOutData[i];
 
     MMA.outerProductAccumulate<DType, Address, DType, DType[OutSize], DType, DType[InSize]>(
         OffsetA, OffsetB, dOutVector, inputVector, address);
@@ -49,18 +47,18 @@ public void testOuterProductAccumulate<
         int InputSize,
         int OutputSize,
         ShMemSize : ISharedMemorySize,
-        int SubgroupCount,
-        int WorkgroupSize>
-    (uint tid,
+        int SubgroupCount>
+    (DType[InputSize] inputData,
+     DType[OutputSize] dOutData,
      RWStructuredBuffer<DType>.Handle outputBuffer)
         where DType.Differential == DType
 {
     __target_switch
     {
     case cuda:
-        testOuterProductAccumulateImpl<DType, InputSize, OutputSize, ShMemSize, TargetEnum.CUDA, SubgroupCount, WorkgroupSize>(tid, outputBuffer);
+        testOuterProductAccumulateImpl<DType, InputSize, OutputSize, ShMemSize, TargetEnum.CUDA, SubgroupCount>(inputData, dOutData, outputBuffer);
     case spirv:
-        testOuterProductAccumulateImpl<DType, InputSize, OutputSize, ShMemSize, TargetEnum.SPIR_V, SubgroupCount, WorkgroupSize>(tid, outputBuffer);
+        testOuterProductAccumulateImpl<DType, InputSize, OutputSize, ShMemSize, TargetEnum.SPIR_V, SubgroupCount>(inputData, dOutData, outputBuffer);
     }
 }
 
@@ -74,9 +72,9 @@ void testOuterProductAccumulateTiledImpl<
         int OutputSize,
         ShMemSize : ISharedMemorySize,
         TargetEnum Target,
-        int SubgroupCount,
-        int WorkgroupSize>
-    (uint tid,
+        int SubgroupCount>
+    (DType[InputSize] inputData,
+     DType[OutputSize] dOutData,
      RWStructuredBuffer<DType>.Handle outputBuffer)
         where DType.Differential == DType
 {
@@ -92,13 +90,11 @@ void testOuterProductAccumulateTiledImpl<
     DType dOutVector[OutSize] = {};
     DType inputVector[InSize] = {};
 
-    float scaleFactor = 1.0f / float(WorkgroupSize);
-
     for (int i = 0; i < InputSize; i++)
-        inputVector[i] = DType((i + 1) * (tid + 1) * scaleFactor);
+        inputVector[i] = inputData[i];
 
     for (int i = 0; i < OutputSize; i++)
-        dOutVector[i] = DType((OutputSize - i) * scaleFactor);
+        dOutVector[i] = dOutData[i];
 
     MMA.outerProductAccumulate<DType, Address, DType, DType[OutSize], DType, DType[InSize]>(
         OffsetA, OffsetB, dOutVector, inputVector, address);
@@ -109,18 +105,18 @@ public void testOuterProductAccumulateTiled<
         int InputSize,
         int OutputSize,
         ShMemSize : ISharedMemorySize,
-        int SubgroupCount,
-        int WorkgroupSize>
-    (uint tid,
+        int SubgroupCount>
+    (DType[InputSize] inputData,
+     DType[OutputSize] dOutData,
      RWStructuredBuffer<DType>.Handle outputBuffer)
         where DType.Differential == DType
 {
     __target_switch
     {
     case cuda:
-        testOuterProductAccumulateTiledImpl<DType, InputSize, OutputSize, ShMemSize, TargetEnum.CUDA, SubgroupCount, WorkgroupSize>(tid, outputBuffer);
+        testOuterProductAccumulateTiledImpl<DType, InputSize, OutputSize, ShMemSize, TargetEnum.CUDA, SubgroupCount>(inputData, dOutData, outputBuffer);
     case spirv:
-        testOuterProductAccumulateTiledImpl<DType, InputSize, OutputSize, ShMemSize, TargetEnum.SPIR_V, SubgroupCount, WorkgroupSize>(tid, outputBuffer);
+        testOuterProductAccumulateTiledImpl<DType, InputSize, OutputSize, ShMemSize, TargetEnum.SPIR_V, SubgroupCount>(inputData, dOutData, outputBuffer);
     }
 }
 

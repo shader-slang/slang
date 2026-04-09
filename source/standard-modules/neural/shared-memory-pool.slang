@@ -375,7 +375,7 @@ public struct SharedMemorySize0<T, TargetEnum Target, ExecutionMode ExeMode, int
     // With MMAHelperNew (CUDA + OptimalLayout), forward and backward MMA
     // use zero shmem (LoadRaw + FromLocal). This term only applies to
     // the legacy shmem-based MMAHelper/TiledMMAHelper paths (non-CUDA).
-    static const uint BytesForMMA = (Target == TargetEnum.CUDA) ? 0 :
+    static const uint BytesForMMA =
         (ShMemInfo.SharedMemSizeInVectorMatA + (ShMemInfo.SharedMemSizeInVectorMatC) * SubgroupCount) * sizeof(uint4);
 
     // Cross-warp all-at-once reduction for sumReduceTilesAllAtOnce().

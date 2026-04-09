@@ -57,7 +57,15 @@ void test<int InputSize, int OutputSize>(uint tid, uint resIndex)
     static const int PaddedInputSize = PadToTile<InputSize>.Value;
     static const int PaddedOutputSize = PadToTile<OutputSize>.Value;
 
-    neural_unittest.testOuterProductAccumulateTiled<DType, PaddedInputSize, PaddedOutputSize, TestShMemSize, workgroupCount, WorkgroupSize>(tid, outputBuffer);
+    float sf = 1.0f / float(WorkgroupSize);
+    DType inputData[PaddedInputSize];
+    for (int i = 0; i < PaddedInputSize; i++)
+        inputData[i] = DType((i + 1) * (tid + 1) * sf);
+    DType dOutData[PaddedOutputSize];
+    for (int i = 0; i < PaddedOutputSize; i++)
+        dOutData[i] = DType((PaddedOutputSize - i) * sf);
+
+    neural_unittest.testOuterProductAccumulateTiled<DType, PaddedInputSize, PaddedOutputSize, TestShMemSize, workgroupCount>(inputData, dOutData, outputBuffer);
 
     int subgroupIndex = tid / SubgroupSize;
     if (subgroupIndex != 0)

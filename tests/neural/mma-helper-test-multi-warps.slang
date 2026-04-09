@@ -19,6 +19,22 @@ typealias DType = half;
 typealias DType = float;
 #endif
 
+// This test verifies that the tiled MMA load operations work correctly.
+//
+// ============================================================================
+// MATRIX A - Loaded from Global Memory
+// ============================================================================
+// We construct a 32x32 matrix in row-major order:
+//
+//   Column:  0    1    2    3   ...  15   16   17   ...   31
+//   Row 0:   0    1    2    3   ...  15   16   17   ...   31
+//   Row 1:  32   33   34   35   ...  47   48   49   ...   63
+//   ...
+//   Row 30: 960  961  962  963  ...  975  976  977  ...  991
+//   Row 31: 992  993  994  995  ... 1007 1008 1009  ... 1023
+//
+
+// Make the weight matrix a 64x64 matrix in row major order
 // TEST_INPUT: set inputBuffer = ubuffer(data=[0], stride=4, count=4096)
 uniform RWStructuredBuffer<DType>.Handle inputBuffer;
 
@@ -37,12 +53,15 @@ public struct TestShMemSize : ISharedMemorySize {
     public static const uint Bytes = (256 + 512) * sizeof(uint4);
 }
 
+// Initialize the weight matrix as identity matrix.
 void identityWeightMatrix<int InputSize, bool Clear>(uint tid)
 {
     if (InputSize <= BatchSize)
     {
         if (tid > InputSize)
             return;
+
+        // InputSize mount of threads are enough to fill the input buffer
         int index = tid * InputSize + tid;
         if (Clear)
             inputBuffer[index] = DType(0);
@@ -85,12 +104,16 @@ bool verifyResult<int OutputSize, T: IArray<DType>>(uint tid, T output)
 
 void test<int InputSize, int OutputSize>(uint tid, int resIndex)
 {
+    DType inputData[InputSize];
+    for (int i = 0; i < InputSize; i++)
+        inputData[i] = DType(tid + 1);
+
 #if !TEST_BIAS
-    let output = neural_unittest.testMatVecMul<DType, InputSize, OutputSize, TestShMemSize, false, 2, false>(
-        tid, inputBuffer, none);
+    let output = neural_unittest.testMatVecMul<DType, InputSize, OutputSize, InputSize, TestShMemSize, false, 2, false>(
+        inputData, inputBuffer, none);
 #else
-    let output = neural_unittest.testMatVecMul<DType, InputSize, OutputSize, TestShMemSize, true, 2, false>(
-        tid, inputBuffer, biasBuffer);
+    let output = neural_unittest.testMatVecMul<DType, InputSize, OutputSize, InputSize, TestShMemSize, true, 2, false>(
+        inputData, inputBuffer, biasBuffer);
 #endif
 
     bool res = verifyResult<OutputSize>(tid, output);

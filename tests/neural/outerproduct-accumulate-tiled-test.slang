@@ -59,7 +59,15 @@ int tiledOffset<int NTileCols>(int row, int col)
 
 void test<int InputSize, int OutputSize>(uint tid, uint resIndex)
 {
-    neural_unittest.testOuterProductAccumulateTiled<DType, InputSize, OutputSize, TestShMemSize, workgroupCount, WorkgroupSize>(tid, outputBuffer);
+    float sf = 1.0f / float(WorkgroupSize);
+    DType inputData[InputSize];
+    for (int i = 0; i < InputSize; i++)
+        inputData[i] = DType((i + 1) * (tid + 1) * sf);
+    DType dOutData[OutputSize];
+    for (int i = 0; i < OutputSize; i++)
+        dOutData[i] = DType((OutputSize - i) * sf);
+
+    neural_unittest.testOuterProductAccumulateTiled<DType, InputSize, OutputSize, TestShMemSize, workgroupCount>(inputData, dOutData, outputBuffer);
 
     int subgroupIndex = tid / SubgroupSize;
     if (subgroupIndex != 0)

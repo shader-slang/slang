@@ -65,12 +65,16 @@ void identityWeightMatrix<int InputSize>(uint tid, bool clear = false)
 
 void test<int InputSize, int OutputSize>(uint tid, int resIndex)
 {
+    DType inputData[InputSize];
+    for (int i = 0; i < InputSize; i++)
+        inputData[i] = DType(tid + 1);
+
 #if !TEST_BIAS
-    let output = neural_unittest.testMatVecMul<DType, InputSize, OutputSize, TestShMemSize, false, 1, false>(
-        tid, inputBuffer, none);
+    let output = neural_unittest.testMatVecMul<DType, InputSize, OutputSize, InputSize, TestShMemSize, false, 1, false>(
+        inputData, inputBuffer, none);
 #else
-    let output = neural_unittest.testMatVecMul<DType, InputSize, OutputSize, TestShMemSize, true, 1, false>(
-        tid, inputBuffer, biasBuffer);
+    let output = neural_unittest.testMatVecMul<DType, InputSize, OutputSize, InputSize, TestShMemSize, true, 1, false>(
+        inputData, inputBuffer, biasBuffer);
 #endif
 
     bool res = true;
