@@ -1,6 +1,6 @@
 ---
 name: slang-build
-description: Platform-aware build instructions for the Slang compiler. Detects OS, selects CMake presets, handles submodules, and knows platform limitations. Referenced by other skills.
+description: Platform-aware build instructions for the Slang compiler. Only invoke when explicitly called via /slang-build or referenced by other skills.
 ---
 
 # Slang Build

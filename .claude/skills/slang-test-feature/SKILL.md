@@ -1,6 +1,6 @@
 ---
 name: slang-test-feature
-description: Orchestrator that researches a language feature, produces a test plan for user review, and fans out parallel agents that each deliver test branches with commits. Supports local-only (dry run) and full (PR + bug filing) modes.
+description: Orchestrator that researches a language feature, produces a test plan for user review, and fans out parallel agents that each deliver test branches with commits. Only invoke when explicitly called via /slang-test-feature.
 ---
 
 # Feature Test Flow

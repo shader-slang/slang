@@ -1,6 +1,6 @@
 ---
 name: slang-run-tests
-description: Platform-aware test runner for the Slang compiler. Knows which targets work on each OS, detects skipped-as-pass false positives, and handles SPIRV validation. Referenced by other skills.
+description: Platform-aware test runner for the Slang compiler. Only invoke when explicitly called via /slang-run-tests or referenced by other skills.
 ---
 
 # Slang Run Tests

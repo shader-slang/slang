@@ -1,6 +1,6 @@
 ---
 name: slang-fix-bug
-description: Analyze a Slang compiler bug from a test failure, CI log, or GitHub issue, investigate root causes in depth, explore alternative fixes in parallel, present options to the user, and implement the chosen fix with tests and a PR.
+description: Analyze a Slang compiler bug from a test failure, CI log, or GitHub issue. Only invoke when explicitly called via /slang-fix-bug.
 ---
 
 # Slang Bug Fix

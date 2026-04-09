@@ -1,6 +1,6 @@
 ---
 name: slang-investigate
-description: Root cause investigation for Slang compiler bugs. Reproduces, classifies, traces code paths, analyzes design context, and searches for prior art. Produces investigation.md. Can be used standalone or from slang-fix-bug.
+description: Root cause investigation for Slang compiler bugs. Only invoke when explicitly called via /slang-investigate or from slang-fix-bug.
 ---
 
 # Slang Investigate

@@ -1,6 +1,6 @@
 ---
 name: slang-write-test
-description: Quick reference for writing Slang compiler tests (.slang files with //TEST directives). Use when writing individual tests, adding test cases, or needing test syntax help. For comprehensive coverage analysis of a feature, use the slang-analyze-coverage skill instead.
+description: Quick reference for writing Slang compiler tests (.slang files with //TEST directives). Only invoke when explicitly called via /slang-write-test.
 ---
 
 # Slang Test Development

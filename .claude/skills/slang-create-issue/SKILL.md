@@ -1,6 +1,6 @@
 ---
 name: slang-create-issue
-description: Create clear, well-structured GitHub issues and pull requests for the Slang compiler repository. Use when the user wants to file a bug report, feature request, improvement proposal, or create a pull request for shader-slang/slang.
+description: Create clear, well-structured GitHub issues and pull requests for the Slang compiler repository. Only invoke when explicitly called via /slang-create-issue.
 ---
 
 # Slang Issues and Pull Requests

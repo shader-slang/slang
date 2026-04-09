@@ -1,6 +1,6 @@
 ---
 name: slang-review-pr
-description: Review a Slang compiler PR for correctness, evaluate review feedback, implement fixes, and manage review threads. Use when the user wants to review a PR, address review comments, or iterate on PR feedback for shader-slang/slang.
+description: Review a Slang compiler PR for correctness, evaluate review feedback, implement fixes, and manage review threads. Only invoke when explicitly called via /slang-review-pr.
 ---
 
 # Slang PR Review

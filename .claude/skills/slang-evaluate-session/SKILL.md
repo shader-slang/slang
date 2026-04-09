@@ -1,6 +1,6 @@
 ---
 name: slang-evaluate-session
-description: Evaluate the current session's skill effectiveness. Scans conversation context to identify which skills were triggered, what instructions were useful, wasteful, or missing. Run at end of a work session.
+description: Evaluate the current session's skill effectiveness. Only invoke when explicitly called via /slang-evaluate-session.
 ---
 
 # Evaluate Session
