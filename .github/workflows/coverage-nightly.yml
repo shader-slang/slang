@@ -28,7 +28,7 @@ jobs:
       container: ghcr.io/shader-slang/slang-linux-gpu-coverage-ci:v1.0.0
       build-llvm: true
       deploy-pages: false
-      server-count: 8
+      server-count: 1
     secrets: inherit
 
   coverage-macos:
