@@ -105,12 +105,14 @@ On a remote server, up to 5.
 
 ### Common Fix Strategies
 
-| Bug Type | Strategy A | Strategy B | Strategy C |
-|----------|------------|------------|------------|
-| Missing validation | Add check at frontend (semantic) | Add check at IR pass | Add check at emission |
-| Wrong codegen | Fix the IR pass that transforms | Fix the emission logic | Add a new IR pass |
-| ICE in pass | Handle the missing case in the pass | Reject the input earlier | Transform to handled form |
-| Missing lowering | Extend existing pass | Add new pass | Emit diagnostic (unsupported) |
+Strategies are listed best-first. See `slang-investigate` skill for the full ranking rationale.
+
+| Bug Type | Best: IR pass | Acceptable: annotate/reject | Last resort: spot-fix |
+|----------|---------------|----------------------------|----------------------|
+| Missing validation | Add validation in IR pass | Reject at frontend (semantic) | Guard in emission |
+| Wrong codegen | Fix or add the IR pass that transforms | Add new IR pass with annotations | Fix emission logic |
+| ICE in pass | Transform input to handled form | Reject the input earlier (semantic/IR) | Handle missing case at crash site |
+| Missing lowering | Extend existing lowering pass | Add new lowering pass | Emit diagnostic (unsupported) |
 
 ### Agent Instructions
 
