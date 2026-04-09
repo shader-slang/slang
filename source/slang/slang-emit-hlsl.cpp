@@ -1733,7 +1733,10 @@ void HLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
         }
 
     case kIROp_BFloat16Type:
-        SLANG_DIAGNOSE_UNEXPECTED(getSink(), type->sourceLoc, "'BFloat16' type is not supported on HLSL target");
+        SLANG_DIAGNOSE_UNEXPECTED(
+            getSink(),
+            type->sourceLoc,
+            "'BFloat16' type is not supported on HLSL target");
         return;
 
     case kIROp_IntPtrType:

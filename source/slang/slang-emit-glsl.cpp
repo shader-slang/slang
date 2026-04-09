@@ -3413,7 +3413,10 @@ void GLSLSourceEmitter::emitSimpleTypeImpl(IRType* type)
             return;
         }
     case kIROp_BFloat16Type:
-        SLANG_DIAGNOSE_UNEXPECTED(getSink(), type->sourceLoc, "'BFloat16' type is not supported on GLSL target");
+        SLANG_DIAGNOSE_UNEXPECTED(
+            getSink(),
+            type->sourceLoc,
+            "'BFloat16' type is not supported on GLSL target");
         return;
     case kIROp_StructType:
     case kIROp_PtrType:
