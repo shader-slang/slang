@@ -4461,6 +4461,8 @@ Type* findGlobalGenericSpecializationArg(
     TypeLayoutContext const& context,
     GlobalGenericParamDecl* decl)
 {
+    if (!context.programLayout)
+        return nullptr;
     Val* arg = nullptr;
     context.programLayout->globalGenericArgs.tryGetValue(decl, arg);
     return as<Type>(arg);
@@ -5031,9 +5033,10 @@ static TypeLayoutResult _createTypeLayoutForGlobalGenericTypeParam(
     // we should have already populated ProgramLayout::genericEntryPointParams list at this point,
     // so we can find the index of this generic param decl in the list
     typeLayout->type = type;
-    typeLayout->paramIndex = findGlobalGenericSpecializationParamIndex(
-        context.programLayout->getProgram(),
-        globalGenericParamDecl);
+    typeLayout->paramIndex = context.programLayout ? findGlobalGenericSpecializationParamIndex(
+                                                         context.programLayout->getProgram(),
+                                                         globalGenericParamDecl)
+                                                   : -1;
     typeLayout->rules = context.rules;
     typeLayout->findOrAddResourceInfo(LayoutResourceKind::GenericResource)->count += 1;
 
