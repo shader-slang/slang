@@ -137,8 +137,13 @@ jobs:
       - name: GPU post-test diagnostics
         if: failure()
         run: |
+          gpu_crashed=0
           echo "=== GPU State ==="
-          nvidia-smi 2>&1 || echo "nvidia-smi FAILED (GPU may have crashed)"
+          if ! nvidia-smi 2>&1; then
+            echo "nvidia-smi FAILED (GPU may have crashed)"
+            echo "::error::GPU crashed during tests — retrying may help."
+            gpu_crashed=1
+          fi
           echo ""
           echo "=== GPU Memory & ECC ==="
           nvidia-smi --query-gpu=name,driver_version,memory.used,memory.free,temperature.gpu,ecc.errors.uncorrected.volatile.total,pstate \
@@ -154,6 +159,9 @@ jobs:
           dmesg 2>/dev/null | grep -iE "nvidia|nvrm|xid|gpu|fault|segfault" | tail -50 || \
           sudo dmesg 2>/dev/null | grep -iE "nvidia|nvrm|xid|gpu|fault|segfault" | tail -50 || \
           echo "(dmesg not available in container)"
+          if [[ "$gpu_crashed" -eq 1 ]]; then
+            exit 1
+          fi
 
   test-slang-rhi:
     runs-on: ["Linux", "self-hosted", "GPU"]
@@ -241,8 +249,13 @@ jobs:
       - name: GPU post-test diagnostics
         if: failure()
         run: |
+          gpu_crashed=0
           echo "=== GPU State ==="
-          nvidia-smi 2>&1 || echo "nvidia-smi FAILED (GPU may have crashed)"
+          if ! nvidia-smi 2>&1; then
+            echo "nvidia-smi FAILED (GPU may have crashed)"
+            echo "::error::GPU crashed during tests — retrying may help."
+            gpu_crashed=1
+          fi
           echo ""
           echo "=== GPU Memory & ECC ==="
           nvidia-smi --query-gpu=name,driver_version,memory.used,memory.free,temperature.gpu,ecc.errors.uncorrected.volatile.total,pstate \
@@ -258,3 +271,6 @@ jobs:
           dmesg 2>/dev/null | grep -iE "nvidia|nvrm|xid|gpu|fault|segfault" | tail -50 || \
           sudo dmesg 2>/dev/null | grep -iE "nvidia|nvrm|xid|gpu|fault|segfault" | tail -50 || \
           echo "(dmesg not available in container)"
+          if [[ "$gpu_crashed" -eq 1 ]]; then
+            exit 1
+          fi
