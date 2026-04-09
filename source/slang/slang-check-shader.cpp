@@ -12,6 +12,8 @@
 #include "slang-rich-diagnostics.h"
 #include "slang-target.h"
 
+#include "../core/slang-type-text-util.h"
+
 namespace Slang
 {
 
@@ -1001,11 +1003,10 @@ void validateEntryPoint(EntryPoint* entryPoint, DiagnosticSink* sink)
             ctx.sink = sink;
             ctx.entryPointName = entryPointName;
             ctx.loc = param->loc;
-            ctx.direction = param->hasModifier<OutModifier>()      ? "output"
-                            : param->hasModifier<InOutModifier>()  ? "input/output"
-                            : param->hasModifier<RefModifier>()    ? "input/output"
-                            : param->hasModifier<ConstRefModifier>() ? "input"
-                                                                   : "input";
+            ctx.direction = param->hasModifier<OutModifier>()     ? "output"
+                            : param->hasModifier<InOutModifier>() ? "input/output"
+                            : param->hasModifier<RefModifier>()   ? "input/output"
+                                                                  : "input";
 
             StringBuilder contextSb;
             contextSb << "parameter '" << param->getName()->text << "'";
