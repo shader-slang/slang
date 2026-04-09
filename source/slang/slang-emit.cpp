@@ -870,6 +870,20 @@ void lowerSumVectorMatrixInsts(IRModule* module)
     pass.processModule();
 }
 
+void removeWeakUseInsts(IRModule* module)
+{
+    List<IRInst*> weakUseInsts;
+    for (auto inst : module->getModuleInst()->getGlobalInsts())
+    {
+        if (inst->getOp() == kIROp_WeakUse)
+            weakUseInsts.add(inst);
+    }
+
+    for (auto weakUse : weakUseInsts)
+    {
+        weakUse->removeAndDeallocate();
+    }
+}
 
 Result linkAndOptimizeIR(
     CodeGenContext* codeGenContext,
@@ -1087,12 +1101,6 @@ Result linkAndOptimizeIR(
     //
     if (requiredLoweringPassSet.enumType)
         SLANG_PASS(lowerEnumType, sink);
-
-    // Lower enum types early since enums and enum casts may appear in
-    // specialization & not resolving them here would block specialization.
-    //
-    if (requiredLoweringPassSet.enumType)
-        lowerEnumType(irModule, sink);
 
     IRSimplificationOptions defaultIRSimplificationOptions =
         IRSimplificationOptions::getDefault(targetProgram);
@@ -1328,21 +1336,8 @@ Result linkAndOptimizeIR(
 
     SLANG_PASS(lowerExistentials, targetProgram, sink);
 
-    // get rid of weak-use insts and any dictionaries in the
-    // module inst.
-    //
-    // -- put into a pass --
-    List<IRInst*> weakUseInsts;
-    for (auto insts : irModule->getModuleInst()->getGlobalInsts())
-    {
-        if (insts->getOp() == kIROp_WeakUse)
-            weakUseInsts.add(insts);
-    }
-
-    for (auto weakUse : weakUseInsts)
-    {
-        weakUse->removeAndDeallocate();
-    }
+    // Get rid of weak-use insts and any dictionaries in the module inst.
+    SLANG_PASS(removeWeakUseInsts);
 
     clearTranslationDictionary(irModule);
 

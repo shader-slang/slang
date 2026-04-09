@@ -1525,7 +1525,6 @@ struct SCCPContext
             instsToProcess.add(child);
         }
 
-        List<IRInst*> instsToRemove;
         for (auto child : instsToProcess)
         {
             auto latticeVal = getLatticeVal(child);
