@@ -97,6 +97,8 @@ Implement and test one strategy at a time. Present results before trying the nex
 ### Parallel (opt-in with `--parallel N`)
 
 Launch parallel sub-agents in isolated worktrees. Each agent gets its own branch.
+Worktrees are created under `.claude/worktrees/` in the repository root
+(e.g., `.claude/worktrees/agent-01234567/`), with corresponding git branches.
 
 **Warning**: Parallel agents use significant CPU/memory. On a laptop, 2-3 agents is practical.
 On a remote server, up to 5.

@@ -105,16 +105,29 @@ Before proposing any fix, answer these questions:
 
 ### Is this the right layer to fix?
 
-**Compiler philosophy**: Keep emission simple, do heavy lifting in IR passes.
+**Compiler philosophy**: The Slang compiler is a pipeline of IR passes. Each pass
+has a clear purpose. Keep emission simple — do heavy lifting in IR passes.
 
-**Prefer adding/extending an IR pass** over patching the emitter. If a fix requires
-complex logic in `slang-emit-*.cpp`, ask whether an earlier IR pass should have
-transformed the IR into a form the emitter can handle simply.
+**Three levels of fix quality** (prefer higher):
 
-**When the fix spans multiple passes**: If you need to detect something in an early pass
-and act on it in a later pass, prefer annotating the IR with decorations or instructions
-in the earlier pass, then reading those annotations in the later pass. Do not try to
-pattern-match arbitrary IR shapes in the later pass — that approach is fragile.
+1. **Best: Add or extend an IR pass** — If the bug is caused by IR that wasn't
+   transformed into the right shape, the fix belongs in an IR pass, not at the
+   crash site. If no existing pass has the right theme, add a new one.
+
+2. **Acceptable: Annotate early, act later** — When a fix needs information from
+   an early compiler stage but must act in a later pass, annotate the IR with
+   decorations in the early pass and read them in the later pass. Do not
+   pattern-match arbitrary IR shapes in the later pass — that approach is fragile.
+
+3. **Last resort: Spot-fix at the symptom** — Only patch the crash site or emitter
+   when the problem is genuinely local (e.g., a missing case in a switch that follows
+   an established pattern). If you find yourself adding complex conditional logic to
+   an emitter or an existing pass whose theme doesn't match, step back — the fix
+   probably belongs upstream.
+
+**Don't shoehorn fixes into existing passes**: If the purpose of an existing pass
+doesn't align with what your fix needs to do, add a new pass rather than complicating
+an existing one with unrelated logic.
 
 ### What related code paths exist?
 
