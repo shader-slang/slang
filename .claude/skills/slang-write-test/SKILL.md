@@ -1,11 +1,11 @@
 ---
-name: slang-test-development
-description: Quick reference for writing Slang compiler tests (.slang files with //TEST directives). Use when writing individual tests, adding test cases, or needing test syntax help. For comprehensive coverage analysis of a feature, use the slang-test-coverage skill instead.
+name: slang-write-test
+description: Quick reference for writing Slang compiler tests (.slang files with //TEST directives). Use when writing individual tests, adding test cases, or needing test syntax help. For comprehensive coverage analysis of a feature, use the slang-analyze-coverage skill instead.
 ---
 
 # Slang Test Development
 
-Quick reference for test syntax and patterns. For systematic coverage analysis, see the `slang-test-coverage` skill.
+Quick reference for test syntax and patterns. For systematic coverage analysis, see the `slang-analyze-coverage` skill.
 
 ## Quick Reference
 
@@ -18,17 +18,13 @@ Place tests under `tests/` directory, organized by category:
 
 ### Running Tests
 
-**Important**: `slang-test` must be run from the repository root directory.
+See the `slang-run-tests` skill for platform-aware test running, skip detection, and SPIRV validation.
+See the `slang-build` skill for building `slang-test` on your platform.
+
+Quick reference (run from repo root):
 
 ```bash
-# Run specific test
-./build/RelWithDebInfo/bin/slang-test tests/path/to/test.slang
-
-# Run all tests in a directory
-./build/RelWithDebInfo/bin/slang-test tests/language-feature/dynamic-dispatch/
-
-# Run with multiple servers (faster)
-./build/RelWithDebInfo/bin/slang-test -use-test-server -server-count 8
+./build/<preset>/bin/slang-test tests/path/to/test.slang
 ```
 
 ## Choosing a Test Type
@@ -304,7 +300,7 @@ Before committing any test file, verify:
 
 ## Additional Resources
 
-- **Coverage methodology**: Use the `slang-test-coverage` skill for 7-phase workflow, gap analysis, and test value scoring
+- **Coverage methodology**: Use the `slang-analyze-coverage` skill for 7-phase workflow, gap analysis, and test value scoring
 - **Diagnostic test annotations**: See `docs/diagnostics.md` for DIAGNOSTIC_TEST directives, caret matching, exhaustive/non-exhaustive modes
 - **Command-line options**: See `tools/slang-test/README.md`
 - **Debugging**: See `CLAUDE.md` for `-dump-ir` usage

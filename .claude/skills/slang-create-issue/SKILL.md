@@ -1,5 +1,5 @@
 ---
-name: slang-issues
+name: slang-create-issue
 description: Create clear, well-structured GitHub issues and pull requests for the Slang compiler repository. Use when the user wants to file a bug report, feature request, improvement proposal, or create a pull request for shader-slang/slang.
 ---
 
@@ -107,7 +107,7 @@ Use this structure for missing features, better diagnostics, and UX improvements
 1. **Focus on the problem, not the solution** -- describe what's wrong or missing
 2. **State the impact** -- who is affected and how (e.g., "all Vulkan users", "downstream project Falcor")
 3. **Keep solution proposals brief and high-level** -- do not prescribe implementation details
-4. **Reference related issues** if they exist -- Slang has 3,659+ issues, duplicates are common
+4. **Reference related issues** if they exist -- duplicates are common in long-lived repositories
 
 ---
 
@@ -176,9 +176,10 @@ Do not narrate the diff line by line -- reviewers read the code themselves.]
 2. **Assign to author**: Always use `--assignee @me` when creating PRs
 3. **Include tests**: Add regression tests as `.slang` files under `tests/`
 4. **Keep PRs focused**: One issue per PR when possible
-5. **Link to issue**: Reference the issue number (e.g., "Fixes #1234")
+5. **Link to issue**: Reference the issue number in the PR body (e.g., "Fixes #1234"). Do NOT put the issue number in the commit summary line — GitHub adds it during merge.
 6. **Do NOT mention AI tools** in commit messages or PR descriptions
 7. **Include technical depth**: Root cause, design rationale, trade-offs. Do not narrate the diff -- reviewers read the code themselves
+8. **Suggest reviewers**: Use `git log --format='%an' -- <changed-files> | sort | uniq -c | sort -rn` to identify 2-5 reviewers based on recent authorship of the affected code. Include 1-2 sentences per reviewer explaining the rationale.
 
 ### Test Quality Rules (for PRs adding tests)
 
@@ -226,16 +227,16 @@ Titles should be scannable and specific. Follow patterns from existing issues:
 
 ## Common Slang Issue Patterns
 
-These are the most common categories:
+| Pattern | Notes |
+|---------|-------|
+| SPIRV validation errors | Include `SLANG_RUN_SPIRV_VALIDATION=1` output |
+| ICE (Internal Compiler Error) | Error 99999 with exception. Always a bug |
+| Wrong codegen | Include expected vs actual output comparison |
+| Missing HLSL compatibility | Reference HLSL spec or DXC behavior |
+| Generics/interface issues | Often complex interactions, be cautious with solutions |
+| Diagnostic quality | User-facing error messages need improvement |
 
-| Pattern | Frequency | Notes |
-|---------|-----------|-------|
-| SPIRV validation errors | Most common | Include `SLANG_RUN_SPIRV_VALIDATION=1` output |
-| ICE (Internal Compiler Error) | Very common | Error 99999 with exception. Always a bug |
-| Wrong codegen | Common | Include expected vs actual output comparison |
-| Missing HLSL compatibility | Common | Reference HLSL spec or DXC behavior |
-| Generics/interface issues | Common | Often complex interactions, be cautious with solutions |
-| Diagnostic quality | Common | User-facing error messages need improvement |
+For deep investigation of any of these, use the `slang-investigate` skill.
 
 ---
 

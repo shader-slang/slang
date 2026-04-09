@@ -1,5 +1,5 @@
 ---
-name: slang-test-coverage
+name: slang-analyze-coverage
 description: Comprehensive test coverage analysis and gap-filling for Slang language features. Use when the user wants to increase test coverage, maximize testing for a feature, perform coverage analysis, identify test gaps, or systematically test all aspects of a language feature.
 ---
 
@@ -259,7 +259,7 @@ Guidelines:
 
 ### Test Templates
 
-See the `slang-test-development` skill for complete test templates, syntax reference, and the test type decision tree. Key templates:
+See the `slang-write-test` skill for complete test templates, syntax reference, and the test type decision tree. Key templates:
 
 - **Compute tests**: `COMPARE_COMPUTE(filecheck-buffer=CHECK):-cpu -shaderobj -output-using-type`
 - **Compilation tests**: `SIMPLE(filecheck=CHECK): -target spirv`
@@ -274,19 +274,7 @@ See the `slang-test-development` skill for complete test templates, syntax refer
 **Placement**: `tests/language-feature/` or `tests/diagnostics/`
 **Naming**: `feature-scenario.slang` or `diagnose-error-condition.slang`
 
-```bash
-# Configure (required at least once per build dir)
-cmake --preset default
-
-# Build if needed
-cmake --build --preset releaseWithDebugInfo --target slangc slang-test
-
-# Run test
-./build/RelWithDebInfo/bin/slang-test tests/path/to/test.slang
-
-# Run full suite
-./build/RelWithDebInfo/bin/slang-test -use-test-server -server-count 8
-```
+Build and run tests using the `slang-build` and `slang-run-tests` skills for platform-aware instructions.
 
 **Self-review**: Is there an existing test just as good? Would I understand this in 6 months? Does it run on all targets?
 
@@ -302,15 +290,15 @@ struct parameters" into one agent, and "generic function parameters" into anothe
 
 **Agent prompt**: Give each agent:
 1. The specific tests to write (from the gap list with filenames and descriptions)
-2. The `slang-test-development` skill content for test syntax reference
+2. The `slang-write-test` skill content for test syntax reference
 3. Feature context from Phase 1
-4. Build/test/format/commit instructions (same as `slang-feature-test-flow` Phase 3)
+4. Build/test/format/commit instructions (same as `slang-test-feature` Phase 3)
 
 **Collecting results**: After agents complete, the orchestrator reviews each branch's
 test results and cherry-picks passing tests into a single branch for the PR.
 
 For a full parallel orchestration workflow with sub-plan decomposition, bug triage,
-and PR creation, use the `slang-feature-test-flow` skill instead.
+and PR creation, use the `slang-test-feature` skill instead.
 
 ---
 

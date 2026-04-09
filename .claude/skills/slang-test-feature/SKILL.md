@@ -1,5 +1,5 @@
 ---
-name: slang-feature-test-flow
+name: slang-test-feature
 description: Orchestrator that researches a language feature, produces a test plan for user review, and fans out parallel agents that each deliver test branches with commits. Supports local-only (dry run) and full (PR + bug filing) modes.
 ---
 
@@ -7,7 +7,7 @@ description: Orchestrator that researches a language feature, produces a test pl
 
 **For**: End-to-end test coverage for a Slang language feature — from research through parallel test implementation to bug triage.
 
-**Usage**: `/slang-feature-test-flow <feature-name> [--dry-run | --live] [--max-agents N] [--reference-url URL]`
+**Usage**: `/slang-test-feature <feature-name> [--dry-run | --live] [--max-agents N] [--reference-url URL]`
 
 - `--dry-run` (default): Local branches + local bug files, no PRs or GitHub issues filed
 - `--live`: Push branches, create PRs, file GitHub issues
@@ -76,7 +76,7 @@ untested error paths. Do not use coverage % as a test-writing target.
 
 ### Output
 
-Write `tmp/<feature>/research.md`:
+Write `tmp/<feature>-<issue-id>/research.md`:
 - Feature overview (from spec + docs)
 - Complete list of behaviors/constraints/error conditions
 - **Complete diagnostic code table** with COVERED/UNCOVERED status
@@ -122,7 +122,7 @@ afterthought.
 
 ### Sub-plan Format
 
-Write each to `tmp/<feature>/sub-plans/sub-plan-<letter>.md`:
+Write each to `tmp/<feature>-<issue-id>/sub-plans/sub-plan-<letter>.md`:
 
 ```markdown
 # Sub-plan [Letter]: [Name]
@@ -169,7 +169,7 @@ Add tests for [feature]: [dimension]
 Every gap from research.md must map to either a sub-plan or an explicit
 SKIP with reason. No gap may be silently dropped.
 
-Write `tmp/<feature>/gap-traceability.md`:
+Write `tmp/<feature>-<issue-id>/gap-traceability.md`:
 
 ```markdown
 | Gap | Action | Sub-plan | Reason |
@@ -185,7 +185,7 @@ gap is not accounted for, the plan is incomplete.
 
 ### Plan Summary
 
-Write `tmp/<feature>/plan.md` with overview table:
+Write `tmp/<feature>-<issue-id>/plan.md` with overview table:
 
 | Sub-plan | Dimension | Tests | Priority |
 |----------|-----------|-------|----------|
@@ -214,7 +214,7 @@ directory hierarchy.
 
 Each agent receives:
 1. Its sub-plan document
-2. The `slang-test-development` skill content (canonical test syntax reference)
+2. The `slang-write-test` skill content (canonical test syntax reference)
 3. Feature context from research.md
 4. Mode flag (dry-run vs live)
 
@@ -231,7 +231,7 @@ You are running in an isolated git worktree with your own branch.
 {sub-plan content}
 
 ## Test Syntax Reference
-{slang-test-development SKILL.md content}
+{slang-write-test SKILL.md content}
 
 ## Feature Context
 {research.md overview section}
@@ -239,9 +239,8 @@ You are running in an isolated git worktree with your own branch.
 ## Project Context
 
 This is the Slang shading language compiler (C++). Key conventions:
-- Build: cmake --build --preset releaseWithDebugInfo --target slangc slang-test >/dev/null 2>&1 || \
-    cmake --build --preset releaseWithDebugInfo --target slangc slang-test
-- Test: ./build/RelWithDebInfo/bin/slang-test tests/path/to/test.slang (run from repo root)
+- Build: see slang-build skill for platform-aware instructions
+- Test: see slang-run-tests skill for platform-aware test running
 - Format: ./extras/formatting.sh
 - Single-dash CLI options: -target spirv (not --target)
 - Do not mention AI tools in commits
@@ -250,10 +249,7 @@ This is the Slang shading language compiler (C++). Key conventions:
 ## Instructions
 
 ### Step 0: Build (if needed)
-Check if ./build/RelWithDebInfo/bin/slang-test exists. If not, build:
-  cmake --preset default
-  cmake --build --preset releaseWithDebugInfo --target slangc slang-test >/dev/null 2>&1 || \
-    cmake --build --preset releaseWithDebugInfo --target slangc slang-test
+Follow the slang-build skill to build slangc and slang-test.
 
 ### Step 1: Write and validate tests
 For each test in the sub-plan:
@@ -349,7 +345,7 @@ BUGS:
 After all agents complete, collect and triage all reported bugs.
 
 ### Step 1: Collect
-Gather all bug reports from all agents into `tmp/<feature>/bugs/`.
+Gather all bug reports from all agents into `tmp/<feature>-<issue-id>/bugs/`.
 
 ### Step 2: Deduplicate
 Group bugs by:
@@ -361,7 +357,7 @@ For each group, keep one canonical bug report (best reproducer, clearest symptom
 
 ### Step 3: Write bug files
 
-For each unique bug, write `tmp/<feature>/bugs/bug-<id>.md`:
+For each unique bug, write `tmp/<feature>-<issue-id>/bugs/bug-<id>.md`:
 
 ```markdown
 # Bug <ID>: [Short title]
@@ -395,11 +391,11 @@ slangc -target [target] test.slang
 
 ### Step 4: Mode-dependent actions
 
-**Dry-run mode**: Stop here. Bug files in `tmp/<feature>/bugs/` are the deliverable.
+**Dry-run mode**: Stop here. Bug files in `tmp/<feature>-<issue-id>/bugs/` are the deliverable.
 
 **Live mode**:
 - Search existing GitHub issues for each bug
-- File new issues for confirmed new bugs using `slang-issues` bug report format with `--assignee @me`
+- File new issues for confirmed new bugs using `slang-create-issue` bug report format with `--assignee @me`
 - Comment on existing issues with new reproducers
 - Update PR descriptions to link to filed issues
 
@@ -407,7 +403,7 @@ slangc -target [target] test.slang
 
 ## Phase 5: REPORT
 
-Write `tmp/<feature>/SUMMARY.md` and present to user:
+Write `tmp/<feature>-<issue-id>/SUMMARY.md` and present to user:
 
 ```markdown
 ## Feature Test Flow: [feature] — Results
@@ -452,7 +448,7 @@ dry-run | live
 ## Output Structure
 
 ```text
-tmp/<feature>/
+tmp/<feature>-<issue-id>/
 ├── research.md                    # Phase 1 output
 ├── plan.md                        # Phase 2 overview
 ├── sub-plans/
