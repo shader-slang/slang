@@ -3213,9 +3213,76 @@ struct TypeFlowSpecializationContext
         }
 
         if (!witnessTableInfo)
+        {
+            // Handle module-scope extractExistentialWitnessTable on a global interface param.
+            // The typeflow pass doesn't analyze module-scope instructions, so their info
+            // is never set. We analyze the chain on-the-fly here.
+            if (auto extractWT = as<IRExtractExistentialWitnessTable>(witnessTable))
+            {
+                auto taggedUnion =
+                    tryMakeTaggedUnionForGlobalInterfaceParam(extractWT->getOperand(0));
+                if (taggedUnion)
+                {
+                    witnessTableInfo = makeElementOfSetType(
+                        as<IRTaggedUnionType>(taggedUnion)->getWitnessTableSet());
+                }
+            }
+        }
+        if (!witnessTableInfo)
             return none();
 
+        // Re-check after the global interface param fallback above.
+        if (auto elementOfSetType = as<IRElementOfSetType>(witnessTableInfo))
+        {
+            IRBuilder builder(module);
+            HashSet<IRInst*>& results = *module->getContainerPool().getHashSet<IRInst>();
+            forEachInSet(
+                module,
+                cast<IRWitnessTableSet>(elementOfSetType->getSet()),
+                [&](IRInst* table)
+                {
+                    auto resolvedTable = translationContext.resolveInst(table);
+                    results.add(findWitnessTableEntry(cast<IRWitnessTable>(resolvedTable), key));
+                });
+
+            auto setOp = getSetOpFromType(inst->getDataType());
+            auto resultSetType = makeElementOfSetType(builder.getSet(setOp, results));
+            module->getContainerPool().free(&results);
+            return resultSetType;
+        }
+
         SLANG_UNEXPECTED("Unexpected witness table info type in analyzeLookupWitnessMethod");
+    }
+
+    // Helper: create a TaggedUnionType for a module-scope instruction with interface type.
+    // This handles:
+    //   - global_param of interface type (e.g., `uniform IFoo`)
+    //   - module-scope load from a pointer to interface type (after
+    //     moveEntryPointUniformParamsToGlobalScope transforms global params into
+    //     fields of a globalParams struct)
+    //
+    IRInst* tryMakeTaggedUnionForGlobalInterfaceParam(IRInst* operand)
+    {
+        auto interfaceType = as<IRInterfaceType>(operand->getDataType());
+        if (!interfaceType || isComInterfaceType(interfaceType))
+            return nullptr;
+
+        // Only handle global params or module-scope loads of interface type
+        if (!as<IRGlobalParam>(operand) && !(as<IRLoad>(operand) && isGlobalInst(operand)))
+            return nullptr;
+
+        IRBuilder builder(module);
+        HashSet<IRInst*>& tables = *module->getContainerPool().getHashSet<IRInst>();
+        collectExistentialTables(interfaceType, tables);
+        if (tables.getCount() > 0)
+        {
+            auto result = makeTaggedUnionType(
+                as<IRWitnessTableSet>(builder.getSet(kIROp_WitnessTableSet, tables)));
+            module->getContainerPool().free(&tables);
+            return result;
+        }
+        module->getContainerPool().free(&tables);
+        return nullptr;
     }
 
     IRInst* analyzeExtractExistentialWitnessTable(
@@ -3242,6 +3309,8 @@ struct TypeFlowSpecializationContext
         }
 
         auto operandInfo = tryGetInfo(context, operand);
+        if (!operandInfo)
+            operandInfo = tryMakeTaggedUnionForGlobalInterfaceParam(operand);
         if (!operandInfo)
             return none();
 
@@ -3290,6 +3359,8 @@ struct TypeFlowSpecializationContext
 
         auto operandInfo = tryGetInfo(context, operand);
         if (!operandInfo)
+            operandInfo = tryMakeTaggedUnionForGlobalInterfaceParam(operand);
+        if (!operandInfo)
             return none();
 
         if (auto taggedUnion = as<IRTaggedUnionType>(operandInfo))
@@ -3321,6 +3392,8 @@ struct TypeFlowSpecializationContext
         }
 
         auto operandInfo = tryGetInfo(context, operand);
+        if (!operandInfo)
+            operandInfo = tryMakeTaggedUnionForGlobalInterfaceParam(operand);
         if (!operandInfo)
             return none();
 
@@ -4302,14 +4375,45 @@ struct TypeFlowSpecializationContext
         }
         else if (isGlobalInst(callee))
         {
-            auto resolvedCallee = translationContext.resolveInst(callee);
-            if (!resolvedCallee)
-                return none();
+            // If the callee is a module-scope lookupWitness on a dynamic interface
+            // from a global param, analyze it on-the-fly as a dynamic dispatch site
+            // instead of trying to resolve it (which would crash).
+            if (auto lookupInst = as<IRLookupWitnessMethod>(callee))
+            {
+                auto lookupInfo = analyzeLookupWitnessMethod(context, lookupInst);
+                if (auto eos = as<IRElementOfSetType>(lookupInfo))
+                {
+                    List<IRInst*>& funcs = *module->getContainerPool().getList<IRInst>();
+                    forEachInSet(module, eos->getSet(), [&](IRInst* func) { funcs.add(func); });
 
-            auto paramInfos =
-                convertArgInfosToParamInfos(cast<IRFuncType>(resolvedCallee->getDataType()));
-            if (auto boundCallee = maybeGetBoundFunc(resolvedCallee, paramInfos, workQueue))
-                propagateToCallSite(boundCallee);
+                    for (auto func : funcs)
+                    {
+                        auto resolvedFunc = translationContext.resolveInst(func);
+                        if (!resolvedFunc)
+                        {
+                            module->getContainerPool().free(&funcs);
+                            return none();
+                        }
+                        auto paramInfos = convertArgInfosToParamInfos(
+                            cast<IRFuncType>(resolvedFunc->getDataType()));
+                        if (auto boundCallee =
+                                maybeGetBoundFunc(resolvedFunc, paramInfos, workQueue))
+                            propagateToCallSite(boundCallee);
+                    }
+                    module->getContainerPool().free(&funcs);
+                }
+            }
+            else
+            {
+                auto resolvedCallee = translationContext.resolveInst(callee);
+                if (!resolvedCallee)
+                    return none();
+
+                auto paramInfos =
+                    convertArgInfosToParamInfos(cast<IRFuncType>(resolvedCallee->getDataType()));
+                if (auto boundCallee = maybeGetBoundFunc(resolvedCallee, paramInfos, workQueue))
+                    propagateToCallSite(boundCallee);
+            }
         }
 
         if (calleeSet.getCount() != 0)
@@ -6250,7 +6354,24 @@ struct TypeFlowSpecializationContext
         }
 
         if (isGlobalInst(callee))
-            callee = translationContext.resolveInst(callee);
+        {
+            // If the callee is a module-scope lookupWitness on a dynamic interface
+            // from a global param, skip resolution (which would crash because the
+            // witness table is not concrete). The callee stays as a global inst and
+            // is handled downstream via callSiteInfo.
+            bool isDynamicGlobalLookup = false;
+            if (auto lookupInst = as<IRLookupWitnessMethod>(callee))
+            {
+                if (auto extractWT =
+                        as<IRExtractExistentialWitnessTable>(lookupInst->getWitnessTable()))
+                {
+                    if (tryMakeTaggedUnionForGlobalInterfaceParam(extractWT->getOperand(0)))
+                        isDynamicGlobalLookup = true;
+                }
+            }
+            if (!isDynamicGlobalLookup)
+                callee = translationContext.resolveInst(callee);
+        }
 
         List<IRInst*>& callArgs = *module->getContainerPool().getList<IRInst>();
 
@@ -7128,7 +7249,15 @@ struct TypeFlowSpecializationContext
 
         auto loadPtr = as<IRLoad>(inst)->getPtr();
         auto loadPtrType = as<IRPtrTypeBase>(loadPtr->getDataType());
-        auto ptrValType = loadPtrType->getValueType();
+
+        // ConstantBuffer and other PointerLikeTypes derive from IRBuiltinGenericType,
+        // not IRPtrTypeBase. Both store the element type as operand 0.
+        auto pointerLikeType = as<IRPointerLikeType>(loadPtr->getDataType());
+        auto ptrValType = loadPtrType       ? loadPtrType->getValueType()
+                          : pointerLikeType ? pointerLikeType->getElementType()
+                                            : nullptr;
+        if (!ptrValType)
+            return false;
 
         IRType* specializedType = (IRType*)getLoweredType(valInfo);
         if (ptrValType != specializedType)
@@ -7151,8 +7280,15 @@ struct TypeFlowSpecializationContext
                     loadPtr,
                     taggedUnionType->getWitnessTableSet(),
                     taggedUnionType->getTypeSet()};
+
+                // For PtrTypeBase types, preserve the address space.
+                // For PointerLikeType (ConstantBuffer etc.), use a plain Ptr.
+                auto castPtrType =
+                    loadPtrType
+                        ? (IRType*)builder.getPtrTypeWithAddressSpace(specializedType, loadPtrType)
+                        : (IRType*)builder.getPtrType(specializedType);
                 auto newLoadPtr = builder.emitIntrinsicInst(
-                    builder.getPtrTypeWithAddressSpace(specializedType, loadPtrType),
+                    castPtrType,
                     kIROp_CastInterfaceToTaggedUnionPtr,
                     3,
                     castArgs);

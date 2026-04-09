@@ -1220,8 +1220,11 @@ struct TaggedUnionLoweringContext : public InstPassBase
                 case kIROp_Load:
                     {
                         auto baseInterfacePtr = inst->getPtr();
+                        auto basePtrDataType = baseInterfacePtr->getDataType();
                         auto baseInterfaceType = as<IRInterfaceType>(
-                            as<IRPtrTypeBase>(baseInterfacePtr->getDataType())->getValueType());
+                            as<IRPtrTypeBase>(basePtrDataType)
+                                ? as<IRPtrTypeBase>(basePtrDataType)->getValueType()
+                                : (IRType*)basePtrDataType->getOperand(0));
 
                         // Rewrite the load to use the original ptr and load
                         // an interface-typed object.
@@ -1251,8 +1254,11 @@ struct TaggedUnionLoweringContext : public InstPassBase
                         auto storeInst = cast<IRStore>(user);
 
                         auto baseInterfacePtr = inst->getPtr();
+                        auto storePtrDataType = baseInterfacePtr->getDataType();
                         auto baseInterfaceType = as<IRInterfaceType>(
-                            as<IRPtrTypeBase>(baseInterfacePtr->getDataType())->getValueType());
+                            as<IRPtrTypeBase>(storePtrDataType)
+                                ? as<IRPtrTypeBase>(storePtrDataType)->getValueType()
+                                : (IRType*)storePtrDataType->getOperand(0));
 
                         // Rewrite the store to use the original ptr and store
                         // an interface type'd object.
