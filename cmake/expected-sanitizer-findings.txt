@@ -1,0 +1,21 @@
+# Expected sanitizer findings for Slang.
+#
+# Known sanitizer findings that should not block PRs or nightly runs.
+# Each non-comment, non-empty line is a fixed substring matched against
+# sanitizer SUMMARY lines. A finding is "expected" when its SUMMARY line
+# contains any pattern listed here.
+#
+# Use the error type + function name for stable matching -- file paths
+# and line numbers shift between builds and should not be used.
+#
+#   Good:  null-pointer-use in slang::IRBlock::SuccessorList::reverse
+#   Bad:   slang-ir.h:456    (fragile, breaks on any edit)
+#   Bad:   null-pointer-use  (too broad, suppresses all null-pointer findings)
+#
+# Track each entry with a bug/issue number so entries can be removed
+# when the underlying issue is fixed.
+#
+# See also:
+#   cmake/lsan-suppressions.txt        -- suppresses leak reports at LSan level
+#   cmake/sanitizer-ignorelist.txt     -- suppresses UBSan checks at compile level
+#   This file                          -- accepts real findings as known issues
