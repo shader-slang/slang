@@ -147,6 +147,9 @@ Check that tests cover:
 - Negative cases (the fix doesn't break valid code / the diagnostic doesn't fire incorrectly)
 - Edge cases (related patterns, different targets, generic/parametric types)
 - The original reproducer from the linked issue
+- **All applicable backends**: Tests should have `//TEST` lines for all relevant
+  targets, not just one. Target-independent features need at minimum `-cpu` and
+  `-spirv`. Flag tests that only test a single backend when the fix applies broadly.
 
 ---
 

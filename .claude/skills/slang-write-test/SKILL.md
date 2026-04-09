@@ -282,7 +282,13 @@ Before committing any test file, verify:
    verify a companion `-negative` diagnostic test exists that proves
    the constraint is enforced by rejecting invalid types/values.
 
-7. **Run the test**: Every test must pass locally before committing.
+7. **Backend coverage**: Add `//TEST` lines for all applicable backends,
+   not just one. If the feature is target-independent, test at minimum
+   `-cpu` and `-spirv`. If it's target-specific, test the relevant
+   target plus `-cpu` as a baseline. Use the platform capabilities table
+   in `slang-run-tests` to know which targets run locally vs CI-only.
+
+8. **Run the test**: Every test must pass locally before committing.
 
 ## Troubleshooting
 
