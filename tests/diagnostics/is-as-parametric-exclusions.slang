@@ -40,9 +40,9 @@ void testConcreteMismatch()
 {
     Dog d;
     bool b = d is Cat;
-//CHECK: 'is'/'as' on unrelated concrete types is always false
-//CHECK: 'is'/'as' comparison between unrelated concrete types is always false.
+//CHECK: 'is'/'as' on unrelated concrete types
+//CHECK: 'is'/'as' on unrelated concrete types will never succeed.
     let c = d as Cat;
-//CHECK: 'is'/'as' on unrelated concrete types is always false
-//CHECK: 'is'/'as' comparison between unrelated concrete types is always false.
+//CHECK: 'is'/'as' on unrelated concrete types
+//CHECK: 'is'/'as' on unrelated concrete types will never succeed.
 }

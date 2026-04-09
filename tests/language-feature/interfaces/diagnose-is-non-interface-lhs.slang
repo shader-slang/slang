@@ -23,9 +23,9 @@ void test()
 {
     Other o;
     bool b = o is Impl;
-//CHECK:       ^^ 'is'/'as' on unrelated concrete types is always false
-//CHECK:       ^^ 'is'/'as' comparison between unrelated concrete types is always false.
+//CHECK:       ^^ 'is'/'as' on unrelated concrete types
+//CHECK:       ^^ 'is'/'as' on unrelated concrete types will never succeed.
     let c = o as Impl;
-//CHECK:      ^^ 'is'/'as' on unrelated concrete types is always false
-//CHECK:      ^^ 'is'/'as' comparison between unrelated concrete types is always false.
+//CHECK:      ^^ 'is'/'as' on unrelated concrete types
+//CHECK:      ^^ 'is'/'as' on unrelated concrete types will never succeed.
 }

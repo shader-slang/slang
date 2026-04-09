@@ -61,15 +61,15 @@ void main()
     bool isTest2 = (other is AnotherType);
     bool isTest3 = (ConcreteImpl is ConcreteImpl);
     bool isTest4 = (AnotherType is ConcreteImpl);
-//diag:                         ^^ 'is'/'as' on unrelated concrete types is always false
-//diag:                         ^^ 'is'/'as' comparison between unrelated concrete types is always false.
+//diag:                         ^^ 'is'/'as' on unrelated concrete types
+//diag:                         ^^ 'is'/'as' on unrelated concrete types will never succeed.
 
     // Test as operator directly
     let asTest1 = impl as AnotherType;
-//diag:                ^^ 'is'/'as' on unrelated concrete types is always false
-//diag:                ^^ 'is'/'as' comparison between unrelated concrete types is always false.
+//diag:                ^^ 'is'/'as' on unrelated concrete types
+//diag:                ^^ 'is'/'as' on unrelated concrete types will never succeed.
     let asTest2 = other as ConcreteImpl;
-//diag:                 ^^ 'is'/'as' on unrelated concrete types is always false
-//diag:                 ^^ 'is'/'as' comparison between unrelated concrete types is always false.
+//diag:                 ^^ 'is'/'as' on unrelated concrete types
+//diag:                 ^^ 'is'/'as' on unrelated concrete types will never succeed.
     let asTest3 = impl as ConcreteImpl;
 }
