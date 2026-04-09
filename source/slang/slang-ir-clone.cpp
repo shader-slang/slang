@@ -99,6 +99,9 @@ IRInst* cloneInstAndOperands(IRCloneEnv* env, IRBuilder* builder, IRInst* oldIns
         newOperands[ii] = newOperand;
     }
 
+    if (shouldHaveSpecConstRate(oldInst->getOp(), newType, operandCount, newOperands.getArrayView().getBuffer()))
+        newType = ensureSpecConstRate(builder, newType);
+
     // Finally we create the inst with the updated operands.
     auto newInst = builder->emitIntrinsicInst(
         newType,
