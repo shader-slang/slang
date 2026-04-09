@@ -1954,17 +1954,21 @@ bool SemanticsVisitor::_coerce(
         return true;
     }
 
-    // Pointer covariance: Ptr<T> -> Ptr<I> when T implements I and the
-    // pointee types differ. The address value is preserved via bitcast.
-    // All other Ptr generic parameters (access, address space, layout)
-    // must match; changing access qualifier requires an explicit cast.
+    // Pointer covariance: Ptr<ISub> -> Ptr<IBase> when both pointee types
+    // are interface types and ISub is a subtype of IBase. Both sides share
+    // the same in-memory representation (the interface's existential layout),
+    // so the bitcast preserves the address without layout mismatch.
+    //
+    // Concrete-to-interface (Ptr<Foo> -> Ptr<IFoo>) is NOT allowed implicitly
+    // because the memory layouts differ: Foo has no existential header.
     if (auto fromPtrType = as<PtrType>(fromType))
     {
         if (auto toPtrType = as<PtrType>(toType))
         {
             auto fromValueType = fromPtrType->getValueType();
             auto toValueType = toPtrType->getValueType();
-            if (!fromValueType->equals(toValueType))
+            if (!fromValueType->equals(toValueType) && isInterfaceType(fromValueType) &&
+                isInterfaceType(toValueType))
             {
                 auto fromAccess = fromPtrType->getAccessQualifier();
                 auto toAccess = toPtrType->getAccessQualifier();
@@ -1972,17 +1976,11 @@ bool SemanticsVisitor::_coerce(
                 auto toAddrSpace = toPtrType->getAddressSpace();
                 auto fromLayout = fromPtrType->getDataLayout();
                 auto toLayout = toPtrType->getDataLayout();
-                // Null layout is tolerated: during generic specialization a PtrType
-                // may have an unresolved layout parameter. In practice both sides
-                // default to DefaultDataLayout so both are non-null.
                 if (fromAccess->equals(toAccess) && fromAddrSpace->equals(toAddrSpace) &&
                     (!fromLayout || !toLayout || fromLayout->equals(toLayout)))
                 {
                     if (auto witness = tryGetSubtypeWitness(fromValueType, toValueType))
                     {
-                        // TODO(#10015): when dispatch through the converted IFoo* is
-                        // supported, the witness will be needed to resolve the vtable.
-                        // For now the bitcast only preserves the address value.
                         SLANG_UNUSED(witness);
                         if (outCost)
                             *outCost = kConversionCost_CastToInterface;

@@ -15,13 +15,10 @@ Current limitations include:
   [storeAligned()](../../../core-module-reference/global-decls/storealigned-5.html) may be used for loads and
   stores using pointers with known alignment.
 - Pointers are not supported on all targets.
-- Slang supports implicit covariant pointer conversion: a pointer to a structure conforming to
-  interface `I` can be implicitly converted to a pointer to `I` (e.g. `IFoo* p = &myStruct;`),
-  provided both pointers share the same access qualifier, address space, and data layout. The
-  conversion preserves the raw address via bitcast. Dereferencing the resulting interface pointer
-  for dynamic dispatch works when the pointee memory contains a valid serialized existential
-  (tag + witness table + AnyValue); dispatching through an interface pointer that points directly
-  at concrete struct memory (without the existential header) is not supported.
+- Slang supports implicit pointer conversion between interface subtypes: a pointer to an interface
+  subtype can be implicitly converted to a pointer to its base interface type. Converting a pointer
+  to a concrete struct into a pointer to an interface type is not implicitly supported because the
+  in-memory representations differ.
 
 See also GitHub issue [#9061](https://github.com/shader-slang/slang/issues/9061).
 

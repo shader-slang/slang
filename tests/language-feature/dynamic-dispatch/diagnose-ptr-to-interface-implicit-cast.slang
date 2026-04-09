@@ -1,10 +1,8 @@
-// Covariant pointer conversion (Foo* -> IFoo* when Foo : IFoo) is allowed
-// as of #9962. The reverse (contravariant) direction is still rejected.
-//
-// Note: dispatching through an IFoo* that points directly at concrete
-// struct memory (not a serialized existential) is not supported.
-// See interface-ptr-deref-via-buffer-address.slang for dispatch through
-// properly serialized existentials.
+// Implicit pointer conversion is rejected when the in-memory representations
+// are incompatible. This covers:
+// 1. Concrete struct pointer to interface pointer (layouts differ)
+// 2. Non-conforming type pointer to interface pointer
+// 3. Access qualifier mismatch between interface pointers
 
 //TEST:SIMPLE(filecheck=CHECK): -target spirv
 
@@ -19,6 +17,11 @@ struct Foo : IFoo
     int getVal() { return val; }
 }
 
+struct Bar
+{
+    int val;
+}
+
 RWStructuredBuffer<int> outputBuffer;
 
 [numthreads(1, 1, 1)]
@@ -28,12 +31,20 @@ void computeMain()
     f.val = 5;
     Foo* pf = &f;
 
-    // Covariant direction: Foo* -> IFoo* is allowed (#9962)
+    // Concrete-to-interface: rejected (memory layouts differ)
+    // CHECK: error[E30019]
     IFoo* ip = pf;
 
-    // Contravariant direction: IFoo* -> Foo* is NOT allowed
+    // Non-conforming type: rejected (Bar does not implement IFoo)
+    Bar b;
+    b.val = 1;
     // CHECK: error[E30019]
-    Foo* pf2 = ip;
+    IFoo* ip2 = &b;
+
+    // Access qualifier mismatch: rejected
+    Ptr<IFoo, Access.Read> pRead;
+    // CHECK: error[E30019]
+    Ptr<IFoo, Access.ReadWrite> pWrite = pRead;
 
     outputBuffer[0] = 0;
 }

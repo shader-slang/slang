@@ -9,8 +9,9 @@
 // CPU only), this test validates multi-backend support (CPU, CUDA, Vulkan, LLVM)
 // with explicit type_conformance registration and runtime type selection.
 //
-// Note: The IFoo* pointer is only initialized to nullptr here. For pointer
-// dereferencing tests (ptr->foo()), see interface-ptr-deref-via-buffer-address.slang.
+// Note: The IFoo* pointer is only initialized to nullptr here. Testing actual
+// pointer dereferencing (ptr->foo()) requires slang-test infrastructure to
+// embed device addresses in buffer data. See #10015 for follow-up.
 //
 // anyValueSize is intentionally omitted to test the auto-computation path.
 
