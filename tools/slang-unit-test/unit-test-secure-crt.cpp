@@ -12,6 +12,12 @@
 #include <string.h>
 #include <wchar.h>
 
+#if defined(__MINGW32__) && !defined(__CYGWIN__)
+static const char* const kNullDevice = "NUL";
+#else
+static const char* const kNullDevice = "/dev/null";
+#endif
+
 SLANG_UNIT_TEST(secureCrtMemcpyS)
 {
     // Happy path
@@ -58,7 +64,7 @@ SLANG_UNIT_TEST(secureCrtFopenS)
     // Happy path — open a temp file
     {
         FILE* f = nullptr;
-        SLANG_CHECK(fopen_s(&f, "/dev/null", "r") == 0);
+        SLANG_CHECK(fopen_s(&f, kNullDevice, "r") == 0);
         SLANG_CHECK(f != nullptr);
         if (f)
             fclose(f);
@@ -66,19 +72,22 @@ SLANG_UNIT_TEST(secureCrtFopenS)
     // null file pointer
     {
         errno = 0;
-        SLANG_CHECK(fopen_s(nullptr, "/dev/null", "r") == EINVAL);
+        SLANG_CHECK(fopen_s(nullptr, kNullDevice, "r") == EINVAL);
+        SLANG_CHECK(errno == EINVAL);
     }
     // null filename
     {
         FILE* f = nullptr;
         errno = 0;
         SLANG_CHECK(fopen_s(&f, nullptr, "r") == EINVAL);
+        SLANG_CHECK(errno == EINVAL);
     }
     // null mode
     {
         FILE* f = nullptr;
         errno = 0;
-        SLANG_CHECK(fopen_s(&f, "/dev/null", nullptr) == EINVAL);
+        SLANG_CHECK(fopen_s(&f, kNullDevice, nullptr) == EINVAL);
+        SLANG_CHECK(errno == EINVAL);
     }
     // nonexistent file
     {
@@ -91,11 +100,16 @@ SLANG_UNIT_TEST(secureCrtFopenS)
 
 SLANG_UNIT_TEST(secureCrtFreadS)
 {
-    // Happy path
+    // Happy path — use tmpfile() for portability (no /dev/zero on MinGW)
     {
-        FILE* f = fopen("/dev/zero", "rb");
+        FILE* f = tmpfile();
+        SLANG_CHECK(f != nullptr);
         if (f)
         {
+            const char data[4] = {};
+            SLANG_CHECK(fwrite(data, 1, sizeof(data), f) == sizeof(data));
+            rewind(f);
+
             char buf[8] = {};
             size_t n = fread_s(buf, sizeof(buf), 1, 4, f);
             SLANG_CHECK(n == 4);
