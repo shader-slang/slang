@@ -42,8 +42,8 @@ Parse or ask for: minimal reproducer, target(s), error output.
 
 ### Intake Output
 
-Optionally write `tmp/<issue-repository>-<bug-id>/intake.md` for complex bugs.
-For straightforward bugs, keep the intake in the conversation context instead.
+Write `tmp/<issue-repository>-<bug-id>/intake.md` so the investigation trail
+is preserved for rewinding or handoff.
 
 ```markdown
 # Bug Intake: [short title]
@@ -172,8 +172,8 @@ CONCERNS: [any remaining concerns]
 
 ### Evaluation Output
 
-Compare strategies directly in the conversation. Writing `tmp/<bug-id>/alternatives.md`
-is optional — only useful if the comparison is complex enough to need a persistent record.
+Write `tmp/<bug-id>/alternatives.md` comparing strategies so the evaluation
+trail is preserved. Also present the comparison in the conversation.
 
 ---
 
