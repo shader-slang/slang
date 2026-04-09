@@ -3241,7 +3241,26 @@ struct TypeFlowSpecializationContext
                 cast<IRWitnessTableSet>(elementOfSetType->getSet()),
                 [&](IRInst* table)
                 {
+                    if (as<IRUnboundedWitnessTableElement>(table))
+                    {
+                        if (inst->getDataType()->getOp() == kIROp_FuncType)
+                            results.add(builder.getUnboundedFuncElement());
+                        else if (inst->getDataType()->getOp() == kIROp_WitnessTableType)
+                            results.add(builder.getUnboundedWitnessTableElement(
+                                as<IRWitnessTableType>(inst->getDataType())->getConformanceType()));
+                        return;
+                    }
+
                     auto resolvedTable = translationContext.resolveInst(table);
+
+                    if (as<IRNoneWitnessTableElement>(table) || as<IRVoidLit>(table) ||
+                        (as<IRWitnessTable>(resolvedTable)->getConformanceType()->getOp() ==
+                         kIROp_VoidType))
+                    {
+                        results.add(builder.getVoidValue());
+                        return;
+                    }
+
                     results.add(findWitnessTableEntry(cast<IRWitnessTable>(resolvedTable), key));
                 });
 

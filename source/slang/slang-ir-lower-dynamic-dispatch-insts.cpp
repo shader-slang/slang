@@ -1221,10 +1221,13 @@ struct TaggedUnionLoweringContext : public InstPassBase
                     {
                         auto baseInterfacePtr = inst->getPtr();
                         auto basePtrDataType = baseInterfacePtr->getDataType();
-                        auto baseInterfaceType = as<IRInterfaceType>(
+                        auto baseElementType =
                             as<IRPtrTypeBase>(basePtrDataType)
                                 ? as<IRPtrTypeBase>(basePtrDataType)->getValueType()
-                                : (IRType*)basePtrDataType->getOperand(0));
+                            : as<IRPointerLikeType>(basePtrDataType)
+                                ? as<IRPointerLikeType>(basePtrDataType)->getElementType()
+                                : nullptr;
+                        auto baseInterfaceType = as<IRInterfaceType>(baseElementType);
 
                         // Rewrite the load to use the original ptr and load
                         // an interface-typed object.
@@ -1255,10 +1258,13 @@ struct TaggedUnionLoweringContext : public InstPassBase
 
                         auto baseInterfacePtr = inst->getPtr();
                         auto storePtrDataType = baseInterfacePtr->getDataType();
-                        auto baseInterfaceType = as<IRInterfaceType>(
+                        auto storeElementType =
                             as<IRPtrTypeBase>(storePtrDataType)
                                 ? as<IRPtrTypeBase>(storePtrDataType)->getValueType()
-                                : (IRType*)storePtrDataType->getOperand(0));
+                            : as<IRPointerLikeType>(storePtrDataType)
+                                ? as<IRPointerLikeType>(storePtrDataType)->getElementType()
+                                : nullptr;
+                        auto baseInterfaceType = as<IRInterfaceType>(storeElementType);
 
                         // Rewrite the store to use the original ptr and store
                         // an interface type'd object.
