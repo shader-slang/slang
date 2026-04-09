@@ -451,6 +451,75 @@ TypeExp SemanticsVisitor::CheckProperType(TypeExp typeExp)
     return CoerceToProperType(TranslateTypeNode(typeExp));
 }
 
+// Validates matrix dimensions and element types at type-construction time.
+// Returns true if the matrix type is valid, false if an error was diagnosed.
+static bool validateMatrixType(
+    SemanticsVisitor* visitor,
+    MatrixExpressionType* matType,
+    SourceLoc loc)
+{
+    auto sink = visitor->getSink();
+    bool valid = true;
+
+    if (auto colCountVal = as<ConstantIntVal>(matType->getColumnCount()))
+    {
+        auto colCount = colCountVal->getValue();
+        if (colCount < 1 || colCount > 4)
+        {
+            sink->diagnose(Diagnostics::MatrixDimensionOutOfRange{
+                .dimName = "column count",
+                .dimValue = String(colCount),
+                .maxValue = "4",
+                .location = loc});
+            valid = false;
+        }
+    }
+
+    if (auto rowCountVal = as<ConstantIntVal>(matType->getRowCount()))
+    {
+        auto rowCount = rowCountVal->getValue();
+        if (rowCount < 1 || rowCount > 4)
+        {
+            sink->diagnose(Diagnostics::MatrixDimensionOutOfRange{
+                .dimName = "row count",
+                .dimValue = String(rowCount),
+                .maxValue = "4",
+                .location = loc});
+            valid = false;
+        }
+    }
+
+    auto elemType = as<BasicExpressionType>(matType->getElementType());
+    if (elemType)
+    {
+        switch (elemType->getBaseType())
+        {
+        case BaseType::Float:
+        case BaseType::Half:
+        case BaseType::Double:
+        case BaseType::Int:
+        case BaseType::UInt:
+            break;
+        case BaseType::Int8:
+        case BaseType::Int16:
+        case BaseType::Int64:
+        case BaseType::UInt8:
+        case BaseType::UInt16:
+        case BaseType::UInt64:
+        case BaseType::Bool:
+            sink->diagnose(Diagnostics::MatrixInvalidElementType{
+                .elementType = matType->getElementType(),
+                .location = loc});
+            valid = false;
+            break;
+        default:
+            break;
+        }
+    }
+
+    return valid;
+}
+
 TypeExp SemanticsVisitor::CoerceToUsableType(TypeExp const& typeExp, Decl* decl)
 {
     TypeExp result = CoerceToProperType(typeExp);
@@ -462,6 +531,17 @@ TypeExp SemanticsVisitor::CoerceToUsableType(TypeExp const& typeExp, Decl* decl)
         {
             // TODO(tfoley): pick the right diagnostic message
             getSink()->diagnose(Diagnostics::InvalidTypeVoid{.location = result.exp->loc});
+            result.type = m_astBuilder->getErrorType();
+            return result;
+        }
+    }
+
+    // Validate matrix dimensions and element types
+    if (auto matType = as<MatrixExpressionType>(type))
+    {
+        SourceLoc loc = result.exp ? result.exp->loc : SourceLoc();
+        if (!validateMatrixType(this, matType, loc))
+        {
             result.type = m_astBuilder->getErrorType();
             return result;
         }
