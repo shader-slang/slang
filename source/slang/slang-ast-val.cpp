@@ -851,6 +851,10 @@ Val* DeclaredSubtypeWitness::_substituteImplOverride(
             {
                 index++;
             }
+            else if (as<HasDiffTypeInfoConstraintDecl>(member))
+            {
+                index++;
+            }
         }
         if (found)
         {
@@ -1324,6 +1328,75 @@ void NoneWitness::_toTextOverride(StringBuilder& out)
 Val* NoneWitness::_resolveImplOverride()
 {
     return this;
+}
+
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! HasDiffTypeInfoWitness !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+void HasDiffTypeInfoWitness::_toTextOverride(StringBuilder& out)
+{
+    out << "has_diff_type_info_witness(" << getDeclRef() << ")";
+}
+
+Val* HasDiffTypeInfoWitness::_resolveImplOverride()
+{
+    return this;
+}
+
+Val* HasDiffTypeInfoWitness::_substituteImplOverride(
+    ASTBuilder* astBuilder,
+    SubstitutionSet subst,
+    int* ioDiff)
+{
+    auto constraintDeclRef = getDeclRef();
+    auto genericDecl = as<GenericDecl>(constraintDeclRef.getDecl()->parentDecl);
+    if (genericDecl)
+    {
+        auto args = tryGetGenericArguments(subst, genericDecl);
+        if (args.getCount())
+        {
+            bool found = false;
+            Index index = 0;
+            for (auto member : genericDecl->getDirectMemberDecls())
+            {
+                if (as<GenericTypeConstraintDecl>(member) ||
+                    as<TypeCoercionConstraintDecl>(member) ||
+                    as<NonEmptyPackConstraintDecl>(member) ||
+                    as<HasDiffTypeInfoConstraintDecl>(member))
+                {
+                    if (member == constraintDeclRef.getDecl())
+                    {
+                        found = true;
+                        break;
+                    }
+                    index++;
+                }
+            }
+
+            if (found)
+            {
+                auto ordinaryParamCount =
+                    genericDecl->getMembersOfType<GenericTypeParamDeclBase>().getCount() +
+                    genericDecl->getMembersOfType<GenericValueParamDecl>().getCount() +
+                    genericDecl->getMembersOfType<GenericValuePackParamDecl>().getCount();
+                if (index + ordinaryParamCount < args.getCount())
+                {
+                    (*ioDiff)++;
+                    return args[index + ordinaryParamCount];
+                }
+            }
+        }
+    }
+
+    int diff = 0;
+    auto substDeclRef = constraintDeclRef.substituteImpl(astBuilder, subst, &diff);
+    if (!diff)
+        return this;
+
+    (*ioDiff)++;
+    auto substConstraintDeclRef = substDeclRef.as<HasDiffTypeInfoConstraintDecl>();
+    if (!substConstraintDeclRef)
+        return this;
+    return astBuilder->getHasDiffTypeInfoWitness(substConstraintDeclRef);
 }
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! NonEmptyPackWitness !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
