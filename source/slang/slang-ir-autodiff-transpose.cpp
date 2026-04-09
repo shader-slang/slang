@@ -520,6 +520,8 @@ struct DiffTransposePass
                     currentBlock = breakBlock;
                     break;
                 }
+            default:
+                SLANG_UNEXPECTED("Unsupported terminator type in reverseCFGRegion");
             }
         }
 

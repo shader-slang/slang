@@ -1612,6 +1612,7 @@ class DifferentiableAttribute : public Attribute
 
     auto begin(Val* targetVal) const
     {
+        SLANG_ASSERT(hasAssociatedVals(targetVal));
         return m_associatedValMapping.tryGetValue(targetVal)->begin();
     }
 
