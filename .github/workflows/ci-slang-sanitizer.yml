@@ -1,0 +1,505 @@
+name: CI Sanitizer Workflow
+
+on:
+  workflow_call:
+    inputs:
+      runs-on:
+        required: true
+        type: string
+      server-count:
+        required: false
+        type: number
+        default: 8
+      test-category:
+        required: false
+        type: string
+        default: smoke
+
+jobs:
+  sanitizer:
+    runs-on: ${{ fromJSON(inputs.runs-on) }}
+    timeout-minutes: 120
+    permissions:
+      id-token: write
+      contents: read
+      packages: read
+
+    container:
+      image: ghcr.io/shader-slang/slang-linux-clang-ci:v1.0.1
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+      options: --user root
+
+    env:
+      IS_FORK_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == true }}
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Configure Git safe directory
+        run: git config --global --add safe.directory '*'
+
+      - uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
+          # Need full history to diff PR changes against the base branch
+          # for classifying sanitizer findings as PR-related vs pre-existing.
+          fetch-depth: "0"
+
+      - name: Compute PR changed files
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            echo "Computing diff against PR base: $BASE_SHA"
+            git diff --name-only "$BASE_SHA"...HEAD > /tmp/pr-changed-files.txt
+            changed_count=$(wc -l < /tmp/pr-changed-files.txt)
+            echo "PR touches $changed_count file(s)"
+            cat /tmp/pr-changed-files.txt
+          else
+            echo "Not a PR event -- all sanitizer findings will be treated as errors"
+            : > /tmp/pr-changed-files.txt
+          fi
+
+      - name: Authenticate to Google Cloud
+        if: env.IS_FORK_PR != 'true'
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: "projects/125098404903/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider"
+          service_account: "github-ci@slang-runners.iam.gserviceaccount.com"
+
+      - name: Setup sccache
+        uses: ./.github/actions/setup-sccache
+        with:
+          platform: linux
+
+      - name: Restore sccache cache
+        uses: actions/cache/restore@v4
+        with:
+          path: /tmp/.cache/sccache
+          key: sccache-linux-clang-18-x86_64-asan-${{ github.sha }}
+          restore-keys: |
+            sccache-linux-clang-18-x86_64-asan-
+
+      - name: Setup LLVM from GCS
+        uses: ./.github/actions/setup-llvm-from-gcs
+        with:
+          os: linux
+          # GCC-built LLVM is ABI-compatible with clang-18
+          compiler: gcc
+          platform: x86_64
+          llvm-hash: ${{ hashFiles('external/build-llvm.sh') }}
+          build-if-missing: "true"
+          github-token: ${{ github.token }}
+
+      - name: Setup
+        uses: ./.github/actions/common-setup
+        with:
+          os: linux
+          compiler: clang-18
+          platform: x86_64
+          config: releaseWithDebugInfo
+          build-llvm: true
+          use-cached-llvm: false
+
+      - name: Create sanitizer log directory
+        run: mkdir -p asan-logs
+
+      - name: Build Slang with Sanitizers
+        id: build
+        run: |
+          echo "cmake version: $(cmake --version)"
+          echo "Building with AddressSanitizer and UndefinedBehaviorSanitizer"
+
+          # Binaries built with -shared-libsan dynamically link libclang_rt.asan.
+          # Persist LD_LIBRARY_PATH so both build-time generators and test steps
+          # can locate the sanitizer runtime.
+          CLANG_RUNTIME_DIR=$(clang-18 -print-runtime-dir)
+          export LD_LIBRARY_PATH="${CLANG_RUNTIME_DIR}:${LD_LIBRARY_PATH:-}"
+          echo "Clang runtime dir: $CLANG_RUNTIME_DIR"
+
+          # Also include the build lib directory so that dlopen() can find
+          # sibling modules like libslang-llvm.so at test time.
+          export LD_LIBRARY_PATH="${lib_dir}:${LD_LIBRARY_PATH}"
+          echo "LD_LIBRARY_PATH=${LD_LIBRARY_PATH}" >> "$GITHUB_ENV"
+
+          # Disable leak detection during build: generators are short-lived
+          # build tools and LSan's non-zero exit code would break the build.
+          export ASAN_OPTIONS=detect_leaks=0
+
+          if command -v sccache &> /dev/null; then
+            echo "sccache statistics (pre-build):"
+            sccache --show-stats || true
+          fi
+
+          cmake_launcher_defines=()
+          if [[ -n "${sccache_path:-}" ]]; then
+            cmake_launcher_defines+=("-DCMAKE_C_COMPILER_LAUNCHER=${sccache_path}")
+            cmake_launcher_defines+=("-DCMAKE_CXX_COMPILER_LAUNCHER=${sccache_path}")
+            cmake_launcher_defines+=("-DSLANG_ENABLE_PCH=OFF")
+          fi
+
+          cmake --preset default --fresh \
+            -DSLANG_ENABLE_ASAN=ON \
+            -DSLANG_SLANG_LLVM_FLAVOR=USE_SYSTEM_LLVM \
+            -DSLANG_ENABLE_EXAMPLES=OFF \
+            "${cmake_launcher_defines[@]}"
+
+          cmake --build --preset releaseWithDebugInfo -j$(nproc)
+
+          if command -v sccache &> /dev/null; then
+            echo "sccache statistics (post-build):"
+            sccache --show-stats || true
+          fi
+
+      - name: Save sccache cache
+        if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        uses: actions/cache/save@v4
+        with:
+          path: /tmp/.cache/sccache
+          key: sccache-linux-clang-18-x86_64-asan-${{ github.sha }}
+
+      - name: Verify sanitizer runtime is active
+        if: steps.build.outcome == 'success'
+        run: |
+          # Build and run a small program with a known ASan error to confirm
+          # the sanitizer runtime is loaded and producing log files.
+          cat > /tmp/asan-canary.c << 'CANARY'
+          #include <stdlib.h>
+          int main(void) { volatile int *p = (int*)malloc(sizeof(int)); free((void*)p); return *p; }
+          CANARY
+          export ASAN_OPTIONS="log_path=/tmp/canary"
+          clang-18 -fsanitize=address -O0 /tmp/asan-canary.c -o /tmp/asan-canary
+          /tmp/asan-canary || true
+          if ls /tmp/canary.* 1>/dev/null 2>&1; then
+            echo "Sanitizer runtime verified: log files produced"
+          else
+            echo "::error::Sanitizer canary failed — ASan runtime did not produce log files"
+            exit 1
+          fi
+          rm -f /tmp/canary.* /tmp/asan-canary /tmp/asan-canary.c
+
+      - name: Run Tests with Sanitizers
+        if: steps.build.outcome == 'success'
+        env:
+          TEST_CATEGORY: ${{ inputs.test-category }}
+          SERVER_COUNT: ${{ inputs.server-count }}
+        run: |
+          # halt_on_error=0: continue after each error to find more issues
+          # per run. Using server-count > 1 isolates tests in separate
+          # processes for better coverage.
+          export ASAN_OPTIONS="detect_leaks=1:halt_on_error=0:print_scariness=1:log_path=$PWD/asan-logs/asan"
+          export UBSAN_OPTIONS="print_stacktrace=1:halt_on_error=0:print_suppressions=0:log_path=$PWD/asan-logs/ubsan"
+          export LSAN_OPTIONS="suppressions=$PWD/cmake/lsan-suppressions.txt"
+
+          export SLANG_RUN_SPIRV_VALIDATION=1
+          export SLANG_USE_SPV_SOURCE_LANGUAGE_UNKNOWN=1
+
+          echo "=== Pre-flight checks ==="
+          echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
+          ls "$bin_dir/slang-test" "$lib_dir/"libslang* 2>/dev/null || true
+          ldd "$bin_dir/slang-test" 2>&1 | head -30 || true
+
+          slang_test_args=(
+            "-category" "$TEST_CATEGORY"
+            "-expected-failure-list" "tests/expected-failure-github.txt"
+            "-expected-failure-list" "tests/expected-failure-no-gpu.txt"
+            "-expected-failure-list" "tests/expected-failure-linux.txt"
+            "-skip-reference-image-generation"
+            "-show-adapter-info"
+            "-enable-debug-layers" "false"
+          )
+
+          if [ "$SERVER_COUNT" -gt 1 ]; then
+            slang_test_args+=("-use-test-server")
+            slang_test_args+=("-server-count" "$SERVER_COUNT")
+          fi
+
+          # Non-zero exits are expected (sanitizer errors, test failures); this
+          # job gates only on sanitizer log output in the Summary step.
+          "$bin_dir/slang-test" "${slang_test_args[@]}" && slang_test_exit=0 || slang_test_exit=$?
+          echo "SLANG_TEST_EXIT=$slang_test_exit" >> "$GITHUB_ENV"
+          if [ "$slang_test_exit" -ne 0 ]; then
+            echo "::warning::slang-test exited with code $slang_test_exit"
+          fi
+
+      - name: Run slangc tests with Sanitizers
+        if: steps.build.outcome == 'success'
+        run: |
+          export ASAN_OPTIONS="detect_leaks=1:halt_on_error=0:print_scariness=1:log_path=$PWD/asan-logs/asan-slangc"
+          export UBSAN_OPTIONS="print_stacktrace=1:halt_on_error=0:print_suppressions=0:log_path=$PWD/asan-logs/ubsan-slangc"
+          export LSAN_OPTIONS="suppressions=$PWD/cmake/lsan-suppressions.txt"
+
+          PATH=$bin_dir:$PATH tools/slangc-test/test.sh && slangc_test_exit=0 || slangc_test_exit=$?
+          echo "SLANGC_TEST_EXIT=$slangc_test_exit" >> "$GITHUB_ENV"
+          if [ "$slangc_test_exit" -ne 0 ]; then
+            echo "::warning::slangc tests exited with code $slangc_test_exit"
+          fi
+
+      - name: Sanitizer Summary
+        if: always()
+        env:
+          BUILD_OUTCOME: ${{ steps.build.outcome }}
+        run: |
+          echo ""
+          echo "========================================"
+          echo "       SANITIZER REPORT"
+          echo "========================================"
+          echo ""
+
+          log_files=$(find asan-logs -type f \( -name 'asan*' -o -name 'ubsan*' \) -size +0c 2>/dev/null || true)
+          total_logs=0
+          if [ -n "$log_files" ]; then
+            total_logs=$(echo "$log_files" | wc -l)
+          fi
+
+          if [ "$total_logs" -gt 0 ]; then
+            # Prepare expected-findings patterns (strip comments and blank lines).
+            expected_patterns="/tmp/expected-patterns.txt"
+            if [ -f cmake/expected-sanitizer-findings.txt ]; then
+              grep -v '^\s*#' cmake/expected-sanitizer-findings.txt \
+                | grep -v '^\s*$' > "$expected_patterns" || true
+            else
+              : > "$expected_patterns"
+            fi
+            has_expected_patterns=false
+            if [ -s "$expected_patterns" ]; then
+              has_expected_patterns=true
+              echo "Loaded $(wc -l < "$expected_patterns" | tr -d ' ') expected-finding pattern(s)"
+            fi
+
+            # Classify each sanitizer log into one of three buckets:
+            #   expected       -- all SUMMARY lines match expected-sanitizer-findings.txt
+            #   pr_related     -- unexpected, stack frames in PR-changed files
+            #   preexisting    -- unexpected, stack frames only in unchanged code
+            expected_files=""
+            pr_related_files=""
+            preexisting_files=""
+            has_pr_changed_files=false
+            if [ -s /tmp/pr-changed-files.txt ]; then
+              has_pr_changed_files=true
+            fi
+
+            while IFS= read -r f; do
+              # Check if all findings in this log are expected.
+              summaries=$(grep -h 'SUMMARY:' "$f" 2>/dev/null || true)
+              if $has_expected_patterns && [ -n "$summaries" ]; then
+                unexpected=$(echo "$summaries" | grep -vFf "$expected_patterns" || true)
+                if [ -z "$unexpected" ]; then
+                  expected_files="${expected_files}${f}"$'\n'
+                  continue
+                fi
+              fi
+
+              # Extract workspace-relative source paths from stack traces.
+              # Sanitizer output uses absolute paths like:
+              #   #0 0x... in func /home/runner/work/slang/slang/source/foo.cpp:123:45
+              # Also catches UBSan inline locations (/path/file.cpp:line:col: runtime error).
+              log_paths=$(grep -oE "${GITHUB_WORKSPACE}/[^:[:space:]]+" "$f" 2>/dev/null \
+                | sed "s|${GITHUB_WORKSPACE}/||" | sort -u || true)
+
+              is_pr_related=false
+
+              if $has_pr_changed_files && [ -n "$log_paths" ]; then
+                while IFS= read -r src_path; do
+                  if grep -qxF "$src_path" /tmp/pr-changed-files.txt; then
+                    is_pr_related=true
+                    break
+                  fi
+                done <<< "$log_paths"
+              elif $has_pr_changed_files && [ -z "$log_paths" ]; then
+                # No parseable paths -- cannot attribute; treat as PR-related
+                # to be conservative (add to expected-findings if benign)
+                is_pr_related=true
+              elif ! $has_pr_changed_files; then
+                # Not a PR (push to master, etc.) -- treat all findings as errors
+                is_pr_related=true
+              fi
+
+              if $is_pr_related; then
+                pr_related_files="${pr_related_files}${f}"$'\n'
+              else
+                preexisting_files="${preexisting_files}${f}"$'\n'
+              fi
+            done <<< "$log_files"
+
+            # Trim trailing newlines and count
+            expected_files="${expected_files%$'\n'}"
+            pr_related_files="${pr_related_files%$'\n'}"
+            preexisting_files="${preexisting_files%$'\n'}"
+            expected_count=0
+            pr_count=0
+            preexisting_count=0
+            if [ -n "$expected_files" ]; then
+              expected_count=$(echo "$expected_files" | wc -l | tr -d ' ')
+            fi
+            if [ -n "$pr_related_files" ]; then
+              pr_count=$(echo "$pr_related_files" | wc -l | tr -d ' ')
+            fi
+            if [ -n "$preexisting_files" ]; then
+              preexisting_count=$(echo "$preexisting_files" | wc -l | tr -d ' ')
+            fi
+
+            echo "FOUND $total_logs SANITIZER LOG(S): $pr_count PR-related, $preexisting_count pre-existing, $expected_count expected"
+            echo ""
+
+            # Show expected findings as notices
+            if [ -n "$expected_files" ]; then
+              echo "--- Expected findings (known issues, not blocking) ---"
+              echo "$expected_files" | while IFS= read -r f; do
+                echo "::group::EXPECTED: $(basename "$f")"
+                head -100 "$f"
+                echo "::endgroup::"
+              done
+
+              expected_summaries=$(echo "$expected_files" | xargs grep -h 'SUMMARY:' 2>/dev/null | sort -u | head -20 || true)
+              if [ -n "$expected_summaries" ]; then
+                echo ""
+                echo "Expected (known) issues:"
+                echo "$expected_summaries"
+                while IFS= read -r line; do
+                  echo "::notice::Expected: $line"
+                done <<< "$expected_summaries"
+              fi
+            fi
+
+            # Show PR-related findings as errors
+            if [ -n "$pr_related_files" ]; then
+              echo ""
+              echo "--- PR-related findings (will fail the job) ---"
+              echo "$pr_related_files" | while IFS= read -r f; do
+                echo "::group::PR-RELATED: $(basename "$f")"
+                head -100 "$f"
+                echo "::endgroup::"
+              done
+
+              pr_summaries=$(echo "$pr_related_files" | xargs grep -h 'SUMMARY:' 2>/dev/null | sort -u | head -20 || true)
+              if [ -n "$pr_summaries" ]; then
+                echo ""
+                echo "PR-related unique issues:"
+                echo "$pr_summaries"
+                while IFS= read -r line; do
+                  echo "::error::$line"
+                done <<< "$pr_summaries"
+              fi
+            fi
+
+            # Show pre-existing findings as warnings
+            if [ -n "$preexisting_files" ]; then
+              echo ""
+              echo "--- Pre-existing findings (warnings only) ---"
+              echo "$preexisting_files" | while IFS= read -r f; do
+                echo "::group::PRE-EXISTING: $(basename "$f")"
+                head -100 "$f"
+                echo "::endgroup::"
+              done
+
+              preexisting_summaries=$(echo "$preexisting_files" | xargs grep -h 'SUMMARY:' 2>/dev/null | sort -u | head -20 || true)
+              if [ -n "$preexisting_summaries" ]; then
+                echo ""
+                echo "Pre-existing unique issues:"
+                echo "$preexisting_summaries"
+                while IFS= read -r line; do
+                  echo "::warning::Pre-existing: $line"
+                done <<< "$preexisting_summaries"
+              fi
+            fi
+
+            echo ""
+            echo "========================================"
+            echo ""
+
+            # Job summary (visible on the PR checks page)
+            {
+              echo "## Sanitizer Report"
+              echo ""
+              if [ "$pr_count" -gt 0 ]; then
+                pr_summaries=$(echo "$pr_related_files" | xargs grep -h 'SUMMARY:' 2>/dev/null | sort -u | head -20 || true)
+                echo "### PR-related findings: $pr_count"
+                echo ""
+                echo "These findings have stack frames in files changed by this PR."
+                echo ""
+                if [ -n "$pr_summaries" ]; then
+                  echo '```'
+                  echo "$pr_summaries"
+                  echo '```'
+                  echo ""
+                fi
+              fi
+              if [ "$preexisting_count" -gt 0 ]; then
+                preexisting_summaries=$(echo "$preexisting_files" | xargs grep -h 'SUMMARY:' 2>/dev/null | sort -u | head -20 || true)
+                echo "### Pre-existing findings: $preexisting_count (warnings only)"
+                echo ""
+                echo "These findings are in code not changed by this PR."
+                echo ""
+                if [ -n "$preexisting_summaries" ]; then
+                  echo '```'
+                  echo "$preexisting_summaries"
+                  echo '```'
+                  echo ""
+                fi
+              fi
+              if [ "$expected_count" -gt 0 ]; then
+                expected_summaries=$(echo "$expected_files" | xargs grep -h 'SUMMARY:' 2>/dev/null | sort -u | head -20 || true)
+                echo "### Expected findings: $expected_count (known issues)"
+                echo ""
+                echo "These match patterns in \`cmake/expected-sanitizer-findings.txt\`."
+                echo ""
+                if [ -n "$expected_summaries" ]; then
+                  echo '```'
+                  echo "$expected_summaries"
+                  echo '```'
+                  echo ""
+                fi
+              fi
+              echo "Download the \`sanitizer-logs\` artifact for full stack traces."
+            } >> "$GITHUB_STEP_SUMMARY"
+
+            # Only fail the job for unexpected PR-related findings
+            if [ "$pr_count" -gt 0 ]; then
+              echo "Failing: $pr_count unexpected sanitizer finding(s) in PR-changed files."
+              exit 1
+            else
+              echo "Passing: $expected_count expected, $preexisting_count pre-existing finding(s)."
+            fi
+          else
+            if [ "$BUILD_OUTCOME" != "success" ]; then
+              echo "Build failed -- sanitizer results unavailable."
+              echo ""
+              echo "## Sanitizer Report" >> "$GITHUB_STEP_SUMMARY"
+              echo "" >> "$GITHUB_STEP_SUMMARY"
+              echo "Build failed -- sanitizer results unavailable." >> "$GITHUB_STEP_SUMMARY"
+            elif [ "${SLANG_TEST_EXIT:-0}" -ne 0 ] || [ "${SLANGC_TEST_EXIT:-0}" -ne 0 ]; then
+              echo "::warning::Tests exited with errors but produced no sanitizer logs (non-blocking)."
+              echo ""
+              {
+                echo "## Sanitizer Report"
+                echo ""
+                echo "Tests exited with errors (slang-test=${SLANG_TEST_EXIT:-skipped}, slangc=${SLANGC_TEST_EXIT:-skipped})"
+                echo "but produced no sanitizer logs. No sanitizer findings to report."
+                echo ""
+                echo "The test failures are unrelated to sanitizer checks and are handled by the main CI job."
+              } >> "$GITHUB_STEP_SUMMARY"
+              # Do not fail: no sanitizer logs means no sanitizer findings.
+              # Test pass/fail is already validated by the main CI job.
+            else
+              echo "No sanitizer issues detected."
+              echo ""
+              echo "## Sanitizer Report" >> "$GITHUB_STEP_SUMMARY"
+              echo "" >> "$GITHUB_STEP_SUMMARY"
+              echo "No sanitizer issues detected." >> "$GITHUB_STEP_SUMMARY"
+            fi
+          fi
+
+      - name: Upload Sanitizer Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sanitizer-logs
+          path: asan-logs/
+          retention-days: 7
+          if-no-files-found: ignore

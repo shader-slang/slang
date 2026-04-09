@@ -1408,6 +1408,28 @@ bool SemanticsVisitor::_failedCoercion(
                     .expectedType = toType,
                     .actualType = fromExpr->type,
                     .expr = fromExpr});
+
+                // When calling an interface method on an existential, the
+                // 'This' type in the parameter becomes an
+                // ExtractExistentialType. If the argument is also an opened
+                // existential (a different ExtractExistentialType), both
+                // print as "This" in the error, making the message confusing.
+                // Add a note explaining the type-erasure issue.
+                if (auto toExtType = as<ExtractExistentialType>(toType))
+                {
+                    if (auto fromExtType = as<ExtractExistentialType>(fromType))
+                    {
+                        Type* toInterfaceType = toExtType->getOriginalInterfaceType();
+                        Type* fromInterfaceType = fromExtType->getOriginalInterfaceType();
+                        if (toInterfaceType && fromInterfaceType &&
+                            toInterfaceType->equals(fromInterfaceType))
+                        {
+                            sink->diagnose(Diagnostics::ThisTypeMismatchAfterErasure{
+                                .interfaceType = toInterfaceType,
+                                .location = fromExpr->loc});
+                        }
+                    }
+                }
             }
         }
     }
