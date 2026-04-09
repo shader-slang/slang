@@ -208,4 +208,5 @@ Write `tmp/<issue-repository>-<bug-id>/investigation.md` (or `tmp/<bug-id>/` for
 ### Sharing Results
 
 If a GitHub issue exists for this bug, offer to post a summary of the investigation
-as a comment on the issue. Ask the user before posting.
+as a comment on the issue. Ask the user before posting. Prefix with `[Agent]`
+(see `slang-create-issue` GitHub Comment Rules).

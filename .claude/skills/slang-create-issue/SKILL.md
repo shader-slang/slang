@@ -170,6 +170,12 @@ Do not narrate the diff line by line -- reviewers read the code themselves.]
 - [ ] SPIRV validation: `SLANG_RUN_SPIRV_VALIDATION=1 slangc -target spirv test.slang`
 ```
 
+### GitHub Comment Rules
+
+**Prefix all agent-written GitHub comments with `[Agent]`** — issue comments,
+PR comments, review replies, investigation summaries. This applies everywhere
+the agent posts to GitHub, not just PR reviews.
+
 ### Commit Rules
 
 These rules apply to ALL commits across all skills.
