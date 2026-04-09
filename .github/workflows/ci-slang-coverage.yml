@@ -43,7 +43,7 @@ jobs:
   coverage:
     runs-on: ${{ fromJSON(inputs.runs-on) }}
     timeout-minutes: 120
-    container: ${{ inputs.container != '' && fromJSON(format('{{"image":"{0}","options":"--user root --gpus all"}}', inputs.container)) || null }}
+    container: ${{ inputs.container != '' && fromJSON(format('{{"image":"{0}","options":"--gpus all --user root --cap-add SYSLOG --device /dev/nvidia-modeset:/dev/nvidia-modeset --device /dev/dri:/dev/dri -e NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics -v /etc/vulkan/icd.d/nvidia_icd.json:/etc/vulkan/icd.d/nvidia_icd.json:ro -v /usr/share/nvidia:/usr/share/nvidia:ro -v /usr/share/glvnd/egl_vendor.d/10_nvidia.json:/usr/share/glvnd/egl_vendor.d/10_nvidia.json:ro"}}', inputs.container)) || null }}
     permissions:
       id-token: write # Required for Workload Identity (GCS auth)
       contents: read
