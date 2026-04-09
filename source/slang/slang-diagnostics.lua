@@ -1113,6 +1113,13 @@ err(
     }
 )
 
+standalone_note(
+    "this-type-mismatch-after-erasure",
+    30021,
+    "the concrete 'This' type identity is lost after type erasure into interface type '~interfaceType:Type'; consider using a generic function with a type constraint instead",
+    span { loc = "location" }
+)
+
 err(
     "cannot-convert-array-of-smaller-to-larger-size",
     30024,
@@ -3146,6 +3153,13 @@ err(
     30702,
     "system value semantic '~semantic' cannot be used as ~direction in '~stage' shader stage",
     span { loc = "location" }
+)
+
+err(
+    "parameter-without-default-after-parameter-with-default",
+    30703,
+    "parameter '~param:Decl' does not have a default value, but follows a parameter that does",
+    span { loc = "param:Decl" }
 )
 
 --

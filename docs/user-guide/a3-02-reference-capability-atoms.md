@@ -786,11 +786,17 @@ Extensions
 `spvFragmentShaderPixelInterlockEXT`
 > Represents the SPIR-V capability for using SPV_EXT_fragment_shader_interlock.
 
+`spvGroupNonUniform`
+> Represents the SPIR-V GroupNonUniform capability (basic subgroup operations).
+
 `spvGroupNonUniformArithmetic`
 > Represents the SPIR-V capability for group non-uniform arithmetic operations.
 
 `spvGroupNonUniformBallot`
 > Represents the SPIR-V capability for group non-uniform ballot operations.
+
+`spvGroupNonUniformClustered`
+> Represents the SPIR-V capability for group non-uniform clustered operations.
 
 `spvGroupNonUniformPartitionedNV`
 > Represents the SPIR-V capability for group non-uniform partitioned operations.
@@ -803,6 +809,9 @@ Extensions
 
 `spvGroupNonUniformShuffle`
 > Represents the SPIR-V capability for group non-uniform shuffle operations.
+
+`spvGroupNonUniformShuffleRelative`
+> Represents the SPIR-V capability for group non-uniform shuffle relative operations.
 
 `spvGroupNonUniformVote`
 > Represents the SPIR-V capability for group non-uniform vote operations.
