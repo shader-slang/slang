@@ -114,18 +114,111 @@ Strategies are listed best-first. See `slang-investigate` skill for the full ran
 | ICE in pass | Transform input to handled form | Reject the input earlier (semantic/IR) | Handle missing case at crash site |
 | Missing lowering | Extend existing lowering pass | Add new lowering pass | Emit diagnostic (unsupported) |
 
-### Agent Instructions
+### Constructing the Agent Prompt
 
-Each agent receives: intake.md, investigation.md, the fix strategy to implement, and references
-to the `slang-build`, `slang-run-tests`, and `slang-write-test` skills.
+The orchestrator must read the following skills and include their content in each
+agent's prompt at the marked placeholders:
+- `slang-build` → `{slang-build content}` (build commands, preset selection)
+- `slang-run-tests` → `{slang-run-tests content}` (test commands, skip detection)
+- `slang-write-test` → `{slang-write-test content}` (test syntax reference)
+- `slang-create-issue` "Commit Rules" section → `{commit-rules}`
 
-Each agent must:
-1. Implement the fix (minimal diff, follow existing patterns)
-2. Write a regression test (see `slang-write-test` skill)
-3. Build and validate (see `slang-build` and `slang-run-tests` skills)
-4. Format: `./extras/formatting.sh`
-5. Commit (do NOT push): `"Fix [short description]"` — follow commit rules from `slang-create-issue` skill.
-6. Report: VERDICT, build/test results, changes, risk assessment
+### Agent Prompt Template
+
+```text
+You are implementing and testing a fix strategy for a Slang compiler bug.
+You are running in an isolated git worktree with your own branch.
+
+## Bug Summary
+{intake.md content}
+
+## Root Cause
+{investigation.md content}
+
+## Your Strategy: [Strategy Name]
+
+Implement the following fix approach:
+[Description of the specific fix strategy]
+
+## Build Reference
+{slang-build content}
+
+## Test Reference
+{slang-run-tests content}
+
+## Test Syntax Reference
+{slang-write-test content}
+
+## Instructions
+
+### Step 1: Implement the fix
+1. Read the relevant source files to understand the current implementation
+2. Implement the fix -- change only what is necessary
+3. Follow existing patterns in the codebase
+4. Add comments only for non-obvious logic
+
+### Step 2: Write a regression test
+1. Create a .slang test file that reproduces the original bug
+2. Place it in tests/bugs/ or tests/diagnostics/ or tests/language-feature/
+3. Use the appropriate test type from the test syntax reference
+
+### Step 3: Build and validate
+1. Build slangc and slang-test using the build reference
+2. Run the regression test
+3. Run the original reproducer to confirm it's fixed
+4. Run SPIRV validation if applicable
+5. Run broader test suite with -use-test-server -server-count 8
+6. Check skip counts -- skipped tests are NOT passed tests
+
+### Step 4: Format
+Run ./extras/formatting.sh on changed files.
+
+### Step 5: Commit
+{commit-rules}
+Create a commit with message: "Fix [short description]"
+Do NOT push -- the orchestrator will compare results across strategies.
+
+### Step 6: Report back
+Return a structured result with ALL of the following:
+
+STRATEGY: [Name]
+BRANCH: [branch-name]
+COMMIT: [commit-hash]
+VERDICT: RECOMMENDED | VIABLE | RISKY | NOT_VIABLE
+
+BUILD: pass | fail
+  build_output: [key lines if failed]
+
+REPRODUCER_FIXED: yes | no
+  output: [compiler output after fix]
+
+REGRESSION_TEST: pass | fail
+  test_file: [path]
+  output: [test runner output]
+
+TEST_SUITE: pass | fail
+  total: N
+  passed: N
+  failed: N
+  skipped: N
+  failed_tests: [list of any newly failing tests]
+
+CHANGES:
+- file: source/slang/<file>.cpp
+  function: <name>
+  description: <what changes>
+  lines_changed: N
+
+CORRECTNESS: [root cause fix / symptom fix / partial fix]
+COMPLETENESS: [handles all cases / handles reproducer only / handles N of M cases]
+RISK: [low / medium / high -- what could break]
+
+EDGE_CASES:
+- [case 1]: [how this strategy handles it]
+
+CONCERNS:
+- [any remaining concerns or unknowns]
+```
 
 ### Evaluation Output
 

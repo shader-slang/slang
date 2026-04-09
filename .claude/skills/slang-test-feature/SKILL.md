@@ -210,18 +210,19 @@ Launch parallel agents (one per approved sub-plan) in **worktree isolation** usi
 so agents cannot conflict with each other even when creating files in the same
 directory hierarchy.
 
-### Agent Configuration
+### Constructing the Agent Prompt
 
-Each agent receives:
-1. Its sub-plan document
-2. The `slang-write-test` skill content (canonical test syntax reference)
-3. Feature context from research.md
-4. Mode flag (dry-run vs live)
+The orchestrator must read the following skills and include their content in each
+agent's prompt at the marked placeholders:
+- `slang-write-test` → `{slang-write-test content}` (test syntax reference)
+- `slang-build` → `{slang-build content}` (build commands, preset selection)
+- `slang-run-tests` → `{slang-run-tests content}` (test commands, skip detection)
+- `slang-create-issue` "Commit Rules" section → `{commit-rules}`
 
 Launch agents in parallel by sending multiple `Task` tool calls in a single message,
 each with `subagent_type="best-of-n-runner"`.
 
-### Agent Prompt
+### Agent Prompt Template
 
 ```text
 You are implementing tests for the Slang compiler.
@@ -231,25 +232,28 @@ You are running in an isolated git worktree with your own branch.
 {sub-plan content}
 
 ## Test Syntax Reference
-{slang-write-test SKILL.md content}
+{slang-write-test content}
+
+## Build Reference
+{slang-build content}
+
+## Test Runner Reference
+{slang-run-tests content}
 
 ## Feature Context
 {research.md overview section}
 
 ## Project Context
 
-This is the Slang shading language compiler (C++). Key conventions:
-- Build: see slang-build skill for platform-aware instructions
-- Test: see slang-run-tests skill for platform-aware test running
+This is the Slang shading language compiler (C++). Additional conventions:
 - Format: ./extras/formatting.sh
 - Single-dash CLI options: -target spirv (not --target)
-- Commit rules: never amend, no AI tool mentions, no issue numbers in commit summary
 - No trailing whitespace or blank lines with only spaces/tabs
 
 ## Instructions
 
 ### Step 0: Build (if needed)
-Follow the slang-build skill to build slangc and slang-test.
+Build slangc and slang-test using the build reference above.
 
 ### Step 1: Write and validate tests
 For each test in the sub-plan:
@@ -283,11 +287,11 @@ Before formatting or committing, verify EVERY test file:
 Run ./extras/formatting.sh on changed files.
 
 ### Step 4: Create branch & commit
+{commit-rules}
 Create a dedicated branch from master for this sub-plan:
   git checkout -b <branch-name>
 Stage all new test files. Create a commit with message:
   "Add tests for <feature>: <dimension>"
-Never amend, no AI tool mentions, no issue numbers in commit summary.
 
 **IMPORTANT**: Each agent creates its own branch and PR independently.
 The orchestrator does NOT merge agents' work into a single branch/PR.
