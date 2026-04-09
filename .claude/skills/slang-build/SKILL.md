@@ -74,6 +74,11 @@ The `-DSLANG_IGNORE_ABORT_MSG=ON` flag suppresses modal abort dialogs during una
 
 For faster rebuilds, pass `-DSLANG_USE_SCCACHE=ON` at configure time. Requires `sccache` in PATH.
 
+**Debugging pitfall**: When debugging with printf/debug output, sccache may return cached
+objects that don't include your changes. If edits seem to have no effect, either:
+- Force recache: `SCCACHE_RECACHE=1 cmake --build --preset <preset> --target slangc`
+- Or temporarily disable: reconfigure with `-DSLANG_USE_SCCACHE=OFF`
+
 ---
 
 ## Step 4: Build

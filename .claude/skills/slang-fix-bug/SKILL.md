@@ -42,7 +42,8 @@ Parse or ask for: minimal reproducer, target(s), error output.
 
 ### Intake Output
 
-Write `tmp/<issue-repository>-<bug-id>/intake.md`:
+Optionally write `tmp/<issue-repository>-<bug-id>/intake.md` for complex bugs.
+For straightforward bugs, keep the intake in the conversation context instead.
 
 ```markdown
 # Bug Intake: [short title]
@@ -137,94 +138,42 @@ You are running in an isolated git worktree with your own branch.
 {investigation.md content}
 
 ## Your Strategy: [Strategy Name]
-
-Implement the following fix approach:
 [Description of the specific fix strategy]
 
 ## Build Reference
 {slang-build content}
-
-## Test Reference
-{slang-run-tests content}
 
 ## Test Syntax Reference
 {slang-write-test content}
 
 ## Instructions
 
-### Step 1: Implement the fix
-1. Read the relevant source files to understand the current implementation
-2. Implement the fix -- change only what is necessary
-3. Follow existing patterns in the codebase
-4. Add comments only for non-obvious logic
+1. Implement the fix — minimal diff, follow existing patterns, comments only for non-obvious logic
+2. Write a regression test in tests/bugs/ or tests/diagnostics/ or tests/language-feature/
+3. Build: use build reference above
+4. Validate: run regression test + original reproducer. Do NOT run full test suite — the orchestrator runs it on the winning strategy only
+5. Format: ./extras/formatting.sh
+6. Commit: {commit-rules}. Message: "Fix [short description]". Do NOT push.
 
-### Step 2: Write a regression test
-1. Create a .slang test file that reproduces the original bug
-2. Place it in tests/bugs/ or tests/diagnostics/ or tests/language-feature/
-3. Use the appropriate test type from the test syntax reference
-
-### Step 3: Build and validate
-1. Build slangc and slang-test using the build reference
-2. Run the regression test
-3. Run the original reproducer to confirm it's fixed
-4. Run SPIRV validation if applicable
-5. Run broader test suite with -use-test-server -server-count 8
-6. Check skip counts -- skipped tests are NOT passed tests
-
-### Step 4: Format
-Run ./extras/formatting.sh on changed files.
-
-### Step 5: Commit
-{commit-rules}
-Create a commit with message: "Fix [short description]"
-Do NOT push -- the orchestrator will compare results across strategies.
-
-### Step 6: Report back
-Return a structured result with ALL of the following:
+## Report
 
 STRATEGY: [Name]
 BRANCH: [branch-name]
 COMMIT: [commit-hash]
 VERDICT: RECOMMENDED | VIABLE | RISKY | NOT_VIABLE
-
 BUILD: pass | fail
-  build_output: [key lines if failed]
-
 REPRODUCER_FIXED: yes | no
-  output: [compiler output after fix]
-
-REGRESSION_TEST: pass | fail
-  test_file: [path]
-  output: [test runner output]
-
-TEST_SUITE: pass | fail
-  total: N
-  passed: N
-  failed: N
-  skipped: N
-  failed_tests: [list of any newly failing tests]
-
-CHANGES:
-- file: source/slang/<file>.cpp
-  function: <name>
-  description: <what changes>
-  lines_changed: N
-
+REGRESSION_TEST: pass | fail (test_file: [path])
+CHANGES: [files changed, functions modified, lines changed]
 CORRECTNESS: [root cause fix / symptom fix / partial fix]
-COMPLETENESS: [handles all cases / handles reproducer only / handles N of M cases]
-RISK: [low / medium / high -- what could break]
-
-EDGE_CASES:
-- [case 1]: [how this strategy handles it]
-
-CONCERNS:
-- [any remaining concerns or unknowns]
+RISK: [low / medium / high — what could break]
+CONCERNS: [any remaining concerns]
 ```
 
 ### Evaluation Output
 
-After all strategies are evaluated, write `tmp/<bug-id>/alternatives.md` comparing
-build success, reproducer fixed, test suite regressions, root cause vs symptom fix, risk.
+Compare strategies directly in the conversation. Writing `tmp/<bug-id>/alternatives.md`
+is optional — only useful if the comparison is complex enough to need a persistent record.
 
 ---
 
@@ -245,11 +194,18 @@ Present:
 
 After user approval, adopt the chosen strategy or implement fresh.
 
+**Worktree CWD warning**: After agents complete, verify you are in the main repo
+(`pwd` should be the project root, not `.claude/worktrees/`). Agent worktrees can
+shift CWD if you read their files. Use absolute paths from the main repo root.
+
 ### Adopt from Worktree (if Phase 3 produced a passing implementation)
+
+Do NOT cherry-pick — worktree branches share the same base commit, so cherry-pick
+produces empty commits or conflicts. Instead, extract the diff and apply it:
 
 ```bash
 git checkout -b fix-<bug-id>-<short-description>
-git cherry-pick <commit-hash-from-winning-strategy>
+git diff master..<winning-agent-branch> -- source/ tests/ | git apply
 ```
 
 ### Implement Fresh (if no clean result from Phase 3)
@@ -276,6 +232,12 @@ EOF
 
 git push -u origin HEAD
 ```
+
+### Verify Pre-existing Failures
+
+After the full test suite runs, if any tests fail, immediately run the same
+failing tests on master to confirm they are pre-existing. Document this in the
+PR body: "Tests X, Y, Z also fail on master (pre-existing)."
 
 Create PR using the `slang-create-issue` skill PR format:
 - Label: `pr: non-breaking` (default)
