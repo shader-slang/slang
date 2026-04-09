@@ -1230,9 +1230,8 @@ struct TaggedUnionLoweringContext : public InstPassBase
                         auto baseInterfaceType = as<IRInterfaceType>(baseElementType);
                         if (!baseInterfaceType)
                         {
-                            SLANG_UNEXPECTED(
-                                "Expected interface-typed pointer for "
-                                "CastInterfaceToTaggedUnionPtr load.");
+                            SLANG_UNEXPECTED("Expected interface-typed pointer for "
+                                             "CastInterfaceToTaggedUnionPtr load.");
                         }
 
                         // Rewrite the load to use the original ptr and load
@@ -1273,9 +1272,8 @@ struct TaggedUnionLoweringContext : public InstPassBase
                         auto baseInterfaceType = as<IRInterfaceType>(storeElementType);
                         if (!baseInterfaceType)
                         {
-                            SLANG_UNEXPECTED(
-                                "Expected interface-typed pointer for "
-                                "CastInterfaceToTaggedUnionPtr store.");
+                            SLANG_UNEXPECTED("Expected interface-typed pointer for "
+                                             "CastInterfaceToTaggedUnionPtr store.");
                         }
 
                         // Rewrite the store to use the original ptr and store
