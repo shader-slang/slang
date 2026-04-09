@@ -624,38 +624,8 @@ InheritanceInfo SharedSemanticsContext::_calcInheritanceInfo(
                 if (!selfType->equals(toType))
                     continue;
 
-                auto fromType = getFromType(astBuilder, typeCoercionConstraintDecl);
 
-                // Create a synthetic-facet from our `KnownMethodDecl` and put inside it our synthetic-method
-                // that signifies that type-coercion with a particular type is possible
-                auto paramDecl = astBuilder->create<ParamDecl>();
-                paramDecl->type = TypeExp(fromType);
-                paramDecl->nameAndLoc.name = visitor.getName("value");
-                paramDecl->nameAndLoc.loc = typeCoercionConstraintDecl->loc;
-                
-                auto syntheticFunctionDecl = astBuilder->create<ConstructorDecl>();
-                syntheticFunctionDecl->returnType = TypeExp(toType);
-                syntheticFunctionDecl->nameAndLoc.name = visitor.getName("$init");
-                syntheticFunctionDecl->nameAndLoc.loc = typeCoercionConstraintDecl->loc;
-                syntheticFunctionDecl->addMember(paramDecl);
-
-                // `syntheticFunctionDecl` should be an implicit conversion if the constraint is `implicit`
-                if (auto implicitConversionModifier = typeCoercionConstraintDecl->findModifier<ImplicitConversionModifier>())
-                    addModifier(syntheticFunctionDecl, implicitConversionModifier);
-
-                auto parentDecl = getModule()->getModuleDecl();
-                DeclRef<KnownMethodDecl> syntheticFacetDeclRef =
-                    astBuilder->create<KnownMethodDecl>();
-                KnownMethodDecl* syntheticFacetDecl = syntheticFacetDeclRef.getDecl();
-                syntheticFacetDecl->constraintDecl = typeCoercionConstraintDecl;
-                syntheticFacetDecl->ownedScope = astBuilder->create<Scope>();
-                syntheticFacetDecl->ownedScope->parent = visitor.getScope(parentDecl);
-                syntheticFacetDecl->ownedScope->containerDecl = syntheticFacetDecl;
-                syntheticFacetDecl->parentDecl = parentDecl;
-                syntheticFacetDecl->nameAndLoc.loc = typeCoercionConstraintDecl->loc;
-                syntheticFacetDecl->addMember(syntheticFunctionDecl);
-                syntheticFacetDecl->thisType = selfType;
-                
+                auto syntheticFacetDeclRef = typeCoercionConstraintDecl->syntheticFacetDeclRef;
                 auto syntheticAsAType = DeclRefType::create(astBuilder, syntheticFacetDeclRef);
                 auto syntheticAsAWitness = astBuilder->getTypeEqualityWitness(syntheticAsAType);
 

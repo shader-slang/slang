@@ -4053,6 +4053,41 @@ void SemanticsDeclHeaderVisitor::visitTypeCoercionConstraintDecl(TypeCoercionCon
     if (!decl->toType.type)
         decl->toType = TranslateTypeNodeForced(decl->toType);
 
+    auto astBuilder = getASTBuilder();
+
+    // Pre-generate a container (`KnownMethodDecl`) that will function as a synthetic-facet
+    // during member lookup. Put inside it a synthetic-method that signifies
+    // that a particular type contains some method of the form `ToType __init(FromType)`.
+    auto paramDecl = astBuilder->create<ParamDecl>();
+    paramDecl->type = decl->fromType;
+    paramDecl->nameAndLoc.name = getName("value");
+    paramDecl->nameAndLoc.loc = decl->loc;
+    
+    auto syntheticFunctionDecl = astBuilder->create<ConstructorDecl>();
+    syntheticFunctionDecl->returnType = decl->toType;
+    syntheticFunctionDecl->nameAndLoc.name = getName("$init");
+    syntheticFunctionDecl->nameAndLoc.loc = decl->loc;
+    syntheticFunctionDecl->addMember(paramDecl);
+
+    // `syntheticFunctionDecl` should be an implicit conversion if the constraint is `implicit`
+    if (auto implicitConversionModifier = decl->findModifier<ImplicitConversionModifier>())
+        addModifier(syntheticFunctionDecl, implicitConversionModifier);
+
+    auto parentDecl = getModuleDecl(decl->parentDecl);
+    DeclRef<KnownMethodDecl> syntheticFacetDeclRef =
+        astBuilder->create<KnownMethodDecl>();
+    KnownMethodDecl* syntheticFacetDecl = syntheticFacetDeclRef.getDecl();
+    syntheticFacetDecl->constraintDecl = decl;
+    syntheticFacetDecl->ownedScope = astBuilder->create<Scope>();
+    syntheticFacetDecl->ownedScope->parent = getScope(parentDecl);
+    syntheticFacetDecl->ownedScope->containerDecl = syntheticFacetDecl;
+    syntheticFacetDecl->parentDecl = parentDecl;
+    syntheticFacetDecl->nameAndLoc.loc = decl->loc;
+    syntheticFacetDecl->addMember(syntheticFunctionDecl);
+    syntheticFacetDecl->thisType = getToType(astBuilder, decl);
+    
+    decl->syntheticFacetDeclRef = syntheticFacetDeclRef;
+    
     // To resolve calling a method constrained via a `TypeCoercionWitness` we must
     // add a synthetic facet to our `ToType` and resolve the methods existence via
     // specialization. As a result, if a user specifies a `ToType` not defined in the

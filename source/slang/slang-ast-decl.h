@@ -1004,6 +1004,7 @@ class TypeCoercionConstraintDecl : public Decl
     SourceLoc whereTokenLoc = SourceLoc();
     FIDDLE() TypeExp fromType;
     FIDDLE() TypeExp toType;
+    FIDDLE() DeclRef<KnownMethodDecl> syntheticFacetDeclRef;
 };
 
 FIDDLE()
