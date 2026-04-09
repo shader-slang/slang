@@ -186,6 +186,7 @@ These rules apply to ALL commits across all skills.
 4. **Keep PRs focused**: One issue per PR when possible
 5. **Include technical depth**: Root cause, design rationale, trade-offs. Do not narrate the diff -- reviewers read the code themselves
 6. **Suggest reviewers**: Use `git log --format='%an' -- <changed-files> | sort | uniq -c | sort -rn` to identify 2-5 reviewers based on recent authorship of the affected code. Include 1-2 sentences per reviewer explaining the rationale.
+7. **Keep PR description current**: Update the PR description whenever the scope or structure changes significantly. A stale description misleads reviewers.
 
 ### Test Quality Rules (for PRs adding tests)
 

@@ -212,8 +212,9 @@ directory hierarchy.
 
 ### Constructing the Agent Prompt
 
-The orchestrator must read the following skills and include their content in each
-agent's prompt at the marked placeholders:
+**Agent prompts must be self-contained.** Agents cannot read other skills.
+The orchestrator must read the following skills and include their content
+in each agent's prompt at the marked `{placeholder}` locations:
 - `slang-write-test` → `{slang-write-test content}` (test syntax reference)
 - `slang-build` → `{slang-build content}` (build commands, preset selection)
 - `slang-run-tests` → `{slang-run-tests content}` (test commands, skip detection)
