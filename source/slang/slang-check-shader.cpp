@@ -764,6 +764,27 @@ static bool _matchVectorBoolType(Type* type)
     return elemType->getBaseType() == BaseType::Bool;
 }
 
+static bool _matchMatrixWithInvalidElementType(Type* type)
+{
+    auto matType = as<MatrixExpressionType>(type);
+    if (!matType)
+        return false;
+    auto elemType = as<BasicExpressionType>(matType->getElementType());
+    if (!elemType)
+        return false;
+    switch (elemType->getBaseType())
+    {
+    case BaseType::Float:
+    case BaseType::Half:
+    case BaseType::Double:
+    case BaseType::Int:
+    case BaseType::UInt:
+        return false;
+    default:
+        return true;
+    }
+}
+
 static bool _isSpirvTarget(CodeGenTarget target)
 {
     return isSPIRV(target);
@@ -775,6 +796,9 @@ static const EntryPointVaryingTypeRule kEntryPointVaryingTypeRules[] = {
     {_matchCoopVectorType, "CoopVec is not a valid varying type", nullptr},
     {_matchCoopMatrixType, "CoopMat is not a valid varying type", nullptr},
     {_matchVectorBoolType, "vector<bool> is not valid as a SPIR-V varying type", _isSpirvTarget},
+    {_matchMatrixWithInvalidElementType,
+     "matrix with this element type is not valid as a SPIR-V varying type",
+     _isSpirvTarget},
 };
 
 struct VaryingTypeValidationContext

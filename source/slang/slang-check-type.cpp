@@ -451,7 +451,7 @@ TypeExp SemanticsVisitor::CheckProperType(TypeExp typeExp)
     return CoerceToProperType(TranslateTypeNode(typeExp));
 }
 
-// Validates matrix dimensions and element types at type-construction time.
+// Validates matrix dimensions at type-construction time.
 // Returns true if the matrix type is valid, false if an error was diagnosed.
 static bool validateMatrixType(
     SemanticsVisitor* visitor,
@@ -486,34 +486,6 @@ static bool validateMatrixType(
                 .maxValue = "4",
                 .location = loc});
             valid = false;
-        }
-    }
-
-    auto elemType = as<BasicExpressionType>(matType->getElementType());
-    if (elemType)
-    {
-        switch (elemType->getBaseType())
-        {
-        case BaseType::Float:
-        case BaseType::Half:
-        case BaseType::Double:
-        case BaseType::Int:
-        case BaseType::UInt:
-            break;
-        case BaseType::Int8:
-        case BaseType::Int16:
-        case BaseType::Int64:
-        case BaseType::UInt8:
-        case BaseType::UInt16:
-        case BaseType::UInt64:
-        case BaseType::Bool:
-            sink->diagnose(Diagnostics::MatrixInvalidElementType{
-                .elementType = matType->getElementType(),
-                .location = loc});
-            valid = false;
-            break;
-        default:
-            break;
         }
     }
 
