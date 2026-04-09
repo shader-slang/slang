@@ -220,13 +220,15 @@ Do NOT cherry-pick — worktree branches share the same base commit, so cherry-p
 produces empty commits or conflicts. Instead, extract the diff and apply it:
 
 ```bash
-git checkout -b fix-<bug-id>-<short-description>
+git checkout -b fix-<issue-number>-<short-description>
 git diff master..<winning-agent-branch> -- source/ tests/ | git apply
 ```
 
+**Branch naming**: Always include the GitHub issue number. Example: `fix-10314-global-interface-param-crash`, not `fix-global-interface-param-crash`.
+
 ### Implement Fresh (if no clean result from Phase 3)
 
-1. Create branch: `fix-<bug-id>-<short-description>`
+1. Create branch: `fix-<issue-number>-<short-description>` (e.g., `fix-10314-global-interface-param-crash`)
 2. Implement the fix — minimal diff, follow existing patterns
 3. Write regression test (see `slang-write-test` skill)
 4. Build and validate (see `slang-build` and `slang-run-tests` skills)
