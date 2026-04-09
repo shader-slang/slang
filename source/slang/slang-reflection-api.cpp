@@ -1236,7 +1236,7 @@ SLANG_API SlangReflectionTypeLayout* spReflection_GetTypeLayout(
     auto type = convert(inType);
     auto targetReq = context->getTargetReq();
 
-    auto typeLayout = targetReq->getTypeLayout(type, (slang::LayoutRules)rules);
+    auto typeLayout = targetReq->getTypeLayout(type, (slang::LayoutRules)rules, context);
     return convert(typeLayout);
 }
 

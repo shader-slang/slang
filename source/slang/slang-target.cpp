@@ -233,21 +233,14 @@ CapabilitySet TargetRequest::getTargetCaps()
 }
 
 
-TypeLayout* TargetRequest::getTypeLayout(Type* type, slang::LayoutRules rules)
+TypeLayout* TargetRequest::getTypeLayout(
+    Type* type,
+    slang::LayoutRules rules,
+    ProgramLayout* programLayout)
 {
     SLANG_AST_BUILDER_RAII(getLinkage()->getASTBuilder());
 
-    // TODO: We are not passing in a `ProgramLayout` here, although one
-    // is nominally required to establish the global ordering of
-    // generic type parameters, which might be referenced from field types.
-    //
-    // The solution here is to make sure that the reflection data for
-    // uses of global generic/existential types does *not* include any
-    // kind of index in that global ordering, and just refers to the
-    // parameter instead (leaving the user to figure out how that
-    // maps to the ordering via some API on the program layout).
-    //
-    auto layoutContext = getInitialLayoutContextForTarget(this, nullptr, rules);
+    auto layoutContext = getInitialLayoutContextForTarget(this, programLayout, rules);
 
     RefPtr<TypeLayout> result;
     auto key = TypeLayoutKey{type, rules};

@@ -145,7 +145,10 @@ public:
 
     Dictionary<TypeLayoutKey, RefPtr<TypeLayout>>& getTypeLayouts() { return typeLayouts; }
 
-    TypeLayout* getTypeLayout(Type* type, slang::LayoutRules rules);
+    TypeLayout* getTypeLayout(
+        Type* type,
+        slang::LayoutRules rules,
+        ProgramLayout* programLayout = nullptr);
 
     CompilerOptionSet& getOptionSet() { return optionSet; }
 
