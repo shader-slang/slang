@@ -3348,8 +3348,6 @@ struct TypeFlowSpecializationContext
 
         auto operandInfo = tryGetInfo(context, operand);
         if (!operandInfo)
-            operandInfo = tryMakeTaggedUnionForGlobalInterfaceParam(operand);
-        if (!operandInfo)
         {
             if (auto param = as<IRParam>(operand))
                 diagnoseEntryPointInterfaceParamIfNeeded(param, inst);
@@ -3401,8 +3399,6 @@ struct TypeFlowSpecializationContext
 
         auto operandInfo = tryGetInfo(context, operand);
         if (!operandInfo)
-            operandInfo = tryMakeTaggedUnionForGlobalInterfaceParam(operand);
-        if (!operandInfo)
         {
             if (auto param = as<IRParam>(operand))
                 diagnoseEntryPointInterfaceParamIfNeeded(param, inst);
@@ -3438,8 +3434,6 @@ struct TypeFlowSpecializationContext
         }
 
         auto operandInfo = tryGetInfo(context, operand);
-        if (!operandInfo)
-            operandInfo = tryMakeTaggedUnionForGlobalInterfaceParam(operand);
         if (!operandInfo)
         {
             if (auto param = as<IRParam>(operand))
@@ -4428,11 +4422,13 @@ struct TypeFlowSpecializationContext
             // If the callee is a module-scope lookupWitness on a dynamic interface
             // from a global param, analyze it on-the-fly as a dynamic dispatch site
             // instead of trying to resolve it (which would crash).
+            bool handled = false;
             if (auto lookupInst = as<IRLookupWitnessMethod>(callee))
             {
                 auto lookupInfo = analyzeLookupWitnessMethod(context, lookupInst);
                 if (auto eos = as<IRElementOfSetType>(lookupInfo))
                 {
+                    handled = true;
                     List<IRInst*>& funcs = *module->getContainerPool().getList<IRInst>();
                     forEachInSet(module, eos->getSet(), [&](IRInst* func) { funcs.add(func); });
 
@@ -4453,7 +4449,10 @@ struct TypeFlowSpecializationContext
                     module->getContainerPool().free(&funcs);
                 }
             }
-            else
+
+            // Fall through to normal resolution for non-dynamic-dispatch global callees
+            // (e.g., concrete witness lookups in autodiff code).
+            if (!handled)
             {
                 auto resolvedCallee = translationContext.resolveInst(callee);
                 if (!resolvedCallee)
@@ -6405,17 +6404,18 @@ struct TypeFlowSpecializationContext
 
         if (isGlobalInst(callee))
         {
-            // If the callee is a module-scope lookupWitness on a dynamic interface
-            // from a global param, skip resolution (which would crash because the
-            // witness table is not concrete). The callee stays as a global inst and
-            // is handled downstream via callSiteInfo.
+            // Skip resolution for module-scope lookupWitness instructions from
+            // dynamic global interface params — these have non-concrete witness
+            // tables that resolveInst can't handle. They're handled downstream
+            // via callSiteInfo instead.
             bool isDynamicGlobalLookup = false;
             if (auto lookupInst = as<IRLookupWitnessMethod>(callee))
             {
                 if (auto extractWT =
                         as<IRExtractExistentialWitnessTable>(lookupInst->getWitnessTable()))
                 {
-                    if (tryMakeTaggedUnionForGlobalInterfaceParam(extractWT->getOperand(0)))
+                    if (tryMakeTaggedUnionForGlobalInterfaceParam(extractWT->getOperand(0)) &&
+                        this->callSiteInfo.containsKey(InstWithContext(context, inst)))
                         isDynamicGlobalLookup = true;
                 }
             }
