@@ -13,6 +13,7 @@ concurrency:
 permissions:
   id-token: write # Required for Workload Identity (GCS auth)
   contents: read # Read slang repo
+  packages: read # Pull container images from ghcr.io
   pull-requests: write # For PR comments (if needed)
 
 jobs:
