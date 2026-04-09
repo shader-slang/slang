@@ -2796,6 +2796,20 @@ err(
     span { loc = "attr:Modifier", message = "'[MaybeDifferentiable]' cannot be applied to non-interface requirement; it can only be applied to interface requirements." }
 )
 
+err(
+    "optional-has-diff-type-info-constraint-is-invalid",
+    30315,
+    "optional __hasDiffTypeInfo constraint invalid",
+    span { loc = "location", message = "'optional' is not supported on '__hasDiffTypeInfo(...)' constraints" }
+)
+
+err(
+    "type-does-not-have-diff-type-info",
+    30316,
+    "type does not have diff type info",
+    span { loc = "location", message = "type '~type:Type' does not satisfy '__hasDiffTypeInfo(...)'" }
+)
+
 -- Interop (304xx)
 
 err(
@@ -3132,6 +3146,13 @@ err(
     30702,
     "system value semantic '~semantic' cannot be used as ~direction in '~stage' shader stage",
     span { loc = "location" }
+)
+
+err(
+    "parameter-without-default-after-parameter-with-default",
+    30703,
+    "parameter '~param:Decl' does not have a default value, but follows a parameter that does",
+    span { loc = "param:Decl" }
 )
 
 --
