@@ -57,15 +57,15 @@ jobs:
         shell: bash
 
     steps:
-      - name: Check disk space
-        uses: ./.github/actions/check-disk-space
-        with:
-          min-disk-gb: "10"
-
       - uses: actions/checkout@v4
         with:
           submodules: "recursive"
           fetch-depth: "0"
+
+      - name: Check disk space
+        uses: ./.github/actions/check-disk-space
+        with:
+          min-disk-gb: "10"
 
       - name: Install Clang 18 and LLVM Tools
         if: inputs.compiler == 'clang-18' && inputs.os == 'linux' && inputs.container == ''
