@@ -348,6 +348,28 @@ All N threads resolved.
 
 ---
 
+## Phase 7: POST SUMMARY (optional)
+
+After all other phases are complete, offer to post a brief summary to the PR.
+This is a high-level overview — do NOT repeat thread-level detail already covered
+by individual replies.
+
+**STOP and ask the user** before posting. Show a preview.
+
+Format:
+
+```
+## [Agent] Review Summary
+
+**Assessment**: [1-2 sentences — is the root cause fix correct, any concerns]
+
+**Actions taken**: [what was implemented, commit references if applicable]
+
+**Open items**: [anything remaining — unresolved questions, follow-up needed]
+```
+
+---
+
 ## Iteration
 
 The user may ask to check for new comments after pushing fixes. Repeat from Phase 1
