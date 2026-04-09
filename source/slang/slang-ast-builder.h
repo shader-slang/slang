@@ -644,9 +644,6 @@ public:
     DeclRef<InterfaceDecl> getDifferentiableInterfaceDecl();
     DeclRef<InterfaceDecl> getDifferentiableRefInterfaceDecl();
 
-    Type* getDiffTypeInfoInterfaceType();
-    DeclRef<InterfaceDecl> getDiffTypeInfoInterfaceDecl();
-
     DeclRef<InterfaceDecl> getFunctionBaseInterfaceDecl();
 
     Type* getDifferentiableInterfaceType();
@@ -729,6 +726,8 @@ public:
     Val* getShapeReduceIntValPack(Val* valuePack, IntVal* axis);
 
     NonEmptyPackWitness* getNonEmptyPackWitness(Val* pack);
+    HasDiffTypeInfoWitness* getHasDiffTypeInfoWitness(
+        DeclRef<HasDiffTypeInfoConstraintDecl> declRef);
 
     /// Produce a witness that `T : T` for any type `T`
     TypeEqualityWitness* getTypeEqualityWitness(Type* type);

@@ -1016,6 +1016,14 @@ class NonEmptyPackConstraintDecl : public Decl
 };
 
 FIDDLE()
+class HasDiffTypeInfoConstraintDecl : public Decl
+{
+    FIDDLE(...)
+    SourceLoc whereTokenLoc = SourceLoc();
+    FIDDLE() TypeExp type;
+};
+
+FIDDLE()
 class GenericValueParamDecl : public VarDeclBase
 {
     FIDDLE(...)

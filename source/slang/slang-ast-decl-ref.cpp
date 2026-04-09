@@ -855,6 +855,7 @@ DeclRef<Decl> createDefaultSubstitutionsIfNeeded(
 {
     if (isGenericParam(declRef))
         return declRef;
+
     ShortList<GenericDecl*> genericParentDecls;
     auto lastSubstNode = SubstitutionSet(declRef).getInnerMostNodeWithSubstInfo();
     auto lastGenApp = as<GenericAppDeclRef>(lastSubstNode);
@@ -866,7 +867,8 @@ DeclRef<Decl> createDefaultSubstitutionsIfNeeded(
         if (lastLookup && lastLookup->getDecl()->isChildOf(dd))
             break;
         if ((as<GenericTypeConstraintDecl>(declRef.getDecl()) ||
-             as<TypeCoercionConstraintDecl>(declRef.getDecl())) &&
+             as<TypeCoercionConstraintDecl>(declRef.getDecl()) ||
+             as<HasDiffTypeInfoConstraintDecl>(declRef.getDecl())) &&
             dd == declRef.getDecl()->parentDecl)
             continue;
         if (auto gen = as<GenericDecl>(dd))
