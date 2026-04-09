@@ -162,11 +162,9 @@ static void synthesizeBitFieldSetter(IRFunc* func, IRBitFieldAccessorDecoration*
 
 void synthesizeBitFieldAccessors(IRModule* module)
 {
-    for (const auto inst : module->getModuleInst()->getGlobalInsts())
+    for (auto inst : module->getFuncs())
     {
-        const auto func = as<IRFunc>(getResolvedInstForDecorations(inst));
-        if (!func)
-            continue;
+        auto func = as<IRFunc>(inst);
         const auto bfd = func->findDecoration<IRBitFieldAccessorDecoration>();
         if (!bfd)
             continue;

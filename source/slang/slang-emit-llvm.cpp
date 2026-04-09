@@ -1098,7 +1098,7 @@ struct LLVMEmitter
         if (mapInstToLLVM.containsKey(inst))
             return mapInstToLLVM.getValue(inst);
 
-        bool globalInstruction = inst->getParent()->getOp() == kIROp_ModuleInst;
+        bool globalInstruction = isAtModuleScope(inst);
 
         auto op = inst->getOp();
 
@@ -2629,7 +2629,7 @@ struct LLVMEmitter
 
     void emitGlobalDebugInfo(IRModule* irModule)
     {
-        for (auto inst : irModule->getGlobalInsts())
+        for (auto inst : irModule->getAnnotations())
         {
             if (auto debugSource = as<IRDebugSource>(inst))
             {
@@ -2648,11 +2648,14 @@ struct LLVMEmitter
 
     void emitGlobalDeclarations(IRModule* irModule)
     {
-        for (auto inst : irModule->getGlobalInsts())
+        for (auto inst : irModule->getFuncs())
         {
             if (auto func = as<IRFunc>(inst))
                 ensureFuncDecl(func);
-            else if (auto globalVar = as<IRGlobalVar>(inst))
+        }
+        for (auto inst : irModule->getGlobalVars())
+        {
+            if (auto globalVar = as<IRGlobalVar>(inst))
                 emitGlobalVarDecl(globalVar);
         }
     }

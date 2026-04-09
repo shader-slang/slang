@@ -31,12 +31,9 @@ bool deduplicateGenericChildren(IRGeneric* genericInst)
 bool deduplicateGenericChildren(IRModule* module)
 {
     bool changed = false;
-    for (auto inst : module->getGlobalInsts())
+    for (auto gen : module->getGenerics())
     {
-        if (auto gen = as<IRGeneric>(inst))
-        {
-            changed |= deduplicateGenericChildren(gen);
-        }
+        changed |= deduplicateGenericChildren(as<IRGeneric>(gen));
     }
     return changed;
 }

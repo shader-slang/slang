@@ -188,18 +188,12 @@ struct DllImportContext
 
     void processModule()
     {
-        for (auto childFunc : module->getGlobalInsts())
+        for (auto inst : module->getFuncs())
         {
-            switch (childFunc->getOp())
+            auto func = as<IRFunc>(inst);
+            if (auto dllImportDecoration = func->findDecoration<IRDllImportDecoration>())
             {
-            case kIROp_Func:
-                if (auto dllImportDecoration = childFunc->findDecoration<IRDllImportDecoration>())
-                {
-                    processFunc(as<IRFunc>(childFunc), dllImportDecoration);
-                }
-                break;
-            default:
-                break;
+                processFunc(func, dllImportDecoration);
             }
         }
     }

@@ -435,7 +435,7 @@ struct ValidateUniformityContext
     {
         InstWorkList workList(module);
 
-        for (auto globalInst : module->getGlobalInsts())
+        for (auto globalInst : module->getFuncs())
         {
             if (auto code = as<IRGlobalValueWithCode>(globalInst))
             {

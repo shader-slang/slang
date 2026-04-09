@@ -54,23 +54,12 @@ void stripFrontEndOnlyInstructions(IRModule* module, IRStripOptions const& optio
 
 void stripImportedWitnessTable(IRModule* module)
 {
-    for (auto globalInst : module->getGlobalInsts())
+    auto processWitnessTableInst = [&](IRInst* globalInst, IRInst* inst)
     {
-        auto inst = globalInst;
-        switch (globalInst->getOp())
-        {
-        case kIROp_Generic:
-            inst = findInnerMostGenericReturnVal(as<IRGeneric>(globalInst));
-            break;
-        case kIROp_WitnessTable:
-            break;
-        default:
-            continue;
-        }
         if (!inst || inst->getOp() != kIROp_WitnessTable)
-            continue;
+            return;
         if (!globalInst->findDecoration<IRImportDecoration>())
-            continue;
+            return;
         IRInst* nextChild = nullptr;
         for (auto child = inst->getFirstChild(); child;)
         {
@@ -79,7 +68,11 @@ void stripImportedWitnessTable(IRModule* module)
                 child->removeAndDeallocate();
             child = nextChild;
         }
-    }
+    };
+    for (auto gen : module->getGenerics())
+        processWitnessTableInst(gen, findInnerMostGenericReturnVal(as<IRGeneric>(gen)));
+    for (auto wt : module->getWitnessTables())
+        processWitnessTableInst(wt, wt);
 }
 
 } // namespace Slang

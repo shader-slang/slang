@@ -96,7 +96,7 @@ void fixEntryPointCallsites(IRFunc* entryPoint)
 
 void fixEntryPointCallsites(IRModule* module)
 {
-    for (auto globalInst : module->getGlobalInsts())
+    for (auto globalInst : module->getFuncs())
     {
         if (globalInst->findDecoration<IREntryPointDecoration>())
             fixEntryPointCallsites((IRFunc*)globalInst);

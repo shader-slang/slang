@@ -573,17 +573,17 @@ bool unrollLoopsInModule(IRModule* module, TargetProgram* target, DiagnosticSink
 {
     SLANG_PROFILE;
 
-    for (auto inst : module->getGlobalInsts())
+    for (auto inst : module->getFuncs())
     {
-        if (as<IRGeneric>(inst))
-            continue;
-
-        if (auto func = as<IRGlobalValueWithCode>(inst))
-        {
-            bool result = unrollLoopsInFunc(target, module, func, sink);
-            if (!result)
-                return false;
-        }
+        bool result = unrollLoopsInFunc(target, module, as<IRGlobalValueWithCode>(inst), sink);
+        if (!result)
+            return false;
+    }
+    for (auto inst : module->getGlobalVars())
+    {
+        bool result = unrollLoopsInFunc(target, module, as<IRGlobalValueWithCode>(inst), sink);
+        if (!result)
+            return false;
     }
     return true;
 }

@@ -636,13 +636,10 @@ void eliminateMultiLevelBreak(IRModule* irModule, TargetProgram* targetProgram)
     EliminateMultiLevelBreakContext context;
     context.irModule = irModule;
     context.targetProgram = targetProgram;
-    for (auto globalInst : irModule->getGlobalInsts())
-    {
-        if (auto codeInst = as<IRGlobalValueWithCode>(globalInst))
-        {
-            context.processFunc(codeInst);
-        }
-    }
+    for (auto inst : irModule->getFuncs())
+        context.processFunc(as<IRGlobalValueWithCode>(inst));
+    for (auto inst : irModule->getGlobalVars())
+        context.processFunc(as<IRGlobalValueWithCode>(inst));
 }
 
 void eliminateMultiLevelBreakForFunc(

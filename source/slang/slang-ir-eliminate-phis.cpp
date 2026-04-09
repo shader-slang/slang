@@ -95,21 +95,10 @@ struct PhiEliminationContext
     //
     void eliminatePhisInModule()
     {
-        for (auto inst : m_module->getGlobalInsts())
-        {
-            switch (inst->getOp())
-            {
-            default:
-                continue;
-
-            case kIROp_Func:
-            case kIROp_GlobalVar:
-                break;
-            }
-
-            auto code = (IRGlobalValueWithCode*)inst;
-            eliminatePhisInFunc(code);
-        }
+        for (auto inst : m_module->getFuncs())
+            eliminatePhisInFunc(as<IRGlobalValueWithCode>(inst));
+        for (auto inst : m_module->getGlobalVars())
+            eliminatePhisInFunc(as<IRGlobalValueWithCode>(inst));
     }
 
     // Within a single function, we are primarily concerned with processing

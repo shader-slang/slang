@@ -67,11 +67,9 @@ struct OutOfBoundAccessChecker : public InstPassBase
         // By this point, we assume that all generics of non-trivial functions
         // have been specialized away into `IRFunc`s
         //
-        for (auto globalInst : module->getGlobalInsts())
+        for (auto inst : module->getFuncs())
         {
-            auto func = as<IRFunc>(globalInst);
-            if (!func)
-                continue;
+            auto func = as<IRFunc>(inst);
 
             for (auto block : func->getBlocks())
             {

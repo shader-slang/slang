@@ -82,7 +82,7 @@ void resolveVaryingInputRef(IRFunc* func)
 
 void resolveVaryingInputRef(IRModule* module)
 {
-    for (auto globalInst : module->getGlobalInsts())
+    for (auto globalInst : module->getFuncs())
     {
         if (globalInst->findDecoration<IREntryPointDecoration>())
             resolveVaryingInputRef((IRFunc*)globalInst);

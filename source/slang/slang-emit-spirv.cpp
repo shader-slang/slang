@@ -621,7 +621,7 @@ struct SPIRVEmitContext : public SourceEmitterBase, public SPIRVEmitSharedContex
                     }
                 }
             }
-            else if (as<IRFunc>(parent) || as<IRModuleInst>(parent))
+            else if (as<IRFunc>(parent) || isModuleScopeParent(parent))
             {
                 SpvInst* spvInst = nullptr;
                 if (m_mapIRInstToSpvDebugInst.tryGetValue(parent, spvInst))

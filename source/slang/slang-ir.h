@@ -1897,6 +1897,32 @@ IRInst* findSpecializeReturnVal(IRSpecialize* specialize);
 //
 IRInst* getResolvedInstForDecorations(IRInst* inst, bool resolveThroughDifferentiation = false);
 
+// Iterator that walks global instructions by descending into IRModuleSection children.
+// Yields the children of each section, skipping the section nodes themselves.
+struct IRFlattenedGlobalInstIterator
+{
+    IRInst* inst;      // current instruction (a child of a section)
+    IRInst* section;   // current section
+
+    IRFlattenedGlobalInstIterator() : inst(nullptr), section(nullptr) {}
+    IRFlattenedGlobalInstIterator(IRInst* inst, IRInst* section) : inst(inst), section(section) {}
+
+    void operator++();
+    IRInst* operator*() { return inst; }
+    bool operator!=(IRFlattenedGlobalInstIterator const& other) { return inst != other.inst; }
+};
+
+struct IRFlattenedGlobalInstRange
+{
+    IRInst* moduleInst; // The IRModuleInst
+
+    IRFlattenedGlobalInstRange() : moduleInst(nullptr) {}
+    IRFlattenedGlobalInstRange(IRInst* moduleInst) : moduleInst(moduleInst) {}
+
+    IRFlattenedGlobalInstIterator begin();
+    IRFlattenedGlobalInstIterator end() { return IRFlattenedGlobalInstIterator(nullptr, nullptr); }
+};
+
 // The IR module itself is represented as an instruction, which
 // serves at the root of the tree of all instructions in the module.
 FIDDLE()
@@ -1908,8 +1934,63 @@ struct IRModuleInst : IRInst
     // that need it.
     IRModule* module;
 
-    IRInstListBase getGlobalInsts() { return getChildren(); }
+    IRFlattenedGlobalInstRange getGlobalInsts() { return IRFlattenedGlobalInstRange(this); }
+
+    // Direct children access (includes section nodes themselves).
+    IRInstListBase getDirectChildren() { return getChildren(); }
 };
+
+// A section within an IR module that groups related global instructions.
+// Sections are direct children of IRModuleInst and contain global instructions
+// of a specific category (funcs, types, generics, etc.).
+FIDDLE()
+struct IRModuleSection : IRInst
+{
+    FIDDLE(leafInst())
+
+    IRInstListBase getInsts() { return getChildren(); }
+};
+
+/// Returns true if `parent` is a valid "module scope" parent for global instructions.
+/// This includes both IRModuleInst and IRModuleSection.
+inline bool isModuleScopeParent(IRInst* parent)
+{
+    if (!parent)
+        return false;
+    auto op = parent->getOp();
+    return op == kIROp_ModuleInst || op == kIROp_ModuleSection;
+}
+
+/// Returns true if `inst` is at module/global scope (its parent is the module or a section).
+inline bool isAtModuleScope(IRInst* inst)
+{
+    return inst && isModuleScopeParent(inst->getParent());
+}
+
+// Categories of global instructions within an IR module.
+// Each section groups instructions that passes commonly need to iterate together.
+enum class IRModuleSectionKind
+{
+    Funcs,        // IRFunc (non-generic functions)
+    Generics,     // IRGeneric (all generics: generic funcs, types, witness tables, etc.)
+    StructTypes,  // IRStructType, IRClassType, IREnumType, IRInterfaceType, and other type defs
+    GlobalVars,   // IRGlobalVar, IRGlobalConstant
+    GlobalParams, // IRGlobalParam
+    Hoistables,   // IRSpecialize, hoistable non-type non-literal ops
+    WitnessTables, // IRWitnessTable (non-generic)
+    Annotations,  // IRAnnotation and related metadata
+    Capabilities, // IRCapabilityConjunction, IRCapabilityDisjunction
+    Literals,     // IRConstant subtypes (IntLit, FloatLit, StringLit, etc.)
+    Keys,         // IRStructKey, IRIndexedFieldKey
+    Misc,         // Catch-all for uncategorized global instructions
+    Count,
+};
+
+/// Returns the section kind that a given instruction should be placed in.
+IRModuleSectionKind getSectionKindForInst(IRInst* inst);
+
+/// Returns a human-readable name for a section kind (used for NameHint decorations).
+const char* getSectionKindName(IRModuleSectionKind kind);
 
 struct IRModule;
 
@@ -2109,7 +2190,41 @@ public:
     }
     void invalidateAllAnalysis() { m_mapInstToAnalysis.clear(); }
 
-    IRInstListBase getGlobalInsts() const { return getModuleInst()->getChildren(); }
+    IRFlattenedGlobalInstRange getGlobalInsts() const
+    {
+        return IRFlattenedGlobalInstRange(getModuleInst());
+    }
+
+    /// Get the section for a given kind, or null if not yet created.
+    IRModuleSection* getSection(IRModuleSectionKind kind) const
+    {
+        return m_sections[(int)kind];
+    }
+
+    /// Get or create the section for a given kind.
+    IRModuleSection* getOrCreateSection(IRModuleSectionKind kind);
+
+    /// Rebuild m_sections[] from deserialized module children.
+    /// Called after deserialization to populate the sections array.
+    void _rebuildSectionTable();
+
+    /// Get instructions in a specific section.
+    IRInstListBase getSectionInsts(IRModuleSectionKind kind) const
+    {
+        if (auto sec = getSection(kind))
+            return sec->getChildren();
+        return IRInstListBase();
+    }
+
+    /// Convenience: iterate specific sections.
+    IRInstListBase getFuncs() const { return getSectionInsts(IRModuleSectionKind::Funcs); }
+    IRInstListBase getGenerics() const { return getSectionInsts(IRModuleSectionKind::Generics); }
+    IRInstListBase getStructTypes() const { return getSectionInsts(IRModuleSectionKind::StructTypes); }
+    IRInstListBase getGlobalVars() const { return getSectionInsts(IRModuleSectionKind::GlobalVars); }
+    IRInstListBase getGlobalParams() const { return getSectionInsts(IRModuleSectionKind::GlobalParams); }
+    IRInstListBase getWitnessTables() const { return getSectionInsts(IRModuleSectionKind::WitnessTables); }
+    IRInstListBase getAnnotations() const { return getSectionInsts(IRModuleSectionKind::Annotations); }
+    IRInstListBase getKeys() const { return getSectionInsts(IRModuleSectionKind::Keys); }
 
     Name* getName() const { return m_name; }
     void setName(Name* name) { m_name = name; }
@@ -2164,8 +2279,8 @@ public:
     // It represents the version of module regarding semantics and doesn't have
     // anything to do with serialization format
     //
-    const static UInt k_minSupportedModuleVersion = 4;
-    const static UInt k_maxSupportedModuleVersion = 14;
+    const static UInt k_minSupportedModuleVersion = 15;
+    const static UInt k_maxSupportedModuleVersion = 15;
     static_assert(k_minSupportedModuleVersion <= k_maxSupportedModuleVersion);
 
 private:
@@ -2191,6 +2306,9 @@ private:
     /// `IRModuleInst` for the module the instruction belongs to, if any.
     ///
     FIDDLE() IRModuleInst* m_moduleInst = nullptr;
+
+    /// Sections indexed by IRModuleSectionKind.
+    IRModuleSection* m_sections[(int)IRModuleSectionKind::Count] = {};
 
     // The name of the module.
     FIDDLE() Name* m_name = nullptr;

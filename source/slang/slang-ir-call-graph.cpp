@@ -99,13 +99,13 @@ void buildEntryPointReferenceGraph(
         }
     };
 
-    for (auto globalInst : module->getGlobalInsts())
+    for (auto inst : module->getFuncs())
     {
-        if (globalInst->getOp() == kIROp_Func &&
-            (globalInst->findDecoration<IREntryPointDecoration>() ||
-             globalInst->findDecoration<IRCudaKernelDecoration>()))
+        auto func = as<IRFunc>(inst);
+        if (func->findDecoration<IREntryPointDecoration>() ||
+            func->findDecoration<IRCudaKernelDecoration>())
         {
-            visit(as<IRFunc>(globalInst), globalInst);
+            visit(func, func);
         }
     }
     for (Index i = 0; i < workList.getCount(); i++)

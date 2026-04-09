@@ -2802,7 +2802,7 @@ struct ForwardDiffTranslationContext
     {
         if (as<IRGlobalValueWithCode>(origInst))
             return true;
-        if (origInst->parent && origInst->parent->getOp() == kIROp_ModuleInst)
+        if (isAtModuleScope(origInst))
             return true;
         if (isChildInstOf(currentParent, origInst->getParent()))
             return true;
@@ -3289,7 +3289,7 @@ struct ForwardDiffTranslationContext
         // At this point we should not see any global insts that are differentiable.
         // If the inst's parent is IRModule, return (inst, null).
         //
-        if (as<IRModuleInst>(origInst->getParent()) && !as<IRType>(origInst))
+        if (isAtModuleScope(origInst) && !as<IRType>(origInst))
             return InstPair(origInst, nullptr);
 
         IRBuilderSourceLocRAII sourceLocationScope(builder, origInst->sourceLoc);

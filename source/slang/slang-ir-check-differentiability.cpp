@@ -53,7 +53,7 @@ public:
             }
         };
 
-        if (as<IRModuleInst>(code->getParent()))
+        if (isAtModuleScope(code))
         {
             traverseUsers(
                 code,
@@ -809,7 +809,7 @@ public:
         if (!sharedContext.isInterfaceAvailable && !sharedContext.isPtrInterfaceAvailable)
             return;
 
-        for (auto inst : module->getGlobalInsts())
+        for (auto inst : module->getGenerics())
         {
             if (auto genericInst = as<IRGeneric>(inst))
             {
@@ -817,7 +817,10 @@ public:
                         as<IRGlobalValueWithCode>(findInnerMostGenericReturnVal(genericInst)))
                     processFunc(innerFunc);
             }
-            else if (auto funcInst = as<IRGlobalValueWithCode>(inst))
+        }
+        for (auto inst : module->getFuncs())
+        {
+            if (auto funcInst = as<IRGlobalValueWithCode>(inst))
             {
                 processFunc(funcInst);
             }

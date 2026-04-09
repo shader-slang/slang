@@ -62,18 +62,9 @@ void checkTypeRecursion(HashSet<IRInst*>& checkedTypes, IRInst* type, Diagnostic
 void checkForRecursiveTypes(IRModule* module, DiagnosticSink* sink)
 {
     HashSet<IRInst*> checkedTypes;
-    for (auto globalInst : module->getGlobalInsts())
+    for (auto structType : module->getStructTypes())
     {
-        switch (globalInst->getOp())
-        {
-        case kIROp_StructType:
-            {
-                checkTypeRecursion(checkedTypes, globalInst, sink);
-            }
-            break;
-        default:
-            break;
-        }
+        checkTypeRecursion(checkedTypes, structType, sink);
     }
 }
 
@@ -121,20 +112,13 @@ void checkFunctionRecursion(HashSet<IRFunc*>& checkedFuncs, IRFunc* func, Diagno
 void checkForRecursiveFunctions(IRModule* module, TargetRequest* target, DiagnosticSink* sink)
 {
     HashSet<IRFunc*> checkedFuncsForRecursionDetection;
-    for (auto globalInst : module->getGlobalInsts())
+    for (auto inst : module->getFuncs())
     {
-        switch (globalInst->getOp())
-        {
-        case kIROp_Func:
-            if (!isCPUTarget(target))
-                checkFunctionRecursion(
-                    checkedFuncsForRecursionDetection,
-                    as<IRFunc>(globalInst),
-                    sink);
-            break;
-        default:
-            break;
-        }
+        if (!isCPUTarget(target))
+            checkFunctionRecursion(
+                checkedFuncsForRecursionDetection,
+                as<IRFunc>(inst),
+                sink);
     }
 }
 

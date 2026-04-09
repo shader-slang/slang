@@ -1005,16 +1005,10 @@ static bool processFunc(IRGlobalValueWithCode* func, CFGSimplificationOptions op
 bool simplifyCFG(IRModule* module, CFGSimplificationOptions options)
 {
     bool changed = false;
-    for (auto inst : module->getGlobalInsts())
+    for (auto inst : module->getFuncs())
     {
-        if (auto genericInst = as<IRGeneric>(inst))
-        {
-            inst = findGenericReturnVal(genericInst);
-        }
-        if (auto func = as<IRFunc>(inst))
-        {
-            changed |= processFunc(func, options);
-        }
+        auto func = as<IRFunc>(inst);
+        changed |= processFunc(func, options);
     }
     return changed;
 }

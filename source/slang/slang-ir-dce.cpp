@@ -492,13 +492,10 @@ bool trimOptimizableType(IRStructType* type)
 bool trimOptimizableTypes(IRModule* module)
 {
     bool changed = false;
-    for (auto inst : module->getGlobalInsts())
+    for (auto type : module->getStructTypes())
     {
-        if (auto type = as<IRStructType>(inst))
-        {
-            if (type->findDecoration<IROptimizableTypeDecoration>())
-                changed |= trimOptimizableType(type);
-        }
+        if (type->findDecoration<IROptimizableTypeDecoration>())
+            changed |= trimOptimizableType(as<IRStructType>(type));
     }
     return changed;
 }

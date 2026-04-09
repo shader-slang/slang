@@ -749,7 +749,7 @@ void WGSLSourceEmitter::emitLayoutQualifiersImpl(IRVarLayout* layout)
 
 static bool isStaticConst(IRInst* inst)
 {
-    if (inst->getParent()->getOp() == kIROp_ModuleInst)
+    if (isAtModuleScope(inst))
     {
         return true;
     }

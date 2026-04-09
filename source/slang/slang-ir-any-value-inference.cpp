@@ -107,19 +107,16 @@ void inferAnyValueSizeWhereNecessary(
 
     HashSet<IRInst*> implementedInterfaces;
     // Add all interface type that are implemented by at least one type to a set.
-    for (auto inst : module->getGlobalInsts())
+    for (auto wt : module->getWitnessTables())
     {
-        if (inst->getOp() == kIROp_WitnessTable)
-        {
-            auto interfaceType =
-                cast<IRWitnessTableType>(inst->getDataType())->getConformanceType();
-            implementedInterfaces.add(interfaceType);
-        }
+        auto interfaceType =
+            cast<IRWitnessTableType>(wt->getDataType())->getConformanceType();
+        implementedInterfaces.add(interfaceType);
     }
 
     // Collect all interface types that require inference.
     HashSet<IRInterfaceType*> interfaceTypes;
-    for (auto inst : module->getGlobalInsts())
+    for (auto inst : module->getStructTypes())
     {
         if (inst->getOp() == kIROp_InterfaceType)
         {
@@ -185,7 +182,7 @@ void inferAnyValueSizeWhereNecessary(
             // Only consider implementations at the top-level (ignore those nested
             // in generics)
             //
-            if (concreteImpl->getParent() == module->getModuleInst())
+            if (isAtModuleScope(concreteImpl))
                 implList.add(concreteImpl);
         }
 

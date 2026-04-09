@@ -200,7 +200,7 @@ bool propagateFuncPropertiesImpl(IRModule* module, FuncPropertyPropagationContex
         workListSet.clear();
 
         // Add side effect free functions and their transitive callers to work list.
-        for (auto inst : module->getGlobalInsts())
+        auto processInitialFuncs = [&](IRInst* inst)
         {
             auto genericInst = as<IRGeneric>(inst);
             if (genericInst)
@@ -214,10 +214,14 @@ bool propagateFuncPropertiesImpl(IRModule* module, FuncPropertyPropagationContex
                     addCallersToWorkList(func);
                 }
             }
-        }
+        };
+        for (auto inst : module->getFuncs())
+            processInitialFuncs(inst);
+        for (auto inst : module->getGenerics())
+            processInitialFuncs(inst);
 
         // Add remaining functions to work list.
-        for (auto inst : module->getGlobalInsts())
+        auto processRemainingFuncs = [&](IRInst* inst)
         {
             auto genericInst = as<IRGeneric>(inst);
             if (genericInst)
@@ -228,7 +232,11 @@ bool propagateFuncPropertiesImpl(IRModule* module, FuncPropertyPropagationContex
             {
                 addToWorkList(func);
             }
-        }
+        };
+        for (auto inst : module->getFuncs())
+            processRemainingFuncs(inst);
+        for (auto inst : module->getGenerics())
+            processRemainingFuncs(inst);
 
         IRBuilder builder(module);
 

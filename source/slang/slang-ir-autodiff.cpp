@@ -201,7 +201,7 @@ AutoDiffSharedContext::AutoDiffSharedContext(
 {
     auto module = moduleInst->getModule();
 
-    for (auto globalInst : module->getGlobalInsts())
+    for (auto globalInst : module->getGenerics())
     {
         if (auto generic = as<IRGeneric>(globalInst))
         {
@@ -669,7 +669,7 @@ void DifferentiableTypeConformanceContext::markDiffTypeInst(
     IRType* primalType)
 {
     // Ignore module-level insts.
-    if (as<IRModuleInst>(diffInst->getParent()))
+    if (isAtModuleScope(diffInst))
         return;
 
     // Also ignore generic-container-level insts.
@@ -975,7 +975,7 @@ void checkAutodiffPatterns(IRModule* module, TargetProgram* target, DiagnosticSi
     // For now, we have only 1 check to see if methods that have side-effects
     // are marked with prefer-recompute
     //
-    for (auto inst : module->getGlobalInsts())
+    for (auto inst : module->getFuncs())
     {
         if (auto func = as<IRFunc>(inst))
         {

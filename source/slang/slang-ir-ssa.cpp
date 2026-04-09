@@ -1619,7 +1619,11 @@ bool constructSSA(IRModule* module, IRInst* globalVal)
 bool constructSSA(IRModule* module)
 {
     bool changed = false;
-    for (auto ii : module->getGlobalInsts())
+    for (auto ii : module->getFuncs())
+    {
+        changed |= constructSSA(module, ii);
+    }
+    for (auto ii : module->getGlobalVars())
     {
         changed |= constructSSA(module, ii);
     }

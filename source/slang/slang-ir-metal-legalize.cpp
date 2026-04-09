@@ -250,19 +250,17 @@ static void processInst(IRInst* inst, TargetProgram* targetProgram, DiagnosticSi
 void legalizeIRForMetal(IRModule* module, TargetProgram* targetProgram, DiagnosticSink* sink)
 {
     List<EntryPointInfo> entryPoints;
-    for (auto inst : module->getGlobalInsts())
+    for (auto inst : module->getFuncs())
     {
-        if (auto func = as<IRFunc>(inst))
+        auto func = as<IRFunc>(inst);
+        if (auto entryPointDecor = func->findDecoration<IREntryPointDecoration>())
         {
-            if (auto entryPointDecor = func->findDecoration<IREntryPointDecoration>())
-            {
-                EntryPointInfo info;
-                info.entryPointDecor = entryPointDecor;
-                info.entryPointFunc = func;
-                entryPoints.add(info);
-            }
-            legalizeFuncBody(func);
+            EntryPointInfo info;
+            info.entryPointDecor = entryPointDecor;
+            info.entryPointFunc = func;
+            entryPoints.add(info);
         }
+        legalizeFuncBody(func);
     }
 
     legalizeEntryPointVaryingParamsForMetal(module, sink, entryPoints);

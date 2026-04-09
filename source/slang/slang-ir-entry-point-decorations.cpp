@@ -23,7 +23,7 @@ public:
 
     void check()
     {
-        for (auto inst : m_module->getGlobalInsts())
+        for (auto inst : m_module->getFuncs())
         {
             const auto func = as<IRFunc>(inst);
             if (!func)

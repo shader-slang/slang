@@ -5,26 +5,27 @@ namespace Slang
 void legalizeUniformBufferLoad(IRModule* module)
 {
     List<IRLoad*> workList;
-    for (auto globalInst : module->getGlobalInsts())
+    auto collectLoads = [&](IRGlobalValueWithCode* code)
     {
-        if (auto func = as<IRGlobalValueWithCode>(globalInst))
+        for (auto block : code->getBlocks())
         {
-            for (auto block : func->getBlocks())
+            for (auto inst : block->getChildren())
             {
-                for (auto inst : block->getChildren())
+                if (auto load = as<IRLoad>(inst))
                 {
-                    if (auto load = as<IRLoad>(inst))
-                    {
-                        auto uniformBufferType =
-                            as<IRConstantBufferType>(load->getPtr()->getDataType());
-                        if (!uniformBufferType)
-                            continue;
-                        workList.add(load);
-                    }
+                    auto uniformBufferType =
+                        as<IRConstantBufferType>(load->getPtr()->getDataType());
+                    if (!uniformBufferType)
+                        continue;
+                    workList.add(load);
                 }
             }
         }
-    }
+    };
+    for (auto inst : module->getFuncs())
+        collectLoads(as<IRGlobalValueWithCode>(inst));
+    for (auto inst : module->getGlobalVars())
+        collectLoads(as<IRGlobalValueWithCode>(inst));
 
     IRBuilder builder(module);
     for (auto load : workList)

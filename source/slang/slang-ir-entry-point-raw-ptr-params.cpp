@@ -28,7 +28,7 @@ struct ConvertEntryPointPtrParamsToRawPtrsPass
         // Now we loop over global-scope instructions searching
         // for any entry points.
         //
-        for (auto inst : m_module->getGlobalInsts())
+        for (auto inst : m_module->getFuncs())
         {
             auto func = as<IRFunc>(inst);
             if (!func)

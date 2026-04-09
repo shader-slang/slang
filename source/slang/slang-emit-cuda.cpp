@@ -224,7 +224,7 @@ UnownedStringSlice CUDASourceEmitter::getVectorPrefix(IROp op)
 void CUDASourceEmitter::emitTempModifiers(IRInst* temp)
 {
     CPPSourceEmitter::emitTempModifiers(temp);
-    if (as<IRModuleInst>(temp->getParent()))
+    if (isAtModuleScope(temp))
     {
         m_writer->emit("__device__ ");
     }

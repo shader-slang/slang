@@ -27,15 +27,13 @@ bool funcHasGetCurrentStageInst(IRGlobalValueWithCode* func)
 void discoverStageSpecificFunctions(HashSet<IRInst*>& stageSpecificFunctions, IRModule* module)
 {
     List<IRInst*> workList;
-    for (auto inst : module->getGlobalInsts())
+    for (auto inst : module->getFuncs())
     {
-        if (auto func = as<IRGlobalValueWithCode>(inst))
+        auto func = as<IRGlobalValueWithCode>(inst);
+        if (func && funcHasGetCurrentStageInst(func))
         {
-            if (funcHasGetCurrentStageInst(func))
-            {
-                workList.add(inst);
-                stageSpecificFunctions.add(func);
-            }
+            workList.add(inst);
+            stageSpecificFunctions.add(inst);
         }
     }
     for (Index i = 0; i < workList.getCount(); i++)

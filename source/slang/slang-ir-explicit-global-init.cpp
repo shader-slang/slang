@@ -78,7 +78,7 @@ struct MoveGlobalVarInitializationToEntryPointsPass
         // initialization) and function (to compute the
         // initial value).
         //
-        for (auto inst : m_module->getGlobalInsts())
+        for (auto inst : m_module->getGlobalVars())
         {
             auto globalVar = as<IRGlobalVar>(inst);
             if (!globalVar)
@@ -102,7 +102,7 @@ struct MoveGlobalVarInitializationToEntryPointsPass
         // all the global variables that were identified
         // and processed in the first pass.
         //
-        for (auto inst : m_module->getGlobalInsts())
+        for (auto inst : m_module->getFuncs())
         {
             auto func = as<IRFunc>(inst);
             if (!func)
@@ -222,7 +222,7 @@ struct MoveGlobalVarInitializationToEntryPointsPass
                 if (auto returnInst = as<IRReturn>(initFirstBlock->getTerminator()))
                 {
                     if (returnInst->getVal() &&
-                        returnInst->getVal()->getParent() == m_module->getModuleInst())
+                        isAtModuleScope(returnInst->getVal()))
                     {
                         initVal = returnInst->getVal();
                     }

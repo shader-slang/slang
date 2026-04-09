@@ -430,7 +430,7 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
              operand++, opIndex++)
         {
             if (!_isDifferentialInst(operand->get()) && !as<IRFunc>(operand->get()) &&
-                !as<IRBlock>(operand->get()) && !(as<IRModuleInst>(operand->get()->getParent())) &&
+                !as<IRBlock>(operand->get()) && !isAtModuleScope(operand->get()) &&
                 !isDifferentialBlock(getBlock(operand->get())))
                 workList.add(operand);
         }
@@ -672,7 +672,7 @@ RefPtr<HoistedPrimalsInfo> AutodiffCheckpointPolicyBase::processFunc(
                 // actions.
                 //
                 auto calleeUse = &call->getOperands()[0];
-                if (!as<IRModuleInst>(calleeUse->get()->getParent()) &&
+                if (!isAtModuleScope(calleeUse->get()) &&
                     !processedUses.contains(calleeUse))
                     addPrimalOperandsToWorkList(call);
 

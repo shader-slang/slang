@@ -73,13 +73,8 @@ struct BindExistentialSlots
         // We will search for global shader parameters that make
         // use of existential specialization parameters.
         //
-        for (auto inst : module->getGlobalInsts())
+        for (auto globalParam : module->getGlobalParams())
         {
-            // We only care about global shader parameters.
-            //
-            auto globalParam = as<IRGlobalParam>(inst);
-            if (!globalParam)
-                continue;
 
             // We only care about global shader parameters
             // that have existential specialization parameters,

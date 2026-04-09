@@ -826,6 +826,7 @@ local insts = {
 	{
 		module = { struct_name = "ModuleInst", parent = true },
 	},
+	{ moduleSection = { struct_name = "ModuleSection", parent = true } },
 	{ block = { parent = true } },
 
 	-- A global inst representing an alias of another symbol, under a different mangled name.

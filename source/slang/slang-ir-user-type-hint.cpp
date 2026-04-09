@@ -9,11 +9,8 @@ namespace Slang
 
 void addUserTypeHintDecorations(IRModule* module)
 {
-    for (auto globalInst : module->getGlobalInsts())
+    for (auto inst : module->getGlobalParams())
     {
-        auto inst = as<IRGlobalParam>(globalInst);
-        if (!inst)
-            continue;
         if (inst->getDataType())
         {
             // Preserve the original type name as a decoration before we do any type lowering.

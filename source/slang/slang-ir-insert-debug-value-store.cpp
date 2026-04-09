@@ -268,19 +268,9 @@ void DebugValueStoreContext::insertDebugValueStore(IRFunc* func)
 
 void insertDebugValueStore(DebugValueStoreContext& context, IRModule* module)
 {
-    for (auto globalInst : module->getGlobalInsts())
+    for (auto inst : module->getFuncs())
     {
-        if (auto genericInst = as<IRGeneric>(globalInst))
-        {
-            if (auto func = as<IRFunc>(findGenericReturnVal(genericInst)))
-            {
-                context.insertDebugValueStore(func);
-            }
-        }
-        else if (auto func = as<IRFunc>(globalInst))
-        {
-            context.insertDebugValueStore(func);
-        }
+        context.insertDebugValueStore(as<IRFunc>(inst));
     }
 }
 } // namespace Slang

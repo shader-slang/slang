@@ -380,13 +380,10 @@ void deferBufferLoad(IRModule* module, CodeGenContext* codeGenContext)
 {
     DeferBufferLoadContext context;
     context.codeGenContext = codeGenContext;
-    for (auto childInst : module->getGlobalInsts())
-    {
-        if (auto code = as<IRGlobalValueWithCode>(childInst))
-        {
-            context.deferBufferLoad(code);
-        }
-    }
+    for (auto inst : module->getFuncs())
+        context.deferBufferLoad(as<IRGlobalValueWithCode>(inst));
+    for (auto inst : module->getGlobalVars())
+        context.deferBufferLoad(as<IRGlobalValueWithCode>(inst));
 }
 
 } // namespace Slang

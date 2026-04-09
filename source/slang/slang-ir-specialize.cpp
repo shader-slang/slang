@@ -3551,7 +3551,7 @@ IRInst* specializeGenericWithSetArgs(
         else
         {
             // For everything else, just set the parameter type to the argument;
-            SLANG_ASSERT(specArg->getParent()->getOp() == kIROp_ModuleInst);
+            SLANG_ASSERT(isAtModuleScope(specArg));
             cloneEnv.mapOldValToNew[param] = specArg;
         }
     }

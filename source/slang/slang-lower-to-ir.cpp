@@ -9722,10 +9722,10 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
     void ensureInsertAtGlobalScope(IRBuilder* builder)
     {
         auto inst = builder->getInsertLoc().getInst();
-        if (inst->getOp() == kIROp_ModuleInst)
+        if (isModuleScopeParent(inst))
             return;
 
-        while (inst && inst->getParent() && inst->getParent()->getOp() != kIROp_ModuleInst)
+        while (inst && inst->getParent() && !isModuleScopeParent(inst->getParent()))
         {
             inst = inst->getParent();
         }
@@ -12204,7 +12204,7 @@ struct DeclLoweringVisitor : DeclVisitor<DeclLoweringVisitor, LoweredValInfo>
                         //
                         // If it's in the global scope, we're good if we use the same type.
                         //
-                        if (!as<IRModuleInst>(param.originalParam->getFullType()->getParent()))
+                        if (!isAtModuleScope(param.originalParam->getFullType()))
                             param.clonedParam->setFullType((IRType*)cloneInst(
                                 &cloneEnv,
                                 &typeBuilder,
