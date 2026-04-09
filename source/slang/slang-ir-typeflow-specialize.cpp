@@ -4467,6 +4467,13 @@ struct TypeFlowSpecializationContext
                     }
                     module->getContainerPool().free(&funcs);
                 }
+                else if (as<IRExtractExistentialWitnessTable>(lookupInst->getWitnessTable()))
+                {
+                    // This is a dynamic interface dispatch lookup that couldn't be
+                    // analyzed (e.g., no conformances registered). Don't fall through
+                    // to resolveInst() which would try to resolve the existential chain.
+                    handled = true;
+                }
             }
 
             // Fall through to normal resolution for non-dynamic-dispatch global callees
