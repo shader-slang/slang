@@ -101,6 +101,11 @@ on later review iterations.
 
 ## Phase 2: REVIEW THE APPROACH
 
+**This is YOUR independent assessment of the code.** Phase 3 (next) is your response
+to EACH reviewer comment. These are distinct — a reviewer may raise something you
+missed, or you may disagree with a reviewer. Do not skip Phase 3 even if you feel
+you covered the comments during Phase 2.
+
 Read the actual code changes and evaluate the solution against the linked issue.
 
 ### Step 1: Read the Changed Files
@@ -155,9 +160,17 @@ Check that tests cover:
 
 ## Phase 3: EVALUATE REVIEW FEEDBACK
 
-For each review comment, determine if it's valid and actionable.
+**CHECKPOINT**: Before proceeding, list every unresolved review thread by ID/file.
+Each one MUST appear in the classification table below. If there are zero threads
+to evaluate, state that explicitly. Do not skip this phase — even if you feel you
+already covered the comments during Phase 2, the structured evaluation ensures
+nothing is missed and gives the user a clear action list.
 
-### Classification
+### Step 1: Enumerate all threads
+
+List every unresolved thread: `#{number} — {file}:{line} — {one-line summary}`
+
+### Step 2: Classify each thread
 
 | Category | Criteria | Action |
 |----------|----------|--------|
