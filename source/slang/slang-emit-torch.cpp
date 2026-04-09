@@ -52,6 +52,9 @@ void emitTorchScalarTypeName(SourceWriter* m_writer, IRInst* type)
     case kIROp_BoolType:
         m_writer->emit("kBool");
         break;
+    case kIROp_BFloat16Type:
+        m_writer->emit("kBFloat16");
+        break;
     default:
         SLANG_UNEXPECTED((std::string("unknown scalar type in allocTorchTensor: ") +
                           std::string(getIROpInfo(type->getOp()).name))
