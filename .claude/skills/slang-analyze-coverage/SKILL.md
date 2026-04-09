@@ -1,6 +1,6 @@
 ---
 name: slang-analyze-coverage
-description: Comprehensive test coverage analysis and gap-filling for Slang language features. Use when the user wants to increase test coverage, maximize testing for a feature, perform coverage analysis, identify test gaps, or systematically test all aspects of a language feature.
+description: Test coverage analysis and gap-filling for Slang language features. Use when the user wants to increase test coverage, maximize testing for a feature, perform coverage analysis, identify test gaps, or systematically test all aspects of a language feature.
 ---
 
 # Feature-Oriented Test Coverage

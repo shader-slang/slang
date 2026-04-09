@@ -120,7 +120,7 @@ Each agent must:
 2. Write a regression test (see `slang-write-test` skill)
 3. Build and validate (see `slang-build` and `slang-run-tests` skills)
 4. Format: `./extras/formatting.sh`
-5. Commit (do NOT push): `"Fix [short description]"` — do not mention issue numbers in commit summary
+5. Commit (do NOT push): `"Fix [short description]"` — follow commit rules from `slang-create-issue` skill.
 6. Report: VERDICT, build/test results, changes, risk assessment
 
 ### Evaluation Output
@@ -162,6 +162,8 @@ git cherry-pick <commit-hash-from-winning-strategy>
 4. Build and validate (see `slang-build` and `slang-run-tests` skills)
 
 ### Format, Commit, and PR
+
+Follow commit rules from the `slang-create-issue` skill.
 
 ```bash
 ./extras/formatting.sh

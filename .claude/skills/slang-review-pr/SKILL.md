@@ -207,7 +207,8 @@ platform-aware build instructions and preset selection.
 
 ### Step 5: Commit and Push
 
-One commit per logical fix. Commit message should reference the review feedback:
+One commit per logical fix. Follow commit rules from the `slang-create-issue` skill.
+Commit message should reference the review feedback:
 
 ```bash
 git add <files>

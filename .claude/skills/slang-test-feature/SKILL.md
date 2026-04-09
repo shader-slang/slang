@@ -243,7 +243,7 @@ This is the Slang shading language compiler (C++). Key conventions:
 - Test: see slang-run-tests skill for platform-aware test running
 - Format: ./extras/formatting.sh
 - Single-dash CLI options: -target spirv (not --target)
-- Do not mention AI tools in commits
+- Commit rules: never amend, no AI tool mentions, no issue numbers in commit summary
 - No trailing whitespace or blank lines with only spaces/tabs
 
 ## Instructions
@@ -287,7 +287,7 @@ Create a dedicated branch from master for this sub-plan:
   git checkout -b <branch-name>
 Stage all new test files. Create a commit with message:
   "Add tests for <feature>: <dimension>"
-Do NOT mention AI tools in the commit message.
+Never amend, no AI tool mentions, no issue numbers in commit summary.
 
 **IMPORTANT**: Each agent creates its own branch and PR independently.
 The orchestrator does NOT merge agents' work into a single branch/PR.

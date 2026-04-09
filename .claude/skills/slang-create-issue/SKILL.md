@@ -170,16 +170,22 @@ Do not narrate the diff line by line -- reviewers read the code themselves.]
 - [ ] SPIRV validation: `SLANG_RUN_SPIRV_VALIDATION=1 slangc -target spirv test.slang`
 ```
 
+### Commit Rules
+
+These rules apply to ALL commits across all skills.
+
+1. **Never amend**: Always create new commits, never `git commit --amend` or `git rebase -i` to squash/edit. This preserves branch history so earlier attempts and intermediate states remain findable. If a previous commit had a problem, fix it in a new commit — do not rewrite or back out the original.
+2. **Do NOT mention AI tools** in commit messages or PR descriptions
+3. **No issue numbers in commit summary**: Reference the issue in the PR body (e.g., "Fixes #1234"), not the commit message — GitHub adds it during merge.
+
 ### PR Rules
 
 1. **Label the PR**: Use `pr: non-breaking` (default) or `pr: breaking` (for ABI/language-breaking changes)
 2. **Assign to author**: Always use `--assignee @me` when creating PRs
 3. **Include tests**: Add regression tests as `.slang` files under `tests/`
 4. **Keep PRs focused**: One issue per PR when possible
-5. **Link to issue**: Reference the issue number in the PR body (e.g., "Fixes #1234"). Do NOT put the issue number in the commit summary line — GitHub adds it during merge.
-6. **Do NOT mention AI tools** in commit messages or PR descriptions
-7. **Include technical depth**: Root cause, design rationale, trade-offs. Do not narrate the diff -- reviewers read the code themselves
-8. **Suggest reviewers**: Use `git log --format='%an' -- <changed-files> | sort | uniq -c | sort -rn` to identify 2-5 reviewers based on recent authorship of the affected code. Include 1-2 sentences per reviewer explaining the rationale.
+5. **Include technical depth**: Root cause, design rationale, trade-offs. Do not narrate the diff -- reviewers read the code themselves
+6. **Suggest reviewers**: Use `git log --format='%an' -- <changed-files> | sort | uniq -c | sort -rn` to identify 2-5 reviewers based on recent authorship of the affected code. Include 1-2 sentences per reviewer explaining the rationale.
 
 ### Test Quality Rules (for PRs adding tests)
 
