@@ -198,12 +198,9 @@ void convertCompositeTypeParametersToPointers(IRFunc* func)
 
 void convertCompositeTypeParametersToPointers(IRModule* module)
 {
-    for (auto inst : module->getGlobalInsts())
+    for (auto inst : module->getFuncs())
     {
-        if (auto func = as<IRFunc>(inst))
-        {
-            convertCompositeTypeParametersToPointers(func);
-        }
+        convertCompositeTypeParametersToPointers(as<IRFunc>(inst));
     }
 }
 } // namespace Slang

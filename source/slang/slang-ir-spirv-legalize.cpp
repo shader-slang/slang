@@ -1046,13 +1046,13 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         builder.setInsertBefore(inst);
         if (!m_mapArrayValueToVar.tryGetValue(x, y))
         {
-            if (x->getParent()->getOp() == kIROp_ModuleInst)
+            if (isAtModuleScope(x))
                 builder.setInsertBefore(inst);
             else
                 setInsertAfterOrdinaryInst(&builder, x);
             y = builder.emitVar(x->getDataType(), AddressSpace::Function);
             builder.emitStore(y, x);
-            if (x->getParent()->getOp() != kIROp_ModuleInst)
+            if (!isAtModuleScope(x))
                 m_mapArrayValueToVar.set(x, y);
         }
         builder.setInsertBefore(inst);
@@ -1485,13 +1485,14 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         for (auto operand = inst->getOperands(); opIndex < inst->getOperandCount();
              operand++, opIndex++)
         {
-            if (operand->get()->getParent() != m_module->getModuleInst())
+            if (!isAtModuleScope(operand->get()))
                 return;
 
             if (as<IRGlobalParam>(operand->get()))
                 return;
         }
-        inst->insertAtEnd(m_module->getModuleInst());
+        auto sectionKind = getSectionKindForInst(inst);
+        inst->insertAtEnd(m_module->getOrCreateSection(sectionKind));
     }
 
     void processDefaultConstruct(IRInst* inst)
@@ -1536,7 +1537,7 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
     {
         maybeHoistConstructInstToGlobalScope(inst);
 
-        if (inst->getOp() == kIROp_MakeVector && inst->getParent()->getOp() == kIROp_ModuleInst &&
+        if (inst->getOp() == kIROp_MakeVector && isAtModuleScope(inst) &&
             inst->getOperandCount() !=
                 (UInt)getIntVal(as<IRVectorType>(inst->getDataType())->getElementCount()))
         {
@@ -2073,11 +2074,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
     // This fills gaps after legalization where only the access-chain inst was decorated.
     void propagateNonUniformAccessChainDecorations()
     {
-        for (auto globalInst : m_module->getGlobalInsts())
+        for (auto globalInst : m_module->getFuncs())
         {
             auto func = as<IRFunc>(globalInst);
-            if (!func)
-                continue;
 
             for (auto block : func->getBlocks())
             {
@@ -2270,11 +2269,9 @@ struct SPIRVLegalizationContext : public SourceEmitterBase
         // Work list of load/store insts to add Aligned attribute to.
         List<IRInst*> loadStoreInsts;
 
-        for (auto globalInst : m_module->getGlobalInsts())
+        for (auto globalInst : m_module->getFuncs())
         {
             auto func = as<IRFunc>(globalInst);
-            if (!func)
-                continue;
             for (auto block : func->getBlocks())
             {
                 for (auto inst : block->getChildren())

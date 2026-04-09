@@ -89,18 +89,8 @@ void lowerMatrixSwizzleStores(IRModule* module)
 {
     List<IRMatrixSwizzleStore*> instsToLower;
 
-    for (auto globalInst : module->getGlobalInsts())
+    auto collectFromFunc = [&](IRFunc* func)
     {
-        auto func = as<IRFunc>(globalInst);
-        if (!func)
-        {
-            auto gen = as<IRGeneric>(globalInst);
-            if (gen)
-                func = as<IRFunc>(findGenericReturnVal(gen));
-        }
-        if (!func)
-            continue;
-
         for (auto block : func->getBlocks())
         {
             for (auto inst : block->getChildren())
@@ -109,6 +99,23 @@ void lowerMatrixSwizzleStores(IRModule* module)
                     instsToLower.add(matSwizzleStore);
             }
         }
+    };
+    for (auto globalInst : module->getFuncs())
+    {
+        auto func = as<IRFunc>(globalInst);
+        if (!func)
+            continue;
+        collectFromFunc(func);
+    }
+    for (auto globalInst : module->getGenerics())
+    {
+        auto gen = as<IRGeneric>(globalInst);
+        if (!gen)
+            continue;
+        auto func = as<IRFunc>(findGenericReturnVal(gen));
+        if (!func)
+            continue;
+        collectFromFunc(func);
     }
 
     if (instsToLower.getCount() == 0)

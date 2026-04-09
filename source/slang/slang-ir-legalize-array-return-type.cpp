@@ -82,14 +82,12 @@ void legalizeArrayReturnType(IRModule* module)
 {
     IRBuilder builder(module);
 
-    for (auto inst : module->getGlobalInsts())
+    for (auto inst : module->getFuncs())
     {
-        if (auto func = as<IRFunc>(inst))
+        auto func = as<IRFunc>(inst);
+        if (func->getResultType()->getOp() == kIROp_ArrayType)
         {
-            if (func->getResultType()->getOp() == kIROp_ArrayType)
-            {
-                makeFuncReturnViaOutParam(builder, func);
-            }
+            makeFuncReturnViaOutParam(builder, func);
         }
     }
 }

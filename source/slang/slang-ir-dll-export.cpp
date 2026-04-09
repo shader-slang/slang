@@ -38,18 +38,12 @@ struct DllExportContext
             IRDllExportDecoration* exportDecoration;
         };
         List<Candidate> candidates;
-        for (auto childFunc : module->getGlobalInsts())
+        for (auto inst : module->getFuncs())
         {
-            switch (childFunc->getOp())
+            auto func = as<IRFunc>(inst);
+            if (auto dllExportDecoration = func->findDecoration<IRDllExportDecoration>())
             {
-            case kIROp_Func:
-                if (auto dllExportDecoration = childFunc->findDecoration<IRDllExportDecoration>())
-                {
-                    candidates.add(Candidate{as<IRFunc>(childFunc), dllExportDecoration});
-                }
-                break;
-            default:
-                break;
+                candidates.add(Candidate{func, dllExportDecoration});
             }
         }
 

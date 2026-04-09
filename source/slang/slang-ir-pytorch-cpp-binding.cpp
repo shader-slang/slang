@@ -1102,14 +1102,12 @@ IRFunc* generateCUDAWrapperForFunc(IRFunc* func, DiagnosticSink* sink)
 void lowerBuiltinTypesForKernelEntryPoints(IRModule* module, DiagnosticSink*)
 {
     List<IRFunc*> cudaKernels;
-    for (auto globalInst : module->getGlobalInsts())
+    for (auto inst : module->getFuncs())
     {
-        if (auto func = as<IRFunc>(globalInst))
+        auto func = as<IRFunc>(inst);
+        if (func->findDecoration<IRCudaKernelDecoration>())
         {
-            if (func->findDecoration<IRCudaKernelDecoration>())
-            {
-                cudaKernels.add(func);
-            }
+            cudaKernels.add(func);
         }
     }
 
@@ -1237,14 +1235,12 @@ void lowerBuiltinTypesForKernelEntryPoints(IRModule* module, DiagnosticSink*)
 void generateHostFunctionsForAutoBindCuda(IRModule* module, DiagnosticSink* sink)
 {
     List<IRFunc*> autoBindRequests;
-    for (auto globalInst : module->getGlobalInsts())
+    for (auto inst : module->getFuncs())
     {
-        if (auto func = as<IRFunc>(globalInst))
+        auto func = as<IRFunc>(inst);
+        if (func->findDecoration<IRAutoPyBindCudaDecoration>())
         {
-            if (func->findDecoration<IRAutoPyBindCudaDecoration>())
-            {
-                autoBindRequests.add(func);
-            }
+            autoBindRequests.add(func);
         }
     }
 
@@ -1259,30 +1255,28 @@ void generatePyTorchCppBinding(IRModule* module, DiagnosticSink* sink)
     List<IRFunc*> workList;
     List<IRFunc*> cudaKernels;
     List<IRType*> typesToExport;
-    for (auto globalInst : module->getGlobalInsts())
+    for (auto inst : module->getFuncs())
     {
-        if (auto func = as<IRFunc>(globalInst))
+        auto func = as<IRFunc>(inst);
+        if (func->findDecoration<IRTorchEntryPointDecoration>())
         {
-            if (func->findDecoration<IRTorchEntryPointDecoration>())
-            {
-                workList.add(func);
-            }
-            else if (func->findDecoration<IRCudaKernelDecoration>())
-            {
-                cudaKernels.add(func);
-            }
-            else
-            {
-                // Remove all other export decorations if this is not a cuda host func.
-                if (auto decor = func->findDecoration<IRPublicDecoration>())
-                    decor->removeAndDeallocate();
-                if (auto decor = func->findDecoration<IRHLSLExportDecoration>())
-                    decor->removeAndDeallocate();
-                if (auto decor = func->findDecoration<IRKeepAliveDecoration>())
-                    decor->removeAndDeallocate();
-                if (auto decor = func->findDecoration<IRDllExportDecoration>())
-                    decor->removeAndDeallocate();
-            }
+            workList.add(func);
+        }
+        else if (func->findDecoration<IRCudaKernelDecoration>())
+        {
+            cudaKernels.add(func);
+        }
+        else
+        {
+            // Remove all other export decorations if this is not a cuda host func.
+            if (auto decor = func->findDecoration<IRPublicDecoration>())
+                decor->removeAndDeallocate();
+            if (auto decor = func->findDecoration<IRHLSLExportDecoration>())
+                decor->removeAndDeallocate();
+            if (auto decor = func->findDecoration<IRKeepAliveDecoration>())
+                decor->removeAndDeallocate();
+            if (auto decor = func->findDecoration<IRDllExportDecoration>())
+                decor->removeAndDeallocate();
         }
     }
 
@@ -1318,12 +1312,10 @@ void generatePyTorchCppBinding(IRModule* module, DiagnosticSink* sink)
 void removeTorchKernels(IRModule* module)
 {
     List<IRInst*> toRemove;
-    for (auto globalInst : module->getGlobalInsts())
+    for (auto func : module->getFuncs())
     {
-        if (!as<IRFunc>(globalInst))
-            continue;
-        if (globalInst->findDecoration<IRTorchEntryPointDecoration>())
-            toRemove.add(globalInst);
+        if (func->findDecoration<IRTorchEntryPointDecoration>())
+            toRemove.add(func);
     }
     for (auto inst : toRemove)
         inst->removeAndDeallocate();
@@ -1334,12 +1326,12 @@ void handleAutoBindNames(IRModule* module)
     // We need to rewrite extern-cpp names for functions that have an auto-bind decoration.
     // since the name needs to be used for the host function.
     //
-    for (auto globalInst : module->getGlobalInsts())
+    for (auto func : module->getFuncs())
     {
-        if (auto autobindDecor = globalInst->findDecoration<IRAutoPyBindCudaDecoration>())
+        if (auto autobindDecor = func->findDecoration<IRAutoPyBindCudaDecoration>())
         {
             // Find an extern decoration on the original function, and append a prefix to the name.
-            if (auto externCppHint = globalInst->findDecoration<IRExternCppDecoration>())
+            if (auto externCppHint = func->findDecoration<IRExternCppDecoration>())
             {
                 IRBuilder builder(module);
 
@@ -1347,7 +1339,7 @@ void handleAutoBindNames(IRModule* module)
                 StringBuilder nameBuilder;
                 nameBuilder << "__kernel__" << externCppHint->getName();
                 externCppHint->removeAndDeallocate();
-                builder.addExternCppDecoration(globalInst, nameBuilder.getUnownedSlice());
+                builder.addExternCppDecoration(func, nameBuilder.getUnownedSlice());
             }
 
             autobindDecor->removeAndDeallocate();
@@ -1360,19 +1352,16 @@ void removeTorchAndCUDAEntryPoints(IRModule* module)
     // Go through global insts, find cuda & torch related entry points and remove the keep-alive
     // decoration.
     IRBuilder builder(module);
-    for (auto globalInst : module->getGlobalInsts())
+    for (auto func : module->getFuncs())
     {
-        if (auto func = as<IRFunc>(globalInst))
+        if (func->findDecoration<IRAutoPyBindCudaDecoration>() ||
+            func->findDecoration<IRTorchEntryPointDecoration>() ||
+            func->findDecoration<IRCudaKernelDecoration>())
         {
-            if (func->findDecoration<IRAutoPyBindCudaDecoration>() ||
-                func->findDecoration<IRTorchEntryPointDecoration>() ||
-                func->findDecoration<IRCudaKernelDecoration>())
-            {
-                if (auto keepAlive = func->findDecoration<IRKeepAliveDecoration>())
-                    keepAlive->removeAndDeallocate();
-                if (auto hlslExport = func->findDecoration<IRHLSLExportDecoration>())
-                    hlslExport->removeAndDeallocate();
-            }
+            if (auto keepAlive = func->findDecoration<IRKeepAliveDecoration>())
+                keepAlive->removeAndDeallocate();
+            if (auto hlslExport = func->findDecoration<IRHLSLExportDecoration>())
+                hlslExport->removeAndDeallocate();
         }
     }
 }
@@ -1380,13 +1369,11 @@ void removeTorchAndCUDAEntryPoints(IRModule* module)
 void generateDerivativeWrappers(IRModule* module, DiagnosticSink* sink)
 {
     SLANG_UNUSED(sink);
-    for (auto globalInst : module->getGlobalInsts())
+    for (auto inst : module->getFuncs())
     {
-        if (!as<IRFunc>(globalInst))
-            continue;
-
+        auto func = as<IRFunc>(inst);
         // Look for methods marked with auto-bind and have derivatives registered.
-        if (auto autoBindDecoration = globalInst->findDecoration<IRAutoPyBindCudaDecoration>())
+        if (auto autoBindDecoration = func->findDecoration<IRAutoPyBindCudaDecoration>())
         {
             if (autoBindDecoration->getFwdDiffFuncOperand())
             {
@@ -1406,7 +1393,6 @@ void generateDerivativeWrappers(IRModule* module, DiagnosticSink* sink)
 
                 // Create a new wrapper function.
                 IRBuilder builder(module);
-                auto func = cast<IRFunc>(globalInst);
                 auto wrapperFunc = builder.createFunc();
                 builder.setInsertInto(wrapperFunc);
                 builder.emitBlock();
@@ -1472,7 +1458,6 @@ void generateDerivativeWrappers(IRModule* module, DiagnosticSink* sink)
 
                 // Create a new wrapper function.
                 IRBuilder builder(module);
-                auto func = cast<IRFunc>(globalInst);
                 auto wrapperFunc = builder.createFunc();
                 builder.setInsertInto(wrapperFunc);
                 builder.emitBlock();

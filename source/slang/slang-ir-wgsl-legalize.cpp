@@ -215,11 +215,9 @@ struct GlobalInstInliningContext : public GlobalInstInliningContextGeneric
 void legalizeIRForWGSL(IRModule* module, TargetProgram* targetProgram, DiagnosticSink* sink)
 {
     List<EntryPointInfo> entryPoints;
-    for (auto inst : module->getGlobalInsts())
+    for (auto inst : module->getFuncs())
     {
-        IRFunc* const func{as<IRFunc>(inst)};
-        if (!func)
-            continue;
+        auto func = as<IRFunc>(inst);
         IREntryPointDecoration* const entryPointDecor =
             func->findDecoration<IREntryPointDecoration>();
         if (!entryPointDecor)

@@ -358,18 +358,32 @@ struct AddressSpaceContext : public AddressSpaceSpecializationContext
 
     void processModule()
     {
-        for (auto globalInst : module->getGlobalInsts())
+        for (auto globalVar : module->getGlobalVars())
         {
-            auto addrSpace = getLeafInstAddressSpace(globalInst);
+            auto addrSpace = getLeafInstAddressSpace(globalVar);
             if (addrSpace != AddressSpace::Generic)
             {
-                mapInstToAddrSpace[globalInst] = addrSpace;
+                mapInstToAddrSpace[globalVar] = addrSpace;
             }
-            if (auto func = as<IRFunc>(globalInst))
+        }
+        for (auto globalParam : module->getGlobalParams())
+        {
+            auto addrSpace = getLeafInstAddressSpace(globalParam);
+            if (addrSpace != AddressSpace::Generic)
             {
-                if (func->findDecoration<IREntryPointDecoration>())
-                    workList.add(func);
+                mapInstToAddrSpace[globalParam] = addrSpace;
             }
+        }
+        for (auto inst : module->getFuncs())
+        {
+            auto addrSpace = getLeafInstAddressSpace(inst);
+            if (addrSpace != AddressSpace::Generic)
+            {
+                mapInstToAddrSpace[inst] = addrSpace;
+            }
+            auto func = as<IRFunc>(inst);
+            if (func && func->findDecoration<IREntryPointDecoration>())
+                workList.add(func);
         }
 
         HashSet<IRFunc*> newWorkList;

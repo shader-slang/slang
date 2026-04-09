@@ -1626,7 +1626,7 @@ bool CLikeSourceEmitter::shouldFoldInstIntoUseSites(IRInst* inst)
     // If the instruction is at global scope, then it might represent
     // a constant (e.g., the value of an enum case).
     //
-    if (as<IRModuleInst>(inst->getParent()))
+    if (isAtModuleScope(inst))
     {
         if (!inst->mightHaveSideEffects())
             return true;
@@ -2028,7 +2028,7 @@ void CLikeSourceEmitter::emitInstResultDecl(IRInst* inst)
 
     emitRateQualifiers(inst);
 
-    if (as<IRModuleInst>(inst->getParent()))
+    if (isAtModuleScope(inst))
     {
         // "Ordinary" instructions at module scope are constants
 
@@ -4821,7 +4821,7 @@ void CLikeSourceEmitter::_emitInstAsVarInitializerImpl(IRInst* inst)
 
 bool _isFoldableValue(IRInst* val)
 {
-    if (val->getParent() && val->getParent()->getOp() == kIROp_ModuleInst)
+    if (isAtModuleScope(val))
         return true;
 
     switch (val->getOp())

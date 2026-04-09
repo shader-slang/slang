@@ -5078,7 +5078,7 @@ void legalizeConstantBufferLoadForGLSL(IRModule* module)
     // we need to replace it with a `MakeStruct` inst where each field is separately
     // loaded.
     IRBuilder builder(module);
-    for (auto globalInst : module->getGlobalInsts())
+    for (auto globalInst : module->getFuncs())
     {
         if (auto func = as<IRGlobalValueWithCode>(globalInst))
         {
@@ -5127,7 +5127,7 @@ void legalizeDispatchMeshPayloadForGLSL(IRModule* module)
 {
     // Find out DispatchMesh function
     IRGlobalValueWithCode* dispatchMeshFunc = nullptr;
-    for (const auto globalInst : module->getGlobalInsts())
+    for (const auto globalInst : module->getFuncs())
     {
         if (const auto func = as<IRGlobalValueWithCode>(globalInst))
         {
@@ -5165,7 +5165,7 @@ void legalizeDispatchMeshPayloadForGLSL(IRModule* module)
                 SLANG_ASSERT(payloadType);
 
                 const bool isGroupsharedGlobal =
-                    payload->getParent() == module->getModuleInst() &&
+                    isAtModuleScope(payload) &&
                     composeGetters<IRGroupSharedRate>(payload, &IRInst::getRate);
                 if (isGroupsharedGlobal)
                 {
@@ -5221,7 +5221,7 @@ void legalizeDynamicResourcesForGLSL(IRModule* module, CodeGenContext* context)
 
     // At this stage, we can safely remove the generic `getDescriptorFromHandle` function
     // despite it being marked `export`.
-    for (auto inst : module->getGlobalInsts())
+    for (auto inst : module->getGenerics())
     {
         if (auto genFunc = as<IRGeneric>(inst))
         {
@@ -5236,7 +5236,7 @@ void legalizeDynamicResourcesForGLSL(IRModule* module, CodeGenContext* context)
         inst->removeAndDeallocate();
     }
 
-    for (auto inst : module->getGlobalInsts())
+    for (auto inst : module->getGlobalParams())
     {
         auto param = as<IRGlobalParam>(inst);
 

@@ -75,11 +75,8 @@ void simplifyIR(
         changed |= peepholeOptimizeGlobalScope(target, module);
         changed |= trimOptimizableTypes(module);
 
-        for (auto inst : module->getGlobalInsts())
+        auto processCodeInst = [&](IRGlobalValueWithCode* func)
         {
-            auto func = as<IRGlobalValueWithCode>(inst);
-            if (!func)
-                continue;
             bool funcChanged = true;
             int funcIterationCount = 0;
             while (funcChanged && funcIterationCount < kMaxFuncIterations)
@@ -104,7 +101,11 @@ void simplifyIR(
                 changed |= funcChanged;
                 funcIterationCount++;
             }
-        }
+        };
+        for (auto inst : module->getFuncs())
+            processCodeInst(as<IRGlobalValueWithCode>(inst));
+        for (auto inst : module->getGlobalVars())
+            processCodeInst(as<IRGlobalValueWithCode>(inst));
         iterationCounter++;
     }
     eliminateDeadCode(module, options.deadCodeElimOptions);

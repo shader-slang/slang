@@ -14,7 +14,7 @@ void PerEntryPointPass::processModule(IRModule* module)
     // pass should be run after the entry point(s) have
     // been specialized to their generic type parameters.
 
-    for (auto inst : module->getGlobalInsts())
+    for (auto inst : module->getFuncs())
     {
         // We are only interested in entry points.
         //

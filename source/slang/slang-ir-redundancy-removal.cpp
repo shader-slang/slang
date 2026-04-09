@@ -111,17 +111,10 @@ struct RedundancyRemovalContext
 bool removeRedundancy(IRModule* module, bool hoistLoopInvariantInsts)
 {
     bool changed = false;
-    for (auto inst : module->getGlobalInsts())
+    for (auto inst : module->getFuncs())
     {
-        if (auto genericInst = as<IRGeneric>(inst))
-        {
-            removeRedundancyInFunc(genericInst, hoistLoopInvariantInsts);
-            inst = findGenericReturnVal(genericInst);
-        }
-        if (auto func = as<IRFunc>(inst))
-        {
-            changed |= removeRedundancyInFunc(func, hoistLoopInvariantInsts);
-        }
+        auto func = as<IRFunc>(inst);
+        changed |= removeRedundancyInFunc(func, hoistLoopInvariantInsts);
     }
     return changed;
 }
@@ -364,22 +357,20 @@ void removeAvailableInDownstreamModuleDecorations(IRModule* module, CodeGenTarge
 {
     List<IRInst*> toRemove;
     auto builder = IRBuilder(module);
-    for (auto globalInst : module->getGlobalInsts())
+    for (auto inst : module->getFuncs())
     {
-        if (auto funcInst = as<IRFunc>(globalInst))
+        auto funcInst = as<IRFunc>(inst);
+        if (auto dec = funcInst->findDecoration<IRAvailableInDownstreamIRDecoration>())
         {
-            if (auto dec = globalInst->findDecoration<IRAvailableInDownstreamIRDecoration>())
+            if ((dec->getTarget() == CodeGenTarget::DXIL && target == CodeGenTarget::HLSL) ||
+                (dec->getTarget() == target))
             {
-                if ((dec->getTarget() == CodeGenTarget::DXIL && target == CodeGenTarget::HLSL) ||
-                    (dec->getTarget() == target))
+                // Gut the function definition, turning it into a declaration
+                for (auto block : funcInst->getBlocks())
                 {
-                    // Gut the function definition, turning it into a declaration
-                    for (auto block : funcInst->getBlocks())
-                    {
-                        toRemove.add(block);
-                    }
-                    builder.addDecoration(funcInst, kIROp_DownstreamModuleImportDecoration);
+                    toRemove.add(block);
                 }
+                builder.addDecoration(funcInst, kIROp_DownstreamModuleImportDecoration);
             }
         }
     }

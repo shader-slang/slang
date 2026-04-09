@@ -1145,12 +1145,9 @@ public:
         }
 
         // Emit remaining funcitons, if they are called by entry points.
-        for (auto globalInst : linkedIR.module->getGlobalInsts())
+        for (auto globalInst : linkedIR.module->getFuncs())
         {
             auto func = as<IRFunc>(globalInst);
-
-            if (!func)
-                continue;
 
             // Skip if already emitted as an entry point.
             if (entryPointSet.contains(func))

@@ -107,13 +107,9 @@ void searchChildrenForForceVarIntoStructTemporarily(IRModule* module, IRInst* in
 
 void legalizeNonStructParameterToStructForHLSL(IRModule* module)
 {
-    for (auto globalInst : module->getGlobalInsts())
+    for (auto func : module->getFuncs())
     {
-        // Only process functions - at this stage generics are already resolved,
-        // and the search only handles Block and Call children.
-        if (globalInst->getOp() != kIROp_Func)
-            continue;
-        searchChildrenForForceVarIntoStructTemporarily(module, globalInst);
+        searchChildrenForForceVarIntoStructTemporarily(module, func);
     }
 }
 

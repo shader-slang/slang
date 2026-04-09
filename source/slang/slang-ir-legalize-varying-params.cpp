@@ -361,7 +361,7 @@ public:
         // We now search for entry-point definitions in the IR module.
         // All entry points should appear at the global scope.
         //
-        for (auto inst : module->getGlobalInsts())
+        for (auto inst : module->getFuncs())
         {
             // Entry points are IR functions.
             //

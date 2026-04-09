@@ -86,7 +86,7 @@ void GLSLSourceEmitter::beforeComputeEmitActions(IRModule* module)
     buildEntryPointReferenceGraph(this->m_referencingEntryPoints, module);
 
     IRBuilder builder(module);
-    for (auto globalInst : module->getGlobalInsts())
+    for (auto globalInst : module->getFuncs())
     {
         if (auto func = as<IRGlobalValueWithCode>(globalInst))
         {

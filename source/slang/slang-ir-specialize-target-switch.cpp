@@ -99,7 +99,7 @@ void specializeTargetSwitch(
 
 void specializeTargetSwitch(TargetRequest* target, IRModule* module, DiagnosticSink* sink)
 {
-    for (auto globalInst : module->getGlobalInsts())
+    for (auto globalInst : module->getFuncs())
     {
         if (auto code = as<IRGlobalValueWithCode>(globalInst))
         {

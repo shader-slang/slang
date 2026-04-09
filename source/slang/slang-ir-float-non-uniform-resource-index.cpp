@@ -221,9 +221,9 @@ void floatNonUniformResourceIndex(IRModule* module, NonUniformResourceIndexFloat
     // insts to the right place in the IR module.
 
     List<IRInst*> workList;
-    for (auto globalInst : module->getGlobalInsts())
+    for (auto globalInst : module->getFuncs())
     {
-        auto func = as<IRGlobalValueWithCode>(getGenericReturnVal(globalInst));
+        auto func = as<IRGlobalValueWithCode>(globalInst);
         if (!func)
             continue;
         workList.clear();

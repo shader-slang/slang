@@ -616,10 +616,12 @@ void propagateConstExpr(IRModule* module, DiagnosticSink* sink)
 
     // We will build an initial work list with all of the global values in it.
 
-    for (auto ii : module->getGlobalInsts())
-    {
+    for (auto ii : module->getFuncs())
         maybeAddToWorkList(&context, ii);
-    }
+    for (auto ii : module->getGlobalVars())
+        maybeAddToWorkList(&context, ii);
+    for (auto ii : module->getGenerics())
+        maybeAddToWorkList(&context, ii);
 
     // We will iterate applying propagation to one global value at a time
     // until we run out.
@@ -657,22 +659,10 @@ void propagateConstExpr(IRModule* module, DiagnosticSink* sink)
     // we find that they are *required* to be `constexpr`, but *cannot*
     // be, for some reason.
 
-    for (auto ii : module->getGlobalInsts())
-    {
-        switch (ii->getOp())
-        {
-        default:
-            break;
-
-        case kIROp_Func:
-        case kIROp_GlobalVar:
-            {
-                IRGlobalValueWithCode* code = (IRGlobalValueWithCode*)ii;
-                validateConstExpr(&context, code);
-            }
-            break;
-        }
-    }
+    for (auto inst : module->getFuncs())
+        validateConstExpr(&context, as<IRGlobalValueWithCode>(inst));
+    for (auto inst : module->getGlobalVars())
+        validateConstExpr(&context, as<IRGlobalValueWithCode>(inst));
 }
 
 } // namespace Slang

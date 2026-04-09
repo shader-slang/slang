@@ -902,7 +902,7 @@ struct SequentialIDTagLoweringContext : public InstPassBase
         StringBuilder generatedMangledName;
 
         auto linkage = getLinkage();
-        for (auto inst : module->getGlobalInsts())
+        for (auto inst : module->getWitnessTables())
         {
             if (inst->getOp() == kIROp_WitnessTable)
             {

@@ -156,13 +156,9 @@ struct ResourceOutputSpecializationPass
         // (which must appear at the global level) and specializing
         // them if needed.
         //
-        for (auto inst : module->getGlobalInsts())
+        for (auto inst : module->getFuncs())
         {
-            auto func = as<IRFunc>(inst);
-            if (!func)
-                continue;
-
-            changed |= processFunc(func);
+            changed |= processFunc(as<IRFunc>(inst));
         }
         return changed;
     }

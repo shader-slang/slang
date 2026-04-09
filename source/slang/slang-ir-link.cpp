@@ -2427,7 +2427,7 @@ struct IRPrelinkContext : IRSpecContext
         };
 
         auto builderForClone = builder;
-        if (as<IRModuleInst>(originalVal->getParent()))
+        if (isAtModuleScope(originalVal))
         {
             // If we are cloning a global value, we will use the module builder.
             builderForClone = &shared->builderStorage;

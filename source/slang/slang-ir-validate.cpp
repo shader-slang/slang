@@ -254,7 +254,7 @@ void validateIRInstOperand(IRValidateContext* context, IRInst* inst, IRUse* oper
     }
 
     // We allow out-of-order def-use in global scope.
-    bool allInGlobalScope = inst->getParent() && inst->getParent()->getOp() == kIROp_ModuleInst;
+    bool allInGlobalScope = isAtModuleScope(inst);
     if (allInGlobalScope)
     {
         for (UInt i = 0; i < inst->getOperandCount(); i++)
@@ -264,7 +264,7 @@ void validateIRInstOperand(IRValidateContext* context, IRInst* inst, IRUse* oper
                 continue;
             if (!op->getParent())
                 continue;
-            if (op->getParent()->getOp() != kIROp_ModuleInst)
+            if (!isAtModuleScope(op))
             {
                 allInGlobalScope = false;
                 break;
@@ -415,6 +415,35 @@ void validateIRInst(IRInst* inst)
     validateIRInst(context, inst);
 }
 
+void validateModuleSections(IRValidateContext* context, IRModule* module, IRModuleInst* moduleInst)
+{
+    // Check that every non-decoration direct child of IRModuleInst is an IRModuleSection.
+    for (auto child : moduleInst->getChildren())
+    {
+        validate(
+            context,
+            as<IRModuleSection>(child) != nullptr,
+            child,
+            "all non-decoration direct children of IRModuleInst must be IRModuleSection");
+    }
+
+    // Check that every instruction in a section belongs in that section.
+    for (int i = 0; i < (int)IRModuleSectionKind::Count; i++)
+    {
+        auto section = module->getSection((IRModuleSectionKind)i);
+        if (!section)
+            continue;
+        for (auto inst : section->getChildren())
+        {
+            validate(
+                context,
+                getSectionKindForInst(inst) == (IRModuleSectionKind)i,
+                inst,
+                "instruction is in the wrong section");
+        }
+    }
+}
+
 void validateIRModule(IRModule* module, DiagnosticSink* sink)
 {
     IRValidateContext contextStorage;
@@ -428,6 +457,10 @@ void validateIRModule(IRModule* module, DiagnosticSink* sink)
     validate(context, moduleInst->parent == nullptr, moduleInst, "module instruction parent");
     validate(context, moduleInst->prev == nullptr, moduleInst, "module instruction prev");
     validate(context, moduleInst->next == nullptr, moduleInst, "module instruction next");
+
+    // Validate section invariants if sections exist.
+    if (module->getSection(IRModuleSectionKind::Funcs) != nullptr)
+        validateModuleSections(context, module, moduleInst);
 
     validateIRInst(context, moduleInst);
 }

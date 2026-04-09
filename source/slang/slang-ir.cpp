@@ -211,6 +211,50 @@ void IRUse::clear()
     }
 }
 
+// IRFlattenedGlobalInstIterator
+
+// Helper: advance to the next sibling section that has children.
+static IRInst* _findNextNonEmptySection(IRInst* section)
+{
+    while (section)
+    {
+        section = section->next;
+        if (!section)
+            return nullptr;
+        if (section->getOp() == kIROp_ModuleSection && section->getFirstChild())
+            return section;
+    }
+    return nullptr;
+}
+
+void IRFlattenedGlobalInstIterator::operator++()
+{
+    if (!inst)
+        return;
+
+    inst = inst->next;
+    if (inst)
+        return;
+
+    // End of current section's children. Advance to next non-empty section.
+    section = _findNextNonEmptySection(section);
+    inst = section ? section->getFirstChild() : nullptr;
+}
+
+IRFlattenedGlobalInstIterator IRFlattenedGlobalInstRange::begin()
+{
+    if (!moduleInst)
+        return IRFlattenedGlobalInstIterator(nullptr, nullptr);
+
+    // Find the first section with children.
+    IRInst* sec = moduleInst->getFirstChild();
+    while (sec && (sec->getOp() != kIROp_ModuleSection || !sec->getFirstChild()))
+        sec = sec->next;
+    if (sec)
+        return IRFlattenedGlobalInstIterator(sec->getFirstChild(), sec);
+    return IRFlattenedGlobalInstIterator(nullptr, nullptr);
+}
+
 // IRInstListBase
 
 void IRInstListBase::Iterator::operator++()
@@ -1674,6 +1718,13 @@ void addHoistableInst(IRBuilder* builder, IRInst* inst)
     //
     SLANG_ASSERT(parent);
 
+    // If the resolved parent is the module inst, route to the appropriate section.
+    if (as<IRModuleInst>(parent))
+    {
+        auto sectionKind = getSectionKindForInst(inst);
+        parent = builder->getModule()->getOrCreateSection(sectionKind);
+    }
+
     // Once we determine the parent instruction that the
     // new instruction should be inserted into, we need
     // to find an appropriate place to insert it.
@@ -1732,7 +1783,7 @@ void addHoistableInst(IRBuilder* builder, IRInst* inst)
     // else, we want to ensure that an instruction comes after
     // its type and operands.
     //
-    if (!as<IRModuleInst>(parent))
+    if (!isModuleScopeParent(parent))
     {
         // We need to make sure that if any of
         // the operands of `inst` come from the same
@@ -2597,7 +2648,7 @@ static void addGlobalValue(IRBuilder* builder, IRInst* value)
     {
         // Inserting into the top level of a module?
         // That is fine, and we can stop searching.
-        if (as<IRModuleInst>(parent))
+        if (isModuleScopeParent(parent))
             break;
 
         // Inserting into a basic block inside of
@@ -2619,6 +2670,13 @@ static void addGlobalValue(IRBuilder* builder, IRInst* value)
     if (!parent)
     {
         parent = builder->getModule()->getModuleInst();
+    }
+
+    // If landing at module scope, route to the appropriate section.
+    if (as<IRModuleInst>(parent))
+    {
+        auto sectionKind = getSectionKindForInst(value);
+        parent = builder->getModule()->getOrCreateSection(sectionKind);
     }
 
     // If it turns out that we are inserting into the
@@ -4800,6 +4858,133 @@ IRInst* IRBuilder::addIntermediateContextFieldDifferentialTypeDecoration(
     return addDecoration(target, kIROp_IntermediateContextFieldDifferentialTypeDecoration, witness);
 }
 
+const char* getSectionKindName(IRModuleSectionKind kind)
+{
+    switch (kind)
+    {
+    case IRModuleSectionKind::Funcs:
+        return "Funcs";
+    case IRModuleSectionKind::Generics:
+        return "Generics";
+    case IRModuleSectionKind::StructTypes:
+        return "StructTypes";
+    case IRModuleSectionKind::GlobalVars:
+        return "GlobalVars";
+    case IRModuleSectionKind::GlobalParams:
+        return "GlobalParams";
+    case IRModuleSectionKind::Hoistables:
+        return "Hoistables";
+    case IRModuleSectionKind::WitnessTables:
+        return "WitnessTables";
+    case IRModuleSectionKind::Annotations:
+        return "Annotations";
+    case IRModuleSectionKind::Capabilities:
+        return "Capabilities";
+    case IRModuleSectionKind::Literals:
+        return "Literals";
+    case IRModuleSectionKind::Keys:
+        return "Keys";
+    case IRModuleSectionKind::Misc:
+        return "Misc";
+    default:
+        SLANG_UNEXPECTED("unknown section kind");
+    }
+}
+
+IRModuleSectionKind getSectionKindForInst(IRInst* inst)
+{
+    auto op = inst->getOp();
+
+    // Functions
+    if (op == kIROp_Func)
+        return IRModuleSectionKind::Funcs;
+
+    // Generics (generic funcs, types, witness tables, etc.)
+    if (op == kIROp_Generic)
+        return IRModuleSectionKind::Generics;
+
+    // Constants / Literals
+    if (op >= kIROp_FirstConstant && op <= kIROp_LastConstant)
+        return IRModuleSectionKind::Literals;
+
+    // Types (struct, class, enum, interface, and all other type defs)
+    if (op >= kIROp_FirstType && op <= kIROp_LastType)
+        return IRModuleSectionKind::StructTypes;
+
+    // Global variables and constants
+    if (op == kIROp_GlobalVar || op == kIROp_GlobalConstant)
+        return IRModuleSectionKind::GlobalVars;
+
+    // Global parameters
+    if (op == kIROp_GlobalParam)
+        return IRModuleSectionKind::GlobalParams;
+
+    // Witness tables
+    if (op == kIROp_WitnessTable)
+        return IRModuleSectionKind::WitnessTables;
+
+    // Keys
+    if (op == kIROp_StructKey || op == kIROp_IndexedFieldKey)
+        return IRModuleSectionKind::Keys;
+
+    // Capabilities
+    if (op >= kIROp_FirstCapabilitySet && op <= kIROp_LastCapabilitySet)
+        return IRModuleSectionKind::Capabilities;
+
+    // Annotations
+    if (op == kIROp_Annotation || op == kIROp_DifferentiableTypeAnnotation ||
+        op == kIROp_WitnessTableAnnotation || op == kIROp_DebugSource)
+        return IRModuleSectionKind::Annotations;
+
+    // Hoistable instructions (Specialize, etc.) that are not types, literals, or other categories
+    if (getIROpInfo(op).isHoistable())
+        return IRModuleSectionKind::Hoistables;
+
+    // Everything else
+    return IRModuleSectionKind::Misc;
+}
+
+IRModuleSection* IRModule::getOrCreateSection(IRModuleSectionKind kind)
+{
+    auto& section = m_sections[(int)kind];
+    if (!section)
+    {
+        section = _allocateInst<IRModuleSection>(kIROp_ModuleSection, 0);
+        section->insertAtEnd(m_moduleInst);
+
+        // Add a name hint for IR dump readability.
+        IRBuilder builder(this);
+        builder.addNameHintDecoration(section, UnownedStringSlice(getSectionKindName(kind)));
+    }
+    return section;
+}
+
+void IRModule::_rebuildSectionTable()
+{
+    // Scan the module inst's direct children for section nodes
+    // and populate the m_sections array by matching NameHint decorations.
+    for (auto child = m_moduleInst->getFirstChild(); child; child = child->next)
+    {
+        if (auto section = as<IRModuleSection>(child))
+        {
+            // Determine which section kind this is by checking its first child's
+            // expected section kind, or by matching the NameHint decoration.
+            if (auto nameHint = section->findDecoration<IRNameHintDecoration>())
+            {
+                auto name = nameHint->getName();
+                for (int i = 0; i < (int)IRModuleSectionKind::Count; i++)
+                {
+                    if (name == getSectionKindName((IRModuleSectionKind)i))
+                    {
+                        m_sections[i] = section;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+}
+
 RefPtr<IRModule> IRModule::create(Session* session)
 {
     RefPtr<IRModule> module = new IRModule(session);
@@ -4808,6 +4993,10 @@ RefPtr<IRModule> IRModule::create(Session* session)
 
     module->m_moduleInst = moduleInst;
     moduleInst->module = module;
+
+    // Eagerly create all sections so the flattened iterator always sees sections.
+    for (int i = 0; i < (int)IRModuleSectionKind::Count; i++)
+        module->getOrCreateSection((IRModuleSectionKind)i);
 
     return module;
 }
@@ -7160,7 +7349,7 @@ IRSetBase* IRBuilder::getSet(IROp op, const HashSet<IRInst*>& elements)
 {
     // Verify that all operands are global instructions
     for (auto element : elements)
-        if (element->getParent()->getOp() != kIROp_ModuleInst)
+        if (!isAtModuleScope(element))
             SLANG_ASSERT_FAILURE("createSet called with non-global operands");
 
     List<IRInst*>* sortedElements = getModule()->getContainerPool().getList<IRInst>();
@@ -8009,9 +8198,10 @@ static void dumpInst(IRDumpContext* context, IRInst* inst)
 
 void dumpIRModule(IRDumpContext* context, IRModule* module)
 {
-    for (auto ii : module->getGlobalInsts())
+    // Dump the actual structure including sections.
+    for (auto child : module->getModuleInst()->getDirectChildren())
     {
-        dumpInst(context, ii);
+        dumpInst(context, child);
     }
 }
 
@@ -8558,7 +8748,7 @@ static void _maybeHoistOperand(IRUse* use)
                 continue;
 
             // We allow out-of-order uses in global scope.
-            if (operand->getParent() && operand->getParent()->getOp() == kIROp_ModuleInst)
+            if (isAtModuleScope(operand))
                 continue;
 
             // If the operand is defined after user, move it to before user.

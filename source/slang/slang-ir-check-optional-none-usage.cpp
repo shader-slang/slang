@@ -28,24 +28,9 @@ static void checkForOptionalNoneUsage(IRFunc* func, DiagnosticSink* sink)
 
 void checkForOptionalNoneUsage(IRModule* module, DiagnosticSink* sink)
 {
-    for (auto globalInst : module->getGlobalInsts())
+    for (auto inst : module->getFuncs())
     {
-        switch (globalInst->getOp())
-        {
-        case kIROp_Func:
-            checkForOptionalNoneUsage(as<IRFunc>(globalInst), sink);
-            break;
-        case kIROp_Generic:
-            {
-                auto generic = as<IRGeneric>(globalInst);
-                auto innerFunc = as<IRFunc>(findGenericReturnVal(generic));
-                if (innerFunc)
-                    checkForOptionalNoneUsage(innerFunc, sink);
-                break;
-            }
-        default:
-            break;
-        }
+        checkForOptionalNoneUsage(as<IRFunc>(inst), sink);
     }
 }
 

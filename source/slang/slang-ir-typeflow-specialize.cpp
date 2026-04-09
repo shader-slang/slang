@@ -140,7 +140,7 @@ struct InstWithContext
         // reference. An explicit IRSpecialize instruction must be provided as
         // context.
         //
-        SLANG_ASSERT(func->getParent()->getOp() == kIROp_ModuleInst);
+        SLANG_ASSERT(isAtModuleScope(func));
 
         context = func;
     }
@@ -467,7 +467,7 @@ IRInst* getArrayStride(IRArrayType* arrayType)
 // Helper to test if an inst is in the global scope.
 bool isGlobalInst(IRInst* inst)
 {
-    return inst->getParent()->getOp() == kIROp_ModuleInst;
+    return isAtModuleScope(inst);
 }
 
 // This is fairly fundamental check:
@@ -1060,7 +1060,7 @@ struct TypeFlowSpecializationContext
             return none();
 
         // Global insts always have no info.
-        if (as<IRModuleInst>(inst->getParent()))
+        if (isAtModuleScope(inst))
             return none();
 
         return _tryGetInfo(InstWithContext(context, inst));
@@ -1534,10 +1534,12 @@ struct TypeFlowSpecializationContext
         // discoverContext encounters the corresponding IRSpecialize context or when
         // propagateToCallSite/specializeCall resolves the callee.
         //
-        for (auto inst : module->getGlobalInsts())
-            if (auto func = as<IRFunc>(inst))
-                if (isEntryPoint(func) && !isInvalidExistentialSpecialization(func))
-                    discoverContext(func, workQueue);
+        for (auto inst : module->getFuncs())
+        {
+            auto func = as<IRFunc>(inst);
+            if (isEntryPoint(func) && !isInvalidExistentialSpecialization(func))
+                discoverContext(func, workQueue);
+        }
 
         // Process until fixed point.
         while (workQueue.hasItems())
@@ -3645,7 +3647,7 @@ struct TypeFlowSpecializationContext
             //
 
             IRType* typeOfSpecialization = nullptr;
-            if (inst->getDataType()->getParent()->getOp() == kIROp_ModuleInst)
+            if (isAtModuleScope(inst->getDataType()))
                 typeOfSpecialization = inst->getDataType();
             else if (auto funcType = as<IRFuncType>(inst->getDataType()))
             {
@@ -5279,7 +5281,7 @@ struct TypeFlowSpecializationContext
     bool replaceType(IRInst* context, IRInst* inst)
     {
         // If the inst is a global val, we won't modify it.
-        if (as<IRModuleInst>(inst->getParent()))
+        if (isAtModuleScope(inst))
         {
             if (as<IRType>(inst) || as<IRWitnessTable>(inst) || as<IRFunc>(inst) ||
                 as<IRGeneric>(inst))

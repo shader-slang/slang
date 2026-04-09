@@ -119,26 +119,26 @@ void collectMetadata(const IRModule* irModule, ArtifactPostEmitMetadata& outMeta
 {
     // Scan the instructions looking for global resource declarations
     // and exported functions.
-    for (const auto& inst : irModule->getGlobalInsts())
+    for (auto inst : irModule->getFuncs())
     {
+        if (inst->findDecoration<IRDownstreamModuleExportDecoration>())
+        {
+            auto name = inst->findDecoration<IRExportDecoration>()->getMangledName();
+            outMetadata.m_exportedFunctionMangledNames.add(name);
+        }
+
+        // Collect metadata from entrypoint params.
         if (auto func = as<IRFunc>(inst))
         {
-            if (func->findDecoration<IRDownstreamModuleExportDecoration>())
-            {
-                auto name = func->findDecoration<IRExportDecoration>()->getMangledName();
-                outMetadata.m_exportedFunctionMangledNames.add(name);
-            }
-
-            // Collect metadata from entrypoint params.
             for (auto param : func->getParams())
             {
                 collectMetadataFromInst(param, outMetadata);
             }
         }
+    }
 
-        auto param = as<IRGlobalParam>(inst);
-        if (!param)
-            continue;
+    for (auto param : irModule->getGlobalParams())
+    {
         collectMetadataFromInst(param, outMetadata);
     }
 }

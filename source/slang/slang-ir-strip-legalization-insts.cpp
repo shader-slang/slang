@@ -9,51 +9,42 @@ namespace Slang
 
 void stripLegalizationOnlyInstructions(IRModule* module)
 {
-    for (auto inst : module->getGlobalInsts())
+    // Remove global param entry point param decoration.
+    for (auto inst : module->getGlobalParams())
     {
-        switch (inst->getOp())
+        if (const auto entryPointParamDecoration =
+                inst->findDecoration<IREntryPointParamDecoration>())
+            entryPointParamDecoration->removeAndDeallocate();
+    }
+
+    // Remove witness tables.
+    // Our goal here is to empty out any witness tables in
+    // the IR so that they don't keep other symbols alive
+    // further into compilation. Luckily we expect all
+    // witness tables to live directly at the global scope
+    // (or inside of a generic, which we can ignore for
+    // now because the emit logic also ignores generics),
+    // and there is a single function we can call to
+    // remove all of the content from the witness tables
+    // (since the key-value associations are stored as
+    // children of each table).
+    for (auto inst : module->getWitnessTables())
+    {
+        auto witnessTable = as<IRWitnessTable>(inst);
+        if (!witnessTable)
+            continue;
+        auto conformanceType = witnessTable->getConformanceType();
+        if (!conformanceType ||
+            !conformanceType->findDecoration<IRComInterfaceDecoration>())
         {
-        // Remove global param entry point param decoration.
-        case kIROp_GlobalParam:
-            {
-                if (const auto entryPointParamDecoration =
-                        inst->findDecoration<IREntryPointParamDecoration>())
-                    entryPointParamDecoration->removeAndDeallocate();
-                break;
-            }
-
-        // Remove witness tables.
-        // Our goal here is to empty out any witness tables in
-        // the IR so that they don't keep other symbols alive
-        // further into compilation. Luckily we expect all
-        // witness tables to live directly at the global scope
-        // (or inside of a generic, which we can ignore for
-        // now because the emit logic also ignores generics),
-        // and there is a single function we can call to
-        // remove all of the content from the witness tables
-        // (since the key-value associations are stored as
-        // children of each table).
-        case kIROp_WitnessTable:
-            {
-                auto witnessTable = as<IRWitnessTable>(inst);
-                auto conformanceType = witnessTable->getConformanceType();
-                if (!conformanceType ||
-                    !conformanceType->findDecoration<IRComInterfaceDecoration>())
-                {
-                    witnessTable->removeAndDeallocateAllDecorationsAndChildren();
-                }
-                break;
-            }
-
-        default:
-            break;
+            witnessTable->removeAndDeallocateAllDecorationsAndChildren();
         }
     }
 }
 
 void unpinWitnessTables(IRModule* module)
 {
-    for (auto inst : module->getGlobalInsts())
+    for (auto inst : module->getWitnessTables())
     {
         auto witnessTable = as<IRWitnessTable>(inst);
         if (!witnessTable)

@@ -214,11 +214,9 @@ void TorchCppSourceEmitter::emitModuleImpl(IRModule* module, DiagnosticSink* sin
     // Emit PyBind declarations.
     m_writer->emit("PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {\n");
     m_writer->indent();
-    for (auto inst : module->getGlobalInsts())
+    for (auto inst : module->getFuncs())
     {
         auto func = as<IRFunc>(inst);
-        if (!func)
-            continue;
         auto decor = func->findDecoration<IRTorchEntryPointDecoration>();
         if (!decor)
             continue;

@@ -705,6 +705,9 @@ void IRSerialReadContext::handleIRModule(IRReadSerializer const& serializer, IRM
     serialize(serializer, value->m_name);
     serialize(serializer, value->m_version);
     value->m_moduleInst = deserializeFromFlatModule(serializer, value);
+
+    // Rebuild the section table from the deserialized module children.
+    value->_rebuildSectionTable();
 }
 
 //

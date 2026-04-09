@@ -725,19 +725,25 @@ static void checkUninitializedGlobals(IRGlobalVar* variable, DiagnosticSink* sin
 
 void checkForUsingUninitializedValues(IRModule* module, DiagnosticSink* sink)
 {
-    for (auto inst : module->getGlobalInsts())
+    for (auto inst : module->getFuncs())
     {
         if (auto func = as<IRFunc>(inst))
         {
             checkUninitializedValues(func, sink);
         }
-        else if (auto generic = as<IRGeneric>(inst))
+    }
+    for (auto inst : module->getGenerics())
+    {
+        if (auto generic = as<IRGeneric>(inst))
         {
             auto retVal = findGenericReturnVal(generic);
             if (auto funcVal = as<IRFunc>(retVal))
                 checkUninitializedValues(funcVal, sink);
         }
-        else if (auto global = as<IRGlobalVar>(inst))
+    }
+    for (auto inst : module->getGlobalVars())
+    {
+        if (auto global = as<IRGlobalVar>(inst))
         {
             checkUninitializedGlobals(global, sink);
         }

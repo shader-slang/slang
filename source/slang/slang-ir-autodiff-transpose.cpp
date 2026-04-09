@@ -1106,7 +1106,7 @@ struct DiffTransposePass
                 if (instParent->getParent() == fwdBlock->getParent())
                     externInsts.add(inst);
 
-                if (as<IRModuleInst>(instParent))
+                if (isModuleScopeParent(instParent))
                     globalInsts.add(inst);
             }
         }
