@@ -3,6 +3,7 @@
 // GitHub issue: #10376
 
 //DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -target spirv -stage compute -entry computeMain -conformance "ImplA:IFoo=1"
+//DIAGNOSTIC_TEST:SIMPLE(filecheck=CHECK): -target hlsl -stage compute -entry computeMain -conformance "ImplA:IFoo=1"
 
 [anyValueSize(8)]
 interface IFoo

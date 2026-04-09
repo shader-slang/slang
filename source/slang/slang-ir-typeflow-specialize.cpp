@@ -234,10 +234,10 @@ bool isInvalidExistentialSpecialization(IRInst* specializedValue)
                 }
                 if (inst->getOp() == kIROp_ByteAddressBufferStore)
                 {
-                    // The stored value operand (operand index 2) may have an interface
-                    // type.
-                    if (inst->getOperandCount() > 2 &&
-                        as<IRInterfaceType>(inst->getOperand(2)->getDataType()))
+                    // Operands: (buffer, offset, alignment, value).
+                    // The stored value is at index 3.
+                    if (inst->getOperandCount() > 3 &&
+                        as<IRInterfaceType>(inst->getOperand(3)->getDataType()))
                         return true;
                 }
 
