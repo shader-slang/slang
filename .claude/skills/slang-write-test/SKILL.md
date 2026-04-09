@@ -235,17 +235,64 @@ outputBuffer[0] = 42.0;
 //TEST(smoke,compute):COMPARE_COMPUTE: -cpu
 ```
 
+## Coverage Planning (when applicable)
+
+Before writing tests for a feature that involves types, positions, or backends,
+plan which combinations need coverage. **Skip this** for pure diagnostic wording
+tests or syntax-only tests where type combinations don't matter.
+
+### When to plan
+
+- Feature accepts or operates on multiple types (generics, buffers, serialization)
+- Feature behavior varies by position (local, parameter, return, field, global)
+- Feature interacts with type categories differently (scalars vs vectors vs structs)
+
+### How to plan
+
+List the relevant dimensions and mark which combinations need tests:
+
+```text
+Feature: [name]
+Types: [relevant types for THIS feature, not all types]
+Positions: [relevant positions, or N/A]
+Backends: [relevant backends]
+
+| Type/Position | local | param | return | field |
+|---------------|-------|-------|--------|-------|
+| int           | TEST  | —     | TEST   | —     |
+| float3        | TEST  | TEST  | —      | TEST  |
+| MyStruct      | TEST  | —     | —      | TEST  |
+```
+
+- **TEST** = write a test for this cell
+- **—** = not interesting (same codegen path as another cell)
+- **GAP** = needed but out of scope, file as follow-up
+
+For comprehensive coverage analysis with full type taxonomy, see the
+`slang-analyze-coverage` skill.
+
+### Share the plan (if GitHub issue exists)
+
+**STOP and ask the user** before posting. Show a preview of the comment.
+
+If approved, post an `[Agent]`-prefixed coverage plan to the linked GitHub issue.
+This makes the test strategy visible and lets others see what's covered vs gaps.
+
+---
+
 ## Creating a New Test
 
 1. **Choose test type** using the decision tree above
 
-2. **Create file** in appropriate directory under `tests/`
+2. **Plan coverage** if the feature involves type/position combinations (see above)
 
-3. **Add test directive** at the top
+3. **Create file** in appropriate directory under `tests/`
 
-4. **Add CHECK comments** for expected output
+4. **Add test directive** at the top
 
-5. **Run test** to verify:
+5. **Add CHECK comments** for expected output
+
+6. **Run test** to verify:
    ```bash
    ./build/RelWithDebInfo/bin/slang-test tests/your/test.slang
    ```

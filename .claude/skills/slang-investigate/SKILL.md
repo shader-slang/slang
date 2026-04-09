@@ -205,8 +205,10 @@ Write `tmp/<issue-repository>-<bug-id>/investigation.md` (or `tmp/<bug-id>/` for
 [Which fix location and why, considering the "prefer IR pass" principle]
 ```
 
-### Sharing Results
+### Share investigation (if GitHub issue exists)
 
-If a GitHub issue exists for this bug, offer to post a summary of the investigation
-as a comment on the issue. Ask the user before posting. Prefix with `[Agent]`
-(see `slang-create-issue` GitHub Comment Rules).
+**STOP and ask the user** before posting. Show a preview of the comment.
+
+If approved, post an `[Agent]`-prefixed summary of the investigation to the
+linked GitHub issue. This makes the root cause analysis visible to other
+contributors.

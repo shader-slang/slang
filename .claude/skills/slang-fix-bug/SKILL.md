@@ -75,13 +75,19 @@ is preserved for rewinding or handoff.
 
 ## Phase 2: ROOT CAUSE INVESTIGATION
 
+### Step 1: Investigate
+
 Run the `slang-investigate` skill on the bug source. This produces `tmp/<bug-id>/investigation.md`
 with crash site, code path, violated invariant, design context, and potential fix locations.
 
-If a GitHub issue exists, post a summary of the investigation as a comment (prefix with
-`[Agent]`). This shares the analysis with other contributors.
-
 See the `slang-investigate` skill for the full investigation methodology.
+
+### Step 2: Share investigation (if GitHub issue exists)
+
+**STOP and ask the user** before posting. Show a preview of the comment.
+
+If approved, post an `[Agent]`-prefixed summary of investigation.md to the linked
+GitHub issue. This makes the root cause analysis visible to other contributors.
 
 ---
 
@@ -173,13 +179,17 @@ RISK: [low / medium / high — what could break]
 CONCERNS: [any remaining concerns]
 ```
 
-### Evaluation Output
+### Step 1: Write evaluation
 
 Write `tmp/<bug-id>/alternatives.md` comparing strategies so the evaluation
 trail is preserved. Also present the comparison in the conversation.
 
-If a GitHub issue exists, post the alternatives summary as a comment (prefix
-with `[Agent]`) so the analysis is visible to other contributors.
+### Step 2: Share alternatives (if GitHub issue exists)
+
+**STOP and ask the user** before posting. Show a preview of the comment.
+
+If approved, post an `[Agent]`-prefixed summary of the alternatives comparison
+to the linked GitHub issue.
 
 ---
 

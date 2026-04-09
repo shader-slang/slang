@@ -201,6 +201,14 @@ Write `tmp/<feature>-<issue-id>/plan.md` with overview table:
 - Adjust scope (add/remove tests)
 - Merge sub-plans that are too small
 
+### Share the plan (if GitHub issue exists)
+
+**STOP and ask the user** before posting. Show a preview of the comment.
+
+If approved, post an `[Agent]`-prefixed test plan summary (sub-plan overview table +
+gap traceability) to the linked GitHub issue. This makes the coverage strategy visible
+to other contributors and documents what's planned vs gaps.
+
 ---
 
 ## Phase 3: EXECUTE

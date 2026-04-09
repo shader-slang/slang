@@ -324,7 +324,16 @@ Update `tmp/feature-name/test-coverage.md` with final status.
 Create `tmp/feature-name/SUMMARY.md`:
 - Tests created (list with descriptions)
 - Bugs found (list with status)
+- Remaining gaps (with GAP markers from type coverage matrix)
 - Validation results
+
+### Share results (if GitHub issue exists)
+
+**STOP and ask the user** before posting. Show a preview of the comment.
+
+If approved, post an `[Agent]`-prefixed coverage summary to the linked GitHub issue:
+tests created, bugs found, remaining gaps. This documents what's covered and what
+still needs work.
 
 ---
 
