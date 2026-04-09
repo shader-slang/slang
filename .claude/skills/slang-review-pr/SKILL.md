@@ -189,9 +189,18 @@ Address feedback in this order:
 4. **Code clarity** (e.g., comments, variable names)
 5. **Out-of-scope suggestions** (reply only)
 
+### Step 3: Present findings to user
+
+**STOP and present** the full classification table and your recommended actions.
+Ask: "Which items should I implement? All actionable, specific items (list numbers), or none?"
+
+The user may also provide additional context or disagree with classifications.
+
 ---
 
 ## Phase 4: IMPLEMENT FIXES
+
+Only implement items the user approved in Phase 3.
 
 ### Step 1: Build if Needed
 
