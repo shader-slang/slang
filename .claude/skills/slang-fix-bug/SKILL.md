@@ -78,6 +78,9 @@ is preserved for rewinding or handoff.
 Run the `slang-investigate` skill on the bug source. This produces `tmp/<bug-id>/investigation.md`
 with crash site, code path, violated invariant, design context, and potential fix locations.
 
+If a GitHub issue exists, post a summary of the investigation as a comment (prefix with
+`[Agent]`). This shares the analysis with other contributors.
+
 See the `slang-investigate` skill for the full investigation methodology.
 
 ---
@@ -174,6 +177,9 @@ CONCERNS: [any remaining concerns]
 
 Write `tmp/<bug-id>/alternatives.md` comparing strategies so the evaluation
 trail is preserved. Also present the comparison in the conversation.
+
+If a GitHub issue exists, post the alternatives summary as a comment (prefix
+with `[Agent]`) so the analysis is visible to other contributors.
 
 ---
 
