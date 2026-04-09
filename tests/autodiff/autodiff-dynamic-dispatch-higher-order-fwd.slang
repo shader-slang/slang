@@ -23,8 +23,8 @@ struct A : IFoo
     [NoDiffThis]
     float calc(float x)
     {
-        // f(x) = x^3, f'(x) = 3x^2
-        return x * x * x;
+        // f(x) = a*x^3, f'(x) = 3*a*x^2
+        return a * x * x * x;
     }
 }
 
@@ -38,8 +38,8 @@ struct B : IFoo
     [NoDiffThis]
     float calc(float x)
     {
-        // f(x) = x^4, f'(x) = 4x^3
-        return x * x * x * x;
+        // f(x) = b*x^4, f'(x) = 4*b*x^3
+        return b * x * x * x * x;
     }
 }
 
