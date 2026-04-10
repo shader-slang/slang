@@ -87,6 +87,9 @@ void identityWeightMatrixTiled<int InputSize, int PaddedSize, bool Clear>(uint t
         int offset = tileIndex * TileSize * TileSize + localRow * TileSize + localCol;
         weightBuffer[offset] = DType(1);
     }
+
+    AllMemoryBarrierWithGroupSync();
+    convertTiledToNativeB<DType, PaddedSize, PaddedSize, BatchSize>(tid, weightBuffer);
 }
 
 void test<int InputSize, int OutputSize>(uint tid, int resIndex)

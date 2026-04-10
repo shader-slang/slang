@@ -58,7 +58,7 @@ internal struct TiledMMAVulkan<T, int InputSize, int OutputSize, int SubgroupSiz
         T inputArr[K];
         for (int i = 0; i < K; i++) inputArr[i] = input[i];
         MatrixB<K, N> inputB;
-        inputB.fromVectorViaShMem<ShMemSize, T, K>(inputArr, shBase);
+        inputB.fromVectorViaShMem<ShMemSize, T, K, false>(inputArr, shBase);
 
         // MMA: result(M, N) = W(M, K) × input(K, N)
         MatrixC<T, M, N> resultMat = matMul<T, M, K, N>(wA, inputB);
@@ -66,7 +66,7 @@ internal struct TiledMMAVulkan<T, int InputSize, int OutputSize, int SubgroupSiz
         // Extract output vector
         typealias OutputVec = WaveTangledVector<T, ShMemSize, OutputSize, SubgroupSize, SubgroupCount>;
         T outputArr[M] = {};
-        resultMat.toVectorViaShMem<ShMemSize, M>(outputArr, shBase);
+        resultMat.toVectorViaShMem<ShMemSize, M, false>(outputArr, shBase);
 
         if (Bias)
         {
@@ -78,31 +78,29 @@ internal struct TiledMMAVulkan<T, int InputSize, int OutputSize, int SubgroupSiz
     }
 
     // =========================================================================
-    // Transpose MMA: dInput = W^T × dOut
+    // Transpose MMA: result = W^T × input
     //
     // Weight tiles loaded from global into MatA(K, M) with transposed addressing.
-    // dOut loaded from per-lane vector into MatB(M, N) via shmem.
+    // Input loaded from per-lane vector into MatB(M, N) via shmem.
     // Result extracted from MatC(K, N) via shmem.
     // =========================================================================
 
     [ForceInline]
     [require(cooperative_matrix, subgroup_basic)]
-    internal static void mma<Address>(
-        MatrixB<M, N> dOutB,
+    internal static void mmaTranspose<Address>(
+        MatrixB<M, N> inputB,
         Address weightAddress,
-        inout T dInputArr[K],
+        inout T resultArr[K],
         uint shBase)
         where Address : IPointerLikeAddress<T>
     {
-        // Weight: MatA(K, M) loaded transposed from stored M×K tiled layout
         MatrixA<K, M> wA;
         wA.loadWeightTiled<T, Address, true>(weightAddress);
 
-        // MMA: result(K, N) = W^T(K, M) × dOut(M, N)
-        MatrixC<T, K, N> resultMat = matMul<T, K, M, N>(wA, dOutB);
+        // MMA: result(K, N) = W^T(K, M) × input(M, N)
+        MatrixC<T, K, N> resultMat = matMul<T, K, M, N>(wA, inputB);
 
-        // Extract dInput from result via shmem
-        resultMat.toVectorViaShMem<ShMemSize, K>(dInputArr, shBase);
+        resultMat.toVectorViaShMem<ShMemSize, K, false>(resultArr, shBase);
     }
 
     // =========================================================================
@@ -212,7 +210,7 @@ internal struct TiledMMAVulkan<T, int InputSize, int OutputSize, int SubgroupSiz
 
         // dOut: MatA(M, N) — each lane's dOut as a column, converted to half internally
         MatrixA<M, N> dOutA;
-        dOutA.fromVectorViaShMem<ShMemSize, T, M>(dOutArr, shBase);
+        dOutA.fromVectorViaShMem<ShMemSize, T, M, false>(dOutArr, shBase);
 
         // input: MatB(N, K) — each lane's input as a row
         static const int ElemPerUint4_half = sizeof(uint4) / sizeof(half);
@@ -220,7 +218,7 @@ internal struct TiledMMAVulkan<T, int InputSize, int OutputSize, int SubgroupSiz
         uint shInputBase = shBase + uint(SubgroupCount) * uint(ShmemPerWarpA);
 
         MatrixB<N, K> inputB;
-        inputB.fromVectorViaShMem<ShMemSize, T, K>(inputArr, shInputBase);
+        inputB.fromVectorViaShMem<ShMemSize, T, K, true>(inputArr, shInputBase);
 
         GroupMemoryBarrierWithWaveSync();
 
@@ -310,11 +308,11 @@ internal struct TiledMMAVulkan<T, int InputSize, int OutputSize, int SubgroupSiz
         // Load dOut as MatB(M, N) once — reused by both MMA and bias reduce.
         // fromVectorViaShMem handles float→half conversion internally.
         MatrixB<M, N> dOutB;
-        dOutB.fromVectorViaShMem<ShMemSize, T, M>(dOutArr, shBase);
+        dOutB.fromVectorViaShMem<ShMemSize, T, M, false>(dOutArr, shBase);
 
         // 1. Transpose MMA: dInput = W^T × dOut
         T dInputArr[K] = {};
-        mma<Address>(dOutB, weightAddress, dInputArr, shBase);
+        mmaTranspose<Address>(dOutB, weightAddress, dInputArr, shBase);
 
         GroupMemoryBarrierWithGroupSync();
 

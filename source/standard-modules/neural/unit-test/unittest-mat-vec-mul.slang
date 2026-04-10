@@ -105,22 +105,90 @@ DType[TransposeA ? InputSize : OutputSize]
     typealias Address = BindlessAddress<DType>;
     Address address = Address(weightBuffer);
 
-    typealias MMA = TiledMMAHelper<DType, PaddedInputSize, PaddedOutputSize, 32, Target, ShMemSize, TransposeA, SubgroupCount>;
-    typealias InputVec = WaveTangledVector<DType, ShMemSize, PaddedInputSize, 32, SubgroupCount>;
+    static const int K = PaddedInputSize;
+    static const int M = PaddedOutputSize;
+    static const int N = 32;
     const int ResultSize = TransposeA ? InputSize : OutputSize;
 
-    InputVec inputVec;
-    for (int i = 0; i < InArraySize; i++)
-        inputVec.data[i] = inputData[i];
+    if (TransposeA)
+    {
+        // mmaTranspose: input has M elements, result has K elements
+        //   CUDA:   result(N,K) = input(N,M) × W^T(M,K)
+        //   Vulkan: result(K,N) = W^T(K,M) × input(M,N)
+        DType output[ResultSize];
 
-    let resultVec = Bias
-        ? MMA.forward<Address, true>(inputVec, address, Address(biasBuffer.value))
-        : MMA.forward<Address, false>(inputVec, address, none);
+        __target_switch
+        {
+        case cuda:
+        {
+            typealias Cuda = TiledMMACuda<DType, K, M, N, TargetEnum.CUDA>;
 
-    DType output[ResultSize];
-    for (int i = 0; i < ResultSize; i++)
-        output[i] = resultVec[i];
-    return output;
+            Cuda.DOutMatrix inputMat;
+            half inputHalf[M];
+            for (int i = 0; i < InArraySize; i++)
+                inputHalf[i] = __realCast<half>(inputData[i]);
+            for (int i = InArraySize; i < M; i++)
+                inputHalf[i] = half(0);
+            let inputPacked = bit_cast<uint[M / 2]>(inputHalf);
+            inputMat.fromArrayPacked<M / 2>(inputPacked);
+
+            Cuda.BwdResultMatrix resultMat;
+            Cuda.mmaTranspose<Address>(inputMat, address, resultMat);
+
+            static const int PackedResultSize = K / (sizeof(uint) / sizeof(DType));
+            uint resultPacked[PackedResultSize];
+            resultMat.toArrayPacked<PackedResultSize>(resultPacked);
+            let resultArr = bit_cast<DType[K]>(resultPacked);
+            for (int i = 0; i < ResultSize; i++)
+                output[i] = resultArr[i];
+        }
+        case spirv:
+        {
+            typealias Vulkan = TiledMMAVulkan<DType, K, M, N, TargetEnum.SPIR_V, ShMemSize, TransposeA, SubgroupCount>;
+
+            DType inputArr[M];
+            for (int i = 0; i < InArraySize; i++)
+                inputArr[i] = inputData[i];
+            for (int i = InArraySize; i < M; i++)
+                inputArr[i] = DType(0);
+
+            // Per-warp shmem offset. With tile-row-at-a-time, each warp needs
+            // 32 × max(TILE/HalvesPerUint4, TILE/ElemPerUint4_T) uint4 per group.
+            static const int HalfTileWidth = 16 / (sizeof(uint4) / sizeof(half));
+            static const int DTileTileWidth = 16 / (sizeof(uint4) / sizeof(DType));
+            static const int PerWarpUint4 = N * ((DTileTileWidth > HalfTileWidth) ? DTileTileWidth : HalfTileWidth);
+            uint shBase = uint(getWaveId()) * uint(PerWarpUint4);
+
+            MatrixB<M, N> inputB;
+            inputB.fromVectorViaShMem<ShMemSize, DType, M, false>(inputArr, shBase);
+
+            DType resultArr[K] = {};
+            Vulkan.mmaTranspose<Address>(inputB, address, resultArr, shBase);
+            for (int i = 0; i < ResultSize; i++)
+                output[i] = resultArr[i];
+        }
+        }
+        return output;
+    }
+    else
+    {
+        // mma (forward): input has K elements, result has M elements
+        typealias MMA = TiledMMAHelper<DType, K, M, N, Target, ShMemSize, TransposeA, SubgroupCount>;
+        typealias InputVec = WaveTangledVector<DType, ShMemSize, K, N, SubgroupCount>;
+
+        InputVec inputVec;
+        for (int i = 0; i < InArraySize; i++)
+            inputVec.data[i] = inputData[i];
+
+        let resultVec = Bias
+            ? MMA.forward<Address, true>(inputVec, address, Address(biasBuffer.value))
+            : MMA.forward<Address, false>(inputVec, address, none);
+
+        DType output[ResultSize];
+        for (int i = 0; i < ResultSize; i++)
+            output[i] = resultVec[i];
+        return output;
+    }
 }
 
 public DType[TransposeA ? InputSize : OutputSize]

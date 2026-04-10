@@ -25,7 +25,6 @@ RWStructuredBuffer<uint> outputBuffer;
 
 static const int BatchSize = 64;
 static const int SubgroupSize = 32;
-static const int TileSize = 16;
 
 public struct TestShMemSize : ISharedMemorySize {
     public static const uint Bytes = (256 + 512) * sizeof(uint4);
@@ -35,48 +34,7 @@ static const uint OffsetB = 256;
 
 void fillWeightMatrixTiled<int InputSize, int OutputSize, int PaddedInputSize, int PaddedOutputSize, bool Clear>(uint tid)
 {
-    static const int NTileCols = PaddedInputSize / TileSize;
-    static const int TotalElements = PaddedOutputSize * PaddedInputSize;
-    static const int NumIters = (TotalElements + BatchSize - 1) / BatchSize;
-
-    if (Clear)
-    {
-        for (int iter = 0; iter < NumIters; iter++)
-        {
-            int idx = iter * BatchSize + tid;
-            if (idx < TotalElements)
-                inputBuffer[idx] = DType(0);
-        }
-        return;
-    }
-
-    for (int iter = 0; iter < NumIters; iter++)
-    {
-        int idx = iter * BatchSize + tid;
-        if (idx < TotalElements)
-            inputBuffer[idx] = DType(0);
-    }
-    AllMemoryBarrierWithGroupSync();
-
-    static const int NumRowIters = (OutputSize + BatchSize - 1) / BatchSize;
-    for (int iter = 0; iter < NumRowIters; iter++)
-    {
-        int row = iter * BatchSize + tid;
-        if (row >= OutputSize)
-            break;
-
-        int scaleFactor = (row % 3 == 0) ? -1 : ((row % 3 == 1) ? 0 : 1);
-        int tileRow = row / TileSize;
-        int localRow = row % TileSize;
-
-        for (int col = 0; col < InputSize; col++)
-        {
-            int tileCol = col / TileSize;
-            int localCol = col % TileSize;
-            int offset = (tileRow * NTileCols + tileCol) * (TileSize * TileSize) + localRow * TileSize + localCol;
-            inputBuffer[offset] = DType(scaleFactor * (col + 1));
-        }
-    }
+    fillTransposeWeightTiled<DType, OutputSize, InputSize, BatchSize, Clear>(tid, inputBuffer);
 }
 
 void test<int InputSize, int OutputSize>(uint tid, int resIndex)

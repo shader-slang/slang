@@ -93,8 +93,6 @@ internal struct WaveMatrix<T, linalg.CoopMatMatrixUse Use, int Rows, int Cols>
     //
     // Per tile: sub-tile transpose (swap reg[1]↔reg[2]) + ChangeMajor.
     // Tile grid: swapped — src tile(r, c) → dst tile(c, r).
-    //
-    // Equivalent to Tin2's w.transpose() + change_major_axis(w).
     // =========================================================================
 
     [ForceInline]
@@ -133,8 +131,6 @@ internal struct WaveMatrix<T, linalg.CoopMatMatrixUse Use, int Rows, int Cols>
 
     // =========================================================================
     // add: element-wise addition of two matrices of the same shape and Use.
-    //
-    // Equivalent to Tin2's operator+(MatrixBase, MatrixBase).
     // =========================================================================
 
     [ForceInline]
@@ -153,8 +149,6 @@ internal struct WaveMatrix<T, linalg.CoopMatMatrixUse Use, int Rows, int Cols>
     // Each thread holds PackedSize uint32 values (each packing 2 half values).
     // The function distributes them across tiles using warp shuffles.
     // Only valid for MatrixA use.
-    //
-    // Equivalent to Tin2's Vector::from_array (optimized shuffle path).
     // =========================================================================
 
     [ForceInline]
@@ -232,8 +226,6 @@ internal struct WaveMatrix<T, linalg.CoopMatMatrixUse Use, int Rows, int Cols>
     // Inverse of fromArrayPacked. Each thread gets PackedSize uint32 values
     // (each packing 2 half values) via warp shuffles.
     // Only valid for MatrixA use.
-    //
-    // Equivalent to Tin2's Vector::to_array (optimized shuffle path).
     // =========================================================================
 
     [ForceInline]
@@ -246,15 +238,21 @@ internal struct WaveMatrix<T, linalg.CoopMatMatrixUse Use, int Rows, int Cols>
 
         uint laneid = WaveGetLaneIndex();
 
-        // For half: 2 elements per uint32, TileColsPacked = 8
-        // For float: 1 element per uint32, TileColsPacked = 16
         static const int ElemsPerReg = sizeof(uint) / sizeof(T);
         static const int TotalColsPacked = PackedSize;
         static const int TileColsPacked = TILE / ElemsPerReg;
         static const uint RegColsPacked = 4;
         static const uint RegRowsPacked = 8;
-        static const uint RegRows = 2;
         static const uint MMARows = 2;
+        static const uint RegRows = 2;
+
+        // Half 16×16 tile: 4 regs = 2 sub-tiles × {gid, gid+8}
+        //   sub-tile stride = 2, row group stride = 1
+        // Float 16×16 tile: 8 regs = 2 sub-tiles × {gid_c0, gid_c1, gid+8_c0, gid+8_c1}
+        //   sub-tile stride = 4, row group stride = 2
+        static const uint RowGroupStride = 2 / uint(ElemsPerReg);
+        static const uint ColsPerRowPerSubTile = 2 / uint(ElemsPerReg);
+        static const uint RegsPerSubTile = 2 * RowGroupStride;
 
         [ForceUnroll]
         for (uint col_packed = 0; col_packed < uint(TotalColsPacked); col_packed += RegColsPacked)
@@ -267,7 +265,7 @@ internal struct WaveMatrix<T, linalg.CoopMatMatrixUse Use, int Rows, int Cols>
             [ForceUnroll]
             for (uint i = 0; i < RegColsPacked; i++)
             {
-                int base_reg_idx = int(r_col * RegRows);
+                int base_reg_idx = int((r_col / ColsPerRowPerSubTile) * RegsPerSubTile + (r_col % ColsPerRowPerSubTile));
                 int base_frag_idx = int(mma_col * MMARows);
                 regsi[i] = tiles[base_frag_idx].fragmentRead(base_reg_idx);
 
@@ -277,7 +275,7 @@ internal struct WaveMatrix<T, linalg.CoopMatMatrixUse Use, int Rows, int Cols>
                     uint r_row = j % RegRows;
                     uint mma_row = j / RegRows;
 
-                    int reg_idx = int(r_col * RegRows + r_row);
+                    int reg_idx = base_reg_idx + int(r_row * RowGroupStride);
                     int frag_idx = int(mma_col * MMARows + mma_row);
 
                     if (laneid % RegColsPacked == (i + j) % RegColsPacked)
@@ -293,6 +291,10 @@ internal struct WaveMatrix<T, linalg.CoopMatMatrixUse Use, int Rows, int Cols>
                 regsi[i] = WaveMaskReadLaneAt(fullMask, regsi[i], int(shfl_idx));
             }
 
+            // For float, even/odd columns come from separate r_col iterations
+            // so we interleave: idx = sub_tile_base + i * ColsPerRowPerSubTile + col_within
+            static const uint SubTileCols = RegColsPacked * ColsPerRowPerSubTile;
+
             [ForceUnroll]
             for (uint i = 0; i < RegColsPacked; i++)
             {
@@ -304,7 +306,10 @@ internal struct WaveMatrix<T, linalg.CoopMatMatrixUse Use, int Rows, int Cols>
                         op = regsi[j];
                 }
 
-                uint idx = col_packed + i;
+                uint idx = mma_col * uint(TileColsPacked)
+                    + (r_col / ColsPerRowPerSubTile) * SubTileCols
+                    + i * ColsPerRowPerSubTile
+                    + (r_col % ColsPerRowPerSubTile);
                 if (idx < uint(TotalColsPacked))
                     packedOut[int(idx)] = op;
             }
@@ -506,61 +511,58 @@ internal struct WaveMatrix<T, linalg.CoopMatMatrixUse Use, int Rows, int Cols>
     [ForceInline]
     [require(cooperative_matrix, subgroup_basic)]
     [mutating]
-    internal void fromVectorViaShMem<ShMemSize : ISharedMemorySize, U, int VecSize>(
+    internal void fromVectorViaShMem<ShMemSize : ISharedMemorySize, U, int VecSize, bool LanesAreRows>(
         U vec[VecSize], uint shMemOffset)
         where U : __BuiltinFloatingPointType
     {
         typealias ShMemPool = SharedMemoryPool<ShMemSize>;
         uint laneId = WaveGetLaneIndex();
 
-        // Shmem is always packed as half (MatA/MatB element type).
         static const int HalvesPerUint4 = sizeof(uint4) / sizeof(half);
-        static const int VecsPerLane = (VecSize + HalvesPerUint4 - 1) / HalvesPerUint4;
         static const int TileWidthUint4 = TILE / HalvesPerUint4;
 
-        uint base = shMemOffset + laneId * uint(VecsPerLane);
-        [ForceUnroll]
-        for (int i = 0; i < VecsPerLane; i++)
-        {
-            uint4 value;
-            int startIdx = i * HalvesPerUint4;
-
-            // __realCast<half> handles both half→half (nop) and float→half (convert).
-            value.x = bit_cast<uint>(half2(__realCast<half>(vec[startIdx+0]), __realCast<half>(vec[startIdx+1])));
-            value.y = bit_cast<uint>(half2(__realCast<half>(vec[startIdx+2]), __realCast<half>(vec[startIdx+3])));
-            value.z = bit_cast<uint>(half2(__realCast<half>(vec[startIdx+4]), __realCast<half>(vec[startIdx+5])));
-            value.w = bit_cast<uint>(half2(__realCast<half>(vec[startIdx+6]), __realCast<half>(vec[startIdx+7])));
-
-            ShMemPool.data[base + uint(i)] = value;
-        }
-
-        GroupMemoryBarrierWithWaveSync();
-
-        // Lanes (subgroup threads) map to one dimension of the matrix.
-        // Rows == N (subgroup size) → lanes are rows → shmem is row-major → RowMajor load.
-        // Cols == N → lanes are cols → shmem is column-major → ColumnMajor load.
-        static const bool LanesAreRows = (Rows == 32);
+        // Process one tile-group at a time (16 elements per lane per group).
+        // Shmem per group: 32 × TileWidthUint4 uint4 = 16 × 32 × sizeof(half).
+        static const int NumGroups = LanesAreRows ? TileCols : TileRows;
+        static const int NumTilesPerGroup = LanesAreRows ? TileRows : TileCols;
 
         [ForceUnroll]
-        for (int tc = 0; tc < TileCols; tc++)
+        for (int g = 0; g < NumGroups; g++)
         {
+            int vecStart = g * TILE;
+            uint base = shMemOffset + laneId * uint(TileWidthUint4);
+
             [ForceUnroll]
-            for (int tr = 0; tr < TileRows; tr++)
+            for (int i = 0; i < TileWidthUint4; i++)
             {
+                uint4 value;
+                int s = vecStart + i * HalvesPerUint4;
+                value.x = bit_cast<uint>(half2(__realCast<half>(vec[s+0]), __realCast<half>(vec[s+1])));
+                value.y = bit_cast<uint>(half2(__realCast<half>(vec[s+2]), __realCast<half>(vec[s+3])));
+                value.z = bit_cast<uint>(half2(__realCast<half>(vec[s+4]), __realCast<half>(vec[s+5])));
+                value.w = bit_cast<uint>(half2(__realCast<half>(vec[s+6]), __realCast<half>(vec[s+7])));
+                ShMemPool.data[base + uint(i)] = value;
+            }
+
+            GroupMemoryBarrierWithWaveSync();
+
+            [ForceUnroll]
+            for (int t = 0; t < NumTilesPerGroup; t++)
+            {
+                int tr = LanesAreRows ? t : g;
+                int tc = LanesAreRows ? g : t;
                 int idx = tileIdx(tr, tc);
-                uint tileOffset;
-                if (LanesAreRows)
-                    tileOffset = shMemOffset + uint(tr * TILE * VecsPerLane + tc * TileWidthUint4);
-                else
-                    tileOffset = shMemOffset + uint(tc * TILE * VecsPerLane + tr * TileWidthUint4);
+                uint tileOffset = shMemOffset + uint(t * TILE * TileWidthUint4);
 
                 if (LanesAreRows)
                     tiles[idx] = Tile.Load<linalg.CoopMatMatrixLayout.RowMajor, uint4>(
-                        ShMemPool.data, tileOffset, uint(VecsPerLane));
+                        ShMemPool.data, tileOffset, uint(TileWidthUint4));
                 else
                     tiles[idx] = Tile.Load<linalg.CoopMatMatrixLayout.ColumnMajor, uint4>(
-                        ShMemPool.data, tileOffset, uint(VecsPerLane));
+                        ShMemPool.data, tileOffset, uint(TileWidthUint4));
             }
+
+            GroupMemoryBarrierWithWaveSync();
         }
     }
 
@@ -573,73 +575,71 @@ internal struct WaveMatrix<T, linalg.CoopMatMatrixUse Use, int Rows, int Cols>
 
     [ForceInline]
     [require(cooperative_matrix, subgroup_basic)]
-    internal void toVectorViaShMem<ShMemSize : ISharedMemorySize, int VecSize>(
+    internal void toVectorViaShMem<ShMemSize : ISharedMemorySize, int VecSize, bool LanesAreRows>(
         inout T vec[VecSize], uint shMemOffset)
     {
         typealias ShMemPool = SharedMemoryPool<ShMemSize>;
         uint laneId = WaveGetLaneIndex();
 
         static const int ElemPerUint4 = sizeof(uint4) / sizeof(T);
-        static const int VecsPerLane = (VecSize + ElemPerUint4 - 1) / ElemPerUint4;
         static const int TileWidthUint4 = TILE / ElemPerUint4;
 
-        static const bool LanesAreRows = (Rows == 32);
+        // Process one tile-group at a time (16 elements per lane per group).
+        // Shmem per group: 32 × TileWidthUint4 uint4 = 16 × 32 × sizeof(T).
+        static const int NumGroups = LanesAreRows ? TileCols : TileRows;
+        static const int NumTilesPerGroup = LanesAreRows ? TileRows : TileCols;
 
-        // Store tiles to shmem
         [ForceUnroll]
-        for (int tc = 0; tc < TileCols; tc++)
+        for (int g = 0; g < NumGroups; g++)
         {
             [ForceUnroll]
-            for (int tr = 0; tr < TileRows; tr++)
+            for (int t = 0; t < NumTilesPerGroup; t++)
             {
+                int tr = LanesAreRows ? t : g;
+                int tc = LanesAreRows ? g : t;
                 int idx = tileIdx(tr, tc);
-                uint tileOffset;
-                if (LanesAreRows)
-                    tileOffset = shMemOffset + uint(tr * TILE * VecsPerLane + tc * TileWidthUint4);
-                else
-                    tileOffset = shMemOffset + uint(tc * TILE * VecsPerLane + tr * TileWidthUint4);
+                uint tileOffset = shMemOffset + uint(t * TILE * TileWidthUint4);
 
                 if (LanesAreRows)
                     tiles[idx].Store<linalg.CoopMatMatrixLayout.RowMajor, uint4>(
-                        ShMemPool.data, tileOffset, uint(VecsPerLane));
+                        ShMemPool.data, tileOffset, uint(TileWidthUint4));
                 else
                     tiles[idx].Store<linalg.CoopMatMatrixLayout.ColumnMajor, uint4>(
-                        ShMemPool.data, tileOffset, uint(VecsPerLane));
+                        ShMemPool.data, tileOffset, uint(TileWidthUint4));
             }
-        }
 
-        GroupMemoryBarrierWithWaveSync();
+            GroupMemoryBarrierWithWaveSync();
 
-        // Each lane reads its vector from shmem
-        uint base = shMemOffset + laneId * uint(VecsPerLane);
-        [ForceUnroll]
-        for (int i = 0; i < VecsPerLane; i++)
-        {
-            uint4 value = ShMemPool.data[base + uint(i)];
-            int startIdx = i * ElemPerUint4;
+            int vecStart = g * TILE;
+            uint base = shMemOffset + laneId * uint(TileWidthUint4);
 
-            if (sizeof(T) == 2)
+            [ForceUnroll]
+            for (int i = 0; i < TileWidthUint4; i++)
             {
-                vector<T, 2> p0 = bit_cast<vector<T, 2>>(value.x);
-                vector<T, 2> p1 = bit_cast<vector<T, 2>>(value.y);
-                vector<T, 2> p2 = bit_cast<vector<T, 2>>(value.z);
-                vector<T, 2> p3 = bit_cast<vector<T, 2>>(value.w);
-                vec[startIdx+0] = p0.x;
-                vec[startIdx+1] = p0.y;
-                vec[startIdx+2] = p1.x;
-                vec[startIdx+3] = p1.y;
-                vec[startIdx+4] = p2.x;
-                vec[startIdx+5] = p2.y;
-                vec[startIdx+6] = p3.x;
-                vec[startIdx+7] = p3.y;
+                uint4 value = ShMemPool.data[base + uint(i)];
+                int s = vecStart + i * ElemPerUint4;
+
+                if (sizeof(T) == 2)
+                {
+                    vector<T, 2> p0 = bit_cast<vector<T, 2>>(value.x);
+                    vector<T, 2> p1 = bit_cast<vector<T, 2>>(value.y);
+                    vector<T, 2> p2 = bit_cast<vector<T, 2>>(value.z);
+                    vector<T, 2> p3 = bit_cast<vector<T, 2>>(value.w);
+                    vec[s+0] = p0.x; vec[s+1] = p0.y;
+                    vec[s+2] = p1.x; vec[s+3] = p1.y;
+                    vec[s+4] = p2.x; vec[s+5] = p2.y;
+                    vec[s+6] = p3.x; vec[s+7] = p3.y;
+                }
+                else if (sizeof(T) == 4)
+                {
+                    vec[s+0] = bit_cast<T>(value.x);
+                    vec[s+1] = bit_cast<T>(value.y);
+                    vec[s+2] = bit_cast<T>(value.z);
+                    vec[s+3] = bit_cast<T>(value.w);
+                }
             }
-            else if (sizeof(T) == 4)
-            {
-                vec[startIdx+0] = bit_cast<T>(value.x);
-                vec[startIdx+1] = bit_cast<T>(value.y);
-                vec[startIdx+2] = bit_cast<T>(value.z);
-                vec[startIdx+3] = bit_cast<T>(value.w);
-            }
+
+            GroupMemoryBarrierWithWaveSync();
         }
     }
 

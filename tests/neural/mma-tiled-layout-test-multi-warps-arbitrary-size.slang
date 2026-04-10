@@ -63,27 +63,30 @@ void clearWeightBuffer<int PaddedM, int PaddedK>(uint tid)
     }
 }
 
-// Fill an OutputSize x InputSize weight matrix with 0.125 in tiled layout.
-// The matrix is padded to PaddedM x PaddedK (multiples of 16); padding is zero.
+// Fill weight matrix with 0.125 in tiled MatB(K, M) layout.
+// MatB has K=InputSize rows × M=OutputSize columns, padded to PaddedK × PaddedM.
 void fillWeightMatrixTiled<int InputSize, int OutputSize, int PaddedK, int PaddedM>(uint tid)
 {
     clearWeightBuffer<PaddedM, PaddedK>(tid);
     AllMemoryBarrierWithGroupSync();
 
-    static const int NumRowIters = (OutputSize + BatchSize - 1) / BatchSize;
+    static const int NumRowIters = (InputSize + BatchSize - 1) / BatchSize;
 
     for (int iter = 0; iter < NumRowIters; iter++)
     {
         int row = iter * BatchSize + tid;
-        if (row >= OutputSize)
+        if (row >= InputSize)
             break;
 
-        for (int col = 0; col < InputSize; col++)
+        for (int col = 0; col < OutputSize; col++)
         {
-            int offset = tiledOffset<PaddedK>(row, col);
+            int offset = tiledOffset<PaddedM>(row, col);
             weightBuffer[offset] = DType(0.125f);
         }
     }
+
+    AllMemoryBarrierWithGroupSync();
+    convertTiledToNativeB<DType, PaddedK, PaddedM, BatchSize>(tid, weightBuffer);
 }
 
 void test<int InputSize, int OutputSize>(uint tid, int resIndex)
