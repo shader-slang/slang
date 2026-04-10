@@ -48,9 +48,8 @@ IArtifact* TargetProgram::_createWholeProgramResult(
         if (m_wholeProgramResult)
             return m_wholeProgramResult;
         m_wholeProgramResult = artifact;
+        return m_wholeProgramResult;
     }
-
-    return m_wholeProgramResult;
 }
 
 IArtifact* TargetProgram::_createEntryPointResult(
@@ -88,9 +87,8 @@ IArtifact* TargetProgram::_createEntryPointResult(
         if (m_entryPointResults[entryPointIndex])
             return m_entryPointResults[entryPointIndex];
         m_entryPointResults[entryPointIndex] = artifact;
+        return m_entryPointResults[entryPointIndex];
     }
-
-    return m_entryPointResults[entryPointIndex];
 }
 
 IArtifact* TargetProgram::getOrCreateWholeProgramResult(DiagnosticSink* sink)
