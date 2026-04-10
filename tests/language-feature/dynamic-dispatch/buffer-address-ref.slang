@@ -10,8 +10,8 @@
 // Scenario:
 //   valueBuf  -> serialized Literal{val=10} existential for IValue
 //   nodeBuf   -> serialized IndirectNode{source=&valueBuf, offset=5} for INode
-//   nodeBuf->evaluate() dispatches IndirectNode::evaluate() which calls
-//   source->get() (Literal::get() = 10) + offset (5) = 15
+//   nodeBuf.evaluate() dispatches IndirectNode::evaluate() which calls
+//   source.get() (Literal::get() = 10) + offset (5) = 15
 
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=CHECK):-cpu -compute -shaderobj -output-using-type
 //TEST(compute):COMPARE_COMPUTE(filecheck-buffer=CHECK):-vk -emit-spirv-directly -output-using-type
@@ -46,7 +46,7 @@ struct IndirectNode : INode
 {
     IValue* source;
     int offset;
-    int evaluate() { return source->get() + offset; }
+    int evaluate() { return source.get() + offset; }
 }
 
 //TEST_INPUT: type_conformance Literal:IValue = 1
@@ -74,12 +74,12 @@ void computeMain()
 {
     // Direct: Literal.get() = val = 10
     // CHECK: 10
-    outputBuffer[0] = valueBuf->get();
+    outputBuffer[0] = valueBuf.get();
 
     // Indirect via data=[bufferName]:
-    // IndirectNode.evaluate() = source->get() + offset = 10 + 5 = 15
+    // IndirectNode.evaluate() = source.get() + offset = 10 + 5 = 15
     // CHECK: 15
-    outputBuffer[1] = nodeBuf->evaluate();
+    outputBuffer[1] = nodeBuf.evaluate();
 
     // LeafNode for comparison (not using data=[bufferName], just static construction)
     LeafNode leaf;

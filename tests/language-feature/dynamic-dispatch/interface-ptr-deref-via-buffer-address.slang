@@ -1,4 +1,4 @@
-// Test for issue #10015: Dynamic dispatch through interface pointer (ptr->foo())
+// Test for issue #10015: Dynamic dispatch through interface pointer (ptr.foo())
 // where the pointer is constructed via the data=[bufferName] buffer address
 // embedding syntax.
 //
@@ -53,7 +53,7 @@ struct IndirectWrapper : IWrapper
 {
     IValue* source;
     float bias;
-    float evaluate() { return source->getValue() + bias; }
+    float evaluate() { return source.getValue() + bias; }
 }
 
 //TEST_INPUT: type_conformance FloatVal:IValue = 1
@@ -91,19 +91,19 @@ void computeMain()
 {
     // Direct IValue dereference: FloatVal.getValue() = v = 10.0
     // CHECK: 10.0
-    outputBuffer[0] = floatValBuf->getValue();
+    outputBuffer[0] = floatValBuf.getValue();
 
     // IndirectWrapper -> FloatVal via data=[floatValBuf]:
-    // source->getValue() + bias = 10.0 + 100.0 = 110.0
+    // source.getValue() + bias = 10.0 + 100.0 = 110.0
     // CHECK: 110.0
-    outputBuffer[1] = indirectWrapperBuf->evaluate();
+    outputBuffer[1] = indirectWrapperBuf.evaluate();
 
     // IndirectWrapper -> DoubledVal via data=[doubledValBuf]:
-    // source->getValue() + bias = (3.0 * 2.0) + 0.5 = 6.5
+    // source.getValue() + bias = (3.0 * 2.0) + 0.5 = 6.5
     // CHECK: 6.5
-    outputBuffer[2] = indirectWrapperBuf2->evaluate();
+    outputBuffer[2] = indirectWrapperBuf2.evaluate();
 
     // Direct IValue dereference: DoubledVal.getValue() = v * 2.0 = 6.0
     // CHECK: 6.0
-    outputBuffer[3] = doubledValBuf->getValue();
+    outputBuffer[3] = doubledValBuf.getValue();
 }
