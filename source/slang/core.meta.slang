@@ -692,7 +692,7 @@ interface IForwardDifferentiable<FType> where __hasDiffTypeInfo(FType)
 {
     __builtin_requirement($( (int)BuiltinRequirementKind::ForwardDerivativeFunc))
     [MaybeDifferentiable]
-    static __associatedfunc FwdDiffFuncType<FType> fwd_diff; // -> fwd_diff
+    static __associatedfunc FwdDiffFuncType<FType> fwd_diff; // -> fwd_diff 
 };
 
 // Core library interfaces:
