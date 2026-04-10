@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import itertools
 import os
 import re
 import sys
@@ -42,7 +43,13 @@ def scanForAnchor(file, anchorMatcher, filename, anchor):
 
 def checkMarkDownLinks(srcFile):
     errors = 0
-    linkMatcher = re.compile(r"\[(?:[^]\\]|\.)*\]\(([^)#]*)([^)]*)\)")
+
+    # match:                            [link text........] ((url...)(anchr))
+    linkMatcherMarkDown = re.compile(r"\[(?:[^\]\\]|\\.)*\]\(([^)#]*)([^)]*)\)")
+
+    # match:                       <a      href="(url...)(anchr)"     >
+    linkMatcherHref = re.compile(r'<a [^>]*href="([^"#]*)([^"]*)"[^>]*>')
+
     anchorMatcher = re.compile(r"^#.*\{(#[^}]+)\}")
 
     verbosePrint(f"Collecting links: {srcFile}")
@@ -51,7 +58,7 @@ def checkMarkDownLinks(srcFile):
         lineNo = 0
         for line in file1:
             lineNo = lineNo + 1
-            for m in linkMatcher.finditer(line):
+            for m in itertools.chain(linkMatcherMarkDown.finditer(line), linkMatcherHref.finditer(line)):
                 linkDstFile = m.group(1)
                 linkDstAnchor = m.group(2)
                 verbosePrintNoNewline(f"- {linkDstFile} {linkDstAnchor}:")

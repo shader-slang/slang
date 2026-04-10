@@ -30,6 +30,9 @@ jobs:
           submodules: "recursive"
           fetch-depth: 0 # Need full history for version tags
 
+      - name: Check disk space
+        uses: ./.github/actions/check-disk-space
+
       # Explicitly fetch tags for version detection
       # actions/checkout doesn't always fetch tags properly
       - name: Fetch version tags
