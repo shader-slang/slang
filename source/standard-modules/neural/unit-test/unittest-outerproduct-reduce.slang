@@ -81,9 +81,9 @@ void testOuterProductAccumulateTiledImpl<
     typealias Address = BindlessAddress<DType>;
     Address address = Address(outputBuffer);
 
-    typealias MMA = TiledMMAHelper<DType, InputSize, OutputSize, 32, Target, ShMemSize, false, SubgroupCount>;
-    const int OutSize = MMA.TileInfoT.Uint4AlignedM;
-    const int InSize = MMA.TileInfoT.Uint4AlignedK;
+    typealias MMA = MMAHelper<DType, InputSize, OutputSize, 32, Target, ShMemSize, false, SubgroupCount>;
+    const int OutSize = MMA.Uint4AlignedM;
+    const int InSize = MMA.Uint4AlignedK;
     const int OffsetA = 0;
     const int OffsetB = 64 * 4 * SubgroupCount;
 

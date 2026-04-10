@@ -106,30 +106,20 @@ DType[TransposeA ? InputSize : OutputSize]
     Address address = Address(weightBuffer);
 
     typealias MMA = TiledMMAHelper<DType, PaddedInputSize, PaddedOutputSize, 32, Target, ShMemSize, TransposeA, SubgroupCount>;
-    const int InSize = TransposeA ? MMA.TileInfoT.Uint4AlignedM : MMA.TileInfoT.Uint4AlignedK;
-    const int OutSize = TransposeA ? MMA.TileInfoT.Uint4AlignedK : MMA.TileInfoT.Uint4AlignedM;
+    typealias InputVec = WaveTangledVector<DType, ShMemSize, PaddedInputSize, 32, SubgroupCount>;
     const int ResultSize = TransposeA ? InputSize : OutputSize;
 
-    DType inputVector[InSize] = {};
+    InputVec inputVec;
     for (int i = 0; i < InArraySize; i++)
-        inputVector[i] = inputData[i];
+        inputVec.data[i] = inputData[i];
 
-    DType alignedOutput[OutSize];
-    if (Bias)
-    {
-        Address biasAddress = Address(biasBuffer.value);
-        alignedOutput = MMA.mma<DType, Address, DType[InSize], DType[OutSize], DType, true>(
-            inputVector, 0, 256, 256, address, biasAddress);
-    }
-    else
-    {
-        alignedOutput = MMA.mma<DType, Address, DType[InSize], DType[OutSize], DType, false>(
-            inputVector, 0, 256, 256, address, none);
-    }
+    let resultVec = Bias
+        ? MMA.forward<Address, true>(inputVec, address, Address(biasBuffer.value))
+        : MMA.forward<Address, false>(inputVec, address, none);
 
     DType output[ResultSize];
     for (int i = 0; i < ResultSize; i++)
-        output[i] = alignedOutput[i];
+        output[i] = resultVec[i];
     return output;
 }
 

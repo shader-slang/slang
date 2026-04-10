@@ -102,24 +102,9 @@ public struct WaveTangledVector<T, ShMemSize : ISharedMemorySize, int N, int Sub
     {
         if (Layout.Layout == LayoutType.Optimal)
         {
-            __target_switch
-            {
-            case cuda:
-                typealias MMA = MMAHelperNew<T, N, OutputVector.Size, SubgroupSize, Target>;
-                const int AlignedOutSize = ((OutputVector.Size + int(MMA.ElementCountPerVector) - 1) / int(MMA.ElementCountPerVector)) * int(MMA.ElementCountPerVector);
-                let outputArray = MMA.mma<T, Address, T[Uint4AlignedInputSize], T[AlignedOutSize], T, Bias>(
-                    data, weightAddress, biasAddress);
-                return OutputVector(outputArray);
-            case spirv:
-                typealias MMA_spirv = TiledMMAHelper<T, N, OutputVector.Size, SubgroupSize, Target, ShMemSize, false, SubgroupCount>;
-                uint shA = 0;
-                uint shB = MMA_spirv.ShMemInfo.SharedMemSizeInVectorMatA;
-                uint shC = shB;
-                const int AlignedOutSize_spirv = MMA_spirv.TileInfo.Uint4AlignedM;
-                let outputArray_spirv = MMA_spirv.mma<T, Address, T[Uint4AlignedInputSize], T[AlignedOutSize_spirv], T, Bias
-                                    >( data, shA, shB, shC, weightAddress, biasAddress);
-                return OutputVector(outputArray_spirv);
-            }
+            typealias TiledMMA = TiledMMAHelper<T, N, OutputVector.Size, SubgroupSize, Target, ShMemSize, false, SubgroupCount>;
+            let resultVec = TiledMMA.forward<Address, Bias>(This(data), weightAddress, biasAddress);
+            return OutputVector(resultVec.data);
         }
         else
         {
@@ -149,45 +134,9 @@ public struct WaveTangledVector<T, ShMemSize : ISharedMemorySize, int N, int Sub
         if (Layout.Layout == LayoutType.Optimal)
         {
             typealias MMA = TiledMMAHelper<T, N, OutputVector.Size, SubgroupSize, Target, ShMemSize, true, SubgroupCount>;
-
-            uint shA = 0;
-            uint shB = MMA.ShMemInfo.SharedMemSizeInVectorMatA;
-            uint shC = shB;
-
-            const int AlignedOutSize = MMA.TileInfo.Uint4AlignedK;
-
-#if PERF_MMA_TRANSPOSE_ACTIVE
-            // dIn = W^T * dOut (tiled layout)
-            let outArray = MMA.mma<T, Address, OutputVector.Differential, T[AlignedOutSize], T, false
-                            >( doutput, shA, shB, shC, dWeightAddress.p, none);
-            This.Differential dInput = This.Differential(outArray);
-            dthis = DifferentialPair<This>(dthis.p, dInput);
-
-            GroupMemoryBarrierWithGroupSync();
-#endif
-
-#if PERF_BIAS_REDUCE_ACTIVE
-            if (Bias)
-            {
-                const int subgroupIndex = getWaveId();
-                MMA.sumReduceRows<T, Address.Differential, OutputVector.Differential
-                    >(shA, doutput, subgroupIndex, biasAddress.value.d);
-            }
-
-            GroupMemoryBarrierWithGroupSync();
-#endif
-
-#if PERF_OPA_ACTIVE
-            static const int _outerRows = (MMA.M + MMA.CMShape.ROW_A - 1) / MMA.CMShape.ROW_A;
-            static const int _outerPerWarpA = _outerRows * MMA.CMShape.ROW_A / MMA.CMShape.ElementCountPerVector * SubgroupSize;
-            uint shB_outer = shA + uint(SubgroupCount * _outerPerWarpA);
-
-            // dW = dOut * input^T, stored in tiled layout
-            MMA.outerProductAccumulate<T, Address.Differential,
-                                       T, OutputVector.Differential,
-                                       T, T[Uint4AlignedInputSize]
-                                      >( shA, shB_outer, doutput, dthis.p.data, dWeightAddress.d);
-#endif
+            let dInputVec = MMA.backward<Address, OutputVector.Differential>(
+                dthis.p, doutput, dWeightAddress.p, dWeightAddress.d, biasAddress.value.d);
+            dthis = DifferentialPair<This>(dthis.p, bit_cast<This>(dInputVec));
         }
         else
         {

@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
-// Single-layer backward benchmark using MMAHelperNewV2.backward().
+// Single-layer backward benchmark using TiledMMAHelper.backward() dispatcher.
+// On CUDA, dispatches to TiledMMACuda (WaveMatrix register ops).
 
+#define UNIT_TEST
 import slang.neural;
 
 #ifndef INPUT_SIZE
@@ -17,15 +19,6 @@ static const int SubgroupSize = 32;
 #endif
 static const int SubgroupCount = SUBGROUP_COUNT;
 
-typealias Address = BindlessAddress<half>;
-
-typealias ShMemSize = SharedMemorySize<half, TargetEnum.CUDA, ExecutionMode.Training, SubgroupSize, SubgroupCount>;
-typealias ShMemSizeLayer = ShMemSize.OfLayer1<INPUT_SIZE, OUTPUT_SIZE>;
-
-typealias Helper = MMAHelperNewV2<half, INPUT_SIZE, OUTPUT_SIZE, SubgroupSize, TargetEnum.CUDA>;
-typealias InputVec = WaveTangledVector<half, ShMemSizeLayer, INPUT_SIZE, SubgroupSize, SubgroupCount>;
-typealias OutputVec = WaveTangledVector<half, ShMemSizeLayer, OUTPUT_SIZE, SubgroupSize, SubgroupCount>;
-
 static const int NTileRows = (OUTPUT_SIZE + 15) / 16;
 static const int NTileCols = (INPUT_SIZE + 15) / 16;
 static const int TILED_WEIGHT_COUNT = NTileRows * NTileCols * 256;
@@ -33,6 +26,8 @@ static const int TILED_WEIGHT_COUNT = NTileRows * NTileCols * 256;
 public int get_input_size() { return INPUT_SIZE; }
 public int get_output_size() { return OUTPUT_SIZE; }
 public int get_tiled_weight_count() { return TILED_WEIGHT_COUNT; }
+
+public struct BenchShMem : ISharedMemorySize { public static const uint Bytes = 40 * 1024; }
 
 [shader("compute")]
 #if SUBGROUP_COUNT == 2
@@ -57,17 +52,15 @@ void compute_backward(
     if (sampleIdx >= batch_size)
         return;
 
-    let weightAddr = Address(params).getOffset(0);
-    let weightGradAddr = Address(weightGrad).getOffset(0);
-    let biasGradAddr = Address(biasGrad).getOffset(0);
+    half inputArr[INPUT_SIZE];
+    half dOutArr[OUTPUT_SIZE];
+    for (int i = 0; i < INPUT_SIZE; i++) inputArr[i] = half(1.0);
+    for (int i = 0; i < OUTPUT_SIZE; i++) dOutArr[i] = half(1.0);
 
-    InputVec input = InputVec(half(1.0));
-    OutputVec dOut = OutputVec(half(1.0));
+    let dInput = neural_unittest.testTiledBackward<half, INPUT_SIZE, OUTPUT_SIZE, BenchShMem, SubgroupCount>(
+        inputArr, dOutArr, params, weightGrad, biasGrad);
 
-    InputVec dInput = Helper.backward<Address, ShMemSizeLayer, SubgroupCount>(
-        input, dOut, weightAddr, weightGradAddr, biasGradAddr);
-
-    // Checksum
+    // Checksum to prevent dead code elimination
     uint checksum = 0;
     [ForceUnroll]
     for (int i = 0; i < INPUT_SIZE; i++)

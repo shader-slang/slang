@@ -20,7 +20,7 @@ internal typealias MatrixA<int Rows, int Cols> = WaveMatrix<half, linalg.CoopMat
 internal typealias MatrixB<int Rows, int Cols> = WaveMatrix<half, linalg.CoopMatMatrixUse.MatrixB, Rows, Cols>;
 internal typealias MatrixC<T: __BuiltinFloatingPointType, int Rows, int Cols> = WaveMatrix<T, linalg.CoopMatMatrixUse.MatrixAccumulator, Rows, Cols>;
 
-[require(cuda)]
+[require(cooperative_matrix)]
 internal struct WaveMatrix<T, linalg.CoopMatMatrixUse Use, int Rows, int Cols>
     where T : __BuiltinFloatingPointType
 {
@@ -56,6 +56,7 @@ internal struct WaveMatrix<T, linalg.CoopMatMatrixUse Use, int Rows, int Cols>
     // =========================================================================
 
     [ForceInline]
+    [require(cuda)]
     [mutating]
     void changeMajor()
     {
@@ -73,6 +74,7 @@ internal struct WaveMatrix<T, linalg.CoopMatMatrixUse Use, int Rows, int Cols>
     // =========================================================================
 
     [ForceInline]
+    [require(cuda)]
     [mutating]
     void transposeSubMatrix()
     {
@@ -84,6 +86,49 @@ internal struct WaveMatrix<T, linalg.CoopMatMatrixUse Use, int Rows, int Cols>
             tiles[idx].fragmentWrite(1, r2);
             tiles[idx].fragmentWrite(2, r1);
         }
+    }
+
+    // =========================================================================
+    // transpose: full matrix transpose returning WaveMatrix<T, Use, Cols, Rows>.
+    //
+    // Per tile: sub-tile transpose (swap reg[1]↔reg[2]) + ChangeMajor.
+    // Tile grid: swapped — src tile(r, c) → dst tile(c, r).
+    //
+    // Equivalent to Tin2's w.transpose() + change_major_axis(w).
+    // =========================================================================
+
+    [ForceInline]
+    [require(cuda)]
+    WaveMatrix<T, Use, Cols, Rows> transpose()
+    {
+        WaveMatrix<T, Use, Cols, Rows> result;
+        static const int DstTileRows = (Cols + TILE - 1) / TILE;
+        static const int DstTileCols = (Rows + TILE - 1) / TILE;
+
+        [ForceUnroll]
+        for (int r = 0; r < DstTileRows; r++)
+        {
+            [ForceUnroll]
+            for (int c = 0; c < DstTileCols; c++)
+            {
+                int srcIdx = tileIdx(c, r);
+                int dstIdx = result.tileIdx(r, c);
+
+                uint r0 = tiles[srcIdx].fragmentRead(0);
+                uint r1 = tiles[srcIdx].fragmentRead(1);
+                uint r2 = tiles[srcIdx].fragmentRead(2);
+                uint r3 = tiles[srcIdx].fragmentRead(3);
+
+                // Sub-tile transpose: swap reg[1] and reg[2]
+                result.tiles[dstIdx].fragmentWrite(0, r0);
+                result.tiles[dstIdx].fragmentWrite(1, r2);
+                result.tiles[dstIdx].fragmentWrite(2, r1);
+                result.tiles[dstIdx].fragmentWrite(3, r3);
+
+                result.tiles[dstIdx].ChangeMajor();
+            }
+        }
+        return result;
     }
 
     // =========================================================================
@@ -443,6 +488,219 @@ internal struct WaveMatrix<T, linalg.CoopMatMatrixUse Use, int Rows, int Cols>
             }
         }
     }
+
+    // =========================================================================
+    // fromVectorViaShMem: load per-lane vector into WaveMatrix tiles via shmem.
+    //
+    // Each lane writes its VecSize-element vector to shared memory, then
+    // CoopMat.Load reads the tiles. Works on both CUDA and Vulkan.
+    //
+    // The shmem layout is lane-contiguous: lane i's data is at
+    // [shMemOffset + i * VecsPerLane, ..., shMemOffset + (i+1) * VecsPerLane - 1].
+    //
+    // For WaveMatrix(T, Use, Rows, Cols) with N=32 lanes:
+    //   Rows == N: lanes map to rows → tiles loaded RowMajor
+    //   Cols == N: lanes map to cols → tiles loaded ColumnMajor
+    // =========================================================================
+
+    [ForceInline]
+    [require(cooperative_matrix, subgroup_basic)]
+    [mutating]
+    internal void fromVectorViaShMem<ShMemSize : ISharedMemorySize, U, int VecSize>(
+        U vec[VecSize], uint shMemOffset)
+        where U : __BuiltinFloatingPointType
+    {
+        typealias ShMemPool = SharedMemoryPool<ShMemSize>;
+        uint laneId = WaveGetLaneIndex();
+
+        // Shmem is always packed as half (MatA/MatB element type).
+        static const int HalvesPerUint4 = sizeof(uint4) / sizeof(half);
+        static const int VecsPerLane = (VecSize + HalvesPerUint4 - 1) / HalvesPerUint4;
+        static const int TileWidthUint4 = TILE / HalvesPerUint4;
+
+        uint base = shMemOffset + laneId * uint(VecsPerLane);
+        [ForceUnroll]
+        for (int i = 0; i < VecsPerLane; i++)
+        {
+            uint4 value;
+            int startIdx = i * HalvesPerUint4;
+
+            // __realCast<half> handles both half→half (nop) and float→half (convert).
+            value.x = bit_cast<uint>(half2(__realCast<half>(vec[startIdx+0]), __realCast<half>(vec[startIdx+1])));
+            value.y = bit_cast<uint>(half2(__realCast<half>(vec[startIdx+2]), __realCast<half>(vec[startIdx+3])));
+            value.z = bit_cast<uint>(half2(__realCast<half>(vec[startIdx+4]), __realCast<half>(vec[startIdx+5])));
+            value.w = bit_cast<uint>(half2(__realCast<half>(vec[startIdx+6]), __realCast<half>(vec[startIdx+7])));
+
+            ShMemPool.data[base + uint(i)] = value;
+        }
+
+        GroupMemoryBarrierWithWaveSync();
+
+        // Lanes (subgroup threads) map to one dimension of the matrix.
+        // Rows == N (subgroup size) → lanes are rows → shmem is row-major → RowMajor load.
+        // Cols == N → lanes are cols → shmem is column-major → ColumnMajor load.
+        static const bool LanesAreRows = (Rows == 32);
+
+        [ForceUnroll]
+        for (int tc = 0; tc < TileCols; tc++)
+        {
+            [ForceUnroll]
+            for (int tr = 0; tr < TileRows; tr++)
+            {
+                int idx = tileIdx(tr, tc);
+                uint tileOffset;
+                if (LanesAreRows)
+                    tileOffset = shMemOffset + uint(tr * TILE * VecsPerLane + tc * TileWidthUint4);
+                else
+                    tileOffset = shMemOffset + uint(tc * TILE * VecsPerLane + tr * TileWidthUint4);
+
+                if (LanesAreRows)
+                    tiles[idx] = Tile.Load<linalg.CoopMatMatrixLayout.RowMajor, uint4>(
+                        ShMemPool.data, tileOffset, uint(VecsPerLane));
+                else
+                    tiles[idx] = Tile.Load<linalg.CoopMatMatrixLayout.ColumnMajor, uint4>(
+                        ShMemPool.data, tileOffset, uint(VecsPerLane));
+            }
+        }
+    }
+
+    // =========================================================================
+    // toVectorViaShMem: extract per-lane vector from WaveMatrix tiles via shmem.
+    //
+    // CoopMat.Store writes tiles to shared memory, then each lane reads its data.
+    // Inverse of fromVectorViaShMem.
+    // =========================================================================
+
+    [ForceInline]
+    [require(cooperative_matrix, subgroup_basic)]
+    internal void toVectorViaShMem<ShMemSize : ISharedMemorySize, int VecSize>(
+        inout T vec[VecSize], uint shMemOffset)
+    {
+        typealias ShMemPool = SharedMemoryPool<ShMemSize>;
+        uint laneId = WaveGetLaneIndex();
+
+        static const int ElemPerUint4 = sizeof(uint4) / sizeof(T);
+        static const int VecsPerLane = (VecSize + ElemPerUint4 - 1) / ElemPerUint4;
+        static const int TileWidthUint4 = TILE / ElemPerUint4;
+
+        static const bool LanesAreRows = (Rows == 32);
+
+        // Store tiles to shmem
+        [ForceUnroll]
+        for (int tc = 0; tc < TileCols; tc++)
+        {
+            [ForceUnroll]
+            for (int tr = 0; tr < TileRows; tr++)
+            {
+                int idx = tileIdx(tr, tc);
+                uint tileOffset;
+                if (LanesAreRows)
+                    tileOffset = shMemOffset + uint(tr * TILE * VecsPerLane + tc * TileWidthUint4);
+                else
+                    tileOffset = shMemOffset + uint(tc * TILE * VecsPerLane + tr * TileWidthUint4);
+
+                if (LanesAreRows)
+                    tiles[idx].Store<linalg.CoopMatMatrixLayout.RowMajor, uint4>(
+                        ShMemPool.data, tileOffset, uint(VecsPerLane));
+                else
+                    tiles[idx].Store<linalg.CoopMatMatrixLayout.ColumnMajor, uint4>(
+                        ShMemPool.data, tileOffset, uint(VecsPerLane));
+            }
+        }
+
+        GroupMemoryBarrierWithWaveSync();
+
+        // Each lane reads its vector from shmem
+        uint base = shMemOffset + laneId * uint(VecsPerLane);
+        [ForceUnroll]
+        for (int i = 0; i < VecsPerLane; i++)
+        {
+            uint4 value = ShMemPool.data[base + uint(i)];
+            int startIdx = i * ElemPerUint4;
+
+            if (sizeof(T) == 2)
+            {
+                vector<T, 2> p0 = bit_cast<vector<T, 2>>(value.x);
+                vector<T, 2> p1 = bit_cast<vector<T, 2>>(value.y);
+                vector<T, 2> p2 = bit_cast<vector<T, 2>>(value.z);
+                vector<T, 2> p3 = bit_cast<vector<T, 2>>(value.w);
+                vec[startIdx+0] = p0.x;
+                vec[startIdx+1] = p0.y;
+                vec[startIdx+2] = p1.x;
+                vec[startIdx+3] = p1.y;
+                vec[startIdx+4] = p2.x;
+                vec[startIdx+5] = p2.y;
+                vec[startIdx+6] = p3.x;
+                vec[startIdx+7] = p3.y;
+            }
+            else if (sizeof(T) == 4)
+            {
+                vec[startIdx+0] = bit_cast<T>(value.x);
+                vec[startIdx+1] = bit_cast<T>(value.y);
+                vec[startIdx+2] = bit_cast<T>(value.z);
+                vec[startIdx+3] = bit_cast<T>(value.w);
+            }
+        }
+    }
+
+    // =========================================================================
+    // loadWeightTiled: load weight tiles from tiled global memory layout.
+    //
+    // Portable alternative to loadWeightRaw. Uses CoopMat.Load from global
+    // memory via loadCoopMat. Float weights are loaded as MatrixAccumulator
+    // then converted to the target type via cooperative matrix conversion.
+    //
+    // Weight tiles are stored row-major in tile order: tile(r,c) at offset
+    // (r * StoredTileCols + c) * 256 elements.
+    //
+    // When Transpose=true, the WaveMatrix represents W^T but the storage is W.
+    // The tile indices are swapped and tiles are loaded ColumnMajor to transpose
+    // each tile's content. StoredTileCols in that case equals TileRows (the
+    // columns of the stored W correspond to the rows of W^T).
+    // =========================================================================
+
+    [ForceInline]
+    [require(cooperative_matrix, subgroup_basic)]
+    [mutating]
+    void loadWeightTiled<U, Address, bool Transpose = false>(Address weightAddress)
+        where U : __BuiltinFloatingPointType
+        where U.Differential == U
+        where Address : IPointerLikeAddress<U>
+    {
+        static const int TileSizeInElements = TILE * TILE;
+        static const int StoredTileCols = Transpose ? TileRows : TileCols;
+        static const linalg.CoopMatMatrixLayout loadLayout =
+            Transpose ? linalg.CoopMatMatrixLayout.ColumnMajor : linalg.CoopMatMatrixLayout.RowMajor;
+
+        [ForceUnroll]
+        for (int r = 0; r < TileRows; r++)
+        {
+            [ForceUnroll]
+            for (int c = 0; c < TileCols; c++)
+            {
+                int idx = tileIdx(r, c);
+                int storedRow = Transpose ? c : r;
+                int storedCol = Transpose ? r : c;
+                int offset = (storedRow * StoredTileCols + storedCol) * TileSizeInElements;
+                let tileAddr = weightAddress.getOffset(offset);
+
+                if (sizeof(U) == sizeof(T))
+                {
+                    tiles[idx] = bit_cast<Tile>(loadCoopMat<U, Address, TILE, TILE, Use,
+                        loadLayout>(tileAddr, 0u, uint(TILE)));
+                }
+                else
+                {
+                    typealias MatAcc = linalg.CoopMat<U, MemoryScope.Subgroup, TILE, TILE,
+                        linalg.CoopMatMatrixUse.MatrixAccumulator>;
+                    let matAcc = loadCoopMat<U, Address, TILE, TILE,
+                        linalg.CoopMatMatrixUse.MatrixAccumulator,
+                        loadLayout>(tileAddr, 0u, uint(TILE));
+                    tiles[idx] = Tile(matAcc);
+                }
+            }
+        }
+    }
 }
 
 // =========================================================================
@@ -485,7 +743,7 @@ toMatrixB<int Rows, int Cols>(
 // Internally uses MatrixAccumulator for MMA, then copies result to MatA.
 // Equivalent to Tin2's mad(MatrixA, MatrixB, MatrixA).
 [ForceInline]
-[require(cuda)]
+[require(cooperative_matrix)]
 internal void matMad<T, int R0, int C0, int C1>(
     WaveMatrix<half, linalg.CoopMatMatrixUse.MatrixA, R0, C0> a,
     WaveMatrix<half, linalg.CoopMatMatrixUse.MatrixB, C0, C1> b,
@@ -520,7 +778,7 @@ internal void matMad<T, int R0, int C0, int C1>(
 
 // Matrix multiply: A(R0×C0) × B(C0×C1) → MatA(R0×C1)
 [ForceInline]
-[require(cuda)]
+[require(cooperative_matrix)]
 internal WaveMatrix<T, linalg.CoopMatMatrixUse.MatrixAccumulator, R0, C1>
 matMul<T, int R0, int C0, int C1>(
     WaveMatrix<half, linalg.CoopMatMatrixUse.MatrixA, R0, C0> a,

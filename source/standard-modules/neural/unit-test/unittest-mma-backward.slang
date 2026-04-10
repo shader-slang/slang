@@ -4,10 +4,9 @@ implementing neural;
 namespace neural_unittest
 {
 
-// Full backward pass using TiledMMAHelper (OptimalLayout):
-//   1. dIn = W^T * dOut         (transpose MMA)
-//   2. dBias += sum(dOut)       (bias reduce)
-//   3. dW += dOut * input^T     (outer product accumulate, tiled store)
+// Full backward pass using TiledMMAHelper.backward() dispatcher:
+//   CUDA:   TiledMMACuda (WaveMatrix register ops)
+//   Vulkan: TiledMMAVulkan (WaveMatrix + shmem)
 //
 // InputSize and OutputSize must be multiples of 16 (tiled layout requirement).
 
@@ -27,55 +26,22 @@ DType[InputSize]
         where DType.Differential == DType
 {
     typealias Address = BindlessAddress<DType>;
-    Address weightAddr = Address(weightBuffer);
-    Address weightGradAddr = Address(weightGradBuffer);
-    Address biasGradAddr = Address(biasGradBuffer);
-
+    typealias InputVec = WaveTangledVector<DType, ShMemSize, InputSize, 32, SubgroupCount>;
+    typealias OutputVec = WaveTangledVector<DType, ShMemSize, OutputSize, 32, SubgroupCount>;
     typealias MMA = TiledMMAHelper<DType, InputSize, OutputSize, 32, Target, ShMemSize, true, SubgroupCount>;
 
-    uint shA = 0;
-    uint shB = MMA.ShMemInfo.SharedMemSizeInVectorMatA;
-    uint shC = shB;
+    InputVec input = InputVec(inputData);
+    OutputVec dOut = OutputVec(dOutData);
 
-    const int AlignedM = MMA.TileInfoT.Uint4AlignedM;
-    const int AlignedK = MMA.TileInfoT.Uint4AlignedK;
-
-    DType dOutVector[AlignedM] = {};
-    for (int i = 0; i < OutputSize; i++)
-        dOutVector[i] = dOutData[i];
-
-    DType inputVector[AlignedK] = {};
-    for (int i = 0; i < InputSize; i++)
-        inputVector[i] = inputData[i];
-
-    // 1. dIn = W^T * dOut
-    let dInArray = MMA.mma<DType, Address, DType[AlignedM], DType[AlignedK], DType, false>(
-        dOutVector, shA, shB, shC, weightAddr, none);
-
-    GroupMemoryBarrierWithGroupSync();
-
-    // 2. dBias += sum(dOut)
-    {
-        const int subgroupIndex = getWaveId();
-        MMA.sumReduceRows<DType, Address, DType[AlignedM]>(
-            shA, dOutVector, subgroupIndex, biasGradAddr);
-    }
-
-    GroupMemoryBarrierWithGroupSync();
-
-    // 3. dW += dOut * input^T (stored in tiled layout)
-    static const int _outerRows = (MMA.M + MMA.CMShape.ROW_A - 1) / MMA.CMShape.ROW_A;
-    static const int _outerPerWarpA = _outerRows * MMA.CMShape.ROW_A / MMA.CMShape.ElementCountPerVector * 32;
-    uint shB_outer = shA + uint(SubgroupCount * _outerPerWarpA);
-
-    MMA.outerProductAccumulate<DType, Address,
-                               DType, DType[AlignedM],
-                               DType, DType[AlignedK]>(
-        shA, shB_outer, dOutVector, inputVector, weightGradAddr);
+    typealias GradAddress = Address.Differential;
+    let dInput = MMA.backward<Address, OutputVec.Differential>(
+        input, bit_cast<OutputVec.Differential>(dOut), Address(weightBuffer),
+        bit_cast<GradAddress>(Address(weightGradBuffer)),
+        bit_cast<GradAddress>(Address(biasGradBuffer)));
 
     DType result[InputSize];
     for (int i = 0; i < InputSize; i++)
-        result[i] = dInArray[i];
+        result[i] = dInput[i];
     return result;
 }
 
