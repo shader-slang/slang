@@ -243,13 +243,10 @@ jobs:
           fi
 
           # --with-synthesis runs a second pass with -only-synthesized to
-          # exercise backend emit paths without a GPU. Skip synthesis when
-          # running with GPU — the main pass already covers emit paths via
-          # actual GPU test execution.
-          SYNTHESIS_FLAG=""
-          if [[ "${{ inputs.container }}" == "" ]]; then
-            SYNTHESIS_FLAG="--with-synthesis"
-          fi
+          # exercise backend emit paths. With GPU + test servers (server-count > 1),
+          # synthesis is safe. Only skip if running in-process (server-count 1)
+          # where Vulkan driver cleanup causes heap corruption at exit.
+          SYNTHESIS_FLAG="--with-synthesis"
 
           ./tools/coverage/run-coverage.sh $SYNTHESIS_FLAG "${test_args[@]}"
 
