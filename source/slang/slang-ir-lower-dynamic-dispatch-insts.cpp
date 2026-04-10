@@ -606,10 +606,11 @@ struct UntaggedUnionLoweringContext : public InstPassBase
             //
             if (sink && !canTypeBeStored(type))
             {
-                sink->diagnose(Diagnostics::TypeCannotBePackedIntoAnyValue{
-                    .type = type,
-                    .location = type->sourceLoc,
-                });
+                sink->diagnose(
+                    Diagnostics::TypeCannotBePackedIntoAnyValue{
+                        .type = type,
+                        .location = type->sourceLoc,
+                    });
             }
         }
 
@@ -971,18 +972,19 @@ struct SequentialIDTagLoweringContext : public InstPassBase
                             auto interfaceLinkage =
                                 interfaceType->findDecoration<IRLinkageDecoration>();
                             SLANG_ASSERT(
-                                interfaceLinkage && "An interface type does not have a linkage,"
-                                                    "but a witness table associated with it has one.");
+                                interfaceLinkage &&
+                                "An interface type does not have a linkage,"
+                                "but a witness table associated with it has one.");
                             auto interfaceName = interfaceLinkage->getMangledName();
                             auto idAllocator =
                                 linkage->mapInterfaceMangledNameToSequentialIDCounters.tryGetValue(
                                     interfaceName);
                             if (!idAllocator)
                             {
-                                linkage->mapInterfaceMangledNameToSequentialIDCounters[interfaceName] =
+                                linkage
+                                    ->mapInterfaceMangledNameToSequentialIDCounters[interfaceName] =
                                     0;
-                                idAllocator = linkage
-                                                  ->mapInterfaceMangledNameToSequentialIDCounters
+                                idAllocator = linkage->mapInterfaceMangledNameToSequentialIDCounters
                                                   .tryGetValue(interfaceName);
                             }
                             seqID = *idAllocator;
@@ -2071,10 +2073,11 @@ void reportDispatchLocation(
                 count++;
             });
 
-        sink->diagnose(Diagnostics::DynamicDispatchCodeGeneratedHere{
-            .count = (int64_t)count,
-            .types = tableElementsStr.produceString(),
-            .location = use->getUser()->sourceLoc});
+        sink->diagnose(
+            Diagnostics::DynamicDispatchCodeGeneratedHere{
+                .count = (int64_t)count,
+                .types = tableElementsStr.produceString(),
+                .location = use->getUser()->sourceLoc});
     }
 }
 
@@ -2124,11 +2127,12 @@ void reportSpecializedDispatchLocation(
             printDiagnosticArg(specArgsStr, arg);
         }
 
-        sink->diagnose(Diagnostics::SpecializedDynamicDispatchCodeGeneratedHere{
-            .count = (int64_t)count,
-            .types = tableElementsStr.produceString(),
-            .specArgs = specArgsStr.produceString(),
-            .location = use->getUser()->sourceLoc});
+        sink->diagnose(
+            Diagnostics::SpecializedDynamicDispatchCodeGeneratedHere{
+                .count = (int64_t)count,
+                .types = tableElementsStr.produceString(),
+                .specArgs = specArgsStr.produceString(),
+                .location = use->getUser()->sourceLoc});
     }
 }
 

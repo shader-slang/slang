@@ -1269,9 +1269,10 @@ void Linkage::_diagnoseErrorInImportedModule(DiagnosticSink* sink)
 {
     for (auto info = m_modulesBeingImported; info; info = info->next)
     {
-        sink->diagnose(Diagnostics::ErrorInImportedModule{
-            .module = info->name->text,
-            .location = info->importLoc});
+        sink->diagnose(
+            Diagnostics::ErrorInImportedModule{
+                .module = info->name->text,
+                .location = info->importLoc});
     }
     if (!isInLanguageServer())
     {
@@ -1477,9 +1478,10 @@ RefPtr<Module> Linkage::findOrImportModule(
         if (isBeingImported(previouslyLoadedModule))
         {
             // We seem to be in the middle of loading this module
-            sink->diagnose(Diagnostics::RecursiveModuleImport{
-                .module = moduleName,
-                .location = requestingLoc});
+            sink->diagnose(
+                Diagnostics::RecursiveModuleImport{
+                    .module = moduleName,
+                    .location = requestingLoc});
             return nullptr;
         }
 
@@ -1729,9 +1731,10 @@ RefPtr<Module> Linkage::findOrImportModule(
                                 ->findDecoration<IRExperimentalModuleDecoration>() &&
                             !m_optionSet.getBoolOption(CompilerOptionName::ExperimentalFeature))
                         {
-                            sink->diagnose(Diagnostics::NeedToEnableExperimentFeature{
-                                .module = getText(moduleName),
-                                .loc = requestingLoc});
+                            sink->diagnose(
+                                Diagnostics::NeedToEnableExperimentFeature{
+                                    .module = getText(moduleName),
+                                    .loc = requestingLoc});
                         }
                     }
                     return module;

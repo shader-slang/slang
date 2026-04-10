@@ -128,9 +128,10 @@ static void _verifyParallelGenericEntryPointCode(
     case ParallelGenericEntryPointBackend::SPIRV:
         {
             StringBuilder expectedExecutionMode;
-            expectedExecutionMode << "OpExecutionMode %computeMain LocalSize " << specializationValue
-                                  << " 1 1";
-            SLANG_CHECK_ABORT(codeSlice.indexOf(toSlice("OpEntryPoint GLCompute %computeMain")) != -1);
+            expectedExecutionMode << "OpExecutionMode %computeMain LocalSize "
+                                  << specializationValue << " 1 1";
+            SLANG_CHECK_ABORT(
+                codeSlice.indexOf(toSlice("OpEntryPoint GLCompute %computeMain")) != -1);
             SLANG_CHECK_ABORT(codeSlice.indexOf(expectedExecutionMode.getUnownedSlice()) != -1);
             SLANG_CHECK_ABORT(codeSlice.indexOf(toSlice("OpConstant %int")) != -1);
             break;
@@ -234,7 +235,9 @@ static void _runParallelGenericEntryPointCompileForTarget(
                     ComPtr<slang::IComponentType> composedProgram;
                     if (SLANG_SUCCEEDED(results[threadIndex].specializeResult))
                     {
-                        slang::IComponentType* componentTypes[] = {module, specializedEntryPoint.get()};
+                        slang::IComponentType* componentTypes[] = {
+                            module,
+                            specializedEntryPoint.get()};
                         results[threadIndex].composeResult = session->createCompositeComponentType(
                             componentTypes,
                             2,
@@ -286,7 +289,8 @@ static void _runParallelGenericEntryPointCompileForTarget(
             {
                 fprintf(
                     stderr,
-                    "parallelGenericEntryPointCompile target %s iteration %d thread %d diagnostics:\n%s\n",
+                    "parallelGenericEntryPointCompile target %s iteration %d thread %d "
+                    "diagnostics:\n%s\n",
                     target.name,
                     iterationIndex,
                     threadIndex,
@@ -464,9 +468,6 @@ SLANG_UNIT_TEST(parallelGenericEntryPointCompile)
 
     for (const auto& target : targets)
     {
-        _runParallelGenericEntryPointCompileForTarget(
-            globalSession,
-            target,
-            iterationCount);
+        _runParallelGenericEntryPointCompileForTarget(globalSession, target, iterationCount);
     }
 }

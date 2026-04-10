@@ -583,25 +583,28 @@ bool checkStaticAssert(IRInst* inst, DiagnosticSink* sink)
                     IRInst* msg = inst->getOperand(1);
                     if (auto msgLit = as<IRStringLit>(msg))
                     {
-                        sink->diagnose(Diagnostics::StaticAssertionFailure{
-                            .message = String(msgLit->getStringSlice()),
-                            .location = inst->sourceLoc,
-                        });
+                        sink->diagnose(
+                            Diagnostics::StaticAssertionFailure{
+                                .message = String(msgLit->getStringSlice()),
+                                .location = inst->sourceLoc,
+                            });
                     }
                     else
                     {
-                        sink->diagnose(Diagnostics::StaticAssertionFailureWithoutMessage{
-                            .location = inst->sourceLoc,
-                        });
+                        sink->diagnose(
+                            Diagnostics::StaticAssertionFailureWithoutMessage{
+                                .location = inst->sourceLoc,
+                            });
                     }
                     diagnoseCallStack(inst, sink);
                 }
             }
             else
             {
-                sink->diagnose(Diagnostics::StaticAssertionConditionNotConstant{
-                    .location = condi->sourceLoc,
-                });
+                sink->diagnose(
+                    Diagnostics::StaticAssertionConditionNotConstant{
+                        .location = condi->sourceLoc,
+                    });
             }
 
             return true;
@@ -2397,8 +2400,9 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
 
     if (!sourceEmitter)
     {
-        sink->diagnose(Diagnostics::UnableToGenerateCodeForTarget{
-            .target = TypeTextUtil::getCompileTargetName(SlangCompileTarget(target))});
+        sink->diagnose(
+            Diagnostics::UnableToGenerateCodeForTarget{
+                .target = TypeTextUtil::getCompileTargetName(SlangCompileTarget(target))});
         return SLANG_FAIL;
     }
 
@@ -2511,10 +2515,11 @@ SlangResult CodeGenContext::emitEntryPointsSourceFromIR(ComPtr<IArtifact>& outAr
 
     if (sourceMap)
     {
-        auto sourceMapArtifact = ArtifactUtil::createArtifact(ArtifactDesc::make(
-            ArtifactKind::Json,
-            ArtifactPayload::SourceMap,
-            ArtifactStyle::None));
+        auto sourceMapArtifact = ArtifactUtil::createArtifact(
+            ArtifactDesc::make(
+                ArtifactKind::Json,
+                ArtifactPayload::SourceMap,
+                ArtifactStyle::None));
 
         sourceMapArtifact->addRepresentation(sourceMap);
 
@@ -3083,8 +3088,9 @@ SlangResult emitLLVMForEntryPoints(CodeGenContext* codeGenContext, ComPtr<IArtif
     ISlangSharedLibrary* library = codeGenContext->getSession()->getOrLoadSlangLLVM();
     if (!library)
     {
-        codeGenContext->getSink()->diagnose(Diagnostics::UnableToGenerateCodeForTarget{
-            .target = TypeTextUtil::getCompileTargetName(SlangCompileTarget(target))});
+        codeGenContext->getSink()->diagnose(
+            Diagnostics::UnableToGenerateCodeForTarget{
+                .target = TypeTextUtil::getCompileTargetName(SlangCompileTarget(target))});
         return SLANG_FAIL;
     }
 

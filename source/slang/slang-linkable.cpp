@@ -380,9 +380,10 @@ RefPtr<ComponentType> ComponentType::specialize(
         sink);
     if (consumedArgCount != specializationArgCount)
     {
-        sink->diagnose(Diagnostics::MismatchSpecializationArguments{
-            .expected = (int64_t)Math::Max(consumedArgCount, getSpecializationParamCount()),
-            .provided = (int64_t)specializationArgCount});
+        sink->diagnose(
+            Diagnostics::MismatchSpecializationArguments{
+                .expected = (int64_t)Math::Max(consumedArgCount, getSpecializationParamCount()),
+                .provided = (int64_t)specializationArgCount});
     }
     if (sink->getErrorCount() != 0)
         return nullptr;
@@ -759,9 +760,10 @@ IArtifact* ComponentType::getTargetArtifact(Int targetIndex, slang::IBlob** outD
             DiagnosticSink sink(linkage->getSourceManager(), Lexer::sourceLocationLexer);
             applySettingsToDiagnosticSink(&sink, &sink, linkage->m_optionSet);
             applySettingsToDiagnosticSink(&sink, &sink, m_optionSet);
-            sink.diagnose(Diagnostics::CompilationAbortedDueToException{
-                .exceptionType = typeid(e).name(),
-                .exceptionMessage = e.Message});
+            sink.diagnose(
+                Diagnostics::CompilationAbortedDueToException{
+                    .exceptionType = typeid(e).name(),
+                    .exceptionMessage = e.Message});
             sink.getBlobIfNeeded(outDiagnostics);
         }
         return nullptr;
