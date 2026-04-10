@@ -18,7 +18,7 @@ jobs:
       # TODO: Expand to test-category: full once we have a dedicated runner
       # with enough time budget, or after smoke stabilizes with zero findings.
       test-category: smoke
-      server-count: 8
+      server-count: 2
     secrets: inherit
 
   notify:
