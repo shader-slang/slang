@@ -3852,9 +3852,10 @@ An application may create and re-use a single global session across
 multiple sessions, in order to amortize startups costs (in current
 Slang this is mostly the cost of loading the Slang standard library).
 
-The global session is currently *not* thread-safe and objects created from
-a single global session should only be used from a single thread at
-a time.
+A single global session object is currently *not* thread-safe. Unless
+documented otherwise, a global session and the objects created from it
+should be externally synchronized when shared across threads. Distinct
+global sessions may be used from different threads in parallel.
 */
 struct IGlobalSession : public ISlangUnknown
 {

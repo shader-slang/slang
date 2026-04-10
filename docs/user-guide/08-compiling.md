@@ -922,7 +922,9 @@ const char* spGetBuildTagString();
 
 This assumes Slang has been built with the C++ multithreaded runtime, as is the default.
 
-Beyond those helpers, Slang should still be treated as serial by default. Front-end operations such as loading modules, type checking, specialization, and `link()` are not [reentrant](https://en.wikipedia.org/wiki/Reentrancy_(computing)) and require external synchronization.
+Beyond those helpers, Slang should still be treated as non-reentrant by default on shared objects. Front-end operations such as loading modules, type checking, specialization, and `link()` are not [reentrant](https://en.wikipedia.org/wiki/Reentrancy_(computing)) and require external synchronization when multiple threads share a global session, a session, or objects created from them.
+
+Distinct global sessions may be used concurrently from different threads, even when those threads happen to call the same Slang API entry point at the same time.
 
 There is one important experimental exception for backend code generation. After an `IComponentType` has been fully specialized and linked, the following `IComponentType` methods are supported for concurrent use:
 
@@ -941,9 +943,9 @@ This enables a serial-frontend / parallel-backend workflow:
 
 This backend parallelism is still experimental. It is supported, but it should not yet be treated as fully hardened for every production workload.
 
-All other functions and methods should still be assumed non-reentrant. More precisely, unless documented otherwise, only one thread should be inside a given Slang API call at a time.
+All other functions and methods should still be assumed non-reentrant when they operate on shared Slang objects. Unless documented otherwise, protect a shared global session, session, or object graph derived from them with external synchronization.
 
-Much of the Slang API is available through [COM interfaces](https://en.wikipedia.org/wiki/Component_Object_Model). In strict COM, interfaces should be atomically reference counted. Currently *MOST* Slang API COM interfaces are *NOT* atomic reference counted. One exception is the `ISlangSharedLibrary` interface when produced from [host-callable](../cpu-target.md#host-callable). It is atomically reference counted, allowing it to persist and be used beyond the original compilation and be freed on a different thread.
+Much of the Slang API is available through [COM interfaces](https://en.wikipedia.org/wiki/Component_Object_Model). Strict COM expects atomic reference counting. Slang does not yet make that guarantee uniformly across every exposed interface. Many core compiler objects implemented via `RefObject` or `ComBaseObject` do use atomic reference counts, but some interfaces still use custom or singleton lifetime management. Unless documented otherwise, do not assume that an arbitrary Slang API object can be retained or released safely from unrelated threads solely because it is exposed as a COM interface. One explicit cross-thread lifetime guarantee is the `ISlangSharedLibrary` interface when produced from [host-callable](../cpu-target.md#host-callable). It is atomically reference counted, allowing it to persist and be used beyond the original compilation and be freed on a different thread.
 ## Compiler Options
 
 Both the `SessionDesc` and `TargetDesc` structures contain fields that encode a `CompilerOptionEntry` array for additional compiler options to apply on the session or the target. In addition,
