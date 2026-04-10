@@ -3208,7 +3208,13 @@ void registerAssociatedMethods(SemanticsVisitor* context, DeclRef<Decl> declRef)
                 declRef.declRefBase,
                 context->getName("BwdCallable"),
                 AnnotationKind::BackwardDerivativeContext));
-            SLANG_ASSERT(bwdCallableType); // TODO: Diagnose if not found.
+            if (!bwdCallableType)
+            {
+                context->getSink()->diagnose(Diagnostics::Unexpected{
+                    .message = "failed to find 'BwdCallable' type for backward derivative context",
+                    .location = declRef.getLoc()});
+                return;
+            }
 
             maybeRegisterVal(
                 context,

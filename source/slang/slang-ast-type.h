@@ -566,6 +566,7 @@ class ConditionalType : public DeclRefType
 {
     FIDDLE(...)
     Type* getValueType();
+    IntVal* getHasValue();
 };
 
 FIDDLE()
@@ -667,12 +668,6 @@ class BwdDiffFuncInterfaceType : public BuiltinType
 
 FIDDLE()
 class LegacyBwdDiffFuncInterfaceType : public BuiltinType
-{
-    FIDDLE(...)
-};
-
-FIDDLE()
-class DiffTypeInfoInterfaceType : public BuiltinType
 {
     FIDDLE(...)
 };
