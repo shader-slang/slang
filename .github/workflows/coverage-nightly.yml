@@ -46,6 +46,7 @@ jobs:
 
   merge-and-deploy:
     needs: [coverage-linux, coverage-macos]
+    if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-22.04
     permissions:
       contents: write
