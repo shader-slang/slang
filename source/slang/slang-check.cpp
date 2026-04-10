@@ -146,10 +146,8 @@ IDownstreamCompiler* Session::getOrLoadDownstreamCompiler(
             //
             if (sink)
             {
-                sink->diagnose(
-                    Diagnostics::FailedToLoadDownstreamCompiler{
-                        .compiler =
-                            TypeTextUtil::getPassThroughAsHumanText(SlangPassThrough(type))});
+                sink->diagnose(Diagnostics::FailedToLoadDownstreamCompiler{
+                    .compiler = TypeTextUtil::getPassThroughAsHumanText(SlangPassThrough(type))});
             }
             SinkSharedLibraryLoader loader(m_sharedLibraryLoader, sink);
             locator(m_downstreamCompilerPaths[int(type)], &loader, m_downstreamCompilerSet);

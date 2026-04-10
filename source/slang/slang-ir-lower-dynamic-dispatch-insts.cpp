@@ -608,11 +608,10 @@ struct UntaggedUnionLoweringContext : public InstPassBase
             //
             if (sink && !canTypeBeStored(type))
             {
-                sink->diagnose(
-                    Diagnostics::TypeCannotBePackedIntoAnyValue{
-                        .type = type,
-                        .location = type->sourceLoc,
-                    });
+                sink->diagnose(Diagnostics::TypeCannotBePackedIntoAnyValue{
+                    .type = type,
+                    .location = type->sourceLoc,
+                });
             }
         }
 
@@ -2074,11 +2073,10 @@ void reportDispatchLocation(
                 count++;
             });
 
-        sink->diagnose(
-            Diagnostics::DynamicDispatchCodeGeneratedHere{
-                .count = (int64_t)count,
-                .types = tableElementsStr.produceString(),
-                .location = use->getUser()->sourceLoc});
+        sink->diagnose(Diagnostics::DynamicDispatchCodeGeneratedHere{
+            .count = (int64_t)count,
+            .types = tableElementsStr.produceString(),
+            .location = use->getUser()->sourceLoc});
     }
 }
 
@@ -2128,12 +2126,11 @@ void reportSpecializedDispatchLocation(
             printDiagnosticArg(specArgsStr, arg);
         }
 
-        sink->diagnose(
-            Diagnostics::SpecializedDynamicDispatchCodeGeneratedHere{
-                .count = (int64_t)count,
-                .types = tableElementsStr.produceString(),
-                .specArgs = specArgsStr.produceString(),
-                .location = use->getUser()->sourceLoc});
+        sink->diagnose(Diagnostics::SpecializedDynamicDispatchCodeGeneratedHere{
+            .count = (int64_t)count,
+            .types = tableElementsStr.produceString(),
+            .specArgs = specArgsStr.produceString(),
+            .location = use->getUser()->sourceLoc});
     }
 }
 
