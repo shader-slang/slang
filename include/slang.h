@@ -4604,16 +4604,28 @@ struct IComponentType : public ISlangUnknown
      */
     virtual SLANG_NO_THROW SlangInt SLANG_MCALL getSpecializationParamCount() = 0;
 
-    /** Get the compiled code for the entry point at `entryPointIndex` for the chosen `targetIndex`
-
-    Entry point code can only be computed for a component type that
-    has no specialization parameters (it must be fully specialized)
-    and that has no requirements (it must be fully linked).
-
-    If code has not already been generated for the given entry point and target,
-    then a compilation error may be detected, in which case `outDiagnostics`
-    (if non-null) will be filled in with a blob of messages diagnosing the error.
-    */
+    /** Get the compiled code for the entry point at `entryPointIndex` for the chosen
+     * `targetIndex`.
+     *
+     * Entry point code requires a component type that is fully specialized and fully
+     * linked.
+     *
+     * If code has not already been generated for the given entry point and target,
+     * then a compilation error may be detected, in which case `outDiagnostics`
+     * (if non-null) will be filled in with a blob of messages diagnosing the error.
+     *
+     * Experimental threading note: after a component type has been fully
+     * specialized and linked, this method is supported for concurrent backend code
+     * generation, including from multiple threads compiling different linked
+     * `IComponentType` instances.
+     *
+     * The same experimental threading model also applies to
+     * `getResultAsFileSystem()`, `getTargetCode()`, `getTargetMetadata()`, and
+     * `getEntryPointMetadata()`.
+     *
+     * Front-end operations such as loading modules, specialization, and linking
+     * still require external synchronization unless documented otherwise.
+     */
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointCode(
         SlangInt entryPointIndex,
         SlangInt targetIndex,
@@ -4621,12 +4633,13 @@ struct IComponentType : public ISlangUnknown
         IBlob** outDiagnostics = nullptr) = 0;
 
     /** Get the compilation result as a file system.
-
-    Has the same requirements as getEntryPointCode.
-
-    The result is not written to the actual OS file system, but is made available as an
-    in memory representation.
-    */
+     *
+     * Has the same requirements and experimental threading note as
+     * `getEntryPointCode()`.
+     *
+     * The result is not written to the actual OS file system, but is made
+     * available as an in memory representation.
+     */
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getResultAsFileSystem(
         SlangInt entryPointIndex,
         SlangInt targetIndex,
@@ -4710,14 +4723,30 @@ struct IComponentType : public ISlangUnknown
         CompilerOptionEntry const* compilerOptionEntries,
         ISlangBlob** outDiagnostics = nullptr) = 0;
 
+    /** Get the compiled code for the chosen `targetIndex`.
+     *
+     * Has the same requirements and experimental threading note as
+     * `getEntryPointCode()`.
+     */
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL
     getTargetCode(SlangInt targetIndex, IBlob** outCode, IBlob** outDiagnostics = nullptr) = 0;
 
+    /** Get metadata for the chosen `targetIndex`.
+     *
+     * Has the same requirements and experimental threading note as
+     * `getEntryPointCode()`.
+     */
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getTargetMetadata(
         SlangInt targetIndex,
         IMetadata** outMetadata,
         IBlob** outDiagnostics = nullptr) = 0;
 
+    /** Get metadata for the entry point at `entryPointIndex` for the chosen
+     * `targetIndex`.
+     *
+     * Has the same requirements and experimental threading note as
+     * `getEntryPointCode()`.
+     */
     virtual SLANG_NO_THROW SlangResult SLANG_MCALL getEntryPointMetadata(
         SlangInt entryPointIndex,
         SlangInt targetIndex,

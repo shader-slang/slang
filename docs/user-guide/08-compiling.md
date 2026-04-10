@@ -908,7 +908,7 @@ In many cases `kernelBlob->getBufferPointer()` can be passed directly to the app
 
 ## Multithreading
 
-The only functions which are currently thread-safe are:
+The following global-session creation helpers are thread-safe:
 
 ```C++
 SlangSession* spCreateSession(const char* deprecated);
@@ -922,11 +922,28 @@ const char* spGetBuildTagString();
 
 This assumes Slang has been built with the C++ multithreaded runtime, as is the default.
 
-All other functions and methods are not [reentrant](https://en.wikipedia.org/wiki/Reentrancy_(computing)) and can only execute on a single thread. More precisely, functions and methods can only be called on a *single* thread at *any one time*. This means for example a global session can be used across multiple threads, as long as some synchronization enforces that only one thread can be in a Slang call at any one time.
+Beyond those helpers, Slang should still be treated as serial by default. Front-end operations such as loading modules, type checking, specialization, and `link()` are not [reentrant](https://en.wikipedia.org/wiki/Reentrancy_(computing)) and require external synchronization.
+
+There is one important experimental exception for backend code generation. After an `IComponentType` has been fully specialized and linked, the following `IComponentType` methods are supported for concurrent use:
+
+```C++
+getEntryPointCode()
+getResultAsFileSystem()
+getTargetCode()
+getTargetMetadata()
+getEntryPointMetadata()
+```
+
+This enables a serial-frontend / parallel-backend workflow:
+
+1. Create sessions, load modules, specialize components, and call `link()` under external synchronization.
+2. Once you have fully linked component types, fan out backend compilation work across threads by calling the methods above for different entry points, targets, or specializations.
+
+This backend parallelism is still experimental. It is supported, but it should not yet be treated as fully hardened for every production workload.
+
+All other functions and methods should still be assumed non-reentrant. More precisely, unless documented otherwise, only one thread should be inside a given Slang API call at a time.
 
 Much of the Slang API is available through [COM interfaces](https://en.wikipedia.org/wiki/Component_Object_Model). In strict COM, interfaces should be atomically reference counted. Currently *MOST* Slang API COM interfaces are *NOT* atomic reference counted. One exception is the `ISlangSharedLibrary` interface when produced from [host-callable](../cpu-target.md#host-callable). It is atomically reference counted, allowing it to persist and be used beyond the original compilation and be freed on a different thread.
-
-
 ## Compiler Options
 
 Both the `SessionDesc` and `TargetDesc` structures contain fields that encode a `CompilerOptionEntry` array for additional compiler options to apply on the session or the target. In addition,
