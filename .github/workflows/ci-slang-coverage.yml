@@ -225,6 +225,7 @@ jobs:
             # Running in GPU container — use Linux GPU expected failures
             test_args+=("-expected-failure-list" "tests/expected-failure-linux.txt")
             test_args+=("-expected-failure-list" "tests/expected-failure-linux-gpu.txt")
+            test_args+=("-expected-failure-list" "tests/expected-failure-coverage-gpu.txt")
           else
             # Running without GPU — skip GPU tests via no-gpu list
             test_args+=("-expected-failure-list" "tests/expected-failure-no-gpu.txt")
@@ -242,10 +243,16 @@ jobs:
           fi
 
           # --with-synthesis runs a second pass with -only-synthesized to
-          # exercise backend emit paths without a GPU. The main pass is strict
-          # (test failures are reported); the synthesis pass is tolerant.
+          # exercise backend emit paths without a GPU. Skip synthesis when
+          # running with GPU — the main pass already covers emit paths via
+          # actual GPU test execution.
+          SYNTHESIS_FLAG=""
+          if [[ "${{ inputs.container }}" == "" ]]; then
+            SYNTHESIS_FLAG="--with-synthesis"
+          fi
+
           TEST_EXIT=0
-          ./tools/coverage/run-coverage.sh --with-synthesis "${test_args[@]}" || TEST_EXIT=$?
+          ./tools/coverage/run-coverage.sh $SYNTHESIS_FLAG "${test_args[@]}" || TEST_EXIT=$?
           echo "test-exit-code=$TEST_EXIT" >> $GITHUB_OUTPUT
           if [ "$TEST_EXIT" -ne 0 ]; then
             echo "::warning::Tests had failures (exit code $TEST_EXIT) but coverage data was collected"

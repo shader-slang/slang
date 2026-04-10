@@ -1,0 +1,27 @@
+# GFX unit tests that fail with "Failed to create Vulkan instance" when
+# running in coverage-instrumented builds in GPU containers.
+# These pass in normal GPU CI without coverage instrumentation.
+gfx-unit-test-tool/bufferBarrierVulkan.internal
+gfx-unit-test-tool/computeSmokeVulkan.internal
+gfx-unit-test-tool/computeTrivialVulkan.internal
+gfx-unit-test-tool/createBufferFromHandleVulkan.internal
+gfx-unit-test-tool/linkTimeConstantArraySizeVulkan.internal
+gfx-unit-test-tool/linkTimeConstantNestedStructOffsetsVulkan.internal
+gfx-unit-test-tool/linkTimeConstantStructOffsetsVulkan.internal
+gfx-unit-test-tool/linkTimeConstantVulkan.internal
+gfx-unit-test-tool/linkTimeDefaultVulkan.internal
+gfx-unit-test-tool/linkTimeLogicalOperatorsVulkan.internal
+gfx-unit-test-tool/linkTimeTypeGenericVulkan.internal
+gfx-unit-test-tool/linkTimeTypeLayoutCache.internal
+gfx-unit-test-tool/linkTimeTypeLayoutNested.internal
+gfx-unit-test-tool/linkTimeTypeLayout.internal
+gfx-unit-test-tool/linkTimeTypeMultiUseGenericVulkan.internal
+gfx-unit-test-tool/linkTimeTypeMultiUseVulkan.internal
+gfx-unit-test-tool/linkTimeTypeVulkan.internal
+gfx-unit-test-tool/mutableShaderObjectVulkan.internal
+gfx-unit-test-tool/nestedParameterBlockTestVulkan.internal
+gfx-unit-test-tool/precompiledModuleCacheVulkan.internal
+gfx-unit-test-tool/precompiledModuleVulkan.internal
+gfx-unit-test-tool/rootShaderParameterVulkan.internal
+gfx-unit-test-tool/samplerArrayVulkan.internal
+gfx-unit-test-tool/uint16BufferTestVulkan.internal
