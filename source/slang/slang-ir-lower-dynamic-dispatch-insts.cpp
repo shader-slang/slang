@@ -1073,6 +1073,18 @@ bool isEffectivelyComPtrType(IRType* type)
     return false;
 }
 
+// Extract the element type from a pointer-like data type, handling both
+// IRPtrTypeBase (regular pointers) and IRPointerLikeType (ConstantBuffer,
+// ParameterBlock, etc.).
+static IRType* getPointerElementType(IRType* ptrDataType)
+{
+    if (auto ptrType = as<IRPtrTypeBase>(ptrDataType))
+        return ptrType->getValueType();
+    if (auto pointerLikeType = as<IRPointerLikeType>(ptrDataType))
+        return pointerLikeType->getElementType();
+    return nullptr;
+}
+
 // This context lowers `CastInterfaceToTaggedUnionPtr` by finding all `IRLoad` and
 // `IRStore` uses of these insts, and upcasting the tagged-union
 // tuple to the the interface-based tuple (of the loaded inst or before
@@ -1220,14 +1232,8 @@ struct TaggedUnionLoweringContext : public InstPassBase
                 case kIROp_Load:
                     {
                         auto baseInterfacePtr = inst->getPtr();
-                        auto basePtrDataType = baseInterfacePtr->getDataType();
-                        auto baseElementType =
-                            as<IRPtrTypeBase>(basePtrDataType)
-                                ? as<IRPtrTypeBase>(basePtrDataType)->getValueType()
-                            : as<IRPointerLikeType>(basePtrDataType)
-                                ? as<IRPointerLikeType>(basePtrDataType)->getElementType()
-                                : nullptr;
-                        auto baseInterfaceType = as<IRInterfaceType>(baseElementType);
+                        auto baseInterfaceType = as<IRInterfaceType>(
+                            getPointerElementType(baseInterfacePtr->getDataType()));
                         if (!baseInterfaceType)
                         {
                             SLANG_UNEXPECTED("Expected interface-typed pointer for "
@@ -1262,14 +1268,8 @@ struct TaggedUnionLoweringContext : public InstPassBase
                         auto storeInst = cast<IRStore>(user);
 
                         auto baseInterfacePtr = inst->getPtr();
-                        auto storePtrDataType = baseInterfacePtr->getDataType();
-                        auto storeElementType =
-                            as<IRPtrTypeBase>(storePtrDataType)
-                                ? as<IRPtrTypeBase>(storePtrDataType)->getValueType()
-                            : as<IRPointerLikeType>(storePtrDataType)
-                                ? as<IRPointerLikeType>(storePtrDataType)->getElementType()
-                                : nullptr;
-                        auto baseInterfaceType = as<IRInterfaceType>(storeElementType);
+                        auto baseInterfaceType = as<IRInterfaceType>(
+                            getPointerElementType(baseInterfacePtr->getDataType()));
                         if (!baseInterfaceType)
                         {
                             SLANG_UNEXPECTED("Expected interface-typed pointer for "

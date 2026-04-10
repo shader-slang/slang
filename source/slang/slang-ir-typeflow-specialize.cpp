@@ -3248,6 +3248,11 @@ struct TypeFlowSpecializationContext
                         else if (inst->getDataType()->getOp() == kIROp_WitnessTableType)
                             results.add(builder.getUnboundedWitnessTableElement(
                                 as<IRWitnessTableType>(inst->getDataType())->getConformanceType()));
+                        else if (inst->getDataType()->getOp() == kIROp_TypeKind)
+                        {
+                            SLANG_UNEXPECTED(
+                                "TypeKind result from LookupWitnessMethod not supported");
+                        }
                         return;
                     }
 
@@ -3271,6 +3276,25 @@ struct TypeFlowSpecializationContext
         }
 
         SLANG_UNEXPECTED("Unexpected witness table info type in analyzeLookupWitnessMethod");
+    }
+
+    // Check if an operand is a global interface parameter with registered conformances,
+    // without creating any IR instructions. Use this for predicate checks where the
+    // TaggedUnionType itself is not needed.
+    bool isGlobalInterfaceParamWithConformances(IRInst* operand)
+    {
+        auto interfaceType = as<IRInterfaceType>(operand->getDataType());
+        if (!interfaceType || isComInterfaceType(interfaceType))
+            return false;
+
+        if (!as<IRGlobalParam>(operand) && !(as<IRLoad>(operand) && isGlobalInst(operand)))
+            return false;
+
+        HashSet<IRInst*>& tables = *module->getContainerPool().getHashSet<IRInst>();
+        collectExistentialTables(interfaceType, tables);
+        bool hasConformances = tables.getCount() > 0;
+        module->getContainerPool().free(&tables);
+        return hasConformances;
     }
 
     // Helper: create a TaggedUnionType for a module-scope instruction with interface type.
@@ -6440,7 +6464,7 @@ struct TypeFlowSpecializationContext
                 if (auto extractWT =
                         as<IRExtractExistentialWitnessTable>(lookupInst->getWitnessTable()))
                 {
-                    if (tryMakeTaggedUnionForGlobalInterfaceParam(extractWT->getOperand(0)) &&
+                    if (isGlobalInterfaceParamWithConformances(extractWT->getOperand(0)) &&
                         this->callSiteInfo.containsKey(InstWithContext(context, inst)))
                         isDynamicGlobalLookup = true;
                 }

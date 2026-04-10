@@ -29,6 +29,8 @@ RWStructuredBuffer<float> outputBuffer;
 [numthreads(1, 1, 1)]
 void computeMain()
 {
+    // Note: bare `uniform IFoo` emits E50100 without the interface type name,
+    // unlike ConstantBuffer<IFoo> which includes 'IFoo' in the message.
     // CHECK: error[E50100]
     outputBuffer[0] = gFoo.getValue();
 }

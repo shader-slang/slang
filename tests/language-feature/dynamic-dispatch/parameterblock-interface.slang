@@ -38,8 +38,14 @@ void computeMain()
     outputBuffer[0] = gFoo.getValue();
 }
 
-// SPIRV: OpEntryPoint
+// Verify dispatch code is generated with both conformance types.
+// HLSL: ImplA_getValue
+// HLSL: ImplB_getValue
+// HLSL: s_dispatch_IFoo_getValue
+// HLSL: switch(
 // HLSL: void computeMain
+
+// SPIRV: OpEntryPoint
 // CUDA: void computeMain
 // CPP: void computeMain
 // MTL: void computeMain
