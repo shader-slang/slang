@@ -67,11 +67,9 @@ float dispatchBase(uint id, float x, no_diff float param)
     return useBase(obj, x);
 }
 
-// Note: Direct dispatch through IDerived existential triggers ICE
-// (assert failure: witnessTableVal). Only IBase dispatch is tested here
-// to verify that types conforming to IDerived can be dispatched through
-// the base interface correctly.
-// BUG: https://github.com/shader-slang/slang/issues/10775
+// Note: Direct dispatch through IDerived existential triggers ICE (#10775).
+// See autodiff-dynamic-dispatch-interface-inherit-derived.slang for the
+// disabled regression test covering that path.
 
 //TEST_INPUT: type_conformance A:IBase = 0
 //TEST_INPUT: type_conformance B:IBase = 1
