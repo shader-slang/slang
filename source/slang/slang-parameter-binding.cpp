@@ -2486,6 +2486,14 @@ static RefPtr<TypeLayout> processEntryPointVaryingParameter(
                         getSink(context)->diagnose(Diagnostics::NotValidVaryingParameter{
                             .paramName = field.getName(),
                             .decl = field.getDecl()});
+
+                        // Keep the aggregate layout structurally well-formed so later
+                        // validation and cleanup code doesn't trip over a null field layout
+                        // after we've already diagnosed the invalid varying field.
+                        fieldTypeLayout = new TypeLayout();
+                        fieldTypeLayout->type = getType(context->getASTBuilder(), field);
+                        fieldTypeLayout->rules = context->layoutContext.rules;
+                        fieldVarLayout->typeLayout = fieldTypeLayout;
                         continue;
                     }
                     fieldVarLayout->typeLayout = fieldTypeLayout;
