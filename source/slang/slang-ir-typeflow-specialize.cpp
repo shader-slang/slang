@@ -3675,13 +3675,6 @@ struct TypeFlowSpecializationContext
                             typeOfSpecialization,
                             arg,
                             specializationArgs);
-                        if (inst->findDecoration<
-                                IRDisallowSpecializationWithExistentialsDecoration>())
-                        {
-                            builder.addDecoration(
-                                newSpec,
-                                kIROp_DisallowSpecializationWithExistentialsDecoration);
-                        }
                         specializedSet.add(newSpec);
                     });
             }
@@ -3692,12 +3685,6 @@ struct TypeFlowSpecializationContext
                 builder.setInsertInto(module);
                 auto newSpec =
                     builder.emitSpecializeInst(typeOfSpecialization, operand, specializationArgs);
-                if (inst->findDecoration<IRDisallowSpecializationWithExistentialsDecoration>())
-                {
-                    builder.addDecoration(
-                        newSpec,
-                        kIROp_DisallowSpecializationWithExistentialsDecoration);
-                }
                 specializedSet.add(newSpec);
             }
 
@@ -7063,16 +7050,6 @@ struct TypeFlowSpecializationContext
                 inst->getBase(),
                 args.getCount(),
                 args.getBuffer());
-
-            // Preserve existential-specialization diagnostics when rewriting a
-            // specialize instruction into its lowered form. Without this, the
-            // shared checker can miss post-rewrite IRSpecialize nodes.
-            if (inst->findDecoration<IRDisallowSpecializationWithExistentialsDecoration>())
-            {
-                builder.addDecoration(
-                    newInst,
-                    kIROp_DisallowSpecializationWithExistentialsDecoration);
-            }
 
             inst->replaceUsesWith(newInst);
             inst->removeAndDeallocate();
