@@ -628,6 +628,9 @@ struct UntaggedUnionLoweringContext : public InstPassBase
     // in emitMarshallingCode or produce invalid output for the current target.
     bool containsUnmarshalableType(IRType* type)
     {
+        if (getResolvedInstForDecorations(type)->findDecoration<IRNonCopyableTypeDecoration>())
+            return true;
+
         switch (type->getOp())
         {
         case kIROp_AtomicType:
