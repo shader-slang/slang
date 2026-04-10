@@ -217,7 +217,8 @@ SLANG_UNIT_TEST(typeConformance)
 SLANG_UNIT_TEST(typeConformanceSequentialIDAllocatesFirstFreeSlot)
 {
     ComPtr<slang::IGlobalSession> globalSession;
-    SLANG_CHECK_ABORT(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
 
     slang::TargetDesc targetDesc = {};
     targetDesc.format = SLANG_HLSL;
@@ -262,11 +263,14 @@ SLANG_UNIT_TEST(typeConformanceSequentialIDAllocatesFirstFreeSlot)
     uint32_t triangleID = 0;
     uint32_t curvesID = 0;
     SLANG_CHECK_ABORT(
-        session->getTypeConformanceWitnessSequentialID(invalidHitInfo, hitInfo, &invalidID) == SLANG_OK);
+        session->getTypeConformanceWitnessSequentialID(invalidHitInfo, hitInfo, &invalidID) ==
+        SLANG_OK);
     SLANG_CHECK_ABORT(
-        session->getTypeConformanceWitnessSequentialID(triangleHitInfo, hitInfo, &triangleID) == SLANG_OK);
+        session->getTypeConformanceWitnessSequentialID(triangleHitInfo, hitInfo, &triangleID) ==
+        SLANG_OK);
     SLANG_CHECK_ABORT(
-        session->getTypeConformanceWitnessSequentialID(curvesHitInfo, hitInfo, &curvesID) == SLANG_OK);
+        session->getTypeConformanceWitnessSequentialID(curvesHitInfo, hitInfo, &curvesID) ==
+        SLANG_OK);
 
     SLANG_CHECK(invalidID == 0);
     SLANG_CHECK(triangleID == 5);
@@ -276,7 +280,8 @@ SLANG_UNIT_TEST(typeConformanceSequentialIDAllocatesFirstFreeSlot)
 SLANG_UNIT_TEST(typeConformanceDuplicateExplicitSequentialIDDiagnostic)
 {
     ComPtr<slang::IGlobalSession> globalSession;
-    SLANG_CHECK_ABORT(slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
+    SLANG_CHECK_ABORT(
+        slang_createGlobalSession(SLANG_API_VERSION, globalSession.writeRef()) == SLANG_OK);
 
     slang::TargetDesc targetDesc = {};
     targetDesc.format = SLANG_HLSL;
@@ -343,7 +348,8 @@ SLANG_UNIT_TEST(typeConformanceDuplicateExplicitSequentialIDDiagnostic)
             diagnostics.writeRef()) == SLANG_OK);
 
     ComPtr<slang::IComponentType> linkedProgram;
-    SLANG_CHECK_ABORT(composedProgram->link(linkedProgram.writeRef(), diagnostics.writeRef()) == SLANG_OK);
+    SLANG_CHECK_ABORT(
+        composedProgram->link(linkedProgram.writeRef(), diagnostics.writeRef()) == SLANG_OK);
 
     ComPtr<slang::IBlob> code;
     diagnostics = nullptr;

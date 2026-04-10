@@ -977,7 +977,8 @@ struct SequentialIDTagLoweringContext : public InstPassBase
                     witnessTableMangledName = generatedMangledName.getUnownedSlice();
                 }
 
-                auto interfaceType = cast<IRWitnessTableType>(inst->getDataType())->getConformanceType();
+                auto interfaceType =
+                    cast<IRWitnessTableType>(inst->getDataType())->getConformanceType();
                 auto interfaceName = String();
                 if (as<IRInterfaceType>(interfaceType))
                 {
