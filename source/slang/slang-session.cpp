@@ -367,6 +367,8 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::createCompositeComponentType(
     slang::IComponentType** outCompositeComponentType,
     ISlangBlob** outDiagnostics)
 {
+    std::lock_guard<std::recursive_mutex> lock(getComponentTypeOperationMutex());
+
     if (outCompositeComponentType == nullptr)
         return SLANG_E_INVALID_ARG;
 
@@ -750,6 +752,7 @@ SLANG_NO_THROW SlangResult SLANG_MCALL Linkage::getTypeConformanceWitnessSequent
 
     auto name = getMangledNameForConformanceWitness(m_astBuilder, subType, supType);
     auto interfaceName = getMangledTypeName(m_astBuilder, supType);
+    std::lock_guard<std::mutex> lock(m_sequentialIDMapMutex);
     uint32_t resultIndex = 0;
     if (mapMangledNameToRTTIObjectIndex.tryGetValue(name, resultIndex))
     {

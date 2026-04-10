@@ -395,6 +395,8 @@ SLANG_NO_THROW SlangResult SLANG_MCALL ComponentType::specialize(
     slang::IComponentType** outSpecializedComponentType,
     ISlangBlob** outDiagnostics)
 {
+    std::lock_guard<std::recursive_mutex> lock(getLinkage()->getComponentTypeOperationMutex());
+
     SLANG_AST_BUILDER_RAII(getLinkage()->getASTBuilder());
     DiagnosticSink sink(getLinkage()->getSourceManager(), Lexer::sourceLocationLexer);
 
@@ -456,6 +458,8 @@ RefPtr<ComponentType> fillRequirements(ComponentType* inComponentType);
 SLANG_NO_THROW SlangResult SLANG_MCALL
 ComponentType::link(slang::IComponentType** outLinkedComponentType, ISlangBlob** outDiagnostics)
 {
+    std::lock_guard<std::recursive_mutex> lock(getLinkage()->getComponentTypeOperationMutex());
+
     // TODO: It should be possible for `fillRequirements` to fail,
     // in cases where we have a dependency that can't be automatically
     // resolved.
@@ -680,9 +684,12 @@ IArtifact* ComponentType::getTargetArtifact(Int targetIndex, slang::IBlob** outD
     if (targetIndex < 0 || targetIndex >= linkage->targets.getCount())
         return nullptr;
     ComPtr<IArtifact> artifact;
-    if (m_targetArtifacts.tryGetValue(targetIndex, artifact))
     {
-        return artifact.get();
+        std::lock_guard<std::mutex> lock(m_cacheMutex);
+        if (m_targetArtifacts.tryGetValue(targetIndex, artifact))
+        {
+            return artifact.get();
+        }
     }
     try
     {
@@ -719,6 +726,7 @@ IArtifact* ComponentType::getTargetArtifact(Int targetIndex, slang::IBlob** outD
                                           ->getTargetArtifact(targetIndex, outDiagnostics);
                 if (targetArtifact)
                 {
+                    std::lock_guard<std::mutex> lock(m_cacheMutex);
                     m_targetArtifacts[targetIndex] = targetArtifact;
                 }
                 return targetArtifact;
@@ -734,8 +742,15 @@ IArtifact* ComponentType::getTargetArtifact(Int targetIndex, slang::IBlob** outD
 
         IArtifact* targetArtifact = targetProgram->getOrCreateWholeProgramResult(&sink);
         sink.getBlobIfNeeded(outDiagnostics);
-        m_targetArtifacts[targetIndex] = ComPtr<IArtifact>(targetArtifact);
-        return targetArtifact;
+        artifact = ComPtr<IArtifact>(targetArtifact);
+        {
+            std::lock_guard<std::mutex> lock(m_cacheMutex);
+            ComPtr<IArtifact> existingArtifact;
+            if (m_targetArtifacts.tryGetValue(targetIndex, existingArtifact))
+                return existingArtifact.get();
+            m_targetArtifacts[targetIndex] = artifact;
+        }
+        return artifact.get();
     }
     catch (const Exception& e)
     {
@@ -1164,10 +1179,22 @@ ConstantIntVal* ComponentType::tryFoldIntVal(IntVal* intVal)
 TargetProgram* ComponentType::getTargetProgram(TargetRequest* target)
 {
     RefPtr<TargetProgram> targetProgram;
-    if (!m_targetPrograms.tryGetValue(target, targetProgram))
     {
-        targetProgram = new TargetProgram(this, target);
-        m_targetPrograms[target] = targetProgram;
+        std::lock_guard<std::mutex> lock(m_cacheMutex);
+        if (m_targetPrograms.tryGetValue(target, targetProgram))
+            return targetProgram;
+    }
+
+    std::lock_guard<std::recursive_mutex> operationLock(
+        getLinkage()->getComponentTypeOperationMutex());
+
+    {
+        std::lock_guard<std::mutex> lock(m_cacheMutex);
+        if (!m_targetPrograms.tryGetValue(target, targetProgram))
+        {
+            targetProgram = new TargetProgram(this, target);
+            m_targetPrograms[target] = targetProgram;
+        }
     }
     return targetProgram;
 }

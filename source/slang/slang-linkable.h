@@ -17,6 +17,7 @@
 #include "slang-compiler-fwd.h"
 #include "slang-compiler-options.h"
 
+#include <mutex>
 #include <slang-com-helper.h>
 #include <slang.h>
 
@@ -413,6 +414,7 @@ protected:
 
 protected:
     Linkage* m_linkage;
+    mutable std::mutex m_cacheMutex;
 
     CompilerOptionSet m_optionSet;
 

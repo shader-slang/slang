@@ -13,6 +13,8 @@
 #include "slang-linkable.h"
 #include "slang-target.h"
 
+#include <mutex>
+
 namespace Slang
 {
 
@@ -124,6 +126,7 @@ private:
     RefPtr<ProgramLayout> m_layout;
 
     CompilerOptionSet m_optionSet;
+    mutable std::mutex m_resultCacheMutex;
 
     // Generated compile results for each entry point
     // in the parent `Program` (indexing matches

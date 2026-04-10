@@ -24,6 +24,7 @@
 #include "slang-content-assist-info.h"
 #include "slang-global-session.h"
 
+#include <mutex>
 #include <slang.h>
 
 namespace Slang
@@ -228,6 +229,7 @@ public:
     NamePool* getNamePool() { return namePool; }
 
     ASTBuilder* getASTBuilder() { return m_astBuilder; }
+    std::recursive_mutex& getComponentTypeOperationMutex() { return m_componentTypeOperationMutex; }
 
     RefPtr<ASTBuilder> m_astBuilder;
 
@@ -239,6 +241,7 @@ public:
     void destroyTypeCheckingCache();
 
     RefPtr<RefObject> m_typeCheckingCache = nullptr;
+    std::recursive_mutex m_componentTypeOperationMutex;
 
     // Modules that have been dynamically loaded via `import`
     //
@@ -257,6 +260,7 @@ public:
 
     // Counters for allocating sequential IDs to witness tables conforming to each interface type.
     Dictionary<String, uint32_t> mapInterfaceMangledNameToSequentialIDCounters;
+    std::mutex m_sequentialIDMapMutex;
 
     SearchDirectoryList searchDirectoryCache;
 

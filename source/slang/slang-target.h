@@ -15,6 +15,7 @@
 #include "slang-compiler-options.h"
 #include "slang-hlsl-to-vulkan-layout-options.h"
 
+#include <mutex>
 #include <slang.h>
 
 namespace Slang
@@ -160,6 +161,7 @@ private:
     CompilerOptionSet optionSet;
     CapabilitySet cookedCapabilities;
     RefPtr<HLSLToVulkanLayoutOptions> hlslToVulkanOptions;
+    std::mutex m_mutex;
 };
 
 /// Are resource types "bindless" (implemented as ordinary data) on the given `target`?

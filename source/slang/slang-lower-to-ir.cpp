@@ -15100,10 +15100,7 @@ RefPtr<IRModule> TargetProgram::createIRModuleForLayout(DiagnosticSink* sink)
     if (m_irModuleForLayout)
         return m_irModuleForLayout;
 
-
-    // Okay, now we need to fill it in.
-
-    auto programLayout = getOrCreateLayout(sink);
+    auto programLayout = m_layout;
     if (!programLayout)
         return nullptr;
 

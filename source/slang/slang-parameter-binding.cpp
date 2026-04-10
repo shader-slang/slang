@@ -4387,16 +4387,22 @@ RefPtr<ProgramLayout> generateParameterBindings(TargetProgram* targetProgram, Di
 
 ProgramLayout* TargetProgram::getOrCreateLayout(DiagnosticSink* sink)
 {
+    std::lock_guard<std::recursive_mutex> lock(
+        m_program->getLinkage()->getComponentTypeOperationMutex());
+
+    m_targetReq->getTargetCaps();
+    m_targetReq->getHLSLToVulkanLayoutOptions();
+
     if (!m_layout)
     {
         m_layout = generateParameterBindings(this, sink);
         if (sink->getErrorCount() != 0)
             return nullptr;
+    }
 
-        if (m_layout)
-        {
-            m_irModuleForLayout = createIRModuleForLayout(sink);
-        }
+    if (m_layout && !m_irModuleForLayout)
+    {
+        m_irModuleForLayout = createIRModuleForLayout(sink);
     }
     return m_layout;
 }

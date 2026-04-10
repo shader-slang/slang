@@ -20,6 +20,8 @@
 #include "slang-pass-through.h"
 #include "slang-target.h"
 
+#include <mutex>
+
 namespace Slang
 {
 
@@ -185,6 +187,7 @@ public:
     SLANG_NO_THROW void SLANG_MCALL
     getCompilerElapsedTime(double* outTotalTime, double* outDownstreamTime) override
     {
+        std::lock_guard<std::mutex> lock(m_compileTimeMutex);
         *outDownstreamTime = m_downstreamCompileTime;
         *outTotalTime = m_totalCompileTime;
     }
@@ -308,8 +311,16 @@ public:
         Module*& outModule);
     ~Session();
 
-    void addDownstreamCompileTime(double time) { m_downstreamCompileTime += time; }
-    void addTotalCompileTime(double time) { m_totalCompileTime += time; }
+    void addDownstreamCompileTime(double time)
+    {
+        std::lock_guard<std::mutex> lock(m_compileTimeMutex);
+        m_downstreamCompileTime += time;
+    }
+    void addTotalCompileTime(double time)
+    {
+        std::lock_guard<std::mutex> lock(m_compileTimeMutex);
+        m_totalCompileTime += time;
+    }
 
     ISlangSharedLibrary* getOrLoadSlangLLVM();
 
@@ -335,6 +346,8 @@ public:
     RefPtr<RefObject> m_typeCheckingCache;
     TypeCheckingCache* getTypeCheckingCache();
     std::mutex m_typeCheckingCacheMutex;
+    std::recursive_mutex m_downstreamCompilerMutex;
+    std::mutex m_compileTimeMutex;
 
 private:
     struct BuiltinModuleInfo

@@ -30,7 +30,6 @@ IArtifact* TargetProgram::_createWholeProgramResult(
     // emit code for, so we construct such a list first.
     List<Int> entryPointIndices;
 
-    m_entryPointResults.setCount(m_program->getEntryPointCount());
     entryPointIndices.setCount(m_program->getEntryPointCount());
     for (Index i = 0; i < entryPointIndices.getCount(); i++)
         entryPointIndices[i] = i;
@@ -38,9 +37,17 @@ IArtifact* TargetProgram::_createWholeProgramResult(
     CodeGenContext::Shared sharedCodeGenContext(this, entryPointIndices, sink, endToEndReq);
     CodeGenContext codeGenContext(&sharedCodeGenContext);
 
-    if (SLANG_FAILED(codeGenContext.emitEntryPoints(m_wholeProgramResult)))
+    ComPtr<IArtifact> artifact;
+    if (SLANG_FAILED(codeGenContext.emitEntryPoints(artifact)))
     {
         return nullptr;
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(m_resultCacheMutex);
+        if (m_wholeProgramResult)
+            return m_wholeProgramResult;
+        m_wholeProgramResult = artifact;
     }
 
     return m_wholeProgramResult;
@@ -59,20 +66,25 @@ IArtifact* TargetProgram::_createEntryPointResult(
     // constructed all at once rather than incrementally, to avoid
     // this problem.
     //
-    if (entryPointIndex >= m_entryPointResults.getCount())
-        m_entryPointResults.setCount(entryPointIndex + 1);
-
-
     CodeGenContext::EntryPointIndices entryPointIndices;
     entryPointIndices.add(entryPointIndex);
 
     CodeGenContext::Shared sharedCodeGenContext(this, entryPointIndices, sink, endToEndReq);
     CodeGenContext codeGenContext(&sharedCodeGenContext);
 
-    if (SLANG_FAILED(codeGenContext.emitEntryPoints(m_entryPointResults[entryPointIndex])))
+    ComPtr<IArtifact> artifact;
+    if (SLANG_FAILED(codeGenContext.emitEntryPoints(artifact)))
     {
-        m_entryPointResults[entryPointIndex].setNull();
         return nullptr;
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(m_resultCacheMutex);
+        if (entryPointIndex >= m_entryPointResults.getCount())
+            m_entryPointResults.setCount(entryPointIndex + 1);
+        if (m_entryPointResults[entryPointIndex])
+            return m_entryPointResults[entryPointIndex];
+        m_entryPointResults[entryPointIndex] = artifact;
     }
 
     return m_entryPointResults[entryPointIndex];
@@ -80,8 +92,11 @@ IArtifact* TargetProgram::_createEntryPointResult(
 
 IArtifact* TargetProgram::getOrCreateWholeProgramResult(DiagnosticSink* sink)
 {
-    if (m_wholeProgramResult)
-        return m_wholeProgramResult;
+    {
+        std::lock_guard<std::mutex> lock(m_resultCacheMutex);
+        if (m_wholeProgramResult)
+            return m_wholeProgramResult;
+    }
 
     // If we haven't yet computed a layout for this target
     // program, we need to make sure that is done before
@@ -97,11 +112,14 @@ IArtifact* TargetProgram::getOrCreateWholeProgramResult(DiagnosticSink* sink)
 
 IArtifact* TargetProgram::getOrCreateEntryPointResult(Int entryPointIndex, DiagnosticSink* sink)
 {
-    if (entryPointIndex >= m_entryPointResults.getCount())
-        m_entryPointResults.setCount(entryPointIndex + 1);
+    {
+        std::lock_guard<std::mutex> lock(m_resultCacheMutex);
+        if (entryPointIndex >= m_entryPointResults.getCount())
+            m_entryPointResults.setCount(entryPointIndex + 1);
 
-    if (IArtifact* artifact = m_entryPointResults[entryPointIndex])
-        return artifact;
+        if (IArtifact* artifact = m_entryPointResults[entryPointIndex])
+            return artifact;
+    }
 
     try
     {

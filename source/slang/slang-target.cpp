@@ -46,6 +46,7 @@ Session* TargetRequest::getSession()
 
 HLSLToVulkanLayoutOptions* TargetRequest::getHLSLToVulkanLayoutOptions()
 {
+    std::lock_guard<std::mutex> lock(m_mutex);
     if (!hlslToVulkanOptions)
     {
         hlslToVulkanOptions = new HLSLToVulkanLayoutOptions();
@@ -56,11 +57,13 @@ HLSLToVulkanLayoutOptions* TargetRequest::getHLSLToVulkanLayoutOptions()
 
 void TargetRequest::setTargetCaps(CapabilitySet capSet)
 {
+    std::lock_guard<std::mutex> lock(m_mutex);
     cookedCapabilities = capSet;
 }
 
 CapabilitySet TargetRequest::getTargetCaps()
 {
+    std::lock_guard<std::mutex> lock(m_mutex);
     if (!cookedCapabilities.isEmpty())
         return cookedCapabilities;
 
