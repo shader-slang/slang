@@ -6,6 +6,6 @@ RWStructuredBuffer<float> buffer;
 [numthreads(1,1,1)]
 void computeMain(uint3 threadId : SV_DispatchThreadID)
 {
-    // CHECK: ([[# @LINE+1]]): error 30086
+    // CHECK: error[E30087]: address-of operator not supported
     float* p = &buffer[threadId.x];
 }
