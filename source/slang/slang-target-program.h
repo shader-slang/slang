@@ -70,7 +70,11 @@ public:
     IArtifact* getOrCreateEntryPointResult(Int entryPointIndex, DiagnosticSink* sink);
     IArtifact* getOrCreateWholeProgramResult(DiagnosticSink* sink);
 
-    IArtifact* getExistingWholeProgramResult() { return m_wholeProgramResult; }
+    IArtifact* getExistingWholeProgramResult()
+    {
+        std::lock_guard<std::mutex> lock(m_resultCacheMutex);
+        return m_wholeProgramResult;
+    }
     /// Get the compiled code for an entry point on the target.
     ///
     /// This routine assumes that `getOrCreateEntryPointResult`
@@ -78,6 +82,9 @@ public:
     ///
     IArtifact* getExistingEntryPointResult(Int entryPointIndex)
     {
+        std::lock_guard<std::mutex> lock(m_resultCacheMutex);
+        if (entryPointIndex < 0 || entryPointIndex >= m_entryPointResults.getCount())
+            return nullptr;
         return m_entryPointResults[entryPointIndex];
     }
 

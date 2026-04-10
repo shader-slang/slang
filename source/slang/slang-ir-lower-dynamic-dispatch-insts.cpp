@@ -11,6 +11,8 @@
 #include "slang-rich-diagnostics.h"
 #include "slang-target.h"
 
+#include <atomic>
+
 namespace Slang
 {
 
@@ -903,13 +905,12 @@ struct SequentialIDTagLoweringContext : public InstPassBase
     //
     void ensureWitnessTableSequentialIDs()
     {
-        StringBuilder generatedMangledName;
-
         auto linkage = getLinkage();
         for (auto inst : module->getGlobalInsts())
         {
             if (inst->getOp() == kIROp_WitnessTable)
             {
+                StringBuilder generatedMangledName;
                 UnownedStringSlice witnessTableMangledName;
                 bool shouldUpdateSequentialIDMap = false;
                 if (auto instLinkage = inst->findDecoration<IRLinkageDecoration>())
@@ -955,9 +956,9 @@ struct SequentialIDTagLoweringContext : public InstPassBase
 
                     if (shouldUpdateSequentialIDMap)
                     {
-                        static int32_t uniqueId = 0;
-                        uniqueId++;
-                        generatedMangledName << "_generated_witness_uuid_" << uniqueId;
+                        static std::atomic<int32_t> uniqueId = 0;
+                        auto currentUniqueId = uniqueId.fetch_add(1, std::memory_order_relaxed) + 1;
+                        generatedMangledName << "_generated_witness_uuid_" << currentUniqueId;
                         witnessTableMangledName = generatedMangledName.getUnownedSlice();
                     }
 

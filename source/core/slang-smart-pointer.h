@@ -37,11 +37,10 @@ public:
 
     UInt releaseReference()
     {
-        UInt oldCount = referenceCount.load(std::memory_order_relaxed);
+        UInt oldCount = referenceCount.fetch_sub(1, std::memory_order_acq_rel);
         SLANG_ASSERT(oldCount != 0);
-        if (referenceCount.fetch_sub(1, std::memory_order_acq_rel) == 1)
+        if (oldCount == 1)
         {
-            std::atomic_thread_fence(std::memory_order_acquire);
             delete this;
             return 0;
         }

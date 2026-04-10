@@ -58,6 +58,9 @@ IArtifact* TargetProgram::_createEntryPointResult(
     DiagnosticSink* sink,
     EndToEndCompileRequest* endToEndReq)
 {
+    if (entryPointIndex < 0)
+        return nullptr;
+
     // It is possible that entry points got added to the `Program`
     // *after* we created this `TargetProgram`, so there might be
     // a request for an entry point that we didn't allocate space for.
@@ -112,6 +115,9 @@ IArtifact* TargetProgram::getOrCreateWholeProgramResult(DiagnosticSink* sink)
 
 IArtifact* TargetProgram::getOrCreateEntryPointResult(Int entryPointIndex, DiagnosticSink* sink)
 {
+    if (entryPointIndex < 0)
+        return nullptr;
+
     {
         std::lock_guard<std::mutex> lock(m_resultCacheMutex);
         if (entryPointIndex >= m_entryPointResults.getCount())

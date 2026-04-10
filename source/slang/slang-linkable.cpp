@@ -728,6 +728,9 @@ IArtifact* ComponentType::getTargetArtifact(Int targetIndex, slang::IBlob** outD
                 if (targetArtifact)
                 {
                     std::lock_guard<std::mutex> lock(m_cacheMutex);
+                    ComPtr<IArtifact> existingArtifact;
+                    if (m_targetArtifacts.tryGetValue(targetIndex, existingArtifact))
+                        return existingArtifact.get();
                     m_targetArtifacts[targetIndex] = targetArtifact;
                 }
                 return targetArtifact;
