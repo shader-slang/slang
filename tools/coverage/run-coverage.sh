@@ -139,8 +139,16 @@ else
 
   # Merge coverage data
   echo
+  echo "Coverage data files found:"
+  ls -lh "$COVERAGE_DIR"/slang-test-*.profraw 2>/dev/null | head -20
+  PROFRAW_COUNT=$(ls "$COVERAGE_DIR"/slang-test-*.profraw 2>/dev/null | wc -l)
+  PROFRAW_TOTAL_SIZE=$(du -sh "$COVERAGE_DIR"/slang-test-*.profraw 2>/dev/null | tail -1 | cut -f1)
+  echo "Total profraw files: $PROFRAW_COUNT"
+  echo "Total profraw size: $PROFRAW_TOTAL_SIZE"
+  echo
   echo "Merging coverage data..."
   $LLVM_PROFDATA merge -sparse "$COVERAGE_DIR"/slang-test-*.profraw -o "$COVERAGE_DIR"/slang-test.profdata
+  echo "Merged profdata size: $(ls -lh "$COVERAGE_DIR/slang-test.profdata" | awk '{print $5}')"
 fi
 
 # Load slangc compiler-only ignore patterns (shared with CI workflow)
