@@ -251,15 +251,9 @@ jobs:
             SYNTHESIS_FLAG="--with-synthesis"
           fi
 
-          TEST_EXIT=0
-          ./tools/coverage/run-coverage.sh $SYNTHESIS_FLAG "${test_args[@]}" || TEST_EXIT=$?
-          echo "test-exit-code=$TEST_EXIT" >> $GITHUB_OUTPUT
-          if [ "$TEST_EXIT" -ne 0 ]; then
-            echo "::warning::Tests had failures (exit code $TEST_EXIT) but coverage data was collected"
-          fi
+          ./tools/coverage/run-coverage.sh $SYNTHESIS_FLAG "${test_args[@]}"
 
       - name: Generate Coverage Summary
-        if: always()
         id: coverage-summary
         run: |
           # Ensure git works in container (ownership check)
@@ -381,7 +375,7 @@ jobs:
           fi
 
       - name: Upload Coverage Artifacts for Merging
-        if: ${{ always() && !inputs.deploy-pages }}
+        if: ${{ !inputs.deploy-pages }}
         uses: actions/upload-artifact@v4
         with:
           name: coverage-${{ inputs.os }}-${{ inputs.platform }}
@@ -470,7 +464,7 @@ jobs:
           fi
 
       - name: Report Coverage in PR
-        if: ${{ always() && inputs.pr-comment }}
+        if: ${{ inputs.pr-comment }}
         uses: zgosalvez/github-actions-report-lcov@v4
         with:
           coverage-files: coverage.lcov
@@ -480,7 +474,6 @@ jobs:
           update-comment: true
 
       - name: Compress and Upload LCOV Report
-        if: always()
         run: |
           # Compress LCOV file to save space
           gzip -9 coverage.lcov
@@ -488,7 +481,6 @@ jobs:
           ls -lh coverage.lcov.gz
 
       - name: Upload LCOV Report
-        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: coverage-lcov-${{ inputs.os }}-${{ inputs.platform }}-${{ inputs.compiler }}
