@@ -1,4 +1,4 @@
-// Test E30300: 'is'/'as' operator on a concrete (non-interface) typed expression.
+// Test E30304: 'is'/'as' on unrelated concrete types.
 
 //DIAGNOSTIC_TEST:SIMPLE(diag=CHECK):
 
